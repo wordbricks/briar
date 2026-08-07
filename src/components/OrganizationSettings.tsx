@@ -1,5 +1,6 @@
 import {
   Building2,
+  Bot,
   Check,
   Copy,
   Cpu,
@@ -61,12 +62,14 @@ import type {
 } from "../types";
 import { OrganizationWorkersSettings } from "./OrganizationWorkersSettings";
 import { OrganizationIntegrationsSettings } from "./OrganizationIntegrationsSettings";
+import { OrganizationAgentsSettings } from "./OrganizationAgentsSettings";
 import { SelectMenu } from "./SelectMenu";
 
 type RoleFilter = "all" | OrganizationMember["role"];
 export type OrganizationSettingsSection =
   | "general"
   | "members"
+  | "agents"
   | "workers"
   | "integrations";
 
@@ -291,6 +294,13 @@ export function OrganizationSettings({
               onClick={() => setActiveSection("members")}
             >
               {t("organization.membersAndInvites")}
+            </SettingsNavItem>
+            <SettingsNavItem
+              active={activeSection === "agents"}
+              icon={<Bot aria-hidden="true" size={16} strokeWidth={1.8} />}
+              onClick={() => setActiveSection("agents")}
+            >
+              {t("organization.agents")}
             </SettingsNavItem>
             <SettingsNavItem
               active={activeSection === "workers"}
@@ -864,6 +874,12 @@ export function OrganizationSettings({
                   </section>
                 ) : null}
               </>
+            ) : activeSection === "agents" ? (
+              <OrganizationAgentsSettings
+                organizationId={organizationId}
+                organizationName={organization.name}
+                token={token}
+              />
             ) : activeSection === "workers" ? (
               <OrganizationWorkersSettings
                 connectedProjectIds={connectedProjectIds}

@@ -1363,7 +1363,13 @@ export function App() {
             organizationId={briar.activeOrganizationId}
             token={briar.token}
             onCreateAgent={() => {
-              if (activeProject) navigateToPage("agents");
+              setSettingsTarget({
+                scope: "organization",
+                organizationId: briar.activeOrganizationId!,
+                section: "agents",
+              });
+              setIsSidebarOpen(true);
+              navigateToPage("settings");
             }}
             onIssueCreated={(runId) => {
               setRequestedRunId(runId);

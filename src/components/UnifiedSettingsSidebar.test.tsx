@@ -149,6 +149,19 @@ describe("UnifiedSettingsSidebar", () => {
       section: "members",
     });
 
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>(
+          '[data-organization-settings-section="agents"]',
+        )
+        ?.click();
+    });
+    expect(onNavigate).toHaveBeenLastCalledWith({
+      scope: "organization",
+      organizationId: "organization-1",
+      section: "agents",
+    });
+
     await act(async () => root.unmount());
     container.remove();
   });
