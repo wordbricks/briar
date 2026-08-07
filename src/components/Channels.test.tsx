@@ -161,7 +161,10 @@ describe("Channels", () => {
     expect(container.querySelector(".channel-rail")).toBeNull();
     expect(container.textContent).toContain("Welcome");
     expect(container.textContent).toContain("Hello team");
-    expect(container.textContent).toContain("@honey");
+    expect(container.querySelector(".channel-welcome")).not.toBeNull();
+    expect(container.textContent).toContain("에이전트 만들기");
+    expect(container.textContent).toContain("사람 추가");
+    expect(container.querySelector(".channel-composer-shell")).not.toBeNull();
   });
 
   it("sends the picked Agent as a structured mention rather than parsing the text", async () => {
