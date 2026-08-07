@@ -7,6 +7,8 @@ type LanguageSwitcherProps = {
   label: string;
   englishLabel: string;
   koreanLabel: string;
+  /** The real, crawlable URL for this page in each locale. */
+  hrefs: Record<Locale, string>;
 };
 
 export function LanguageSwitcher({
@@ -14,14 +16,19 @@ export function LanguageSwitcher({
   label,
   englishLabel,
   koreanLabel,
+  hrefs,
 }: LanguageSwitcherProps) {
   function changeLanguage(nextLocale: Locale) {
     if (nextLocale === locale) {
       return;
     }
 
+    // Remember the choice so a future visit to an unprefixed (English) URL
+    // convenience-redirects straight to this locale (see proxy.ts) — but
+    // the navigation below is what actually reaches the language; the
+    // cookie is never the only way to get there.
     document.cookie = `${localeCookieName}=${nextLocale}; Path=/; Max-Age=31536000; SameSite=Lax`;
-    window.location.reload();
+    window.location.href = hrefs[nextLocale];
   }
 
   return (

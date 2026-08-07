@@ -1,8 +1,11 @@
 import type { Metadata } from "next";
-import { copy, type Locale } from "../i18n";
-import { LanguageSwitcher } from "../language-switcher";
-import { MobileMenu } from "../mobile-menu";
-import { getRequestLocale } from "../request-locale";
+import { copy, localizedPath, type Locale } from "../../i18n";
+import { LanguageSwitcher } from "../../language-switcher";
+import { MobileMenu } from "../../mobile-menu";
+import { buildPageMetadata } from "../../seo";
+
+const LOCALE = "en" as const satisfies Locale;
+const PATH = "/blog" as const;
 
 const WEB_APP_URL = "/app/";
 const GITHUB_URL = "https://github.com/wordbricks/briar";
@@ -41,18 +44,27 @@ const blogCopy = {
 } as const satisfies Record<Locale, unknown>;
 
 export async function generateMetadata(): Promise<Metadata> {
-  const locale = await getRequestLocale();
-  return blogCopy[locale].metadata;
+  const metadata = blogCopy[LOCALE].metadata;
+  return buildPageMetadata({
+    locale: LOCALE,
+    path: PATH,
+    title: metadata.title,
+    description: metadata.description,
+  });
 }
 
 function Arrow() {
   return <span aria-hidden="true">↗</span>;
 }
 
-export default async function BlogPage() {
-  const locale = await getRequestLocale();
+export default function BlogPage() {
+  const locale = LOCALE;
   const c = copy[locale];
   const b = blogCopy[locale];
+  const hrefs = {
+    en: localizedPath("en", PATH),
+    ko: localizedPath("ko", PATH),
+  } as const;
 
   return (
     <main className="blog-page" id="top">
@@ -79,6 +91,7 @@ export default async function BlogPage() {
               label={c.language.label}
               englishLabel={c.language.english}
               koreanLabel={c.language.korean}
+              hrefs={hrefs}
             />
             <a
               className="header-cta header-github"
@@ -141,6 +154,7 @@ export default async function BlogPage() {
           </a>
           <p>{c.footer.tagline}</p>
           <div>
+            {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
             <a href="/">{b.home}</a>
             <a href="/tutorial">{c.nav.tutorial}</a>
             <a href="/download">{c.nav.download}</a>

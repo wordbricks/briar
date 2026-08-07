@@ -20,6 +20,30 @@ export function isLocale(value: string | undefined): value is Locale {
   return supportedLocales.includes(value as Locale);
 }
 
+/**
+ * Every crawlable landing page, keyed by its path in the default locale.
+ * Single source of truth for routing, the sitemap, and robots.txt — add a
+ * page here once and it is automatically routed, localized, and listed.
+ */
+export const routePaths = ["/", "/tutorial", "/blog", "/download"] as const;
+
+export type RoutePath = (typeof routePaths)[number];
+
+/**
+ * The stable, crawlable URL for a given locale + route.
+ *
+ * Scheme: the default locale (`en`) is unprefixed (`/`, `/tutorial`, ...)
+ * so existing indexed URLs keep working. Every other locale is prefixed
+ * with its locale code (`/ko`, `/ko/tutorial`, ...).
+ */
+export function localizedPath(locale: Locale, path: RoutePath | string): string {
+  if (locale === defaultLocale) {
+    return path;
+  }
+
+  return path === "/" ? `/${locale}` : `/${locale}${path}`;
+}
+
 export const copy = {
   ko: {
     metadata: {

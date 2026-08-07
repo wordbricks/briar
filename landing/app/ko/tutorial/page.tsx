@@ -1,8 +1,11 @@
 import type { Metadata } from "next";
-import { copy, type Locale } from "../i18n";
-import { LanguageSwitcher } from "../language-switcher";
-import { MobileMenu } from "../mobile-menu";
-import { getRequestLocale } from "../request-locale";
+import { copy, localizedPath, type Locale } from "../../i18n";
+import { LanguageSwitcher } from "../../language-switcher";
+import { MobileMenu } from "../../mobile-menu";
+import { buildPageMetadata } from "../../seo";
+
+const LOCALE = "ko" as const satisfies Locale;
+const PATH = "/tutorial" as const;
 
 const WEB_APP_URL = "/app/";
 const MAC_DOWNLOAD_URL =
@@ -314,34 +317,41 @@ const tutorialCopy = {
 } as const satisfies Record<Locale, unknown>;
 
 export async function generateMetadata(): Promise<Metadata> {
-  const locale = await getRequestLocale();
-  return tutorialCopy[locale].metadata;
+  const metadata = tutorialCopy[LOCALE].metadata;
+  return buildPageMetadata({
+    locale: LOCALE,
+    path: PATH,
+    title: metadata.title,
+    description: metadata.description,
+  });
 }
 
 function Arrow() {
   return <span aria-hidden="true">↗</span>;
 }
 
-export default async function TutorialPage() {
-  const locale = await getRequestLocale();
+export default function TutorialPage() {
+  const locale = LOCALE;
   const c = copy[locale];
   const t = tutorialCopy[locale];
+  const hrefs = {
+    en: localizedPath("en", PATH),
+    ko: localizedPath("ko", PATH),
+  } as const;
 
   return (
     <main className="tutorial-page" id="top">
       <header className="site-header tutorial-header">
         <div className="shell nav-shell">
           {/* vinext currently hydrates next/link with a duplicate React instance. */}
-          {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
-          <a className="brand" href="/" aria-label={c.aria.brandHome}>
+          <a className="brand" href="/ko" aria-label={c.aria.brandHome}>
             <span className="brand-mark">
               <img src="/briar-app-icon.png" alt="" />
             </span>
             <span>briar</span>
           </a>
           <nav aria-label={c.aria.mainMenu}>
-            {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
-            <a href="/">{t.backHome}</a>
+            <a href="/ko">{t.backHome}</a>
             <a href="#run-auto-hunt">{t.steps[2].nav}</a>
             <a href="#review-result">{t.steps[4].nav}</a>
             <a href="#schedule-agents">{t.steps[7].nav}</a>
@@ -350,6 +360,7 @@ export default async function TutorialPage() {
             <LanguageSwitcher
               locale={locale}
               label={c.language.label}
+              hrefs={hrefs}
               englishLabel={c.language.english}
               koreanLabel={c.language.korean}
             />
@@ -360,7 +371,7 @@ export default async function TutorialPage() {
             <MobileMenu
               navLabel={c.aria.mainMenu}
               navLinks={[
-                { href: "/", label: t.backHome },
+                { href: "/ko", label: t.backHome },
                 { href: "#run-auto-hunt", label: t.steps[2].nav },
                 { href: "#review-result", label: t.steps[4].nav },
                 { href: "#schedule-agents", label: t.steps[7].nav },
@@ -494,8 +505,7 @@ export default async function TutorialPage() {
 
       <footer>
         <div className="shell footer-shell">
-          {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
-          <a className="brand" href="/" aria-label={c.aria.brandHome}>
+          <a className="brand" href="/ko" aria-label={c.aria.brandHome}>
             <span className="brand-mark">
               <img src="/briar-app-icon.png" alt="" />
             </span>
@@ -503,8 +513,7 @@ export default async function TutorialPage() {
           </a>
           <p>{c.footer.tagline}</p>
           <div>
-            {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
-            <a href="/">{t.backHome}</a>
+            <a href="/ko">{t.backHome}</a>
             <a href="#top">{t.backTop}</a>
           </div>
         </div>

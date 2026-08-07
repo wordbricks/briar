@@ -1,9 +1,6 @@
-import type { Metadata } from "next";
 import localFont from "next/font/local";
-import { headers } from "next/headers";
 import "./globals.css";
-import { copy } from "./i18n";
-import { getRequestLocale } from "./request-locale";
+import { copy, supportedLocales, type Locale } from "./i18n";
 
 // Self-hosted latin-only slices of the Geist variable fonts, extracted
 // from the woff2 files Google's own API serves for Geist/Geist Mono at
@@ -34,61 +31,40 @@ const geistMono = localFont({
   display: "swap",
 });
 
-export async function generateMetadata(): Promise<Metadata> {
-  const locale = await getRequestLocale();
-  const metadata = copy[locale].metadata;
-  const requestHeaders = await headers();
-  const host =
-    requestHeaders.get("x-forwarded-host") ??
-    requestHeaders.get("host") ??
-    "briar.run";
-  const protocol =
-    requestHeaders.get("x-forwarded-proto") ??
-    (host.includes("localhost") ? "http" : "https");
-  const origin = `${protocol}://${host}`;
-
-  return {
-    metadataBase: new URL(origin),
-    title: metadata.title,
-    description: metadata.description,
-    icons: {
-      icon: "/briar-app-icon.png",
-      shortcut: "/briar-app-icon.png",
-    },
-    openGraph: {
-      title: metadata.title,
-      description: metadata.socialDescription,
-      type: "website",
-      locale: metadata.locale,
-      url: origin,
-      images: [
-        {
-          url: `${origin}/og-briar-workflow.png`,
-          width: 1200,
-          height: 630,
-          alt: metadata.title,
-        },
-      ],
-    },
-    twitter: {
-      card: "summary_large_image",
-      title: metadata.title,
-      description: metadata.socialDescription,
-      images: [`${origin}/og-briar-workflow.png`],
-    },
-  };
-}
-
-export default async function RootLayout({
+/**
+ * Shared `<html>`/`<body>` shell for every locale's root layout.
+ *
+ * Each locale gets its own root layout file (see `app/(en)/layout.tsx` and
+ * `app/ko/layout.tsx`) so `<html lang>` is static per-route rather than
+ * resolved at request time from a cookie/header — that's what makes each
+ * locale's URL independently crawlable with the right `lang`. This
+ * component just keeps the actual markup and font wiring in one place.
+ */
+export function RootHtml({
+  locale,
   children,
-}: Readonly<{
+}: {
+  locale: Locale;
   children: React.ReactNode;
-}>) {
-  const locale = await getRequestLocale();
+}) {
+  // `openGraph.alternateLocale` in each page's generateMetadata() computes
+  // the right value, but vinext's metadata renderer (unlike Next.js
+  // itself) doesn't turn that field into an `og:locale:alternate` tag —
+  // so it's emitted directly here instead. React 19 hoists <meta>/<link>/
+  // <title> rendered anywhere in the tree into <head>, so this works even
+  // though it's rendered inside <body>.
+  const otherLocales = supportedLocales.filter((candidate) => candidate !== locale);
 
   return (
     <html lang={locale} data-theme="light" style={{ colorScheme: "light" }}>
       <body className={`${geistSans.variable} ${geistMono.variable}`}>
+        {otherLocales.map((otherLocale) => (
+          <meta
+            key={otherLocale}
+            property="og:locale:alternate"
+            content={copy[otherLocale].metadata.locale}
+          />
+        ))}
         {children}
       </body>
     </html>

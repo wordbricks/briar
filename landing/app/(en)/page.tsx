@@ -1,7 +1,11 @@
-import { copy, type LandingCopy } from "./i18n";
-import { LanguageSwitcher } from "./language-switcher";
-import { MobileMenu } from "./mobile-menu";
-import { getRequestLocale } from "./request-locale";
+import type { Metadata } from "next";
+import { copy, localizedPath, type LandingCopy } from "../i18n";
+import { LanguageSwitcher } from "../language-switcher";
+import { MobileMenu } from "../mobile-menu";
+import { buildPageMetadata, resolveOrigin } from "../seo";
+
+const LOCALE = "en" as const;
+const PATH = "/" as const;
 
 // Stable redirect that always resolves to the current Production DMG.
 const MAC_DOWNLOAD_URL =
@@ -9,6 +13,17 @@ const MAC_DOWNLOAD_URL =
 const GITHUB_URL = "https://github.com/wordbricks/briar";
 const ANDROID_DOWNLOAD_URL = `${GITHUB_URL}/releases/latest`;
 const WEB_APP_URL = "/app/";
+
+export async function generateMetadata(): Promise<Metadata> {
+  const metadata = copy[LOCALE].metadata;
+  return buildPageMetadata({
+    locale: LOCALE,
+    path: PATH,
+    title: metadata.title,
+    description: metadata.description,
+    socialDescription: metadata.socialDescription,
+  });
+}
 
 function Brand({ c }: { c: LandingCopy }) {
   return (
@@ -328,8 +343,33 @@ function WorkflowVisual({ c }: { c: LandingCopy }) {
 }
 
 export default async function Home() {
-  const locale = await getRequestLocale();
+  const locale = LOCALE;
   const c = copy[locale];
+  const origin = await resolveOrigin();
+  const hrefs = {
+    en: localizedPath("en", PATH),
+    ko: localizedPath("ko", PATH),
+  } as const;
+  const structuredData = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Organization",
+        name: "Briar",
+        url: origin,
+        logo: `${origin}/briar-app-icon.png`,
+        sameAs: [GITHUB_URL],
+      },
+      {
+        "@type": "SoftwareApplication",
+        name: "Briar",
+        applicationCategory: "DeveloperApplication",
+        operatingSystem: "macOS, Android, Web",
+        url: origin,
+        description: c.metadata.description,
+      },
+    ],
+  };
   const agents = [
     {
       name: "Codex",
@@ -353,6 +393,10 @@ export default async function Home() {
 
   return (
     <main id="top">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+      />
       <a className="skip-link" href="#main-content">
         {c.aria.skipToContent}
       </a>
@@ -370,6 +414,7 @@ export default async function Home() {
               label={c.language.label}
               englishLabel={c.language.english}
               koreanLabel={c.language.korean}
+              hrefs={hrefs}
             />
             <a
               className="header-cta header-download"

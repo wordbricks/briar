@@ -1,8 +1,11 @@
 import type { Metadata } from "next";
-import { copy, type Locale } from "../i18n";
-import { LanguageSwitcher } from "../language-switcher";
-import { MobileMenu } from "../mobile-menu";
-import { getRequestLocale } from "../request-locale";
+import { copy, localizedPath, type Locale } from "../../i18n";
+import { LanguageSwitcher } from "../../language-switcher";
+import { MobileMenu } from "../../mobile-menu";
+import { buildPageMetadata } from "../../seo";
+
+const LOCALE = "ko" as const satisfies Locale;
+const PATH = "/download" as const;
 
 const MAC_DOWNLOAD_URL =
   "https://briar-api.wbai.workers.dev/releases/latest/mac-aarch64.dmg";
@@ -78,8 +81,13 @@ const downloadCopy = {
 } as const satisfies Record<Locale, unknown>;
 
 export async function generateMetadata(): Promise<Metadata> {
-  const locale = await getRequestLocale();
-  return downloadCopy[locale].metadata;
+  const metadata = downloadCopy[LOCALE].metadata;
+  return buildPageMetadata({
+    locale: LOCALE,
+    path: PATH,
+    title: metadata.title,
+    description: metadata.description,
+  });
 }
 
 function Arrow({ direction = "out" }: { direction?: "out" | "down" }) {
@@ -95,17 +103,20 @@ function PlatformIcon({ platform }: { platform: "mac" | "android" | "web" }) {
   );
 }
 
-export default async function DownloadPage() {
-  const locale = await getRequestLocale();
+export default function DownloadPage() {
+  const locale = LOCALE;
   const c = copy[locale];
   const d = downloadCopy[locale];
+  const hrefs = {
+    en: localizedPath("en", PATH),
+    ko: localizedPath("ko", PATH),
+  } as const;
 
   return (
     <main className="download-page" id="top">
       <header className="site-header download-header">
         <div className="shell nav-shell">
-          {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
-          <a className="brand" href="/" aria-label={c.aria.brandHome}>
+          <a className="brand" href="/ko" aria-label={c.aria.brandHome}>
             <span className="brand-mark">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/briar-app-icon.png" alt="" />
@@ -113,9 +124,9 @@ export default async function DownloadPage() {
             <span>briar</span>
           </a>
           <nav aria-label={c.aria.mainMenu}>
-            <a href="/tutorial">{c.nav.tutorial}</a>
-            <a href="/blog">{c.nav.blog}</a>
-            <a className="is-current" href="/download" aria-current="page">
+            <a href="/ko/tutorial">{c.nav.tutorial}</a>
+            <a href="/ko/blog">{c.nav.blog}</a>
+            <a className="is-current" href="/ko/download" aria-current="page">
               {c.nav.download}
             </a>
           </nav>
@@ -125,6 +136,7 @@ export default async function DownloadPage() {
               label={c.language.label}
               englishLabel={c.language.english}
               koreanLabel={c.language.korean}
+              hrefs={hrefs}
             />
             <a className="header-cta header-download" href={WEB_APP_URL}>
               <span className="header-cta-label">{c.nav.openWebApp}</span>{" "}
@@ -133,10 +145,10 @@ export default async function DownloadPage() {
             <MobileMenu
               navLabel={c.aria.mainMenu}
               navLinks={[
-                { href: "/tutorial", label: c.nav.tutorial },
-                { href: "/blog", label: c.nav.blog },
+                { href: "/ko/tutorial", label: c.nav.tutorial },
+                { href: "/ko/blog", label: c.nav.blog },
                 {
-                  href: "/download",
+                  href: "/ko/download",
                   label: c.nav.download,
                   isCurrent: true,
                 },
@@ -244,8 +256,7 @@ export default async function DownloadPage() {
       <footer>
         <div className="shell footer-shell">
           {/* vinext currently hydrates next/link with a duplicate React instance. */}
-          {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
-          <a className="brand" href="/" aria-label={c.aria.brandHome}>
+          <a className="brand" href="/ko" aria-label={c.aria.brandHome}>
             <span className="brand-mark">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/briar-app-icon.png" alt="" />
@@ -254,9 +265,8 @@ export default async function DownloadPage() {
           </a>
           <p>{c.footer.tagline}</p>
           <div>
-            {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
-            <a href="/">{d.home}</a>
-            <a href="/tutorial">{c.nav.tutorial}</a>
+            <a href="/ko">{d.home}</a>
+            <a href="/ko/tutorial">{c.nav.tutorial}</a>
             <a href="#top">{d.backTop}</a>
           </div>
         </div>
