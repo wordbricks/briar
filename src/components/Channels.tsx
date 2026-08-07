@@ -1104,7 +1104,7 @@ function MessageRow({
             <div>
               <strong>{message.document.title}</strong>
               <span>
-                {t("channel.planDocument")} · v{message.document.version}
+                {t("channel.planDocument")}
                 {message.document.projectId ? "" : ` · ${t("channel.orgDocument")}`}
               </span>
             </div>

@@ -46,6 +46,7 @@ import {
   getIssueActionProposal,
   getOrganizationInvitationByTokenHash,
   getRunEvidenceImage,
+  getIssueMessage,
   getNextQueuedHuntRun,
   HuntClaimError,
   HuntTransitionError,
@@ -57,6 +58,8 @@ import {
   listIssueThreadMessages,
   listIssueResultReviews,
   listIssueReworkProposals,
+  updateIssueMessage,
+  deleteIssueMessage,
   listInboxReadStates,
   listDashboardChanges,
   listDashboardRuns,
@@ -96,19 +99,6 @@ import {
   upsertInboxReadStates,
   upsertProjectAgentSession,
 } from "./db";
-import {
-  claimNextIdeaJob,
-  completeIdeaChatJob,
-  completeIdeaPlanJob,
-  convertIdeaPlanToIssues,
-  createIdea,
-  enqueueIdeaPlan,
-  failIdeaJob,
-  getIdea,
-  retryIdeaJob,
-  sendIdeaMessage,
-  updateIdea,
-} from "./ideas";
 
 const releaseWorkflow = normalizeAutoHuntWorkflow({
   version: 2,
@@ -2905,6 +2895,99 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     ]);
   });
 
+  it("edits a user message body without spawning an agent reply and deletes a message with its replies", async () => {
+    const runId = await recordHuntEvent(
+      db,
+      projectId,
+      event("queued", 30, {
+        sourceKey: "issue-message-edit-run",
+        eventKey: "issue-message-edit-run:queued",
+      }),
+    );
+    const rootId = "eeeeeeee-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    const replyId = "eeeeeeee-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+    await createIssueMessage(db, {
+      id: rootId,
+      projectId,
+      runId,
+      parentMessageId: null,
+      authorUserId: "owner",
+      authorAgentProvider: null,
+      body: "Original body",
+      createdAt: atMinute(30),
+    });
+    await createIssueMessage(db, {
+      id: replyId,
+      projectId,
+      runId,
+      parentMessageId: rootId,
+      authorUserId: "owner",
+      authorAgentProvider: null,
+      body: "Original reply",
+      createdAt: atMinute(31),
+    });
+    await executeSql(
+      db,
+      `
+      insert into user (id, name, email, emailVerified, createdAt, updatedAt)
+      values (
+        'issue-message-mention', 'Issue Mention',
+        'mention@example.com', 1, '${atMinute(0)}', '${atMinute(0)}'
+      );
+      insert into briar_organization_members (
+        organization_id, user_id, role, created_at, updated_at
+      ) values (
+        '${projectId}', 'issue-message-mention', 'member',
+        '${atMinute(0)}', '${atMinute(0)}'
+      );`,
+    );
+    const editedAt = atMinute(32);
+    const edited = await updateIssueMessage(db, projectId, runId, rootId, {
+      body: "@issue-message-mention 수정된 본문",
+      mentionedUserIds: ["issue-message-mention"],
+      updatedAt: editedAt,
+    });
+    expect(edited).toEqual(
+      expect.objectContaining({
+        id: rootId,
+        body: "@issue-message-mention 수정된 본문",
+        updated_at: editedAt,
+        author_name: "Owner",
+      }),
+    );
+    const mentionRows = await db
+      .prepare(
+        `select user_id from briar_issue_message_mentions
+         where message_id = ?`,
+      )
+      .bind(rootId)
+      .all<{ user_id: string }>();
+    expect(mentionRows.results.map((row) => row.user_id)).toEqual([
+      "issue-message-mention",
+    ]);
+    expect(await getIssueMessage(db, projectId, runId, rootId)).toEqual(
+      expect.objectContaining({
+        id: rootId,
+        body: "@issue-message-mention 수정된 본문",
+        reply_count: 1,
+      }),
+    );
+    expect(
+      await deleteIssueMessage(db, projectId, runId, rootId),
+    ).toBe(true);
+    const remaining = await listIssueMessages(db, projectId, runId);
+    expect(remaining).toEqual([]);
+    expect(await getIssueMessage(db, projectId, runId, rootId)).toBeNull();
+    const mentionAfter = await db
+      .prepare(
+        `select count(*) as count from briar_issue_message_mentions
+         where message_id = ?`,
+      )
+      .bind(rootId)
+      .first<{ count: number }>();
+    expect(mentionAfter?.count).toBe(0);
+  });
+
   it("lists mentions and replies to a user's root messages for inbox delivery", async () => {
     await executeSql(
       db,
@@ -4466,196 +4549,4 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       .run();
   });
 
-  it("updates an idea through chat and atomically creates an acyclic issue plan", async () => {
-    await db
-      .prepare(`update briar_project_settings set workflow_json = ? where project_id = ?`)
-      .bind(JSON.stringify(localWorkflow), projectId)
-      .run();
-    const organizationId = (await db
-      .prepare(`select organization_id from briar_projects where id = ?`)
-      .bind(projectId)
-      .first<{ organization_id: string }>())!.organization_id;
-    const ideaId = "12121212-1212-4121-8121-121212121212";
-    const idea = await createIdea(db, {
-      id: ideaId,
-      organizationId,
-      projectId,
-      authorUserId: "owner",
-      provider: "codex",
-      model: "gpt-5.6-sol",
-      title: "새 아이디어",
-      createdAt: atMinute(90),
-    });
-    expect(idea?.canEdit).toBe(true);
-
-    expect(
-      await sendIdeaMessage(db, {
-        jobId: "13131313-1313-4131-8131-131313131313",
-        messageId: "14141414-1414-4141-8141-141414141414",
-        replyMessageId: "15151515-1515-4151-8151-151515151515",
-        projectId,
-        ideaId,
-        authorUserId: "owner",
-        body: "아이디어를 구체화해줘",
-        createdAt: atMinute(91),
-      }),
-    ).toBe("queued");
-    const chatJob = await claimNextIdeaJob(db, projectId, {
-      workerId: "legacy-worker",
-      providers: ["codex"],
-      claimTokenHash: "1".repeat(64),
-      claimedAt: atMinute(92),
-      leaseExpiresAt: atMinute(93),
-    });
-    expect(chatJob?.kind).toBe("chat");
-    expect(
-      await completeIdeaChatJob(
-        db,
-        chatJob!,
-        "1".repeat(64),
-        {
-          reply: "문서를 갱신했습니다.",
-          documentMarkdown: "# 로컬 아이디어\n\n검증 가능한 요구사항",
-          title: "로컬 아이디어",
-        },
-        atMinute(93),
-      ),
-    ).toBe(true);
-    const refined = await getIdea(db, projectId, ideaId, "owner");
-    expect(refined?.messages.map((message) => message.role)).toEqual([
-      "user",
-      "assistant",
-    ]);
-    expect(refined?.documentMarkdown).toContain("검증 가능한 요구사항");
-
-    expect(
-      await updateIdea(db, {
-        projectId,
-        ideaId,
-        authorUserId: "owner",
-        expectedVersion: refined!.version,
-        status: "ready",
-        updatedAt: atMinute(94),
-      }),
-    ).toBe("updated");
-    expect(
-      await enqueueIdeaPlan(db, {
-        jobId: "16161616-1616-4161-8161-161616161616",
-        projectId,
-        ideaId,
-        authorUserId: "owner",
-        createdAt: atMinute(95),
-      }),
-    ).toBe("queued");
-    const planJob = await claimNextIdeaJob(db, projectId, {
-      workerId: "legacy-worker",
-      providers: ["codex"],
-      claimTokenHash: "2".repeat(64),
-      claimedAt: atMinute(96),
-      leaseExpiresAt: atMinute(97),
-    });
-    expect(planJob?.kind).toBe("issue_plan");
-    expect(
-      await completeIdeaPlanJob(
-        db,
-        planJob!,
-        "2".repeat(64),
-        [
-          {
-            key: "foundation",
-            title: "기반 구현",
-            description: "기반 계약을 구현한다.",
-            priority: 1,
-            provider: null,
-            model: null,
-            effort: null,
-            prerequisiteKeys: [],
-          },
-          {
-            key: "ui",
-            title: "화면 구현",
-            description: "사용자 화면을 구현한다.",
-            priority: 2,
-            provider: null,
-            model: null,
-            effort: null,
-            prerequisiteKeys: ["foundation"],
-          },
-        ],
-        atMinute(97),
-      ),
-    ).toBe(true);
-    const planned = await getIdea(db, projectId, ideaId, "owner");
-    const conversion = await convertIdeaPlanToIssues(db, {
-      projectId,
-      ideaId,
-      authorUserId: "owner",
-      planVersion: planned!.plan!.version,
-      createdAt: atMinute(98),
-    });
-    expect(conversion.outcome).toBe("created");
-    expect(conversion.runIds).toHaveLength(2);
-    const dependencies = await listIssueDependencies(db, projectId);
-    expect(
-      dependencies.some(
-        (dependency) =>
-          dependency.prerequisite_run_id === conversion.runIds[0] &&
-          dependency.dependent_run_id === conversion.runIds[1],
-      ),
-    ).toBe(true);
-    expect((await getIdea(db, projectId, ideaId, "owner"))?.status).toBe(
-      "issues_created",
-    );
-
-    const failedJobId = "17171717-1717-4171-8171-171717171717";
-    expect(
-      await sendIdeaMessage(db, {
-        jobId: failedJobId,
-        messageId: "18181818-1818-4181-8181-181818181818",
-        replyMessageId: "19191919-1919-4191-8191-191919191919",
-        projectId,
-        ideaId,
-        authorUserId: "owner",
-        body: "실패한 작업을 재시도해줘",
-        createdAt: atMinute(99),
-      }),
-    ).toBe("queued");
-    for (let attempt = 0; attempt < 3; attempt += 1) {
-      const tokenHash = String(attempt + 3).repeat(64);
-      const claimed = await claimNextIdeaJob(db, projectId, {
-        workerId: "legacy-worker",
-        providers: ["codex"],
-        claimTokenHash: tokenHash,
-        claimedAt: atMinute(100 + attempt * 2),
-        leaseExpiresAt: atMinute(101 + attempt * 2),
-      });
-      expect(claimed?.id).toBe(failedJobId);
-      await failIdeaJob(
-        db,
-        claimed!,
-        tokenHash,
-        "provider unavailable",
-        atMinute(101 + attempt * 2),
-      );
-    }
-    expect((await getIdea(db, projectId, ideaId, "owner"))?.activeJob).toMatchObject({
-      id: failedJobId,
-      status: "failed",
-    });
-    expect(
-      await retryIdeaJob(db, {
-        failedJobId,
-        jobId: "20202020-2020-4202-8202-202020202020",
-        replyMessageId: "21212121-2121-4212-8212-212121212121",
-        projectId,
-        ideaId,
-        authorUserId: "owner",
-        createdAt: atMinute(106),
-      }),
-    ).toBe("queued");
-    expect((await getIdea(db, projectId, ideaId, "owner"))?.activeJob).toMatchObject({
-      id: "20202020-2020-4202-8202-202020202020",
-      status: "queued",
-    });
-  });
 });

@@ -6,8 +6,6 @@
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
 	<string>$(BRIAR_DISPLAY_NAME)</string>
-	<key>BriarFeatureIdeas</key>
-	<string>$(BRIAR_FEATURE_IDEAS)</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIcons</key>

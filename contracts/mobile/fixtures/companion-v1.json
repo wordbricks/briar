@@ -887,10 +887,8 @@
             "replyCount": 0,
             "lastReplyAt": null,
             "document": {
-              "ideaId": "77777777-7777-4777-8777-777777777777",
+              "messageId": "55555555-5555-4555-8555-555555555555",
               "title": "온보딩 개편 계획",
-              "status": "ready",
-              "version": 1,
               "projectId": null
             },
             "proposal": null,

@@ -7,7 +7,6 @@ Status: implemented (1~4단계). Updated 2026-08-06.
 | 영역 | 상태 | 위치 |
 | --- | --- | --- |
 | 에이전트 조직 스코프 승격, 핸들 | done | `migrations/0071_organization_agents.sql`, `worker/src/organization-agents.ts` |
-| 조직 아이디어(`project_id is null`) | done | `migrations/0072_organization_ideas.sql`, `worker/src/ideas.ts` |
 | 채널·메시지·스레드·멘션·답글 잡·제안 | done | `migrations/0073_organization_channels.sql`, `worker/src/channels.ts` |
 | 조직 스코프 변경 피드 | done | `migrations/0074_channel_delta_sync.sql` |
 | 채널 API와 조직 스코프 클레임 평면 | done | `worker/src/index.ts` |
@@ -21,10 +20,11 @@ Status: implemented (1~4단계). Updated 2026-08-06.
   프로바이더 헬스는 요청이 함께 보내는 프로젝트 바인딩(`workerId`)에서 읽는다.
   디바이스 단위 프로바이더 저장소를 새로 만들지 않기 위한 선택이며, 잡 단위
   자격 검사(조직 에이전트는 조직만, 프로젝트 에이전트는 바인딩까지)는 설계대로다.
-- **조직 아이디어의 chat/plan 잡은 미구현**. 채널이 만든 계획서는 읽고 목록에
-  노출되지만, 계획서를 이슈로 변환하는 경로(`briar_idea_issue_plans`)는 아직
-  프로젝트 아이디어 전용이다. 채널에서의 이슈 생성은 계획서 변환이 아니라
-  에이전트의 이슈 생성 제안으로 처리한다.
+- **Ideas 기능은 폐기됐다**(`migrations/0075_remove_ideas.sql`). 계획서는
+  이제 `briar_channel_message_documents`가 제목·마크다운·대상 프로젝트를
+  직접 들고 있으며 채널 밖에 독립적으로 존재하지 않는다. 계획서를 여러 이슈로
+  한 번에 쪼개는 경로는 함께 사라졌고, 채널에서의 이슈 생성은 에이전트의
+  이슈 생성 제안(한 건씩)으로만 이뤄진다.
 - **채널 답글 트랜스크립트 미기록**. `briar_agent_transcript_sessions.project_id`가
   NOT NULL이라 프로젝트 없는 실행을 담을 수 없다.
 - **채널 첨부 미구현**. 계획서는 첨부가 아니라 문서 카드로 처리한다.
@@ -45,7 +45,7 @@ Status: implemented (1~4단계). Updated 2026-08-06.
 
 ```mermaid
 flowchart LR
-  A["채널 대화"] -->|"에이전트 멘션"| B["계획서 (briar_ideas)"]
+  A["채널 대화"] -->|"에이전트 멘션"| B["계획서 (채널 메시지 문서)"]
   B -->|"이슈 생성 제안 수락"| C["이슈 (briar_hunt_runs)"]
   C -->|"워크플로우 이벤트"| A
 ```
@@ -73,7 +73,6 @@ flowchart LR
 | 에이전트 답글 큐(클레임·리스·재시도) | `migrations/0044_issue_agent_reply_jobs.sql`, `POST /issue-reply-claims` | 채널 전용 잡 테이블과 조직 스코프 클레임으로 확장 |
 | 조직 스코프 디바이스 신원 | `migrations/0034_execution_worker_credentials.sql` | 프로젝트 없는 에이전트 실행의 기반 |
 | 액션 제안(사람이 수락해야 적용) | `migrations/0068_issue_action_proposals.sql` | 채널에서 이슈 생성 제안에 동일 패턴 적용 |
-| 계획서 문서 + 이슈 변환 | `migrations/0056_ideas.sql`, `convertIdeaPlanToIssues` | 채널 계획서 카드의 실체로 사용 |
 | 계정 스코프 읽음 상태 | `migrations/0063_inbox_read_states.sql` | 채널 멘션·스레드 답글을 기존 Inbox에 합류 |
 | 델타 동기화 트리거 | `migrations/0049_dashboard_delta_sync.sql` | 조직 스코프 변경 피드의 원형 |
 | 대화 UI | `src/components/HuntDashboard.tsx` `IssueConversation`, `IssueMessageItem`, `MessageComposer` | 공용 컴포넌트로 추출 후 양쪽에서 사용 |
@@ -320,15 +319,18 @@ create index briar_channel_agent_reply_jobs_queue_idx
 
 ### 계획서와 액션 제안
 
-계획서는 메시지 본문(1만 자 제한)이 아니라 `briar_ideas`에 저장하고 메시지는
-카드로 참조한다. 이렇게 하면 버전 관리, `draft → ready → issues_created`
-상태 머신, `convertIdeaPlanToIssues`(계획서 → 다수 이슈)를 그대로 얻는다.
+계획서는 메시지 본문(1만 자 제한)에 넣기엔 크므로 별도 테이블에 저장하고
+메시지는 카드로 참조한다. 문서는 채널 메시지에 종속되며 제목·마크다운과
+대상 프로젝트를 함께 들고 있다.
 
 ```sql
 create table briar_channel_message_documents (
   message_id text primary key not null
     references briar_channel_messages (id) on delete cascade,
-  idea_id text not null references briar_ideas (id) on delete cascade,
+  channel_id text not null references briar_channels (id) on delete cascade,
+  project_id text references briar_projects (id) on delete set null,
+  title text not null,
+  markdown text not null,
   document_version integer not null check (document_version >= 1),
   created_at text not null
 );
@@ -349,7 +351,6 @@ create table briar_channel_action_proposals (
   accepted_by_user_id text references "user" (id) on delete set null,
   accepted_at text,
   result_run_id text references briar_hunt_runs (id) on delete set null,
-  result_idea_id text references briar_ideas (id) on delete set null,
   created_at text not null,
   updated_at text not null,
   unique (channel_id, trigger_message_id)
@@ -444,8 +445,7 @@ MVP는 기존 BYO 머신 모델을 유지한다.
 
 ### 산출물의 프로젝트
 
-이슈 생성과 계획서 저장은 프로젝트를 요구한다(`briar_ideas.project_id`는
-NOT NULL). 제안 카드가 프로젝트 필드를 들고 있으며 기본값은
+이슈 생성은 프로젝트를 요구한다. 제안 카드가 프로젝트 필드를 들고 있으며 기본값은
 `briar_channels.default_project_id`, 없으면 사용자가 고른다. 어차피 사용자가
 "이 이슈를 어느 프로젝트에 넣을지" 확인해야 하는 값이므로 UI 부담이 늘지
 않는다.
@@ -529,7 +529,7 @@ MVP에 넣으면 검증 전에 비용이 커진다. 다만 "채팅이 느리다"
 | 1 | 채널·메시지·스레드·유저 멘션·Inbox·변경 피드·모바일 읽기 |
 | 2 | 에이전트 스코프 마이그레이션, 조직 에이전트 CRUD, 핸들, 채널 로스터 |
 | 3 | 답글 잡, 조직 스코프 클레임, `channelReply` 러너(worktree 생략 경로) |
-| 4 | 계획서 카드(ideas 연결), 이슈 생성 제안 및 수락 |
+| 4 | 계획서 카드, 이슈 생성 제안 및 수락 |
 | 5 | 이슈 카드 unfurl과 워크플로우 이벤트 구독, 스탠드업 다이제스트, 스레드 → 이슈 승격 |
 | 후순위 | DM, Slack 브리지, 메시지 검색·편집, WebSocket, 서버측 조직 에이전트 실행 |
 
@@ -551,7 +551,7 @@ MVP에 넣으면 검증 전에 비용이 커진다. 다만 "채팅이 느리다"
   정책이 현재 명시적이지 않으므로 2단계에서 확정한다.
 - **계획서의 프로젝트 강제**: 프로젝트가 아직 정해지지 않은 아이데이션에서
   계획서를 쓰려면 프로젝트를 골라야 한다. MVP는 이 마찰을 받아들이고,
-  실제로 걸림돌이면 `briar_ideas`를 조직 스코프로 확장한다.
+  실제로 걸림돌이면 문서에 프로젝트를 나중에 붙이는 경로를 추가한다.
 - **쓰기 증폭**: 채팅 빈도로 변경 트리거가 도는 만큼 D1 쓰기가 늘어난다.
   메시지 insert와 잡 상태 전이로만 트리거를 한정하고, 보존 기간을 두어
   `briar_channel_changes`를 정리한다.

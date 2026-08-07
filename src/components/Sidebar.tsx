@@ -15,7 +15,6 @@ import {
   Plus,
   Settings,
   Languages,
-  Lightbulb,
   Lock,
 } from "lucide-react";
 import * as ContextMenu from "@radix-ui/react-context-menu";
@@ -49,12 +48,10 @@ export function Sidebar({
   channels,
   channelsLoading = false,
   connectedProjectIds,
-  ideasEnabled = featureFlags.ideas,
   isOpen,
   onAddProject,
   onAgentSessionOpen,
   onAgentsOpen,
-  onIdeasOpen = () => undefined,
   onScheduleOpen,
   onInboxOpen,
   onChannelCreate,
@@ -81,7 +78,6 @@ export function Sidebar({
     | "issues"
     | "agents"
     | "channels"
-    | "ideas"
     | "schedule"
     | "inbox"
     | "project-settings"
@@ -95,12 +91,10 @@ export function Sidebar({
   channels?: ChannelSummary[];
   channelsLoading?: boolean;
   connectedProjectIds: string[] | null;
-  ideasEnabled?: boolean;
   isOpen: boolean;
   onAddProject: () => void;
   onAgentSessionOpen: (sessionId: string) => void;
   onAgentsOpen: () => void;
-  onIdeasOpen?: () => void;
   onScheduleOpen: () => void;
   onInboxOpen: () => void;
   onChannelCreate?: (name: string) => Promise<void>;
@@ -800,26 +794,6 @@ export function Sidebar({
                         <Plus aria-hidden="true" size={16} strokeWidth={1.7} />
                       </button>
                     </div>
-                    {ideasEnabled ? (
-                      <div className="sidebar-agent-navigation">
-                        <a
-                          aria-current={
-                            isActive && activePage === "ideas" ? "page" : undefined
-                          }
-                          className={`sidebar-project-view${
-                            isActive && activePage === "ideas" ? " active" : ""
-                          }`}
-                          href="#ideas"
-                          onClick={(event) => {
-                            event.preventDefault();
-                            openProjectPage(onIdeasOpen);
-                          }}
-                        >
-                          <Lightbulb size={14} strokeWidth={1.7} />
-                          <span>{t("sidebar.ideas")}</span>
-                        </a>
-                      </div>
-                    ) : null}
                     <div className="sidebar-agent-navigation">
                       <a
                         aria-current={

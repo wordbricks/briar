@@ -23,14 +23,6 @@ import {
 } from "../../src/lib/agent-result";
 import { agentExecutionMetricsSchema } from "../../src/lib/agent-execution-metrics";
 import {
-  ideaDocumentSchema,
-  ideaIssuePlanItemsSchema,
-  ideaMessageSchema,
-  ideaPlanResultSchema,
-  ideaProviders,
-  ideaTurnResultSchema,
-} from "../../src/lib/ideas-contract";
-import {
   defaultProjectAgentCalendarColor,
 } from "../../src/lib/project-agent";
 import {
@@ -144,6 +136,7 @@ import {
   getIssueAgentReplyJob,
   getIssueReworkProposal,
   getIssueAttachment,
+  getIssueMessage,
   getRunEvidenceImage,
   getOrganizationRole,
   getOrganizationInvitationByTokenHash,
@@ -224,6 +217,8 @@ import {
   updateIssueCheckpoints,
   updateIssueExecutionPreferences,
   updateHuntRunExecutionMetrics,
+  updateIssueMessage,
+  deleteIssueMessage,
   updateSlackInstallationProject,
   upsertInboxReadStates,
   upsertProjectAgentSession,
@@ -326,27 +321,6 @@ import {
   updateProjectExecutionWorkerPolicy,
 } from "./workers";
 import { serveRelease } from "./releases";
-import {
-  claimNextIdeaJob,
-  completeIdeaChatJob,
-  completeIdeaPlanJob,
-  convertIdeaPlanToIssues,
-  createIdea,
-  deleteIdea,
-  enqueueIdeaPlan,
-  failIdeaJob,
-  getClaimedIdeaJob,
-  getIdea,
-  getOrganizationIdea,
-  ideaJobSnapshot,
-  listIdeas,
-  listOrganizationIdeas,
-  renewIdeaJobLease,
-  retryIdeaJob,
-  sendIdeaMessage,
-  updateIdea,
-  updateIdeaPlan,
-} from "./ideas";
 import {
   acceptChannelActionProposal,
   addChannelAgent,
@@ -1153,55 +1127,6 @@ const issueInputSchema = issueInputBaseSchema.superRefine((input, context) => {
   }
 });
 
-const ideaModelSchema = z.string().trim().min(1).max(100).nullable();
-const ideaCreateInputSchema = z
-  .object({
-    provider: z.enum(ideaProviders),
-    model: ideaModelSchema.default(null),
-  })
-  .strict();
-const ideaUpdateInputSchema = z
-  .object({
-    expectedVersion: z.number().int().min(1),
-    title: z.string().trim().min(1).max(300).optional(),
-    documentMarkdown: ideaDocumentSchema.optional(),
-    status: z.enum(["refining", "ready", "archived"]).optional(),
-    provider: z.enum(ideaProviders).optional(),
-    model: ideaModelSchema.optional(),
-  })
-  .strict()
-  .refine(
-    (input) =>
-      input.title !== undefined ||
-      input.documentMarkdown !== undefined ||
-      input.status !== undefined ||
-      input.provider !== undefined ||
-      input.model !== undefined,
-    "At least one idea field is required",
-  );
-const ideaMessageInputSchema = z
-  .object({ body: ideaMessageSchema })
-  .strict();
-const ideaPlanUpdateInputSchema = z
-  .object({
-    expectedVersion: z.number().int().min(1),
-    items: ideaIssuePlanItemsSchema,
-  })
-  .strict();
-const ideaConversionInputSchema = z
-  .object({ planVersion: z.number().int().min(1) })
-  .strict();
-const ideaJobClaimInputSchema = z
-  .object({ projectId: z.string().uuid(), workerId: z.string().uuid() })
-  .strict();
-const ideaJobLeaseInputSchema = ideaJobClaimInputSchema.extend({
-  claimToken: z.string().startsWith("briar_idea_claim_"),
-});
-const ideaJobCompletionInputSchema = ideaJobLeaseInputSchema.extend({
-  error: z.string().trim().min(1).max(4_000).optional(),
-  result: z.unknown().optional(),
-});
-
 export const issueUpdateInputSchema = issueInputBaseSchema
   .pick({
     title: true,
@@ -1314,6 +1239,13 @@ const issueMessageInputSchema = z
       .max(1_000)
       .nullable()
       .optional(),
+  })
+  .strict();
+
+const issueMessageEditInputSchema = z
+  .object({
+    body: z.string().trim().min(1).max(10_000),
+    mentionedUserIds: z.array(z.string().min(1).max(200)).max(50).optional(),
   })
   .strict();
 
@@ -4400,6 +4332,42 @@ const listIssueMessagesWithArchive = async (
   );
 };
 
+const removeOrphanedIssueAttachments = async (
+  db: D1Database,
+  attachmentsBucket: R2Bucket,
+  projectId: string,
+  runId: string,
+) => {
+  const [messages, attachments] = await Promise.all([
+    listIssueMessages(db, projectId, runId),
+    listIssueAttachments(db, projectId, runId),
+  ]);
+  const referenced = new Set<string>();
+  for (const message of messages) {
+    for (const id of issueAttachmentReferences(message.body)) {
+      referenced.add(id);
+    }
+  }
+  const orphaned = attachments.filter((attachment) => !referenced.has(attachment.id));
+  if (orphaned.length === 0) return;
+  await deleteIssueAttachments(
+    db,
+    projectId,
+    runId,
+    orphaned.map((attachment) => attachment.id),
+  );
+  await Promise.all(
+    orphaned.map((attachment) => attachmentsBucket.delete(attachment.object_key)),
+  ).catch((error) => {
+    console.error(
+      JSON.stringify({
+        message: "orphaned issue attachment cleanup failed",
+        error: error instanceof Error ? error.message : String(error),
+      }),
+    );
+  });
+};
+
 const runEvidenceJson = (
   evidence: RunEvidenceRow,
   requiredRevision: number,
@@ -4891,332 +4859,6 @@ async function route(
     return new Response(null, { status: 204, headers: corsHeaders });
   }
 
-  const projectIdeasMatch = pathname.match(
-    /^\/projects\/([0-9a-f-]+)\/ideas$/u,
-  );
-  if (projectIdeasMatch && request.method === "GET") {
-    const session = await requireSession(auth, request);
-    const project = await getProject(db, projectIdeasMatch[1], session.user.id);
-    if (!project) throw new HttpError(404, "Project not found");
-    return json({ ideas: await listIdeas(db, project.id) });
-  }
-  if (projectIdeasMatch && request.method === "POST") {
-    const session = await requireSession(auth, request);
-    const project = await getProject(db, projectIdeasMatch[1], session.user.id);
-    if (!project) throw new HttpError(404, "Project not found");
-    const input = ideaCreateInputSchema.parse(await readJson(request));
-    const idea = await createIdea(db, {
-      id: crypto.randomUUID(),
-      organizationId: project.organization_id,
-      projectId: project.id,
-      authorUserId: session.user.id,
-      provider: input.provider,
-      model: input.model,
-      title: "새 아이디어",
-      createdAt: new Date().toISOString(),
-    });
-    return json({ idea }, 201);
-  }
-
-  const ideaMatch = pathname.match(
-    /^\/projects\/([0-9a-f-]+)\/ideas\/([0-9a-f-]+)$/u,
-  );
-  if (ideaMatch && request.method === "GET") {
-    const session = await requireSession(auth, request);
-    const project = await getProject(db, ideaMatch[1], session.user.id);
-    if (!project) throw new HttpError(404, "Project not found");
-    const idea = await getIdea(db, project.id, ideaMatch[2], session.user.id);
-    if (!idea) throw new HttpError(404, "Idea not found");
-    return json({ idea });
-  }
-  if (ideaMatch && request.method === "PATCH") {
-    const session = await requireSession(auth, request);
-    const project = await getProject(db, ideaMatch[1], session.user.id);
-    if (!project) throw new HttpError(404, "Project not found");
-    const input = ideaUpdateInputSchema.parse(await readJson(request, 220_000));
-    const outcome = await updateIdea(db, {
-      projectId: project.id,
-      ideaId: ideaMatch[2],
-      authorUserId: session.user.id,
-      expectedVersion: input.expectedVersion,
-      title: input.title,
-      documentMarkdown: input.documentMarkdown,
-      status: input.status,
-      provider: input.provider,
-      model: input.model,
-      updatedAt: new Date().toISOString(),
-    });
-    if (outcome === "not_found") throw new HttpError(404, "Idea not found");
-    if (outcome === "busy") throw new HttpError(409, "Idea is being updated by an agent");
-    if (outcome === "conflict") throw new HttpError(409, "Idea was updated elsewhere");
-    return json({
-      idea: await getIdea(db, project.id, ideaMatch[2], session.user.id),
-    });
-  }
-  if (ideaMatch && request.method === "DELETE") {
-    const session = await requireSession(auth, request);
-    const project = await getProject(db, ideaMatch[1], session.user.id);
-    if (!project) throw new HttpError(404, "Project not found");
-    const deleted = await deleteIdea(
-      db,
-      project.id,
-      ideaMatch[2],
-      session.user.id,
-    );
-    if (!deleted) throw new HttpError(409, "Idea is busy or not editable");
-    return json({ deleted: true });
-  }
-
-  const ideaMessagesMatch = pathname.match(
-    /^\/projects\/([0-9a-f-]+)\/ideas\/([0-9a-f-]+)\/messages$/u,
-  );
-  if (ideaMessagesMatch && request.method === "POST") {
-    const session = await requireSession(auth, request);
-    const project = await getProject(db, ideaMessagesMatch[1], session.user.id);
-    if (!project) throw new HttpError(404, "Project not found");
-    const input = ideaMessageInputSchema.parse(await readJson(request));
-    const outcome = await sendIdeaMessage(db, {
-      jobId: crypto.randomUUID(),
-      messageId: crypto.randomUUID(),
-      replyMessageId: crypto.randomUUID(),
-      projectId: project.id,
-      ideaId: ideaMessagesMatch[2],
-      authorUserId: session.user.id,
-      body: input.body,
-      createdAt: new Date().toISOString(),
-    });
-    if (outcome === "not_found") throw new HttpError(404, "Idea not found");
-    if (outcome === "archived") throw new HttpError(409, "Archived ideas are read-only");
-    if (outcome === "busy") throw new HttpError(409, "Idea is already processing a request");
-    return json(
-      {
-        idea: await getIdea(
-          db,
-          project.id,
-          ideaMessagesMatch[2],
-          session.user.id,
-        ),
-      },
-      202,
-    );
-  }
-
-  const ideaPlanMatch = pathname.match(
-    /^\/projects\/([0-9a-f-]+)\/ideas\/([0-9a-f-]+)\/plan$/u,
-  );
-  if (ideaPlanMatch && request.method === "POST") {
-    const session = await requireSession(auth, request);
-    const project = await getProject(db, ideaPlanMatch[1], session.user.id);
-    if (!project) throw new HttpError(404, "Project not found");
-    const outcome = await enqueueIdeaPlan(db, {
-      jobId: crypto.randomUUID(),
-      projectId: project.id,
-      ideaId: ideaPlanMatch[2],
-      authorUserId: session.user.id,
-      createdAt: new Date().toISOString(),
-    });
-    if (outcome === "not_found") throw new HttpError(404, "Idea not found");
-    if (outcome === "archived") throw new HttpError(409, "Archived ideas are read-only");
-    if (outcome === "not_ready") throw new HttpError(409, "Idea must be ready first");
-    if (outcome === "busy") throw new HttpError(409, "Idea is already processing a request");
-    return json(
-      {
-        idea: await getIdea(db, project.id, ideaPlanMatch[2], session.user.id),
-      },
-      202,
-    );
-  }
-  if (ideaPlanMatch && request.method === "PATCH") {
-    const session = await requireSession(auth, request);
-    const project = await getProject(db, ideaPlanMatch[1], session.user.id);
-    if (!project) throw new HttpError(404, "Project not found");
-    const input = ideaPlanUpdateInputSchema.parse(await readJson(request, 550_000));
-    const updated = await updateIdeaPlan(db, {
-      projectId: project.id,
-      ideaId: ideaPlanMatch[2],
-      authorUserId: session.user.id,
-      expectedVersion: input.expectedVersion,
-      items: input.items,
-      updatedAt: new Date().toISOString(),
-    });
-    if (!updated) throw new HttpError(409, "Idea plan was updated elsewhere");
-    return json({
-      idea: await getIdea(db, project.id, ideaPlanMatch[2], session.user.id),
-    });
-  }
-
-  const ideaJobRetryMatch = pathname.match(
-    /^\/projects\/([0-9a-f-]+)\/ideas\/([0-9a-f-]+)\/jobs\/([0-9a-f-]+)\/retry$/u,
-  );
-  if (ideaJobRetryMatch && request.method === "POST") {
-    const session = await requireSession(auth, request);
-    const project = await getProject(db, ideaJobRetryMatch[1], session.user.id);
-    if (!project) throw new HttpError(404, "Project not found");
-    const outcome = await retryIdeaJob(db, {
-      failedJobId: ideaJobRetryMatch[3],
-      jobId: crypto.randomUUID(),
-      replyMessageId: crypto.randomUUID(),
-      projectId: project.id,
-      ideaId: ideaJobRetryMatch[2],
-      authorUserId: session.user.id,
-      createdAt: new Date().toISOString(),
-    });
-    if (outcome === "not_found") throw new HttpError(404, "Failed idea job not found");
-    if (outcome === "archived") throw new HttpError(409, "Archived ideas are read-only");
-    if (outcome === "not_ready") throw new HttpError(409, "Idea must be ready first");
-    if (outcome === "busy") throw new HttpError(409, "Idea is already processing a request");
-    return json(
-      {
-        idea: await getIdea(db, project.id, ideaJobRetryMatch[2], session.user.id),
-      },
-      202,
-    );
-  }
-
-  const ideaConvertMatch = pathname.match(
-    /^\/projects\/([0-9a-f-]+)\/ideas\/([0-9a-f-]+)\/convert$/u,
-  );
-  if (ideaConvertMatch && request.method === "POST") {
-    const session = await requireSession(auth, request);
-    const project = await getProject(db, ideaConvertMatch[1], session.user.id);
-    if (!project) throw new HttpError(404, "Project not found");
-    const input = ideaConversionInputSchema.parse(await readJson(request));
-    const result = await convertIdeaPlanToIssues(db, {
-      projectId: project.id,
-      ideaId: ideaConvertMatch[2],
-      authorUserId: session.user.id,
-      planVersion: input.planVersion,
-      createdAt: new Date().toISOString(),
-    });
-    if (result.outcome === "active_issues") {
-      throw new HttpError(409, "Generated issues have already started");
-    }
-    if (result.outcome === "workflow_pending") {
-      throw new HttpError(409, "Project workflow is not ready");
-    }
-    if (result.outcome !== "created") {
-      throw new HttpError(409, "Idea or plan is not ready");
-    }
-    return json({ runIds: result.runIds }, 201);
-  }
-
-  if (pathname === "/idea-job-claims" && request.method === "POST") {
-    const input = ideaJobClaimInputSchema.parse(await readJson(request));
-    const worker = await requireWorkerProjectBinding(
-      db,
-      request,
-      input.projectId,
-      input.workerId,
-    );
-    const observedAt = new Date().toISOString();
-    if (
-      workerStateAt(
-        worker.binding.last_heartbeat_at,
-        observedAt,
-        worker.binding.state,
-      ) !== "online" ||
-      worker.binding.accepting_work !== 1 ||
-      worker.binding.readiness_state === "needs_attention"
-    ) {
-      throw new HttpError(409, "Worker is not ready to claim idea work");
-    }
-    const providers = executionWorkerProviders(worker.binding);
-    const claimToken = `briar_idea_claim_${crypto.randomUUID().replaceAll("-", "")}${crypto.randomUUID().replaceAll("-", "")}`;
-    const job = await claimNextIdeaJob(db, input.projectId, {
-      workerId: worker.binding.id,
-      providers,
-      claimTokenHash: await sha256(claimToken),
-      claimedAt: observedAt,
-      leaseExpiresAt: leaseExpiryFrom(observedAt),
-    });
-    if (!job) return json({ work: null });
-    const snapshot = await ideaJobSnapshot(db, job);
-    if (!snapshot) throw new HttpError(409, "Idea job lost its context");
-    return json({
-      work: {
-        workType: "idea",
-        workId: job.id,
-        runId: job.idea_id,
-        sourceKey: `briar-idea:${job.idea_id}:${job.kind}`,
-        title: snapshot.idea.title,
-        kind: job.kind,
-        provider: job.provider,
-        model: job.model,
-        claimToken,
-        leaseExpiresAt: job.lease_expires_at,
-        snapshot,
-      },
-    });
-  }
-
-  const ideaJobClaimMatch = pathname.match(
-    /^\/idea-job-claims\/([0-9a-f-]+)\/(lease|complete)$/u,
-  );
-  if (ideaJobClaimMatch && request.method === "POST") {
-    if (ideaJobClaimMatch[2] === "lease") {
-      const input = ideaJobLeaseInputSchema.parse(await readJson(request));
-      const worker = await requireWorkerProjectBinding(
-        db,
-        request,
-        input.projectId,
-        input.workerId,
-      );
-      const observedAt = new Date().toISOString();
-      const renewed = await renewIdeaJobLease(
-        db,
-        input.projectId,
-        ideaJobClaimMatch[1],
-        {
-          workerId: worker.binding.id,
-          claimTokenHash: await sha256(input.claimToken),
-          leaseExpiresAt: leaseExpiryFrom(observedAt),
-          updatedAt: observedAt,
-        },
-      );
-      if (!renewed) throw new HttpError(409, "Idea claim is no longer active");
-      return json({ leaseExpiresAt: renewed.lease_expires_at });
-    }
-    const input = ideaJobCompletionInputSchema.parse(await readJson(request, 550_000));
-    const worker = await requireWorkerProjectBinding(
-      db,
-      request,
-      input.projectId,
-      input.workerId,
-    );
-    const claimTokenHash = await sha256(input.claimToken);
-    const job = await getClaimedIdeaJob(
-      db,
-      input.projectId,
-      ideaJobClaimMatch[1],
-      worker.binding.id,
-      claimTokenHash,
-    );
-    if (!job) throw new HttpError(409, "Idea claim is no longer active");
-    const observedAt = new Date().toISOString();
-    if (input.error) {
-      await failIdeaJob(db, job, claimTokenHash, input.error, observedAt);
-      return json({ status: "failed" });
-    }
-    const completed =
-      job.kind === "chat"
-        ? await completeIdeaChatJob(
-            db,
-            job,
-            claimTokenHash,
-            ideaTurnResultSchema.parse(input.result),
-            observedAt,
-          )
-        : await completeIdeaPlanJob(
-            db,
-            job,
-            claimTokenHash,
-            ideaPlanResultSchema.parse(input.result).issues,
-            observedAt,
-          );
-    if (!completed) throw new HttpError(409, "Idea result became stale");
-    return json({ status: "completed" });
-  }
-
   const publicInvitationMatch = pathname.match(
     /^\/invitations\/(briar_invite_[0-9a-f]{64})$/u,
   );
@@ -5616,35 +5258,6 @@ async function route(
     );
     if (!deleted) throw new HttpError(404, "Organization agent not found");
     return json({ deleted: true });
-  }
-
-  const organizationIdeasMatch = pathname.match(
-    /^\/organizations\/([0-9a-f-]+)\/ideas$/u,
-  );
-  if (organizationIdeasMatch && request.method === "GET") {
-    const session = await requireSession(auth, request);
-    const organizationId = organizationIdeasMatch[1];
-    const role = await getOrganizationRole(db, organizationId, session.user.id);
-    if (!role) throw new HttpError(404, "Organization not found");
-    return json({ ideas: await listOrganizationIdeas(db, organizationId) });
-  }
-
-  const organizationIdeaMatch = pathname.match(
-    /^\/organizations\/([0-9a-f-]+)\/ideas\/([0-9a-f-]+)$/u,
-  );
-  if (organizationIdeaMatch && request.method === "GET") {
-    const session = await requireSession(auth, request);
-    const organizationId = organizationIdeaMatch[1];
-    const role = await getOrganizationRole(db, organizationId, session.user.id);
-    if (!role) throw new HttpError(404, "Organization not found");
-    const idea = await getOrganizationIdea(
-      db,
-      organizationId,
-      organizationIdeaMatch[2],
-      session.user.id,
-    );
-    if (!idea) throw new HttpError(404, "Idea not found");
-    return json({ idea });
   }
 
   const channelChangesMatch = pathname.match(
@@ -7918,6 +7531,90 @@ async function route(
       },
       201,
     );
+  }
+
+  const issueMessageEditMatch = pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/messages\/([0-9a-f-]+)$/u,
+  );
+  if (issueMessageEditMatch && request.method === "PATCH") {
+    const session = await requireSession(auth, request);
+    const project = await getProject(
+      db,
+      issueMessageEditMatch[1],
+      session.user.id,
+    );
+    if (!project) throw new HttpError(404, "Project not found");
+    const input = issueMessageEditInputSchema.parse(await readJson(request));
+    const message = await getIssueMessage(
+      db,
+      project.id,
+      issueMessageEditMatch[2],
+      issueMessageEditMatch[3],
+    );
+    if (!message) throw new HttpError(404, "Message not found");
+    if (message.author_user_id !== session.user.id) {
+      throw new HttpError(403, "Only the author can edit this message");
+    }
+    const updated = await updateIssueMessage(
+      db,
+      project.id,
+      issueMessageEditMatch[2],
+      message.id,
+      {
+        body: input.body,
+        mentionedUserIds: input.mentionedUserIds,
+        updatedAt: new Date().toISOString(),
+      },
+    );
+    if (!updated) throw new HttpError(404, "Message not found");
+    await removeOrphanedIssueAttachments(
+      db,
+      attachmentsBucket,
+      project.id,
+      issueMessageEditMatch[2],
+    );
+    const [attachments, reworkProposals, actionProposals] = await Promise.all([
+      listIssueAttachments(db, project.id, issueMessageEditMatch[2]),
+      listIssueReworkProposals(db, project.id, issueMessageEditMatch[2]),
+      listIssueActionProposals(db, project.id, issueMessageEditMatch[2]),
+    ]);
+    const proposal = [...reworkProposals, ...actionProposals].find(
+      (candidate) => candidate.reply_message_id === updated.id,
+    ) ?? null;
+    return json({ message: issueMessageJson(updated, attachments, proposal) });
+  }
+  if (issueMessageEditMatch && request.method === "DELETE") {
+    const session = await requireSession(auth, request);
+    const project = await getProject(
+      db,
+      issueMessageEditMatch[1],
+      session.user.id,
+    );
+    if (!project) throw new HttpError(404, "Project not found");
+    const message = await getIssueMessage(
+      db,
+      project.id,
+      issueMessageEditMatch[2],
+      issueMessageEditMatch[3],
+    );
+    if (!message) throw new HttpError(404, "Message not found");
+    if (message.author_user_id !== session.user.id) {
+      throw new HttpError(403, "Only the author can delete this message");
+    }
+    const deleted = await deleteIssueMessage(
+      db,
+      project.id,
+      issueMessageEditMatch[2],
+      message.id,
+    );
+    if (!deleted) throw new HttpError(404, "Message not found");
+    await removeOrphanedIssueAttachments(
+      db,
+      attachmentsBucket,
+      project.id,
+      issueMessageEditMatch[2],
+    );
+    return new Response(null, { status: 204, headers: corsHeaders });
   }
 
   const issueAgentReplyStatusMatch = pathname.match(
