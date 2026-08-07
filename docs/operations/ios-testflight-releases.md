@@ -265,3 +265,28 @@ Build `1` (`54b73944-44b2-4a25-9059-4df289c9ee9e`) was processed as `VALID`
 from commit `6fad1765abe9fe6b7e610e26a08a8200db3cacd6`. While Apple was processing it,
 main advanced to `85d8094e`; build `2` was rebuilt and revalidated from that
 new latest main commit and is the final build handed off for this release.
+
+## 2026-08-07 — 1.2.79 (3)
+
+- App: Briar Companion (`app.briar.companion`)
+- Marketing version: `1.2.79`
+- App Store Connect build: `3`
+- App Store Connect build ID: `9539daa7-6d23-40aa-8cc3-af2ca14e3401`
+- Latest main commit: `fff1856e`
+- Release source commit: `fff1856e54b28549750465164239e2aaf6c7f56b`
+- Implementation: native SwiftUI
+- Toolchain: Xcode 26.6, iOS 26.5 SDK
+- Minimum iOS version: 17.0
+- App Store Connect processing state: `VALID`
+- TestFlight state: `IN_BETA_TESTING`
+- Internal group: `wordbricks` (`hasAccessToAllBuilds=true`)
+- Automatic tester notification: enabled
+- IPA SHA-256: `651ba75e0d4f6f154b491cd4ad1841e93ceb517fcbb1b766677542d955cf3494`
+
+The release includes the improved mobile channel conversation UI and the
+Swift compatibility fix merged in PR #711. It passed the shared API contract,
+Swift unit and UI tests, iPhone and iPad accessibility and layout tests,
+Production analyze and build checks, session/download/log security checks, and
+the Tauri iOS and Android regression builds. Archive identity, App Store
+provisioning, distribution signature, production entitlements, and all
+alternate app icons were verified before upload.
