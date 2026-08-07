@@ -456,6 +456,28 @@ final class IssueMutationTests: XCTestCase {
         XCTAssertEqual(methods, ["POST", "GET"])
     }
 
+    func testSendMessageEncodesMentionedUserIds() async throws {
+        let recorder = MentionMessageAPIRecorder()
+        let store = IssueMutationStore(
+            api: recorder,
+            projectID: Self.projectID,
+            token: "token"
+        )
+
+        _ = try await store.sendMessage(
+            runID: Self.runID,
+            body: "@sam 확인해 줘",
+            parentMessageID: nil,
+            mentionedUserIds: ["user-2", "user-2", ""],
+            pollInterval: .zero,
+            maximumPolls: 1
+        )
+
+        let body = await recorder.recordedBody()
+        XCTAssertEqual(body?["body"] as? String, "@sam 확인해 줘")
+        XCTAssertEqual(body?["mentionedUserIds"] as? [String], ["user-2"])
+    }
+
     func testConversationImageUsesMultipartUpload() async throws {
         let recorder = MessageAttachmentAPIRecorder()
         let store = IssueMutationStore(
@@ -538,6 +560,28 @@ private actor AgentReplyAPIRecorder: MobileAPIClientProtocol {
         } else {
             throw MobileAPIError.invalidRequest
         }
+        return try JSONDecoder.mobileContract.decode(Response.self, from: Data(payload.utf8))
+    }
+}
+
+private actor MentionMessageAPIRecorder: MobileAPIClientProtocol {
+    private var bodyObject: [String: Any]?
+
+    func recordedBody() -> [String: Any]? { bodyObject }
+
+    func send<Response: Decodable & Sendable>(
+        _ path: String,
+        method: String,
+        token: String?,
+        body: (any Encodable & Sendable)?,
+        as responseType: Response.Type
+    ) async throws -> Response {
+        guard method == "POST", path.hasSuffix("/messages"), let body else {
+            throw MobileAPIError.invalidRequest
+        }
+        let data = try JSONEncoder().encode(body)
+        bodyObject = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        let payload = #"{"message":{"id":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","runId":"33333333-3333-4333-8333-333333333333","parentMessageId":null,"body":"@sam 확인해 줘","author":{"id":"fixture-user","name":"Briar User","image":null,"provider":null},"replyCount":0,"createdAt":"2026-08-02T01:00:00Z","updatedAt":"2026-08-02T01:00:00Z"},"agentReply":null}"#
         return try JSONDecoder.mobileContract.decode(Response.self, from: Data(payload.utf8))
     }
 }
