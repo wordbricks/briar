@@ -45,7 +45,7 @@ struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
     }
 
     struct Document: Codable, Hashable, Sendable {
-        let ideaId: UUID
+        let messageId: UUID
         let title: String
         let projectId: UUID?
     }

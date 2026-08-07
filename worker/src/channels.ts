@@ -38,10 +38,8 @@ export type ChannelMessageRow = {
   body: string;
   reply_count: number;
   last_reply_at: string | null;
-  document_idea_id: string | null;
+  document_message_id: string | null;
   document_title: string | null;
-  document_status: string | null;
-  document_version: number | null;
   document_project_id: string | null;
   proposal_id: string | null;
   proposal_action_type: ChannelActionType | null;
@@ -49,7 +47,6 @@ export type ChannelMessageRow = {
   proposal_project_id: string | null;
   proposal_payload_json: string | null;
   proposal_result_run_id: string | null;
-  proposal_result_idea_id: string | null;
   created_at: string;
 };
 
@@ -128,23 +125,20 @@ const messageSelect = `
           where reply.parent_message_id = message.id) as reply_count,
          (select max(reply.created_at) from briar_channel_messages reply
           where reply.parent_message_id = message.id) as last_reply_at,
-         document.idea_id as document_idea_id,
-         idea.title as document_title, idea.status as document_status,
-         idea.version as document_version,
-         idea.project_id as document_project_id,
+         document.message_id as document_message_id,
+         document.title as document_title,
+         document.project_id as document_project_id,
          proposal.id as proposal_id,
          proposal.action_type as proposal_action_type,
          proposal.status as proposal_status,
          proposal.project_id as proposal_project_id,
          proposal.payload_json as proposal_payload_json,
          proposal.result_run_id as proposal_result_run_id,
-         proposal.result_idea_id as proposal_result_idea_id,
          message.created_at
   from briar_channel_messages message
   left join "user" author on author.id = message.author_user_id
   left join briar_channel_message_documents document
     on document.message_id = message.id
-  left join briar_ideas idea on idea.id = document.idea_id
   left join briar_channel_action_proposals proposal
     on proposal.reply_message_id = message.id`;
 
@@ -207,12 +201,10 @@ export const channelMessageJson = (
   attachments,
   replyCount: row.reply_count,
   lastReplyAt: row.last_reply_at,
-  document: row.document_idea_id
+  document: row.document_message_id
     ? {
-        ideaId: row.document_idea_id,
+        messageId: row.document_message_id,
         title: row.document_title ?? "",
-        status: row.document_status ?? "draft",
-        version: row.document_version ?? 1,
         projectId: row.document_project_id,
       }
     : null,
@@ -224,7 +216,6 @@ export const channelMessageJson = (
         projectId: row.proposal_project_id,
         payload: JSON.parse(row.proposal_payload_json ?? "{}"),
         resultRunId: row.proposal_result_run_id,
-        resultIdeaId: row.proposal_result_idea_id,
       }
     : null,
   createdAt: row.created_at,
@@ -1065,39 +1056,24 @@ export async function completeChannelReply(
         input.completedAt,
       ),
   ];
-  let ideaId: string | null = null;
   if (input.document) {
-    ideaId = crypto.randomUUID();
     statements.push(
       db
         .prepare(
-          `insert into briar_ideas (
-             id, organization_id, project_id, author_user_id, title,
-             title_is_auto, document_markdown, status, provider, model,
-             version, created_at, updated_at
-           )
-           select ?, ?, ?, channel.created_by_user_id, ?, 0, ?, 'ready', ?,
-                  null, 1, ?, ?
-           from briar_channels channel where channel.id = ?`,
+          `insert into briar_channel_message_documents (
+             message_id, channel_id, project_id, title, markdown,
+             created_at, updated_at
+           ) values (?, ?, ?, ?, ?, ?, ?)`,
         )
         .bind(
-          ideaId,
-          job.organization_id,
+          job.reply_message_id,
+          job.channel_id,
           input.document.projectId,
           input.document.title,
           input.document.markdown,
-          input.agentProvider,
           input.completedAt,
           input.completedAt,
-          job.channel_id,
         ),
-      db
-        .prepare(
-          `insert into briar_channel_message_documents (
-             message_id, idea_id, created_at
-           ) values (?, ?, ?)`,
-        )
-        .bind(job.reply_message_id, ideaId, input.completedAt),
     );
   }
   if (input.issueProposal) {
@@ -1162,7 +1138,6 @@ export async function getChannelActionProposal(
       payload_json: string;
       status: "pending" | "accepted";
       result_run_id: string | null;
-      result_idea_id: string | null;
       created_at: string;
       updated_at: string;
     }>();

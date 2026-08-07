@@ -41,7 +41,6 @@
       "/workers*",
       "/runs*",
       "/transcripts",
-      "/idea-job-claims*",
       "/issue-reply-claims*",
       "/channel-reply-claims*",
       "/queue*",

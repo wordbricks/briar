@@ -93,7 +93,6 @@ private struct UITestCompanionFlow: View {
                 errorMessage: nil,
                 token: "ui-test-token",
                 api: api,
-                ideas: IdeasStore(api: api),
                 user: CurrentUserResponse.User(
                     id: "fixture-user",
                     username: "briar_user",

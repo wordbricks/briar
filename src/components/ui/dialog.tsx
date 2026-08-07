@@ -16,7 +16,7 @@ const DialogOverlay = React.forwardRef<
   <DialogPrimitive.Overlay
     ref={ref}
     className={cn(
-      // Above inbox side panel (70/71) and idea-plan overlays (~80); below context menus (120+)
+      // Above the inbox side panel (70/71); below context menus (120+)
       "fixed inset-0 z-[90] bg-foreground/25 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
       className,
     )}

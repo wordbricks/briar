@@ -30,14 +30,9 @@ import {
   issueTitleOverLimitMessage,
 } from "../src/lib/issue-title";
 import {
-  ideaPlanResultSchema,
-  ideaTurnResultSchema,
-} from "../src/lib/ideas-contract";
-import {
   createDetachedTranscriptSequencer,
   detachedAgentPrompt,
   detachedChannelReplyPrompt,
-  detachedIdeaPrompt,
   detachedIssueReplyPrompt,
   detachedPayloadDirection,
   detachedProviderBlockedRunEvent,
@@ -1966,24 +1961,6 @@ const claimedIssueReplySchema = z.object({
 
 type ClaimedIssueReply = z.infer<typeof claimedIssueReplySchema>;
 
-const claimedIdeaSchema = z.object({
-  workType: z.literal("idea"),
-  workId: z.string().uuid(),
-  runId: z.string().uuid(),
-  sourceKey: z.string().min(1),
-  title: z.string().min(1),
-  kind: z.enum(["chat", "issue_plan"]),
-  provider: z.enum(["codex", "claude", "grok", "opencode"]),
-  model: z.string().nullable(),
-  claimToken: z.string().startsWith("briar_idea_claim_"),
-  leaseExpiresAt: z.string().datetime({ offset: true }),
-  snapshot: z.object({
-    idea: z.record(z.string(), z.unknown()),
-    messages: z.array(z.record(z.string(), z.unknown())),
-  }),
-});
-
-type ClaimedIdea = z.infer<typeof claimedIdeaSchema>;
 
 const claimedChannelReplySchema = z.object({
   workType: z.literal("channelReply"),
@@ -2700,256 +2677,6 @@ async function failClaimedIssueReply(
   );
 }
 
-async function runClaimedIdea(
-  config: Config,
-  project: ProjectConfig,
-  idea: ClaimedIdea,
-  workerToken: string,
-  signal: AbortSignal,
-) {
-  const registered = project.executionWorker;
-  if (!registered) throw new Error("Worker registration is missing");
-  const binaryName = idea.provider === "claude" ? "claude" : idea.provider;
-  const agentBinary = Bun.which(binaryName);
-  if (!agentBinary) {
-    throw new Error(`${binaryName} coding agent is not installed on this Worker`);
-  }
-  const analysisWorktree = await allocateAnalysisWorktree({
-    repositoryPath: project.repositoryPath,
-    projectId: project.id,
-    workId: idea.workId,
-    settings: worktreeSettings(project),
-    git: runGit,
-  });
-  try {
-    const prompt = detachedIdeaPrompt({
-      kind: idea.kind,
-      snapshot: {
-        ...idea.snapshot,
-        repository: {
-          baseRef: analysisWorktree.baseRef,
-          baseSha: analysisWorktree.baseSha,
-        },
-      },
-    });
-    const launch = detachedProviderRequest({
-      agent: {
-        id: idea.workId,
-        name: "Briar Ideas",
-        provider: idea.provider,
-        model: idea.model,
-        effort: null,
-        responsibility: "",
-        skill: "",
-      },
-      prompt,
-      workspacePath: analysisWorktree.path,
-      fullAccess: false,
-      readOnly: true,
-      agentBinary,
-    });
-    let command = agentBinary;
-    let commandArgs = launch.arguments;
-    if (launch.kind === "runner") {
-      const runnerPath = (
-        await Promise.all(
-          [
-            resolve(import.meta.dir, `agent/${idea.provider}-runner.js`),
-            resolve(import.meta.dir, `../dist-agent/${idea.provider}-runner.js`),
-          ].map(async (path) => ((await Bun.file(path).exists()) ? path : null)),
-        )
-      ).find((path): path is string => Boolean(path));
-      if (!runnerPath) {
-        throw new Error(
-          `${idea.provider} runner bundle is missing; run \`bun run agent:build\``,
-        );
-      }
-      command = process.execPath;
-      commandArgs = [runnerPath];
-    }
-    const child = spawn(command, commandArgs, {
-      cwd: analysisWorktree.path,
-      env: {
-        ...process.env,
-        PATH: workerExecutionPath(),
-        BRIAR_CLI: workerCliPath(),
-        BRIAR_WORKER_TOKEN: workerToken,
-        BRIAR_PROJECT_ID: project.id,
-      },
-      stdio: ["pipe", "pipe", "pipe"],
-    });
-    const exitPromise = new Promise<number | null>((resolveExit, rejectExit) => {
-      child.once("error", rejectExit);
-      child.once("close", resolveExit);
-    });
-    let stderr = "";
-    let resultText: string | null = null;
-    let runnerError: string | null = null;
-    let sequence = 0;
-    const terminate = () => {
-      if (child.exitCode !== null || child.killed) return;
-      child.kill("SIGTERM");
-      setTimeout(() => {
-        if (child.exitCode === null) child.kill("SIGKILL");
-      }, 5_000).unref();
-    };
-    signal.addEventListener("abort", terminate, { once: true });
-    child.stderr.setEncoding("utf8");
-    child.stderr.on("data", (chunk: string) => {
-      stderr = `${stderr}${chunk}`.slice(-8_000);
-    });
-    if (launch.request) child.stdin.write(`${JSON.stringify(launch.request)}\n`);
-    else child.stdin.end();
-
-    try {
-      const lines = createInterface({ input: child.stdout, crlfDelay: Infinity });
-      for await (const line of lines) {
-        if (!line.trim()) continue;
-        sequence += 1;
-        let payload: unknown = line;
-        try {
-          payload = JSON.parse(line);
-        } catch {
-          // Preserve plain provider output as diagnostic transcript data.
-        }
-        const candidate = issueReplyTextFromPayload(payload);
-        if (candidate) resultText = candidate;
-        const direction = detachedPayloadDirection(payload);
-        const bounded = detachedTranscriptPayload(payload, line);
-        if (
-          launch.request &&
-          payload &&
-          typeof payload === "object" &&
-          "type" in payload &&
-          (payload as { type?: string }).type === "approval" &&
-          "id" in payload &&
-          typeof payload.id === "string"
-        ) {
-          child.stdin.write(
-            `${JSON.stringify({
-              type: "approvalResponse",
-              id: payload.id,
-              approved: !(
-                "sandboxMode" in launch.request &&
-                launch.request.sandboxMode === "readOnly"
-              ),
-            })}\n`,
-          );
-        }
-        if (
-          payload &&
-          typeof payload === "object" &&
-          "type" in payload &&
-          (payload as { type?: string }).type === "error"
-        ) {
-          runnerError = String(
-            (payload as { message?: unknown }).message ?? "Agent failed",
-          );
-        }
-        if (shouldPersistDetachedTranscriptPayload(bounded)) {
-          try {
-            await request(config.apiUrl, "/transcripts", workerToken, {
-              method: "POST",
-              body: JSON.stringify({
-                projectId: project.id,
-                sessionId: `idea-${idea.workId}`,
-                runId: null,
-                workerId: registered.workerId,
-                agentProvider: idea.provider,
-                events: [{
-                  sequence,
-                  direction,
-                  payload: bounded,
-                }],
-              }),
-            });
-          } catch {
-            // The durable idea result is more important than optional diagnostics.
-          }
-        }
-      }
-      const exitCode = await exitPromise;
-      if (signal.aborted) {
-        throw signal.reason instanceof Error
-          ? signal.reason
-          : new Error("Worker execution was cancelled");
-      }
-      if (exitCode !== 0 || runnerError) {
-        throw new Error(
-          runnerError ?? (stderr.trim() || `Agent exited with ${exitCode}`),
-        );
-      }
-      if (!resultText) throw new Error("Agent returned an empty idea result");
-      const parsed = parseDetachedJsonResult(resultText);
-      const result = idea.kind === "chat"
-        ? ideaTurnResultSchema.parse(parsed)
-        : ideaPlanResultSchema.parse(parsed);
-      await request(
-        config.apiUrl,
-        `/idea-job-claims/${idea.workId}/complete`,
-        workerToken,
-        {
-          method: "POST",
-          body: JSON.stringify({
-            projectId: project.id,
-            workerId: registered.workerId,
-            claimToken: idea.claimToken,
-            result,
-          }),
-        },
-      );
-    } finally {
-      signal.removeEventListener("abort", terminate);
-      terminate();
-    }
-  } finally {
-    try {
-      await removeAnalysisWorktree({
-        repositoryPath: project.repositoryPath,
-        path: analysisWorktree.path,
-        git: runGit,
-      });
-    } catch (error) {
-      console.error(
-        `Idea analysis worktree cleanup failed: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      );
-    }
-  }
-}
-
-async function failClaimedIdea(
-  config: Config,
-  project: ProjectConfig,
-  idea: ClaimedIdea,
-  workerToken: string,
-  error: unknown,
-) {
-  const workerId = project.executionWorker?.workerId;
-  if (!workerId) throw error;
-  await request(
-    config.apiUrl,
-    `/idea-job-claims/${idea.workId}/complete`,
-    workerToken,
-    {
-      method: "POST",
-      body: JSON.stringify({
-        projectId: project.id,
-        workerId,
-        claimToken: idea.claimToken,
-        error: error instanceof Error ? error.message : String(error),
-      }),
-    },
-  );
-}
-
-/**
- * Runs one channel reply. An organization Agent has no repository, so the
- * provider runs in an empty scratch directory instead of a worktree. Transcript
- * events are not persisted: transcript sessions are project-scoped and a
- * channel reply may have no project at all.
- */
 async function runClaimedChannelReply(
   config: Config,
   project: ProjectConfig,
@@ -3433,18 +3160,6 @@ async function workerCommand() {
   const result = await runWorkerLoop(
     {
       claim: async () => {
-        const ideaClaim = await request<{ work: unknown }>(
-          config.apiUrl,
-          "/idea-job-claims",
-          workerToken,
-          {
-            method: "POST",
-            body: JSON.stringify({ workerId, projectId: project.id }),
-          },
-        );
-        if (ideaClaim.work !== null) {
-          return claimedIdeaSchema.parse(ideaClaim.work);
-        }
         const replyClaim = await request<{ work: unknown }>(
           config.apiUrl,
           "/issue-reply-claims",
@@ -3496,23 +3211,6 @@ async function workerCommand() {
           : claimedRunSchema.parse(claimed.work);
       },
       renewLease: async (issue) => {
-        if (issue.workType === "idea") {
-          const idea = claimedIdeaSchema.parse(issue);
-          await request(
-            config.apiUrl,
-            `/idea-job-claims/${idea.workId}/lease`,
-            workerToken,
-            {
-              method: "POST",
-              body: JSON.stringify({
-                projectId: project.id,
-                workerId,
-                claimToken: idea.claimToken,
-              }),
-            },
-          );
-          return;
-        }
         if (issue.workType === "channelReply") {
           const reply = claimedChannelReplySchema.parse(issue);
           await request(
@@ -3701,15 +3399,6 @@ async function workerCommand() {
         };
       },
       runIssue: async (issue, signal) => {
-        if (issue.workType === "idea") {
-          const idea = claimedIdeaSchema.parse(issue);
-          try {
-            await runClaimedIdea(config, project, idea, workerToken, signal);
-          } catch (error) {
-            await failClaimedIdea(config, project, idea, workerToken, error);
-          }
-          return;
-        }
         if (issue.workType === "channelReply") {
           const reply = claimedChannelReplySchema.parse(issue);
           try {
