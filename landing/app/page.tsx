@@ -1,5 +1,6 @@
 import { copy, type LandingCopy } from "./i18n";
 import { LanguageSwitcher } from "./language-switcher";
+import { MobileMenu } from "./mobile-menu";
 import { getRequestLocale } from "./request-locale";
 
 // Stable redirect that always resolves to the current Production DMG.
@@ -372,8 +373,22 @@ export default async function Home() {
               href={WEB_APP_URL}
               aria-label={c.aria.openWebApp}
             >
-              {c.nav.openWebApp} <Arrow />
+              <span className="header-cta-label">{c.nav.openWebApp}</span>{" "}
+              <Arrow />
             </a>
+            <MobileMenu
+              navLabel={c.aria.mainMenu}
+              navLinks={[
+                { href: "/tutorial", label: c.nav.tutorial },
+                { href: "/blog", label: c.nav.blog },
+                { href: "/download", label: c.nav.download },
+              ]}
+              ctaHref={WEB_APP_URL}
+              ctaLabel={c.nav.openWebApp}
+              ctaAriaLabel={c.aria.openWebApp}
+              openLabel={c.aria.menuOpen}
+              closeLabel={c.aria.menuClose}
+            />
           </div>
         </div>
       </header>
@@ -408,20 +423,31 @@ export default async function Home() {
               {c.hero.openWebApp} <Arrow />
             </a>
             <a
-              className="button button-secondary"
+              className="button button-secondary hero-action-download"
               href={MAC_DOWNLOAD_URL}
               aria-label={c.aria.macDownload}
             >
               {c.hero.macDownload} <span aria-hidden="true">↓</span>
             </a>
             <a
-              className="button button-secondary"
+              className="button button-secondary hero-action-download"
               href={ANDROID_DOWNLOAD_URL}
               aria-label={c.aria.androidDownload}
             >
               {c.hero.androidDownload} <span aria-hidden="true">↓</span>
             </a>
-            <a className="button button-secondary" href="#workflow">
+            <a
+              className="button button-secondary hero-action-workflow"
+              href="#workflow"
+            >
+              {c.hero.howItWorks} <span aria-hidden="true">↓</span>
+            </a>
+          </div>
+          <div className="hero-actions-compact">
+            <a href="/download">
+              {c.hero.allDownloads} <span aria-hidden="true">↓</span>
+            </a>
+            <a href="#workflow">
               {c.hero.howItWorks} <span aria-hidden="true">↓</span>
             </a>
           </div>

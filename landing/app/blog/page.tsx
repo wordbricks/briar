@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { copy, type Locale } from "../i18n";
 import { LanguageSwitcher } from "../language-switcher";
+import { MobileMenu } from "../mobile-menu";
 import { getRequestLocale } from "../request-locale";
 
 const WEB_APP_URL = "/app/";
@@ -89,8 +90,27 @@ export default async function BlogPage() {
               GitHub <Arrow />
             </a>
             <a className="header-cta header-download" href={WEB_APP_URL}>
-              {c.nav.openWebApp} <Arrow />
+              <span className="header-cta-label">{c.nav.openWebApp}</span>{" "}
+              <Arrow />
             </a>
+            <MobileMenu
+              navLabel={c.aria.mainMenu}
+              navLinks={[
+                { href: "/tutorial", label: c.nav.tutorial },
+                { href: "/blog", label: c.nav.blog, isCurrent: true },
+                { href: "/download", label: c.nav.download },
+                {
+                  href: GITHUB_URL,
+                  label: "GitHub",
+                  external: true,
+                },
+              ]}
+              ctaHref={WEB_APP_URL}
+              ctaLabel={c.nav.openWebApp}
+              ctaAriaLabel={c.aria.openWebApp}
+              openLabel={c.aria.menuOpen}
+              closeLabel={c.aria.menuClose}
+            />
           </div>
         </div>
       </header>

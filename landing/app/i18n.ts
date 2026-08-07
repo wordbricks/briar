@@ -40,6 +40,8 @@ export const copy = {
       openWebApp: "Briar 웹 앱 열기",
       macDownload: "Mac용 Briar 최신 버전 다운로드",
       androidDownload: "Android용 Briar 최신 릴리즈 다운로드",
+      menuOpen: "메뉴 열기",
+      menuClose: "메뉴 닫기",
     },
     language: {
       label: "언어",
@@ -66,6 +68,7 @@ export const copy = {
       macDownload: "Mac용 Briar 다운로드",
       androidDownload: "Android용 다운로드",
       howItWorks: "작동 방식 보기",
+      allDownloads: "전체 다운로드 보기",
     },
     dashboard: {
       agentRuns: "에이전트 실행",
@@ -238,6 +241,8 @@ export const copy = {
       openWebApp: "Open the Briar web app",
       macDownload: "Download the latest Briar for Mac",
       androidDownload: "Download the latest Briar release for Android",
+      menuOpen: "Open menu",
+      menuClose: "Close menu",
     },
     language: {
       label: "Language",
@@ -264,6 +269,7 @@ export const copy = {
       macDownload: "Download Briar for Mac",
       androidDownload: "Download for Android",
       howItWorks: "See how it works",
+      allDownloads: "See all downloads",
     },
     dashboard: {
       agentRuns: "Agent runs",

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { copy, type Locale } from "../i18n";
 import { LanguageSwitcher } from "../language-switcher";
+import { MobileMenu } from "../mobile-menu";
 import { getRequestLocale } from "../request-locale";
 
 const WEB_APP_URL = "/app/";
@@ -353,8 +354,23 @@ export default async function TutorialPage() {
               koreanLabel={c.language.korean}
             />
             <a className="header-cta header-download" href={WEB_APP_URL}>
-              {t.openApp} <Arrow />
+              <span className="header-cta-label">{t.openApp}</span>{" "}
+              <Arrow />
             </a>
+            <MobileMenu
+              navLabel={c.aria.mainMenu}
+              navLinks={[
+                { href: "/", label: t.backHome },
+                { href: "#run-auto-hunt", label: t.steps[2].nav },
+                { href: "#review-result", label: t.steps[4].nav },
+                { href: "#schedule-agents", label: t.steps[7].nav },
+              ]}
+              ctaHref={WEB_APP_URL}
+              ctaLabel={t.openApp}
+              ctaAriaLabel={c.aria.openWebApp}
+              openLabel={c.aria.menuOpen}
+              closeLabel={c.aria.menuClose}
+            />
           </div>
         </div>
       </header>
