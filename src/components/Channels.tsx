@@ -95,6 +95,12 @@ type ChannelsProps = {
   onChannelsChange: Dispatch<SetStateAction<ChannelSummary[]>>;
   onIssueCreated?: (runId: string) => void;
   onCreateAgent?: () => void;
+  requestedMessage?: {
+    channelId: string;
+    messageId: string;
+    rootMessageId: string;
+  } | null;
+  onRequestedMessageOpen?: () => void;
 };
 
 type ChannelInviteCandidate =
@@ -165,6 +171,8 @@ export function Channels({
   onChannelSelect,
   onChannelsChange,
   onIssueCreated,
+  requestedMessage,
+  onRequestedMessageOpen,
   onCreateAgent,
 }: ChannelsProps) {
   const { t, localeTag } = useI18n();
@@ -314,8 +322,31 @@ export function Channels({
         setMembers(result.members);
         setAgents(result.agents);
         setMessages(result.messages);
-        setThreadParentId(null);
-        setThreadMessages([]);
+        const target = requestedMessage?.channelId === activeChannelId
+          ? requestedMessage
+          : null;
+        if (target && target.rootMessageId !== target.messageId) {
+          const threadResult = await listChannelMessages(
+            token,
+            organizationId,
+            activeChannelId,
+            target.rootMessageId,
+          );
+          if (cancelled) return;
+          setThreadParentId(target.rootMessageId);
+          setThreadMessages(threadResult.messages);
+        } else {
+          setThreadParentId(null);
+          setThreadMessages([]);
+        }
+        if (target) {
+          window.requestAnimationFrame(() => {
+            document
+              .querySelector(`[data-channel-message-id="${target.messageId}"]`)
+              ?.scrollIntoView?.({ block: "center" });
+            onRequestedMessageOpen?.();
+          });
+        }
       } catch (cause) {
         if (!cancelled) setError(errorMessage(cause));
       }
@@ -323,7 +354,13 @@ export function Channels({
     return () => {
       cancelled = true;
     };
-  }, [activeChannelId, organizationId, token]);
+  }, [
+    activeChannelId,
+    onRequestedMessageOpen,
+    organizationId,
+    requestedMessage,
+    token,
+  ]);
 
   // The change feed is organization-wide, so messages for other channels are
   // dropped here rather than filtered server-side.
@@ -1071,7 +1108,10 @@ function MessageRow({
     message.author.type === "user" ? message.author.image : null;
 
   return (
-    <article className={`channel-message ${message.author.type}`}>
+    <article
+      className={`channel-message ${message.author.type}`}
+      data-channel-message-id={message.id}
+    >
       <div className="channel-message-avatar" aria-hidden="true">
         {image ? (
           <img alt="" src={image} />

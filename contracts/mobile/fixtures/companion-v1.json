@@ -181,6 +181,23 @@
           }
         ],
         "conversationNotifications": [],
+        "channelNotifications": [
+          {
+            "id": "77777777-7777-4777-8777-777777777777",
+            "channelId": "66666666-6666-4666-8666-666666666666",
+            "channelName": "product",
+            "rootMessageId": "88888888-8888-4888-8888-888888888888",
+            "body": "Please review this thread",
+            "author": {
+              "id": "fixture-member",
+              "name": "Teammate",
+              "image": null,
+              "provider": null
+            },
+            "reason": "thread_reply",
+            "createdAt": "2026-08-02T01:01:00.000Z"
+          }
+        ],
         "members": [
           {
             "userId": "fixture-user",

@@ -221,6 +221,17 @@ export const mobileConversationNotificationSchema = z.object({
   createdAt: z.iso.datetime(),
 });
 
+export const mobileChannelNotificationSchema = z.object({
+  id: z.uuid(),
+  channelId: z.uuid(),
+  channelName: z.string(),
+  rootMessageId: z.uuid(),
+  body: z.string(),
+  author: mobileMessageAuthorSchema,
+  reason: z.enum(["mention", "thread_reply"]),
+  createdAt: z.iso.datetime(),
+});
+
 const mobileDashboardProjectSchema = mobileProjectsResponseSchema.shape.projects.element;
 
 export const mobileDashboardSnapshotSchema = z.object({
@@ -230,6 +241,7 @@ export const mobileDashboardSnapshotSchema = z.object({
   organizationProviders: z.array(z.enum(["codex", "claude", "grok", "opencode"])).optional(),
   members: z.array(mobileOrganizationMemberSchema).optional(),
   conversationNotifications: z.array(mobileConversationNotificationSchema).optional(),
+  channelNotifications: z.array(mobileChannelNotificationSchema).optional(),
   cursor: z.number().int().nonnegative().optional(),
   generatedAt: z.iso.datetime(),
 });
@@ -244,6 +256,7 @@ export const mobileDashboardDeltaSchema = z.object({
   organizationProviders: z.array(z.enum(["codex", "claude", "grok", "opencode"])).optional(),
   members: z.array(mobileOrganizationMemberSchema).optional(),
   conversationNotifications: z.array(mobileConversationNotificationSchema).optional(),
+  channelNotifications: z.array(mobileChannelNotificationSchema).optional(),
   generatedAt: z.iso.datetime(),
 });
 

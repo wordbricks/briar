@@ -250,4 +250,113 @@ final class ChannelGroupingTests: XCTestCase {
             ["AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA"]
         )
     }
+
+    func testChannelMessageDecodesStructuredMentionRecipients() throws {
+        let json = """
+        {
+          "id": "44444444-4444-4444-8444-444444444444",
+          "channelId": "33333333-3333-4333-8333-333333333333",
+          "parentMessageId": null,
+          "body": "@honey 온보딩 개편 계획서를 정리해줘",
+          "author": {
+            "type": "user",
+            "name": "Jay",
+            "image": null,
+            "provider": null
+          },
+          "mentionedUserIds": [],
+          "mentionedAgentIds": ["66666666-6666-4666-8666-666666666666"],
+          "replyCount": 1,
+          "lastReplyAt": "2026-08-06T00:04:00Z",
+          "document": null,
+          "proposal": null,
+          "createdAt": "2026-08-06T00:03:00Z"
+        }
+        """
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let message = try decoder.decode(ChannelMessage.self, from: Data(json.utf8))
+
+        XCTAssertEqual(message.mentionedUserIds, [])
+        XCTAssertEqual(
+            message.mentionedAgentIds,
+            [UUID(uuidString: "66666666-6666-4666-8666-666666666666")!]
+        )
+    }
+
+    func testMessageMentionsLinkOnlyKnownHandles() {
+        let segments = MessageMentions.segments(
+            "@honey please ask @typed and @sam.",
+            handles: ["honey", "sam"]
+        )
+        let mentions = segments.compactMap { segment -> String? in
+            if case let .mention(handle) = segment.kind { return handle }
+            return nil
+        }
+
+        XCTAssertEqual(mentions, ["honey", "sam"])
+        XCTAssertEqual(
+            MessageMentions.markdownWithLinks("@honey 확인", handles: ["honey"]),
+            "[@honey](briar-mention://honey) 확인"
+        )
+        XCTAssertEqual(
+            MessageMentions.markdownWithLinks("@typed 확인", handles: ["honey"]),
+            "@typed 확인"
+        )
+    }
+
+    func testIssueMentionCandidatesIncludeBriarAndMembers() {
+        let member = OrganizationMember(
+            userId: "user-2",
+            name: "Sam",
+            email: "sam@example.com",
+            image: nil,
+            role: "member",
+            createdAt: Date(timeIntervalSince1970: 1_700_000_000)
+        )
+        let candidates = MessageMentions.issueCandidates(
+            members: [member],
+            currentUserId: "user-1"
+        )
+
+        XCTAssertEqual(candidates.map(\.handle), ["briar", "sam"])
+        XCTAssertEqual(
+            ChannelMentions.suggestions(in: "@s", candidates: candidates).map(\.handle),
+            ["sam"]
+        )
+        XCTAssertEqual(
+            ChannelMentions.suggestions(in: "@b", candidates: candidates).map(\.handle),
+            ["briar"]
+        )
+    }
+
+    func testChannelMentionHandlesResolveFromStructuredRecipients() {
+        let agent = ChannelAgentSummary(
+            agentId: UUID(uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!,
+            handle: "honey",
+            name: "Honey",
+            provider: "claude",
+            model: nil,
+            projectId: nil,
+            responsibility: "Writing partner",
+            createdAt: Date(timeIntervalSince1970: 1_700_000_000)
+        )
+        let member = ChannelMember(
+            userId: "user-2",
+            name: "Sam",
+            email: "sam@example.com",
+            image: nil,
+            role: "member",
+            createdAt: Date(timeIntervalSince1970: 1_700_000_000)
+        )
+
+        let handles = MessageMentions.channelHandles(
+            mentionedUserIds: ["user-2"],
+            mentionedAgentIds: [agent.agentId],
+            members: [member],
+            agents: [agent]
+        )
+
+        XCTAssertEqual(handles, Set(["honey", "sam"]))
+    }
 }

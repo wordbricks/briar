@@ -608,6 +608,21 @@ export type IssueConversationNotificationRow = IssueMessageRow & {
   notification_reason: "mention" | "thread_reply";
 };
 
+export type ChannelConversationNotificationRow = {
+  id: string;
+  channel_id: string;
+  channel_name: string;
+  parent_message_id: string | null;
+  author_user_id: string | null;
+  author_agent_provider: ProjectAgentProvider | null;
+  author_name: string | null;
+  author_image: string | null;
+  body: string;
+  created_at: string;
+  root_message_id: string;
+  notification_reason: "mention" | "thread_reply";
+};
+
 export type DashboardChangeRow = {
   version: number;
   entity_type: "run" | "worker" | "notifications" | "metadata";
@@ -6006,6 +6021,59 @@ export async function listIssueConversationNotifications(
     )
     .bind(userId, projectId, userId, userId)
     .all<IssueConversationNotificationRow>();
+  return result.results;
+}
+
+/**
+ * Returns channel messages that require this organization member's attention:
+ * direct mentions and replies to root messages they authored. Public channels
+ * are organization-visible; private channels require explicit membership.
+ */
+export async function listChannelConversationNotifications(
+  db: D1Database,
+  organizationId: string,
+  userId: string,
+) {
+  const result = await db
+    .prepare(
+      `select message.id, message.channel_id, channel.name as channel_name,
+              message.parent_message_id, message.author_user_id,
+              message.author_agent_provider,
+              coalesce(author.name, message.author_agent_name, '') as author_name,
+              author.image as author_image, message.body, message.created_at,
+              coalesce(message.parent_message_id, message.id) as root_message_id,
+              case when mention.user_id is not null
+                then 'mention' else 'thread_reply' end as notification_reason
+       from briar_channel_messages message
+       join briar_channels channel on channel.id = message.channel_id
+       left join "user" author on author.id = message.author_user_id
+       left join briar_channel_messages root
+         on root.id = message.parent_message_id
+        and root.channel_id = message.channel_id
+       left join briar_channel_message_mentions mention
+         on mention.message_id = message.id and mention.user_id = ?
+       where channel.organization_id = ?
+         and channel.archived_at is null
+         and (
+           channel.visibility = 'public'
+           or exists (
+             select 1 from briar_channel_members member
+             where member.channel_id = channel.id and member.user_id = ?
+           )
+         )
+         and (message.author_user_id is null or message.author_user_id != ?)
+         and (
+           mention.user_id is not null
+           or (
+             message.parent_message_id is not null
+             and root.author_user_id = ?
+           )
+         )
+       order by message.created_at desc, message.id desc
+       limit 500`,
+    )
+    .bind(userId, organizationId, userId, userId, userId)
+    .all<ChannelConversationNotificationRow>();
   return result.results;
 }
 

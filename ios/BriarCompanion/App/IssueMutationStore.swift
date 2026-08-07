@@ -311,6 +311,7 @@ final class IssueMutationStore: ObservableObject {
         runID: UUID,
         body: String,
         parentMessageID: UUID?,
+        mentionedUserIds: [String] = [],
         attachments: [PendingIssueAttachment] = [],
         pollInterval: Duration = .seconds(2),
         maximumPolls: Int = 150
@@ -327,6 +328,11 @@ final class IssueMutationStore: ObservableObject {
                 throw IssueMutationError.attachment("대화에는 이미지만 첨부할 수 있습니다.")
             }
             let path = MobileAPIContract.Endpoint.runMessages(projectID: projectID, runID: runID)
+            let uniqueMentionedUserIds = Array(Set(mentionedUserIds.filter { !$0.isEmpty })).sorted()
+            let mentionedUserIdsJSON = String(
+                data: try JSONEncoder().encode(uniqueMentionedUserIds),
+                encoding: .utf8
+            ) ?? "[]"
             let response: CreateIssueMessageResponse
             if attachments.isEmpty {
                 response = try await api.send(
@@ -336,7 +342,7 @@ final class IssueMutationStore: ObservableObject {
                     body: CreateIssueMessageRequest(
                         body: trimmed,
                         parentMessageId: parentMessageID,
-                        mentionedUserIds: [],
+                        mentionedUserIds: uniqueMentionedUserIds,
                         agentConversationId: nil
                     ),
                     as: CreateIssueMessageResponse.self
@@ -353,7 +359,7 @@ final class IssueMutationStore: ObservableObject {
                     fields: [
                         "body": messageBody,
                         "parentMessageId": parentMessageID?.uuidString.lowercased() ?? "",
-                        "mentionedUserIds": "[]",
+                        "mentionedUserIds": mentionedUserIdsJSON,
                         "agentConversationId": "",
                         "attachmentReferences": String(
                             data: try JSONEncoder().encode(references),

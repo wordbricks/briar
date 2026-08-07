@@ -101,6 +101,10 @@ final class MobileAPIContractTests: XCTestCase {
         XCTAssertEqual(acceptedAction.proposal.changes?.description, "Use the revised acceptance criteria.")
         XCTAssertEqual(channels.channels.count, 2)
         XCTAssertEqual(channel.messages.first?.body, "@honey 온보딩 개편 계획서를 정리해줘")
+        XCTAssertEqual(
+            channel.messages.first?.mentionedAgentIds,
+            [UUID(uuidString: "66666666-6666-4666-8666-666666666666")!]
+        )
         XCTAssertEqual(channelMessages.messages.last?.proposal?.status, .pending)
         XCTAssertEqual(acceptedChannelProposal.outcome, .accepted)
         XCTAssertEqual(

@@ -214,6 +214,43 @@ describe("Inbox messages", () => {
     ]);
   });
 
+  it("creates actionable channel items with navigation context", () => {
+    const [message] = buildCurrentInboxMessages(
+      {
+        ...demoDashboard,
+        runs: [],
+        channelNotifications: [{
+          id: "channel-reply",
+          channelId: "channel-product",
+          channelName: "product",
+          rootMessageId: "channel-root",
+          body: "I answered your question.",
+          author: {
+            id: "member",
+            name: "Member",
+            image: null,
+            provider: null,
+          },
+          reason: "thread_reply",
+          createdAt: "2026-07-30T02:00:00.000Z",
+        }],
+      },
+      [],
+      [project],
+    );
+
+    expect(message).toMatchObject({
+      id: "channel:channel-reply",
+      kind: "channel",
+      channelId: "channel-product",
+      channelName: "product",
+      messageId: "channel-reply",
+      rootMessageId: "channel-root",
+      reason: "thread_reply",
+    });
+    expect(classifyInboxMessage(message)).toBe("action_required");
+  });
+
   it("creates one message for a task and its linked Auto Hunt dispatch", () => {
     const taskSession = {
       ...session("completed", "task-session"),

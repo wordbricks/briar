@@ -140,7 +140,11 @@ describe("Channels", () => {
   let container: HTMLDivElement;
   let root: ReturnType<typeof createRoot>;
 
-  const render = async (messages: ChannelMessage[]) => {
+  const render = async (
+    messages: ChannelMessage[],
+    requestedMessage?: { channelId: string; messageId: string; rootMessageId: string },
+    onRequestedMessageOpen?: () => void,
+  ) => {
     listChannels.mockResolvedValue({ channels: [channel], cursor: 7 });
     loadChannel.mockResolvedValue({
       channel,
@@ -173,7 +177,9 @@ describe("Channels", () => {
           onChannelSelect={() => undefined}
           onChannelsChange={() => undefined}
           organizationId="org-1"
+          requestedMessage={requestedMessage}
           token="token"
+          onRequestedMessageOpen={onRequestedMessageOpen}
         />,
       );
     });
@@ -203,6 +209,35 @@ describe("Channels", () => {
     expect(container.textContent).toContain("에이전트 만들기");
     expect(container.textContent).toContain("사람 추가");
     expect(container.querySelector(".channel-composer-shell")).not.toBeNull();
+  });
+
+  it("opens a requested reply in its channel thread", async () => {
+    const rootMessage = message({ id: "message-root", replyCount: 1 });
+    const reply = message({
+      id: "message-reply",
+      parentMessageId: "message-root",
+      body: "Requested reply",
+    });
+    listChannelMessages.mockResolvedValue({ messages: [rootMessage, reply] });
+    const onOpened = vi.fn();
+
+    await render(
+      [rootMessage],
+      {
+        channelId: channel.id,
+        messageId: reply.id,
+        rootMessageId: rootMessage.id,
+      },
+      onOpened,
+    );
+
+    expect(listChannelMessages).toHaveBeenCalledWith(
+      "token",
+      "org-1",
+      channel.id,
+      rootMessage.id,
+    );
+    expect(container.textContent).toContain("Requested reply");
   });
 
   it("sends the picked Agent as a structured mention rather than parsing the text", async () => {

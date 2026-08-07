@@ -159,6 +159,7 @@ import {
   initializeWorkflowProgress,
   importLinearHuntRuns,
   listIssueAttachments,
+  listChannelConversationNotifications,
   listIssueDependencies,
   listIssueConversationNotifications,
   listIssueActionProposals,
@@ -240,6 +241,7 @@ import {
   type IssueAttachmentRow,
   type IssueActionProposalRow,
   type IssueAgentReplyJobRow,
+  type ChannelConversationNotificationRow,
   type IssueConversationNotificationRow,
   type IssueMessageRow,
   type IssueReworkProposalRow,
@@ -4440,6 +4442,24 @@ const issueConversationNotificationJson = (
   createdAt: notification.created_at,
 });
 
+const channelConversationNotificationJson = (
+  notification: ChannelConversationNotificationRow,
+) => ({
+  id: notification.id,
+  channelId: notification.channel_id,
+  channelName: notification.channel_name,
+  rootMessageId: notification.root_message_id,
+  body: notification.body,
+  author: {
+    id: notification.author_user_id,
+    name: notification.author_name ?? "",
+    image: notification.author_image,
+    provider: notification.author_agent_provider,
+  },
+  reason: notification.notification_reason,
+  createdAt: notification.created_at,
+});
+
 export const claimConversationJson = (messages: IssueMessageRow[]) =>
   messages.map((message) => issueMessageJson(message));
 
@@ -7486,6 +7506,14 @@ async function route(
           session.user.id,
         )
       : null;
+    // Channel changes have an organization cursor rather than a project
+    // dashboard cursor. Refresh this bounded projection on the existing
+    // dashboard cadence so Inbox needs no second polling loop.
+    const channelNotifications = await listChannelConversationNotifications(
+      db,
+      project.organization_id,
+      session.user.id,
+    );
 
     return json({
       cursor: page.nextCursor,
@@ -7524,6 +7552,9 @@ async function route(
             ),
           }
         : {}),
+      channelNotifications: channelNotifications.map(
+        channelConversationNotificationJson,
+      ),
       generatedAt: observedAt,
     });
   }
@@ -7551,6 +7582,7 @@ async function route(
       executionPolicy,
       members,
       conversationNotifications,
+      channelNotifications,
     ] =
       await Promise.all([
         listDashboardRuns(db, project.id),
@@ -7570,6 +7602,11 @@ async function route(
         listIssueConversationNotifications(
           db,
           project.id,
+          session.user.id,
+        ),
+        listChannelConversationNotifications(
+          db,
+          project.organization_id,
           session.user.id,
         ),
       ]);
@@ -7621,6 +7658,9 @@ async function route(
       members: members.map(organizationMemberJson),
       conversationNotifications: conversationNotifications.map(
         issueConversationNotificationJson,
+      ),
+      channelNotifications: channelNotifications.map(
+        channelConversationNotificationJson,
       ),
       cursor,
       generatedAt: observedAt,
