@@ -31,6 +31,17 @@ export function isIssueMentionUrl(url: string | null | undefined) {
   return typeof url === "string" && url.startsWith(issueMentionUrlPrefix);
 }
 
+export function issueMentionHandleFromUrl(
+  url: string | null | undefined,
+) {
+  if (typeof url !== "string" || !isIssueMentionUrl(url)) return null;
+  try {
+    return decodeURIComponent(url.slice(issueMentionUrlPrefix.length));
+  } catch {
+    return null;
+  }
+}
+
 function splitTextNode(node: IssueMentionNode, handles: Set<string>) {
   if (typeof node.value !== "string") return [node];
 

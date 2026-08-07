@@ -31,8 +31,6 @@ import {
   type PointerEvent as ReactPointerEvent,
   type SetStateAction,
 } from "react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import { useI18n } from "../i18n";
 import {
   acceptChannelProposal,
@@ -71,7 +69,6 @@ import {
   ChannelDraftImages,
   ChannelMessageImages,
   channelBodyWithImages,
-  channelBodyWithoutImages,
   draftChannelImage,
   type DraftChannelImage,
 } from "./ChannelImages";
@@ -83,6 +80,7 @@ import {
   loadChannelThreadWidth,
   saveChannelThreadWidth,
 } from "../lib/channel-thread-width";
+import { ChannelMessageText } from "./ChannelMessageText";
 
 /** Chat needs a tighter cadence than the 15s dashboard poll. */
 const CHANNEL_POLL_INTERVAL_MS = 3_000;
@@ -642,7 +640,9 @@ export function Channels({
                       </div>
                     ) : null}
                     <MessageRow
+                      agents={agents}
                       message={message}
+                      members={members}
                       localeTag={localeTag}
                       currentUserId={currentUserId}
                       onAcceptProposal={() => void acceptProposal(message)}
@@ -716,8 +716,10 @@ export function Channels({
           <div className="channel-messages">
             {threadMessages.map((message) => (
               <MessageRow
+                agents={agents}
                 key={message.id}
                 message={message}
+                members={members}
                 localeTag={localeTag}
                 currentUserId={currentUserId}
                 onAcceptProposal={() => void acceptProposal(message)}
@@ -1040,7 +1042,9 @@ function ChannelInviteDialog({
 }
 
 function MessageRow({
+  agents,
   message,
+  members,
   localeTag,
   currentUserId,
   onOpenThread,
@@ -1048,7 +1052,9 @@ function MessageRow({
   busy,
   token,
 }: {
+  agents: ChannelAgentSummary[];
   message: ChannelMessage;
+  members: ChannelMember[];
   localeTag: string;
   currentUserId: string | null;
   onOpenThread?: () => void;
@@ -1091,11 +1097,7 @@ function MessageRow({
             {formatMessageTime(message.createdAt, localeTag)}
           </time>
         </header>
-        {channelBodyWithoutImages(message.body) ? (
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>
-            {channelBodyWithoutImages(message.body)}
-          </ReactMarkdown>
-        ) : null}
+        <ChannelMessageText agents={agents} members={members} message={message} />
         <ChannelMessageImages attachments={message.attachments} token={token} />
 
         {message.document ? (
