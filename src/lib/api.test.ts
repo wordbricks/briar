@@ -3,6 +3,7 @@ import {
   apiErrorIssueMessages,
   ApiError,
   addIssueDependency,
+  acceptChannelProposal,
   beginDeviceAuthorization,
   claimProjectAgentScheduleRun,
   completeProjectAgentScheduleRun,
@@ -81,6 +82,42 @@ describe("Project settings", () => {
 });
 
 describe("API errors", () => {
+  it("accepts a channel proposal in the selected project", async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response(JSON.stringify({
+        outcome: "accepted",
+        projectId: "project-2",
+        resultRunId: "run-2",
+      }), {
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      acceptChannelProposal(
+        "token",
+        "organization-1",
+        "channel-1",
+        "proposal-1",
+        "project-2",
+      ),
+    ).resolves.toEqual({
+      outcome: "accepted",
+      projectId: "project-2",
+      resultRunId: "run-2",
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "/organizations/organization-1/channels/channel-1/proposals/proposal-1/accept",
+      ),
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ projectId: "project-2" }),
+      }),
+    );
+  });
+
   it("adds a member to a channel with the member role", async () => {
     const fetchMock = vi.fn(async () =>
       new Response(JSON.stringify({ members: [] }), {

@@ -7,6 +7,8 @@ struct ChannelInboxTargetView: View {
     @State private var usesThreadFallback = false
     let target: CompanionNavigationModel.ChannelTarget
     let currentUserID: String?
+    let projects: [ProjectsResponse.Project]
+    let onIssueOpen: (UUID, UUID) -> Void
 
     private var channel: ChannelSummary? {
         channels.channels.first { $0.id == target.channelID }
@@ -25,7 +27,9 @@ struct ChannelInboxTargetView: View {
                             channels: channels,
                             channel: channel,
                             parent: threadParent,
-                            currentUserID: currentUserID
+                            currentUserID: currentUserID,
+                            projects: projects,
+                            onIssueOpen: onIssueOpen
                         )
                     } else {
                         ProgressView()
@@ -34,7 +38,9 @@ struct ChannelInboxTargetView: View {
                     ChannelMessagesView(
                         channels: channels,
                         channel: channel,
-                        currentUserID: currentUserID
+                        currentUserID: currentUserID,
+                        projects: projects,
+                        onIssueOpen: onIssueOpen
                     )
                 }
             } else if channels.loading {
@@ -65,6 +71,7 @@ struct ChannelsHomeView: View {
     let activeProjectID: UUID?
     let currentUserID: String?
     let projects: [ProjectsResponse.Project]
+    let onIssueOpen: (UUID, UUID) -> Void
 
     private var locale: CompanionLocale {
         CompanionLocale(rawValue: localeRaw) ?? .ko
@@ -108,7 +115,9 @@ struct ChannelsHomeView: View {
             ChannelMessagesView(
                 channels: channels,
                 channel: channel,
-                currentUserID: currentUserID
+                currentUserID: currentUserID,
+                projects: projects,
+                onIssueOpen: onIssueOpen
             )
         }
     }
@@ -143,6 +152,8 @@ struct ChannelMessagesView: View {
 
     let channel: ChannelSummary
     let currentUserID: String?
+    let projects: [ProjectsResponse.Project]
+    let onIssueOpen: (UUID, UUID) -> Void
 
     private var locale: CompanionLocale {
         CompanionLocale(rawValue: localeRaw) ?? .ko
@@ -153,14 +164,22 @@ struct ChannelMessagesView: View {
             ScrollView {
                 LazyVStack(spacing: 0) {
                     ForEach(channels.messages) { message in
-                        NavigationLink(value: message) {
-                            ChannelMessageRow(
-                                message: message,
-                                locale: locale,
-                                showsThreadSummary: true
-                            )
-                        }
-                        .buttonStyle(.plain)
+                        ChannelMessageRow(
+                            acceptingProposalID: channels.acceptingProposalID,
+                            channel: channel,
+                            message: message,
+                            locale: locale,
+                            onAcceptProposal: { proposalID, projectID in
+                                await channels.acceptProposal(
+                                    channelID: channel.id,
+                                    proposalID: proposalID,
+                                    projectID: projectID
+                                )
+                            },
+                            onIssueOpen: onIssueOpen,
+                            projects: projects,
+                            showsThreadSummary: true
+                        )
                     }
                 }
             }
@@ -202,7 +221,9 @@ struct ChannelMessagesView: View {
                 channels: channels,
                 channel: channel,
                 parent: message,
-                currentUserID: currentUserID
+                currentUserID: currentUserID,
+                projects: projects,
+                onIssueOpen: onIssueOpen
             )
         }
         .overlay {
@@ -224,6 +245,8 @@ struct ChannelThreadView: View {
     let channel: ChannelSummary
     let parent: ChannelMessage
     let currentUserID: String?
+    let projects: [ProjectsResponse.Project]
+    let onIssueOpen: (UUID, UUID) -> Void
 
     private var locale: CompanionLocale {
         CompanionLocale(rawValue: localeRaw) ?? .ko
@@ -234,7 +257,21 @@ struct ChannelThreadView: View {
             ScrollView {
                 LazyVStack(spacing: 0) {
                     ForEach(channels.thread) { message in
-                        ChannelMessageRow(message: message, locale: locale)
+                        ChannelMessageRow(
+                            acceptingProposalID: channels.acceptingProposalID,
+                            channel: channel,
+                            message: message,
+                            locale: locale,
+                            onAcceptProposal: { proposalID, projectID in
+                                await channels.acceptProposal(
+                                    channelID: channel.id,
+                                    proposalID: proposalID,
+                                    projectID: projectID
+                                )
+                            },
+                            onIssueOpen: onIssueOpen,
+                            projects: projects
+                        )
                     }
                 }
             }
@@ -269,8 +306,13 @@ struct ChannelThreadView: View {
 }
 
 private struct ChannelMessageRow: View {
+    let acceptingProposalID: UUID?
+    let channel: ChannelSummary
     let message: ChannelMessage
     let locale: CompanionLocale
+    let onAcceptProposal: (UUID, UUID) async -> AcceptChannelProposalResponse?
+    let onIssueOpen: (UUID, UUID) -> Void
+    let projects: [ProjectsResponse.Project]
     var showsThreadSummary = false
 
     var body: some View {
@@ -304,25 +346,45 @@ private struct ChannelMessageRow: View {
                         .foregroundStyle(.secondary)
                         .padding(.top, 3)
                 }
-                if showsThreadSummary, message.replyCount > 0 {
-                    HStack(spacing: 6) {
-                        Image(systemName: "bubble.left")
-                        Text(
-                            String(
-                                format: L10n.text(.channelReplies, locale: locale),
-                                message.replyCount
+                if let proposal = message.proposal,
+                   proposal.actionType == .createIssue {
+                    ChannelProposalCard(
+                        accepting: acceptingProposalID == proposal.id,
+                        channel: channel,
+                        locale: locale,
+                        onAccept: { projectID in
+                            await onAcceptProposal(proposal.id, projectID)
+                        },
+                        onIssueOpen: onIssueOpen,
+                        projects: projects,
+                        proposal: proposal
+                    )
+                    .padding(.top, 5)
+                }
+                if showsThreadSummary {
+                    NavigationLink(value: message) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "bubble.left")
+                            Text(
+                                message.replyCount > 0
+                                    ? String(
+                                        format: L10n.text(.channelReplies, locale: locale),
+                                        message.replyCount
+                                    )
+                                    : L10n.text(.channelReplyInThread, locale: locale)
                             )
-                        )
-                        .fontWeight(.semibold)
-                        if let lastReplyText {
-                            Text("· \(lastReplyText)")
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
+                            .fontWeight(.semibold)
+                            if let lastReplyText {
+                                Text("· \(lastReplyText)")
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                            }
                         }
+                        .font(.caption)
+                        .foregroundStyle(.tint)
+                        .padding(.top, 4)
                     }
-                    .font(.caption)
-                    .foregroundStyle(.tint)
-                    .padding(.top, 4)
+                    .buttonStyle(.plain)
                 }
             }
         }
@@ -347,6 +409,115 @@ private struct ChannelMessageRow: View {
             format: L10n.text(.channelLastReply, locale: locale),
             relative
         )
+    }
+}
+
+private struct ChannelProposalCard: View {
+    @State private var selectedProjectID: UUID?
+
+    let accepting: Bool
+    let channel: ChannelSummary
+    let locale: CompanionLocale
+    let onAccept: (UUID) async -> AcceptChannelProposalResponse?
+    let onIssueOpen: (UUID, UUID) -> Void
+    let projects: [ProjectsResponse.Project]
+    let proposal: ChannelMessage.Proposal
+
+    private var availableProjects: [ProjectsResponse.Project] {
+        projects
+            .filter { $0.organizationId == channel.organizationId }
+            .sorted {
+                $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+            }
+    }
+
+    private var targetProjectID: UUID? {
+        proposal.projectId ?? channel.defaultProjectId ?? selectedProjectID
+    }
+
+    private var selectedProjectName: String? {
+        guard let selectedProjectID else { return nil }
+        return availableProjects.first(where: { $0.id == selectedProjectID })?.name
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(L10n.text(.channelIssueProposal, locale: locale))
+                    .font(.caption.weight(.bold))
+                Text(
+                    L10n.text(
+                        proposal.status == .accepted
+                            ? .channelIssueProposalAccepted
+                            : .channelIssueProposalPending,
+                        locale: locale
+                    )
+                )
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            }
+
+            if proposal.status == .pending {
+                if proposal.projectId == nil, channel.defaultProjectId == nil {
+                    Menu {
+                        ForEach(availableProjects, id: \.id) { project in
+                            Button(project.name) { selectedProjectID = project.id }
+                        }
+                    } label: {
+                        Label(
+                            selectedProjectName ?? L10n.text(
+                                .channelSelectProposalProject,
+                                locale: locale
+                            ),
+                            systemImage: "folder"
+                        )
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .buttonStyle(.borderless)
+                    .accessibilityIdentifier(
+                        "channel-proposal-project-\(proposal.id.uuidString.lowercased())"
+                    )
+                }
+
+                Button {
+                    guard let targetProjectID else { return }
+                    Task {
+                        if let result = await onAccept(targetProjectID) {
+                            onIssueOpen(result.projectId, result.resultRunId)
+                        }
+                    }
+                } label: {
+                    if accepting {
+                        ProgressView().controlSize(.small)
+                    } else {
+                        Text(L10n.text(.channelCreateIssue, locale: locale))
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+                .disabled(accepting || targetProjectID == nil)
+                .accessibilityIdentifier(
+                    "accept-channel-proposal-\(proposal.id.uuidString.lowercased())"
+                )
+            } else if let projectID = proposal.projectId,
+                      let runID = proposal.resultRunId {
+                Button(L10n.text(.channelViewIssue, locale: locale)) {
+                    onIssueOpen(projectID, runID)
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+                .accessibilityIdentifier(
+                    "open-channel-proposal-result-\(proposal.id.uuidString.lowercased())"
+                )
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(10)
+        .background(Color.accentColor.opacity(0.07), in: RoundedRectangle(cornerRadius: 10))
+        .overlay {
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(Color.accentColor.opacity(0.24), lineWidth: 1)
+        }
     }
 }
 

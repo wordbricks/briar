@@ -49,6 +49,14 @@ final class MobileAPIContractTests: XCTestCase {
         let acceptedAction: AcceptIssueActionProposalResponse = try decodeResponse(
             "acceptIssueActionProposal"
         )
+        let channels: ChannelsResponse = try decodeResponse("listChannels")
+        let channel: ChannelDetailResponse = try decodeResponse("getChannel")
+        let channelMessages: ChannelMessagesResponse = try decodeResponse(
+            "listChannelMessages"
+        )
+        let acceptedChannelProposal: AcceptChannelProposalResponse = try decodeResponse(
+            "acceptChannelProposal"
+        )
 
         XCTAssertTrue(health.ok)
         XCTAssertEqual(device.userCode, "BRIAR123")
@@ -88,6 +96,14 @@ final class MobileAPIContractTests: XCTestCase {
         XCTAssertEqual(accepted.revision, 2)
         XCTAssertEqual(acceptedAction.proposal.type, .update)
         XCTAssertEqual(acceptedAction.proposal.changes?.description, "Use the revised acceptance criteria.")
+        XCTAssertEqual(channels.channels.count, 2)
+        XCTAssertEqual(channel.messages.first?.body, "@honey 온보딩 개편 계획서를 정리해줘")
+        XCTAssertEqual(channelMessages.messages.last?.proposal?.status, .pending)
+        XCTAssertEqual(acceptedChannelProposal.outcome, .accepted)
+        XCTAssertEqual(
+            acceptedChannelProposal.projectId.uuidString.lowercased(),
+            "11111111-1111-4111-8111-111111111111"
+        )
     }
 
     func testEndpointPathsMatchOpenAPISubset() {
@@ -123,6 +139,16 @@ final class MobileAPIContractTests: XCTestCase {
             "/projects/11111111-1111-4111-8111-111111111111/runs/33333333-3333-4333-8333-333333333333/resume"
         )
         let proposalID = UUID(uuidString: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee")!
+        let organizationID = UUID(uuidString: "22222222-2222-4222-8222-222222222222")!
+        let channelID = UUID(uuidString: "33333333-3333-4333-8333-333333333333")!
+        XCTAssertEqual(
+            MobileAPIContract.Endpoint.acceptChannelProposal(
+                organizationID: organizationID,
+                channelID: channelID,
+                proposalID: proposalID
+            ),
+            "/organizations/22222222-2222-4222-8222-222222222222/channels/33333333-3333-4333-8333-333333333333/proposals/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee/accept"
+        )
         XCTAssertEqual(
             MobileAPIContract.Endpoint.acceptIssueReworkProposal(
                 projectID: projectID,

@@ -1738,6 +1738,13 @@ export function App() {
               requestedTarget={requestedChannelTarget}
               token={briar.token}
               onRequestedTargetOpen={clearRequestedChannelTarget}
+              onIssueOpen={(projectId, runId) => {
+                briar.setActiveProjectId(projectId);
+                setRequestedRunId(runId);
+                setIssueListRequestKey((key) => key + 1);
+                setCompanionStatus("all");
+                setCompanionPage("issues");
+              }}
             />
             <CompanionBottomNavigation
               activeDestination="home"

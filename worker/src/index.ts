@@ -5750,8 +5750,12 @@ async function route(
     );
     if (!proposal) throw new HttpError(404, "Proposal not found");
     if (proposal.status === "accepted") {
+      if (!proposal.project_id || !proposal.result_run_id) {
+        throw new HttpError(409, "Accepted proposal is missing its result");
+      }
       return json({
         outcome: "already_accepted",
+        projectId: proposal.project_id,
         resultRunId: proposal.result_run_id,
       });
     }
@@ -5797,7 +5801,11 @@ async function route(
       acceptedAt: new Date().toISOString(),
     });
     if (!accepted) throw new HttpError(409, "Proposal changed");
-    return json({ outcome: "accepted", resultRunId: created.runId });
+    return json({
+      outcome: "accepted",
+      projectId: project.id,
+      resultRunId: created.runId,
+    });
   }
 
   const organizationWorkersMatch = pathname.match(
