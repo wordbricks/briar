@@ -343,7 +343,7 @@ export function Channels({
           window.requestAnimationFrame(() => {
             document
               .querySelector(`[data-channel-message-id="${target.messageId}"]`)
-              ?.scrollIntoView({ block: "center" });
+              ?.scrollIntoView?.({ block: "center" });
             onRequestedMessageOpen?.();
           });
         }

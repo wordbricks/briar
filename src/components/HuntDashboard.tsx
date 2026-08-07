@@ -33,6 +33,7 @@ import {
   Plus,
   RefreshCw,
   RotateCcw,
+  Send,
   Search,
   Share2,
   Signal,
@@ -8568,7 +8569,7 @@ function MessageComposer({
           {sending ? (
             <LoaderCircle className="spin" size={16} />
           ) : (
-            <ArrowUp size={19} strokeWidth={2.2} />
+            <Send aria-hidden="true" size={19} strokeWidth={2.2} />
           )}
         </button>
       </footer>
