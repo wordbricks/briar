@@ -264,6 +264,20 @@ struct ConversationNotification: Codable, Equatable, Identifiable, Sendable {
     let createdAt: Date
 }
 
+struct ChannelNotification: Codable, Equatable, Identifiable, Sendable {
+    let id: UUID
+    let organizationId: UUID
+    let channelId: UUID
+    let channelName: String
+    let defaultProjectId: UUID?
+    let messageId: UUID
+    let rootMessageId: UUID
+    let body: String
+    let author: ChannelMessage.Author
+    let reason: String
+    let createdAt: Date
+}
+
 struct OrganizationMember: Codable, Equatable, Identifiable, Sendable {
     let userId: String
     let name: String
@@ -282,6 +296,7 @@ struct DashboardSnapshot: Codable, Equatable, Sendable {
     var organizationProviders: [AgentProvider]?
     var members: [OrganizationMember]?
     var conversationNotifications: [ConversationNotification]?
+    var channelNotifications: [ChannelNotification]?
     var cursor: Int?
     var generatedAt: Date
 
@@ -292,6 +307,7 @@ struct DashboardSnapshot: Codable, Equatable, Sendable {
         organizationProviders: [AgentProvider]? = nil,
         members: [OrganizationMember]? = nil,
         conversationNotifications: [ConversationNotification]? = nil,
+        channelNotifications: [ChannelNotification]? = nil,
         cursor: Int?,
         generatedAt: Date
     ) {
@@ -301,6 +317,7 @@ struct DashboardSnapshot: Codable, Equatable, Sendable {
         self.organizationProviders = organizationProviders
         self.members = members
         self.conversationNotifications = conversationNotifications
+        self.channelNotifications = channelNotifications
         self.cursor = cursor
         self.generatedAt = generatedAt
     }
@@ -316,6 +333,7 @@ struct DashboardDelta: Codable, Equatable, Sendable {
     let organizationProviders: [AgentProvider]?
     let members: [OrganizationMember]?
     let conversationNotifications: [ConversationNotification]?
+    let channelNotifications: [ChannelNotification]?
     let generatedAt: Date
 
     init(
@@ -328,6 +346,7 @@ struct DashboardDelta: Codable, Equatable, Sendable {
         organizationProviders: [AgentProvider]? = nil,
         members: [OrganizationMember]? = nil,
         conversationNotifications: [ConversationNotification]? = nil,
+        channelNotifications: [ChannelNotification]? = nil,
         generatedAt: Date
     ) {
         self.cursor = cursor
@@ -339,6 +358,7 @@ struct DashboardDelta: Codable, Equatable, Sendable {
         self.organizationProviders = organizationProviders
         self.members = members
         self.conversationNotifications = conversationNotifications
+        self.channelNotifications = channelNotifications
         self.generatedAt = generatedAt
     }
 }
@@ -548,6 +568,7 @@ enum DashboardMerge {
             organizationProviders: delta.organizationProviders ?? snapshot.organizationProviders,
             members: delta.members ?? snapshot.members,
             conversationNotifications: delta.conversationNotifications ?? snapshot.conversationNotifications,
+            channelNotifications: delta.channelNotifications ?? snapshot.channelNotifications,
             cursor: delta.cursor,
             generatedAt: delta.generatedAt
         )

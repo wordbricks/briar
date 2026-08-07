@@ -68,10 +68,30 @@ export type InboxConversationMessage = {
   reason: "mention" | "thread_reply";
 };
 
+export type InboxChannelMessage = {
+  id: string;
+  kind: "channel";
+  projectId: string;
+  projectName: string;
+  organizationId: string;
+  targetId: string;
+  channelId: string;
+  channelName: string;
+  messageId: string;
+  rootMessageId: string;
+  title: string;
+  occurredAt: string;
+  version: string;
+  body: string;
+  authorName: string;
+  reason: "mention" | "thread_reply";
+};
+
 export type InboxMessage =
   | InboxIssueMessage
   | InboxSessionMessage
-  | InboxConversationMessage;
+  | InboxConversationMessage
+  | InboxChannelMessage;
 export type InboxMessageWithReadState = InboxMessage & { isUnread: boolean };
 export type InboxCategory =
   | "urgent"
@@ -151,6 +171,31 @@ export function buildCurrentInboxMessages(
         targetId: notification.runId,
         rootMessageId: notification.rootMessageId,
         title: notification.runTitle,
+        occurredAt: notification.createdAt,
+        version: notification.id,
+        body: notification.body,
+        authorName: notification.author.name,
+        reason: notification.reason,
+      });
+    }
+
+    for (const notification of dashboard.channelNotifications ?? []) {
+      const projectId = notification.defaultProjectId &&
+          projectNames.has(notification.defaultProjectId)
+        ? notification.defaultProjectId
+        : dashboard.project.id;
+      messages.push({
+        id: `channel:${notification.messageId}`,
+        kind: "channel",
+        projectId,
+        projectName: projectNames.get(projectId) ?? dashboard.project.name,
+        organizationId: notification.organizationId,
+        targetId: notification.channelId,
+        channelId: notification.channelId,
+        channelName: notification.channelName,
+        messageId: notification.messageId,
+        rootMessageId: notification.rootMessageId,
+        title: notification.channelName,
         occurredAt: notification.createdAt,
         version: notification.id,
         body: notification.body,
@@ -264,7 +309,9 @@ export function inboxReadVersionsToPush(
 export function classifyInboxMessage(
   message: InboxMessage,
 ): InboxCategory {
-  if (message.kind === "conversation") return "action_required";
+  if (message.kind === "conversation" || message.kind === "channel") {
+    return "action_required";
+  }
   if (message.kind === "session") {
     return message.requiresAttention || message.status === "failed"
       ? "action_required"
@@ -330,7 +377,11 @@ export function filterInboxMessagesByOrganization<T extends InboxMessage>(
       .filter((project) => project.organizationId === organizationId)
       .map((project) => project.id),
   );
-  return messages.filter((message) => projectIds.has(message.projectId));
+  return messages.filter((message) =>
+    message.kind === "channel"
+      ? message.organizationId === organizationId
+      : projectIds.has(message.projectId),
+  );
 }
 
 function readInboxStorage(storageKey: string): InboxStorage {
@@ -379,6 +430,7 @@ export function useInbox(
     () => buildCurrentInboxMessages(dashboard, sessions, projects),
     [
       dashboard?.conversationNotifications,
+      dashboard?.channelNotifications,
       dashboard?.project.id,
       dashboard?.project.name,
       dashboard?.runs,

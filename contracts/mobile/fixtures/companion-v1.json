@@ -181,6 +181,27 @@
           }
         ],
         "conversationNotifications": [],
+        "channelNotifications": [
+          {
+            "id": "12121212-1212-4121-8121-121212121212",
+            "organizationId": "22222222-2222-4222-8222-222222222222",
+            "channelId": "13131313-1313-4131-8131-131313131313",
+            "channelName": "product",
+            "defaultProjectId": "11111111-1111-4111-8111-111111111111",
+            "messageId": "12121212-1212-4121-8121-121212121212",
+            "rootMessageId": "14141414-1414-4141-8141-141414141414",
+            "body": "스레드에 확인 내용을 남겼습니다.",
+            "author": {
+              "type": "user",
+              "id": "channel-member",
+              "name": "Channel Member",
+              "email": "member@example.com",
+              "image": null
+            },
+            "reason": "thread_reply",
+            "createdAt": "2026-08-02T01:00:30.000Z"
+          }
+        ],
         "members": [
           {
             "userId": "fixture-user",
@@ -232,6 +253,7 @@
           }
         ],
         "deletedRunIds": [],
+        "channelNotifications": [],
         "generatedAt": "2026-08-02T01:01:00.000Z"
       },
       "errorResponse": {

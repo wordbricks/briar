@@ -63,6 +63,12 @@ type CompanionChannelsProps = {
   currentUserId: string | null;
   projects: readonly ChannelGroupProject[];
   token: string;
+  requestedTarget?: {
+    channelId: string;
+    messageId: string;
+    rootMessageId: string;
+  } | null;
+  onRequestedTargetOpen?: () => void;
   onIssueOpen?: (projectId: string, runId: string) => void;
 };
 
@@ -77,6 +83,8 @@ export function CompanionChannels({
   currentUserId,
   projects,
   token,
+  requestedTarget,
+  onRequestedTargetOpen,
   onIssueOpen,
 }: CompanionChannelsProps) {
   const { t } = useI18n();
@@ -138,8 +146,10 @@ export function CompanionChannels({
         setMessages(result.messages);
         setMembers(result.members);
         setAgents(result.agents);
+        return result;
       } catch (cause) {
         setError(message(cause));
+        return null;
       } finally {
         setLoading(false);
       }
@@ -169,6 +179,55 @@ export function CompanionChannels({
     },
     [channel, organizationId, token],
   );
+
+  useEffect(() => {
+    if (!requestedTarget || channels.length === 0) return;
+    const summary = channels.find(
+      (candidate) => candidate.id === requestedTarget.channelId,
+    );
+    if (!summary) return;
+    let cancelled = false;
+    void (async () => {
+      const result = await openChannel(summary);
+      if (cancelled) return;
+      const targetIsOutsideRootWindow =
+        requestedTarget.rootMessageId === requestedTarget.messageId &&
+        !result?.messages.some(
+          (candidate) => candidate.id === requestedTarget.messageId,
+        );
+      if (
+        requestedTarget.rootMessageId !== requestedTarget.messageId ||
+        targetIsOutsideRootWindow
+      ) {
+        setThreadParentId(requestedTarget.rootMessageId);
+        setLoading(true);
+        try {
+          const result = await listChannelMessages(
+            token,
+            organizationId,
+            requestedTarget.channelId,
+            requestedTarget.rootMessageId,
+          );
+          if (!cancelled) setThread(result.messages);
+        } catch (cause) {
+          if (!cancelled) setError(message(cause));
+        } finally {
+          if (!cancelled) setLoading(false);
+        }
+      }
+      if (!cancelled) onRequestedTargetOpen?.();
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    channels,
+    onRequestedTargetOpen,
+    openChannel,
+    organizationId,
+    requestedTarget,
+    token,
+  ]);
 
   const send = useCallback(
     async (

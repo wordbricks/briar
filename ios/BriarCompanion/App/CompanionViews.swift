@@ -7,6 +7,7 @@ struct CompanionShellView: View {
     @AppStorage("companion-appearance") private var appearance = CompanionAppearance.system.rawValue
     @AppStorage("companion-locale") private var localeRaw = CompanionLocale.ko.rawValue
     @State private var showingSettings = false
+    @State private var homePath = NavigationPath()
     @State private var taskPath = NavigationPath()
 
     @ObservedObject var navigation: CompanionNavigationModel
@@ -33,7 +34,7 @@ struct CompanionShellView: View {
 
     var body: some View {
         TabView(selection: $navigation.selectedTab) {
-            NavigationStack {
+            NavigationStack(path: $homePath) {
                 ChannelsHomeView(
                     channels: channels,
                     activeProjectID: project.id,
@@ -46,6 +47,17 @@ struct CompanionShellView: View {
                 .navigationTitle(L10n.text(.channelHome, locale: companionLocale))
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar { companionToolbar(showsProjectMenu: true) }
+                .navigationDestination(for: CompanionNavigationModel.ChannelTarget.self) { target in
+                    ChannelInboxTargetView(
+                        channels: channels,
+                        target: target,
+                        currentUserID: user?.id,
+                        projects: projects,
+                        onIssueOpen: { projectID, runID in
+                            navigation.open(.issue(projectID: projectID, runID: runID))
+                        }
+                    )
+                }
             }
             .tabItem { Label(L10n.text(.channelHome, locale: companionLocale), systemImage: "house") }
             .tag(CompanionNavigationModel.Tab.home)
@@ -135,13 +147,34 @@ struct CompanionShellView: View {
                 taskPath.append(runID)
             }
         }
+        .onChange(of: navigation.pathChannelToken) { _, _ in
+            guard navigation.pendingProjectID == nil || navigation.pendingProjectID == project.id else {
+                return
+            }
+            if let target = navigation.consumePendingChannel() {
+                homePath.append(target)
+            }
+        }
         .onChange(of: project.id) { _, _ in
+            homePath = NavigationPath()
             taskPath = NavigationPath()
+            if let target = navigation.consumePendingChannel() {
+                homePath.append(target)
+            }
         }
         .task(id: navigation.pathIssueToken) {
             if let runID = navigation.pendingIssueID {
                 _ = navigation.consumePendingIssue()
                 taskPath.append(runID)
+            }
+        }
+        .task(id: navigation.pathChannelToken) {
+            guard navigation.pendingProjectID == nil || navigation.pendingProjectID == project.id else {
+                return
+            }
+            if let target = navigation.pendingChannelTarget {
+                _ = navigation.consumePendingChannel()
+                homePath.append(target)
             }
         }
     }

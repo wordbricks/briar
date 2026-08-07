@@ -9,6 +9,7 @@ import {
 } from "./lib/auto-hunt-contract";
 import type { StructuredAgentResult } from "./lib/agent-result";
 import type { AgentExecutionMetrics } from "./lib/agent-execution-metrics";
+import type { ChannelMessage } from "./lib/channels-contract";
 import type { ProjectAgentCodexPet } from "./lib/codex-pets";
 import type { AgentProvider, ModelEffort } from "./lib/project-llm";
 import type {
@@ -174,6 +175,20 @@ export type IssueConversationNotification = {
   rootMessageId: string;
   body: string;
   author: IssueMessageAuthor;
+  reason: "mention" | "thread_reply";
+  createdAt: string;
+};
+
+export type ChannelNotification = {
+  id: string;
+  organizationId: string;
+  channelId: string;
+  channelName: string;
+  defaultProjectId: string | null;
+  messageId: string;
+  rootMessageId: string;
+  body: string;
+  author: ChannelMessage["author"];
   reason: "mention" | "thread_reply";
   createdAt: string;
 };
@@ -540,6 +555,7 @@ export type DashboardPayload = {
   executionPolicy?: ProjectExecutionWorkerPolicy;
   members?: OrganizationMember[];
   conversationNotifications?: IssueConversationNotification[];
+  channelNotifications?: ChannelNotification[];
   cursor?: number;
   generatedAt: string;
 };
@@ -556,6 +572,7 @@ export type DashboardDeltaPayload = {
   executionPolicy?: ProjectExecutionWorkerPolicy;
   members?: OrganizationMember[];
   conversationNotifications?: IssueConversationNotification[];
+  channelNotifications?: ChannelNotification[];
   generatedAt: string;
 };
 

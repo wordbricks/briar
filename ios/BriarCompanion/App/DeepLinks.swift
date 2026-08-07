@@ -86,6 +86,12 @@ enum BriarShareLinks {
 
 @MainActor
 final class CompanionNavigationModel: ObservableObject {
+    struct ChannelTarget: Hashable, Sendable {
+        let channelID: UUID
+        let messageID: UUID
+        let rootMessageID: UUID
+    }
+
     enum Tab: Hashable {
         case home
         case tasks
@@ -97,8 +103,10 @@ final class CompanionNavigationModel: ObservableObject {
     @Published var pendingIssueID: UUID?
     @Published var pendingSessionID: String?
     @Published var pendingProjectID: UUID?
+    @Published var pendingChannelTarget: ChannelTarget?
     @Published var pathIssueToken = 0
     @Published var pathSessionToken = 0
+    @Published var pathChannelToken = 0
 
     func open(_ target: BriarLinkTarget) {
         pendingProjectID = target.projectID
@@ -122,9 +130,30 @@ final class CompanionNavigationModel: ObservableObject {
             if let runID = UUID(uuidString: message.targetId) {
                 open(.issue(projectID: message.projectId, runID: runID))
             }
+        case .channel:
+            guard
+                let channelID = UUID(uuidString: message.targetId),
+                let messageID = message.channelMessageId,
+                let rootMessageID = message.rootMessageId
+            else { return }
+            pendingProjectID = message.projectId
+            pendingIssueID = nil
+            pendingSessionID = nil
+            pendingChannelTarget = ChannelTarget(
+                channelID: channelID,
+                messageID: messageID,
+                rootMessageID: rootMessageID
+            )
+            selectedTab = .home
+            pathChannelToken &+= 1
         case .session:
             open(.session(projectID: message.projectId, sessionID: message.targetId))
         }
+    }
+
+    func consumePendingChannel() -> ChannelTarget? {
+        defer { pendingChannelTarget = nil }
+        return pendingChannelTarget
     }
 
     func consumePendingIssue() -> UUID? {

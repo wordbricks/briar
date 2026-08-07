@@ -1,5 +1,68 @@
 import SwiftUI
 
+/// Resolves an Inbox channel target into the existing channel or thread views.
+/// Loading by stable IDs keeps notification taps working before Home was opened.
+struct ChannelInboxTargetView: View {
+    @ObservedObject var channels: ChannelsStore
+    @State private var usesThreadFallback = false
+    let target: CompanionNavigationModel.ChannelTarget
+    let currentUserID: String?
+    let projects: [ProjectsResponse.Project]
+    let onIssueOpen: (UUID, UUID) -> Void
+
+    private var channel: ChannelSummary? {
+        channels.channels.first { $0.id == target.channelID }
+    }
+
+    private var threadParent: ChannelMessage? {
+        channels.thread.first { $0.id == target.rootMessageID }
+    }
+
+    var body: some View {
+        Group {
+            if let channel {
+                if target.rootMessageID != target.messageID || usesThreadFallback {
+                    if let threadParent {
+                        ChannelThreadView(
+                            channels: channels,
+                            channel: channel,
+                            parent: threadParent,
+                            currentUserID: currentUserID,
+                            projects: projects,
+                            onIssueOpen: onIssueOpen
+                        )
+                    } else {
+                        ProgressView()
+                    }
+                } else {
+                    ChannelMessagesView(
+                        channels: channels,
+                        channel: channel,
+                        currentUserID: currentUserID,
+                        projects: projects,
+                        onIssueOpen: onIssueOpen
+                    )
+                }
+            } else if channels.loading {
+                ProgressView()
+            } else {
+                ContentUnavailableView("채널을 찾을 수 없음", systemImage: "number")
+            }
+        }
+        .task(id: target) {
+            await channels.openChannel(target.channelID)
+            usesThreadFallback = target.rootMessageID == target.messageID &&
+                !channels.messages.contains { $0.id == target.messageID }
+            if target.rootMessageID != target.messageID || usesThreadFallback {
+                await channels.openThread(
+                    channelID: target.channelID,
+                    parentMessageID: target.rootMessageID
+                )
+            }
+        }
+    }
+}
+
 /// Home: the organization's channels, grouped by project with section dividers.
 struct ChannelsHomeView: View {
     @ObservedObject var channels: ChannelsStore
