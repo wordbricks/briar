@@ -162,15 +162,49 @@ test("server-renders the localized download catalog", async () => {
   );
 });
 
-test("landing header links to tutorial, blog, and download without section navigation", async () => {
+test("landing header links to tutorial, changelog, blog, and download without section navigation", async () => {
   const response = await render({ acceptLanguage: "en-US,en;q=0.9" });
   const html = await response.text();
   const header = html.match(/<header class="site-header">([\s\S]*?)<\/header>/)?.[1] ?? "";
 
   assert.match(header, /href="\/tutorial"/);
+  assert.match(header, /href="\/changelog"/);
   assert.match(header, /href="\/blog"/);
   assert.match(header, /href="\/download"/);
   assert.doesNotMatch(header, /href="#(?:product|workflow|security|agents)"/);
+});
+
+test("server-renders the localized changelog from published releases", async () => {
+  const koreanResponse = await render({
+    acceptLanguage: "ko-KR,ko;q=0.9",
+    path: "/changelog",
+  });
+  assert.equal(koreanResponse.status, 200);
+
+  const koreanHtml = await koreanResponse.text();
+  assert.match(koreanHtml, /<html lang="ko">/i);
+  assert.match(koreanHtml, /Briar 변경 기록/);
+  assert.match(koreanHtml, /현재 안정 버전/);
+  assert.match(koreanHtml, /채널 협업이 더 풍부해졌습니다/);
+  assert.match(koreanHtml, /v1\.2\.85/);
+  assert.match(koreanHtml, /v1\.2\.80/);
+  assert.match(koreanHtml, /aria-current="page"[^>]*>변경 기록</);
+  assert.match(
+    koreanHtml,
+    /href="https:\/\/github\.com\/wordbricks\/briar\/releases\/tag\/v1\.2\.85"/,
+  );
+
+  const englishResponse = await render({
+    acceptLanguage: "en-US,en;q=0.9",
+    path: "/changelog",
+  });
+  assert.equal(englishResponse.status, 200);
+
+  const englishHtml = await englishResponse.text();
+  assert.match(englishHtml, /<html lang="en">/i);
+  assert.match(englishHtml, /Briar changelog/);
+  assert.match(englishHtml, /Richer collaboration in channels/);
+  assert.match(englishHtml, /Current stable release/);
 });
 
 test("server-renders the localized empty blog", async () => {
