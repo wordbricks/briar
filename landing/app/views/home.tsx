@@ -432,7 +432,7 @@ export default async function HomeView({ locale }: { locale: Locale }) {
         <div className="hero-content shell">
           <div className="hero-kicker">
             <span />
-            Agent Development Environment
+            {c.hero.kicker}
           </div>
           <h1>
             {c.hero.line1}
@@ -454,19 +454,6 @@ export default async function HomeView({ locale }: { locale: Locale }) {
               aria-label={c.aria.macDownload}
             >
               {c.hero.macDownload} <span aria-hidden="true">↓</span>
-            </a>
-            <a
-              className="button button-secondary hero-action-download"
-              href={ANDROID_DOWNLOAD_URL}
-              aria-label={c.aria.androidDownload}
-            >
-              {c.hero.androidDownload} <span aria-hidden="true">↓</span>
-            </a>
-            <a
-              className="button button-secondary hero-action-workflow"
-              href="#workflow"
-            >
-              {c.hero.howItWorks} <span aria-hidden="true">↓</span>
             </a>
           </div>
           <div className="hero-actions-compact">
@@ -499,6 +486,29 @@ export default async function HomeView({ locale }: { locale: Locale }) {
 
       <section className="hero-product shell" id="product">
         <ProductStage c={c} />
+      </section>
+
+      <section className="differentiators-section shell" id="why-briar">
+        <div className="section-intro section-intro-centered">
+          <span className="section-index">{c.differentiators.index}</span>
+          <h2>{c.differentiators.title}</h2>
+          <p>{c.differentiators.description}</p>
+        </div>
+        <ol className="workflow-steps differentiator-list">
+          {c.differentiators.items.map((item, index) => (
+            <li key={item.title}>
+              <span>{String(index + 1).padStart(2, "0")}</span>
+              <div>
+                <h3>{item.title}</h3>
+                <p>{item.description}</p>
+              </div>
+            </li>
+          ))}
+        </ol>
+        <p className="differentiators-access">
+          <strong>{c.differentiators.accessLabel}</strong>{" "}
+          {c.differentiators.accessDescription}
+        </p>
       </section>
 
       <section className="principles shell">

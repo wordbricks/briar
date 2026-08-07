@@ -435,7 +435,27 @@ button:focus-visible {
 }
 
 .hero-actions-compact {
-  display: none;
+  display: flex;
+  gap: 22px;
+  align-items: center;
+  justify-content: center;
+  margin-top: 22px;
+}
+
+.hero-actions-compact a {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  color: var(--ink-muted);
+  font-size: 13px;
+  font-weight: 570;
+  letter-spacing: -0.01em;
+}
+
+.hero-actions-compact a:focus-visible {
+  border-radius: 4px;
+  outline: 2px solid var(--violet);
+  outline-offset: 3px;
 }
 
 .button {
@@ -689,6 +709,29 @@ button:focus-visible {
   color: #827679;
   font-family: var(--font-geist-mono), monospace;
   font-size: 11px;
+}
+
+.differentiators-section {
+  padding-bottom: 96px;
+}
+
+.differentiator-list {
+  max-width: 760px;
+  margin: 0 auto;
+}
+
+.differentiators-access {
+  max-width: 640px;
+  margin: 36px auto 0;
+  color: #6e6265;
+  font-size: 13px;
+  line-height: 1.75;
+  text-align: center;
+}
+
+.differentiators-access strong {
+  color: #33282b;
+  font-weight: 560;
 }
 
 .principles {
@@ -1708,35 +1751,14 @@ footer {
   }
 
   /* Only the primary CTA stays as a full-width button on mobile. The Mac
-     download, Android download, and "how it works" buttons are replaced by
-     the compact text-link row below, since a Mac-only download button is
-     not useful on a phone. */
-  .hero-action-download,
-  .hero-action-workflow {
+     download button is replaced by the compact text-link row below, since
+     a Mac-only download button is not useful on a phone. */
+  .hero-action-download {
     display: none;
   }
 
   .hero-actions-compact {
-    display: flex;
-    gap: 22px;
-    justify-content: center;
     margin-top: 20px;
-  }
-
-  .hero-actions-compact a {
-    display: inline-flex;
-    gap: 6px;
-    align-items: center;
-    color: var(--ink-muted);
-    font-size: 13px;
-    font-weight: 570;
-    letter-spacing: -0.01em;
-  }
-
-  .hero-actions-compact a:focus-visible {
-    border-radius: 4px;
-    outline: 2px solid var(--violet);
-    outline-offset: 3px;
   }
 
   .hero-meta {

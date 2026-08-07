@@ -79,7 +79,7 @@ test("server-renders Korean at /ko regardless of Accept-Language", async () => {
 
   const html = await response.text();
   assert.match(html, /<html lang="ko"[\s>]/i);
-  assert.match(html, /Briar — 에이전트 개발의 운영체제/);
+  assert.match(html, /Briar — Agent Development Environment/);
   assert.match(html, /이슈에서 PR까지/);
   assert.match(html, /에이전트 작업을 운영하세요/);
   assert.match(html, /코드는 로컬에/);
@@ -121,7 +121,7 @@ test("server-renders English for an English browser", async () => {
   assert.match(html, /<html lang="en"[\s>]/i);
   assert.match(
     html,
-    /Briar — The operating system for agent development/,
+    /Briar — Agent Development Environment/,
   );
   assert.match(html, /From issue to PR\./);
   assert.match(html, /Operate your agent work\./);
