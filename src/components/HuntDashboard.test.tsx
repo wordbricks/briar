@@ -1819,17 +1819,57 @@ describe("HuntDashboard", () => {
     const root = createRoot(container);
     await act(async () =>
       root.render(
-        <HuntDashboard
-          {...dashboardProps}
-          dashboard={demoDashboard}
-          recoveryError="상태 이동에 실패했습니다."
-        />,
+        <ToastProvider>
+          <HuntDashboard
+            {...dashboardProps}
+            dashboard={demoDashboard}
+            recoveryError="상태 이동에 실패했습니다."
+          />
+        </ToastProvider>,
       ),
     );
 
-    expect(container.querySelector(".error-banner")?.textContent).toContain(
-      "상태 이동에 실패했습니다.",
+    expect(container.querySelector(".error-banner")).toBeNull();
+    expect(
+      document.body.querySelector('[data-testid="app-toast"].error')?.textContent,
+    ).toContain("상태 이동에 실패했습니다.");
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("shows issue detail errors as error toasts instead of inline banners", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () =>
+      root.render(
+        <ToastProvider>
+          <RunPage
+            error="이슈 상태를 저장하지 못했습니다."
+            isRecovering={false}
+            isSidebarOpen
+            onBack={() => undefined}
+            onCancel={async () => undefined}
+            onLoadAttachment={async () => new Blob()}
+            onLoadIssueMessages={async () => []}
+            onLoadRunEvidence={async () => []}
+            onMove={async () => undefined}
+            onRetry={async () => undefined}
+            onSendIssueMessage={async () => {
+              throw new Error("not implemented in this test");
+            }}
+            run={demoDashboard.runs[0]}
+          />
+        </ToastProvider>,
+      ),
     );
+
+    expect(container.querySelector(".error-banner")).toBeNull();
+    expect(container.querySelector(".run-status-error")).toBeNull();
+    expect(
+      document.body.querySelector('[data-testid="app-toast"].error')?.textContent,
+    ).toContain("이슈 상태를 저장하지 못했습니다.");
 
     await act(async () => root.unmount());
     container.remove();

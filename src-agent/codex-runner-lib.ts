@@ -10,6 +10,7 @@ export type CodexRunnerRequest = {
   approvalPolicy: "untrusted" | "on-request" | "never";
   sandboxMode: "readOnly" | "workspaceWrite" | "dangerFullAccess";
   networkAccess: boolean;
+  imagePaths?: string[];
   codexBinary: string;
 };
 
@@ -182,7 +183,13 @@ export function codexTurnRequest(
     threadId,
     cwd: request.workspaceRoot,
     approvalPolicy: request.approvalPolicy,
-    input: [{ type: "text", text: request.message }],
+    input: [
+      { type: "text", text: request.message },
+      ...(request.imagePaths ?? []).map((path) => ({
+        type: "localImage",
+        path,
+      })),
+    ],
   };
   if (request.outputSchema !== null && request.outputSchema !== undefined) {
     params.outputSchema = request.outputSchema;

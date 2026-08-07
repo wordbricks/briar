@@ -84,6 +84,11 @@ import {
   selectProjectForApi,
 } from "./config-environment";
 import {
+  channelReplyImageDirectory,
+  cleanupChannelReplyImages,
+  downloadChannelReplyImages,
+} from "./channel-reply-images";
+import {
   healthyWorkerProviders,
   inspectWorkerProviderHealth,
 } from "./provider-health";
@@ -2706,9 +2711,23 @@ async function runClaimedChannelReply(
   if (!analysisWorktree) {
     await mkdir(workspacePath, { recursive: true });
   }
+  const imageDirectory = channelReplyImageDirectory(workspacePath);
   try {
-    const prompt = detachedChannelReplyPrompt({
+    const downloadedImages = await downloadChannelReplyImages({
+      apiUrl: config.apiUrl,
+      workerToken,
+      organizationId: reply.organizationId,
+      workId: reply.workId,
+      claimToken: reply.claimToken,
+      triggerMessageId: reply.triggerMessageId,
       snapshot: reply.snapshot,
+      workspacePath,
+    });
+    const prompt = detachedChannelReplyPrompt({
+      snapshot: {
+        ...reply.snapshot,
+        downloadedImagePaths: downloadedImages.paths,
+      },
       workspaceAvailable: Boolean(analysisWorktree),
     });
     const launch = detachedProviderRequest({
@@ -2725,6 +2744,7 @@ async function runClaimedChannelReply(
       workspacePath,
       fullAccess: false,
       readOnly: true,
+      imagePaths: downloadedImages.paths,
       agentBinary,
     });
     let command = agentBinary;
@@ -2835,20 +2855,24 @@ async function runClaimedChannelReply(
       terminate();
     }
   } finally {
-    if (analysisWorktree) {
-      try {
-        await removeAnalysisWorktree({
-          repositoryPath: project.repositoryPath,
-          path: analysisWorktree.path,
-          git: runGit,
-        });
-      } catch (error) {
-        console.error(
-          `Channel analysis worktree cleanup failed: ${
-            error instanceof Error ? error.message : String(error)
-          }`,
-        );
-      }
+    try {
+      await cleanupChannelReplyImages(
+        imageDirectory,
+        analysisWorktree
+          ? () =>
+              removeAnalysisWorktree({
+                repositoryPath: project.repositoryPath,
+                path: analysisWorktree.path,
+                git: runGit,
+              })
+          : undefined,
+      );
+    } catch (error) {
+      console.error(
+        `Channel image and analysis worktree cleanup failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
     }
   }
 }
