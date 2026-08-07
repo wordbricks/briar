@@ -552,7 +552,7 @@ describe("HuntDashboard", () => {
     },
   );
 
-  it("keeps compact Worker and workflow-stage icons on completed companion tasks", () => {
+  it("keeps a compact Worker icon and omits the workflow-stage icon on completed companion tasks", () => {
     const run = {
       ...demoDashboard.runs[0],
       status: "completed" as const,
@@ -573,7 +573,7 @@ describe("HuntDashboard", () => {
 
     expect(markup).toContain('class="kanban-card-worker-badge"');
     expect(markup).toContain('aria-label="배정된 Worker: Lemon Worker"');
-    expect(markup).toContain('class="kanban-card-stage-icon"');
+    expect(markup).not.toContain('class="kanban-card-stage-icon"');
     expect(markup).not.toContain(">Lemon Worker<");
   });
 

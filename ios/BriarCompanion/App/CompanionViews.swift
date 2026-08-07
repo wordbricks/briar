@@ -425,26 +425,6 @@ struct RunRow: View {
         return workers.first { $0.id == workerID }
     }
 
-    static func workflowStageSystemImage(for stage: String) -> String {
-        switch stage {
-        case "analyzing": "magnifyingglass"
-        case "planning": "list.bullet.clipboard"
-        case "implementing": "hammer"
-        case "reviewing": "eye"
-        case "pr_open": "arrow.triangle.pull"
-        case "local_qa", "ci_qa": "checkmark.seal"
-        case "staging_qa", "production_qa": "shippingbox"
-        case "monitoring": "waveform.path.ecg"
-        case "merged": "arrow.triangle.merge"
-        default: "point.3.connected.trianglepath.dotted"
-        }
-    }
-
-    static func workflowStageLabel(for run: DashboardRun) -> String? {
-        guard let workflowStage = run.workflowStage else { return nil }
-        return run.workflow?.stages.first { $0.id == workflowStage }?.label ?? workflowStage
-    }
-
     private var workerLabel: String? {
         worker?.label ?? run.workerId ?? run.requestedWorkerId
     }
@@ -491,14 +471,8 @@ struct RunRow: View {
     private var identityMetadata: some View {
         HStack(spacing: 10) {
             if let runNumber = run.runNumber {
-                Text("\(issueKeyPrefix)-\(runNumber)")
+                Text(verbatim: "\(issueKeyPrefix)-\(runNumber)")
                     .fixedSize(horizontal: true, vertical: false)
-            }
-            if let workflowStage = run.workflowStage,
-               let workflowStageLabel = Self.workflowStageLabel(for: run) {
-                Image(systemName: Self.workflowStageSystemImage(for: workflowStage))
-                    .accessibilityLabel("작업 단계 \(workflowStageLabel)")
-                    .help(workflowStageLabel)
             }
             if let assignee {
                 ProfileImageView(
@@ -1115,7 +1089,7 @@ struct RunDetailView: View {
                     HStack {
                         VStack(alignment: .leading) {
                             Text(dependency.title)
-                            Text("\(issueKeyPrefix)-\(dependency.runNumber) · \(dependency.status.displayName)")
+                            Text(verbatim: "\(issueKeyPrefix)-\(dependency.runNumber) · \(dependency.status.displayName)")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -1562,7 +1536,7 @@ struct RunDetailView: View {
                         reviewed: !(run.resultReviews ?? []).isEmpty
                     )
                     if let runNumber = run.runNumber {
-                        Text("\(issueKeyPrefix)-\(runNumber)")
+                        Text(verbatim: "\(issueKeyPrefix)-\(runNumber)")
                     }
                     Spacer()
                     Text(run.updatedAt, style: .relative)
@@ -1985,7 +1959,7 @@ struct DependencyPickerSheet: View {
                                             .foregroundStyle(.primary)
                                         HStack(spacing: 6) {
                                             if let number = candidate.runNumber {
-                                                Text("\(issueKeyPrefix)-\(number)")
+                                                Text(verbatim: "\(issueKeyPrefix)-\(number)")
                                             }
                                             Text(candidate.status.displayName)
                                         }

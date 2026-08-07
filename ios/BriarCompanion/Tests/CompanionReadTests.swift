@@ -92,7 +92,7 @@ final class CompanionReadTests: XCTestCase {
         }
     }
 
-    func testTaskRowUsesCompactStageAndWorkerIcons() {
+    func testTaskRowUsesCompactWorkerIcon() {
         let worker = DashboardWorker(
             id: "worker-1",
             label: "Mac Studio",
@@ -111,8 +111,6 @@ final class CompanionReadTests: XCTestCase {
             updatedAt: newer
         )
 
-        XCTAssertEqual(RunRow.workflowStageSystemImage(for: "merged"), "arrow.triangle.merge")
-        XCTAssertEqual(RunRow.workflowStageSystemImage(for: "custom"), "point.3.connected.trianglepath.dotted")
         XCTAssertEqual(RunRow.worker(for: run, workers: [worker]), worker)
     }
 }
