@@ -9,6 +9,7 @@ import type {
   ChannelMessage,
   ChannelSummary,
 } from "../lib/channels-contract";
+import type { OrganizationMember } from "../types";
 
 const listChannels = vi.fn();
 const loadChannel = vi.fn();
@@ -17,6 +18,10 @@ const sendChannelMessage = vi.fn();
 const acceptChannelProposal = vi.fn();
 const listChannelMessages = vi.fn();
 const createChannel = vi.fn();
+const loadOrganizationMembers = vi.fn();
+const listOrganizationAgents = vi.fn();
+const setChannelMember = vi.fn();
+const setChannelAgent = vi.fn();
 
 vi.mock("../lib/api", () => ({
   listChannels: (...args: unknown[]) => listChannels(...args),
@@ -26,6 +31,11 @@ vi.mock("../lib/api", () => ({
   acceptChannelProposal: (...args: unknown[]) => acceptChannelProposal(...args),
   listChannelMessages: (...args: unknown[]) => listChannelMessages(...args),
   createChannel: (...args: unknown[]) => createChannel(...args),
+  loadOrganizationMembers: (...args: unknown[]) =>
+    loadOrganizationMembers(...args),
+  listOrganizationAgents: (...args: unknown[]) => listOrganizationAgents(...args),
+  setChannelMember: (...args: unknown[]) => setChannelMember(...args),
+  setChannelAgent: (...args: unknown[]) => setChannelAgent(...args),
 }));
 
 const { Channels } = await import("./Channels");
@@ -62,6 +72,26 @@ const member: ChannelMember = {
   email: "sam@example.com",
   image: null,
   role: "member",
+  createdAt: "2026-08-01T00:00:00.000Z",
+};
+
+const organizationMember: OrganizationMember = {
+  userId: "user-3",
+  name: "Alex",
+  email: "alex@example.com",
+  image: null,
+  role: "member",
+  createdAt: "2026-08-01T00:00:00.000Z",
+};
+
+const availableAgent: ChannelAgentSummary = {
+  agentId: "agent-2",
+  handle: "reviewer",
+  name: "Reviewer",
+  provider: "codex",
+  model: null,
+  projectId: "project-1",
+  responsibility: "Review changes",
   createdAt: "2026-08-01T00:00:00.000Z",
 };
 
@@ -126,6 +156,13 @@ describe("Channels", () => {
       removedMessageIds: [],
       agentReplies: [],
     });
+    loadOrganizationMembers.mockResolvedValue([member, organizationMember]);
+    listOrganizationAgents.mockResolvedValue({
+      agents: [agent, availableAgent],
+      canManage: true,
+    });
+    setChannelMember.mockResolvedValue({ members: [member] });
+    setChannelAgent.mockResolvedValue({ agents: [agent] });
     await act(async () => {
       root.render(
         <Channels
@@ -247,6 +284,128 @@ describe("Channels", () => {
       "channel-1",
       expect.objectContaining({ mentionedAgentIds: [] }),
     );
+  });
+
+  it("opens the channel invite modal from the existing button and adds people and Agents", async () => {
+    await render([message()]);
+    loadChannel.mockResolvedValueOnce({
+      channel: { ...channel, memberCount: 3, agentCount: 2 },
+      members: [member, { ...organizationMember, role: "member" }],
+      agents: [agent, availableAgent],
+      messages: [message()],
+    });
+
+    const addPeople = [...container.querySelectorAll<HTMLButtonElement>("button")]
+      .find((button) => button.textContent?.includes("사람 추가"));
+    expect(addPeople).toBeDefined();
+    await act(async () => {
+      addPeople!.click();
+      await Promise.resolve();
+    });
+
+    const dialog = container.querySelector<HTMLElement>(".channel-invite-dialog");
+    expect(dialog?.textContent).toContain("#Welcome에 멤버 추가");
+    expect(dialog?.textContent).toContain("Alex");
+    expect(dialog?.textContent).toContain("Reviewer");
+    expect(dialog?.textContent).not.toContain("Sam");
+
+    const candidates = dialog!.querySelectorAll<HTMLButtonElement>(
+      ".channel-invite-candidate",
+    );
+    await act(async () => {
+      candidates[0]!.click();
+      candidates[1]!.click();
+    });
+    const add = [...dialog!.querySelectorAll<HTMLButtonElement>("button")]
+      .find((button) => button.textContent === "추가");
+    await act(async () => {
+      add!.click();
+      await Promise.resolve();
+    });
+
+    expect(setChannelMember).toHaveBeenCalledWith(
+      "token",
+      "org-1",
+      "channel-1",
+      "user-3",
+      true,
+    );
+    expect(setChannelAgent).toHaveBeenCalledWith(
+      "token",
+      "org-1",
+      "channel-1",
+      "agent-2",
+      true,
+    );
+    expect(container.querySelector(".channel-invite-dialog")).toBeNull();
+  });
+
+  it("waits for every invite request before refreshing after a partial failure", async () => {
+    await render([message()]);
+    const loadCallsBeforeInvite = loadChannel.mock.calls.length;
+    let finishAgentInvite!: () => void;
+    setChannelMember.mockRejectedValueOnce(new Error("Member invite failed"));
+    setChannelAgent.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishAgentInvite = () => resolve({ agents: [agent, availableAgent] });
+        }),
+    );
+    loadChannel.mockResolvedValueOnce({
+      channel: { ...channel, agentCount: 2 },
+      members: [member],
+      agents: [agent, availableAgent],
+      messages: [message()],
+    });
+
+    const addPeople = [...container.querySelectorAll<HTMLButtonElement>("button")]
+      .find((button) => button.textContent?.includes("사람 추가"));
+    await act(async () => {
+      addPeople!.click();
+      await Promise.resolve();
+    });
+    const candidates = container.querySelectorAll<HTMLButtonElement>(
+      ".channel-invite-candidate",
+    );
+    await act(async () => {
+      candidates[0]!.click();
+      candidates[1]!.click();
+    });
+    const add = [...container.querySelectorAll<HTMLButtonElement>("button")]
+      .find((button) => button.textContent === "추가");
+    await act(async () => {
+      add!.click();
+      await Promise.resolve();
+    });
+
+    expect(loadChannel).toHaveBeenCalledTimes(loadCallsBeforeInvite);
+
+    await act(async () => {
+      finishAgentInvite();
+      await Promise.resolve();
+    });
+
+    expect(loadChannel).toHaveBeenCalledTimes(loadCallsBeforeInvite + 1);
+    expect(container.querySelector(".channel-invite-dialog")).not.toBeNull();
+    expect(container.querySelector("[role=alert]")?.textContent).toContain(
+      "Member invite failed",
+    );
+  });
+
+  it("opens the invite modal for /invite without sending a message", async () => {
+    await render([message()]);
+    const textarea = container.querySelector("textarea")!;
+    await typeInto(textarea, "/invite");
+    await act(async () => {
+      textarea.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+      );
+      await Promise.resolve();
+    });
+
+    expect(container.querySelector(".channel-invite-dialog")).not.toBeNull();
+    expect(textarea.value).toBe("");
+    expect(sendChannelMessage).not.toHaveBeenCalled();
   });
 
   it("accepts an issue proposal against the channel's default project", async () => {

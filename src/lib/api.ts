@@ -1494,6 +1494,23 @@ export async function setChannelAgent(
   );
 }
 
+export async function setChannelMember(
+  token: string,
+  organizationId: string,
+  channelId: string,
+  userId: string,
+  present: boolean,
+) {
+  return request<{ members: ChannelMember[] }>(
+    `/organizations/${organizationId}/channels/${channelId}/members/${encodeURIComponent(userId)}`,
+    token,
+    {
+      method: present ? "PUT" : "DELETE",
+      body: present ? JSON.stringify({ role: "member" }) : undefined,
+    },
+  );
+}
+
 export async function acceptChannelProposal(
   token: string,
   organizationId: string,
