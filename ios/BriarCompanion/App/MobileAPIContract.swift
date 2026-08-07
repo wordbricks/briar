@@ -54,6 +54,14 @@ enum MobileAPIContract {
             return "\(base)?parentMessageId=\(parentMessageID.uuidString.lowercased())"
         }
 
+        static func acceptChannelProposal(
+            organizationID: UUID,
+            channelID: UUID,
+            proposalID: UUID
+        ) -> String {
+            "\(channel(organizationID: organizationID, channelID: channelID))/proposals/\(proposalID.uuidString.lowercased())/accept"
+        }
+
         static func runEvents(projectID: UUID, runID: UUID) -> String {
             "/projects/\(projectID.uuidString.lowercased())/runs/\(runID.uuidString.lowercased())/events"
         }

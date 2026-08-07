@@ -89,6 +89,8 @@ export const ko = {
   "channel.issueProposalAccepted": "승인되어 이슈가 생성되었습니다.",
   "channel.issueProposalPending": "승인하면 이슈가 생성됩니다.",
   "channel.createIssue": "이슈 만들기",
+  "channel.selectProposalProject": "프로젝트 선택",
+  "channel.viewIssue": "이슈 보기",
   "channel.replyCount": "답글 {count}개",
   "channel.replyInThread": "스레드에서 답글",
   "channel.messagePlaceholder": "#{name}에 메시지 보내기",
@@ -1535,6 +1537,8 @@ export type Messages = Record<MessageKey, string>;
 
 export const en: Messages = {
   ...ko,
+  "channel.selectProposalProject": "Select project",
+  "channel.viewIssue": "View issue",
   "settings.issueKeyPrefix": "Issue key prefix",
   "settings.issueKeyPrefixDescription": "Set the short code shown before issue numbers in this project.",
   "settings.issueKeyPrefixHint": "1–3 letters or numbers · Example: BR-42",
@@ -2276,6 +2280,8 @@ export const en: Messages = {
 };
 export const zh: Messages = {
   ...en,
+  "channel.selectProposalProject": "选择项目",
+  "channel.viewIssue": "查看问题",
   "settings.issueKeyPrefix": "问题键前缀",
   "settings.issueKeyPrefixDescription": "设置显示在此项目问题编号前的短代码。",
   "settings.issueKeyPrefixHint": "1–3 个字母或数字 · 示例：BR-42",

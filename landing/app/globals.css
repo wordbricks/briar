@@ -2497,7 +2497,7 @@ footer {
   content: "";
 }
 
-.hero-art img {
+.hero-art video {
   position: absolute;
   inset: 0;
   display: block;
@@ -3403,7 +3403,7 @@ footer {
     padding: 86px 0 194px;
   }
 
-  .hero-art img {
+  .hero-art video {
     opacity: 0.78;
     object-position: 50% center;
   }
@@ -3708,10 +3708,25 @@ html[data-theme="light"] .hero-art::after {
     linear-gradient(90deg, rgb(251 248 246 / 0.4), transparent 26% 72%, rgb(251 248 246 / 0.48));
 }
 
-html[data-theme="light"] .hero-art img {
-  content: url("/briar-hero-orchestration-light.webp");
+html[data-theme="light"] .hero-art video {
   opacity: 0.55;
   filter: saturate(0.78) contrast(0.92) brightness(1.04);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-art {
+    background-image: url("/briar-hero-orchestration.webp");
+    background-position: center;
+    background-size: cover;
+  }
+
+  .hero-art video {
+    display: none;
+  }
+
+  html[data-theme="light"] .hero-art {
+    background-image: url("/briar-hero-orchestration-light.webp");
+  }
 }
 
 html[data-theme="light"] .hero-content h1,

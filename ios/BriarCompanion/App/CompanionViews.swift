@@ -38,7 +38,10 @@ struct CompanionShellView: View {
                     channels: channels,
                     activeProjectID: project.id,
                     currentUserID: user?.id,
-                    projects: projects
+                    projects: projects,
+                    onIssueOpen: { projectID, runID in
+                        navigation.open(.issue(projectID: projectID, runID: runID))
+                    }
                 )
                 .navigationTitle(L10n.text(.channelHome, locale: companionLocale))
                 .navigationBarTitleDisplayMode(.inline)

@@ -30,6 +30,7 @@ struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
     let replyCount: Int
     let lastReplyAt: Date?
     let document: Document?
+    var proposal: Proposal?
     let createdAt: Date
 
     struct Author: Codable, Hashable, Sendable {
@@ -48,6 +49,24 @@ struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
         let messageId: UUID
         let title: String
         let projectId: UUID?
+    }
+
+    struct Proposal: Codable, Hashable, Identifiable, Sendable {
+        let id: UUID
+        let actionType: ActionType
+        let status: Status
+        let projectId: UUID?
+        let resultRunId: UUID?
+
+        enum ActionType: String, Codable, Hashable, Sendable {
+            case createIssue = "request_issue_create"
+            case createPlanDocument = "request_plan_document"
+        }
+
+        enum Status: String, Codable, Hashable, Sendable {
+            case pending
+            case accepted
+        }
     }
 }
 
@@ -75,6 +94,21 @@ struct CreateChannelMessageRequest: Codable, Sendable {
 
 struct CreateChannelMessageResponse: Codable, Sendable {
     let message: ChannelMessage
+}
+
+struct AcceptChannelProposalRequest: Codable, Equatable, Sendable {
+    let projectId: UUID?
+}
+
+struct AcceptChannelProposalResponse: Codable, Equatable, Sendable {
+    let outcome: Outcome
+    let projectId: UUID
+    let resultRunId: UUID
+
+    enum Outcome: String, Codable, Equatable, Sendable {
+        case accepted
+        case alreadyAccepted = "already_accepted"
+    }
 }
 
 struct ChannelMember: Codable, Equatable, Identifiable, Sendable {
@@ -154,7 +188,7 @@ enum ChannelMentions {
     ) -> [ChannelMentionTarget] {
         guard let query = query(in: body) else { return [] }
         let needle = query.text.lowercased()
-        guard !needle.isEmpty else { return candidates }
+        if needle.isEmpty { return candidates }
         return candidates.filter {
             "\($0.handle) \($0.label)".lowercased().contains(needle)
         }
