@@ -1295,7 +1295,10 @@ struct RunDetailView: View {
                 }
             }
             HStack {
-                if replyTo != nil { Button("답글 취소") { replyTo = nil } }
+                if replyTo != nil {
+                    Button("답글 취소") { replyTo = nil }
+                        .buttonStyle(.borderless)
+                }
                 PhotosPicker(
                     selection: $selectedMessagePhotos,
                     maxSelectionCount: max(
@@ -1307,6 +1310,7 @@ struct RunDetailView: View {
                 ) {
                     Label("갤러리", systemImage: "photo.on.rectangle")
                 }
+                .buttonStyle(.borderless)
                 .disabled(
                     isLoadingMessagePhotos ||
                         messageAttachments.count >= PendingIssueAttachment.maximumCount
@@ -1316,13 +1320,21 @@ struct RunDetailView: View {
                 } label: {
                     Label("붙여넣기", systemImage: "doc.on.clipboard")
                 }
+                .buttonStyle(.borderless)
                 Spacer()
-                Button("보내기") { Task { await sendMessage() } }
+                Button {
+                    Task { await sendMessage() }
+                } label: {
+                    Image(systemName: "paperplane.fill")
+                }
+                    .buttonStyle(.borderedProminent)
+                    .buttonBorderShape(.circle)
                     .disabled(
                         (messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
                             messageAttachments.isEmpty) ||
                             mutations.isActive("message-\(run.id)")
                     )
+                    .accessibilityLabel("보내기")
                     .accessibilityIdentifier("issue-message-send")
             }
         }

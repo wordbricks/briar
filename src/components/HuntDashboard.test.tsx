@@ -3327,6 +3327,11 @@ describe("HuntDashboard", () => {
     await act(async () => textarea?.dispatchEvent(paste));
     expect(container.querySelector(".issue-composer-attachment")?.textContent)
       .toContain("clipboard.png");
+    expect(
+      container.querySelector(
+        ".issue-conversation > .issue-message-composer .issue-message-send .lucide-send",
+      ),
+    ).not.toBeNull();
 
     await act(async () => {
       container.querySelector<HTMLButtonElement>(
