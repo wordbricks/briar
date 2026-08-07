@@ -10,6 +10,8 @@ import {
 } from "react";
 import { isDesktopTauri } from "../lib/platform";
 import { prepareForAppUpdate } from "../lib/planned-update-recovery";
+import { compareSemanticVersions } from "../lib/semantic-version";
+import { listenForWorkerUpdateLinks } from "../lib/worker-update-links";
 
 /** How often the signed update channel is re-checked while the app is open. */
 export const UPDATE_CHECK_INTERVAL_MS = 60 * 60 * 1000;
@@ -60,6 +62,23 @@ export function AppUpdateProvider({
     isInstallingRef.current = isInstalling;
   }, [isInstalling]);
 
+  const performInstall = useCallback(async (update: Update) => {
+    if (isInstallingRef.current) return;
+    isInstallingRef.current = true;
+    setIsInstalling(true);
+    setInstallError(null);
+    try {
+      await update.downloadAndInstall();
+      await prepareForAppUpdate();
+      const { relaunch } = await import("@tauri-apps/plugin-process");
+      await relaunch();
+    } catch (caught) {
+      isInstallingRef.current = false;
+      setIsInstalling(false);
+      setInstallError(caught instanceof Error ? caught.message : String(caught));
+    }
+  }, []);
+
   const checkForUpdate = useCallback(async () => {
     if (!supported || isInstallingRef.current) return availableRef.current;
     if (checkPromiseRef.current) return checkPromiseRef.current;
@@ -98,21 +117,37 @@ export function AppUpdateProvider({
     return () => window.clearInterval(intervalId);
   }, [checkForUpdate, supported]);
 
+  useEffect(() => {
+    if (!supported) return;
+    return listenForWorkerUpdateLinks(({ targetVersion }) => {
+      if (isInstallingRef.current) return;
+      void checkForUpdate()
+        .then(async (update) => {
+          if (!update) {
+            const { invoke } = await import("@tauri-apps/api/core");
+            await invoke("refresh_execution_worker_runtime");
+            return;
+          }
+          if (compareSemanticVersions(update.version, targetVersion) < 0) {
+            throw new Error(
+              `Signed update ${targetVersion} is not available yet`,
+            );
+          }
+          await performInstall(update);
+        })
+        .catch((caught) => {
+          setInstallError(
+            caught instanceof Error ? caught.message : String(caught),
+          );
+        });
+    });
+  }, [checkForUpdate, performInstall, supported]);
+
   const installUpdate = useCallback(async () => {
     const update = availableRef.current;
     if (!update) return;
-    setIsInstalling(true);
-    setInstallError(null);
-    try {
-      await update.downloadAndInstall();
-      await prepareForAppUpdate();
-      const { relaunch } = await import("@tauri-apps/plugin-process");
-      await relaunch();
-    } catch (caught) {
-      setIsInstalling(false);
-      setInstallError(caught instanceof Error ? caught.message : String(caught));
-    }
-  }, []);
+    await performInstall(update);
+  }, [performInstall]);
 
   const value = useMemo(
     () => ({

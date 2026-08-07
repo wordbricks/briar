@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { invoke } from "@tauri-apps/api/core";
 import {
   loadOrganizationExecutionWorkers,
+  requestOrganizationExecutionWorkerUpdate,
   updateOrganizationExecutionWorkerIcon,
 } from "../lib/api";
 import { OrganizationWorkersSettings } from "./OrganizationWorkersSettings";
@@ -15,6 +16,7 @@ vi.mock("../lib/platform", () => ({ isDesktopTauri: () => true }));
 vi.mock("../lib/api", () => ({
   disableOrganizationExecutionWorker: vi.fn(),
   loadOrganizationExecutionWorkers: vi.fn(),
+  requestOrganizationExecutionWorkerUpdate: vi.fn(),
   updateOrganizationExecutionWorkerConcurrency: vi.fn(),
   updateOrganizationExecutionWorkerIcon: vi.fn(),
 }));
@@ -52,15 +54,24 @@ describe("OrganizationWorkersSettings", () => {
           activeSessions: 0,
           lastHeartbeatAt: "2026-07-30T00:00:00Z",
           createdAt: "2026-07-30T00:00:00Z",
+          versions: { briar: "1.2.69" },
+          remoteUpdateSupported: true,
+          updateRequest: null,
           bindings: [],
         },
       ],
+      latestVersion: "1.2.84",
       canManage: true,
       generatedAt: "2026-07-30T00:00:00Z",
     });
     vi.mocked(updateOrganizationExecutionWorkerIcon).mockResolvedValue({
       deviceId: "device-1",
       icon: { type: "emoji", value: "🍋" },
+    });
+    vi.mocked(requestOrganizationExecutionWorkerUpdate).mockResolvedValue({
+      outcome: "requested",
+      requestId: "77777777-7777-4777-8777-777777777777",
+      targetVersion: "1.2.84",
     });
     localStorage.setItem("briar.locale.v1", "ko");
     (
@@ -178,6 +189,44 @@ describe("OrganizationWorkersSettings", () => {
       "organization-1",
       "device-1",
       { type: "emoji", value: "🍋" },
+    );
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("requests the latest signed version for a remote Worker", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(
+        <OrganizationWorkersSettings
+          connectedProjectIds={["project-1"]}
+          organization={{
+            id: "organization-1",
+            name: "Wordbricks",
+            handle: "wordbricks",
+            logo: null,
+            role: "owner",
+            createdAt: "2026-07-30T00:00:00Z",
+          }}
+          projects={[]}
+          token="token"
+          userId="user-1"
+        />,
+      );
+    });
+
+    const update = container.querySelector<HTMLButtonElement>(
+      '[aria-label="renamed-host Worker 업데이트"]',
+    );
+    expect(update?.disabled).toBe(false);
+    await act(async () => update?.click());
+    expect(requestOrganizationExecutionWorkerUpdate).toHaveBeenCalledWith(
+      "token",
+      "organization-1",
+      "device-1",
     );
 
     await act(async () => root.unmount());

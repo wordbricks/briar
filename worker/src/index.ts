@@ -290,6 +290,7 @@ import {
   authenticateExecutionWorker,
   bindExecutionWorkerProject,
   countExecutionWorkerDeviceSessions,
+  completeExecutionWorkerUpdates,
   countLeasedRuns,
   disableExecutionWorker,
   dispatchHuntRun,
@@ -302,6 +303,7 @@ import {
   listExecutionAuditEvents,
   listExecutionWorkers,
   listOrganizationExecutionWorkers,
+  pendingExecutionWorkerUpdate,
   getProjectExecutionWorkerPolicy,
   MAX_WORKER_CONCURRENT_SESSIONS,
   MAX_TRANSCRIPT_EVENTS_PER_REQUEST,
@@ -310,6 +312,7 @@ import {
   readAgentTranscript,
   recordWorkerHeartbeat,
   registerExecutionWorker,
+  requestExecutionWorkerUpdate,
   renewHuntRunLease,
   TranscriptLimitError,
   WorkerConflictError,
@@ -320,7 +323,11 @@ import {
   updateExecutionWorkerLabel,
   updateProjectExecutionWorkerPolicy,
 } from "./workers";
-import { serveRelease } from "./releases";
+import { readLatestVersion, serveRelease } from "./releases";
+import {
+  compareSemanticVersions,
+  isSemanticVersion,
+} from "../../src/lib/semantic-version";
 import {
   acceptChannelActionProposal,
   addChannelAgent,
@@ -5792,9 +5799,65 @@ async function route(
         organizationId,
         observedAt,
       ),
+      latestVersion: await readLatestVersion(env.RELEASES),
       canManage: canManageOrganization(role),
       generatedAt: observedAt,
     });
+  }
+
+  const organizationWorkerUpdateMatch = pathname.match(
+    /^\/organizations\/([0-9a-f-]+)\/workers\/([0-9a-zA-Z-]+)\/updates$/u,
+  );
+  if (organizationWorkerUpdateMatch && request.method === "POST") {
+    const session = await requireSession(auth, request);
+    const organizationId = organizationWorkerUpdateMatch[1];
+    const deviceId = organizationWorkerUpdateMatch[2];
+    const role = await getOrganizationRole(db, organizationId, session.user.id);
+    if (!role) throw new HttpError(404, "Organization not found");
+    const device = (
+      await listOrganizationExecutionWorkers(
+        db,
+        organizationId,
+        new Date().toISOString(),
+      )
+    ).find((candidate) => candidate.deviceId === deviceId);
+    if (!device) throw new HttpError(404, "Worker not found");
+    if (
+      device.ownerUserId !== session.user.id &&
+      !canManageOrganization(role)
+    ) {
+      throw new HttpError(
+        403,
+        "Worker owner or organization admin access required",
+      );
+    }
+    if (!device.remoteUpdateSupported) {
+      throw new HttpError(409, "Worker does not support remote updates");
+    }
+    const targetVersion = await readLatestVersion(env.RELEASES);
+    if (!targetVersion) throw new HttpError(503, "Latest release is unavailable");
+    const currentVersion = device.versions.briar;
+    if (
+      currentVersion &&
+      isSemanticVersion(currentVersion) &&
+      compareSemanticVersions(currentVersion, targetVersion) >= 0
+    ) {
+      return json({ outcome: "already_current", targetVersion });
+    }
+    const requestedAt = new Date().toISOString();
+    const updateRequest = await requestExecutionWorkerUpdate(db, {
+      id: crypto.randomUUID(),
+      organizationId,
+      deviceId,
+      requestedByUserId: session.user.id,
+      targetVersion,
+      requestedAt,
+    });
+    return json({
+      outcome: "requested",
+      requestId: updateRequest.id,
+      targetVersion: updateRequest.targetVersion,
+    }, 202);
   }
 
   const organizationWorkerMatch = pathname.match(
@@ -8718,6 +8781,16 @@ async function route(
       capabilities: input.capabilities,
       observedAt,
     });
+    await completeExecutionWorkerUpdates(
+      db,
+      principal.deviceId,
+      input.versions?.briar,
+      observedAt,
+    );
+    const updateDirective = await pendingExecutionWorkerUpdate(
+      db,
+      principal.deviceId,
+    );
     if (
       input.acceptingWork !== undefined ||
       input.readinessState !== undefined ||
@@ -8750,6 +8823,7 @@ async function route(
       worker: workerJson(worker, observedAt),
       reaped,
       workflowRequirements: projectWorkflow?.requirements ?? [],
+      updateDirective,
     });
   }
 
