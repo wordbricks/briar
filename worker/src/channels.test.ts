@@ -12,6 +12,7 @@ import {
   enqueueChannelAgentReplies,
   failChannelReply,
   getChannelById,
+  getClaimedChannelReplyAttachment,
   getChannelMessage,
   getChannelMessageAttachment,
   listChannelAgents,
@@ -339,6 +340,124 @@ describe("organization channels", () => {
         attachmentId,
       ),
     ).resolves.toMatchObject({ object_key: expect.stringContaining(attachmentId) });
+  });
+
+  it("limits a claimed reply image to its device, token, and trigger message", async () => {
+    const channelId = "e0000000-0000-4000-8000-000000000014";
+    const triggerId = "f0000000-0000-4000-8000-000000000014";
+    const attachmentId = "fa000000-0000-4000-8000-000000000014";
+    const otherMessageId = "f0000000-0000-4000-8000-000000000015";
+    const otherAttachmentId = "fa000000-0000-4000-8000-000000000015";
+    const claimTokenHash = "4".repeat(64);
+    await createChannel(db, {
+      id: channelId,
+      organizationId,
+      slug: "vision-room",
+      name: "Vision room",
+      topic: null,
+      visibility: "private",
+      defaultProjectId: null,
+      createdByUserId: ownerId,
+      createdAt: at(8),
+    });
+    const agent = await createOrganizationAgent(db, {
+      id: "aa000000-0000-4000-8000-000000000014",
+      organizationId,
+      name: "Vision",
+      provider: "grok",
+      model: null,
+      responsibility: "Inspect images",
+      effort: null,
+      createdAt: at(8),
+    });
+    await createChannelMessage(db, {
+      id: triggerId,
+      channelId,
+      parentMessageId: null,
+      authorUserId: ownerId,
+      authorAgentId: null,
+      authorAgentName: null,
+      authorAgentProvider: null,
+      body: "@vision inspect this image",
+      mentionedUserIds: [],
+      mentionedAgentIds: [agent!.id],
+      attachments: [{
+        id: attachmentId,
+        organization_id: organizationId,
+        object_key: `channel-attachments/${organizationId}/${channelId}/${triggerId}/${attachmentId}`,
+        filename: "trigger.png",
+        content_type: "image/png",
+        byte_size: 5,
+      }],
+      createdAt: at(8),
+    });
+    await createChannelMessage(db, {
+      id: otherMessageId,
+      channelId,
+      parentMessageId: null,
+      authorUserId: ownerId,
+      authorAgentId: null,
+      authorAgentName: null,
+      authorAgentProvider: null,
+      body: "Private unrelated image",
+      mentionedUserIds: [],
+      mentionedAgentIds: [],
+      attachments: [{
+        id: otherAttachmentId,
+        organization_id: organizationId,
+        object_key: `channel-attachments/${organizationId}/${channelId}/${otherMessageId}/${otherAttachmentId}`,
+        filename: "other.png",
+        content_type: "image/png",
+        byte_size: 5,
+      }],
+      createdAt: at(8),
+    });
+    await enqueueChannelAgentReplies(db, {
+      organizationId,
+      channelId,
+      triggerMessageId: triggerId,
+      parentMessageId: triggerId,
+      agents: [{ id: agent!.id, projectId: null, provider: "grok" }],
+      createdAt: at(8),
+    });
+    const claimed = await claimNextChannelAgentReply(db, organizationId, {
+      deviceId,
+      providers: ["grok"],
+      claimTokenHash,
+      claimedAt: at(9),
+      leaseExpiresAt: at(19),
+    });
+    expect(claimed).not.toBeNull();
+
+    const lookup = (overrides: Partial<Parameters<typeof getClaimedChannelReplyAttachment>[1]> = {}) =>
+      getClaimedChannelReplyAttachment(db, {
+        organizationId,
+        jobId: claimed!.id,
+        deviceId,
+        claimTokenHash,
+        attachmentId,
+        observedAt: at(10),
+        ...overrides,
+      });
+    await expect(lookup()).resolves.toMatchObject({
+      id: attachmentId,
+      message_id: triggerId,
+    });
+    await expect(lookup({ deviceId: "c0000000-0000-4000-8000-000000000099" }))
+      .resolves.toBeNull();
+    await expect(lookup({ claimTokenHash: "9".repeat(64) })).resolves.toBeNull();
+    await expect(lookup({ attachmentId: otherAttachmentId })).resolves.toBeNull();
+    await expect(lookup({ observedAt: at(20) })).resolves.toBeNull();
+    await completeChannelReply(db, claimed!, {
+      jobId: claimed!.id,
+      claimTokenHash,
+      body: "I inspected the image.",
+      document: null,
+      issueProposal: null,
+      agentName: "Vision",
+      agentProvider: "grok",
+      completedAt: at(10),
+    });
   });
 
   it("lets any organization device claim an organization Agent reply", async () => {

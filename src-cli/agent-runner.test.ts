@@ -195,6 +195,33 @@ describe("detached Agent runner", () => {
     });
   });
 
+  it("passes downloaded channel images only to the Codex vision input", () => {
+    const launch = detachedProviderRequest({
+      agent,
+      prompt: "Inspect the attached screenshot",
+      workspacePath: "/worktree",
+      fullAccess: false,
+      readOnly: true,
+      imagePaths: ["/worktree/.briar-channel-images/screen.png"],
+      agentBinary: "/bin/codex",
+    });
+    expect(launch.request).toMatchObject({
+      imagePaths: ["/worktree/.briar-channel-images/screen.png"],
+      sandboxMode: "readOnly",
+    });
+
+    const claudeLaunch = detachedProviderRequest({
+      agent: { ...agent, provider: "claude" },
+      prompt: "Inspect the attached screenshot",
+      workspacePath: "/worktree",
+      fullAccess: false,
+      readOnly: true,
+      imagePaths: ["/worktree/.briar-channel-images/screen.png"],
+      agentBinary: "/bin/claude",
+    });
+    expect(claudeLaunch.request).not.toHaveProperty("imagePaths");
+  });
+
   it("prevents terminal-stage replay after the final checkpoint resumes", () => {
     const prompt = detachedAgentPrompt({
       agent,
