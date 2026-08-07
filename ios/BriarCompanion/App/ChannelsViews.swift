@@ -103,7 +103,9 @@ struct ChannelMessagesView: View {
                     ForEach(channels.messages) { message in
                         ChannelMessageRow(
                             acceptingProposalID: channels.acceptingProposalID,
+                            agents: channels.agents,
                             channel: channel,
+                            members: channels.members,
                             message: message,
                             locale: locale,
                             onAcceptProposal: { proposalID, projectID in
@@ -196,7 +198,9 @@ struct ChannelThreadView: View {
                     ForEach(channels.thread) { message in
                         ChannelMessageRow(
                             acceptingProposalID: channels.acceptingProposalID,
+                            agents: channels.agents,
                             channel: channel,
+                            members: channels.members,
                             message: message,
                             locale: locale,
                             onAcceptProposal: { proposalID, projectID in
@@ -244,13 +248,24 @@ struct ChannelThreadView: View {
 
 private struct ChannelMessageRow: View {
     let acceptingProposalID: UUID?
+    let agents: [ChannelAgentSummary]
     let channel: ChannelSummary
+    let members: [ChannelMember]
     let message: ChannelMessage
     let locale: CompanionLocale
     let onAcceptProposal: (UUID, UUID) async -> AcceptChannelProposalResponse?
     let onIssueOpen: (UUID, UUID) -> Void
     let projects: [ProjectsResponse.Project]
     var showsThreadSummary = false
+
+    private var mentionHandles: Set<String> {
+        MessageMentions.channelHandles(
+            mentionedUserIds: message.mentionedUserIds,
+            mentionedAgentIds: message.mentionedAgentIds,
+            members: members,
+            agents: agents
+        )
+    }
 
     var body: some View {
         HStack(alignment: .top, spacing: 11) {
@@ -274,7 +289,7 @@ private struct ChannelMessageRow: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-                Text(message.body)
+                MentionText(text: message.body, handles: mentionHandles)
                     .font(.body)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 if let document = message.document {

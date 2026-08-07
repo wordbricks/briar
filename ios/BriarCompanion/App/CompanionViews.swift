@@ -60,6 +60,7 @@ struct CompanionShellView: View {
                     errorMessage: errorMessage,
                     token: token,
                     api: api,
+                    currentUserID: user?.id,
                     refresh: refresh
                 )
                 .id(project.id)
@@ -79,6 +80,7 @@ struct CompanionShellView: View {
                             workers: snapshot?.workers ?? [],
                             providers: snapshot?.organizationProviders ?? [],
                             members: snapshot?.members ?? [],
+                            currentUserID: user?.id,
                             refresh: refresh
                         )
                     } else {
@@ -250,6 +252,7 @@ struct TaskListView: View {
     let errorMessage: String?
     let token: String
     let api: any MobileAPIClientProtocol
+    let currentUserID: String?
     let refresh: () async -> Void
 
     @MainActor
@@ -261,6 +264,7 @@ struct TaskListView: View {
         errorMessage: String?,
         token: String,
         api: any MobileAPIClientProtocol,
+        currentUserID: String? = nil,
         refresh: @escaping () async -> Void
     ) {
         self.project = project
@@ -270,6 +274,7 @@ struct TaskListView: View {
         self.errorMessage = errorMessage
         self.token = token
         self.api = api
+        self.currentUserID = currentUserID
         self.refresh = refresh
         _mutations = StateObject(wrappedValue: IssueMutationStore(
             api: api,
@@ -331,6 +336,7 @@ struct TaskListView: View {
                                     workers: snapshot?.workers ?? [],
                                     providers: snapshot?.organizationProviders ?? [],
                                     members: snapshot?.members ?? [],
+                                    currentUserID: currentUserID,
                                     refresh: refresh
                                 )
                             } label: {
@@ -638,6 +644,7 @@ struct RunDetailView: View {
     @State private var dependencyIDs: Set<UUID>
     @State private var preferences: IssueExecutionPreferences
     @State private var messageText = ""
+    @State private var messageMentions: [ChannelMentionTarget] = []
     @State private var messageAttachments: [PendingIssueAttachment] = []
     @State private var selectedMessagePhotos: [PhotosPickerItem] = []
     @State private var isLoadingMessagePhotos = false
@@ -657,7 +664,22 @@ struct RunDetailView: View {
     private let workers: [DashboardWorker]
     private let providers: [AgentProvider]
     private let members: [OrganizationMember]
+    private let currentUserID: String?
     private let refresh: () async -> Void
+
+    private var issueMentionCandidates: [ChannelMentionTarget] {
+        MessageMentions.issueCandidates(members: members, currentUserId: currentUserID)
+    }
+
+    private var issueMentionSuggestions: [ChannelMentionTarget] {
+        Array(
+            ChannelMentions.suggestions(in: messageText, candidates: issueMentionCandidates).prefix(6)
+        )
+    }
+
+    private var issueMentionHandles: Set<String> {
+        MessageMentions.issueHandles(members: members)
+    }
 
     private var transferDestinations: [ProjectsResponse.Project] {
         let currentOrganization = projects.first(where: { $0.id == projectID })?.organizationId
@@ -679,6 +701,7 @@ struct RunDetailView: View {
         workers: [DashboardWorker] = [],
         providers: [AgentProvider] = [],
         members: [OrganizationMember] = [],
+        currentUserID: String? = nil,
         refresh: @escaping () async -> Void = {}
     ) {
         self.run = run
@@ -689,6 +712,7 @@ struct RunDetailView: View {
         self.workers = workers
         self.providers = providers
         self.members = members
+        self.currentUserID = currentUserID
         self.refresh = refresh
         _detail = StateObject(wrappedValue: RunDetailStore(
             api: api,
@@ -1208,9 +1232,49 @@ struct RunDetailView: View {
         }
 
         Section(replyTo == nil ? "메시지 보내기" : "\(replyTo?.author.name ?? "")에게 답글") {
+            if !issueMentionSuggestions.isEmpty {
+                ForEach(issueMentionSuggestions) { target in
+                    Button {
+                        messageText = ChannelMentions.insert(target, into: messageText)
+                        if !messageMentions.contains(where: { $0.id == target.id }) {
+                            messageMentions.append(target)
+                        }
+                    } label: {
+                        HStack(spacing: 10) {
+                            ProfileImageView(
+                                image: target.image,
+                                name: target.label,
+                                systemImage: target.kind == .agent ? "cpu" : "person.fill",
+                                size: 32
+                            )
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(target.label)
+                                    .font(.subheadline.weight(.semibold))
+                                    .lineLimit(1)
+                                Text("@\(target.handle)")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                            }
+                            Spacer(minLength: 8)
+                            Text(target.detail)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("issue-mention-\(target.id)")
+                }
+                .accessibilityIdentifier("issue-mention-menu")
+            }
             TextField("메시지 또는 @Briar 질문", text: $messageText, axis: .vertical)
                 .lineLimit(2...6)
                 .accessibilityIdentifier("issue-message-field")
+                .onChange(of: messageText) { _, body in
+                    messageMentions = ChannelMentions.retained(in: body, mentions: messageMentions)
+                }
             ForEach(messageAttachments) { attachment in
                 HStack {
                     if let image = UIImage(data: attachment.data) {
@@ -1287,17 +1351,33 @@ struct RunDetailView: View {
                 }
                 if let parent = detail.messages.first(where: { $0.id == message.parentMessageId }) {
                     HStack(alignment: .top, spacing: 6) {
-                        Image(systemName: "arrowshape.turn.up.left").font(.caption2)
-                        Text(conversationMessageText(parent.body)).font(.caption).lineLimit(2)
+                        Image(systemName: "arrowshape.turn.up.left")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                        MentionText(
+                            text: conversationMessageText(parent.body),
+                            handles: issueMentionHandles
+                        )
+                        .font(.caption)
+                        .lineLimit(2)
+                        .foregroundStyle(.secondary)
                     }
-                    .foregroundStyle(.secondary)
                     .padding(8)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(Color.secondary.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
                 }
                 let visibleBody = conversationMessageText(message.body)
                 if !visibleBody.isEmpty {
-                    MarkdownText(markdown: visibleBody)
+                    MarkdownText(
+                        markdown: MessageMentions.markdownWithLinks(
+                            visibleBody,
+                            handles: issueMentionHandles
+                        )
+                    )
+                    .environment(\.openURL, OpenURLAction { url in
+                        if url.scheme == "briar-mention" { return .handled }
+                        return .systemAction
+                    })
                 }
                 ForEach(message.attachments ?? []) { attachment in
                     AuthenticatedImagePreview(
@@ -1755,15 +1835,21 @@ struct RunDetailView: View {
     }
 
     private func sendMessage() async {
+        let retainedMentions = ChannelMentions.retained(in: messageText, mentions: messageMentions)
+        let mentionedUserIds = retainedMentions.compactMap {
+            $0.kind == .user ? $0.recipientId : nil
+        }
         do {
             let sent = try await mutations.sendMessage(
                 runID: run.id,
                 body: messageText,
                 parentMessageID: replyTo?.id,
+                mentionedUserIds: mentionedUserIds,
                 attachments: messageAttachments
             )
             detail.appendMessages(sent)
             messageText = ""
+            messageMentions = []
             messageAttachments = []
             replyTo = nil
             actionError = nil
@@ -1772,18 +1858,21 @@ struct RunDetailView: View {
             actionError = error.localizedDescription
             if case IssueMutationError.agentReplyTimedOut = error {
                 messageText = ""
+                messageMentions = []
                 messageAttachments = []
                 replyTo = nil
                 await detail.load()
                 await refresh()
             } else if case IssueMutationError.agentReplyPollingFailed = error {
                 messageText = ""
+                messageMentions = []
                 messageAttachments = []
                 replyTo = nil
                 await detail.load()
                 await refresh()
             } else if case IssueMutationError.agentReplyFailed = error {
                 messageText = ""
+                messageMentions = []
                 messageAttachments = []
                 replyTo = nil
                 await detail.load()
