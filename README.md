@@ -77,3 +77,7 @@ Focused issues and pull requests are welcome, especially bug fixes, reliability 
 Before opening a pull request, run the relevant local checks and keep changes scoped. Workflow and operations documentation lives in [`docs/`](docs/), including guides for [isolated worktrees](docs/operations/workflow-worktrees.md), [GitHub integration](docs/operations/github-integration.md), [Slack integration](docs/operations/slack-integration.md), and [production releases](docs/operations/production-release.md).
 
 Need help or found a bug? [Open a GitHub issue](https://github.com/wordbricks/briar/issues).
+
+## License
+
+Except where otherwise noted, Briar is licensed under the [Apache License 2.0](LICENSE). Third-party components remain subject to their respective licenses.
