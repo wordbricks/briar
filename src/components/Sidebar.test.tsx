@@ -323,6 +323,52 @@ describe("Sidebar", () => {
     });
 
     expect(onCreateIssue).toHaveBeenCalledOnce();
+    expect(onCreateIssue).toHaveBeenCalledWith("project-1");
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("opens issue creation for the clicked project when another is active", async () => {
+    const onProjectChange = vi.fn();
+    const onCreateIssue = vi.fn();
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(
+        <Sidebar
+          {...sidebarProps}
+          activeProjectId="project-1"
+          onCreateIssue={onCreateIssue}
+          onProjectChange={onProjectChange}
+          projects={[
+            ...sidebarProps.projects,
+            {
+              id: "project-2",
+              name: "Console",
+              organizationId: "organization-1",
+              organizationName: "Briar",
+              role: "owner" as const,
+              createdAt: "2026-07-23T00:00:00Z",
+            },
+          ]}
+        />,
+      );
+    });
+
+    const consoleAdd = Array.from(
+      container.querySelectorAll<HTMLButtonElement>(".sidebar-issue-add"),
+    ).find((button) =>
+      button.closest(".sidebar-project-group")?.textContent?.includes("Console"),
+    );
+    expect(consoleAdd).toBeDefined();
+    await act(async () => {
+      consoleAdd?.click();
+    });
+
+    expect(onProjectChange).toHaveBeenCalledWith("project-2");
+    expect(onCreateIssue).toHaveBeenCalledWith("project-2");
 
     await act(async () => root.unmount());
     container.remove();

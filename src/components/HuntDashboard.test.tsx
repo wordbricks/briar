@@ -179,6 +179,33 @@ describe("HuntDashboard", () => {
     expect(markup).toContain('aria-label="새 이슈"');
   });
 
+  it("preselects the requested project in the create dialog", () => {
+    const markup = renderToStaticMarkup(
+      <HuntDashboard
+        {...dashboardProps}
+        createIssueDefaultProjectId="project-2"
+        dashboard={demoDashboard}
+        isIssueDialogOpen
+        projects={[
+          {
+            id: "demo-project",
+            name: "Briar",
+            organizationId: "organization-1",
+            createdAt: "2026-07-01T00:00:00.000Z",
+          },
+          {
+            id: "project-2",
+            name: "Mobile",
+            organizationId: "organization-1",
+            createdAt: "2026-07-02T00:00:00.000Z",
+          },
+        ]}
+      />,
+    );
+
+    expect(markup).toContain(">Mobile<");
+  });
+
   it("opens issue creation with Command-N", async () => {
     const container = document.createElement("div");
     document.body.append(container);
