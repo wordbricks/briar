@@ -8,6 +8,7 @@ struct CompanionShellView: View {
     @AppStorage("companion-locale") private var localeRaw = CompanionLocale.ko.rawValue
     @State private var showingSettings = false
     @State private var taskPath = NavigationPath()
+    @State private var homePath = NavigationPath()
 
     @ObservedObject var navigation: CompanionNavigationModel
     @ObservedObject var agents: AgentsStore
@@ -33,7 +34,7 @@ struct CompanionShellView: View {
 
     var body: some View {
         TabView(selection: $navigation.selectedTab) {
-            NavigationStack {
+            NavigationStack(path: $homePath) {
                 ChannelsHomeView(
                     channels: channels,
                     activeProjectID: project.id,
@@ -135,6 +136,9 @@ struct CompanionShellView: View {
                 taskPath.append(runID)
             }
         }
+        .onChange(of: navigation.pathChannelToken) { _, _ in
+            Task { await openPendingChannel() }
+        }
         .onChange(of: project.id) { _, _ in
             taskPath = NavigationPath()
         }
@@ -144,6 +148,27 @@ struct CompanionShellView: View {
                 taskPath.append(runID)
             }
         }
+        .task(id: navigation.pathChannelToken) {
+            await openPendingChannel()
+        }
+    }
+
+    @MainActor
+    private func openPendingChannel() async {
+        guard let target = navigation.consumePendingChannel() else { return }
+        if !channels.channels.contains(where: { $0.id == target.channelID }) {
+            await channels.refresh()
+        }
+        guard let channel = channels.channels.first(where: { $0.id == target.channelID }) else {
+            return
+        }
+        homePath = NavigationPath()
+        homePath.append(channel)
+        await channels.openChannel(target.channelID)
+        guard let root = channels.messages.first(where: { $0.id == target.rootMessageID }) else {
+            return
+        }
+        homePath.append(root)
     }
 
     @ToolbarContentBuilder

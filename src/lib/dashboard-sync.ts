@@ -1,6 +1,7 @@
 import type {
   DashboardDeltaPayload,
   DashboardPayload,
+  ChannelConversationNotification,
   ExecutionWorker,
   HuntRun,
   IssueConversationNotification,
@@ -98,6 +99,12 @@ export function mergeDashboardDelta(
         current.conversationNotifications ?? [],
         delta.conversationNotifications,
       );
+  const channelNotifications = delta.channelNotifications === undefined
+    ? current.channelNotifications
+    : replaceEntities<ChannelConversationNotification>(
+        current.channelNotifications ?? [],
+        delta.channelNotifications,
+      );
 
   const changed =
     runs !== current.runs ||
@@ -107,7 +114,8 @@ export function mergeDashboardDelta(
     settings !== current.settings ||
     executionPolicy !== current.executionPolicy ||
     members !== current.members ||
-    conversationNotifications !== current.conversationNotifications;
+    conversationNotifications !== current.conversationNotifications ||
+    channelNotifications !== current.channelNotifications;
   if (!changed) return { dashboard: current, changed: false };
   return {
     dashboard: {
@@ -120,6 +128,7 @@ export function mergeDashboardDelta(
       executionPolicy,
       members,
       conversationNotifications,
+      channelNotifications,
       cursor: delta.cursor,
       generatedAt: delta.generatedAt,
     },

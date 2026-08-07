@@ -1926,6 +1926,12 @@
               "$ref": "#/components/schemas/ConversationNotification"
             }
           },
+          "channelNotifications": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChannelNotification"
+            }
+          },
           "cursor": {
             "type": "integer",
             "minimum": 0
@@ -1998,6 +2004,12 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/ConversationNotification"
+            }
+          },
+          "channelNotifications": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChannelNotification"
             }
           },
           "generatedAt": {
@@ -2172,6 +2184,33 @@
             "type": "string",
             "format": "date-time"
           }
+        },
+        "additionalProperties": true
+      },
+      "ChannelNotification": {
+        "type": "object",
+        "required": [
+          "id",
+          "channelId",
+          "channelName",
+          "rootMessageId",
+          "body",
+          "author",
+          "reason",
+          "createdAt"
+        ],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "channelId": { "type": "string", "format": "uuid" },
+          "channelName": { "type": "string" },
+          "rootMessageId": { "type": "string", "format": "uuid" },
+          "body": { "type": "string" },
+          "author": { "$ref": "#/components/schemas/MessageAuthor" },
+          "reason": {
+            "type": "string",
+            "enum": ["mention", "thread_reply"]
+          },
+          "createdAt": { "type": "string", "format": "date-time" }
         },
         "additionalProperties": true
       },

@@ -178,6 +178,17 @@ export type IssueConversationNotification = {
   createdAt: string;
 };
 
+export type ChannelConversationNotification = {
+  id: string;
+  channelId: string;
+  channelName: string;
+  rootMessageId: string;
+  body: string;
+  author: IssueMessageAuthor;
+  reason: "mention" | "thread_reply";
+  createdAt: string;
+};
+
 export type RunEvidenceImage = {
   id: string;
   filename: string;
@@ -540,6 +551,7 @@ export type DashboardPayload = {
   executionPolicy?: ProjectExecutionWorkerPolicy;
   members?: OrganizationMember[];
   conversationNotifications?: IssueConversationNotification[];
+  channelNotifications?: ChannelConversationNotification[];
   cursor?: number;
   generatedAt: string;
 };
@@ -556,6 +568,7 @@ export type DashboardDeltaPayload = {
   executionPolicy?: ProjectExecutionWorkerPolicy;
   members?: OrganizationMember[];
   conversationNotifications?: IssueConversationNotification[];
+  channelNotifications?: ChannelConversationNotification[];
   generatedAt: string;
 };
 
