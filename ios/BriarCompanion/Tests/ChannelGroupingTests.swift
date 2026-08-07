@@ -177,6 +177,8 @@ final class ChannelGroupingTests: XCTestCase {
             currentUserId: "user-1"
         )
 
+        XCTAssertEqual(candidates.map(\.handle), ["honey"])
+        XCTAssertEqual(ChannelMentions.suggestions(in: "@h", candidates: candidates).map(\.handle), ["honey"])
         XCTAssertEqual(ChannelMentions.suggestions(in: "@", candidates: candidates).map(\.handle), ["honey"])
         XCTAssertEqual(ChannelMentions.insert(candidates[0], into: "확인 @hon"), "확인 @honey ")
     }
