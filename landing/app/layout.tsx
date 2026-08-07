@@ -1,18 +1,37 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import localFont from "next/font/local";
 import { headers } from "next/headers";
 import "./globals.css";
 import { copy } from "./i18n";
 import { getRequestLocale } from "./request-locale";
 
-const geistSans = Geist({
+// Self-hosted latin-only slices of the Geist variable fonts, extracted
+// from the woff2 files Google's own API serves for Geist/Geist Mono at
+// wght 100-900. `next/font/google` with `subsets: ["latin"]` still ships
+// every script Geist supports
+// (latin, latin-ext, cyrillic, cyrillic-ext, vietnamese, +symbols2 for
+// Mono) as 5-6 separate woff2 files each, and preloads all of them - 11
+// files total - because there's no per-subset filtering. This page only
+// ever renders latin text (English + Korean copy, where Korean already
+// falls back to a system font since Geist has no Hangul glyphs either
+// way) and a handful of decorative symbols (↗ ⌁ ▦ ⌕ ◆ ◇ ＋) that fall
+// outside every Geist subset, latin included, so they already render via
+// system fallback today. Loading just the latin file per family (still
+// the full variable 100-900 weight range, so every fractional
+// font-weight in globals.css still interpolates exactly as before) cuts
+// 11 preloaded fonts down to 2 with no visual change.
+const geistSans = localFont({
+  src: "./fonts/geist-sans-latin.woff2",
   variable: "--font-geist-sans",
-  subsets: ["latin"],
+  weight: "100 900",
+  display: "swap",
 });
 
-const geistMono = Geist_Mono({
+const geistMono = localFont({
+  src: "./fonts/geist-mono-latin.woff2",
   variable: "--font-geist-mono",
-  subsets: ["latin"],
+  weight: "100 900",
+  display: "swap",
 });
 
 export async function generateMetadata(): Promise<Metadata> {
