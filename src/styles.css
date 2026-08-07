@@ -5289,7 +5289,62 @@ button.issue-message-state { width:100%; cursor:pointer; }
   overflow: hidden;
   background: var(--card, #fff);
 }
-.channels:has(.channel-thread) { grid-template-columns: minmax(0, 1fr) minmax(320px, 30%); }
+.channels:has(.channel-thread) {
+  grid-template-columns: minmax(0, 1fr) var(--channel-thread-resizer-width, 6px) minmax(320px, var(--channel-thread-width, 42%));
+}
+.channels.is-resizing-thread { cursor: col-resize; user-select: none; }
+
+.channel-thread-resizer {
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  position: relative;
+  z-index: 1;
+  cursor: col-resize;
+  touch-action: none;
+  outline: none;
+  background: transparent;
+}
+.channel-thread-resizer::before {
+  content: "";
+  width: 1px;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  background: var(--border, #ddd8cf);
+  opacity: 0;
+  transform: translateX(-50%);
+  transition: opacity .12s ease-out, background-color .12s ease-out, box-shadow .12s ease-out;
+}
+.channel-thread-resizer::after {
+  content: "";
+  width: 5px;
+  height: 34px;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  border: 1px solid var(--border, #ddd8cf);
+  border-radius: 999px;
+  background: var(--card, #fff);
+  opacity: 0;
+  transform: translate(-50%, -50%);
+  transition: opacity .12s ease-out, border-color .12s ease-out, background-color .12s ease-out;
+}
+.channel-thread-resizer:hover::before,
+.channel-thread-resizer:focus-visible::before,
+.channels.is-resizing-thread .channel-thread-resizer::before {
+  opacity: 1;
+  background: #a997df;
+  box-shadow: 0 0 0 1px rgba(128, 104, 206, .08);
+}
+.channel-thread-resizer:hover::after,
+.channel-thread-resizer:focus-visible::after,
+.channels.is-resizing-thread .channel-thread-resizer::after {
+  opacity: 1;
+  border-color: #a997df;
+  background: #f1edfc;
+}
 
 .channel-main { display: flex; min-height: 0; min-width: 0; height: 100%; flex-direction: column; background: var(--card, #fff); }
 
@@ -5705,6 +5760,7 @@ button.issue-message-state { width:100%; cursor:pointer; }
 @media (max-width: 900px) {
   .channels,
   .channels:has(.channel-thread) { grid-template-columns: minmax(0, 1fr); }
+  .channel-thread-resizer { display: none; }
   .channel-thread { position: fixed; inset: 0; z-index: 60; }
   .channel-welcome { padding: 20px 16px 12px; }
   .channel-welcome-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); max-width: none; }

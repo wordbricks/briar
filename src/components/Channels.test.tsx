@@ -339,4 +339,76 @@ describe("Channels", () => {
     expect(card?.textContent).toContain("Onboarding plan");
     expect(card?.textContent).toContain("조직 문서");
   });
+
+  it("resizes the thread panel with the separator", async () => {
+    listChannelMessages.mockResolvedValue({ messages: [] });
+    await render([
+      message({
+        id: "message-6",
+        replyCount: 1,
+        parentMessageId: null,
+      }),
+    ]);
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(".channel-thread-link")?.click();
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    const resizer = container.querySelector<HTMLElement>(
+      ".channel-thread-resizer",
+    );
+    expect(resizer).not.toBeNull();
+    expect(resizer?.getAttribute("role")).toBe("separator");
+    expect(resizer?.getAttribute("aria-orientation")).toBe("vertical");
+    expect(resizer?.getAttribute("aria-valuemin")).toBe("30");
+    expect(resizer?.getAttribute("aria-valuemax")).toBe("65");
+    expect(resizer?.getAttribute("aria-valuenow")).toBe("42");
+    const channels = container.querySelector<HTMLElement>(".channels");
+    expect(
+      channels?.style.getPropertyValue("--channel-thread-width"),
+    ).toBe("");
+    expect(container.querySelector(".channel-thread")).not.toBeNull();
+
+    await act(async () => {
+      resizer?.dispatchEvent(
+        new KeyboardEvent("keydown", { bubbles: true, key: "ArrowRight" }),
+      );
+    });
+    expect(resizer?.getAttribute("aria-valuenow")).toBe("47");
+    expect(
+      channels?.style.getPropertyValue("--channel-thread-width"),
+    ).toBe("47%");
+    expect(
+      window.localStorage.getItem("briar.settings.channel-thread-width.v1"),
+    ).toBe("47");
+
+    await act(async () => {
+      resizer?.dispatchEvent(
+        new KeyboardEvent("keydown", { bubbles: true, key: "Home" }),
+      );
+    });
+    expect(resizer?.getAttribute("aria-valuenow")).toBe("30");
+
+    await act(async () => {
+      resizer?.dispatchEvent(
+        new KeyboardEvent("keydown", { bubbles: true, key: "End" }),
+      );
+    });
+    expect(resizer?.getAttribute("aria-valuenow")).toBe("65");
+
+    await act(async () => {
+      resizer?.dispatchEvent(
+        new KeyboardEvent("keydown", { bubbles: true, key: "ArrowLeft" }),
+      );
+    });
+    expect(resizer?.getAttribute("aria-valuenow")).toBe("60");
+    expect(
+      channels?.style.getPropertyValue("--channel-thread-width"),
+    ).toBe("60%");
+
+    window.localStorage.removeItem("briar.settings.channel-thread-width.v1");
+  });
 });
