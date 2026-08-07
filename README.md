@@ -52,6 +52,8 @@ bun run dev:all
 
 Useful checks:
 
+For the fastest pre-PR validation, run `bun run check`.
+
 ```sh
 bun run check
 bun test
