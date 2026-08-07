@@ -96,7 +96,10 @@ import {
   generateProjectWorkflow,
   reviseProjectWorkflow,
 } from "../lib/project-workflow";
-import { shouldSyncSharedWorkflow } from "../lib/shared-workflow-sync";
+import {
+  shouldSyncSharedWorkflow,
+  syncSharedProjectWorkflows,
+} from "../lib/shared-workflow-sync";
 import {
   clearSessionToken,
   readSessionToken,
@@ -697,8 +700,52 @@ export function useBriar(options: UseBriarOptions = {}) {
     token,
   ]);
 
-  const lastSyncedSharedWorkflowKey = useRef<string | null>(null);
-  const lastSyncedProjectId = useRef<string | null>(null);
+  const lastSyncedSharedWorkflowKeys = useRef(new Map<string, string>());
+
+  // Once the saved session and local project ids have been restored, mirror
+  // the server-owned workflow for every repository connected to this desktop.
+  // Keep each project independent so an offline/deleted project cannot block
+  // the app or leave other connected repositories with stale worker settings.
+  useEffect(() => {
+    if (
+      demoMode ||
+      remoteMode ||
+      !token ||
+      connectedProjectIds === null
+    ) {
+      return;
+    }
+    const projectIds = projects
+      .map((project) => project.id)
+      .filter((projectId) =>
+        isProjectConnectedLocally(connectedProjectIds, projectId),
+      );
+    if (projectIds.length === 0) return;
+
+    let cancelled = false;
+    void syncSharedProjectWorkflows({
+      projectIds,
+      lastSyncedKeys: lastSyncedSharedWorkflowKeys.current,
+      loadSharedWorkflow: async (projectId) =>
+        (await loadDashboard(token, projectId)).settings.workflow,
+      updateLocalWorkflow: updateLocalProjectWorkflow,
+    }).then((results) => {
+      if (cancelled) return;
+      for (const result of results) {
+        if (result.status === "synced" || result.status === "unchanged") {
+          lastSyncedSharedWorkflowKeys.current.set(result.projectId, result.key);
+        } else if (result.status === "failed") {
+          console.warn(
+            `Failed to mirror shared project workflow for ${result.projectId}`,
+            result.error,
+          );
+        }
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [connectedProjectIds, projects, token]);
 
   const refreshHealth = useCallback(async () => {
     if (
@@ -712,10 +759,6 @@ export function useBriar(options: UseBriarOptions = {}) {
       setHealthError(null);
       return null;
     }
-    if (lastSyncedProjectId.current !== activeProjectId) {
-      lastSyncedProjectId.current = activeProjectId;
-      lastSyncedSharedWorkflowKey.current = null;
-    }
     setHealthLoading(true);
     try {
       // Project workflow tools are shared via project settings. Mirror them
@@ -727,13 +770,19 @@ export function useBriar(options: UseBriarOptions = {}) {
       const syncPlan = shouldSyncSharedWorkflow({
         connectedLocally: true,
         sharedWorkflow,
-        lastSyncedKey: lastSyncedSharedWorkflowKey.current,
+        lastSyncedKey:
+          lastSyncedSharedWorkflowKeys.current.get(activeProjectId) ?? null,
         projectId: activeProjectId,
       });
       if (syncPlan.sync && sharedWorkflow) {
         try {
           await updateLocalProjectWorkflow(activeProjectId, sharedWorkflow);
-          lastSyncedSharedWorkflowKey.current = syncPlan.key;
+          if (syncPlan.key) {
+            lastSyncedSharedWorkflowKeys.current.set(
+              activeProjectId,
+              syncPlan.key,
+            );
+          }
         } catch (syncError) {
           console.warn(
             "Failed to mirror shared project workflow for tool checks",
@@ -741,7 +790,7 @@ export function useBriar(options: UseBriarOptions = {}) {
           );
         }
       } else if (syncPlan.key) {
-        lastSyncedSharedWorkflowKey.current = syncPlan.key;
+        lastSyncedSharedWorkflowKeys.current.set(activeProjectId, syncPlan.key);
       }
 
       const result = await loadAutoHuntHealth(activeProjectId);
