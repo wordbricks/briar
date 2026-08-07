@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { copy, type Locale } from "../i18n";
 import { LanguageSwitcher } from "../language-switcher";
 import { getRequestLocale } from "../request-locale";
-import { ThemeToggle } from "../theme-toggle";
 
 const MAC_DOWNLOAD_URL =
   "https://briar-api.wbai.workers.dev/releases/latest/mac-aarch64.dmg";
@@ -120,13 +119,6 @@ export default async function DownloadPage() {
             </a>
           </nav>
           <div className="header-actions">
-            <ThemeToggle
-              label={c.theme.label}
-              darkLabel={c.theme.dark}
-              lightLabel={c.theme.light}
-              darkName={c.theme.darkName}
-              lightName={c.theme.lightName}
-            />
             <LanguageSwitcher
               locale={locale}
               label={c.language.label}

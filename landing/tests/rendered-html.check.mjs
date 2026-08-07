@@ -40,7 +40,7 @@ test("server-renders Korean for a Korean browser", async () => {
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
 
   const html = await response.text();
-  assert.match(html, /<html lang="ko">/i);
+  assert.match(html, /<html lang="ko"[\s>]/i);
   assert.match(html, /Briar — 에이전트 개발의 운영체제/);
   assert.match(html, /이슈에서 PR까지/);
   assert.match(html, /에이전트 작업을 운영하세요/);
@@ -54,10 +54,6 @@ test("server-renders Korean for a Korean browser", async () => {
   assert.match(html, /Android용 다운로드/);
   assert.match(html, /Android companion/);
   assert.match(html, /aria-label="언어"/);
-  assert.match(html, /aria-label="테마: 다크 모드로 전환"/);
-  assert.match(html, />라이트</);
-  assert.match(html, />다크</);
-  assert.match(html, /briar-theme/);
   assert.match(html, /aria-pressed="true"[^>]*aria-label="한국어"/);
   assert.match(
     html,
@@ -71,6 +67,7 @@ test("server-renders Korean for a Korean browser", async () => {
   assert.match(html, /https:\/\/github\.com\/wordbricks\/briar/);
   assert.match(html, /http:\/\/localhost\/og-briar-workflow\.png/);
   assert.doesNotMatch(html, /codex-preview|react-loading-skeleton/i);
+  assert.doesNotMatch(html, /theme-toggle|briar-theme/i);
 });
 
 test("server-renders English for an English browser", async () => {
@@ -78,7 +75,7 @@ test("server-renders English for an English browser", async () => {
   assert.equal(response.status, 200);
 
   const html = await response.text();
-  assert.match(html, /<html lang="en">/i);
+  assert.match(html, /<html lang="en"[\s>]/i);
   assert.match(
     html,
     /Briar — The operating system for agent development/,
@@ -91,9 +88,6 @@ test("server-renders English for an English browser", async () => {
   assert.match(html, /class="detail-properties"/);
   assert.match(html, /Download Briar for Mac/);
   assert.match(html, /aria-label="Language"/);
-  assert.match(html, /aria-label="Theme: Switch to dark mode"/);
-  assert.match(html, />Light</);
-  assert.match(html, />Dark</);
   assert.match(html, /aria-pressed="true"[^>]*aria-label="English"/);
 });
 
@@ -102,7 +96,7 @@ test("falls back to English when the browser language is unsupported", async () 
   assert.equal(response.status, 200);
 
   const html = await response.text();
-  assert.match(html, /<html lang="en">/i);
+  assert.match(html, /<html lang="en"[\s>]/i);
   assert.match(html, /From issue to PR\./);
 });
 
@@ -114,7 +108,7 @@ test("saved language choice overrides the browser language", async () => {
   assert.equal(response.status, 200);
 
   const html = await response.text();
-  assert.match(html, /<html lang="ko">/i);
+  assert.match(html, /<html lang="ko"[\s>]/i);
   assert.match(html, /이슈에서 PR까지/);
 });
 
@@ -147,7 +141,7 @@ test("server-renders the localized download catalog", async () => {
   assert.equal(response.status, 200);
 
   const html = await response.text();
-  assert.match(html, /<html lang="ko">/i);
+  assert.match(html, /<html lang="ko"[\s>]/i);
   assert.match(html, /Briar 다운로드/);
   assert.match(html, /Apple Silicon 다운로드/);
   assert.match(html, /Android 릴리즈 열기/);
@@ -181,7 +175,7 @@ test("server-renders the localized empty blog", async () => {
   assert.equal(response.status, 200);
 
   const html = await response.text();
-  assert.match(html, /<html lang="ko">/i);
+  assert.match(html, /<html lang="ko"[\s>]/i);
   assert.match(html, /Briar 블로그/);
   assert.match(html, /첫 글을 준비하고 있어요/);
   assert.match(html, /aria-current="page"[^>]*>블로그</);

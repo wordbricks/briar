@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { copy, type Locale } from "../i18n";
 import { LanguageSwitcher } from "../language-switcher";
 import { getRequestLocale } from "../request-locale";
-import { ThemeToggle } from "../theme-toggle";
 
 const WEB_APP_URL = "/app/";
 const GITHUB_URL = "https://github.com/wordbricks/briar";
@@ -74,13 +73,6 @@ export default async function BlogPage() {
             <a href="/download">{c.nav.download}</a>
           </nav>
           <div className="header-actions">
-            <ThemeToggle
-              label={c.theme.label}
-              darkLabel={c.theme.dark}
-              lightLabel={c.theme.light}
-              darkName={c.theme.darkName}
-              lightName={c.theme.lightName}
-            />
             <LanguageSwitcher
               locale={locale}
               label={c.language.label}

@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { copy, type Locale } from "../i18n";
 import { LanguageSwitcher } from "../language-switcher";
 import { getRequestLocale } from "../request-locale";
-import { ThemeToggle } from "../theme-toggle";
 
 const WEB_APP_URL = "/app/";
 const MAC_DOWNLOAD_URL =
@@ -347,13 +346,6 @@ export default async function TutorialPage() {
             <a href="#schedule-agents">{t.steps[7].nav}</a>
           </nav>
           <div className="header-actions">
-            <ThemeToggle
-              label={c.theme.label}
-              darkLabel={c.theme.dark}
-              lightLabel={c.theme.light}
-              darkName={c.theme.darkName}
-              lightName={c.theme.lightName}
-            />
             <LanguageSwitcher
               locale={locale}
               label={c.language.label}

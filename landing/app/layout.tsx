@@ -5,20 +5,6 @@ import "./globals.css";
 import { copy } from "./i18n";
 import { getRequestLocale } from "./request-locale";
 
-const themeScript = `(() => {
-  try {
-    const saved = localStorage.getItem("briar-theme");
-    const theme = saved === "light" || saved === "dark"
-      ? saved
-      : "light";
-    document.documentElement.dataset.theme = theme;
-    document.documentElement.style.colorScheme = theme;
-  } catch {
-    document.documentElement.dataset.theme = "light";
-    document.documentElement.style.colorScheme = "light";
-  }
-})();`;
-
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -82,10 +68,7 @@ export default async function RootLayout({
   const locale = await getRequestLocale();
 
   return (
-    <html lang={locale} suppressHydrationWarning>
-      <head>
-        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
-      </head>
+    <html lang={locale} data-theme="light" style={{ colorScheme: "light" }}>
       <body className={`${geistSans.variable} ${geistMono.variable}`}>
         {children}
       </body>
