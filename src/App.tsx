@@ -1365,6 +1365,19 @@ export function App() {
             onChannelsChange={setOrganizationChannels}
             organizationId={briar.activeOrganizationId}
             token={briar.token}
+            onCreateAgent={() => {
+              if (activeProject) navigateToPage("agents");
+            }}
+            onAddPeople={() => {
+              if (!briar.activeOrganizationId) return;
+              setSettingsTarget({
+                scope: "organization",
+                organizationId: briar.activeOrganizationId,
+                section: "members",
+              });
+              setIsSidebarOpen(true);
+              navigateToPage("settings");
+            }}
             onIssueCreated={(runId) => {
               setRequestedRunId(runId);
               setIssueListRequestKey((key) => key + 1);
