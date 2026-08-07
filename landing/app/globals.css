@@ -2497,7 +2497,7 @@ footer {
   content: "";
 }
 
-.hero-art video {
+.hero-art img {
   position: absolute;
   inset: 0;
   display: block;
@@ -2520,6 +2520,25 @@ footer {
 
 .product-stage::before {
   content: none;
+}
+
+.product-stage.product-stage-video {
+  overflow: hidden;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: #0b0809;
+  box-shadow:
+    0 48px 100px rgb(0 0 0 / 0.42),
+    0 12px 32px rgb(0 0 0 / 0.28);
+}
+
+.product-demo-video {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
 }
 
 .stage-glow {
@@ -3403,7 +3422,7 @@ footer {
     padding: 86px 0 194px;
   }
 
-  .hero-art video {
+  .hero-art img {
     opacity: 0.78;
     object-position: 50% center;
   }
@@ -3708,25 +3727,10 @@ html[data-theme="light"] .hero-art::after {
     linear-gradient(90deg, rgb(251 248 246 / 0.4), transparent 26% 72%, rgb(251 248 246 / 0.48));
 }
 
-html[data-theme="light"] .hero-art video {
+html[data-theme="light"] .hero-art img {
+  content: url("/briar-hero-orchestration-light.webp");
   opacity: 0.55;
   filter: saturate(0.78) contrast(0.92) brightness(1.04);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .hero-art {
-    background-image: url("/briar-hero-orchestration.webp");
-    background-position: center;
-    background-size: cover;
-  }
-
-  .hero-art video {
-    display: none;
-  }
-
-  html[data-theme="light"] .hero-art {
-    background-image: url("/briar-hero-orchestration-light.webp");
-  }
 }
 
 html[data-theme="light"] .hero-content h1,
