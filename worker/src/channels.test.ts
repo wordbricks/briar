@@ -13,6 +13,7 @@ import {
   failChannelReply,
   getChannelById,
   getChannelMessage,
+  getChannelMessageAttachment,
   listChannelAgents,
   listChannelRootMessages,
   listChannelThreadMessages,
@@ -282,6 +283,62 @@ describe("organization channels", () => {
       createdAt: at(7),
     });
     expect(created).toBeNull();
+  });
+
+  it("stores channel image metadata with the message and returns an authenticated URL", async () => {
+    const channelId = "e0000000-0000-4000-8000-000000000013";
+    const messageId = "f0000000-0000-4000-8000-000000000013";
+    const attachmentId = "fa000000-0000-4000-8000-000000000013";
+    await createChannel(db, {
+      id: channelId,
+      organizationId,
+      slug: "image-room",
+      name: "Image room",
+      topic: null,
+      visibility: "public",
+      defaultProjectId: null,
+      createdByUserId: ownerId,
+      createdAt: at(7),
+    });
+
+    const created = await createChannelMessage(db, {
+      id: messageId,
+      channelId,
+      parentMessageId: null,
+      authorUserId: ownerId,
+      authorAgentId: null,
+      authorAgentName: null,
+      authorAgentProvider: null,
+      body: `Screenshot\n\n![screen.png](briar-attachment://${attachmentId})`,
+      mentionedUserIds: [],
+      mentionedAgentIds: [],
+      attachments: [{
+        id: attachmentId,
+        organization_id: organizationId,
+        object_key: `channel-attachments/${organizationId}/${channelId}/${messageId}/${attachmentId}`,
+        filename: "screen.png",
+        content_type: "image/png",
+        byte_size: 5,
+      }],
+      createdAt: at(8),
+    });
+
+    expect(created?.attachments).toEqual([{
+      id: attachmentId,
+      filename: "screen.png",
+      contentType: "image/png",
+      byteSize: 5,
+      url: `/organizations/${organizationId}/channels/${channelId}/messages/${messageId}/attachments/${attachmentId}`,
+    }]);
+    await expect(
+      getChannelMessageAttachment(
+        db,
+        organizationId,
+        channelId,
+        messageId,
+        attachmentId,
+      ),
+    ).resolves.toMatchObject({ object_key: expect.stringContaining(attachmentId) });
   });
 
   it("lets any organization device claim an organization Agent reply", async () => {

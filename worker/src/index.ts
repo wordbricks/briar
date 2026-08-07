@@ -366,11 +366,13 @@ import {
   getChannelAgentReplyJob,
   getChannelById,
   getChannelMessage,
+  getChannelMessageAttachment,
   getChannelSyncCursor,
   getClaimedChannelReply,
   getOrganizationProject,
   listOrganizationProjectTargets,
   listChannelAgentReplies,
+  listChannelAttachmentObjectKeys,
   listChannelAgents,
   listChannelMembers,
   listChannelRootMessages,
@@ -1393,6 +1395,79 @@ export async function readIssueMessageRequest(request: Request) {
   };
 }
 
+export async function readChannelMessageRequest(request: Request) {
+  const contentType = request.headers.get("content-type") ?? "";
+  if (!contentType.toLowerCase().startsWith("multipart/form-data;")) {
+    return {
+      input: channelMessageInputSchema.parse(await readJson(request, 32_768)),
+      attachments: [] as File[],
+      attachmentReferences: [] as string[],
+    };
+  }
+  const declaredLength = Number(request.headers.get("content-length") ?? "0");
+  if (!Number.isSafeInteger(declaredLength) || declaredLength <= 0) {
+    throw new HttpError(411, "Multipart Content-Length is required");
+  }
+  if (declaredLength > maxIssueMultipartBytes) {
+    throw new HttpError(413, "Channel images exceed the 25MB total limit");
+  }
+  let form: FormData;
+  try {
+    form = await request.formData();
+  } catch {
+    throw new HttpError(400, "Invalid multipart form data");
+  }
+  const rawAttachments = form.getAll("attachments");
+  if (rawAttachments.some((attachment) => !(attachment instanceof File))) {
+    throw new HttpError(400, "Attachments must be files");
+  }
+  const attachments = rawAttachments as File[];
+  const attachmentError = validateIssueAttachments(attachments);
+  if (attachmentError) throw new HttpError(400, attachmentError);
+  if (attachments.some((attachment) => !attachment.type.startsWith("image/"))) {
+    throw new HttpError(400, "Channel attachments must be images");
+  }
+  const parseArray = (name: string) => {
+    const value = form.get(name);
+    if (typeof value !== "string" || !value) return [] as unknown[];
+    try {
+      const parsed: unknown = JSON.parse(value);
+      if (!Array.isArray(parsed)) throw new Error("not an array");
+      return parsed;
+    } catch {
+      throw new HttpError(400, `${name} is invalid`);
+    }
+  };
+  const attachmentReferences = parseArray("attachmentReferences");
+  if (
+    attachmentReferences.length !== attachments.length ||
+    !attachmentReferences.every(isIssueAttachmentReference)
+  ) {
+    throw new HttpError(400, "Attachment references are invalid");
+  }
+  const rawBody = form.get("body");
+  const bodyReferences = issueAttachmentReferences(
+    typeof rawBody === "string" ? rawBody : null,
+  );
+  if (!attachmentReferences.every((reference) => bodyReferences.has(String(reference)))) {
+    throw new HttpError(400, "Every channel image must be referenced in the body");
+  }
+  const parentMessageId = form.get("parentMessageId");
+  return {
+    input: channelMessageInputSchema.parse({
+      body: rawBody,
+      parentMessageId:
+        typeof parentMessageId === "string" && parentMessageId
+          ? parentMessageId
+          : null,
+      mentionedUserIds: parseArray("mentionedUserIds"),
+      mentionedAgentIds: parseArray("mentionedAgentIds"),
+    }),
+    attachments,
+    attachmentReferences: attachmentReferences as string[],
+  };
+}
+
 const issueUpdateProposalActionSchema = z
   .object({
     type: z.literal("request_issue_update"),
@@ -1553,6 +1628,104 @@ export async function readIssueRequest(request: Request) {
     }),
     attachments,
     attachmentReferences,
+  };
+}
+
+const issueKeptAttachmentIdsSchema = z.array(z.string().uuid()).max(50);
+
+export async function readIssueUpdateRequest(request: Request) {
+  const contentType = request.headers.get("content-type") ?? "";
+  if (!contentType.toLowerCase().startsWith("multipart/form-data;")) {
+    const raw = await readJson(request);
+    const { keptAttachmentIds, ...fields } = (raw ?? {}) as {
+      keptAttachmentIds?: unknown;
+      [key: string]: unknown;
+    };
+    return {
+      input: issueUpdateInputSchema.parse(fields),
+      attachments: [] as File[],
+      attachmentReferences: [] as string[],
+      keptAttachmentIds:
+        keptAttachmentIds === undefined
+          ? undefined
+          : issueKeptAttachmentIdsSchema.parse(keptAttachmentIds),
+    };
+  }
+
+  const declaredLength = Number(request.headers.get("content-length") ?? "0");
+  if (!Number.isSafeInteger(declaredLength) || declaredLength <= 0) {
+    throw new HttpError(411, "Multipart Content-Length is required");
+  }
+  if (declaredLength > maxIssueMultipartBytes) {
+    throw new HttpError(413, "Issue attachments exceed the 25MB total limit");
+  }
+
+  let form: FormData;
+  try {
+    form = await request.formData();
+  } catch {
+    throw new HttpError(400, "Invalid multipart form data");
+  }
+  const rawAttachments = form.getAll("attachments");
+  if (rawAttachments.some((attachment) => !(attachment instanceof File))) {
+    throw new HttpError(400, "Attachments must be files");
+  }
+  const attachments = rawAttachments as File[];
+  const attachmentError = validateIssueAttachments(attachments);
+  if (attachmentError) throw new HttpError(400, attachmentError);
+
+  const rawAttachmentReferences = form.get("attachmentReferences");
+  let attachmentReferences: string[] = [];
+  if (typeof rawAttachmentReferences === "string" && rawAttachmentReferences) {
+    try {
+      const parsed: unknown = JSON.parse(rawAttachmentReferences);
+      if (
+        !Array.isArray(parsed) ||
+        parsed.length !== attachments.length ||
+        !parsed.every(isIssueAttachmentReference)
+      ) {
+        throw new Error("invalid attachment references");
+      }
+      attachmentReferences = parsed;
+    } catch {
+      throw new HttpError(400, "Attachment references are invalid");
+    }
+  }
+
+  const rawKeptAttachmentIds = form.get("keptAttachmentIds");
+  let keptAttachmentIds: string[] | undefined;
+  if (typeof rawKeptAttachmentIds === "string" && rawKeptAttachmentIds) {
+    try {
+      const parsed: unknown = JSON.parse(rawKeptAttachmentIds);
+      if (!Array.isArray(parsed) || !parsed.every((id) => typeof id === "string")) {
+        throw new Error("invalid kept attachment ids");
+      }
+      keptAttachmentIds = issueKeptAttachmentIdsSchema.parse(parsed);
+    } catch {
+      throw new HttpError(400, "Kept attachment IDs are invalid");
+    }
+  }
+
+  const description = form.get("description");
+  const priority = form.get("priority");
+  const assigneeUserId = form.get("assigneeUserId");
+  return {
+    input: issueUpdateInputSchema.parse({
+      title: form.get("title"),
+      description:
+        typeof description === "string" && description.trim()
+          ? description
+          : null,
+      priority:
+        typeof priority === "string" && priority ? Number(priority) : null,
+      assigneeUserId:
+        typeof assigneeUserId === "string" && assigneeUserId.trim()
+          ? assigneeUserId
+          : null,
+    }),
+    attachments,
+    attachmentReferences,
+    keptAttachmentIds,
   };
 }
 
@@ -2196,6 +2369,111 @@ async function createIssueWithAttachments(input: {
           }),
         );
       }
+    }
+    throw error;
+  }
+}
+
+async function updateIssueWithAttachments(input: {
+  db: D1Database;
+  attachmentsBucket: R2Bucket;
+  project: Pick<ProjectRow, "id">;
+  runId: string;
+  issue: z.infer<typeof issueUpdateInputSchema>;
+  attachments: File[];
+  attachmentReferences?: string[];
+  keptAttachmentIds?: string[];
+  updatedAt: string;
+}) {
+  const existing = await listIssueAttachments(
+    input.db,
+    input.project.id,
+    input.runId,
+  );
+  const keptIds =
+    input.keptAttachmentIds === undefined
+      ? new Set(existing.map((attachment) => attachment.id))
+      : new Set(input.keptAttachmentIds);
+  const removed = existing.filter(
+    (attachment) => !keptIds.has(attachment.id),
+  );
+  const storedAttachments: Array<IssueAttachmentInput & { file: File }> =
+    input.attachments.map((file) => {
+      const id = crypto.randomUUID();
+      return {
+        id,
+        object_key: `issue-attachments/${input.project.id}/${input.runId}/${id}`,
+        filename: file.name.normalize("NFC").trim(),
+        content_type: file.type,
+        byte_size: file.size,
+        file,
+      };
+    });
+  const uploadedKeys: string[] = [];
+  const issueDescription = canonicalizeIssueAttachmentReferences(
+    input.issue.description,
+    input.attachmentReferences ?? [],
+    storedAttachments.map((attachment) => attachment.id),
+  );
+  try {
+    for (const attachment of storedAttachments) {
+      await input.attachmentsBucket.put(
+        attachment.object_key,
+        attachment.file.stream(),
+        {
+          httpMetadata: {
+            contentType: attachment.content_type,
+            contentDisposition: contentDisposition(attachment.filename),
+          },
+          customMetadata: {
+            attachmentId: attachment.id,
+            projectId: input.project.id,
+          },
+        },
+      );
+      uploadedKeys.push(attachment.object_key);
+    }
+    const run = await updateIssue(input.db, input.project.id, input.runId, {
+      title: input.issue.title,
+      description: issueDescription ?? null,
+      priority: input.issue.priority ?? null,
+      assigneeUserId: input.issue.assigneeUserId,
+      updatedAt: input.updatedAt,
+    });
+    if (!run) throw new HttpError(404, "Run not found");
+    await createIssueAttachments(
+      input.db,
+      input.project.id,
+      input.runId,
+      storedAttachments.map(({ file: _file, ...attachment }) => attachment),
+    );
+    if (removed.length > 0) {
+      await deleteIssueAttachments(
+        input.db,
+        input.project.id,
+        input.runId,
+        removed.map((attachment) => attachment.id),
+      );
+      await Promise.all(
+        removed.map((attachment) =>
+          input.attachmentsBucket.delete(attachment.object_key),
+        ),
+      ).catch(() => undefined);
+    }
+    return run;
+  } catch (error) {
+    if (uploadedKeys.length > 0) {
+      await Promise.all(
+        uploadedKeys.map((objectKey) =>
+          input.attachmentsBucket.delete(objectKey),
+        ),
+      ).catch(() => undefined);
+      await deleteIssueAttachments(
+        input.db,
+        input.project.id,
+        input.runId,
+        storedAttachments.map((attachment) => attachment.id),
+      ).catch(() => undefined);
     }
     throw error;
   }
@@ -5499,12 +5777,30 @@ async function route(
     if (!canManageOrganization(role)) {
       throw new HttpError(403, "Organization admin access required");
     }
+    const attachmentKeys = await listChannelAttachmentObjectKeys(
+      db,
+      organizationId,
+      organizationChannelMatch[2],
+    );
     const deleted = await deleteChannel(
       db,
       organizationId,
       organizationChannelMatch[2],
     );
     if (!deleted) throw new HttpError(404, "Channel not found");
+    if (attachmentKeys.length > 0) {
+      try {
+        await attachmentsBucket.delete(attachmentKeys);
+      } catch (error) {
+        console.error(JSON.stringify({
+          message: "Channel attachment cleanup failed",
+          organizationId,
+          channelId: organizationChannelMatch[2],
+          attachmentCount: attachmentKeys.length,
+          error: error instanceof Error ? error.message : String(error),
+        }));
+      }
+    }
     return json({ deleted: true });
   }
 
@@ -5594,6 +5890,37 @@ async function route(
   const channelMessagesMatch = pathname.match(
     /^\/organizations\/([0-9a-f-]+)\/channels\/([0-9a-f-]+)\/messages$/u,
   );
+  const channelAttachmentMatch = pathname.match(
+    /^\/organizations\/([0-9a-f-]+)\/channels\/([0-9a-f-]+)\/messages\/([0-9a-f-]+)\/attachments\/([0-9a-f-]+)$/u,
+  );
+  if (
+    channelAttachmentMatch &&
+    (request.method === "GET" || request.method === "HEAD")
+  ) {
+    const session = await requireSession(auth, request);
+    await requireChannelAccess(
+      db,
+      channelAttachmentMatch[1],
+      channelAttachmentMatch[2],
+      session.user.id,
+    );
+    const attachment = await getChannelMessageAttachment(
+      db,
+      channelAttachmentMatch[1],
+      channelAttachmentMatch[2],
+      channelAttachmentMatch[3],
+      channelAttachmentMatch[4],
+    );
+    if (!attachment) throw new HttpError(404, "Attachment not found");
+    if (request.method === "HEAD") {
+      const object = await attachmentsBucket.head(attachment.object_key);
+      if (!object) throw new HttpError(404, "Attachment not found");
+      return attachmentResponse(attachment, object, null);
+    }
+    const object = await attachmentsBucket.get(attachment.object_key);
+    if (!object) throw new HttpError(404, "Attachment not found");
+    return attachmentResponse(attachment, object, object.body);
+  }
   if (channelMessagesMatch && request.method === "GET") {
     const session = await requireSession(auth, request);
     const channel = await requireChannelAccess(
@@ -5623,35 +5950,102 @@ async function route(
     if (channel.archived_at) {
       throw new HttpError(409, "Channel is archived");
     }
-    const input = channelMessageInputSchema.parse(await readJson(request));
+    const { input: rawInput, attachments, attachmentReferences } =
+      await readChannelMessageRequest(request);
     const roster = await listChannelAgents(db, channel.id);
-    const mentionedAgents = input.mentionedAgentIds.map((agentId) => {
+    const mentionedAgents = rawInput.mentionedAgentIds.map((agentId) => {
       const agent = roster.find((candidate) => candidate.id === agentId);
       if (!agent) {
         throw new HttpError(400, "Mentioned Agent is not in this channel");
       }
       return agent;
     });
-    for (const userId of input.mentionedUserIds) {
+    for (const userId of rawInput.mentionedUserIds) {
       if (!(await getOrganizationRole(db, organizationId, userId))) {
         throw new HttpError(400, "Mentioned member is not in this organization");
       }
     }
     const createdAt = new Date().toISOString();
-    const message = await createChannelMessage(db, {
-      id: crypto.randomUUID(),
-      channelId: channel.id,
-      parentMessageId: input.parentMessageId,
-      authorUserId: session.user.id,
-      authorAgentId: null,
-      authorAgentName: null,
-      authorAgentProvider: null,
-      body: input.body,
-      mentionedUserIds: input.mentionedUserIds,
-      mentionedAgentIds: input.mentionedAgentIds,
-      createdAt,
+    const messageId = crypto.randomUUID();
+    const storedAttachments = attachments.map((file) => {
+      const id = crypto.randomUUID();
+      return {
+        id,
+        organization_id: organizationId,
+        object_key: `channel-attachments/${organizationId}/${channel.id}/${messageId}/${id}`,
+        filename: file.name.normalize("NFC").trim(),
+        content_type: file.type,
+        byte_size: file.size,
+        file,
+      };
     });
-    if (!message) throw new HttpError(404, "Thread message not found");
+    const input = {
+      ...rawInput,
+      body: canonicalizeIssueAttachmentReferences(
+        rawInput.body,
+        attachmentReferences,
+        storedAttachments.map((attachment) => attachment.id),
+      ) ?? rawInput.body,
+    };
+    const uploadedKeys: string[] = [];
+    let message = null;
+    try {
+      for (const attachment of storedAttachments) {
+        await attachmentsBucket.put(
+          attachment.object_key,
+          attachment.file.stream(),
+          {
+            httpMetadata: {
+              contentType: attachment.content_type,
+              contentDisposition: contentDisposition(attachment.filename),
+            },
+            customMetadata: {
+              attachmentId: attachment.id,
+              channelId: channel.id,
+              messageId,
+              organizationId,
+            },
+          },
+        );
+        uploadedKeys.push(attachment.object_key);
+      }
+      message = await createChannelMessage(db, {
+        id: messageId,
+        channelId: channel.id,
+        parentMessageId: input.parentMessageId,
+        authorUserId: session.user.id,
+        authorAgentId: null,
+        authorAgentName: null,
+        authorAgentProvider: null,
+        body: input.body,
+        mentionedUserIds: input.mentionedUserIds,
+        mentionedAgentIds: input.mentionedAgentIds,
+        attachments: storedAttachments.map(({ file: _file, ...attachment }) =>
+          attachment
+        ),
+        createdAt,
+      });
+      if (!message) throw new HttpError(404, "Thread message not found");
+    } catch (error) {
+      if (uploadedKeys.length > 0) {
+        try {
+          await attachmentsBucket.delete(uploadedKeys);
+        } catch (cleanupError) {
+          console.error(JSON.stringify({
+            message: "Failed channel upload cleanup",
+            organizationId,
+            channelId: channel.id,
+            messageId,
+            attachmentCount: uploadedKeys.length,
+            error:
+              cleanupError instanceof Error
+                ? cleanupError.message
+                : String(cleanupError),
+          }));
+        }
+      }
+      throw error;
+    }
     const agentReplies = await enqueueChannelAgentReplies(db, {
       organizationId,
       channelId: channel.id,
@@ -8079,26 +8473,35 @@ async function route(
     const session = await requireSession(auth, request);
     const project = await getProject(db, issueUpdateMatch[1], session.user.id);
     if (!project) throw new HttpError(404, "Project not found");
-    const input = issueUpdateInputSchema.parse(await readJson(request));
+    const { input, attachments, attachmentReferences, keptAttachmentIds } =
+      await readIssueUpdateRequest(request);
     await requireIssueAssigneeMembership(
       db,
       project.organization_id,
       input.assigneeUserId,
     );
-    const run = await updateIssue(db, project.id, issueUpdateMatch[2], {
-      title: input.title,
-      description: input.description ?? null,
-      priority: input.priority ?? null,
-      assigneeUserId: input.assigneeUserId,
+    const run = await updateIssueWithAttachments({
+      db,
+      attachmentsBucket,
+      project,
+      runId: issueUpdateMatch[2],
+      issue: input,
+      attachments,
+      attachmentReferences,
+      keptAttachmentIds,
       updatedAt: new Date().toISOString(),
     });
-    if (!run) throw new HttpError(404, "Run not found");
     return json({
       runId: run.id,
       title: run.title,
       description: run.issue_description,
       priority: run.priority,
       assigneeUserId: run.assignee_user_id,
+      attachments: (await listIssueAttachments(
+        db,
+        project.id,
+        issueUpdateMatch[2],
+      )).map(attachmentJson),
     });
   }
   if (issueUpdateMatch && request.method === "DELETE") {

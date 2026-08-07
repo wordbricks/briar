@@ -29,6 +29,7 @@ import {
   loadRunEvents,
   loadSession,
   removeIssueDependency,
+  sendChannelMessage,
   reworkPausedHuntRun,
   setChannelMember,
   updateProjectAgent,
@@ -366,6 +367,7 @@ describe("API errors", () => {
         title: "Updated issue",
         description: "Updated description",
         priority: 1,
+        attachments: [],
       }),
     ).resolves.toEqual({
       runId,
@@ -384,6 +386,58 @@ describe("API errors", () => {
         }),
       }),
     );
+  });
+
+  it("uploads issue update attachments as multipart form data", async () => {
+    const projectId = "22222222-2222-4222-8222-222222222222";
+    const runId = "11111111-1111-4111-8111-111111111111";
+    const fetchMock = vi.fn(
+      async (_input: RequestInfo | URL, init?: RequestInit) => {
+        const form = init?.body instanceof FormData ? init.body : new FormData();
+        return new Response(
+          JSON.stringify({
+            runId,
+            title: form.get("title"),
+            description: form.get("description"),
+            priority: Number(form.get("priority")),
+            assigneeUserId: null,
+            attachments: [],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      },
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const image = new File(["image"], "inline.png", { type: "image/png" });
+    const reference = "draft-inline-1";
+
+    const result = await updateIssue("token", projectId, runId, {
+      title: "Updated issue",
+      description: `![inline.png](briar-attachment://${reference})`,
+      priority: 1,
+      attachments: [image],
+      attachmentReferences: [reference],
+      keptAttachmentIds: [],
+    });
+    expect(result).toMatchObject({
+      runId,
+      title: "Updated issue",
+      priority: 1,
+    });
+    const [calledUrl, init] = fetchMock.mock.calls[0]!;
+    expect(String(calledUrl)).toContain(
+      `/projects/${projectId}/runs/${runId}`,
+    );
+    expect(init?.method).toBe("PATCH");
+    const body = init?.body as FormData;
+    expect(body.get("title")).toBe("Updated issue");
+    expect(body.get("attachmentReferences")).toBe(
+      JSON.stringify([reference]),
+    );
+    expect(body.get("keptAttachmentIds")).toBe(JSON.stringify([]));
+    const uploaded = body.getAll("attachments") as File[];
+    expect(uploaded).toHaveLength(1);
+    expect(uploaded[0]?.name).toBe("inline.png");
   });
 
   it("records a result review through the project-scoped run endpoint", async () => {
@@ -1598,5 +1652,86 @@ describe("API errors", () => {
       ),
       expect.objectContaining({ method: "DELETE" }),
     );
+  });
+});
+
+describe("channel message API", () => {
+  it("keeps attachment-only fields out of JSON channel messages", async () => {
+    const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
+      expect(JSON.parse(String(init?.body))).toEqual({
+        body: "Hello",
+        parentMessageId: null,
+        mentionedUserIds: [],
+        mentionedAgentIds: [],
+      });
+      return new Response(
+        JSON.stringify({ message: {}, agentReplies: [] }),
+        { status: 201, headers: { "Content-Type": "application/json" } },
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await sendChannelMessage("token", "org-1", "channel-1", {
+      body: "Hello",
+      parentMessageId: null,
+      mentionedUserIds: [],
+      mentionedAgentIds: [],
+      attachments: [],
+      attachmentReferences: [],
+    });
+
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it("uploads channel images and attachment references as multipart form data", async () => {
+    const reference = crypto.randomUUID();
+    const image = new File(["image"], "clipboard.png", { type: "image/png" });
+    const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
+      const form = init?.body as FormData;
+      expect(form).toBeInstanceOf(FormData);
+      expect(form.get("body")).toContain(`briar-attachment://${reference}`);
+      expect(form.get("mentionedAgentIds")).toBe(JSON.stringify(["agent-1"]));
+      expect(form.get("attachmentReferences")).toBe(JSON.stringify([reference]));
+      expect(form.getAll("attachments")).toEqual([image]);
+      return new Response(
+        JSON.stringify({
+          message: {
+            id: crypto.randomUUID(),
+            channelId: "channel-1",
+            parentMessageId: null,
+            author: {
+              type: "user",
+              id: "owner",
+              name: "Owner",
+              email: "owner@example.com",
+              image: null,
+            },
+            body: String(form.get("body")),
+            mentionedUserIds: [],
+            mentionedAgentIds: ["agent-1"],
+            attachments: [],
+            replyCount: 0,
+            lastReplyAt: null,
+            document: null,
+            proposal: null,
+            createdAt: "2026-08-07T00:00:00.000Z",
+          },
+          agentReplies: [],
+        }),
+        { status: 201, headers: { "Content-Type": "application/json" } },
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await sendChannelMessage("token", "org-1", "channel-1", {
+      body: `Screenshot\n\n![clipboard.png](briar-attachment://${reference})`,
+      parentMessageId: null,
+      mentionedUserIds: [],
+      mentionedAgentIds: ["agent-1"],
+      attachments: [image],
+      attachmentReferences: [reference],
+    });
+
+    expect(fetchMock).toHaveBeenCalledOnce();
   });
 });

@@ -187,6 +187,14 @@ export type ChannelMessageProposal = {
   resultIdeaId: string | null;
 };
 
+export type ChannelMessageAttachment = {
+  id: string;
+  filename: string;
+  contentType: string;
+  byteSize: number;
+  url: string;
+};
+
 export type ChannelMessage = {
   id: string;
   channelId: string;
@@ -195,6 +203,7 @@ export type ChannelMessage = {
   body: string;
   mentionedUserIds: string[];
   mentionedAgentIds: string[];
+  attachments: ChannelMessageAttachment[];
   replyCount: number;
   lastReplyAt: string | null;
   document: ChannelMessageDocument | null;

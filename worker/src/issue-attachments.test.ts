@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { maxIssueMultipartBytes } from "../../src/lib/issue-attachments";
-import { readIssueMessageRequest, readIssueRequest } from "./index";
+import {
+  readIssueMessageRequest,
+  readChannelMessageRequest,
+  readIssueRequest,
+  readIssueUpdateRequest,
+} from "./index";
 
 const issueRequest = (
   file: File,
@@ -102,6 +107,157 @@ describe("issue multipart input", () => {
         ),
       ),
     ).rejects.toThrow("Attachment references are invalid");
+  });
+});
+
+describe("channel image multipart input", () => {
+  it("parses image references and structured mentions", async () => {
+    const reference = "7316678b-e3d4-4de3-a045-b76a0fc2e765";
+    const image = new File(["image"], "screen.png", { type: "image/png" });
+    const form = new FormData();
+    form.set("body", `Screenshot\n\n![screen.png](briar-attachment://${reference})`);
+    form.set("parentMessageId", "11111111-1111-4111-8111-111111111111");
+    form.set("mentionedUserIds", JSON.stringify(["owner"]));
+    form.set(
+      "mentionedAgentIds",
+      JSON.stringify(["22222222-2222-4222-8222-222222222222"]),
+    );
+    form.set("attachmentReferences", JSON.stringify([reference]));
+    form.append("attachments", image, image.name);
+    const request = new Request("https://briar.example/channels/channel/messages", {
+      method: "POST",
+      headers: { "Content-Length": "2048" },
+      body: form,
+    });
+
+    const result = await readChannelMessageRequest(request);
+
+    expect(result.attachments).toHaveLength(1);
+    expect(result.attachments[0]).toEqual(
+      expect.objectContaining({
+        name: "screen.png",
+        type: "image/png",
+        size: image.size,
+      }),
+    );
+    expect(result.attachmentReferences).toEqual([reference]);
+    expect(result.input).toMatchObject({
+      parentMessageId: "11111111-1111-4111-8111-111111111111",
+      mentionedUserIds: ["owner"],
+      mentionedAgentIds: ["22222222-2222-4222-8222-222222222222"],
+    });
+  });
+
+  it("rejects non-image channel attachments", async () => {
+    const reference = "7316678b-e3d4-4de3-a045-b76a0fc2e765";
+    const form = new FormData();
+    form.set("body", `File\n\n![recording.mp4](briar-attachment://${reference})`);
+    form.set("attachmentReferences", JSON.stringify([reference]));
+    form.append(
+      "attachments",
+      new File(["video"], "recording.mp4", { type: "video/mp4" }),
+    );
+    const request = new Request("https://briar.example/channels/channel/messages", {
+      method: "POST",
+      headers: { "Content-Length": "2048" },
+      body: form,
+    });
+
+    await expect(readChannelMessageRequest(request)).rejects.toThrow(
+      "must be images",
+    );
+  });
+});
+
+describe("issue update multipart input", () => {
+  const updateRequest = (
+    file: File,
+    declaredLength = file.size + 2048,
+    keptAttachmentIds?: string[],
+  ) => {
+    const form = new FormData();
+    form.set("title", "Edited screenshot issue");
+    form.set("description", "Replaced description");
+    form.set("priority", "3");
+    form.set("assigneeUserId", "user-1");
+    form.append("attachments", file, file.name);
+    form.set("attachmentReferences", JSON.stringify(["draft-update-1"]));
+    if (keptAttachmentIds) {
+      form.set("keptAttachmentIds", JSON.stringify(keptAttachmentIds));
+    }
+    return new Request("https://briar.example/projects/project/runs/run", {
+      method: "PATCH",
+      headers: { "Content-Length": String(declaredLength) },
+      body: form,
+    });
+  };
+
+  const existingAttachmentId = "7316678b-e3d4-4de3-a045-b76a0fc2e765";
+
+  it("parses a JSON update without attachment fields", async () => {
+    const result = await readIssueUpdateRequest(
+      new Request("https://briar.example/projects/project/runs/run", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: "Updated issue",
+          description: null,
+          priority: 2,
+          assigneeUserId: null,
+        }),
+      }),
+    );
+
+    expect(result.input).toEqual({
+      title: "Updated issue",
+      description: null,
+      priority: 2,
+      assigneeUserId: null,
+    });
+    expect(result.attachments).toEqual([]);
+    expect(result.keptAttachmentIds).toBeUndefined();
+  });
+
+  it("parses a multipart update with attachments and kept IDs", async () => {
+    const result = await readIssueUpdateRequest(
+      updateRequest(
+        new File(["image"], "inline.png", { type: "image/png" }),
+        undefined,
+        [existingAttachmentId],
+      ),
+    );
+
+    expect(result.input).toEqual({
+      title: "Edited screenshot issue",
+      description: "Replaced description",
+      priority: 3,
+      assigneeUserId: "user-1",
+    });
+    expect(result.attachments).toEqual([
+      expect.objectContaining({ name: "inline.png", type: "image/png" }),
+    ]);
+    expect(result.attachmentReferences).toEqual(["draft-update-1"]);
+    expect(result.keptAttachmentIds).toEqual([existingAttachmentId]);
+  });
+
+  it("keeps keptAttachmentIds undefined when the field is absent", async () => {
+    const result = await readIssueUpdateRequest(
+      updateRequest(new File(["image"], "inline.png", { type: "image/png" })),
+    );
+
+    expect(result.keptAttachmentIds).toBeUndefined();
+  });
+
+  it("rejects malformed kept attachment IDs", async () => {
+    await expect(
+      readIssueUpdateRequest(
+        updateRequest(
+          new File(["image"], "inline.png", { type: "image/png" }),
+          undefined,
+          ["not-a-uuid"],
+        ),
+      ),
+    ).rejects.toThrow("Kept attachment IDs are invalid");
   });
 });
 
