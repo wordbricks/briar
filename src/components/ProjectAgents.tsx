@@ -76,6 +76,7 @@ export function ProjectAgents({
   onSettleTaskSession,
   onStopSession,
   onStart,
+  onStartRemoteTask,
   onStartTaskSession,
   project,
   requestedSessionId = null,
@@ -103,6 +104,10 @@ export function ProjectAgents({
       targetRunIds?: string[];
       retryReason?: string | null;
     },
+  ) => string | Promise<string>;
+  onStartRemoteTask?: (
+    agent: ProjectAgent,
+    input: { request: string; workerId: string },
   ) => string | Promise<string>;
   onStartTaskSession: (
     agent: ProjectAgent,
@@ -310,7 +315,7 @@ export function ProjectAgents({
     setExecutingAgentIds((current) => new Set(current).add(agent.id));
     try {
       if (companionMode) {
-        await onStart(agent, dashboard.runs);
+        setSelectedAgent(agent);
         return;
       }
       await executeProjectAgentTask(
@@ -365,6 +370,11 @@ export function ProjectAgents({
         onIssueOpen={onIssueOpen}
         onRequestedSessionOpen={onRequestedSessionOpen}
         onRunResponsibility={() => runResponsibility(selectedAgent)}
+        onStartRemoteTask={
+          onStartRemoteTask
+            ? (input) => onStartRemoteTask(selectedAgent, input)
+            : undefined
+        }
         onSettleTaskSession={onSettleTaskSession}
         onStopSession={onStopSession}
         onStartAutoHunt={(runs, options) =>
@@ -525,7 +535,13 @@ export function ProjectAgents({
                           })}
                           className="project-agent-run-button"
                           disabled={isRunning || !dashboard}
-                          onClick={() => void runResponsibility(agent)}
+                          onClick={() => {
+                            if (companionMode) {
+                              setSelectedAgent(agent);
+                            } else {
+                              void runResponsibility(agent);
+                            }
+                          }}
                           title={t("agents.runAgent", { name: agent.name })}
                           type="button"
                         >

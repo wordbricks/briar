@@ -40,6 +40,7 @@ final class MobileAPIContractTests: XCTestCase {
         let evidence: RunEvidenceResponse = try decodeResponse("listRunEvidence")
         let agents: ProjectAgentsResponse = try decodeResponse("listProjectAgents")
         let sessions: ProjectAgentSessionsResponse = try decodeResponse("listProjectAgentSessions")
+        let directTask: ProjectAgentTaskResponse = try decodeResponse("runProjectAgentTask")
         let resume: ResumeRunResponse = try decodeResponse("resumeRun")
         let dispatch: DispatchRunResponse = try decodeResponse("dispatchRun")
         let reassign: DispatchRunResponse = try decodeResponse("reassignRun")
@@ -84,6 +85,8 @@ final class MobileAPIContractTests: XCTestCase {
         XCTAssertEqual(evidence.evidence.first?.images?.first?.filename, "companion.png")
         XCTAssertEqual(agents.agents.first?.name, "Issue processing agent")
         XCTAssertEqual(sessions.sessions.first?.id, "session-fixture-1")
+        XCTAssertEqual(directTask.session.status, .running)
+        XCTAssertEqual(directTask.session.requestedWorkerId, "worker-1")
         XCTAssertEqual(resume.checkpointKey, "user-before-production_qa")
         XCTAssertEqual(resume.attempt, 2)
         XCTAssertEqual(resume.revision, 3)
@@ -124,6 +127,10 @@ final class MobileAPIContractTests: XCTestCase {
         XCTAssertEqual(
             MobileAPIContract.Endpoint.dashboardDelta(projectID: projectID, cursor: 41),
             "/projects/11111111-1111-4111-8111-111111111111/dashboard/delta?cursor=41"
+        )
+        XCTAssertEqual(
+            MobileAPIContract.Endpoint.projectAgentTasks(projectID: projectID),
+            "/projects/11111111-1111-4111-8111-111111111111/agent-tasks"
         )
         let runID = UUID(uuidString: "33333333-3333-4333-8333-333333333333")!
         XCTAssertEqual(

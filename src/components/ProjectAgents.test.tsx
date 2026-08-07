@@ -57,6 +57,20 @@ const dashboard = {
   runs: [],
 } as unknown as DashboardPayload;
 
+const dashboardWithWorker = {
+  ...dashboard,
+  workers: [{
+    id: "worker-1",
+    label: "Mac Studio",
+    agentProvider: "codex",
+    providers: ["codex"],
+    state: "online",
+    readiness: "available",
+    acceptingWork: true,
+    readinessDetail: "작업 수신 가능",
+  }],
+} as unknown as DashboardPayload;
+
 const projectAgentsProps = {
   dashboard,
   error: null,
@@ -218,15 +232,16 @@ describe("ProjectAgents", () => {
     );
   });
 
-  it("dispatches an agent to remote Workers directly in companion mode", async () => {
+  it("opens direct Worker execution from the play button in companion mode", async () => {
     vi.mocked(runProjectAgent).mockClear();
-    const onStart = vi.fn(async () => "remote-dispatch");
+    const onStartRemoteTask = vi.fn(async () => "remote-session");
     const onStartTaskSession = vi.fn();
     const container = await mount(
       <ProjectAgents
         {...projectAgentsProps}
         companionMode
-        onStart={onStart}
+        dashboard={dashboardWithWorker}
+        onStartRemoteTask={onStartRemoteTask}
         onStartTaskSession={onStartTaskSession}
       />,
     );
@@ -241,9 +256,22 @@ describe("ProjectAgents", () => {
       await Promise.resolve();
     });
 
-    expect(onStart).toHaveBeenCalledWith(
+    await act(async () => {
+      document.querySelector<HTMLButtonElement>(".project-agent-run-task")?.click();
+      await Promise.resolve();
+    });
+    expect(document.querySelector('[role="dialog"]')).not.toBeNull();
+    await act(async () => {
+      document.querySelector<HTMLButtonElement>('button[type="submit"]')?.click();
+      await Promise.resolve();
+    });
+
+    expect(onStartRemoteTask).toHaveBeenCalledWith(
       expect.objectContaining({ id: "demo-agent-auto-hunt" }),
-      dashboard.runs,
+      {
+        request: "대기 중인 모든 이슈를 처리합니다.",
+        workerId: "worker-1",
+      },
     );
     expect(runProjectAgent).not.toHaveBeenCalled();
     expect(onStartTaskSession).not.toHaveBeenCalled();

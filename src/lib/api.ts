@@ -166,6 +166,8 @@ const projectAgentSessionSchema = z.object({
   workspaceRoot: z.null(),
   summary: z.string().nullable(),
   error: z.string().nullable(),
+  requestedWorkerId: z.string().nullable().optional(),
+  workerId: z.string().nullable().optional(),
   events: z.array(z.object({
     id: z.string(),
     type: z.enum([
@@ -1067,6 +1069,32 @@ export async function loadProjectAgentSessions(
   );
 }
 
+export async function runProjectAgentTaskOnWorker(
+  token: string,
+  projectId: string,
+  input: {
+    agentId: string;
+    request: string;
+    workerId: string;
+  },
+): Promise<AutoHuntSession> {
+  const result = await request<{ session: unknown }>(
+    `/projects/${projectId}/agent-tasks`,
+    token,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        ...input,
+        requestId: crypto.randomUUID(),
+      }),
+    },
+  );
+  return {
+    ...projectAgentSessionSchema.parse(result.session),
+    localOwner: false,
+  } as AutoHuntSession;
+}
+
 export async function upsertProjectAgentSession(
   token: string,
   session: AutoHuntSession,
@@ -1090,6 +1118,8 @@ export async function upsertProjectAgentSession(
         startedAt: session.startedAt,
         completedAt: session.completedAt,
         conversationId: session.conversationId,
+        requestedWorkerId: session.requestedWorkerId ?? null,
+        workerId: session.workerId ?? null,
         summary: session.summary,
         error: session.error,
         events: session.events,

@@ -98,6 +98,35 @@ final class AgentsStore: ObservableObject {
 
     func run(
         agent: ProjectAgent,
+        request: String,
+        workerID: String
+    ) async throws -> ProjectAgentSession {
+        guard let projectID, let token else {
+            throw MobileAPIError.invalidRequest
+        }
+        let response: ProjectAgentTaskResponse = try await api.send(
+            MobileAPIContract.Endpoint.projectAgentTasks(projectID: projectID),
+            method: "POST",
+            token: token,
+            body: ProjectAgentTaskRequest(
+                agentId: agent.id,
+                request: request,
+                workerId: workerID,
+                requestId: UUID()
+            ),
+            as: ProjectAgentTaskResponse.self
+        )
+        sessions = Self.collapseLinked(
+            [response.session] + sessions.filter { $0.id != response.session.id }
+        ).sorted { $0.displayTimestamp > $1.displayTimestamp }
+        errorMessage = nil
+        return response.session
+    }
+
+    /// Legacy issue-dispatch entry point retained for existing native callers.
+    /// Direct saved-Agent runs use the overload above and do not require a queued issue.
+    func run(
+        agent: ProjectAgent,
         runs: [DashboardRun],
         maxIssues: Int = 3
     ) async throws -> String {
@@ -371,6 +400,8 @@ final class AgentsStore: ObservableObject {
         status: ProjectAgentSession.Status? = nil,
         issues: [ProjectAgentSession.Issue]? = nil,
         completedAt: Date? = nil,
+        requestedWorkerId: String? = nil,
+        workerId: String? = nil,
         summary: String? = nil,
         error: String? = nil,
         events: [ProjectAgentSession.Event]? = nil,
@@ -392,6 +423,8 @@ final class AgentsStore: ObservableObject {
             startedAt: session.startedAt,
             completedAt: completedAt,
             conversationId: session.conversationId,
+            requestedWorkerId: requestedWorkerId ?? session.requestedWorkerId,
+            workerId: workerId ?? session.workerId,
             workspaceRoot: session.workspaceRoot,
             summary: summary,
             error: error,

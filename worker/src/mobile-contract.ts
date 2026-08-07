@@ -720,6 +720,8 @@ export const mobileProjectAgentSessionSchema = z.object({
   completedAt: z.string().nullable(),
   conversationId: z.string().nullable().optional(),
   workspaceRoot: z.null().optional(),
+  requestedWorkerId: z.string().nullable().optional(),
+  workerId: z.string().nullable().optional(),
   summary: z.string().nullable().optional(),
   error: z.string().nullable().optional(),
   events: z.array(z.object({
@@ -741,6 +743,17 @@ export const mobileProjectAgentSessionSchema = z.object({
 
 export const mobileProjectAgentSessionsResponseSchema = z.object({
   sessions: z.array(mobileProjectAgentSessionSchema),
+});
+
+export const mobileProjectAgentTaskRequestSchema = z.object({
+  agentId: z.uuid(),
+  request: z.string().trim().min(1).max(50_000),
+  workerId: z.string().trim().min(1).max(128),
+  requestId: z.uuid(),
+});
+
+export const mobileProjectAgentTaskResponseSchema = z.object({
+  session: mobileProjectAgentSessionSchema,
 });
 
 export const mobileOperationSchemas = {
@@ -792,6 +805,10 @@ export const mobileOperationSchemas = {
   },
   listProjectAgents: { response: mobileProjectAgentsResponseSchema },
   listProjectAgentSessions: { response: mobileProjectAgentSessionsResponseSchema },
+  runProjectAgentTask: {
+    request: mobileProjectAgentTaskRequestSchema,
+    response: mobileProjectAgentTaskResponseSchema,
+  },
   listChannels: { response: mobileChannelsResponseSchema },
   getChannel: { response: mobileChannelDetailResponseSchema },
   listChannelMessages: { response: mobileChannelMessagesResponseSchema },

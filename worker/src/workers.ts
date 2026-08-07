@@ -663,23 +663,33 @@ export async function recordWorkerHeartbeat(
       `select worker.*, device.max_concurrent_sessions,
               device.icon_type, device.icon_value,
               (
-                select count(*)
-                from briar_hunt_runs active
-                join briar_execution_workers holder
-                  on holder.id = active.worker_id
-                where holder.device_id = device.id
-                  and active.claim_token_hash is not null
-                  and active.lease_expires_at is not null
-                  and active.lease_expires_at > ?
-                  and active.status not in (
-                    'backlog', 'completed', 'cancelled', 'blocked', 'failed'
-                  )
+                select count(*) from (
+                  select active.id
+                  from briar_hunt_runs active
+                  join briar_execution_workers holder
+                    on holder.id = active.worker_id
+                  where holder.device_id = device.id
+                    and active.claim_token_hash is not null
+                    and active.lease_expires_at is not null
+                    and active.lease_expires_at > ?
+                    and active.status not in (
+                      'backlog', 'completed', 'cancelled', 'blocked', 'failed'
+                    )
+                  union all
+                  select task.id
+                  from briar_project_agent_task_jobs task
+                  join briar_execution_workers holder
+                    on holder.id = task.claimed_worker_id
+                  where holder.device_id = device.id
+                    and task.status = 'running'
+                    and task.lease_expires_at > ?
+                ) active_work
               ) as active_sessions
        from briar_execution_workers worker
        join briar_execution_worker_devices device on device.id = worker.device_id
        where worker.id = ?`,
     )
-    .bind(input.observedAt, input.workerId)
+    .bind(input.observedAt, input.observedAt, input.workerId)
     .first<ExecutionWorkerRow>();
   if (!updated) {
     throw new WorkerConflictError("Worker heartbeat update was not persisted");
@@ -857,24 +867,34 @@ export async function listExecutionWorkers(
               device.max_concurrent_sessions, device.icon_type,
               device.icon_value,
               (
-                select count(*)
-                from briar_hunt_runs active
-                join briar_execution_workers holder
-                  on holder.id = active.worker_id
-                where holder.device_id = device.id
-                  and active.claim_token_hash is not null
-                  and active.lease_expires_at is not null
-                  and active.lease_expires_at > ?
-                  and active.status not in (
-                    'backlog', 'completed', 'cancelled', 'blocked', 'failed'
-                  )
+                select count(*) from (
+                  select active.id
+                  from briar_hunt_runs active
+                  join briar_execution_workers holder
+                    on holder.id = active.worker_id
+                  where holder.device_id = device.id
+                    and active.claim_token_hash is not null
+                    and active.lease_expires_at is not null
+                    and active.lease_expires_at > ?
+                    and active.status not in (
+                      'backlog', 'completed', 'cancelled', 'blocked', 'failed'
+                    )
+                  union all
+                  select task.id
+                  from briar_project_agent_task_jobs task
+                  join briar_execution_workers holder
+                    on holder.id = task.claimed_worker_id
+                  where holder.device_id = device.id
+                    and task.status = 'running'
+                    and task.lease_expires_at > ?
+                ) active_work
               ) as active_sessions
        from briar_execution_workers worker
        join briar_execution_worker_devices device on device.id = worker.device_id
        where worker.project_id = ?
        order by worker.last_heartbeat_at desc, worker.id asc`,
     )
-    .bind(observedAt, projectId)
+    .bind(observedAt, observedAt, projectId)
     .all<
       ExecutionWorkerRow & {
         owner_user_id: string;
@@ -906,17 +926,27 @@ export async function listOrganizationExecutionWorkers(
               worker.accepting_work, worker.readiness_state,
               worker.readiness_detail, worker.last_heartbeat_at as worker_heartbeat_at,
               (
-                select count(*)
-                from briar_hunt_runs active
-                join briar_execution_workers holder
-                  on holder.id = active.worker_id
-                where holder.device_id = device.id
-                  and active.claim_token_hash is not null
-                  and active.lease_expires_at is not null
-                  and active.lease_expires_at > ?
-                  and active.status not in (
-                    'backlog', 'completed', 'cancelled', 'blocked', 'failed'
-                  )
+                select count(*) from (
+                  select active.id
+                  from briar_hunt_runs active
+                  join briar_execution_workers holder
+                    on holder.id = active.worker_id
+                  where holder.device_id = device.id
+                    and active.claim_token_hash is not null
+                    and active.lease_expires_at is not null
+                    and active.lease_expires_at > ?
+                    and active.status not in (
+                      'backlog', 'completed', 'cancelled', 'blocked', 'failed'
+                    )
+                  union all
+                  select task.id
+                  from briar_project_agent_task_jobs task
+                  join briar_execution_workers holder
+                    on holder.id = task.claimed_worker_id
+                  where holder.device_id = device.id
+                    and task.status = 'running'
+                    and task.lease_expires_at > ?
+                ) active_work
               ) as active_sessions
        from briar_execution_worker_devices device
        join "user" owner on owner.id = device.owner_user_id
@@ -926,7 +956,7 @@ export async function listOrganizationExecutionWorkers(
        where device.organization_id = ?
        order by device.last_heartbeat_at desc, device.id, project.created_at`,
     )
-    .bind(observedAt, organizationId)
+    .bind(observedAt, observedAt, organizationId)
     .all<{
       device_id: string;
       owner_user_id: string;
