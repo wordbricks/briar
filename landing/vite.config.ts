@@ -28,6 +28,9 @@ const localBindingConfig = {
       "/_vinext/image",
     ],
   },
+  images: {
+    binding: "IMAGES",
+  },
   d1_databases: d1
     ? [
         {

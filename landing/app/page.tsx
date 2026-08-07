@@ -389,13 +389,18 @@ export default async function Home() {
 
       <section className="hero">
         <div className="hero-art" aria-hidden="true">
-          <img
-            src="/briar-hero-orchestration.webp"
-            alt=""
+          <video
+            autoPlay
+            loop
+            muted
+            playsInline
+            preload="auto"
+            poster="/briar-hero-orchestration.webp"
             width="1899"
             height="828"
-            fetchPriority="high"
-          />
+          >
+            <source src="/briar-x-demo-20s.mp4" type="video/mp4" />
+          </video>
         </div>
         <div className="hero-content shell">
           <div className="hero-kicker">
