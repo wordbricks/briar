@@ -114,6 +114,7 @@ export default async function DownloadPage() {
           </a>
           <nav aria-label={c.aria.mainMenu}>
             <a href="/tutorial">{c.nav.tutorial}</a>
+            <a href="/changelog">{c.nav.changelog}</a>
             <a href="/blog">{c.nav.blog}</a>
             <a className="is-current" href="/download" aria-current="page">
               {c.nav.download}
@@ -246,6 +247,7 @@ export default async function DownloadPage() {
             {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
             <a href="/">{d.home}</a>
             <a href="/tutorial">{c.nav.tutorial}</a>
+            <a href="/changelog">{c.nav.changelog}</a>
             <a href="#top">{d.backTop}</a>
           </div>
         </div>

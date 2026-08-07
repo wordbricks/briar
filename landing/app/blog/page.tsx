@@ -68,6 +68,7 @@ export default async function BlogPage() {
           </a>
           <nav aria-label={c.aria.mainMenu}>
             <a href="/tutorial">{c.nav.tutorial}</a>
+            <a href="/changelog">{c.nav.changelog}</a>
             <a className="is-current" href="/blog" aria-current="page">
               {c.nav.blog}
             </a>
@@ -129,8 +130,10 @@ export default async function BlogPage() {
           </a>
           <p>{c.footer.tagline}</p>
           <div>
+            {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
             <a href="/">{b.home}</a>
             <a href="/tutorial">{c.nav.tutorial}</a>
+            <a href="/changelog">{c.nav.changelog}</a>
             <a href="/download">{c.nav.download}</a>
             <a href="#top">{b.backTop}</a>
           </div>

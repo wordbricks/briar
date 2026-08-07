@@ -497,6 +497,7 @@ export default async function TutorialPage() {
           <div>
             {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
             <a href="/">{t.backHome}</a>
+            <a href="/changelog">{c.nav.changelog}</a>
             <a href="#top">{t.backTop}</a>
           </div>
         </div>
