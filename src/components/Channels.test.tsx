@@ -79,6 +79,7 @@ const message = (overrides: Partial<ChannelMessage> = {}): ChannelMessage => ({
   body: "Hello team",
   mentionedUserIds: [],
   mentionedAgentIds: [],
+  attachments: [],
   replyCount: 0,
   lastReplyAt: null,
   document: null,
@@ -247,6 +248,81 @@ describe("Channels", () => {
       "channel-1",
       expect.objectContaining({ mentionedAgentIds: [] }),
     );
+  });
+
+  it("pastes an image, previews it, and sends it as multipart message data", async () => {
+    Object.defineProperty(URL, "createObjectURL", {
+      configurable: true,
+      value: vi.fn(() => "blob:channel-preview"),
+    });
+    Object.defineProperty(URL, "revokeObjectURL", {
+      configurable: true,
+      value: vi.fn(),
+    });
+    await render([message()]);
+    sendChannelMessage.mockResolvedValue({
+      message: message({ id: "message-image", body: "Image" }),
+      agentReplies: [],
+    });
+    const image = new File(["image"], "clipboard.png", { type: "image/png" });
+    const textarea = container.querySelector("textarea")!;
+    const paste = new Event("paste", { bubbles: true, cancelable: true });
+    Object.defineProperty(paste, "clipboardData", {
+      value: {
+        files: [image],
+        items: [{ kind: "file", getAsFile: () => image }],
+        types: ["Files"],
+      },
+    });
+
+    await act(async () => textarea.dispatchEvent(paste));
+
+    expect(paste.defaultPrevented).toBe(true);
+    expect(container.querySelector(".channel-image-draft img")).not.toBeNull();
+    await act(async () => {
+      container
+        .querySelector("form.channel-composer")!
+        .dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    });
+
+    expect(sendChannelMessage).toHaveBeenCalledWith(
+      "token",
+      "org-1",
+      "channel-1",
+      expect.objectContaining({
+        attachments: [image],
+        attachmentReferences: [expect.any(String)],
+        body: expect.stringContaining("briar-attachment://"),
+      }),
+    );
+  });
+
+  it("accepts a dropped image in the composer", async () => {
+    Object.defineProperty(URL, "createObjectURL", {
+      configurable: true,
+      value: vi.fn(() => "blob:dropped-channel-image"),
+    });
+    Object.defineProperty(URL, "revokeObjectURL", {
+      configurable: true,
+      value: vi.fn(),
+    });
+    await render([message()]);
+    const image = new File(["image"], "dropped.png", { type: "image/png" });
+    const drop = new Event("drop", { bubbles: true, cancelable: true });
+    Object.defineProperty(drop, "dataTransfer", {
+      value: {
+        files: [image],
+        items: [{ kind: "file", getAsFile: () => image }],
+        types: ["Files"],
+      },
+    });
+
+    await act(async () =>
+      container.querySelector("form.channel-composer")!.dispatchEvent(drop),
+    );
+
+    expect(drop.defaultPrevented).toBe(true);
+    expect(container.querySelector(".channel-image-draft img")).not.toBeNull();
   });
 
   it("accepts an issue proposal against the channel's default project", async () => {
