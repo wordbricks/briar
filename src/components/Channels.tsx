@@ -54,6 +54,21 @@ import {
   type MentionTarget,
 } from "../lib/channel-mentions";
 import {
+  dataTransferHasFiles,
+  filesFromDataTransfer,
+  maxIssueAttachmentCount,
+  normalizeIssueAttachmentFile,
+  validateIssueAttachments,
+} from "../lib/issue-attachments";
+import {
+  ChannelDraftImages,
+  ChannelMessageImages,
+  channelBodyWithImages,
+  channelBodyWithoutImages,
+  draftChannelImage,
+  type DraftChannelImage,
+} from "./ChannelImages";
+import {
   channelThreadWidthDefault,
   channelThreadWidthMax,
   channelThreadWidthMin,
@@ -311,7 +326,13 @@ export function Channels({
   );
 
   const send = useCallback(
-    async (body: string, mentions: MentionTarget[], parentMessageId: string | null) => {
+    async (
+      body: string,
+      mentions: MentionTarget[],
+      parentMessageId: string | null,
+      attachments: File[],
+      attachmentReferences: string[],
+    ) => {
       if (!activeChannelId || !body.trim()) return;
       setBusy(true);
       setError(null);
@@ -325,6 +346,8 @@ export function Channels({
           mentionedAgentIds: mentions
             .filter((mention) => mention.type === "agent")
             .map((mention) => mention.id),
+          attachments,
+          attachmentReferences,
         });
         setReplies((current) => [...current, ...result.agentReplies]);
         if (parentMessageId) {
@@ -526,6 +549,7 @@ export function Channels({
                       onAcceptProposal={() => void acceptProposal(message)}
                       onOpenThread={() => void openThread(message.id)}
                       busy={busy}
+                      token={token}
                     />
                   </div>
                 );
@@ -550,7 +574,9 @@ export function Channels({
               members={members}
               currentUserId={currentUserId}
               channelName={activeChannel.name}
-              onSend={(body, mentions) => void send(body, mentions, null)}
+              onSend={(body, mentions, attachments, references) =>
+                void send(body, mentions, null, attachments, references)
+              }
             />
           </>
         ) : (
@@ -596,6 +622,7 @@ export function Channels({
                 currentUserId={currentUserId}
                 onAcceptProposal={() => void acceptProposal(message)}
                 busy={busy}
+                token={token}
               />
             ))}
           </div>
@@ -606,7 +633,15 @@ export function Channels({
             currentUserId={currentUserId}
             channelName={activeChannel.name}
             placeholder={t("channel.threadPlaceholder")}
-            onSend={(body, mentions) => void send(body, mentions, threadParentId)}
+            onSend={(body, mentions, attachments, references) =>
+              void send(
+                body,
+                mentions,
+                threadParentId,
+                attachments,
+                references,
+              )
+            }
           />
           </aside>
         </>
@@ -684,6 +719,7 @@ function MessageRow({
   onOpenThread,
   onAcceptProposal,
   busy,
+  token,
 }: {
   message: ChannelMessage;
   localeTag: string;
@@ -691,6 +727,7 @@ function MessageRow({
   onOpenThread?: () => void;
   onAcceptProposal: () => void;
   busy: boolean;
+  token: string;
 }) {
   const { t } = useI18n();
   const isAgent = message.author.type === "agent";
@@ -727,7 +764,12 @@ function MessageRow({
             {formatMessageTime(message.createdAt, localeTag)}
           </time>
         </header>
-        <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.body}</ReactMarkdown>
+        {channelBodyWithoutImages(message.body) ? (
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+            {channelBodyWithoutImages(message.body)}
+          </ReactMarkdown>
+        ) : null}
+        <ChannelMessageImages attachments={message.attachments} token={token} />
 
         {message.document ? (
           <div className="channel-document-card">
@@ -788,7 +830,12 @@ function Composer({
   channelName: string;
   placeholder?: string;
   busy: boolean;
-  onSend: (body: string, mentions: MentionTarget[]) => void;
+  onSend: (
+    body: string,
+    mentions: MentionTarget[],
+    attachments: File[],
+    attachmentReferences: string[],
+  ) => void;
 }) {
   const { t } = useI18n();
   const [body, setBody] = useState("");
@@ -798,7 +845,11 @@ function Composer({
   // Mentions are tracked as picked entities, never re-parsed from the text:
   // the server trusts this list, so a handle typed by hand is just text.
   const [mentions, setMentions] = useState<MentionTarget[]>([]);
+  const [images, setImages] = useState<DraftChannelImage[]>([]);
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
+  const [dragging, setDragging] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const attachmentInputRef = useRef<HTMLInputElement | null>(null);
   const pendingCaret = useRef<number | null>(null);
   const mentionListId = useId();
 
@@ -884,17 +935,66 @@ function Composer({
     textareaRef.current?.focus();
   };
 
+  const addImages = (files: readonly File[]) => {
+    const normalized = files.map(normalizeIssueAttachmentFile);
+    if (
+      normalized.length === 0 ||
+      normalized.some((file) => !file.type.startsWith("image/"))
+    ) {
+      setAttachmentError(t("channel.imageOnly"));
+      return;
+    }
+    const next = [...images, ...normalized.map(draftChannelImage)];
+    const validationError = validateIssueAttachments(
+      next.map((image) => image.file),
+    );
+    if (validationError) {
+      setAttachmentError(validationError);
+      return;
+    }
+    setImages(next);
+    setAttachmentError(null);
+  };
+
   const submit = () => {
-    if (!body.trim() || busy) return;
-    onSend(body, retainedMentions(body, mentions));
+    if ((!body.trim() && images.length === 0) || busy) return;
+    onSend(
+      channelBodyWithImages(body, images),
+      retainedMentions(body, mentions),
+      images.map((image) => image.file),
+      images.map((image) => image.reference),
+    );
     setBody("");
+    setImages([]);
     setMentions([]);
     setMentionDismissed(false);
   };
 
   return (
     <form
-      className="channel-composer"
+      className={`channel-composer${dragging ? " is-dragging" : ""}`}
+      onDragEnter={(event) => {
+        if (!dataTransferHasFiles(event.dataTransfer)) return;
+        event.preventDefault();
+        setDragging(true);
+      }}
+      onDragOver={(event) => {
+        if (!dataTransferHasFiles(event.dataTransfer)) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = "copy";
+        setDragging(true);
+      }}
+      onDragLeave={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+          setDragging(false);
+        }
+      }}
+      onDrop={(event) => {
+        if (!dataTransferHasFiles(event.dataTransfer)) return;
+        event.preventDefault();
+        setDragging(false);
+        addImages(filesFromDataTransfer(event.dataTransfer));
+      }}
       onSubmit={(event) => {
         event.preventDefault();
         submit();
@@ -936,6 +1036,15 @@ function Composer({
       ) : null}
 
       <div className="channel-composer-shell">
+        <ChannelDraftImages
+          images={images}
+          onRemove={(reference) => {
+            setImages((current) =>
+              current.filter((image) => image.reference !== reference),
+            );
+            setAttachmentError(null);
+          }}
+        />
         <textarea
           aria-activedescendant={
             showsSuggestions
@@ -985,6 +1094,14 @@ function Composer({
           onKeyUp={(event) =>
             setCaret(event.currentTarget.selectionStart ?? 0)
           }
+          onPaste={(event) => {
+            const pasted = filesFromDataTransfer(event.clipboardData).filter(
+              (file) => file.type.startsWith("image/"),
+            );
+            if (pasted.length === 0) return;
+            event.preventDefault();
+            addImages(pasted);
+          }}
           onClick={(event) => setCaret(event.currentTarget.selectionStart ?? 0)}
           ref={textareaRef}
           role="combobox"
@@ -1005,11 +1122,23 @@ function Composer({
               type="button"
               className="channel-composer-tool"
               aria-label={t("channel.toolAttach")}
-              disabled
-              title={t("channel.toolComingSoon")}
+              disabled={busy || images.length >= maxIssueAttachmentCount}
+              onClick={() => attachmentInputRef.current?.click()}
             >
               <Paperclip size={16} />
             </button>
+            <input
+              accept="image/*"
+              className="channel-composer-file-input"
+              disabled={busy || images.length >= maxIssueAttachmentCount}
+              multiple
+              onChange={(event) => {
+                addImages(Array.from(event.currentTarget.files ?? []));
+                event.currentTarget.value = "";
+              }}
+              ref={attachmentInputRef}
+              type="file"
+            />
             <button
               type="button"
               className="channel-composer-tool"
@@ -1023,12 +1152,15 @@ function Composer({
           <button
             aria-label={t("channel.send")}
             className="channel-composer-send"
-            disabled={busy || !body.trim()}
+            disabled={busy || (!body.trim() && images.length === 0)}
             type="submit"
           >
             <Send size={16} />
           </button>
         </div>
+        {attachmentError ? (
+          <p className="channel-composer-error">{attachmentError}</p>
+        ) : null}
       </div>
     </form>
   );
