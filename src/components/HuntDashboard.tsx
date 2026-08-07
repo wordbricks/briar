@@ -124,6 +124,11 @@ import {
   validateIssueAttachments,
 } from "../lib/issue-attachments";
 import {
+  issueTitleInputMaxLength,
+  issueTitleLength,
+  isIssueTitleWithinLimit,
+} from "../lib/issue-title";
+import {
   defaultIssueDetailTab,
   type IssueDetailTab,
 } from "../lib/issue-detail-tab";
@@ -394,6 +399,7 @@ export function HuntDashboard({
   companionStatus,
   companionUnreadInboxCount = 0,
   currentUserId = null,
+  createIssueDefaultProjectId,
   dashboard,
   error,
   isCreatingIssue,
@@ -448,6 +454,7 @@ export function HuntDashboard({
   companionStatus?: CompanionStatusFilter;
   companionUnreadInboxCount?: number;
   currentUserId?: string | null;
+  createIssueDefaultProjectId?: string | null;
   dashboard: DashboardPayload | null;
   error: string | null;
   isCreatingIssue: boolean;
@@ -979,7 +986,9 @@ export function HuntDashboard({
     <CreateIssueDialog
       availableProviders={availableProviders}
       compactHeader={companionMode}
-      defaultProjectId={dashboard?.project.id}
+      defaultProjectId={
+        createIssueDefaultProjectId ?? dashboard?.project.id
+      }
       isSubmitting={isCreatingIssue}
       onClose={() => setIsIssueDialogOpen(false)}
       onCreate={async (projectId, input) => {
@@ -1802,7 +1811,7 @@ export function EditIssueDialog({
   onUpdate: (input: UpdateIssueInput) => Promise<unknown>;
   run: HuntRun;
 }) {
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
   const [title, setTitle] = useState(run.title);
   const [description, setDescription] = useState(run.issueDescription ?? "");
   const [priority, setPriority] = useState(
@@ -1812,6 +1821,10 @@ export function EditIssueDialog({
     run.assigneeUserId ?? "",
   );
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const titleMaxLength = issueTitleInputMaxLength(title, locale);
+  const titleLength = issueTitleLength(title);
+  const titleTooLong =
+    Boolean(title.trim()) && !isIssueTitleWithinLimit(title);
 
   useEffect(() => {
     const closeOnEscape = (event: KeyboardEvent) => {
@@ -1845,6 +1858,15 @@ export function EditIssueDialog({
         onSubmit={(event) => {
           event.preventDefault();
           if (!title.trim() || isSubmitting) return;
+          if (!isIssueTitleWithinLimit(title)) {
+            setSubmitError(
+              t("issue.titleTooLong", {
+                max: titleMaxLength,
+                count: titleLength,
+              }),
+            );
+            return;
+          }
           setSubmitError(null);
           void onUpdate({
             title: title.trim(),
@@ -1877,12 +1899,21 @@ export function EditIssueDialog({
               aria-label={t("issue.title")}
               autoFocus
               className="issue-title-input"
-              maxLength={300}
+              maxLength={titleMaxLength}
               onChange={(event) => setTitle(event.target.value)}
               placeholder={t("issue.titlePlaceholder")}
               required
               value={title}
             />
+            <p
+              className={`issue-title-counter${titleTooLong ? " is-over" : ""}`}
+              aria-live="polite"
+            >
+              {t("issue.titleCount", {
+                count: titleLength,
+                max: titleMaxLength,
+              })}
+            </p>
             <textarea
               aria-label={t("issue.description")}
               className="issue-description-input"
@@ -1940,7 +1971,7 @@ export function EditIssueDialog({
             </button>
             <button
               className="issue-submit-button"
-              disabled={isSubmitting || !title.trim()}
+              disabled={isSubmitting || !title.trim() || titleTooLong}
               type="submit"
             >
               {isSubmitting && <LoaderCircle className="spin" size={13} />}
@@ -2090,7 +2121,7 @@ export function CreateIssueDialog({
   workflow?: AutoHuntWorkflow;
   workflowProjectId?: string;
 }) {
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
   const [initialDraft] = useState(() => {
     const draft = loadCreateIssueDraft();
     return draft && projects.some((project) => project.id === draft.projectId)
@@ -2098,6 +2129,10 @@ export function CreateIssueDialog({
       : null;
   });
   const [title, setTitle] = useState(initialDraft?.title ?? "");
+  const titleMaxLength = issueTitleInputMaxLength(title, locale);
+  const titleLength = issueTitleLength(title);
+  const titleTooLong =
+    Boolean(title.trim()) && !isIssueTitleWithinLimit(title);
   const [description, setDescription] = useState(
     initialDraft?.description ?? "",
   );
@@ -2374,6 +2409,15 @@ export function CreateIssueDialog({
         onSubmit={(event) => {
           event.preventDefault();
           if (!title.trim() || isSubmitting) return;
+          if (!isIssueTitleWithinLimit(title)) {
+            setSubmitError(
+              t("issue.titleTooLong", {
+                max: titleMaxLength,
+                count: titleLength,
+              }),
+            );
+            return;
+          }
           setSubmitError(null);
           if (!projectId) return;
           void onCreate(
@@ -2458,12 +2502,21 @@ export function CreateIssueDialog({
               aria-label={t("issue.title")}
               autoFocus
               className="issue-title-input"
-              maxLength={300}
+              maxLength={titleMaxLength}
               onChange={(event) => setTitle(event.target.value)}
               placeholder={t("issue.titlePlaceholder")}
               required
               value={title}
             />
+            <p
+              className={`issue-title-counter${titleTooLong ? " is-over" : ""}`}
+              aria-live="polite"
+            >
+              {t("issue.titleCount", {
+                count: titleLength,
+                max: titleMaxLength,
+              })}
+            </p>
             <DraftIssueDescriptionEditor
               attachments={attachments}
               description={description}
@@ -2657,7 +2710,9 @@ export function CreateIssueDialog({
             </button>
             <button
               className="issue-submit-button"
-              disabled={isSubmitting || !title.trim() || !projectId}
+              disabled={
+                isSubmitting || !title.trim() || !projectId || titleTooLong
+              }
               type="submit"
             >
               {isSubmitting && <LoaderCircle className="spin" size={13} />}

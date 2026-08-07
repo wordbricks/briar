@@ -5,6 +5,18 @@ import XCTest
 
 @MainActor
 final class IssueMutationTests: XCTestCase {
+    func testIssueTitleLimitsMatchLanguageAwareRules() {
+        XCTAssertEqual(IssueTitleLimits.maxLength(for: "로그인 오류"), IssueTitleLimits.hangulMax)
+        XCTAssertEqual(IssueTitleLimits.maxLength(for: "登录失败"), IssueTitleLimits.hanMax)
+        XCTAssertEqual(IssueTitleLimits.maxLength(for: "Checkout is blank"), IssueTitleLimits.latinMax)
+        XCTAssertNil(IssueTitleLimits.validationError(for: "정상 제목"))
+        XCTAssertEqual(
+            IssueTitleLimits.validationError(for: String(repeating: "가", count: IssueTitleLimits.hangulMax + 1)),
+            .titleTooLong(max: IssueTitleLimits.hangulMax, count: IssueTitleLimits.hangulMax + 1)
+        )
+        XCTAssertEqual(IssueTitleLimits.validationError(for: "   "), .invalidTitle)
+    }
+
     func testAttachmentLimitsMatchSharedMobileContract() {
         let image = PendingIssueAttachment(
             filename: "screen.png",

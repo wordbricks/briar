@@ -106,7 +106,7 @@ export function Sidebar({
   onChannelCreate?: (name: string) => Promise<void>;
   onChannelOpen?: (channelId: string) => void;
   onIssuesOpen: () => void;
-  onCreateIssue: () => void;
+  onCreateIssue: (projectId: string) => void;
   onAddOrganization: () => void;
   onOrganizationChange: (organizationId: string) => void;
   onOrganizationSettings: (
@@ -791,7 +791,9 @@ export function Sidebar({
                       <button
                         aria-label={t("dashboard.createIssue")}
                         className="sidebar-issue-add"
-                        onClick={() => openProjectPage(onCreateIssue)}
+                        onClick={() =>
+                          openProjectPage(() => onCreateIssue(project.id))
+                        }
                         title={t("dashboard.createIssue")}
                         type="button"
                       >

@@ -1,3 +1,5 @@
+import { issueTitleAbsoluteMaxLength } from "./issue-title";
+
 export const createIssueDraftStorageKey = "briar.create-issue-draft.v1";
 
 export type CreateIssueDraft = {
@@ -22,7 +24,7 @@ function isCreateIssueDraft(value: unknown): value is CreateIssueDraft {
   const draft = value as Record<string, unknown>;
   return (
     typeof draft.title === "string" &&
-    draft.title.length <= 300 &&
+    draft.title.length <= issueTitleAbsoluteMaxLength &&
     typeof draft.description === "string" &&
     draft.description.length <= 100000 &&
     (draft.status === "backlog" || draft.status === "queued") &&

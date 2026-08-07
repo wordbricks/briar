@@ -4,6 +4,13 @@ import {
   validateIssueAttachments,
 } from "../../src/lib/issue-attachments";
 import { formatIssueKey } from "../../src/lib/issue-key";
+import {
+  issueTitleAbsoluteMaxLength,
+  issueTitleInputMaxLength,
+  issueTitleLength,
+  issueTitleTooLongMessageKo,
+  isIssueTitleWithinLimit,
+} from "../../src/lib/issue-title";
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -135,6 +142,8 @@ export type SlackIssueInstruction = {
   description: string | null;
   priority: number | null;
   status: Extract<AutoHuntRunStatus, "backlog" | "queued">;
+  /** Present when the title exceeds the language-aware limit. */
+  titleTooLong?: true;
 };
 
 const priorityByName: Record<string, number> = {
@@ -201,10 +210,25 @@ export function parseSlackIssueInstruction(
     .filter(Boolean);
   const title = lines.shift()?.replace(/\s+/gu, " ").trim() ?? "";
   if (!title) return null;
-
+  const description = lines.length > 0 ? lines.join("\n") : null;
+  // Keep the full title (capped only at the storage ceiling) so callers can
+  // reject over-limit mentions with guidance instead of silently truncating.
+  const boundedTitle =
+    issueTitleLength(title) > issueTitleAbsoluteMaxLength
+      ? title.slice(0, issueTitleAbsoluteMaxLength)
+      : title;
+  if (!isIssueTitleWithinLimit(boundedTitle)) {
+    return {
+      title: boundedTitle,
+      description,
+      priority,
+      status,
+      titleTooLong: true,
+    };
+  }
   return {
-    title: title.slice(0, 300),
-    description: lines.length > 0 ? lines.join("\n") : null,
+    title: boundedTitle,
+    description,
     priority,
     status,
   };
@@ -298,7 +322,16 @@ export function buildSlackCreateIssueModal(input: {
   if (!defaultProject) {
     throw new Error("A project is required to build the Slack issue modal");
   }
-  const initialTitle = input.initialTitle?.trim().slice(0, 300);
+  const initialTitleRaw = input.initialTitle?.trim() ?? "";
+  const initialTitle = initialTitleRaw
+    ? initialTitleRaw.slice(
+        0,
+        Math.min(
+          issueTitleInputMaxLength(initialTitleRaw, "ko"),
+          issueTitleAbsoluteMaxLength,
+        ),
+      )
+    : undefined;
   return {
     type: "modal",
     callback_id: slackCreateIssueCallbackId,
@@ -331,7 +364,9 @@ export function buildSlackCreateIssueModal(input: {
           type: "plain_text_input",
           action_id: slackCreateIssueActions.title,
           placeholder: plainText("Issue title"),
-          max_length: 300,
+          // Hard input ceiling is the highest language-aware budget (Latin).
+          // Submit validation still applies Hangul/Han/Kana-specific limits.
+          max_length: issueTitleInputMaxLength("A", "en"),
           ...(initialTitle ? { initial_value: initialTitle } : {}),
         },
       },
@@ -437,10 +472,16 @@ export function parseSlackCreateIssueSubmission(
     slackCreateIssueActions.title,
   );
   const title = typeof titleState?.value === "string" ? titleState.value.trim() : "";
-  if (!title || title.length > 300) {
+  if (!title) {
     throw new SlackCreateIssueValidationError(
       slackCreateIssueBlocks.title,
-      "제목을 300자 이내로 입력해 주세요.",
+      "제목을 입력해 주세요.",
+    );
+  }
+  if (!isIssueTitleWithinLimit(title)) {
+    throw new SlackCreateIssueValidationError(
+      slackCreateIssueBlocks.title,
+      issueTitleTooLongMessageKo(title),
     );
   }
 

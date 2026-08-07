@@ -9076,7 +9076,7 @@ export async function importLinearHuntRuns(
 
   for (const raw of inputs) {
     try {
-      const title = raw.title.trim().slice(0, 300);
+      const title = raw.title.trim().slice(0, 300); // absolute DB ceiling
       if (!title) {
         failed += 1;
         continue;

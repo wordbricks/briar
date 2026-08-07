@@ -1,4 +1,8 @@
 import { z } from "zod";
+import {
+  issueTitleAbsoluteMaxLength,
+  issueTitleOverLimitMessage,
+} from "../../src/lib/issue-title";
 
 export const mobileClientIds = ["briar-mobile", "briar-android"] as const;
 export const mobileClientIdSchema = z.enum(mobileClientIds);
@@ -477,9 +481,21 @@ const mobileProviderSchema = z.enum(["codex", "claude", "grok", "opencode"]);
 const mobileEffortSchema = z.enum(["low", "medium", "high", "xhigh", "max", "ultra"]);
 const requestIdSchema = z.object({ requestId: z.uuid() });
 
+const mobileIssueTitleSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(issueTitleAbsoluteMaxLength)
+  .superRefine((title, context) => {
+    const message = issueTitleOverLimitMessage(title);
+    if (message) {
+      context.addIssue({ code: "custom", message });
+    }
+  });
+
 const mobileIssueWriteBaseSchema = z
   .object({
-    title: z.string().trim().min(1).max(300),
+    title: mobileIssueTitleSchema,
     description: z.string().max(100_000).nullable(),
     priority: z.number().int().min(1).max(4).nullable(),
     assigneeUserId: z.string().nullable(),
@@ -521,7 +537,7 @@ export const mobileCreateIssueResponseSchema = z.object({
 });
 export const mobileUpdateIssueRequestSchema = z
   .object({
-    title: z.string().trim().min(1).max(300),
+    title: mobileIssueTitleSchema,
     description: z.string().max(100_000).nullable(),
     priority: z.number().int().min(1).max(4).nullable(),
     assigneeUserId: z.string().nullable(),

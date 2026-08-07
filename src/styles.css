@@ -1870,6 +1870,17 @@ button.issue-message-state { width:100%; cursor:pointer; }
   line-height: 1.35;
   letter-spacing: -.025em;
 }
+.issue-title-counter {
+  margin: 0 0 4px;
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  line-height: 1.3;
+  text-align: right;
+}
+.issue-title-counter.is-over {
+  color: var(--destructive, #dc2626);
+  font-weight: 600;
+}
 .issue-description-editor {
   min-height: 90px;
   flex: 1 0 90px;
