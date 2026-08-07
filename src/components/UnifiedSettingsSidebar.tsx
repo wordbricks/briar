@@ -163,6 +163,11 @@ export function UnifiedSettingsSidebar({
         label: t("organization.membersAndInvites"),
       },
       {
+        id: "agents",
+        icon: <Bot size={16} strokeWidth={1.75} />,
+        label: t("organization.agents"),
+      },
+      {
         id: "workers",
         icon: <Cpu size={16} strokeWidth={1.75} />,
         label: t("organization.workers"),
