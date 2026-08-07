@@ -339,6 +339,7 @@ import {
   getChannelActionProposal,
   getChannelAgentReplyJob,
   getChannelById,
+  getClaimedChannelReplyAttachment,
   getChannelMessage,
   getChannelMessageAttachment,
   getChannelSyncCursor,
@@ -372,6 +373,7 @@ import {
   channelMemberInputSchema,
   channelMessageInputSchema,
   channelProposalAcceptInputSchema,
+  channelReplyClaimTokenHeader,
   channelReplyClaimInputSchema,
   channelReplyCompleteInputSchema,
   channelReplyLeaseInputSchema,
@@ -9184,6 +9186,44 @@ async function route(
         },
       },
     });
+  }
+
+  const channelReplyAttachmentMatch = pathname.match(
+    /^\/organizations\/([0-9a-f-]+)\/channel-reply-claims\/([0-9a-f-]+)\/attachments\/([0-9a-f-]+)$/u,
+  );
+  if (
+    channelReplyAttachmentMatch &&
+    (request.method === "GET" || request.method === "HEAD")
+  ) {
+    const principal = await requireWorkerOrganization(
+      db,
+      request,
+      channelReplyAttachmentMatch[1],
+    );
+    const claimToken = request.headers.get(channelReplyClaimTokenHeader)?.trim();
+    if (
+      !claimToken?.startsWith("briar_channel_claim_") ||
+      claimToken.length > 200
+    ) {
+      throw new HttpError(401, "Channel reply claim token required");
+    }
+    const attachment = await getClaimedChannelReplyAttachment(db, {
+      organizationId: channelReplyAttachmentMatch[1],
+      jobId: channelReplyAttachmentMatch[2],
+      deviceId: principal.deviceId,
+      claimTokenHash: await sha256(claimToken),
+      attachmentId: channelReplyAttachmentMatch[3],
+      observedAt: new Date().toISOString(),
+    });
+    if (!attachment) throw new HttpError(404, "Attachment not found");
+    if (request.method === "HEAD") {
+      const object = await attachmentsBucket.head(attachment.object_key);
+      if (!object) throw new HttpError(404, "Attachment not found");
+      return attachmentResponse(attachment, object, null);
+    }
+    const object = await attachmentsBucket.get(attachment.object_key);
+    if (!object) throw new HttpError(404, "Attachment not found");
+    return attachmentResponse(attachment, object, object.body);
   }
 
   const channelReplyClaimMatch = pathname.match(

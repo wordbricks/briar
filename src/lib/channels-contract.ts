@@ -29,6 +29,9 @@ export const channelReplyStatuses = [
 ] as const;
 export type ChannelReplyStatus = (typeof channelReplyStatuses)[number];
 
+export const channelReplyClaimTokenHeader =
+  "X-Briar-Channel-Claim-Token";
+
 export const channelSlugSchema = z
   .string()
   .trim()

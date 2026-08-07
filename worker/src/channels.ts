@@ -792,6 +792,49 @@ export async function getChannelMessageAttachment(
 }
 
 /**
+ * Resolve an image only when it belongs to the message that triggered the
+ * active reply claim on this exact Worker device. This keeps a leaked claim
+ * token, another channel image ID, or another enrolled device from widening
+ * access to private channel files.
+ */
+export async function getClaimedChannelReplyAttachment(
+  db: D1Database,
+  input: {
+    organizationId: string;
+    jobId: string;
+    deviceId: string;
+    claimTokenHash: string;
+    attachmentId: string;
+    observedAt: string;
+  },
+) {
+  return db
+    .prepare(
+      `select attachment.id, attachment.organization_id, attachment.channel_id,
+              attachment.message_id, attachment.object_key, attachment.filename,
+              attachment.content_type, attachment.byte_size, attachment.created_at
+       from briar_channel_agent_reply_jobs job
+       join briar_channel_message_attachments attachment
+         on attachment.organization_id = job.organization_id
+        and attachment.channel_id = job.channel_id
+        and attachment.message_id = job.trigger_message_id
+       where job.id = ? and job.organization_id = ?
+         and job.claimed_device_id = ? and job.claim_token_hash = ?
+         and job.status = 'running' and job.lease_expires_at > ?
+         and attachment.id = ?`,
+    )
+    .bind(
+      input.jobId,
+      input.organizationId,
+      input.deviceId,
+      input.claimTokenHash,
+      input.observedAt,
+      input.attachmentId,
+    )
+    .first<ChannelMessageAttachmentRow>();
+}
+
+/**
  * One job per mentioned agent, so a message that names two agents gets two
  * independent replies. Organization agents leave project_id null, which is what
  * makes them claimable by any device in the organization.

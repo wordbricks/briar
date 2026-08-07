@@ -472,6 +472,7 @@ export function detachedProviderRequest(input: {
   workspacePath: string;
   fullAccess: boolean;
   readOnly?: boolean;
+  imagePaths?: string[];
   agentBinary: string;
 }) {
   return {
@@ -494,7 +495,12 @@ export function detachedProviderRequest(input: {
           : "workspaceWrite",
       networkAccess: true,
       ...(input.agent.provider === "codex"
-        ? { codexBinary: input.agentBinary }
+        ? {
+            codexBinary: input.agentBinary,
+            ...(input.imagePaths?.length
+              ? { imagePaths: input.imagePaths }
+              : {}),
+          }
         : input.agent.provider === "claude"
           ? { claudeBinary: input.agentBinary }
           : input.agent.provider === "grok"
