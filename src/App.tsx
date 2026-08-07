@@ -16,7 +16,6 @@ import { Inbox } from "./components/Inbox";
 import { InboxDetailPanel } from "./components/InboxDetailPanel";
 import { Channels } from "./components/Channels";
 import { CompanionChannels } from "./components/CompanionChannels";
-import { Ideas } from "./components/Ideas";
 import { InitialOnboarding } from "./components/InitialOnboarding";
 import { InvitationOnboarding } from "./components/InvitationOnboarding";
 import { LaunchIntro } from "./components/LaunchIntro";
@@ -122,7 +121,6 @@ type ActivePage =
   | "issues"
   | "agents"
   | "channels"
-  | "ideas"
   | "schedule"
   | "inbox"
   | "organization-create"
@@ -446,7 +444,7 @@ export function App() {
   >(null);
   const [dispatchRun, setDispatchRun] = useState<HuntRun | null>(null);
   const [companionPage, setCompanionPage] = useState<
-    "issues" | "agents" | "ideas" | "home" | "inbox" | "settings"
+    "issues" | "agents" | "home" | "inbox" | "settings"
   >("issues");
   const [companionStatus, setCompanionStatus] =
     useState<CompanionStatusFilter>("all");
@@ -1071,7 +1069,6 @@ export function App() {
               navigateToPage("agents");
             }}
             onAgentsOpen={() => navigateToPage("agents")}
-            onIdeasOpen={() => navigateToPage("ideas")}
             onScheduleOpen={() => navigateToPage("schedule")}
             onInboxOpen={() => navigateToPage("inbox")}
             onChannelCreate={
@@ -1384,17 +1381,7 @@ export function App() {
               navigateToPage("issues");
             }}
           />
-        ) : activePage === "ideas" && featureFlags.ideas && activeProject ? (
-          <Ideas
-            isSidebarOpen={isSidebarOpen}
-            onIssuesCreated={(runIds) => {
-              setRequestedRunId(runIds[0] ?? null);
-              setIssueListRequestKey((key) => key + 1);
-              navigateToPage("issues");
-            }}
-            projectId={activeProject.id}
-            token={briar.token}
-          />
+
         ) : (
           <HuntDashboard
             agents={activeProjectAgents}
@@ -1708,7 +1695,6 @@ export function App() {
             <CompanionBottomNavigation
               activeDestination="home"
               onAgentsOpen={() => setCompanionPage("agents")}
-              onIdeasOpen={() => setCompanionPage("ideas")}
               onInboxOpen={() => setCompanionPage("inbox")}
               onHomeOpen={() => {}}
               onStatusChange={(status) => {
@@ -1736,33 +1722,7 @@ export function App() {
             <CompanionBottomNavigation
               activeDestination="inbox"
               onAgentsOpen={() => setCompanionPage("agents")}
-              onIdeasOpen={() => setCompanionPage("ideas")}
               onInboxOpen={() => {}}
-              onHomeOpen={() => setCompanionPage("home")}
-              onStatusChange={(status) => {
-                setCompanionStatus(status);
-                setCompanionPage("issues");
-              }}
-              unreadInboxCount={inbox.unreadCount}
-            />
-          </>
-        ) : companionPage === "ideas" && featureFlags.ideas && activeProject ? (
-          <>
-            <Ideas
-              isSidebarOpen
-              onIssuesCreated={(runIds) => {
-                setRequestedRunId(runIds[0] ?? null);
-                setCompanionStatus("all");
-                setCompanionPage("issues");
-              }}
-              projectId={activeProject.id}
-              token={briar.token}
-            />
-            <CompanionBottomNavigation
-              activeDestination="ideas"
-              onAgentsOpen={() => setCompanionPage("agents")}
-              onIdeasOpen={() => {}}
-              onInboxOpen={() => setCompanionPage("inbox")}
               onHomeOpen={() => setCompanionPage("home")}
               onStatusChange={(status) => {
                 setCompanionStatus(status);
@@ -1801,7 +1761,6 @@ export function App() {
             <CompanionBottomNavigation
               activeDestination="agents"
               onAgentsOpen={() => {}}
-              onIdeasOpen={() => setCompanionPage("ideas")}
               onInboxOpen={() => setCompanionPage("inbox")}
               onHomeOpen={() => setCompanionPage("home")}
               onStatusChange={(status) => {
@@ -1829,7 +1788,6 @@ export function App() {
             requestedRunId={requestedRunId}
             isSidebarOpen
             onCompanionAgentsOpen={() => setCompanionPage("agents")}
-            onCompanionIdeasOpen={() => setCompanionPage("ideas")}
             onCompanionInboxOpen={() => setCompanionPage("inbox")}
             onCompanionHomeOpen={() => setCompanionPage("home")}
             onCompanionStatusChange={(status) => {

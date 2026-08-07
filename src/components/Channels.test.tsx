@@ -343,7 +343,6 @@ describe("Channels", () => {
             projectId: null,
             payload: {},
             resultRunId: null,
-            resultIdeaId: null,
           },
         }),
       ],
@@ -403,10 +402,8 @@ describe("Channels", () => {
       message({
         id: "message-5",
         document: {
-          ideaId: "idea-1",
+          messageId: "message-5",
           title: "Onboarding plan",
-          status: "ready",
-          version: 1,
           projectId: null,
         },
       }),

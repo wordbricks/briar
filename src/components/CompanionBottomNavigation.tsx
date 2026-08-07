@@ -1,7 +1,6 @@
-import { Bot, House, Inbox, Lightbulb, ListTodo, Plus } from "lucide-react";
+import { Bot, House, Inbox, ListTodo, Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { featureFlags } from "@/lib/feature-flags";
 import { cn } from "@/lib/utils";
 import { useI18n } from "../i18n";
 
@@ -15,25 +14,20 @@ type CompanionDestination =
   | CompanionStatusFilter
   | "agents"
   | "home"
-  | "ideas"
   | "inbox";
 
 export function CompanionBottomNavigation({
   activeDestination,
-  ideasEnabled = featureFlags.ideas,
   onCreate,
   onAgentsOpen,
-  onIdeasOpen = () => undefined,
   onHomeOpen,
   onInboxOpen,
   onStatusChange,
   unreadInboxCount,
 }: {
   activeDestination: CompanionDestination;
-  ideasEnabled?: boolean;
   onCreate?: () => void;
   onAgentsOpen: () => void;
-  onIdeasOpen?: () => void;
   onHomeOpen: () => void;
   onInboxOpen: () => void;
   onStatusChange: (status: CompanionStatusFilter) => void;
@@ -49,9 +43,6 @@ export function CompanionBottomNavigation({
     { icon: House, label: t("companion.navHome"), value: "home" },
     { icon: ListTodo, label: t("companion.navTasks"), value: "all" },
     { icon: Bot, label: t("companion.navAgents"), value: "agents" },
-    ...(ideasEnabled
-      ? [{ icon: Lightbulb, label: t("companion.navIdeas"), value: "ideas" as const }]
-      : []),
     {
       count: unreadInboxCount,
       icon: Inbox,
@@ -66,7 +57,7 @@ export function CompanionBottomNavigation({
         aria-label={t("sidebar.mainMenu")}
         className={cn(
           "companion-bottom-nav grid gap-1 px-2",
-          ideasEnabled ? "grid-cols-5" : "grid-cols-4",
+          "grid-cols-4",
         )}
       >
         {destinations.map((destination) => {
@@ -82,7 +73,6 @@ export function CompanionBottomNavigation({
               key={destination.value}
               onClick={() => {
                 if (destination.value === "agents") onAgentsOpen();
-                else if (destination.value === "ideas") onIdeasOpen();
                 else if (destination.value === "inbox") onInboxOpen();
                 else if (destination.value === "home") onHomeOpen();
                 else onStatusChange(destination.value);

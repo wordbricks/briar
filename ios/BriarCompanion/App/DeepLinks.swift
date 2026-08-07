@@ -91,7 +91,6 @@ final class CompanionNavigationModel: ObservableObject {
         case tasks
         case agents
         case inbox
-        case ideas
     }
 
     @Published var selectedTab: Tab = .tasks

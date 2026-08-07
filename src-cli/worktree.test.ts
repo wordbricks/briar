@@ -532,7 +532,7 @@ describe("read-only analysis allocation", () => {
     });
 
     expect(worktree.path).toBe(
-      join(root, "project-1", "analysis", "idea-abababab-abab-4bab-8bab-abababababab"),
+      join(root, "project-1", "analysis", "analysis-abababab-abab-4bab-8bab-abababababab"),
     );
     expect(worktree).toMatchObject({ baseRef: "origin/main", baseSha: "base-sha" });
     expect(calls).toContainEqual([

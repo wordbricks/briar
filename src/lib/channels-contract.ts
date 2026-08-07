@@ -169,11 +169,10 @@ export type ChannelMessageAuthor =
       provider: ChannelAgentProvider | null;
     };
 
+/** A plan document written by an Agent, stored on the channel message itself. */
 export type ChannelMessageDocument = {
-  ideaId: string;
+  messageId: string;
   title: string;
-  status: string;
-  version: number;
   projectId: string | null;
 };
 
@@ -184,7 +183,6 @@ export type ChannelMessageProposal = {
   projectId: string | null;
   payload: unknown;
   resultRunId: string | null;
-  resultIdeaId: string | null;
 };
 
 export type ChannelMessageAttachment = {
