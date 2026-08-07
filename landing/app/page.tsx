@@ -40,13 +40,15 @@ function ProductStage({ c }: { c: LandingCopy }) {
       tone: "amber",
       cards: [
         { id: "AH-23", title: c.dashboard.issues[1], meta: "Issue · 14m" },
+        { id: "AH-26", title: c.dashboard.issues[4], meta: "Issue · 22m" },
       ],
     },
     {
       name: "Analyze",
       tone: "blue",
       cards: [
-        { id: "AH-24", title: c.dashboard.issues[0], meta: "Issue · 4m" },
+        { id: "AH-27", title: c.dashboard.issues[5], meta: "Issue · 6m" },
+        { id: "AH-28", title: c.dashboard.issues[6], meta: "Feedback · 2m" },
       ],
     },
     {
@@ -112,7 +114,7 @@ function ProductStage({ c }: { c: LandingCopy }) {
                 <i />
               </div>
               <div className="board-project-link board-project-active">
-                <span>⌁</span> Issues <em>6</em>
+                <span>⌁</span> Issues <em>8</em>
               </div>
               <div className="board-project-link">
                 <span>✦</span> Agents
@@ -134,7 +136,7 @@ function ProductStage({ c }: { c: LandingCopy }) {
             <div className="board-toolbar">
               <div>
                 <strong>Task queue</strong>
-                <small>6 tasks</small>
+                <small>8 tasks</small>
               </div>
               <div className="board-toolbar-actions">
                 <span className="board-toolbar-primary">＋ {c.dashboard.newIssue.replace("+ ", "")}</span>
@@ -143,8 +145,8 @@ function ProductStage({ c }: { c: LandingCopy }) {
               </div>
             </div>
             <div className="board-filters">
-              <span className="is-selected">All <i>6</i></span>
-              <span>In progress <i>3</i></span>
+              <span className="is-selected">All <i>8</i></span>
+              <span>In progress <i>4</i></span>
               <span>Needs attention <i>1</i></span>
               <span>Completed <i>12</i></span>
             </div>
@@ -178,12 +180,6 @@ function ProductStage({ c }: { c: LandingCopy }) {
                         <small>{card.meta}</small>
                       </article>
                     ))}
-                    {column.cards.length < 2 ? (
-                      <div className="kanban-empty">
-                        <span>⌁</span>
-                        Drop task here
-                      </div>
-                    ) : null}
                   </div>
                 </div>
               ))}
