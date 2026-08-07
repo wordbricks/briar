@@ -28,6 +28,19 @@ const changelogCopy = {
     backTop: "맨 위로 ↑",
     entries: [
       {
+        version: "1.2.86",
+        date: "2026년 8월 7일",
+        title: "사람과 Worker를 더 선명하게 연결합니다",
+        summary:
+          "프로필과 멘션의 맥락을 풍부하게 만들고, 원격 Worker 업데이트와 데스크톱 종료 흐름을 더 안전하게 다듬었습니다.",
+        items: [
+          "채널 멘션에서 사람과 에이전트의 프로필을 열어 이름, 역할, 활동 정보를 확인할 수 있습니다.",
+          "조직 Worker의 원격 업데이트 상태를 확인하고 새 버전을 더 안전하게 적용할 수 있습니다.",
+          "Cmd+Q로 앱을 종료하기 전에 확인해 실수로 작업 창을 닫는 일을 방지합니다.",
+          "이슈 카드 배지에서 불필요한 소스 점 아이콘을 제거해 상태 정보를 간결하게 표시합니다.",
+        ],
+      },
+      {
         version: "1.2.85",
         date: "2026년 8월 7일",
         title: "채널 협업이 더 풍부해졌습니다",
@@ -119,6 +132,19 @@ const changelogCopy = {
     home: "Home",
     backTop: "Back to top ↑",
     entries: [
+      {
+        version: "1.2.86",
+        date: "August 7, 2026",
+        title: "Clearer connections between people and workers",
+        summary:
+          "Profiles and mentions now carry richer context, while remote worker updates and desktop quitting are safer and more deliberate.",
+        items: [
+          "Open profiles from channel mentions to see a person or agent's name, role, and activity context.",
+          "Check remote organization worker update status and apply new versions more safely.",
+          "Confirm before quitting with Cmd+Q to avoid closing active work by mistake.",
+          "Removed the redundant source-dot icon from issue card badges for cleaner status information.",
+        ],
+      },
       {
         version: "1.2.85",
         date: "August 7, 2026",
@@ -256,9 +282,9 @@ export default async function ChangelogPage() {
           <h1>{changelog.title}</h1>
           <p>{changelog.description}</p>
         </div>
-        <a href="#v1-2-85" className="changelog-current">
+        <a href="#v1-2-86" className="changelog-current">
           <span>{changelog.current}</span>
-          <strong>v1.2.85</strong>
+          <strong>v1.2.86</strong>
           <i aria-hidden="true">↓</i>
         </a>
       </section>
