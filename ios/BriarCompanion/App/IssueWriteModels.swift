@@ -325,6 +325,7 @@ struct IssueAgentReplyResponse: Codable, Sendable {
 enum IssueMutationError: LocalizedError, Equatable {
     case duplicateAction
     case invalidTitle
+    case titleTooLong(max: Int, count: Int)
     case invalidMessage
     case invalidPreferences
     case attachment(String)
@@ -336,6 +337,8 @@ enum IssueMutationError: LocalizedError, Equatable {
         switch self {
         case .duplicateAction: "이미 요청을 처리하고 있습니다."
         case .invalidTitle: "이슈 제목을 입력해 주세요."
+        case let .titleTooLong(max, count):
+            "제목이 너무 깁니다. \(max)자 이내로 줄여 주세요. (현재 \(count)자)"
         case .invalidMessage: "메시지를 입력해 주세요."
         case .invalidPreferences: "모델과 effort를 선택하려면 프로바이더와 모델을 순서대로 선택해 주세요."
         case let .attachment(message): message
@@ -344,6 +347,79 @@ enum IssueMutationError: LocalizedError, Equatable {
             "메시지는 전송됐지만 Briar 답변 상태를 확인하지 못했습니다. 상세를 새로고침해 주세요."
         case let .agentReplyFailed(message): message
         }
+    }
+}
+
+/// Language-aware issue title limits matching `src/lib/issue-title.ts`.
+enum IssueTitleLimits {
+    static let absoluteMax = 300
+    static let hangulMax = 100
+    static let hanMax = 80
+    static let kanaMax = 100
+    static let latinMax = 200
+
+    static func graphemeCount(_ value: String) -> Int {
+        value.count
+    }
+
+    static func maxLength(for title: String) -> Int {
+        let letters = title.unicodeScalars.filter { CharacterSet.letters.contains($0) }
+        guard !letters.isEmpty else { return latinMax }
+
+        var hangul = 0
+        var han = 0
+        var kana = 0
+        for scalar in letters {
+            if isHangul(scalar) {
+                hangul += 1
+            } else if isHan(scalar) {
+                han += 1
+            } else if isKana(scalar) {
+                kana += 1
+            }
+        }
+        let threshold = max(1, Int(ceil(Double(letters.count) * 0.3)))
+        if hangul >= threshold { return hangulMax }
+        if han >= threshold { return hanMax }
+        if kana >= threshold { return kanaMax }
+        return latinMax
+    }
+
+    static func validationError(for title: String) -> IssueMutationError? {
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty { return .invalidTitle }
+        let count = graphemeCount(trimmed)
+        let max = maxLength(for: trimmed)
+        if count > max {
+            return .titleTooLong(max: max, count: count)
+        }
+        return nil
+    }
+
+    private static func isHangul(_ scalar: UnicodeScalar) -> Bool {
+        let value = scalar.value
+        return (0x1100...0x11FF).contains(value)
+            || (0x3130...0x318F).contains(value)
+            || (0xA960...0xA97F).contains(value)
+            || (0xAC00...0xD7A3).contains(value)
+            || (0xD7B0...0xD7FF).contains(value)
+    }
+
+    private static func isHan(_ scalar: UnicodeScalar) -> Bool {
+        let value = scalar.value
+        return (0x2E80...0x2EFF).contains(value)
+            || (0x2F00...0x2FDF).contains(value)
+            || (0x3400...0x4DBF).contains(value)
+            || (0x4E00...0x9FFF).contains(value)
+            || (0xF900...0xFAFF).contains(value)
+    }
+
+    private static func isKana(_ scalar: UnicodeScalar) -> Bool {
+        let value = scalar.value
+        return (0x3040...0x309F).contains(value)
+            || (0x30A0...0x30FF).contains(value)
+            || (0x31F0...0x31FF).contains(value)
+            || (0xFF66...0xFF9D).contains(value)
     }
 }
 

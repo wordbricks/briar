@@ -97,6 +97,12 @@ struct CreateIssueSheet: View {
     private var issueSection: some View {
         Section("이슈") {
             TextField("제목", text: $draft.title)
+                .onChange(of: draft.title) { _, value in
+                    let max = IssueTitleLimits.maxLength(for: value)
+                    if value.count > max {
+                        draft.title = String(value.prefix(max))
+                    }
+                }
                 .accessibilityIdentifier("create-issue-title")
             // Description field with a photo attachment control inside the
             // bottom-trailing corner of the writing area.
@@ -401,6 +407,12 @@ struct EditIssueSheet: View {
         NavigationStack {
             Form {
                 TextField("제목", text: $draft.title)
+                    .onChange(of: draft.title) { _, value in
+                        let max = IssueTitleLimits.maxLength(for: value)
+                        if value.count > max {
+                            draft.title = String(value.prefix(max))
+                        }
+                    }
                     .accessibilityIdentifier("edit-issue-title")
                 TextField("설명", text: $draft.description, axis: .vertical)
                     .lineLimit(5...12)

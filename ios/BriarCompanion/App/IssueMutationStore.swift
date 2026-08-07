@@ -31,7 +31,9 @@ final class IssueMutationStore: ObservableObject {
     ) async throws -> CreateIssueResponse {
         try await perform("create") {
             let title = draft.title.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !title.isEmpty else { throw IssueMutationError.invalidTitle }
+            if let titleError = IssueTitleLimits.validationError(for: title) {
+                throw titleError
+            }
             if let message = PendingIssueAttachment.validationMessage(for: attachments) {
                 throw IssueMutationError.attachment(message)
             }
@@ -88,7 +90,9 @@ final class IssueMutationStore: ObservableObject {
     func updateIssue(runID: UUID, draft: IssueDraft) async throws -> UpdateIssueResponse {
         try await perform("update-\(runID)") {
             let title = draft.title.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !title.isEmpty else { throw IssueMutationError.invalidTitle }
+            if let titleError = IssueTitleLimits.validationError(for: title) {
+                throw titleError
+            }
             let description = draft.description.trimmingCharacters(in: .whitespacesAndNewlines)
             return try await api.send(
                 MobileAPIContract.Endpoint.run(projectID: projectID, runID: runID),

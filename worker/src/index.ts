@@ -58,6 +58,12 @@ import {
 } from "../../src/lib/issue-markdown";
 import { shouldBriarReply } from "../../src/lib/issue-reply-decision";
 import {
+  issueTitleAbsoluteMaxLength,
+  issueTitleOverLimitMessage,
+  issueTitleTooLongMessageKo,
+  isIssueTitleWithinLimit,
+} from "../../src/lib/issue-title";
+import {
   isWorkerEmoji,
   isWorkerLogoDataUrl,
   maxWorkerEmojiLength,
@@ -1065,9 +1071,21 @@ const providerModels = {
   opencode: new Set<string>(),
 } as const;
 
+const issueTitleSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(issueTitleAbsoluteMaxLength)
+  .superRefine((title, context) => {
+    const message = issueTitleOverLimitMessage(title);
+    if (message) {
+      context.addIssue({ code: "custom", message });
+    }
+  });
+
 const issueInputBaseSchema = z
   .object({
-    title: z.string().trim().min(1).max(300),
+    title: issueTitleSchema,
     description: z.string().trim().max(100_000).nullable().optional(),
     priority: z.number().int().min(1).max(4).nullable().optional(),
     assigneeUserId: z.string().trim().min(1).max(200).nullable().optional(),
@@ -1380,7 +1398,7 @@ const issueUpdateProposalActionSchema = z
     type: z.literal("request_issue_update"),
     changes: z
       .object({
-        title: z.string().trim().min(1).max(300).optional(),
+        title: issueTitleSchema.optional(),
         description: z.string().trim().max(100_000).nullable().optional(),
         priority: z.number().int().min(1).max(4).nullable().optional(),
       })
@@ -1396,7 +1414,7 @@ const issueCreateProposalActionSchema = z
     type: z.literal("request_issue_create"),
     issue: z
       .object({
-        title: z.string().trim().min(1).max(300),
+        title: issueTitleSchema,
         description: z.string().trim().max(100_000).nullable(),
         priority: z.number().int().min(1).max(4).nullable(),
         status: z.enum(["backlog", "queued"]),
@@ -2833,6 +2851,26 @@ async function processSlackAppMention(env: Env, payload: SlackEventCallback) {
     const instruction = parseSlackIssueInstruction(payload.event.text);
     if (!instruction) {
       await postSlackReply(token, payload.event, slackHelpMessage());
+      await completeSlackEvent(
+        env.DB,
+        payload.team_id,
+        payload.event_id,
+        new Date().toISOString(),
+      );
+      return;
+    }
+    if (
+      instruction.titleTooLong ||
+      !isIssueTitleWithinLimit(instruction.title)
+    ) {
+      await postSlackReply(
+        token,
+        payload.event,
+        [
+          `:warning: ${issueTitleTooLongMessageKo(instruction.title)}`,
+          "멘션 뒤 첫 줄 제목만 짧게 다시 보내 주세요.",
+        ].join("\n"),
+      );
       await completeSlackEvent(
         env.DB,
         payload.team_id,

@@ -131,6 +131,17 @@ describe("Slack integration", () => {
     expect(parseSlackIssueInstruction("<@U123ABC> 도움말")).toBeNull();
   });
 
+  it("flags Slack mention titles that exceed the language-aware limit", () => {
+    const longHangul = "가".repeat(101);
+    expect(parseSlackIssueInstruction(`<@U123ABC> ${longHangul}`)).toEqual({
+      title: longHangul,
+      description: null,
+      priority: null,
+      status: "queued",
+      titleTooLong: true,
+    });
+  });
+
   it("builds a /create modal with project, text, and attachment inputs", () => {
     const modal = buildSlackCreateIssueModal({
       projects: [
@@ -279,6 +290,36 @@ describe("Slack integration", () => {
       expect.objectContaining({
         constructor: SlackCreateIssueValidationError,
         blockId: slackCreateIssueBlocks.title,
+      }),
+    );
+  });
+
+  it("returns guidance when a modal title exceeds the language-aware limit", () => {
+    const longHangul = "가".repeat(101);
+    expect(() =>
+      parseSlackCreateIssueSubmission({
+        team: { id: "T123" },
+        user: { id: "U123" },
+        view: {
+          id: "V123",
+          private_metadata: "{}",
+          state: {
+            values: {
+              [slackCreateIssueBlocks.project]: {
+                project: { selected_option: { value: "project-1" } },
+              },
+              [slackCreateIssueBlocks.title]: {
+                title: { value: longHangul },
+              },
+            },
+          },
+        },
+      }),
+    ).toThrow(
+      expect.objectContaining({
+        constructor: SlackCreateIssueValidationError,
+        blockId: slackCreateIssueBlocks.title,
+        message: expect.stringContaining("100자"),
       }),
     );
   });

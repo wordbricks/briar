@@ -26,6 +26,10 @@ import {
 import { validateEvidenceImages } from "../src/lib/evidence-images";
 import { channelReplyCompletionSchema } from "../src/lib/channels-contract";
 import {
+  issueTitleAbsoluteMaxLength,
+  issueTitleOverLimitMessage,
+} from "../src/lib/issue-title";
+import {
   ideaPlanResultSchema,
   ideaTurnResultSchema,
 } from "../src/lib/ideas-contract";
@@ -1353,7 +1357,17 @@ async function createIssueCommand() {
   const project = await currentProject(config);
   const priorityValue = value("--priority");
   const input = z.object({
-    title: z.string().trim().min(1).max(300),
+    title: z
+      .string()
+      .trim()
+      .min(1)
+      .max(issueTitleAbsoluteMaxLength)
+      .superRefine((title, context) => {
+        const message = issueTitleOverLimitMessage(title);
+        if (message) {
+          context.addIssue({ code: "custom", message });
+        }
+      }),
     description: z.string().trim().max(100_000).nullable(),
     priority: z.number().int().min(1).max(4).nullable(),
     status: z.enum(["backlog", "queued"]),
