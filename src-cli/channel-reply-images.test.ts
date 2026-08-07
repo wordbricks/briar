@@ -146,4 +146,27 @@ describe("channel reply image inputs", () => {
 
     expect(removeWorkspace).toHaveBeenCalledOnce();
   });
+
+  it("does not retain private images when analysis worktree removal fails", async () => {
+    const workspacePath = await temporaryWorkspace();
+    const downloaded = await downloadChannelReplyImages({
+      apiUrl: "https://api.example",
+      workerToken: "briar_worker_secret",
+      organizationId,
+      workId,
+      claimToken: "briar_channel_claim_secret",
+      triggerMessageId,
+      snapshot,
+      workspacePath,
+      fetcher: async () =>
+        new Response(imageBytes, { headers: { "Content-Type": "image/png" } }),
+    });
+
+    await expect(
+      cleanupChannelReplyImages(downloaded.directory, async () => {
+        throw new Error("git worktree remove failed");
+      }),
+    ).rejects.toThrow("git worktree remove failed");
+    await expect(access(downloaded.directory)).rejects.toThrow();
+  });
 });
