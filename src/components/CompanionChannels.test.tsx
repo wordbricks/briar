@@ -58,6 +58,7 @@ const message = (id: string, body: string, replyCount = 0): ChannelMessage => ({
   body,
   mentionedUserIds: [],
   mentionedAgentIds: [],
+  attachments: [],
   replyCount,
   lastReplyAt: null,
   document: null,
@@ -298,6 +299,8 @@ describe("CompanionChannels", () => {
       parentMessageId: "m-1",
       mentionedAgentIds: [],
       mentionedUserIds: [],
+      attachments: [],
+      attachmentReferences: [],
     });
   });
 
@@ -360,6 +363,70 @@ describe("CompanionChannels", () => {
       parentMessageId: null,
       mentionedAgentIds: ["agent-1"],
       mentionedUserIds: [],
+      attachments: [],
+      attachmentReferences: [],
     });
+  });
+
+  it("attaches a pasted image and sends an image-only message", async () => {
+    Object.defineProperty(URL, "createObjectURL", {
+      configurable: true,
+      value: vi.fn(() => "blob:companion-preview"),
+    });
+    Object.defineProperty(URL, "revokeObjectURL", {
+      configurable: true,
+      value: vi.fn(),
+    });
+    loadChannel.mockResolvedValue({
+      channel: channel("c-common", "Welcome", null),
+      members: [],
+      agents: [],
+      messages: [],
+    });
+    sendChannelMessage.mockResolvedValue({
+      message: message("m-image", "Image"),
+      agentReplies: [],
+    });
+    await render();
+    await act(async () => {
+      [
+        ...container.querySelectorAll<HTMLButtonElement>(
+          ".companion-channel-group button",
+        ),
+      ]
+        .find((button) => button.textContent?.includes("Welcome"))!
+        .click();
+    });
+    await act(async () => Promise.resolve());
+    const image = new File(["image"], "clipboard.png", { type: "image/png" });
+    const input = container.querySelector<HTMLInputElement>(
+      ".companion-channel-composer input[role='combobox']",
+    )!;
+    const paste = new Event("paste", { bubbles: true, cancelable: true });
+    Object.defineProperty(paste, "clipboardData", {
+      value: {
+        files: [image],
+        items: [{ kind: "file", getAsFile: () => image }],
+        types: ["Files"],
+      },
+    });
+
+    await act(async () => input.dispatchEvent(paste));
+    await act(async () => {
+      container
+        .querySelector("form.companion-channel-composer")!
+        .dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    });
+
+    expect(sendChannelMessage).toHaveBeenCalledWith(
+      "token",
+      "org-1",
+      "c-common",
+      expect.objectContaining({
+        attachments: [image],
+        attachmentReferences: [expect.any(String)],
+        body: expect.stringContaining("briar-attachment://"),
+      }),
+    );
   });
 });

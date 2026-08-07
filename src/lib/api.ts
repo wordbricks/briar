@@ -19,6 +19,7 @@ import type {
   ChannelDelta,
   ChannelMember,
   ChannelMessage,
+  ChannelMessageAttachment,
   ChannelSummary,
   ChannelVisibility,
 } from "./channels-contract";
@@ -66,6 +67,7 @@ import type {
   UpdateProjectAgentInput,
   UpdateProjectAgentScheduleInput,
   UpdateIssueInput,
+  UpdateIssueResult,
   WorkerIcon,
 } from "../types";
 
@@ -1453,16 +1455,57 @@ export async function sendChannelMessage(
     parentMessageId?: string | null;
     mentionedUserIds?: string[];
     mentionedAgentIds?: string[];
+    attachments?: File[];
+    attachmentReferences?: string[];
   },
 ) {
+  let body: BodyInit;
+  if (input.attachments?.length) {
+    const form = new FormData();
+    form.set("body", input.body);
+    form.set("parentMessageId", input.parentMessageId ?? "");
+    form.set("mentionedUserIds", JSON.stringify(input.mentionedUserIds ?? []));
+    form.set("mentionedAgentIds", JSON.stringify(input.mentionedAgentIds ?? []));
+    form.set(
+      "attachmentReferences",
+      JSON.stringify(input.attachmentReferences ?? []),
+    );
+    for (const attachment of input.attachments) {
+      form.append("attachments", attachment, attachment.name);
+    }
+    body = form;
+  } else {
+    const {
+      attachments: _attachments,
+      attachmentReferences: _attachmentReferences,
+      ...jsonInput
+    } = input;
+    body = JSON.stringify(jsonInput);
+  }
   return request<{
     message: ChannelMessage;
     agentReplies: ChannelAgentReply[];
   }>(
     `/organizations/${organizationId}/channels/${channelId}/messages`,
     token,
-    { method: "POST", body: JSON.stringify(input) },
+    { method: "POST", body },
   );
+}
+
+export async function loadChannelMessageAttachment(
+  token: string,
+  attachment: ChannelMessageAttachment,
+) {
+  if (!apiUrl || !attachment.url.startsWith("/")) {
+    throw new Error("첨부 이미지 경로가 유효하지 않습니다.");
+  }
+  const response = await fetch(`${apiUrl}${attachment.url}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) {
+    throw new Error(`첨부 이미지를 열 수 없습니다. (${response.status})`);
+  }
+  return response.blob();
 }
 
 export async function loadChannelAgentReplies(
@@ -1702,16 +1745,49 @@ export async function updateIssue(
   runId: string,
   input: UpdateIssueInput,
 ) {
-  return request<{
-    runId: string;
-    title: string;
-    description: string | null;
-    priority: number | null;
-    assigneeUserId: string | null;
-  }>(`/projects/${projectId}/runs/${runId}`, token, {
-    method: "PATCH",
-    body: JSON.stringify(input),
-  });
+  if (input.attachments.length === 0) {
+    const {
+      attachments: _attachments,
+      attachmentReferences: _attachmentReferences,
+      ...issue
+    } = input;
+    return request<UpdateIssueResult>(
+      `/projects/${projectId}/runs/${runId}`,
+      token,
+      {
+        method: "PATCH",
+        body: JSON.stringify(
+          input.keptAttachmentIds === undefined
+            ? issue
+            : { ...issue, keptAttachmentIds: input.keptAttachmentIds },
+        ),
+      },
+    );
+  }
+  const attachmentError = validateIssueAttachments(input.attachments);
+  if (attachmentError) throw new Error(attachmentError);
+  const form = new FormData();
+  form.set("title", input.title);
+  form.set("description", input.description ?? "");
+  form.set("priority", input.priority === null ? "" : String(input.priority));
+  form.set("assigneeUserId", input.assigneeUserId ?? "");
+  if (input.attachmentReferences?.length) {
+    form.set(
+      "attachmentReferences",
+      JSON.stringify(input.attachmentReferences),
+    );
+  }
+  if (input.keptAttachmentIds !== undefined) {
+    form.set("keptAttachmentIds", JSON.stringify(input.keptAttachmentIds));
+  }
+  for (const attachment of input.attachments) {
+    form.append("attachments", attachment, attachment.name);
+  }
+  return request<UpdateIssueResult>(
+    `/projects/${projectId}/runs/${runId}`,
+    token,
+    { method: "PATCH", body: form },
+  );
 }
 
 export async function updateIssueExecutionPreferences(

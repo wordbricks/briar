@@ -1361,6 +1361,7 @@ export function HuntDashboard({
                 title: run.title,
                 description: run.issueDescription,
                 priority,
+                attachments: [],
               }).catch(() => undefined)
             }
             onPreferencesChange={(run, preferences) =>
@@ -1587,6 +1588,7 @@ export function HuntDashboard({
                         title: run.title,
                         description: run.issueDescription,
                         priority,
+                        attachments: [],
                       }).catch(() => undefined)
                     }
                     onPreferencesChange={(preferences) =>
@@ -1634,6 +1636,7 @@ export function HuntDashboard({
         <EditIssueDialog
           isSubmitting={updatingIssueId === editingRun.id}
           onClose={() => setEditingRunId(null)}
+          onLoadAttachment={onLoadAttachment}
           onUpdate={async (input) => {
             await onUpdateIssue(editingRun.id, input);
             setEditingRunId(null);
@@ -1819,12 +1822,14 @@ export function EditIssueDialog({
   isSubmitting,
   members = [],
   onClose,
+  onLoadAttachment,
   onUpdate,
   run,
 }: {
   isSubmitting: boolean;
   members?: OrganizationMember[];
   onClose: () => void;
+  onLoadAttachment?: (attachment: IssueAttachment) => Promise<Blob>;
   onUpdate: (input: UpdateIssueInput) => Promise<unknown>;
   run: HuntRun;
 }) {
@@ -1838,10 +1843,23 @@ export function EditIssueDialog({
     run.assigneeUserId ?? "",
   );
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [attachments, setAttachments] = useState<
+    Array<{ file: File; reference: string }>
+  >([]);
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
+  const [keptAttachmentIds, setKeptAttachmentIds] = useState<string[]>(() =>
+    (run.attachments ?? []).map((attachment) => attachment.id),
+  );
+  const [isDraggingAttachments, setIsDraggingAttachments] = useState(false);
+  const attachmentDragDepthRef = useRef(0);
+  const descriptionEditorRef = useRef<HTMLDivElement>(null);
   const titleMaxLength = issueTitleInputMaxLength(title, locale);
   const titleLength = issueTitleLength(title);
   const titleTooLong =
     Boolean(title.trim()) && !isIssueTitleWithinLimit(title);
+
+  const existingAttachments = run.attachments ?? [];
+  const inlineAttachmentReferences = issueAttachmentReferences(description);
 
   useEffect(() => {
     const closeOnEscape = (event: KeyboardEvent) => {
@@ -1850,6 +1868,118 @@ export function EditIssueDialog({
     document.addEventListener("keydown", closeOnEscape);
     return () => document.removeEventListener("keydown", closeOnEscape);
   }, [isSubmitting, onClose]);
+
+  useEffect(() => {
+    if (!isSubmitting) return;
+    attachmentDragDepthRef.current = 0;
+    setIsDraggingAttachments(false);
+  }, [isSubmitting]);
+
+  const focusDescriptionAt = (offset: number) => {
+    const inputs = Array.from(
+      descriptionEditorRef.current?.querySelectorAll<HTMLTextAreaElement>(
+        ".issue-description-input",
+      ) ?? [],
+    );
+    const input =
+      inputs.find((candidate) => {
+        const start = Number(candidate.dataset.descriptionStart ?? 0);
+        const end = Number(candidate.dataset.descriptionEnd ?? start);
+        return offset >= start && offset <= end;
+      }) ?? inputs.at(-1);
+    if (!input) return;
+    const start = Number(input.dataset.descriptionStart ?? 0);
+    const caret = Math.max(0, Math.min(input.value.length, offset - start));
+    input.focus();
+    input.setSelectionRange(caret, caret);
+  };
+
+  const addAttachments = (
+    selected: File[],
+    insertImages = false,
+    selection?: { start: number; end: number },
+  ) => {
+    if (selected.length === 0) return;
+    const added = selected.map((file) => ({
+      file: normalizeIssueAttachmentFile(file),
+      reference: crypto.randomUUID(),
+    }));
+    const next = [...attachments, ...added];
+    const error = validateIssueAttachments(next.map(({ file }) => file));
+    setAttachmentError(error);
+    if (error) return;
+    setAttachments(next);
+
+    const inlineImages = insertImages
+      ? added.filter(({ file }) => file.type.startsWith("image/"))
+      : [];
+    if (inlineImages.length === 0) return;
+    const start = selection?.start ?? description.length;
+    const end = selection?.end ?? start;
+    const before = description.slice(0, start);
+    const after = description.slice(end);
+    const markdown = inlineImages
+      .map(({ file, reference }) => issueAttachmentMarkdown(reference, file.name))
+      .join("\n\n");
+    const prefix = before.length === 0 || before.endsWith("\n\n")
+      ? ""
+      : before.endsWith("\n")
+        ? "\n"
+        : "\n\n";
+    const suffix = after.length === 0 || after.startsWith("\n\n")
+      ? ""
+      : after.startsWith("\n")
+        ? "\n"
+        : "\n\n";
+    const insertion = `${prefix}${markdown}${suffix}`;
+    setDescription(`${before}${insertion}${after}`);
+    requestAnimationFrame(() => {
+      const caret = start + insertion.length;
+      focusDescriptionAt(caret);
+    });
+  };
+
+  const removeNewAttachment = (index: number, reference: string) => {
+    setAttachments((current) =>
+      current.filter((_, candidateIndex) => candidateIndex !== index),
+    );
+    setDescription((current) =>
+      removeIssueAttachmentMarkdown(current, reference),
+    );
+    setAttachmentError(null);
+  };
+
+  const removeExistingAttachment = (attachmentId: string) => {
+    setKeptAttachmentIds((current) =>
+      current.filter((candidate) => candidate !== attachmentId),
+    );
+    setDescription((current) =>
+      removeIssueAttachmentMarkdown(current, attachmentId),
+    );
+  };
+
+  const inlineAttachments: IssueDraftInlineAttachment[] = [
+    ...existingAttachments.map((attachment) => ({
+      attachment,
+      reference: attachment.id,
+      type: "existing" as const,
+    })),
+    ...attachments.map(({ file, reference }) => ({
+      file,
+      reference,
+      type: "new" as const,
+    })),
+  ];
+  const remainingNewAttachments = attachments.filter(
+    ({ file, reference }) =>
+      !file.type.startsWith("image/") ||
+      !inlineAttachmentReferences.has(reference),
+  );
+  const remainingExistingAttachments = existingAttachments.filter(
+    (attachment) =>
+      keptAttachmentIds.includes(attachment.id) &&
+      !inlineAttachmentReferences.has(attachment.id),
+  );
 
   return (
     <div
@@ -1861,16 +1991,94 @@ export function EditIssueDialog({
       <form
         aria-label={t("issue.editDialog")}
         aria-modal="true"
-        className="issue-dialog edit-issue-dialog"
+        className={`issue-dialog edit-issue-dialog${
+          isDraggingAttachments ? " is-dragging-attachments" : ""
+        }`}
+        onDragEnter={(event) => {
+          if (!dataTransferHasFiles(event.dataTransfer)) return;
+          event.preventDefault();
+          attachmentDragDepthRef.current += 1;
+          if (!isSubmitting) setIsDraggingAttachments(true);
+        }}
+        onDragLeave={(event) => {
+          if (!dataTransferHasFiles(event.dataTransfer)) return;
+          event.preventDefault();
+          attachmentDragDepthRef.current = Math.max(
+            0,
+            attachmentDragDepthRef.current - 1,
+          );
+          if (attachmentDragDepthRef.current === 0) {
+            setIsDraggingAttachments(false);
+          }
+        }}
+        onDragOver={(event) => {
+          if (!dataTransferHasFiles(event.dataTransfer)) return;
+          event.preventDefault();
+          if (!isSubmitting) event.dataTransfer.dropEffect = "copy";
+        }}
+        onDrop={(event) => {
+          if (!dataTransferHasFiles(event.dataTransfer)) return;
+          event.preventDefault();
+          attachmentDragDepthRef.current = 0;
+          setIsDraggingAttachments(false);
+          if (!isSubmitting) {
+            addAttachments(filesFromDataTransfer(event.dataTransfer), true);
+          }
+        }}
         onKeyDown={(event) => {
+          const isTitleEnter =
+            event.target instanceof HTMLInputElement &&
+            event.target.classList.contains("issue-title-input") &&
+            !event.metaKey &&
+            !event.ctrlKey;
           if (
-            event.key === "Enter" &&
-            (event.metaKey || event.ctrlKey) &&
-            !isSubmitting
+            event.key !== "Enter" ||
+            event.nativeEvent.isComposing ||
+            isSubmitting
           ) {
+            return;
+          }
+          if (isTitleEnter) {
+            event.preventDefault();
+            event.currentTarget
+              .querySelector<HTMLTextAreaElement>(".issue-description-input")
+              ?.focus();
+            return;
+          }
+          if (event.metaKey || event.ctrlKey) {
             event.preventDefault();
             event.currentTarget.requestSubmit();
           }
+        }}
+        onPaste={(event) => {
+          const items = Array.from(event.clipboardData.items);
+          const pastedImages = items
+            .filter((item) => item.kind === "file" && item.type.startsWith("image/"))
+            .map((item) => item.getAsFile())
+            .filter((file): file is File => file !== null);
+          const images = pastedImages.length > 0
+            ? pastedImages
+            : Array.from(event.clipboardData.files).filter((file) =>
+                file.type.startsWith("image/"),
+              );
+          if (images.length === 0) return;
+          event.preventDefault();
+          const target = event.target instanceof HTMLTextAreaElement
+            ? event.target
+            : null;
+          const segmentStart = Number(
+            target?.dataset.descriptionStart ?? description.length,
+          );
+          addAttachments(
+            images,
+            true,
+            target
+              ? {
+                  start: segmentStart + target.selectionStart,
+                  end: segmentStart + target.selectionEnd,
+                }
+              : undefined,
+          );
         }}
         onSubmit={(event) => {
           event.preventDefault();
@@ -1890,6 +2098,15 @@ export function EditIssueDialog({
             description: description.trim() || null,
             priority: priority ? Number(priority) : null,
             assigneeUserId: assigneeUserId || null,
+            attachments: attachments.map(({ file }) => file),
+            ...(attachments.length > 0
+              ? {
+                  attachmentReferences: attachments.map(
+                    ({ reference }) => reference,
+                  ),
+                }
+              : {}),
+            keptAttachmentIds,
           }).catch((error) =>
             setSubmitError(error instanceof Error ? error.message : String(error)),
           );
@@ -1911,7 +2128,11 @@ export function EditIssueDialog({
           </button>
         </header>
         <div className="issue-form-body">
-          <div className="issue-editor-content">
+          <div
+            className={`issue-editor-content${
+              inlineAttachments.length > 0 ? " has-attachments" : ""
+            }`}
+          >
             <input
               aria-label={t("issue.title")}
               autoFocus
@@ -1931,18 +2152,61 @@ export function EditIssueDialog({
                 max: titleMaxLength,
               })}
             </p>
-            <textarea
-              aria-label={t("issue.description")}
-              className="issue-description-input"
-              maxLength={100000}
-              onChange={(event) => setDescription(event.target.value)}
+            <DraftIssueDescriptionEditor
+              attachments={inlineAttachments}
+              description={description}
+              editorRef={descriptionEditorRef}
+              label={t("issue.description")}
+              onChange={setDescription}
+              onLoadAttachment={onLoadAttachment}
+              onRemoveAttachment={(reference) => {
+                const existingIndex = existingAttachments.findIndex(
+                  (attachment) => attachment.id === reference,
+                );
+                if (existingIndex >= 0) {
+                  removeExistingAttachment(reference);
+                  return;
+                }
+                const newIndex = attachments.findIndex(
+                  (attachment) => attachment.reference === reference,
+                );
+                if (newIndex >= 0) removeNewAttachment(newIndex, reference);
+              }}
               placeholder={t("issue.descriptionPlaceholder")}
-              value={description}
+              removeLabel={(name) => t("issue.remove", { name })}
             />
-            {submitError && (
+            {remainingNewAttachments.length > 0 ||
+            remainingExistingAttachments.length > 0 ? (
+              <div
+                aria-label={t("issue.attachments")}
+                className="issue-attachment-list"
+              >
+                {remainingExistingAttachments.map((attachment) => (
+                  <SelectedAttachment
+                    key={attachment.id}
+                    onLoadAttachment={onLoadAttachment}
+                    onRemove={() => removeExistingAttachment(attachment.id)}
+                    source={{ attachment, type: "existing" }}
+                  />
+                ))}
+                {remainingNewAttachments.map(({ file, reference }) => (
+                  <SelectedAttachment
+                    key={reference}
+                    onRemove={() => {
+                      const index = attachments.findIndex(
+                        (attachment) => attachment.reference === reference,
+                      );
+                      if (index >= 0) removeNewAttachment(index, reference);
+                    }}
+                    source={{ file, type: "new" }}
+                  />
+                ))}
+              </div>
+            ) : null}
+            {(submitError || attachmentError) && (
               <div className="issue-form-error">
                 <CircleAlert size={14} />
-                {submitError}
+                {submitError ?? attachmentError}
               </div>
             )}
           </div>
@@ -1973,10 +2237,40 @@ export function EditIssueDialog({
               ]}
               value={priority}
             />
+            <label className="issue-attachment-trigger">
+              <Paperclip size={13} />
+              <span>
+                {attachments.length + existingAttachments.length > 0
+                  ? t("issue.attachmentCount", {
+                      count: attachments.length + existingAttachments.length,
+                    })
+                  : t("issue.attachments")}
+              </span>
+              <input
+                accept={issueAttachmentAccept}
+                aria-label={t("issue.attachmentLabel")}
+                disabled={
+                  isSubmitting ||
+                  attachments.length >= maxIssueAttachmentCount
+                }
+                multiple
+                onChange={(event) => {
+                  const selected = Array.from(
+                    event.currentTarget.files ?? [],
+                  );
+                  event.currentTarget.value = "";
+                  addAttachments(selected, true);
+                }}
+                type="file"
+              />
+            </label>
           </div>
         </div>
         <footer>
-          <span />
+          <span className="issue-submit-hint">
+            <kbd>⌘</kbd>
+            {t("issue.submitHint")}
+          </span>
           <div>
             <button
               className="issue-cancel-button"
@@ -1996,6 +2290,16 @@ export function EditIssueDialog({
             </button>
           </div>
         </footer>
+        {isDraggingAttachments && (
+          <div
+            aria-live="polite"
+            className="issue-attachment-drop-overlay"
+            role="status"
+          >
+            <ImageIcon aria-hidden="true" size={28} />
+            <strong>{t("issue.dropHint")}</strong>
+          </div>
+        )}
       </form>
     </div>
   );
@@ -2535,7 +2839,11 @@ export function CreateIssueDialog({
               })}
             </p>
             <DraftIssueDescriptionEditor
-              attachments={attachments}
+              attachments={attachments.map(({ file, reference }) => ({
+                file,
+                reference,
+                type: "new",
+              }))}
               description={description}
               editorRef={descriptionEditorRef}
               label={t("issue.description")}
@@ -2556,7 +2864,6 @@ export function CreateIssueDialog({
               >
                 {remainingAttachments.map(({ file, reference }) => (
                   <SelectedAttachment
-                    file={file}
                     key={reference}
                     onRemove={() => {
                       const index = attachments.findIndex(
@@ -2564,6 +2871,7 @@ export function CreateIssueDialog({
                       );
                       if (index >= 0) removeAttachment(index, reference);
                     }}
+                    source={{ file, type: "new" }}
                   />
                 ))}
               </div>
@@ -2754,27 +3062,45 @@ export function CreateIssueDialog({
 
 type DraftIssueAttachment = { file: File; reference: string };
 
+type IssueDraftInlineAttachment =
+  | { type: "new"; file: File; reference: string }
+  | { type: "existing"; attachment: IssueAttachment; reference: string };
+
+function draftInlineAttachmentFile(
+  attachment: IssueDraftInlineAttachment,
+): File | null {
+  return attachment.type === "new" ? attachment.file : null;
+}
+
+function draftInlineAttachmentIsImage(
+  attachment: IssueDraftInlineAttachment,
+): boolean {
+  return attachment.type === "new"
+    ? attachment.file.type.startsWith("image/")
+    : isIssueAttachmentImage(attachment.attachment.contentType, attachment.attachment.filename);
+}
+
 type DraftIssueDescriptionPart =
   | { type: "text"; start: number; end: number; value: string }
   | {
       type: "attachment";
       start: number;
       end: number;
-      attachment: DraftIssueAttachment;
+      attachment: IssueDraftInlineAttachment;
     };
 
 function draftIssueDescriptionParts(
   description: string,
-  attachments: DraftIssueAttachment[],
+  attachments: IssueDraftInlineAttachment[],
 ): DraftIssueDescriptionPart[] {
   const ranges = attachments
-    .filter(({ file }) => file.type.startsWith("image/"))
+    .filter(draftInlineAttachmentIsImage)
     .flatMap((attachment) => {
       const target = `briar-attachment://${attachment.reference}`;
       const matches: Array<{
         start: number;
         end: number;
-        attachment: DraftIssueAttachment;
+        attachment: IssueDraftInlineAttachment;
       }> = [];
       let targetIndex = description.indexOf(target);
       while (targetIndex >= 0) {
@@ -2827,15 +3153,17 @@ function DraftIssueDescriptionEditor({
   editorRef,
   label,
   onChange,
+  onLoadAttachment,
   onRemoveAttachment,
   placeholder,
   removeLabel,
 }: {
-  attachments: DraftIssueAttachment[];
+  attachments: IssueDraftInlineAttachment[];
   description: string;
   editorRef: RefObject<HTMLDivElement | null>;
   label: string;
   onChange: (value: string) => void;
+  onLoadAttachment?: (attachment: IssueAttachment) => Promise<Blob>;
   onRemoveAttachment: (reference: string) => void;
   placeholder: string;
   removeLabel: (name: string) => string;
@@ -2875,11 +3203,16 @@ function DraftIssueDescriptionEditor({
             value={part.value}
           />
         ) : (
-          <DraftInlineAttachment
-            file={part.attachment.file}
+          <IssueInlineAttachmentPreview
+            attachment={part.attachment}
             key={`attachment-${part.attachment.reference}`}
+            onLoadAttachment={onLoadAttachment}
             onRemove={() => onRemoveAttachment(part.attachment.reference)}
-            removeLabel={removeLabel(part.attachment.file.name)}
+            removeLabel={removeLabel(
+              part.attachment.type === "new"
+                ? part.attachment.file.name
+                : part.attachment.attachment.filename,
+            )}
           />
         ),
       )}
@@ -2887,24 +3220,60 @@ function DraftIssueDescriptionEditor({
   );
 }
 
-function DraftInlineAttachment({
-  file,
+function IssueInlineAttachmentPreview({
+  attachment,
+  onLoadAttachment,
   onRemove,
   removeLabel,
 }: {
-  file: File;
+  attachment: IssueDraftInlineAttachment;
+  onLoadAttachment?: (attachment: IssueAttachment) => Promise<Blob>;
   onRemove: () => void;
   removeLabel: string;
 }) {
+  const file = draftInlineAttachmentFile(attachment);
+  const previewSource =
+    attachment.type === "new" ? attachment.file : attachment.attachment.url;
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
   useEffect(() => {
-    const url = URL.createObjectURL(file);
-    setPreviewUrl(url);
-    return () => URL.revokeObjectURL(url);
-  }, [file]);
+    if (attachment.type === "new") {
+      const url = URL.createObjectURL(attachment.file);
+      setPreviewUrl(url);
+      setFailed(false);
+      return () => URL.revokeObjectURL(url);
+    }
+    if (!onLoadAttachment) return;
+    let active = true;
+    let objectUrl: string | null = null;
+    setPreviewUrl(null);
+    setFailed(false);
+    void onLoadAttachment(attachment.attachment)
+      .then((blob) => {
+        if (!active) return;
+        objectUrl = URL.createObjectURL(blob);
+        setPreviewUrl(objectUrl);
+      })
+      .catch(() => active && setFailed(true));
+    return () => {
+      active = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [onLoadAttachment, previewSource]);
+  const alt =
+    attachment.type === "new" ? attachment.file.name : attachment.attachment.filename;
   return (
     <figure className="issue-inline-attachment">
-      {previewUrl && <img alt={file.name} src={previewUrl} />}
+      {previewUrl && <img alt={alt} src={previewUrl} />}
+      {!previewUrl && failed && (
+        <span className="issue-inline-attachment-state">
+          <CircleAlert aria-hidden="true" size={14} />
+          {alt}
+        </span>
+      )}
+      {!previewUrl && !failed && file && (
+        <LoaderCircle aria-hidden="true" className="spin" size={14} />
+      )}
       <button aria-label={removeLabel} onClick={onRemove} type="button">
         <Trash2 size={14} />
       </button>
@@ -2912,39 +3281,75 @@ function DraftInlineAttachment({
   );
 }
 
+type SelectedAttachmentSource =
+  | { type: "new"; file: File }
+  | { type: "existing"; attachment: IssueAttachment };
+
 function SelectedAttachment({
-  file,
+  onLoadAttachment,
   onRemove,
+  source,
 }: {
-  file: File;
+  onLoadAttachment?: (attachment: IssueAttachment) => Promise<Blob>;
   onRemove: () => void;
+  source: SelectedAttachmentSource;
 }) {
   const { t } = useI18n();
+  const previewSource =
+    source.type === "new" ? source.file : source.attachment.url;
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
   useEffect(() => {
-    const url = URL.createObjectURL(file);
-    setPreviewUrl(url);
-    return () => URL.revokeObjectURL(url);
-  }, [file]);
-  const isImage = file.type.startsWith("image/");
+    if (source.type === "new") {
+      const url = URL.createObjectURL(source.file);
+      setPreviewUrl(url);
+      setFailed(false);
+      return () => URL.revokeObjectURL(url);
+    }
+    if (!onLoadAttachment) return;
+    let active = true;
+    let objectUrl: string | null = null;
+    setPreviewUrl(null);
+    setFailed(false);
+    void onLoadAttachment(source.attachment)
+      .then((blob) => {
+        if (!active) return;
+        objectUrl = URL.createObjectURL(blob);
+        setPreviewUrl(objectUrl);
+      })
+      .catch(() => active && setFailed(true));
+    return () => {
+      active = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [onLoadAttachment, previewSource]);
+  const name = source.type === "new" ? source.file.name : source.attachment.filename;
+  const bytes =
+    source.type === "new" ? source.file.size : source.attachment.byteSize;
+  const isImage =
+    source.type === "new"
+      ? source.file.type.startsWith("image/")
+      : isIssueAttachmentImage(source.attachment.contentType, name);
   return (
     <figure className="issue-attachment-item">
       <div className="issue-attachment-preview">
         {previewUrl && isImage ? (
-          <img alt={file.name} src={previewUrl} />
+          <img alt={name} src={previewUrl} />
         ) : previewUrl ? (
           <video controls muted playsInline preload="metadata" src={previewUrl} />
+        ) : failed ? (
+          <CircleAlert size={22} />
         ) : (
           <Video size={22} />
         )}
       </div>
       <figcaption>
         <span>
-          <strong>{file.name}</strong>
-          <small>{formatAttachmentBytes(file.size)}</small>
+          <strong>{name}</strong>
+          <small>{failed ? t("run.loadFailed") : formatAttachmentBytes(bytes)}</small>
         </span>
         <button
-          aria-label={t("issue.remove", { name: file.name })}
+          aria-label={t("issue.remove", { name })}
           onClick={onRemove}
           type="button"
         >
@@ -5830,6 +6235,7 @@ export function RunPage({
         <EditIssueDialog
           isSubmitting={isUpdatingIssue}
           onClose={() => setIsEditDialogOpen(false)}
+          onLoadAttachment={onLoadAttachment}
           onUpdate={async (input) => {
             await onUpdateIssue(input);
             setIsEditDialogOpen(false);

@@ -13,6 +13,7 @@ import type {
   IssueMessage,
   ProjectAgent,
   RunEvidence,
+  UpdateIssueInput,
 } from "../types";
 import {
   CreateIssueDialog,
@@ -1298,7 +1299,174 @@ describe("HuntDashboard", () => {
       description: "수정된 설명",
       priority: 3,
       assigneeUserId: "user-1",
+      attachments: [],
+      keptAttachmentIds: [],
     });
+    await act(async () => root.unmount());
+  });
+
+  it("pastes an image into the edit description and submits it with kept attachments", async () => {
+    URL.createObjectURL = vi.fn(() => "blob:preview");
+    URL.revokeObjectURL = vi.fn();
+    let updated: UpdateIssueInput | undefined;
+    const run: HuntRun = {
+      ...demoDashboard.runs[0],
+      issueDescription: "before after",
+      attachments: [
+        {
+          id: "existing-1",
+          filename: "screen.png",
+          contentType: "image/png",
+          byteSize: 100,
+          url: "/projects/project/runs/run/attachments/existing-1",
+        },
+      ],
+    };
+    const container = document.createElement("div");
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(
+        <EditIssueDialog
+          isSubmitting={false}
+          members={[]}
+          onClose={() => undefined}
+          onLoadAttachment={async () => new Blob()}
+          onUpdate={async (input) => {
+            updated = input;
+          }}
+          run={run}
+        />,
+      );
+    });
+    const textarea = container.querySelector<HTMLTextAreaElement>(
+      ".issue-description-input",
+    );
+    await act(async () => {
+      textarea?.focus();
+      textarea?.setSelectionRange(6, 6);
+    });
+    const image = new File(["image"], "inline.png", { type: "image/png" });
+    const pasteEvent = new Event("paste", { bubbles: true, cancelable: true });
+    Object.defineProperty(pasteEvent, "clipboardData", {
+      value: {
+        files: [],
+        items: [{ getAsFile: () => image, kind: "file", type: "image/png" }],
+      },
+    });
+    await act(async () => {
+      container.querySelector("form")?.dispatchEvent(pasteEvent);
+    });
+    expect(pasteEvent.defaultPrevented).toBe(true);
+    expect(
+      container.querySelectorAll<HTMLImageElement>(
+        ".issue-inline-attachment img",
+      ),
+    ).toHaveLength(1);
+    await act(async () => {
+      container.querySelector<HTMLFormElement>("form")?.requestSubmit();
+    });
+    expect(updated).toBeDefined();
+    expect(updated!.attachments).toEqual([image]);
+    expect(updated!.attachmentReferences).toHaveLength(1);
+    expect(updated!.keptAttachmentIds).toEqual(["existing-1"]);
+    expect(updated!.description).toContain(
+      `briar-attachment://${updated!.attachmentReferences?.[0]}`,
+    );
+    await act(async () => root.unmount());
+  });
+
+  it("removes an existing inline image while editing", async () => {
+    URL.createObjectURL = vi.fn(() => "blob:preview");
+    URL.revokeObjectURL = vi.fn();
+    let updated: UpdateIssueInput | undefined;
+    const run: HuntRun = {
+      ...demoDashboard.runs[0],
+      issueDescription: "before\n\n![screen.png](briar-attachment://existing-1)\n\nafter",
+      attachments: [
+        {
+          id: "existing-1",
+          filename: "screen.png",
+          contentType: "image/png",
+          byteSize: 100,
+          url: "/projects/project/runs/run/attachments/existing-1",
+        },
+      ],
+    };
+    const container = document.createElement("div");
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(
+        <EditIssueDialog
+          isSubmitting={false}
+          members={[]}
+          onClose={() => undefined}
+          onLoadAttachment={async () => new Blob()}
+          onUpdate={async (input) => {
+            updated = input;
+          }}
+          run={run}
+        />,
+      );
+    });
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>(".issue-inline-attachment button")
+        ?.click();
+    });
+    expect(
+      Array.from(container.querySelectorAll<HTMLTextAreaElement>("textarea"))
+        .map((textarea) => textarea.value)
+        .join(""),
+    ).toBe("before\n\nafter");
+    await act(async () => {
+      container.querySelector<HTMLFormElement>("form")?.requestSubmit();
+    });
+    expect(updated!.description).not.toContain("briar-attachment://");
+    expect(updated!.keptAttachmentIds).toEqual([]);
+    await act(async () => root.unmount());
+  });
+
+  it("keeps all existing attachments when the kept list is not changed", async () => {
+    URL.createObjectURL = vi.fn(() => "blob:preview");
+    URL.revokeObjectURL = vi.fn();
+    let updated: UpdateIssueInput | undefined;
+    const run: HuntRun = {
+      ...demoDashboard.runs[0],
+      issueDescription: "기존 설명",
+      attachments: [
+        {
+          id: "existing-1",
+          filename: "clip.mp4",
+          contentType: "video/mp4",
+          byteSize: 200,
+          url: "/projects/project/runs/run/attachments/existing-1",
+        },
+      ],
+    };
+    const container = document.createElement("div");
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(
+        <EditIssueDialog
+          isSubmitting={false}
+          members={[]}
+          onClose={() => undefined}
+          onUpdate={async (input) => {
+            updated = input;
+          }}
+          run={run}
+        />,
+      );
+    });
+    expect(
+      container.querySelectorAll<HTMLImageElement>(".issue-inline-attachment img"),
+    ).toHaveLength(0);
+    expect(container.querySelector(".issue-attachment-item")).not.toBeNull();
+    await act(async () => {
+      container.querySelector<HTMLFormElement>("form")?.requestSubmit();
+    });
+    expect(updated!.attachments).toEqual([]);
+    expect(updated!.keptAttachmentIds).toEqual(["existing-1"]);
     await act(async () => root.unmount());
   });
 
