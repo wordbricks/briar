@@ -158,8 +158,10 @@ import {
 } from "../lib/issue-agent-reply";
 import {
   isIssueMentionUrl,
+  issueMentionHandleFromUrl,
   remarkIssueMentions,
 } from "../lib/issue-mentions";
+import { ProfileDialog, type ProfileTarget } from "./ProfileDialog";
 import {
   copyIssueId,
   copyIssueShareLink,
@@ -7528,6 +7530,7 @@ function IssueConversation({
   const [actionProposalStates, setActionProposalStates] = useState<
     Record<string, { accepting: boolean; error: string | null }>
   >({});
+  const [activeProfile, setActiveProfile] = useState<ProfileTarget | null>(null);
   const messageListRef = useRef<HTMLDivElement | null>(null);
   const onLoadRef = useRef(onLoad);
   onLoadRef.current = onLoad;
@@ -7573,6 +7576,33 @@ function IssueConversation({
     ],
     [mentionMembers],
   );
+  const profilesByHandle = useMemo(() => {
+    const profiles = new Map<string, ProfileTarget>();
+    profiles.set("briar", {
+      type: "agent",
+      id: "briar",
+      name: "Briar",
+      handle: "briar",
+      provider: null,
+      model: null,
+      responsibility: t("profile.briarResponsibility"),
+      projectId: null,
+      createdAt: null,
+    });
+    for (const member of mentionMembers) {
+      profiles.set(issueMentionHandle(member).toLowerCase(), {
+        type: "user",
+        id: member.userId,
+        name: member.name,
+        email: member.email,
+        image: member.image,
+        role: member.role,
+        roleContext: "organization",
+        createdAt: member.createdAt,
+      });
+    }
+    return profiles;
+  }, [mentionMembers, t]);
 
   useLayoutEffect(() => {
     const messageList = messageListRef.current;
@@ -7781,6 +7811,10 @@ function IssueConversation({
                   localeTag={localeTag}
                   message={message}
                   mentionHandles={mentionHandles}
+                  onMentionOpen={(handle) => {
+                    const profile = profilesByHandle.get(handle.toLowerCase());
+                    if (profile) setActiveProfile(profile);
+                  }}
                   onAcceptIssueAction={onAcceptIssueAction && message.proposedAction
                     ? () => void acceptIssueAction(message.proposedAction!)
                     : undefined}
@@ -7883,6 +7917,12 @@ function IssueConversation({
         }
         placeholder={t("run.messagePlaceholder", { title: run.title })}
       />
+      <ProfileDialog
+        profile={activeProfile}
+        onOpenChange={(open) => {
+          if (!open) setActiveProfile(null);
+        }}
+      />
     </section>
   );
 }
@@ -7894,6 +7934,7 @@ function IssueMessageItem({
   localeTag,
   message,
   mentionHandles,
+  onMentionOpen,
   onAcceptIssueAction,
   onDelete,
   onEdit,
@@ -7912,6 +7953,7 @@ function IssueMessageItem({
   localeTag: string;
   message: IssueMessage;
   mentionHandles: readonly string[];
+  onMentionOpen: (handle: string) => void;
   onAcceptIssueAction?: () => void;
   onDelete?: () => void;
   onEdit?: () => void;
@@ -7963,7 +8005,8 @@ function IssueMessageItem({
           <ReactMarkdown
             components={{
               a: ({ children, href, node: _node, ...props }) => {
-                const isMention = isIssueMentionUrl(href);
+                const mentionHandle = issueMentionHandleFromUrl(href);
+                const isMention = mentionHandle !== null;
                 return (
                   <a
                     {...props}
@@ -7971,7 +8014,10 @@ function IssueMessageItem({
                     href={href}
                     onClick={
                       isMention
-                        ? (event) => event.preventDefault()
+                        ? (event) => {
+                            event.preventDefault();
+                            onMentionOpen(mentionHandle);
+                          }
                         : props.onClick
                     }
                   >

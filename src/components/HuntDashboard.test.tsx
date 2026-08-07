@@ -3936,7 +3936,7 @@ describe("HuntDashboard", () => {
     container.remove();
   });
 
-  it("renders a member mention as a blue no-op link", async () => {
+  it("opens the mentioned member's profile from a conversation link", async () => {
     const createdAt = new Date().toISOString();
     const message: IssueMessage = {
       id: "member-mention-message",
@@ -3998,7 +3998,15 @@ describe("HuntDashboard", () => {
       bubbles: true,
       cancelable: true,
     });
-    expect(mentionLink?.dispatchEvent(click)).toBe(false);
+    await act(async () => {
+      expect(mentionLink?.dispatchEvent(click)).toBe(false);
+    });
+    const profile = document.body.querySelector<HTMLElement>(
+      ".profile-dialog[role='dialog']",
+    );
+    expect(profile?.textContent).toContain("Member One");
+    expect(profile?.textContent).toContain("member@example.com");
+    expect(profile?.textContent).toContain("멤버");
 
     await act(async () => root.unmount());
     container.remove();

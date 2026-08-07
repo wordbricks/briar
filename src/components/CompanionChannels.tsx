@@ -51,10 +51,10 @@ import {
   ChannelDraftImages,
   ChannelMessageImages,
   channelBodyWithImages,
-  channelBodyWithoutImages,
   draftChannelImage,
   type DraftChannelImage,
 } from "./ChannelImages";
+import { ChannelMessageText } from "./ChannelMessageText";
 
 type CompanionChannelsProps = {
   organizationId: string;
@@ -214,7 +214,13 @@ export function CompanionChannels({
         <div className="companion-channel-messages">
           {loading && !thread ? <Spinner /> : null}
           {(thread ?? []).map((item) => (
-            <MessageRow key={item.id} message={item} token={token} />
+            <MessageRow
+              agents={agents}
+              key={item.id}
+              members={members}
+              message={item}
+              token={token}
+            />
           ))}
         </div>
         <CompanionChannelComposer
@@ -243,15 +249,15 @@ export function CompanionChannels({
         <div className="companion-channel-messages">
           {loading && messages.length === 0 ? <Spinner /> : null}
           {messages.map((item) => (
-            <button
-              aria-label={`${t("run.viewThread")}: ${item.author.name} — ${item.body}`}
-              className="companion-channel-message-button"
+            <MessageRow
+              agents={agents}
               key={item.id}
-              onClick={() => void openThread(item)}
-              type="button"
-            >
-              <MessageRow message={item} showThreadSummary token={token} />
-            </button>
+              members={members}
+              message={item}
+              onOpenThread={() => void openThread(item)}
+              showThreadSummary
+              token={token}
+            />
           ))}
           {!loading && messages.length === 0 ? (
             <p className="companion-channel-empty">
@@ -329,11 +335,17 @@ function ChannelBar({
 }
 
 function MessageRow({
+  agents,
+  members,
   message,
+  onOpenThread,
   showThreadSummary = false,
   token,
 }: {
+  agents: ChannelAgentSummary[];
+  members: ChannelMember[];
   message: ChannelMessage;
+  onOpenThread?: () => void;
   showThreadSummary?: boolean;
   token: string;
 }) {
@@ -352,9 +364,7 @@ function MessageRow({
             })}
           </time>
         </header>
-        {channelBodyWithoutImages(message.body) ? (
-          <p>{channelBodyWithoutImages(message.body)}</p>
-        ) : null}
+        <ChannelMessageText agents={agents} members={members} message={message} />
         <ChannelMessageImages
           attachments={message.attachments}
           interactive={!showThreadSummary}
@@ -366,10 +376,19 @@ function MessageRow({
             {message.document.title}
           </span>
         ) : null}
-        {showThreadSummary && message.replyCount > 0 ? (
-          <span className="companion-channel-thread-summary">
+        {showThreadSummary && onOpenThread ? (
+          <button
+            aria-label={`${t("run.viewThread")}: ${message.author.name} — ${message.body}`}
+            className="companion-channel-message-button companion-channel-thread-summary"
+            onClick={onOpenThread}
+            type="button"
+          >
             <MessageSquare size={14} />
-            <strong>{t("run.replies", { count: message.replyCount })}</strong>
+            <strong>
+              {message.replyCount > 0
+                ? t("run.replies", { count: message.replyCount })
+                : t("channel.replyInThread")}
+            </strong>
             {message.lastReplyAt ? (
               <small>
                 · {t("companion.channelLastReply", {
@@ -377,7 +396,7 @@ function MessageRow({
                 })}
               </small>
             ) : null}
-          </span>
+          </button>
         ) : null}
       </div>
     </article>

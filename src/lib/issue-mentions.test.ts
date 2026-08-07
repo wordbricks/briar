@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   isIssueMentionUrl,
+  issueMentionHandleFromUrl,
   issueMentionUrl,
   remarkIssueMentions,
 } from "./issue-mentions";
@@ -55,5 +56,10 @@ describe("issue conversation mentions", () => {
   it("recognizes only the internal mention URL scheme", () => {
     expect(isIssueMentionUrl(issueMentionUrl("member"))).toBe(true);
     expect(isIssueMentionUrl("https://example.com")).toBe(false);
+    expect(issueMentionHandleFromUrl(issueMentionUrl("멤버 one"))).toBe(
+      "멤버 one",
+    );
+    expect(issueMentionHandleFromUrl("https://example.com")).toBeNull();
+    expect(issueMentionHandleFromUrl("briar-mention://%E0%A4%A")).toBeNull();
   });
 });
