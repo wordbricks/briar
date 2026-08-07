@@ -8,6 +8,7 @@ struct ProjectAgent: Codable, Equatable, Identifiable, Sendable {
     let codexPet: CodexPet?
     let provider: AgentProvider
     let model: String?
+    let effort: ModelEffort?
     let responsibility: String
     let skill: String
     let calendarColor: String
@@ -158,6 +159,103 @@ struct ProjectAgentTaskResponse: Codable, Equatable, Sendable {
 
 struct ProjectAgentSessionsResponse: Codable, Equatable, Sendable {
     let sessions: [ProjectAgentSession]
+}
+
+struct ProjectAgentSessionResponse: Codable, Equatable, Sendable {
+    let session: ProjectAgentSession
+}
+
+struct ProjectAgentSessionSyncRequest: Codable, Sendable {
+    let dispatchGroupId: String
+    let agentId: UUID?
+    let sessionType: ProjectAgentSession.SessionType
+    let trigger: ProjectAgentSession.Trigger?
+    let scheduleId: String?
+    let scheduleRunId: String?
+    let parentSessionId: String?
+    let request: String?
+    let status: ProjectAgentSession.Status
+    let issues: [ProjectAgentSession.Issue]
+    let startedAt: Date
+    let completedAt: Date?
+    let conversationId: String?
+    let summary: String?
+    let error: String?
+    let events: [ProjectAgentSession.Event]
+    let updatedAt: Date
+
+    init(session: ProjectAgentSession) {
+        dispatchGroupId = session.dispatchGroupId ?? session.id
+        agentId = session.agentId
+        sessionType = session.sessionType ?? .dispatch
+        trigger = session.trigger
+        scheduleId = session.scheduleId
+        scheduleRunId = session.scheduleRunId
+        parentSessionId = session.parentSessionId
+        request = session.request
+        status = session.status
+        issues = session.issues
+        startedAt = session.startedAt
+        completedAt = session.completedAt
+        conversationId = session.conversationId
+        summary = session.summary
+        error = session.error
+        events = session.events ?? []
+        updatedAt = session.updatedAt ?? session.completedAt ?? session.startedAt
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case dispatchGroupId
+        case agentId
+        case sessionType
+        case trigger
+        case scheduleId
+        case scheduleRunId
+        case parentSessionId
+        case request
+        case status
+        case issues
+        case startedAt
+        case completedAt
+        case conversationId
+        case summary
+        case error
+        case events
+        case updatedAt
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(dispatchGroupId, forKey: .dispatchGroupId)
+        try encode(agentId, forKey: .agentId, into: &container)
+        try container.encode(sessionType, forKey: .sessionType)
+        try encode(trigger, forKey: .trigger, into: &container)
+        try encode(scheduleId, forKey: .scheduleId, into: &container)
+        try encode(scheduleRunId, forKey: .scheduleRunId, into: &container)
+        try encode(parentSessionId, forKey: .parentSessionId, into: &container)
+        try encode(request, forKey: .request, into: &container)
+        try container.encode(status, forKey: .status)
+        try container.encode(issues, forKey: .issues)
+        try container.encode(startedAt, forKey: .startedAt)
+        try encode(completedAt, forKey: .completedAt, into: &container)
+        try encode(conversationId, forKey: .conversationId, into: &container)
+        try encode(summary, forKey: .summary, into: &container)
+        try encode(error, forKey: .error, into: &container)
+        try container.encode(events, forKey: .events)
+        try container.encode(updatedAt, forKey: .updatedAt)
+    }
+
+    private func encode<Value: Encodable, Key: CodingKey>(
+        _ value: Value?,
+        forKey key: Key,
+        into container: inout KeyedEncodingContainer<Key>
+    ) throws {
+        if let value {
+            try container.encode(value, forKey: key)
+        } else {
+            try container.encodeNil(forKey: key)
+        }
+    }
 }
 
 enum ProjectAgentLocale: String, CaseIterable, Identifiable, Sendable {

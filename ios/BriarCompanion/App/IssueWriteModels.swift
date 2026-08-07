@@ -264,12 +264,31 @@ struct ResumeRunResponse: Codable, Sendable {
 }
 
 struct DispatchRunRequest: Codable, Sendable {
+    let agentId: UUID?
     let provider: AgentProvider
     let model: String?
     let effort: ModelEffort?
     let persistPreferences: Bool
     let workerId: String?
     let requestId: UUID
+
+    init(
+        agentId: UUID? = nil,
+        provider: AgentProvider,
+        model: String?,
+        effort: ModelEffort?,
+        persistPreferences: Bool,
+        workerId: String?,
+        requestId: UUID
+    ) {
+        self.agentId = agentId
+        self.provider = provider
+        self.model = model
+        self.effort = effort
+        self.persistPreferences = persistPreferences
+        self.workerId = workerId
+        self.requestId = requestId
+    }
 }
 
 struct DispatchRunResponse: Codable, Sendable {

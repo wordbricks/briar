@@ -133,6 +133,10 @@ enum MobileAPIContract {
         static func projectAgentTasks(projectID: UUID) -> String {
             "/projects/\(projectID.uuidString.lowercased())/agent-tasks"
         }
+
+        static func projectAgentSession(projectID: UUID, sessionID: String) -> String {
+            "\(projectAgentSessions(projectID: projectID))/\(sessionID)"
+        }
     }
 }
 
