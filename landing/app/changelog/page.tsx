@@ -28,6 +28,20 @@ const changelogCopy = {
     backTop: "맨 위로 ↑",
     entries: [
       {
+        version: "1.2.87",
+        date: "2026년 8월 7일",
+        title: "조직 에이전트와 채널 실행 흐름을 확장했습니다",
+        summary:
+          "조직 단위 에이전트를 직접 관리하고, 채널의 멘션과 이슈 제안 흐름을 데스크톱과 모바일에서 더 매끄럽게 이어갈 수 있습니다.",
+        items: [
+          "조직 설정에서 저장소에 속하지 않은 에이전트를 만들고 조회하거나 삭제할 수 있습니다.",
+          "에이전트를 만들 때 제공자, 모델, 추론 강도와 담당 역할을 함께 설정할 수 있습니다.",
+          "채널에서 @를 입력하면 전체 멤버와 에이전트 후보가 다시 빠짐없이 표시됩니다.",
+          "모바일 웹과 iOS에서 채널의 이슈 생성 제안을 승인하고 대상 프로젝트와 생성된 이슈로 바로 이동할 수 있습니다.",
+          "랜딩의 제품 미리보기를 실제 Briar 작업 흐름을 보여주는 데모 영상으로 개선했습니다.",
+        ],
+      },
+      {
         version: "1.2.86",
         date: "2026년 8월 7일",
         title: "사람과 Worker를 더 선명하게 연결합니다",
@@ -132,6 +146,20 @@ const changelogCopy = {
     home: "Home",
     backTop: "Back to top ↑",
     entries: [
+      {
+        version: "1.2.87",
+        date: "August 7, 2026",
+        title: "Organization agents and channel execution, connected",
+        summary:
+          "Manage organization-level agents directly and carry mentions and issue proposals through smoother desktop and mobile channel workflows.",
+        items: [
+          "Create, review, and delete organization agents that are not tied to a repository.",
+          "Choose each agent's provider, model, reasoning effort, and responsibility when creating it.",
+          "Typing @ in a channel once again shows the complete roster of people and agents.",
+          "Approve channel issue proposals on mobile web and iOS, select a project, and open the resulting issue directly.",
+          "Updated the landing product preview with a demo video of the real Briar workflow.",
+        ],
+      },
       {
         version: "1.2.86",
         date: "August 7, 2026",
@@ -282,9 +310,9 @@ export default async function ChangelogPage() {
           <h1>{changelog.title}</h1>
           <p>{changelog.description}</p>
         </div>
-        <a href="#v1-2-86" className="changelog-current">
+        <a href="#v1-2-87" className="changelog-current">
           <span>{changelog.current}</span>
-          <strong>v1.2.86</strong>
+          <strong>v1.2.87</strong>
           <i aria-hidden="true">↓</i>
         </a>
       </section>
