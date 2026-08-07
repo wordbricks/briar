@@ -61,6 +61,11 @@ import {
   type ClaimedIssue,
 } from "./worker";
 import {
+  supportsRemoteWorkerUpdates,
+  workerUpdateDeepLink,
+  type WorkerUpdateDirective,
+} from "./worker-update";
+import {
   allocateAnalysisWorktree,
   allocateIssueWorktree,
   defaultWorktreeRoot,
@@ -3157,7 +3162,9 @@ async function workerCommand() {
     const providerHealth = await inspectWorkerProviderHealth(
       config.agentProviders,
     );
-    await request(
+    const heartbeat = await request<{
+      updateDirective?: WorkerUpdateDirective | null;
+    }>(
       config.apiUrl,
       `/workers/${workerId}/heartbeat`,
       workerToken,
@@ -3172,15 +3179,31 @@ async function workerCommand() {
             providers: healthyWorkerProviders(providerHealth),
             providerHealth,
             worktrees: true,
+            remoteUpdates: {
+              supported: supportsRemoteWorkerUpdates(platform()),
+              protocol: 1,
+            },
           },
         }),
       },
     );
+    if (
+      heartbeat.updateDirective &&
+      supportsRemoteWorkerUpdates(platform())
+    ) {
+      const child = spawn(
+        "/usr/bin/open",
+        [workerUpdateDeepLink(heartbeat.updateDirective)],
+        { detached: true, stdio: "ignore" },
+      );
+      child.unref();
+    }
     throw new Error(readinessProblem);
   }
 
   const maxIssues = Number.parseInt(value("--max-issues") ?? "", 10);
   let lastWorktreeSweepAt = Number.NEGATIVE_INFINITY;
+  let lastTriggeredUpdateId: string | null = null;
   const result = await runWorkerLoop(
     {
       claim: async () => {
@@ -3325,6 +3348,7 @@ async function workerCommand() {
           : requirementDetail;
         const heartbeat = await request<{
           worker: { maxConcurrentSessions?: number };
+          updateDirective?: WorkerUpdateDirective | null;
           workflowRequirements?: Array<{
             id: string;
             label: string;
@@ -3347,6 +3371,10 @@ async function workerCommand() {
                 providers,
                 providerHealth,
                 worktrees: worktreesEnabled(project),
+                remoteUpdates: {
+                  supported: supportsRemoteWorkerUpdates(platform()),
+                  protocol: 1,
+                },
                 workflowRequirements: requirementHealth.map((item) => ({
                   id: item.id,
                   healthy: item.healthy,
@@ -3357,6 +3385,25 @@ async function workerCommand() {
           },
         );
         let effectiveAcceptingWork = acceptingWork;
+        if (heartbeat.updateDirective) {
+          effectiveAcceptingWork = false;
+          if (
+            readinessState === "ready" &&
+            supportsRemoteWorkerUpdates(platform()) &&
+            lastTriggeredUpdateId !== heartbeat.updateDirective.id
+          ) {
+            lastTriggeredUpdateId = heartbeat.updateDirective.id;
+            const child = spawn(
+              "/usr/bin/open",
+              [workerUpdateDeepLink(heartbeat.updateDirective)],
+              { detached: true, stdio: "ignore" },
+            );
+            child.unref();
+            console.log(
+              `worker update requested: ${heartbeat.updateDirective.targetVersion}`,
+            );
+          }
+        }
         if (Array.isArray(heartbeat.workflowRequirements)) {
           const previousKey = JSON.stringify(sharedWorkflowRequirements ?? []);
           const nextKey = JSON.stringify(heartbeat.workflowRequirements);
@@ -3403,6 +3450,10 @@ async function workerCommand() {
                       providers,
                       providerHealth,
                       worktrees: worktreesEnabled(project),
+                      remoteUpdates: {
+                        supported: supportsRemoteWorkerUpdates(platform()),
+                        protocol: 1,
+                      },
                       workflowRequirements: refreshedHealth.map((item) => ({
                         id: item.id,
                         healthy: item.healthy,

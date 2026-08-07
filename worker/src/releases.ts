@@ -14,7 +14,7 @@ function contentType(pathname: string) {
   return "application/octet-stream";
 }
 
-async function readLatestVersion(
+export async function readLatestVersion(
   bucket: Pick<R2Bucket, "get">,
 ): Promise<string | null> {
   const object = await bucket.get("releases/latest.json");

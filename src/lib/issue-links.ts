@@ -174,7 +174,7 @@ export async function shareIssueLink(input: {
   return "copied";
 }
 
-function listenForLinks<T>(
+export function listenForLinks<T>(
   parseLink: (value: string) => T | null,
   onLink: (target: T) => void,
 ): () => void {

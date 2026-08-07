@@ -646,9 +646,26 @@ export async function loadOrganizationExecutionWorkers(
 ) {
   return request<{
     workers: OrganizationExecutionWorker[];
+    latestVersion?: string | null;
     canManage: boolean;
     generatedAt: string;
   }>(`/organizations/${organizationId}/workers`, token);
+}
+
+export async function requestOrganizationExecutionWorkerUpdate(
+  token: string,
+  organizationId: string,
+  deviceId: string,
+) {
+  return request<{
+    outcome: "requested" | "already_current";
+    requestId?: string;
+    targetVersion: string;
+  }>(
+    `/organizations/${organizationId}/workers/${encodeURIComponent(deviceId)}/updates`,
+    token,
+    { method: "POST" },
+  );
 }
 
 export async function disableOrganizationExecutionWorker(

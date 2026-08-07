@@ -4079,6 +4079,16 @@ fn sync_execution_worker_labels(app: AppHandle) -> Result<serde_json::Value, Str
         .map_err(|error| format!("Worker 이름 동기화 결과를 읽지 못했습니다: {error}"))
 }
 
+#[tauri::command]
+fn refresh_execution_worker_runtime(app: AppHandle) -> Result<bool, String> {
+    let resource_directory = app
+        .path()
+        .resource_dir()
+        .map_err(|error| error.to_string())?;
+    let home = app.path().home_dir().map_err(|error| error.to_string())?;
+    sync_auto_hunt_assets_and_restart_workers(&resource_directory, &home)
+}
+
 fn inspect_execution_workers_at(
     config_path: &Path,
     project_ids: Vec<String>,
@@ -7341,6 +7351,7 @@ pub fn run() {
             auto_hunt_health,
             repair_auto_hunt,
             configure_execution_worker,
+            refresh_execution_worker_runtime,
             sync_execution_worker_labels,
             inspect_execution_workers,
             show_inbox_notification,
