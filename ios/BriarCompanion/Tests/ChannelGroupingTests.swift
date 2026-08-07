@@ -181,6 +181,37 @@ final class ChannelGroupingTests: XCTestCase {
         XCTAssertEqual(ChannelMentions.insert(candidates[0], into: "확인 @hon"), "확인 @honey ")
     }
 
+    func testAtSignSuggestsEveryChannelRosterMember() {
+        let agent = ChannelAgentSummary(
+            agentId: UUID(uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!,
+            handle: "honey",
+            name: "Honey",
+            provider: "claude",
+            model: nil,
+            projectId: nil,
+            responsibility: "Writing partner",
+            createdAt: Date(timeIntervalSince1970: 1_700_000_000)
+        )
+        let member = ChannelMember(
+            userId: "user-2",
+            name: "Sam",
+            email: "sam@example.com",
+            image: nil,
+            role: "member",
+            createdAt: Date(timeIntervalSince1970: 1_700_000_000)
+        )
+        let candidates = ChannelMentions.candidates(
+            members: [member],
+            agents: [agent],
+            currentUserId: "user-1"
+        )
+
+        XCTAssertEqual(
+            ChannelMentions.suggestions(in: "@", candidates: candidates),
+            candidates
+        )
+    }
+
     func testMentionRecipientsStayAttachedOnlyWhileTheirPickedHandleRemains() {
         let member = ChannelMember(
             userId: "user-2",

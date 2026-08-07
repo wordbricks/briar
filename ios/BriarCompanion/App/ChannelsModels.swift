@@ -154,6 +154,7 @@ enum ChannelMentions {
     ) -> [ChannelMentionTarget] {
         guard let query = query(in: body) else { return [] }
         let needle = query.text.lowercased()
+        guard !needle.isEmpty else { return candidates }
         return candidates.filter {
             "\($0.handle) \($0.label)".lowercased().contains(needle)
         }
