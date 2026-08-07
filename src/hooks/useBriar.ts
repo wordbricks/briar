@@ -2210,6 +2210,20 @@ export function useBriar(options: UseBriarOptions = {}) {
       try {
         if (demoMode) {
           const updatedAt = new Date().toISOString();
+          const addedAttachments: IssueAttachment[] = input.attachments.map(
+            (file) => ({
+              id: crypto.randomUUID(),
+              filename: file.name,
+              contentType: file.type,
+              byteSize: file.size,
+              url: URL.createObjectURL(file),
+            }),
+          );
+          const canonicalDescription = canonicalizeIssueAttachmentReferences(
+            input.description,
+            input.attachmentReferences ?? [],
+            addedAttachments.map((attachment) => attachment.id),
+          );
           setDashboard((current) =>
             current
               ? {
@@ -2219,12 +2233,22 @@ export function useBriar(options: UseBriarOptions = {}) {
                       ? {
                           ...run,
                           title: input.title.trim(),
-                          issueDescription: input.description,
+                          issueDescription: canonicalDescription,
                           priority: input.priority,
                           assigneeUserId:
                             input.assigneeUserId === undefined
                               ? run.assigneeUserId ?? null
                               : input.assigneeUserId,
+                          attachments: [
+                            ...(input.keptAttachmentIds
+                              ? (run.attachments ?? []).filter((attachment) =>
+                                  input.keptAttachmentIds?.includes(
+                                    attachment.id,
+                                  ),
+                                )
+                              : run.attachments ?? []),
+                            ...addedAttachments,
+                          ],
                           updatedAt,
                         }
                       : run,
@@ -2235,9 +2259,19 @@ export function useBriar(options: UseBriarOptions = {}) {
           return {
             runId,
             title: input.title.trim(),
-            description: input.description,
+            description: canonicalDescription,
             priority: input.priority,
             assigneeUserId: input.assigneeUserId ?? null,
+            attachments: [
+              ...(input.keptAttachmentIds
+                ? (dashboard.runs.find((run) => run.id === runId)?.attachments ??
+                  []).filter((attachment) =>
+                    input.keptAttachmentIds?.includes(attachment.id),
+                  )
+                : dashboard.runs.find((run) => run.id === runId)?.attachments ??
+                  []),
+              ...addedAttachments,
+            ],
           };
         }
         if (!token) throw new Error("로그인이 필요합니다.");

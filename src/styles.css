@@ -1934,6 +1934,20 @@ button.issue-message-state { width:100%; cursor:pointer; }
   display: block;
   object-fit: contain;
 }
+.issue-inline-attachment-state {
+  min-width: 140px;
+  min-height: 84px;
+  display: grid;
+  place-items: center;
+  gap: 6px;
+  padding: 10px;
+  font-size: 12px;
+  color: var(--muted-foreground);
+  text-align: center;
+}
+.issue-inline-attachment-state > svg {
+  flex: 0 0 auto;
+}
 .issue-inline-attachment button {
   width: 30px;
   height: 30px;
