@@ -5315,8 +5315,12 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .channel-composer > button:disabled { opacity: .4; }
 .channel-mention-menu { position: absolute; bottom: calc(100% - 4px); left: 16px; z-index: 20; margin: 0; width: min(320px, calc(100% - 32px)); list-style: none; border: 1px solid var(--border, #ddd8cf); border-radius: 10px; background: var(--card, #fff); padding: 5px; box-shadow: 0 12px 34px rgb(20 17 13 / 14%); }
 .channel-mention-menu button { display: flex; width: 100%; align-items: center; gap: 7px; border: 0; border-radius: 7px; background: transparent; padding: 6px 8px; color: inherit; font: inherit; font-size: 12px; text-align: left; }
-.channel-mention-menu button:hover { background: var(--background, #f2efe9); }
-.channel-mention-menu span { margin-left: auto; color: var(--muted-foreground, #777168); font-size: 11px; }
+.channel-mention-menu button:hover,
+.channel-mention-menu button.active { background: var(--background, #f2efe9); }
+.channel-mention-menu button > img,
+.channel-mention-avatar { width:24px; height:24px; flex:0 0 24px; border-radius:7px; object-fit:cover; }
+.channel-mention-avatar { display:grid; place-items:center; color:#fff; background:#7664b8; font-size:11px; font-weight:700; }
+.channel-mention-menu button > span:not(.channel-mention-avatar) { margin-left: auto; color: var(--muted-foreground, #777168); font-size: 11px; }
 
 .channel-thread { display: flex; min-height: 0; flex-direction: column; border-left: 1px solid var(--border, #ddd8cf); background: var(--card, #fff); }
 .channel-thread > header { display: flex; height: 46px; flex: 0 0 46px; align-items: center; justify-content: space-between; padding: 0 10px 0 16px; border-bottom: 1px solid var(--border, #ddd8cf); font-size: 12px; font-weight: 620; }
@@ -5372,5 +5376,18 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .companion-channel-composer-add { width:40px; height:40px; flex:0 0 40px; display:grid; place-items:center; border:1px solid color-mix(in srgb,var(--border,#d6d1c8) 72%,transparent); border-radius:50%; color:var(--muted-foreground,#777168); background:var(--background,#faf9f6); }
 .companion-channel-composer input { min-width:0; flex: 1; border: 0; outline:0; background: transparent; padding: 8px 2px; color: inherit; font: inherit; font-size: 16px; }
 .companion-channel-composer input::placeholder { color:var(--muted-foreground,#777168); }
-.companion-channel-composer button { display: grid; width: 40px; height: 40px; flex:0 0 40px; place-items: center; border: 0; border-radius: 50%; background: var(--primary,#5943a4); color: white; }
-.companion-channel-composer button:disabled { opacity: .4; }
+.companion-channel-composer > button { display: grid; width: 40px; height: 40px; flex:0 0 40px; place-items: center; border: 0; border-radius: 50%; background: var(--primary,#5943a4); color: white; }
+.companion-channel-composer > button:disabled { opacity: .4; }
+.companion-channel-mention-menu { position:absolute; right:0; bottom:calc(100% + 8px); left:0; z-index:4; max-height:min(310px,48vh); margin:0; overflow-y:auto; border:1px solid var(--border,#d6d1c8); border-radius:16px; background:var(--card,#fff); padding:6px; list-style:none; box-shadow:0 16px 38px rgba(22,20,28,.18); }
+.companion-channel-mention-menu button { display:flex; width:100%; min-height:48px; align-items:center; gap:10px; border:0; border-radius:11px; background:transparent; padding:6px 8px; color:inherit; font:inherit; text-align:left; }
+.companion-channel-mention-menu button:hover,
+.companion-channel-mention-menu button.active { background:var(--background,#f2efe9); }
+.companion-channel-mention-menu img,
+.companion-channel-mention-avatar { width:36px; height:36px; flex:0 0 36px; border-radius:10px; object-fit:cover; }
+.companion-channel-mention-avatar { display:grid; place-items:center; color:#fff; background:#7664b8; font-size:13px; font-weight:700; }
+.companion-channel-mention-avatar.agent { color:var(--primary,#5943a4); background:color-mix(in srgb,var(--primary,#5943a4) 13%,var(--card,#fff)); }
+.companion-channel-mention-copy { display:flex; min-width:0; flex:1; flex-direction:column; }
+.companion-channel-mention-copy strong { overflow:hidden; font-size:13px; text-overflow:ellipsis; white-space:nowrap; }
+.companion-channel-mention-copy small,
+.companion-channel-mention-menu em { overflow:hidden; color:var(--muted-foreground,#777168); font-size:11px; font-style:normal; text-overflow:ellipsis; white-space:nowrap; }
+.companion-channel-mention-menu em { max-width:36%; }

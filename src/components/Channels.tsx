@@ -11,6 +11,7 @@ import {
 import {
   useCallback,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -36,6 +37,7 @@ import type {
 } from "../lib/channels-contract";
 import {
   mentionAtCaret,
+  mentionHandle,
   retainedMentions,
   type MentionTarget,
 } from "../lib/channel-mentions";
@@ -471,27 +473,32 @@ function Composer({
 }) {
   const [body, setBody] = useState("");
   const [caret, setCaret] = useState(0);
+  const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(0);
+  const [mentionDismissed, setMentionDismissed] = useState(false);
   // Mentions are tracked as picked entities, never re-parsed from the text:
   // the server trusts this list, so a handle typed by hand is just text.
   const [mentions, setMentions] = useState<MentionTarget[]>([]);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const pendingCaret = useRef<number | null>(null);
+  const mentionListId = useId();
 
   const candidates = useMemo<MentionTarget[]>(
     () => [
       ...agents.map((agent) => ({
         type: "agent" as const,
         id: agent.agentId,
-        handle: agent.handle ?? agent.name,
+        handle: mentionHandle(agent.handle?.trim() || agent.name),
         label: agent.name,
         detail: agent.projectId ? "프로젝트 에이전트" : "조직 에이전트",
       })),
-      ...members
-        .filter((member) => member.userId !== currentUserId)
-        .map((member) => ({
+      ...members.map((member) => ({
           type: "user" as const,
           id: member.userId,
-          handle: member.email.split("@")[0] ?? member.userId,
+          handle: mentionHandle(member.email.split("@")[0] || member.userId),
           label: member.name,
-          detail: member.email,
+          detail:
+            member.userId === currentUserId ? `나 · ${member.email}` : member.email,
+          image: member.image,
         })),
     ],
     [agents, members, currentUserId],
@@ -507,12 +514,28 @@ function Composer({
         )
         .slice(0, 6)
     : [];
+  const showsSuggestions = !mentionDismissed && suggestions.length > 0;
+
+  useEffect(() => {
+    setActiveSuggestionIndex(0);
+  }, [query?.query]);
+
+  useEffect(() => {
+    if (pendingCaret.current === null) return;
+    const nextCaret = pendingCaret.current;
+    pendingCaret.current = null;
+    textareaRef.current?.focus();
+    textareaRef.current?.setSelectionRange(nextCaret, nextCaret);
+  }, [body]);
 
   const pick = (target: MentionTarget) => {
     if (!query) return;
-    setBody(
-      `${body.slice(0, query.start)}@${target.handle} ${body.slice(query.end)}`,
-    );
+    const inserted = `@${target.handle} `;
+    const nextCaret = query.start + inserted.length;
+    setBody(`${body.slice(0, query.start)}${inserted}${body.slice(query.end)}`);
+    setCaret(nextCaret);
+    pendingCaret.current = nextCaret;
+    setMentionDismissed(true);
     setMentions((current) =>
       current.some(
         (mention) => mention.id === target.id && mention.type === target.type,
@@ -527,6 +550,7 @@ function Composer({
     onSend(body, retainedMentions(body, mentions));
     setBody("");
     setMentions([]);
+    setMentionDismissed(false);
   };
 
   return (
@@ -537,12 +561,33 @@ function Composer({
         submit();
       }}
     >
-      {suggestions.length > 0 ? (
-        <ul className="channel-mention-menu">
-          {suggestions.map((target) => (
+      {showsSuggestions ? (
+        <ul
+          aria-label="멘션 후보"
+          className="channel-mention-menu"
+          id={mentionListId}
+          role="listbox"
+        >
+          {suggestions.map((target, index) => (
             <li key={`${target.type}:${target.id}`}>
-              <button onClick={() => pick(target)} type="button">
-                {target.type === "agent" ? <Bot size={13} /> : null}
+              <button
+                aria-selected={index === activeSuggestionIndex}
+                className={index === activeSuggestionIndex ? "active" : undefined}
+                id={`${mentionListId}-option-${index}`}
+                onClick={() => pick(target)}
+                onMouseEnter={() => setActiveSuggestionIndex(index)}
+                role="option"
+                type="button"
+              >
+                {target.image ? (
+                  <img alt="" src={target.image} />
+                ) : target.type === "agent" ? (
+                  <Bot size={15} />
+                ) : (
+                  <span className="channel-mention-avatar">
+                    {target.label.trim().charAt(0).toUpperCase() || "?"}
+                  </span>
+                )}
                 <strong>@{target.handle}</strong>
                 <span>{target.detail}</span>
               </button>
@@ -551,6 +596,14 @@ function Composer({
         </ul>
       ) : null}
       <textarea
+        aria-activedescendant={
+          showsSuggestions
+            ? `${mentionListId}-option-${activeSuggestionIndex}`
+            : undefined
+        }
+        aria-autocomplete="list"
+        aria-controls={showsSuggestions ? mentionListId : undefined}
+        aria-expanded={showsSuggestions}
         aria-label="채널 메시지"
         disabled={busy}
         placeholder={placeholder}
@@ -558,8 +611,30 @@ function Composer({
         onChange={(event) => {
           setBody(event.target.value);
           setCaret(event.target.selectionStart ?? event.target.value.length);
+          setMentionDismissed(false);
         }}
         onKeyDown={(event) => {
+          if (showsSuggestions) {
+            if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+              event.preventDefault();
+              const offset = event.key === "ArrowDown" ? 1 : -1;
+              setActiveSuggestionIndex(
+                (index) => (index + offset + suggestions.length) % suggestions.length,
+              );
+              return;
+            }
+            if (event.key === "Enter" || event.key === "Tab") {
+              event.preventDefault();
+              const target = suggestions[activeSuggestionIndex] ?? suggestions[0];
+              if (target) pick(target);
+              return;
+            }
+            if (event.key === "Escape") {
+              event.preventDefault();
+              setMentionDismissed(true);
+              return;
+            }
+          }
           if (event.key === "Enter" && !event.shiftKey) {
             event.preventDefault();
             submit();
@@ -569,6 +644,8 @@ function Composer({
           setCaret(event.currentTarget.selectionStart ?? 0)
         }
         onClick={(event) => setCaret(event.currentTarget.selectionStart ?? 0)}
+        ref={textareaRef}
+        role="combobox"
       />
       <button aria-label="메시지 보내기" disabled={busy || !body.trim()} type="submit">
         <Send size={17} />

@@ -6,6 +6,7 @@ struct ChannelsHomeView: View {
     @AppStorage("companion-locale") private var localeRaw = CompanionLocale.ko.rawValue
 
     let activeProjectID: UUID?
+    let currentUserID: String?
     let projects: [ProjectsResponse.Project]
 
     private var locale: CompanionLocale {
@@ -47,7 +48,11 @@ struct ChannelsHomeView: View {
         }
         .refreshable { await channels.refresh() }
         .navigationDestination(for: ChannelSummary.self) { channel in
-            ChannelMessagesView(channels: channels, channel: channel)
+            ChannelMessagesView(
+                channels: channels,
+                channel: channel,
+                currentUserID: currentUserID
+            )
         }
     }
 }
@@ -80,6 +85,7 @@ struct ChannelMessagesView: View {
     @State private var draft = ""
 
     let channel: ChannelSummary
+    let currentUserID: String?
 
     private var locale: CompanionLocale {
         CompanionLocale(rawValue: localeRaw) ?? .ko
@@ -104,15 +110,21 @@ struct ChannelMessagesView: View {
             ChannelComposer(
                 draft: $draft,
                 sending: channels.sending,
+                candidates: ChannelMentions.candidates(
+                    members: channels.members,
+                    agents: channels.agents,
+                    currentUserId: currentUserID
+                ),
                 placeholder: String(
                     format: L10n.text(.channelMessagePlaceholder, locale: locale),
                     channel.name
                 ),
-                send: { body in
+                send: { body, mentions in
                     await channels.send(
                         channelID: channel.id,
                         parentMessageID: nil,
-                        body: body
+                        body: body,
+                        mentions: mentions
                     )
                 }
             )
@@ -129,7 +141,12 @@ struct ChannelMessagesView: View {
         }
         .task(id: channel.id) { await channels.openChannel(channel.id) }
         .navigationDestination(for: ChannelMessage.self) { message in
-            ChannelThreadView(channels: channels, channel: channel, parent: message)
+            ChannelThreadView(
+                channels: channels,
+                channel: channel,
+                parent: message,
+                currentUserID: currentUserID
+            )
         }
         .overlay {
             if channels.messages.isEmpty, !channels.loading {
@@ -149,6 +166,7 @@ struct ChannelThreadView: View {
 
     let channel: ChannelSummary
     let parent: ChannelMessage
+    let currentUserID: String?
 
     private var locale: CompanionLocale {
         CompanionLocale(rawValue: localeRaw) ?? .ko
@@ -166,15 +184,21 @@ struct ChannelThreadView: View {
             ChannelComposer(
                 draft: $draft,
                 sending: channels.sending,
+                candidates: ChannelMentions.candidates(
+                    members: channels.members,
+                    agents: channels.agents,
+                    currentUserId: currentUserID
+                ),
                 placeholder: String(
                     format: L10n.text(.channelMessagePlaceholder, locale: locale),
                     channel.name
                 ),
-                send: { body in
+                send: { body, mentions in
                     await channels.send(
                         channelID: channel.id,
                         parentMessageID: parent.id,
-                        body: body
+                        body: body,
+                        mentions: mentions
                     )
                 }
             )
@@ -271,44 +295,111 @@ private struct ChannelMessageRow: View {
 
 private struct ChannelComposer: View {
     @Binding var draft: String
+    @State private var mentions: [ChannelMentionTarget] = []
     let sending: Bool
+    let candidates: [ChannelMentionTarget]
     let placeholder: String
-    let send: (String) async -> Void
+    let send: (String, [ChannelMentionTarget]) async -> Void
+
+    private var suggestions: [ChannelMentionTarget] {
+        Array(ChannelMentions.suggestions(in: draft, candidates: candidates).prefix(6))
+    }
 
     var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "plus")
-                .font(.body.weight(.medium))
-                .foregroundStyle(.secondary)
-                .frame(width: 40, height: 40)
-                .background(.background, in: Circle())
-                .overlay { Circle().stroke(Color.secondary.opacity(0.18), lineWidth: 1) }
-            TextField(placeholder, text: $draft, axis: .vertical)
-                .textFieldStyle(.plain)
-                .lineLimit(1...4)
-                .disabled(sending)
-                .accessibilityIdentifier("channel-composer-field")
-            if !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                Button {
-                    let body = draft
-                    draft = ""
-                    Task { await send(body) }
-                } label: {
-                    Image(systemName: "arrow.up")
-                        .font(.body.weight(.bold))
-                        .foregroundStyle(.white)
-                        .frame(width: 40, height: 40)
-                        .background(.tint, in: Circle())
+        VStack(spacing: 0) {
+            if !suggestions.isEmpty {
+                ScrollView {
+                    LazyVStack(spacing: 2) {
+                        ForEach(suggestions) { target in
+                            Button {
+                                draft = ChannelMentions.insert(target, into: draft)
+                                if !mentions.contains(where: { $0.id == target.id }) {
+                                    mentions.append(target)
+                                }
+                            } label: {
+                                HStack(spacing: 10) {
+                                    ProfileImageView(
+                                        image: target.image,
+                                        name: target.label,
+                                        systemImage: target.kind == .agent ? "cpu" : "person.fill",
+                                        size: 36
+                                    )
+                                    VStack(alignment: .leading, spacing: 1) {
+                                        Text(target.label)
+                                            .font(.subheadline.weight(.semibold))
+                                            .lineLimit(1)
+                                        Text("@\(target.handle)")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                            .lineLimit(1)
+                                    }
+                                    Spacer(minLength: 8)
+                                    Text(target.detail)
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(1)
+                                }
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 6)
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityIdentifier("channel-mention-\(target.id)")
+                        }
+                    }
+                    .padding(5)
                 }
-                .disabled(sending)
-                .accessibilityIdentifier("channel-composer-send")
+                .frame(maxHeight: 250)
+                .background(.background)
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 14)
+                        .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
+                }
+                .shadow(color: .black.opacity(0.12), radius: 12, y: 5)
+                .padding(.horizontal, 12)
+                .padding(.bottom, 8)
+                .accessibilityIdentifier("channel-mention-menu")
             }
+            HStack(spacing: 8) {
+                Image(systemName: "plus")
+                    .font(.body.weight(.medium))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 40, height: 40)
+                    .background(.background, in: Circle())
+                    .overlay { Circle().stroke(Color.secondary.opacity(0.18), lineWidth: 1) }
+                TextField(placeholder, text: $draft, axis: .vertical)
+                    .textFieldStyle(.plain)
+                    .lineLimit(1...4)
+                    .disabled(sending)
+                    .accessibilityIdentifier("channel-composer-field")
+                    .onChange(of: draft) { _, body in
+                        mentions = ChannelMentions.retained(in: body, mentions: mentions)
+                    }
+                if !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    Button {
+                        let body = draft
+                        let selected = ChannelMentions.retained(in: body, mentions: mentions)
+                        draft = ""
+                        mentions = []
+                        Task { await send(body, selected) }
+                    } label: {
+                        Image(systemName: "arrow.up")
+                            .font(.body.weight(.bold))
+                            .foregroundStyle(.white)
+                            .frame(width: 40, height: 40)
+                            .background(.tint, in: Circle())
+                    }
+                    .disabled(sending)
+                    .accessibilityIdentifier("channel-composer-send")
+                }
+            }
+            .padding(7)
+            .background(.secondary.opacity(0.1), in: Capsule())
+            .overlay { Capsule().stroke(Color.secondary.opacity(0.18), lineWidth: 1) }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
         }
-        .padding(7)
-        .background(.secondary.opacity(0.1), in: Capsule())
-        .overlay { Capsule().stroke(Color.secondary.opacity(0.18), lineWidth: 1) }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
         .background(.bar)
     }
 }

@@ -159,4 +159,62 @@ final class ChannelGroupingTests: XCTestCase {
         XCTAssertEqual(message.replyCount, 2)
         XCTAssertNotNil(message.lastReplyAt)
     }
+
+    func testMentionCandidatesAppearForAtSignAndInsertASelectedAgent() {
+        let agent = ChannelAgentSummary(
+            agentId: UUID(uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!,
+            handle: "honey",
+            name: "Honey",
+            provider: "claude",
+            model: nil,
+            projectId: nil,
+            responsibility: "Writing partner",
+            createdAt: Date(timeIntervalSince1970: 1_700_000_000)
+        )
+        let candidates = ChannelMentions.candidates(
+            members: [],
+            agents: [agent],
+            currentUserId: "user-1"
+        )
+
+        XCTAssertEqual(ChannelMentions.suggestions(in: "@", candidates: candidates).map(\.handle), ["honey"])
+        XCTAssertEqual(ChannelMentions.insert(candidates[0], into: "확인 @hon"), "확인 @honey ")
+    }
+
+    func testMentionRecipientsStayAttachedOnlyWhileTheirPickedHandleRemains() {
+        let member = ChannelMember(
+            userId: "user-2",
+            name: "Sam",
+            email: "sam@example.com",
+            image: nil,
+            role: "member",
+            createdAt: Date(timeIntervalSince1970: 1_700_000_000)
+        )
+        let targets = ChannelMentions.candidates(
+            members: [member],
+            agents: [],
+            currentUserId: "user-1"
+        )
+
+        XCTAssertEqual(ChannelMentions.retained(in: "@sam 확인", mentions: targets), targets)
+        XCTAssertTrue(ChannelMentions.retained(in: "sam 확인", mentions: targets).isEmpty)
+    }
+
+    func testChannelMessageRequestEncodesStructuredMentionRecipients() throws {
+        let request = CreateChannelMessageRequest(
+            body: "@honey @sam 확인",
+            parentMessageId: nil,
+            mentionedUserIds: ["user-2"],
+            mentionedAgentIds: [UUID(uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!]
+        )
+        let object = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: JSONEncoder().encode(request)) as? [String: Any]
+        )
+
+        XCTAssertEqual(object["mentionedUserIds"] as? [String], ["user-2"])
+        XCTAssertEqual(
+            object["mentionedAgentIds"] as? [String],
+            ["AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA"]
+        )
+    }
 }
