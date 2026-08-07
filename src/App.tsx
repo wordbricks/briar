@@ -1442,6 +1442,8 @@ export function App() {
             onResumeRun={briar.resumeRun}
             onRequestedRunOpen={() => setRequestedRunId(null)}
             onSendIssueMessage={sendIssueMessage}
+            onEditIssueMessage={briar.updateIssueMessage}
+            onDeleteIssueMessage={briar.removeIssueMessage}
             processingIssueIds={processingIssueIds}
             projects={activeOrganizationProjects}
             sessions={autoHunt.sessions}
@@ -1865,6 +1867,8 @@ export function App() {
             onUnassignRun={(runId) => briar.unassignRun(activeProject?.id ?? "", runId)}
             onResumeRun={briar.resumeRun}
             onSendIssueMessage={sendIssueMessage}
+            onEditIssueMessage={briar.updateIssueMessage}
+            onDeleteIssueMessage={briar.removeIssueMessage}
             processingIssueIds={processingIssueIds}
             projects={activeOrganizationProjects}
             sessions={autoHunt.sessions}

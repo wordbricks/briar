@@ -3374,6 +3374,172 @@ describe("HuntDashboard", () => {
     container.remove();
   });
 
+  it("edits and deletes messages the current user authored", async () => {
+    const createdAt = "2026-08-03T10:00:00.000Z";
+    const rootMessage: IssueMessage = {
+      id: "message-root",
+      runId: demoDashboard.runs[0].id,
+      parentMessageId: null,
+      body: "수정 전 원문",
+      author: { id: "jay", name: "Jay", image: null, provider: null },
+      replyCount: 1,
+      createdAt,
+      updatedAt: createdAt,
+    };
+    const reply: IssueMessage = {
+      ...rootMessage,
+      id: "message-reply",
+      parentMessageId: rootMessage.id,
+      body: "기존 답글",
+      replyCount: 0,
+      createdAt: "2026-08-03T10:01:00.000Z",
+      updatedAt: "2026-08-03T10:01:00.000Z",
+    };
+    const onEditIssueMessage = vi.fn(async () => ({
+      ...rootMessage,
+      body: "수정 후 본문",
+      updatedAt: "2026-08-03T10:02:00.000Z",
+    }));
+    const onDeleteIssueMessage = vi.fn(async () => undefined);
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(
+        <RunPage
+          currentUserId="jay"
+          isSidebarOpen
+          error={null}
+          isRecovering={false}
+          onBack={() => undefined}
+          onCancel={async () => undefined}
+          onDeleteIssueMessage={onDeleteIssueMessage}
+          onEditIssueMessage={onEditIssueMessage}
+          onLoadAttachment={async () => new Blob()}
+          onLoadIssueMessages={async () => [rootMessage, reply]}
+          onLoadRunEvidence={async () => []}
+          onMove={async () => undefined}
+          onRetry={async () => undefined}
+          onSendIssueMessage={async () => ({
+            message: rootMessage,
+            agentReply: null,
+          })}
+          run={demoDashboard.runs[0]}
+        />,
+      );
+    });
+
+    const groupByBody = (body: string) =>
+      Array.from(
+        container.querySelectorAll<HTMLElement>(".issue-message-group"),
+      ).find((group) =>
+        group
+          .querySelector(":scope > .issue-message > div > .issue-message-body")
+          ?.textContent?.includes(body),
+      );
+    const rootGroup = groupByBody("수정 전 원문");
+    expect(rootGroup).not.toBeUndefined();
+    const editButton = rootGroup?.querySelector<HTMLButtonElement>(
+      'button[title="메시지 수정"]',
+    );
+    const deleteButton = rootGroup?.querySelector<HTMLButtonElement>(
+      'button[title="메시지 삭제"]',
+    );
+    expect(editButton).not.toBeNull();
+    expect(deleteButton).not.toBeNull();
+
+    await act(async () => editButton?.click());
+    const editComposer = rootGroup?.querySelector<HTMLElement>(
+      ".issue-inline-reply-composer .issue-message-composer textarea",
+    ) as HTMLTextAreaElement | null;
+    expect(editComposer?.value).toBe("수정 전 원문");
+    expect(editComposer?.placeholder).toBe("메시지 수정…");
+    await act(async () => {
+      if (!editComposer) return;
+      Object.getOwnPropertyDescriptor(
+        HTMLTextAreaElement.prototype,
+        "value",
+      )?.set?.call(editComposer, "수정 후 본문");
+      editComposer.dispatchEvent(new Event("input", { bubbles: true }));
+      editComposer.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          bubbles: true,
+          cancelable: true,
+          key: "Enter",
+        }),
+      );
+      await Promise.resolve();
+    });
+    expect(onEditIssueMessage).toHaveBeenCalledWith(
+      rootMessage.id,
+      expect.objectContaining({ body: "수정 후 본문" }),
+    );
+    expect(container.textContent).toContain("수정 후 본문");
+
+    const confirmSpy = vi
+      .spyOn(window, "confirm")
+      .mockImplementation(() => true);
+    await act(async () => deleteButton?.click());
+    confirmSpy.mockRestore();
+    expect(onDeleteIssueMessage).toHaveBeenCalledWith(rootMessage.id);
+    expect(container.querySelector(".issue-message-group")).toBeNull();
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("hides edit and delete actions for messages the current user did not author", async () => {
+    const createdAt = "2026-08-03T10:00:00.000Z";
+    const agentMessage: IssueMessage = {
+      id: "message-agent",
+      runId: demoDashboard.runs[0].id,
+      parentMessageId: null,
+      body: "Briar의 답변",
+      author: {
+        id: null,
+        name: "Briar · Codex",
+        image: null,
+        provider: "codex",
+      },
+      replyCount: 0,
+      createdAt,
+      updatedAt: createdAt,
+    };
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(
+        <RunPage
+          currentUserId="jay"
+          isSidebarOpen
+          error={null}
+          isRecovering={false}
+          onBack={() => undefined}
+          onCancel={async () => undefined}
+          onLoadAttachment={async () => new Blob()}
+          onLoadIssueMessages={async () => [agentMessage]}
+          onLoadRunEvidence={async () => []}
+          onMove={async () => undefined}
+          onRetry={async () => undefined}
+          onSendIssueMessage={async () => ({
+            message: agentMessage,
+            agentReply: null,
+          })}
+          run={demoDashboard.runs[0]}
+        />,
+      );
+    });
+    expect(
+      container.querySelector('button[title="메시지 수정"]'),
+    ).toBeNull();
+    expect(
+      container.querySelector('button[title="메시지 삭제"]'),
+    ).toBeNull();
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
   it("inserts @briar and places the provider reply below its comment", async () => {
     const createdAt = new Date().toISOString();
     const userMessage: IssueMessage = {

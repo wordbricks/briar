@@ -443,6 +443,10 @@ export function HuntDashboard({
   onIssueViewed,
   onRequestedRunOpen,
   onSendIssueMessage,
+  onEditIssueMessage = async () => {
+    throw new Error("메시지 수정 기능을 사용할 수 없습니다.");
+  },
+  onDeleteIssueMessage = async () => undefined,
   requestedRunId = null,
   issueListRequestKey = 0,
   processingIssueIds = new Set<string>(),
@@ -531,6 +535,15 @@ export function HuntDashboard({
       attachmentReferences?: string[];
     },
   ) => Promise<IssueMessageSendResult>;
+  onEditIssueMessage?: (
+    runId: string,
+    messageId: string,
+    input: {
+      body: string;
+      mentionedUserIds?: string[];
+    },
+  ) => Promise<IssueMessage>;
+  onDeleteIssueMessage?: (runId: string, messageId: string) => Promise<unknown>;
   requestedRunId?: string | null;
   issueListRequestKey?: number;
   processingIssueIds?: ReadonlySet<string>;
@@ -1115,6 +1128,10 @@ export function HuntDashboard({
           }
           onResume={() => onResumeRun(selected.id)}
           onSendIssueMessage={(input) => onSendIssueMessage(selected.id, input)}
+          onEditIssueMessage={(messageId, input) =>
+            onEditIssueMessage(selected.id, messageId, input)}
+          onDeleteIssueMessage={(messageId) =>
+            onDeleteIssueMessage(selected.id, messageId)}
           onUpdateIssue={(input) => onUpdateIssue(selected.id, input)}
           onUpdateIssueCheckpoints={(checkpoints) =>
             onUpdateIssueCheckpoints(selected.id, checkpoints)}
@@ -3900,6 +3917,10 @@ export function RunPage({
   onResume = async () => undefined,
   onRemoveDependency,
   onSendIssueMessage,
+  onEditIssueMessage = async () => {
+    throw new Error("메시지 수정 기능을 사용할 수 없습니다.");
+  },
+  onDeleteIssueMessage = async () => undefined,
   onUpdateIssue,
   onUpdateIssueCheckpoints,
   onUpdateIssuePreferences = async () => undefined,
@@ -3957,6 +3978,11 @@ export function RunPage({
     attachments?: File[];
     attachmentReferences?: string[];
   }) => Promise<IssueMessageSendResult>;
+  onEditIssueMessage?: (messageId: string, input: {
+    body: string;
+    mentionedUserIds?: string[];
+  }) => Promise<IssueMessage>;
+  onDeleteIssueMessage?: (messageId: string) => Promise<unknown>;
   onUpdateIssue?: (input: UpdateIssueInput) => Promise<unknown>;
   onUpdateIssueCheckpoints?: (
     checkpoints: AutoHuntWorkflowCheckpoint[],
@@ -5461,8 +5487,11 @@ export function RunPage({
                     role="tabpanel"
                   >
                     <IssueConversation
+                      currentUserId={currentUserId}
                       mentionMembers={mentionMembers}
                       onAcceptIssueAction={onAcceptIssueAction}
+                      onDelete={onDeleteIssueMessage}
+                      onEdit={onEditIssueMessage}
                       onLoadAttachment={onLoadAttachment}
                       onLoad={onLoadIssueMessages}
                       onSend={onSendIssueMessage}
@@ -5494,8 +5523,11 @@ export function RunPage({
                     tabIndex={0}
                   />
                   <IssueConversation
+                    currentUserId={currentUserId}
                     mentionMembers={mentionMembers}
                     onAcceptIssueAction={onAcceptIssueAction}
+                    onDelete={onDeleteIssueMessage}
+                    onEdit={onEditIssueMessage}
                     onLoadAttachment={onLoadAttachment}
                     onLoad={onLoadIssueMessages}
                     onSend={onSendIssueMessage}
@@ -7017,17 +7049,26 @@ function RunEvidenceImagePreview({
 }
 
 function IssueConversation({
+  currentUserId = null,
   mentionMembers,
   onAcceptIssueAction,
+  onDelete,
+  onEdit,
   onLoadAttachment,
   onLoad,
   onSend,
   run,
 }: {
+  currentUserId?: string | null;
   mentionMembers: OrganizationMember[];
   onAcceptIssueAction?: (
     proposal: IssueProposedAction,
   ) => Promise<IssueProposedAction>;
+  onDelete: (messageId: string) => Promise<unknown>;
+  onEdit: (messageId: string, input: {
+    body: string;
+    mentionedUserIds?: string[];
+  }) => Promise<IssueMessage>;
   onLoadAttachment: (attachment: IssueAttachment) => Promise<Blob>;
   onLoad: () => Promise<IssueMessage[]>;
   onSend: (input: {
@@ -7044,8 +7085,14 @@ function IssueConversation({
   const [activeReplyMessageId, setActiveReplyMessageId] = useState<
     string | null
   >(null);
+  const [activeEditMessageId, setActiveEditMessageId] = useState<
+    string | null
+  >(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [messageErrors, setMessageErrors] = useState<
+    Record<string, string | null>
+  >({});
   const [agentReplyStates, setAgentReplyStates] = useState<
     Record<string, { pending: number; error: string | null }>
   >({});
@@ -7203,6 +7250,64 @@ function IssueConversation({
     }
   };
 
+  const editMessage = async (
+    messageId: string,
+    body: string,
+    mentionedUserIds: string[],
+  ) => {
+    setMessageErrors((current) => ({ ...current, [messageId]: null }));
+    try {
+      const updated = await onEdit(messageId, { body, mentionedUserIds });
+      setMessages((current) =>
+        current.map((message) =>
+          message.id === messageId ? updated : message,
+        )
+      );
+      setActiveEditMessageId((current) =>
+        current === messageId ? null : current,
+      );
+    } catch (caught) {
+      setMessageErrors((current) => ({
+        ...current,
+        [messageId]: caught instanceof Error ? caught.message : String(caught),
+      }));
+    }
+  };
+
+  const deleteMessage = async (messageId: string) => {
+    if (!window.confirm(t("run.deleteMessageConfirm"))) return;
+    setMessageErrors((current) => ({ ...current, [messageId]: null }));
+    try {
+      await onDelete(messageId);
+      const deletedIds = new Set<string>([messageId]);
+      let changed = true;
+      while (changed) {
+        changed = false;
+        for (const message of messages) {
+          if (
+            message.parentMessageId &&
+            deletedIds.has(message.parentMessageId) &&
+            !deletedIds.has(message.id)
+          ) {
+            deletedIds.add(message.id);
+            changed = true;
+          }
+        }
+      }
+      setMessages((current) =>
+        current.filter((message) => !deletedIds.has(message.id))
+      );
+      setActiveEditMessageId((current) =>
+        current && deletedIds.has(current) ? null : current,
+      );
+    } catch (caught) {
+      setMessageErrors((current) => ({
+        ...current,
+        [messageId]: caught instanceof Error ? caught.message : String(caught),
+      }));
+    }
+  };
+
   return (
     <section className="issue-conversation" aria-label={t("run.messages")}>
       <header className="issue-conversation-header">
@@ -7232,13 +7337,17 @@ function IssueConversation({
         ) : (
           orderedMessages.map((message) => {
             const replyComposerId = `issue-reply-composer-${message.id}`;
+            const editComposerId = `issue-edit-composer-${message.id}`;
             const isReplying = activeReplyMessageId === message.id;
+            const isEditing = activeEditMessageId === message.id;
             const parentMessage = message.parentMessageId
               ? messagesById.get(message.parentMessageId) ?? null
               : null;
             return (
               <div className="issue-message-group" key={message.id}>
                 <IssueMessageItem
+                  currentUserId={currentUserId}
+                  isEditing={isEditing}
                   isReplying={isReplying}
                   localeTag={localeTag}
                   message={message}
@@ -7246,6 +7355,12 @@ function IssueConversation({
                   onAcceptIssueAction={onAcceptIssueAction && message.proposedAction
                     ? () => void acceptIssueAction(message.proposedAction!)
                     : undefined}
+                  onDelete={() => void deleteMessage(message.id)}
+                  onEdit={() =>
+                    setActiveEditMessageId((current) =>
+                      current === message.id ? null : message.id,
+                    )
+                  }
                   onLoadAttachment={onLoadAttachment}
                   onReply={() =>
                     setActiveReplyMessageId((current) =>
@@ -7254,9 +7369,11 @@ function IssueConversation({
                   }
                   parentMessage={parentMessage}
                   replyComposerId={replyComposerId}
+                  editComposerId={editComposerId}
                   actionProposalState={message.proposedAction
                     ? actionProposalStates[message.proposedAction.id]
                     : undefined}
+                  actionError={messageErrors[message.id] ?? null}
                   reworkStageLabel={message.proposedAction?.type === "request_issue_rework"
                     ? localizeWorkflowStage(
                         t,
@@ -7301,6 +7418,30 @@ function IssueConversation({
                     />
                   </div>
                 )}
+                {isEditing && (
+                  <div
+                    className="issue-inline-reply-composer"
+                    id={editComposerId}
+                  >
+                    <MessageComposer
+                      autoFocus
+                      compact
+                      disableAttachments
+                      initialBody={message.body}
+                      mentionMembers={mentionMembers}
+                      onCancel={() => setActiveEditMessageId(null)}
+                      onSubmit={async (
+                        body,
+                        mentionedUserIds,
+                        _attachments,
+                        _references,
+                      ) => {
+                        await editMessage(message.id, body, mentionedUserIds);
+                      }}
+                      placeholder={t("run.editMessagePlaceholder")}
+                    />
+                  </div>
+                )}
               </div>
             );
           })
@@ -7318,34 +7459,49 @@ function IssueConversation({
 }
 
 function IssueMessageItem({
+  currentUserId = null,
+  isEditing = false,
   isReplying = false,
   localeTag,
   message,
   mentionHandles,
   onAcceptIssueAction,
+  onDelete,
+  onEdit,
   onLoadAttachment,
   onReply,
   parentMessage = null,
   replyComposerId,
+  editComposerId,
   actionProposalState,
+  actionError,
   reworkStageLabel,
 }: {
+  currentUserId?: string | null;
+  isEditing?: boolean;
   isReplying?: boolean;
   localeTag: string;
   message: IssueMessage;
   mentionHandles: readonly string[];
   onAcceptIssueAction?: () => void;
+  onDelete?: () => void;
+  onEdit?: () => void;
   onLoadAttachment: (attachment: IssueAttachment) => Promise<Blob>;
   onReply?: () => void;
   parentMessage?: IssueMessage | null;
   replyComposerId?: string;
+  editComposerId?: string;
   actionProposalState?: { accepting: boolean; error: string | null };
+  actionError?: string | null;
   reworkStageLabel?: string | null;
 }) {
   const { t } = useI18n();
   const remarkPlugins = useMemo(
     () => [remarkGfm, remarkIssueMentions(mentionHandles)],
     [mentionHandles],
+  );
+  const canManage = Boolean(
+    currentUserId && message.author.id === currentUserId && onEdit && onDelete,
   );
   const proposal = message.proposedAction;
   const proposalTitle = proposal?.type === "request_issue_update"
@@ -7490,25 +7646,57 @@ function IssueMessageItem({
           </section>
         ) : null}
       </div>
-      {onReply && (
+      {(onReply || canManage) && (
         <div
           aria-label={t("run.replyInThread")}
           className="issue-message-actions"
           role="toolbar"
         >
-          <button
-            aria-controls={replyComposerId}
-            aria-expanded={isReplying}
-            aria-label={t("run.replyInThread")}
-            className="issue-reply-trigger"
-            onClick={onReply}
-            title={t("run.replyInThread")}
-            type="button"
-          >
-            <MessageCircle aria-hidden="true" size={16} />
-          </button>
+          {onReply ? (
+            <button
+              aria-controls={replyComposerId}
+              aria-expanded={isReplying}
+              aria-label={t("run.replyInThread")}
+              className="issue-reply-trigger"
+              onClick={onReply}
+              title={t("run.replyInThread")}
+              type="button"
+            >
+              <MessageCircle aria-hidden="true" size={16} />
+            </button>
+          ) : null}
+          {canManage ? (
+            <>
+              <button
+                aria-controls={editComposerId}
+                aria-expanded={isEditing}
+                aria-label={t("run.editMessage")}
+                className="issue-reply-trigger"
+                onClick={onEdit}
+                title={t("run.editMessage")}
+                type="button"
+              >
+                <Pencil aria-hidden="true" size={15} />
+              </button>
+              <button
+                aria-label={t("run.deleteMessage")}
+                className="issue-reply-trigger"
+                onClick={onDelete}
+                title={t("run.deleteMessage")}
+                type="button"
+              >
+                <Trash2 aria-hidden="true" size={15} />
+              </button>
+            </>
+          ) : null}
         </div>
       )}
+      {actionError ? (
+        <p className="issue-message-action-error">
+          <CircleAlert aria-hidden="true" size={14} />
+          {actionError}
+        </p>
+      ) : null}
     </article>
   );
 }
@@ -7567,6 +7755,8 @@ function MessageAvatar({ message }: { message: IssueMessage }) {
 function MessageComposer({
   autoFocus = false,
   compact = false,
+  disableAttachments = false,
+  initialBody = "",
   mentionMembers,
   onCancel,
   onSubmit,
@@ -7574,6 +7764,8 @@ function MessageComposer({
 }: {
   autoFocus?: boolean;
   compact?: boolean;
+  disableAttachments?: boolean;
+  initialBody?: string;
   mentionMembers: OrganizationMember[];
   onCancel?: () => void;
   onSubmit: (
@@ -7585,7 +7777,7 @@ function MessageComposer({
   placeholder: string;
 }) {
   const { t } = useI18n();
-  const [body, setBody] = useState("");
+  const [body, setBody] = useState(initialBody);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [caret, setCaret] = useState(0);
@@ -7593,7 +7785,18 @@ function MessageComposer({
   const [mentionDismissed, setMentionDismissed] = useState(false);
   const [selectedMentions, setSelectedMentions] = useState<
     Record<string, string>
-  >({});
+  >(() => {
+    const existing: Record<string, string> = {};
+    if (initialBody) {
+      for (const member of mentionMembers) {
+        const handle = issueMentionHandle(member);
+        if (handle && mentionsIssueHandle(initialBody, handle)) {
+          existing[member.userId] = handle;
+        }
+      }
+    }
+    return existing;
+  });
   const [attachments, setAttachments] = useState<
     Array<{ file: File; reference: string }>
   >([]);
@@ -7724,10 +7927,14 @@ function MessageComposer({
       }}
       onFocus={() => setComposerFocused(true)}
       onDragOver={(event) => {
-        if (dataTransferHasFiles(event.dataTransfer)) event.preventDefault();
+        if (!disableAttachments && dataTransferHasFiles(event.dataTransfer)) {
+          event.preventDefault();
+        }
       }}
       onDrop={(event) => {
-        if (!dataTransferHasFiles(event.dataTransfer)) return;
+        if (disableAttachments || !dataTransferHasFiles(event.dataTransfer)) {
+          return;
+        }
         event.preventDefault();
         addImages(filesFromDataTransfer(event.dataTransfer));
       }}
@@ -7826,6 +8033,7 @@ function MessageComposer({
           }
         }}
         onPaste={(event) => {
+          if (disableAttachments) return;
           const images = filesFromDataTransfer(event.clipboardData).filter(
             (file) => file.type.startsWith("image/"),
           );
@@ -7852,27 +8060,31 @@ function MessageComposer({
             <X size={17} />
           </button>
         ) : null}
-        <button
-          aria-label={t("issue.attachmentLabel")}
-          className="issue-composer-link"
-          disabled={sending || attachments.length >= maxIssueAttachmentCount}
-          onClick={() => attachmentInputRef.current?.click()}
-          type="button"
-        >
-          <Paperclip size={18} />
-        </button>
-        <input
-          accept="image/*"
-          className="issue-composer-file-input"
-          disabled={sending || attachments.length >= maxIssueAttachmentCount}
-          multiple
-          onChange={(event) => {
-            addImages(Array.from(event.currentTarget.files ?? []));
-            event.currentTarget.value = "";
-          }}
-          ref={attachmentInputRef}
-          type="file"
-        />
+        {!disableAttachments ? (
+          <>
+            <button
+              aria-label={t("issue.attachmentLabel")}
+              className="issue-composer-link"
+              disabled={sending || attachments.length >= maxIssueAttachmentCount}
+              onClick={() => attachmentInputRef.current?.click()}
+              type="button"
+            >
+              <Paperclip size={18} />
+            </button>
+            <input
+              accept="image/*"
+              className="issue-composer-file-input"
+              disabled={sending || attachments.length >= maxIssueAttachmentCount}
+              multiple
+              onChange={(event) => {
+                addImages(Array.from(event.currentTarget.files ?? []));
+                event.currentTarget.value = "";
+              }}
+              ref={attachmentInputRef}
+              type="file"
+            />
+          </>
+        ) : null}
         <button
           aria-label={sending ? t("run.sendingMessage") : t("run.sendMessage")}
           className="issue-message-send"

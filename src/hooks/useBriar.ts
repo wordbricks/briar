@@ -17,10 +17,12 @@ import {
   createProject,
   deleteAccount as deleteRemoteAccount,
   deleteIssue as deleteRemoteIssue,
+  deleteIssueMessage,
   transferIssue as transferRemoteIssue,
   deleteProject as deleteRemoteProject,
   dispatchHuntRun,
   unassignHuntRun,
+  editIssueMessage,
   errorWithMessage,
   importLinearIssues,
   isApiErrorStatus,
@@ -2760,6 +2762,115 @@ export function useBriar(options: UseBriarOptions = {}) {
     [activeProjectId, token],
   );
 
+  const updateIssueMessage = useCallback(
+    async (
+      runId: string,
+      messageId: string,
+      input: {
+        body: string;
+        mentionedUserIds?: string[];
+      },
+    ): Promise<IssueMessage> => {
+      const body = input.body.trim();
+      if (!body) {
+        throw new Error("메시지 내용을 입력해 주세요.");
+      }
+      if (!activeProjectId) throw new Error("수정할 프로젝트가 없습니다.");
+      if (demoMode) {
+        const updatedAt = new Date().toISOString();
+        const message = {
+          ...(issueMessagesByRun.current[runId] ?? []).find(
+            (candidate) => candidate.id === messageId,
+          ),
+          body,
+          updatedAt,
+        } as IssueMessage;
+        issueMessagesByRun.current = {
+          ...issueMessagesByRun.current,
+          [runId]: (issueMessagesByRun.current[runId] ?? []).map((candidate) =>
+            candidate.id === messageId ? message : candidate,
+          ),
+        };
+        return message;
+      }
+      if (!token) throw new Error("메시지를 수정하려면 로그인이 필요합니다.");
+      const updated = await editIssueMessage(
+        token,
+        activeProjectId,
+        runId,
+        messageId,
+        {
+          body,
+          mentionedUserIds: input.mentionedUserIds,
+        },
+      );
+      issueMessagesByRun.current = {
+        ...issueMessagesByRun.current,
+        [runId]: (issueMessagesByRun.current[runId] ?? []).map((candidate) =>
+          candidate.id === messageId ? updated : candidate,
+        ),
+      };
+      return updated;
+    },
+    [activeProjectId, demoMode, token],
+  );
+
+  const removeIssueMessage = useCallback(
+    async (runId: string, messageId: string) => {
+      if (!activeProjectId) throw new Error("삭제할 프로젝트가 없습니다.");
+      if (demoMode) {
+        const deletedIds = new Set<string>([messageId]);
+        const currentMessages = issueMessagesByRun.current[runId] ?? [];
+        let changed = true;
+        while (changed) {
+          changed = false;
+          for (const candidate of currentMessages) {
+            if (
+              candidate.parentMessageId &&
+              deletedIds.has(candidate.parentMessageId) &&
+              !deletedIds.has(candidate.id)
+            ) {
+              deletedIds.add(candidate.id);
+              changed = true;
+            }
+          }
+        }
+        issueMessagesByRun.current = {
+          ...issueMessagesByRun.current,
+          [runId]: currentMessages.filter(
+            (candidate) => !deletedIds.has(candidate.id),
+          ),
+        };
+        return;
+      }
+      if (!token) throw new Error("메시지를 삭제하려면 로그인이 필요합니다.");
+      await deleteIssueMessage(token, activeProjectId, runId, messageId);
+      const deletedIds = new Set<string>([messageId]);
+      const currentMessages = issueMessagesByRun.current[runId] ?? [];
+      let changed = true;
+      while (changed) {
+        changed = false;
+        for (const candidate of currentMessages) {
+          if (
+            candidate.parentMessageId &&
+            deletedIds.has(candidate.parentMessageId) &&
+            !deletedIds.has(candidate.id)
+          ) {
+            deletedIds.add(candidate.id);
+            changed = true;
+          }
+        }
+      }
+      issueMessagesByRun.current = {
+        ...issueMessagesByRun.current,
+        [runId]: currentMessages.filter(
+          (candidate) => !deletedIds.has(candidate.id),
+        ),
+      };
+    },
+    [activeProjectId, demoMode, token],
+  );
+
   const acceptConversationIssueAction = useCallback(
     async (runId: string, proposal: IssueProposedAction) => {
       if (!activeProjectId || !dashboard) {
@@ -3336,6 +3447,8 @@ export function useBriar(options: UseBriarOptions = {}) {
     readRunEvidence,
     readRunEvidenceImage,
     addIssueMessage,
+    updateIssueMessage,
+    removeIssueMessage,
     acceptConversationIssueAction,
     setActiveOrganizationId: selectOrganization,
     setActiveProjectId: selectProject,

@@ -1938,6 +1938,37 @@ export async function createIssueMessage(
   return result;
 }
 
+export async function editIssueMessage(
+  token: string,
+  projectId: string,
+  runId: string,
+  messageId: string,
+  input: {
+    body: string;
+    mentionedUserIds?: string[];
+  },
+) {
+  const result = await request<{ message: IssueMessage }>(
+    `/projects/${projectId}/runs/${runId}/messages/${messageId}`,
+    token,
+    { method: "PATCH", body: JSON.stringify(input) },
+  );
+  return result.message;
+}
+
+export async function deleteIssueMessage(
+  token: string,
+  projectId: string,
+  runId: string,
+  messageId: string,
+) {
+  await request<null>(
+    `/projects/${projectId}/runs/${runId}/messages/${messageId}`,
+    token,
+    { method: "DELETE" },
+  );
+}
+
 export async function waitForIssueAgentReply(
   token: string,
   projectId: string,
