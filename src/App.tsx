@@ -432,6 +432,9 @@ export function App() {
     null,
   );
   const [isIssueDialogOpen, setIsIssueDialogOpen] = useState(false);
+  const [createIssueProjectId, setCreateIssueProjectId] = useState<string | null>(
+    null,
+  );
   const [quickStartingRunId, setQuickStartingRunId] = useState<string | null>(
     null,
   );
@@ -950,6 +953,7 @@ export function App() {
             setRequestedRunId(null);
             setRequestedSessionId(null);
             resetNavigation("issues");
+            setCreateIssueProjectId(null);
             setIsIssueDialogOpen(true);
           } finally {
             setAcceptingInvitation(false);
@@ -1088,7 +1092,8 @@ export function App() {
               setIssueListRequestKey((key) => key + 1);
               navigateToPage("issues");
             }}
-            onCreateIssue={() => {
+            onCreateIssue={(projectId) => {
+              setCreateIssueProjectId(projectId);
               navigateToPage("issues");
               setIsIssueDialogOpen(true);
             }}
@@ -1385,6 +1390,7 @@ export function App() {
             error={quickProcessError ?? briar.error}
             isCreatingIssue={briar.isCreatingIssue}
             isIssueDialogOpen={isIssueDialogOpen}
+            createIssueDefaultProjectId={createIssueProjectId}
             deletingIssueId={briar.deletingIssueId}
             updatingIssueId={briar.updatingIssueId}
             noProject={!activeProject}
@@ -1395,7 +1401,10 @@ export function App() {
             isSidebarOpen={isSidebarOpen}
             onAddProject={briar.startProjectCreation}
             onCreateIssue={briar.addIssue}
-            onIssueDialogOpenChange={setIsIssueDialogOpen}
+            onIssueDialogOpenChange={(isOpen) => {
+              if (!isOpen) setCreateIssueProjectId(null);
+              setIsIssueDialogOpen(isOpen);
+            }}
             onIssueViewed={markInboxIssueRead}
             onDeleteIssue={briar.deleteIssue}
             onTransferIssue={briar.transferIssue}
@@ -1814,7 +1823,10 @@ export function App() {
               setCompanionPage("issues");
             }}
             onCreateIssue={briar.addIssue}
-            onIssueDialogOpenChange={setIsIssueDialogOpen}
+            onIssueDialogOpenChange={(isOpen) => {
+              if (!isOpen) setCreateIssueProjectId(null);
+              setIsIssueDialogOpen(isOpen);
+            }}
             onIssueViewed={markInboxIssueRead}
             onDeleteIssue={briar.deleteIssue}
             onTransferIssue={briar.transferIssue}

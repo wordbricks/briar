@@ -394,6 +394,7 @@ export function HuntDashboard({
   companionStatus,
   companionUnreadInboxCount = 0,
   currentUserId = null,
+  createIssueDefaultProjectId,
   dashboard,
   error,
   isCreatingIssue,
@@ -448,6 +449,7 @@ export function HuntDashboard({
   companionStatus?: CompanionStatusFilter;
   companionUnreadInboxCount?: number;
   currentUserId?: string | null;
+  createIssueDefaultProjectId?: string | null;
   dashboard: DashboardPayload | null;
   error: string | null;
   isCreatingIssue: boolean;
@@ -979,7 +981,9 @@ export function HuntDashboard({
     <CreateIssueDialog
       availableProviders={availableProviders}
       compactHeader={companionMode}
-      defaultProjectId={dashboard?.project.id}
+      defaultProjectId={
+        createIssueDefaultProjectId ?? dashboard?.project.id
+      }
       isSubmitting={isCreatingIssue}
       onClose={() => setIsIssueDialogOpen(false)}
       onCreate={async (projectId, input) => {
