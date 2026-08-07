@@ -46,7 +46,6 @@ import * as ContextMenu from "@radix-ui/react-context-menu";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import {
   EmptyState,
-  ErrorBanner,
   MainContent,
   PageHeader,
 } from "@/components/layout";
@@ -549,6 +548,7 @@ export function HuntDashboard({
   token?: string | null;
 }) {
   const { t } = useI18n();
+  const { toast } = useToast();
   const [query, setQuery] = useState("");
   const [source, setSource] = useState<SourceFilter>("all");
   const [isSourceFilterOpen, setIsSourceFilterOpen] = useState(false);
@@ -733,6 +733,11 @@ export function HuntDashboard({
   const runs = dashboard?.runs ?? [];
   const issuesLoading = dashboard === null && !noProject && !error && !recoveryError;
   const selected = runs.find((run) => run.id === selectedRunId) ?? null;
+  const displayedError = error ?? recoveryError;
+  useEffect(() => {
+    if (selected || !displayedError) return;
+    toast(displayedError, { tone: "error" });
+  }, [displayedError, selected, toast]);
   const selectedInboxVersion = selected
     ? inboxIssueMessageVersion(selected)
     : null;
@@ -1072,7 +1077,7 @@ export function HuntDashboard({
           companionMode={companionMode}
           issueKeyPrefix={dashboard?.project.issueKeyPrefix}
           currentUserId={currentUserId}
-          error={recoveryError}
+          error={displayedError}
           isDeletingIssue={deletingIssueId === selected.id}
           isRecovering={recoveringRunId === selected.id}
           isUpdatingIssue={updatingIssueId === selected.id}
@@ -1232,11 +1237,6 @@ export function HuntDashboard({
         />
       ) : null}
       <div className="dashboard-scroll">
-        {error || recoveryError ? (
-          <ErrorBanner className="error-banner" icon={<CircleAlert size={16} />}>
-            {error ?? recoveryError}
-          </ErrorBanner>
-        ) : null}
         {companionMode ? (
           <div className="queue-header">
             <div className="queue-heading">
@@ -4428,6 +4428,10 @@ export function RunPage({
     (member) => member.userId === run.assigneeUserId,
   ) ?? null;
   const { toast } = useToast();
+  useEffect(() => {
+    if (!error) return;
+    toast(error, { tone: "error" });
+  }, [error, toast]);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -5982,7 +5986,6 @@ export function RunPage({
                     </span>
                     {isRecovering && <LoaderCircle className="spin" size={14} />}
                   </label>
-                  {error && <p className="run-status-error"><CircleAlert size={13} />{error}</p>}
                   <div
                     aria-label={`${t("issue.priority")}: ${priorityLabel}`}
                     className="run-property"
