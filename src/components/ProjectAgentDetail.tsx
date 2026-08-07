@@ -34,6 +34,7 @@ import type {
   HuntRun,
   ProjectAgent,
 } from "../types";
+import { NativeSelect } from "./NativeSelect";
 import { ProjectAgentSessionDetail } from "./ProjectAgentSessionDetail";
 import { ProjectAgentSessions } from "./ProjectAgentSessions";
 
@@ -51,7 +52,7 @@ export function ProjectAgentDetail({
   onBack,
   onIssueOpen,
   onRequestedSessionOpen,
-  onRunResponsibility,
+  onStartRemoteTask,
   onSettleTaskSession,
   onStopSession,
   onStartAutoHunt,
@@ -70,6 +71,10 @@ export function ProjectAgentDetail({
   onIssueOpen: (runId: string) => void;
   onRequestedSessionOpen?: () => void;
   onRunResponsibility?: () => void | Promise<void>;
+  onStartRemoteTask?: (input: {
+    request: string;
+    workerId: string;
+  }) => string | Promise<string>;
   onSettleTaskSession: (
     sessionId: string,
     settlement: ProjectAgentTaskSessionSettlement,
@@ -99,6 +104,13 @@ export function ProjectAgentDetail({
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(
     requestedSessionId,
   );
+  const availableWorkers = (dashboard?.workers ?? []).filter(
+    (worker) =>
+      (worker.providers ?? [worker.agentProvider]).includes(agent.provider) &&
+      worker.acceptingWork &&
+      worker.readiness === "available",
+  );
+  const [selectedWorkerId, setSelectedWorkerId] = useState("");
   const selectedSession =
     sessions.find(
       (session) =>
@@ -142,6 +154,14 @@ export function ProjectAgentDetail({
   ]);
 
   useEffect(() => {
+    if (!companionMode) return;
+    if (availableWorkers.some((worker) => worker.id === selectedWorkerId)) {
+      return;
+    }
+    setSelectedWorkerId(availableWorkers[0]?.id ?? "");
+  }, [availableWorkers, companionMode, selectedWorkerId]);
+
+  useEffect(() => {
     if (selectedSession) setIsTaskDialogOpen(false);
   }, [selectedSession]);
 
@@ -162,10 +182,6 @@ export function ProjectAgentDetail({
   ]);
 
   const openTaskDialog = () => {
-    if (companionMode) {
-      void onRunResponsibility?.();
-      return;
-    }
     setRequest(agent.responsibility);
     setError(null);
     setIsTaskDialogOpen(true);
@@ -177,6 +193,18 @@ export function ProjectAgentDetail({
     setError(null);
     setIsRunning(true);
     try {
+      if (companionMode) {
+        if (!onStartRemoteTask || !selectedWorkerId) {
+          throw new Error("실행할 수 있는 Worker를 선택해 주세요.");
+        }
+        const sessionId = await onStartRemoteTask({
+          request: message,
+          workerId: selectedWorkerId,
+        });
+        setSelectedSessionId(sessionId);
+        setIsTaskDialogOpen(false);
+        return;
+      }
       const sessionId = crypto.randomUUID();
       setSelectedSessionId(sessionId);
       await executeProjectAgentTask(
@@ -220,7 +248,11 @@ export function ProjectAgentDetail({
         action={
           <Button
             className="project-agent-create project-agent-run-task"
-            disabled={isResponsibilityRunning || !dashboard}
+            disabled={
+              isResponsibilityRunning ||
+              !dashboard ||
+              (companionMode && availableWorkers.length === 0)
+            }
             onClick={openTaskDialog}
             type="button"
           >
@@ -270,59 +302,81 @@ export function ProjectAgentDetail({
         />
       </div>
 
-      {!companionMode ? (
-        <Dialog
-          onOpenChange={(open) => {
-            if (!isRunning) setIsTaskDialogOpen(open);
-          }}
-          open={isTaskDialogOpen}
-        >
-          <DialogContent className="project-agent-task-dialog">
-            <DialogHeader>
-              <DialogTitle>{t("agents.taskTitle")}</DialogTitle>
-              <DialogDescription>
-                {t("agents.taskDescription")}
-              </DialogDescription>
-            </DialogHeader>
+      <Dialog
+        onOpenChange={(open) => {
+          if (!isRunning) setIsTaskDialogOpen(open);
+        }}
+        open={isTaskDialogOpen}
+      >
+        <DialogContent className="project-agent-task-dialog">
+          <DialogHeader>
+            <DialogTitle>{t("agents.taskTitle")}</DialogTitle>
+            <DialogDescription>
+              {t("agents.taskDescription")}
+            </DialogDescription>
+          </DialogHeader>
 
-            {error ? <ErrorBanner>{error}</ErrorBanner> : null}
+          {error ? <ErrorBanner>{error}</ErrorBanner> : null}
 
-            <form
-              className="project-agent-run-composer"
-              id="project-agent-task-form"
-              onSubmit={(event) => {
-                event.preventDefault();
-                void submit();
-              }}
-            >
-              <Textarea
-                aria-label={t("agents.taskInput")}
-                disabled={isRunning}
-                onChange={(event) => setRequest(event.target.value)}
-                placeholder={t("agents.taskPlaceholder")}
-                value={request}
+          {companionMode ? (
+            <label className="project-agent-run-worker-select">
+              <span>실행 호스트</span>
+              <NativeSelect
+                disabled={isRunning || availableWorkers.length === 0}
+                label="실행 호스트"
+                onValueChange={setSelectedWorkerId}
+                options={availableWorkers.map((worker) => ({
+                  label: `${worker.icon?.type === "emoji" ? `${worker.icon.value} ` : ""}${worker.label}`,
+                  value: worker.id,
+                }))}
+                placeholder="Worker 선택"
+                value={selectedWorkerId}
               />
-            </form>
+            </label>
+          ) : null}
 
-            <DialogFooter>
-              <Button
-                disabled={
-                  isRunning || request.trim().length === 0 || !dashboard
-                }
-                form="project-agent-task-form"
-                type="submit"
-              >
-                {isRunning ? (
-                  <LoaderCircle className="spin" size={16} />
-                ) : (
-                  <Play size={16} />
-                )}
-                {isRunning ? t("agents.running") : t("agents.runTask")}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      ) : null}
+          {companionMode && availableWorkers.length === 0 ? (
+            <ErrorBanner>이 Agent를 실행할 수 있는 사용 가능한 Worker가 없습니다.</ErrorBanner>
+          ) : null}
+
+          <form
+            className="project-agent-run-composer"
+            id="project-agent-task-form"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void submit();
+            }}
+          >
+            <Textarea
+              aria-label={t("agents.taskInput")}
+              disabled={isRunning}
+              onChange={(event) => setRequest(event.target.value)}
+              placeholder={t("agents.taskPlaceholder")}
+              value={request}
+            />
+          </form>
+
+          <DialogFooter>
+            <Button
+              disabled={
+                isRunning ||
+                request.trim().length === 0 ||
+                !dashboard ||
+                (companionMode && !selectedWorkerId)
+              }
+              form="project-agent-task-form"
+              type="submit"
+            >
+              {isRunning ? (
+                <LoaderCircle className="spin" size={16} />
+              ) : (
+                <Play size={16} />
+              )}
+              {isRunning ? t("agents.running") : t("agents.runTask")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </MainContent>
   );
 }

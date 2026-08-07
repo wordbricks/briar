@@ -48,8 +48,9 @@ export function ProjectAgentSessionDetail({
   token?: string | null;
 }) {
   const { localeTag, t } = useI18n();
+  const isRemoteSession = session.localOwner === false;
   const appServerEvents = useAutoHuntAppServerEvents(
-    session.sessionType === "task" ? session.id : null,
+    !isRemoteSession && session.sessionType === "task" ? session.id : null,
   );
   const workerEvents = useProjectAgentWorkerEvents(
     token,
@@ -59,9 +60,11 @@ export function ProjectAgentSessionDetail({
       : [],
     session.status === "running",
   );
-  const executionEvents = session.sessionType === "task"
-    ? appServerEvents
-    : workerEvents;
+  const executionEvents = isRemoteSession
+    ? { events: [], isLoading: false, error: null }
+    : session.sessionType === "task"
+      ? appServerEvents
+      : workerEvents;
   const agentMessages = useMemo(
     () => agentMessagesFromAppServerEvents(executionEvents.events),
     [executionEvents.events],
@@ -223,7 +226,7 @@ export function ProjectAgentSessionDetail({
               <Download aria-hidden="true" />
               {t("agents.exportSessionLog")}
             </Button>
-            {session.status === "running" ? (
+            {session.status === "running" && session.localOwner !== false ? (
               <Button
                 aria-label={t("agents.stopSession")}
                 className="auto-hunt-session-stop"
@@ -436,6 +439,14 @@ export function ProjectAgentSessionDetail({
                       )}
                     </dd>
                   </div>
+                  {session.requestedWorkerId || session.workerId ? (
+                    <div>
+                      <dt>실행 Worker</dt>
+                      <dd title={session.workerId ?? session.requestedWorkerId ?? undefined}>
+                        {session.workerId ?? session.requestedWorkerId}
+                      </dd>
+                    </div>
+                  ) : null}
                   <div>
                     <dt>{t("agents.messageCount")}</dt>
                     <dd>

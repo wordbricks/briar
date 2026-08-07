@@ -157,6 +157,7 @@ describe("detached execution workers", () => {
       "migrations/0067_issue_checkpoints.sql",
       "migrations/0068_issue_action_proposals.sql",
       "migrations/0076_execution_worker_updates.sql",
+      "migrations/0077_project_agent_task_jobs.sql",
     ]) {
       await executeSql(db, await readFile(resolve(migration), "utf8"));
     }
@@ -228,6 +229,7 @@ describe("detached execution workers", () => {
        delete from briar_project_execution_worker_policies;
        delete from briar_execution_worker_update_requests;
        delete from briar_execution_worker_credentials;
+       delete from briar_project_agent_task_jobs;
        delete from briar_execution_workers;
        delete from briar_execution_worker_devices;
        insert into briar_organization_members (

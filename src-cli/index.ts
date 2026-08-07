@@ -34,6 +34,7 @@ import {
   detachedAgentPrompt,
   detachedChannelReplyPrompt,
   detachedIssueReplyPrompt,
+  detachedProjectAgentPrompt,
   detachedPayloadDirection,
   detachedProviderBlockedRunEvent,
   detachedProviderBlockFromPayload,
@@ -1947,6 +1948,31 @@ const claimedRunSchema = queuedIssueSchema.extend({
     .nullable(),
 });
 
+const claimedProjectAgentTaskSchema = z.object({
+  workType: z.literal("projectAgentTask"),
+  workId: z.string().uuid(),
+  runId: z.string().uuid(),
+  sourceKey: z.string().min(1),
+  title: z.string().min(1),
+  claimToken: z.string().startsWith("briar_agent_task_claim_"),
+  claimedAt: z.string().datetime({ offset: true }),
+  leaseExpiresAt: z.string().datetime({ offset: true }),
+  request: z.string().min(1),
+  agent: z.object({
+    id: z.string().uuid(),
+    name: z.string().min(1),
+    provider: z.enum(["codex", "claude", "grok", "opencode"]),
+    model: z.string().nullable(),
+    effort: z
+      .enum(["low", "medium", "high", "xhigh", "max", "ultra"])
+      .nullable(),
+    responsibility: z.string(),
+    skill: z.string(),
+  }),
+});
+
+type ClaimedProjectAgentTask = z.infer<typeof claimedProjectAgentTaskSchema>;
+
 const claimedIssueReplySchema = z.object({
   workType: z.literal("issueReply"),
   workId: z.string().uuid(),
@@ -2432,6 +2458,181 @@ async function runClaimedIssueInRuntime(
       }
     }
   }
+}
+
+async function runClaimedProjectAgentTask(
+  config: Config,
+  project: ProjectConfig,
+  task: ClaimedProjectAgentTask,
+  workerToken: string,
+  workerId: string,
+  signal: AbortSignal,
+) {
+  const provider = task.agent.provider;
+  const binaryName = provider === "claude" ? "claude" : provider;
+  const agentBinary = Bun.which(binaryName);
+  if (!agentBinary) {
+    throw new Error(`${binaryName} coding agent is not installed on this Worker`);
+  }
+  const workspacePath = project.repositoryPath;
+  const prompt = detachedProjectAgentPrompt({
+    agent: task.agent,
+    request: task.request,
+    workspacePath,
+  });
+  const launch = detachedProviderRequest({
+    agent: task.agent,
+    prompt,
+    workspacePath,
+    fullAccess: project.autoHunt?.sandbox?.fullAccess ?? true,
+    agentBinary,
+  });
+  let command = agentBinary;
+  let commandArgs = launch.arguments;
+  if (launch.kind === "runner") {
+    const runnerPath = (
+      await Promise.all(
+        [
+          resolve(import.meta.dir, `agent/${provider}-runner.js`),
+          resolve(import.meta.dir, `../dist-agent/${provider}-runner.js`),
+        ].map(async (path) => ((await Bun.file(path).exists()) ? path : null)),
+      )
+    ).find((path): path is string => Boolean(path));
+    if (!runnerPath) {
+      throw new Error(
+        `${provider} runner bundle is missing; run \`bun run agent:build\``,
+      );
+    }
+    command = process.execPath;
+    commandArgs = [runnerPath];
+  }
+
+  const child = spawn(command, commandArgs, {
+    cwd: workspacePath,
+    env: {
+      ...process.env,
+      PATH: workerExecutionPath(),
+      BRIAR_CLI: workerCliPath(),
+      BRIAR_WORKER_TOKEN: workerToken,
+      BRIAR_PROJECT_ID: project.id,
+    },
+    stdio: ["pipe", "pipe", "pipe"],
+  });
+  const exitPromise = new Promise<number | null>((resolveExit, rejectExit) => {
+    child.once("error", rejectExit);
+    child.once("close", resolveExit);
+  });
+  let stderr = "";
+  let resultText: string | null = null;
+  let runnerError: string | null = null;
+  const terminate = () => {
+    if (child.exitCode !== null || child.killed) return;
+    child.kill("SIGTERM");
+    setTimeout(() => {
+      if (child.exitCode === null) child.kill("SIGKILL");
+    }, 5_000).unref();
+  };
+  signal.addEventListener("abort", terminate, { once: true });
+  child.stderr.setEncoding("utf8");
+  child.stderr.on("data", (chunk: string) => {
+    stderr = `${stderr}${chunk}`.slice(-8_000);
+  });
+  if (launch.request) child.stdin.write(`${JSON.stringify(launch.request)}\n`);
+  else child.stdin.end();
+
+  try {
+    const lines = createInterface({ input: child.stdout, crlfDelay: Infinity });
+    for await (const line of lines) {
+      if (!line.trim()) continue;
+      let payload: unknown = line;
+      try {
+        payload = JSON.parse(line);
+      } catch {
+        // Plain provider output remains a valid final summary fallback.
+      }
+      const candidate = issueReplyTextFromPayload(payload);
+      if (candidate) resultText = candidate;
+      if (
+        launch.request &&
+        payload &&
+        typeof payload === "object" &&
+        "type" in payload &&
+        (payload as { type?: string }).type === "approval" &&
+        "id" in payload &&
+        typeof payload.id === "string"
+      ) {
+        child.stdin.write(
+          `${JSON.stringify({ type: "approvalResponse", id: payload.id, approved: true })}\n`,
+        );
+      }
+      if (
+        payload &&
+        typeof payload === "object" &&
+        "type" in payload &&
+        (payload as { type?: string }).type === "error"
+      ) {
+        runnerError = String(
+          (payload as { message?: unknown }).message ?? "Agent failed",
+        );
+      }
+    }
+    const exitCode = await exitPromise;
+    if (signal.aborted) {
+      throw signal.reason instanceof Error
+        ? signal.reason
+        : new Error("Worker execution was cancelled");
+    }
+    if (exitCode !== 0 || runnerError) {
+      throw new Error(
+        runnerError ?? (stderr.trim() || `Agent exited with ${exitCode}`),
+      );
+    }
+    if (!resultText) throw new Error("Agent returned an empty direct-run summary");
+    await request(
+      config.apiUrl,
+      `/agent-task-claims/${task.workId}/complete`,
+      workerToken,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          projectId: project.id,
+          workerId,
+          claimToken: task.claimToken,
+          summary: resultText.slice(0, 50_000),
+          conversationId: null,
+        }),
+      },
+    );
+  } finally {
+    signal.removeEventListener("abort", terminate);
+    terminate();
+    await exitPromise.catch(() => null);
+  }
+}
+
+async function failClaimedProjectAgentTask(
+  config: Config,
+  project: ProjectConfig,
+  task: ClaimedProjectAgentTask,
+  workerToken: string,
+  error: unknown,
+) {
+  const workerId = project.executionWorker?.workerId;
+  if (!workerId) throw error;
+  await request(
+    config.apiUrl,
+    `/agent-task-claims/${task.workId}/complete`,
+    workerToken,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        projectId: project.id,
+        workerId,
+        claimToken: task.claimToken,
+        error: error instanceof Error ? error.message : String(error),
+      }),
+    },
+  );
 }
 
 async function runClaimedIssueReply(
@@ -3223,6 +3424,21 @@ async function workerCommand() {
         if (replyClaim.work !== null) {
           return claimedIssueReplySchema.parse(replyClaim.work);
         }
+        const taskClaim = await request<{ work: unknown }>(
+          config.apiUrl,
+          "/agent-task-claims",
+          workerToken,
+          {
+            method: "POST",
+            body: JSON.stringify({
+              workerId,
+              projectId: project.id,
+            }),
+          },
+        );
+        if (taskClaim.work !== null) {
+          return claimedProjectAgentTaskSchema.parse(taskClaim.work);
+        }
         if (registered.organizationId) {
           const channelClaim = await request<{ work: unknown }>(
             config.apiUrl,
@@ -3258,6 +3474,23 @@ async function workerCommand() {
           : claimedRunSchema.parse(claimed.work);
       },
       renewLease: async (issue) => {
+        if (issue.workType === "projectAgentTask") {
+          const task = claimedProjectAgentTaskSchema.parse(issue);
+          await request(
+            config.apiUrl,
+            `/agent-task-claims/${task.workId}/lease`,
+            workerToken,
+            {
+              method: "POST",
+              body: JSON.stringify({
+                projectId: project.id,
+                workerId,
+                claimToken: task.claimToken,
+              }),
+            },
+          );
+          return;
+        }
         if (issue.workType === "channelReply") {
           const reply = claimedChannelReplySchema.parse(issue);
           await request(
@@ -3474,6 +3707,28 @@ async function workerCommand() {
         };
       },
       runIssue: async (issue, signal) => {
+        if (issue.workType === "projectAgentTask") {
+          const task = claimedProjectAgentTaskSchema.parse(issue);
+          try {
+            await runClaimedProjectAgentTask(
+              config,
+              project,
+              task,
+              workerToken,
+              workerId,
+              signal,
+            );
+          } catch (error) {
+            await failClaimedProjectAgentTask(
+              config,
+              project,
+              task,
+              workerToken,
+              error,
+            );
+          }
+          return;
+        }
         if (issue.workType === "channelReply") {
           const reply = claimedChannelReplySchema.parse(issue);
           try {

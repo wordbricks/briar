@@ -90,6 +90,7 @@ import {
   attemptGithubMergeAutoResume,
   claimGithubDelivery,
   claimNextIssueAgentReply,
+  claimNextProjectAgentTask,
   claimDueProjectAgentScheduleRun,
   claimNextQueuedHuntRun,
   completeIssueAgentReply,
@@ -111,6 +112,7 @@ import {
   createOrganization,
   createOrganizationInvitation,
   createProjectAgent,
+  createProjectAgentTaskJob,
   createProjectAgentSchedule,
   createProject,
   createSlackOAuthState,
@@ -146,6 +148,10 @@ import {
   isOrganizationHandleAvailable,
   getProject,
   getProjectSettings,
+  getProjectAgentSession,
+  getProjectAgentTaskJob,
+  getProjectAgentTaskJobByRequest,
+  getClaimedProjectAgentTask,
   getDashboardSyncCursor,
   getHuntRunForProject,
   HuntClaimError,
@@ -195,6 +201,9 @@ import {
   revokeOrganizationInvitation,
   renewProjectAgentScheduleRunLease,
   renewIssueAgentReplyLease,
+  renewProjectAgentTaskLease,
+  completeProjectAgentTask,
+  reapProjectAgentTaskJobs,
   acceptIssueCreateProposal,
   acceptIssueUpdateProposal,
   acceptIssueReworkProposal,
@@ -238,6 +247,7 @@ import {
   type IssueDependencyRow,
   type ProjectRow,
   type ProjectAgentRow,
+  type ProjectAgentSessionRow,
   type ProjectAgentScheduleRunRow,
   type ProjectAgentScheduleRow,
   type ProjectSettingsRow,
@@ -305,6 +315,7 @@ import {
   listOrganizationExecutionWorkers,
   pendingExecutionWorkerUpdate,
   getProjectExecutionWorkerPolicy,
+  isExecutionWorkerAllowedForProject,
   MAX_WORKER_CONCURRENT_SESSIONS,
   MAX_TRANSCRIPT_EVENTS_PER_REQUEST,
   WORKER_STALE_AFTER_MS,
@@ -871,10 +882,50 @@ export const projectAgentSessionInputSchema = z
     conversationId: z.string().max(128).nullable(),
     summary: z.string().max(50_000).nullable(),
     error: z.string().max(20_000).nullable(),
+    requestedWorkerId: z.string().max(128).nullable().optional(),
+    workerId: z.string().max(128).nullable().optional(),
     events: z.array(projectAgentSessionEventSchema).max(200),
     updatedAt: z.string().datetime({ offset: true }),
   })
   .strict();
+
+const projectAgentTaskInputSchema = z
+  .object({
+    agentId: z.string().uuid(),
+    request: z.string().trim().min(1).max(50_000),
+    workerId: z.string().trim().min(1).max(128),
+    requestId: z.string().uuid(),
+  })
+  .strict();
+
+const projectAgentTaskClaimInputSchema = z
+  .object({
+    projectId: z.string().uuid(),
+    workerId: z.string().trim().min(1).max(128),
+  })
+  .strict();
+
+const projectAgentTaskLeaseSchema = z
+  .object({
+    projectId: z.string().uuid(),
+    workerId: z.string().trim().min(1).max(128),
+    claimToken: z.string().startsWith("briar_agent_task_claim_"),
+  })
+  .strict();
+
+const projectAgentTaskCompletionSchema = z
+  .object({
+    projectId: z.string().uuid(),
+    workerId: z.string().trim().min(1).max(128),
+    claimToken: z.string().startsWith("briar_agent_task_claim_"),
+    summary: z.string().trim().min(1).max(50_000).optional(),
+    conversationId: z.string().trim().max(128).nullable().optional(),
+    error: z.string().trim().min(1).max(20_000).optional(),
+  })
+  .strict()
+  .refine((input) => Boolean(input.summary) !== Boolean(input.error), {
+    message: "Provide exactly one of summary or error",
+  });
 export const projectAgentScheduleInputSchema = z
   .object({
     agentId: z.string().uuid(),
@@ -2822,6 +2873,78 @@ const projectAgentSessionJson = (row: {
   dispatchEvents: [],
   workers: [],
 });
+
+const projectAgentTaskSessionEvent = (
+  type: "started" | "completed" | "failed",
+  occurredAt: string,
+) => ({
+  id: crypto.randomUUID(),
+  type,
+  occurredAt,
+});
+
+async function syncProjectAgentTaskSession(
+  db: D1Database,
+  job: {
+    id: string;
+    project_id: string;
+    agent_id: string;
+    status: "queued" | "running" | "completed" | "failed";
+    claimed_worker_id: string | null;
+    preferred_worker_id: string;
+    updated_at: string;
+    completed_at: string | null;
+    error: string | null;
+  },
+  input: {
+    summary?: string | null;
+    conversationId?: string | null;
+    error?: string | null;
+  } = {},
+) {
+  const current = await getProjectAgentSession(db, job.project_id, job.id);
+  if (!current) return null;
+  let payload: Record<string, unknown>;
+  try {
+    payload = JSON.parse(current.payload_json) as Record<string, unknown>;
+  } catch {
+    payload = {};
+  }
+  const currentEvents = Array.isArray(payload.events) ? payload.events : [];
+  const terminal = job.status === "completed" || job.status === "failed";
+  const nextPayload = {
+    ...payload,
+    status: job.status === "queued" || job.status === "running"
+      ? "running"
+      : job.status,
+    requestedWorkerId: payload.requestedWorkerId ?? job.preferred_worker_id,
+    workerId: job.claimed_worker_id ?? payload.workerId ?? job.preferred_worker_id,
+    conversationId: input.conversationId ?? payload.conversationId ?? null,
+    summary: input.summary ?? payload.summary ?? null,
+    error: terminal ? (input.error ?? job.error ?? null) : null,
+    completedAt: terminal ? job.completed_at : null,
+    updatedAt: job.updated_at,
+    events: [
+      ...currentEvents,
+      projectAgentTaskSessionEvent(
+        terminal ? (job.status === "completed" ? "completed" : "failed") : "started",
+        job.updated_at,
+      ),
+    ],
+  };
+  const updated = await upsertProjectAgentSession(db, {
+    project_id: current.project_id,
+    id: current.id,
+    agent_id: current.agent_id,
+    status: nextPayload.status as ProjectAgentSessionRow["status"],
+    session_type: current.session_type,
+    payload_json: JSON.stringify(nextPayload),
+    started_at: current.started_at,
+    completed_at: nextPayload.completedAt as string | null,
+    updated_at: job.updated_at,
+  });
+  return updated ? projectAgentSessionJson(updated) : null;
+}
 
 const projectAgentScheduleJson = (row: ProjectAgentScheduleRow) => ({
   id: row.id,
@@ -6494,6 +6617,156 @@ async function route(
   const projectAgentSessionsMatch = pathname.match(
     /^\/projects\/([0-9a-f-]+)\/agent-sessions$/u,
   );
+  const projectAgentTasksMatch = pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/agent-tasks$/u,
+  );
+  if (projectAgentTasksMatch && request.method === "POST") {
+    const session = await requireSession(auth, request);
+    const project = await getProject(
+      db,
+      projectAgentTasksMatch[1],
+      session.user.id,
+    );
+    if (!project) throw new HttpError(404, "Project not found");
+    const input = projectAgentTaskInputSchema.parse(await readJson(request));
+    const existingJob = await getProjectAgentTaskJobByRequest(
+      db,
+      project.id,
+      input.requestId,
+    );
+    if (existingJob) {
+      const existingSession = await getProjectAgentSession(
+        db,
+        project.id,
+        existingJob.id,
+      );
+      if (!existingSession) {
+        throw new HttpError(409, "Agent task session is missing");
+      }
+      return json({ session: projectAgentSessionJson(existingSession) });
+    }
+
+    const agent = await getProjectAgent(db, project.id, input.agentId);
+    if (!agent) throw new HttpError(404, "Agent not found for this project");
+    const worker = await db
+      .prepare(
+        `select worker.*, device.max_concurrent_sessions
+         from briar_execution_workers worker
+         join briar_execution_worker_devices device on device.id = worker.device_id
+         where worker.id = ? and worker.project_id = ?
+           and device.organization_id = ?`,
+      )
+      .bind(input.workerId, project.id, project.organization_id)
+      .first<{
+        id: string;
+        agent_provider: "codex" | "claude" | "grok" | "opencode";
+        capabilities_json: string;
+        state: "online" | "stale" | "disabled";
+        accepting_work: number;
+        readiness_state: "ready" | "busy" | "needs_attention";
+        last_heartbeat_at: string;
+        max_concurrent_sessions: number;
+      }>();
+    if (!worker) throw new HttpError(404, "Worker not found for this project");
+    const observedAt = new Date().toISOString();
+    if (
+      workerStateAt(worker.last_heartbeat_at, observedAt, worker.state) !== "online" ||
+      worker.accepting_work !== 1 ||
+      worker.readiness_state === "needs_attention"
+    ) {
+      throw new HttpError(409, "Worker is not ready to accept agent tasks");
+    }
+    if (!executionWorkerProviders(worker).includes(agent.provider)) {
+      throw new HttpError(
+        409,
+        `Worker does not support the ${agent.provider} provider`,
+      );
+    }
+    if (!(await isExecutionWorkerAllowedForProject(db, project.id, worker.id))) {
+      throw new HttpError(
+        409,
+        "Worker is not allowed by this project's execution policy",
+      );
+    }
+    const active = await db
+      .prepare(
+        `select
+           (select count(*)
+            from briar_hunt_runs run
+            where run.worker_id = ? and run.claim_token_hash is not null
+              and run.lease_expires_at > ?
+              and run.status not in ('backlog', 'completed', 'cancelled', 'blocked', 'failed'))
+           +
+           (select count(*)
+            from briar_project_agent_task_jobs task
+            where task.claimed_worker_id = ? and task.status = 'running'
+              and task.lease_expires_at > ?) as count`,
+      )
+      .bind(worker.id, observedAt, worker.id, observedAt)
+      .first<{ count: number }>();
+    if ((active?.count ?? 0) >= worker.max_concurrent_sessions) {
+      throw new HttpError(409, "Worker has no available execution slot");
+    }
+
+    const taskId = crypto.randomUUID();
+    let job;
+    try {
+      job = await createProjectAgentTaskJob(db, {
+        id: taskId,
+        projectId: project.id,
+        agentId: agent.id,
+        request: input.request,
+        requestId: input.requestId,
+        workerId: worker.id,
+        createdAt: observedAt,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message.toLowerCase() : "";
+      if (!message.includes("unique")) throw error;
+      job = await getProjectAgentTaskJobByRequest(
+        db,
+        project.id,
+        input.requestId,
+      );
+    }
+    if (!job) throw new HttpError(409, "Agent task could not be queued");
+    const payload = {
+      dispatchGroupId: taskId,
+      agentId: agent.id,
+      sessionType: "task" as const,
+      trigger: "manual" as const,
+      scheduleId: null,
+      scheduleRunId: null,
+      parentSessionId: null,
+      request: input.request,
+      status: "running" as const,
+      issues: [],
+      startedAt: observedAt,
+      completedAt: null,
+      conversationId: null,
+      requestedWorkerId: worker.id,
+      workerId: worker.id,
+      summary: null,
+      error: null,
+      events: [projectAgentTaskSessionEvent("started", observedAt)],
+      updatedAt: observedAt,
+    };
+    const createdSession = await upsertProjectAgentSession(db, {
+      project_id: project.id,
+      id: taskId,
+      agent_id: agent.id,
+      status: "running",
+      session_type: "task",
+      payload_json: JSON.stringify(payload),
+      started_at: observedAt,
+      completed_at: null,
+      updated_at: observedAt,
+    });
+    if (!createdSession) {
+      throw new HttpError(409, "Agent task session could not be created");
+    }
+    return json({ session: projectAgentSessionJson(createdSession) });
+  }
   if (projectAgentSessionsMatch && request.method === "GET") {
     const session = await requireSession(auth, request);
     const project = await getProject(
@@ -9533,6 +9806,148 @@ async function route(
       agentReply: issueAgentReplyJson(completed),
       message: issueMessageJson(reply, [], proposal),
     });
+  }
+
+  if (pathname === "/agent-task-claims" && request.method === "POST") {
+    const input = projectAgentTaskClaimInputSchema.parse(await readJson(request));
+    const authenticatedWorker = await requireWorkerProjectBinding(
+      db,
+      request,
+      input.projectId,
+      input.workerId,
+    );
+    const observedAt = new Date().toISOString();
+    if (
+      workerStateAt(
+        authenticatedWorker.binding.last_heartbeat_at,
+        observedAt,
+        authenticatedWorker.binding.state,
+      ) !== "online" ||
+      authenticatedWorker.binding.accepting_work !== 1 ||
+      authenticatedWorker.binding.readiness_state === "needs_attention"
+    ) {
+      throw new HttpError(409, "Worker is not ready to claim agent tasks");
+    }
+    const providers = executionWorkerProviders(authenticatedWorker.binding);
+    if (providers.length === 0) {
+      throw new HttpError(409, "Worker has no available agent provider");
+    }
+    if (
+      !(await isExecutionWorkerAllowedForProject(
+        db,
+        input.projectId,
+        authenticatedWorker.binding.id,
+      ))
+    ) {
+      throw new HttpError(
+        409,
+        "Worker is not allowed by this project's execution policy",
+      );
+    }
+    const reaped = await reapProjectAgentTaskJobs(db, input.projectId, {
+      observedAt,
+      error: "Worker lease expired after repeated attempts.",
+    });
+    await Promise.all(
+      reaped.map((job) =>
+        syncProjectAgentTaskSession(db, job, { error: job.error }),
+      ),
+    );
+    const claimToken = `briar_agent_task_claim_${crypto.randomUUID().replaceAll("-", "")}${crypto.randomUUID().replaceAll("-", "")}`;
+    const job = await claimNextProjectAgentTask(db, input.projectId, {
+      workerId: authenticatedWorker.binding.id,
+      agentProviders: providers,
+      claimTokenHash: await sha256(claimToken),
+      claimedAt: observedAt,
+      leaseExpiresAt: leaseExpiryFrom(observedAt),
+    });
+    if (!job) return json({ work: null });
+    return json({
+      work: {
+        workType: "projectAgentTask",
+        workId: job.id,
+        runId: job.id,
+        sourceKey: `project-agent:${input.projectId}:${job.id}`,
+        title: job.agent_name,
+        claimToken,
+        claimedAt: job.claimed_at,
+        leaseExpiresAt: job.lease_expires_at,
+        request: job.request,
+        agent: {
+          id: job.agent_id,
+          name: job.agent_name,
+          provider: job.agent_provider,
+          model: job.agent_model,
+          effort: job.agent_effort,
+          responsibility: job.agent_responsibility,
+          skill: job.agent_skill,
+        },
+      },
+    });
+  }
+
+  const projectAgentTaskClaimMatch = pathname.match(
+    /^\/agent-task-claims\/([0-9a-f-]+)\/(lease|complete)$/u,
+  );
+  if (projectAgentTaskClaimMatch && request.method === "POST") {
+    const body = await readJson(request);
+    if (projectAgentTaskClaimMatch[2] === "lease") {
+      const input = projectAgentTaskLeaseSchema.parse(body);
+      const worker = await requireWorkerProjectBinding(
+        db,
+        request,
+        input.projectId,
+        input.workerId,
+      );
+      const renewed = await renewProjectAgentTaskLease(
+        db,
+        input.projectId,
+        projectAgentTaskClaimMatch[1],
+        {
+          workerId: worker.binding.id,
+          claimTokenHash: await sha256(input.claimToken),
+          leaseExpiresAt: leaseExpiryFrom(new Date().toISOString()),
+          updatedAt: new Date().toISOString(),
+        },
+      );
+      if (!renewed) throw new HttpError(409, "Agent task claim is no longer active");
+      return json({ leaseExpiresAt: renewed.lease_expires_at });
+    }
+    const input = projectAgentTaskCompletionSchema.parse(body);
+    const worker = await requireWorkerProjectBinding(
+      db,
+      request,
+      input.projectId,
+      input.workerId,
+    );
+    const claimTokenHash = await sha256(input.claimToken);
+    const job = await getClaimedProjectAgentTask(
+      db,
+      input.projectId,
+      projectAgentTaskClaimMatch[1],
+      { workerId: worker.binding.id, claimTokenHash },
+    );
+    if (!job) throw new HttpError(409, "Agent task claim is no longer active");
+    const observedAt = new Date().toISOString();
+    const completed = await completeProjectAgentTask(
+      db,
+      input.projectId,
+      job.id,
+      {
+        workerId: worker.binding.id,
+        claimTokenHash,
+        updatedAt: observedAt,
+        error: input.error,
+      },
+    );
+    if (!completed) throw new HttpError(409, "Agent task claim is no longer active");
+    const session = await syncProjectAgentTaskSession(db, completed, {
+      summary: input.summary ?? null,
+      conversationId: input.conversationId ?? null,
+      error: input.error ?? null,
+    });
+    if (!session) throw new HttpError(409, "Agent task session is missing");
+    return json({ session });
   }
 
   if (pathname === "/queue/claims" && request.method === "POST") {

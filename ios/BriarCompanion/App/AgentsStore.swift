@@ -75,6 +75,33 @@ final class AgentsStore: ObservableObject {
         }
     }
 
+    func run(
+        agent: ProjectAgent,
+        request: String,
+        workerID: String
+    ) async throws -> ProjectAgentSession {
+        guard let projectID, let token else {
+            throw MobileAPIError.invalidRequest
+        }
+        let response: ProjectAgentTaskResponse = try await api.send(
+            MobileAPIContract.Endpoint.projectAgentTasks(projectID: projectID),
+            method: "POST",
+            token: token,
+            body: ProjectAgentTaskRequest(
+                agentId: agent.id,
+                request: request,
+                workerId: workerID,
+                requestId: UUID()
+            ),
+            as: ProjectAgentTaskResponse.self
+        )
+        sessions = Self.collapseLinked(
+            [response.session] + sessions.filter { $0.id != response.session.id }
+        ).sorted { $0.displayTimestamp > $1.displayTimestamp }
+        errorMessage = nil
+        return response.session
+    }
+
     func applicationDidBecomeActive() {
         guard projectID != nil, token != nil else { return }
         Task { await refresh() }

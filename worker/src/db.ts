@@ -253,6 +253,34 @@ export type ProjectAgentSessionRow = {
   updated_at: string;
 };
 
+export type ProjectAgentTaskJobRow = {
+  id: string;
+  project_id: string;
+  agent_id: string;
+  request: string;
+  request_id: string;
+  status: "queued" | "running" | "completed" | "failed";
+  preferred_worker_id: string;
+  claimed_worker_id: string | null;
+  claim_token_hash: string | null;
+  claimed_at: string | null;
+  lease_expires_at: string | null;
+  attempts: number;
+  error: string | null;
+  created_at: string;
+  updated_at: string;
+  completed_at: string | null;
+};
+
+export type ClaimedProjectAgentTaskRow = ProjectAgentTaskJobRow & {
+  agent_name: string;
+  agent_provider: ProjectAgentProvider;
+  agent_model: string | null;
+  agent_effort: string | null;
+  agent_responsibility: string;
+  agent_skill: string;
+};
+
 export type ProjectAgentScheduleRow = {
   id: string;
   project_id: string;
@@ -3709,6 +3737,22 @@ export async function listProjectAgentSessions(
   return result.results;
 }
 
+export async function getProjectAgentSession(
+  db: D1Database,
+  projectId: string,
+  sessionId: string,
+) {
+  return db
+    .prepare(
+      `select project_id, id, agent_id, status, session_type, payload_json,
+              started_at, completed_at, updated_at
+       from briar_project_agent_sessions
+       where project_id = ? and id = ?`,
+    )
+    .bind(projectId, sessionId)
+    .first<ProjectAgentSessionRow>();
+}
+
 export async function upsertProjectAgentSession(
   db: D1Database,
   input: ProjectAgentSessionRow,
@@ -3750,6 +3794,244 @@ export async function upsertProjectAgentSession(
     )
     .bind(input.project_id, input.id)
     .first<ProjectAgentSessionRow>();
+}
+
+export async function createProjectAgentTaskJob(
+  db: D1Database,
+  input: {
+    id: string;
+    projectId: string;
+    agentId: string;
+    request: string;
+    requestId: string;
+    workerId: string;
+    createdAt: string;
+  },
+) {
+  const inserted = await db
+    .prepare(
+      `insert into briar_project_agent_task_jobs (
+         id, project_id, agent_id, request, request_id, status,
+         preferred_worker_id, created_at, updated_at
+       ) values (?, ?, ?, ?, ?, 'queued', ?, ?, ?)`,
+    )
+    .bind(
+      input.id,
+      input.projectId,
+      input.agentId,
+      input.request,
+      input.requestId,
+      input.workerId,
+      input.createdAt,
+      input.createdAt,
+    )
+    .run();
+  if ((inserted.meta.changes ?? 0) < 1) return null;
+  return getProjectAgentTaskJob(db, input.projectId, input.id);
+}
+
+export async function getProjectAgentTaskJob(
+  db: D1Database,
+  projectId: string,
+  jobId: string,
+) {
+  return db
+    .prepare(
+      `select * from briar_project_agent_task_jobs
+       where project_id = ? and id = ?`,
+    )
+    .bind(projectId, jobId)
+    .first<ProjectAgentTaskJobRow>();
+}
+
+export async function getProjectAgentTaskJobByRequest(
+  db: D1Database,
+  projectId: string,
+  requestId: string,
+) {
+  return db
+    .prepare(
+      `select * from briar_project_agent_task_jobs
+       where project_id = ? and request_id = ?`,
+    )
+    .bind(projectId, requestId)
+    .first<ProjectAgentTaskJobRow>();
+}
+
+export async function reapProjectAgentTaskJobs(
+  db: D1Database,
+  projectId: string,
+  input: { observedAt: string; error: string },
+) {
+  const result = await db
+    .prepare(
+      `update briar_project_agent_task_jobs
+       set status = 'failed',
+           error = coalesce(error, ?),
+           claim_token_hash = null, claimed_at = null, lease_expires_at = null,
+           completed_at = ?, updated_at = ?
+       where project_id = ? and status = 'running'
+         and attempts >= 3 and lease_expires_at <= ?
+       returning *`,
+    )
+    .bind(
+      input.error,
+      input.observedAt,
+      input.observedAt,
+      projectId,
+      input.observedAt,
+    )
+    .all<ProjectAgentTaskJobRow>();
+  return result.results ?? [];
+}
+
+export async function claimNextProjectAgentTask(
+  db: D1Database,
+  projectId: string,
+  input: {
+    workerId: string;
+    agentProviders: ProjectAgentProvider[];
+    claimTokenHash: string;
+    claimedAt: string;
+    leaseExpiresAt: string;
+  },
+) {
+  const providerPlaceholders = input.agentProviders.map(() => "?").join(", ");
+  const claimed = await db
+    .prepare(
+      `update briar_project_agent_task_jobs
+       set status = 'running', claimed_worker_id = ?,
+           claim_token_hash = ?, claimed_at = ?, lease_expires_at = ?,
+           attempts = attempts + 1, error = null, updated_at = ?
+       where id = (
+         select job.id
+         from briar_project_agent_task_jobs job
+         join briar_project_agents agent on agent.id = job.agent_id
+         where job.project_id = ?
+           and job.preferred_worker_id = ?
+           and agent.provider in (${providerPlaceholders})
+           and job.attempts < 3
+           and (
+             job.status = 'queued'
+             or (job.status = 'running' and job.lease_expires_at <= ?)
+           )
+         order by job.created_at, job.id
+         limit 1
+       )
+       returning *`,
+    )
+    .bind(
+      input.workerId,
+      input.claimTokenHash,
+      input.claimedAt,
+      input.leaseExpiresAt,
+      input.claimedAt,
+      projectId,
+      input.workerId,
+      ...input.agentProviders,
+      input.claimedAt,
+    )
+    .first<ProjectAgentTaskJobRow>();
+  if (!claimed) return null;
+  return db
+    .prepare(
+      `select job.*, agent.name as agent_name, agent.provider as agent_provider,
+              agent.model as agent_model, agent.effort as agent_effort,
+              agent.responsibility as agent_responsibility,
+              agent.skill_markdown as agent_skill
+       from briar_project_agent_task_jobs job
+       join briar_project_agents agent on agent.id = job.agent_id
+       where job.id = ? and job.project_id = ?`,
+    )
+    .bind(claimed.id, projectId)
+    .first<ClaimedProjectAgentTaskRow>();
+}
+
+export async function getClaimedProjectAgentTask(
+  db: D1Database,
+  projectId: string,
+  jobId: string,
+  input: { workerId: string; claimTokenHash: string },
+) {
+  return db
+    .prepare(
+      `select * from briar_project_agent_task_jobs
+       where id = ? and project_id = ? and status = 'running'
+         and claimed_worker_id = ? and claim_token_hash = ?`,
+    )
+    .bind(jobId, projectId, input.workerId, input.claimTokenHash)
+    .first<ProjectAgentTaskJobRow>();
+}
+
+export async function renewProjectAgentTaskLease(
+  db: D1Database,
+  projectId: string,
+  jobId: string,
+  input: {
+    workerId: string;
+    claimTokenHash: string;
+    leaseExpiresAt: string;
+    updatedAt: string;
+  },
+) {
+  return db
+    .prepare(
+      `update briar_project_agent_task_jobs
+       set lease_expires_at = ?, updated_at = ?
+       where id = ? and project_id = ? and status = 'running'
+         and claimed_worker_id = ? and claim_token_hash = ?
+       returning *`,
+    )
+    .bind(
+      input.leaseExpiresAt,
+      input.updatedAt,
+      jobId,
+      projectId,
+      input.workerId,
+      input.claimTokenHash,
+    )
+    .first<ProjectAgentTaskJobRow>();
+}
+
+export async function completeProjectAgentTask(
+  db: D1Database,
+  projectId: string,
+  jobId: string,
+  input: {
+    workerId: string;
+    claimTokenHash: string;
+    updatedAt: string;
+    error?: string;
+  },
+) {
+  return db
+    .prepare(
+      `update briar_project_agent_task_jobs
+       set status = case when ? is null then 'completed' else
+         case when attempts >= 3 then 'failed' else 'queued' end end,
+           error = ?,
+           claim_token_hash = null, claimed_worker_id = null,
+           claimed_at = null, lease_expires_at = null,
+           completed_at = case when ? is null then ? else
+             case when attempts >= 3 then ? else null end end,
+           updated_at = ?
+       where id = ? and project_id = ? and status = 'running'
+         and claimed_worker_id = ? and claim_token_hash = ?
+       returning *`,
+    )
+    .bind(
+      input.error ?? null,
+      input.error ?? null,
+      input.error ?? null,
+      input.updatedAt,
+      input.updatedAt,
+      input.updatedAt,
+      jobId,
+      projectId,
+      input.workerId,
+      input.claimTokenHash,
+    )
+    .first<ProjectAgentTaskJobRow>();
 }
 
 export async function createProjectAgent(

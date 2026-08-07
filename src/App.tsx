@@ -97,6 +97,7 @@ import {
   listChannels,
   loadDashboard,
   loadProjectAgents,
+  runProjectAgentTaskOnWorker,
   retryHuntRun,
 } from "./lib/api";
 import type { ChannelSummary } from "./lib/channels-contract";
@@ -778,6 +779,35 @@ export function App() {
     return dispatchAgentAutoHunt(activeProject.id, agent, runs, options);
   };
 
+  const startProjectAgentTask = useCallback(async (
+    agent: ProjectAgent,
+    input: { request: string; workerId: string },
+  ) => {
+    if (!activeProject || !briar.token) {
+      throw new Error("로그인이 필요합니다.");
+    }
+    const session = await runProjectAgentTaskOnWorker(
+      briar.token,
+      activeProject.id,
+      {
+        agentId: agent.id,
+        request: input.request,
+        workerId: input.workerId,
+      },
+    );
+    autoHunt.adoptRemoteSession(session);
+    if (activeProject.id === briar.activeProjectId) {
+      await briar.refresh();
+    }
+    return session.id;
+  }, [
+    activeProject,
+    autoHunt.adoptRemoteSession,
+    briar.activeProjectId,
+    briar.refresh,
+    briar.token,
+  ]);
+
   useEffect(() => {
     if (!runsOnDesktopTauri || !briar.token || plannedUpdateRecoveryRef.current) {
       return;
@@ -1336,6 +1366,7 @@ export function App() {
               autoHunt.settleTaskSession(sessionId, settlement)}
             onStopSession={(sessionId) => autoHunt.stopSession(sessionId)}
             onStart={startAgentAutoHunt}
+            onStartRemoteTask={startProjectAgentTask}
             onStartTaskSession={(agent, session) => {
               rememberIssueAgent(agent);
               autoHunt.startTaskSession(activeProject.id, agent.id, session);
@@ -1754,6 +1785,7 @@ export function App() {
                 autoHunt.settleTaskSession(sessionId, settlement)}
               onStopSession={(sessionId) => autoHunt.stopSession(sessionId)}
               onStart={startAgentAutoHunt}
+              onStartRemoteTask={startProjectAgentTask}
               onStartTaskSession={(agent, session) => {
                 rememberIssueAgent(agent);
                 autoHunt.startTaskSession(activeProject.id, agent.id, session);

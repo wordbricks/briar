@@ -14,6 +14,7 @@ import {
   acceptIssueUpdateProposal,
   acceptIssueReworkProposal,
   assertQueuedHuntClaim,
+  claimNextProjectAgentTask,
   claimNextQueuedHuntRun,
   claimDueProjectAgentScheduleRun,
   addOrganizationMember,
@@ -23,6 +24,7 @@ import {
   createOrganizationInvitation,
   createIssueActionProposal,
   createIssueMessage,
+  createProjectAgentTaskJob,
   createIssueReworkProposal,
   createProjectAgent,
   createProjectAgentSchedule,
@@ -87,6 +89,8 @@ import {
   removeOrganizationMember,
   revokeOrganizationInvitation,
   renewProjectAgentScheduleRunLease,
+  completeProjectAgentTask,
+  renewProjectAgentTaskLease,
   updateProjectSettings,
   updateProjectAgent,
   updateProjectAgentSchedule,
@@ -99,6 +103,7 @@ import {
   upsertInboxReadStates,
   upsertProjectAgentSession,
 } from "./db";
+import { registerExecutionWorker } from "./workers";
 
 const releaseWorkflow = normalizeAutoHuntWorkflow({
   version: 2,
@@ -754,6 +759,13 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       db,
       await readFile(resolve("migrations/0072_organization_ideas.sql"), "utf8"),
     );
+    await executeSql(
+      db,
+      await readFile(
+        resolve("migrations/0077_project_agent_task_jobs.sql"),
+        "utf8",
+      ),
+    );
   }, 30_000);
 
   afterAll(async () => {
@@ -1217,6 +1229,127 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         calendar_color: "#3275d5",
       }),
     ]);
+  });
+
+  it("pins a direct Agent task to the selected Worker through completion", async () => {
+    const agent = (await listProjectAgents(db, projectId))[0];
+    const selected = await registerExecutionWorker(db, projectId, {
+      id: "direct-task-worker-selected",
+      deviceId: "direct-task-device-selected",
+      organizationId: projectId,
+      ownerUserId: "owner",
+      label: "Selected direct task Worker",
+      deviceIdentityHash: "d".repeat(64),
+      credentialTokenHash: "e".repeat(64),
+      agentProvider: "codex",
+      providers: ["codex"],
+      providerHealth: {
+        codex: { installed: true, authenticated: true, healthy: true },
+      },
+      versions: { briar: "1.1.1" },
+      observedAt: atMinute(10),
+    });
+    const other = await registerExecutionWorker(db, projectId, {
+      id: "direct-task-worker-other",
+      deviceId: "direct-task-device-other",
+      organizationId: projectId,
+      ownerUserId: "owner",
+      label: "Other direct task Worker",
+      deviceIdentityHash: "f".repeat(64),
+      credentialTokenHash: "0".repeat(64),
+      agentProvider: "codex",
+      providers: ["codex"],
+      providerHealth: {
+        codex: { installed: true, authenticated: true, healthy: true },
+      },
+      versions: { briar: "1.1.1" },
+      observedAt: atMinute(10),
+    });
+    const taskId = "55555555-5555-4555-8555-555555555555";
+    const requestId = "44444444-4444-4444-8444-444444444444";
+    const claimTokenHash = "1".repeat(64);
+
+    try {
+      await expect(
+        createProjectAgentTaskJob(db, {
+          id: taskId,
+          projectId,
+          agentId: agent.id,
+          request: "Summarize the repository without processing queued issues.",
+          requestId,
+          workerId: selected.worker.id,
+          createdAt: atMinute(11),
+        }),
+      ).resolves.toMatchObject({
+        id: taskId,
+        status: "queued",
+        preferred_worker_id: selected.worker.id,
+      });
+
+      await expect(
+        claimNextProjectAgentTask(db, projectId, {
+          workerId: other.worker.id,
+          agentProviders: ["codex"],
+          claimTokenHash,
+          claimedAt: atMinute(12),
+          leaseExpiresAt: atMinute(14),
+        }),
+      ).resolves.toBeNull();
+
+      const claimed = await claimNextProjectAgentTask(db, projectId, {
+        workerId: selected.worker.id,
+        agentProviders: ["codex"],
+        claimTokenHash,
+        claimedAt: atMinute(12),
+        leaseExpiresAt: atMinute(14),
+      });
+      expect(claimed).toMatchObject({
+        id: taskId,
+        request: "Summarize the repository without processing queued issues.",
+        preferred_worker_id: selected.worker.id,
+        claimed_worker_id: selected.worker.id,
+        status: "running",
+        attempts: 1,
+        agent_provider: "codex",
+      });
+
+      await expect(
+        renewProjectAgentTaskLease(db, projectId, taskId, {
+          workerId: selected.worker.id,
+          claimTokenHash,
+          leaseExpiresAt: atMinute(15),
+          updatedAt: atMinute(13),
+        }),
+      ).resolves.toMatchObject({
+        id: taskId,
+        lease_expires_at: atMinute(15),
+      });
+
+      await expect(
+        completeProjectAgentTask(db, projectId, taskId, {
+          workerId: selected.worker.id,
+          claimTokenHash,
+          updatedAt: atMinute(14),
+        }),
+      ).resolves.toMatchObject({
+        id: taskId,
+        status: "completed",
+        preferred_worker_id: selected.worker.id,
+        claimed_worker_id: null,
+        completed_at: atMinute(14),
+      });
+    } finally {
+      await executeSql(
+        db,
+        `delete from briar_project_agent_task_jobs where id = '${taskId}';
+         delete from briar_execution_worker_credentials
+         where device_id in ('${selected.device.id}', '${other.device.id}');
+         delete from briar_execution_workers
+         where id in ('${selected.worker.id}', '${other.worker.id}');
+         delete from briar_execution_worker_devices
+         where id in ('${selected.device.id}', '${other.device.id}');`,
+      );
+    }
   });
 
   it("creates and lists custom agents scoped to a project", async () => {

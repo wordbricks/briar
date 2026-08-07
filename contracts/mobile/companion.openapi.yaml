@@ -902,6 +902,52 @@
         }
       }
     },
+    "/projects/{projectId}/agent-tasks": {
+      "post": {
+        "operationId": "runProjectAgentTask",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ProjectId"
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectAgentTaskRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Direct saved-Agent task accepted for the selected Worker",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectAgentTaskResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
     "/organizations/{organizationId}/channels": {
       "get": {
         "operationId": "listChannels",
@@ -2954,6 +3000,14 @@
             "type": "string",
             "nullable": true
           },
+          "requestedWorkerId": {
+            "type": "string",
+            "nullable": true
+          },
+          "workerId": {
+            "type": "string",
+            "nullable": true
+          },
           "conversationId": {
             "type": "string",
             "nullable": true
@@ -2999,6 +3053,46 @@
             "items": {
               "$ref": "#/components/schemas/ProjectAgentSession"
             }
+          }
+        },
+        "additionalProperties": true
+      },
+      "ProjectAgentTaskRequest": {
+        "type": "object",
+        "required": [
+          "agentId",
+          "request",
+          "workerId",
+          "requestId"
+        ],
+        "properties": {
+          "agentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "request": {
+            "type": "string",
+            "minLength": 1
+          },
+          "workerId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ProjectAgentTaskResponse": {
+        "type": "object",
+        "required": [
+          "session"
+        ],
+        "properties": {
+          "session": {
+            "$ref": "#/components/schemas/ProjectAgentSession"
           }
         },
         "additionalProperties": true

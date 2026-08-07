@@ -45,6 +45,8 @@ struct ProjectAgentSession: Codable, Equatable, Identifiable, Sendable {
     let completedAt: Date?
     let conversationId: String?
     let workspaceRoot: String?
+    let requestedWorkerId: String? = nil
+    let workerId: String? = nil
     let summary: String?
     let error: String?
     let events: [Event]?
@@ -141,6 +143,17 @@ struct ProjectAgentSession: Codable, Equatable, Identifiable, Sendable {
     var displayTimestamp: Date {
         completedAt ?? updatedAt ?? startedAt
     }
+}
+
+struct ProjectAgentTaskRequest: Codable, Equatable, Sendable {
+    let agentId: UUID
+    let request: String
+    let workerId: String
+    let requestId: UUID
+}
+
+struct ProjectAgentTaskResponse: Codable, Equatable, Sendable {
+    let session: ProjectAgentSession
 }
 
 struct ProjectAgentSessionsResponse: Codable, Equatable, Sendable {

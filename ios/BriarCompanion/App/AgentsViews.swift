@@ -87,6 +87,14 @@ struct AgentsHomeView: View {
                         AgentDetailView(
                             agent: agent,
                             sessions: agents.sessions(for: id),
+                            workers: snapshot?.workers ?? [],
+                            onRun: { request, workerID in
+                                _ = try await agents.run(
+                                    agent: agent,
+                                    request: request,
+                                    workerID: workerID
+                                )
+                            },
                             onOpenSession: { path.append(AgentRoute.session($0)) }
                         )
                     } else {
@@ -222,7 +230,19 @@ private struct SessionRow: View {
 struct AgentDetailView: View {
     let agent: ProjectAgent
     let sessions: [ProjectAgentSession]
+    let workers: [DashboardWorker]
+    let onRun: (String, String) async throws -> Void
     let onOpenSession: (String) -> Void
+
+    @State private var showingRun = false
+
+    private var availableWorkers: [DashboardWorker] {
+        workers.filter { worker in
+            guard worker.readiness == "available" else { return false }
+            return worker.providers?.contains(agent.provider) == true ||
+                worker.agentProvider == agent.provider
+        }
+    }
 
     var body: some View {
         List {
@@ -278,6 +298,121 @@ struct AgentDetailView: View {
         }
         .navigationTitle(agent.name)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    showingRun = true
+                } label: {
+                    Label("Agent 실행", systemImage: "play.fill")
+                }
+                .disabled(availableWorkers.isEmpty)
+                .accessibilityIdentifier("agent-run-button")
+            }
+        }
+        .sheet(isPresented: $showingRun) {
+            AgentRunSheet(
+                agent: agent,
+                workers: availableWorkers,
+                onRun: onRun
+            )
+        }
+    }
+}
+
+private struct AgentRunSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let agent: ProjectAgent
+    let workers: [DashboardWorker]
+    let onRun: (String, String) async throws -> Void
+
+    @State private var request: String
+    @State private var selectedWorkerID: String
+    @State private var isRunning = false
+    @State private var errorMessage: String?
+
+    init(
+        agent: ProjectAgent,
+        workers: [DashboardWorker],
+        onRun: @escaping (String, String) async throws -> Void
+    ) {
+        self.agent = agent
+        self.workers = workers
+        self.onRun = onRun
+        _request = State(initialValue: agent.responsibility)
+        _selectedWorkerID = State(initialValue: workers.first?.id ?? "")
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("작업 요청") {
+                    TextEditor(text: $request)
+                        .frame(minHeight: 130)
+                        .accessibilityLabel("에이전트 작업 요청")
+                        .accessibilityIdentifier("agent-run-request")
+                }
+
+                Section("실행 호스트") {
+                    Picker("Worker", selection: $selectedWorkerID) {
+                        ForEach(workers) { worker in
+                            Text(worker.label).tag(worker.id)
+                        }
+                    }
+                    .accessibilityIdentifier("agent-run-worker-picker")
+                    if let worker = workers.first(where: { $0.id == selectedWorkerID }) {
+                        Label(
+                            worker.readinessDetail ?? "실행 가능",
+                            systemImage: "checkmark.circle.fill"
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
+                }
+
+                if let errorMessage {
+                    Section {
+                        Label(errorMessage, systemImage: "exclamationmark.triangle")
+                            .foregroundStyle(.red)
+                    }
+                }
+            }
+            .navigationTitle("Agent 실행")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("취소") { dismiss() }
+                        .disabled(isRunning)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button {
+                        Task { await submit() }
+                    } label: {
+                        if isRunning {
+                            ProgressView()
+                        } else {
+                            Text("실행")
+                        }
+                    }
+                    .disabled(isRunning || request.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || selectedWorkerID.isEmpty)
+                    .accessibilityIdentifier("agent-run-submit")
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+    }
+
+    private func submit() async {
+        let trimmed = request.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, !selectedWorkerID.isEmpty, !isRunning else { return }
+        isRunning = true
+        errorMessage = nil
+        do {
+            try await onRun(trimmed, selectedWorkerID)
+            dismiss()
+        } catch {
+            errorMessage = CompanionStore.message(for: error)
+        }
+        isRunning = false
     }
 }
 
@@ -321,6 +456,9 @@ struct SessionDetailView: View {
                 }
                 if let type = session.sessionType {
                     LabeledContent("유형", value: type.rawValue)
+                }
+                if let workerID = session.workerId ?? session.requestedWorkerId {
+                    LabeledContent("실행 Worker", value: workerID)
                 }
                 LabeledContent("시작", value: session.startedAt.formatted())
                 if let completedAt = session.completedAt {

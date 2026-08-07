@@ -275,6 +275,10 @@ private actor UITestAPIClient: MobileAPIClientProtocol {
             payload = #"{"messages":[]}"#
         } else if path.hasSuffix("/evidence") {
             payload = #"{"evidence":[{"key":"ui-test:evidence:image","attempt":1,"revision":1,"stage":"reviewing","type":"review findings","status":"passed","detail":"완성 화면","url":null,"actor":"codex","observedAt":"2026-08-02T01:03:00Z","images":[{"id":"bbbbbbbb-2222-4222-8222-222222222222","filename":"result-screen.png","contentType":"image/png","byteSize":68,"url":"/ui-test/result-screen.png"}],"canonical":true}]}"#
+        } else if path.hasSuffix("/agent-tasks") && method == "POST" {
+            payload = ##"""
+            {"session":{"id":"session-direct-1","projectId":"11111111-1111-4111-8111-111111111111","dispatchGroupId":"session-direct-1","agentId":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","sessionType":"task","trigger":"manual","scheduleId":null,"scheduleRunId":null,"parentSessionId":null,"request":"Summarize the current repository status.","status":"running","issues":[],"startedAt":"2026-08-02T01:10:00Z","completedAt":null,"conversationId":null,"workspaceRoot":null,"requestedWorkerId":"worker-1","workerId":"worker-1","summary":null,"error":null,"events":[{"id":"event-direct-1","type":"started","occurredAt":"2026-08-02T01:10:00Z"}],"dispatchEvents":[],"workers":[],"updatedAt":"2026-08-02T01:10:00Z"}}
+            """##
         } else if path.contains("/agents") {
             payload = ##"""
             {"agents":[{"id":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","projectId":"11111111-1111-4111-8111-111111111111","name":"Issue processing agent","avatar":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==","codexPet":null,"provider":"codex","model":"gpt-5.4","responsibility":"Process every queued issue.","skill":"# Issue processing agent","calendarColor":"#3275d5","createdAt":"2026-08-02T01:00:00Z","updatedAt":"2026-08-02T01:00:00Z"}]}
