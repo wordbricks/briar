@@ -7,7 +7,6 @@ struct CompanionRootView: View {
     @StateObject private var session: SessionStore
     @StateObject private var companion: CompanionStore
     @StateObject private var dashboard: DashboardStore
-    @StateObject private var ideas: IdeasStore
     @StateObject private var channels: ChannelsStore
     @StateObject private var agents: AgentsStore
     @StateObject private var inbox: InboxStore
@@ -40,7 +39,6 @@ struct CompanionRootView: View {
         _session = StateObject(wrappedValue: session)
         _companion = StateObject(wrappedValue: CompanionStore(api: api))
         _dashboard = StateObject(wrappedValue: DashboardStore(api: api))
-        _ideas = StateObject(wrappedValue: IdeasStore(api: api))
         _channels = StateObject(wrappedValue: ChannelsStore(api: api))
         _agents = StateObject(wrappedValue: AgentsStore(api: api))
         _inbox = StateObject(wrappedValue: InboxStore(api: api))
@@ -87,7 +85,6 @@ struct CompanionRootView: View {
                     errorMessage: dashboard.errorMessage,
                     token: token,
                     api: api,
-                    ideas: ideas,
                     user: companion.user,
                     refresh: { await dashboard.refresh(forceSnapshot: true) },
                     selectProject: { companion.selectedProjectID = $0 },
@@ -102,7 +99,6 @@ struct CompanionRootView: View {
             guard let token = session.token else {
                 companion.clear()
                 dashboard.select(projectID: nil, token: nil)
-                ideas.select(projectID: nil, token: nil)
                 channels.select(organizationID: nil, token: nil)
                 agents.select(projectID: nil, token: nil, locale: locale.agentLocale.rawValue)
                 inbox.configure(token: nil, userID: nil)
@@ -191,7 +187,6 @@ struct CompanionRootView: View {
         let projectID = active ? companion.selectedProjectID : nil
         let token = active ? session.token : nil
         dashboard.select(projectID: projectID, token: token)
-        ideas.select(projectID: projectID, token: token)
         // Channels follow the selected project's organization, not the project.
         channels.select(
             organizationID: projectID.flatMap { id in
@@ -241,7 +236,6 @@ struct CompanionRootView: View {
 
     private func signOut() {
         dashboard.select(projectID: nil, token: nil)
-        ideas.select(projectID: nil, token: nil)
         channels.select(organizationID: nil, token: nil)
         agents.select(projectID: nil, token: nil, locale: locale.agentLocale.rawValue)
         companion.clear()

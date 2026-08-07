@@ -35,12 +35,6 @@ enum MobileAPIContract {
             "\(dashboard(projectID: projectID))/delta?cursor=\(cursor)"
         }
 
-        static func ideas(projectID: UUID) -> String { "/projects/\(projectID.uuidString.lowercased())/ideas" }
-        static func idea(projectID: UUID, ideaID: UUID) -> String { "\(ideas(projectID: projectID))/\(ideaID.uuidString.lowercased())" }
-        static func ideaMessages(projectID: UUID, ideaID: UUID) -> String { "\(idea(projectID: projectID, ideaID: ideaID))/messages" }
-        static func ideaPlan(projectID: UUID, ideaID: UUID) -> String { "\(idea(projectID: projectID, ideaID: ideaID))/plan" }
-        static func ideaConvert(projectID: UUID, ideaID: UUID) -> String { "\(idea(projectID: projectID, ideaID: ideaID))/convert" }
-        static func ideaJobRetry(projectID: UUID, ideaID: UUID, jobID: UUID) -> String { "\(idea(projectID: projectID, ideaID: ideaID))/jobs/\(jobID.uuidString.lowercased())/retry" }
 
         static func channels(organizationID: UUID) -> String {
             "/organizations/\(organizationID.uuidString.lowercased())/channels"

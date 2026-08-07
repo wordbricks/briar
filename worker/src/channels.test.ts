@@ -436,8 +436,10 @@ describe("organization channels", () => {
 
     const reply = await getChannelMessage(db, channelId, claimed!.reply_message_id);
     expect(reply?.author).toMatchObject({ type: "agent", name: "Honey" });
-    // A plan document with no project is an organization idea.
+    // A plan document with no project stays organization-wide until a member
+    // decides where the work belongs.
     expect(reply?.document).toMatchObject({
+      messageId: claimed!.reply_message_id,
       title: "Onboarding plan",
       projectId: null,
     });
@@ -447,14 +449,17 @@ describe("organization channels", () => {
       projectId,
     });
 
-    const idea = await db
-      .prepare(`select organization_id, project_id, status from briar_ideas where id = ?`)
-      .bind(reply!.document!.ideaId)
-      .first<{ organization_id: string; project_id: string | null; status: string }>();
-    expect(idea).toMatchObject({
-      organization_id: organizationId,
+    const stored = await db
+      .prepare(
+        `select channel_id, project_id, markdown
+         from briar_channel_message_documents where message_id = ?`,
+      )
+      .bind(claimed!.reply_message_id)
+      .first<{ channel_id: string; project_id: string | null; markdown: string }>();
+    expect(stored).toMatchObject({
+      channel_id: channelId,
       project_id: null,
-      status: "ready",
+      markdown: "# Onboarding\n\nSteps.",
     });
   });
 

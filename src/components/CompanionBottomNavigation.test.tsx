@@ -4,14 +4,13 @@ import { I18nProvider } from "../i18n";
 import { CompanionBottomNavigation } from "./CompanionBottomNavigation";
 
 describe("CompanionBottomNavigation", () => {
-  it("hides Ideas by default", () => {
+  it("renders Home first and drops Ideas and Search", () => {
     const markup = renderToStaticMarkup(
       <I18nProvider>
         <CompanionBottomNavigation
           activeDestination="inbox"
           onCreate={() => undefined}
           onAgentsOpen={() => undefined}
-          onIdeasOpen={() => undefined}
           onInboxOpen={() => undefined}
           onHomeOpen={() => undefined}
           onStatusChange={() => undefined}
@@ -36,26 +35,5 @@ describe("CompanionBottomNavigation", () => {
     expect(markup.indexOf("companion-bottom-nav")).toBeLessThan(
       markup.indexOf("companion-fab"),
     );
-  });
-
-  it("shows Ideas when the feature flag is enabled", () => {
-    const markup = renderToStaticMarkup(
-      <I18nProvider>
-        <CompanionBottomNavigation
-          activeDestination="ideas"
-          ideasEnabled
-          onAgentsOpen={() => undefined}
-          onIdeasOpen={() => undefined}
-          onInboxOpen={() => undefined}
-          onHomeOpen={() => undefined}
-          onStatusChange={() => undefined}
-          unreadInboxCount={0}
-        />
-      </I18nProvider>,
-    );
-
-    expect(markup).toContain("아이디어");
-    expect(markup).toContain("grid-cols-5");
-    expect(markup).toContain('aria-current="page"');
   });
 });

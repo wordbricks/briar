@@ -362,10 +362,8 @@ export const mobileChannelMessageSchema = z.object({
   lastReplyAt: z.iso.datetime().nullable(),
   document: z
     .object({
-      ideaId: z.uuid(),
+      messageId: z.uuid(),
       title: z.string(),
-      status: z.string(),
-      version: z.number().int().positive(),
       projectId: z.uuid().nullable(),
     })
     .nullable(),
@@ -377,7 +375,6 @@ export const mobileChannelMessageSchema = z.object({
       projectId: z.uuid().nullable(),
       payload: z.unknown(),
       resultRunId: z.uuid().nullable(),
-      resultIdeaId: z.uuid().nullable(),
     })
     .nullable(),
   createdAt: z.iso.datetime(),
