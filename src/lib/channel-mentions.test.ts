@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { channelSlugFromName, handleFromName } from "./channels-contract";
-import { mentionAtCaret, retainedMentions } from "./channel-mentions";
+import {
+  mentionAtCaret,
+  mentionHandle,
+  retainedMentions,
+} from "./channel-mentions";
 
 const target = (handle: string) => ({
   type: "agent" as const,
@@ -11,6 +15,10 @@ const target = (handle: string) => ({
 });
 
 describe("mentionAtCaret", () => {
+  it("turns a display name into a selectable mention handle", () => {
+    expect(mentionHandle("Honey Writer")).toBe("honey-writer");
+  });
+
   it("finds the handle the caret is inside", () => {
     expect(mentionAtCaret("hey @hon", 8)).toEqual({
       start: 4,

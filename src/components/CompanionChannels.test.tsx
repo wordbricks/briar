@@ -4,7 +4,12 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { I18nProvider } from "../i18n";
-import type { ChannelMessage, ChannelSummary } from "../lib/channels-contract";
+import type {
+  ChannelAgentSummary,
+  ChannelMember,
+  ChannelMessage,
+  ChannelSummary,
+} from "../lib/channels-contract";
 
 const listChannels = vi.fn();
 const loadChannel = vi.fn();
@@ -60,6 +65,26 @@ const message = (id: string, body: string, replyCount = 0): ChannelMessage => ({
   createdAt: "2026-08-01T01:00:00.000Z",
 });
 
+const member: ChannelMember = {
+  userId: "user-2",
+  name: "Sam",
+  email: "sam@example.com",
+  image: null,
+  role: "member",
+  createdAt: "2026-08-01T00:00:00.000Z",
+};
+
+const agent: ChannelAgentSummary = {
+  agentId: "agent-1",
+  handle: "honey",
+  name: "Honey",
+  provider: "claude",
+  model: null,
+  projectId: null,
+  responsibility: "Writing partner",
+  createdAt: "2026-08-01T00:00:00.000Z",
+};
+
 describe("CompanionChannels", () => {
   let container: HTMLDivElement;
   let root: ReturnType<typeof createRoot>;
@@ -70,6 +95,7 @@ describe("CompanionChannels", () => {
         <I18nProvider>
           <CompanionChannels
             activeProjectId="project-1"
+            currentUserId="user-1"
             organizationId="org-1"
             projects={[
               { id: "project-1", name: "Briar" },
@@ -270,6 +296,70 @@ describe("CompanionChannels", () => {
     expect(sendChannelMessage).toHaveBeenCalledWith("token", "org-1", "c-common", {
       body: "답글",
       parentMessageId: "m-1",
+      mentionedAgentIds: [],
+      mentionedUserIds: [],
+    });
+  });
+
+  it("opens @ candidates and sends a picked Agent as a structured mention", async () => {
+    loadChannel.mockResolvedValue({
+      channel: channel("c-common", "Welcome", null),
+      members: [member],
+      agents: [agent],
+      messages: [],
+    });
+    sendChannelMessage.mockResolvedValue({
+      message: message("m-2", "@honey 확인해 줘"),
+      agentReplies: [],
+    });
+    await render();
+
+    await act(async () => {
+      [
+        ...container.querySelectorAll<HTMLButtonElement>(
+          ".companion-channel-group button",
+        ),
+      ]
+        .find((button) => button.textContent?.includes("Welcome"))!
+        .click();
+    });
+    await act(async () => Promise.resolve());
+
+    const input = container.querySelector<HTMLInputElement>(
+      ".companion-channel-composer input",
+    )!;
+    const setter = Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      "value",
+    )!.set!;
+    setter.call(input, "@");
+    input.selectionStart = 1;
+    input.selectionEnd = 1;
+    await act(async () => input.dispatchEvent(new Event("input", { bubbles: true })));
+
+    expect(input.getAttribute("aria-expanded")).toBe("true");
+    const honey = [
+      ...container.querySelectorAll<HTMLButtonElement>(
+        ".companion-channel-mention-menu button",
+      ),
+    ].find((button) => button.textContent?.includes("Honey"));
+    await act(async () => honey!.click());
+
+    setter.call(input, "@honey 확인해 줘");
+    input.selectionStart = input.value.length;
+    input.selectionEnd = input.value.length;
+    await act(async () => input.dispatchEvent(new Event("input", { bubbles: true })));
+    await act(async () => {
+      container
+        .querySelector("form.companion-channel-composer")!
+        .dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    });
+
+    expect(sendChannelMessage).toHaveBeenCalledWith("token", "org-1", "c-common", {
+      body: "@honey 확인해 줘",
+      parentMessageId: null,
+      mentionedAgentIds: ["agent-1"],
+      mentionedUserIds: [],
     });
   });
 });

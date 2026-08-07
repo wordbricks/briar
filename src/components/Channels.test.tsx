@@ -199,6 +199,30 @@ describe("Channels", () => {
     );
   });
 
+  it("opens candidates for @ and picks the highlighted mention with the keyboard", async () => {
+    await render([message()]);
+    const textarea = container.querySelector("textarea")!;
+    await typeInto(textarea, "@");
+
+    expect(textarea.getAttribute("aria-expanded")).toBe("true");
+    expect(container.querySelectorAll(".channel-mention-menu button")).toHaveLength(2);
+
+    await act(async () => {
+      textarea.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }),
+      );
+    });
+    await act(async () => {
+      textarea.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+      );
+    });
+
+    expect(textarea.value).toBe("@sam ");
+    expect(textarea.getAttribute("aria-expanded")).toBe("false");
+    expect(sendChannelMessage).not.toHaveBeenCalled();
+  });
+
   it("does not attach a mention whose handle was typed but never picked", async () => {
     await render([message()]);
     sendChannelMessage.mockResolvedValue({

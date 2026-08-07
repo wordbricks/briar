@@ -57,6 +57,8 @@ struct ChannelsResponse: Codable, Sendable {
 
 struct ChannelDetailResponse: Codable, Sendable {
     let channel: ChannelSummary
+    let members: [ChannelMember]
+    let agents: [ChannelAgentSummary]
     let messages: [ChannelMessage]
 }
 
@@ -67,10 +69,144 @@ struct ChannelMessagesResponse: Codable, Sendable {
 struct CreateChannelMessageRequest: Codable, Sendable {
     let body: String
     let parentMessageId: UUID?
+    let mentionedUserIds: [String]
+    let mentionedAgentIds: [UUID]
 }
 
 struct CreateChannelMessageResponse: Codable, Sendable {
     let message: ChannelMessage
+}
+
+struct ChannelMember: Codable, Equatable, Identifiable, Sendable {
+    let userId: String
+    let name: String
+    let email: String
+    let image: String?
+    let role: String
+    let createdAt: Date
+
+    var id: String { userId }
+}
+
+struct ChannelAgentSummary: Codable, Equatable, Identifiable, Sendable {
+    let agentId: UUID
+    let handle: String?
+    let name: String
+    let provider: String
+    let model: String?
+    let projectId: UUID?
+    let responsibility: String
+    let createdAt: Date
+
+    var id: UUID { agentId }
+}
+
+struct ChannelMentionTarget: Equatable, Identifiable, Sendable {
+    enum Kind: Sendable {
+        case user
+        case agent
+    }
+
+    let kind: Kind
+    let recipientId: String
+    let handle: String
+    let label: String
+    let detail: String
+    let image: String?
+
+    var id: String { "\(kind == .user ? "user" : "agent"):\(recipientId)" }
+}
+
+enum ChannelMentions {
+    static func candidates(
+        members: [ChannelMember],
+        agents: [ChannelAgentSummary],
+        currentUserId: String?
+    ) -> [ChannelMentionTarget] {
+        let agentTargets = agents.map { agent in
+            let preferredHandle = agent.handle?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let handle = preferredHandle.flatMap { $0.isEmpty ? nil : $0 } ?? agent.name
+            return ChannelMentionTarget(
+                kind: .agent,
+                recipientId: agent.agentId.uuidString,
+                handle: normalizedHandle(handle),
+                label: agent.name,
+                detail: "Agent",
+                image: nil
+            )
+        }
+        let memberTargets = members.map { member in
+            ChannelMentionTarget(
+                kind: .user,
+                recipientId: member.userId,
+                handle: normalizedHandle(member.email.split(separator: "@").first.map(String.init) ?? member.userId),
+                label: member.name,
+                detail: member.userId == currentUserId ? "나 · \(member.email)" : member.email,
+                image: member.image
+            )
+        }
+        return agentTargets + memberTargets
+    }
+
+    static func suggestions(
+        in body: String,
+        candidates: [ChannelMentionTarget]
+    ) -> [ChannelMentionTarget] {
+        guard let query = query(in: body) else { return [] }
+        let needle = query.text.lowercased()
+        return candidates.filter {
+            "\($0.handle) \($0.label)".lowercased().contains(needle)
+        }
+    }
+
+    static func insert(
+        _ target: ChannelMentionTarget,
+        into body: String
+    ) -> String {
+        guard let query = query(in: body) else { return body }
+        return body.replacingCharacters(in: query.range, with: "@\(target.handle) ")
+    }
+
+    static func retained(
+        in body: String,
+        mentions: [ChannelMentionTarget]
+    ) -> [ChannelMentionTarget] {
+        mentions.filter { target in
+            let escaped = NSRegularExpression.escapedPattern(for: target.handle)
+            return body.range(
+                of: "(^|[^\\p{L}\\p{N}_.-])@\(escaped)(?=$|[^\\p{L}\\p{N}_.-])",
+                options: .regularExpression
+            ) != nil
+        }
+    }
+
+    private struct Query {
+        let range: Range<String.Index>
+        let text: String
+    }
+
+    private static func query(in body: String) -> Query? {
+        guard let expression = try? NSRegularExpression(
+            pattern: "(^|[^\\p{L}\\p{N}_.-])@([\\p{L}\\p{N}_.-]*)$"
+        ) else { return nil }
+        let fullRange = NSRange(body.startIndex..<body.endIndex, in: body)
+        guard let match = expression.firstMatch(in: body, range: fullRange),
+              let tokenRange = Range(match.range(at: 2), in: body),
+              let atIndex = body.index(tokenRange.lowerBound, offsetBy: -1, limitedBy: body.startIndex)
+        else { return nil }
+        return Query(range: atIndex..<body.endIndex, text: String(body[tokenRange]))
+    }
+
+    private static func normalizedHandle(_ value: String) -> String {
+        let allowed = value.lowercased().map { character -> Character in
+            if character.isLetter || character.isNumber || "_.-".contains(character) {
+                return character
+            }
+            return "-"
+        }
+        let handle = String(allowed).trimmingCharacters(in: CharacterSet(charactersIn: "-"))
+        return handle.isEmpty ? "member" : handle
+    }
 }
 
 /// One divider plus the channels under it on the Home list.

@@ -9,7 +9,14 @@ import {
   Plus,
   Send,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   listChannelMessages,
   listChannels,
@@ -21,14 +28,23 @@ import {
   type ChannelGroupProject,
 } from "../lib/channel-grouping";
 import type {
+  ChannelAgentSummary,
+  ChannelMember,
   ChannelMessage,
   ChannelSummary,
 } from "../lib/channels-contract";
+import {
+  mentionAtCaret,
+  mentionHandle,
+  retainedMentions,
+  type MentionTarget,
+} from "../lib/channel-mentions";
 import { useI18n } from "../i18n";
 
 type CompanionChannelsProps = {
   organizationId: string;
   activeProjectId: string | null;
+  currentUserId: string | null;
   projects: readonly ChannelGroupProject[];
   token: string;
 };
@@ -41,6 +57,7 @@ type CompanionChannelsProps = {
 export function CompanionChannels({
   organizationId,
   activeProjectId,
+  currentUserId,
   projects,
   token,
 }: CompanionChannelsProps) {
@@ -48,6 +65,8 @@ export function CompanionChannels({
   const [channels, setChannels] = useState<ChannelSummary[]>([]);
   const [channel, setChannel] = useState<ChannelSummary | null>(null);
   const [messages, setMessages] = useState<ChannelMessage[]>([]);
+  const [members, setMembers] = useState<ChannelMember[]>([]);
+  const [agents, setAgents] = useState<ChannelAgentSummary[]>([]);
   const [thread, setThread] = useState<ChannelMessage[] | null>(null);
   const [threadParentId, setThreadParentId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -89,11 +108,15 @@ export function CompanionChannels({
       setThread(null);
       setThreadParentId(null);
       setMessages([]);
+      setMembers([]);
+      setAgents([]);
       setLoading(true);
       try {
         const result = await loadChannel(token, organizationId, summary.id);
         setChannel(result.channel);
         setMessages(result.messages);
+        setMembers(result.members);
+        setAgents(result.agents);
       } catch (cause) {
         setError(message(cause));
       } finally {
@@ -127,13 +150,19 @@ export function CompanionChannels({
   );
 
   const send = useCallback(
-    async (body: string) => {
+    async (body: string, mentions: MentionTarget[]) => {
       if (!channel || !body.trim()) return;
       setBusy(true);
       try {
         const result = await sendChannelMessage(token, organizationId, channel.id, {
           body: body.trim(),
           parentMessageId: threadParentId,
+          mentionedUserIds: mentions
+            .filter((mention) => mention.type === "user")
+            .map((mention) => mention.id),
+          mentionedAgentIds: mentions
+            .filter((mention) => mention.type === "agent")
+            .map((mention) => mention.id),
         });
         if (threadParentId) {
           setThread((current) => [...(current ?? []), result.message]);
@@ -166,7 +195,13 @@ export function CompanionChannels({
             <MessageRow key={item.id} message={item} />
           ))}
         </div>
-        <Composer busy={busy} onSend={send} />
+        <CompanionChannelComposer
+          agents={agents}
+          busy={busy}
+          currentUserId={currentUserId}
+          members={members}
+          onSend={send}
+        />
       </section>
     );
   }
@@ -202,7 +237,13 @@ export function CompanionChannels({
             </p>
           ) : null}
         </div>
-        <Composer busy={busy} onSend={send} />
+        <CompanionChannelComposer
+          agents={agents}
+          busy={busy}
+          currentUserId={currentUserId}
+          members={members}
+          onSend={send}
+        />
       </section>
     );
   }
@@ -337,33 +378,184 @@ function MessageAvatar({ message }: { message: ChannelMessage }) {
   );
 }
 
-function Composer({
+export function CompanionChannelComposer({
+  agents,
   busy,
+  currentUserId,
+  members,
   onSend,
 }: {
+  agents: ChannelAgentSummary[];
   busy: boolean;
-  onSend: (body: string) => void;
+  currentUserId: string | null;
+  members: ChannelMember[];
+  onSend: (body: string, mentions: MentionTarget[]) => void;
 }) {
   const { t } = useI18n();
   const [body, setBody] = useState("");
+  const [caret, setCaret] = useState(0);
+  const [mentions, setMentions] = useState<MentionTarget[]>([]);
+  const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(0);
+  const [mentionDismissed, setMentionDismissed] = useState(false);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const pendingCaret = useRef<number | null>(null);
+  const mentionListId = useId();
+  const candidates = useMemo<MentionTarget[]>(
+    () => [
+      ...agents.map((agent) => ({
+        type: "agent" as const,
+        id: agent.agentId,
+        handle: mentionHandle(agent.handle?.trim() || agent.name),
+        label: agent.name,
+        detail: agent.projectId ? "프로젝트 에이전트" : "조직 에이전트",
+      })),
+      ...members.map((member) => ({
+          type: "user" as const,
+          id: member.userId,
+          handle: mentionHandle(member.email.split("@")[0] || member.userId),
+          label: member.name,
+          detail:
+            member.userId === currentUserId ? `나 · ${member.email}` : member.email,
+          image: member.image,
+        })),
+    ],
+    [agents, currentUserId, members],
+  );
+  const query = mentionAtCaret(body, caret);
+  const suggestions = query
+    ? candidates
+        .filter((candidate) =>
+          `${candidate.handle} ${candidate.label}`
+            .toLowerCase()
+            .includes(query.query.toLowerCase()),
+        )
+        .slice(0, 6)
+    : [];
+  const showsSuggestions = !mentionDismissed && suggestions.length > 0;
+
+  useEffect(() => setActiveSuggestionIndex(0), [query?.query]);
+
+  useEffect(() => {
+    if (pendingCaret.current === null) return;
+    const nextCaret = pendingCaret.current;
+    pendingCaret.current = null;
+    inputRef.current?.focus();
+    inputRef.current?.setSelectionRange(nextCaret, nextCaret);
+  }, [body]);
+
+  const pick = (target: MentionTarget) => {
+    if (!query) return;
+    const inserted = `@${target.handle} `;
+    const nextCaret = query.start + inserted.length;
+    setBody(`${body.slice(0, query.start)}${inserted}${body.slice(query.end)}`);
+    setCaret(nextCaret);
+    pendingCaret.current = nextCaret;
+    setMentionDismissed(true);
+    setMentions((current) =>
+      current.some(
+        (mention) => mention.id === target.id && mention.type === target.type,
+      )
+        ? current
+        : [...current, target],
+    );
+  };
+
   return (
     <form
       className="companion-channel-composer"
       onSubmit={(event) => {
         event.preventDefault();
         if (!body.trim() || busy) return;
-        onSend(body);
+        onSend(body, retainedMentions(body, mentions));
         setBody("");
+        setMentions([]);
+        setMentionDismissed(false);
       }}
     >
+      {showsSuggestions ? (
+        <ul
+          aria-label={t("run.mention")}
+          className="companion-channel-mention-menu"
+          id={mentionListId}
+          role="listbox"
+        >
+          {suggestions.map((target, index) => (
+            <li key={`${target.type}:${target.id}`}>
+              <button
+                aria-selected={index === activeSuggestionIndex}
+                className={index === activeSuggestionIndex ? "active" : undefined}
+                id={`${mentionListId}-option-${index}`}
+                onClick={() => pick(target)}
+                onMouseEnter={() => setActiveSuggestionIndex(index)}
+                role="option"
+                type="button"
+              >
+                {target.image ? (
+                  <img alt="" src={target.image} />
+                ) : (
+                  <span className={`companion-channel-mention-avatar ${target.type}`}>
+                    {target.type === "agent" ? (
+                      <Bot size={16} />
+                    ) : (
+                      target.label.trim().charAt(0).toUpperCase() || "?"
+                    )}
+                  </span>
+                )}
+                <span className="companion-channel-mention-copy">
+                  <strong>{target.label}</strong>
+                  <small>@{target.handle}</small>
+                </span>
+                <em>{target.detail}</em>
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
       <span aria-hidden="true" className="companion-channel-composer-add">
         <Plus size={20} />
       </span>
       <input
+        aria-activedescendant={
+          showsSuggestions
+            ? `${mentionListId}-option-${activeSuggestionIndex}`
+            : undefined
+        }
+        aria-autocomplete="list"
+        aria-controls={showsSuggestions ? mentionListId : undefined}
+        aria-expanded={showsSuggestions}
         aria-label={t("companion.channelMessagePlaceholder")}
         disabled={busy}
-        onChange={(event) => setBody(event.target.value)}
+        onChange={(event) => {
+          setBody(event.target.value);
+          setCaret(event.target.selectionStart ?? event.target.value.length);
+          setMentionDismissed(false);
+        }}
+        onClick={(event) => setCaret(event.currentTarget.selectionStart ?? 0)}
+        onKeyDown={(event) => {
+          if (!showsSuggestions) return;
+          if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+            event.preventDefault();
+            const offset = event.key === "ArrowDown" ? 1 : -1;
+            setActiveSuggestionIndex(
+              (index) => (index + offset + suggestions.length) % suggestions.length,
+            );
+            return;
+          }
+          if (event.key === "Enter" || event.key === "Tab") {
+            event.preventDefault();
+            const target = suggestions[activeSuggestionIndex] ?? suggestions[0];
+            if (target) pick(target);
+            return;
+          }
+          if (event.key === "Escape") {
+            event.preventDefault();
+            setMentionDismissed(true);
+          }
+        }}
+        onKeyUp={(event) => setCaret(event.currentTarget.selectionStart ?? 0)}
         placeholder={t("companion.channelMessagePlaceholder")}
+        ref={inputRef}
+        role="combobox"
         value={body}
       />
       {body.trim() ? (

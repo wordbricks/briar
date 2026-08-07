@@ -5,6 +5,8 @@ final class ChannelsStore: ObservableObject {
     @Published private(set) var channels: [ChannelSummary] = []
     @Published private(set) var messages: [ChannelMessage] = []
     @Published private(set) var thread: [ChannelMessage] = []
+    @Published private(set) var members: [ChannelMember] = []
+    @Published private(set) var agents: [ChannelAgentSummary] = []
     @Published private(set) var loading = false
     @Published private(set) var sending = false
     @Published private(set) var errorMessage: String?
@@ -22,6 +24,8 @@ final class ChannelsStore: ObservableObject {
         channels = []
         messages = []
         thread = []
+        members = []
+        agents = []
         guard organizationID != nil, token != nil else { return }
         Task { await refresh() }
     }
@@ -48,6 +52,8 @@ final class ChannelsStore: ObservableObject {
         loading = true
         messages = []
         thread = []
+        members = []
+        agents = []
         defer { loading = false }
         do {
             let response: ChannelDetailResponse = try await api.get(
@@ -59,6 +65,8 @@ final class ChannelsStore: ObservableObject {
                 as: ChannelDetailResponse.self
             )
             messages = response.messages
+            members = response.members
+            agents = response.agents
             errorMessage = nil
         } catch {
             errorMessage = CompanionStore.message(for: error)
@@ -88,7 +96,12 @@ final class ChannelsStore: ObservableObject {
     }
 
     /// A nil `parentMessageID` posts to the channel; otherwise into that thread.
-    func send(channelID: UUID, parentMessageID: UUID?, body: String) async {
+    func send(
+        channelID: UUID,
+        parentMessageID: UUID?,
+        body: String,
+        mentions: [ChannelMentionTarget]
+    ) async {
         guard let organizationID, let token else { return }
         let trimmed = body.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
@@ -104,7 +117,13 @@ final class ChannelsStore: ObservableObject {
                 token: token,
                 body: CreateChannelMessageRequest(
                     body: trimmed,
-                    parentMessageId: parentMessageID
+                    parentMessageId: parentMessageID,
+                    mentionedUserIds: mentions.compactMap {
+                        $0.kind == .user ? $0.recipientId : nil
+                    },
+                    mentionedAgentIds: mentions.compactMap {
+                        $0.kind == .agent ? UUID(uuidString: $0.recipientId) : nil
+                    }
                 ),
                 as: CreateChannelMessageResponse.self
             )

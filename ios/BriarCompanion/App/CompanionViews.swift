@@ -47,6 +47,7 @@ struct CompanionShellView: View {
                 ChannelsHomeView(
                     channels: channels,
                     activeProjectID: project.id,
+                    currentUserID: user?.id,
                     projects: projects
                 )
                 .navigationTitle(L10n.text(.channelHome, locale: companionLocale))

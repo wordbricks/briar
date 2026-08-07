@@ -1687,6 +1687,7 @@ export function App() {
           <>
             <CompanionChannels
               activeProjectId={activeProject?.id ?? null}
+              currentUserId={briar.user?.id ?? null}
               organizationId={briar.activeOrganizationId}
               projects={activeOrganizationProjects}
               token={briar.token}

@@ -10,6 +10,7 @@ export type MentionTarget = {
   handle: string;
   label: string;
   detail: string;
+  image?: string | null;
 };
 
 export type MentionQuery = {
@@ -17,6 +18,16 @@ export type MentionQuery = {
   end: number;
   query: string;
 };
+
+/** Produces a token the mention parser can recognize even for a display name. */
+export function mentionHandle(value: string) {
+  return (
+    value
+      .toLocaleLowerCase()
+      .replace(/[^\p{L}\p{N}_.-]+/gu, "-")
+      .replace(/^-+|-+$/gu, "") || "member"
+  );
+}
 
 /**
  * Finds the `@` token the caret sits inside, if any. Mirrors the issue
