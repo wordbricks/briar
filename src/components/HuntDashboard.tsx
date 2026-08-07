@@ -3529,7 +3529,6 @@ function KanbanCard({
             tone={meta.tone}
           />
           <i className="kanban-source">
-            <span className={`source-dot ${run.source}`} />
             {t(`source.${run.source}` as MessageKey)}
           </i>
           {run.executionReadiness === "waiting" && (

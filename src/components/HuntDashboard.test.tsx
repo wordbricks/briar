@@ -375,7 +375,8 @@ describe("HuntDashboard", () => {
     );
 
     expect(markup).toContain('class="kanban-source"');
-    expect(markup).toContain('class="source-dot issue"');
+    expect(markup).toContain("이슈");
+    expect(markup).not.toContain('class="source-dot issue"');
     expect(markup).not.toContain("lucide-paperclip");
     expect(markup).not.toContain("screenshot.png");
     expect(markup).not.toContain("attachment-1");
