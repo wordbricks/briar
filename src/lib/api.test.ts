@@ -31,6 +31,7 @@ import {
   removeIssueDependency,
   sendChannelMessage,
   reworkPausedHuntRun,
+  setChannelMember,
   updateProjectAgent,
   updateProjectAgentSchedule,
   updateOrganizationMemberRole,
@@ -80,6 +81,33 @@ describe("Project settings", () => {
 });
 
 describe("API errors", () => {
+  it("adds a member to a channel with the member role", async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response(JSON.stringify({ members: [] }), {
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await setChannelMember(
+      "token",
+      "organization-1",
+      "channel-1",
+      "user/1",
+      true,
+    );
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "/organizations/organization-1/channels/channel-1/members/user%2F1",
+      ),
+      expect.objectContaining({
+        method: "PUT",
+        body: JSON.stringify({ role: "member" }),
+      }),
+    );
+  });
+
   it("preserves API validation metadata when adding context to an error", () => {
     const original = new ApiError(
       400,

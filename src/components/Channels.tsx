@@ -1,6 +1,7 @@
 import {
   AtSign,
   Bot,
+  Check,
   FileText,
   Hash,
   Headphones,
@@ -10,6 +11,7 @@ import {
   MessageSquare,
   MoreHorizontal,
   Paperclip,
+  Search,
   Send,
   Type,
   UserPlus,
@@ -36,10 +38,15 @@ import {
   acceptChannelProposal,
   listChannelMessages,
   listChannels,
+  listOrganizationAgents,
   loadChannel,
   loadChannelDelta,
+  loadOrganizationMembers,
   sendChannelMessage,
+  setChannelAgent,
+  setChannelMember,
 } from "../lib/api";
+import type { OrganizationMember } from "../types";
 import type {
   ChannelAgentReply,
   ChannelAgentSummary,
@@ -90,8 +97,11 @@ type ChannelsProps = {
   onChannelsChange: Dispatch<SetStateAction<ChannelSummary[]>>;
   onIssueCreated?: (runId: string) => void;
   onCreateAgent?: () => void;
-  onAddPeople?: () => void;
 };
+
+type ChannelInviteCandidate =
+  | { type: "user"; id: string; member: OrganizationMember }
+  | { type: "agent"; id: string; agent: ChannelAgentSummary };
 
 const mergeMessages = (
   current: ChannelMessage[],
@@ -158,7 +168,6 @@ export function Channels({
   onChannelsChange,
   onIssueCreated,
   onCreateAgent,
-  onAddPeople,
 }: ChannelsProps) {
   const { t, localeTag } = useI18n();
   const [members, setMembers] = useState<ChannelMember[]>([]);
@@ -169,6 +178,12 @@ export function Channels({
   const [threadMessages, setThreadMessages] = useState<ChannelMessage[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [inviteMembers, setInviteMembers] = useState<OrganizationMember[]>([]);
+  const [inviteAgents, setInviteAgents] = useState<ChannelAgentSummary[]>([]);
+  const [inviteLoading, setInviteLoading] = useState(false);
+  const [inviteSaving, setInviteSaving] = useState(false);
+  const [inviteError, setInviteError] = useState<string | null>(null);
   const [threadWidth, setThreadWidth] = useState<number | null>(() =>
     loadChannelThreadWidth(),
   );
@@ -185,6 +200,90 @@ export function Channels({
   const activeChannel = useMemo(
     () => channels.find((channel) => channel.id === activeChannelId) ?? null,
     [channels, activeChannelId],
+  );
+
+  const openInvite = useCallback(() => {
+    if (!activeChannelId) return;
+    setInviteOpen(true);
+    setInviteLoading(true);
+    setInviteError(null);
+    setInviteMembers([]);
+    setInviteAgents([]);
+    void Promise.all([
+      loadOrganizationMembers(token, organizationId),
+      listOrganizationAgents(token, organizationId),
+    ])
+      .then(([organizationMembers, organizationAgents]) => {
+        setInviteMembers(organizationMembers);
+        setInviteAgents(organizationAgents.agents);
+      })
+      .catch((cause) => setInviteError(errorMessage(cause)))
+      .finally(() => setInviteLoading(false));
+  }, [activeChannelId, organizationId, token]);
+
+  const addInvitees = useCallback(
+    async (selected: ChannelInviteCandidate[]) => {
+      if (!activeChannelId || selected.length === 0) return;
+      setInviteSaving(true);
+      setInviteError(null);
+      const refreshRoster = async () => {
+        const refreshed = await loadChannel(
+          token,
+          organizationId,
+          activeChannelId,
+        );
+        setMembers(refreshed.members);
+        setAgents(refreshed.agents);
+        onChannelsChange((current) =>
+          current.map((channel) =>
+            channel.id === refreshed.channel.id ? refreshed.channel : channel,
+          ),
+        );
+      };
+      try {
+        const results = await Promise.allSettled(
+          selected.map((candidate) =>
+            candidate.type === "user"
+              ? setChannelMember(
+                  token,
+                  organizationId,
+                  activeChannelId,
+                  candidate.id,
+                  true,
+                )
+              : setChannelAgent(
+                  token,
+                  organizationId,
+                  activeChannelId,
+                  candidate.id,
+                  true,
+                ),
+          ),
+        );
+        const failed = results.find(
+          (result): result is PromiseRejectedResult =>
+            result.status === "rejected",
+        );
+        try {
+          await refreshRoster();
+        } catch (cause) {
+          setInviteError(errorMessage(failed?.reason ?? cause));
+          return;
+        }
+
+        if (failed) {
+          // Some idempotent roster writes may have succeeded. Keep the modal
+          // open with the refreshed roster so retrying the remaining entries
+          // is safe and cannot race an in-flight write.
+          setInviteError(errorMessage(failed.reason));
+          return;
+        }
+        setInviteOpen(false);
+      } finally {
+        setInviteSaving(false);
+      }
+    },
+    [activeChannelId, onChannelsChange, organizationId, token],
   );
 
   useEffect(() => {
@@ -496,7 +595,7 @@ export function Channels({
                   type="button"
                   className="channel-header-icon channel-header-members"
                   aria-label={t("channel.headerMembers", { count: memberCount })}
-                  onClick={onAddPeople}
+                  onClick={openInvite}
                 >
                   <Users size={16} aria-hidden="true" />
                   <span>{memberCount}</span>
@@ -526,7 +625,7 @@ export function Channels({
               <ChannelWelcome
                 channel={activeChannel}
                 onCreateAgent={onCreateAgent}
-                onAddPeople={onAddPeople}
+                onAddPeople={openInvite}
               />
 
               {messages.map((message) => {
@@ -574,6 +673,7 @@ export function Channels({
               members={members}
               currentUserId={currentUserId}
               channelName={activeChannel.name}
+              onInvite={openInvite}
               onSend={(body, mentions, attachments, references) =>
                 void send(body, mentions, null, attachments, references)
               }
@@ -632,6 +732,7 @@ export function Channels({
             members={members}
             currentUserId={currentUserId}
             channelName={activeChannel.name}
+            onInvite={openInvite}
             placeholder={t("channel.threadPlaceholder")}
             onSend={(body, mentions, attachments, references) =>
               void send(
@@ -645,6 +746,23 @@ export function Channels({
           />
           </aside>
         </>
+      ) : null}
+
+      {inviteOpen && activeChannel ? (
+        <ChannelInviteDialog
+          agents={inviteAgents}
+          channel={activeChannel}
+          channelAgents={agents}
+          channelMembers={members}
+          loading={inviteLoading}
+          members={inviteMembers}
+          saving={inviteSaving}
+          error={inviteError}
+          onAdd={(selected) => void addInvitees(selected)}
+          onClose={() => {
+            if (!inviteSaving) setInviteOpen(false);
+          }}
+        />
       ) : null}
     </div>
   );
@@ -708,6 +826,215 @@ function ChannelWelcome({
           <span>{t("channel.addPeopleHint")}</span>
         </button>
       </div>
+    </div>
+  );
+}
+
+function ChannelInviteDialog({
+  agents,
+  channel,
+  channelAgents,
+  channelMembers,
+  error,
+  loading,
+  members,
+  saving,
+  onAdd,
+  onClose,
+}: {
+  agents: ChannelAgentSummary[];
+  channel: ChannelSummary;
+  channelAgents: ChannelAgentSummary[];
+  channelMembers: ChannelMember[];
+  error: string | null;
+  loading: boolean;
+  members: OrganizationMember[];
+  saving: boolean;
+  onAdd: (selected: ChannelInviteCandidate[]) => void;
+  onClose: () => void;
+}) {
+  const { t } = useI18n();
+  const titleId = useId();
+  const [query, setQuery] = useState("");
+  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !saving) onClose();
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [onClose, saving]);
+
+  const candidates = useMemo<ChannelInviteCandidate[]>(() => {
+    const channelMemberIds = new Set(
+      channelMembers.map((member) => member.userId),
+    );
+    const channelAgentIds = new Set(
+      channelAgents.map((agent) => agent.agentId),
+    );
+    return [
+      ...members
+        .filter((member) => !channelMemberIds.has(member.userId))
+        .map((member) => ({
+          type: "user" as const,
+          id: member.userId,
+          member,
+        })),
+      ...agents
+        .filter((agent) => !channelAgentIds.has(agent.agentId))
+        .map((agent) => ({
+          type: "agent" as const,
+          id: agent.agentId,
+          agent,
+        })),
+    ];
+  }, [agents, channelAgents, channelMembers, members]);
+
+  const normalizedQuery = query.trim().toLowerCase();
+  const filtered = candidates.filter((candidate) => {
+    if (!normalizedQuery) return true;
+    const searchable =
+      candidate.type === "user"
+        ? `${candidate.member.name} ${candidate.member.email}`
+        : `${candidate.agent.name} ${candidate.agent.handle ?? ""} ${candidate.agent.provider} ${candidate.agent.responsibility}`;
+    return searchable.toLowerCase().includes(normalizedQuery);
+  });
+
+  const toggle = (candidate: ChannelInviteCandidate) => {
+    const key = `${candidate.type}:${candidate.id}`;
+    setSelectedKeys((current) => {
+      const next = new Set(current);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const selected = candidates.filter((candidate) =>
+    selectedKeys.has(`${candidate.type}:${candidate.id}`),
+  );
+
+  return (
+    <div
+      className="channel-invite-overlay"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget && !saving) onClose();
+      }}
+    >
+      <section
+        aria-labelledby={titleId}
+        aria-modal="true"
+        className="channel-invite-dialog"
+        role="dialog"
+      >
+        <header>
+          <div>
+            <h2 id={titleId}>
+              {t("channel.inviteTitle", { name: channel.name })}
+            </h2>
+            <p>{t("channel.inviteDescription")}</p>
+          </div>
+          <button
+            aria-label={t("common.close")}
+            disabled={saving}
+            onClick={onClose}
+            type="button"
+          >
+            <X size={20} />
+          </button>
+        </header>
+
+        <label className="channel-invite-search">
+          <Search aria-hidden="true" size={17} />
+          <input
+            autoFocus
+            disabled={loading || saving}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder={t("channel.inviteSearchPlaceholder")}
+            type="search"
+            value={query}
+          />
+        </label>
+
+        <div className="channel-invite-results">
+          {loading ? (
+            <p className="channel-invite-status">
+              <LoaderCircle className="spin" size={16} />
+              {t("channel.inviteLoading")}
+            </p>
+          ) : filtered.length > 0 ? (
+            filtered.map((candidate) => {
+              const key = `${candidate.type}:${candidate.id}`;
+              const checked = selectedKeys.has(key);
+              const name =
+                candidate.type === "user"
+                  ? candidate.member.name
+                  : candidate.agent.name;
+              const detail =
+                candidate.type === "user"
+                  ? candidate.member.email
+                  : candidate.agent.projectId
+                    ? t("channel.projectAgent")
+                    : t("channel.orgAgent");
+              const image =
+                candidate.type === "user" ? candidate.member.image : null;
+              return (
+                <button
+                  aria-pressed={checked}
+                  className="channel-invite-candidate"
+                  disabled={saving}
+                  key={key}
+                  onClick={() => toggle(candidate)}
+                  type="button"
+                >
+                  <span className={`channel-invite-avatar ${candidate.type}`}>
+                    {image ? (
+                      <img alt="" src={image} />
+                    ) : candidate.type === "agent" ? (
+                      <Bot aria-hidden="true" size={18} />
+                    ) : (
+                      authorInitial(name)
+                    )}
+                  </span>
+                  <span>
+                    <strong>{name}</strong>
+                    <small>{detail}</small>
+                  </span>
+                  <i aria-hidden="true">{checked ? <Check size={15} /> : null}</i>
+                </button>
+              );
+            })
+          ) : (
+            <p className="channel-invite-status">
+              {candidates.length === 0
+                ? t("channel.inviteEveryoneAdded")
+                : t("channel.inviteNoResults")}
+            </p>
+          )}
+        </div>
+
+        {error ? (
+          <p className="channel-invite-error" role="alert">
+            {error}
+          </p>
+        ) : null}
+
+        <footer>
+          <span>
+            {selected.length > 0
+              ? t("channel.inviteSelected", { count: selected.length })
+              : t("channel.inviteSelectHint")}
+          </span>
+          <button
+            disabled={selected.length === 0 || loading || saving}
+            onClick={() => onAdd(selected)}
+            type="button"
+          >
+            {saving ? t("channel.inviting") : t("channel.inviteAdd")}
+          </button>
+        </footer>
+      </section>
     </div>
   );
 }
@@ -822,6 +1149,7 @@ function Composer({
   channelName,
   placeholder,
   busy,
+  onInvite,
   onSend,
 }: {
   agents: ChannelAgentSummary[];
@@ -830,6 +1158,7 @@ function Composer({
   channelName: string;
   placeholder?: string;
   busy: boolean;
+  onInvite: () => void;
   onSend: (
     body: string,
     mentions: MentionTarget[],
@@ -958,6 +1287,13 @@ function Composer({
 
   const submit = () => {
     if ((!body.trim() && images.length === 0) || busy) return;
+    if (body.trim() === "/invite" && images.length === 0) {
+      onInvite();
+      setBody("");
+      setMentions([]);
+      setMentionDismissed(false);
+      return;
+    }
     onSend(
       channelBodyWithImages(body, images),
       retainedMentions(body, mentions),
