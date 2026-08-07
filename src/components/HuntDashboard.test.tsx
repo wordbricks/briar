@@ -884,7 +884,7 @@ describe("HuntDashboard", () => {
       ".run-page-process-now",
     );
     expect(processNow).not.toBeNull();
-    expect(processNow?.textContent).toContain("바로 처리");
+    expect(processNow?.getAttribute("aria-label")).toContain("바로 처리");
     expect(processNow?.disabled).toBe(true);
     expect(
       titlebarActions?.querySelector(".run-page-properties-toggle"),
@@ -955,12 +955,60 @@ describe("HuntDashboard", () => {
     );
     expect(processNow).not.toBeNull();
     expect(processNow?.disabled).toBe(false);
-    expect(processNow?.textContent).toContain("바로 처리하기");
+    expect(processNow?.getAttribute("aria-label")).toContain("바로 처리하기");
     await act(async () => processNow?.click());
     expect(onProcessIssueNow).toHaveBeenCalledWith(queuedRun);
 
     await act(async () => root.unmount());
     container.remove();
+  });
+
+  it("shows the assignee and assigned worker as avatars in the issue header", () => {
+    const member = demoDashboard.members?.[0];
+    if (!member) throw new Error("Demo assignee is required");
+    const run = {
+      ...demoDashboard.runs[0],
+      assigneeUserId: member.userId,
+      workerId: dashboardWorker.id,
+    };
+    const markup = renderToStaticMarkup(
+      <TooltipProvider>
+        <RunPage
+          assignedWorker={dashboardWorker}
+          isSidebarOpen
+          error={null}
+          isRecovering={false}
+          mentionMembers={[
+            {
+              userId: member.userId,
+              name: member.name,
+              email: member.email,
+              image: null,
+              role: member.role,
+              createdAt: member.createdAt,
+            },
+          ]}
+          onBack={() => undefined}
+          onCancel={async () => undefined}
+          onLoadAttachment={async () => new Blob()}
+          onLoadIssueMessages={async () => []}
+          onLoadRunEvidence={async () => []}
+          onMove={async () => undefined}
+          onRetry={async () => undefined}
+          onSendIssueMessage={async () => {
+            throw new Error("not implemented in this test");
+          }}
+          run={run}
+        />
+      </TooltipProvider>,
+    );
+
+    expect(markup).toContain('class="run-page-property-badge assignee"');
+    expect(markup).toContain("issue-assignee-avatar");
+    expect(markup).toContain('class="run-page-property-badge worker"');
+    expect(markup).toContain("worker-icon");
+    expect(markup).toContain(`담당자: ${member.name}`);
+    expect(markup).toContain(`배정된 Worker: ${dashboardWorker.label}`);
   });
 
   it("renders the companion queue directly in its parent", () => {
@@ -1889,7 +1937,7 @@ describe("HuntDashboard", () => {
     expect(workflowStages[2]?.getAttribute("aria-label")).toContain("대기");
     expect(
       container.querySelectorAll(".run-page-property-badge"),
-    ).toHaveLength(4);
+    ).toHaveLength(3);
     const propertiesToggle = container.querySelector<HTMLButtonElement>(
       ".run-page-properties-toggle",
     );
@@ -2342,8 +2390,11 @@ describe("HuntDashboard", () => {
       demoDashboard.runs[0].title,
     );
     expect(container.querySelector(".run-page-actions-trigger")).not.toBeNull();
-    expect(container.querySelector(".run-page-process-now")).not.toBeNull();
-    expect(container.textContent).toContain("바로 처리");
+    const processNow = container.querySelector<HTMLButtonElement>(
+      ".run-page-process-now",
+    );
+    expect(processNow).not.toBeNull();
+    expect(processNow?.getAttribute("aria-label")).toContain("바로 처리");
     expect(container.querySelector(".run-page-meta")).toBeNull();
     expect(container.querySelector(".run-page-summary")).toBeNull();
 
@@ -4168,7 +4219,7 @@ describe("HuntDashboard", () => {
     expect(markup).toContain('class="recovery-panel"');
     expect(markup).toContain('class="run-page-property-badge red"');
     expect(markup).toContain(">실패</span>");
-    expect(markup).toContain('aria-expanded="false" class="run-page-properties-toggle"');
+    expect(markup).toContain('aria-expanded="false" aria-label="속성" class="run-page-properties-toggle"');
   });
 
   it("shows a concise paused checkpoint summary in the result tab", () => {

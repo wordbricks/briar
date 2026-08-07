@@ -63,6 +63,7 @@ import { useToast } from "@/components/ui/toast";
 import {
   Tooltip,
   TooltipContent,
+  TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Typography } from "@/components/ui/typography";
@@ -4960,37 +4961,59 @@ export function RunPage({
         <Signal aria-hidden="true" size={13} />
         {priorityLabel}
       </span>
-      <span className="run-page-property-badge worker" title={t("run.assignee")}>
-        <UserRound aria-hidden="true" size={13} />
-        {assignee?.name ?? t("run.unassigned")}
-      </span>
+      {assignee && (
+        <span
+          aria-label={`${t("issue.assignee")}: ${assignee.name}`}
+          className="run-page-property-badge assignee"
+          title={`${t("issue.assignee")}: ${assignee.name}`}
+        >
+          <IssueAssigneeAvatar member={assignee} />
+        </span>
+      )}
+      {executionWorker && (
+        <span
+          aria-label={t("run.workerAssigned", { worker: executionWorker.label })}
+          className="run-page-property-badge worker"
+          title={t("run.workerAssigned", { worker: executionWorker.label })}
+        >
+          <WorkerIcon icon={executionWorker.icon} size={18} />
+        </span>
+      )}
       <span className="run-page-property-badge agent" title={t("run.agent")}>
         <Bot aria-hidden="true" size={13} />
         {performedAgentName ?? t("run.unassigned")}
       </span>
     </div>
   );
+  const processNowLabel = t(
+    isProcessing
+      ? "issue.processNowRunning"
+      : canReassign
+        ? "worker.reassign"
+        : "issue.processNow",
+  );
   const processNowButton = (
-    <Button
-      className="run-page-process-now"
-      disabled={processNowDisabled}
-      onClick={onProcessNow}
-      size="sm"
-      type="button"
-    >
-      {isProcessing ? (
-        <LoaderCircle aria-hidden="true" className="spin" size={15} />
-      ) : (
-        <Bot aria-hidden="true" size={15} />
-      )}
-      {t(
-        isProcessing
-          ? "issue.processNowRunning"
-          : canReassign
-            ? "worker.reassign"
-            : "issue.processNow",
-      )}
-    </Button>
+    <TooltipProvider delayDuration={200}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            aria-label={processNowLabel}
+            className="run-page-process-now"
+            disabled={processNowDisabled}
+            onClick={onProcessNow}
+            size="icon-sm"
+            type="button"
+          >
+            {isProcessing ? (
+              <LoaderCircle aria-hidden="true" className="spin" size={15} />
+            ) : (
+              <Play aria-hidden="true" size={15} />
+            )}
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side="bottom">{processNowLabel}</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
   return (
     <MainContent className="run-page-shell" id="issue-detail">
@@ -5037,12 +5060,12 @@ export function RunPage({
             <button
               aria-controls="run-properties-panel"
               aria-expanded={isPropertiesOpen}
+              aria-label={t("run.properties")}
               className="run-page-properties-toggle"
               onClick={() => setIsPropertiesOpen((open) => !open)}
               type="button"
             >
               <Columns3 aria-hidden="true" size={15} />
-              {t("run.properties")}
               <ChevronDown aria-hidden="true" size={13} />
             </button>
             <button
@@ -5154,12 +5177,12 @@ export function RunPage({
                   <button
                     aria-controls="run-properties-panel"
                     aria-expanded={isPropertiesOpen}
+                    aria-label={t("run.properties")}
                     className="run-page-properties-toggle"
                     onClick={() => setIsPropertiesOpen((open) => !open)}
                     type="button"
                   >
                     <Columns3 aria-hidden="true" size={15} />
-                    {t("run.properties")}
                     <ChevronDown aria-hidden="true" size={13} />
                   </button>
                 </div>
