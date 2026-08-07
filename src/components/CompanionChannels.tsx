@@ -18,6 +18,7 @@ import {
   useState,
 } from "react";
 import {
+  acceptChannelProposal,
   listChannelMessages,
   listChannels,
   loadChannel,
@@ -62,6 +63,7 @@ type CompanionChannelsProps = {
   currentUserId: string | null;
   projects: readonly ChannelGroupProject[];
   token: string;
+  onIssueOpen?: (projectId: string, runId: string) => void;
 };
 
 /**
@@ -75,6 +77,7 @@ export function CompanionChannels({
   currentUserId,
   projects,
   token,
+  onIssueOpen,
 }: CompanionChannelsProps) {
   const { t } = useI18n();
   const [channels, setChannels] = useState<ChannelSummary[]>([]);
@@ -87,6 +90,9 @@ export function CompanionChannels({
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [proposalProjects, setProposalProjects] = useState<
+    Record<string, string>
+  >({});
 
   useEffect(() => {
     let cancelled = false;
@@ -200,6 +206,49 @@ export function CompanionChannels({
     [channel, organizationId, threadParentId, token],
   );
 
+  const acceptProposal = useCallback(
+    async (item: ChannelMessage) => {
+      if (!channel || !item.proposal) return;
+      const proposalId = item.proposal.id;
+      const projectId =
+        proposalProjects[item.proposal.id] ??
+        item.proposal.projectId ??
+        channel.defaultProjectId;
+      if (!projectId) return;
+      setBusy(true);
+      setError(null);
+      try {
+        const result = await acceptChannelProposal(
+          token,
+          organizationId,
+          channel.id,
+          proposalId,
+          projectId,
+        );
+        const applyResult = (candidate: ChannelMessage): ChannelMessage => {
+          if (candidate.proposal?.id !== proposalId) return candidate;
+          return {
+            ...candidate,
+            proposal: {
+              ...candidate.proposal,
+              status: "accepted",
+              projectId: result.projectId,
+              resultRunId: result.resultRunId,
+            },
+          };
+        };
+        setMessages((current) => current.map(applyResult));
+        setThread((current) => current?.map(applyResult) ?? null);
+        onIssueOpen?.(result.projectId, result.resultRunId);
+      } catch (cause) {
+        setError(message(cause));
+      } finally {
+        setBusy(false);
+      }
+    },
+    [channel, onIssueOpen, organizationId, proposalProjects, token],
+  );
+
   if (channel && threadParentId) {
     return (
       <section className="companion-channels companion-channel-detail">
@@ -216,9 +265,25 @@ export function CompanionChannels({
           {(thread ?? []).map((item) => (
             <MessageRow
               agents={agents}
+              busy={busy}
+              channel={channel}
               key={item.id}
               members={members}
               message={item}
+              onAcceptProposal={() => void acceptProposal(item)}
+              onIssueOpen={onIssueOpen}
+              onProjectChange={(projectId) => {
+                const proposalId = item.proposal?.id;
+                if (!proposalId) return;
+                setProposalProjects((current) => ({
+                  ...current,
+                  [proposalId]: projectId,
+                }));
+              }}
+              projects={projects}
+              selectedProjectId={
+                item.proposal ? proposalProjects[item.proposal.id] ?? null : null
+              }
               token={token}
             />
           ))}
@@ -251,10 +316,26 @@ export function CompanionChannels({
           {messages.map((item) => (
             <MessageRow
               agents={agents}
+              busy={busy}
+              channel={channel}
               key={item.id}
               members={members}
               message={item}
+              onAcceptProposal={() => void acceptProposal(item)}
+              onIssueOpen={onIssueOpen}
               onOpenThread={() => void openThread(item)}
+              onProjectChange={(projectId) => {
+                const proposalId = item.proposal?.id;
+                if (!proposalId) return;
+                setProposalProjects((current) => ({
+                  ...current,
+                  [proposalId]: projectId,
+                }));
+              }}
+              projects={projects}
+              selectedProjectId={
+                item.proposal ? proposalProjects[item.proposal.id] ?? null : null
+              }
               showThreadSummary
               token={token}
             />
@@ -336,20 +417,41 @@ function ChannelBar({
 
 function MessageRow({
   agents,
+  busy,
+  channel,
   members,
   message,
+  onAcceptProposal,
+  onIssueOpen,
   onOpenThread,
+  onProjectChange,
+  projects,
+  selectedProjectId,
   showThreadSummary = false,
   token,
 }: {
   agents: ChannelAgentSummary[];
+  busy: boolean;
+  channel: ChannelSummary;
   members: ChannelMember[];
   message: ChannelMessage;
+  onAcceptProposal: () => void;
+  onIssueOpen?: (projectId: string, runId: string) => void;
   onOpenThread?: () => void;
+  onProjectChange: (projectId: string) => void;
+  projects: readonly ChannelGroupProject[];
+  selectedProjectId: string | null;
   showThreadSummary?: boolean;
   token: string;
 }) {
   const { localeTag, t } = useI18n();
+  const proposalProjectId =
+    selectedProjectId ?? message.proposal?.projectId ?? channel.defaultProjectId;
+  const needsProject =
+    message.proposal?.status === "pending" && !message.proposal.projectId &&
+    !channel.defaultProjectId;
+  const acceptedProjectId = message.proposal?.projectId;
+  const acceptedRunId = message.proposal?.resultRunId;
   return (
     <article className="companion-channel-message">
       <MessageAvatar message={message} />
@@ -375,6 +477,51 @@ function MessageRow({
             <FileText size={13} />
             {message.document.title}
           </span>
+        ) : null}
+        {message.proposal ? (
+          <div className="companion-channel-proposal">
+            <div className="companion-channel-proposal-copy">
+              <strong>{t("channel.issueProposal")}</strong>
+              <span>
+                {message.proposal.status === "accepted"
+                  ? t("channel.issueProposalAccepted")
+                  : t("channel.issueProposalPending")}
+              </span>
+            </div>
+            {needsProject ? (
+              <select
+                aria-label={t("channel.selectProposalProject")}
+                disabled={busy}
+                onChange={(event) => onProjectChange(event.currentTarget.value)}
+                value={selectedProjectId ?? ""}
+              >
+                <option disabled value="">
+                  {t("channel.selectProposalProject")}
+                </option>
+                {projects.map((project) => (
+                  <option key={project.id} value={project.id}>
+                    {project.name}
+                  </option>
+                ))}
+              </select>
+            ) : null}
+            {message.proposal.status === "pending" ? (
+              <button
+                disabled={busy || !proposalProjectId}
+                onClick={onAcceptProposal}
+                type="button"
+              >
+                {t("channel.createIssue")}
+              </button>
+            ) : acceptedProjectId && acceptedRunId && onIssueOpen ? (
+              <button
+                onClick={() => onIssueOpen(acceptedProjectId, acceptedRunId)}
+                type="button"
+              >
+                {t("channel.viewIssue")}
+              </button>
+            ) : null}
+          </div>
         ) : null}
         {showThreadSummary && onOpenThread ? (
           <button

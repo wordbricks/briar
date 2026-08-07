@@ -1573,7 +1573,8 @@ export async function acceptChannelProposal(
 ) {
   return request<{
     outcome: "accepted" | "already_accepted";
-    resultRunId: string | null;
+    projectId: string;
+    resultRunId: string;
   }>(
     `/organizations/${organizationId}/channels/${channelId}/proposals/${proposalId}/accept`,
     token,

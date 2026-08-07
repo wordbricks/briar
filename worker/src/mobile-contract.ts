@@ -436,6 +436,16 @@ export const mobileCreateChannelMessageResponseSchema = z.object({
   })),
 });
 
+export const mobileAcceptChannelProposalRequestSchema = z.object({
+  projectId: z.uuid().nullable(),
+}).strict();
+
+export const mobileAcceptChannelProposalResponseSchema = z.object({
+  outcome: z.enum(["accepted", "already_accepted"]),
+  projectId: z.uuid(),
+  resultRunId: z.uuid(),
+});
+
 export const mobileRunEvidenceResponseSchema = z.object({
   evidence: z.array(z.object({
     key: z.string(),
@@ -775,6 +785,10 @@ export const mobileOperationSchemas = {
   createChannelMessage: {
     request: mobileCreateChannelMessageRequestSchema,
     response: mobileCreateChannelMessageResponseSchema,
+  },
+  acceptChannelProposal: {
+    request: mobileAcceptChannelProposalRequestSchema,
+    response: mobileAcceptChannelProposalResponseSchema,
   },
 } as const;
 

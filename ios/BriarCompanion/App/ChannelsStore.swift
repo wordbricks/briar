@@ -9,6 +9,7 @@ final class ChannelsStore: ObservableObject {
     @Published private(set) var agents: [ChannelAgentSummary] = []
     @Published private(set) var loading = false
     @Published private(set) var sending = false
+    @Published private(set) var acceptingProposalID: UUID?
     @Published private(set) var errorMessage: String?
 
     private let api: any MobileAPIClientProtocol
@@ -135,6 +136,47 @@ final class ChannelsStore: ObservableObject {
             errorMessage = nil
         } catch {
             errorMessage = CompanionStore.message(for: error)
+        }
+    }
+
+    func acceptProposal(
+        channelID: UUID,
+        proposalID: UUID,
+        projectID: UUID
+    ) async -> AcceptChannelProposalResponse? {
+        guard let organizationID, let token else { return nil }
+        acceptingProposalID = proposalID
+        defer { acceptingProposalID = nil }
+        do {
+            let response: AcceptChannelProposalResponse = try await api.send(
+                MobileAPIContract.Endpoint.acceptChannelProposal(
+                    organizationID: organizationID,
+                    channelID: channelID,
+                    proposalID: proposalID
+                ),
+                method: "POST",
+                token: token,
+                body: AcceptChannelProposalRequest(projectId: projectID),
+                as: AcceptChannelProposalResponse.self
+            )
+            let accepted = ChannelMessage.Proposal(
+                id: proposalID,
+                actionType: .createIssue,
+                status: .accepted,
+                projectId: response.projectId,
+                resultRunId: response.resultRunId
+            )
+            for index in messages.indices where messages[index].proposal?.id == proposalID {
+                messages[index].proposal = accepted
+            }
+            for index in thread.indices where thread[index].proposal?.id == proposalID {
+                thread[index].proposal = accepted
+            }
+            errorMessage = nil
+            return response
+        } catch {
+            errorMessage = CompanionStore.message(for: error)
+            return nil
         }
     }
 

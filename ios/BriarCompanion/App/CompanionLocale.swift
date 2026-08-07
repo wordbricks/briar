@@ -61,9 +61,16 @@ enum L10n {
         case channelsEmpty
         case channelThread
         case channelReplies
+        case channelReplyInThread
         case channelLastReply
         case channelMessagePlaceholder
         case channelHome
+        case channelIssueProposal
+        case channelIssueProposalAccepted
+        case channelIssueProposalPending
+        case channelCreateIssue
+        case channelSelectProposalProject
+        case channelViewIssue
 
         var ko: String {
             switch self {
@@ -92,9 +99,16 @@ enum L10n {
             case .channelsEmpty: "채널이 없습니다."
             case .channelThread: "스레드"
             case .channelReplies: "답글 %d개"
+            case .channelReplyInThread: "스레드에서 답글"
             case .channelLastReply: "마지막 답글 %@"
             case .channelMessagePlaceholder: "#%@에 메시지 보내기"
             case .channelHome: "홈"
+            case .channelIssueProposal: "이슈 생성 제안"
+            case .channelIssueProposalAccepted: "승인되어 이슈가 생성되었습니다."
+            case .channelIssueProposalPending: "승인하면 이슈가 생성됩니다."
+            case .channelCreateIssue: "이슈 만들기"
+            case .channelSelectProposalProject: "프로젝트 선택"
+            case .channelViewIssue: "이슈 보기"
             case .notificationHint: "선택한 분류의 새 항목이 도착하면 로컬 알림을 보냅니다."
             }
         }
@@ -126,9 +140,16 @@ enum L10n {
             case .channelsEmpty: "No channels yet."
             case .channelThread: "Thread"
             case .channelReplies: "%d replies"
+            case .channelReplyInThread: "Reply in thread"
             case .channelLastReply: "last reply %@"
             case .channelMessagePlaceholder: "Message #%@"
             case .channelHome: "Home"
+            case .channelIssueProposal: "Issue proposal"
+            case .channelIssueProposalAccepted: "Accepted — the issue was created."
+            case .channelIssueProposalPending: "Accept to create an issue."
+            case .channelCreateIssue: "Create issue"
+            case .channelSelectProposalProject: "Select project"
+            case .channelViewIssue: "View issue"
             case .notificationHint: "Local notifications fire for newly arrived items in the selected categories."
             }
         }
@@ -160,9 +181,16 @@ enum L10n {
             case .channelsEmpty: "还没有频道。"
             case .channelThread: "话题"
             case .channelReplies: "%d 条回复"
+            case .channelReplyInThread: "在线程中回复"
             case .channelLastReply: "最后回复于%@"
             case .channelMessagePlaceholder: "发送消息到 #%@"
             case .channelHome: "主页"
+            case .channelIssueProposal: "创建问题建议"
+            case .channelIssueProposalAccepted: "已批准并创建问题。"
+            case .channelIssueProposalPending: "批准后将创建问题。"
+            case .channelCreateIssue: "创建问题"
+            case .channelSelectProposalProject: "选择项目"
+            case .channelViewIssue: "查看问题"
             case .notificationHint: "所选分类有新项目时会发送本地通知。"
             }
         }
