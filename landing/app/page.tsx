@@ -401,15 +401,6 @@ export default async function Home() {
       </header>
 
       <section className="hero" id="main-content" tabIndex={-1}>
-        <div className="hero-art" aria-hidden="true">
-          <img
-            src="/briar-hero-orchestration.webp"
-            alt=""
-            width="1899"
-            height="828"
-            fetchPriority="high"
-          />
-        </div>
         <div className="hero-content shell">
           <div className="hero-kicker">
             <span />
