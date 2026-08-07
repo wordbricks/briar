@@ -46,6 +46,7 @@ import {
   getIssueActionProposal,
   getOrganizationInvitationByTokenHash,
   getRunEvidenceImage,
+  getIssueMessage,
   getNextQueuedHuntRun,
   HuntClaimError,
   HuntTransitionError,
@@ -57,6 +58,8 @@ import {
   listIssueThreadMessages,
   listIssueResultReviews,
   listIssueReworkProposals,
+  updateIssueMessage,
+  deleteIssueMessage,
   listInboxReadStates,
   listDashboardChanges,
   listDashboardRuns,
@@ -2890,6 +2893,99 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       agentReplyId,
       nestedReplyId,
     ]);
+  });
+
+  it("edits a user message body without spawning an agent reply and deletes a message with its replies", async () => {
+    const runId = await recordHuntEvent(
+      db,
+      projectId,
+      event("queued", 30, {
+        sourceKey: "issue-message-edit-run",
+        eventKey: "issue-message-edit-run:queued",
+      }),
+    );
+    const rootId = "eeeeeeee-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    const replyId = "eeeeeeee-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+    await createIssueMessage(db, {
+      id: rootId,
+      projectId,
+      runId,
+      parentMessageId: null,
+      authorUserId: "owner",
+      authorAgentProvider: null,
+      body: "Original body",
+      createdAt: atMinute(30),
+    });
+    await createIssueMessage(db, {
+      id: replyId,
+      projectId,
+      runId,
+      parentMessageId: rootId,
+      authorUserId: "owner",
+      authorAgentProvider: null,
+      body: "Original reply",
+      createdAt: atMinute(31),
+    });
+    await executeSql(
+      db,
+      `
+      insert into user (id, name, email, emailVerified, createdAt, updatedAt)
+      values (
+        'issue-message-mention', 'Issue Mention',
+        'mention@example.com', 1, '${atMinute(0)}', '${atMinute(0)}'
+      );
+      insert into briar_organization_members (
+        organization_id, user_id, role, created_at, updated_at
+      ) values (
+        '${projectId}', 'issue-message-mention', 'member',
+        '${atMinute(0)}', '${atMinute(0)}'
+      );`,
+    );
+    const editedAt = atMinute(32);
+    const edited = await updateIssueMessage(db, projectId, runId, rootId, {
+      body: "@issue-message-mention 수정된 본문",
+      mentionedUserIds: ["issue-message-mention"],
+      updatedAt: editedAt,
+    });
+    expect(edited).toEqual(
+      expect.objectContaining({
+        id: rootId,
+        body: "@issue-message-mention 수정된 본문",
+        updated_at: editedAt,
+        author_name: "Owner",
+      }),
+    );
+    const mentionRows = await db
+      .prepare(
+        `select user_id from briar_issue_message_mentions
+         where message_id = ?`,
+      )
+      .bind(rootId)
+      .all<{ user_id: string }>();
+    expect(mentionRows.results.map((row) => row.user_id)).toEqual([
+      "issue-message-mention",
+    ]);
+    expect(await getIssueMessage(db, projectId, runId, rootId)).toEqual(
+      expect.objectContaining({
+        id: rootId,
+        body: "@issue-message-mention 수정된 본문",
+        reply_count: 1,
+      }),
+    );
+    expect(
+      await deleteIssueMessage(db, projectId, runId, rootId),
+    ).toBe(true);
+    const remaining = await listIssueMessages(db, projectId, runId);
+    expect(remaining).toEqual([]);
+    expect(await getIssueMessage(db, projectId, runId, rootId)).toBeNull();
+    const mentionAfter = await db
+      .prepare(
+        `select count(*) as count from briar_issue_message_mentions
+         where message_id = ?`,
+      )
+      .bind(rootId)
+      .first<{ count: number }>();
+    expect(mentionAfter?.count).toBe(0);
   });
 
   it("lists mentions and replies to a user's root messages for inbox delivery", async () => {

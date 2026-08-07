@@ -136,6 +136,7 @@ import {
   getIssueAgentReplyJob,
   getIssueReworkProposal,
   getIssueAttachment,
+  getIssueMessage,
   getRunEvidenceImage,
   getOrganizationRole,
   getOrganizationInvitationByTokenHash,
@@ -216,6 +217,8 @@ import {
   updateIssueCheckpoints,
   updateIssueExecutionPreferences,
   updateHuntRunExecutionMetrics,
+  updateIssueMessage,
+  deleteIssueMessage,
   updateSlackInstallationProject,
   upsertInboxReadStates,
   upsertProjectAgentSession,
@@ -1236,6 +1239,13 @@ const issueMessageInputSchema = z
       .max(1_000)
       .nullable()
       .optional(),
+  })
+  .strict();
+
+const issueMessageEditInputSchema = z
+  .object({
+    body: z.string().trim().min(1).max(10_000),
+    mentionedUserIds: z.array(z.string().min(1).max(200)).max(50).optional(),
   })
   .strict();
 
@@ -4320,6 +4330,42 @@ const listIssueMessagesWithArchive = async (
       left.created_at.localeCompare(right.created_at) ||
       left.id.localeCompare(right.id),
   );
+};
+
+const removeOrphanedIssueAttachments = async (
+  db: D1Database,
+  attachmentsBucket: R2Bucket,
+  projectId: string,
+  runId: string,
+) => {
+  const [messages, attachments] = await Promise.all([
+    listIssueMessages(db, projectId, runId),
+    listIssueAttachments(db, projectId, runId),
+  ]);
+  const referenced = new Set<string>();
+  for (const message of messages) {
+    for (const id of issueAttachmentReferences(message.body)) {
+      referenced.add(id);
+    }
+  }
+  const orphaned = attachments.filter((attachment) => !referenced.has(attachment.id));
+  if (orphaned.length === 0) return;
+  await deleteIssueAttachments(
+    db,
+    projectId,
+    runId,
+    orphaned.map((attachment) => attachment.id),
+  );
+  await Promise.all(
+    orphaned.map((attachment) => attachmentsBucket.delete(attachment.object_key)),
+  ).catch((error) => {
+    console.error(
+      JSON.stringify({
+        message: "orphaned issue attachment cleanup failed",
+        error: error instanceof Error ? error.message : String(error),
+      }),
+    );
+  });
 };
 
 const runEvidenceJson = (
@@ -7485,6 +7531,90 @@ async function route(
       },
       201,
     );
+  }
+
+  const issueMessageEditMatch = pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/messages\/([0-9a-f-]+)$/u,
+  );
+  if (issueMessageEditMatch && request.method === "PATCH") {
+    const session = await requireSession(auth, request);
+    const project = await getProject(
+      db,
+      issueMessageEditMatch[1],
+      session.user.id,
+    );
+    if (!project) throw new HttpError(404, "Project not found");
+    const input = issueMessageEditInputSchema.parse(await readJson(request));
+    const message = await getIssueMessage(
+      db,
+      project.id,
+      issueMessageEditMatch[2],
+      issueMessageEditMatch[3],
+    );
+    if (!message) throw new HttpError(404, "Message not found");
+    if (message.author_user_id !== session.user.id) {
+      throw new HttpError(403, "Only the author can edit this message");
+    }
+    const updated = await updateIssueMessage(
+      db,
+      project.id,
+      issueMessageEditMatch[2],
+      message.id,
+      {
+        body: input.body,
+        mentionedUserIds: input.mentionedUserIds,
+        updatedAt: new Date().toISOString(),
+      },
+    );
+    if (!updated) throw new HttpError(404, "Message not found");
+    await removeOrphanedIssueAttachments(
+      db,
+      attachmentsBucket,
+      project.id,
+      issueMessageEditMatch[2],
+    );
+    const [attachments, reworkProposals, actionProposals] = await Promise.all([
+      listIssueAttachments(db, project.id, issueMessageEditMatch[2]),
+      listIssueReworkProposals(db, project.id, issueMessageEditMatch[2]),
+      listIssueActionProposals(db, project.id, issueMessageEditMatch[2]),
+    ]);
+    const proposal = [...reworkProposals, ...actionProposals].find(
+      (candidate) => candidate.reply_message_id === updated.id,
+    ) ?? null;
+    return json({ message: issueMessageJson(updated, attachments, proposal) });
+  }
+  if (issueMessageEditMatch && request.method === "DELETE") {
+    const session = await requireSession(auth, request);
+    const project = await getProject(
+      db,
+      issueMessageEditMatch[1],
+      session.user.id,
+    );
+    if (!project) throw new HttpError(404, "Project not found");
+    const message = await getIssueMessage(
+      db,
+      project.id,
+      issueMessageEditMatch[2],
+      issueMessageEditMatch[3],
+    );
+    if (!message) throw new HttpError(404, "Message not found");
+    if (message.author_user_id !== session.user.id) {
+      throw new HttpError(403, "Only the author can delete this message");
+    }
+    const deleted = await deleteIssueMessage(
+      db,
+      project.id,
+      issueMessageEditMatch[2],
+      message.id,
+    );
+    if (!deleted) throw new HttpError(404, "Message not found");
+    await removeOrphanedIssueAttachments(
+      db,
+      attachmentsBucket,
+      project.id,
+      issueMessageEditMatch[2],
+    );
+    return new Response(null, { status: 204, headers: corsHeaders });
   }
 
   const issueAgentReplyStatusMatch = pathname.match(

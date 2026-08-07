@@ -5003,6 +5003,104 @@ export async function createIssueMessage(
   return messages.find((message) => message.id === input.id) ?? null;
 }
 
+export async function getIssueMessage(
+  db: D1Database,
+  projectId: string,
+  runId: string,
+  messageId: string,
+) {
+  return await db
+    .prepare(
+      `select message.id, message.run_id, message.parent_message_id,
+              message.author_user_id, message.author_agent_provider,
+              author.name as author_name,
+              author.image as author_image, message.body,
+              (select count(*) from briar_issue_messages reply
+               where reply.parent_message_id = message.id) as reply_count,
+              message.created_at, message.updated_at
+       from briar_issue_messages message
+       left join "user" author on author.id = message.author_user_id
+       where message.project_id = ? and message.run_id = ? and message.id = ?`,
+    )
+    .bind(projectId, runId, messageId)
+    .first<IssueMessageRow>();
+}
+
+export async function updateIssueMessage(
+  db: D1Database,
+  projectId: string,
+  runId: string,
+  messageId: string,
+  input: {
+    body: string;
+    mentionedUserIds?: string[];
+    updatedAt: string;
+  },
+) {
+  const updated = await db
+    .prepare(
+      `update briar_issue_messages
+       set body = ?, updated_at = ?
+       where project_id = ? and run_id = ? and id = ?`,
+    )
+    .bind(input.body, input.updatedAt, projectId, runId, messageId)
+    .run();
+  if (updated.meta.changes < 1) return null;
+  const mentionedUserIds = [...new Set(input.mentionedUserIds ?? [])];
+  await db.batch([
+    db
+      .prepare(`delete from briar_issue_message_mentions where message_id = ?`)
+      .bind(messageId),
+    ...mentionedUserIds.map((userId) =>
+      db
+        .prepare(
+          `insert into briar_issue_message_mentions (
+             message_id, user_id, created_at
+           )
+           select message.id, membership.user_id, ?
+           from briar_issue_messages message
+           join briar_projects project on project.id = message.project_id
+           join briar_organization_members membership
+             on membership.organization_id = project.organization_id
+            and membership.user_id = ?
+           where message.id = ?
+             and (message.author_user_id is null
+               or message.author_user_id != membership.user_id)
+           on conflict (message_id, user_id) do nothing`,
+        )
+        .bind(input.updatedAt, userId, messageId),
+    ),
+  ]);
+  const messages = await listIssueMessages(db, projectId, runId);
+  return messages.find((message) => message.id === messageId) ?? null;
+}
+
+export async function deleteIssueMessage(
+  db: D1Database,
+  projectId: string,
+  runId: string,
+  messageId: string,
+) {
+  const result = await db
+    .prepare(
+      `with recursive descendants(id) as (
+         select message.id
+         from briar_issue_messages message
+         where message.project_id = ? and message.run_id = ? and message.id = ?
+         union all
+         select reply.id
+         from briar_issue_messages reply
+         join descendants parent on reply.parent_message_id = parent.id
+         where reply.project_id = ? and reply.run_id = ?
+       )
+       delete from briar_issue_messages
+       where id in (select id from descendants)`,
+    )
+    .bind(projectId, runId, messageId, projectId, runId)
+    .run();
+  return result.meta.changes > 0;
+}
+
 export async function enqueueIssueAgentReply(
   db: D1Database,
   input: {
