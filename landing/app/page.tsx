@@ -26,198 +26,22 @@ function Arrow() {
 }
 
 function ProductStage({ c }: { c: LandingCopy }) {
-  const columns = [
-    {
-      name: "Backlog",
-      tone: "slate",
-      cards: [
-        { id: "AH-18", title: c.dashboard.issues[3], meta: "Issue · 1h" },
-        { id: "AH-21", title: c.dashboard.issues[2], meta: "Feedback · 36m" },
-      ],
-    },
-    {
-      name: "Queued",
-      tone: "amber",
-      cards: [
-        { id: "AH-23", title: c.dashboard.issues[1], meta: "Issue · 14m" },
-      ],
-    },
-    {
-      name: "Analyze",
-      tone: "blue",
-      cards: [
-        { id: "AH-24", title: c.dashboard.issues[0], meta: "Issue · 4m" },
-      ],
-    },
-    {
-      name: "Implement",
-      tone: "violet",
-      cards: [
-        {
-          id: "AH-24",
-          title: c.workflow.issueTitle,
-          meta: `Codex · ${c.dashboard.now}`,
-          active: true,
-        },
-        { id: "AH-19", title: c.workflow.writingTests, meta: "Claude · 9m" },
-      ],
-    },
-  ] as const;
-
   return (
-    <div className="product-stage" aria-label={c.aria.productPreview}>
-      <div className="stage-glow" />
-      <div className="product-window board-window">
-        <div className="window-topbar">
-          <div className="window-traffic" aria-hidden="true">
-            <i />
-            <i />
-            <i />
-          </div>
-          <div className="window-project">
-            <span className="window-project-mark">B</span>
-            wordbricks / briar
-          </div>
-          <div className="window-live">
-            <span />
-            Live
-          </div>
-        </div>
-
-        <div className="board-shell">
-          <aside className="board-rail" aria-hidden="true">
-            <img src="/briar-app-icon.png" alt="" />
-            <span>⌁</span>
-            <span>▦</span>
-            <span>⌕</span>
-            <i />
-            <span className="rail-active">◆</span>
-            <span>◇</span>
-            <span>＋</span>
-          </aside>
-
-          <aside className="board-sidebar">
-            <div className="board-sidebar-brand">
-              <strong>Briar</strong>
-              <span>⌄</span>
-            </div>
-            <a href="#workflow">
-              <span>⌂</span> Inbox <i>3</i>
-            </a>
-            <p>Projects</p>
-            <div className="board-project">
-              <div>
-                <span>⌘</span>
-                <strong>Briar</strong>
-                <i />
-              </div>
-              <a className="board-project-active" href="#product">
-                <span>⌁</span> Issues <em>6</em>
-              </a>
-              <a href="#agents">
-                <span>✦</span> Agents
-              </a>
-              <a href="#workflow">
-                <span>□</span> Schedule
-              </a>
-            </div>
-            <div className="board-profile">
-              <span>J</span>
-              <div>
-                <strong>Jay</strong>
-                <small>demo@briar.local</small>
-              </div>
-            </div>
-          </aside>
-
-          <section className="board-main">
-            <div className="board-toolbar">
-              <div>
-                <strong>Task queue</strong>
-                <small>6 tasks</small>
-              </div>
-              <div className="board-toolbar-actions">
-                <button type="button">＋ {c.dashboard.newIssue.replace("+ ", "")}</button>
-                <span>⌕ Search tasks</span>
-                <i>▦ Board</i>
-              </div>
-            </div>
-            <div className="board-filters">
-              <span className="is-selected">All <i>6</i></span>
-              <span>In progress <i>3</i></span>
-              <span>Needs attention <i>1</i></span>
-              <span>Completed <i>12</i></span>
-            </div>
-            <div className="kanban-board">
-              {columns.map((column) => (
-                <div className="kanban-column" key={column.name}>
-                  <div className="kanban-column-head">
-                    <span className={`column-dot ${column.tone}`} />
-                    <strong>{column.name}</strong>
-                    <i>{column.cards.length}</i>
-                  </div>
-                  <div className="kanban-card-list">
-                    {column.cards.map((card, index) => (
-                      <article
-                        className={`kanban-card ${"active" in card && card.active ? "is-running" : ""}`}
-                        key={`${card.id}-${index}`}
-                      >
-                        <div className="kanban-card-meta">
-                          <span>{card.id}</span>
-                          <i>Issue</i>
-                        </div>
-                        <strong>{card.title}</strong>
-                        {"active" in card && card.active ? (
-                          <div className="kanban-progress">
-                            <span>
-                              <i />
-                            </span>
-                            <em>Implement · 72%</em>
-                          </div>
-                        ) : null}
-                        <small>{card.meta}</small>
-                      </article>
-                    ))}
-                    {column.cards.length < 2 ? (
-                      <div className="kanban-empty">
-                        <span>⌁</span>
-                        Drop task here
-                      </div>
-                    ) : null}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-        </div>
-
-        <div className="board-statusbar">
-          <div>
-            <span>✦ Claude · Signed in</span>
-            <span>◉ Codex · Signed in</span>
-          </div>
-          <div>
-            <span>v1.2.22</span>
-            <strong>
-              <i /> {c.dashboard.active}
-            </strong>
-          </div>
-        </div>
-      </div>
-      <div className="floating-note floating-note-left">
-        <span className="note-icon">✓</span>
-        <div>
-          <strong>{c.dashboard.qaPassed}</strong>
-          <small>142 tests · 0 failures</small>
-        </div>
-      </div>
-      <div className="floating-note floating-note-right">
-        <span className="note-icon pr-note">↗</span>
-        <div>
-          <strong>{c.dashboard.prReady}</strong>
-          <small>3 files · +186 −24</small>
-        </div>
-      </div>
+    <div
+      className="product-stage product-stage-video"
+      aria-label={c.aria.productPreview}
+    >
+      <video
+        className="product-demo-video"
+        aria-hidden="true"
+        autoPlay
+        loop
+        muted
+        playsInline
+        preload="auto"
+      >
+        <source src="/briar-x-demo-20s.mp4" type="video/mp4" />
+      </video>
     </div>
   );
 }
@@ -389,18 +213,13 @@ export default async function Home() {
 
       <section className="hero">
         <div className="hero-art" aria-hidden="true">
-          <video
-            autoPlay
-            loop
-            muted
-            playsInline
-            preload="auto"
-            poster="/briar-hero-orchestration.webp"
+          <img
+            src="/briar-hero-orchestration.webp"
+            alt=""
             width="1899"
             height="828"
-          >
-            <source src="/briar-x-demo-20s.mp4" type="video/mp4" />
-          </video>
+            fetchPriority="high"
+          />
         </div>
         <div className="hero-content shell">
           <div className="hero-kicker">
