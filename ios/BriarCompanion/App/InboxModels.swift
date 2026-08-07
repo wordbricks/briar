@@ -21,6 +21,7 @@ enum InboxCategory: String, CaseIterable, Identifiable, Sendable {
 enum InboxMessageKind: String, Codable, Sendable {
     case issue
     case conversation
+    case channel
     case session
 }
 
@@ -40,6 +41,7 @@ struct InboxMessage: Identifiable, Equatable, Sendable {
     let priority: Int?
     let structuredResult: StructuredRunResult?
     let rootMessageId: UUID?
+    let channelMessageId: UUID?
 
     var isUnread: Bool = true
 }
@@ -74,7 +76,8 @@ enum InboxMessageBuilder {
                     requiresAttention: run.status.needsAttention,
                     priority: run.priority,
                     structuredResult: run.structuredResult,
-                    rootMessageId: nil
+                    rootMessageId: nil,
+                    channelMessageId: nil
                 ))
             }
 
@@ -94,7 +97,29 @@ enum InboxMessageBuilder {
                     requiresAttention: true,
                     priority: nil,
                     structuredResult: nil,
-                    rootMessageId: notification.rootMessageId
+                    rootMessageId: notification.rootMessageId,
+                    channelMessageId: nil
+                ))
+            }
+
+            for notification in snapshot.channelNotifications ?? [] {
+                messages.append(InboxMessage(
+                    id: "channel:\(notification.messageId.uuidString.lowercased())",
+                    kind: .channel,
+                    projectId: notification.defaultProjectId ?? project.id,
+                    projectName: project.name,
+                    targetId: notification.channelId.uuidString.lowercased(),
+                    title: notification.channelName,
+                    occurredAt: notification.createdAt,
+                    version: notification.id.uuidString.lowercased(),
+                    body: notification.body,
+                    authorName: notification.author.name,
+                    statusLabel: notification.reason == "mention" ? "멘션" : "답글",
+                    requiresAttention: true,
+                    priority: nil,
+                    structuredResult: nil,
+                    rootMessageId: notification.rootMessageId,
+                    channelMessageId: notification.messageId
                 ))
             }
         }
@@ -121,7 +146,8 @@ enum InboxMessageBuilder {
                 requiresAttention: session.requiresAttention,
                 priority: nil,
                 structuredResult: nil,
-                rootMessageId: nil
+                rootMessageId: nil,
+                channelMessageId: nil
             ))
         }
 
@@ -129,7 +155,9 @@ enum InboxMessageBuilder {
     }
 
     static func classify(_ message: InboxMessage) -> InboxCategory {
-        if message.kind == .conversation { return .actionRequired }
+        if message.kind == .conversation || message.kind == .channel {
+            return .actionRequired
+        }
         if message.kind == .session {
             return message.requiresAttention ? .actionRequired : .activity
         }

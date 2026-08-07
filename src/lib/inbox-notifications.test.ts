@@ -98,6 +98,40 @@ describe("inbox notification navigation", () => {
     ).toEqual(target);
   });
 
+  it("keeps channel and thread IDs in notification navigation targets", () => {
+    const target = inboxNotificationTarget({
+      id: "channel:message-reply",
+      kind: "channel",
+      projectId: "project-1",
+      projectName: "Briar",
+      organizationId: "organization-1",
+      targetId: "channel-1",
+      channelId: "channel-1",
+      channelName: "product",
+      messageId: "message-reply",
+      rootMessageId: "message-root",
+      title: "product",
+      occurredAt: "2026-07-31T00:00:00.000Z",
+      version: "message-reply",
+      body: "확인했습니다.",
+      authorName: "Member",
+      reason: "thread_reply",
+    });
+
+    expect(targetFromNotificationAction({
+      actionId: "tap",
+      notification: {
+        extra: { briarInboxTarget: JSON.stringify(target) },
+      },
+    })).toEqual(expect.objectContaining({
+      kind: "channel",
+      organizationId: "organization-1",
+      channelId: "channel-1",
+      channelMessageId: "message-reply",
+      rootMessageId: "message-root",
+    }));
+  });
+
   it("falls back to the stored target for iOS action payloads", () => {
     const target = inboxNotificationTarget(message);
     window.localStorage.setItem(

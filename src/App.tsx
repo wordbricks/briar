@@ -179,12 +179,31 @@ export function App() {
     ChannelSummary[]
   >([]);
   const [activeChannelId, setActiveChannelId] = useState<string | null>(null);
+  const [requestedChannelTarget, setRequestedChannelTarget] = useState<{
+    organizationId: string;
+    channelId: string;
+    messageId: string;
+    rootMessageId: string;
+  } | null>(null);
+  const requestedChannelTargetRef = useRef(requestedChannelTarget);
+  const clearRequestedChannelTarget = useCallback(
+    () => {
+      requestedChannelTargetRef.current = null;
+      setRequestedChannelTarget(null);
+    },
+    [],
+  );
   const [channelsLoading, setChannelsLoading] = useState(false);
   useEffect(() => {
     const organizationId = briar.activeOrganizationId;
     const token = briar.token;
     setOrganizationChannels([]);
-    setActiveChannelId(null);
+    const requestedTarget = requestedChannelTargetRef.current;
+    setActiveChannelId(
+      requestedTarget?.organizationId === organizationId
+        ? requestedTarget.channelId
+        : null,
+    );
     if (!organizationId || !token) {
       setChannelsLoading(false);
       return;
@@ -512,6 +531,32 @@ export function App() {
       briar.setActiveProjectId(pendingInboxNotificationTarget.projectId);
     }
     if (
+      pendingInboxNotificationTarget.kind === "channel" &&
+      pendingInboxNotificationTarget.organizationId &&
+      pendingInboxNotificationTarget.channelId &&
+      pendingInboxNotificationTarget.channelMessageId &&
+      pendingInboxNotificationTarget.rootMessageId
+    ) {
+      if (
+        pendingInboxNotificationTarget.organizationId !==
+        briar.activeOrganizationId
+      ) {
+        briar.setActiveOrganizationId(
+          pendingInboxNotificationTarget.organizationId,
+        );
+      }
+      setActiveChannelId(pendingInboxNotificationTarget.channelId);
+      const requestedTarget = {
+        organizationId: pendingInboxNotificationTarget.organizationId,
+        channelId: pendingInboxNotificationTarget.channelId,
+        messageId: pendingInboxNotificationTarget.channelMessageId,
+        rootMessageId: pendingInboxNotificationTarget.rootMessageId,
+      };
+      requestedChannelTargetRef.current = requestedTarget;
+      setRequestedChannelTarget(requestedTarget);
+      if (briar.companionMode) setCompanionPage("home");
+      else navigateToPage("channels");
+    } else if (
       pendingInboxNotificationTarget.kind === "issue" ||
       pendingInboxNotificationTarget.kind === "conversation"
     ) {
@@ -531,10 +576,12 @@ export function App() {
     setPendingInboxNotificationTarget(null);
   }, [
     briar.activeProjectId,
+    briar.activeOrganizationId,
     briar.companionMode,
     briar.loading,
     briar.projects,
     briar.setActiveProjectId,
+    briar.setActiveOrganizationId,
     briar.user,
     inbox.markRead,
     navigateToPage,
@@ -1248,6 +1295,10 @@ export function App() {
             onOpen={(message) => {
               const target = inboxNotificationTarget(message);
               inbox.markRead(message.id);
+              if (message.kind === "channel") {
+                setPendingInboxNotificationTarget(target);
+                return;
+              }
               if (target.projectId !== briar.activeProjectId) {
                 briar.setActiveProjectId(target.projectId);
               }
@@ -1361,6 +1412,8 @@ export function App() {
             onChannelSelect={setActiveChannelId}
             onChannelsChange={setOrganizationChannels}
             organizationId={briar.activeOrganizationId}
+            requestedTarget={requestedChannelTarget}
+            onRequestedTargetOpen={clearRequestedChannelTarget}
             token={briar.token}
             onCreateAgent={() => {
               if (activeProject) navigateToPage("agents");
@@ -1682,7 +1735,9 @@ export function App() {
               currentUserId={briar.user?.id ?? null}
               organizationId={briar.activeOrganizationId}
               projects={activeOrganizationProjects}
+              requestedTarget={requestedChannelTarget}
               token={briar.token}
+              onRequestedTargetOpen={clearRequestedChannelTarget}
             />
             <CompanionBottomNavigation
               activeDestination="home"

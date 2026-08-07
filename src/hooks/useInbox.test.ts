@@ -214,6 +214,50 @@ describe("Inbox messages", () => {
     ]);
   });
 
+  it("creates actionable channel messages with navigation IDs", () => {
+    const [message] = buildCurrentInboxMessages(
+      {
+        ...demoDashboard,
+        runs: [],
+        channelNotifications: [
+          {
+            id: "message-reply",
+            organizationId: project.organizationId!,
+            channelId: "channel-product",
+            channelName: "product",
+            defaultProjectId: project.id,
+            messageId: "message-reply",
+            rootMessageId: "message-root",
+            body: "검토 결과를 스레드에 남겼습니다.",
+            author: {
+              type: "user",
+              id: "member",
+              name: "Member",
+              email: "member@example.com",
+              image: null,
+            },
+            reason: "thread_reply",
+            createdAt: "2026-07-30T01:02:00.000Z",
+          },
+        ],
+      },
+      [],
+      [project],
+    );
+
+    expect(message).toMatchObject({
+      id: "channel:message-reply",
+      kind: "channel",
+      organizationId: project.organizationId,
+      channelId: "channel-product",
+      channelName: "product",
+      messageId: "message-reply",
+      rootMessageId: "message-root",
+      reason: "thread_reply",
+    });
+    expect(classifyInboxMessage(message!)).toBe("action_required");
+  });
+
   it("creates one message for a task and its linked Auto Hunt dispatch", () => {
     const taskSession = {
       ...session("completed", "task-session"),

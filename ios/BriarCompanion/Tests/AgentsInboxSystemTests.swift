@@ -138,6 +138,26 @@ final class AgentsInboxSystemTests: XCTestCase {
                     createdAt: Date(timeIntervalSince1970: 1_700_000_120)
                 ),
             ],
+            channelNotifications: [
+                ChannelNotification(
+                    id: UUID(uuidString: "77777777-7777-4777-8777-777777777777")!,
+                    organizationId: project.organizationId,
+                    channelId: UUID(uuidString: "66666666-6666-4666-8666-666666666666")!,
+                    channelName: "product",
+                    defaultProjectId: project.id,
+                    messageId: UUID(uuidString: "77777777-7777-4777-8777-777777777777")!,
+                    rootMessageId: UUID(uuidString: "55555555-5555-4555-8555-555555555555")!,
+                    body: "스레드에 확인 내용을 남겼습니다.",
+                    author: ChannelMessage.Author(
+                        type: .user,
+                        name: "Alex",
+                        image: nil,
+                        provider: nil
+                    ),
+                    reason: "thread_reply",
+                    createdAt: Date(timeIntervalSince1970: 1_700_000_125)
+                ),
+            ],
             cursor: 1,
             generatedAt: Date(timeIntervalSince1970: 1_700_000_130)
         )
@@ -171,12 +191,13 @@ final class AgentsInboxSystemTests: XCTestCase {
             sessions: [session],
             project: project
         )
-        XCTAssertEqual(messages.count, 4)
-        // Newest first: mention (120) > blocked issue (100) > failed session (80) > completed (50)
+        XCTAssertEqual(messages.count, 5)
+        // Newest first: channel (125) > mention (120) > blocked issue (100) > session (80) > completed (50)
         XCTAssertEqual(messages.map(\.occurredAt), messages.map(\.occurredAt).sorted(by: >))
-        XCTAssertEqual(messages.map(\.kind), [.conversation, .issue, .session, .issue])
-        XCTAssertEqual(messages.map(\.title)[1], "Needs help")
-        XCTAssertEqual(messages.map(\.title)[3], "Done")
+        XCTAssertEqual(messages.map(\.kind), [.channel, .conversation, .issue, .session, .issue])
+        XCTAssertEqual(messages.map(\.title)[0], "product")
+        XCTAssertEqual(messages.map(\.title)[2], "Needs help")
+        XCTAssertEqual(messages.map(\.title)[4], "Done")
 
         let blockedMessage = try XCTUnwrap(
             messages.first { $0.kind == .issue && $0.title == "Needs help" }
@@ -184,6 +205,9 @@ final class AgentsInboxSystemTests: XCTestCase {
         XCTAssertEqual(InboxMessageBuilder.classify(blockedMessage), .urgent)
         let mention = try XCTUnwrap(messages.first { $0.kind == .conversation })
         XCTAssertEqual(InboxMessageBuilder.classify(mention), .actionRequired)
+        let channel = try XCTUnwrap(messages.first { $0.kind == .channel })
+        XCTAssertEqual(InboxMessageBuilder.classify(channel), .actionRequired)
+        XCTAssertEqual(channel.rootMessageId?.uuidString.lowercased(), "55555555-5555-4555-8555-555555555555")
         let failedSession = try XCTUnwrap(messages.first { $0.kind == .session })
         XCTAssertEqual(InboxMessageBuilder.classify(failedSession), .actionRequired)
 

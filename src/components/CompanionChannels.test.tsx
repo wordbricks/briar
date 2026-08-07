@@ -90,7 +90,14 @@ describe("CompanionChannels", () => {
   let container: HTMLDivElement;
   let root: ReturnType<typeof createRoot>;
 
-  const render = async () => {
+  const render = async (
+    requestedTarget?: {
+      channelId: string;
+      messageId: string;
+      rootMessageId: string;
+    },
+    onRequestedTargetOpen = vi.fn(),
+  ) => {
     await act(async () => {
       root.render(
         <I18nProvider>
@@ -102,6 +109,8 @@ describe("CompanionChannels", () => {
               { id: "project-1", name: "Briar" },
               { id: "project-2", name: "Sprout" },
             ]}
+            requestedTarget={requestedTarget}
+            onRequestedTargetOpen={onRequestedTargetOpen}
             token="token"
           />
         </I18nProvider>,
@@ -191,6 +200,39 @@ describe("CompanionChannels", () => {
       "m-1",
     );
     expect(container.textContent).toContain("On it");
+    expect(container.textContent).toContain("Thread");
+  });
+
+  it("opens a notification's channel thread directly", async () => {
+    loadChannel.mockResolvedValue({
+      channel: channel("c-common", "Welcome", null),
+      members: [],
+      agents: [],
+      messages: [message("m-root", "Hello team", 1)],
+    });
+    const reply = message("m-reply", "Inbox reply");
+    reply.parentMessageId = "m-root";
+    listChannelMessages.mockResolvedValue({
+      messages: [message("m-root", "Hello team", 1), reply],
+    });
+    const opened = vi.fn();
+
+    await render({
+      channelId: "c-common",
+      messageId: "m-reply",
+      rootMessageId: "m-root",
+    }, opened);
+
+    await vi.waitFor(() => {
+      expect(listChannelMessages).toHaveBeenCalledWith(
+        "token",
+        "org-1",
+        "c-common",
+        "m-root",
+      );
+      expect(opened).toHaveBeenCalledOnce();
+    });
+    expect(container.textContent).toContain("Inbox reply");
     expect(container.textContent).toContain("Thread");
   });
 

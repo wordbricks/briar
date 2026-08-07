@@ -16,6 +16,7 @@ import {
   getChannelMessage,
   getChannelMessageAttachment,
   listChannelAgents,
+  listChannelNotifications,
   listChannelRootMessages,
   listChannelThreadMessages,
   listChannels,
@@ -189,6 +190,25 @@ describe("organization channels", () => {
     expect(
       (await listChannels(db, organizationId, outsiderId)).map((row) => row.id),
     ).not.toContain(channelId);
+    const privateMessageId = "f0000000-0000-4000-8000-000000000010";
+    await createChannelMessage(db, {
+      id: privateMessageId,
+      channelId,
+      parentMessageId: null,
+      authorUserId: ownerId,
+      authorAgentId: null,
+      authorAgentName: null,
+      authorAgentProvider: null,
+      body: "Private mention",
+      mentionedUserIds: [outsiderId],
+      mentionedAgentIds: [],
+      createdAt: at(1.5),
+    });
+    expect(
+      (await listChannelNotifications(db, organizationId, outsiderId)).some(
+        (notification) => notification.id === privateMessageId,
+      ),
+    ).toBe(false);
 
     await addChannelMember(db, {
       channelId,
@@ -199,6 +219,11 @@ describe("organization channels", () => {
     expect(
       (await listChannels(db, organizationId, outsiderId)).map((row) => row.id),
     ).toContain(channelId);
+    expect(
+      (await listChannelNotifications(db, organizationId, outsiderId)).some(
+        (notification) => notification.id === privateMessageId,
+      ),
+    ).toBe(true);
   });
 
   it("threads messages and returns the structured mentions that were stored", async () => {
@@ -254,6 +279,28 @@ describe("organization channels", () => {
 
     const thread = await listChannelThreadMessages(db, channelId, rootId);
     expect(thread.map((message) => message.id)).toEqual([rootId, replyId]);
+
+    expect(await listChannelNotifications(db, organizationId, ownerId)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: replyId,
+          channel_id: channelId,
+          channel_name: "General",
+          root_message_id: rootId,
+          notification_reason: "thread_reply",
+        }),
+      ]),
+    );
+    expect(
+      await listChannelNotifications(db, organizationId, outsiderId),
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: rootId,
+          notification_reason: "mention",
+        }),
+      ]),
+    );
   });
 
   it("rejects a thread reply that points at another channel's message", async () => {

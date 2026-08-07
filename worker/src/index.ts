@@ -357,6 +357,7 @@ import {
   listChannelAttachmentObjectKeys,
   listChannelAgents,
   listChannelMembers,
+  listChannelNotifications,
   listChannelRootMessages,
   listChannelThreadMessages,
   listChannels,
@@ -365,6 +366,7 @@ import {
   removeChannelMember,
   renewChannelReplyLease,
   updateChannel,
+  type ChannelNotificationRow,
 } from "./channels";
 import {
   createOrganizationAgent,
@@ -4317,6 +4319,20 @@ const issueConversationNotificationJson = (
   createdAt: notification.created_at,
 });
 
+const channelNotificationJson = (notification: ChannelNotificationRow) => ({
+  id: notification.id,
+  organizationId: notification.organization_id,
+  channelId: notification.channel_id,
+  channelName: notification.channel_name,
+  defaultProjectId: notification.default_project_id,
+  messageId: notification.id,
+  rootMessageId: notification.root_message_id,
+  body: notification.body,
+  author: channelMessageJson(notification).author,
+  reason: notification.notification_reason,
+  createdAt: notification.created_at,
+});
+
 export const claimConversationJson = (messages: IssueMessageRow[]) =>
   messages.map((message) => issueMessageJson(message));
 
@@ -7198,13 +7214,15 @@ async function route(
           listOrganizationMembers(db, project.organization_id),
         ])
       : null;
-    const conversationNotifications = notificationsChanged
-      ? await listIssueConversationNotifications(
-          db,
-          project.id,
-          session.user.id,
-        )
-      : null;
+    const [conversationNotifications, channelNotifications] = await Promise.all([
+      notificationsChanged
+        ? listIssueConversationNotifications(db, project.id, session.user.id)
+        : Promise.resolve(null),
+      // Channel changes use an organization-scoped cursor, not this project's
+      // dashboard cursor. Return the bounded notification projection on every
+      // dashboard poll so Inbox updates even while Channels is closed.
+      listChannelNotifications(db, project.organization_id, session.user.id),
+    ]);
 
     return json({
       cursor: page.nextCursor,
@@ -7243,6 +7261,7 @@ async function route(
             ),
           }
         : {}),
+      channelNotifications: channelNotifications.map(channelNotificationJson),
       generatedAt: observedAt,
     });
   }
@@ -7270,6 +7289,7 @@ async function route(
       executionPolicy,
       members,
       conversationNotifications,
+      channelNotifications,
     ] =
       await Promise.all([
         listDashboardRuns(db, project.id),
@@ -7289,6 +7309,11 @@ async function route(
         listIssueConversationNotifications(
           db,
           project.id,
+          session.user.id,
+        ),
+        listChannelNotifications(
+          db,
+          project.organization_id,
           session.user.id,
         ),
       ]);
@@ -7341,6 +7366,7 @@ async function route(
       conversationNotifications: conversationNotifications.map(
         issueConversationNotificationJson,
       ),
+      channelNotifications: channelNotifications.map(channelNotificationJson),
       cursor,
       generatedAt: observedAt,
     });

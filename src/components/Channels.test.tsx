@@ -140,7 +140,15 @@ describe("Channels", () => {
   let container: HTMLDivElement;
   let root: ReturnType<typeof createRoot>;
 
-  const render = async (messages: ChannelMessage[]) => {
+  const render = async (
+    messages: ChannelMessage[],
+    requestedTarget?: {
+      channelId: string;
+      messageId: string;
+      rootMessageId: string;
+    },
+    onRequestedTargetOpen = vi.fn(),
+  ) => {
     listChannels.mockResolvedValue({ channels: [channel], cursor: 7 });
     loadChannel.mockResolvedValue({
       channel,
@@ -172,6 +180,8 @@ describe("Channels", () => {
           currentUserId="user-1"
           onChannelSelect={() => undefined}
           onChannelsChange={() => undefined}
+          requestedTarget={requestedTarget}
+          onRequestedTargetOpen={onRequestedTargetOpen}
           organizationId="org-1"
           token="token"
         />,
@@ -203,6 +213,42 @@ describe("Channels", () => {
     expect(container.textContent).toContain("에이전트 만들기");
     expect(container.textContent).toContain("사람 추가");
     expect(container.querySelector(".channel-composer-shell")).not.toBeNull();
+  });
+
+  it("opens a requested Inbox thread in the side panel", async () => {
+    const rootMessage = message({ id: "message-root", replyCount: 1 });
+    const reply = message({
+      id: "message-reply",
+      parentMessageId: "message-root",
+      body: "Inbox reply",
+    });
+    listChannelMessages.mockResolvedValue({
+      messages: [rootMessage, reply],
+    });
+    const opened = vi.fn();
+
+    await render(
+      [rootMessage],
+      {
+        channelId: "channel-1",
+        messageId: "message-reply",
+        rootMessageId: "message-root",
+      },
+      opened,
+    );
+
+    await vi.waitFor(() => {
+      expect(listChannelMessages).toHaveBeenCalledWith(
+        "token",
+        "org-1",
+        "channel-1",
+        "message-root",
+      );
+      expect(opened).toHaveBeenCalledOnce();
+    });
+    expect(container.querySelector(".channel-thread")?.textContent).toContain(
+      "Inbox reply",
+    );
   });
 
   it("sends the picked Agent as a structured mention rather than parsing the text", async () => {

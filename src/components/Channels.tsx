@@ -95,6 +95,12 @@ type ChannelsProps = {
   onChannelsChange: Dispatch<SetStateAction<ChannelSummary[]>>;
   onIssueCreated?: (runId: string) => void;
   onCreateAgent?: () => void;
+  requestedTarget?: {
+    channelId: string;
+    messageId: string;
+    rootMessageId: string;
+  } | null;
+  onRequestedTargetOpen?: () => void;
 };
 
 type ChannelInviteCandidate =
@@ -166,6 +172,8 @@ export function Channels({
   onChannelsChange,
   onIssueCreated,
   onCreateAgent,
+  requestedTarget,
+  onRequestedTargetOpen,
 }: ChannelsProps) {
   const { t, localeTag } = useI18n();
   const [members, setMembers] = useState<ChannelMember[]>([]);
@@ -174,6 +182,7 @@ export function Channels({
   const [replies, setReplies] = useState<ChannelAgentReply[]>([]);
   const [threadParentId, setThreadParentId] = useState<string | null>(null);
   const [threadMessages, setThreadMessages] = useState<ChannelMessage[]>([]);
+  const [loadedChannelId, setLoadedChannelId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -307,6 +316,7 @@ export function Channels({
   useEffect(() => {
     if (!activeChannelId) return;
     let cancelled = false;
+    setLoadedChannelId(null);
     void (async () => {
       try {
         const result = await loadChannel(token, organizationId, activeChannelId);
@@ -316,6 +326,7 @@ export function Channels({
         setMessages(result.messages);
         setThreadParentId(null);
         setThreadMessages([]);
+        setLoadedChannelId(activeChannelId);
       } catch (cause) {
         if (!cancelled) setError(errorMessage(cause));
       }
@@ -421,6 +432,44 @@ export function Channels({
     },
     [activeChannelId, organizationId, token],
   );
+
+  useEffect(() => {
+    if (
+      !requestedTarget ||
+      requestedTarget.channelId !== activeChannelId ||
+      loadedChannelId !== activeChannelId
+    ) {
+      return;
+    }
+    if (requestedTarget.rootMessageId !== requestedTarget.messageId) {
+      void openThread(requestedTarget.rootMessageId).finally(() => {
+        onRequestedTargetOpen?.();
+      });
+      return;
+    }
+    if (!messages.some((message) => message.id === requestedTarget.messageId)) {
+      void openThread(requestedTarget.rootMessageId).finally(() => {
+        onRequestedTargetOpen?.();
+      });
+      return;
+    }
+    requestAnimationFrame(() => {
+      [...document.querySelectorAll<HTMLElement>("[data-channel-message-id]")]
+        .find(
+          (element) =>
+            element.dataset.channelMessageId === requestedTarget.messageId,
+        )
+        ?.scrollIntoView?.({ block: "center" });
+      onRequestedTargetOpen?.();
+    });
+  }, [
+    activeChannelId,
+    loadedChannelId,
+    messages,
+    onRequestedTargetOpen,
+    openThread,
+    requestedTarget,
+  ]);
 
   const send = useCallback(
     async (
@@ -1071,7 +1120,10 @@ function MessageRow({
     message.author.type === "user" ? message.author.image : null;
 
   return (
-    <article className={`channel-message ${message.author.type}`}>
+    <article
+      className={`channel-message ${message.author.type}`}
+      data-channel-message-id={message.id}
+    >
       <div className="channel-message-avatar" aria-hidden="true">
         {image ? (
           <img alt="" src={image} />
