@@ -31,9 +31,12 @@ export const copy = {
       locale: "ko_KR",
     },
     aria: {
+      skipToContent: "본문으로 건너뛰기",
       brandHome: "Briar 홈",
       mainMenu: "주요 메뉴",
       productPreview: "Briar 작업 대시보드 미리보기",
+      workflowPreview:
+        "Briar 이슈 상세 화면 스크린샷. 저장소 매핑을 마친 분석 단계와 회귀 테스트를 작성 중인 구현 단계의 증거를 보여줍니다.",
       heroArtwork: "사람이 Briar 작업 흐름을 이끄는 리소그래프 일러스트",
       securityVisual: "Briar 보안 구조",
       sendCommand: "에이전트에게 전송",
@@ -231,9 +234,12 @@ export const copy = {
       locale: "en_US",
     },
     aria: {
+      skipToContent: "Skip to content",
       brandHome: "Briar home",
       mainMenu: "Main navigation",
       productPreview: "Preview of the Briar task dashboard",
+      workflowPreview:
+        "Screenshot of a Briar issue detail view, showing evidence for a completed analysis step and an in-progress implementation step writing regression tests.",
       heroArtwork:
         "Risograph illustration of a person guiding a Briar workflow",
       securityVisual: "Briar security architecture",

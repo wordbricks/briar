@@ -53,6 +53,37 @@ button {
   font: inherit;
 }
 
+a:focus-visible,
+button:focus-visible {
+  border-radius: 4px;
+  outline: 2px solid var(--violet);
+  outline-offset: 2px;
+}
+
+.skip-link {
+  position: absolute;
+  top: -48px;
+  left: 12px;
+  z-index: 100;
+  padding: 10px 16px;
+  border-radius: 8px;
+  color: #fff;
+  background: var(--violet);
+  font-size: 13px;
+  font-weight: 600;
+  transition: top 150ms ease;
+}
+
+.skip-link:focus-visible {
+  top: 12px;
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+#main-content:focus {
+  outline: none;
+}
+
 .shell {
   width: var(--shell);
   margin-inline: auto;
@@ -138,17 +169,17 @@ button {
 
 .language-switcher > span {
   margin-right: 6px;
-  color: #8d8285;
+  color: #6f6567;
   font-size: 12px;
 }
 
 .language-switcher button {
   padding: 4px;
   border: 0;
-  color: #8d8285;
+  color: #6f6567;
   background: transparent;
   font-family: var(--font-geist-mono), monospace;
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 600;
   cursor: pointer;
   transition: color 180ms ease;
@@ -360,7 +391,7 @@ button {
   margin-bottom: 26px;
   color: #6e6265;
   font-family: var(--font-geist-mono), monospace;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 550;
   letter-spacing: 0.13em;
   text-transform: uppercase;
@@ -456,8 +487,8 @@ button {
   align-items: center;
   justify-content: center;
   margin-top: 27px;
-  color: #8b7f82;
-  font-size: 10px;
+  color: #6f6567;
+  font-size: 12px;
   letter-spacing: 0.025em;
   text-transform: uppercase;
 }
@@ -469,7 +500,7 @@ button {
 }
 
 .hero-meta i {
-  color: #8b7f82;
+  color: #6f6567;
   font-style: normal;
 }
 
@@ -674,9 +705,9 @@ button {
 }
 
 .section-index {
-  color: #8b7f82;
+  color: #6f6567;
   font-family: var(--font-geist-mono), monospace;
-  font-size: 9px;
+  font-size: 12px;
   letter-spacing: 0.12em;
 }
 
@@ -737,9 +768,9 @@ button {
 }
 
 .card-figure {
-  color: #8b7f82;
+  color: #6f6567;
   font-family: var(--font-geist-mono), monospace;
-  font-size: 8px;
+  font-size: 12px;
 }
 
 .principle-symbol {
@@ -857,7 +888,7 @@ button {
 .principle-grid p {
   max-width: 300px;
   margin: 0;
-  color: #74686b;
+  color: #706467;
   font-size: 12px;
   letter-spacing: -0.01em;
   line-height: 1.75;
@@ -895,23 +926,21 @@ button {
   gap: 15px;
   padding: 22px 0;
   border-bottom: 1px solid #222228;
-  opacity: 0.45;
-  transition: opacity 180ms ease;
+  transition: background-color 180ms ease;
 }
 
 .workflow-steps li:first-child {
   border-top: 1px solid #222228;
 }
 
-.workflow-steps li:hover,
-.workflow-steps li.is-active {
-  opacity: 1;
+.workflow-steps li:hover {
+  background-color: rgb(101 80 188 / 0.05);
 }
 
 .workflow-steps > li > span {
   color: #5e5e67;
   font-family: var(--font-geist-mono), monospace;
-  font-size: 8px;
+  font-size: 12px;
 }
 
 .workflow-steps h3 {
@@ -924,8 +953,8 @@ button {
 
 .workflow-steps p {
   margin: 0;
-  color: #74686b;
-  font-size: 11px;
+  color: #706467;
+  font-size: 12px;
   line-height: 1.6;
 }
 
@@ -978,7 +1007,7 @@ button {
   padding: 0 22px;
   border-bottom: 1px solid #27272d;
   color: #43383b;
-  font-size: 10px;
+  font-size: 12px;
   border-color: #ddd5d2;
 }
 
@@ -986,8 +1015,8 @@ button {
   display: inline-flex;
   gap: 6px;
   align-items: center;
-  color: #5f8a70;
-  font-size: 7px;
+  color: #4c6f5a;
+  font-size: 12px;
 }
 
 .agent-board-top small i {
@@ -1020,7 +1049,7 @@ button {
   color: #d3cafd;
   background: #352d4b;
   font-family: var(--font-geist-mono), monospace;
-  font-size: 11px;
+  font-size: 12px;
   place-items: center;
 }
 
@@ -1044,13 +1073,13 @@ button {
 
 .agent-row strong {
   color: #43383b;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 530;
 }
 
 .agent-row small {
   color: #786d70;
-  font-size: 8px;
+  font-size: 12px;
 }
 
 .agent-state {
@@ -1059,7 +1088,7 @@ button {
   border-radius: 9px;
   color: #786d70;
   font-family: var(--font-geist-mono), monospace;
-  font-size: 7px;
+  font-size: 12px;
   border-color: #d9cfcc;
   background: #faf7f5;
 }
@@ -1133,9 +1162,9 @@ button {
   display: flex;
   gap: 9px;
   align-items: center;
-  color: #74686b;
+  color: #706467;
   font-family: var(--font-geist-mono), monospace;
-  font-size: 8px;
+  font-size: 12px;
 }
 
 .security-points i {
@@ -1416,9 +1445,9 @@ button {
 .download-note {
   display: block;
   margin-top: 18px;
-  color: #8b7f82;
+  color: #6f6567;
   font-family: var(--font-geist-mono), monospace;
-  font-size: 8px;
+  font-size: 12px;
   letter-spacing: 0.02em;
 }
 
@@ -1435,8 +1464,8 @@ footer {
 }
 
 .footer-shell > p {
-  color: #8b7f82;
-  font-size: 10px;
+  color: #6f6567;
+  font-size: 12px;
 }
 
 .footer-shell > div {
@@ -1444,7 +1473,7 @@ footer {
   gap: 22px;
   justify-self: end;
   color: #71666a;
-  font-size: 10px;
+  font-size: 12px;
 }
 
 @media (max-width: 1050px) {
@@ -1641,7 +1670,7 @@ footer {
 
   .hero-kicker {
     margin-bottom: 20px;
-    font-size: 8px;
+    font-size: 12px;
   }
 
   .hero h1 {
@@ -1699,7 +1728,7 @@ footer {
   .hero-meta {
     gap: 11px;
     flex-wrap: wrap;
-    font-size: 8px;
+    font-size: 12px;
   }
 
   .product-stage {
@@ -2088,7 +2117,7 @@ footer {
   font-size: 10px;
 }
 
-.board-project > a {
+.board-project-link {
   display: flex;
   gap: 8px;
   align-items: center;
@@ -2099,7 +2128,7 @@ footer {
   font-size: 8px;
 }
 
-.board-sidebar > a {
+.board-sidebar-link {
   display: flex;
   gap: 8px;
   align-items: center;
@@ -2110,7 +2139,7 @@ footer {
   font-size: 8px;
 }
 
-.board-sidebar > a i {
+.board-sidebar-link i {
   margin-left: auto;
   color: #a894ff;
   font-style: normal;
@@ -2141,17 +2170,17 @@ footer {
   background: #6ed5a3;
 }
 
-.board-project > a {
+.board-project-link {
   padding-left: 21px;
   color: #786d70;
 }
 
-.board-project > a em {
+.board-project-link em {
   margin-left: auto;
   font-style: normal;
 }
 
-.board-project > a.board-project-active {
+.board-project-link.board-project-active {
   color: #51418f;
   background: #e5e0ed;
 }
@@ -2239,7 +2268,6 @@ footer {
   align-items: center;
 }
 
-.board-toolbar-actions button,
 .board-toolbar-actions i {
   display: inline-flex;
   align-items: center;
@@ -2269,7 +2297,7 @@ footer {
   border-color: #d7cecb;
 }
 
-.board-toolbar-actions button {
+.board-toolbar-actions .board-toolbar-primary {
   border-color: #c4b9d8;
   color: #5c49a5;
   background: #e8e3f1;
@@ -2886,7 +2914,7 @@ footer {
     grid-template-columns: repeat(4, minmax(116px, 1fr));
   }
 
-  .board-toolbar-actions span {
+  .board-toolbar-actions span:not(.board-toolbar-primary) {
     display: none;
   }
 

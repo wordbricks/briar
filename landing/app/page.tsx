@@ -65,7 +65,7 @@ function ProductStage({ c }: { c: LandingCopy }) {
   ] as const;
 
   return (
-    <div className="product-stage" aria-label={c.aria.productPreview}>
+    <div className="product-stage" role="img" aria-label={c.aria.productPreview}>
       <div className="stage-glow" />
       <div className="product-window board-window">
         <div className="window-topbar">
@@ -101,9 +101,9 @@ function ProductStage({ c }: { c: LandingCopy }) {
               <strong>Briar</strong>
               <span>⌄</span>
             </div>
-            <a href="#workflow">
+            <div className="board-sidebar-link">
               <span>⌂</span> Inbox <i>3</i>
-            </a>
+            </div>
             <p>Projects</p>
             <div className="board-project">
               <div>
@@ -111,15 +111,15 @@ function ProductStage({ c }: { c: LandingCopy }) {
                 <strong>Briar</strong>
                 <i />
               </div>
-              <a className="board-project-active" href="#product">
+              <div className="board-project-link board-project-active">
                 <span>⌁</span> Issues <em>6</em>
-              </a>
-              <a href="#agents">
+              </div>
+              <div className="board-project-link">
                 <span>✦</span> Agents
-              </a>
-              <a href="#workflow">
+              </div>
+              <div className="board-project-link">
                 <span>□</span> Schedule
-              </a>
+              </div>
             </div>
             <div className="board-profile">
               <span>J</span>
@@ -137,7 +137,7 @@ function ProductStage({ c }: { c: LandingCopy }) {
                 <small>6 tasks</small>
               </div>
               <div className="board-toolbar-actions">
-                <button type="button">＋ {c.dashboard.newIssue.replace("+ ", "")}</button>
+                <span className="board-toolbar-primary">＋ {c.dashboard.newIssue.replace("+ ", "")}</span>
                 <span>⌕ Search tasks</span>
                 <i>▦ Board</i>
               </div>
@@ -224,7 +224,11 @@ function ProductStage({ c }: { c: LandingCopy }) {
 
 function WorkflowVisual({ c }: { c: LandingCopy }) {
   return (
-    <div className="workflow-visual detail-window" aria-label={c.workflow.title}>
+    <div
+      className="workflow-visual detail-window"
+      role="img"
+      aria-label={c.aria.workflowPreview}
+    >
       <div className="detail-toolbar">
         <span>←</span>
         <small>AH-24</small>
@@ -353,6 +357,9 @@ export default async function Home() {
 
   return (
     <main id="top">
+      <a className="skip-link" href="#main-content">
+        {c.aria.skipToContent}
+      </a>
       <header className="site-header">
         <div className="shell nav-shell">
           <Brand c={c} />
@@ -393,7 +400,7 @@ export default async function Home() {
         </div>
       </header>
 
-      <section className="hero">
+      <section className="hero" id="main-content" tabIndex={-1}>
         <div className="hero-art" aria-hidden="true">
           <img
             src="/briar-hero-orchestration.webp"
@@ -530,7 +537,7 @@ export default async function Home() {
           <div className="workflow-layout">
             <ol className="workflow-steps">
               {c.workflow.steps.map((step, index) => (
-                <li className={index === 2 ? "is-active" : ""} key={step.title}>
+                <li key={step.title}>
                   <span>{String(index + 1).padStart(2, "0")}</span>
                   <div>
                     <h3>{step.title}</h3>
@@ -599,7 +606,11 @@ export default async function Home() {
               ))}
             </div>
           </div>
-          <div className="security-visual" aria-label={c.aria.securityVisual}>
+          <div
+            className="security-visual"
+            role="img"
+            aria-label={c.aria.securityVisual}
+          >
             <div className="secure-device">
               <div className="device-top">
                 <span />
