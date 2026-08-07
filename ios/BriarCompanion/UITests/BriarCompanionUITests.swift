@@ -169,6 +169,19 @@ final class BriarCompanionUITests: XCTestCase {
         XCTAssertTrue(app.navigationBars["Agents"].waitForExistence(timeout: 5))
         captureScreenshot(named: "companion-agents")
 
+        let agentRow = app.descendants(matching: .any)[
+            "agent-row-aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+        ]
+        XCTAssertTrue(agentRow.waitForExistence(timeout: 5))
+        agentRow.tap()
+        XCTAssertTrue(app.navigationBars["Issue processing agent"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons[
+            "agent-run-button-aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+        ].waitForExistence(timeout: 5))
+        captureScreenshot(named: "companion-agent-run")
+        app.navigationBars["Issue processing agent"].buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(app.navigationBars["Agents"].waitForExistence(timeout: 5))
+
         app.tabBars.buttons["Inbox"].tap()
         XCTAssertTrue(app.navigationBars["Inbox"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.descendants(matching: .any)["inbox-importance-filters"].exists)

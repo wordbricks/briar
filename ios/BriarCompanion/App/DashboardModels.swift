@@ -5,6 +5,8 @@ struct DashboardRun: Codable, Equatable, Identifiable, Sendable {
     let runNumber: Int?
     let currentAttempt: Int?
     let currentRevision: Int?
+    let sourceKey: String?
+    let sourceCreatedAt: Date?
     let title: String
     let status: Status
     let workflowStage: String?
@@ -31,11 +33,13 @@ struct DashboardRun: Codable, Equatable, Identifiable, Sendable {
     let preferredProvider: AgentProvider?
     let preferredModel: String?
     let preferredEffort: ModelEffort?
+    let dispatchedAt: Date?
     let requestedProvider: AgentProvider?
     let requestedModel: String?
     let requestedEffort: ModelEffort?
     let requestedWorkerId: String?
     let workerId: String?
+    let startedAt: Date?
     let updatedAt: Date
     let completedAt: Date?
     let lastEventAt: String?
@@ -46,6 +50,8 @@ struct DashboardRun: Codable, Equatable, Identifiable, Sendable {
         runNumber: Int? = nil,
         currentAttempt: Int? = nil,
         currentRevision: Int? = nil,
+        sourceKey: String? = nil,
+        sourceCreatedAt: Date? = nil,
         title: String,
         status: Status,
         workflowStage: String? = nil,
@@ -72,11 +78,13 @@ struct DashboardRun: Codable, Equatable, Identifiable, Sendable {
         preferredProvider: AgentProvider? = nil,
         preferredModel: String? = nil,
         preferredEffort: ModelEffort? = nil,
+        dispatchedAt: Date? = nil,
         requestedProvider: AgentProvider? = nil,
         requestedModel: String? = nil,
         requestedEffort: ModelEffort? = nil,
         requestedWorkerId: String? = nil,
         workerId: String? = nil,
+        startedAt: Date? = nil,
         updatedAt: Date,
         completedAt: Date? = nil,
         lastEventAt: String? = nil,
@@ -86,6 +94,8 @@ struct DashboardRun: Codable, Equatable, Identifiable, Sendable {
         self.runNumber = runNumber
         self.currentAttempt = currentAttempt
         self.currentRevision = currentRevision
+        self.sourceKey = sourceKey
+        self.sourceCreatedAt = sourceCreatedAt
         self.title = title
         self.status = status
         self.workflowStage = workflowStage
@@ -112,11 +122,13 @@ struct DashboardRun: Codable, Equatable, Identifiable, Sendable {
         self.preferredProvider = preferredProvider
         self.preferredModel = preferredModel
         self.preferredEffort = preferredEffort
+        self.dispatchedAt = dispatchedAt
         self.requestedProvider = requestedProvider
         self.requestedModel = requestedModel
         self.requestedEffort = requestedEffort
         self.requestedWorkerId = requestedWorkerId
         self.workerId = workerId
+        self.startedAt = startedAt
         self.updatedAt = updatedAt
         self.completedAt = completedAt
         self.lastEventAt = lastEventAt

@@ -33,7 +33,7 @@ struct AgentsHomeView: View {
                             NavigationLink(value: AgentRoute.agent(agent.id)) {
                                 AgentRow(agent: agent, sessionCount: agents.sessions(for: agent.id).count)
                             }
-                            .accessibilityIdentifier("agent-row-\(agent.id.uuidString)")
+                            .accessibilityIdentifier("agent-row-\(agent.id.uuidString.lowercased())")
                         }
                     }
                 }
@@ -87,6 +87,8 @@ struct AgentsHomeView: View {
                         AgentDetailView(
                             agent: agent,
                             sessions: agents.sessions(for: id),
+                            isRunning: agents.isExecuting(id),
+                            onRun: { runAgent(agent) },
                             onOpenSession: { path.append(AgentRoute.session($0)) }
                         )
                     } else {
@@ -117,6 +119,19 @@ struct AgentsHomeView: View {
                     ProgressView("Agent를 불러오는 중…")
                 }
             }
+            .alert(
+                "Agent 실행",
+                isPresented: Binding(
+                    get: { agents.executionError != nil },
+                    set: { isPresented in
+                        if !isPresented { agents.clearExecutionError() }
+                    }
+                )
+            ) {
+                Button("확인") { agents.clearExecutionError() }
+            } message: {
+                Text(agents.executionError ?? "실행 요청을 처리하지 못했습니다.")
+            }
         }
         .onChange(of: navigation.pathSessionToken) { _, _ in
             if let sessionID = navigation.consumePendingSession() {
@@ -127,6 +142,21 @@ struct AgentsHomeView: View {
             if let sessionID = navigation.pendingSessionID {
                 _ = navigation.consumePendingSession()
                 path.append(AgentRoute.session(sessionID))
+            }
+        }
+        .onChange(of: snapshot) { _, nextSnapshot in
+            guard let nextSnapshot else { return }
+            Task { await agents.reconcile(runs: nextSnapshot.runs) }
+        }
+    }
+
+    private func runAgent(_ agent: ProjectAgent) {
+        Task {
+            do {
+                _ = try await agents.run(agent: agent, runs: snapshot?.runs ?? [])
+                await refreshDashboard()
+            } catch {
+                // AgentsStore exposes a localized error for the alert above.
             }
         }
     }
@@ -222,6 +252,8 @@ private struct SessionRow: View {
 struct AgentDetailView: View {
     let agent: ProjectAgent
     let sessions: [ProjectAgentSession]
+    let isRunning: Bool
+    let onRun: () -> Void
     let onOpenSession: (String) -> Void
 
     var body: some View {
@@ -278,6 +310,18 @@ struct AgentDetailView: View {
         }
         .navigationTitle(agent.name)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button(action: onRun) {
+                    Label(
+                        isRunning ? "실행 중" : "지금 실행",
+                        systemImage: isRunning ? "hourglass" : "play.fill"
+                    )
+                }
+                .disabled(isRunning)
+                .accessibilityIdentifier("agent-run-button-\(agent.id.uuidString.lowercased())")
+            }
+        }
     }
 }
 
