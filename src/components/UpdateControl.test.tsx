@@ -9,15 +9,28 @@ import {
 } from "./AppUpdateProvider";
 import { UpdateControl } from "./UpdateControl";
 
-const { check, invoke, relaunch } = vi.hoisted(() => ({
+const { check, invoke, relaunch, updateLinkListener } = vi.hoisted(() => ({
   check: vi.fn(),
   invoke: vi.fn(),
   relaunch: vi.fn(),
+  updateLinkListener: {
+    current: null as null | ((target: { targetVersion: string }) => void),
+  },
 }));
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke }));
 vi.mock("@tauri-apps/plugin-updater", () => ({ check }));
 vi.mock("@tauri-apps/plugin-process", () => ({ relaunch }));
+vi.mock("../lib/worker-update-links", () => ({
+  listenForWorkerUpdateLinks: (
+    listener: (target: { targetVersion: string }) => void,
+  ) => {
+    updateLinkListener.current = listener;
+    return () => {
+      updateLinkListener.current = null;
+    };
+  },
+}));
 
 describe("UpdateControl", () => {
   let container: HTMLDivElement;
@@ -31,6 +44,7 @@ describe("UpdateControl", () => {
     invoke.mockReset();
     invoke.mockResolvedValue(0);
     relaunch.mockReset();
+    updateLinkListener.current = null;
   });
 
   afterEach(() => {
@@ -54,6 +68,20 @@ describe("UpdateControl", () => {
     });
     expect(check).toHaveBeenCalledOnce();
     expect(container.querySelector("button")).toBeNull();
+    await act(async () => root.unmount());
+  });
+
+  it("refreshes the bundled Worker runtime for a remote update link", async () => {
+    check.mockResolvedValue(null);
+    const root = createRoot(container);
+    await act(async () => root.render(control));
+    await act(async () => {
+      updateLinkListener.current?.({ targetVersion: "1.2.84" });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(invoke).toHaveBeenCalledWith("refresh_execution_worker_runtime");
     await act(async () => root.unmount());
   });
 

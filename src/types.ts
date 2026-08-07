@@ -339,6 +339,14 @@ export type OrganizationExecutionWorker = {
   activeSessions: number;
   lastHeartbeatAt: string;
   createdAt: string;
+  versions?: Record<string, string>;
+  remoteUpdateSupported?: boolean;
+  updateRequest?: {
+    id: string;
+    targetVersion: string;
+    status: "requested" | "completed" | "cancelled";
+    requestedAt: string;
+  } | null;
   bindings: Array<{
     id: string;
     projectId: string;
