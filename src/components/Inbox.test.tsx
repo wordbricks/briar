@@ -372,6 +372,47 @@ describe("Inbox", () => {
     expect(container.textContent).toContain("재현 절차를 추가했습니다.");
   });
 
+  it("shows channel name and reply context for channel notifications", async () => {
+    const message: InboxMessageWithReadState = {
+      id: "channel:reply",
+      kind: "channel",
+      projectId: "project-1",
+      projectName: "Briar",
+      targetId: "channel-1",
+      channelId: "channel-1",
+      channelName: "product",
+      messageId: "reply",
+      rootMessageId: "root",
+      title: "product",
+      occurredAt: "2026-07-28T07:48:00.000Z",
+      version: "reply",
+      body: "채널 답글입니다.",
+      authorName: "Member",
+      reason: "thread_reply",
+      isUnread: true,
+    };
+
+    await act(async () =>
+      root.render(
+        <I18nProvider>
+          <Inbox
+            isSidebarOpen
+            messages={[message]}
+            onMarkAllRead={vi.fn()}
+            onMarkRead={vi.fn()}
+            onOpen={vi.fn()}
+            projects={projects}
+            unreadCount={1}
+          />
+        </I18nProvider>,
+      ),
+    );
+
+    expect(container.textContent).toContain("Member님이 회원님의 스레드에 답글을 남겼습니다.");
+    expect(container.textContent).toContain("#product");
+    expect(container.textContent).toContain("채널 답글입니다.");
+  });
+
   it("companion mode shows a chronological feed with importance filters and no page title", async () => {
     const messages = [
       issue("activity", "Routine dependency update", {

@@ -94,6 +94,8 @@ describe("CompanionChannels", () => {
 
   const render = async (
     onIssueOpen?: (projectId: string, runId: string) => void,
+    requestedMessage?: { channelId: string; messageId: string; rootMessageId: string },
+    onRequestedMessageOpen?: () => void,
   ) => {
     await act(async () => {
       root.render(
@@ -108,6 +110,8 @@ describe("CompanionChannels", () => {
             ]}
             token="token"
             onIssueOpen={onIssueOpen}
+            requestedMessage={requestedMessage}
+            onRequestedMessageOpen={onRequestedMessageOpen}
           />
         </I18nProvider>,
       );
@@ -196,6 +200,41 @@ describe("CompanionChannels", () => {
       "m-1",
     );
     expect(container.textContent).toContain("On it");
+    expect(container.textContent).toContain("Thread");
+  });
+
+  it("opens a requested Inbox reply directly in its thread", async () => {
+    const rootMessage = message("m-root", "Thread root", 1);
+    const reply = {
+      ...message("m-reply", "Requested reply"),
+      parentMessageId: rootMessage.id,
+    };
+    loadChannel.mockResolvedValue({
+      channel: channel("c-common", "Welcome", null),
+      members: [],
+      agents: [],
+      messages: [rootMessage],
+    });
+    listChannelMessages.mockResolvedValue({ messages: [rootMessage, reply] });
+
+    await render(
+      undefined,
+      {
+        channelId: "c-common",
+        messageId: reply.id,
+        rootMessageId: rootMessage.id,
+      },
+      vi.fn(),
+    );
+    await vi.waitFor(() => {
+      expect(container.textContent).toContain("Requested reply");
+    });
+    expect(listChannelMessages).toHaveBeenCalledWith(
+      "token",
+      "org-1",
+      "c-common",
+      rootMessage.id,
+    );
     expect(container.textContent).toContain("Thread");
   });
 

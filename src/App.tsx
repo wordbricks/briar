@@ -425,6 +425,15 @@ export function App() {
     useState<InboxNotificationTarget | null>(null);
   useInboxNotificationClicks(setPendingInboxNotificationTarget);
   const [requestedRunId, setRequestedRunId] = useState<string | null>(null);
+  const [requestedChannelMessage, setRequestedChannelMessage] = useState<{
+    channelId: string;
+    messageId: string;
+    rootMessageId: string;
+  } | null>(null);
+  const clearRequestedChannelMessage = useCallback(
+    () => setRequestedChannelMessage(null),
+    [],
+  );
   const [issueListRequestKey, setIssueListRequestKey] = useState(0);
   const [requestedSessionId, setRequestedSessionId] = useState<string | null>(
     null,
@@ -523,6 +532,19 @@ export function App() {
       } else {
         navigateToPage("issues");
       }
+    } else if (pendingInboxNotificationTarget.kind === "channel") {
+      const { channelMessageId, rootMessageId } = pendingInboxNotificationTarget;
+      if (!channelMessageId || !rootMessageId) return;
+      setRequestedRunId(null);
+      setRequestedSessionId(null);
+      setRequestedChannelMessage({
+        channelId: pendingInboxNotificationTarget.targetId,
+        messageId: channelMessageId,
+        rootMessageId,
+      });
+      setActiveChannelId(pendingInboxNotificationTarget.targetId);
+      if (briar.companionMode) setCompanionPage("home");
+      else navigateToPage("channels");
     } else {
       setRequestedRunId(null);
       setRequestedSessionId(pendingInboxNotificationTarget.targetId);
@@ -1362,6 +1384,8 @@ export function App() {
             onChannelsChange={setOrganizationChannels}
             organizationId={briar.activeOrganizationId}
             token={briar.token}
+            requestedMessage={requestedChannelMessage}
+            onRequestedMessageOpen={clearRequestedChannelMessage}
             onCreateAgent={() => {
               setSettingsTarget({
                 scope: "organization",
@@ -1689,6 +1713,8 @@ export function App() {
               organizationId={briar.activeOrganizationId}
               projects={activeOrganizationProjects}
               token={briar.token}
+              requestedMessage={requestedChannelMessage}
+              onRequestedMessageOpen={clearRequestedChannelMessage}
               onIssueOpen={(projectId, runId) => {
                 briar.setActiveProjectId(projectId);
                 setRequestedRunId(runId);

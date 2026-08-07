@@ -403,12 +403,14 @@ function InboxMessageRow({
             "inbox-message-icon grid size-9 shrink-0 place-items-center rounded-lg",
             category,
             message.kind,
-            message.kind === "conversation" ? message.reason : message.status,
+            message.kind === "conversation" || message.kind === "channel"
+              ? message.reason
+              : message.status,
           )}
         >
           {message.kind === "session" ? (
             <Bot size={17} />
-          ) : message.kind === "conversation" ? (
+          ) : message.kind === "conversation" || message.kind === "channel" ? (
             message.reason === "mention" ? (
               <AtSign size={17} />
             ) : (
@@ -431,7 +433,9 @@ function InboxMessageRow({
             {messageTitle(t, message)}
           </Typography>
           <small className="inbox-message-detail">
-            <span className="inbox-message-project">{message.projectName}</span>
+            <span className="inbox-message-project">
+              {message.kind === "channel" ? `#${message.channelName}` : message.projectName}
+            </span>
             <span aria-hidden="true" className="inbox-message-separator">
               ·
             </span>
@@ -476,7 +480,7 @@ function messageTitle(
   message: InboxMessageWithReadState,
 ) {
   if (message.kind === "issue") return message.title;
-  if (message.kind === "conversation") {
+  if (message.kind === "conversation" || message.kind === "channel") {
     return message.reason === "mention"
       ? t("inbox.conversationMention", { author: message.authorName })
       : t("inbox.conversationThreadReply", { author: message.authorName });
@@ -490,7 +494,9 @@ function messageDescription(
   t: (key: MessageKey, values?: Record<string, string | number>) => string,
   message: InboxMessageWithReadState,
 ) {
-  if (message.kind === "conversation") return message.body;
+  if (message.kind === "conversation" || message.kind === "channel") {
+    return message.body;
+  }
   if (message.kind === "session") {
     if (message.status === "failed") {
       return message.error

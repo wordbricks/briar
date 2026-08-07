@@ -21,6 +21,8 @@ export type InboxNotificationTarget = {
   projectId: string;
   targetId: string;
   kind: InboxMessage["kind"];
+  channelMessageId?: string;
+  rootMessageId?: string;
 };
 
 type StoredInboxNotificationTarget = InboxNotificationTarget & {
@@ -87,6 +89,12 @@ export function inboxNotificationTarget(
     projectId: message.projectId,
     targetId: message.targetId,
     kind: message.kind,
+    ...(message.kind === "channel"
+      ? {
+          channelMessageId: message.messageId,
+          rootMessageId: message.rootMessageId,
+        }
+      : {}),
   };
 }
 
@@ -101,7 +109,10 @@ function isInboxNotificationTarget(
     typeof target.targetId === "string" &&
     (target.kind === "issue" ||
       target.kind === "conversation" ||
-      target.kind === "session")
+      target.kind === "session" ||
+      (target.kind === "channel" &&
+        typeof target.channelMessageId === "string" &&
+        typeof target.rootMessageId === "string"))
   );
 }
 
@@ -218,6 +229,10 @@ export function targetFromNotificationAction(payload: unknown) {
         projectId: stored.projectId,
         targetId: stored.targetId,
         kind: stored.kind,
+        ...(stored.channelMessageId
+          ? { channelMessageId: stored.channelMessageId }
+          : {}),
+        ...(stored.rootMessageId ? { rootMessageId: stored.rootMessageId } : {}),
       }
     : null;
 }

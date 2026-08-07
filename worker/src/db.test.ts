@@ -54,6 +54,7 @@ import {
   listIssueActionProposals,
   listIssueDependencies,
   listIssueConversationNotifications,
+  listChannelConversationNotifications,
   listIssueMessages,
   listIssueThreadMessages,
   listIssueResultReviews,
@@ -753,6 +754,10 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     await executeSql(
       db,
       await readFile(resolve("migrations/0072_organization_ideas.sql"), "utf8"),
+    );
+    await executeSql(
+      db,
+      await readFile(resolve("migrations/0073_organization_channels.sql"), "utf8"),
     );
   }, 30_000);
 
@@ -3083,6 +3088,80 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     ).toBe(false);
 
     await removeOrganizationMember(db, projectId, "conversation-member");
+  });
+
+  it("lists visible channel mentions and replies to a user's root message", async () => {
+    const publicChannelId = "55555555-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    const privateChannelId = "55555555-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+    const rootId = "66666666-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    const replyId = "77777777-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    const mentionId = "88888888-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    await executeSql(
+      db,
+      `
+      insert into user (id, name, email, emailVerified, createdAt, updatedAt)
+      values (
+        'channel-member', 'Channel Member', 'channel@example.com', 1,
+        '${atMinute(0)}', '${atMinute(0)}'
+      );
+      insert into briar_organization_members (
+        organization_id, user_id, role, created_at, updated_at
+      ) values (
+        '${projectId}', 'channel-member', 'member',
+        '${atMinute(0)}', '${atMinute(0)}'
+      );
+      insert into briar_channels (
+        id, organization_id, slug, name, visibility, created_at, updated_at
+      ) values
+        ('${publicChannelId}', '${projectId}', 'inbox-public', 'Inbox Public',
+         'public', '${atMinute(30)}', '${atMinute(30)}'),
+        ('${privateChannelId}', '${projectId}', 'inbox-private', 'Inbox Private',
+         'private', '${atMinute(30)}', '${atMinute(30)}');
+      insert into briar_channel_messages (
+        id, channel_id, parent_message_id, author_user_id, body, created_at, updated_at
+      ) values
+        ('${rootId}', '${publicChannelId}', null, 'owner', 'Owner root',
+         '${atMinute(30.1)}', '${atMinute(30.1)}'),
+        ('${replyId}', '${publicChannelId}', '${rootId}', 'channel-member', 'A reply',
+         '${atMinute(30.2)}', '${atMinute(30.2)}'),
+        ('${mentionId}', '${publicChannelId}', null, 'channel-member', '@owner review',
+         '${atMinute(30.3)}', '${atMinute(30.3)}'),
+        ('99999999-aaaa-4aaa-8aaa-aaaaaaaaaaaa', '${publicChannelId}', '${rootId}',
+         'owner', 'Own reply', '${atMinute(30.4)}', '${atMinute(30.4)}'),
+        ('99999999-bbbb-4bbb-8bbb-bbbbbbbbbbbb', '${privateChannelId}', null,
+         'channel-member', 'Hidden mention', '${atMinute(30.5)}', '${atMinute(30.5)}');
+      insert into briar_channel_message_mentions (message_id, user_id, created_at)
+      values
+        ('${mentionId}', 'owner', '${atMinute(30.3)}'),
+        ('99999999-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'owner', '${atMinute(30.4)}'),
+        ('99999999-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'owner', '${atMinute(30.5)}');`,
+    );
+
+    const notifications = await listChannelConversationNotifications(
+      db,
+      projectId,
+      "owner",
+    );
+
+    expect(notifications).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: mentionId,
+        channel_name: "Inbox Public",
+        root_message_id: mentionId,
+        notification_reason: "mention",
+      }),
+      expect.objectContaining({
+        id: replyId,
+        root_message_id: rootId,
+        notification_reason: "thread_reply",
+      }),
+    ]));
+    expect(notifications.map((notification) => notification.id)).not.toContain(
+      "99999999-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    );
+    expect(notifications.map((notification) => notification.id)).not.toContain(
+      "99999999-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    );
   });
 
   it("stores account-scoped inbox read versions for multi-device sync", async () => {

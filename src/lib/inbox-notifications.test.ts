@@ -98,6 +98,35 @@ describe("inbox notification navigation", () => {
     ).toEqual(target);
   });
 
+  it("preserves channel message and thread context in notification targets", () => {
+    const channelMessage: InboxMessage = {
+      id: "channel:message-1",
+      kind: "channel",
+      projectId: "project-1",
+      projectName: "Briar",
+      targetId: "channel-1",
+      channelId: "channel-1",
+      channelName: "product",
+      messageId: "message-1",
+      rootMessageId: "root-1",
+      title: "product",
+      occurredAt: "2026-08-08T00:00:00.000Z",
+      version: "message-1",
+      body: "A reply",
+      authorName: "Sam",
+      reason: "thread_reply",
+    };
+
+    expect(inboxNotificationTarget(channelMessage)).toEqual({
+      messageId: "channel:message-1",
+      projectId: "project-1",
+      targetId: "channel-1",
+      kind: "channel",
+      channelMessageId: "message-1",
+      rootMessageId: "root-1",
+    });
+  });
+
   it("falls back to the stored target for iOS action payloads", () => {
     const target = inboxNotificationTarget(message);
     window.localStorage.setItem(

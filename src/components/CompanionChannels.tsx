@@ -64,6 +64,12 @@ type CompanionChannelsProps = {
   projects: readonly ChannelGroupProject[];
   token: string;
   onIssueOpen?: (projectId: string, runId: string) => void;
+  requestedMessage?: {
+    channelId: string;
+    messageId: string;
+    rootMessageId: string;
+  } | null;
+  onRequestedMessageOpen?: () => void;
 };
 
 /**
@@ -78,6 +84,8 @@ export function CompanionChannels({
   projects,
   token,
   onIssueOpen,
+  requestedMessage,
+  onRequestedMessageOpen,
 }: CompanionChannelsProps) {
   const { t } = useI18n();
   const [channels, setChannels] = useState<ChannelSummary[]>([]);
@@ -169,6 +177,61 @@ export function CompanionChannels({
     },
     [channel, organizationId, token],
   );
+
+  useEffect(() => {
+    if (!requestedMessage) return;
+    const summary = channels.find(
+      (candidate) => candidate.id === requestedMessage.channelId,
+    );
+    if (!summary) return;
+    let cancelled = false;
+    setLoading(true);
+    void (async () => {
+      try {
+        const result = await loadChannel(token, organizationId, summary.id);
+        if (cancelled) return;
+        setChannel(result.channel);
+        setMessages(result.messages);
+        setMembers(result.members);
+        setAgents(result.agents);
+        if (requestedMessage.rootMessageId !== requestedMessage.messageId) {
+          const threadResult = await listChannelMessages(
+            token,
+            organizationId,
+            summary.id,
+            requestedMessage.rootMessageId,
+          );
+          if (cancelled) return;
+          setThreadParentId(requestedMessage.rootMessageId);
+          setThread(threadResult.messages);
+        } else {
+          setThreadParentId(null);
+          setThread(null);
+        }
+        window.requestAnimationFrame(() => {
+          document
+            .querySelector(
+              `[data-companion-channel-message-id="${requestedMessage.messageId}"]`,
+            )
+            ?.scrollIntoView({ block: "center" });
+          onRequestedMessageOpen?.();
+        });
+      } catch (cause) {
+        if (!cancelled) setError(message(cause));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    channels,
+    onRequestedMessageOpen,
+    organizationId,
+    requestedMessage,
+    token,
+  ]);
 
   const send = useCallback(
     async (
@@ -453,7 +516,10 @@ function MessageRow({
   const acceptedProjectId = message.proposal?.projectId;
   const acceptedRunId = message.proposal?.resultRunId;
   return (
-    <article className="companion-channel-message">
+    <article
+      className="companion-channel-message"
+      data-companion-channel-message-id={message.id}
+    >
       <MessageAvatar message={message} />
       <div className="companion-channel-message-copy">
         <header>
