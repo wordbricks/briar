@@ -183,9 +183,9 @@ final class BriarCompanionUITests: XCTestCase {
         captureScreenshot(named: "companion-accessibility-xxxl")
 
         app.buttons["login-button"].tap()
-        XCTAssertTrue(app.buttons["project-continue-button"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["project-continue-button"].waitForExistence(timeout: transitionTimeout))
         app.buttons["project-continue-button"].tap()
-        XCTAssertTrue(app.buttons["project-menu"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["project-menu"].waitForExistence(timeout: transitionTimeout))
         XCTAssertTrue(app.staticTexts["iOS Native Companion 읽기 경험"].exists)
         try app.performAccessibilityAudit(for: [.textClipped])
         captureScreenshot(named: "companion-task-list-accessibility-xxxl")
