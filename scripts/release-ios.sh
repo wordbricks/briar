@@ -175,6 +175,7 @@ authentication_args=(
   -authenticationKeyIssuerID "$APPLE_API_ISSUER"
 )
 common_build_settings=(
+  CODE_SIGN_IDENTITY="Apple Distribution"
   DEVELOPMENT_TEAM=QFJZ2V3829
   PRODUCT_BUNDLE_IDENTIFIER="$bundle_id"
   MARKETING_VERSION="$marketing_version"
