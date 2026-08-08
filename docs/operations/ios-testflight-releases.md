@@ -322,3 +322,29 @@ processed as `VALID` from commit
 `5a283951d7489706863cb900b738cf790ca03d05`. Main then advanced through a
 mobile-path change and the `1.2.87` version release, so `1.2.87 (1)` is the
 final build handed off for this release.
+
+## 2026-08-08 — 1.2.88 (1)
+
+- App: Briar Companion (`app.briar.companion`)
+- Marketing version: `1.2.88`
+- App Store Connect build: `1`
+- App Store Connect build ID: `c9ae20f2-29b8-4a2a-9db7-7b97e67f9601`
+- Latest main commit: `ed8188af`
+- Release source commit: `ed8188af07220bfe7dde8729a872bf07a67e10de`
+- Implementation: native SwiftUI
+- Toolchain: Xcode 26.6, iOS 26.5 SDK
+- Minimum iOS version: 17.0
+- App Store Connect processing state: `VALID`
+- TestFlight state: `IN_BETA_TESTING`
+- Internal group: `wordbricks` (`hasAccessToAllBuilds=true`)
+- Automatic tester notification: enabled
+- IPA SHA-256: `04eba6b2100ccc7fe1e94103ec7ea6c4f64495c25d8788d5bc1eec791a2e32b9`
+
+The release includes project-agent execution on selected workers, channel
+notifications in Inbox, blue mention links and issue autocomplete, and the
+redesigned channel detail header. It passed the shared API contract, Swift unit
+and UI tests, iPhone and iPad accessibility and layout tests, Production
+analyze and build checks, session/download/log security checks, and the Tauri
+iOS and Android regression builds. Archive identity, App Store provisioning,
+distribution signature, production entitlements, and all alternate app icons
+were verified before upload.
