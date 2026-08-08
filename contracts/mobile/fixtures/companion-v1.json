@@ -937,7 +937,16 @@
             "lastReplyAt": "2026-08-06T00:04:00.000Z",
             "document": null,
             "proposal": null,
-            "createdAt": "2026-08-06T00:03:00.000Z"
+            "createdAt": "2026-08-06T00:03:00.000Z",
+            "attachments": [
+              {
+                "id": "aaaaaaaa-1111-4111-8111-111111111111",
+                "filename": "design.png",
+                "contentType": "image/png",
+                "byteSize": 2048,
+                "url": "/organizations/cccccccc-1111-4111-8111-111111111111/channels/33333333-3333-4333-8333-333333333333/messages/44444444-4444-4444-8444-444444444444/attachments/aaaaaaaa-1111-4111-8111-111111111111"
+              }
+            ]
           },
           {
             "id": "55555555-5555-4555-8555-555555555555",
@@ -1008,7 +1017,16 @@
           "lastReplyAt": "2026-08-06T00:04:00.000Z",
           "document": null,
           "proposal": null,
-          "createdAt": "2026-08-06T00:03:00.000Z"
+          "createdAt": "2026-08-06T00:03:00.000Z",
+          "attachments": [
+            {
+              "id": "aaaaaaaa-1111-4111-8111-111111111111",
+              "filename": "design.png",
+              "contentType": "image/png",
+              "byteSize": 2048,
+              "url": "/organizations/cccccccc-1111-4111-8111-111111111111/channels/33333333-3333-4333-8333-333333333333/messages/44444444-4444-4444-8444-444444444444/attachments/aaaaaaaa-1111-4111-8111-111111111111"
+            }
+          ]
         },
         "agentReplies": [
           {

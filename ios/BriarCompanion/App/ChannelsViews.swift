@@ -1,4 +1,6 @@
+import PhotosUI
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// Home: the organization's channels, grouped by project with section dividers.
 struct ChannelsHomeView: View {
@@ -88,6 +90,7 @@ struct ChannelMessagesView: View {
     @ObservedObject var channels: ChannelsStore
     @AppStorage("companion-locale") private var localeRaw = CompanionLocale.ko.rawValue
     @State private var draft = ""
+    @State private var previewFile: PreviewFile?
 
     let channel: ChannelSummary
     let currentUserID: String?
@@ -118,6 +121,13 @@ struct ChannelMessagesView: View {
                                 )
                             },
                             onIssueOpen: onIssueOpen,
+                            onLoadAttachment: { attachment in
+                                try await channels.download(
+                                    path: attachment.url,
+                                    filename: attachment.filename
+                                )
+                            },
+                            onOpenAttachment: { previewFile = PreviewFile(url: $0) },
                             projects: projects,
                             showsThreadSummary: true
                         )
@@ -136,12 +146,13 @@ struct ChannelMessagesView: View {
                     format: L10n.text(.channelMessagePlaceholder, locale: locale),
                     channel.name
                 ),
-                send: { body, mentions in
+                send: { body, mentions, attachments in
                     await channels.send(
                         channelID: channel.id,
                         parentMessageID: nil,
                         body: body,
-                        mentions: mentions
+                        mentions: mentions,
+                        attachments: attachments
                     )
                 }
             )
@@ -156,6 +167,9 @@ struct ChannelMessagesView: View {
         }
         .toolbar(.hidden, for: .navigationBar)
         .task(id: channel.id) { await channels.openChannel(channel.id) }
+        .sheet(item: $previewFile) { file in
+            QuickLookPreview(fileURL: file.url)
+        }
         .navigationDestination(for: ChannelMessage.self) { message in
             ChannelThreadView(
                 channels: channels,
@@ -270,6 +284,7 @@ struct ChannelThreadView: View {
     @ObservedObject var channels: ChannelsStore
     @AppStorage("companion-locale") private var localeRaw = CompanionLocale.ko.rawValue
     @State private var draft = ""
+    @State private var previewFile: PreviewFile?
 
     let channel: ChannelSummary
     let parent: ChannelMessage
@@ -301,6 +316,13 @@ struct ChannelThreadView: View {
                                 )
                             },
                             onIssueOpen: onIssueOpen,
+                            onLoadAttachment: { attachment in
+                                try await channels.download(
+                                    path: attachment.url,
+                                    filename: attachment.filename
+                                )
+                            },
+                            onOpenAttachment: { previewFile = PreviewFile(url: $0) },
                             projects: projects
                         )
                     }
@@ -318,18 +340,22 @@ struct ChannelThreadView: View {
                     format: L10n.text(.channelMessagePlaceholder, locale: locale),
                     channel.name
                 ),
-                send: { body, mentions in
+                send: { body, mentions, attachments in
                     await channels.send(
                         channelID: channel.id,
                         parentMessageID: parent.id,
                         body: body,
-                        mentions: mentions
+                        mentions: mentions,
+                        attachments: attachments
                     )
                 }
             )
         }
         .navigationTitle(L10n.text(.channelThread, locale: locale))
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(item: $previewFile) { file in
+            QuickLookPreview(fileURL: file.url)
+        }
         .task(id: parent.id) {
             await channels.openThread(channelID: channel.id, parentMessageID: parent.id)
         }
@@ -345,6 +371,8 @@ private struct ChannelMessageRow: View {
     let locale: CompanionLocale
     let onAcceptProposal: (UUID, UUID) async -> AcceptChannelProposalResponse?
     let onIssueOpen: (UUID, UUID) -> Void
+    let onLoadAttachment: @MainActor (ChannelMessageAttachment) async throws -> URL
+    let onOpenAttachment: @MainActor (URL) -> Void
     let projects: [ProjectsResponse.Project]
     var showsThreadSummary = false
 
@@ -355,6 +383,14 @@ private struct ChannelMessageRow: View {
             members: members,
             agents: agents
         )
+    }
+
+    private var messageBodyWithoutAttachments: String {
+        message.body
+            .split(separator: "\n", omittingEmptySubsequences: false)
+            .filter { !$0.contains("](briar-attachment://") }
+            .joined(separator: "\n")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     var body: some View {
@@ -379,9 +415,35 @@ private struct ChannelMessageRow: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-                MentionText(text: message.body, handles: mentionHandles)
+                MentionText(text: messageBodyWithoutAttachments, handles: mentionHandles)
                     .font(.body)
                     .frame(maxWidth: .infinity, alignment: .leading)
+                if !message.attachments.isEmpty {
+                    LazyVGrid(
+                        columns: Array(
+                            repeating: GridItem(.flexible(), spacing: 6),
+                            count: message.attachments.count > 1 ? 2 : 1
+                        ),
+                        spacing: 6
+                    ) {
+                        ForEach(message.attachments) { attachment in
+                            AuthenticatedImagePreview(
+                                sourceID: attachment.url,
+                                filename: attachment.filename,
+                                detail: ByteCountFormatter.string(
+                                    fromByteCount: Int64(attachment.byteSize),
+                                    countStyle: .file
+                                ),
+                                accessibilityID: "channel-message-attachment-\(attachment.id.uuidString.lowercased())",
+                                load: {
+                                    try await onLoadAttachment(attachment)
+                                },
+                                open: onOpenAttachment
+                            )
+                        }
+                    }
+                    .padding(.top, 4)
+                }
                 if let document = message.document {
                     Label(document.title, systemImage: "doc.text")
                         .font(.caption)
@@ -566,10 +628,14 @@ private struct ChannelProposalCard: View {
 private struct ChannelComposer: View {
     @Binding var draft: String
     @State private var mentions: [ChannelMentionTarget] = []
+    @State private var attachments: [PendingIssueAttachment] = []
+    @State private var selectedPhotos: [PhotosPickerItem] = []
+    @State private var isLoadingPhotos = false
+    @State private var attachmentError: String?
     let sending: Bool
     let candidates: [ChannelMentionTarget]
     let placeholder: String
-    let send: (String, [ChannelMentionTarget]) async -> Void
+    let send: (String, [ChannelMentionTarget], [PendingIssueAttachment]) async -> Void
 
     private var suggestions: [ChannelMentionTarget] {
         Array(ChannelMentions.suggestions(in: draft, candidates: candidates).prefix(6))
@@ -631,13 +697,50 @@ private struct ChannelComposer: View {
                 .padding(.bottom, 8)
                 .accessibilityIdentifier("channel-mention-menu")
             }
+            if !attachments.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(attachments) { attachment in
+                            ChannelAttachmentDraft(attachment: attachment) {
+                                attachments.removeAll { $0.id == attachment.id }
+                                attachmentError = nil
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 8)
+                }
+            }
+            if let attachmentError {
+                Text(attachmentError)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 6)
+            }
             HStack(spacing: 8) {
-                Image(systemName: "plus")
-                    .font(.body.weight(.medium))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 40, height: 40)
-                    .background(.background, in: Circle())
-                    .overlay { Circle().stroke(Color.secondary.opacity(0.18), lineWidth: 1) }
+                PhotosPicker(
+                    selection: $selectedPhotos,
+                    maxSelectionCount: max(
+                        1,
+                        PendingIssueAttachment.maximumCount - attachments.count
+                    ),
+                    matching: .images,
+                    preferredItemEncoding: .compatible
+                ) {
+                    Image(systemName: "plus")
+                        .font(.body.weight(.medium))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 40, height: 40)
+                        .background(.background, in: Circle())
+                        .overlay { Circle().stroke(Color.secondary.opacity(0.18), lineWidth: 1) }
+                }
+                .disabled(
+                    isLoadingPhotos || sending ||
+                        attachments.count >= PendingIssueAttachment.maximumCount
+                )
+                .accessibilityLabel("이미지 첨부")
+                .accessibilityIdentifier("channel-composer-attach")
                 TextField(placeholder, text: $draft, axis: .vertical)
                     .textFieldStyle(.plain)
                     .lineLimit(1...4)
@@ -646,19 +749,26 @@ private struct ChannelComposer: View {
                     .onChange(of: draft) { _, body in
                         mentions = ChannelMentions.retained(in: body, mentions: mentions)
                     }
-                if !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                if !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+                    !attachments.isEmpty {
                     Button {
                         let body = draft
                         let selected = ChannelMentions.retained(in: body, mentions: mentions)
                         draft = ""
                         mentions = []
-                        Task { await send(body, selected) }
+                        let selectedAttachments = attachments
+                        attachments = []
+                        Task { await send(body, selected, selectedAttachments) }
                     } label: {
-                        Image(systemName: "arrow.up")
-                            .font(.body.weight(.bold))
-                            .foregroundStyle(.white)
-                            .frame(width: 40, height: 40)
-                            .background(.tint, in: Circle())
+                        if sending {
+                            ProgressView().controlSize(.small).frame(width: 40, height: 40)
+                        } else {
+                            Image(systemName: "arrow.up")
+                                .font(.body.weight(.bold))
+                                .foregroundStyle(.white)
+                                .frame(width: 40, height: 40)
+                                .background(.tint, in: Circle())
+                        }
                     }
                     .disabled(sending)
                     .accessibilityIdentifier("channel-composer-send")
@@ -671,5 +781,86 @@ private struct ChannelComposer: View {
             .padding(.vertical, 10)
         }
         .background(.bar)
+        .onChange(of: selectedPhotos) { _, items in
+            guard !items.isEmpty else { return }
+            Task { await importPhotos(items) }
+        }
+    }
+
+    @MainActor
+    private func importPhotos(_ items: [PhotosPickerItem]) async {
+        isLoadingPhotos = true
+        defer {
+            isLoadingPhotos = false
+            selectedPhotos = []
+        }
+        do {
+            var loaded = attachments
+            for item in items.prefix(PendingIssueAttachment.maximumCount - loaded.count) {
+                guard let data = try await item.loadTransferable(type: Data.self) else {
+                    throw IssueMutationError.attachment("사진 앱에서 이미지를 읽지 못했습니다.")
+                }
+                let supportedType = item.supportedContentTypes.first { type in
+                    guard type.conforms(to: .image),
+                          let mimeType = type.preferredMIMEType else { return false }
+                    return PendingIssueAttachment.allowedContentTypes.contains(mimeType)
+                }
+                if let supportedType,
+                   let mimeType = supportedType.preferredMIMEType,
+                   mimeType.hasPrefix("image/") {
+                    loaded.append(PendingIssueAttachment(
+                        filename: "image-\(UUID().uuidString).\(supportedType.preferredFilenameExtension ?? "bin")",
+                        contentType: mimeType,
+                        data: data
+                    ))
+                } else if let jpegData = UIImage(data: data)?.jpegData(compressionQuality: 0.9) {
+                    loaded.append(PendingIssueAttachment(
+                        filename: "image-\(UUID().uuidString).jpg",
+                        contentType: "image/jpeg",
+                        data: jpegData
+                    ))
+                } else {
+                    throw IssueMutationError.attachment("선택한 이미지 형식을 첨부할 수 없습니다.")
+                }
+            }
+            if let message = PendingIssueAttachment.validationMessage(for: loaded) {
+                throw IssueMutationError.attachment(message)
+            }
+            attachments = loaded
+            attachmentError = nil
+        } catch {
+            attachmentError = error.localizedDescription
+        }
+    }
+}
+
+private struct ChannelAttachmentDraft: View {
+    let attachment: PendingIssueAttachment
+    let onRemove: () -> Void
+
+    var body: some View {
+        HStack(spacing: 6) {
+            if let image = UIImage(data: attachment.data) {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 34, height: 34)
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+            } else {
+                Image(systemName: "photo")
+                    .frame(width: 34, height: 34)
+                    .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 6))
+            }
+            Text(attachment.filename).lineLimit(1).font(.caption)
+            Button(role: .destructive, action: onRemove) {
+                Image(systemName: "xmark.circle.fill")
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("첨부 삭제")
+        }
+        .padding(.vertical, 5)
+        .padding(.horizontal, 8)
+        .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
     }
 }

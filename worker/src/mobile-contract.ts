@@ -371,6 +371,7 @@ export const mobileChannelMessageSchema = z.object({
   ]),
   mentionedUserIds: z.array(z.string()).default([]),
   mentionedAgentIds: z.array(z.uuid()).default([]),
+  attachments: z.array(mobileIssueAttachmentSchema).default([]),
   replyCount: z.number().int().nonnegative(),
   lastReplyAt: z.iso.datetime().nullable(),
   document: z

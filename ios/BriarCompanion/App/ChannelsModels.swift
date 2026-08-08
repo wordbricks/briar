@@ -21,6 +21,14 @@ struct ChannelSummary: Codable, Hashable, Identifiable, Sendable {
     }
 }
 
+struct ChannelMessageAttachment: Codable, Hashable, Identifiable, Sendable {
+    let id: UUID
+    let filename: String
+    let contentType: String
+    let byteSize: Int
+    let url: String
+}
+
 struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
     let id: UUID
     let channelId: UUID
@@ -29,6 +37,7 @@ struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
     let author: Author
     let mentionedUserIds: [String]
     let mentionedAgentIds: [UUID]
+    let attachments: [ChannelMessageAttachment]
     let replyCount: Int
     let lastReplyAt: Date?
     let document: Document?
@@ -43,6 +52,7 @@ struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
         case author
         case mentionedUserIds
         case mentionedAgentIds
+        case attachments
         case replyCount
         case lastReplyAt
         case document
@@ -58,6 +68,7 @@ struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
         author: Author,
         mentionedUserIds: [String] = [],
         mentionedAgentIds: [UUID] = [],
+        attachments: [ChannelMessageAttachment] = [],
         replyCount: Int,
         lastReplyAt: Date?,
         document: Document?,
@@ -71,6 +82,7 @@ struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
         self.author = author
         self.mentionedUserIds = mentionedUserIds
         self.mentionedAgentIds = mentionedAgentIds
+        self.attachments = attachments
         self.replyCount = replyCount
         self.lastReplyAt = lastReplyAt
         self.document = document
@@ -87,6 +99,7 @@ struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
         author = try container.decode(Author.self, forKey: .author)
         mentionedUserIds = try container.decodeIfPresent([String].self, forKey: .mentionedUserIds) ?? []
         mentionedAgentIds = try container.decodeIfPresent([UUID].self, forKey: .mentionedAgentIds) ?? []
+        attachments = try container.decodeIfPresent([ChannelMessageAttachment].self, forKey: .attachments) ?? []
         replyCount = try container.decode(Int.self, forKey: .replyCount)
         lastReplyAt = try container.decodeIfPresent(Date.self, forKey: .lastReplyAt)
         document = try container.decodeIfPresent(Document.self, forKey: .document)

@@ -101,33 +101,86 @@ final class ChannelsStore: ObservableObject {
         channelID: UUID,
         parentMessageID: UUID?,
         body: String,
-        mentions: [ChannelMentionTarget]
+        mentions: [ChannelMentionTarget],
+        attachments: [PendingIssueAttachment] = []
     ) async {
         guard let organizationID, let token else { return }
         let trimmed = body.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
+        guard !trimmed.isEmpty || !attachments.isEmpty else { return }
+        if let message = PendingIssueAttachment.validationMessage(for: attachments) {
+            errorMessage = message
+            return
+        }
+        guard attachments.allSatisfy({ $0.contentType.hasPrefix("image/") }) else {
+            errorMessage = "채널에는 이미지만 첨부할 수 있습니다."
+            return
+        }
         sending = true
         defer { sending = false }
         do {
-            let response: CreateChannelMessageResponse = try await api.send(
-                MobileAPIContract.Endpoint.channelMessages(
-                    organizationID: organizationID,
-                    channelID: channelID
-                ),
-                method: "POST",
-                token: token,
-                body: CreateChannelMessageRequest(
-                    body: trimmed,
-                    parentMessageId: parentMessageID,
-                    mentionedUserIds: mentions.compactMap {
-                        $0.kind == .user ? $0.recipientId : nil
-                    },
-                    mentionedAgentIds: mentions.compactMap {
-                        $0.kind == .agent ? UUID(uuidString: $0.recipientId) : nil
-                    }
-                ),
-                as: CreateChannelMessageResponse.self
+            let path = MobileAPIContract.Endpoint.channelMessages(
+                organizationID: organizationID,
+                channelID: channelID
             )
+            let mentionedUserIds = mentions.compactMap {
+                $0.kind == .user ? $0.recipientId : nil
+            }
+            let mentionedAgentIds = mentions.compactMap {
+                $0.kind == .agent ? UUID(uuidString: $0.recipientId) : nil
+            }
+            let response: CreateChannelMessageResponse
+            if attachments.isEmpty {
+                response = try await api.send(
+                    path,
+                    method: "POST",
+                    token: token,
+                    body: CreateChannelMessageRequest(
+                        body: trimmed,
+                        parentMessageId: parentMessageID,
+                        mentionedUserIds: mentionedUserIds,
+                        mentionedAgentIds: mentionedAgentIds
+                    ),
+                    as: CreateChannelMessageResponse.self
+                )
+            } else {
+                let references = attachments.map { _ in UUID().uuidString.lowercased() }
+                let markdown = zip(attachments, references).map { attachment, reference in
+                    let name = attachment.filename.replacingOccurrences(of: "]", with: "\\]")
+                    return "![\(name)](briar-attachment://\(reference))"
+                }.joined(separator: "\n\n")
+                let messageBody = [trimmed, markdown].filter { !$0.isEmpty }.joined(separator: "\n\n")
+                response = try await api.upload(
+                    path,
+                    fields: [
+                        "body": messageBody,
+                        "parentMessageId": parentMessageID?.uuidString.lowercased() ?? "",
+                        "mentionedUserIds": String(
+                            data: try JSONEncoder().encode(mentionedUserIds),
+                            encoding: .utf8
+                        ) ?? "[]",
+                        "mentionedAgentIds": String(
+                            data: try JSONEncoder().encode(
+                                mentionedAgentIds.map { $0.uuidString.lowercased() }
+                            ),
+                            encoding: .utf8
+                        ) ?? "[]",
+                        "attachmentReferences": String(
+                            data: try JSONEncoder().encode(references),
+                            encoding: .utf8
+                        ) ?? "[]",
+                    ],
+                    files: attachments.map {
+                        MultipartFile(
+                            fieldName: "attachments",
+                            filename: $0.filename,
+                            contentType: $0.contentType,
+                            data: $0.data
+                        )
+                    },
+                    token: token,
+                    as: CreateChannelMessageResponse.self
+                )
+            }
             if parentMessageID == nil {
                 messages.append(response.message)
             } else {
@@ -137,6 +190,16 @@ final class ChannelsStore: ObservableObject {
         } catch {
             errorMessage = CompanionStore.message(for: error)
         }
+    }
+
+    /// Downloads a channel message attachment for previewing.
+    func download(path: String, filename: String) async throws -> URL {
+        guard let token else { throw MobileAPIError.invalidRequest }
+        let safeName = filename.replacingOccurrences(of: "/", with: "-")
+        let destination = FileManager.default.temporaryDirectory
+            .appending(path: "briar-channel-previews", directoryHint: .isDirectory)
+            .appending(path: "\(UUID().uuidString)-\(safeName)")
+        return try await api.download(path, token: token, to: destination)
     }
 
     func acceptProposal(
