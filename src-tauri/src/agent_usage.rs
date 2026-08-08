@@ -4,7 +4,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::{
-    env, fs,
+    env,
+    ffi::OsStr,
+    fs,
     io::{BufRead, BufReader, Write},
     path::{Path, PathBuf},
     process::{Child, Command, Stdio},
@@ -166,17 +168,37 @@ pub(crate) async fn load(home: PathBuf) -> AgentUsageSnapshot {
     }
 }
 
-pub(crate) fn locally_authenticated(home: &Path, provider: &str) -> bool {
-    match provider {
-        "codex" => read_codex_account_identity(home).0,
-        "claude" => read_claude_credentials(home).is_ok(),
-        "grok" => read_grok_auth_session(home).is_ok_and(|session| {
-            session
-                .expires_at
-                .is_none_or(|expires_at| expires_at > now_millis() + GROK_TOKEN_SKEW_MILLIS)
-        }),
-        _ => false,
-    }
+pub(crate) fn codex_locally_authenticated(home: &Path) -> bool {
+    read_codex_account_identity(home).0
+}
+
+fn parse_claude_auth_status(stdout: &[u8]) -> bool {
+    serde_json::from_slice::<Value>(stdout)
+        .ok()
+        .and_then(|status| status.get("loggedIn").and_then(Value::as_bool))
+        == Some(true)
+}
+
+pub(crate) fn claude_locally_authenticated(
+    home: &Path,
+    binary: &Path,
+    execution_path: &OsStr,
+) -> bool {
+    Command::new(binary)
+        .args(["auth", "status"])
+        .env("HOME", home)
+        .env("PATH", execution_path)
+        .output()
+        .ok()
+        .is_some_and(|output| parse_claude_auth_status(&output.stdout))
+}
+
+pub(crate) fn grok_locally_authenticated(home: &Path) -> bool {
+    read_grok_auth_session(home).is_ok_and(|session| {
+        session
+            .expires_at
+            .is_none_or(|expires_at| expires_at > now_millis() + GROK_TOKEN_SKEW_MILLIS)
+    })
 }
 
 fn load_codex(home: &Path) -> ProviderUsage {
@@ -912,6 +934,13 @@ mod tests {
         )
         .unwrap();
         assert_eq!(token, "secret");
+    }
+
+    #[test]
+    fn parses_claude_cli_login_status() {
+        assert!(parse_claude_auth_status(br#"{"loggedIn":true}"#));
+        assert!(!parse_claude_auth_status(br#"{"loggedIn":false}"#));
+        assert!(!parse_claude_auth_status(b"not json"));
     }
 
     #[test]

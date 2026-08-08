@@ -209,11 +209,12 @@ export function CompanionChannels({
           setThread(null);
         }
         window.requestAnimationFrame(() => {
-          document
-            .querySelector(
-              `[data-companion-channel-message-id="${requestedMessage.messageId}"]`,
-            )
-            ?.scrollIntoView({ block: "center" });
+          const requestedMessageElement = document.querySelector(
+            `[data-companion-channel-message-id="${requestedMessage.messageId}"]`,
+          );
+          if (requestedMessageElement?.scrollIntoView) {
+            requestedMessageElement.scrollIntoView({ block: "center" });
+          }
           onRequestedMessageOpen?.();
         });
       } catch (cause) {

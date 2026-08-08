@@ -1167,12 +1167,16 @@ fn inspect_agent_browser_cli(
 fn inspect_onboarding_prerequisites_sync(home: &Path) -> OnboardingPrerequisites {
     let execution_path = cli_execution_path(home).unwrap_or_default();
     let mut codex = inspect_cli(agent::codex_binary(home, &execution_path));
-    let mut claude = inspect_cli(agent::claude_binary(home, &execution_path));
+    let claude_binary = agent::claude_binary(home, &execution_path);
+    let mut claude = inspect_cli(claude_binary.clone());
     let mut grok = inspect_cli(agent::grok_binary(home, &execution_path));
     let mut opencode = inspect_cli(agent::opencode_binary(home, &execution_path));
-    codex.authenticated = codex.installed && agent_usage::locally_authenticated(home, "codex");
-    claude.authenticated = claude.installed && agent_usage::locally_authenticated(home, "claude");
-    grok.authenticated = grok.installed && agent_usage::locally_authenticated(home, "grok");
+    codex.authenticated = codex.installed && agent_usage::codex_locally_authenticated(home);
+    claude.authenticated = claude.installed
+        && claude_binary.as_deref().is_ok_and(|binary| {
+            agent_usage::claude_locally_authenticated(home, binary, &execution_path)
+        });
+    grok.authenticated = grok.installed && agent_usage::grok_locally_authenticated(home);
     // OpenCode delegates authentication to its configured model providers. A
     // healthy installed CLI is enough to launch; the server reports any
     // provider-specific authentication error during the request.
