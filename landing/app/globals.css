@@ -778,7 +778,7 @@ button:focus-visible {
   padding-bottom: 96px;
 }
 
-.differentiator-list {
+.workflow-steps.differentiator-list {
   max-width: 760px;
   margin: 0 auto;
 }
