@@ -1085,6 +1085,9 @@ export async function runProjectAgentTaskOnWorker(
       method: "POST",
       body: JSON.stringify({
         ...input,
+        // Project Agent IDs are persisted as lowercase UUID strings and the
+        // Worker uses case-sensitive lookups. Keep shared clients canonical.
+        agentId: input.agentId.toLowerCase(),
         requestId: crypto.randomUUID(),
       }),
     },
