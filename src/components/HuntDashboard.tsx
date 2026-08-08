@@ -1445,7 +1445,6 @@ export function HuntDashboard({
                     <KanbanCard
                       availableProviders={availableProviders}
                       issueKeyPrefix={dashboard?.project.issueKeyPrefix}
-                      hideStageIcon={companionMode}
                       activeAgent={
                         agentAssociationsByRunId.activeAgents.get(run.id) ?? null
                       }
@@ -3388,7 +3387,6 @@ function KanbanCard({
   onCheckpointsChange,
   token,
   updatingIssueId,
-  hideStageIcon = false,
 }: {
   availableProviders: AgentProvider[];
   activeAgent: ProjectAgent | null;
@@ -3400,7 +3398,6 @@ function KanbanCard({
   isMoving: boolean;
   isProcessing: boolean;
   issueKeyPrefix?: string;
-  hideStageIcon?: boolean;
   onDelete: () => void;
   onTransfer?: () => void;
   onPointerCancel: (event: ReactPointerEvent<HTMLElement>) => void;
@@ -3476,7 +3473,9 @@ function KanbanCard({
                 title={t("run.workerAssigned", {
                   worker: assignedWorker.label,
                 })}
-              />
+              >
+                <WorkerIcon icon={assignedWorker.icon} size={18} />
+              </span>
             )}
             {activeAgent && (
               <span
@@ -3504,15 +3503,6 @@ function KanbanCard({
         )}
         <span className="kanban-card-kicker">
           <small>{formatIssueKey(issueKeyPrefix, run.runNumber)}</small>
-          {!hideStageIcon && run.workflowStage && (
-            <i
-              aria-label={run.workflow.stages.find((stage) => stage.id === run.workflowStage)?.label ?? run.workflowStage}
-              className="kanban-card-stage-icon"
-              title={run.workflow.stages.find((stage) => stage.id === run.workflowStage)?.label ?? run.workflowStage}
-            >
-              <Waypoints aria-hidden="true" size={13} />
-            </i>
-          )}
         </span>
         <span className="kanban-card-copy">
           <strong>{run.title}</strong>
