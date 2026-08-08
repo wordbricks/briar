@@ -374,3 +374,37 @@ analyze and build checks, session/download/log security checks, and the Tauri
 iOS and Android regression builds. Archive identity, App Store provisioning,
 distribution signature, production entitlements, and all alternate app icons
 were verified before upload.
+
+## 2026-08-08 — 1.2.91 (1)
+
+- App: Briar Companion (`app.briar.companion`)
+- Marketing version: `1.2.91`
+- App Store Connect build: `1`
+- App Store Connect build ID: `23c34ef3-b469-4aa6-b6f2-8a96c39b9ec6`
+- Latest main commit: `da2885e7`
+- Release source commit: `da2885e75d255095a22523df08c99a50e6676812`
+- Implementation: native SwiftUI
+- Toolchain: Xcode 26.6, iOS 26.5 SDK
+- Minimum iOS version: 17.0
+- App Store Connect processing state: `VALID`
+- TestFlight state: `IN_BETA_TESTING`
+- Internal group: `wordbricks` (`hasAccessToAllBuilds=true`)
+- Automatic tester notification: enabled
+- IPA SHA-256: `be89a5d26ec9c57131df724dcb8111da4fcc1b6a9e621a39cb6165110c0a5fc1`
+
+The release includes canonical iOS agent execution IDs, terminal-state Inbox
+notification filtering, and the 1.2.91 release metadata. The first latest-main
+gate exposed a stale uppercase UUID expectation, which was corrected and
+merged in PR #793 before the release archive was created. The corrected source
+passed the shared API contract, Swift unit and nine UI tests, iPhone and iPad
+accessibility and layout tests, Production analyze and build checks,
+session/download/log security checks, and the Tauri iOS and Android regression
+builds. Archive identity, App Store provisioning, distribution signature,
+production entitlements, and all alternate app icons were verified before
+upload.
+
+Build `1` of version `1.2.90`
+(`88aeff4c-21ed-4c41-a333-55c45cd2e07d`) remains `VALID`, but main advanced
+through the iOS execution-ID fix, notification filtering, and the 1.2.91
+release. Version `1.2.91 (1)` is therefore the final build handed off from
+the latest main commit.
