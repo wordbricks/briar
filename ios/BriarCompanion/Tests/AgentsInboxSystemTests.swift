@@ -363,9 +363,16 @@ final class AgentsInboxSystemTests: XCTestCase {
             priority: 3,
             updatedAt: Date(timeIntervalSince1970: 1_700_000_050)
         )
+        let running = DashboardRun(
+            id: UUID(uuidString: "33333333-3333-4333-8333-333333333333")!,
+            title: "Working",
+            status: .running,
+            priority: 3,
+            updatedAt: Date(timeIntervalSince1970: 1_700_000_090)
+        )
         let snapshot = DashboardSnapshot(
             project: project,
-            runs: [blocked, completed],
+            runs: [blocked, running, completed],
             conversationNotifications: [
                 ConversationNotification(
                     id: UUID(uuidString: "99999999-9999-4999-8999-999999999999")!,
@@ -424,6 +431,9 @@ final class AgentsInboxSystemTests: XCTestCase {
             project: project
         )
         XCTAssertEqual(messages.count, 5)
+        // In-progress issues never surface as a message; only decision and
+        // terminal states do.
+        XCTAssertFalse(messages.contains { $0.title == "Working" })
         // Newest first: channel reply (125) > mention (120) > blocked issue (100) > failed session (80) > completed (50)
         XCTAssertEqual(messages.map(\.occurredAt), messages.map(\.occurredAt).sorted(by: >))
         XCTAssertEqual(messages.map(\.kind), [.channel, .conversation, .issue, .session, .issue])

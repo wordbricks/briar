@@ -56,7 +56,7 @@ enum InboxMessageBuilder {
         var messages: [InboxMessage] = []
 
         if let snapshot {
-            for run in snapshot.runs {
+            for run in snapshot.runs where run.status.showsInInbox {
                 let stage = run.workflowStage ?? "none"
                 // Keep this formula aligned with desktop/web `useInbox` so
                 // account-synced read versions match across clients.

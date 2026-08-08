@@ -120,7 +120,7 @@ describe("Inbox messages", () => {
         runs: [
           {
             ...run,
-            status: "running",
+            status: "paused",
             workflowStage: "merged",
             workflow,
           },
@@ -135,6 +135,41 @@ describe("Inbox messages", () => {
       workflowStage: "merged",
       workflowStageLabel: "Merge to main",
     });
+  });
+
+  it("surfaces only decision and terminal run states in the inbox", () => {
+    const baseRun = demoDashboard.runs[0];
+    const statuses = [
+      "backlog",
+      "queued",
+      "running",
+      "paused",
+      "blocked",
+      "failed",
+      "completed",
+      "cancelled",
+    ] as const;
+    const messages = buildCurrentInboxMessages(
+      {
+        ...demoDashboard,
+        runs: statuses.map((status, index) => ({
+          ...baseRun,
+          id: `run-${status}`,
+          runNumber: index + 1,
+          status,
+        })),
+      },
+      [],
+      [project],
+    );
+
+    expect(messages.map((message) => message.targetId)).toEqual([
+      "run-paused",
+      "run-blocked",
+      "run-failed",
+      "run-completed",
+    ]);
+    expect(messages.every((message) => message.kind === "issue")).toBe(true);
   });
 
   it("creates session messages only for completed and failed sessions", () => {

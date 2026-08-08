@@ -19,6 +19,14 @@ const builtInWorkflowStageIds = new Set<string>(
   autoHuntWorkflowStageCatalog.map((stage) => stage.id),
 );
 
+/** Run states that surface a message in the Inbox. Other transitions are too noisy. */
+export const inboxIssueNotifyingStatuses = new Set<HuntStatus>([
+  "paused",
+  "completed",
+  "failed",
+  "blocked",
+]);
+
 export type InboxIssueMessage = {
   id: string;
   kind: "issue";
@@ -135,6 +143,7 @@ export function buildCurrentInboxMessages(
 
   if (dashboard) {
     for (const run of dashboard.runs) {
+      if (!inboxIssueNotifyingStatuses.has(run.status)) continue;
       messages.push({
         id: `issue:${run.id}`,
         kind: "issue",
