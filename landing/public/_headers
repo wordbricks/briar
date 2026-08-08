@@ -1,0 +1,28 @@
+# Content-hashed build output (filenames change when content changes) -
+# safe to cache forever. vinext would otherwise generate this same rule
+# automatically, but only when no _headers file already exists; this file
+# also covers the static images below, which vinext doesn't know about.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# Static images referenced by a fixed URL (not content-hashed). A new
+# deploy serves fresh content at the same path, so a short-lived cache is
+# safe and still beats the previous default of no caching at all
+# (public, max-age=0, must-revalidate on every request).
+/briar-app-icon.png
+  Cache-Control: public, max-age=86400
+
+/og-briar-workflow.png
+  Cache-Control: public, max-age=86400
+
+/tutorial/*
+  Cache-Control: public, max-age=86400
+
+/file.svg
+  Cache-Control: public, max-age=86400
+
+/globe.svg
+  Cache-Control: public, max-age=86400
+
+/window.svg
+  Cache-Control: public, max-age=86400

@@ -1,14 +1,13 @@
-import type { Metadata } from "next";
-import { copy, type Locale } from "../i18n";
+import { type Locale, copy, localizedPath } from "../i18n";
 import { LanguageSwitcher } from "../language-switcher";
-import { getRequestLocale } from "../request-locale";
-import { ThemeToggle } from "../theme-toggle";
+import { MobileMenu } from "../mobile-menu";
+
 
 const WEB_APP_URL = "/app/";
 const MAC_DOWNLOAD_URL =
   "https://briar-api.wbai.workers.dev/releases/latest/mac-aarch64.dmg";
 
-const tutorialCopy = {
+export const tutorialCopy = {
   ko: {
     metadata: {
       title: "Briar 튜토리얼 — 첫 이슈부터 검증된 결과까지",
@@ -23,12 +22,14 @@ const tutorialCopy = {
     openApp: "Briar 열기",
     captured:
       "Briar v1.2.67 로컬 데모 환경에서 직접 캡처한 화면입니다.",
+    shotBarLabel: "briar · 로컬 데모",
     setupTitle: "시작하기 전에",
     setup: [
       ["Briar 실행", "웹 앱을 열거나 Mac 앱을 설치하고 로그인합니다."],
       ["저장소 연결", "작업할 Git 저장소를 프로젝트로 연결합니다."],
       ["에이전트 준비", "Codex, Claude 또는 Grok 중 사용할 에이전트에 로그인합니다."],
     ],
+    setupLabel: "00 · SETUP",
     tocTitle: "이 튜토리얼에서",
     steps: [
       {
@@ -37,10 +38,10 @@ const tutorialCopy = {
         nav: "이슈 만들기",
         title: "요청을 실행 가능한 이슈로 만드세요.",
         description:
-          "New issue에서 제목과 설명을 입력하고 담당자, 시작 상태, 우선순위를 정합니다. 화면이나 재현 영상이 있다면 첨부 파일로 함께 남길 수 있습니다.",
+          "새 이슈에서 제목과 설명을 입력하고 담당자, 시작 상태, 우선순위를 정합니다. 화면이나 재현 영상이 있다면 첨부 파일로 함께 남길 수 있습니다.",
         bullets: [
           "설명에는 기대 결과와 완료 조건을 함께 적어 주세요.",
-          "바로 시작할 일은 Queued, 나중에 다듬을 일은 Backlog로 둡니다.",
+          "바로 시작할 일은 대기, 나중에 다듬을 일은 백로그로 둡니다.",
         ],
         image: "/tutorial/01-create-issue.webp",
         alt: "Briar 새 이슈 작성 대화상자",
@@ -52,9 +53,9 @@ const tutorialCopy = {
         nav: "작업 추적하기",
         title: "보드에서 모든 작업의 현재 위치를 보세요.",
         description:
-          "작업은 Backlog와 Queued에서 시작해 Analyze, Implement, Local validation, Review를 거칩니다. 막힌 작업과 완료된 작업도 같은 보드에서 놓치지 않습니다.",
+          "작업은 백로그와 대기에서 시작해 분석, 구현, 로컬 검증, 리뷰를 거칩니다. 막힌 작업과 완료된 작업도 같은 보드에서 놓치지 않습니다.",
         bullets: [
-          "In progress와 Needs attention 필터로 지금 볼 일만 좁힙니다.",
+          "진행 중과 확인 필요 필터로 지금 볼 일만 좁힙니다.",
           "카드를 열면 실행 단계와 최신 활동을 바로 확인할 수 있습니다.",
         ],
         image: "/tutorial/02-task-board.webp",
@@ -67,10 +68,10 @@ const tutorialCopy = {
         nav: "대기 이슈 처리하기",
         title: "이슈 처리 에이전트가 대기 이슈를 자동으로 처리하게 하세요.",
         description:
-          "Agents에서 이슈 처리 에이전트의 Run Task를 열면 대기 중인 이슈를 찾아 워크플로에 따라 분석, 구현, 검증하도록 실행할 수 있습니다. 에이전트는 각 이슈를 독립된 작업으로 처리하고 진행 상태를 보드에 기록합니다.",
+          "에이전트에서 이슈 처리 에이전트의 작업 실행을 열면 대기 중인 이슈를 찾아 워크플로에 따라 분석, 구현, 검증하도록 실행할 수 있습니다. 에이전트는 각 이슈를 독립된 작업으로 처리하고 진행 상태를 보드에 기록합니다.",
         bullets: [
-          "요청에 “대기 중인 모든 이슈를 처리합니다.”가 들어 있는지 확인하고 Run Task를 누릅니다.",
-          "실행이 시작되면 Queued 이슈가 워크플로 단계로 이동하고 필요한 검증까지 이어집니다.",
+          "요청에 “대기 중인 모든 이슈를 처리합니다.”가 들어 있는지 확인하고 작업 실행을 누릅니다.",
+          "실행이 시작되면 대기 중인 이슈가 워크플로 단계로 이동하고 필요한 검증까지 이어집니다.",
         ],
         image: "/tutorial/07-run-auto-hunt.webp",
         alt: "Briar 이슈 처리 에이전트 작업 실행 대화상자",
@@ -82,10 +83,10 @@ const tutorialCopy = {
         nav: "에이전트와 대화하기",
         title: "이슈 안에서 맥락을 이어가세요.",
         description:
-          "Issue 탭의 대화에는 사람의 추가 요청과 에이전트의 응답이 함께 남습니다. 실행 도중 새로운 제약이나 확인할 사항이 생겨도 작업 맥락이 흩어지지 않습니다.",
+          "이슈 탭의 대화에는 사람의 추가 요청과 에이전트의 응답이 함께 남습니다. 실행 도중 새로운 제약이나 확인할 사항이 생겨도 작업 맥락이 흩어지지 않습니다.",
         bullets: [
           "댓글로 추가 요구사항, 예외 조건, 리뷰 피드백을 전달합니다.",
-          "Result, Evidence, Work log, Status 탭을 오가며 같은 이슈를 봅니다.",
+          "작업 결과, 증빙, 활동 기록, 상태 탭을 오가며 같은 이슈를 봅니다.",
         ],
         image: "/tutorial/03-issue-conversation.webp",
         alt: "Briar 이슈 상세와 에이전트 대화",
@@ -97,14 +98,14 @@ const tutorialCopy = {
         nav: "정리된 결과 확인하기",
         title: "이슈 상세에서 깔끔하게 정리된 결과를 확인하세요.",
         description:
-          "작업이 끝나거나 검토 지점에 도달하면 Result 탭이 구현 내용, 실행 단계, 검증 결과, 다음 행동을 한눈에 볼 수 있도록 정리합니다. 긴 작업 로그를 전부 읽지 않아도 무엇이 바뀌었고 무엇을 확인해야 하는지 빠르게 판단할 수 있습니다.",
+          "작업이 끝나거나 검토 지점에 도달하면 작업 결과 탭이 구현 내용, 실행 단계, 검증 결과, 다음에 할 일을 한눈에 볼 수 있도록 정리합니다. 긴 작업 로그를 전부 읽지 않아도 무엇이 바뀌었고 무엇을 확인해야 하는지 빠르게 판단할 수 있습니다.",
         bullets: [
-          "Work result에서 구현 내용과 검증 요약을 먼저 읽습니다.",
-          "Next action을 확인한 뒤 승인하거나 수정 요청을 남기고, 필요하면 Evidence로 세부 근거를 엽니다.",
+          "작업 결과에서 구현 내용과 검증 요약을 먼저 읽습니다.",
+          "다음에 할 일을 확인한 뒤 승인하거나 수정 요청을 남기고, 필요하면 증빙으로 세부 근거를 엽니다.",
         ],
         image: "/tutorial/08-result.webp",
-        alt: "Briar 이슈 상세 Result 탭의 정리된 작업 결과",
-        caption: "구현, 검증, 다음 행동이 이슈 상세의 Result 탭에 구조화됩니다.",
+        alt: "Briar 이슈 상세 작업 결과 탭의 정리된 작업 결과",
+        caption: "구현, 검증, 다음에 할 일이 이슈 상세의 작업 결과 탭에 구조화됩니다.",
       },
       {
         id: "review-evidence",
@@ -112,10 +113,10 @@ const tutorialCopy = {
         nav: "검증 근거 확인하기",
         title: "완료라는 말보다 근거를 확인하세요.",
         description:
-          "Evidence 탭은 워크플로 단계별 산출물과 검증 상태를 보여 줍니다. 실행한 명령, 통과 여부, 시도와 수정 차수까지 남아 결과를 다시 확인할 수 있습니다.",
+          "증빙 탭은 워크플로 단계별 산출물과 검증 상태를 보여 줍니다. 실행한 명령, 통과 여부, 시도와 수정 차수까지 남아 결과를 다시 확인할 수 있습니다.",
         bullets: [
-          "Passed, Pending, Not recorded 상태로 빠진 검증을 찾습니다.",
-          "Result에서 요약을 읽고 Evidence에서 그 결론을 뒷받침하는 기록을 확인합니다.",
+          "통과, 대기, 기록 안 됨 상태로 빠진 검증을 찾습니다.",
+          "작업 결과에서 요약을 읽고 증빙에서 그 결론을 뒷받침하는 기록을 확인합니다.",
         ],
         image: "/tutorial/04-evidence.webp",
         alt: "Briar 이슈의 단계별 검증 증거",
@@ -127,7 +128,7 @@ const tutorialCopy = {
         nav: "전문 에이전트 만들기",
         title: "반복되는 책임을 에이전트로 정의하세요.",
         description:
-          "Agents에서 한 가지 책임, 제공자, 모델을 조합해 재사용 가능한 에이전트를 만듭니다. 대기 이슈 처리, 오류 탐지, 피드백 분석처럼 팀의 실제 역할에 맞춰 구성할 수 있습니다.",
+          "에이전트에서 한 가지 책임, 제공자, 모델을 조합해 재사용 가능한 에이전트를 만듭니다. 대기 이슈 처리, 오류 탐지, 피드백 분석처럼 팀의 실제 역할에 맞춰 구성할 수 있습니다.",
         bullets: [
           "책임은 한 문장으로 구체적으로 적을수록 실행 범위가 선명해집니다.",
           "카드의 실행 버튼으로 필요할 때 즉시 책임을 수행시킵니다.",
@@ -142,10 +143,10 @@ const tutorialCopy = {
         nav: "반복 실행 예약하기",
         title: "정기적인 에이전트 업무를 예약하세요.",
         description:
-          "Schedule에서 실행할 에이전트와 반복 주기, 시간, 알림 수준을 정합니다. 저장소 점검이나 피드백 분류처럼 놓치기 쉬운 업무를 팀 시간대에 맞춰 자동으로 실행할 수 있습니다.",
+          "스케줄에서 실행할 에이전트와 반복 주기, 시간, 알림 수준을 정합니다. 저장소 점검이나 피드백 분류처럼 놓치기 쉬운 업무를 팀 시간대에 맞춰 자동으로 실행할 수 있습니다.",
         bullets: [
-          "Weekdays, 매일, 매주 등 업무에 맞는 주기를 선택합니다.",
-          "Important updates 알림으로 사람의 판단이 필요한 순간만 받습니다.",
+          "평일, 매일, 매주 등 업무에 맞는 주기를 선택합니다.",
+          "중요 업데이트 알림으로 사람의 판단이 필요한 순간만 받습니다.",
         ],
         image: "/tutorial/06-schedule.webp",
         alt: "Briar 에이전트 스케줄 생성 대화상자",
@@ -174,12 +175,14 @@ const tutorialCopy = {
     openApp: "Open Briar",
     captured:
       "Screens captured directly from a local Briar v1.2.67 demo environment.",
+    shotBarLabel: "briar · local demo",
     setupTitle: "Before you begin",
     setup: [
       ["Open Briar", "Open the web app or install the Mac app and sign in."],
       ["Connect a repository", "Connect the Git repository you want to work on as a project."],
       ["Prepare an agent", "Sign in to Codex, Claude, or Grok for agent execution."],
     ],
+    setupLabel: "00 · SETUP",
     tocTitle: "In this tutorial",
     steps: [
       {
@@ -313,56 +316,63 @@ const tutorialCopy = {
   },
 } as const satisfies Record<Locale, unknown>;
 
-export async function generateMetadata(): Promise<Metadata> {
-  const locale = await getRequestLocale();
-  return tutorialCopy[locale].metadata;
-}
-
 function Arrow() {
   return <span aria-hidden="true">↗</span>;
 }
 
-export default async function TutorialPage() {
-  const locale = await getRequestLocale();
+const PATH = "/tutorial" as const;
+
+export default function TutorialView({ locale }: { locale: Locale }) {
   const c = copy[locale];
   const t = tutorialCopy[locale];
+  const hrefs = {
+    en: localizedPath("en", PATH),
+    ko: localizedPath("ko", PATH),
+  } as const;
 
   return (
     <main className="tutorial-page" id="top">
       <header className="site-header tutorial-header">
         <div className="shell nav-shell">
           {/* vinext currently hydrates next/link with a duplicate React instance. */}
-          {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
-          <a className="brand" href="/" aria-label={c.aria.brandHome}>
+          <a className="brand" href={localizedPath(locale, "/")} aria-label={c.aria.brandHome}>
             <span className="brand-mark">
               <img src="/briar-app-icon.png" alt="" />
             </span>
             <span>briar</span>
           </a>
           <nav aria-label={c.aria.mainMenu}>
-            {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
-            <a href="/">{t.backHome}</a>
+            <a href={localizedPath(locale, "/")}>{t.backHome}</a>
             <a href="#run-auto-hunt">{t.steps[2].nav}</a>
             <a href="#review-result">{t.steps[4].nav}</a>
             <a href="#schedule-agents">{t.steps[7].nav}</a>
           </nav>
           <div className="header-actions">
-            <ThemeToggle
-              label={c.theme.label}
-              darkLabel={c.theme.dark}
-              lightLabel={c.theme.light}
-              darkName={c.theme.darkName}
-              lightName={c.theme.lightName}
-            />
             <LanguageSwitcher
               locale={locale}
               label={c.language.label}
+              hrefs={hrefs}
               englishLabel={c.language.english}
               koreanLabel={c.language.korean}
             />
             <a className="header-cta header-download" href={WEB_APP_URL}>
-              {t.openApp} <Arrow />
+              <span className="header-cta-label">{t.openApp}</span>{" "}
+              <Arrow />
             </a>
+            <MobileMenu
+              navLabel={c.aria.mainMenu}
+              navLinks={[
+                { href: localizedPath(locale, "/"), label: t.backHome },
+                { href: "#run-auto-hunt", label: t.steps[2].nav },
+                { href: "#review-result", label: t.steps[4].nav },
+                { href: "#schedule-agents", label: t.steps[7].nav },
+              ]}
+              ctaHref={WEB_APP_URL}
+              ctaLabel={t.openApp}
+              ctaAriaLabel={c.aria.openWebApp}
+              openLabel={c.aria.menuOpen}
+              closeLabel={c.aria.menuClose}
+            />
           </div>
         </div>
       </header>
@@ -401,7 +411,7 @@ export default async function TutorialPage() {
 
       <section className="tutorial-setup shell" aria-labelledby="setup-title">
         <div>
-          <span className="section-index">00 · SETUP</span>
+          <span className="section-index">{t.setupLabel}</span>
           <h2 id="setup-title">{t.setupTitle}</h2>
         </div>
         <ol>
@@ -451,7 +461,7 @@ export default async function TutorialPage() {
                   <span />
                   <span />
                   <span />
-                  <small>briar · local demo</small>
+                  <small>{t.shotBarLabel}</small>
                 </div>
                 <img
                   src={step.image}
@@ -486,8 +496,7 @@ export default async function TutorialPage() {
 
       <footer>
         <div className="shell footer-shell">
-          {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
-          <a className="brand" href="/" aria-label={c.aria.brandHome}>
+          <a className="brand" href={localizedPath(locale, "/")} aria-label={c.aria.brandHome}>
             <span className="brand-mark">
               <img src="/briar-app-icon.png" alt="" />
             </span>
@@ -495,9 +504,8 @@ export default async function TutorialPage() {
           </a>
           <p>{c.footer.tagline}</p>
           <div>
-            {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
-            <a href="/">{t.backHome}</a>
-            <a href="/changelog">{c.nav.changelog}</a>
+            <a href={localizedPath(locale, "/changelog")}>{c.nav.changelog}</a>
+            <a href={localizedPath(locale, "/")}>{t.backHome}</a>
             <a href="#top">{t.backTop}</a>
           </div>
         </div>

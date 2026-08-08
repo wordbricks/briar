@@ -1,13 +1,12 @@
-import type { Metadata } from "next";
-import { copy, type Locale } from "../i18n";
+import { type Locale, copy, localizedPath } from "../i18n";
 import { LanguageSwitcher } from "../language-switcher";
-import { getRequestLocale } from "../request-locale";
-import { ThemeToggle } from "../theme-toggle";
+import { MobileMenu } from "../mobile-menu";
+
 
 const WEB_APP_URL = "/app/";
 const GITHUB_URL = "https://github.com/wordbricks/briar";
 
-const blogCopy = {
+export const blogCopy = {
   ko: {
     metadata: {
       title: "Briar 블로그 — 제품과 에이전트 개발 이야기",
@@ -40,26 +39,25 @@ const blogCopy = {
   },
 } as const satisfies Record<Locale, unknown>;
 
-export async function generateMetadata(): Promise<Metadata> {
-  const locale = await getRequestLocale();
-  return blogCopy[locale].metadata;
-}
-
 function Arrow() {
   return <span aria-hidden="true">↗</span>;
 }
 
-export default async function BlogPage() {
-  const locale = await getRequestLocale();
+const PATH = "/blog" as const;
+
+export default function BlogView({ locale }: { locale: Locale }) {
   const c = copy[locale];
   const b = blogCopy[locale];
+  const hrefs = {
+    en: localizedPath("en", PATH),
+    ko: localizedPath("ko", PATH),
+  } as const;
 
   return (
     <main className="blog-page" id="top">
       <header className="site-header blog-header">
         <div className="shell nav-shell">
-          {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
-          <a className="brand" href="/" aria-label={c.aria.brandHome}>
+          <a className="brand" href={localizedPath(locale, "/")} aria-label={c.aria.brandHome}>
             <span className="brand-mark">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/briar-app-icon.png" alt="" />
@@ -67,39 +65,52 @@ export default async function BlogPage() {
             <span>briar</span>
           </a>
           <nav aria-label={c.aria.mainMenu}>
-            <a href="/tutorial">{c.nav.tutorial}</a>
-            <a href="/changelog">{c.nav.changelog}</a>
-            <a className="is-current" href="/blog" aria-current="page">
+            <a href={localizedPath(locale, "/tutorial")}>{c.nav.tutorial}</a>
+            <a href={localizedPath(locale, "/changelog")}>{c.nav.changelog}</a>
+            <a className="is-current" href={localizedPath(locale, "/blog")} aria-current="page">
               {c.nav.blog}
             </a>
-            <a href="/download">{c.nav.download}</a>
+            <a href={localizedPath(locale, "/download")}>{c.nav.download}</a>
           </nav>
           <div className="header-actions">
-            <ThemeToggle
-              label={c.theme.label}
-              darkLabel={c.theme.dark}
-              lightLabel={c.theme.light}
-              darkName={c.theme.darkName}
-              lightName={c.theme.lightName}
-            />
             <LanguageSwitcher
               locale={locale}
               label={c.language.label}
               englishLabel={c.language.english}
               koreanLabel={c.language.korean}
+              hrefs={hrefs}
             />
             <a
               className="header-cta header-github"
               href={GITHUB_URL}
               target="_blank"
               rel="noreferrer"
-              aria-label="Briar on GitHub"
+              aria-label={c.aria.githubLink}
             >
               GitHub <Arrow />
             </a>
             <a className="header-cta header-download" href={WEB_APP_URL}>
-              {c.nav.openWebApp} <Arrow />
+              <span className="header-cta-label">{c.nav.openWebApp}</span>{" "}
+              <Arrow />
             </a>
+            <MobileMenu
+              navLabel={c.aria.mainMenu}
+              navLinks={[
+                { href: localizedPath(locale, "/tutorial"), label: c.nav.tutorial },
+                { href: localizedPath(locale, "/blog"), label: c.nav.blog, isCurrent: true },
+                { href: localizedPath(locale, "/download"), label: c.nav.download },
+                {
+                  href: GITHUB_URL,
+                  label: "GitHub",
+                  external: true,
+                },
+              ]}
+              ctaHref={WEB_APP_URL}
+              ctaLabel={c.nav.openWebApp}
+              ctaAriaLabel={c.aria.openWebApp}
+              openLabel={c.aria.menuOpen}
+              closeLabel={c.aria.menuClose}
+            />
           </div>
         </div>
       </header>
@@ -120,8 +131,7 @@ export default async function BlogPage() {
 
       <footer>
         <div className="shell footer-shell">
-          {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
-          <a className="brand" href="/" aria-label={c.aria.brandHome}>
+          <a className="brand" href={localizedPath(locale, "/")} aria-label={c.aria.brandHome}>
             <span className="brand-mark">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/briar-app-icon.png" alt="" />
@@ -130,11 +140,10 @@ export default async function BlogPage() {
           </a>
           <p>{c.footer.tagline}</p>
           <div>
-            {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
-            <a href="/">{b.home}</a>
-            <a href="/tutorial">{c.nav.tutorial}</a>
-            <a href="/changelog">{c.nav.changelog}</a>
-            <a href="/download">{c.nav.download}</a>
+            <a href={localizedPath(locale, "/")}>{b.home}</a>
+            <a href={localizedPath(locale, "/tutorial")}>{c.nav.tutorial}</a>
+            <a href={localizedPath(locale, "/changelog")}>{c.nav.changelog}</a>
+            <a href={localizedPath(locale, "/download")}>{c.nav.download}</a>
             <a href="#top">{b.backTop}</a>
           </div>
         </div>

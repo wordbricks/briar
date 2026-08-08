@@ -1,8 +1,7 @@
-import type { Metadata } from "next";
-import { copy, type Locale } from "../i18n";
+import { type Locale, copy, localizedPath } from "../i18n";
 import { LanguageSwitcher } from "../language-switcher";
-import { getRequestLocale } from "../request-locale";
-import { ThemeToggle } from "../theme-toggle";
+import { MobileMenu } from "../mobile-menu";
+
 
 const MAC_DOWNLOAD_URL =
   "https://briar-api.wbai.workers.dev/releases/latest/mac-aarch64.dmg";
@@ -10,7 +9,7 @@ const GITHUB_RELEASES_URL =
   "https://github.com/wordbricks/briar/releases/latest";
 const WEB_APP_URL = "/app/";
 
-const downloadCopy = {
+export const downloadCopy = {
   ko: {
     metadata: {
       title: "Briar 다운로드 — macOS, Android, Web",
@@ -77,11 +76,6 @@ const downloadCopy = {
   },
 } as const satisfies Record<Locale, unknown>;
 
-export async function generateMetadata(): Promise<Metadata> {
-  const locale = await getRequestLocale();
-  return downloadCopy[locale].metadata;
-}
-
 function Arrow({ direction = "out" }: { direction?: "out" | "down" }) {
   return <span aria-hidden="true">{direction === "out" ? "↗" : "↓"}</span>;
 }
@@ -95,17 +89,21 @@ function PlatformIcon({ platform }: { platform: "mac" | "android" | "web" }) {
   );
 }
 
-export default async function DownloadPage() {
-  const locale = await getRequestLocale();
+const PATH = "/download" as const;
+
+export default function DownloadView({ locale }: { locale: Locale }) {
   const c = copy[locale];
   const d = downloadCopy[locale];
+  const hrefs = {
+    en: localizedPath("en", PATH),
+    ko: localizedPath("ko", PATH),
+  } as const;
 
   return (
     <main className="download-page" id="top">
       <header className="site-header download-header">
         <div className="shell nav-shell">
-          {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
-          <a className="brand" href="/" aria-label={c.aria.brandHome}>
+          <a className="brand" href={localizedPath(locale, "/")} aria-label={c.aria.brandHome}>
             <span className="brand-mark">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/briar-app-icon.png" alt="" />
@@ -113,30 +111,42 @@ export default async function DownloadPage() {
             <span>briar</span>
           </a>
           <nav aria-label={c.aria.mainMenu}>
-            <a href="/tutorial">{c.nav.tutorial}</a>
-            <a href="/changelog">{c.nav.changelog}</a>
-            <a href="/blog">{c.nav.blog}</a>
-            <a className="is-current" href="/download" aria-current="page">
+            <a href={localizedPath(locale, "/tutorial")}>{c.nav.tutorial}</a>
+            <a href={localizedPath(locale, "/changelog")}>{c.nav.changelog}</a>
+            <a href={localizedPath(locale, "/blog")}>{c.nav.blog}</a>
+            <a className="is-current" href={localizedPath(locale, "/download")} aria-current="page">
               {c.nav.download}
             </a>
           </nav>
           <div className="header-actions">
-            <ThemeToggle
-              label={c.theme.label}
-              darkLabel={c.theme.dark}
-              lightLabel={c.theme.light}
-              darkName={c.theme.darkName}
-              lightName={c.theme.lightName}
-            />
             <LanguageSwitcher
               locale={locale}
               label={c.language.label}
               englishLabel={c.language.english}
               koreanLabel={c.language.korean}
+              hrefs={hrefs}
             />
             <a className="header-cta header-download" href={WEB_APP_URL}>
-              {c.nav.openWebApp} <Arrow />
+              <span className="header-cta-label">{c.nav.openWebApp}</span>{" "}
+              <Arrow />
             </a>
+            <MobileMenu
+              navLabel={c.aria.mainMenu}
+              navLinks={[
+                { href: localizedPath(locale, "/tutorial"), label: c.nav.tutorial },
+                { href: localizedPath(locale, "/blog"), label: c.nav.blog },
+                {
+                  href: localizedPath(locale, "/download"),
+                  label: c.nav.download,
+                  isCurrent: true,
+                },
+              ]}
+              ctaHref={WEB_APP_URL}
+              ctaLabel={c.nav.openWebApp}
+              ctaAriaLabel={c.aria.openWebApp}
+              openLabel={c.aria.menuOpen}
+              closeLabel={c.aria.menuClose}
+            />
           </div>
         </div>
       </header>
@@ -234,8 +244,7 @@ export default async function DownloadPage() {
       <footer>
         <div className="shell footer-shell">
           {/* vinext currently hydrates next/link with a duplicate React instance. */}
-          {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
-          <a className="brand" href="/" aria-label={c.aria.brandHome}>
+          <a className="brand" href={localizedPath(locale, "/")} aria-label={c.aria.brandHome}>
             <span className="brand-mark">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/briar-app-icon.png" alt="" />
@@ -244,10 +253,9 @@ export default async function DownloadPage() {
           </a>
           <p>{c.footer.tagline}</p>
           <div>
-            {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
-            <a href="/">{d.home}</a>
-            <a href="/tutorial">{c.nav.tutorial}</a>
-            <a href="/changelog">{c.nav.changelog}</a>
+            <a href={localizedPath(locale, "/")}>{d.home}</a>
+            <a href={localizedPath(locale, "/tutorial")}>{c.nav.tutorial}</a>
+            <a href={localizedPath(locale, "/changelog")}>{c.nav.changelog}</a>
             <a href="#top">{d.backTop}</a>
           </div>
         </div>

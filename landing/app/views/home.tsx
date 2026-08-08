@@ -1,7 +1,8 @@
-import { copy, type LandingCopy } from "./i18n";
-import { LanguageSwitcher } from "./language-switcher";
-import { getRequestLocale } from "./request-locale";
-import { ThemeToggle } from "./theme-toggle";
+import { type LandingCopy, type Locale, copy, localizedPath } from "../i18n";
+import { LanguageSwitcher } from "../language-switcher";
+import { resolveOrigin } from "../seo";
+import { MobileMenu } from "../mobile-menu";
+
 
 // Stable redirect that always resolves to the current Production DMG.
 const MAC_DOWNLOAD_URL =
@@ -29,6 +30,7 @@ function ProductStage({ c }: { c: LandingCopy }) {
   return (
     <div
       className="product-stage product-stage-video"
+      role="img"
       aria-label={c.aria.productPreview}
     >
       <video
@@ -47,8 +49,13 @@ function ProductStage({ c }: { c: LandingCopy }) {
 }
 
 function WorkflowVisual({ c }: { c: LandingCopy }) {
+  const d = c.mockup.detail;
   return (
-    <div className="workflow-visual detail-window" aria-label={c.workflow.title}>
+    <div
+      className="workflow-visual detail-window"
+      role="img"
+      aria-label={c.aria.workflowPreview}
+    >
       <div className="detail-toolbar">
         <span>←</span>
         <small>AH-24</small>
@@ -58,28 +65,28 @@ function WorkflowVisual({ c }: { c: LandingCopy }) {
       <div className="detail-layout">
         <div className="detail-content">
           <div className="detail-tabs">
-            <span>Description</span>
-            <strong>☷ Evidence</strong>
+            <span>{d.description}</span>
+            <strong>☷ {d.evidence}</strong>
           </div>
 
           <div className="evidence-section">
             <div className="evidence-heading">
               <div>
                 <strong>{c.workflow.analyze}</strong>
-                <span>analyzing</span>
+                <span>{d.analyzing}</span>
               </div>
               <small>1 / 1</small>
             </div>
             <article className="evidence-card is-passed">
               <div className="evidence-card-head">
                 <strong>repository_findings</strong>
-                <span>Passed</span>
+                <span>{d.passed}</span>
               </div>
               <p>{c.workflow.repositoryMapped}</p>
-              <small>Command</small>
+              <small>{d.command}</small>
               <code>rg -n &quot;AgentEvent|HuntDashboard&quot; src</code>
               <footer>
-                <span>Attempt 1 · Revision 1</span>
+                <span>{d.attemptRevision}</span>
                 <span>briar-workflow · {c.dashboard.now}</span>
               </footer>
             </article>
@@ -89,7 +96,7 @@ function WorkflowVisual({ c }: { c: LandingCopy }) {
             <div className="evidence-heading">
               <div>
                 <strong>{c.workflow.implement}</strong>
-                <span>implementing</span>
+                <span>{d.implementing}</span>
               </div>
               <small>0 / 1</small>
             </div>
@@ -105,7 +112,7 @@ function WorkflowVisual({ c }: { c: LandingCopy }) {
           </div>
 
           <div className="detail-composer">
-            <span>Leave a comment…</span>
+            <span>{d.leaveComment}</span>
             <div>
               <i>⌕</i>
               <strong>↑</strong>
@@ -114,7 +121,7 @@ function WorkflowVisual({ c }: { c: LandingCopy }) {
         </div>
 
         <aside className="detail-properties">
-          <h3>Properties</h3>
+          <h3>{d.properties}</h3>
           <div>
             <span>⌁</span>
             <strong>{c.workflow.implement}</strong>
@@ -122,7 +129,7 @@ function WorkflowVisual({ c }: { c: LandingCopy }) {
           </div>
           <div>
             <span>◒</span>
-            <strong>High priority</strong>
+            <strong>{d.highPriority}</strong>
           </div>
           <div>
             <span>◎</span>
@@ -130,9 +137,9 @@ function WorkflowVisual({ c }: { c: LandingCopy }) {
           </div>
           <div>
             <span>↻</span>
-            <strong>Attempt 1 · Revision 1</strong>
+            <strong>{d.attemptRevision}</strong>
           </div>
-          <h3>Repository</h3>
+          <h3>{d.repository}</h3>
           <div>
             <span>⌘</span>
             <strong>wordbricks/briar</strong>
@@ -151,9 +158,35 @@ function WorkflowVisual({ c }: { c: LandingCopy }) {
   );
 }
 
-export default async function Home() {
-  const locale = await getRequestLocale();
+const PATH = "/" as const;
+
+export default async function HomeView({ locale }: { locale: Locale }) {
   const c = copy[locale];
+  const origin = await resolveOrigin();
+  const hrefs = {
+    en: localizedPath("en", PATH),
+    ko: localizedPath("ko", PATH),
+  } as const;
+  const structuredData = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Organization",
+        name: "Briar",
+        url: origin,
+        logo: `${origin}/briar-app-icon.png`,
+        sameAs: [GITHUB_URL],
+      },
+      {
+        "@type": "SoftwareApplication",
+        name: "Briar",
+        applicationCategory: "DeveloperApplication",
+        operatingSystem: "macOS, Android, Web",
+        url: origin,
+        description: c.metadata.description,
+      },
+    ],
+  };
   const agents = [
     {
       name: "Codex",
@@ -168,7 +201,7 @@ export default async function Home() {
       tone: "amber",
     },
     {
-      name: "Human",
+      name: c.agents.humanName,
       state: c.agents.states[2],
       role: c.agents.roles[2],
       tone: "blue",
@@ -177,54 +210,60 @@ export default async function Home() {
 
   return (
     <main id="top">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+      />
+      <a className="skip-link" href="#main-content">
+        {c.aria.skipToContent}
+      </a>
       <header className="site-header">
         <div className="shell nav-shell">
           <Brand c={c} />
           <nav aria-label={c.aria.mainMenu}>
-            <a href="/tutorial">{c.nav.tutorial}</a>
-            <a href="/changelog">{c.nav.changelog}</a>
-            <a href="/blog">{c.nav.blog}</a>
-            <a href="/download">{c.nav.download}</a>
+            <a href={localizedPath(locale, "/tutorial")}>{c.nav.tutorial}</a>
+            <a href={localizedPath(locale, "/changelog")}>{c.nav.changelog}</a>
+            <a href={localizedPath(locale, "/blog")}>{c.nav.blog}</a>
+            <a href={localizedPath(locale, "/download")}>{c.nav.download}</a>
           </nav>
           <div className="header-actions">
-            <ThemeToggle
-              label={c.theme.label}
-              darkLabel={c.theme.dark}
-              lightLabel={c.theme.light}
-              darkName={c.theme.darkName}
-              lightName={c.theme.lightName}
-            />
             <LanguageSwitcher
               locale={locale}
               label={c.language.label}
               englishLabel={c.language.english}
               koreanLabel={c.language.korean}
+              hrefs={hrefs}
             />
             <a
               className="header-cta header-download"
               href={WEB_APP_URL}
               aria-label={c.aria.openWebApp}
             >
-              {c.nav.openWebApp} <Arrow />
+              <span className="header-cta-label">{c.nav.openWebApp}</span>{" "}
+              <Arrow />
             </a>
+            <MobileMenu
+              navLabel={c.aria.mainMenu}
+              navLinks={[
+                { href: localizedPath(locale, "/tutorial"), label: c.nav.tutorial },
+                { href: localizedPath(locale, "/blog"), label: c.nav.blog },
+                { href: localizedPath(locale, "/download"), label: c.nav.download },
+              ]}
+              ctaHref={WEB_APP_URL}
+              ctaLabel={c.nav.openWebApp}
+              ctaAriaLabel={c.aria.openWebApp}
+              openLabel={c.aria.menuOpen}
+              closeLabel={c.aria.menuClose}
+            />
           </div>
         </div>
       </header>
 
-      <section className="hero">
-        <div className="hero-art" aria-hidden="true">
-          <img
-            src="/briar-hero-orchestration.webp"
-            alt=""
-            width="1899"
-            height="828"
-            fetchPriority="high"
-          />
-        </div>
+      <section className="hero" id="main-content" tabIndex={-1}>
         <div className="hero-content shell">
           <div className="hero-kicker">
             <span />
-            Agent Development Environment
+            {c.hero.kicker}
           </div>
           <h1>
             {c.hero.line1}
@@ -241,38 +280,36 @@ export default async function Home() {
               {c.hero.openWebApp} <Arrow />
             </a>
             <a
-              className="button button-secondary"
+              className="button button-secondary hero-action-download"
               href={MAC_DOWNLOAD_URL}
               aria-label={c.aria.macDownload}
             >
               {c.hero.macDownload} <span aria-hidden="true">↓</span>
             </a>
-            <a
-              className="button button-secondary"
-              href={ANDROID_DOWNLOAD_URL}
-              aria-label={c.aria.androidDownload}
-            >
-              {c.hero.androidDownload} <span aria-hidden="true">↓</span>
+          </div>
+          <div className="hero-actions-compact">
+            <a href={localizedPath(locale, "/download")}>
+              {c.hero.allDownloads} <span aria-hidden="true">↓</span>
             </a>
-            <a className="button button-secondary" href="#workflow">
+            <a href="#workflow">
               {c.hero.howItWorks} <span aria-hidden="true">↓</span>
             </a>
           </div>
           <div className="hero-meta">
             <span>
-              <i>⌘</i> macOS Apple Silicon
+              <i>⌘</i> {c.hero.meta[0]}
             </span>
             <span>
-              <i>●</i> Android companion
+              <i>●</i> {c.hero.meta[1]}
             </span>
             <span>
-              <i>✓</i> Repository-agnostic
+              <i>✓</i> {c.hero.meta[2]}
             </span>
             <span>
-              <i>✓</i> Codex + Claude
+              <i>✓</i> {c.hero.meta[3]}
             </span>
             <span>
-              <i>✓</i> Local-first
+              <i>✓</i> {c.hero.meta[4]}
             </span>
           </div>
         </div>
@@ -282,9 +319,32 @@ export default async function Home() {
         <ProductStage c={c} />
       </section>
 
+      <section className="differentiators-section shell" id="why-briar">
+        <div className="section-intro section-intro-centered">
+          <span className="section-index">{c.differentiators.index}</span>
+          <h2>{c.differentiators.title}</h2>
+          <p>{c.differentiators.description}</p>
+        </div>
+        <ol className="workflow-steps differentiator-list">
+          {c.differentiators.items.map((item, index) => (
+            <li key={item.title}>
+              <span>{String(index + 1).padStart(2, "0")}</span>
+              <div>
+                <h3>{item.title}</h3>
+                <p>{item.description}</p>
+              </div>
+            </li>
+          ))}
+        </ol>
+        <p className="differentiators-access">
+          <strong>{c.differentiators.accessLabel}</strong>{" "}
+          {c.differentiators.accessDescription}
+        </p>
+      </section>
+
       <section className="principles shell">
         <div className="section-intro section-intro-wide">
-          <span className="section-index">01 / PRODUCT</span>
+          <span className="section-index">01 / {c.nav.product.toUpperCase()}</span>
           <h2>
             {c.principles.line1}
             <br />
@@ -330,14 +390,14 @@ export default async function Home() {
       <section className="workflow-section" id="workflow">
         <div className="shell">
           <div className="section-intro workflow-intro">
-            <span className="section-index">02 / WORKFLOW</span>
+            <span className="section-index">02 / {c.nav.workflow.toUpperCase()}</span>
             <h2>{c.workflow.title}</h2>
             <p>{c.workflow.description}</p>
           </div>
           <div className="workflow-layout">
             <ol className="workflow-steps">
               {c.workflow.steps.map((step, index) => (
-                <li className={index === 2 ? "is-active" : ""} key={step.title}>
+                <li key={step.title}>
                   <span>{String(index + 1).padStart(2, "0")}</span>
                   <div>
                     <h3>{step.title}</h3>
@@ -353,7 +413,7 @@ export default async function Home() {
 
       <section className="agents-section shell" id="agents">
         <div className="section-intro section-intro-centered">
-          <span className="section-index">03 / AGENTS</span>
+          <span className="section-index">03 / {c.nav.agents.toUpperCase()}</span>
           <h2>{c.agents.title}</h2>
           <p>{c.agents.description}</p>
         </div>
@@ -391,7 +451,7 @@ export default async function Home() {
       <section className="security-section" id="security">
         <div className="shell security-layout">
           <div className="security-copy">
-            <span className="section-index">04 / SECURITY</span>
+            <span className="section-index">04 / {c.nav.security.toUpperCase()}</span>
             <h2>
               {c.security.line1}
               <br />
@@ -406,7 +466,11 @@ export default async function Home() {
               ))}
             </div>
           </div>
-          <div className="security-visual" aria-label={c.aria.securityVisual}>
+          <div
+            className="security-visual"
+            role="img"
+            aria-label={c.aria.securityVisual}
+          >
             <div className="secure-device">
               <div className="device-top">
                 <span />
@@ -513,9 +577,9 @@ export default async function Home() {
               GitHub
             </a>
             <a href="#security">{c.footer.security}</a>
-            <a href="/tutorial">{c.nav.tutorial}</a>
-            <a href="/changelog">{c.nav.changelog}</a>
-            <a href="/blog">{c.nav.blog}</a>
+            <a href={localizedPath(locale, "/tutorial")}>{c.nav.tutorial}</a>
+            <a href={localizedPath(locale, "/changelog")}>{c.nav.changelog}</a>
+            <a href={localizedPath(locale, "/blog")}>{c.nav.blog}</a>
             <a href="#top">{c.footer.backToTop}</a>
           </div>
         </div>

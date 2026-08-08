@@ -20,38 +20,67 @@ export function isLocale(value: string | undefined): value is Locale {
   return supportedLocales.includes(value as Locale);
 }
 
+/**
+ * Every crawlable landing page, keyed by its path in the default locale.
+ * Single source of truth for routing, the sitemap, and robots.txt — add a
+ * page here once and it is automatically routed, localized, and listed.
+ */
+export const routePaths = [
+  "/",
+  "/tutorial",
+  "/changelog",
+  "/blog",
+  "/download",
+] as const;
+
+export type RoutePath = (typeof routePaths)[number];
+
+/**
+ * The stable, crawlable URL for a given locale + route.
+ *
+ * Scheme: the default locale (`en`) is unprefixed (`/`, `/tutorial`, ...)
+ * so existing indexed URLs keep working. Every other locale is prefixed
+ * with its locale code (`/ko`, `/ko/tutorial`, ...).
+ */
+export function localizedPath(locale: Locale, path: RoutePath | string): string {
+  if (locale === defaultLocale) {
+    return path;
+  }
+
+  return path === "/" ? `/${locale}` : `/${locale}${path}`;
+}
+
 export const copy = {
   ko: {
     metadata: {
-      title: "Briar — 에이전트 개발의 운영체제",
+      title: "Briar — 로컬 우선 Agent Development Environment",
       description:
         "이슈에서 PR까지, 사람과 코딩 에이전트가 함께 일하는 과정을 연결하고 관찰하는 로컬 우선 Agent Development Environment.",
       socialDescription:
-        "코드는 로컬에. 에이전트 작업은 이슈에서 PR까지 한눈에.",
+        "Briar는 로컬 우선 Agent Development Environment입니다. 코드는 로컬에, 에이전트 작업은 이슈에서 PR까지 한눈에.",
       locale: "ko_KR",
     },
     aria: {
+      skipToContent: "본문으로 건너뛰기",
       brandHome: "Briar 홈",
       mainMenu: "주요 메뉴",
       productPreview: "Briar 작업 대시보드 미리보기",
+      workflowPreview:
+        "Briar 이슈 상세 화면 스크린샷. 저장소 매핑을 마친 분석 단계와 회귀 테스트를 작성 중인 구현 단계의 증거를 보여줍니다.",
       heroArtwork: "사람이 Briar 작업 흐름을 이끄는 리소그래프 일러스트",
       securityVisual: "Briar 보안 구조",
       sendCommand: "에이전트에게 전송",
       openWebApp: "Briar 웹 앱 열기",
       macDownload: "Mac용 Briar 최신 버전 다운로드",
       androidDownload: "Android용 Briar 최신 릴리즈 다운로드",
+      menuOpen: "메뉴 열기",
+      menuClose: "메뉴 닫기",
+      githubLink: "GitHub에서 Briar 보기",
     },
     language: {
       label: "언어",
       english: "영어",
       korean: "한국어",
-    },
-    theme: {
-      label: "테마",
-      dark: "다크 모드로 전환",
-      light: "라이트 모드로 전환",
-      darkName: "다크",
-      lightName: "라이트",
     },
     nav: {
       product: "제품",
@@ -66,14 +95,23 @@ export const copy = {
       macDownload: "Mac용 다운로드",
     },
     hero: {
+      kicker: "Agent Development Environment",
       line1: "이슈에서 PR까지.",
       line2: "에이전트 작업을 운영하세요.",
       description:
-        "Briar는 사람과 코딩 에이전트가 실제 저장소에서 함께 일하는 과정을 연결하고, 관찰하고, 끝까지 완료하는 로컬 우선 개발 환경입니다.",
+        "Briar는 사람과 코딩 에이전트가 실제 저장소에서 함께 일하는 과정을 연결하고, 관찰하고, 끝까지 완료하는 로컬 우선 Agent Development Environment입니다.",
       openWebApp: "웹에서 Briar 열기",
       macDownload: "Mac용 Briar 다운로드",
       androidDownload: "Android용 다운로드",
       howItWorks: "작동 방식 보기",
+      allDownloads: "전체 다운로드 보기",
+      meta: [
+        "macOS Apple Silicon",
+        "Android 컴패니언",
+        "저장소 무관",
+        "Codex + Claude",
+        "로컬 우선",
+      ],
     },
     dashboard: {
       agentRuns: "에이전트 실행",
@@ -93,6 +131,9 @@ export const copy = {
         "작업 상세 패널 개선",
         "세션 복원 회귀 테스트",
         "D1 이벤트 스키마",
+        "GitHub 이슈 라벨 동기화",
+        "타임라인에 diff 미리보기 표시",
+        "에이전트 이벤트 페이로드 정규화",
       ],
       implementing: "구현 중",
       review: "리뷰",
@@ -184,6 +225,7 @@ export const copy = {
         "도구를 바꾸지 않아도 됩니다. Briar가 서로 다른 에이전트의 실행을 같은 운영 모델로 연결합니다.",
       activeCollaborators: "활성 협업자",
       operational: "모든 시스템 정상",
+      humanName: "사람",
       states: ["3개 실행 중", "1개 리뷰 중", "승인 2개"],
       roles: ["구현 및 로컬 QA", "리뷰 및 추론", "방향 설정 및 승인"],
     },
@@ -218,27 +260,81 @@ export const copy = {
       macDownload: "Mac용 Briar 다운로드",
       androidDownload: "Android용 다운로드",
       github: "GitHub에서 보기",
-      note: "최신 릴리즈 · macOS Apple Silicon · Android companion",
+      note: "최신 릴리즈 · macOS Apple Silicon · Android 컴패니언",
+    },
+    differentiators: {
+      index: "왜 Briar인가",
+      title: "이미 쓰고 있는 에이전트에 Briar가 더하는 것.",
+      description:
+        "Codex와 Claude Code는 이미 코드를 작성합니다. Briar는 그 작업에 큐, 기록, 그리고 사람이 승인할 자리를 더합니다.",
+      items: [
+        {
+          title: "명확한 완료 조건",
+          description:
+            "이슈는 분석, 구현, 로컬 QA, 리뷰, 배포 등 직접 정의한 단계를 거칩니다. 그래서 실행이 끝났다는 것은 에이전트가 말을 멈췄다는 뜻이 아니라 조건을 충족했다는 뜻입니다.",
+        },
+        {
+          title: "관찰 가능한 실행 타임라인",
+          description:
+            "각 단계는 실행한 명령과 통과 여부 같은 근거를 기록합니다. 대화를 처음부터 다시 읽지 않아도 작업 내용을 확인할 수 있습니다.",
+        },
+        {
+          title: "재시도에 안전한 이벤트 기록",
+          description:
+            "상태 업데이트와 증거가 기록되므로, 중단된 실행도 처음부터가 아니라 정확한 체크포인트와 시도 지점에서 다시 시작합니다.",
+        },
+        {
+          title: "사람의 승인 게이트",
+          description:
+            "리뷰를 위해 멈출 지점을 직접 선택하고, 승인한 뒤에만 실행이 이어집니다.",
+        },
+        {
+          title: "저장소 안에서 실행되는 모델",
+          description:
+            "에이전트는 내 기기의 격리된 Git worktree에서 실행됩니다. Briar로 동기화되는 것은 소스 코드가 아니라 작업 상태와 Git 메타데이터뿐입니다.",
+        },
+      ],
+      accessLabel: "무료 오픈소스입니다.",
+      accessDescription:
+        "Briar는 Apache-2.0 라이선스로 GitHub에 공개되어 있습니다. 저장소를 연결하려면 로그인이 필요합니다.",
     },
     footer: {
-      tagline: "에이전트 개발의 모든 과정을 한눈에.",
+      tagline: "이슈에서 PR까지, 로컬 우선 Agent Development Environment.",
       security: "보안",
       backToTop: "맨 위로 ↑",
+    },
+    mockup: {
+      detail: {
+        description: "설명",
+        evidence: "증빙",
+        passed: "통과",
+        command: "실행 명령",
+        attemptRevision: "시도 1 · 리비전 1",
+        leaveComment: "댓글 남기기…",
+        properties: "속성",
+        highPriority: "높은 우선순위",
+        repository: "저장소",
+        analyzing: "분석 중",
+        implementing: "구현 중",
+      },
     },
   },
   en: {
     metadata: {
-      title: "Briar — The operating system for agent development",
+      title: "Briar — Agent Development Environment",
       description:
         "A local-first Agent Development Environment that connects and observes how people and coding agents work together, from issue to PR.",
       socialDescription:
-        "Keep code local and see every agent task from issue to PR.",
+        "Briar is a local-first Agent Development Environment. Keep code local and see every agent task from issue to PR.",
       locale: "en_US",
     },
     aria: {
+      skipToContent: "Skip to content",
       brandHome: "Briar home",
       mainMenu: "Main navigation",
       productPreview: "Preview of the Briar task dashboard",
+      workflowPreview:
+        "Screenshot of a Briar issue detail view, showing evidence for a completed analysis step and an in-progress implementation step writing regression tests.",
       heroArtwork:
         "Risograph illustration of a person guiding a Briar workflow",
       securityVisual: "Briar security architecture",
@@ -246,18 +342,14 @@ export const copy = {
       openWebApp: "Open the Briar web app",
       macDownload: "Download the latest Briar for Mac",
       androidDownload: "Download the latest Briar release for Android",
+      menuOpen: "Open menu",
+      menuClose: "Close menu",
+      githubLink: "Briar on GitHub",
     },
     language: {
       label: "Language",
       english: "English",
       korean: "Korean",
-    },
-    theme: {
-      label: "Theme",
-      dark: "Switch to dark mode",
-      light: "Switch to light mode",
-      darkName: "Dark",
-      lightName: "Light",
     },
     nav: {
       product: "Product",
@@ -272,14 +364,23 @@ export const copy = {
       macDownload: "Download for Mac",
     },
     hero: {
+      kicker: "Agent Development Environment",
       line1: "From issue to PR.",
       line2: "Operate your agent work.",
       description:
-        "Briar is a local-first development environment that connects, observes, and completes the work people and coding agents do together in real repositories.",
+        "Briar is a local-first Agent Development Environment that connects, observes, and completes the work people and coding agents do together in real repositories.",
       openWebApp: "Open Briar on the web",
       macDownload: "Download Briar for Mac",
       androidDownload: "Download for Android",
       howItWorks: "See how it works",
+      allDownloads: "See all downloads",
+      meta: [
+        "macOS Apple Silicon",
+        "Android companion",
+        "Repository-agnostic",
+        "Codex + Claude",
+        "Local-first",
+      ],
     },
     dashboard: {
       agentRuns: "Agent runs",
@@ -299,6 +400,9 @@ export const copy = {
         "Improve task detail panel",
         "Session recovery regression test",
         "D1 event schema",
+        "Sync labels from GitHub issues",
+        "Surface diff previews in the timeline",
+        "Normalize agent event payloads",
       ],
       implementing: "Implementing",
       review: "Review",
@@ -390,6 +494,7 @@ export const copy = {
         "No need to change tools. Briar connects different agents through one operating model.",
       activeCollaborators: "Active collaborators",
       operational: "All systems operational",
+      humanName: "Human",
       states: ["3 running", "1 reviewing", "2 approvals"],
       roles: [
         "Implementation & local QA",
@@ -430,10 +535,61 @@ export const copy = {
       github: "View on GitHub",
       note: "Latest release · macOS Apple Silicon · Android companion",
     },
+    differentiators: {
+      index: "Why Briar",
+      title: "What Briar adds to the agents you already use.",
+      description:
+        "Codex and Claude Code already write code. Briar adds a queue, a record, and a place for a human to approve that work.",
+      items: [
+        {
+          title: "Explicit completion criteria",
+          description:
+            "Issues move through the stages you define — analysis, implementation, local QA, review, release — so a run finishes because it met its criteria, not because the agent stopped talking.",
+        },
+        {
+          title: "An observable run timeline",
+          description:
+            "Each stage records its evidence — the command that ran and whether it passed — so you can check the work instead of re-reading the conversation.",
+        },
+        {
+          title: "Retry-safe event history",
+          description:
+            "Status updates and evidence are written so a paused or interrupted run resumes from its exact checkpoint and attempt, not from scratch.",
+        },
+        {
+          title: "Human approval gates",
+          description:
+            "You choose where a run pauses for review. It continues only after you approve it.",
+        },
+        {
+          title: "A repo-local execution model",
+          description:
+            "Agents run in an isolated Git worktree on your machine. Only task state and Git metadata sync to Briar — not your source.",
+        },
+      ],
+      accessLabel: "Free and open source.",
+      accessDescription:
+        "Briar is released under the Apache-2.0 license on GitHub. You'll need to sign in to connect a repository.",
+    },
     footer: {
-      tagline: "Agent development, with a clear line of sight.",
+      tagline: "A local-first Agent Development Environment, from issue to PR.",
       security: "Security",
       backToTop: "Back to top ↑",
+    },
+    mockup: {
+      detail: {
+        description: "Description",
+        evidence: "Evidence",
+        passed: "Passed",
+        command: "Command",
+        attemptRevision: "Attempt 1 · Revision 1",
+        leaveComment: "Leave a comment…",
+        properties: "Properties",
+        highPriority: "High priority",
+        repository: "Repository",
+        analyzing: "analyzing",
+        implementing: "implementing",
+      },
     },
   },
 } as const;
