@@ -130,7 +130,10 @@ implementation="$(jq -r '.implementation' <<<"$resolved")"
 bundle_id="$(jq -r '.bundleIdentifier' <<<"$resolved")"
 
 echo "[ios-release] Running contract, Swift, accessibility/layout, and Tauri iOS/Android gates."
-bun run mobile:ci
+# The Tauri simulator regression build is explicitly unsigned.  Do not expose
+# App Store Connect credentials to it: the Tauri CLI interprets a partial API
+# key configuration as a code-signing request and rejects the missing key path.
+env -u APPLE_API_KEY -u APPLE_API_ISSUER -u APPLE_API_KEY_CONTENT bun run mobile:ci
 
 release_temp="$(mktemp -d "$release_temp_base/briar-ios-release.XXXXXX")"
 private_keys="$release_temp/private_keys"
