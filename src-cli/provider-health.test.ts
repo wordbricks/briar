@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import {
+  claudeAuthenticated,
   grokAuthenticated,
   healthyWorkerProviders,
   inspectWorkerProviderHealth,
@@ -13,11 +14,31 @@ import {
 const enabled = { codex: true, claude: true, grok: true, opencode: true };
 
 describe("inspectWorkerProviderHealth", () => {
-  it("uses Claude's loggedIn response even when its CLI exit code is unreliable", () => {
+  it("uses Claude's loggedIn response even when its CLI exit code is unreliable", async () => {
     expect(parseClaudeAuthStatus('{"loggedIn":true,"authMethod":"claude.ai"}'))
       .toBe(true);
     expect(parseClaudeAuthStatus('{"loggedIn":false}')).toBe(false);
     expect(parseClaudeAuthStatus("not json")).toBe(false);
+
+    const home = await mkdtemp(join(tmpdir(), "briar-claude-health-"));
+    const binary = join(home, "claude");
+    try {
+      await writeFile(
+        binary,
+        "#!/bin/sh\nprintf '%s' '{\"loggedIn\":true}'\nexit 1\n",
+        { mode: 0o755 },
+      );
+      await expect(claudeAuthenticated(binary)).resolves.toBe(true);
+
+      await writeFile(
+        binary,
+        "#!/bin/sh\nprintf '%s' '{\"loggedIn\":false}'\nexit 0\n",
+        { mode: 0o755 },
+      );
+      await expect(claudeAuthenticated(binary)).resolves.toBe(false);
+    } finally {
+      await rm(home, { recursive: true });
+    }
   });
 
   it("advertises only installed and authenticated providers as healthy", async () => {

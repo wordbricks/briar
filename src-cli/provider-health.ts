@@ -1,5 +1,4 @@
 import { spawnSync } from "node:child_process";
-import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -52,54 +51,7 @@ export const parseClaudeAuthStatus = (stdout: string) => {
   }
 };
 
-const hasClaudeOauthToken = (contents: string) => {
-  try {
-    const credentials = JSON.parse(contents) as {
-      claudeAiOauth?: { accessToken?: unknown };
-    };
-    return (
-      typeof credentials.claudeAiOauth?.accessToken === "string" &&
-      credentials.claudeAiOauth.accessToken.trim().length > 0
-    );
-  } catch {
-    return false;
-  }
-};
-
-const claudeAuthenticated = async (binary: string, home: string) => {
-  const configDirectory =
-    process.env.CLAUDE_CONFIG_DIR?.trim() || join(home, ".claude");
-  try {
-    if (
-      hasClaudeOauthToken(
-        await readFile(join(configDirectory, ".credentials.json"), "utf8"),
-      )
-    ) {
-      return true;
-    }
-  } catch {
-    // Claude stores OAuth credentials in Keychain on macOS.
-  }
-  if (process.platform === "darwin") {
-    const account = process.env.USER || process.env.USERNAME || "user";
-    const suffix = createHash("sha256")
-      .update(configDirectory)
-      .digest("hex")
-      .slice(0, 8);
-    for (const service of [
-      `Claude Code-credentials-${suffix}`,
-      "Claude Code-credentials",
-    ]) {
-      const result = spawnSync(
-        "/usr/bin/security",
-        ["find-generic-password", "-s", service, "-a", account, "-w"],
-        { encoding: "utf8", timeout: 10_000 },
-      );
-      if (result.status === 0 && hasClaudeOauthToken(result.stdout)) {
-        return true;
-      }
-    }
-  }
+export const claudeAuthenticated = async (binary: string) => {
   const result = commandResult(binary, ["auth", "status"]);
   return parseClaudeAuthStatus(result.stdout);
 };
@@ -142,7 +94,7 @@ const defaultDependencies: ProviderHealthDependencies = {
       return codexAuthenticated(binary);
     }
     if (provider === "claude") {
-      return claudeAuthenticated(binary, home);
+      return claudeAuthenticated(binary);
     }
     if (provider === "opencode") {
       // OpenCode delegates credentials to its configured model providers.
