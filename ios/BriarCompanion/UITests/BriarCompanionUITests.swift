@@ -97,6 +97,22 @@ final class BriarCompanionUITests: XCTestCase {
         captureScreenshot(named: "companion-channel-header")
     }
 
+    func testChannelComposerShowsAttachmentButton() {
+        let app = launchInsideCompanion()
+
+        app.tabBars.buttons["홈"].tap()
+        let channel = app.buttons[
+            "channel-row-cccccccc-cccc-4ccc-8ccc-cccccccccccc"
+        ]
+        XCTAssertTrue(channel.waitForExistence(timeout: 5))
+        channel.tap()
+
+        let attach = app.buttons["channel-composer-attach"]
+        XCTAssertTrue(attach.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.textFields["channel-composer-field"].exists)
+        captureScreenshot(named: "companion-channel-composer")
+    }
+
     func testCompletedIssueOpensResultTabFirst() {
         let app = launchInsideCompanion()
 

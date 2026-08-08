@@ -359,4 +359,86 @@ final class ChannelGroupingTests: XCTestCase {
 
         XCTAssertEqual(handles, Set(["honey", "sam"]))
     }
+
+    func testChannelMessageDecodesAttachmentsAndDefaultsToEmpty() throws {
+        let withAttachment = """
+        {
+          "id": "aaaaaaaa-0000-4000-8000-000000000001",
+          "channelId": "bbbbbbbb-0000-4000-8000-000000000001",
+          "parentMessageId": null,
+          "body": "스크린샷 공유합니다",
+          "author": {
+            "type": "user",
+            "name": "Jay",
+            "image": null,
+            "provider": null
+          },
+          "mentionedUserIds": [],
+          "mentionedAgentIds": [],
+          "attachments": [
+            {
+              "id": "cccccccc-0000-4000-8000-000000000001",
+              "filename": "design.png",
+              "contentType": "image/png",
+              "byteSize": 2048,
+              "url": "/organizations/99999999-9999-4999-8999-999999999999/channels/bbbbbbbb-0000-4000-8000-000000000001/messages/aaaaaaaa-0000-4000-8000-000000000001/attachments/cccccccc-0000-4000-8000-000000000001"
+            }
+          ],
+          "replyCount": 0,
+          "lastReplyAt": null,
+          "document": null,
+          "createdAt": "2026-08-01T01:00:00Z"
+        }
+        """
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let message = try decoder.decode(ChannelMessage.self, from: Data(withAttachment.utf8))
+
+        XCTAssertEqual(message.attachments.count, 1)
+        XCTAssertEqual(message.attachments[0].filename, "design.png")
+        XCTAssertEqual(message.attachments[0].contentType, "image/png")
+        XCTAssertEqual(message.attachments[0].byteSize, 2048)
+
+        let withoutAttachment = """
+        {
+          "id": "aaaaaaaa-0000-4000-8000-000000000001",
+          "channelId": "bbbbbbbb-0000-4000-8000-000000000001",
+          "parentMessageId": null,
+          "body": "Hello team",
+          "author": {
+            "type": "user",
+            "name": "Jay",
+            "image": null,
+            "provider": null
+          },
+          "mentionedUserIds": [],
+          "mentionedAgentIds": [],
+          "replyCount": 0,
+          "lastReplyAt": null,
+          "document": null,
+          "createdAt": "2026-08-01T01:00:00Z"
+        }
+        """
+        let plain = try decoder.decode(ChannelMessage.self, from: Data(withoutAttachment.utf8))
+        XCTAssertTrue(plain.attachments.isEmpty)
+    }
+
+    func testChannelMessageAttachmentFieldsRoundTripThroughJSONEncoder() throws {
+        let attachment = ChannelMessageAttachment(
+            id: UUID(uuidString: "cccccccc-0000-4000-8000-000000000001")!,
+            filename: "design.png",
+            contentType: "image/png",
+            byteSize: 2048,
+            url: "/organizations/99999999-9999-4999-8999-999999999999/channels/bbbbbbbb-0000-4000-8000-000000000001/messages/aaaaaaaa-0000-4000-8000-000000000001/attachments/cccccccc-0000-4000-8000-000000000001"
+        )
+        let encoded = try JSONEncoder().encode(attachment)
+        let object = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: encoded) as? [String: Any]
+        )
+
+        XCTAssertEqual(object["filename"] as? String, "design.png")
+        XCTAssertEqual(object["contentType"] as? String, "image/png")
+        XCTAssertEqual(object["byteSize"] as? Int, 2048)
+        XCTAssertTrue((object["url"] as? String)?.hasSuffix("/attachments/cccccccc-0000-4000-8000-000000000001") == true)
+    }
 }
