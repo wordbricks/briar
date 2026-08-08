@@ -26,6 +26,20 @@ export const changelogCopy = {
     backTop: "맨 위로 ↑",
     entries: [
       {
+        version: "1.2.90",
+        date: "2026년 8월 8일",
+        title: "워크플로와 에이전트 실행을 더 안정적으로 이어갑니다",
+        summary:
+          "워크플로 체크포인트를 하나의 v2 규칙으로 정리하고, 에이전트 작업과 스레드 답글이 중간에 끊기거나 잘못 연결되지 않도록 실행 흐름을 강화했습니다.",
+        items: [
+          "프로젝트와 실행 워크플로를 표준 v2 체크포인트 모델로 통합해 승인과 재개 상태를 일관되게 관리합니다.",
+          "에이전트가 한 번의 응답으로 작업을 마치지 못해도 같은 대화와 작업 공간에서 활성 실행을 계속 진행합니다.",
+          "에이전트 작업 요청 경로를 정적 자산보다 먼저 정확히 처리해 Worker가 작업을 안정적으로 가져옵니다.",
+          "데스크톱과 iOS의 스레드 답글이 서버에 저장된 기준 메시지 ID를 사용해 에이전트 응답을 올바른 대화에 연결합니다.",
+          "칸반 카드의 이슈 출처와 Worker 배지를 바로잡아 실행 정보를 더 정확하게 표시합니다.",
+        ],
+      },
+      {
         version: "1.2.89",
         date: "2026년 8월 8일",
         title: "에이전트 실행 결과를 더 정확하게 반영합니다",
@@ -171,6 +185,20 @@ export const changelogCopy = {
     home: "Home",
     backTop: "Back to top ↑",
     entries: [
+      {
+        version: "1.2.90",
+        date: "August 8, 2026",
+        title: "Workflows and agent runs keep moving reliably",
+        summary:
+          "Workflow checkpoints now follow one v2 contract, while agent tasks and threaded replies stay connected through longer-running work.",
+        items: [
+          "Standardized project and run workflows on the canonical v2 checkpoint model for consistent approval and resume behavior.",
+          "Active agent runs continue in the same conversation and worktree when the provider needs more than one turn to finish.",
+          "Agent task claim routes are matched exactly and handled before static assets so workers can claim work reliably.",
+          "Desktop and iOS threaded replies use the canonical stored message ID, keeping agent responses attached to the right conversation.",
+          "Corrected issue source indicators and worker badges on kanban cards for more accurate execution context.",
+        ],
+      },
       {
         version: "1.2.89",
         date: "August 8, 2026",
@@ -378,9 +406,9 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <h1>{changelog.title}</h1>
           <p>{changelog.description}</p>
         </div>
-        <a href="#v1-2-89" className="changelog-current">
+        <a href="#v1-2-90" className="changelog-current">
           <span>{changelog.current}</span>
-          <strong>v1.2.89</strong>
+          <strong>v1.2.90</strong>
           <i aria-hidden="true">↓</i>
         </a>
       </section>
@@ -405,7 +433,9 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   {index === 0 ? <span>{changelog.latest}</span> : null}
                   <time
                     dateTime={
-                      entry.version === "1.2.89" || entry.version === "1.2.88"
+                      entry.version === "1.2.90" ||
+                      entry.version === "1.2.89" ||
+                      entry.version === "1.2.88"
                         ? "2026-08-08"
                         : "2026-08-07"
                     }
