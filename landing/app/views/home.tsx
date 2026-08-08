@@ -27,33 +27,34 @@ function Arrow() {
 }
 
 function ProductStage({ c }: { c: LandingCopy }) {
+  const m = c.mockup;
   const columns = [
     {
-      name: "Backlog",
+      name: m.columns.backlog,
       tone: "slate",
       cards: [
-        { id: "AH-18", title: c.dashboard.issues[3], meta: "Issue · 1h" },
-        { id: "AH-21", title: c.dashboard.issues[2], meta: "Feedback · 36m" },
+        { id: "AH-18", title: c.dashboard.issues[3], meta: m.cardMeta[0] },
+        { id: "AH-21", title: c.dashboard.issues[2], meta: m.cardMeta[1] },
       ],
     },
     {
-      name: "Queued",
+      name: m.columns.queued,
       tone: "amber",
       cards: [
-        { id: "AH-23", title: c.dashboard.issues[1], meta: "Issue · 14m" },
-        { id: "AH-26", title: c.dashboard.issues[4], meta: "Issue · 22m" },
+        { id: "AH-23", title: c.dashboard.issues[1], meta: m.cardMeta[2] },
+        { id: "AH-26", title: c.dashboard.issues[4], meta: m.cardMeta[3] },
       ],
     },
     {
-      name: "Analyze",
+      name: m.columns.analyze,
       tone: "blue",
       cards: [
-        { id: "AH-27", title: c.dashboard.issues[5], meta: "Issue · 6m" },
-        { id: "AH-28", title: c.dashboard.issues[6], meta: "Feedback · 2m" },
+        { id: "AH-27", title: c.dashboard.issues[5], meta: m.cardMeta[4] },
+        { id: "AH-28", title: c.dashboard.issues[6], meta: m.cardMeta[5] },
       ],
     },
     {
-      name: "Implement",
+      name: m.columns.implement,
       tone: "violet",
       cards: [
         {
@@ -62,7 +63,7 @@ function ProductStage({ c }: { c: LandingCopy }) {
           meta: `Codex · ${c.dashboard.now}`,
           active: true,
         },
-        { id: "AH-19", title: c.workflow.writingTests, meta: "Claude · 9m" },
+        { id: "AH-19", title: c.workflow.writingTests, meta: m.cardMeta[6] },
       ],
     },
   ] as const;
@@ -83,7 +84,7 @@ function ProductStage({ c }: { c: LandingCopy }) {
           </div>
           <div className="window-live">
             <span />
-            Live
+            {m.live}
           </div>
         </div>
 
@@ -105,9 +106,9 @@ function ProductStage({ c }: { c: LandingCopy }) {
               <span>⌄</span>
             </div>
             <div className="board-sidebar-link">
-              <span>⌂</span> Inbox <i>3</i>
+              <span>⌂</span> {m.sidebar.inbox} <i>3</i>
             </div>
-            <p>Projects</p>
+            <p>{m.sidebar.projects}</p>
             <div className="board-project">
               <div>
                 <span>⌘</span>
@@ -115,13 +116,13 @@ function ProductStage({ c }: { c: LandingCopy }) {
                 <i />
               </div>
               <div className="board-project-link board-project-active">
-                <span>⌁</span> Issues <em>8</em>
+                <span>⌁</span> {m.sidebar.issues} <em>8</em>
               </div>
               <div className="board-project-link">
-                <span>✦</span> Agents
+                <span>✦</span> {m.sidebar.agents}
               </div>
               <div className="board-project-link">
-                <span>□</span> Schedule
+                <span>□</span> {m.sidebar.schedule}
               </div>
             </div>
             <div className="board-profile">
@@ -136,20 +137,20 @@ function ProductStage({ c }: { c: LandingCopy }) {
           <section className="board-main">
             <div className="board-toolbar">
               <div>
-                <strong>Task queue</strong>
-                <small>8 tasks</small>
+                <strong>{m.taskQueue}</strong>
+                <small>{m.taskCount}</small>
               </div>
               <div className="board-toolbar-actions">
                 <span className="board-toolbar-primary">＋ {c.dashboard.newIssue.replace("+ ", "")}</span>
-                <span>⌕ Search tasks</span>
-                <i>▦ Board</i>
+                <span>⌕ {m.searchTasks}</span>
+                <i>▦ {m.board}</i>
               </div>
             </div>
             <div className="board-filters">
-              <span className="is-selected">All <i>8</i></span>
-              <span>In progress <i>4</i></span>
-              <span>Needs attention <i>1</i></span>
-              <span>Completed <i>12</i></span>
+              <span className="is-selected">{m.filters.all} <i>8</i></span>
+              <span>{m.filters.inProgress} <i>4</i></span>
+              <span>{m.filters.needsAttention} <i>1</i></span>
+              <span>{m.filters.completed} <i>12</i></span>
             </div>
             <div className="kanban-board">
               {columns.map((column) => (
@@ -167,7 +168,7 @@ function ProductStage({ c }: { c: LandingCopy }) {
                       >
                         <div className="kanban-card-meta">
                           <span>{card.id}</span>
-                          <i>Issue</i>
+                          <i>{m.issueLabel}</i>
                         </div>
                         <strong>{card.title}</strong>
                         {"active" in card && card.active ? (
@@ -175,7 +176,7 @@ function ProductStage({ c }: { c: LandingCopy }) {
                             <span>
                               <i />
                             </span>
-                            <em>Implement · 72%</em>
+                            <em>{m.implementProgress}</em>
                           </div>
                         ) : null}
                         <small>{card.meta}</small>
@@ -190,8 +191,8 @@ function ProductStage({ c }: { c: LandingCopy }) {
 
         <div className="board-statusbar">
           <div>
-            <span>✦ Claude · Signed in</span>
-            <span>◉ Codex · Signed in</span>
+            <span>✦ Claude · {m.signedIn}</span>
+            <span>◉ Codex · {m.signedIn}</span>
           </div>
           <div>
             <span>v1.2.22</span>
@@ -220,6 +221,7 @@ function ProductStage({ c }: { c: LandingCopy }) {
 }
 
 function WorkflowVisual({ c }: { c: LandingCopy }) {
+  const d = c.mockup.detail;
   return (
     <div
       className="workflow-visual detail-window"
@@ -235,28 +237,28 @@ function WorkflowVisual({ c }: { c: LandingCopy }) {
       <div className="detail-layout">
         <div className="detail-content">
           <div className="detail-tabs">
-            <span>Description</span>
-            <strong>☷ Evidence</strong>
+            <span>{d.description}</span>
+            <strong>☷ {d.evidence}</strong>
           </div>
 
           <div className="evidence-section">
             <div className="evidence-heading">
               <div>
                 <strong>{c.workflow.analyze}</strong>
-                <span>analyzing</span>
+                <span>{d.analyzing}</span>
               </div>
               <small>1 / 1</small>
             </div>
             <article className="evidence-card is-passed">
               <div className="evidence-card-head">
                 <strong>repository_findings</strong>
-                <span>Passed</span>
+                <span>{d.passed}</span>
               </div>
               <p>{c.workflow.repositoryMapped}</p>
-              <small>Command</small>
+              <small>{d.command}</small>
               <code>rg -n &quot;AgentEvent|HuntDashboard&quot; src</code>
               <footer>
-                <span>Attempt 1 · Revision 1</span>
+                <span>{d.attemptRevision}</span>
                 <span>briar-workflow · {c.dashboard.now}</span>
               </footer>
             </article>
@@ -266,7 +268,7 @@ function WorkflowVisual({ c }: { c: LandingCopy }) {
             <div className="evidence-heading">
               <div>
                 <strong>{c.workflow.implement}</strong>
-                <span>implementing</span>
+                <span>{d.implementing}</span>
               </div>
               <small>0 / 1</small>
             </div>
@@ -282,7 +284,7 @@ function WorkflowVisual({ c }: { c: LandingCopy }) {
           </div>
 
           <div className="detail-composer">
-            <span>Leave a comment…</span>
+            <span>{d.leaveComment}</span>
             <div>
               <i>⌕</i>
               <strong>↑</strong>
@@ -291,7 +293,7 @@ function WorkflowVisual({ c }: { c: LandingCopy }) {
         </div>
 
         <aside className="detail-properties">
-          <h3>Properties</h3>
+          <h3>{d.properties}</h3>
           <div>
             <span>⌁</span>
             <strong>{c.workflow.implement}</strong>
@@ -299,7 +301,7 @@ function WorkflowVisual({ c }: { c: LandingCopy }) {
           </div>
           <div>
             <span>◒</span>
-            <strong>High priority</strong>
+            <strong>{d.highPriority}</strong>
           </div>
           <div>
             <span>◎</span>
@@ -307,9 +309,9 @@ function WorkflowVisual({ c }: { c: LandingCopy }) {
           </div>
           <div>
             <span>↻</span>
-            <strong>Attempt 1 · Revision 1</strong>
+            <strong>{d.attemptRevision}</strong>
           </div>
-          <h3>Repository</h3>
+          <h3>{d.repository}</h3>
           <div>
             <span>⌘</span>
             <strong>wordbricks/briar</strong>
@@ -371,7 +373,7 @@ export default async function HomeView({ locale }: { locale: Locale }) {
       tone: "amber",
     },
     {
-      name: "Human",
+      name: c.agents.humanName,
       state: c.agents.states[2],
       role: c.agents.roles[2],
       tone: "blue",
@@ -466,19 +468,19 @@ export default async function HomeView({ locale }: { locale: Locale }) {
           </div>
           <div className="hero-meta">
             <span>
-              <i>⌘</i> macOS Apple Silicon
+              <i>⌘</i> {c.hero.meta[0]}
             </span>
             <span>
-              <i>●</i> Android companion
+              <i>●</i> {c.hero.meta[1]}
             </span>
             <span>
-              <i>✓</i> Repository-agnostic
+              <i>✓</i> {c.hero.meta[2]}
             </span>
             <span>
-              <i>✓</i> Codex + Claude
+              <i>✓</i> {c.hero.meta[3]}
             </span>
             <span>
-              <i>✓</i> Local-first
+              <i>✓</i> {c.hero.meta[4]}
             </span>
           </div>
         </div>
@@ -513,7 +515,7 @@ export default async function HomeView({ locale }: { locale: Locale }) {
 
       <section className="principles shell">
         <div className="section-intro section-intro-wide">
-          <span className="section-index">01 / PRODUCT</span>
+          <span className="section-index">01 / {c.nav.product.toUpperCase()}</span>
           <h2>
             {c.principles.line1}
             <br />
@@ -559,7 +561,7 @@ export default async function HomeView({ locale }: { locale: Locale }) {
       <section className="workflow-section" id="workflow">
         <div className="shell">
           <div className="section-intro workflow-intro">
-            <span className="section-index">02 / WORKFLOW</span>
+            <span className="section-index">02 / {c.nav.workflow.toUpperCase()}</span>
             <h2>{c.workflow.title}</h2>
             <p>{c.workflow.description}</p>
           </div>
@@ -582,7 +584,7 @@ export default async function HomeView({ locale }: { locale: Locale }) {
 
       <section className="agents-section shell" id="agents">
         <div className="section-intro section-intro-centered">
-          <span className="section-index">03 / AGENTS</span>
+          <span className="section-index">03 / {c.nav.agents.toUpperCase()}</span>
           <h2>{c.agents.title}</h2>
           <p>{c.agents.description}</p>
         </div>
@@ -620,7 +622,7 @@ export default async function HomeView({ locale }: { locale: Locale }) {
       <section className="security-section" id="security">
         <div className="shell security-layout">
           <div className="security-copy">
-            <span className="section-index">04 / SECURITY</span>
+            <span className="section-index">04 / {c.nav.security.toUpperCase()}</span>
             <h2>
               {c.security.line1}
               <br />

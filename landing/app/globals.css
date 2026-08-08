@@ -39,6 +39,69 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/*
+ * Korean wraps by syllable block (each Hangul character is already a full
+ * syllable), so the default `normal` word-break lets the browser split
+ * inside a word wherever a line runs out of room — e.g. "완료하는" breaking
+ * as "완 / 료하는". `keep-all` treats Korean text like CJK text that should
+ * only break at spaces/punctuation. `overflow-wrap: anywhere` is a safety
+ * valve so a single unbreakable long token (a URL, an unspaced English
+ * phrase) can still wrap instead of overflowing the layout. Scoped to
+ * :lang(ko) only — English pages must keep their normal word wrapping.
+ */
+:lang(ko) {
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+/*
+ * Latin display type on this page uses tight negative tracking (down to
+ * -0.075em) tuned for Geist's Latin glyphs. Applied to Hangul, negative
+ * tracking crowds the syllable blocks together instead of just tightening
+ * the whitespace between Latin letterforms. Every negative letter-spacing
+ * rule in this file was audited; the ones below render Korean text on the
+ * /ko pages and are relaxed here. Rules are intentionally left alone when:
+ *   - the element only ever renders Latin text, even on /ko (brand
+ *     wordmark, "macOS"/"Android"/"Briar Web" product names, numeral-only
+ *     index badges), so :lang(ko) would never apply to visible Korean, or
+ *   - the tracking is already positive (widens spacing, which doesn't
+ *     crowd Hangul the way negative tracking does).
+ * Not relaxed for that reason: .brand, .hero-kicker, .hero-meta,
+ * .section-index, .device-top small, .download-note, .board-sidebar > p,
+ * .tutorial-toc > strong, .download-group-index, .download-badge,
+ * .blog-empty > span, .download-card h3.
+ */
+:lang(ko) .hero h1,
+:lang(ko) .tutorial-hero-copy h1,
+:lang(ko) .final-cta h2,
+:lang(ko) .section-intro h2,
+:lang(ko) .security-copy h2,
+:lang(ko) .tutorial-setup h2,
+:lang(ko) .tutorial-step h2,
+:lang(ko) .tutorial-next h2,
+:lang(ko) .download-hero h1,
+:lang(ko) .download-group-heading h2,
+:lang(ko) .blog-hero h1,
+:lang(ko) .blog-empty h2 {
+  letter-spacing: -0.01em;
+}
+
+:lang(ko) .principle-grid h3,
+:lang(ko) .workflow-steps h3 {
+  letter-spacing: -0.005em;
+}
+
+:lang(ko) .hero-content > p,
+:lang(ko) .hero-actions-compact a,
+:lang(ko) .section-intro > p,
+:lang(ko) .principle-grid p,
+:lang(ko) .tutorial-hero-copy > p,
+:lang(ko) .download-hero > p,
+:lang(ko) .blog-hero > p,
+:lang(ko) .mobile-menu nav a {
+  letter-spacing: normal;
+}
+
 a {
   color: inherit;
   text-decoration: none;
@@ -3129,6 +3192,11 @@ footer {
   font-family: var(--font-geist-mono), monospace;
   font-size: 9px;
   font-weight: 650;
+  /* Two-digit index badges (01, 02, …) must never wrap. Without this,
+     :lang(ko)'s `overflow-wrap: anywhere` safety valve can shrink these
+     flex items below their content size and split "03" onto two lines. */
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .tutorial-setup strong {

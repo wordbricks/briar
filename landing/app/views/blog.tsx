@@ -84,7 +84,7 @@ export default function BlogView({ locale }: { locale: Locale }) {
               href={GITHUB_URL}
               target="_blank"
               rel="noreferrer"
-              aria-label="Briar on GitHub"
+              aria-label={c.aria.githubLink}
             >
               GitHub <Arrow />
             </a>

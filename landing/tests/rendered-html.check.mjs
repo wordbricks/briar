@@ -79,7 +79,7 @@ test("server-renders Korean at /ko regardless of Accept-Language", async () => {
 
   const html = await response.text();
   assert.match(html, /<html lang="ko"[\s>]/i);
-  assert.match(html, /Briar — Agent Development Environment/);
+  assert.match(html, /Briar — 로컬 우선 Agent Development Environment/);
   assert.match(html, /이슈에서 PR까지/);
   assert.match(html, /에이전트 작업을 운영하세요/);
   assert.match(html, /코드는 로컬에/);
@@ -90,7 +90,34 @@ test("server-renders Korean at /ko regardless of Accept-Language", async () => {
   assert.match(html, /Mac용 Briar 다운로드/);
   assert.match(html, /macOS Apple Silicon/);
   assert.match(html, /Android용 다운로드/);
-  assert.match(html, /Android companion/);
+  assert.match(html, /Android 컴패니언/);
+  // Hero feature chips: previously hardcoded English that must now be
+  // translated (or, for pure proper nouns, intentionally identical).
+  assert.match(html, /저장소 무관/);
+  assert.match(html, /Codex \+ Claude/);
+  assert.match(html, /로컬 우선/);
+  assert.doesNotMatch(html, /Repository-agnostic/);
+  assert.doesNotMatch(html, /Local-first/);
+  // Section-index eyebrows must pull from the Korean nav vocabulary
+  // instead of leaking hardcoded English category words.
+  assert.match(html, /01 \/ (?:<!-- -->)?제품/);
+  assert.match(html, /02 \/ (?:<!-- -->)?워크플로/);
+  assert.match(html, /03 \/ (?:<!-- -->)?에이전트/);
+  assert.match(html, /04 \/ (?:<!-- -->)?보안/);
+  assert.doesNotMatch(html, /01 \/ (?:<!-- -->)?PRODUCT/);
+  assert.doesNotMatch(html, /02 \/ (?:<!-- -->)?WORKFLOW/);
+  assert.doesNotMatch(html, /03 \/ (?:<!-- -->)?AGENTS/);
+  assert.doesNotMatch(html, /04 \/ (?:<!-- -->)?SECURITY/);
+  // Decorative product-mockup chrome mirrors the real (Korean-first) app UI.
+  assert.match(html, /백로그/);
+  assert.match(html, /작업 큐/);
+  assert.match(html, /작업 검색/);
+  assert.match(html, /로그인됨/);
+  assert.match(html, /증빙/);
+  assert.doesNotMatch(html, />Backlog</);
+  assert.doesNotMatch(html, />Task queue</);
+  assert.doesNotMatch(html, />Search tasks</);
+  assert.doesNotMatch(html, />Signed in</);
   assert.match(html, /aria-label="언어"/);
   assert.match(html, /aria-pressed="true"[^>]*aria-label="한국어"/);
   assert.match(
@@ -101,7 +128,7 @@ test("server-renders Korean at /ko regardless of Accept-Language", async () => {
     html,
     /https:\/\/github\.com\/wordbricks\/briar\/releases\/latest/,
   );
-  assert.match(html, /최신 릴리즈 · macOS Apple Silicon · Android companion/);
+  assert.match(html, /최신 릴리즈 · macOS Apple Silicon · Android 컴패니언/);
   assert.match(html, /https:\/\/github\.com\/wordbricks\/briar/);
   assert.match(html, /http:\/\/localhost\/og-briar-workflow\.png/);
   assert.doesNotMatch(html, /codex-preview|react-loading-skeleton/i);
@@ -130,6 +157,12 @@ test("server-renders English for an English browser", async () => {
   assert.match(html, /class="kanban-board"/);
   assert.match(html, /class="detail-properties"/);
   assert.match(html, /Download Briar for Mac/);
+  assert.match(html, /Repository-agnostic/);
+  assert.match(html, /Local-first/);
+  assert.match(html, /01 \/ (?:<!-- -->)?PRODUCT/);
+  assert.match(html, /02 \/ (?:<!-- -->)?WORKFLOW/);
+  assert.match(html, /03 \/ (?:<!-- -->)?AGENTS/);
+  assert.match(html, /04 \/ (?:<!-- -->)?SECURITY/);
   assert.match(html, /aria-label="Language"/);
   assert.match(html, /aria-pressed="true"[^>]*aria-label="English"/);
 });
@@ -187,6 +220,13 @@ test("server-renders the localized tutorial at /ko/tutorial with captured produc
   assert.match(html, /\/tutorial\/08-result\.webp/);
   assert.match(html, /\/tutorial\/04-evidence\.webp/);
   assert.match(html, /\/tutorial\/06-schedule\.webp/);
+  assert.match(html, /briar · 로컬 데모/);
+  // Body copy referencing real app UI labels must use the app's own
+  // Korean terms (백로그/대기/분석/구현/작업 실행/증빙…), not the English ones.
+  assert.match(html, /백로그로 둡니다/);
+  assert.match(html, /(?:<!-- -->)?작업 실행(?:<!-- -->)?을 누릅니다/);
+  assert.match(html, /증빙 탭은 워크플로/);
+  assert.doesNotMatch(html, /New issue|Run Task|Work result|Next action|Not recorded/);
 });
 
 test("server-renders the localized download catalog at /ko/download", async () => {

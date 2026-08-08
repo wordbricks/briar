@@ -47,7 +47,7 @@ export function localizedPath(locale: Locale, path: RoutePath | string): string 
 export const copy = {
   ko: {
     metadata: {
-      title: "Briar — Agent Development Environment",
+      title: "Briar — 로컬 우선 Agent Development Environment",
       description:
         "이슈에서 PR까지, 사람과 코딩 에이전트가 함께 일하는 과정을 연결하고 관찰하는 로컬 우선 Agent Development Environment.",
       socialDescription:
@@ -69,6 +69,7 @@ export const copy = {
       androidDownload: "Android용 Briar 최신 릴리즈 다운로드",
       menuOpen: "메뉴 열기",
       menuClose: "메뉴 닫기",
+      githubLink: "GitHub에서 Briar 보기",
     },
     language: {
       label: "언어",
@@ -97,6 +98,13 @@ export const copy = {
       androidDownload: "Android용 다운로드",
       howItWorks: "작동 방식 보기",
       allDownloads: "전체 다운로드 보기",
+      meta: [
+        "macOS Apple Silicon",
+        "Android 컴패니언",
+        "저장소 무관",
+        "Codex + Claude",
+        "로컬 우선",
+      ],
     },
     dashboard: {
       agentRuns: "에이전트 실행",
@@ -210,6 +218,7 @@ export const copy = {
         "도구를 바꾸지 않아도 됩니다. Briar가 서로 다른 에이전트의 실행을 같은 운영 모델로 연결합니다.",
       activeCollaborators: "활성 협업자",
       operational: "모든 시스템 정상",
+      humanName: "사람",
       states: ["3개 실행 중", "1개 리뷰 중", "승인 2개"],
       roles: ["구현 및 로컬 QA", "리뷰 및 추론", "방향 설정 및 승인"],
     },
@@ -244,7 +253,7 @@ export const copy = {
       macDownload: "Mac용 Briar 다운로드",
       androidDownload: "Android용 다운로드",
       github: "GitHub에서 보기",
-      note: "최신 릴리즈 · macOS Apple Silicon · Android companion",
+      note: "최신 릴리즈 · macOS Apple Silicon · Android 컴패니언",
     },
     differentiators: {
       index: "왜 Briar인가",
@@ -287,6 +296,57 @@ export const copy = {
       security: "보안",
       backToTop: "맨 위로 ↑",
     },
+    mockup: {
+      columns: {
+        backlog: "백로그",
+        queued: "대기",
+        analyze: "분석",
+        implement: "구현",
+      },
+      cardMeta: [
+        "이슈 · 1시간 전",
+        "피드백 · 36분 전",
+        "이슈 · 14분 전",
+        "이슈 · 22분 전",
+        "이슈 · 6분 전",
+        "피드백 · 2분 전",
+        "Claude · 9분 전",
+      ],
+      taskQueue: "작업 큐",
+      taskCount: "8개 작업",
+      searchTasks: "작업 검색",
+      board: "보드",
+      filters: {
+        all: "전체",
+        inProgress: "진행 중",
+        needsAttention: "확인 필요",
+        completed: "완료",
+      },
+      issueLabel: "이슈",
+      implementProgress: "구현 · 72%",
+      signedIn: "로그인됨",
+      live: "실시간",
+      sidebar: {
+        inbox: "받은 편지함",
+        projects: "프로젝트",
+        issues: "이슈",
+        agents: "에이전트",
+        schedule: "스케줄",
+      },
+      detail: {
+        description: "설명",
+        evidence: "증빙",
+        passed: "통과",
+        command: "실행 명령",
+        attemptRevision: "시도 1 · 리비전 1",
+        leaveComment: "댓글 남기기…",
+        properties: "속성",
+        highPriority: "높은 우선순위",
+        repository: "저장소",
+        analyzing: "분석 중",
+        implementing: "구현 중",
+      },
+    },
   },
   en: {
     metadata: {
@@ -313,6 +373,7 @@ export const copy = {
       androidDownload: "Download the latest Briar release for Android",
       menuOpen: "Open menu",
       menuClose: "Close menu",
+      githubLink: "Briar on GitHub",
     },
     language: {
       label: "Language",
@@ -341,6 +402,13 @@ export const copy = {
       androidDownload: "Download for Android",
       howItWorks: "See how it works",
       allDownloads: "See all downloads",
+      meta: [
+        "macOS Apple Silicon",
+        "Android companion",
+        "Repository-agnostic",
+        "Codex + Claude",
+        "Local-first",
+      ],
     },
     dashboard: {
       agentRuns: "Agent runs",
@@ -454,6 +522,7 @@ export const copy = {
         "No need to change tools. Briar connects different agents through one operating model.",
       activeCollaborators: "Active collaborators",
       operational: "All systems operational",
+      humanName: "Human",
       states: ["3 running", "1 reviewing", "2 approvals"],
       roles: [
         "Implementation & local QA",
@@ -534,6 +603,57 @@ export const copy = {
       tagline: "A local-first Agent Development Environment, from issue to PR.",
       security: "Security",
       backToTop: "Back to top ↑",
+    },
+    mockup: {
+      columns: {
+        backlog: "Backlog",
+        queued: "Queued",
+        analyze: "Analyze",
+        implement: "Implement",
+      },
+      cardMeta: [
+        "Issue · 1h",
+        "Feedback · 36m",
+        "Issue · 14m",
+        "Issue · 22m",
+        "Issue · 6m",
+        "Feedback · 2m",
+        "Claude · 9m",
+      ],
+      taskQueue: "Task queue",
+      taskCount: "8 tasks",
+      searchTasks: "Search tasks",
+      board: "Board",
+      filters: {
+        all: "All",
+        inProgress: "In progress",
+        needsAttention: "Needs attention",
+        completed: "Completed",
+      },
+      issueLabel: "Issue",
+      implementProgress: "Implement · 72%",
+      signedIn: "Signed in",
+      live: "Live",
+      sidebar: {
+        inbox: "Inbox",
+        projects: "Projects",
+        issues: "Issues",
+        agents: "Agents",
+        schedule: "Schedule",
+      },
+      detail: {
+        description: "Description",
+        evidence: "Evidence",
+        passed: "Passed",
+        command: "Command",
+        attemptRevision: "Attempt 1 · Revision 1",
+        leaveComment: "Leave a comment…",
+        properties: "Properties",
+        highPriority: "High priority",
+        repository: "Repository",
+        analyzing: "analyzing",
+        implementing: "implementing",
+      },
     },
   },
 } as const;
