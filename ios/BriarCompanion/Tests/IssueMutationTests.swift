@@ -248,7 +248,7 @@ final class IssueMutationTests: XCTestCase {
         )
         XCTAssertEqual(body["workerId"] as? String, "worker-1")
         XCTAssertEqual(body["provider"] as? String, "codex")
-        XCTAssertEqual(body["requestId"] as? String, requestID.uuidString)
+        XCTAssertEqual(body["requestId"] as? String, requestID.uuidString.lowercased())
     }
 
     func testDispatchSendsAutoAssignmentWhenNoWorkerSelected() async throws {
