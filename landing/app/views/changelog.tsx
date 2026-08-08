@@ -26,6 +26,19 @@ export const changelogCopy = {
     backTop: "맨 위로 ↑",
     entries: [
       {
+        version: "1.2.91",
+        date: "2026년 8월 8일",
+        title: "중요한 실행 순간만 놓치지 않도록 알림을 정리했습니다",
+        summary:
+          "진행 중인 상태 변화로 Inbox가 붐비지 않도록 알림을 결정과 종료 시점에 집중하고, 에이전트 실행 연결과 칸반 카드 표시를 더 정확하게 다듬었습니다.",
+        items: [
+          "백로그, 대기, 실행 중, 단계 변경은 새 Inbox 메시지나 알림을 만들지 않습니다.",
+          "일시정지, 완료, 실패, 차단처럼 확인이나 대응이 필요한 실행 상태만 Inbox에 표시합니다.",
+          "데스크톱과 iOS에서 에이전트 실행 ID를 같은 소문자 형식으로 보내 실행 요청이 안정적으로 연결됩니다.",
+          "칸반 카드에 배정된 Worker 아바타를 복원하고 중복된 단계 아이콘을 제거했습니다.",
+        ],
+      },
+      {
         version: "1.2.90",
         date: "2026년 8월 8일",
         title: "워크플로와 에이전트 실행을 더 안정적으로 이어갑니다",
@@ -185,6 +198,19 @@ export const changelogCopy = {
     home: "Home",
     backTop: "Back to top ↑",
     entries: [
+      {
+        version: "1.2.91",
+        date: "August 8, 2026",
+        title: "Inbox notifications now focus on moments that matter",
+        summary:
+          "Routine in-progress changes no longer crowd the Inbox, while agent execution links and kanban card details are more accurate across clients.",
+        items: [
+          "Backlog, queued, running, and workflow-stage changes no longer create new Inbox messages or notifications.",
+          "The Inbox surfaces only paused, completed, failed, and blocked runs that need attention or mark an outcome.",
+          "Desktop and iOS send agent execution IDs in the same lowercase format for reliable task dispatch.",
+          "Kanban cards once again show assigned worker avatars and omit the redundant workflow-stage icon.",
+        ],
+      },
       {
         version: "1.2.90",
         date: "August 8, 2026",
@@ -406,9 +432,9 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <h1>{changelog.title}</h1>
           <p>{changelog.description}</p>
         </div>
-        <a href="#v1-2-90" className="changelog-current">
+        <a href="#v1-2-91" className="changelog-current">
           <span>{changelog.current}</span>
-          <strong>v1.2.90</strong>
+          <strong>v1.2.91</strong>
           <i aria-hidden="true">↓</i>
         </a>
       </section>
@@ -433,6 +459,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   {index === 0 ? <span>{changelog.latest}</span> : null}
                   <time
                     dateTime={
+                      entry.version === "1.2.91" ||
                       entry.version === "1.2.90" ||
                       entry.version === "1.2.89" ||
                       entry.version === "1.2.88"
