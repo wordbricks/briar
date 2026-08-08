@@ -67,6 +67,26 @@ final class BriarCompanionUITests: XCTestCase {
         captureScreenshot(named: "companion-attention-filter")
     }
 
+    func testChannelHeaderShowsIdentityAndParticipationCounts() {
+        let app = launchInsideCompanion()
+
+        app.tabBars.buttons["홈"].tap()
+        let channel = app.descendants(matching: .any)[
+            "channel-row-cccccccc-cccc-4ccc-8ccc-cccccccccccc"
+        ]
+        XCTAssertTrue(channel.waitForExistence(timeout: 5))
+        channel.tap()
+
+        let header = app.descendants(matching: .any)["channel-header"]
+        XCTAssertTrue(header.waitForExistence(timeout: 5))
+        let identity = app.descendants(matching: .any)["channel-header-identity"]
+        XCTAssertTrue(identity.waitForExistence(timeout: 5))
+        XCTAssertTrue(identity.label.contains("design"))
+        XCTAssertTrue(identity.label.contains("멤버 4명 • Agent 3개"))
+        XCTAssertTrue(app.buttons["channel-header-back"].isHittable)
+        captureScreenshot(named: "companion-channel-header")
+    }
+
     func testCompletedIssueOpensResultTabFirst() {
         let app = launchInsideCompanion()
 

@@ -83,6 +83,8 @@ private struct ChannelRow: View {
 
 /// A channel's root messages. Tapping one opens its thread.
 struct ChannelMessagesView: View {
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @ObservedObject var channels: ChannelsStore
     @AppStorage("companion-locale") private var localeRaw = CompanionLocale.ko.rawValue
     @State private var draft = ""
@@ -98,6 +100,12 @@ struct ChannelMessagesView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            ChannelHeader(
+                channel: channel,
+                locale: locale,
+                showsStatusIcons: !dynamicTypeSize.isAccessibilitySize,
+                onBack: { dismiss() }
+            )
             ScrollView {
                 LazyVStack(spacing: 0) {
                     ForEach(channels.messages) { message in
@@ -144,16 +152,7 @@ struct ChannelMessagesView: View {
                 }
             )
         }
-        .toolbar {
-            ToolbarItem(placement: .principal) {
-                Label(
-                    channel.name,
-                    systemImage: channel.visibility == .restricted ? "lock" : "number"
-                )
-                .font(.headline)
-                .lineLimit(1)
-            }
-        }
+        .toolbar(.hidden, for: .navigationBar)
         .task(id: channel.id) { await channels.openChannel(channel.id) }
         .navigationDestination(for: ChannelMessage.self) { message in
             ChannelThreadView(
@@ -173,6 +172,94 @@ struct ChannelMessagesView: View {
                 )
             }
         }
+    }
+}
+
+private struct ChannelHeader: View {
+    let channel: ChannelSummary
+    let locale: CompanionLocale
+    let showsStatusIcons: Bool
+    let onBack: () -> Void
+
+    private var memberLabel: String {
+        String(
+            format: L10n.text(.channelMembers, locale: locale),
+            channel.memberCount
+        )
+    }
+
+    private var agentLabel: String {
+        String(
+            format: L10n.text(.channelAgents, locale: locale),
+            channel.agentCount
+        )
+    }
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Button(action: onBack) {
+                Image(systemName: "chevron.left")
+                    .font(.title3.weight(.semibold))
+                    .frame(width: 46, height: 46)
+                    .background(.thinMaterial, in: Circle())
+                    .overlay {
+                        Circle()
+                            .stroke(Color.secondary.opacity(0.22), lineWidth: 1)
+                    }
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(L10n.text(.channelBack, locale: locale))
+            .accessibilityIdentifier("channel-header-back")
+
+            HStack(spacing: 10) {
+                Image(systemName: channel.visibility == .restricted ? "lock.fill" : "number")
+                    .font(.title2.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .frame(width: 30)
+
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(channel.name)
+                        .font(.headline.weight(.bold))
+                        .lineLimit(1)
+                    Text("\(memberLabel) • \(agentLabel)")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.78)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(.horizontal, 14)
+            .frame(maxWidth: .infinity, minHeight: 54)
+            .background(.thinMaterial, in: Capsule())
+            .overlay {
+                Capsule()
+                    .stroke(Color.secondary.opacity(0.22), lineWidth: 1)
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("channel-header-identity")
+
+            if showsStatusIcons {
+                HStack(spacing: 16) {
+                    Image(systemName: "sparkles")
+                    Image(systemName: "headphones")
+                }
+                .font(.title3.weight(.medium))
+                .foregroundStyle(.primary)
+                .padding(.horizontal, 15)
+                .frame(height: 46)
+                .background(.thinMaterial, in: Capsule())
+                .overlay {
+                    Capsule()
+                        .stroke(Color.secondary.opacity(0.22), lineWidth: 1)
+                }
+                .accessibilityHidden(true)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(.bar)
+        .accessibilityIdentifier("channel-header")
     }
 }
 

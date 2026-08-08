@@ -182,6 +182,12 @@ describe("CompanionChannels", () => {
 
     expect(loadChannel).toHaveBeenCalledWith("token", "org-1", "c-common");
     expect(container.textContent).toContain("Hello team");
+    expect(
+      container.querySelector(".companion-channel-bar-identity")?.textContent,
+    ).toBe("WelcomeMembers 2 • Agents 1");
+    expect(
+      container.querySelector(".companion-channel-bar-status"),
+    ).not.toBeNull();
 
     const messageButton = container.querySelector<HTMLButtonElement>(
       ".companion-channel-message-button",
