@@ -42,6 +42,7 @@
       "/runs*",
       "/transcripts",
       "/issue-reply-claims*",
+      "/agent-task-claims*",
       "/channel-reply-claims*",
       "/queue*",
       "/run-events",
