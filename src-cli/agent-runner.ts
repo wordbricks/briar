@@ -3,7 +3,9 @@ import { Buffer } from "node:buffer";
 // A detached run keeps one durable transcript session across retries and
 // checkpoint resumes. Each claim gets its own sequence range so a new worker
 // process starting at local sequence 1 cannot collide with earlier output.
-const detachedTranscriptClaimStride = 10_000;
+// A claim may now contain several provider turns. Keep a wide range so long
+// transcripts can continue without colliding with the next claim attempt.
+const detachedTranscriptClaimStride = 1_000_000;
 
 export function detachedTranscriptSequence(
   claimAttempt: number,
@@ -488,6 +490,7 @@ export function detachedProviderRequest(input: {
   prompt: string;
   workspacePath: string;
   fullAccess: boolean;
+  conversationId?: string | null;
   readOnly?: boolean;
   imagePaths?: string[];
   agentBinary: string;
@@ -499,7 +502,7 @@ export function detachedProviderRequest(input: {
       type: "run",
       message: input.prompt,
       workspaceRoot: input.workspacePath,
-      conversationId: null,
+      conversationId: input.conversationId ?? null,
       instructions: input.agent.skill,
       outputSchema: null,
       model: input.agent.model,
@@ -525,6 +528,61 @@ export function detachedProviderRequest(input: {
             : { opencodeBinary: input.agentBinary }),
     },
   };
+}
+
+export function detachedConversationIdFromPayload(payload: unknown) {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return null;
+  }
+  const record = payload as Record<string, unknown>;
+  if (
+    record.type === "session" &&
+    typeof record.sessionId === "string" &&
+    record.sessionId.trim()
+  ) {
+    return record.sessionId.trim();
+  }
+  const event =
+    record.type === "event" &&
+      record.event &&
+      typeof record.event === "object" &&
+      !Array.isArray(record.event)
+      ? (record.event as Record<string, unknown>)
+      : null;
+  if (
+    event?.type === "conversationStarted" &&
+    typeof event.conversationId === "string" &&
+    event.conversationId.trim()
+  ) {
+    return event.conversationId.trim();
+  }
+  return null;
+}
+
+export function detachedRunContinuationPrompt(input: {
+  runId: string;
+  sourceKey: string;
+}) {
+  return [
+    `Your previous turn ended, but Briar run ${input.sourceKey} (${input.runId}) still has an active claim and has not reached a terminal or paused state.`,
+    "Continue the same responsibility now in the existing worktree and conversation. Inspect the current workflow and canonical evidence with the Briar CLI, then resume from the first unfinished configured stage.",
+    "Do not stop after reporting progress, reviewing code, or describing remaining work. Keep executing the configured workflow, including release and verification stages, until the run is explicitly completed, blocked, failed, cancelled, or paused at a configured checkpoint.",
+    "Before returning, use the Briar CLI to record the appropriate terminal result or reach the configured pause. A prose final answer by itself does not finish the run.",
+  ].join("\n\n");
+}
+
+export type DetachedRunDisposition = "continue" | "released" | "terminal";
+
+export function detachedRunDisposition(
+  activeClaim: {
+    runId: string;
+    terminalStatus?: "completed" | "cancelled" | "blocked" | "failed";
+  } | undefined,
+  runId: string,
+): DetachedRunDisposition {
+  if (!activeClaim || activeClaim.runId !== runId) return "released";
+  if (activeClaim.terminalStatus) return "terminal";
+  return "continue";
 }
 
 export function detachedPayloadDirection(
