@@ -184,9 +184,11 @@ final class IssueMutationTests: XCTestCase {
     }
 
     func testDispatchRunRequestEncodesWorkerSelection() throws {
+        let agentID = UUID(uuidString: "AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA")!
         let requestID = UUID(uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!
 
         let specific = DispatchRunRequest(
+            agentId: agentID,
             provider: .codex,
             model: nil,
             effort: nil,
@@ -199,6 +201,7 @@ final class IssueMutationTests: XCTestCase {
             JSONSerialization.jsonObject(with: specificData) as? [String: Any]
         )
         XCTAssertEqual(specificObject["workerId"] as? String, "worker-1")
+        XCTAssertEqual(specificObject["agentId"] as? String, agentID.uuidString.lowercased())
 
         let auto = DispatchRunRequest(
             provider: .codex,
