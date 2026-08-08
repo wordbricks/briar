@@ -5252,6 +5252,7 @@ export async function createIssueMessage(
     createdAt: string;
   },
 ) {
+  const parentMessageId = input.parentMessageId?.toLowerCase() ?? null;
   const result = await db
     .prepare(
       `insert into briar_issue_messages (
@@ -5274,10 +5275,10 @@ export async function createIssueMessage(
       input.body,
       input.createdAt,
       input.createdAt,
-      input.parentMessageId,
+      parentMessageId,
       input.runId,
       input.projectId,
-      input.parentMessageId,
+      parentMessageId,
     )
     .run();
   if (result.meta.changes < 1) return null;

@@ -790,6 +790,39 @@ describe("API errors", () => {
     });
   });
 
+  it("canonicalizes parent message IDs in JSON replies", async () => {
+    const parentMessageId = "AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA";
+    const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
+      expect(JSON.parse(String(init?.body))).toMatchObject({
+        parentMessageId: parentMessageId.toLowerCase(),
+      });
+      return new Response(
+        JSON.stringify({
+          message: {
+            id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            runId: "11111111-1111-4111-8111-111111111111",
+            parentMessageId: parentMessageId.toLowerCase(),
+            body: "답글",
+            author: { id: "owner", name: "Owner", image: null, provider: null },
+            replyCount: 0,
+            createdAt: "2026-08-08T00:00:00.000Z",
+            updatedAt: "2026-08-08T00:00:00.000Z",
+          },
+          agentReply: null,
+        }),
+        { status: 201, headers: { "Content-Type": "application/json" } },
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await createIssueMessage("token", "project-1", "11111111-1111-4111-8111-111111111111", {
+      body: "답글",
+      parentMessageId,
+    });
+
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
   it("uploads pasted conversation images as multipart form data", async () => {
     const projectId = "22222222-2222-4222-8222-222222222222";
     const runId = "11111111-1111-4111-8111-111111111111";
@@ -823,12 +856,14 @@ describe("API errors", () => {
 
     await createIssueMessage("token", projectId, runId, {
       body: `스크린샷\n\n![clipboard.png](briar-attachment://${reference})`,
-      parentMessageId: null,
+      parentMessageId: "AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA",
       attachments: [image],
       attachmentReferences: [reference],
     });
 
     expect(fetchMock).toHaveBeenCalledOnce();
+    const form = fetchMock.mock.calls[0]?.[1]?.body as FormData;
+    expect(form.get("parentMessageId")).toBe("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
   });
 
   it("polls the server until the assigned worker persists its reply", async () => {

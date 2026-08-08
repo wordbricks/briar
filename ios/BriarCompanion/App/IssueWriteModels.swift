@@ -315,6 +315,31 @@ struct CreateIssueMessageRequest: Codable, Sendable {
     let parentMessageId: UUID?
     let mentionedUserIds: [String]
     let agentConversationId: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case body
+        case parentMessageId
+        case mentionedUserIds
+        case agentConversationId
+    }
+
+    /// The API stores UUID identifiers in lowercase. Foundation's synthesized
+    /// UUID encoding uses uppercase characters, which breaks case-sensitive
+    /// parent-message lookups on the server.
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(body, forKey: .body)
+        if let parentMessageId {
+            try container.encode(
+                parentMessageId.uuidString.lowercased(),
+                forKey: .parentMessageId
+            )
+        } else {
+            try container.encodeNil(forKey: .parentMessageId)
+        }
+        try container.encode(mentionedUserIds, forKey: .mentionedUserIds)
+        try container.encodeIfPresent(agentConversationId, forKey: .agentConversationId)
+    }
 }
 
 struct IssueAgentReplyJob: Codable, Sendable {

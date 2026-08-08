@@ -138,6 +138,27 @@ final class IssueMutationTests: XCTestCase {
         XCTAssertEqual(object["preferredEffort"] as? String, "high")
     }
 
+    func testCreateIssueMessageRequestEncodesCanonicalParentMessageID() throws {
+        let parentMessageID = UUID(uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!
+        let request = CreateIssueMessageRequest(
+            body: "답글",
+            parentMessageId: parentMessageID,
+            mentionedUserIds: [],
+            agentConversationId: nil
+        )
+
+        let object = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder.mobileContract.encode(request)
+            ) as? [String: Any]
+        )
+
+        XCTAssertEqual(
+            object["parentMessageId"] as? String,
+            parentMessageID.uuidString.lowercased()
+        )
+    }
+
     func testCreateIssueSendsPreferredPreferences() async throws {
         let recorder = MutationAPIRecorder()
         let store = IssueMutationStore(

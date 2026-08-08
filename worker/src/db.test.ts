@@ -2474,7 +2474,8 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         id: replyId,
         projectId,
         runId,
-        parentMessageId: rootId,
+        // Mobile JSON encoders can send UUIDs with uppercase hex digits.
+        parentMessageId: rootId.toUpperCase(),
         authorUserId: "owner",
         authorAgentProvider: null,
         body: "The edge case is covered.",
