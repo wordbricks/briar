@@ -26,6 +26,19 @@ export const changelogCopy = {
     backTop: "맨 위로 ↑",
     entries: [
       {
+        version: "1.2.89",
+        date: "2026년 8월 8일",
+        title: "에이전트 실행 결과를 더 정확하게 반영합니다",
+        summary:
+          "저장된 에이전트가 맡은 책임을 실제 완료 목표로 수행하고, 실행 결과와 세션 상태를 일치시켜 진행 상황을 더 신뢰할 수 있습니다.",
+        items: [
+          "저장된 에이전트의 책임을 역할 설명이 아니라 끝까지 달성해야 할 명시적인 실행 목표로 전달합니다.",
+          "해결 가능한 사전 조건과 복구 작업을 에이전트가 직접 처리하고, 결과를 검증한 뒤 완료로 보고합니다.",
+          "즉시 실행과 예약 실행 모두 구조화된 결과가 완료일 때만 세션을 완료 상태로 표시합니다.",
+          "부분 완료, 차단, 실패 또는 결과 누락을 성공으로 표시하지 않아 실행 이력을 더 정확하게 확인할 수 있습니다.",
+        ],
+      },
+      {
         version: "1.2.88",
         date: "2026년 8월 8일",
         title: "원하는 Worker에서 에이전트를 바로 실행합니다",
@@ -158,6 +171,19 @@ export const changelogCopy = {
     home: "Home",
     backTop: "Back to top ↑",
     entries: [
+      {
+        version: "1.2.89",
+        date: "August 8, 2026",
+        title: "Agent sessions now reflect the real outcome",
+        summary:
+          "Saved agents treat their responsibility as an outcome to complete, while session status now stays aligned with the structured execution result.",
+        items: [
+          "Pass each saved agent's responsibility as an explicit execution objective instead of a role description.",
+          "Agents handle reasonable prerequisites and recovery work themselves, then verify the result before reporting completion.",
+          "Both immediate and scheduled runs mark a session complete only when the structured outcome is completed.",
+          "Partial, blocked, failed, or missing outcomes no longer appear as successful sessions, making execution history more reliable.",
+        ],
+      },
       {
         version: "1.2.88",
         date: "August 8, 2026",
@@ -352,9 +378,9 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <h1>{changelog.title}</h1>
           <p>{changelog.description}</p>
         </div>
-        <a href="#v1-2-88" className="changelog-current">
+        <a href="#v1-2-89" className="changelog-current">
           <span>{changelog.current}</span>
-          <strong>v1.2.88</strong>
+          <strong>v1.2.89</strong>
           <i aria-hidden="true">↓</i>
         </a>
       </section>
@@ -378,7 +404,11 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   <strong>v{entry.version}</strong>
                   {index === 0 ? <span>{changelog.latest}</span> : null}
                   <time
-                    dateTime={entry.version === "1.2.88" ? "2026-08-08" : "2026-08-07"}
+                    dateTime={
+                      entry.version === "1.2.89" || entry.version === "1.2.88"
+                        ? "2026-08-08"
+                        : "2026-08-07"
+                    }
                   >
                     {changelog.released} · {entry.date}
                   </time>
