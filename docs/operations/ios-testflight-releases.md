@@ -348,3 +348,29 @@ analyze and build checks, session/download/log security checks, and the Tauri
 iOS and Android regression builds. Archive identity, App Store provisioning,
 distribution signature, production entitlements, and all alternate app icons
 were verified before upload.
+
+## 2026-08-08 — 1.2.90 (1)
+
+- App: Briar Companion (`app.briar.companion`)
+- Marketing version: `1.2.90`
+- App Store Connect build: `1`
+- App Store Connect build ID: `88aeff4c-21ed-4c41-a333-55c45cd2e07d`
+- Latest main commit: `3ff10049`
+- Release source commit: `3ff10049a1dd4eee9587a16673f7d9ee8da8c6a7`
+- Implementation: native SwiftUI
+- Toolchain: Xcode 26.6, iOS 26.5 SDK
+- Minimum iOS version: 17.0
+- App Store Connect processing state: `VALID`
+- TestFlight state: `IN_BETA_TESTING`
+- Internal group: `wordbricks` (`hasAccessToAllBuilds=true`)
+- Automatic tester notification: enabled
+- IPA SHA-256: `cdeece0390c6a4799eab0c65710bc4c32a2ff92ff97bafcf3f59402039787ad9`
+
+The release includes canonical threaded-reply message IDs on mobile, exact
+agent-task claim routing, continued active runs across agent turns, and the
+removal of workflow v1 compatibility. It passed the shared API contract, Swift
+unit and UI tests, iPhone and iPad accessibility and layout tests, Production
+analyze and build checks, session/download/log security checks, and the Tauri
+iOS and Android regression builds. Archive identity, App Store provisioning,
+distribution signature, production entitlements, and all alternate app icons
+were verified before upload.
