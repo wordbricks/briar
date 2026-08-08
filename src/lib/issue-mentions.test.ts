@@ -53,6 +53,28 @@ describe("issue conversation mentions", () => {
     });
   });
 
+  it("keeps sentence punctuation outside a known mention link", () => {
+    const transform = remarkIssueMentions(["member"])();
+    const tree = {
+      type: "root",
+      children: [
+        { type: "paragraph", children: [{ type: "text", value: "@member." }] },
+      ],
+    } as Parameters<typeof transform>[0];
+
+    transform(tree);
+
+    expect(tree.children?.[0]?.children).toEqual([
+      {
+        type: "link",
+        title: null,
+        url: issueMentionUrl("member"),
+        children: [{ type: "text", value: "@member" }],
+      },
+      { type: "text", value: "." },
+    ]);
+  });
+
   it("recognizes only the internal mention URL scheme", () => {
     expect(isIssueMentionUrl(issueMentionUrl("member"))).toBe(true);
     expect(isIssueMentionUrl("https://example.com")).toBe(false);

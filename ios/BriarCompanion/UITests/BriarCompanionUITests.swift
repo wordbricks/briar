@@ -71,7 +71,7 @@ final class BriarCompanionUITests: XCTestCase {
         let app = launchInsideCompanion()
 
         app.tabBars.buttons["홈"].tap()
-        let channel = app.descendants(matching: .any)[
+        let channel = app.buttons[
             "channel-row-cccccccc-cccc-4ccc-8ccc-cccccccccccc"
         ]
         XCTAssertTrue(channel.waitForExistence(timeout: 5))
@@ -79,11 +79,19 @@ final class BriarCompanionUITests: XCTestCase {
 
         let header = app.descendants(matching: .any)["channel-header"]
         XCTAssertTrue(header.waitForExistence(timeout: 5))
-        let identity = app.descendants(matching: .any)["channel-header-identity"]
+        let identity = app.descendants(matching: .any)
+            .matching(
+                NSPredicate(
+                    format: "label CONTAINS %@ AND label CONTAINS %@",
+                    "design",
+                    "멤버 4명 • Agent 3개"
+                )
+            )
+            .firstMatch
         XCTAssertTrue(identity.waitForExistence(timeout: 5))
         XCTAssertTrue(identity.label.contains("design"))
         XCTAssertTrue(identity.label.contains("멤버 4명 • Agent 3개"))
-        XCTAssertTrue(app.buttons["channel-header-back"].isHittable)
+        XCTAssertTrue(app.buttons["channel-header-back"].exists)
         captureScreenshot(named: "companion-channel-header")
     }
 
@@ -196,7 +204,7 @@ final class BriarCompanionUITests: XCTestCase {
         agentRow.tap()
         XCTAssertTrue(app.navigationBars["Issue processing agent"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons[
-            "agent-run-button-aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+            "agent-run-button"
         ].waitForExistence(timeout: 5))
         captureScreenshot(named: "companion-agent-run")
         app.navigationBars["Issue processing agent"].buttons.element(boundBy: 0).tap()

@@ -407,7 +407,14 @@ final class AgentsStore: ObservableObject {
         events: [ProjectAgentSession.Event]? = nil,
         updatedAt: Date? = nil
     ) -> ProjectAgentSession {
-        ProjectAgentSession(
+        let replacementStatus: ProjectAgentSession.Status = status ?? session.status
+        let replacementIssues: [ProjectAgentSession.Issue] = issues ?? session.issues
+        let replacementRequestedWorkerID: String? = requestedWorkerId ?? session.requestedWorkerId
+        let replacementWorkerID: String? = workerId ?? session.workerId
+        let replacementEvents: [ProjectAgentSession.Event]? = events ?? session.events
+        let replacementUpdatedAt: Date? = updatedAt ?? session.updatedAt
+
+        return ProjectAgentSession(
             id: session.id,
             projectId: session.projectId,
             dispatchGroupId: session.dispatchGroupId,
@@ -418,18 +425,18 @@ final class AgentsStore: ObservableObject {
             scheduleRunId: session.scheduleRunId,
             parentSessionId: session.parentSessionId,
             request: session.request,
-            status: status ?? session.status,
-            issues: issues ?? session.issues,
+            status: replacementStatus,
+            issues: replacementIssues,
             startedAt: session.startedAt,
             completedAt: completedAt,
             conversationId: session.conversationId,
-            requestedWorkerId: requestedWorkerId ?? session.requestedWorkerId,
-            workerId: workerId ?? session.workerId,
             workspaceRoot: session.workspaceRoot,
+            requestedWorkerId: replacementRequestedWorkerID,
+            workerId: replacementWorkerID,
             summary: summary,
             error: error,
-            events: events ?? session.events,
-            updatedAt: updatedAt ?? session.updatedAt
+            events: replacementEvents,
+            updatedAt: replacementUpdatedAt
         )
     }
 
