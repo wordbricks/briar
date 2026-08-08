@@ -175,7 +175,7 @@ final class BriarCompanionUITests: XCTestCase {
         XCTAssertTrue(title.waitForExistence(timeout: 5))
         XCTAssertTrue(login.exists)
         XCTAssertTrue(login.isHittable)
-        try app.performAccessibilityAudit(for: [
+        try performAccessibilityAudit(on: app, for: [
             .hitRegion,
             .sufficientElementDescription,
             .textClipped,
@@ -187,7 +187,7 @@ final class BriarCompanionUITests: XCTestCase {
         app.buttons["project-continue-button"].tap()
         XCTAssertTrue(app.buttons["project-menu"].waitForExistence(timeout: transitionTimeout))
         XCTAssertTrue(app.staticTexts["iOS Native Companion 읽기 경험"].exists)
-        try app.performAccessibilityAudit(for: [.textClipped])
+        try performAccessibilityAudit(on: app, for: [.textClipped])
         captureScreenshot(named: "companion-task-list-accessibility-xxxl")
     }
 
@@ -299,6 +299,20 @@ final class BriarCompanionUITests: XCTestCase {
         XCTAssertTrue(app.buttons["project-menu"].waitForExistence(timeout: transitionTimeout))
         XCTAssertTrue(app.navigationBars["Tasks"].waitForExistence(timeout: transitionTimeout))
         return app
+    }
+
+    private func performAccessibilityAudit(
+        on app: XCUIApplication,
+        for auditTypes: XCUIAccessibilityAuditType
+    ) throws {
+        do {
+            try app.performAccessibilityAudit(for: auditTypes)
+        } catch {
+            // Xcode 26 simulators can time out while creating an audit snapshot;
+            // rerun once before treating it as a product accessibility failure.
+            Thread.sleep(forTimeInterval: 1)
+            try app.performAccessibilityAudit(for: auditTypes)
+        }
     }
 
     private func captureScreenshot(named name: String) {
