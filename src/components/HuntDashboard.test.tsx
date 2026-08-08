@@ -376,7 +376,11 @@ describe("HuntDashboard", () => {
 
     expect(markup).toContain('class="kanban-source"');
     expect(markup).toContain("이슈");
-    expect(markup).not.toContain('class="source-dot issue"');
+    const container = document.createElement("div");
+    container.innerHTML = markup;
+    expect(
+      container.querySelector(".kanban-source .source-dot.issue"),
+    ).not.toBeNull();
     expect(markup).not.toContain("lucide-paperclip");
     expect(markup).not.toContain("screenshot.png");
     expect(markup).not.toContain("attachment-1");
@@ -475,7 +479,7 @@ describe("HuntDashboard", () => {
     expect(markup).toContain('aria-label="담당자: Jay"');
   });
 
-  it("stacks the assigned worker icon with the active agent avatar", () => {
+  it("stacks the assigned worker badge with the active agent avatar", () => {
     const run = {
       ...demoDashboard.runs[0],
       workerId: dashboardWorker.id,
@@ -499,7 +503,11 @@ describe("HuntDashboard", () => {
     expect(markup).toContain('class="kanban-card-assignee-badges"');
     expect(markup).toContain('class="kanban-card-worker-badge"');
     expect(markup).toContain('aria-label="배정된 Worker: Lemon Worker"');
-    expect(markup).toContain("🍋");
+    const container = document.createElement("div");
+    container.innerHTML = markup;
+    expect(
+      container.querySelector(".kanban-card-worker-badge .worker-icon"),
+    ).toBeNull();
     expect(markup).toContain('class="kanban-card-agent-badge"');
     expect(markup).toContain('class="kanban-card-provider-badge codex"');
   });
@@ -554,7 +562,7 @@ describe("HuntDashboard", () => {
     },
   );
 
-  it("keeps a compact Worker icon and omits the workflow-stage icon on completed companion tasks", () => {
+  it("keeps the assigned worker badge and omits the workflow-stage icon on completed companion tasks", () => {
     const run = {
       ...demoDashboard.runs[0],
       status: "completed" as const,
@@ -575,6 +583,7 @@ describe("HuntDashboard", () => {
 
     expect(markup).toContain('class="kanban-card-worker-badge"');
     expect(markup).toContain('aria-label="배정된 Worker: Lemon Worker"');
+    expect(markup).not.toContain('class="worker-icon"');
     expect(markup).not.toContain('class="kanban-card-stage-icon"');
     expect(markup).not.toContain(">Lemon Worker<");
   });

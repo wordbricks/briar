@@ -3476,9 +3476,7 @@ function KanbanCard({
                 title={t("run.workerAssigned", {
                   worker: assignedWorker.label,
                 })}
-              >
-                <WorkerIcon icon={assignedWorker.icon} size={18} />
-              </span>
+              />
             )}
             {activeAgent && (
               <span
@@ -3532,6 +3530,7 @@ function KanbanCard({
             tone={meta.tone}
           />
           <i className="kanban-source">
+            <span className={`source-dot ${run.source}`} />
             {t(`source.${run.source}` as MessageKey)}
           </i>
           {run.executionReadiness === "waiting" && (
