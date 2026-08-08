@@ -161,6 +161,9 @@ struct DashboardRun: Codable, Equatable, Identifiable, Sendable {
         var needsAttention: Bool { self == .paused || self == .blocked || self == .failed }
         var isActive: Bool { self != .completed && self != .cancelled }
 
+        /// States that surface a message in the Inbox; other transitions are too noisy.
+        var showsInInbox: Bool { self == .paused || self == .completed || self == .failed || self == .blocked }
+
         /// Matches shared React RunPage: completed and paused issues open on the Result tab.
         var prefersResultDetailTab: Bool { self == .completed || self == .paused }
     }
