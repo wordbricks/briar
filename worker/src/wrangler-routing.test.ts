@@ -14,7 +14,8 @@ describe("Cloudflare Worker routing", () => {
       expect.arrayContaining([
         "/transcripts",
         "/issue-reply-claims*",
-        "/agent-task-claims*",
+        "/agent-task-claims",
+        "/agent-task-claims/*",
         "/queue*",
         "/run-events",
         "/github/*",
