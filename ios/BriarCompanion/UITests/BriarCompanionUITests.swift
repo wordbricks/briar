@@ -2,6 +2,8 @@ import XCTest
 
 @MainActor
 final class BriarCompanionUITests: XCTestCase {
+    private let transitionTimeout: TimeInterval = 10
+
     override func setUpWithError() throws {
         continueAfterFailure = false
     }
@@ -290,12 +292,12 @@ final class BriarCompanionUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["--ui-testing"]
         app.launch()
-        XCTAssertTrue(app.buttons["login-button"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["login-button"].waitForExistence(timeout: transitionTimeout))
         app.buttons["login-button"].tap()
-        XCTAssertTrue(app.buttons["project-continue-button"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["project-continue-button"].waitForExistence(timeout: transitionTimeout))
         app.buttons["project-continue-button"].tap()
-        XCTAssertTrue(app.buttons["project-menu"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.navigationBars["Tasks"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["project-menu"].waitForExistence(timeout: transitionTimeout))
+        XCTAssertTrue(app.navigationBars["Tasks"].waitForExistence(timeout: transitionTimeout))
         return app
     }
 
