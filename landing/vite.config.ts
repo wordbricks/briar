@@ -1,5 +1,6 @@
 import vinext from "vinext";
 import { defineConfig } from "vite";
+import { localizedPath, routePaths, supportedLocales } from "./app/i18n";
 import hostingConfig from "./.openai/hosting.json";
 import { sites } from "./build/sites-vite-plugin";
 
@@ -16,15 +17,23 @@ const localBindingConfig = {
   compatibility_flags: ["nodejs_compat"],
   assets: {
     run_worker_first: [
-      "/",
+      // Every localized page must reach the Worker; anything not listed here
+      // is served straight from static assets and 404s. Derived from the
+      // route table so adding a page or a locale cannot silently break it.
+      ...supportedLocales.flatMap((locale) => {
+        // A prefixed locale is covered wholesale by its own subtree; listing
+        // its pages individually is rejected as redundant.
+        const root = localizedPath(locale, "/");
+        if (root !== "/") {
+          return [root, `${root}/*`];
+        }
+        return routePaths.flatMap((path) =>
+          path === "/" ? [path] : [path, `${path}/*`],
+        );
+      }),
+      "/robots.txt",
+      "/sitemap.xml",
       "/app/*",
-      "/blog",
-      "/blog/*",
-      "/changelog",
-      "/changelog/*",
-      "/download",
-      "/download/*",
-      "/tutorial",
       "/_vinext/image",
     ],
   },
