@@ -3,11 +3,14 @@ import {
   boundedTranscriptPayload,
   createDetachedTranscriptSequencer,
   detachedAgentPrompt,
+  detachedConversationIdFromPayload,
   detachedPayloadDirection,
   detachedIssueReplyPrompt,
   detachedProviderRequest,
   detachedProviderBlockedRunEvent,
   detachedProviderBlockFromPayload,
+  detachedRunContinuationPrompt,
+  detachedRunDisposition,
   detachedTranscriptSequence,
   detachedTranscriptPayload,
   issueReplyTextFromPayload,
@@ -95,8 +98,8 @@ describe("detached Agent runner", () => {
   it("appends retry and resume output in a distinct transcript sequence range", () => {
     expect(detachedTranscriptSequence(1, 1)).toBe(1);
     expect(detachedTranscriptSequence(1, 37)).toBe(37);
-    expect(detachedTranscriptSequence(2, 1)).toBe(10_001);
-    expect(detachedTranscriptSequence(3, 1)).toBe(20_001);
+    expect(detachedTranscriptSequence(2, 1)).toBe(1_000_001);
+    expect(detachedTranscriptSequence(3, 1)).toBe(2_000_001);
   });
 
   it("builds a neutral issue prompt when no logical Agent is assigned", () => {
@@ -188,11 +191,64 @@ describe("detached Agent runner", () => {
     expect(prompt).not.toContain("claimToken");
     expect(launch.kind).toBe("runner");
     expect(launch.request).toMatchObject({
+      conversationId: null,
       sandboxMode: "workspaceWrite",
       codexBinary: "/bin/codex",
       model: "gpt-5",
       effort: "high",
     });
+  });
+
+  it("continues the same provider conversation on a follow-up turn", () => {
+    const launch = detachedProviderRequest({
+      agent,
+      prompt: detachedRunContinuationPrompt({
+        runId: "run-42",
+        sourceKey: "BRIAR-42",
+      }),
+      workspacePath: "/worktree",
+      fullAccess: true,
+      conversationId: "thread-42",
+      agentBinary: "/bin/codex",
+    });
+
+    expect(launch.request.conversationId).toBe("thread-42");
+    expect(launch.request.message).toContain("still has an active claim");
+    expect(launch.request.message).toContain("A prose final answer by itself does not finish");
+  });
+
+  it("extracts provider conversation IDs from session payloads", () => {
+    expect(
+      detachedConversationIdFromPayload({
+        type: "session",
+        sessionId: "thread-42",
+      }),
+    ).toBe("thread-42");
+    expect(
+      detachedConversationIdFromPayload({
+        type: "event",
+        event: {
+          type: "conversationStarted",
+          conversationId: "thread-43",
+        },
+      }),
+    ).toBe("thread-43");
+  });
+
+  it("continues only while the claimed run remains active", () => {
+    expect(detachedRunDisposition({ runId: "run-42" }, "run-42")).toBe(
+      "continue",
+    );
+    expect(
+      detachedRunDisposition(
+        { runId: "run-42", terminalStatus: "completed" },
+        "run-42",
+      ),
+    ).toBe("terminal");
+    expect(detachedRunDisposition(undefined, "run-42")).toBe("released");
+    expect(detachedRunDisposition({ runId: "run-new" }, "run-42")).toBe(
+      "released",
+    );
   });
 
   it("passes downloaded channel images only to the Codex vision input", () => {

@@ -33,12 +33,15 @@ import {
   createDetachedTranscriptSequencer,
   detachedAgentPrompt,
   detachedChannelReplyPrompt,
+  detachedConversationIdFromPayload,
   detachedIssueReplyPrompt,
   detachedProjectAgentPrompt,
   detachedPayloadDirection,
   detachedProviderBlockedRunEvent,
   detachedProviderBlockFromPayload,
   detachedProviderRequest,
+  detachedRunContinuationPrompt,
+  detachedRunDisposition,
   detachedTranscriptPayload,
   issueReplyTextFromPayload,
   parseDetachedIssueReplyResult,
@@ -2165,160 +2168,238 @@ async function runClaimedIssueInRuntime(
     BRIAR_CONFIG_HOME: runtimeDirectory,
   };
 
-  const launch = detachedProviderRequest({
-    agent: {
-      id: issue.agent?.id ?? issue.runId,
-      name: issue.agent?.name ?? "Briar Worker",
-      provider: execution.provider,
-      model: execution.model,
-      effort: execution.effort,
-      responsibility: issue.agent?.responsibility ?? "",
-      skill: issue.agent?.skill ?? "",
-    },
-    prompt,
-    workspacePath: workspace.path,
-    fullAccess,
-    agentBinary,
-  });
-  let command = agentBinary;
-  let commandArgs = launch.arguments;
-  const runnerRequest = launch.request;
-  if (launch.kind === "runner") {
-    const runnerPath = (
-      await Promise.all(
-        [
-          resolve(import.meta.dir, `agent/${provider}-runner.js`),
-          resolve(import.meta.dir, `../dist-agent/${provider}-runner.js`),
-        ].map(async (path) => ((await Bun.file(path).exists()) ? path : null)),
-      )
-    ).find((path): path is string => Boolean(path));
-    if (!runnerPath) {
-      throw new Error(
-        `${provider} runner bundle is missing; run \`bun run agent:build\``,
-      );
-    }
-    command = process.execPath;
-    commandArgs = [runnerPath];
+  const detachedAgent = {
+    id: issue.agent?.id ?? issue.runId,
+    name: issue.agent?.name ?? "Briar Worker",
+    provider: execution.provider,
+    model: execution.model,
+    effort: execution.effort,
+    responsibility: issue.agent?.responsibility ?? "",
+    skill: issue.agent?.skill ?? "",
+  };
+  const runnerPath = (
+    await Promise.all(
+      [
+        resolve(import.meta.dir, `agent/${provider}-runner.js`),
+        resolve(import.meta.dir, `../dist-agent/${provider}-runner.js`),
+      ].map(async (path) => ((await Bun.file(path).exists()) ? path : null)),
+    )
+  ).find((path): path is string => Boolean(path));
+  if (!runnerPath) {
+    throw new Error(
+      `${provider} runner bundle is missing; run \`bun run agent:build\``,
+    );
   }
 
   const executionStartedAt = Date.now();
-  const child = spawn(command, commandArgs, {
-    cwd: workspace.path,
-    env: environment,
-    stdio: ["pipe", "pipe", "pipe"],
-  });
-  const exitPromise = new Promise<number | null>((resolveExit, rejectExit) => {
-    child.once("error", rejectExit);
-    child.once("close", resolveExit);
-  });
   const transcriptSequencer = createDetachedTranscriptSequencer(
     issue.claimAttempts,
   );
-  let stderr = "";
-  let runnerError: string | null = null;
-  let runnerBlock: ReturnType<typeof detachedProviderBlockFromPayload> = null;
-  let completed = false;
   let tokenUsage: AgentExecutionTokenUsage | null = null;
-  const terminate = () => {
-    if (child.exitCode !== null || child.killed) return;
-    child.kill("SIGTERM");
-    setTimeout(() => {
-      if (child.exitCode === null) child.kill("SIGKILL");
-    }, 5_000).unref();
-  };
-  signal.addEventListener("abort", terminate, { once: true });
-  child.stderr.setEncoding("utf8");
-  child.stderr.on("data", (chunk: string) => {
-    stderr = `${stderr}${chunk}`.slice(-8_000);
-  });
-  if (runnerRequest) {
-    child.stdin.write(`${JSON.stringify(runnerRequest)}\n`);
-  } else {
-    child.stdin.end();
-  }
-
-  const lines = createInterface({ input: child.stdout, crlfDelay: Infinity });
+  let conversationId: string | null = null;
+  let nextPrompt = prompt;
+  let turnNumber = 0;
   try {
-    for await (const line of lines) {
-      if (!line.trim()) continue;
-      let payload: unknown = line;
+    for (;;) {
+      turnNumber += 1;
+      const launch = detachedProviderRequest({
+        agent: detachedAgent,
+        prompt: nextPrompt,
+        workspacePath: workspace.path,
+        fullAccess,
+        conversationId,
+        agentBinary,
+      });
+      const runnerRequest = launch.request;
+      const child = spawn(process.execPath, [runnerPath], {
+        cwd: workspace.path,
+        env: environment,
+        stdio: ["pipe", "pipe", "pipe"],
+      });
+      const exitPromise = new Promise<number | null>((resolveExit, rejectExit) => {
+        child.once("error", rejectExit);
+        child.once("close", resolveExit);
+      });
+      let stderr = "";
+      let runnerError: string | null = null;
+      let runnerBlock: ReturnType<typeof detachedProviderBlockFromPayload> = null;
+      let completed = false;
+      const terminate = () => {
+        if (child.exitCode !== null || child.killed) return;
+        child.kill("SIGTERM");
+        setTimeout(() => {
+          if (child.exitCode === null) child.kill("SIGKILL");
+        }, 5_000).unref();
+      };
+      signal.addEventListener("abort", terminate, { once: true });
+      child.stderr.setEncoding("utf8");
+      child.stderr.on("data", (chunk: string) => {
+        stderr = `${stderr}${chunk}`.slice(-8_000);
+      });
+      child.stdin.write(`${JSON.stringify(runnerRequest)}\n`);
+
       try {
-        payload = JSON.parse(line);
-      } catch {
-        // Plain output is still useful in the remote transcript.
-      }
-      tokenUsage =
-        agentExecutionTokenUsageFromPayload(provider, payload) ?? tokenUsage;
-      runnerBlock ??= detachedProviderBlockFromPayload(payload);
-      const direction = detachedPayloadDirection(payload);
-      payload = detachedTranscriptPayload(payload, line);
-      if (
-        runnerRequest &&
-        payload &&
-        typeof payload === "object" &&
-        "type" in payload &&
-        (payload as { type?: string }).type === "approval" &&
-        "id" in payload &&
-        typeof payload.id === "string"
-      ) {
-        child.stdin.write(
-          `${JSON.stringify({
-            type: "approvalResponse",
-            id: payload.id,
-            approved:
-              !(
-                typeof runnerRequest === "object" &&
-                runnerRequest !== null &&
-                "sandboxMode" in runnerRequest &&
-                runnerRequest.sandboxMode === "readOnly"
-              ),
-          })}\n`,
-        );
-      }
-      if (
-        payload &&
-        typeof payload === "object" &&
-        "type" in payload &&
-        (payload as { type?: string }).type === "error"
-      ) {
-        runnerError = String((payload as { message?: unknown }).message ?? "Agent failed");
-      }
-      if (
-        payload &&
-        typeof payload === "object" &&
-        "type" in payload &&
-        (payload as { type?: string }).type === "result"
-      ) {
-        completed = true;
-      }
-      const transcriptSequence = transcriptSequencer.nextForPayload(payload);
-      if (transcriptSequence !== null) {
-        try {
-          await request(config.apiUrl, "/transcripts", workerToken, {
+        const lines = createInterface({ input: child.stdout, crlfDelay: Infinity });
+        for await (const line of lines) {
+          if (!line.trim()) continue;
+          let payload: unknown = line;
+          try {
+            payload = JSON.parse(line);
+          } catch {
+            // Plain output is still useful in the remote transcript.
+          }
+          conversationId =
+            detachedConversationIdFromPayload(payload) ?? conversationId;
+          tokenUsage =
+            agentExecutionTokenUsageFromPayload(provider, payload) ?? tokenUsage;
+          runnerBlock ??= detachedProviderBlockFromPayload(payload);
+          const direction = detachedPayloadDirection(payload);
+          payload = detachedTranscriptPayload(payload, line);
+          if (
+            payload &&
+            typeof payload === "object" &&
+            "type" in payload &&
+            (payload as { type?: string }).type === "approval" &&
+            "id" in payload &&
+            typeof payload.id === "string"
+          ) {
+            child.stdin.write(
+              `${JSON.stringify({
+                type: "approvalResponse",
+                id: payload.id,
+                approved: runnerRequest.sandboxMode !== "readOnly",
+              })}\n`,
+            );
+          }
+          if (
+            payload &&
+            typeof payload === "object" &&
+            "type" in payload &&
+            (payload as { type?: string }).type === "error"
+          ) {
+            runnerError = String(
+              (payload as { message?: unknown }).message ?? "Agent failed",
+            );
+          }
+          if (
+            payload &&
+            typeof payload === "object" &&
+            "type" in payload &&
+            (payload as { type?: string }).type === "result"
+          ) {
+            completed = true;
+          }
+          const transcriptSequence = transcriptSequencer.nextForPayload(payload);
+          if (transcriptSequence !== null) {
+            try {
+              await request(config.apiUrl, "/transcripts", workerToken, {
+                method: "POST",
+                body: JSON.stringify({
+                  projectId: project.id,
+                  sessionId,
+                  runId: issue.runId,
+                  workerId: activeProject.executionWorker?.workerId,
+                  agentProvider: provider,
+                  events: [{
+                    sequence: transcriptSequence,
+                    direction,
+                    payload,
+                  }],
+                }),
+              });
+            } catch (error) {
+              console.error(
+                `transcript upload failed for ${issue.sourceKey}: ${
+                  error instanceof Error ? error.message : String(error)
+                }`,
+              );
+            }
+          }
+        }
+        const exitCode = await exitPromise;
+        if (signal.aborted) {
+          throw signal.reason instanceof Error
+            ? signal.reason
+            : new Error("Worker execution was cancelled");
+        }
+        if (runnerBlock) {
+          await request(config.apiUrl, "/run-events", workerToken, {
             method: "POST",
-            body: JSON.stringify({
-              projectId: project.id,
-              sessionId,
-              runId: issue.runId,
-              workerId: activeProject.executionWorker?.workerId,
-              agentProvider: provider,
-              events: [{
-                sequence: transcriptSequence,
-                direction,
-                payload,
-              }],
-            }),
+            headers: { "X-Briar-Claim-Token": issue.claimToken },
+            body: JSON.stringify(
+              detachedProviderBlockedRunEvent({
+                block: runnerBlock,
+                runId: issue.runId,
+                attempt: issue.currentAttempt,
+                actor: `briar-worker:${activeProject.executionWorker?.workerId ?? "unknown"}`,
+                repository: issue.repository,
+                model: execution.model,
+                occurredAt: new Date().toISOString(),
+              }),
+            ),
           });
-        } catch (error) {
-          console.error(
-            `transcript upload failed for ${issue.sourceKey}: ${
-              error instanceof Error ? error.message : String(error)
-            }`,
+          return;
+        }
+        if (exitCode !== 0 || runnerError) {
+          throw new Error(
+            runnerError ?? (stderr.trim() || `Agent exited with ${exitCode}`),
           );
         }
+        if (!completed) {
+          throw new Error("Agent runner exited without a result");
+        }
+      } finally {
+        signal.removeEventListener("abort", terminate);
+        terminate();
+        await exitPromise.catch(() => null);
+      }
+
+      const runtimeConfig = configSchema.parse(
+        JSON.parse(await readFile(join(runtimeDirectory, "config.json"), "utf8")),
+      );
+      const disposition = detachedRunDisposition(
+        runtimeConfig.projects.find((candidate) => candidate.id === project.id)
+          ?.activeClaim,
+        issue.runId,
+      );
+      if (disposition !== "continue") return;
+
+      console.error(
+        `continuing ${issue.sourceKey}: agent turn ${turnNumber} ended while the run remained active`,
+      );
+      nextPrompt = detachedRunContinuationPrompt({
+        runId: issue.runId,
+        sourceKey: issue.sourceKey,
+      });
+      if (!conversationId) {
+        nextPrompt = `${nextPrompt}\n\nThe provider did not return a reusable conversation ID, so the durable issue context follows again.\n\n${prompt}`;
       }
     }
-    const exitCode = await exitPromise;
+  } catch (error) {
+    if (!signal.aborted) {
+      try {
+        await request(config.apiUrl, "/run-events", workerToken, {
+          method: "POST",
+          headers: { "X-Briar-Claim-Token": issue.claimToken },
+          body: JSON.stringify({
+            runId: issue.runId,
+            status: "failed",
+            workflowStage: null,
+            eventKey: `detached:${issue.currentAttempt}:agent-failed`,
+            occurredAt: new Date().toISOString(),
+            actor: `briar-worker:${activeProject.executionWorker?.workerId ?? "unknown"}`,
+            repository: issue.repository,
+            detail: error instanceof Error ? error.message : String(error),
+            pullRequestUrls: [],
+          }),
+        });
+      } catch {
+        // A cancellation or reassignment invalidates the claim before the
+        // process exits. That expected late write must not hide the root error.
+      }
+    }
+    throw error;
+  } finally {
     const executionMetrics = agentExecutionMetrics(
       Date.now() - executionStartedAt,
       tokenUsage,
@@ -2350,65 +2431,6 @@ async function runClaimedIssueInRuntime(
         }`,
       );
     }
-    if (signal.aborted) {
-      throw signal.reason instanceof Error
-        ? signal.reason
-        : new Error("Worker execution was cancelled");
-    }
-    if (runnerBlock) {
-      await request(config.apiUrl, "/run-events", workerToken, {
-        method: "POST",
-        headers: { "X-Briar-Claim-Token": issue.claimToken },
-        body: JSON.stringify(
-          detachedProviderBlockedRunEvent({
-            block: runnerBlock,
-            runId: issue.runId,
-            attempt: issue.currentAttempt,
-            actor: `briar-worker:${activeProject.executionWorker?.workerId ?? "unknown"}`,
-            repository: issue.repository,
-            model: execution.model,
-            occurredAt: new Date().toISOString(),
-          }),
-        ),
-      });
-      return;
-    }
-    if (exitCode !== 0 || runnerError) {
-      throw new Error(
-        runnerError ?? (stderr.trim() || `Agent exited with ${exitCode}`),
-      );
-    }
-    if (runnerRequest && !completed) {
-      throw new Error("Agent runner exited without a result");
-    }
-  } catch (error) {
-    if (!signal.aborted) {
-      try {
-        await request(config.apiUrl, "/run-events", workerToken, {
-          method: "POST",
-          headers: { "X-Briar-Claim-Token": issue.claimToken },
-          body: JSON.stringify({
-            runId: issue.runId,
-            status: "failed",
-            workflowStage: null,
-            eventKey: `detached:${issue.currentAttempt}:agent-failed`,
-            occurredAt: new Date().toISOString(),
-            actor: `briar-worker:${activeProject.executionWorker?.workerId ?? "unknown"}`,
-            repository: issue.repository,
-            detail: error instanceof Error ? error.message : String(error),
-            pullRequestUrls: [],
-          }),
-        });
-      } catch {
-        // A cancellation or reassignment invalidates the claim before the
-        // process exits. That expected late write must not hide the root error.
-      }
-    }
-    throw error;
-  } finally {
-    signal.removeEventListener("abort", terminate);
-    terminate();
-    await exitPromise.catch(() => null);
     if (workspace.type === "worktree") {
       try {
         let completedAt: string | undefined;
