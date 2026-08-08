@@ -3,11 +3,13 @@ import {
   ChevronLeft,
   FileText,
   Hash,
+  Headphones,
   LoaderCircle,
   Lock,
   MessageSquare,
   Plus,
   Send,
+  Sparkles,
 } from "lucide-react";
 import {
   useCallback,
@@ -371,8 +373,7 @@ export function CompanionChannels({
             setChannel(null);
             setMessages([]);
           }}
-          title={channel.name}
-          visibility={channel.visibility}
+          channel={channel}
         />
         {error ? <p className="companion-channel-error">{error}</p> : null}
         <div className="companion-channel-messages">
@@ -458,23 +459,56 @@ export function CompanionChannels({
 }
 
 function ChannelBar({
+  channel,
   onBack,
   title,
-  visibility,
 }: {
+  channel?: ChannelSummary;
   onBack: () => void;
-  title: string;
-  visibility?: "public" | "private";
+  title?: string;
 }) {
   const { t } = useI18n();
+  const memberLabel = channel
+    ? t("companion.channelMembers", { count: channel.memberCount })
+    : null;
+  const agentLabel = channel
+    ? t("companion.channelAgents", { count: channel.agentCount })
+    : null;
   return (
-    <header className="companion-channel-bar">
-      <button aria-label={t("navigation.back")} onClick={onBack} type="button">
+    <header
+      className={`companion-channel-bar${channel ? " is-channel" : ""}`}
+    >
+      <button
+        aria-label={t("navigation.back")}
+        className="companion-channel-bar-back"
+        onClick={onBack}
+        type="button"
+      >
         <ChevronLeft size={18} />
       </button>
-      {visibility === "private" ? <Lock size={15} /> : null}
-      {visibility === "public" ? <Hash size={15} /> : null}
-      <strong>{title}</strong>
+      {channel ? (
+        <>
+          <div className="companion-channel-bar-identity">
+            {channel.visibility === "private" ? (
+              <Lock aria-hidden="true" size={22} />
+            ) : (
+              <Hash aria-hidden="true" size={24} />
+            )}
+            <span>
+              <strong>{channel.name}</strong>
+              <small>
+                {memberLabel} • {agentLabel}
+              </small>
+            </span>
+          </div>
+          <div aria-hidden="true" className="companion-channel-bar-status">
+            <Sparkles size={18} />
+            <Headphones size={18} />
+          </div>
+        </>
+      ) : (
+        <strong className="companion-channel-bar-title">{title}</strong>
+      )}
     </header>
   );
 }

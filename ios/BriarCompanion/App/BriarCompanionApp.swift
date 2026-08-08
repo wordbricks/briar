@@ -30,6 +30,7 @@ private struct UITestCompanionFlow: View {
     @State private var dependencyAdded = false
     @StateObject private var navigation = CompanionNavigationModel()
     @StateObject private var agents: AgentsStore
+    @StateObject private var channels: ChannelsStore
     @StateObject private var inbox = InboxStore()
     @StateObject private var notifications = LocalNotificationService()
 
@@ -58,6 +59,7 @@ private struct UITestCompanionFlow: View {
         self.offline = offline
         _selectedProjectID = State(initialValue: project.id)
         _agents = StateObject(wrappedValue: AgentsStore(api: UITestAPIClient()))
+        _channels = StateObject(wrappedValue: ChannelsStore(api: UITestAPIClient()))
     }
 
     var body: some View {
@@ -85,7 +87,7 @@ private struct UITestCompanionFlow: View {
                 agents: agents,
                 inbox: inbox,
                 notifications: notifications,
-                channels: ChannelsStore(api: api),
+                channels: channels,
                 projects: [project, alternateProject],
                 project: selectedProject,
                 snapshot: snapshot,
@@ -109,6 +111,10 @@ private struct UITestCompanionFlow: View {
             )
             .task {
                 agents.select(projectID: selectedProject.id, token: "ui-test-token", locale: "ko")
+                channels.select(
+                    organizationID: selectedProject.organizationId,
+                    token: "ui-test-token"
+                )
                 inbox.update(snapshot: snapshot, sessions: agents.sessions, project: selectedProject)
             }
         }
@@ -248,7 +254,15 @@ private actor UITestAPIClient: MobileAPIClientProtocol {
         as responseType: Response.Type
     ) async throws -> Response {
         let payload: String
-        if path.hasSuffix("/issues") && method == "POST" {
+        if path.hasSuffix("/channels") && method == "GET" {
+            payload = ##"""
+            {"channels":[{"id":"cccccccc-cccc-4ccc-8ccc-cccccccccccc","organizationId":"22222222-2222-4222-8222-222222222222","slug":"design","name":"design","topic":"Mobile product design","visibility":"public","defaultProjectId":"11111111-1111-4111-8111-111111111111","archivedAt":null,"memberCount":4,"agentCount":3,"createdAt":"2026-08-02T01:00:00Z","updatedAt":"2026-08-02T01:00:00Z"}]}
+            """##
+        } else if path.hasSuffix("/channels/cccccccc-cccc-4ccc-8ccc-cccccccccccc") && method == "GET" {
+            payload = ##"""
+            {"channel":{"id":"cccccccc-cccc-4ccc-8ccc-cccccccccccc","organizationId":"22222222-2222-4222-8222-222222222222","slug":"design","name":"design","topic":"Mobile product design","visibility":"public","defaultProjectId":"11111111-1111-4111-8111-111111111111","archivedAt":null,"memberCount":4,"agentCount":3,"createdAt":"2026-08-02T01:00:00Z","updatedAt":"2026-08-02T01:00:00Z"},"members":[],"agents":[],"messages":[{"id":"dddddddd-dddd-4ddd-8ddd-dddddddddddd","channelId":"cccccccc-cccc-4ccc-8ccc-cccccccccccc","parentMessageId":null,"body":"상단 헤더 디자인을 함께 확인해 주세요.","author":{"type":"user","name":"Briar User","image":null,"provider":null},"mentionedUserIds":[],"mentionedAgentIds":[],"replyCount":0,"lastReplyAt":null,"document":null,"proposal":null,"createdAt":"2026-08-02T01:02:00Z"}]}
+            """##
+        } else if path.hasSuffix("/issues") && method == "POST" {
             issueStatus = .queued
             payload = #"{"runId":"77777777-7777-4777-8777-777777777777","sourceKey":"briar-issue:ui-test","stage":"queued","status":"queued","attachments":[]}"#
         } else if path.hasSuffix("/dispatch") && method == "POST" {

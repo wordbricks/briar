@@ -60,6 +60,9 @@ enum L10n {
         case channelsOtherProject
         case channelsEmpty
         case channelThread
+        case channelBack
+        case channelMembers
+        case channelAgents
         case channelReplies
         case channelReplyInThread
         case channelLastReply
@@ -98,6 +101,9 @@ enum L10n {
             case .channelsOtherProject: "다른 프로젝트"
             case .channelsEmpty: "채널이 없습니다."
             case .channelThread: "스레드"
+            case .channelBack: "뒤로"
+            case .channelMembers: "멤버 %d명"
+            case .channelAgents: "Agent %d개"
             case .channelReplies: "답글 %d개"
             case .channelReplyInThread: "스레드에서 답글"
             case .channelLastReply: "마지막 답글 %@"
@@ -139,6 +145,9 @@ enum L10n {
             case .channelsOtherProject: "Other project"
             case .channelsEmpty: "No channels yet."
             case .channelThread: "Thread"
+            case .channelBack: "Back"
+            case .channelMembers: "Members %d"
+            case .channelAgents: "Agents %d"
             case .channelReplies: "%d replies"
             case .channelReplyInThread: "Reply in thread"
             case .channelLastReply: "last reply %@"
@@ -180,6 +189,9 @@ enum L10n {
             case .channelsOtherProject: "其他项目"
             case .channelsEmpty: "还没有频道。"
             case .channelThread: "话题"
+            case .channelBack: "返回"
+            case .channelMembers: "%d 位成员"
+            case .channelAgents: "%d 个智能体"
             case .channelReplies: "%d 条回复"
             case .channelReplyInThread: "在线程中回复"
             case .channelLastReply: "最后回复于%@"
