@@ -7,8 +7,11 @@ ever used as an object store — never edited by an agent.
 
 ## Invocation boundary
 
-Opening a saved project agent does not start Auto Hunt. It starts one ordinary
-agent conversation in the connected project workspace:
+Opening a saved project agent does not start Auto Hunt. Before every saved-agent
+turn, the host fetches the origin default branch, creates a detached temporary
+worktree from that exact commit, copies the configured `.worktreeinclude`
+inputs, and starts the agent with that worktree as its `cwd`. The connected
+checkout is used only as the Git object store and is never the agent workspace:
 
 ```text
 user starts an agent
@@ -30,7 +33,9 @@ The initial conversation id is retained as the dispatch coordinator id. Once
 all workers terminate, the host resumes that same conversation in read-only
 mode with canonical worker reports. This makes the agent that requested the
 dispatch the agent that reports the aggregate result, without granting it
-control-plane access.
+control-plane access. The saved-agent worktree is removed after the turn,
+including when the agent fails; a worktree allocation, fetch, or cleanup error
+fails the run instead of falling back to the connected checkout.
 
 ## Where things live
 

@@ -31,6 +31,9 @@ use tauri_plugin_opener::OpenerExt;
 
 const SESSION_FILE_NAME: &str = "session.json";
 const AUTO_HUNT_EVENT_DIRECTORY: &str = "auto-hunt-sessions";
+const WORKTREE_INCLUDE_FILE: &str = ".worktreeinclude";
+const WORKTREE_INCLUDE_MAX_BYTES: u64 = 256 * 1024;
+const WORKTREE_INCLUDE_MAX_ENTRIES: usize = 200;
 const AUTO_HUNT_APP_SERVER_EVENT: &str = "auto-hunt-app-server-event";
 const AUTO_HUNT_DISPATCH_EVENT: &str = "auto-hunt-dispatch-event";
 const PROJECT_LLM_PROGRESS_EVENT: &str = "project-llm-progress";
@@ -3340,6 +3343,116 @@ fn remove_analysis_temp_root(_runner: &dyn host::CommandRunner, root: &Path) -> 
         .map_err(|error| format!("워크플로우 분석 임시 폴더를 정리하지 못했습니다: {error}"))
 }
 
+fn parse_worktree_include_file(contents: &str) -> Vec<PathBuf> {
+    let mut entries = Vec::new();
+    let mut seen = BTreeSet::new();
+    for raw_line in contents.lines() {
+        let line = raw_line.trim();
+        if line.is_empty()
+            || line.starts_with('#')
+            || line.starts_with('!')
+            || line.contains('*')
+            || line.contains('?')
+        {
+            continue;
+        }
+        let normalized = line
+            .replace('\\', "/")
+            .trim_start_matches("./")
+            .trim_end_matches('/')
+            .to_string();
+        if normalized.is_empty()
+            || normalized.starts_with('/')
+            || normalized
+                .as_bytes()
+                .get(1)
+                .is_some_and(|character| *character == b':')
+        {
+            continue;
+        }
+        let segments = normalized.split('/').collect::<Vec<_>>();
+        if segments
+            .iter()
+            .any(|segment| segment.is_empty() || *segment == "..")
+            || segments.first() == Some(&".git")
+            || !seen.insert(normalized.clone())
+        {
+            continue;
+        }
+        entries.push(PathBuf::from(normalized));
+        if entries.len() >= WORKTREE_INCLUDE_MAX_ENTRIES {
+            break;
+        }
+    }
+    entries
+}
+
+fn copy_worktree_include_entry(source: &Path, destination: &Path) -> Result<(), String> {
+    let metadata = fs::symlink_metadata(source)
+        .map_err(|error| format!("{}을(를) 읽지 못했습니다: {error}", source.display()))?;
+    if metadata.file_type().is_symlink() {
+        return Ok(());
+    }
+    if metadata.is_file() {
+        if let Some(parent) = destination.parent() {
+            fs::create_dir_all(parent).map_err(|error| {
+                format!("{} 폴더를 만들지 못했습니다: {error}", parent.display())
+            })?;
+        }
+        fs::copy(source, destination).map_err(|error| {
+            format!(
+                "{}을(를) {}에 복사하지 못했습니다: {error}",
+                source.display(),
+                destination.display()
+            )
+        })?;
+        return Ok(());
+    }
+    if !metadata.is_dir() {
+        return Ok(());
+    }
+    fs::create_dir_all(destination).map_err(|error| {
+        format!(
+            "{} 폴더를 만들지 못했습니다: {error}",
+            destination.display()
+        )
+    })?;
+    for entry in fs::read_dir(source)
+        .map_err(|error| format!("{} 폴더를 읽지 못했습니다: {error}", source.display()))?
+    {
+        let entry = entry.map_err(|error| {
+            format!("{} 폴더 항목을 읽지 못했습니다: {error}", source.display())
+        })?;
+        copy_worktree_include_entry(&entry.path(), &destination.join(entry.file_name()))?;
+    }
+    Ok(())
+}
+
+fn copy_worktree_includes(repository: &Path, worktree: &Path) -> Vec<PathBuf> {
+    let include_path = repository.join(WORKTREE_INCLUDE_FILE);
+    let Ok(metadata) = fs::metadata(&include_path) else {
+        return Vec::new();
+    };
+    if !metadata.is_file() || metadata.len() > WORKTREE_INCLUDE_MAX_BYTES {
+        return Vec::new();
+    }
+    let Ok(contents) = fs::read_to_string(include_path) else {
+        return Vec::new();
+    };
+    let mut copied = Vec::new();
+    for entry in parse_worktree_include_file(&contents) {
+        let source = repository.join(&entry);
+        let destination = worktree.join(&entry);
+        if destination.exists() || !source.exists() {
+            continue;
+        }
+        if copy_worktree_include_entry(&source, &destination).is_ok() {
+            copied.push(entry);
+        }
+    }
+    copied
+}
+
 fn prepare_latest_remote_workspace(
     runner: &dyn host::CommandRunner,
     connected_workspace: &Path,
@@ -3433,6 +3546,19 @@ fn prepare_latest_remote_workspace(
         ));
     }
     Ok(Some(LatestRemoteWorkspace { root, checkout }))
+}
+
+fn prepare_latest_project_agent_workspace(
+    runner: &dyn host::CommandRunner,
+    connected_workspace: &Path,
+) -> Result<LatestRemoteWorkspace, String> {
+    let workspace =
+        prepare_latest_remote_workspace(runner, connected_workspace)?.ok_or_else(|| {
+            "저장된 에이전트를 실행하려면 연결된 저장소에 origin 원격 저장소가 필요합니다."
+                .to_string()
+        })?;
+    copy_worktree_includes(connected_workspace, &workspace.checkout);
+    Ok(workspace)
 }
 
 fn remove_latest_remote_workspace(
@@ -4847,7 +4973,8 @@ async fn run_project_agent(
     let outcome = tauri::async_runtime::spawn_blocking(move || {
         let _cancellation = cancellation;
         ensure_agent_session_running(&cancellation_signal)?;
-        let (runner, workspace) = connected_project_runtime(&config_path, &project_id, &home)?;
+        let (runner, connected_workspace) =
+            connected_project_runtime(&config_path, &project_id, &home)?;
         let provider = request.agent_provider;
         if !app_provider_settings_from(&config_path)?.is_enabled(provider) {
             return Err(
@@ -4859,7 +4986,7 @@ async fn run_project_agent(
         let workflow_json = project_auto_hunt_workflow_json(&config_path, &project_id)?;
         let backend = agent::discover_backend(
             provider,
-            runner,
+            runner.clone(),
             agent::AgentRunnerBundles {
                 claude: &claude_runner,
                 grok: &grok_runner,
@@ -4885,10 +5012,12 @@ async fn run_project_agent(
                 ))
                 .blocking_show()
         };
-        agent::run_project_agent(
+        let workspace =
+            prepare_latest_project_agent_workspace(runner.as_ref(), &connected_workspace)?;
+        let result = agent::run_project_agent(
             &backend,
             &project_id,
-            &workspace,
+            &workspace.checkout,
             agent::ChatExecution {
                 approval_policy: settings.approval_policy,
                 sandbox_mode: project_agent_sandbox_mode(full_access),
@@ -4902,7 +5031,17 @@ async fn run_project_agent(
             &workflow_json,
             request,
             &approve,
-        )
+        );
+        let cleanup =
+            remove_latest_remote_workspace(runner.as_ref(), &connected_workspace, &workspace);
+        match (result, cleanup) {
+            (Ok(response), Ok(())) => Ok(response),
+            (Err(error), Ok(())) => Err(error),
+            (Ok(_), Err(cleanup_error)) => Err(cleanup_error),
+            (Err(error), Err(cleanup_error)) => Err(format!(
+                "{error} (최신 에이전트 작업공간 정리 실패: {cleanup_error})"
+            )),
+        }
     })
     .await
     .map_err(|error| error.to_string())?;
@@ -8033,7 +8172,7 @@ branch refs/heads/briar/second-11111111
     }
 
     #[test]
-    fn workflow_analysis_uses_and_removes_the_latest_remote_checkout() {
+    fn project_agent_uses_and_removes_the_latest_remote_checkout() {
         let Ok(git) = which::which("git") else {
             return;
         };
@@ -8106,18 +8245,35 @@ branch refs/heads/briar/second-11111111
             fs::read_to_string(connected.join("version.txt")).expect("connected version"),
             "old\n"
         );
+        fs::write(
+            connected.join(WORKTREE_INCLUDE_FILE),
+            "# local release inputs\n.env.keys\nlocal-config\n../unsafe\n*.glob\n",
+        )
+        .expect("worktree includes");
+        fs::write(connected.join(".env.keys"), "release-key\n").expect("release key");
+        fs::create_dir_all(connected.join("local-config")).expect("local config directory");
+        fs::write(connected.join("local-config/settings.json"), "{}\n").expect("local config");
         let runner = host::LocalRunner::new(
             env::var_os("PATH").unwrap_or_default(),
             root.path().to_path_buf(),
         );
-        let latest = prepare_latest_remote_workspace(&runner, &connected)
-            .expect("latest workspace")
-            .expect("origin workspace");
+        let latest = prepare_latest_project_agent_workspace(&runner, &connected)
+            .expect("latest project Agent workspace");
         assert_eq!(
             fs::read_to_string(latest.checkout.join("version.txt")).expect("analysis version"),
             "latest\n"
         );
         assert_eq!(run(&latest.checkout, &["rev-parse", "HEAD"]), latest_sha);
+        assert_eq!(
+            fs::read_to_string(latest.checkout.join(".env.keys")).expect("copied release key"),
+            "release-key\n"
+        );
+        assert_eq!(
+            fs::read_to_string(latest.checkout.join("local-config/settings.json"))
+                .expect("copied local config"),
+            "{}\n"
+        );
+        assert!(!latest.checkout.join("unsafe").exists());
 
         remove_latest_remote_workspace(&runner, &connected, &latest).expect("cleanup");
         assert!(!latest.root.exists());
@@ -8148,6 +8304,11 @@ branch refs/heads/briar/second-11111111
         assert!(prepare_latest_remote_workspace(&runner, repository.path())
             .expect("connected fallback")
             .is_none());
+        let error = match prepare_latest_project_agent_workspace(&runner, repository.path()) {
+            Ok(_) => panic!("project Agent execution requires origin"),
+            Err(error) => error,
+        };
+        assert!(error.contains("origin"));
     }
 
     #[test]
