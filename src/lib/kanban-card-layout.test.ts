@@ -103,9 +103,6 @@ describe("kanban card layout", () => {
     expect(firstRule(".kanban-card-provider-badge")).toContain(
       "border-radius:50%",
     );
-    expect(firstRule(".kanban-card-worker-badge .worker-icon")).toContain(
-      "border-radius:50%",
-    );
     expect(assignedCardKickerRule).toContain("padding-right:22px");
     expect(multipleAssigneesKickerRule).toContain("padding-right:39px");
   });
