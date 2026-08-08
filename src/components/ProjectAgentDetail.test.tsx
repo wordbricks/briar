@@ -342,6 +342,16 @@ describe("ProjectAgentDetail", () => {
       action: "respond" as const,
       message: "릴리스 상태를 확인했습니다.",
       maxIssues: null,
+      structuredResult: {
+        summary: "릴리스 상태를 확인했습니다.",
+        outcome: "completed" as const,
+        importance: "routine" as const,
+        urgency: "normal" as const,
+        impact: "project" as const,
+        humanActionRequired: false,
+        nextAction: null,
+        dueAt: null,
+      },
     };
     let resolveRun: ((value: typeof response) => void) | undefined;
     runProjectAgent.mockImplementation(

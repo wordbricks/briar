@@ -65,4 +65,60 @@ describe("executeProjectAgentTask", () => {
       }),
     );
   });
+
+  it.each(["partial", "blocked", "failed"] as const)(
+    "records a %s structured result as a failed session",
+    async (outcome) => {
+      const settleSession = vi.fn();
+      await executeProjectAgentTask(
+        {
+          runAgent: vi.fn().mockResolvedValue({
+            conversationId: "briar:project-1:conversation-1",
+            workspaceRoot: "/repo",
+            action: "respond",
+            message: `Agent returned ${outcome}.`,
+            maxIssues: null,
+            structuredResult: {
+              summary: `Agent returned ${outcome}.`,
+              outcome,
+              importance: "important",
+              urgency: "normal",
+              impact: "project",
+              humanActionRequired: outcome === "blocked",
+              nextAction: outcome === "blocked" ? "Restore access." : null,
+              dueAt: null,
+            },
+          }),
+          startSession: vi.fn(),
+          settleSession,
+          startAutoHunt: vi.fn(),
+        },
+        {
+          agent: {
+            id: "agent-1",
+            name: "Release agent",
+            provider: "codex",
+            model: null,
+            effort: null,
+            responsibility: "Publish releases.",
+            skill: "# Release agent",
+          },
+          dashboard: {
+            project: { id: "project-1" },
+            runs: [],
+          } as unknown as DashboardPayload,
+          message: "Publish the release.",
+          sessionId: "session-1",
+        },
+      );
+
+      expect(settleSession).toHaveBeenCalledWith(
+        "session-1",
+        expect.objectContaining({
+          status: "failed",
+          summary: `Agent returned ${outcome}.`,
+        }),
+      );
+    },
+  );
 });

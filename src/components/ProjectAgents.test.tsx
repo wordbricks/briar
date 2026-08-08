@@ -213,7 +213,16 @@ describe("ProjectAgents", () => {
         message: "책임 수행 완료",
         maxIssues: null,
         workspaceRoot: "/repo",
-        structuredResult: null,
+        structuredResult: {
+          summary: "책임 수행 완료",
+          outcome: "completed",
+          importance: "routine",
+          urgency: "normal",
+          impact: "project",
+          humanActionRequired: false,
+          nextAction: null,
+          dueAt: null,
+        },
       });
       await Promise.resolve();
       await Promise.resolve();

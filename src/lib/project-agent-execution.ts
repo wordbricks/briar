@@ -7,6 +7,7 @@ import type {
   DashboardPayload,
   HuntRun,
 } from "../types";
+import type { StructuredAgentResult } from "./agent-result";
 import { plannedUpdateContinuationMessage } from "./planned-update-recovery";
 
 export type ProjectAgentTurnDependencies<DispatchResult> = {
@@ -50,6 +51,12 @@ export type ProjectAgentTaskSessionSettlement = {
   summary: string | null;
   error: string | null;
 };
+
+export function projectAgentSessionStatusForOutcome(
+  outcome: StructuredAgentResult["outcome"],
+): "completed" | "failed" {
+  return outcome === "completed" ? "completed" : "failed";
+}
 
 export type ProjectAgentTaskExecutionDependencies = {
   runAgent: (
@@ -129,8 +136,11 @@ export async function executeProjectAgentTask(
         resumeAfterUpdate: true,
       },
     );
+    const outcome = result.response.action === "respond"
+      ? result.response.structuredResult?.outcome ?? "failed"
+      : "completed";
     dependencies.settleSession(sessionId, {
-      status: "completed",
+      status: projectAgentSessionStatusForOutcome(outcome),
       conversationId: result.response.conversationId,
       workspaceRoot: result.response.workspaceRoot,
       summary: result.response.message,
