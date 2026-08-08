@@ -107,7 +107,7 @@
             "status": "running",
             "workflowStage": "implementing",
             "workflow": {
-              "version": 1,
+              "version": 2,
               "stages": [
                 {
                   "id": "analyzing",
@@ -126,7 +126,13 @@
                 }
               ],
               "execution": {
-                "pauseAfterStage": "local_qa"
+                "checkpoints": [
+                  {
+                    "key": "project-after-local_qa",
+                    "stage": "local_qa",
+                    "position": "after"
+                  }
+                ]
               },
               "completion": {
                 "requiredStages": [

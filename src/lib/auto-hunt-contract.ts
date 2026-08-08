@@ -83,10 +83,9 @@ export const checkpointKeyForBoundary = (
   checkpoint: Pick<AutoHuntWorkflowCheckpoint, "stage" | "position">,
 ) => `${owner}-${checkpoint.position}-${checkpoint.stage}`;
 
-export function canonicalizeCheckpointSet(
+function orderedCheckpointSet(
   workflow: AutoHuntWorkflow,
   checkpoints: AutoHuntWorkflowCheckpoint[],
-  owner: "project" | "user" | "issue",
 ) {
   const normalized = normalizeAutoHuntWorkflow(workflow);
   const stageOrder = new Map(
@@ -112,7 +111,7 @@ export function canonicalizeCheckpointSet(
       ]);
     }
     boundaries.add(boundary);
-    const key = checkpoint.key.trim() || checkpointKeyForBoundary(owner, checkpoint);
+    const key = checkpoint.key.trim();
     if (!autoHuntWorkflowCheckpointKeyPattern.test(key) || keys.has(key)) {
       throw new AutoHuntWorkflowValidationError([
         `checkpoint key '${key}' is invalid or duplicated`,
@@ -133,6 +132,20 @@ export function canonicalizeCheckpointSet(
   });
 }
 
+export function canonicalizeCheckpointSet(
+  workflow: AutoHuntWorkflow,
+  checkpoints: AutoHuntWorkflowCheckpoint[],
+  owner: "project" | "user" | "issue",
+) {
+  return orderedCheckpointSet(
+    workflow,
+    checkpoints.map((checkpoint) => ({
+      ...checkpoint,
+      key: checkpointKeyForBoundary(owner, checkpoint),
+    })),
+  );
+}
+
 export function resolveCheckpointPolicy(
   workflow: AutoHuntWorkflow,
   projectMandatory: AutoHuntWorkflowCheckpoint[],
@@ -145,7 +158,7 @@ export function resolveCheckpointPolicy(
   );
   const defaults = canonicalizeCheckpointSet(workflow, userDefaults, "user");
   const mandatoryBoundaries = new Set(mandatory.map(checkpointBoundaryId));
-  const effective = canonicalizeCheckpointSet(
+  const effective = orderedCheckpointSet(
     workflow,
     [
       ...mandatory,
@@ -153,7 +166,6 @@ export function resolveCheckpointPolicy(
         (checkpoint) => !mandatoryBoundaries.has(checkpointBoundaryId(checkpoint)),
       ),
     ],
-    "project",
   );
   return { projectMandatory: mandatory, userDefaults: defaults, effective };
 }
@@ -185,10 +197,9 @@ export function workflowWithAdditionalCheckpoints(
   return normalizeAutoHuntWorkflow({
     ...normalized,
     execution: {
-      checkpoints: canonicalizeCheckpointSet(
+      checkpoints: orderedCheckpointSet(
         normalized,
         [...normalized.execution.checkpoints, ...additional],
-        "project",
       ),
     },
   });
@@ -334,7 +345,7 @@ export const repositoryWorkflowBootstrap: AutoHuntWorkflow = {
   ],
   execution: {
     checkpoints: [{
-      key: "after-repository-workflow-pending",
+      key: "project-after-repository_workflow_pending",
       stage: repositoryWorkflowPendingStageId,
       position: "after",
     }],
@@ -585,27 +596,6 @@ export function normalizeAutoHuntWorkflow(
     execution: { checkpoints },
     completion: { requiredStages },
   };
-}
-
-export function workflowPauseIndex(workflow: AutoHuntWorkflow) {
-  const checkpoint = [...workflow.execution.checkpoints]
-    .reverse()
-    .find((candidate) => candidate.position === "after");
-  // The old event lifecycle only understands one after-stage pause. v2
-  // checkpoint orchestration is deliberately opt-in through the progress API;
-  // keep this compatibility helper inert for canonical v2 keys.
-  if (!checkpoint || !checkpoint.key.startsWith("legacy-after-")) {
-    return workflow.stages.length;
-  }
-  return workflow.stages.findIndex((stage) => stage.id === checkpoint.stage);
-}
-
-/** @deprecated Use workflowPauseIndex. */
-export const workflowStopIndex = workflowPauseIndex;
-
-export function workflowPauseStage(workflow: AutoHuntWorkflow) {
-  const index = workflowPauseIndex(workflow);
-  return workflow.stages[index]?.id ?? null;
 }
 
 export function orderedWorkflowCheckpoints(workflow: AutoHuntWorkflow) {

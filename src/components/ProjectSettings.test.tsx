@@ -80,13 +80,13 @@ describe("ProjectSettings", () => {
                   ]),
                 ),
                 projectMandatory: [{
-                  key: "legacy-after-local_qa",
+                  key: "project-after-local_qa",
                   stage: "local_qa",
                   position: "after",
                 }],
                 userDefaults: [],
                 effective: [{
-                  key: "legacy-after-local_qa",
+                  key: "project-after-local_qa",
                   stage: "local_qa",
                   position: "after",
                 }],

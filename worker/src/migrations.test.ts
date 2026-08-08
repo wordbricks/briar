@@ -117,7 +117,7 @@ describe("D1 migrations", () => {
     expect(sql).not.toMatch(/\bupdate\s+briar_hunt_runs\b/iu);
   });
 
-  it("canonicalizes every stored v1 workflow before runtime v1 support is removed", async () => {
+  it("leaves already-canonical workflow snapshots stable", async () => {
     const miniflare = new Miniflare({
       modules: true,
       script: "export default { fetch() { return new Response('ok') } }",
@@ -144,17 +144,26 @@ describe("D1 migrations", () => {
            )`,
         )
         .run();
-      const workflow = (pauseAfterStage?: string) => JSON.stringify({
-        version: 1,
+      const workflow = (checkpointStage?: string) => JSON.stringify({
+        version: 2,
+        requirements: [],
         stages: [
           { id: "implementing", label: "Implement", required: true },
           { id: "merged", label: "Merge", required: true },
         ],
-        ...(pauseAfterStage ? { execution: { pauseAfterStage } } : {}),
+        execution: {
+          checkpoints: checkpointStage
+            ? [{
+                key: `project-after-${checkpointStage}`,
+                stage: checkpointStage,
+                position: "after",
+              }]
+            : [],
+        },
         completion: { requiredStages: ["implementing", "merged"] },
       });
       const explicitCheckpoint = JSON.stringify([
-        { key: "team-before-merge", stage: "merged", position: "before" },
+        { key: "project-before-merged", stage: "merged", position: "before" },
       ]);
       const alreadyV2 = JSON.stringify({
         version: 2,
@@ -168,10 +177,7 @@ describe("D1 migrations", () => {
         ["explicit-empty", workflow("merged"), "[]"],
         ["explicit-checkpoint", workflow("implementing"), explicitCheckpoint],
         ["fallback", workflow(), null],
-        ["stop-only", JSON.stringify({
-          ...JSON.parse(workflow()),
-          execution: { stopAfterStage: "implementing" },
-        }), null],
+        ["implementing-checkpoint", workflow("implementing"), null],
         ["already-v2", alreadyV2, "[]"],
       ] as const) {
         await db
@@ -184,8 +190,8 @@ describe("D1 migrations", () => {
           .run();
       }
       for (const row of [
-        ["run-pause", workflow("implementing")],
-        ["run-fallback", workflow()],
+        ["run-checkpoint", workflow("implementing")],
+        ["run-empty", workflow()],
         ["run-v2", alreadyV2],
       ] as const) {
         await db
@@ -220,23 +226,27 @@ describe("D1 migrations", () => {
         requirements: [],
         execution: {
           checkpoints: [{
-            key: "legacy-after-merged",
+            key: "project-after-merged",
             stage: "merged",
             position: "after",
           }],
         },
       });
-      expect(byProject.get("explicit-empty")?.execution.checkpoints).toEqual([]);
-      expect(byProject.get("explicit-checkpoint")?.execution.checkpoints).toEqual(
-        JSON.parse(explicitCheckpoint),
-      );
-      expect(byProject.get("fallback")?.execution.checkpoints).toEqual([{
-        key: "legacy-after-merged",
+      expect(byProject.get("explicit-empty")?.execution.checkpoints).toEqual([{
+        key: "project-after-merged",
         stage: "merged",
         position: "after",
       }]);
-      expect(byProject.get("stop-only")?.execution.checkpoints).toEqual([{
-        key: "legacy-after-implementing",
+      expect(byProject.get("explicit-checkpoint")?.execution.checkpoints).toEqual(
+        [{
+          key: "project-after-implementing",
+          stage: "implementing",
+          position: "after",
+        }],
+      );
+      expect(byProject.get("fallback")?.execution.checkpoints).toEqual([]);
+      expect(byProject.get("implementing-checkpoint")?.execution.checkpoints).toEqual([{
+        key: "project-after-implementing",
         stage: "implementing",
         position: "after",
       }]);
@@ -258,22 +268,18 @@ describe("D1 migrations", () => {
           JSON.parse(row.workflow_snapshot_json),
         ]),
       );
-      expect(byRun.get("run-pause")).toMatchObject({
+      expect(byRun.get("run-checkpoint")).toMatchObject({
         version: 2,
         requirements: [],
         execution: {
           checkpoints: [{
-            key: "legacy-after-implementing",
+            key: "project-after-implementing",
             stage: "implementing",
             position: "after",
           }],
         },
       });
-      expect(byRun.get("run-fallback")?.execution.checkpoints).toEqual([{
-        key: "legacy-after-merged",
-        stage: "merged",
-        position: "after",
-      }]);
+      expect(byRun.get("run-empty")?.execution.checkpoints).toEqual([]);
       expect(
         firstRunPass.results.find((row) => row.id === "run-v2")
           ?.workflow_snapshot_json,

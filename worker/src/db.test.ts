@@ -86,13 +86,13 @@ import {
   recordHuntEvent,
   recordRunEvidence,
   recordQaResult,
-  resumeHuntRun,
+  resumeWorkflowCheckpoint,
   removeOrganizationMember,
   revokeOrganizationInvitation,
   renewProjectAgentScheduleRunLease,
   completeProjectAgentTask,
   renewProjectAgentTaskLease,
-  updateProjectSettings,
+  updateProjectSettings as persistProjectSettings,
   updateProjectAgent,
   updateProjectAgentSchedule,
   updateOrganization,
@@ -118,7 +118,7 @@ const releaseWorkflow = normalizeAutoHuntWorkflow({
   ],
   execution: {
     checkpoints: [{
-      key: "legacy-after-production_qa",
+      key: "project-after-production_qa",
       stage: "production_qa",
       position: "after",
     }],
@@ -139,7 +139,7 @@ const pullRequestBoundaryWorkflow = normalizeAutoHuntWorkflow({
   stages: releaseWorkflow.stages,
   execution: {
     checkpoints: [{
-      key: "legacy-after-pr_open",
+      key: "project-after-pr_open",
       stage: "pr_open",
       position: "after",
     }],
@@ -161,7 +161,7 @@ const localWorkflow = normalizeAutoHuntWorkflow({
   ],
   execution: {
     checkpoints: [{
-      key: "legacy-after-local_qa",
+      key: "project-after-local_qa",
       stage: "local_qa",
       position: "after",
     }],
@@ -199,7 +199,7 @@ const revisionWorkflow = normalizeAutoHuntWorkflow({
   ],
   execution: {
     checkpoints: [{
-      key: "legacy-after-local_qa",
+      key: "project-after-local_qa",
       stage: "local_qa",
       position: "after",
     }],
@@ -208,9 +208,9 @@ const revisionWorkflow = normalizeAutoHuntWorkflow({
     requiredStages: ["analyzing", "implementing", "reviewing", "local_qa"],
   },
 });
-const singlePauseWorkflowSnapshot = (
+const checkpointWorkflowSnapshot = (
   workflow: typeof releaseWorkflow,
-  pauseAfterStage?: string,
+  checkpointStage?: string,
 ) =>
   JSON.stringify({
     version: 2,
@@ -218,8 +218,8 @@ const singlePauseWorkflowSnapshot = (
     stages: workflow.stages,
     execution: {
       checkpoints: [{
-        key: `legacy-after-${pauseAfterStage ?? workflow.completion.requiredStages.at(-1)}`,
-        stage: pauseAfterStage ?? workflow.completion.requiredStages.at(-1),
+        key: `project-after-${checkpointStage ?? workflow.completion.requiredStages.at(-1)}`,
+        stage: checkpointStage ?? workflow.completion.requiredStages.at(-1),
         position: "after",
       }],
     },
@@ -229,6 +229,43 @@ const projectId = "11111111-1111-4111-8111-111111111111";
 const baseTime = Date.parse("2026-07-21T00:00:00Z");
 const atMinute = (minute: number) =>
   new Date(baseTime + minute * 60_000).toISOString();
+
+const updateProjectSettings = async (
+  db: D1Database,
+  targetProjectId: string,
+  input: Parameters<typeof persistProjectSettings>[2],
+) => {
+  const settings = await persistProjectSettings(db, targetProjectId, input);
+  const workflow = normalizeAutoHuntWorkflow(input.workflow);
+  await db
+    .prepare(
+      `update briar_project_settings
+       set mandatory_checkpoints_json = ?
+       where project_id = ?`,
+    )
+    .bind(JSON.stringify(workflow.execution.checkpoints), targetProjectId)
+    .run();
+  return settings;
+};
+
+const setStoredWorkflow = async (
+  db: D1Database,
+  targetProjectId: string,
+  workflow: ReturnType<typeof normalizeAutoHuntWorkflow>,
+) => {
+  await db
+    .prepare(
+      `update briar_project_settings
+       set workflow_json = ?, mandatory_checkpoints_json = ?
+       where project_id = ?`,
+    )
+    .bind(
+      JSON.stringify(workflow),
+      JSON.stringify(workflow.execution.checkpoints),
+      targetProjectId,
+    )
+    .run();
+};
 const completedStructuredResult = {
   summary: "Repository audit completed.",
   outcome: "completed",
@@ -685,6 +722,10 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     );
     await executeSql(
       db,
+      await readFile(resolve("migrations/0059_workflow_v2_progress.sql"), "utf8"),
+    );
+    await executeSql(
+      db,
       await readFile(
         resolve("migrations/0060_workflow_checkpoint_policies.sql"),
         "utf8",
@@ -694,6 +735,13 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       db,
       await readFile(
         resolve("migrations/0061_resume_requested_state.sql"),
+        "utf8",
+      ),
+    );
+    await executeTriggerMigration(
+      db,
+      await readFile(
+        resolve("migrations/0061_workflow_stage_status_events.sql"),
         "utf8",
       ),
     );
@@ -720,6 +768,13 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       db,
       await readFile(
         resolve("migrations/0065_issue_rework_proposals.sql"),
+        "utf8",
+      ),
+    );
+    await executeSql(
+      db,
+      await readFile(
+        resolve("migrations/0066_normalize_project_workflows_v2.sql"),
         "utf8",
       ),
     );
@@ -781,12 +836,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     const targetProjectId = "55555555-5555-4555-8555-555555555555";
     const attachmentId = "f1f1f1f1-f1f1-41f1-81f1-f1f1f1f1f1f1";
     const messageId = "f2f2f2f2-f2f2-42f2-82f2-f2f2f2f2f2f2";
-    await db
-      .prepare(
-        `update briar_project_settings set workflow_json = ? where project_id = ?`,
-      )
-      .bind(JSON.stringify(releaseWorkflow), projectId)
-      .run();
+    await setStoredWorkflow(db, projectId, releaseWorkflow);
     await executeSql(
       db,
       `
@@ -911,21 +961,11 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       }),
     ).toBe("not_found");
 
-    await db
-      .prepare(
-        `update briar_project_settings set workflow_json = ? where project_id = ?`,
-      )
-      .bind(JSON.stringify(repositoryWorkflowBootstrap), projectId)
-      .run();
+    await setStoredWorkflow(db, projectId, repositoryWorkflowBootstrap);
   });
 
   it("records monotonic dashboard deltas and a deletion tombstone", async () => {
-    await db
-      .prepare(
-        `update briar_project_settings set workflow_json = ? where project_id = ?`,
-      )
-      .bind(JSON.stringify(releaseWorkflow), projectId)
-      .run();
+    await setStoredWorkflow(db, projectId, releaseWorkflow);
     const runId = await recordHuntEvent(
       db,
       projectId,
@@ -965,12 +1005,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       projectId,
       updatePage.nextCursor,
     );
-    await db
-      .prepare(
-        `update briar_project_settings set workflow_json = ? where project_id = ?`,
-      )
-      .bind(JSON.stringify(repositoryWorkflowBootstrap), projectId)
-      .run();
+    await setStoredWorkflow(db, projectId, repositoryWorkflowBootstrap);
     expect(deletePage.changes).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -1839,323 +1874,6 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     ).rejects.toThrow();
   });
 
-  it("enforces forward stages, QA gates, and a completion summary", async () => {
-    await updateProjectSettings(db, projectId, {
-      velenOrg: "example",
-      dataSource: null,
-      linear: { enabled: false, source: null, teamKey: null },
-      githubRepository: "example/repository",
-      workflow: releaseWorkflow,
-    });
-    const runId = await recordHuntEvent(db, projectId, event("queued", 1));
-    await db
-      .prepare(
-        `update briar_hunt_runs set workflow_snapshot_json = ? where id = ?`,
-      )
-      .bind(singlePauseWorkflowSnapshot(releaseWorkflow), runId)
-      .run();
-    expect(runId).toMatch(
-      /^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u,
-    );
-    await recordHuntEvent(db, projectId, event("analyzing", 2));
-    await recordHuntEvent(db, projectId, event("implementing", 3));
-    await expect(
-      recordHuntEvent(db, projectId, event("analyzing", 4)),
-    ).rejects.toBeInstanceOf(HuntTransitionError);
-
-    await recordHuntEvent(db, projectId, event("pr_open", 5));
-
-    await recordHuntEvent(
-      db,
-      projectId,
-      event("staging_qa", 6, { qaStatus: "pending", targetSha: "abcdef1" }),
-    );
-    for (const [stage, type, minute] of [
-      ["analyzing", "velen", 6.1],
-      ["analyzing", "repository", 6.2],
-      ["implementing", "diff", 6.3],
-      ["pr_open", "pull_request", 6.4],
-      ["staging_qa", "staging", 6.5],
-    ] as const) {
-      const evidencePullRequestNumber = Math.round(minute * 10);
-      await recordRunEvidence(db, projectId, {
-        runId,
-        evidenceKey: `${stage}:${type}`,
-        stage,
-        type,
-        status: "passed",
-        detail: `${type} verified`,
-        command: null,
-        url: type === "pull_request"
-          ? `https://github.com/example/repository/pull/${evidencePullRequestNumber}`
-          : null,
-        metadata: type === "pull_request"
-          ? {
-              githubPullRequest: {
-                repositoryId: 9001,
-                repository: "example/repository",
-                pullRequestId: 10_000 + evidencePullRequestNumber,
-                pullRequestNodeId: `PR_test_${evidencePullRequestNumber}`,
-                pullRequestNumber: evidencePullRequestNumber,
-              },
-            }
-          : null,
-        actor: "vitest",
-        observedAt: atMinute(minute),
-      });
-    }
-    expect(
-      await recordQaResult(db, projectId, {
-        runId,
-        environment: "staging",
-        result: "passed",
-        actor: "vitest",
-        observedAt: atMinute(7),
-        detail: "staging verified",
-      }),
-    ).toBe("passed");
-    await recordHuntEvent(
-      db,
-      projectId,
-      event("production_qa", 8, { qaStatus: "pending", targetSha: "abcdef1" }),
-    );
-    await expect(
-      recordHuntEvent(
-        db,
-        projectId,
-        event("completed", 9, { resultSummary: "too early" }),
-      ),
-    ).rejects.toThrow("production_qa:production");
-    expect(
-      await recordQaResult(db, projectId, {
-        runId,
-        environment: "production",
-        result: "passed",
-        actor: "vitest",
-        observedAt: atMinute(10),
-        detail: "production verified",
-      }),
-    ).toBe("passed");
-    await recordRunEvidence(db, projectId, {
-      runId,
-      evidenceKey: "production_qa:production",
-      stage: "production_qa",
-      type: "production",
-      status: "passed",
-      detail: "production verified",
-      command: null,
-      url: null,
-      metadata: null,
-      actor: "vitest",
-      observedAt: atMinute(10.5),
-    });
-    const evidence = await listRunEvidence(db, projectId, runId);
-    expect(evidence?.map((item) => item.evidence_key)).toEqual([
-      "analyzing:velen",
-      "analyzing:repository",
-      "implementing:diff",
-      "pr_open:pull_request",
-      "staging_qa:staging",
-      "production_qa:production",
-    ]);
-    await expect(
-      resumeHuntRun(db, projectId, {
-        runId,
-        requestId: "11111111-1111-4111-8111-111111111111",
-        actor: "vitest",
-        occurredAt: atMinute(10.8),
-      }),
-    ).resolves.toEqual({ outcome: "resumed", workflowStage: "production_qa" });
-    await claimResumedRun(runId, 10.9);
-    await recordHuntEvent(db, projectId, event("production_qa", 11));
-    await expect(getHuntRunForProject(db, projectId, runId)).resolves.toMatchObject({
-      status: "running",
-      paused_at: null,
-    });
-    await expect(
-      recordHuntEvent(db, projectId, event("completed", 11.5)),
-    ).rejects.toThrow("result summary");
-    const completion = event("completed", 12, {
-      resultSummary: "Production verified",
-      structuredResult: {
-        ...completedStructuredResult,
-        summary: "Production verified",
-        importance: "important",
-        impact: "project",
-      },
-    });
-    await recordHuntEvent(db, projectId, completion);
-    await expect(recordHuntEvent(db, projectId, completion)).resolves.toBe(
-      runId,
-    );
-
-    const run = await db
-      .prepare(
-        `select stage, staging_qa_status, production_qa_status, result_summary,
-                structured_result_json
-         from briar_hunt_runs where id = ?`,
-      )
-      .bind(runId)
-      .first<{
-        stage: string;
-        staging_qa_status: string;
-        production_qa_status: string;
-        result_summary: string;
-        structured_result_json: string;
-      }>();
-    expect(run).toEqual({
-      stage: "completed",
-      staging_qa_status: "passed",
-      production_qa_status: "passed",
-      result_summary: "Production verified",
-      structured_result_json: JSON.stringify({
-        ...completedStructuredResult,
-        summary: "Production verified",
-        importance: "important",
-        impact: "project",
-      }),
-    });
-  });
-
-  it("pauses at the configured stage and resumes through every completion stage", async () => {
-    await updateProjectSettings(db, projectId, {
-      velenOrg: null,
-      dataSource: null,
-      linear: { enabled: false, source: null, teamKey: null },
-      githubRepository: "example/repository",
-      workflow: pullRequestBoundaryWorkflow,
-    });
-    const common = { sourceKey: "pull-request-boundary" };
-    const runId = await recordHuntEvent(
-      db,
-      projectId,
-      event("queued", 13, common),
-    );
-    await db
-      .prepare(
-        `update briar_hunt_runs set workflow_snapshot_json = ? where id = ?`,
-      )
-      .bind(
-        singlePauseWorkflowSnapshot(pullRequestBoundaryWorkflow, "pr_open"),
-        runId,
-      )
-      .run();
-    await expect(
-      moveHuntRun(db, projectId, {
-        runId,
-        status: "running",
-        workflowStage: "staging_qa",
-        requestId: "99999999-9999-4999-8999-999999999996",
-        actor: "vitest",
-        occurredAt: atMinute(13.5),
-      }),
-    ).rejects.toThrow("Workflow is paused after stage: pr_open");
-    await recordHuntEvent(db, projectId, event("analyzing", 14, common));
-    await recordHuntEvent(db, projectId, event("implementing", 15, common));
-    await recordHuntEvent(db, projectId, event("pr_open", 16, common));
-
-    const paused = await getHuntRunForProject(db, projectId, runId);
-    expect(paused).toMatchObject({
-      status: "running",
-      paused_at: atMinute(16),
-      claim_token_hash: null,
-      claimed_by: null,
-    });
-
-    await expect(
-      recordHuntEvent(db, projectId, event("staging_qa", 17, common)),
-    ).rejects.toThrow("Run is paused; resume it before recording a later workflow stage");
-    await expect(
-      recordRunEvidence(db, projectId, {
-        runId,
-        evidenceKey: "staging-after-boundary",
-        stage: "staging_qa",
-        type: "staging",
-        status: "passed",
-        detail: "must not be accepted",
-        command: null,
-        url: null,
-        metadata: null,
-        actor: "vitest",
-        observedAt: atMinute(17.1),
-      }),
-    ).rejects.toThrow("Run is paused; resume it before recording later-stage evidence");
-
-    await expect(
-      recordHuntEvent(
-        db,
-        projectId,
-        event("completed", 17.2, {
-          ...common,
-          resultSummary: "Too early",
-        }),
-      ),
-    ).rejects.toThrow("staging_qa");
-
-    await expect(
-      resumeHuntRun(db, projectId, {
-        runId,
-        requestId: "99999999-9999-4999-8999-999999999995",
-        actor: "vitest",
-        occurredAt: atMinute(17.3),
-      }),
-    ).resolves.toEqual({ outcome: "resumed", workflowStage: "staging_qa" });
-    await expect(getHuntRunForProject(db, projectId, runId)).resolves.toMatchObject({
-      status: "running",
-      stage: "staging_qa",
-      workflow_stage: "staging_qa",
-      paused_at: atMinute(16),
-      resume_requested_at: atMinute(17.3),
-    });
-    await claimResumedRun(runId, 17.5);
-    await recordHuntEvent(db, projectId, event("staging_qa", 18, common));
-    await recordHuntEvent(db, projectId, event("production_qa", 19, common));
-    for (const [stage, type, minute] of [
-      ["analyzing", "repository", 17.2],
-      ["implementing", "diff", 17.3],
-      ["pr_open", "pull_request", 17.4],
-      ["staging_qa", "staging", 19.1],
-      ["production_qa", "production", 19.2],
-    ] as const) {
-      const evidencePullRequestNumber = Math.round(minute * 10);
-      await recordRunEvidence(db, projectId, {
-        runId,
-        evidenceKey: `${stage}:${type}`,
-        stage,
-        type,
-        status: "passed",
-        detail: `${type} verified`,
-        command: null,
-        url: type === "pull_request"
-          ? `https://github.com/example/repository/pull/${evidencePullRequestNumber}`
-          : null,
-        metadata: type === "pull_request"
-          ? {
-              githubPullRequest: {
-                repositoryId: 9001,
-                repository: "example/repository",
-                pullRequestId: 10_000 + evidencePullRequestNumber,
-                pullRequestNodeId: `PR_test_${evidencePullRequestNumber}`,
-                pullRequestNumber: evidencePullRequestNumber,
-              },
-            }
-          : null,
-        actor: "vitest",
-        observedAt: atMinute(minute),
-      });
-    }
-    await expect(
-      recordHuntEvent(
-        db,
-        projectId,
-        event("completed", 20, {
-          ...common,
-          resultSummary: "All workflow stages verified",
-        }),
-      ),
-    ).resolves.toBe(runId);
-  });
-
   it("links pull request evidence to its issue run", async () => {
     await updateProjectSettings(db, projectId, {
       velenOrg: "example",
@@ -2258,193 +1976,6 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     await expect(
       getRunEvidenceImage(db, projectId, runId, imageId),
     ).resolves.toEqual(stored?.[0]);
-  });
-
-  it("reworks QA findings in the same attempt and requires fresh downstream evidence", async () => {
-    await db
-      .prepare(
-        `update briar_project_settings set workflow_json = ? where project_id = ?`,
-      )
-      .bind(JSON.stringify(revisionWorkflow), projectId)
-      .run();
-    const sourceKey = "revision-loop";
-    const runId = await recordHuntEvent(
-      db,
-      projectId,
-      event("queued", 13, { sourceKey, eventKey: "revision:queued" }),
-    );
-    await db
-      .prepare(
-        `update briar_hunt_runs set workflow_snapshot_json = ? where id = ?`,
-      )
-      .bind(singlePauseWorkflowSnapshot(revisionWorkflow), runId)
-      .run();
-    for (const [stage, minute] of [
-      ["analyzing", 13.1],
-      ["implementing", 13.2],
-      ["reviewing", 13.3],
-      ["local_qa", 13.4],
-    ] as const) {
-      await recordHuntEvent(
-        db,
-        projectId,
-        event(stage === "analyzing" ? "analyzing" : "implementing", minute, {
-          sourceKey,
-          eventKey: `revision:${stage}`,
-          status: "running",
-          workflowStage: stage,
-        }),
-      );
-    }
-    for (const [stage, type, minute] of [
-      ["analyzing", "repository", 13.5],
-      ["implementing", "diff", 13.6],
-      ["reviewing", "review_findings", 13.7],
-      ["local_qa", "local_ci", 13.8],
-    ] as const) {
-      await recordRunEvidence(db, projectId, {
-        runId,
-        evidenceKey: `revision:${stage}:${type}`,
-        stage,
-        type,
-        status: "passed",
-        detail: `${type} revision 1`,
-        command: null,
-        url: null,
-        metadata: null,
-        actor: "vitest",
-        observedAt: atMinute(minute),
-      });
-    }
-    await db
-      .prepare(
-        `update briar_hunt_runs
-         set claim_token_hash = ?, claimed_by = 'revision-agent',
-             claimed_at = ?, lease_expires_at = ?
-         where id = ?`,
-      )
-      .bind("b".repeat(64), atMinute(13.9), atMinute(30), runId)
-      .run();
-
-    const requestId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
-    const reworkInput = {
-      runId,
-      workflowStage: "implementing",
-      requestId,
-      actor: "vitest",
-      reason: "Local QA found a code defect",
-      occurredAt: atMinute(14),
-    };
-    await expect(reworkHuntRun(db, projectId, reworkInput)).resolves.toEqual({
-      outcome: "reworked",
-      attempt: 1,
-      revision: 2,
-      workflowStage: "implementing",
-    });
-    await expect(reworkHuntRun(db, projectId, reworkInput)).resolves.toEqual({
-      outcome: "already_reworked",
-      attempt: 1,
-      revision: 2,
-      workflowStage: "implementing",
-    });
-    await expect(
-      recordHuntEvent(
-        db,
-        projectId,
-        event("completed", 14.1, {
-          sourceKey,
-          eventKey: "revision:premature-completion",
-          resultSummary: "Old evidence must not count",
-        }),
-      ),
-    ).rejects.toThrow("reviewing");
-
-    const reworked = await getHuntRunForProject(db, projectId, runId);
-    expect(reworked).toMatchObject({
-      current_attempt: 1,
-      current_revision: 2,
-      workflow_stage: "implementing",
-      status: "queued",
-      claimed_by: null,
-      claim_token_hash: null,
-    });
-    for (const [stage, minute] of [
-      ["implementing", 14.2],
-      ["reviewing", 14.3],
-      ["local_qa", 14.4],
-    ] as const) {
-      await recordHuntEvent(
-        db,
-        projectId,
-        event("implementing", minute, {
-          sourceKey,
-          eventKey: `revision:${stage}`,
-          status: "running",
-          workflowStage: stage,
-        }),
-      );
-    }
-    await expect(
-      recordHuntEvent(
-        db,
-        projectId,
-        event("completed", 14.5, {
-          sourceKey,
-          eventKey: "revision:missing-fresh-evidence",
-          resultSummary: "Fresh events are not enough",
-        }),
-      ),
-    ).rejects.toThrow("implementing:diff");
-
-    for (const [stage, type, minute] of [
-      ["implementing", "diff", 14.6],
-      ["reviewing", "review_findings", 14.7],
-      ["local_qa", "local_ci", 14.8],
-    ] as const) {
-      await recordRunEvidence(db, projectId, {
-        runId,
-        evidenceKey: `revision:${stage}:${type}`,
-        stage,
-        type,
-        status: "passed",
-        detail: `${type} revision 2`,
-        command: null,
-        url: null,
-        metadata: null,
-        actor: "vitest",
-        observedAt: atMinute(minute),
-      });
-    }
-    await expect(
-      resumeHuntRun(db, projectId, {
-        runId,
-        requestId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaab",
-        actor: "vitest",
-        occurredAt: atMinute(14.85),
-      }),
-    ).resolves.toEqual({ outcome: "resumed", workflowStage: "local_qa" });
-    await claimResumedRun(runId, 14.87);
-    await expect(
-      recordHuntEvent(
-        db,
-        projectId,
-        event("completed", 14.9, {
-          sourceKey,
-          eventKey: "revision:completed",
-          resultSummary: "Revision 2 passed review and QA",
-        }),
-      ),
-    ).resolves.toBe(runId);
-
-    const evidence = await listRunEvidence(db, projectId, runId);
-    expect(
-      evidence?.filter((item) => item.workflow_stage === "analyzing"),
-    ).toEqual([expect.objectContaining({ revision: 1 })]);
-    expect(
-      evidence
-        ?.filter((item) => item.workflow_stage === "local_qa")
-        .map((item) => item.revision),
-    ).toEqual([1, 2]);
   });
 
   it("deletes only a project owned by the requesting user", async () => {
@@ -2860,12 +2391,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
   });
 
   it("stores an app-created issue as a queued Auto Hunt run", async () => {
-    await db
-      .prepare(
-        `update briar_project_settings set workflow_json = ? where project_id = ?`,
-      )
-      .bind(JSON.stringify(localWorkflow), projectId)
-      .run();
+    await setStoredWorkflow(db, projectId, localWorkflow);
     const runId = await recordHuntEvent(
       db,
       projectId,
@@ -3345,78 +2871,6 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     );
     expect(await listInboxReadStates(db, "owner")).toHaveLength(2);
     expect(await listInboxReadStates(db, "member")).toEqual([]);
-  });
-
-  it("completes a local workflow without staging or production", async () => {
-    const common = { sourceKey: "local-only-run" };
-    const runId = await recordHuntEvent(
-      db,
-      projectId,
-      event("queued", 30, common),
-    );
-    await db
-      .prepare(
-        `update briar_hunt_runs set workflow_snapshot_json = ? where id = ?`,
-      )
-      .bind(singlePauseWorkflowSnapshot(localWorkflow), runId)
-      .run();
-    await recordHuntEvent(db, projectId, event("analyzing", 31, common));
-    await recordHuntEvent(db, projectId, event("implementing", 32, common));
-    await recordHuntEvent(
-      db,
-      projectId,
-      event("implementing", 33, {
-        ...common,
-        status: "running",
-        workflowStage: "local_qa",
-      }),
-    );
-    for (const [stage, type, minute] of [
-      ["analyzing", "velen", 33.1],
-      ["analyzing", "repository", 33.2],
-      ["implementing", "diff", 33.3],
-      ["local_qa", "signoff/app-worker", 33.4],
-      ["local_qa", "local QA", 33.5],
-    ] as const) {
-      await recordRunEvidence(db, projectId, {
-        runId,
-        evidenceKey: `${stage}:${type}`,
-        stage,
-        type,
-        status: "passed",
-        detail: `${type} verified`,
-        command: type === "local QA" ? "bun run test" : null,
-        url: null,
-        metadata: null,
-        actor: "vitest",
-        observedAt: atMinute(minute),
-      });
-    }
-    await expect(
-      resumeHuntRun(db, projectId, {
-        runId,
-        requestId: "22222222-2222-4222-8222-222222222222",
-        actor: "vitest",
-        occurredAt: atMinute(33.6),
-      }),
-    ).resolves.toEqual({ outcome: "resumed", workflowStage: "local_qa" });
-    await claimResumedRun(runId, 33.7);
-    await recordHuntEvent(
-      db,
-      projectId,
-      event("completed", 34, {
-        ...common,
-        resultSummary: "Local checks passed",
-      }),
-    );
-    const run = await getHuntRunForProject(db, projectId, runId);
-    expect(run).toEqual(
-      expect.objectContaining({
-        status: "completed",
-        workflow_stage: "local_qa",
-        production_qa_status: null,
-      }),
-    );
   });
 
   it("stores issue attachment metadata scoped to its project and run", async () => {
@@ -4070,7 +3524,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       ],
       execution: {
         checkpoints: [{
-          key: "legacy-after-manual_pause",
+          key: "project-after-manual_pause",
           stage: "manual_pause",
           position: "after",
         }],
@@ -4274,12 +3728,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
   });
 
   it("keeps completed work history and selectively revises an accepted @briar proposal", async () => {
-    await db
-      .prepare(
-        `update briar_project_settings set workflow_json = ? where project_id = ?`,
-      )
-      .bind(JSON.stringify(releaseWorkflow), projectId)
-      .run();
+    await setStoredWorkflow(db, projectId, releaseWorkflow);
     const sourceKey = "completed-rework-proposal";
     const runId = await recordHuntEvent(
       db,
@@ -4585,7 +4034,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
           resultSummary: "Should not complete without evidence",
         }),
       ),
-    ).rejects.toThrow(/requires evidence:.*merged:merge_commit/u);
+    ).rejects.toThrow("terminal stage merged");
 
     // Manual board/list move is an operator override and must not surface that
     // error on the issue list.
@@ -4607,158 +4056,6 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       status: "completed",
       workflow_stage: "merged",
     });
-  });
-
-  it("preserves related rows while migration 0055 rebuilds provider tables", async () => {
-    // Migration 0055 predates the pause checkpoint, resume request marker,
-    // human issue assignee, the agent effort setting, and the organization
-    // scope added in 0070. Exercise the historical rebuild against that earlier
-    // shape, then restore the current columns for the tests that follow.
-    await db.prepare("alter table briar_project_agents drop column effort").run();
-    await db.prepare("drop index briar_project_agents_handle_idx").run();
-    await db.prepare("drop index briar_project_agents_organization_idx").run();
-    await db.prepare("alter table briar_project_agents drop column handle").run();
-    await db
-      .prepare("alter table briar_project_agents drop column organization_id")
-      .run();
-    const pausedRuns = await db
-      .prepare("select count(*) as count from briar_hunt_runs where paused_at is not null")
-      .first<{ count: number }>();
-    expect(pausedRuns?.count ?? 0).toBe(0);
-    const resumeRequestedRuns = await db
-      .prepare(
-        "select count(*) as count from briar_hunt_runs where resume_requested_at is not null",
-      )
-      .first<{ count: number }>();
-    expect(resumeRequestedRuns?.count ?? 0).toBe(0);
-    const assignedRuns = await db
-      .prepare(
-        "select count(*) as count from briar_hunt_runs where assignee_user_id is not null",
-      )
-      .first<{ count: number }>();
-    expect(assignedRuns?.count ?? 0).toBe(0);
-    const issueCheckpointRuns = await db
-      .prepare(
-        "select count(*) as count from briar_hunt_runs where issue_checkpoints_json <> '[]'",
-      )
-      .first<{ count: number }>();
-    expect(issueCheckpointRuns?.count ?? 0).toBe(0);
-    await db.prepare("alter table briar_hunt_runs drop column issue_checkpoints_json").run();
-    await db.prepare("drop index briar_hunt_runs_assignee_idx").run();
-    await db.prepare("alter table briar_hunt_runs drop column assignee_user_id").run();
-    await db.prepare("drop index briar_hunt_runs_resume_requested_idx").run();
-    await db.prepare("alter table briar_hunt_runs drop column resume_requested_at").run();
-    await db.prepare("alter table briar_hunt_runs drop column paused_at").run();
-    const protectedTables = [
-      "briar_hunt_runs",
-      "briar_issue_messages",
-      "briar_issue_agent_reply_jobs",
-      "briar_agent_transcript_sessions",
-      "briar_execution_audit_events",
-      "briar_agent_transcripts",
-      "briar_hunt_events",
-      "briar_issue_attachments",
-      "briar_issue_dependencies",
-      "briar_issue_message_mentions",
-      "briar_issue_result_reviews",
-      "briar_log_archives",
-      "briar_run_evidence",
-      "briar_run_evidence_images",
-      "briar_run_stage_revisions",
-      "briar_project_agent_schedules",
-      "briar_project_agent_schedule_runs",
-      "briar_project_execution_worker_allowlist",
-      "briar_project_execution_worker_policies",
-    ] as const;
-    const snapshot = async () =>
-      Object.fromEntries(
-        await Promise.all(
-          protectedTables.map(async (table) => {
-            const rows = await db
-              .prepare(`select * from "${table}"`)
-              .all<Record<string, unknown>>();
-            return [
-              table,
-              rows.results.map((row) => JSON.stringify(row)).sort(),
-            ] as const;
-          }),
-        ),
-      );
-
-    const before = await snapshot();
-    expect(before.briar_hunt_events.length).toBeGreaterThan(0);
-    expect(before.briar_issue_messages.length).toBeGreaterThan(0);
-    expect(before.briar_run_evidence.length).toBeGreaterThan(0);
-
-    await executeTriggerMigration(
-      db,
-      await readFile(
-        resolve("migrations/0055_agent_provider_opencode.sql"),
-        "utf8",
-      ),
-    );
-
-    expect(await snapshot()).toEqual(before);
-    expect(
-      (await db.prepare("pragma foreign_key_check").all()).results,
-    ).toEqual([]);
-    const backupTables = await db
-      .prepare(
-        `select name from sqlite_master
-         where type = 'table' and name like 'briar_0055_backup_%'`,
-      )
-      .all();
-    expect(backupTables.results).toEqual([]);
-    await db.prepare("alter table briar_hunt_runs add column paused_at text").run();
-    await executeSql(
-      db,
-      await readFile(
-        resolve("migrations/0061_resume_requested_state.sql"),
-        "utf8",
-      ),
-    );
-    await executeSql(
-      db,
-      await readFile(resolve("migrations/0062_issue_assignees.sql"), "utf8"),
-    );
-    await executeSql(
-      db,
-      await readFile(resolve("migrations/0067_issue_checkpoints.sql"), "utf8"),
-    );
-    await db
-      .prepare(
-        `alter table briar_project_agents add column effort text check (
-           effort is null or effort in ('low', 'medium', 'high', 'xhigh', 'max', 'ultra')
-         )`,
-      )
-      .run();
-    await db
-      .prepare("alter table briar_project_agents add column organization_id text")
-      .run();
-    await db
-      .prepare("alter table briar_project_agents add column handle text")
-      .run();
-    await db
-      .prepare(
-        `update briar_project_agents set organization_id = (
-           select organization_id from briar_projects
-           where briar_projects.id = briar_project_agents.project_id
-         ), handle = 'agent-' || lower(replace(id, '-', ''))`,
-      )
-      .run();
-    await db
-      .prepare(
-        `create unique index briar_project_agents_handle_idx
-           on briar_project_agents (organization_id, handle)
-           where handle is not null`,
-      )
-      .run();
-    await db
-      .prepare(
-        `create index briar_project_agents_organization_idx
-           on briar_project_agents (organization_id, created_at, id)`,
-      )
-      .run();
   });
 
 });

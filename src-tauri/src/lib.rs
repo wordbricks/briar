@@ -264,12 +264,6 @@ struct WorkflowCompletionConfig {
 struct WorkflowExecutionConfig {
     #[serde(default)]
     checkpoints: Vec<WorkflowCheckpointConfig>,
-    // These fields are read-only compatibility inputs. They are deliberately
-    // never serialized after the local config is normalized to v2.
-    #[serde(default, skip_serializing)]
-    pause_after_stage: String,
-    #[serde(default, alias = "stopAfterStage", skip_serializing)]
-    stop_after_stage: String,
 }
 
 #[derive(Serialize)]
@@ -292,12 +286,10 @@ fn repository_workflow_bootstrap() -> WorkflowConfig {
         }],
         execution: WorkflowExecutionConfig {
             checkpoints: vec![WorkflowCheckpointConfig {
-                key: "legacy-after-repository_workflow_pending".to_string(),
+                key: "project-after-repository_workflow_pending".to_string(),
                 stage: "repository_workflow_pending".to_string(),
                 position: WorkflowCheckpointPosition::After,
             }],
-            pause_after_stage: String::new(),
-            stop_after_stage: String::new(),
         },
         completion: WorkflowCompletionConfig {
             required_stages: vec!["repository_workflow_pending".to_string()],
@@ -389,7 +381,7 @@ impl From<AutoHuntConfig> for StoredAutoHuntConfig {
                 extra: BTreeMap::new(),
             }),
             github_repository: config.github_repository,
-            workflow: Some(normalize_workflow_execution(config.workflow)),
+            workflow: Some(canonicalize_workflow(config.workflow)),
             // Worktree and sandbox settings belong to the CLI; callers carry the
             // stored values over instead of letting an app-side save erase them.
             worktrees: None,
@@ -1968,65 +1960,17 @@ fn cli_execution_path(home: &Path) -> Result<OsString, String> {
     cli_execution_path_with_runtime(home, runtime_directories)
 }
 
-fn validate_workflow_compatibility(workflow: &WorkflowConfig) -> Result<(), String> {
-    let pause_stage = workflow.execution.pause_after_stage.trim();
-    let stop_stage = workflow.execution.stop_after_stage.trim();
-    if !pause_stage.is_empty() && !stop_stage.is_empty() && pause_stage != stop_stage {
-        return Err(
-            "워크플로우의 pauseAfterStage와 stopAfterStage가 서로 다른 단계를 가리킵니다."
-                .to_string(),
+fn canonicalize_workflow(mut workflow: WorkflowConfig) -> WorkflowConfig {
+    for checkpoint in &mut workflow.execution.checkpoints {
+        checkpoint.key = format!(
+            "project-{}-{}",
+            match checkpoint.position {
+                WorkflowCheckpointPosition::Before => "before",
+                WorkflowCheckpointPosition::After => "after",
+            },
+            checkpoint.stage
         );
     }
-    if workflow.version == 2 && (!pause_stage.is_empty() || !stop_stage.is_empty()) {
-        return Err(
-            "v2 워크플로우는 pauseAfterStage/stopAfterStage 대신 checkpoints를 사용해야 합니다."
-                .to_string(),
-        );
-    }
-    if let Some(stage) = [pause_stage, stop_stage]
-        .into_iter()
-        .find(|stage| !stage.is_empty())
-    {
-        if !workflow
-            .stages
-            .iter()
-            .any(|candidate| candidate.id == stage)
-        {
-            return Err(format!(
-                "워크플로우의 legacy 실행 단계 '{stage}'를 찾을 수 없습니다."
-            ));
-        }
-    }
-    Ok(())
-}
-
-fn normalize_workflow_execution(mut workflow: WorkflowConfig) -> WorkflowConfig {
-    let legacy_stage = if !workflow.execution.pause_after_stage.trim().is_empty() {
-        Some(workflow.execution.pause_after_stage.trim().to_string())
-    } else if !workflow.execution.stop_after_stage.trim().is_empty() {
-        Some(workflow.execution.stop_after_stage.trim().to_string())
-    } else {
-        None
-    };
-    if workflow.version == 1 {
-        let fallback = legacy_stage
-            .or_else(|| workflow.completion.required_stages.last().cloned())
-            .or_else(|| workflow.stages.last().map(|stage| stage.id.clone()));
-        workflow.execution.checkpoints.clear();
-        if let Some(stage) = fallback {
-            workflow
-                .execution
-                .checkpoints
-                .push(WorkflowCheckpointConfig {
-                    key: format!("legacy-after-{stage}"),
-                    stage,
-                    position: WorkflowCheckpointPosition::After,
-                });
-        }
-        workflow.version = 2;
-    }
-    workflow.execution.pause_after_stage.clear();
-    workflow.execution.stop_after_stage.clear();
     workflow.execution.checkpoints.sort_by_key(|checkpoint| {
         (
             workflow
@@ -2945,6 +2889,7 @@ fn write_cli_connection(
     connection: CliConnectionInput,
     agent_config: LocalProjectAgentConfig,
 ) -> Result<(), String> {
+    validate_generated_workflow(&agent_config.auto_hunt.workflow)?;
     let CliConnectionInput {
         api_url,
         project_id,
@@ -3747,8 +3692,7 @@ fn update_project_workflow_at(
     project_id: &str,
     workflow: WorkflowConfig,
 ) -> Result<WorkflowConfig, String> {
-    validate_workflow_compatibility(&workflow)?;
-    let workflow = normalize_workflow_execution(workflow);
+    let workflow = canonicalize_workflow(workflow);
     validate_generated_workflow(&workflow)?;
     let contents = fs::read_to_string(config_path)
         .map_err(|error| format!("Briar 로컬 설정을 읽지 못했습니다: {error}"))?;
@@ -5212,8 +5156,8 @@ fn project_auto_hunt_workflow_json(config_path: &Path, project_id: &str) -> Resu
     {
         return Err("저장소 기반 워크플로우가 생성되지 않았습니다.".to_string());
     }
-    validate_workflow_compatibility(workflow)?;
-    serde_json::to_string_pretty(&normalize_workflow_execution(workflow.clone()))
+    validate_generated_workflow(workflow)?;
+    serde_json::to_string_pretty(&canonicalize_workflow(workflow.clone()))
         .map_err(|error| format!("프로젝트 워크플로우를 직렬화하지 못했습니다: {error}"))
 }
 
@@ -6704,8 +6648,8 @@ async fn connect_local_project(
         let runner = host::LocalRunner::new(cli_execution_path(&home)?, home.clone());
         let root = git_repository_root(Path::new(&repository_path))?;
         let remote = repository_remote(&root);
-        validate_workflow_compatibility(&auto_hunt.workflow)?;
-        auto_hunt.workflow = normalize_workflow_execution(auto_hunt.workflow);
+        auto_hunt.workflow = canonicalize_workflow(auto_hunt.workflow);
+        validate_generated_workflow(&auto_hunt.workflow)?;
         let workflow = auto_hunt.workflow.clone();
         let root_string = root
             .into_os_string()
@@ -8530,7 +8474,7 @@ branch refs/heads/briar/second-11111111
                 "description": "Match the mobile reference.",
                 "priority": 1,
                 "context": { "customer": "enterprise" },
-                "workflow": { "version": 1 },
+                "workflow": { "version": 2 },
                 "attachments": [{
                     "id": "attachment-1",
                     "filename": "layout.png",
@@ -8706,78 +8650,6 @@ branch refs/heads/briar/second-11111111
         assert!(saved["projects"][1]["autoHunt"]["linearEnabled"].is_null());
 
         fs::remove_dir_all(directory).expect("test config directory should be removed");
-    }
-
-    #[test]
-    fn repairs_an_empty_workflow_execution_boundary_when_connecting() {
-        let config_path = test_config_path("empty-workflow-boundary");
-        let workflow = WorkflowConfig {
-            version: 1,
-            requirements: Vec::new(),
-            stages: vec![
-                WorkflowStageConfig {
-                    id: "analyzing".to_string(),
-                    label: "Analyze".to_string(),
-                    required: true,
-                    evidence: Vec::new(),
-                    checks: Vec::new(),
-                },
-                WorkflowStageConfig {
-                    id: "implementing".to_string(),
-                    label: "Implement".to_string(),
-                    required: true,
-                    evidence: Vec::new(),
-                    checks: Vec::new(),
-                },
-            ],
-            execution: WorkflowExecutionConfig::default(),
-            completion: WorkflowCompletionConfig {
-                required_stages: vec!["analyzing".to_string(), "implementing".to_string()],
-            },
-        };
-
-        write_cli_connection(
-            &config_path,
-            CliConnectionInput {
-                api_url: "https://briar.example.com".to_string(),
-                project_id: "project-1".to_string(),
-                agent_token: "briar_agent_test".to_string(),
-                repository_path: "/repo".to_string(),
-                repository_remote: None,
-            },
-            LocalProjectAgentConfig {
-                llm: agent::ProjectLlmSettings::default(),
-                auto_hunt: AutoHuntConfig {
-                    velen_org: None,
-                    data_source: None,
-                    linear_enabled: false,
-                    linear_source: None,
-                    linear_team: None,
-                    github_repository: None,
-                    workflow,
-                },
-            },
-        )
-        .expect("connection should save");
-
-        let saved: serde_json::Value = serde_json::from_str(
-            &fs::read_to_string(&config_path).expect("saved config should be readable"),
-        )
-        .expect("saved config should be valid json");
-        assert_eq!(
-            saved["projects"][0]["autoHunt"]["workflow"]["execution"]["checkpoints"][0]["key"],
-            "legacy-after-implementing"
-        );
-        assert!(saved["projects"][0]["autoHunt"]["workflow"]["execution"]
-            .get("pauseAfterStage")
-            .is_none());
-
-        fs::remove_dir_all(
-            config_path
-                .parent()
-                .expect("config should have a parent directory"),
-        )
-        .expect("test directory should be removed");
     }
 
     #[test]
@@ -8969,8 +8841,9 @@ branch refs/heads/briar/second-11111111
     "autoHunt": {
       "velenOrg": "wordbricks",
       "workflow": {
-        "version": 1,
+        "version": 2,
         "stages": [{"id":"analyzing","label":"Analyze","required":true}],
+        "execution": {"checkpoints":[]},
         "completion": {"requiredStages":["analyzing"]},
         "release": {"enabled":false}
       }
@@ -8981,7 +8854,6 @@ branch refs/heads/briar/second-11111111
         .expect("test config should be written");
 
         let mut workflow = repository_workflow_bootstrap();
-        workflow.version = 1;
         workflow.stages = vec![WorkflowStageConfig {
             id: "repository_qa".to_string(),
             label: "Repository QA".to_string(),
@@ -8990,7 +8862,11 @@ branch refs/heads/briar/second-11111111
             checks: vec!["cargo test".to_string()],
         }];
         workflow.completion.required_stages = vec!["repository_qa".to_string()];
-        workflow.execution.pause_after_stage = "repository_qa".to_string();
+        workflow.execution.checkpoints = vec![WorkflowCheckpointConfig {
+            key: "project-after-repository_qa".to_string(),
+            stage: "repository_qa".to_string(),
+            position: WorkflowCheckpointPosition::After,
+        }];
 
         update_project_workflow_at(&config_path, "project-1", workflow)
             .expect("workflow should save");
@@ -9008,7 +8884,6 @@ branch refs/heads/briar/second-11111111
         assert!(runtime_workflow.contains("repository_qa"));
         assert!(runtime_workflow.contains("cargo test"));
         assert!(runtime_workflow.contains("\"checkpoints\""));
-        assert!(!runtime_workflow.contains("pauseAfterStage"));
         assert!(!runtime_workflow.contains("\"release\""));
 
         fs::remove_dir_all(directory).expect("test config directory should be removed");
@@ -9089,10 +8964,6 @@ branch refs/heads/briar/second-11111111
             evidence: vec!["pull_request".to_string()],
             checks: Vec::new(),
         });
-        // The pause checkpoint is not an execution boundary. Later stages
-        // still determine which repository tools the worker needs.
-        assert!(workflow_requires_github(&workflow));
-        workflow.execution.pause_after_stage = "pr_open".to_string();
         assert!(workflow_requires_github(&workflow));
         assert_eq!(
             github_repository_from_remote("git@github.com:wordbricks/briar.git"),

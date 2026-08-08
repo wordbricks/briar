@@ -297,7 +297,7 @@ Rules:
 - Return empty evidence or checks arrays when a stage has none; never omit those fields.
 - Mark a stage required only when every successful Auto Hunt task must complete it.
 - completion.requiredStages must contain exactly the ids marked required, in stage order.
-- Use version 2 and express every human-review handoff directly in execution.checkpoints. Never return pauseAfterStage or stopAfterStage.
+- Use version 2 and express every human-review handoff directly in execution.checkpoints.
 - For a fresh workflow, include exactly one checkpoint with key human_review, position after, and the stage after which the worker should wait for human review. When current_workflow_json is supplied, preserve its checkpoint set unless repository evidence or the user's request requires a change.
 - A checkpoint is a handoff boundary, not the completion boundary. Stages after it remain part of the executable workflow and may run after an explicit human resume.
 - Do not invent pull requests, CI, staging, production, deployment, or monitoring. Include them only when repository evidence proves they exist and are usable.

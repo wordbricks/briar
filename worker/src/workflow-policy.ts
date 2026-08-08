@@ -56,13 +56,9 @@ export async function loadWorkflowCheckpointPolicy(
   const workflow = normalizeAutoHuntWorkflow(
     project?.workflow_json ? JSON.parse(project.workflow_json) : undefined,
   );
-  // A null value means the project has never saved the v2 policy editor. Its
-  // existing workflow checkpoints remain the lazy, backwards-compatible
-  // mandatory policy until the first explicit save.
-  const projectMandatory = project?.mandatory_checkpoints_json === null ||
-      project?.mandatory_checkpoints_json === undefined
-    ? [...workflow.execution.checkpoints]
-    : parseCheckpoints(project.mandatory_checkpoints_json);
+  const projectMandatory = parseCheckpoints(
+    project?.mandatory_checkpoints_json ?? "[]",
+  );
   const user = userId
     ? await db
         .prepare(
@@ -123,16 +119,11 @@ export async function assertStoredCheckpointPoliciesCompatible(
       .bind(projectId)
       .all<StoredUserPolicyRow>(),
   ]);
-  // Null is the lazy-upgrade sentinel: the replacement workflow's own
-  // checkpoints become the mandatory policy, so there is no old set to carry.
-  if (project?.mandatory_checkpoints_json !== null &&
-      project?.mandatory_checkpoints_json !== undefined) {
-    canonicalizeCheckpointSet(
-      workflow,
-      parseCheckpoints(project.mandatory_checkpoints_json),
-      "project",
-    );
-  }
+  canonicalizeCheckpointSet(
+    workflow,
+    parseCheckpoints(project?.mandatory_checkpoints_json ?? "[]"),
+    "project",
+  );
   for (const user of users.results) {
     canonicalizeCheckpointSet(
       workflow,

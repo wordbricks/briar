@@ -2070,7 +2070,7 @@ export async function resumeHuntRun(
   token: string,
   projectId: string,
   runId: string,
-  checkpoint?: {
+  checkpoint: {
     key: string;
     attempt: number;
     revision: number;
@@ -2084,13 +2084,9 @@ export async function resumeHuntRun(
       method: "POST",
       body: JSON.stringify({
         requestId,
-        ...(checkpoint
-          ? {
-              checkpointKey: checkpoint.key,
-              attempt: checkpoint.attempt,
-              revision: checkpoint.revision,
-            }
-          : {}),
+        checkpointKey: checkpoint.key,
+        attempt: checkpoint.attempt,
+        revision: checkpoint.revision,
       }),
     },
   );

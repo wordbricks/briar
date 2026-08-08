@@ -155,7 +155,7 @@ describe("GitHub pull request D1 integration", () => {
 
   const createScenario = async (
     checkpoint: Checkpoint = {
-      key: "after-pr-open",
+      key: "project-after-pr_open",
       stage: "pr_open",
       position: "after",
     },
@@ -302,7 +302,7 @@ describe("GitHub pull request D1 integration", () => {
           stages: workflow.stages,
           execution: {
             checkpoints: [{
-              key: "legacy-after-pr_open",
+              key: "project-after-pr_open",
               stage: "pr_open",
               position: "after",
             }],
@@ -929,8 +929,8 @@ describe("GitHub pull request D1 integration", () => {
     });
 
     for (const checkpoint of [
-      { key: "before-pr-open", stage: "pr_open", position: "before" },
-      { key: "after-implementing", stage: "implementing", position: "after" },
+      { key: "project-before-pr_open", stage: "pr_open", position: "before" },
+      { key: "project-after-implementing", stage: "implementing", position: "after" },
     ] as const) {
       const ineligible = await createScenario(checkpoint);
       const pullRequest = await addPullRequestEvidence(ineligible);
@@ -1127,7 +1127,7 @@ describe("GitHub pull request D1 integration", () => {
     });
   });
 
-  it("reconciles a merge that arrived before a legacy run paused", async () => {
+  it("does not infer a checkpoint from a status event after a merge", async () => {
     const scenario = await createScenario();
     await useSinglePullRequestPause(scenario);
     const pullRequest = await addPullRequestEvidence(scenario);
@@ -1144,7 +1144,7 @@ describe("GitHub pull request D1 integration", () => {
       stage: "pr_open",
       status: "running",
       workflowStage: "pr_open",
-      eventKey: `${scenario.sourceKey}:legacy-pr-open`,
+      eventKey: `${scenario.sourceKey}:status-pr-open`,
       occurredAt: pausedAt,
       pullRequestUrls: [pullRequest.url],
     });
@@ -1153,29 +1153,29 @@ describe("GitHub pull request D1 integration", () => {
       getHuntRunForProject(db, scenario.projectId, scenario.runId),
     ).resolves.toMatchObject({
       status: "running",
-      stage: "staging_qa",
-      workflow_stage: "staging_qa",
-      paused_at: pausedAt,
-      resume_requested_at: pausedAt,
+      stage: "pr_open",
+      workflow_stage: "pr_open",
+      paused_at: null,
+      resume_requested_at: null,
       waiting_checkpoint_key: null,
     });
   });
 
-  it("retries legacy reconciliation through an idempotent event replay", async () => {
+  it("keeps status-event replay idempotent without checkpoint identity", async () => {
     const scenario = await createScenario();
     await useSinglePullRequestPause(scenario);
     const pullRequest = await addPullRequestEvidence(scenario);
     const pausedAt = nextTime();
-    const legacyEvent: HuntEventInput = {
+    const statusEvent: HuntEventInput = {
       ...eventFor(scenario.sourceKey),
       stage: "pr_open",
       status: "running",
       workflowStage: "pr_open",
-      eventKey: `${scenario.sourceKey}:retryable-legacy-pr-open`,
+      eventKey: `${scenario.sourceKey}:retryable-status-pr-open`,
       occurredAt: pausedAt,
       pullRequestUrls: [pullRequest.url],
     };
-    await recordHuntEvent(db, scenario.projectId, legacyEvent);
+    await recordHuntEvent(db, scenario.projectId, statusEvent);
     const mergedAt = nextTime();
     const deliveryId = nextDeliveryId();
     await db
@@ -1197,15 +1197,15 @@ describe("GitHub pull request D1 integration", () => {
       .run();
 
     await expect(
-      recordHuntEvent(db, scenario.projectId, legacyEvent),
+      recordHuntEvent(db, scenario.projectId, statusEvent),
     ).resolves.toBe(scenario.runId);
     await expect(
       getHuntRunForProject(db, scenario.projectId, scenario.runId),
     ).resolves.toMatchObject({
-      stage: "staging_qa",
-      workflow_stage: "staging_qa",
-      paused_at: pausedAt,
-      resume_requested_at: mergedAt,
+      stage: "pr_open",
+      workflow_stage: "pr_open",
+      paused_at: null,
+      resume_requested_at: null,
     });
   });
 

@@ -19,7 +19,7 @@ describe("Auto Hunt workflows", () => {
       "repository_workflow_pending",
     ]);
     expect(repositoryWorkflowBootstrap.execution.checkpoints).toEqual([{
-      key: "after-repository-workflow-pending",
+      key: "project-after-repository_workflow_pending",
       stage: "repository_workflow_pending",
       position: "after",
     }]);
