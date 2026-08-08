@@ -137,6 +137,42 @@ describe("scheduled project agent execution", () => {
     });
   });
 
+  it.each(["partial", "blocked", "failed"] as const)(
+    "records a scheduled %s structured result as a failed session",
+    async (outcome) => {
+      const current = dependencies();
+      current.startSession = vi.fn(() => "scheduled-session");
+      current.settleSession = vi.fn();
+      vi.mocked(current.runAgent).mockResolvedValue({
+        conversationId: "agent-conversation",
+        action: "respond",
+        message: `Responsibility returned ${outcome}.`,
+        maxIssues: null,
+        workspaceRoot: "/repo",
+        structuredResult: {
+          summary: `Responsibility returned ${outcome}.`,
+          outcome,
+          importance: "important",
+          urgency: "normal",
+          impact: "project",
+          humanActionRequired: outcome === "blocked",
+          nextAction: outcome === "blocked" ? "Restore access." : null,
+          dueAt: null,
+        },
+      });
+
+      await executeScheduledProjectAgent(current, "token", scheduledRun());
+
+      expect(current.settleSession).toHaveBeenCalledWith(
+        "scheduled-session",
+        expect.objectContaining({
+          status: "failed",
+          summary: `Responsibility returned ${outcome}.`,
+        }),
+      );
+    },
+  );
+
   it("records a failed scheduled Agent session before propagating the error", async () => {
     const current = dependencies();
     current.startSession = vi.fn(() => "scheduled-session");

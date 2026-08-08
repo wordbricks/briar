@@ -2,7 +2,10 @@ import {
   dispatchAutoHuntToWorkers,
   NoQueuedAutoHuntIssuesError,
 } from "./auto-hunt-worker-dispatch";
-import { executeProjectAgentTurn } from "./project-agent-execution";
+import {
+  executeProjectAgentTurn,
+  projectAgentSessionStatusForOutcome,
+} from "./project-agent-execution";
 import { projectAgentRunSnapshots } from "./project-llm";
 import type {
   ProjectAgentRunInput,
@@ -204,7 +207,9 @@ export async function executeScheduledProjectAgent(
     }
     if (sessionId) {
       dependencies.settleSession?.(sessionId, {
-        status: skippedNoQueuedDispatch ? "skipped" : "completed",
+        status: skippedNoQueuedDispatch
+          ? "skipped"
+          : projectAgentSessionStatusForOutcome(result.structuredResult.outcome),
         conversationId: result.conversationId,
         workspaceRoot: result.workspaceRoot,
         summary: result.message,
