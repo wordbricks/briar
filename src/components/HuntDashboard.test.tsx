@@ -479,7 +479,7 @@ describe("HuntDashboard", () => {
     expect(markup).toContain('aria-label="담당자: Jay"');
   });
 
-  it("stacks the assigned worker badge with the active agent avatar", () => {
+  it("stacks the assigned worker avatar with the active agent avatar", () => {
     const run = {
       ...demoDashboard.runs[0],
       workerId: dashboardWorker.id,
@@ -507,7 +507,8 @@ describe("HuntDashboard", () => {
     container.innerHTML = markup;
     expect(
       container.querySelector(".kanban-card-worker-badge .worker-icon"),
-    ).toBeNull();
+    ).not.toBeNull();
+    expect(container.querySelector(".kanban-card-stage-icon")).toBeNull();
     expect(markup).toContain('class="kanban-card-agent-badge"');
     expect(markup).toContain('class="kanban-card-provider-badge codex"');
   });
@@ -534,6 +535,11 @@ describe("HuntDashboard", () => {
     expect(markup).toContain("kanban-card slate has-assignees");
     expect(markup).toContain('class="kanban-card-worker-badge"');
     expect(markup).toContain('aria-label="배정된 Worker: Lemon Worker"');
+    const container = document.createElement("div");
+    container.innerHTML = markup;
+    expect(
+      container.querySelector(".kanban-card-worker-badge .worker-icon"),
+    ).not.toBeNull();
     expect(markup).not.toContain("kanban-card-agent-badge");
   });
 
@@ -562,7 +568,7 @@ describe("HuntDashboard", () => {
     },
   );
 
-  it("keeps the assigned worker badge and omits the workflow-stage icon on completed companion tasks", () => {
+  it("keeps the assigned worker avatar and omits the workflow-stage icon on completed companion tasks", () => {
     const run = {
       ...demoDashboard.runs[0],
       status: "completed" as const,
@@ -583,8 +589,12 @@ describe("HuntDashboard", () => {
 
     expect(markup).toContain('class="kanban-card-worker-badge"');
     expect(markup).toContain('aria-label="배정된 Worker: Lemon Worker"');
-    expect(markup).not.toContain('class="worker-icon"');
-    expect(markup).not.toContain('class="kanban-card-stage-icon"');
+    const container = document.createElement("div");
+    container.innerHTML = markup;
+    expect(
+      container.querySelector(".kanban-card-worker-badge .worker-icon"),
+    ).not.toBeNull();
+    expect(container.querySelector(".kanban-card-stage-icon")).toBeNull();
     expect(markup).not.toContain(">Lemon Worker<");
   });
 
