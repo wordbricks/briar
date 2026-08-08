@@ -16,7 +16,6 @@ import { Inbox } from "./components/Inbox";
 import { InboxDetailPanel } from "./components/InboxDetailPanel";
 import { Channels } from "./components/Channels";
 import { CompanionChannels } from "./components/CompanionChannels";
-import { Ideas } from "./components/Ideas";
 import { InitialOnboarding } from "./components/InitialOnboarding";
 import { InvitationOnboarding } from "./components/InvitationOnboarding";
 import { LaunchIntro } from "./components/LaunchIntro";
@@ -98,6 +97,7 @@ import {
   listChannels,
   loadDashboard,
   loadProjectAgents,
+  runProjectAgentTaskOnWorker,
   retryHuntRun,
 } from "./lib/api";
 import type { ChannelSummary } from "./lib/channels-contract";
@@ -122,7 +122,6 @@ type ActivePage =
   | "issues"
   | "agents"
   | "channels"
-  | "ideas"
   | "schedule"
   | "inbox"
   | "organization-create"
@@ -427,6 +426,15 @@ export function App() {
     useState<InboxNotificationTarget | null>(null);
   useInboxNotificationClicks(setPendingInboxNotificationTarget);
   const [requestedRunId, setRequestedRunId] = useState<string | null>(null);
+  const [requestedChannelMessage, setRequestedChannelMessage] = useState<{
+    channelId: string;
+    messageId: string;
+    rootMessageId: string;
+  } | null>(null);
+  const clearRequestedChannelMessage = useCallback(
+    () => setRequestedChannelMessage(null),
+    [],
+  );
   const [issueListRequestKey, setIssueListRequestKey] = useState(0);
   const [requestedSessionId, setRequestedSessionId] = useState<string | null>(
     null,
@@ -446,7 +454,7 @@ export function App() {
   >(null);
   const [dispatchRun, setDispatchRun] = useState<HuntRun | null>(null);
   const [companionPage, setCompanionPage] = useState<
-    "issues" | "agents" | "ideas" | "home" | "inbox" | "settings"
+    "issues" | "agents" | "home" | "inbox" | "settings"
   >("issues");
   const [companionStatus, setCompanionStatus] =
     useState<CompanionStatusFilter>("all");
@@ -525,6 +533,19 @@ export function App() {
       } else {
         navigateToPage("issues");
       }
+    } else if (pendingInboxNotificationTarget.kind === "channel") {
+      const { channelMessageId, rootMessageId } = pendingInboxNotificationTarget;
+      if (!channelMessageId || !rootMessageId) return;
+      setRequestedRunId(null);
+      setRequestedSessionId(null);
+      setRequestedChannelMessage({
+        channelId: pendingInboxNotificationTarget.targetId,
+        messageId: channelMessageId,
+        rootMessageId,
+      });
+      setActiveChannelId(pendingInboxNotificationTarget.targetId);
+      if (briar.companionMode) setCompanionPage("home");
+      else navigateToPage("channels");
     } else {
       setRequestedRunId(null);
       setRequestedSessionId(pendingInboxNotificationTarget.targetId);
@@ -779,6 +800,35 @@ export function App() {
     rememberIssueAgent(agent);
     return dispatchAgentAutoHunt(activeProject.id, agent, runs, options);
   };
+
+  const startProjectAgentTask = useCallback(async (
+    agent: ProjectAgent,
+    input: { request: string; workerId: string },
+  ) => {
+    if (!activeProject || !briar.token) {
+      throw new Error("로그인이 필요합니다.");
+    }
+    const session = await runProjectAgentTaskOnWorker(
+      briar.token,
+      activeProject.id,
+      {
+        agentId: agent.id,
+        request: input.request,
+        workerId: input.workerId,
+      },
+    );
+    autoHunt.adoptRemoteSession(session);
+    if (activeProject.id === briar.activeProjectId) {
+      await briar.refresh();
+    }
+    return session.id;
+  }, [
+    activeProject,
+    autoHunt.adoptRemoteSession,
+    briar.activeProjectId,
+    briar.refresh,
+    briar.token,
+  ]);
 
   useEffect(() => {
     if (!runsOnDesktopTauri || !briar.token || plannedUpdateRecoveryRef.current) {
@@ -1071,7 +1121,6 @@ export function App() {
               navigateToPage("agents");
             }}
             onAgentsOpen={() => navigateToPage("agents")}
-            onIdeasOpen={() => navigateToPage("ideas")}
             onScheduleOpen={() => navigateToPage("schedule")}
             onInboxOpen={() => navigateToPage("inbox")}
             onChannelCreate={
@@ -1339,6 +1388,7 @@ export function App() {
               autoHunt.settleTaskSession(sessionId, settlement)}
             onStopSession={(sessionId) => autoHunt.stopSession(sessionId)}
             onStart={startAgentAutoHunt}
+            onStartRemoteTask={startProjectAgentTask}
             onStartTaskSession={(agent, session) => {
               rememberIssueAgent(agent);
               autoHunt.startTaskSession(activeProject.id, agent.id, session);
@@ -1365,15 +1415,13 @@ export function App() {
             onChannelsChange={setOrganizationChannels}
             organizationId={briar.activeOrganizationId}
             token={briar.token}
+            requestedMessage={requestedChannelMessage}
+            onRequestedMessageOpen={clearRequestedChannelMessage}
             onCreateAgent={() => {
-              if (activeProject) navigateToPage("agents");
-            }}
-            onAddPeople={() => {
-              if (!briar.activeOrganizationId) return;
               setSettingsTarget({
                 scope: "organization",
-                organizationId: briar.activeOrganizationId,
-                section: "members",
+                organizationId: briar.activeOrganizationId!,
+                section: "agents",
               });
               setIsSidebarOpen(true);
               navigateToPage("settings");
@@ -1384,17 +1432,7 @@ export function App() {
               navigateToPage("issues");
             }}
           />
-        ) : activePage === "ideas" && featureFlags.ideas && activeProject ? (
-          <Ideas
-            isSidebarOpen={isSidebarOpen}
-            onIssuesCreated={(runIds) => {
-              setRequestedRunId(runIds[0] ?? null);
-              setIssueListRequestKey((key) => key + 1);
-              navigateToPage("issues");
-            }}
-            projectId={activeProject.id}
-            token={briar.token}
-          />
+
         ) : (
           <HuntDashboard
             agents={activeProjectAgents}
@@ -1442,6 +1480,8 @@ export function App() {
             onResumeRun={briar.resumeRun}
             onRequestedRunOpen={() => setRequestedRunId(null)}
             onSendIssueMessage={sendIssueMessage}
+            onEditIssueMessage={briar.updateIssueMessage}
+            onDeleteIssueMessage={briar.removeIssueMessage}
             processingIssueIds={processingIssueIds}
             projects={activeOrganizationProjects}
             sessions={autoHunt.sessions}
@@ -1704,11 +1744,19 @@ export function App() {
               organizationId={briar.activeOrganizationId}
               projects={activeOrganizationProjects}
               token={briar.token}
+              requestedMessage={requestedChannelMessage}
+              onRequestedMessageOpen={clearRequestedChannelMessage}
+              onIssueOpen={(projectId, runId) => {
+                briar.setActiveProjectId(projectId);
+                setRequestedRunId(runId);
+                setIssueListRequestKey((key) => key + 1);
+                setCompanionStatus("all");
+                setCompanionPage("issues");
+              }}
             />
             <CompanionBottomNavigation
               activeDestination="home"
               onAgentsOpen={() => setCompanionPage("agents")}
-              onIdeasOpen={() => setCompanionPage("ideas")}
               onInboxOpen={() => setCompanionPage("inbox")}
               onHomeOpen={() => {}}
               onStatusChange={(status) => {
@@ -1736,33 +1784,7 @@ export function App() {
             <CompanionBottomNavigation
               activeDestination="inbox"
               onAgentsOpen={() => setCompanionPage("agents")}
-              onIdeasOpen={() => setCompanionPage("ideas")}
               onInboxOpen={() => {}}
-              onHomeOpen={() => setCompanionPage("home")}
-              onStatusChange={(status) => {
-                setCompanionStatus(status);
-                setCompanionPage("issues");
-              }}
-              unreadInboxCount={inbox.unreadCount}
-            />
-          </>
-        ) : companionPage === "ideas" && featureFlags.ideas && activeProject ? (
-          <>
-            <Ideas
-              isSidebarOpen
-              onIssuesCreated={(runIds) => {
-                setRequestedRunId(runIds[0] ?? null);
-                setCompanionStatus("all");
-                setCompanionPage("issues");
-              }}
-              projectId={activeProject.id}
-              token={briar.token}
-            />
-            <CompanionBottomNavigation
-              activeDestination="ideas"
-              onAgentsOpen={() => setCompanionPage("agents")}
-              onIdeasOpen={() => {}}
-              onInboxOpen={() => setCompanionPage("inbox")}
               onHomeOpen={() => setCompanionPage("home")}
               onStatusChange={(status) => {
                 setCompanionStatus(status);
@@ -1789,6 +1811,7 @@ export function App() {
                 autoHunt.settleTaskSession(sessionId, settlement)}
               onStopSession={(sessionId) => autoHunt.stopSession(sessionId)}
               onStart={startAgentAutoHunt}
+              onStartRemoteTask={startProjectAgentTask}
               onStartTaskSession={(agent, session) => {
                 rememberIssueAgent(agent);
                 autoHunt.startTaskSession(activeProject.id, agent.id, session);
@@ -1801,7 +1824,6 @@ export function App() {
             <CompanionBottomNavigation
               activeDestination="agents"
               onAgentsOpen={() => {}}
-              onIdeasOpen={() => setCompanionPage("ideas")}
               onInboxOpen={() => setCompanionPage("inbox")}
               onHomeOpen={() => setCompanionPage("home")}
               onStatusChange={(status) => {
@@ -1829,7 +1851,6 @@ export function App() {
             requestedRunId={requestedRunId}
             isSidebarOpen
             onCompanionAgentsOpen={() => setCompanionPage("agents")}
-            onCompanionIdeasOpen={() => setCompanionPage("ideas")}
             onCompanionInboxOpen={() => setCompanionPage("inbox")}
             onCompanionHomeOpen={() => setCompanionPage("home")}
             onCompanionStatusChange={(status) => {
@@ -1865,6 +1886,8 @@ export function App() {
             onUnassignRun={(runId) => briar.unassignRun(activeProject?.id ?? "", runId)}
             onResumeRun={briar.resumeRun}
             onSendIssueMessage={sendIssueMessage}
+            onEditIssueMessage={briar.updateIssueMessage}
+            onDeleteIssueMessage={briar.removeIssueMessage}
             processingIssueIds={processingIssueIds}
             projects={activeOrganizationProjects}
             sessions={autoHunt.sessions}

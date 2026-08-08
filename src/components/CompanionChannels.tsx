@@ -18,6 +18,7 @@ import {
   useState,
 } from "react";
 import {
+  acceptChannelProposal,
   listChannelMessages,
   listChannels,
   loadChannel,
@@ -39,7 +40,22 @@ import {
   retainedMentions,
   type MentionTarget,
 } from "../lib/channel-mentions";
+import {
+  dataTransferHasFiles,
+  filesFromDataTransfer,
+  maxIssueAttachmentCount,
+  normalizeIssueAttachmentFile,
+  validateIssueAttachments,
+} from "../lib/issue-attachments";
 import { useI18n } from "../i18n";
+import {
+  ChannelDraftImages,
+  ChannelMessageImages,
+  channelBodyWithImages,
+  draftChannelImage,
+  type DraftChannelImage,
+} from "./ChannelImages";
+import { ChannelMessageText } from "./ChannelMessageText";
 
 type CompanionChannelsProps = {
   organizationId: string;
@@ -47,6 +63,13 @@ type CompanionChannelsProps = {
   currentUserId: string | null;
   projects: readonly ChannelGroupProject[];
   token: string;
+  onIssueOpen?: (projectId: string, runId: string) => void;
+  requestedMessage?: {
+    channelId: string;
+    messageId: string;
+    rootMessageId: string;
+  } | null;
+  onRequestedMessageOpen?: () => void;
 };
 
 /**
@@ -60,6 +83,9 @@ export function CompanionChannels({
   currentUserId,
   projects,
   token,
+  onIssueOpen,
+  requestedMessage,
+  onRequestedMessageOpen,
 }: CompanionChannelsProps) {
   const { t } = useI18n();
   const [channels, setChannels] = useState<ChannelSummary[]>([]);
@@ -72,6 +98,9 @@ export function CompanionChannels({
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [proposalProjects, setProposalProjects] = useState<
+    Record<string, string>
+  >({});
 
   useEffect(() => {
     let cancelled = false;
@@ -149,8 +178,68 @@ export function CompanionChannels({
     [channel, organizationId, token],
   );
 
+  useEffect(() => {
+    if (!requestedMessage) return;
+    const summary = channels.find(
+      (candidate) => candidate.id === requestedMessage.channelId,
+    );
+    if (!summary) return;
+    let cancelled = false;
+    setLoading(true);
+    void (async () => {
+      try {
+        const result = await loadChannel(token, organizationId, summary.id);
+        if (cancelled) return;
+        setChannel(result.channel);
+        setMessages(result.messages);
+        setMembers(result.members);
+        setAgents(result.agents);
+        if (requestedMessage.rootMessageId !== requestedMessage.messageId) {
+          const threadResult = await listChannelMessages(
+            token,
+            organizationId,
+            summary.id,
+            requestedMessage.rootMessageId,
+          );
+          if (cancelled) return;
+          setThreadParentId(requestedMessage.rootMessageId);
+          setThread(threadResult.messages);
+        } else {
+          setThreadParentId(null);
+          setThread(null);
+        }
+        window.requestAnimationFrame(() => {
+          document
+            .querySelector(
+              `[data-companion-channel-message-id="${requestedMessage.messageId}"]`,
+            )
+            ?.scrollIntoView({ block: "center" });
+          onRequestedMessageOpen?.();
+        });
+      } catch (cause) {
+        if (!cancelled) setError(message(cause));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    channels,
+    onRequestedMessageOpen,
+    organizationId,
+    requestedMessage,
+    token,
+  ]);
+
   const send = useCallback(
-    async (body: string, mentions: MentionTarget[]) => {
+    async (
+      body: string,
+      mentions: MentionTarget[],
+      attachments: File[],
+      attachmentReferences: string[],
+    ) => {
       if (!channel || !body.trim()) return;
       setBusy(true);
       try {
@@ -163,6 +252,8 @@ export function CompanionChannels({
           mentionedAgentIds: mentions
             .filter((mention) => mention.type === "agent")
             .map((mention) => mention.id),
+          attachments,
+          attachmentReferences,
         });
         if (threadParentId) {
           setThread((current) => [...(current ?? []), result.message]);
@@ -176,6 +267,49 @@ export function CompanionChannels({
       }
     },
     [channel, organizationId, threadParentId, token],
+  );
+
+  const acceptProposal = useCallback(
+    async (item: ChannelMessage) => {
+      if (!channel || !item.proposal) return;
+      const proposalId = item.proposal.id;
+      const projectId =
+        proposalProjects[item.proposal.id] ??
+        item.proposal.projectId ??
+        channel.defaultProjectId;
+      if (!projectId) return;
+      setBusy(true);
+      setError(null);
+      try {
+        const result = await acceptChannelProposal(
+          token,
+          organizationId,
+          channel.id,
+          proposalId,
+          projectId,
+        );
+        const applyResult = (candidate: ChannelMessage): ChannelMessage => {
+          if (candidate.proposal?.id !== proposalId) return candidate;
+          return {
+            ...candidate,
+            proposal: {
+              ...candidate.proposal,
+              status: "accepted",
+              projectId: result.projectId,
+              resultRunId: result.resultRunId,
+            },
+          };
+        };
+        setMessages((current) => current.map(applyResult));
+        setThread((current) => current?.map(applyResult) ?? null);
+        onIssueOpen?.(result.projectId, result.resultRunId);
+      } catch (cause) {
+        setError(message(cause));
+      } finally {
+        setBusy(false);
+      }
+    },
+    [channel, onIssueOpen, organizationId, proposalProjects, token],
   );
 
   if (channel && threadParentId) {
@@ -192,7 +326,29 @@ export function CompanionChannels({
         <div className="companion-channel-messages">
           {loading && !thread ? <Spinner /> : null}
           {(thread ?? []).map((item) => (
-            <MessageRow key={item.id} message={item} />
+            <MessageRow
+              agents={agents}
+              busy={busy}
+              channel={channel}
+              key={item.id}
+              members={members}
+              message={item}
+              onAcceptProposal={() => void acceptProposal(item)}
+              onIssueOpen={onIssueOpen}
+              onProjectChange={(projectId) => {
+                const proposalId = item.proposal?.id;
+                if (!proposalId) return;
+                setProposalProjects((current) => ({
+                  ...current,
+                  [proposalId]: projectId,
+                }));
+              }}
+              projects={projects}
+              selectedProjectId={
+                item.proposal ? proposalProjects[item.proposal.id] ?? null : null
+              }
+              token={token}
+            />
           ))}
         </div>
         <CompanionChannelComposer
@@ -221,15 +377,31 @@ export function CompanionChannels({
         <div className="companion-channel-messages">
           {loading && messages.length === 0 ? <Spinner /> : null}
           {messages.map((item) => (
-            <button
-              aria-label={`${t("run.viewThread")}: ${item.author.name} — ${item.body}`}
-              className="companion-channel-message-button"
+            <MessageRow
+              agents={agents}
+              busy={busy}
+              channel={channel}
               key={item.id}
-              onClick={() => void openThread(item)}
-              type="button"
-            >
-              <MessageRow message={item} showThreadSummary />
-            </button>
+              members={members}
+              message={item}
+              onAcceptProposal={() => void acceptProposal(item)}
+              onIssueOpen={onIssueOpen}
+              onOpenThread={() => void openThread(item)}
+              onProjectChange={(projectId) => {
+                const proposalId = item.proposal?.id;
+                if (!proposalId) return;
+                setProposalProjects((current) => ({
+                  ...current,
+                  [proposalId]: projectId,
+                }));
+              }}
+              projects={projects}
+              selectedProjectId={
+                item.proposal ? proposalProjects[item.proposal.id] ?? null : null
+              }
+              showThreadSummary
+              token={token}
+            />
           ))}
           {!loading && messages.length === 0 ? (
             <p className="companion-channel-empty">
@@ -307,15 +479,47 @@ function ChannelBar({
 }
 
 function MessageRow({
+  agents,
+  busy,
+  channel,
+  members,
   message,
+  onAcceptProposal,
+  onIssueOpen,
+  onOpenThread,
+  onProjectChange,
+  projects,
+  selectedProjectId,
   showThreadSummary = false,
+  token,
 }: {
+  agents: ChannelAgentSummary[];
+  busy: boolean;
+  channel: ChannelSummary;
+  members: ChannelMember[];
   message: ChannelMessage;
+  onAcceptProposal: () => void;
+  onIssueOpen?: (projectId: string, runId: string) => void;
+  onOpenThread?: () => void;
+  onProjectChange: (projectId: string) => void;
+  projects: readonly ChannelGroupProject[];
+  selectedProjectId: string | null;
   showThreadSummary?: boolean;
+  token: string;
 }) {
   const { localeTag, t } = useI18n();
+  const proposalProjectId =
+    selectedProjectId ?? message.proposal?.projectId ?? channel.defaultProjectId;
+  const needsProject =
+    message.proposal?.status === "pending" && !message.proposal.projectId &&
+    !channel.defaultProjectId;
+  const acceptedProjectId = message.proposal?.projectId;
+  const acceptedRunId = message.proposal?.resultRunId;
   return (
-    <article className="companion-channel-message">
+    <article
+      className="companion-channel-message"
+      data-companion-channel-message-id={message.id}
+    >
       <MessageAvatar message={message} />
       <div className="companion-channel-message-copy">
         <header>
@@ -328,17 +532,76 @@ function MessageRow({
             })}
           </time>
         </header>
-        <p>{message.body}</p>
+        <ChannelMessageText agents={agents} members={members} message={message} />
+        <ChannelMessageImages
+          attachments={message.attachments}
+          interactive={!showThreadSummary}
+          token={token}
+        />
         {message.document ? (
           <span className="companion-channel-document">
             <FileText size={13} />
             {message.document.title}
           </span>
         ) : null}
-        {showThreadSummary && message.replyCount > 0 ? (
-          <span className="companion-channel-thread-summary">
+        {message.proposal ? (
+          <div className="companion-channel-proposal">
+            <div className="companion-channel-proposal-copy">
+              <strong>{t("channel.issueProposal")}</strong>
+              <span>
+                {message.proposal.status === "accepted"
+                  ? t("channel.issueProposalAccepted")
+                  : t("channel.issueProposalPending")}
+              </span>
+            </div>
+            {needsProject ? (
+              <select
+                aria-label={t("channel.selectProposalProject")}
+                disabled={busy}
+                onChange={(event) => onProjectChange(event.currentTarget.value)}
+                value={selectedProjectId ?? ""}
+              >
+                <option disabled value="">
+                  {t("channel.selectProposalProject")}
+                </option>
+                {projects.map((project) => (
+                  <option key={project.id} value={project.id}>
+                    {project.name}
+                  </option>
+                ))}
+              </select>
+            ) : null}
+            {message.proposal.status === "pending" ? (
+              <button
+                disabled={busy || !proposalProjectId}
+                onClick={onAcceptProposal}
+                type="button"
+              >
+                {t("channel.createIssue")}
+              </button>
+            ) : acceptedProjectId && acceptedRunId && onIssueOpen ? (
+              <button
+                onClick={() => onIssueOpen(acceptedProjectId, acceptedRunId)}
+                type="button"
+              >
+                {t("channel.viewIssue")}
+              </button>
+            ) : null}
+          </div>
+        ) : null}
+        {showThreadSummary && onOpenThread ? (
+          <button
+            aria-label={`${t("run.viewThread")}: ${message.author.name} — ${message.body}`}
+            className="companion-channel-message-button companion-channel-thread-summary"
+            onClick={onOpenThread}
+            type="button"
+          >
             <MessageSquare size={14} />
-            <strong>{t("run.replies", { count: message.replyCount })}</strong>
+            <strong>
+              {message.replyCount > 0
+                ? t("run.replies", { count: message.replyCount })
+                : t("channel.replyInThread")}
+            </strong>
             {message.lastReplyAt ? (
               <small>
                 · {t("companion.channelLastReply", {
@@ -346,7 +609,7 @@ function MessageRow({
                 })}
               </small>
             ) : null}
-          </span>
+          </button>
         ) : null}
       </div>
     </article>
@@ -389,7 +652,12 @@ export function CompanionChannelComposer({
   busy: boolean;
   currentUserId: string | null;
   members: ChannelMember[];
-  onSend: (body: string, mentions: MentionTarget[]) => void;
+  onSend: (
+    body: string,
+    mentions: MentionTarget[],
+    attachments: File[],
+    attachmentReferences: string[],
+  ) => void;
 }) {
   const { t } = useI18n();
   const [body, setBody] = useState("");
@@ -397,7 +665,11 @@ export function CompanionChannelComposer({
   const [mentions, setMentions] = useState<MentionTarget[]>([]);
   const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(0);
   const [mentionDismissed, setMentionDismissed] = useState(false);
+  const [images, setImages] = useState<DraftChannelImage[]>([]);
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
+  const [dragging, setDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const attachmentInputRef = useRef<HTMLInputElement | null>(null);
   const pendingCaret = useRef<number | null>(null);
   const mentionListId = useId();
   const candidates = useMemo<MentionTarget[]>(
@@ -460,14 +732,63 @@ export function CompanionChannelComposer({
     );
   };
 
+  const addImages = (files: readonly File[]) => {
+    const normalized = files.map(normalizeIssueAttachmentFile);
+    if (
+      normalized.length === 0 ||
+      normalized.some((file) => !file.type.startsWith("image/"))
+    ) {
+      setAttachmentError(t("channel.imageOnly"));
+      return;
+    }
+    const next = [...images, ...normalized.map(draftChannelImage)];
+    const validationError = validateIssueAttachments(
+      next.map((image) => image.file),
+    );
+    if (validationError) {
+      setAttachmentError(validationError);
+      return;
+    }
+    setImages(next);
+    setAttachmentError(null);
+  };
+
   return (
     <form
-      className="companion-channel-composer"
+      className={`companion-channel-composer${dragging ? " is-dragging" : ""}`}
+      onDragEnter={(event) => {
+        if (!dataTransferHasFiles(event.dataTransfer)) return;
+        event.preventDefault();
+        setDragging(true);
+      }}
+      onDragOver={(event) => {
+        if (!dataTransferHasFiles(event.dataTransfer)) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = "copy";
+        setDragging(true);
+      }}
+      onDragLeave={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+          setDragging(false);
+        }
+      }}
+      onDrop={(event) => {
+        if (!dataTransferHasFiles(event.dataTransfer)) return;
+        event.preventDefault();
+        setDragging(false);
+        addImages(filesFromDataTransfer(event.dataTransfer));
+      }}
       onSubmit={(event) => {
         event.preventDefault();
-        if (!body.trim() || busy) return;
-        onSend(body, retainedMentions(body, mentions));
+        if ((!body.trim() && images.length === 0) || busy) return;
+        onSend(
+          channelBodyWithImages(body, images),
+          retainedMentions(body, mentions),
+          images.map((image) => image.file),
+          images.map((image) => image.reference),
+        );
         setBody("");
+        setImages([]);
         setMentions([]);
         setMentionDismissed(false);
       }}
@@ -511,9 +832,24 @@ export function CompanionChannelComposer({
           ))}
         </ul>
       ) : null}
-      <span aria-hidden="true" className="companion-channel-composer-add">
+      <ChannelDraftImages
+        images={images}
+        onRemove={(reference) => {
+          setImages((current) =>
+            current.filter((image) => image.reference !== reference),
+          );
+          setAttachmentError(null);
+        }}
+      />
+      <button
+        aria-label={t("channel.toolAttach")}
+        className="companion-channel-composer-add"
+        disabled={busy || images.length >= maxIssueAttachmentCount}
+        onClick={() => attachmentInputRef.current?.click()}
+        type="button"
+      >
         <Plus size={20} />
-      </span>
+      </button>
       <input
         aria-activedescendant={
           showsSuggestions
@@ -553,15 +889,38 @@ export function CompanionChannelComposer({
           }
         }}
         onKeyUp={(event) => setCaret(event.currentTarget.selectionStart ?? 0)}
+        onPaste={(event) => {
+          const pasted = filesFromDataTransfer(event.clipboardData).filter(
+            (file) => file.type.startsWith("image/"),
+          );
+          if (pasted.length === 0) return;
+          event.preventDefault();
+          addImages(pasted);
+        }}
         placeholder={t("companion.channelMessagePlaceholder")}
         ref={inputRef}
         role="combobox"
         value={body}
       />
-      {body.trim() ? (
+      <input
+        accept="image/*"
+        className="channel-composer-file-input"
+        disabled={busy || images.length >= maxIssueAttachmentCount}
+        multiple
+        onChange={(event) => {
+          addImages(Array.from(event.currentTarget.files ?? []));
+          event.currentTarget.value = "";
+        }}
+        ref={attachmentInputRef}
+        type="file"
+      />
+      {body.trim() || images.length > 0 ? (
         <button aria-label={t("run.sendMessage")} disabled={busy} type="submit">
           <Send size={16} />
         </button>
+      ) : null}
+      {attachmentError ? (
+        <p className="channel-composer-error">{attachmentError}</p>
       ) : null}
     </form>
   );

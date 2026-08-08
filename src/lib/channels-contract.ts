@@ -29,6 +29,9 @@ export const channelReplyStatuses = [
 ] as const;
 export type ChannelReplyStatus = (typeof channelReplyStatuses)[number];
 
+export const channelReplyClaimTokenHeader =
+  "X-Briar-Channel-Claim-Token";
+
 export const channelSlugSchema = z
   .string()
   .trim()
@@ -169,11 +172,10 @@ export type ChannelMessageAuthor =
       provider: ChannelAgentProvider | null;
     };
 
+/** A plan document written by an Agent, stored on the channel message itself. */
 export type ChannelMessageDocument = {
-  ideaId: string;
+  messageId: string;
   title: string;
-  status: string;
-  version: number;
   projectId: string | null;
 };
 
@@ -184,7 +186,14 @@ export type ChannelMessageProposal = {
   projectId: string | null;
   payload: unknown;
   resultRunId: string | null;
-  resultIdeaId: string | null;
+};
+
+export type ChannelMessageAttachment = {
+  id: string;
+  filename: string;
+  contentType: string;
+  byteSize: number;
+  url: string;
 };
 
 export type ChannelMessage = {
@@ -195,6 +204,7 @@ export type ChannelMessage = {
   body: string;
   mentionedUserIds: string[];
   mentionedAgentIds: string[];
+  attachments: ChannelMessageAttachment[];
   replyCount: number;
   lastReplyAt: string | null;
   document: ChannelMessageDocument | null;

@@ -35,12 +35,6 @@ enum MobileAPIContract {
             "\(dashboard(projectID: projectID))/delta?cursor=\(cursor)"
         }
 
-        static func ideas(projectID: UUID) -> String { "/projects/\(projectID.uuidString.lowercased())/ideas" }
-        static func idea(projectID: UUID, ideaID: UUID) -> String { "\(ideas(projectID: projectID))/\(ideaID.uuidString.lowercased())" }
-        static func ideaMessages(projectID: UUID, ideaID: UUID) -> String { "\(idea(projectID: projectID, ideaID: ideaID))/messages" }
-        static func ideaPlan(projectID: UUID, ideaID: UUID) -> String { "\(idea(projectID: projectID, ideaID: ideaID))/plan" }
-        static func ideaConvert(projectID: UUID, ideaID: UUID) -> String { "\(idea(projectID: projectID, ideaID: ideaID))/convert" }
-        static func ideaJobRetry(projectID: UUID, ideaID: UUID, jobID: UUID) -> String { "\(idea(projectID: projectID, ideaID: ideaID))/jobs/\(jobID.uuidString.lowercased())/retry" }
 
         static func channels(organizationID: UUID) -> String {
             "/organizations/\(organizationID.uuidString.lowercased())/channels"
@@ -58,6 +52,14 @@ enum MobileAPIContract {
             let base = "\(channel(organizationID: organizationID, channelID: channelID))/messages"
             guard let parentMessageID else { return base }
             return "\(base)?parentMessageId=\(parentMessageID.uuidString.lowercased())"
+        }
+
+        static func acceptChannelProposal(
+            organizationID: UUID,
+            channelID: UUID,
+            proposalID: UUID
+        ) -> String {
+            "\(channel(organizationID: organizationID, channelID: channelID))/proposals/\(proposalID.uuidString.lowercased())/accept"
         }
 
         static func runEvents(projectID: UUID, runID: UUID) -> String {
@@ -126,6 +128,14 @@ enum MobileAPIContract {
 
         static func projectAgentSessions(projectID: UUID) -> String {
             "/projects/\(projectID.uuidString.lowercased())/agent-sessions"
+        }
+
+        static func projectAgentTasks(projectID: UUID) -> String {
+            "/projects/\(projectID.uuidString.lowercased())/agent-tasks"
+        }
+
+        static func projectAgentSession(projectID: UUID, sessionID: String) -> String {
+            "\(projectAgentSessions(projectID: projectID))/\(sessionID)"
         }
     }
 }

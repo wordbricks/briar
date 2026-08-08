@@ -11,6 +11,10 @@ import {
   isWorkerEmoji,
   isWorkerLogoDataUrl,
 } from "../../src/lib/worker-icon-validation";
+import {
+  compareSemanticVersions,
+  isSemanticVersion,
+} from "../../src/lib/semantic-version";
 
 export type ExecutionWorkerState = "online" | "stale" | "disabled";
 export type ExecutionWorkerReadiness = "ready" | "busy" | "needs_attention";
@@ -91,6 +95,9 @@ export type OrganizationExecutionWorker = {
   activeSessions: number;
   lastHeartbeatAt: string;
   createdAt: string;
+  versions: Record<string, string>;
+  remoteUpdateSupported: boolean;
+  updateRequest: ExecutionWorkerUpdateRequest | null;
   bindings: Array<{
     id: string;
     projectId: string;
@@ -104,6 +111,124 @@ export type OrganizationExecutionWorker = {
     readinessDetail: string | null;
   }>;
 };
+
+export type ExecutionWorkerUpdateRequest = {
+  id: string;
+  targetVersion: string;
+  status: "requested" | "completed" | "cancelled";
+  requestedAt: string;
+};
+
+type ExecutionWorkerUpdateRequestRow = {
+  id: string;
+  organization_id: string;
+  device_id: string;
+  requested_by_user_id: string;
+  target_version: string;
+  status: "requested" | "completed" | "cancelled";
+  requested_at: string;
+  updated_at: string;
+  completed_at: string | null;
+};
+
+const updateRequestJson = (
+  row: Pick<
+    ExecutionWorkerUpdateRequestRow,
+    "id" | "target_version" | "status" | "requested_at"
+  >,
+): ExecutionWorkerUpdateRequest => ({
+  id: row.id,
+  targetVersion: row.target_version,
+  status: row.status,
+  requestedAt: row.requested_at,
+});
+
+export async function pendingExecutionWorkerUpdate(
+  db: D1Database,
+  deviceId: string,
+): Promise<ExecutionWorkerUpdateRequest | null> {
+  const row = await db
+    .prepare(
+      `select id, target_version, status, requested_at
+       from briar_execution_worker_update_requests
+       where device_id = ? and status = 'requested'
+       order by requested_at desc limit 1`,
+    )
+    .bind(deviceId)
+    .first<Pick<
+      ExecutionWorkerUpdateRequestRow,
+      "id" | "target_version" | "status" | "requested_at"
+    >>();
+  return row ? updateRequestJson(row) : null;
+}
+
+export async function requestExecutionWorkerUpdate(
+  db: D1Database,
+  input: {
+    id: string;
+    organizationId: string;
+    deviceId: string;
+    requestedByUserId: string;
+    targetVersion: string;
+    requestedAt: string;
+  },
+): Promise<ExecutionWorkerUpdateRequest> {
+  const pending = await pendingExecutionWorkerUpdate(db, input.deviceId);
+  if (pending) return pending;
+  const inserted = await db
+    .prepare(
+      `insert into briar_execution_worker_update_requests (
+         id, organization_id, device_id, requested_by_user_id,
+         target_version, status, requested_at, updated_at
+       ) values (?, ?, ?, ?, ?, 'requested', ?, ?)
+       on conflict do nothing`,
+    )
+    .bind(
+      input.id,
+      input.organizationId,
+      input.deviceId,
+      input.requestedByUserId,
+      input.targetVersion,
+      input.requestedAt,
+      input.requestedAt,
+    )
+    .run();
+  if (inserted.meta.changes < 1) {
+    const concurrent = await pendingExecutionWorkerUpdate(db, input.deviceId);
+    if (concurrent) return concurrent;
+    throw new WorkerConflictError("Worker update request changed");
+  }
+  return {
+    id: input.id,
+    targetVersion: input.targetVersion,
+    status: "requested",
+    requestedAt: input.requestedAt,
+  };
+}
+
+export async function completeExecutionWorkerUpdates(
+  db: D1Database,
+  deviceId: string,
+  currentVersion: string | undefined,
+  observedAt: string,
+): Promise<void> {
+  if (!currentVersion || !isSemanticVersion(currentVersion)) return;
+  const pending = await pendingExecutionWorkerUpdate(db, deviceId);
+  if (
+    !pending ||
+    compareSemanticVersions(currentVersion, pending.targetVersion) < 0
+  ) {
+    return;
+  }
+  await db
+    .prepare(
+      `update briar_execution_worker_update_requests
+       set status = 'completed', completed_at = ?, updated_at = ?
+       where id = ? and status = 'requested'`,
+    )
+    .bind(observedAt, observedAt, pending.id)
+    .run();
+}
 
 export type ExecutionWorkerCredentialPrincipal = {
   deviceId: string;
@@ -538,23 +663,33 @@ export async function recordWorkerHeartbeat(
       `select worker.*, device.max_concurrent_sessions,
               device.icon_type, device.icon_value,
               (
-                select count(*)
-                from briar_hunt_runs active
-                join briar_execution_workers holder
-                  on holder.id = active.worker_id
-                where holder.device_id = device.id
-                  and active.claim_token_hash is not null
-                  and active.lease_expires_at is not null
-                  and active.lease_expires_at > ?
-                  and active.status not in (
-                    'backlog', 'completed', 'cancelled', 'blocked', 'failed'
-                  )
+                select count(*) from (
+                  select active.id
+                  from briar_hunt_runs active
+                  join briar_execution_workers holder
+                    on holder.id = active.worker_id
+                  where holder.device_id = device.id
+                    and active.claim_token_hash is not null
+                    and active.lease_expires_at is not null
+                    and active.lease_expires_at > ?
+                    and active.status not in (
+                      'backlog', 'completed', 'cancelled', 'blocked', 'failed'
+                    )
+                  union all
+                  select task.id
+                  from briar_project_agent_task_jobs task
+                  join briar_execution_workers holder
+                    on holder.id = task.claimed_worker_id
+                  where holder.device_id = device.id
+                    and task.status = 'running'
+                    and task.lease_expires_at > ?
+                ) active_work
               ) as active_sessions
        from briar_execution_workers worker
        join briar_execution_worker_devices device on device.id = worker.device_id
        where worker.id = ?`,
     )
-    .bind(input.observedAt, input.workerId)
+    .bind(input.observedAt, input.observedAt, input.workerId)
     .first<ExecutionWorkerRow>();
   if (!updated) {
     throw new WorkerConflictError("Worker heartbeat update was not persisted");
@@ -732,24 +867,34 @@ export async function listExecutionWorkers(
               device.max_concurrent_sessions, device.icon_type,
               device.icon_value,
               (
-                select count(*)
-                from briar_hunt_runs active
-                join briar_execution_workers holder
-                  on holder.id = active.worker_id
-                where holder.device_id = device.id
-                  and active.claim_token_hash is not null
-                  and active.lease_expires_at is not null
-                  and active.lease_expires_at > ?
-                  and active.status not in (
-                    'backlog', 'completed', 'cancelled', 'blocked', 'failed'
-                  )
+                select count(*) from (
+                  select active.id
+                  from briar_hunt_runs active
+                  join briar_execution_workers holder
+                    on holder.id = active.worker_id
+                  where holder.device_id = device.id
+                    and active.claim_token_hash is not null
+                    and active.lease_expires_at is not null
+                    and active.lease_expires_at > ?
+                    and active.status not in (
+                      'backlog', 'completed', 'cancelled', 'blocked', 'failed'
+                    )
+                  union all
+                  select task.id
+                  from briar_project_agent_task_jobs task
+                  join briar_execution_workers holder
+                    on holder.id = task.claimed_worker_id
+                  where holder.device_id = device.id
+                    and task.status = 'running'
+                    and task.lease_expires_at > ?
+                ) active_work
               ) as active_sessions
        from briar_execution_workers worker
        join briar_execution_worker_devices device on device.id = worker.device_id
        where worker.project_id = ?
        order by worker.last_heartbeat_at desc, worker.id asc`,
     )
-    .bind(observedAt, projectId)
+    .bind(observedAt, observedAt, projectId)
     .all<
       ExecutionWorkerRow & {
         owner_user_id: string;
@@ -776,21 +921,32 @@ export async function listOrganizationExecutionWorkers(
               device.created_at, worker.id as worker_id,
               worker.project_id, project.name as project_name,
               worker.agent_provider, worker.capabilities_json,
+              worker.versions_json,
               worker.state as worker_state,
               worker.accepting_work, worker.readiness_state,
               worker.readiness_detail, worker.last_heartbeat_at as worker_heartbeat_at,
               (
-                select count(*)
-                from briar_hunt_runs active
-                join briar_execution_workers holder
-                  on holder.id = active.worker_id
-                where holder.device_id = device.id
-                  and active.claim_token_hash is not null
-                  and active.lease_expires_at is not null
-                  and active.lease_expires_at > ?
-                  and active.status not in (
-                    'backlog', 'completed', 'cancelled', 'blocked', 'failed'
-                  )
+                select count(*) from (
+                  select active.id
+                  from briar_hunt_runs active
+                  join briar_execution_workers holder
+                    on holder.id = active.worker_id
+                  where holder.device_id = device.id
+                    and active.claim_token_hash is not null
+                    and active.lease_expires_at is not null
+                    and active.lease_expires_at > ?
+                    and active.status not in (
+                      'backlog', 'completed', 'cancelled', 'blocked', 'failed'
+                    )
+                  union all
+                  select task.id
+                  from briar_project_agent_task_jobs task
+                  join briar_execution_workers holder
+                    on holder.id = task.claimed_worker_id
+                  where holder.device_id = device.id
+                    and task.status = 'running'
+                    and task.lease_expires_at > ?
+                ) active_work
               ) as active_sessions
        from briar_execution_worker_devices device
        join "user" owner on owner.id = device.owner_user_id
@@ -800,7 +956,7 @@ export async function listOrganizationExecutionWorkers(
        where device.organization_id = ?
        order by device.last_heartbeat_at desc, device.id, project.created_at`,
     )
-    .bind(observedAt, organizationId)
+    .bind(observedAt, observedAt, organizationId)
     .all<{
       device_id: string;
       owner_user_id: string;
@@ -817,6 +973,7 @@ export async function listOrganizationExecutionWorkers(
       project_name: string | null;
       agent_provider: AgentProvider | null;
       capabilities_json: string | null;
+      versions_json: string | null;
       worker_state: ExecutionWorkerState | null;
       accepting_work: number | null;
       readiness_state: ExecutionWorkerReadiness | null;
@@ -844,9 +1001,31 @@ export async function listOrganizationExecutionWorkers(
         activeSessions,
         lastHeartbeatAt: row.last_heartbeat_at,
         createdAt: row.created_at,
+        versions: {},
+        remoteUpdateSupported: false,
+        updateRequest: await pendingExecutionWorkerUpdate(db, row.device_id),
         bindings: [],
       } satisfies OrganizationExecutionWorker);
     workers.set(row.device_id, device);
+    if (Object.keys(device.versions).length === 0 && row.versions_json) {
+      try {
+        device.versions = JSON.parse(row.versions_json) as Record<string, string>;
+      } catch {
+        device.versions = {};
+      }
+    }
+    if (row.capabilities_json) {
+      try {
+        const capabilities = JSON.parse(row.capabilities_json) as {
+          remoteUpdates?: { supported?: unknown; protocol?: unknown };
+        };
+        device.remoteUpdateSupported ||=
+          capabilities.remoteUpdates?.supported === true &&
+          capabilities.remoteUpdates.protocol === 1;
+      } catch {
+        // Ignore malformed legacy capabilities.
+      }
+    }
     if (
       !row.worker_id ||
       !row.project_id ||

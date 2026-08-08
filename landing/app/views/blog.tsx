@@ -66,6 +66,7 @@ export default function BlogView({ locale }: { locale: Locale }) {
           </a>
           <nav aria-label={c.aria.mainMenu}>
             <a href={localizedPath(locale, "/tutorial")}>{c.nav.tutorial}</a>
+            <a href={localizedPath(locale, "/changelog")}>{c.nav.changelog}</a>
             <a className="is-current" href={localizedPath(locale, "/blog")} aria-current="page">
               {c.nav.blog}
             </a>
@@ -141,6 +142,7 @@ export default function BlogView({ locale }: { locale: Locale }) {
           <div>
             <a href={localizedPath(locale, "/")}>{b.home}</a>
             <a href={localizedPath(locale, "/tutorial")}>{c.nav.tutorial}</a>
+            <a href={localizedPath(locale, "/changelog")}>{c.nav.changelog}</a>
             <a href={localizedPath(locale, "/download")}>{c.nav.download}</a>
             <a href="#top">{b.backTop}</a>
           </div>

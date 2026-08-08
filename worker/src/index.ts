@@ -23,14 +23,6 @@ import {
 } from "../../src/lib/agent-result";
 import { agentExecutionMetricsSchema } from "../../src/lib/agent-execution-metrics";
 import {
-  ideaDocumentSchema,
-  ideaIssuePlanItemsSchema,
-  ideaMessageSchema,
-  ideaPlanResultSchema,
-  ideaProviders,
-  ideaTurnResultSchema,
-} from "../../src/lib/ideas-contract";
-import {
   defaultProjectAgentCalendarColor,
 } from "../../src/lib/project-agent";
 import {
@@ -98,6 +90,7 @@ import {
   attemptGithubMergeAutoResume,
   claimGithubDelivery,
   claimNextIssueAgentReply,
+  claimNextProjectAgentTask,
   claimDueProjectAgentScheduleRun,
   claimNextQueuedHuntRun,
   completeIssueAgentReply,
@@ -119,6 +112,7 @@ import {
   createOrganization,
   createOrganizationInvitation,
   createProjectAgent,
+  createProjectAgentTaskJob,
   createProjectAgentSchedule,
   createProject,
   createSlackOAuthState,
@@ -144,6 +138,7 @@ import {
   getIssueAgentReplyJob,
   getIssueReworkProposal,
   getIssueAttachment,
+  getIssueMessage,
   getRunEvidenceImage,
   getOrganizationRole,
   getOrganizationInvitationByTokenHash,
@@ -153,6 +148,10 @@ import {
   isOrganizationHandleAvailable,
   getProject,
   getProjectSettings,
+  getProjectAgentSession,
+  getProjectAgentTaskJob,
+  getProjectAgentTaskJobByRequest,
+  getClaimedProjectAgentTask,
   getDashboardSyncCursor,
   getHuntRunForProject,
   HuntClaimError,
@@ -160,6 +159,7 @@ import {
   initializeWorkflowProgress,
   importLinearHuntRuns,
   listIssueAttachments,
+  listChannelConversationNotifications,
   listIssueDependencies,
   listIssueConversationNotifications,
   listIssueActionProposals,
@@ -202,6 +202,9 @@ import {
   revokeOrganizationInvitation,
   renewProjectAgentScheduleRunLease,
   renewIssueAgentReplyLease,
+  renewProjectAgentTaskLease,
+  completeProjectAgentTask,
+  reapProjectAgentTaskJobs,
   acceptIssueCreateProposal,
   acceptIssueUpdateProposal,
   acceptIssueReworkProposal,
@@ -224,6 +227,8 @@ import {
   updateIssueCheckpoints,
   updateIssueExecutionPreferences,
   updateHuntRunExecutionMetrics,
+  updateIssueMessage,
+  deleteIssueMessage,
   updateSlackInstallationProject,
   upsertInboxReadStates,
   upsertProjectAgentSession,
@@ -236,6 +241,7 @@ import {
   type IssueAttachmentRow,
   type IssueActionProposalRow,
   type IssueAgentReplyJobRow,
+  type ChannelConversationNotificationRow,
   type IssueConversationNotificationRow,
   type IssueMessageRow,
   type IssueReworkProposalRow,
@@ -243,6 +249,7 @@ import {
   type IssueDependencyRow,
   type ProjectRow,
   type ProjectAgentRow,
+  type ProjectAgentSessionRow,
   type ProjectAgentScheduleRunRow,
   type ProjectAgentScheduleRow,
   type ProjectSettingsRow,
@@ -295,6 +302,7 @@ import {
   authenticateExecutionWorker,
   bindExecutionWorkerProject,
   countExecutionWorkerDeviceSessions,
+  completeExecutionWorkerUpdates,
   countLeasedRuns,
   disableExecutionWorker,
   dispatchHuntRun,
@@ -307,7 +315,9 @@ import {
   listExecutionAuditEvents,
   listExecutionWorkers,
   listOrganizationExecutionWorkers,
+  pendingExecutionWorkerUpdate,
   getProjectExecutionWorkerPolicy,
+  isExecutionWorkerAllowedForProject,
   MAX_WORKER_CONCURRENT_SESSIONS,
   MAX_TRANSCRIPT_EVENTS_PER_REQUEST,
   WORKER_STALE_AFTER_MS,
@@ -315,6 +325,7 @@ import {
   readAgentTranscript,
   recordWorkerHeartbeat,
   registerExecutionWorker,
+  requestExecutionWorkerUpdate,
   renewHuntRunLease,
   TranscriptLimitError,
   WorkerConflictError,
@@ -325,28 +336,11 @@ import {
   updateExecutionWorkerLabel,
   updateProjectExecutionWorkerPolicy,
 } from "./workers";
-import { serveRelease } from "./releases";
+import { readLatestVersion, serveRelease } from "./releases";
 import {
-  claimNextIdeaJob,
-  completeIdeaChatJob,
-  completeIdeaPlanJob,
-  convertIdeaPlanToIssues,
-  createIdea,
-  deleteIdea,
-  enqueueIdeaPlan,
-  failIdeaJob,
-  getClaimedIdeaJob,
-  getIdea,
-  getOrganizationIdea,
-  ideaJobSnapshot,
-  listIdeas,
-  listOrganizationIdeas,
-  renewIdeaJobLease,
-  retryIdeaJob,
-  sendIdeaMessage,
-  updateIdea,
-  updateIdeaPlan,
-} from "./ideas";
+  compareSemanticVersions,
+  isSemanticVersion,
+} from "../../src/lib/semantic-version";
 import {
   acceptChannelActionProposal,
   addChannelAgent,
@@ -365,12 +359,15 @@ import {
   getChannelActionProposal,
   getChannelAgentReplyJob,
   getChannelById,
+  getClaimedChannelReplyAttachment,
   getChannelMessage,
+  getChannelMessageAttachment,
   getChannelSyncCursor,
   getClaimedChannelReply,
   getOrganizationProject,
   listOrganizationProjectTargets,
   listChannelAgentReplies,
+  listChannelAttachmentObjectKeys,
   listChannelAgents,
   listChannelMembers,
   listChannelRootMessages,
@@ -396,6 +393,7 @@ import {
   channelMemberInputSchema,
   channelMessageInputSchema,
   channelProposalAcceptInputSchema,
+  channelReplyClaimTokenHeader,
   channelReplyClaimInputSchema,
   channelReplyCompleteInputSchema,
   channelReplyLeaseInputSchema,
@@ -886,10 +884,50 @@ export const projectAgentSessionInputSchema = z
     conversationId: z.string().max(128).nullable(),
     summary: z.string().max(50_000).nullable(),
     error: z.string().max(20_000).nullable(),
+    requestedWorkerId: z.string().max(128).nullable().optional(),
+    workerId: z.string().max(128).nullable().optional(),
     events: z.array(projectAgentSessionEventSchema).max(200),
     updatedAt: z.string().datetime({ offset: true }),
   })
   .strict();
+
+const projectAgentTaskInputSchema = z
+  .object({
+    agentId: z.string().uuid(),
+    request: z.string().trim().min(1).max(50_000),
+    workerId: z.string().trim().min(1).max(128),
+    requestId: z.string().uuid(),
+  })
+  .strict();
+
+const projectAgentTaskClaimInputSchema = z
+  .object({
+    projectId: z.string().uuid(),
+    workerId: z.string().trim().min(1).max(128),
+  })
+  .strict();
+
+const projectAgentTaskLeaseSchema = z
+  .object({
+    projectId: z.string().uuid(),
+    workerId: z.string().trim().min(1).max(128),
+    claimToken: z.string().startsWith("briar_agent_task_claim_"),
+  })
+  .strict();
+
+const projectAgentTaskCompletionSchema = z
+  .object({
+    projectId: z.string().uuid(),
+    workerId: z.string().trim().min(1).max(128),
+    claimToken: z.string().startsWith("briar_agent_task_claim_"),
+    summary: z.string().trim().min(1).max(50_000).optional(),
+    conversationId: z.string().trim().max(128).nullable().optional(),
+    error: z.string().trim().min(1).max(20_000).optional(),
+  })
+  .strict()
+  .refine((input) => Boolean(input.summary) !== Boolean(input.error), {
+    message: "Provide exactly one of summary or error",
+  });
 export const projectAgentScheduleInputSchema = z
   .object({
     agentId: z.string().uuid(),
@@ -1151,55 +1189,6 @@ const issueInputSchema = issueInputBaseSchema.superRefine((input, context) => {
   }
 });
 
-const ideaModelSchema = z.string().trim().min(1).max(100).nullable();
-const ideaCreateInputSchema = z
-  .object({
-    provider: z.enum(ideaProviders),
-    model: ideaModelSchema.default(null),
-  })
-  .strict();
-const ideaUpdateInputSchema = z
-  .object({
-    expectedVersion: z.number().int().min(1),
-    title: z.string().trim().min(1).max(300).optional(),
-    documentMarkdown: ideaDocumentSchema.optional(),
-    status: z.enum(["refining", "ready", "archived"]).optional(),
-    provider: z.enum(ideaProviders).optional(),
-    model: ideaModelSchema.optional(),
-  })
-  .strict()
-  .refine(
-    (input) =>
-      input.title !== undefined ||
-      input.documentMarkdown !== undefined ||
-      input.status !== undefined ||
-      input.provider !== undefined ||
-      input.model !== undefined,
-    "At least one idea field is required",
-  );
-const ideaMessageInputSchema = z
-  .object({ body: ideaMessageSchema })
-  .strict();
-const ideaPlanUpdateInputSchema = z
-  .object({
-    expectedVersion: z.number().int().min(1),
-    items: ideaIssuePlanItemsSchema,
-  })
-  .strict();
-const ideaConversionInputSchema = z
-  .object({ planVersion: z.number().int().min(1) })
-  .strict();
-const ideaJobClaimInputSchema = z
-  .object({ projectId: z.string().uuid(), workerId: z.string().uuid() })
-  .strict();
-const ideaJobLeaseInputSchema = ideaJobClaimInputSchema.extend({
-  claimToken: z.string().startsWith("briar_idea_claim_"),
-});
-const ideaJobCompletionInputSchema = ideaJobLeaseInputSchema.extend({
-  error: z.string().trim().min(1).max(4_000).optional(),
-  result: z.unknown().optional(),
-});
-
 export const issueUpdateInputSchema = issueInputBaseSchema
   .pick({
     title: true,
@@ -1315,6 +1304,13 @@ const issueMessageInputSchema = z
   })
   .strict();
 
+const issueMessageEditInputSchema = z
+  .object({
+    body: z.string().trim().min(1).max(10_000),
+    mentionedUserIds: z.array(z.string().min(1).max(200)).max(50).optional(),
+  })
+  .strict();
+
 export async function readIssueMessageRequest(request: Request) {
   const contentType = request.headers.get("content-type") ?? "";
   if (!contentType.toLowerCase().startsWith("multipart/form-data;")) {
@@ -1387,6 +1383,79 @@ export async function readIssueMessageRequest(request: Request) {
         typeof agentConversationId === "string" && agentConversationId
           ? agentConversationId
           : null,
+    }),
+    attachments,
+    attachmentReferences: attachmentReferences as string[],
+  };
+}
+
+export async function readChannelMessageRequest(request: Request) {
+  const contentType = request.headers.get("content-type") ?? "";
+  if (!contentType.toLowerCase().startsWith("multipart/form-data;")) {
+    return {
+      input: channelMessageInputSchema.parse(await readJson(request, 32_768)),
+      attachments: [] as File[],
+      attachmentReferences: [] as string[],
+    };
+  }
+  const declaredLength = Number(request.headers.get("content-length") ?? "0");
+  if (!Number.isSafeInteger(declaredLength) || declaredLength <= 0) {
+    throw new HttpError(411, "Multipart Content-Length is required");
+  }
+  if (declaredLength > maxIssueMultipartBytes) {
+    throw new HttpError(413, "Channel images exceed the 25MB total limit");
+  }
+  let form: FormData;
+  try {
+    form = await request.formData();
+  } catch {
+    throw new HttpError(400, "Invalid multipart form data");
+  }
+  const rawAttachments = form.getAll("attachments");
+  if (rawAttachments.some((attachment) => !(attachment instanceof File))) {
+    throw new HttpError(400, "Attachments must be files");
+  }
+  const attachments = rawAttachments as File[];
+  const attachmentError = validateIssueAttachments(attachments);
+  if (attachmentError) throw new HttpError(400, attachmentError);
+  if (attachments.some((attachment) => !attachment.type.startsWith("image/"))) {
+    throw new HttpError(400, "Channel attachments must be images");
+  }
+  const parseArray = (name: string) => {
+    const value = form.get(name);
+    if (typeof value !== "string" || !value) return [] as unknown[];
+    try {
+      const parsed: unknown = JSON.parse(value);
+      if (!Array.isArray(parsed)) throw new Error("not an array");
+      return parsed;
+    } catch {
+      throw new HttpError(400, `${name} is invalid`);
+    }
+  };
+  const attachmentReferences = parseArray("attachmentReferences");
+  if (
+    attachmentReferences.length !== attachments.length ||
+    !attachmentReferences.every(isIssueAttachmentReference)
+  ) {
+    throw new HttpError(400, "Attachment references are invalid");
+  }
+  const rawBody = form.get("body");
+  const bodyReferences = issueAttachmentReferences(
+    typeof rawBody === "string" ? rawBody : null,
+  );
+  if (!attachmentReferences.every((reference) => bodyReferences.has(String(reference)))) {
+    throw new HttpError(400, "Every channel image must be referenced in the body");
+  }
+  const parentMessageId = form.get("parentMessageId");
+  return {
+    input: channelMessageInputSchema.parse({
+      body: rawBody,
+      parentMessageId:
+        typeof parentMessageId === "string" && parentMessageId
+          ? parentMessageId
+          : null,
+      mentionedUserIds: parseArray("mentionedUserIds"),
+      mentionedAgentIds: parseArray("mentionedAgentIds"),
     }),
     attachments,
     attachmentReferences: attachmentReferences as string[],
@@ -2806,6 +2875,78 @@ const projectAgentSessionJson = (row: {
   dispatchEvents: [],
   workers: [],
 });
+
+const projectAgentTaskSessionEvent = (
+  type: "started" | "completed" | "failed",
+  occurredAt: string,
+) => ({
+  id: crypto.randomUUID(),
+  type,
+  occurredAt,
+});
+
+async function syncProjectAgentTaskSession(
+  db: D1Database,
+  job: {
+    id: string;
+    project_id: string;
+    agent_id: string;
+    status: "queued" | "running" | "completed" | "failed";
+    claimed_worker_id: string | null;
+    preferred_worker_id: string;
+    updated_at: string;
+    completed_at: string | null;
+    error: string | null;
+  },
+  input: {
+    summary?: string | null;
+    conversationId?: string | null;
+    error?: string | null;
+  } = {},
+) {
+  const current = await getProjectAgentSession(db, job.project_id, job.id);
+  if (!current) return null;
+  let payload: Record<string, unknown>;
+  try {
+    payload = JSON.parse(current.payload_json) as Record<string, unknown>;
+  } catch {
+    payload = {};
+  }
+  const currentEvents = Array.isArray(payload.events) ? payload.events : [];
+  const terminal = job.status === "completed" || job.status === "failed";
+  const nextPayload = {
+    ...payload,
+    status: job.status === "queued" || job.status === "running"
+      ? "running"
+      : job.status,
+    requestedWorkerId: payload.requestedWorkerId ?? job.preferred_worker_id,
+    workerId: job.claimed_worker_id ?? payload.workerId ?? job.preferred_worker_id,
+    conversationId: input.conversationId ?? payload.conversationId ?? null,
+    summary: input.summary ?? payload.summary ?? null,
+    error: terminal ? (input.error ?? job.error ?? null) : null,
+    completedAt: terminal ? job.completed_at : null,
+    updatedAt: job.updated_at,
+    events: [
+      ...currentEvents,
+      projectAgentTaskSessionEvent(
+        terminal ? (job.status === "completed" ? "completed" : "failed") : "started",
+        job.updated_at,
+      ),
+    ],
+  };
+  const updated = await upsertProjectAgentSession(db, {
+    project_id: current.project_id,
+    id: current.id,
+    agent_id: current.agent_id,
+    status: nextPayload.status as ProjectAgentSessionRow["status"],
+    session_type: current.session_type,
+    payload_json: JSON.stringify(nextPayload),
+    started_at: current.started_at,
+    completed_at: nextPayload.completedAt as string | null,
+    updated_at: job.updated_at,
+  });
+  return updated ? projectAgentSessionJson(updated) : null;
+}
 
 const projectAgentScheduleJson = (row: ProjectAgentScheduleRow) => ({
   id: row.id,
@@ -4301,6 +4442,24 @@ const issueConversationNotificationJson = (
   createdAt: notification.created_at,
 });
 
+const channelConversationNotificationJson = (
+  notification: ChannelConversationNotificationRow,
+) => ({
+  id: notification.id,
+  channelId: notification.channel_id,
+  channelName: notification.channel_name,
+  rootMessageId: notification.root_message_id,
+  body: notification.body,
+  author: {
+    id: notification.author_user_id,
+    name: notification.author_name ?? "",
+    image: notification.author_image,
+    provider: notification.author_agent_provider,
+  },
+  reason: notification.notification_reason,
+  createdAt: notification.created_at,
+});
+
 export const claimConversationJson = (messages: IssueMessageRow[]) =>
   messages.map((message) => issueMessageJson(message));
 
@@ -4323,6 +4482,42 @@ const listIssueMessagesWithArchive = async (
       left.created_at.localeCompare(right.created_at) ||
       left.id.localeCompare(right.id),
   );
+};
+
+const removeOrphanedIssueAttachments = async (
+  db: D1Database,
+  attachmentsBucket: R2Bucket,
+  projectId: string,
+  runId: string,
+) => {
+  const [messages, attachments] = await Promise.all([
+    listIssueMessages(db, projectId, runId),
+    listIssueAttachments(db, projectId, runId),
+  ]);
+  const referenced = new Set<string>();
+  for (const message of messages) {
+    for (const id of issueAttachmentReferences(message.body)) {
+      referenced.add(id);
+    }
+  }
+  const orphaned = attachments.filter((attachment) => !referenced.has(attachment.id));
+  if (orphaned.length === 0) return;
+  await deleteIssueAttachments(
+    db,
+    projectId,
+    runId,
+    orphaned.map((attachment) => attachment.id),
+  );
+  await Promise.all(
+    orphaned.map((attachment) => attachmentsBucket.delete(attachment.object_key)),
+  ).catch((error) => {
+    console.error(
+      JSON.stringify({
+        message: "orphaned issue attachment cleanup failed",
+        error: error instanceof Error ? error.message : String(error),
+      }),
+    );
+  });
 };
 
 const runEvidenceJson = (
@@ -4816,332 +5011,6 @@ async function route(
     return new Response(null, { status: 204, headers: corsHeaders });
   }
 
-  const projectIdeasMatch = pathname.match(
-    /^\/projects\/([0-9a-f-]+)\/ideas$/u,
-  );
-  if (projectIdeasMatch && request.method === "GET") {
-    const session = await requireSession(auth, request);
-    const project = await getProject(db, projectIdeasMatch[1], session.user.id);
-    if (!project) throw new HttpError(404, "Project not found");
-    return json({ ideas: await listIdeas(db, project.id) });
-  }
-  if (projectIdeasMatch && request.method === "POST") {
-    const session = await requireSession(auth, request);
-    const project = await getProject(db, projectIdeasMatch[1], session.user.id);
-    if (!project) throw new HttpError(404, "Project not found");
-    const input = ideaCreateInputSchema.parse(await readJson(request));
-    const idea = await createIdea(db, {
-      id: crypto.randomUUID(),
-      organizationId: project.organization_id,
-      projectId: project.id,
-      authorUserId: session.user.id,
-      provider: input.provider,
-      model: input.model,
-      title: "새 아이디어",
-      createdAt: new Date().toISOString(),
-    });
-    return json({ idea }, 201);
-  }
-
-  const ideaMatch = pathname.match(
-    /^\/projects\/([0-9a-f-]+)\/ideas\/([0-9a-f-]+)$/u,
-  );
-  if (ideaMatch && request.method === "GET") {
-    const session = await requireSession(auth, request);
-    const project = await getProject(db, ideaMatch[1], session.user.id);
-    if (!project) throw new HttpError(404, "Project not found");
-    const idea = await getIdea(db, project.id, ideaMatch[2], session.user.id);
-    if (!idea) throw new HttpError(404, "Idea not found");
-    return json({ idea });
-  }
-  if (ideaMatch && request.method === "PATCH") {
-    const session = await requireSession(auth, request);
-    const project = await getProject(db, ideaMatch[1], session.user.id);
-    if (!project) throw new HttpError(404, "Project not found");
-    const input = ideaUpdateInputSchema.parse(await readJson(request, 220_000));
-    const outcome = await updateIdea(db, {
-      projectId: project.id,
-      ideaId: ideaMatch[2],
-      authorUserId: session.user.id,
-      expectedVersion: input.expectedVersion,
-      title: input.title,
-      documentMarkdown: input.documentMarkdown,
-      status: input.status,
-      provider: input.provider,
-      model: input.model,
-      updatedAt: new Date().toISOString(),
-    });
-    if (outcome === "not_found") throw new HttpError(404, "Idea not found");
-    if (outcome === "busy") throw new HttpError(409, "Idea is being updated by an agent");
-    if (outcome === "conflict") throw new HttpError(409, "Idea was updated elsewhere");
-    return json({
-      idea: await getIdea(db, project.id, ideaMatch[2], session.user.id),
-    });
-  }
-  if (ideaMatch && request.method === "DELETE") {
-    const session = await requireSession(auth, request);
-    const project = await getProject(db, ideaMatch[1], session.user.id);
-    if (!project) throw new HttpError(404, "Project not found");
-    const deleted = await deleteIdea(
-      db,
-      project.id,
-      ideaMatch[2],
-      session.user.id,
-    );
-    if (!deleted) throw new HttpError(409, "Idea is busy or not editable");
-    return json({ deleted: true });
-  }
-
-  const ideaMessagesMatch = pathname.match(
-    /^\/projects\/([0-9a-f-]+)\/ideas\/([0-9a-f-]+)\/messages$/u,
-  );
-  if (ideaMessagesMatch && request.method === "POST") {
-    const session = await requireSession(auth, request);
-    const project = await getProject(db, ideaMessagesMatch[1], session.user.id);
-    if (!project) throw new HttpError(404, "Project not found");
-    const input = ideaMessageInputSchema.parse(await readJson(request));
-    const outcome = await sendIdeaMessage(db, {
-      jobId: crypto.randomUUID(),
-      messageId: crypto.randomUUID(),
-      replyMessageId: crypto.randomUUID(),
-      projectId: project.id,
-      ideaId: ideaMessagesMatch[2],
-      authorUserId: session.user.id,
-      body: input.body,
-      createdAt: new Date().toISOString(),
-    });
-    if (outcome === "not_found") throw new HttpError(404, "Idea not found");
-    if (outcome === "archived") throw new HttpError(409, "Archived ideas are read-only");
-    if (outcome === "busy") throw new HttpError(409, "Idea is already processing a request");
-    return json(
-      {
-        idea: await getIdea(
-          db,
-          project.id,
-          ideaMessagesMatch[2],
-          session.user.id,
-        ),
-      },
-      202,
-    );
-  }
-
-  const ideaPlanMatch = pathname.match(
-    /^\/projects\/([0-9a-f-]+)\/ideas\/([0-9a-f-]+)\/plan$/u,
-  );
-  if (ideaPlanMatch && request.method === "POST") {
-    const session = await requireSession(auth, request);
-    const project = await getProject(db, ideaPlanMatch[1], session.user.id);
-    if (!project) throw new HttpError(404, "Project not found");
-    const outcome = await enqueueIdeaPlan(db, {
-      jobId: crypto.randomUUID(),
-      projectId: project.id,
-      ideaId: ideaPlanMatch[2],
-      authorUserId: session.user.id,
-      createdAt: new Date().toISOString(),
-    });
-    if (outcome === "not_found") throw new HttpError(404, "Idea not found");
-    if (outcome === "archived") throw new HttpError(409, "Archived ideas are read-only");
-    if (outcome === "not_ready") throw new HttpError(409, "Idea must be ready first");
-    if (outcome === "busy") throw new HttpError(409, "Idea is already processing a request");
-    return json(
-      {
-        idea: await getIdea(db, project.id, ideaPlanMatch[2], session.user.id),
-      },
-      202,
-    );
-  }
-  if (ideaPlanMatch && request.method === "PATCH") {
-    const session = await requireSession(auth, request);
-    const project = await getProject(db, ideaPlanMatch[1], session.user.id);
-    if (!project) throw new HttpError(404, "Project not found");
-    const input = ideaPlanUpdateInputSchema.parse(await readJson(request, 550_000));
-    const updated = await updateIdeaPlan(db, {
-      projectId: project.id,
-      ideaId: ideaPlanMatch[2],
-      authorUserId: session.user.id,
-      expectedVersion: input.expectedVersion,
-      items: input.items,
-      updatedAt: new Date().toISOString(),
-    });
-    if (!updated) throw new HttpError(409, "Idea plan was updated elsewhere");
-    return json({
-      idea: await getIdea(db, project.id, ideaPlanMatch[2], session.user.id),
-    });
-  }
-
-  const ideaJobRetryMatch = pathname.match(
-    /^\/projects\/([0-9a-f-]+)\/ideas\/([0-9a-f-]+)\/jobs\/([0-9a-f-]+)\/retry$/u,
-  );
-  if (ideaJobRetryMatch && request.method === "POST") {
-    const session = await requireSession(auth, request);
-    const project = await getProject(db, ideaJobRetryMatch[1], session.user.id);
-    if (!project) throw new HttpError(404, "Project not found");
-    const outcome = await retryIdeaJob(db, {
-      failedJobId: ideaJobRetryMatch[3],
-      jobId: crypto.randomUUID(),
-      replyMessageId: crypto.randomUUID(),
-      projectId: project.id,
-      ideaId: ideaJobRetryMatch[2],
-      authorUserId: session.user.id,
-      createdAt: new Date().toISOString(),
-    });
-    if (outcome === "not_found") throw new HttpError(404, "Failed idea job not found");
-    if (outcome === "archived") throw new HttpError(409, "Archived ideas are read-only");
-    if (outcome === "not_ready") throw new HttpError(409, "Idea must be ready first");
-    if (outcome === "busy") throw new HttpError(409, "Idea is already processing a request");
-    return json(
-      {
-        idea: await getIdea(db, project.id, ideaJobRetryMatch[2], session.user.id),
-      },
-      202,
-    );
-  }
-
-  const ideaConvertMatch = pathname.match(
-    /^\/projects\/([0-9a-f-]+)\/ideas\/([0-9a-f-]+)\/convert$/u,
-  );
-  if (ideaConvertMatch && request.method === "POST") {
-    const session = await requireSession(auth, request);
-    const project = await getProject(db, ideaConvertMatch[1], session.user.id);
-    if (!project) throw new HttpError(404, "Project not found");
-    const input = ideaConversionInputSchema.parse(await readJson(request));
-    const result = await convertIdeaPlanToIssues(db, {
-      projectId: project.id,
-      ideaId: ideaConvertMatch[2],
-      authorUserId: session.user.id,
-      planVersion: input.planVersion,
-      createdAt: new Date().toISOString(),
-    });
-    if (result.outcome === "active_issues") {
-      throw new HttpError(409, "Generated issues have already started");
-    }
-    if (result.outcome === "workflow_pending") {
-      throw new HttpError(409, "Project workflow is not ready");
-    }
-    if (result.outcome !== "created") {
-      throw new HttpError(409, "Idea or plan is not ready");
-    }
-    return json({ runIds: result.runIds }, 201);
-  }
-
-  if (pathname === "/idea-job-claims" && request.method === "POST") {
-    const input = ideaJobClaimInputSchema.parse(await readJson(request));
-    const worker = await requireWorkerProjectBinding(
-      db,
-      request,
-      input.projectId,
-      input.workerId,
-    );
-    const observedAt = new Date().toISOString();
-    if (
-      workerStateAt(
-        worker.binding.last_heartbeat_at,
-        observedAt,
-        worker.binding.state,
-      ) !== "online" ||
-      worker.binding.accepting_work !== 1 ||
-      worker.binding.readiness_state === "needs_attention"
-    ) {
-      throw new HttpError(409, "Worker is not ready to claim idea work");
-    }
-    const providers = executionWorkerProviders(worker.binding);
-    const claimToken = `briar_idea_claim_${crypto.randomUUID().replaceAll("-", "")}${crypto.randomUUID().replaceAll("-", "")}`;
-    const job = await claimNextIdeaJob(db, input.projectId, {
-      workerId: worker.binding.id,
-      providers,
-      claimTokenHash: await sha256(claimToken),
-      claimedAt: observedAt,
-      leaseExpiresAt: leaseExpiryFrom(observedAt),
-    });
-    if (!job) return json({ work: null });
-    const snapshot = await ideaJobSnapshot(db, job);
-    if (!snapshot) throw new HttpError(409, "Idea job lost its context");
-    return json({
-      work: {
-        workType: "idea",
-        workId: job.id,
-        runId: job.idea_id,
-        sourceKey: `briar-idea:${job.idea_id}:${job.kind}`,
-        title: snapshot.idea.title,
-        kind: job.kind,
-        provider: job.provider,
-        model: job.model,
-        claimToken,
-        leaseExpiresAt: job.lease_expires_at,
-        snapshot,
-      },
-    });
-  }
-
-  const ideaJobClaimMatch = pathname.match(
-    /^\/idea-job-claims\/([0-9a-f-]+)\/(lease|complete)$/u,
-  );
-  if (ideaJobClaimMatch && request.method === "POST") {
-    if (ideaJobClaimMatch[2] === "lease") {
-      const input = ideaJobLeaseInputSchema.parse(await readJson(request));
-      const worker = await requireWorkerProjectBinding(
-        db,
-        request,
-        input.projectId,
-        input.workerId,
-      );
-      const observedAt = new Date().toISOString();
-      const renewed = await renewIdeaJobLease(
-        db,
-        input.projectId,
-        ideaJobClaimMatch[1],
-        {
-          workerId: worker.binding.id,
-          claimTokenHash: await sha256(input.claimToken),
-          leaseExpiresAt: leaseExpiryFrom(observedAt),
-          updatedAt: observedAt,
-        },
-      );
-      if (!renewed) throw new HttpError(409, "Idea claim is no longer active");
-      return json({ leaseExpiresAt: renewed.lease_expires_at });
-    }
-    const input = ideaJobCompletionInputSchema.parse(await readJson(request, 550_000));
-    const worker = await requireWorkerProjectBinding(
-      db,
-      request,
-      input.projectId,
-      input.workerId,
-    );
-    const claimTokenHash = await sha256(input.claimToken);
-    const job = await getClaimedIdeaJob(
-      db,
-      input.projectId,
-      ideaJobClaimMatch[1],
-      worker.binding.id,
-      claimTokenHash,
-    );
-    if (!job) throw new HttpError(409, "Idea claim is no longer active");
-    const observedAt = new Date().toISOString();
-    if (input.error) {
-      await failIdeaJob(db, job, claimTokenHash, input.error, observedAt);
-      return json({ status: "failed" });
-    }
-    const completed =
-      job.kind === "chat"
-        ? await completeIdeaChatJob(
-            db,
-            job,
-            claimTokenHash,
-            ideaTurnResultSchema.parse(input.result),
-            observedAt,
-          )
-        : await completeIdeaPlanJob(
-            db,
-            job,
-            claimTokenHash,
-            ideaPlanResultSchema.parse(input.result).issues,
-            observedAt,
-          );
-    if (!completed) throw new HttpError(409, "Idea result became stale");
-    return json({ status: "completed" });
-  }
-
   const publicInvitationMatch = pathname.match(
     /^\/invitations\/(briar_invite_[0-9a-f]{64})$/u,
   );
@@ -5543,35 +5412,6 @@ async function route(
     return json({ deleted: true });
   }
 
-  const organizationIdeasMatch = pathname.match(
-    /^\/organizations\/([0-9a-f-]+)\/ideas$/u,
-  );
-  if (organizationIdeasMatch && request.method === "GET") {
-    const session = await requireSession(auth, request);
-    const organizationId = organizationIdeasMatch[1];
-    const role = await getOrganizationRole(db, organizationId, session.user.id);
-    if (!role) throw new HttpError(404, "Organization not found");
-    return json({ ideas: await listOrganizationIdeas(db, organizationId) });
-  }
-
-  const organizationIdeaMatch = pathname.match(
-    /^\/organizations\/([0-9a-f-]+)\/ideas\/([0-9a-f-]+)$/u,
-  );
-  if (organizationIdeaMatch && request.method === "GET") {
-    const session = await requireSession(auth, request);
-    const organizationId = organizationIdeaMatch[1];
-    const role = await getOrganizationRole(db, organizationId, session.user.id);
-    if (!role) throw new HttpError(404, "Organization not found");
-    const idea = await getOrganizationIdea(
-      db,
-      organizationId,
-      organizationIdeaMatch[2],
-      session.user.id,
-    );
-    if (!idea) throw new HttpError(404, "Idea not found");
-    return json({ idea });
-  }
-
   const channelChangesMatch = pathname.match(
     /^\/organizations\/([0-9a-f-]+)\/channel-changes$/u,
   );
@@ -5702,12 +5542,30 @@ async function route(
     if (!canManageOrganization(role)) {
       throw new HttpError(403, "Organization admin access required");
     }
+    const attachmentKeys = await listChannelAttachmentObjectKeys(
+      db,
+      organizationId,
+      organizationChannelMatch[2],
+    );
     const deleted = await deleteChannel(
       db,
       organizationId,
       organizationChannelMatch[2],
     );
     if (!deleted) throw new HttpError(404, "Channel not found");
+    if (attachmentKeys.length > 0) {
+      try {
+        await attachmentsBucket.delete(attachmentKeys);
+      } catch (error) {
+        console.error(JSON.stringify({
+          message: "Channel attachment cleanup failed",
+          organizationId,
+          channelId: organizationChannelMatch[2],
+          attachmentCount: attachmentKeys.length,
+          error: error instanceof Error ? error.message : String(error),
+        }));
+      }
+    }
     return json({ deleted: true });
   }
 
@@ -5797,6 +5655,37 @@ async function route(
   const channelMessagesMatch = pathname.match(
     /^\/organizations\/([0-9a-f-]+)\/channels\/([0-9a-f-]+)\/messages$/u,
   );
+  const channelAttachmentMatch = pathname.match(
+    /^\/organizations\/([0-9a-f-]+)\/channels\/([0-9a-f-]+)\/messages\/([0-9a-f-]+)\/attachments\/([0-9a-f-]+)$/u,
+  );
+  if (
+    channelAttachmentMatch &&
+    (request.method === "GET" || request.method === "HEAD")
+  ) {
+    const session = await requireSession(auth, request);
+    await requireChannelAccess(
+      db,
+      channelAttachmentMatch[1],
+      channelAttachmentMatch[2],
+      session.user.id,
+    );
+    const attachment = await getChannelMessageAttachment(
+      db,
+      channelAttachmentMatch[1],
+      channelAttachmentMatch[2],
+      channelAttachmentMatch[3],
+      channelAttachmentMatch[4],
+    );
+    if (!attachment) throw new HttpError(404, "Attachment not found");
+    if (request.method === "HEAD") {
+      const object = await attachmentsBucket.head(attachment.object_key);
+      if (!object) throw new HttpError(404, "Attachment not found");
+      return attachmentResponse(attachment, object, null);
+    }
+    const object = await attachmentsBucket.get(attachment.object_key);
+    if (!object) throw new HttpError(404, "Attachment not found");
+    return attachmentResponse(attachment, object, object.body);
+  }
   if (channelMessagesMatch && request.method === "GET") {
     const session = await requireSession(auth, request);
     const channel = await requireChannelAccess(
@@ -5826,35 +5715,102 @@ async function route(
     if (channel.archived_at) {
       throw new HttpError(409, "Channel is archived");
     }
-    const input = channelMessageInputSchema.parse(await readJson(request));
+    const { input: rawInput, attachments, attachmentReferences } =
+      await readChannelMessageRequest(request);
     const roster = await listChannelAgents(db, channel.id);
-    const mentionedAgents = input.mentionedAgentIds.map((agentId) => {
+    const mentionedAgents = rawInput.mentionedAgentIds.map((agentId) => {
       const agent = roster.find((candidate) => candidate.id === agentId);
       if (!agent) {
         throw new HttpError(400, "Mentioned Agent is not in this channel");
       }
       return agent;
     });
-    for (const userId of input.mentionedUserIds) {
+    for (const userId of rawInput.mentionedUserIds) {
       if (!(await getOrganizationRole(db, organizationId, userId))) {
         throw new HttpError(400, "Mentioned member is not in this organization");
       }
     }
     const createdAt = new Date().toISOString();
-    const message = await createChannelMessage(db, {
-      id: crypto.randomUUID(),
-      channelId: channel.id,
-      parentMessageId: input.parentMessageId,
-      authorUserId: session.user.id,
-      authorAgentId: null,
-      authorAgentName: null,
-      authorAgentProvider: null,
-      body: input.body,
-      mentionedUserIds: input.mentionedUserIds,
-      mentionedAgentIds: input.mentionedAgentIds,
-      createdAt,
+    const messageId = crypto.randomUUID();
+    const storedAttachments = attachments.map((file) => {
+      const id = crypto.randomUUID();
+      return {
+        id,
+        organization_id: organizationId,
+        object_key: `channel-attachments/${organizationId}/${channel.id}/${messageId}/${id}`,
+        filename: file.name.normalize("NFC").trim(),
+        content_type: file.type,
+        byte_size: file.size,
+        file,
+      };
     });
-    if (!message) throw new HttpError(404, "Thread message not found");
+    const input = {
+      ...rawInput,
+      body: canonicalizeIssueAttachmentReferences(
+        rawInput.body,
+        attachmentReferences,
+        storedAttachments.map((attachment) => attachment.id),
+      ) ?? rawInput.body,
+    };
+    const uploadedKeys: string[] = [];
+    let message = null;
+    try {
+      for (const attachment of storedAttachments) {
+        await attachmentsBucket.put(
+          attachment.object_key,
+          attachment.file.stream(),
+          {
+            httpMetadata: {
+              contentType: attachment.content_type,
+              contentDisposition: contentDisposition(attachment.filename),
+            },
+            customMetadata: {
+              attachmentId: attachment.id,
+              channelId: channel.id,
+              messageId,
+              organizationId,
+            },
+          },
+        );
+        uploadedKeys.push(attachment.object_key);
+      }
+      message = await createChannelMessage(db, {
+        id: messageId,
+        channelId: channel.id,
+        parentMessageId: input.parentMessageId,
+        authorUserId: session.user.id,
+        authorAgentId: null,
+        authorAgentName: null,
+        authorAgentProvider: null,
+        body: input.body,
+        mentionedUserIds: input.mentionedUserIds,
+        mentionedAgentIds: input.mentionedAgentIds,
+        attachments: storedAttachments.map(({ file: _file, ...attachment }) =>
+          attachment
+        ),
+        createdAt,
+      });
+      if (!message) throw new HttpError(404, "Thread message not found");
+    } catch (error) {
+      if (uploadedKeys.length > 0) {
+        try {
+          await attachmentsBucket.delete(uploadedKeys);
+        } catch (cleanupError) {
+          console.error(JSON.stringify({
+            message: "Failed channel upload cleanup",
+            organizationId,
+            channelId: channel.id,
+            messageId,
+            attachmentCount: uploadedKeys.length,
+            error:
+              cleanupError instanceof Error
+                ? cleanupError.message
+                : String(cleanupError),
+          }));
+        }
+      }
+      throw error;
+    }
     const agentReplies = await enqueueChannelAgentReplies(db, {
       organizationId,
       channelId: channel.id,
@@ -5921,8 +5877,12 @@ async function route(
     );
     if (!proposal) throw new HttpError(404, "Proposal not found");
     if (proposal.status === "accepted") {
+      if (!proposal.project_id || !proposal.result_run_id) {
+        throw new HttpError(409, "Accepted proposal is missing its result");
+      }
       return json({
         outcome: "already_accepted",
+        projectId: proposal.project_id,
         resultRunId: proposal.result_run_id,
       });
     }
@@ -5968,7 +5928,11 @@ async function route(
       acceptedAt: new Date().toISOString(),
     });
     if (!accepted) throw new HttpError(409, "Proposal changed");
-    return json({ outcome: "accepted", resultRunId: created.runId });
+    return json({
+      outcome: "accepted",
+      projectId: project.id,
+      resultRunId: created.runId,
+    });
   }
 
   const organizationWorkersMatch = pathname.match(
@@ -5986,9 +5950,65 @@ async function route(
         organizationId,
         observedAt,
       ),
+      latestVersion: await readLatestVersion(env.RELEASES),
       canManage: canManageOrganization(role),
       generatedAt: observedAt,
     });
+  }
+
+  const organizationWorkerUpdateMatch = pathname.match(
+    /^\/organizations\/([0-9a-f-]+)\/workers\/([0-9a-zA-Z-]+)\/updates$/u,
+  );
+  if (organizationWorkerUpdateMatch && request.method === "POST") {
+    const session = await requireSession(auth, request);
+    const organizationId = organizationWorkerUpdateMatch[1];
+    const deviceId = organizationWorkerUpdateMatch[2];
+    const role = await getOrganizationRole(db, organizationId, session.user.id);
+    if (!role) throw new HttpError(404, "Organization not found");
+    const device = (
+      await listOrganizationExecutionWorkers(
+        db,
+        organizationId,
+        new Date().toISOString(),
+      )
+    ).find((candidate) => candidate.deviceId === deviceId);
+    if (!device) throw new HttpError(404, "Worker not found");
+    if (
+      device.ownerUserId !== session.user.id &&
+      !canManageOrganization(role)
+    ) {
+      throw new HttpError(
+        403,
+        "Worker owner or organization admin access required",
+      );
+    }
+    if (!device.remoteUpdateSupported) {
+      throw new HttpError(409, "Worker does not support remote updates");
+    }
+    const targetVersion = await readLatestVersion(env.RELEASES);
+    if (!targetVersion) throw new HttpError(503, "Latest release is unavailable");
+    const currentVersion = device.versions.briar;
+    if (
+      currentVersion &&
+      isSemanticVersion(currentVersion) &&
+      compareSemanticVersions(currentVersion, targetVersion) >= 0
+    ) {
+      return json({ outcome: "already_current", targetVersion });
+    }
+    const requestedAt = new Date().toISOString();
+    const updateRequest = await requestExecutionWorkerUpdate(db, {
+      id: crypto.randomUUID(),
+      organizationId,
+      deviceId,
+      requestedByUserId: session.user.id,
+      targetVersion,
+      requestedAt,
+    });
+    return json({
+      outcome: "requested",
+      requestId: updateRequest.id,
+      targetVersion: updateRequest.targetVersion,
+    }, 202);
   }
 
   const organizationWorkerMatch = pathname.match(
@@ -6617,6 +6637,156 @@ async function route(
   const projectAgentSessionsMatch = pathname.match(
     /^\/projects\/([0-9a-f-]+)\/agent-sessions$/u,
   );
+  const projectAgentTasksMatch = pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/agent-tasks$/u,
+  );
+  if (projectAgentTasksMatch && request.method === "POST") {
+    const session = await requireSession(auth, request);
+    const project = await getProject(
+      db,
+      projectAgentTasksMatch[1],
+      session.user.id,
+    );
+    if (!project) throw new HttpError(404, "Project not found");
+    const input = projectAgentTaskInputSchema.parse(await readJson(request));
+    const existingJob = await getProjectAgentTaskJobByRequest(
+      db,
+      project.id,
+      input.requestId,
+    );
+    if (existingJob) {
+      const existingSession = await getProjectAgentSession(
+        db,
+        project.id,
+        existingJob.id,
+      );
+      if (!existingSession) {
+        throw new HttpError(409, "Agent task session is missing");
+      }
+      return json({ session: projectAgentSessionJson(existingSession) });
+    }
+
+    const agent = await getProjectAgent(db, project.id, input.agentId);
+    if (!agent) throw new HttpError(404, "Agent not found for this project");
+    const worker = await db
+      .prepare(
+        `select worker.*, device.max_concurrent_sessions
+         from briar_execution_workers worker
+         join briar_execution_worker_devices device on device.id = worker.device_id
+         where worker.id = ? and worker.project_id = ?
+           and device.organization_id = ?`,
+      )
+      .bind(input.workerId, project.id, project.organization_id)
+      .first<{
+        id: string;
+        agent_provider: "codex" | "claude" | "grok" | "opencode";
+        capabilities_json: string;
+        state: "online" | "stale" | "disabled";
+        accepting_work: number;
+        readiness_state: "ready" | "busy" | "needs_attention";
+        last_heartbeat_at: string;
+        max_concurrent_sessions: number;
+      }>();
+    if (!worker) throw new HttpError(404, "Worker not found for this project");
+    const observedAt = new Date().toISOString();
+    if (
+      workerStateAt(worker.last_heartbeat_at, observedAt, worker.state) !== "online" ||
+      worker.accepting_work !== 1 ||
+      worker.readiness_state === "needs_attention"
+    ) {
+      throw new HttpError(409, "Worker is not ready to accept agent tasks");
+    }
+    if (!executionWorkerProviders(worker).includes(agent.provider)) {
+      throw new HttpError(
+        409,
+        `Worker does not support the ${agent.provider} provider`,
+      );
+    }
+    if (!(await isExecutionWorkerAllowedForProject(db, project.id, worker.id))) {
+      throw new HttpError(
+        409,
+        "Worker is not allowed by this project's execution policy",
+      );
+    }
+    const active = await db
+      .prepare(
+        `select
+           (select count(*)
+            from briar_hunt_runs run
+            where run.worker_id = ? and run.claim_token_hash is not null
+              and run.lease_expires_at > ?
+              and run.status not in ('backlog', 'completed', 'cancelled', 'blocked', 'failed'))
+           +
+           (select count(*)
+            from briar_project_agent_task_jobs task
+            where task.claimed_worker_id = ? and task.status = 'running'
+              and task.lease_expires_at > ?) as count`,
+      )
+      .bind(worker.id, observedAt, worker.id, observedAt)
+      .first<{ count: number }>();
+    if ((active?.count ?? 0) >= worker.max_concurrent_sessions) {
+      throw new HttpError(409, "Worker has no available execution slot");
+    }
+
+    const taskId = crypto.randomUUID();
+    let job;
+    try {
+      job = await createProjectAgentTaskJob(db, {
+        id: taskId,
+        projectId: project.id,
+        agentId: agent.id,
+        request: input.request,
+        requestId: input.requestId,
+        workerId: worker.id,
+        createdAt: observedAt,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message.toLowerCase() : "";
+      if (!message.includes("unique")) throw error;
+      job = await getProjectAgentTaskJobByRequest(
+        db,
+        project.id,
+        input.requestId,
+      );
+    }
+    if (!job) throw new HttpError(409, "Agent task could not be queued");
+    const payload = {
+      dispatchGroupId: taskId,
+      agentId: agent.id,
+      sessionType: "task" as const,
+      trigger: "manual" as const,
+      scheduleId: null,
+      scheduleRunId: null,
+      parentSessionId: null,
+      request: input.request,
+      status: "running" as const,
+      issues: [],
+      startedAt: observedAt,
+      completedAt: null,
+      conversationId: null,
+      requestedWorkerId: worker.id,
+      workerId: worker.id,
+      summary: null,
+      error: null,
+      events: [projectAgentTaskSessionEvent("started", observedAt)],
+      updatedAt: observedAt,
+    };
+    const createdSession = await upsertProjectAgentSession(db, {
+      project_id: project.id,
+      id: taskId,
+      agent_id: agent.id,
+      status: "running",
+      session_type: "task",
+      payload_json: JSON.stringify(payload),
+      started_at: observedAt,
+      completed_at: null,
+      updated_at: observedAt,
+    });
+    if (!createdSession) {
+      throw new HttpError(409, "Agent task session could not be created");
+    }
+    return json({ session: projectAgentSessionJson(createdSession) });
+  }
   if (projectAgentSessionsMatch && request.method === "GET") {
     const session = await requireSession(auth, request);
     const project = await getProject(
@@ -7336,6 +7506,14 @@ async function route(
           session.user.id,
         )
       : null;
+    // Channel changes have an organization cursor rather than a project
+    // dashboard cursor. Refresh this bounded projection on the existing
+    // dashboard cadence so Inbox needs no second polling loop.
+    const channelNotifications = await listChannelConversationNotifications(
+      db,
+      project.organization_id,
+      session.user.id,
+    );
 
     return json({
       cursor: page.nextCursor,
@@ -7374,6 +7552,9 @@ async function route(
             ),
           }
         : {}),
+      channelNotifications: channelNotifications.map(
+        channelConversationNotificationJson,
+      ),
       generatedAt: observedAt,
     });
   }
@@ -7401,6 +7582,7 @@ async function route(
       executionPolicy,
       members,
       conversationNotifications,
+      channelNotifications,
     ] =
       await Promise.all([
         listDashboardRuns(db, project.id),
@@ -7420,6 +7602,11 @@ async function route(
         listIssueConversationNotifications(
           db,
           project.id,
+          session.user.id,
+        ),
+        listChannelConversationNotifications(
+          db,
+          project.organization_id,
           session.user.id,
         ),
       ]);
@@ -7471,6 +7658,9 @@ async function route(
       members: members.map(organizationMemberJson),
       conversationNotifications: conversationNotifications.map(
         issueConversationNotificationJson,
+      ),
+      channelNotifications: channelNotifications.map(
+        channelConversationNotificationJson,
       ),
       cursor,
       generatedAt: observedAt,
@@ -7727,6 +7917,90 @@ async function route(
       },
       201,
     );
+  }
+
+  const issueMessageEditMatch = pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/messages\/([0-9a-f-]+)$/u,
+  );
+  if (issueMessageEditMatch && request.method === "PATCH") {
+    const session = await requireSession(auth, request);
+    const project = await getProject(
+      db,
+      issueMessageEditMatch[1],
+      session.user.id,
+    );
+    if (!project) throw new HttpError(404, "Project not found");
+    const input = issueMessageEditInputSchema.parse(await readJson(request));
+    const message = await getIssueMessage(
+      db,
+      project.id,
+      issueMessageEditMatch[2],
+      issueMessageEditMatch[3],
+    );
+    if (!message) throw new HttpError(404, "Message not found");
+    if (message.author_user_id !== session.user.id) {
+      throw new HttpError(403, "Only the author can edit this message");
+    }
+    const updated = await updateIssueMessage(
+      db,
+      project.id,
+      issueMessageEditMatch[2],
+      message.id,
+      {
+        body: input.body,
+        mentionedUserIds: input.mentionedUserIds,
+        updatedAt: new Date().toISOString(),
+      },
+    );
+    if (!updated) throw new HttpError(404, "Message not found");
+    await removeOrphanedIssueAttachments(
+      db,
+      attachmentsBucket,
+      project.id,
+      issueMessageEditMatch[2],
+    );
+    const [attachments, reworkProposals, actionProposals] = await Promise.all([
+      listIssueAttachments(db, project.id, issueMessageEditMatch[2]),
+      listIssueReworkProposals(db, project.id, issueMessageEditMatch[2]),
+      listIssueActionProposals(db, project.id, issueMessageEditMatch[2]),
+    ]);
+    const proposal = [...reworkProposals, ...actionProposals].find(
+      (candidate) => candidate.reply_message_id === updated.id,
+    ) ?? null;
+    return json({ message: issueMessageJson(updated, attachments, proposal) });
+  }
+  if (issueMessageEditMatch && request.method === "DELETE") {
+    const session = await requireSession(auth, request);
+    const project = await getProject(
+      db,
+      issueMessageEditMatch[1],
+      session.user.id,
+    );
+    if (!project) throw new HttpError(404, "Project not found");
+    const message = await getIssueMessage(
+      db,
+      project.id,
+      issueMessageEditMatch[2],
+      issueMessageEditMatch[3],
+    );
+    if (!message) throw new HttpError(404, "Message not found");
+    if (message.author_user_id !== session.user.id) {
+      throw new HttpError(403, "Only the author can delete this message");
+    }
+    const deleted = await deleteIssueMessage(
+      db,
+      project.id,
+      issueMessageEditMatch[2],
+      message.id,
+    );
+    if (!deleted) throw new HttpError(404, "Message not found");
+    await removeOrphanedIssueAttachments(
+      db,
+      attachmentsBucket,
+      project.id,
+      issueMessageEditMatch[2],
+    );
+    return new Response(null, { status: 204, headers: corsHeaders });
   }
 
   const issueAgentReplyStatusMatch = pathname.match(
@@ -8828,6 +9102,16 @@ async function route(
       capabilities: input.capabilities,
       observedAt,
     });
+    await completeExecutionWorkerUpdates(
+      db,
+      principal.deviceId,
+      input.versions?.briar,
+      observedAt,
+    );
+    const updateDirective = await pendingExecutionWorkerUpdate(
+      db,
+      principal.deviceId,
+    );
     if (
       input.acceptingWork !== undefined ||
       input.readinessState !== undefined ||
@@ -8860,6 +9144,7 @@ async function route(
       worker: workerJson(worker, observedAt),
       reaped,
       workflowRequirements: projectWorkflow?.requirements ?? [],
+      updateDirective,
     });
   }
 
@@ -9298,6 +9583,44 @@ async function route(
     });
   }
 
+  const channelReplyAttachmentMatch = pathname.match(
+    /^\/organizations\/([0-9a-f-]+)\/channel-reply-claims\/([0-9a-f-]+)\/attachments\/([0-9a-f-]+)$/u,
+  );
+  if (
+    channelReplyAttachmentMatch &&
+    (request.method === "GET" || request.method === "HEAD")
+  ) {
+    const principal = await requireWorkerOrganization(
+      db,
+      request,
+      channelReplyAttachmentMatch[1],
+    );
+    const claimToken = request.headers.get(channelReplyClaimTokenHeader)?.trim();
+    if (
+      !claimToken?.startsWith("briar_channel_claim_") ||
+      claimToken.length > 200
+    ) {
+      throw new HttpError(401, "Channel reply claim token required");
+    }
+    const attachment = await getClaimedChannelReplyAttachment(db, {
+      organizationId: channelReplyAttachmentMatch[1],
+      jobId: channelReplyAttachmentMatch[2],
+      deviceId: principal.deviceId,
+      claimTokenHash: await sha256(claimToken),
+      attachmentId: channelReplyAttachmentMatch[3],
+      observedAt: new Date().toISOString(),
+    });
+    if (!attachment) throw new HttpError(404, "Attachment not found");
+    if (request.method === "HEAD") {
+      const object = await attachmentsBucket.head(attachment.object_key);
+      if (!object) throw new HttpError(404, "Attachment not found");
+      return attachmentResponse(attachment, object, null);
+    }
+    const object = await attachmentsBucket.get(attachment.object_key);
+    if (!object) throw new HttpError(404, "Attachment not found");
+    return attachmentResponse(attachment, object, object.body);
+  }
+
   const channelReplyClaimMatch = pathname.match(
     /^\/channel-reply-claims\/([0-9a-f-]+)\/(lease|complete)$/u,
   );
@@ -9523,6 +9846,148 @@ async function route(
       agentReply: issueAgentReplyJson(completed),
       message: issueMessageJson(reply, [], proposal),
     });
+  }
+
+  if (pathname === "/agent-task-claims" && request.method === "POST") {
+    const input = projectAgentTaskClaimInputSchema.parse(await readJson(request));
+    const authenticatedWorker = await requireWorkerProjectBinding(
+      db,
+      request,
+      input.projectId,
+      input.workerId,
+    );
+    const observedAt = new Date().toISOString();
+    if (
+      workerStateAt(
+        authenticatedWorker.binding.last_heartbeat_at,
+        observedAt,
+        authenticatedWorker.binding.state,
+      ) !== "online" ||
+      authenticatedWorker.binding.accepting_work !== 1 ||
+      authenticatedWorker.binding.readiness_state === "needs_attention"
+    ) {
+      throw new HttpError(409, "Worker is not ready to claim agent tasks");
+    }
+    const providers = executionWorkerProviders(authenticatedWorker.binding);
+    if (providers.length === 0) {
+      throw new HttpError(409, "Worker has no available agent provider");
+    }
+    if (
+      !(await isExecutionWorkerAllowedForProject(
+        db,
+        input.projectId,
+        authenticatedWorker.binding.id,
+      ))
+    ) {
+      throw new HttpError(
+        409,
+        "Worker is not allowed by this project's execution policy",
+      );
+    }
+    const reaped = await reapProjectAgentTaskJobs(db, input.projectId, {
+      observedAt,
+      error: "Worker lease expired after repeated attempts.",
+    });
+    await Promise.all(
+      reaped.map((job) =>
+        syncProjectAgentTaskSession(db, job, { error: job.error }),
+      ),
+    );
+    const claimToken = `briar_agent_task_claim_${crypto.randomUUID().replaceAll("-", "")}${crypto.randomUUID().replaceAll("-", "")}`;
+    const job = await claimNextProjectAgentTask(db, input.projectId, {
+      workerId: authenticatedWorker.binding.id,
+      agentProviders: providers,
+      claimTokenHash: await sha256(claimToken),
+      claimedAt: observedAt,
+      leaseExpiresAt: leaseExpiryFrom(observedAt),
+    });
+    if (!job) return json({ work: null });
+    return json({
+      work: {
+        workType: "projectAgentTask",
+        workId: job.id,
+        runId: job.id,
+        sourceKey: `project-agent:${input.projectId}:${job.id}`,
+        title: job.agent_name,
+        claimToken,
+        claimedAt: job.claimed_at,
+        leaseExpiresAt: job.lease_expires_at,
+        request: job.request,
+        agent: {
+          id: job.agent_id,
+          name: job.agent_name,
+          provider: job.agent_provider,
+          model: job.agent_model,
+          effort: job.agent_effort,
+          responsibility: job.agent_responsibility,
+          skill: job.agent_skill,
+        },
+      },
+    });
+  }
+
+  const projectAgentTaskClaimMatch = pathname.match(
+    /^\/agent-task-claims\/([0-9a-f-]+)\/(lease|complete)$/u,
+  );
+  if (projectAgentTaskClaimMatch && request.method === "POST") {
+    const body = await readJson(request);
+    if (projectAgentTaskClaimMatch[2] === "lease") {
+      const input = projectAgentTaskLeaseSchema.parse(body);
+      const worker = await requireWorkerProjectBinding(
+        db,
+        request,
+        input.projectId,
+        input.workerId,
+      );
+      const renewed = await renewProjectAgentTaskLease(
+        db,
+        input.projectId,
+        projectAgentTaskClaimMatch[1],
+        {
+          workerId: worker.binding.id,
+          claimTokenHash: await sha256(input.claimToken),
+          leaseExpiresAt: leaseExpiryFrom(new Date().toISOString()),
+          updatedAt: new Date().toISOString(),
+        },
+      );
+      if (!renewed) throw new HttpError(409, "Agent task claim is no longer active");
+      return json({ leaseExpiresAt: renewed.lease_expires_at });
+    }
+    const input = projectAgentTaskCompletionSchema.parse(body);
+    const worker = await requireWorkerProjectBinding(
+      db,
+      request,
+      input.projectId,
+      input.workerId,
+    );
+    const claimTokenHash = await sha256(input.claimToken);
+    const job = await getClaimedProjectAgentTask(
+      db,
+      input.projectId,
+      projectAgentTaskClaimMatch[1],
+      { workerId: worker.binding.id, claimTokenHash },
+    );
+    if (!job) throw new HttpError(409, "Agent task claim is no longer active");
+    const observedAt = new Date().toISOString();
+    const completed = await completeProjectAgentTask(
+      db,
+      input.projectId,
+      job.id,
+      {
+        workerId: worker.binding.id,
+        claimTokenHash,
+        updatedAt: observedAt,
+        error: input.error,
+      },
+    );
+    if (!completed) throw new HttpError(409, "Agent task claim is no longer active");
+    const session = await syncProjectAgentTaskSession(db, completed, {
+      summary: input.summary ?? null,
+      conversationId: input.conversationId ?? null,
+      error: input.error ?? null,
+    });
+    if (!session) throw new HttpError(409, "Agent task session is missing");
+    return json({ session });
   }
 
   if (pathname === "/queue/claims" && request.method === "POST") {

@@ -84,8 +84,10 @@ test("server-renders Korean at /ko regardless of Accept-Language", async () => {
   assert.match(html, /에이전트 작업을 운영하세요/);
   assert.match(html, /코드는 로컬에/);
   assert.match(html, /에이전트 이벤트 스트림 연결/);
-  assert.doesNotMatch(html, /hero-art/);
-  assert.match(html, /class="kanban-board"/);
+  assert.doesNotMatch(html, /hero-art|briar-hero-orchestration/);
+  assert.match(html, /<video[^>]*autoplay[^>]*loop[^>]*muted[^>]*playsinline/i);
+  assert.match(html, /briar-x-demo-20s\.mp4/);
+  assert.match(html, /class="product-stage product-stage-video"/);
   assert.match(html, /class="detail-properties"/);
   assert.match(html, /Mac용 Briar 다운로드/);
   assert.match(html, /macOS Apple Silicon/);
@@ -108,16 +110,12 @@ test("server-renders Korean at /ko regardless of Accept-Language", async () => {
   assert.doesNotMatch(html, /02 \/ (?:<!-- -->)?WORKFLOW/);
   assert.doesNotMatch(html, /03 \/ (?:<!-- -->)?AGENTS/);
   assert.doesNotMatch(html, /04 \/ (?:<!-- -->)?SECURITY/);
-  // Decorative product-mockup chrome mirrors the real (Korean-first) app UI.
-  assert.match(html, /백로그/);
-  assert.match(html, /작업 큐/);
-  assert.match(html, /작업 검색/);
-  assert.match(html, /로그인됨/);
+  // Decorative issue-detail chrome mirrors the real (Korean-first) app UI.
   assert.match(html, /증빙/);
-  assert.doesNotMatch(html, />Backlog</);
-  assert.doesNotMatch(html, />Task queue</);
-  assert.doesNotMatch(html, />Search tasks</);
-  assert.doesNotMatch(html, />Signed in</);
+  assert.match(html, /속성/);
+  assert.match(html, /높은 우선순위/);
+  assert.doesNotMatch(html, />Evidence</);
+  assert.doesNotMatch(html, />Properties</);
   assert.match(html, /aria-label="언어"/);
   assert.match(html, /aria-pressed="true"[^>]*aria-label="한국어"/);
   assert.match(
@@ -153,8 +151,10 @@ test("server-renders English for an English browser", async () => {
   assert.match(html, /From issue to PR\./);
   assert.match(html, /Operate your agent work\./);
   assert.match(html, /Turn agent development/);
-  assert.doesNotMatch(html, /hero-art/);
-  assert.match(html, /class="kanban-board"/);
+  assert.doesNotMatch(html, /hero-art|briar-hero-orchestration/);
+  assert.match(html, /<video[^>]*autoplay[^>]*loop[^>]*muted[^>]*playsinline/i);
+  assert.match(html, /briar-x-demo-20s\.mp4/);
+  assert.match(html, /class="product-stage product-stage-video"/);
   assert.match(html, /class="detail-properties"/);
   assert.match(html, /Download Briar for Mac/);
   assert.match(html, /Repository-agnostic/);
@@ -249,15 +249,45 @@ test("server-renders the localized download catalog at /ko/download", async () =
   );
 });
 
-test("landing header links to tutorial, blog, and download without section navigation", async () => {
+test("landing header links to tutorial, changelog, blog, and download without section navigation", async () => {
   const response = await render({ acceptLanguage: "en-US,en;q=0.9" });
   const html = await response.text();
   const header = html.match(/<header class="site-header">([\s\S]*?)<\/header>/)?.[1] ?? "";
 
   assert.match(header, /href="\/tutorial"/);
+  assert.match(header, /href="\/changelog"/);
   assert.match(header, /href="\/blog"/);
   assert.match(header, /href="\/download"/);
   assert.doesNotMatch(header, /href="#(?:product|workflow|security|agents)"/);
+});
+
+test("server-renders the localized changelog from published releases", async () => {
+  const koreanResponse = await render({ path: "/ko/changelog" });
+  assert.equal(koreanResponse.status, 200);
+
+  const koreanHtml = await koreanResponse.text();
+  assert.match(koreanHtml, /<html lang="ko"[\s>]/i);
+  assert.match(koreanHtml, /Briar 변경 기록/);
+  assert.match(koreanHtml, /현재 안정 버전/);
+  assert.match(koreanHtml, /조직 에이전트와 채널 실행 흐름을 확장했습니다/);
+  assert.match(koreanHtml, /v1\.2\.87/);
+  assert.match(koreanHtml, /v1\.2\.86/);
+  assert.match(koreanHtml, /v1\.2\.85/);
+  assert.match(koreanHtml, /v1\.2\.80/);
+  assert.match(koreanHtml, /aria-current="page"[^>]*>변경 기록</);
+  assert.match(
+    koreanHtml,
+    /href="https:\/\/github\.com\/wordbricks\/briar\/releases\/tag\/v1\.2\.87"/,
+  );
+
+  const englishResponse = await render({ path: "/changelog" });
+  assert.equal(englishResponse.status, 200);
+
+  const englishHtml = await englishResponse.text();
+  assert.match(englishHtml, /<html lang="en"[\s>]/i);
+  assert.match(englishHtml, /Briar changelog/);
+  assert.match(englishHtml, /Organization agents and channel execution, connected/);
+  assert.match(englishHtml, /Current stable release/);
 });
 
 test("server-renders the localized empty blog at /ko/blog", async () => {
@@ -389,9 +419,11 @@ test("/sitemap.xml is well-formed and lists every route in every locale", async 
     [
       "http://localhost/",
       "http://localhost/blog",
+      "http://localhost/changelog",
       "http://localhost/download",
       "http://localhost/ko",
       "http://localhost/ko/blog",
+      "http://localhost/ko/changelog",
       "http://localhost/ko/download",
       "http://localhost/ko/tutorial",
       "http://localhost/tutorial",
@@ -403,7 +435,7 @@ test("/sitemap.xml is well-formed and lists every route in every locale", async 
 
   // Every <url> entry carries the full hreflang set, including x-default.
   const urlBlocks = xml.match(/<url>[\s\S]*?<\/url>/g) ?? [];
-  assert.equal(urlBlocks.length, 8);
+  assert.equal(urlBlocks.length, 10);
   for (const block of urlBlocks) {
     assert.match(block, /hreflang="en"/);
     assert.match(block, /hreflang="ko"/);

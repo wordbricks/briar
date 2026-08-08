@@ -221,6 +221,17 @@ export const mobileConversationNotificationSchema = z.object({
   createdAt: z.iso.datetime(),
 });
 
+export const mobileChannelNotificationSchema = z.object({
+  id: z.uuid(),
+  channelId: z.uuid(),
+  channelName: z.string(),
+  rootMessageId: z.uuid(),
+  body: z.string(),
+  author: mobileMessageAuthorSchema,
+  reason: z.enum(["mention", "thread_reply"]),
+  createdAt: z.iso.datetime(),
+});
+
 const mobileDashboardProjectSchema = mobileProjectsResponseSchema.shape.projects.element;
 
 export const mobileDashboardSnapshotSchema = z.object({
@@ -230,6 +241,7 @@ export const mobileDashboardSnapshotSchema = z.object({
   organizationProviders: z.array(z.enum(["codex", "claude", "grok", "opencode"])).optional(),
   members: z.array(mobileOrganizationMemberSchema).optional(),
   conversationNotifications: z.array(mobileConversationNotificationSchema).optional(),
+  channelNotifications: z.array(mobileChannelNotificationSchema).optional(),
   cursor: z.number().int().nonnegative().optional(),
   generatedAt: z.iso.datetime(),
 });
@@ -244,6 +256,7 @@ export const mobileDashboardDeltaSchema = z.object({
   organizationProviders: z.array(z.enum(["codex", "claude", "grok", "opencode"])).optional(),
   members: z.array(mobileOrganizationMemberSchema).optional(),
   conversationNotifications: z.array(mobileConversationNotificationSchema).optional(),
+  channelNotifications: z.array(mobileChannelNotificationSchema).optional(),
   generatedAt: z.iso.datetime(),
 });
 
@@ -362,10 +375,8 @@ export const mobileChannelMessageSchema = z.object({
   lastReplyAt: z.iso.datetime().nullable(),
   document: z
     .object({
-      ideaId: z.uuid(),
+      messageId: z.uuid(),
       title: z.string(),
-      status: z.string(),
-      version: z.number().int().positive(),
       projectId: z.uuid().nullable(),
     })
     .nullable(),
@@ -377,7 +388,6 @@ export const mobileChannelMessageSchema = z.object({
       projectId: z.uuid().nullable(),
       payload: z.unknown(),
       resultRunId: z.uuid().nullable(),
-      resultIdeaId: z.uuid().nullable(),
     })
     .nullable(),
   createdAt: z.iso.datetime(),
@@ -437,6 +447,16 @@ export const mobileCreateChannelMessageResponseSchema = z.object({
     createdAt: z.iso.datetime(),
     updatedAt: z.iso.datetime(),
   })),
+});
+
+export const mobileAcceptChannelProposalRequestSchema = z.object({
+  projectId: z.uuid().nullable(),
+}).strict();
+
+export const mobileAcceptChannelProposalResponseSchema = z.object({
+  outcome: z.enum(["accepted", "already_accepted"]),
+  projectId: z.uuid(),
+  resultRunId: z.uuid(),
 });
 
 export const mobileRunEvidenceResponseSchema = z.object({
@@ -700,6 +720,8 @@ export const mobileProjectAgentSessionSchema = z.object({
   completedAt: z.string().nullable(),
   conversationId: z.string().nullable().optional(),
   workspaceRoot: z.null().optional(),
+  requestedWorkerId: z.string().nullable().optional(),
+  workerId: z.string().nullable().optional(),
   summary: z.string().nullable().optional(),
   error: z.string().nullable().optional(),
   events: z.array(z.object({
@@ -721,6 +743,17 @@ export const mobileProjectAgentSessionSchema = z.object({
 
 export const mobileProjectAgentSessionsResponseSchema = z.object({
   sessions: z.array(mobileProjectAgentSessionSchema),
+});
+
+export const mobileProjectAgentTaskRequestSchema = z.object({
+  agentId: z.uuid(),
+  request: z.string().trim().min(1).max(50_000),
+  workerId: z.string().trim().min(1).max(128),
+  requestId: z.uuid(),
+});
+
+export const mobileProjectAgentTaskResponseSchema = z.object({
+  session: mobileProjectAgentSessionSchema,
 });
 
 export const mobileOperationSchemas = {
@@ -772,12 +805,20 @@ export const mobileOperationSchemas = {
   },
   listProjectAgents: { response: mobileProjectAgentsResponseSchema },
   listProjectAgentSessions: { response: mobileProjectAgentSessionsResponseSchema },
+  runProjectAgentTask: {
+    request: mobileProjectAgentTaskRequestSchema,
+    response: mobileProjectAgentTaskResponseSchema,
+  },
   listChannels: { response: mobileChannelsResponseSchema },
   getChannel: { response: mobileChannelDetailResponseSchema },
   listChannelMessages: { response: mobileChannelMessagesResponseSchema },
   createChannelMessage: {
     request: mobileCreateChannelMessageRequestSchema,
     response: mobileCreateChannelMessageResponseSchema,
+  },
+  acceptChannelProposal: {
+    request: mobileAcceptChannelProposalRequestSchema,
+    response: mobileAcceptChannelProposalResponseSchema,
   },
 } as const;
 

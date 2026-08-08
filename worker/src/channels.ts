@@ -3,6 +3,7 @@ import {
   type ChannelAgentProvider as AgentProvider,
   type ChannelAgentReply,
   type ChannelMessage,
+  type ChannelMessageAttachment,
   type ChannelReplyStatus,
   type ChannelSummary,
   type ChannelVisibility,
@@ -37,10 +38,8 @@ export type ChannelMessageRow = {
   body: string;
   reply_count: number;
   last_reply_at: string | null;
-  document_idea_id: string | null;
+  document_message_id: string | null;
   document_title: string | null;
-  document_status: string | null;
-  document_version: number | null;
   document_project_id: string | null;
   proposal_id: string | null;
   proposal_action_type: ChannelActionType | null;
@@ -48,9 +47,25 @@ export type ChannelMessageRow = {
   proposal_project_id: string | null;
   proposal_payload_json: string | null;
   proposal_result_run_id: string | null;
-  proposal_result_idea_id: string | null;
   created_at: string;
 };
+
+export type ChannelMessageAttachmentRow = {
+  id: string;
+  organization_id: string;
+  channel_id: string;
+  message_id: string;
+  object_key: string;
+  filename: string;
+  content_type: string;
+  byte_size: number;
+  created_at: string;
+};
+
+export type ChannelMessageAttachmentInput = Pick<
+  ChannelMessageAttachmentRow,
+  "id" | "organization_id" | "object_key" | "filename" | "content_type" | "byte_size"
+>;
 
 export type ChannelReplyJobRow = {
   id: string;
@@ -110,23 +125,20 @@ const messageSelect = `
           where reply.parent_message_id = message.id) as reply_count,
          (select max(reply.created_at) from briar_channel_messages reply
           where reply.parent_message_id = message.id) as last_reply_at,
-         document.idea_id as document_idea_id,
-         idea.title as document_title, idea.status as document_status,
-         idea.version as document_version,
-         idea.project_id as document_project_id,
+         document.message_id as document_message_id,
+         document.title as document_title,
+         document.project_id as document_project_id,
          proposal.id as proposal_id,
          proposal.action_type as proposal_action_type,
          proposal.status as proposal_status,
          proposal.project_id as proposal_project_id,
          proposal.payload_json as proposal_payload_json,
          proposal.result_run_id as proposal_result_run_id,
-         proposal.result_idea_id as proposal_result_idea_id,
          message.created_at
   from briar_channel_messages message
   left join "user" author on author.id = message.author_user_id
   left join briar_channel_message_documents document
     on document.message_id = message.id
-  left join briar_ideas idea on idea.id = document.idea_id
   left join briar_channel_action_proposals proposal
     on proposal.reply_message_id = message.id`;
 
@@ -164,6 +176,7 @@ export const channelReplyJson = (
 export const channelMessageJson = (
   row: ChannelMessageRow,
   mentions: { users: string[]; agents: string[] } = { users: [], agents: [] },
+  attachments: ChannelMessageAttachment[] = [],
 ): ChannelMessage => ({
   id: row.id,
   channelId: row.channel_id,
@@ -185,14 +198,13 @@ export const channelMessageJson = (
   body: row.body,
   mentionedUserIds: mentions.users,
   mentionedAgentIds: mentions.agents,
+  attachments,
   replyCount: row.reply_count,
   lastReplyAt: row.last_reply_at,
-  document: row.document_idea_id
+  document: row.document_message_id
     ? {
-        ideaId: row.document_idea_id,
+        messageId: row.document_message_id,
         title: row.document_title ?? "",
-        status: row.document_status ?? "draft",
-        version: row.document_version ?? 1,
         projectId: row.document_project_id,
       }
     : null,
@@ -204,7 +216,6 @@ export const channelMessageJson = (
         projectId: row.proposal_project_id,
         payload: JSON.parse(row.proposal_payload_json ?? "{}"),
         resultRunId: row.proposal_result_run_id,
-        resultIdeaId: row.proposal_result_idea_id,
       }
     : null,
   createdAt: row.created_at,
@@ -393,6 +404,21 @@ export async function deleteChannel(
   return (result.meta.changes ?? 0) > 0;
 }
 
+export async function listChannelAttachmentObjectKeys(
+  db: D1Database,
+  organizationId: string,
+  channelId: string,
+) {
+  const rows = await db
+    .prepare(
+      `select object_key from briar_channel_message_attachments
+       where organization_id = ? and channel_id = ?`,
+    )
+    .bind(organizationId, channelId)
+    .all<{ object_key: string }>();
+  return rows.results.map((row) => row.object_key);
+}
+
 export async function listChannelMembers(db: D1Database, channelId: string) {
   const rows = await db
     .prepare(
@@ -522,14 +548,24 @@ export async function removeChannelAgent(
   return (result.meta.changes ?? 0) > 0;
 }
 
-async function attachMentions(
+const channelMessageAttachmentJson = (
+  row: ChannelMessageAttachmentRow,
+): ChannelMessageAttachment => ({
+  id: row.id,
+  filename: row.filename,
+  contentType: row.content_type,
+  byteSize: row.byte_size,
+  url: `/organizations/${row.organization_id}/channels/${row.channel_id}/messages/${row.message_id}/attachments/${row.id}`,
+});
+
+async function attachMessageRelations(
   db: D1Database,
   rows: ChannelMessageRow[],
 ): Promise<ChannelMessage[]> {
   if (rows.length === 0) return [];
   const ids = rows.map((row) => row.id);
   const placeholders = ids.map(() => "?").join(", ");
-  const [userMentions, agentMentions] = await Promise.all([
+  const [userMentions, agentMentions, attachments] = await Promise.all([
     db
       .prepare(
         `select message_id, user_id from briar_channel_message_mentions
@@ -544,6 +580,16 @@ async function attachMentions(
       )
       .bind(...ids)
       .all<{ message_id: string; agent_id: string }>(),
+    db
+      .prepare(
+        `select id, organization_id, channel_id, message_id, object_key,
+                filename, content_type, byte_size, created_at
+         from briar_channel_message_attachments
+         where message_id in (${placeholders})
+         order by created_at, id`,
+      )
+      .bind(...ids)
+      .all<ChannelMessageAttachmentRow>(),
   ]);
   const byMessage = new Map<string, { users: string[]; agents: string[] }>();
   for (const row of rows) byMessage.set(row.id, { users: [], agents: [] });
@@ -553,8 +599,18 @@ async function attachMentions(
   for (const mention of agentMentions.results) {
     byMessage.get(mention.message_id)?.agents.push(mention.agent_id);
   }
+  const attachmentsByMessage = new Map<string, ChannelMessageAttachment[]>();
+  for (const attachment of attachments.results) {
+    const current = attachmentsByMessage.get(attachment.message_id) ?? [];
+    current.push(channelMessageAttachmentJson(attachment));
+    attachmentsByMessage.set(attachment.message_id, current);
+  }
   return rows.map((row) =>
-    channelMessageJson(row, byMessage.get(row.id) ?? { users: [], agents: [] }),
+    channelMessageJson(
+      row,
+      byMessage.get(row.id) ?? { users: [], agents: [] },
+      attachmentsByMessage.get(row.id) ?? [],
+    ),
   );
 }
 
@@ -572,7 +628,7 @@ export async function listChannelRootMessages(
     )
     .bind(channelId, limit)
     .all<ChannelMessageRow>();
-  return attachMentions(db, rows.results.reverse());
+  return attachMessageRelations(db, rows.results.reverse());
 }
 
 export async function listChannelThreadMessages(
@@ -589,7 +645,7 @@ export async function listChannelThreadMessages(
     )
     .bind(channelId, parentMessageId, parentMessageId)
     .all<ChannelMessageRow>();
-  return attachMentions(db, rows.results);
+  return attachMessageRelations(db, rows.results);
 }
 
 export async function getChannelMessage(
@@ -602,7 +658,7 @@ export async function getChannelMessage(
     .bind(channelId, messageId)
     .first<ChannelMessageRow>();
   if (!row) return null;
-  const [message] = await attachMentions(db, [row]);
+  const [message] = await attachMessageRelations(db, [row]);
   return message ?? null;
 }
 
@@ -624,6 +680,7 @@ export async function createChannelMessage(
     body: string;
     mentionedUserIds: string[];
     mentionedAgentIds: string[];
+    attachments?: ChannelMessageAttachmentInput[];
     createdAt: string;
   },
 ) {
@@ -685,9 +742,96 @@ export async function createChannelMessage(
         )
         .bind(input.id, agentId, input.createdAt, input.id),
     ),
+    ...(input.attachments ?? []).map((attachment) =>
+      db
+        .prepare(
+          `insert into briar_channel_message_attachments (
+             id, organization_id, channel_id, message_id, object_key,
+             filename, content_type, byte_size, created_at
+           ) select ?, ?, ?, ?, ?, ?, ?, ?, ?
+             where exists (
+               select 1 from briar_channel_messages
+               where id = ? and channel_id = ?
+             )`,
+        )
+        .bind(
+          attachment.id,
+          attachment.organization_id,
+          input.channelId,
+          input.id,
+          attachment.object_key,
+          attachment.filename,
+          attachment.content_type,
+          attachment.byte_size,
+          input.createdAt,
+          input.id,
+          input.channelId,
+        ),
+    ),
   ];
   await db.batch(statements);
   return getChannelMessage(db, input.channelId, input.id);
+}
+
+export async function getChannelMessageAttachment(
+  db: D1Database,
+  organizationId: string,
+  channelId: string,
+  messageId: string,
+  attachmentId: string,
+) {
+  return db
+    .prepare(
+      `select id, organization_id, channel_id, message_id, object_key,
+              filename, content_type, byte_size, created_at
+       from briar_channel_message_attachments
+       where organization_id = ? and channel_id = ? and message_id = ? and id = ?`,
+    )
+    .bind(organizationId, channelId, messageId, attachmentId)
+    .first<ChannelMessageAttachmentRow>();
+}
+
+/**
+ * Resolve an image only when it belongs to the message that triggered the
+ * active reply claim on this exact Worker device. This keeps a leaked claim
+ * token, another channel image ID, or another enrolled device from widening
+ * access to private channel files.
+ */
+export async function getClaimedChannelReplyAttachment(
+  db: D1Database,
+  input: {
+    organizationId: string;
+    jobId: string;
+    deviceId: string;
+    claimTokenHash: string;
+    attachmentId: string;
+    observedAt: string;
+  },
+) {
+  return db
+    .prepare(
+      `select attachment.id, attachment.organization_id, attachment.channel_id,
+              attachment.message_id, attachment.object_key, attachment.filename,
+              attachment.content_type, attachment.byte_size, attachment.created_at
+       from briar_channel_agent_reply_jobs job
+       join briar_channel_message_attachments attachment
+         on attachment.organization_id = job.organization_id
+        and attachment.channel_id = job.channel_id
+        and attachment.message_id = job.trigger_message_id
+       where job.id = ? and job.organization_id = ?
+         and job.claimed_device_id = ? and job.claim_token_hash = ?
+         and job.status = 'running' and job.lease_expires_at > ?
+         and attachment.id = ?`,
+    )
+    .bind(
+      input.jobId,
+      input.organizationId,
+      input.deviceId,
+      input.claimTokenHash,
+      input.observedAt,
+      input.attachmentId,
+    )
+    .first<ChannelMessageAttachmentRow>();
 }
 
 /**
@@ -955,39 +1099,24 @@ export async function completeChannelReply(
         input.completedAt,
       ),
   ];
-  let ideaId: string | null = null;
   if (input.document) {
-    ideaId = crypto.randomUUID();
     statements.push(
       db
         .prepare(
-          `insert into briar_ideas (
-             id, organization_id, project_id, author_user_id, title,
-             title_is_auto, document_markdown, status, provider, model,
-             version, created_at, updated_at
-           )
-           select ?, ?, ?, channel.created_by_user_id, ?, 0, ?, 'ready', ?,
-                  null, 1, ?, ?
-           from briar_channels channel where channel.id = ?`,
+          `insert into briar_channel_message_documents (
+             message_id, channel_id, project_id, title, markdown,
+             created_at, updated_at
+           ) values (?, ?, ?, ?, ?, ?, ?)`,
         )
         .bind(
-          ideaId,
-          job.organization_id,
+          job.reply_message_id,
+          job.channel_id,
           input.document.projectId,
           input.document.title,
           input.document.markdown,
-          input.agentProvider,
           input.completedAt,
           input.completedAt,
-          job.channel_id,
         ),
-      db
-        .prepare(
-          `insert into briar_channel_message_documents (
-             message_id, idea_id, created_at
-           ) values (?, ?, ?)`,
-        )
-        .bind(job.reply_message_id, ideaId, input.completedAt),
     );
   }
   if (input.issueProposal) {
@@ -1052,7 +1181,6 @@ export async function getChannelActionProposal(
       payload_json: string;
       status: "pending" | "accepted";
       result_run_id: string | null;
-      result_idea_id: string | null;
       created_at: string;
       updated_at: string;
     }>();
@@ -1207,7 +1335,7 @@ export async function loadChannelDelta(
     hasMore,
     channels: channels.map(channelJson),
     removedChannelIds,
-    messages: await attachMentions(db, messageRows),
+    messages: await attachMessageRelations(db, messageRows),
     removedMessageIds,
     agentReplies: agentReplies.map(channelReplyJson),
   };

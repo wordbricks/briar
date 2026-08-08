@@ -69,6 +69,8 @@ export type AutoHuntSession = {
   completedAt: string | null;
   conversationId: string | null;
   workspaceRoot: string | null;
+  requestedWorkerId?: string | null;
+  workerId?: string | null;
   summary: string | null;
   error: string | null;
   events: AutoHuntSessionEvent[];
@@ -377,6 +379,7 @@ export function useAutoHuntSessions(
   useEffect(() => {
     if (!syncContext || synchronizedProjects.size === 0) return;
     for (const session of sessions) {
+      if (session.localOwner === false) continue;
       if (!synchronizedProjects.has(session.projectId)) continue;
       const key = sessionSyncKey(session);
       const version = sessionVersion(session);
@@ -606,6 +609,15 @@ export function useAutoHuntSessions(
     return session.id;
   }, []);
 
+  const adoptRemoteSession = useCallback((remote: AutoHuntSession) => {
+    const next = mergeSynchronizedSessions(sessionsRef.current, [
+      { ...remote, localOwner: false },
+    ]);
+    sessionsRef.current = next;
+    setSessions(next);
+    return remote.id;
+  }, []);
+
   const reconcileWorkerDispatches = useCallback((
     projectId: string,
     runs: readonly HuntRun[],
@@ -723,6 +735,7 @@ export function useAutoHuntSessions(
 
   return {
     sessions,
+    adoptRemoteSession,
     startTaskSession,
     startWorkerDispatchSession,
     reconcileWorkerDispatches,

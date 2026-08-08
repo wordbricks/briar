@@ -188,15 +188,6 @@ describe("Sidebar", () => {
     expect(markup).not.toContain("<select");
   });
 
-  it("shows Ideas when the feature flag is enabled", () => {
-    const markup = renderToStaticMarkup(
-      <Sidebar {...sidebarProps} ideasEnabled />,
-    );
-
-    expect(markup).toContain('href="#ideas"');
-    expect(markup).toContain("아이디어");
-  });
-
   it("shows a saved project icon in the project hierarchy", () => {
     const markup = renderToStaticMarkup(
       <Sidebar

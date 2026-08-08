@@ -96,6 +96,36 @@ describe("Codex App Server runner", () => {
     ).toEqual({ type: "turnCompleted", status: "completed" });
   });
 
+  it("adds local channel images to the same App Server turn as the text", () => {
+    const turn = codexTurnRequest(
+      {
+        ...request,
+        imagePaths: [
+          "/worktree/.briar-channel-images/first.png",
+          "/worktree/.briar-channel-images/second.jpg",
+        ],
+      },
+      "thread-1",
+    );
+
+    expect(turn).toMatchObject({
+      method: "turn/start",
+      params: {
+        input: [
+          { type: "text", text: "Inspect the repository" },
+          {
+            type: "localImage",
+            path: "/worktree/.briar-channel-images/first.png",
+          },
+          {
+            type: "localImage",
+            path: "/worktree/.briar-channel-images/second.jpg",
+          },
+        ],
+      },
+    });
+  });
+
   it("drives initialize, thread, turn, and final-message transitions", () => {
     const state = createCodexAppServerState();
     const initialized = consumeCodexAppServerMessage(state, request, {

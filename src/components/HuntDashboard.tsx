@@ -33,6 +33,7 @@ import {
   Plus,
   RefreshCw,
   RotateCcw,
+  Send,
   Search,
   Share2,
   Signal,
@@ -46,7 +47,6 @@ import * as ContextMenu from "@radix-ui/react-context-menu";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import {
   EmptyState,
-  ErrorBanner,
   MainContent,
   PageHeader,
 } from "@/components/layout";
@@ -64,6 +64,7 @@ import { useToast } from "@/components/ui/toast";
 import {
   Tooltip,
   TooltipContent,
+  TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Typography } from "@/components/ui/typography";
@@ -158,8 +159,10 @@ import {
 } from "../lib/issue-agent-reply";
 import {
   isIssueMentionUrl,
+  issueMentionHandleFromUrl,
   remarkIssueMentions,
 } from "../lib/issue-mentions";
+import { ProfileDialog, type ProfileTarget } from "./ProfileDialog";
 import {
   copyIssueId,
   copyIssueShareLink,
@@ -436,13 +439,16 @@ export function HuntDashboard({
   onUnassignRun,
   onResumeRun = async () => undefined,
   onCompanionAgentsOpen,
-  onCompanionIdeasOpen,
   onCompanionInboxOpen,
   onCompanionHomeOpen,
   onCompanionStatusChange,
   onIssueViewed,
   onRequestedRunOpen,
   onSendIssueMessage,
+  onEditIssueMessage = async () => {
+    throw new Error("메시지 수정 기능을 사용할 수 없습니다.");
+  },
+  onDeleteIssueMessage = async () => undefined,
   requestedRunId = null,
   issueListRequestKey = 0,
   processingIssueIds = new Set<string>(),
@@ -515,7 +521,6 @@ export function HuntDashboard({
   onUnassignRun?: (runId: string) => Promise<unknown>;
   onResumeRun?: (runId: string) => Promise<unknown>;
   onCompanionAgentsOpen?: () => void;
-  onCompanionIdeasOpen?: () => void;
   onCompanionInboxOpen?: () => void;
   onCompanionHomeOpen?: () => void;
   onCompanionStatusChange?: (status: CompanionStatusFilter) => void;
@@ -531,6 +536,15 @@ export function HuntDashboard({
       attachmentReferences?: string[];
     },
   ) => Promise<IssueMessageSendResult>;
+  onEditIssueMessage?: (
+    runId: string,
+    messageId: string,
+    input: {
+      body: string;
+      mentionedUserIds?: string[];
+    },
+  ) => Promise<IssueMessage>;
+  onDeleteIssueMessage?: (runId: string, messageId: string) => Promise<unknown>;
   requestedRunId?: string | null;
   issueListRequestKey?: number;
   processingIssueIds?: ReadonlySet<string>;
@@ -538,6 +552,7 @@ export function HuntDashboard({
   token?: string | null;
 }) {
   const { t } = useI18n();
+  const { toast } = useToast();
   const [query, setQuery] = useState("");
   const [source, setSource] = useState<SourceFilter>("all");
   const [isSourceFilterOpen, setIsSourceFilterOpen] = useState(false);
@@ -722,6 +737,11 @@ export function HuntDashboard({
   const runs = dashboard?.runs ?? [];
   const issuesLoading = dashboard === null && !noProject && !error && !recoveryError;
   const selected = runs.find((run) => run.id === selectedRunId) ?? null;
+  const displayedError = error ?? recoveryError;
+  useEffect(() => {
+    if (selected || !displayedError) return;
+    toast(displayedError, { tone: "error" });
+  }, [displayedError, selected, toast]);
   const selectedInboxVersion = selected
     ? inboxIssueMessageVersion(selected)
     : null;
@@ -1061,7 +1081,7 @@ export function HuntDashboard({
           companionMode={companionMode}
           issueKeyPrefix={dashboard?.project.issueKeyPrefix}
           currentUserId={currentUserId}
-          error={recoveryError}
+          error={displayedError}
           isDeletingIssue={deletingIssueId === selected.id}
           isRecovering={recoveringRunId === selected.id}
           isUpdatingIssue={updatingIssueId === selected.id}
@@ -1115,6 +1135,10 @@ export function HuntDashboard({
           }
           onResume={() => onResumeRun(selected.id)}
           onSendIssueMessage={(input) => onSendIssueMessage(selected.id, input)}
+          onEditIssueMessage={(messageId, input) =>
+            onEditIssueMessage(selected.id, messageId, input)}
+          onDeleteIssueMessage={(messageId) =>
+            onDeleteIssueMessage(selected.id, messageId)}
           onUpdateIssue={(input) => onUpdateIssue(selected.id, input)}
           onUpdateIssueCheckpoints={(checkpoints) =>
             onUpdateIssueCheckpoints(selected.id, checkpoints)}
@@ -1217,11 +1241,6 @@ export function HuntDashboard({
         />
       ) : null}
       <div className="dashboard-scroll">
-        {error || recoveryError ? (
-          <ErrorBanner className="error-banner" icon={<CircleAlert size={16} />}>
-            {error ?? recoveryError}
-          </ErrorBanner>
-        ) : null}
         {companionMode ? (
           <div className="queue-header">
             <div className="queue-heading">
@@ -1607,7 +1626,6 @@ export function HuntDashboard({
           activeDestination={status}
           onCreate={() => setIsIssueDialogOpen(true)}
           onAgentsOpen={() => onCompanionAgentsOpen?.()}
-          onIdeasOpen={() => onCompanionIdeasOpen?.()}
           onInboxOpen={() => onCompanionInboxOpen?.()}
           onHomeOpen={() => onCompanionHomeOpen?.()}
           onStatusChange={setStatus}
@@ -3514,7 +3532,6 @@ function KanbanCard({
             tone={meta.tone}
           />
           <i className="kanban-source">
-            <span className={`source-dot ${run.source}`} />
             {t(`source.${run.source}` as MessageKey)}
           </i>
           {run.executionReadiness === "waiting" && (
@@ -4305,6 +4322,10 @@ export function RunPage({
   onResume = async () => undefined,
   onRemoveDependency,
   onSendIssueMessage,
+  onEditIssueMessage = async () => {
+    throw new Error("메시지 수정 기능을 사용할 수 없습니다.");
+  },
+  onDeleteIssueMessage = async () => undefined,
   onUpdateIssue,
   onUpdateIssueCheckpoints,
   onUpdateIssuePreferences = async () => undefined,
@@ -4362,6 +4383,11 @@ export function RunPage({
     attachments?: File[];
     attachmentReferences?: string[];
   }) => Promise<IssueMessageSendResult>;
+  onEditIssueMessage?: (messageId: string, input: {
+    body: string;
+    mentionedUserIds?: string[];
+  }) => Promise<IssueMessage>;
+  onDeleteIssueMessage?: (messageId: string) => Promise<unknown>;
   onUpdateIssue?: (input: UpdateIssueInput) => Promise<unknown>;
   onUpdateIssueCheckpoints?: (
     checkpoints: AutoHuntWorkflowCheckpoint[],
@@ -4405,6 +4431,10 @@ export function RunPage({
     (member) => member.userId === run.assigneeUserId,
   ) ?? null;
   const { toast } = useToast();
+  useEffect(() => {
+    if (!error) return;
+    toast(error, { tone: "error" });
+  }, [error, toast]);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -4933,37 +4963,59 @@ export function RunPage({
         <Signal aria-hidden="true" size={13} />
         {priorityLabel}
       </span>
-      <span className="run-page-property-badge worker" title={t("run.assignee")}>
-        <UserRound aria-hidden="true" size={13} />
-        {assignee?.name ?? t("run.unassigned")}
-      </span>
+      {assignee && (
+        <span
+          aria-label={`${t("issue.assignee")}: ${assignee.name}`}
+          className="run-page-property-badge assignee"
+          title={`${t("issue.assignee")}: ${assignee.name}`}
+        >
+          <IssueAssigneeAvatar member={assignee} />
+        </span>
+      )}
+      {executionWorker && (
+        <span
+          aria-label={t("run.workerAssigned", { worker: executionWorker.label })}
+          className="run-page-property-badge worker"
+          title={t("run.workerAssigned", { worker: executionWorker.label })}
+        >
+          <WorkerIcon icon={executionWorker.icon} size={18} />
+        </span>
+      )}
       <span className="run-page-property-badge agent" title={t("run.agent")}>
         <Bot aria-hidden="true" size={13} />
         {performedAgentName ?? t("run.unassigned")}
       </span>
     </div>
   );
+  const processNowLabel = t(
+    isProcessing
+      ? "issue.processNowRunning"
+      : canReassign
+        ? "worker.reassign"
+        : "issue.processNow",
+  );
   const processNowButton = (
-    <Button
-      className="run-page-process-now"
-      disabled={processNowDisabled}
-      onClick={onProcessNow}
-      size="sm"
-      type="button"
-    >
-      {isProcessing ? (
-        <LoaderCircle aria-hidden="true" className="spin" size={15} />
-      ) : (
-        <Bot aria-hidden="true" size={15} />
-      )}
-      {t(
-        isProcessing
-          ? "issue.processNowRunning"
-          : canReassign
-            ? "worker.reassign"
-            : "issue.processNow",
-      )}
-    </Button>
+    <TooltipProvider delayDuration={200}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            aria-label={processNowLabel}
+            className="run-page-process-now"
+            disabled={processNowDisabled}
+            onClick={onProcessNow}
+            size="icon-sm"
+            type="button"
+          >
+            {isProcessing ? (
+              <LoaderCircle aria-hidden="true" className="spin" size={15} />
+            ) : (
+              <Play aria-hidden="true" size={15} />
+            )}
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side="bottom">{processNowLabel}</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
   return (
     <MainContent className="run-page-shell" id="issue-detail">
@@ -5010,12 +5062,12 @@ export function RunPage({
             <button
               aria-controls="run-properties-panel"
               aria-expanded={isPropertiesOpen}
+              aria-label={t("run.properties")}
               className="run-page-properties-toggle"
               onClick={() => setIsPropertiesOpen((open) => !open)}
               type="button"
             >
               <Columns3 aria-hidden="true" size={15} />
-              {t("run.properties")}
               <ChevronDown aria-hidden="true" size={13} />
             </button>
             <button
@@ -5127,12 +5179,12 @@ export function RunPage({
                   <button
                     aria-controls="run-properties-panel"
                     aria-expanded={isPropertiesOpen}
+                    aria-label={t("run.properties")}
                     className="run-page-properties-toggle"
                     onClick={() => setIsPropertiesOpen((open) => !open)}
                     type="button"
                   >
                     <Columns3 aria-hidden="true" size={15} />
-                    {t("run.properties")}
                     <ChevronDown aria-hidden="true" size={13} />
                   </button>
                 </div>
@@ -5866,8 +5918,11 @@ export function RunPage({
                     role="tabpanel"
                   >
                     <IssueConversation
+                      currentUserId={currentUserId}
                       mentionMembers={mentionMembers}
                       onAcceptIssueAction={onAcceptIssueAction}
+                      onDelete={onDeleteIssueMessage}
+                      onEdit={onEditIssueMessage}
                       onLoadAttachment={onLoadAttachment}
                       onLoad={onLoadIssueMessages}
                       onSend={onSendIssueMessage}
@@ -5899,8 +5954,11 @@ export function RunPage({
                     tabIndex={0}
                   />
                   <IssueConversation
+                    currentUserId={currentUserId}
                     mentionMembers={mentionMembers}
                     onAcceptIssueAction={onAcceptIssueAction}
+                    onDelete={onDeleteIssueMessage}
+                    onEdit={onEditIssueMessage}
                     onLoadAttachment={onLoadAttachment}
                     onLoad={onLoadIssueMessages}
                     onSend={onSendIssueMessage}
@@ -5953,7 +6011,6 @@ export function RunPage({
                     </span>
                     {isRecovering && <LoaderCircle className="spin" size={14} />}
                   </label>
-                  {error && <p className="run-status-error"><CircleAlert size={13} />{error}</p>}
                   <div
                     aria-label={`${t("issue.priority")}: ${priorityLabel}`}
                     className="run-property"
@@ -7423,17 +7480,26 @@ function RunEvidenceImagePreview({
 }
 
 function IssueConversation({
+  currentUserId = null,
   mentionMembers,
   onAcceptIssueAction,
+  onDelete,
+  onEdit,
   onLoadAttachment,
   onLoad,
   onSend,
   run,
 }: {
+  currentUserId?: string | null;
   mentionMembers: OrganizationMember[];
   onAcceptIssueAction?: (
     proposal: IssueProposedAction,
   ) => Promise<IssueProposedAction>;
+  onDelete: (messageId: string) => Promise<unknown>;
+  onEdit: (messageId: string, input: {
+    body: string;
+    mentionedUserIds?: string[];
+  }) => Promise<IssueMessage>;
   onLoadAttachment: (attachment: IssueAttachment) => Promise<Blob>;
   onLoad: () => Promise<IssueMessage[]>;
   onSend: (input: {
@@ -7450,14 +7516,21 @@ function IssueConversation({
   const [activeReplyMessageId, setActiveReplyMessageId] = useState<
     string | null
   >(null);
+  const [activeEditMessageId, setActiveEditMessageId] = useState<
+    string | null
+  >(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [messageErrors, setMessageErrors] = useState<
+    Record<string, string | null>
+  >({});
   const [agentReplyStates, setAgentReplyStates] = useState<
     Record<string, { pending: number; error: string | null }>
   >({});
   const [actionProposalStates, setActionProposalStates] = useState<
     Record<string, { accepting: boolean; error: string | null }>
   >({});
+  const [activeProfile, setActiveProfile] = useState<ProfileTarget | null>(null);
   const messageListRef = useRef<HTMLDivElement | null>(null);
   const onLoadRef = useRef(onLoad);
   onLoadRef.current = onLoad;
@@ -7503,6 +7576,33 @@ function IssueConversation({
     ],
     [mentionMembers],
   );
+  const profilesByHandle = useMemo(() => {
+    const profiles = new Map<string, ProfileTarget>();
+    profiles.set("briar", {
+      type: "agent",
+      id: "briar",
+      name: "Briar",
+      handle: "briar",
+      provider: null,
+      model: null,
+      responsibility: t("profile.briarResponsibility"),
+      projectId: null,
+      createdAt: null,
+    });
+    for (const member of mentionMembers) {
+      profiles.set(issueMentionHandle(member).toLowerCase(), {
+        type: "user",
+        id: member.userId,
+        name: member.name,
+        email: member.email,
+        image: member.image,
+        role: member.role,
+        roleContext: "organization",
+        createdAt: member.createdAt,
+      });
+    }
+    return profiles;
+  }, [mentionMembers, t]);
 
   useLayoutEffect(() => {
     const messageList = messageListRef.current;
@@ -7609,6 +7709,64 @@ function IssueConversation({
     }
   };
 
+  const editMessage = async (
+    messageId: string,
+    body: string,
+    mentionedUserIds: string[],
+  ) => {
+    setMessageErrors((current) => ({ ...current, [messageId]: null }));
+    try {
+      const updated = await onEdit(messageId, { body, mentionedUserIds });
+      setMessages((current) =>
+        current.map((message) =>
+          message.id === messageId ? updated : message,
+        )
+      );
+      setActiveEditMessageId((current) =>
+        current === messageId ? null : current,
+      );
+    } catch (caught) {
+      setMessageErrors((current) => ({
+        ...current,
+        [messageId]: caught instanceof Error ? caught.message : String(caught),
+      }));
+    }
+  };
+
+  const deleteMessage = async (messageId: string) => {
+    if (!window.confirm(t("run.deleteMessageConfirm"))) return;
+    setMessageErrors((current) => ({ ...current, [messageId]: null }));
+    try {
+      await onDelete(messageId);
+      const deletedIds = new Set<string>([messageId]);
+      let changed = true;
+      while (changed) {
+        changed = false;
+        for (const message of messages) {
+          if (
+            message.parentMessageId &&
+            deletedIds.has(message.parentMessageId) &&
+            !deletedIds.has(message.id)
+          ) {
+            deletedIds.add(message.id);
+            changed = true;
+          }
+        }
+      }
+      setMessages((current) =>
+        current.filter((message) => !deletedIds.has(message.id))
+      );
+      setActiveEditMessageId((current) =>
+        current && deletedIds.has(current) ? null : current,
+      );
+    } catch (caught) {
+      setMessageErrors((current) => ({
+        ...current,
+        [messageId]: caught instanceof Error ? caught.message : String(caught),
+      }));
+    }
+  };
+
   return (
     <section className="issue-conversation" aria-label={t("run.messages")}>
       <header className="issue-conversation-header">
@@ -7638,20 +7796,34 @@ function IssueConversation({
         ) : (
           orderedMessages.map((message) => {
             const replyComposerId = `issue-reply-composer-${message.id}`;
+            const editComposerId = `issue-edit-composer-${message.id}`;
             const isReplying = activeReplyMessageId === message.id;
+            const isEditing = activeEditMessageId === message.id;
             const parentMessage = message.parentMessageId
               ? messagesById.get(message.parentMessageId) ?? null
               : null;
             return (
               <div className="issue-message-group" key={message.id}>
                 <IssueMessageItem
+                  currentUserId={currentUserId}
+                  isEditing={isEditing}
                   isReplying={isReplying}
                   localeTag={localeTag}
                   message={message}
                   mentionHandles={mentionHandles}
+                  onMentionOpen={(handle) => {
+                    const profile = profilesByHandle.get(handle.toLowerCase());
+                    if (profile) setActiveProfile(profile);
+                  }}
                   onAcceptIssueAction={onAcceptIssueAction && message.proposedAction
                     ? () => void acceptIssueAction(message.proposedAction!)
                     : undefined}
+                  onDelete={() => void deleteMessage(message.id)}
+                  onEdit={() =>
+                    setActiveEditMessageId((current) =>
+                      current === message.id ? null : message.id,
+                    )
+                  }
                   onLoadAttachment={onLoadAttachment}
                   onReply={() =>
                     setActiveReplyMessageId((current) =>
@@ -7660,9 +7832,11 @@ function IssueConversation({
                   }
                   parentMessage={parentMessage}
                   replyComposerId={replyComposerId}
+                  editComposerId={editComposerId}
                   actionProposalState={message.proposedAction
                     ? actionProposalStates[message.proposedAction.id]
                     : undefined}
+                  actionError={messageErrors[message.id] ?? null}
                   reworkStageLabel={message.proposedAction?.type === "request_issue_rework"
                     ? localizeWorkflowStage(
                         t,
@@ -7707,6 +7881,30 @@ function IssueConversation({
                     />
                   </div>
                 )}
+                {isEditing && (
+                  <div
+                    className="issue-inline-reply-composer"
+                    id={editComposerId}
+                  >
+                    <MessageComposer
+                      autoFocus
+                      compact
+                      disableAttachments
+                      initialBody={message.body}
+                      mentionMembers={mentionMembers}
+                      onCancel={() => setActiveEditMessageId(null)}
+                      onSubmit={async (
+                        body,
+                        mentionedUserIds,
+                        _attachments,
+                        _references,
+                      ) => {
+                        await editMessage(message.id, body, mentionedUserIds);
+                      }}
+                      placeholder={t("run.editMessagePlaceholder")}
+                    />
+                  </div>
+                )}
               </div>
             );
           })
@@ -7719,39 +7917,62 @@ function IssueConversation({
         }
         placeholder={t("run.messagePlaceholder", { title: run.title })}
       />
+      <ProfileDialog
+        profile={activeProfile}
+        onOpenChange={(open) => {
+          if (!open) setActiveProfile(null);
+        }}
+      />
     </section>
   );
 }
 
 function IssueMessageItem({
+  currentUserId = null,
+  isEditing = false,
   isReplying = false,
   localeTag,
   message,
   mentionHandles,
+  onMentionOpen,
   onAcceptIssueAction,
+  onDelete,
+  onEdit,
   onLoadAttachment,
   onReply,
   parentMessage = null,
   replyComposerId,
+  editComposerId,
   actionProposalState,
+  actionError,
   reworkStageLabel,
 }: {
+  currentUserId?: string | null;
+  isEditing?: boolean;
   isReplying?: boolean;
   localeTag: string;
   message: IssueMessage;
   mentionHandles: readonly string[];
+  onMentionOpen: (handle: string) => void;
   onAcceptIssueAction?: () => void;
+  onDelete?: () => void;
+  onEdit?: () => void;
   onLoadAttachment: (attachment: IssueAttachment) => Promise<Blob>;
   onReply?: () => void;
   parentMessage?: IssueMessage | null;
   replyComposerId?: string;
+  editComposerId?: string;
   actionProposalState?: { accepting: boolean; error: string | null };
+  actionError?: string | null;
   reworkStageLabel?: string | null;
 }) {
   const { t } = useI18n();
   const remarkPlugins = useMemo(
     () => [remarkGfm, remarkIssueMentions(mentionHandles)],
     [mentionHandles],
+  );
+  const canManage = Boolean(
+    currentUserId && message.author.id === currentUserId && onEdit && onDelete,
   );
   const proposal = message.proposedAction;
   const proposalTitle = proposal?.type === "request_issue_update"
@@ -7784,7 +8005,8 @@ function IssueMessageItem({
           <ReactMarkdown
             components={{
               a: ({ children, href, node: _node, ...props }) => {
-                const isMention = isIssueMentionUrl(href);
+                const mentionHandle = issueMentionHandleFromUrl(href);
+                const isMention = mentionHandle !== null;
                 return (
                   <a
                     {...props}
@@ -7792,7 +8014,10 @@ function IssueMessageItem({
                     href={href}
                     onClick={
                       isMention
-                        ? (event) => event.preventDefault()
+                        ? (event) => {
+                            event.preventDefault();
+                            onMentionOpen(mentionHandle);
+                          }
                         : props.onClick
                     }
                   >
@@ -7896,25 +8121,57 @@ function IssueMessageItem({
           </section>
         ) : null}
       </div>
-      {onReply && (
+      {(onReply || canManage) && (
         <div
           aria-label={t("run.replyInThread")}
           className="issue-message-actions"
           role="toolbar"
         >
-          <button
-            aria-controls={replyComposerId}
-            aria-expanded={isReplying}
-            aria-label={t("run.replyInThread")}
-            className="issue-reply-trigger"
-            onClick={onReply}
-            title={t("run.replyInThread")}
-            type="button"
-          >
-            <MessageCircle aria-hidden="true" size={16} />
-          </button>
+          {onReply ? (
+            <button
+              aria-controls={replyComposerId}
+              aria-expanded={isReplying}
+              aria-label={t("run.replyInThread")}
+              className="issue-reply-trigger"
+              onClick={onReply}
+              title={t("run.replyInThread")}
+              type="button"
+            >
+              <MessageCircle aria-hidden="true" size={16} />
+            </button>
+          ) : null}
+          {canManage ? (
+            <>
+              <button
+                aria-controls={editComposerId}
+                aria-expanded={isEditing}
+                aria-label={t("run.editMessage")}
+                className="issue-reply-trigger"
+                onClick={onEdit}
+                title={t("run.editMessage")}
+                type="button"
+              >
+                <Pencil aria-hidden="true" size={15} />
+              </button>
+              <button
+                aria-label={t("run.deleteMessage")}
+                className="issue-reply-trigger"
+                onClick={onDelete}
+                title={t("run.deleteMessage")}
+                type="button"
+              >
+                <Trash2 aria-hidden="true" size={15} />
+              </button>
+            </>
+          ) : null}
         </div>
       )}
+      {actionError ? (
+        <p className="issue-message-action-error">
+          <CircleAlert aria-hidden="true" size={14} />
+          {actionError}
+        </p>
+      ) : null}
     </article>
   );
 }
@@ -7973,6 +8230,8 @@ function MessageAvatar({ message }: { message: IssueMessage }) {
 function MessageComposer({
   autoFocus = false,
   compact = false,
+  disableAttachments = false,
+  initialBody = "",
   mentionMembers,
   onCancel,
   onSubmit,
@@ -7980,6 +8239,8 @@ function MessageComposer({
 }: {
   autoFocus?: boolean;
   compact?: boolean;
+  disableAttachments?: boolean;
+  initialBody?: string;
   mentionMembers: OrganizationMember[];
   onCancel?: () => void;
   onSubmit: (
@@ -7991,7 +8252,7 @@ function MessageComposer({
   placeholder: string;
 }) {
   const { t } = useI18n();
-  const [body, setBody] = useState("");
+  const [body, setBody] = useState(initialBody);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [caret, setCaret] = useState(0);
@@ -7999,7 +8260,18 @@ function MessageComposer({
   const [mentionDismissed, setMentionDismissed] = useState(false);
   const [selectedMentions, setSelectedMentions] = useState<
     Record<string, string>
-  >({});
+  >(() => {
+    const existing: Record<string, string> = {};
+    if (initialBody) {
+      for (const member of mentionMembers) {
+        const handle = issueMentionHandle(member);
+        if (handle && mentionsIssueHandle(initialBody, handle)) {
+          existing[member.userId] = handle;
+        }
+      }
+    }
+    return existing;
+  });
   const [attachments, setAttachments] = useState<
     Array<{ file: File; reference: string }>
   >([]);
@@ -8130,10 +8402,14 @@ function MessageComposer({
       }}
       onFocus={() => setComposerFocused(true)}
       onDragOver={(event) => {
-        if (dataTransferHasFiles(event.dataTransfer)) event.preventDefault();
+        if (!disableAttachments && dataTransferHasFiles(event.dataTransfer)) {
+          event.preventDefault();
+        }
       }}
       onDrop={(event) => {
-        if (!dataTransferHasFiles(event.dataTransfer)) return;
+        if (disableAttachments || !dataTransferHasFiles(event.dataTransfer)) {
+          return;
+        }
         event.preventDefault();
         addImages(filesFromDataTransfer(event.dataTransfer));
       }}
@@ -8232,6 +8508,7 @@ function MessageComposer({
           }
         }}
         onPaste={(event) => {
+          if (disableAttachments) return;
           const images = filesFromDataTransfer(event.clipboardData).filter(
             (file) => file.type.startsWith("image/"),
           );
@@ -8258,27 +8535,31 @@ function MessageComposer({
             <X size={17} />
           </button>
         ) : null}
-        <button
-          aria-label={t("issue.attachmentLabel")}
-          className="issue-composer-link"
-          disabled={sending || attachments.length >= maxIssueAttachmentCount}
-          onClick={() => attachmentInputRef.current?.click()}
-          type="button"
-        >
-          <Paperclip size={18} />
-        </button>
-        <input
-          accept="image/*"
-          className="issue-composer-file-input"
-          disabled={sending || attachments.length >= maxIssueAttachmentCount}
-          multiple
-          onChange={(event) => {
-            addImages(Array.from(event.currentTarget.files ?? []));
-            event.currentTarget.value = "";
-          }}
-          ref={attachmentInputRef}
-          type="file"
-        />
+        {!disableAttachments ? (
+          <>
+            <button
+              aria-label={t("issue.attachmentLabel")}
+              className="issue-composer-link"
+              disabled={sending || attachments.length >= maxIssueAttachmentCount}
+              onClick={() => attachmentInputRef.current?.click()}
+              type="button"
+            >
+              <Paperclip size={18} />
+            </button>
+            <input
+              accept="image/*"
+              className="issue-composer-file-input"
+              disabled={sending || attachments.length >= maxIssueAttachmentCount}
+              multiple
+              onChange={(event) => {
+                addImages(Array.from(event.currentTarget.files ?? []));
+                event.currentTarget.value = "";
+              }}
+              ref={attachmentInputRef}
+              type="file"
+            />
+          </>
+        ) : null}
         <button
           aria-label={sending ? t("run.sendingMessage") : t("run.sendMessage")}
           className="issue-message-send"
@@ -8288,7 +8569,7 @@ function MessageComposer({
           {sending ? (
             <LoaderCircle className="spin" size={16} />
           ) : (
-            <ArrowUp size={19} strokeWidth={2.2} />
+            <Send aria-hidden="true" size={19} strokeWidth={2.2} />
           )}
         </button>
       </footer>

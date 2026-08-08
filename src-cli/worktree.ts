@@ -714,7 +714,7 @@ export async function allocateAnalysisWorktree(input: {
     projectWorktreeRoot(input.settings.root, input.projectId),
     "analysis",
   );
-  const path = assertPathWithinRoot(join(root, `idea-${input.workId}`), root);
+  const path = assertPathWithinRoot(join(root, `analysis-${input.workId}`), root);
   await mkdir(root, { recursive: true, mode: 0o700 });
   if (await pathExists(path)) {
     input.git(["worktree", "remove", "--force", path], {

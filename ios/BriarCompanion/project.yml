@@ -10,7 +10,6 @@ configs:
   Production: release
 settings:
   base:
-    BRIAR_FEATURE_IDEAS: "false"
     CURRENT_PROJECT_VERSION: 1
     MARKETING_VERSION: 1.2.52
     SWIFT_VERSION: "6.0"
@@ -49,7 +48,6 @@ targets:
       path: App/Info.plist
       properties:
         CFBundleDisplayName: $(BRIAR_DISPLAY_NAME)
-        BriarFeatureIdeas: $(BRIAR_FEATURE_IDEAS)
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         CFBundleURLTypes:

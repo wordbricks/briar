@@ -68,10 +68,29 @@ export type InboxConversationMessage = {
   reason: "mention" | "thread_reply";
 };
 
+export type InboxChannelMessage = {
+  id: string;
+  kind: "channel";
+  projectId: string;
+  projectName: string;
+  targetId: string;
+  channelId: string;
+  channelName: string;
+  messageId: string;
+  rootMessageId: string;
+  title: string;
+  occurredAt: string;
+  version: string;
+  body: string;
+  authorName: string;
+  reason: "mention" | "thread_reply";
+};
+
 export type InboxMessage =
   | InboxIssueMessage
   | InboxSessionMessage
-  | InboxConversationMessage;
+  | InboxConversationMessage
+  | InboxChannelMessage;
 export type InboxMessageWithReadState = InboxMessage & { isUnread: boolean };
 export type InboxCategory =
   | "urgent"
@@ -151,6 +170,29 @@ export function buildCurrentInboxMessages(
         targetId: notification.runId,
         rootMessageId: notification.rootMessageId,
         title: notification.runTitle,
+        occurredAt: notification.createdAt,
+        version: notification.id,
+        body: notification.body,
+        authorName: notification.author.name,
+        reason: notification.reason,
+      });
+    }
+
+    for (const notification of dashboard.channelNotifications ?? []) {
+      messages.push({
+        id: `channel:${notification.id}`,
+        kind: "channel",
+        // Dashboard loading already scopes this projection to the active
+        // project's organization. Retaining the active project keeps the
+        // existing persisted Inbox/project filtering contract compatible.
+        projectId: dashboard.project.id,
+        projectName: dashboard.project.name,
+        targetId: notification.channelId,
+        channelId: notification.channelId,
+        channelName: notification.channelName,
+        messageId: notification.id,
+        rootMessageId: notification.rootMessageId,
+        title: notification.channelName,
         occurredAt: notification.createdAt,
         version: notification.id,
         body: notification.body,
@@ -264,7 +306,9 @@ export function inboxReadVersionsToPush(
 export function classifyInboxMessage(
   message: InboxMessage,
 ): InboxCategory {
-  if (message.kind === "conversation") return "action_required";
+  if (message.kind === "conversation" || message.kind === "channel") {
+    return "action_required";
+  }
   if (message.kind === "session") {
     return message.requiresAttention || message.status === "failed"
       ? "action_required"
@@ -379,6 +423,7 @@ export function useInbox(
     () => buildCurrentInboxMessages(dashboard, sessions, projects),
     [
       dashboard?.conversationNotifications,
+      dashboard?.channelNotifications,
       dashboard?.project.id,
       dashboard?.project.name,
       dashboard?.runs,

@@ -4079,6 +4079,16 @@ fn sync_execution_worker_labels(app: AppHandle) -> Result<serde_json::Value, Str
         .map_err(|error| format!("Worker 이름 동기화 결과를 읽지 못했습니다: {error}"))
 }
 
+#[tauri::command]
+fn refresh_execution_worker_runtime(app: AppHandle) -> Result<bool, String> {
+    let resource_directory = app
+        .path()
+        .resource_dir()
+        .map_err(|error| error.to_string())?;
+    let home = app.path().home_dir().map_err(|error| error.to_string())?;
+    sync_auto_hunt_assets_and_restart_workers(&resource_directory, &home)
+}
+
 fn inspect_execution_workers_at(
     config_path: &Path,
     project_ids: Vec<String>,
@@ -6978,6 +6988,170 @@ fn prepare_launch_intro(app: tauri::AppHandle) -> Result<(), String> {
     }
 }
 
+/// Menu id of the custom Quit item installed by [`install_app_menu`].
+///
+/// The default macOS menu's predefined Quit item terminates the app directly
+/// (Cmd+Q goes through NSApplication `terminate:`), bypassing the exit
+/// confirmation. Replacing it with a normal menu item whose accelerator routes
+/// through this id keeps the confirmation dialog on every quit path.
+#[cfg(desktop)]
+pub(crate) const APP_QUIT_MENU_ID: &str = "app:quit";
+
+/// Install the app-wide menu with a custom Quit item that asks for
+/// confirmation before exiting.
+///
+/// Mirrors Tauri's default macOS menu (About, Services, Hide, Hide Others,
+/// Edit, View, Window, Help) but swaps the predefined Quit item for a regular
+/// item bound to [`APP_QUIT_MENU_ID`] with the Cmd/Ctrl+Q accelerator. The
+/// menu event handler registered in [`run`] shows the confirmation dialog.
+#[cfg(desktop)]
+fn install_app_menu(app: &AppHandle) -> Result<(), String> {
+    use tauri::menu::{AboutMetadata, Menu, MenuItem, PredefinedMenuItem, Submenu};
+
+    let pkg_info = app.package_info();
+    let config = app.config();
+    let about_metadata = AboutMetadata {
+        name: Some(pkg_info.name.clone()),
+        version: Some(pkg_info.version.to_string()),
+        copyright: config.bundle.copyright.clone(),
+        authors: config
+            .bundle
+            .publisher
+            .clone()
+            .map(|publisher| vec![publisher]),
+        ..Default::default()
+    };
+
+    #[cfg(any(target_os = "macos", windows))]
+    let quit = MenuItem::with_id(
+        app,
+        APP_QUIT_MENU_ID,
+        format!("Quit {}", pkg_info.name),
+        true,
+        Some("CmdOrCtrl+Q"),
+    )
+    .map_err(|error| format!("App menu quit item failed: {error}"))?;
+
+    let window_menu = Submenu::with_id_and_items(
+        app,
+        "window",
+        "Window",
+        true,
+        &[
+            &PredefinedMenuItem::minimize(app, None)
+                .map_err(|error| format!("App menu minimize item failed: {error}"))?,
+            &PredefinedMenuItem::maximize(app, None)
+                .map_err(|error| format!("App menu maximize item failed: {error}"))?,
+            #[cfg(target_os = "macos")]
+            &PredefinedMenuItem::separator(app)
+                .map_err(|error| format!("App menu separator failed: {error}"))?,
+            &PredefinedMenuItem::close_window(app, None)
+                .map_err(|error| format!("App menu close window item failed: {error}"))?,
+        ],
+    )
+    .map_err(|error| format!("App menu Window submenu failed: {error}"))?;
+
+    let help_menu = Submenu::with_id_and_items(
+        app,
+        "help",
+        "Help",
+        true,
+        &[
+            #[cfg(not(target_os = "macos"))]
+            &PredefinedMenuItem::about(app, None, Some(about_metadata))
+                .map_err(|error| format!("App menu about item failed: {error}"))?,
+        ],
+    )
+    .map_err(|error| format!("App menu Help submenu failed: {error}"))?;
+
+    let menu = Menu::with_items(
+        app,
+        &[
+            #[cfg(target_os = "macos")]
+            &Submenu::with_items(
+                app,
+                pkg_info.name.clone(),
+                true,
+                &[
+                    &PredefinedMenuItem::about(app, None, Some(about_metadata))
+                        .map_err(|error| format!("App menu about item failed: {error}"))?,
+                    &PredefinedMenuItem::separator(app)
+                        .map_err(|error| format!("App menu separator failed: {error}"))?,
+                    &PredefinedMenuItem::services(app, None)
+                        .map_err(|error| format!("App menu services item failed: {error}"))?,
+                    &PredefinedMenuItem::separator(app)
+                        .map_err(|error| format!("App menu separator failed: {error}"))?,
+                    &PredefinedMenuItem::hide(app, None)
+                        .map_err(|error| format!("App menu hide item failed: {error}"))?,
+                    &PredefinedMenuItem::hide_others(app, None)
+                        .map_err(|error| format!("App menu hide others item failed: {error}"))?,
+                    &PredefinedMenuItem::separator(app)
+                        .map_err(|error| format!("App menu separator failed: {error}"))?,
+                    &quit,
+                ],
+            )
+            .map_err(|error| format!("App menu failed: {error}"))?,
+            #[cfg(not(any(
+                target_os = "linux",
+                target_os = "dragonfly",
+                target_os = "freebsd",
+                target_os = "netbsd",
+                target_os = "openbsd"
+            )))]
+            &Submenu::with_items(
+                app,
+                "File",
+                true,
+                &[
+                    &PredefinedMenuItem::close_window(app, None)
+                        .map_err(|error| format!("App menu close window item failed: {error}"))?,
+                    #[cfg(not(target_os = "macos"))]
+                    &quit,
+                ],
+            )
+            .map_err(|error| format!("App menu File submenu failed: {error}"))?,
+            &Submenu::with_items(
+                app,
+                "Edit",
+                true,
+                &[
+                    &PredefinedMenuItem::undo(app, None)
+                        .map_err(|error| format!("App menu undo item failed: {error}"))?,
+                    &PredefinedMenuItem::redo(app, None)
+                        .map_err(|error| format!("App menu redo item failed: {error}"))?,
+                    &PredefinedMenuItem::separator(app)
+                        .map_err(|error| format!("App menu separator failed: {error}"))?,
+                    &PredefinedMenuItem::cut(app, None)
+                        .map_err(|error| format!("App menu cut item failed: {error}"))?,
+                    &PredefinedMenuItem::copy(app, None)
+                        .map_err(|error| format!("App menu copy item failed: {error}"))?,
+                    &PredefinedMenuItem::paste(app, None)
+                        .map_err(|error| format!("App menu paste item failed: {error}"))?,
+                    &PredefinedMenuItem::select_all(app, None)
+                        .map_err(|error| format!("App menu select all item failed: {error}"))?,
+                ],
+            )
+            .map_err(|error| format!("App menu Edit submenu failed: {error}"))?,
+            #[cfg(target_os = "macos")]
+            &Submenu::with_items(
+                app,
+                "View",
+                true,
+                &[&PredefinedMenuItem::fullscreen(app, None)
+                    .map_err(|error| format!("App menu fullscreen item failed: {error}"))?],
+            )
+            .map_err(|error| format!("App menu View submenu failed: {error}"))?,
+            &window_menu,
+            &help_menu,
+        ],
+    )
+    .map_err(|error| format!("App menu build failed: {error}"))?;
+
+    app.set_menu(menu)
+        .map_err(|error| format!("App menu install failed: {error}"))?;
+    Ok(())
+}
+
 #[cfg(desktop)]
 pub(crate) fn request_exit_confirmation(app: &AppHandle) {
     let state = app.state::<ExitConfirmationState>();
@@ -7024,6 +7198,11 @@ pub fn run() {
     let builder = builder
         .manage(ExitConfirmationState::default())
         .manage(status_tray::StatusTrayState::default())
+        .on_menu_event(|app, event| {
+            if event.id() == APP_QUIT_MENU_ID {
+                request_exit_confirmation(app);
+            }
+        })
         .on_window_event(|window, event| {
             if window.label() == "main" {
                 if let tauri::WindowEvent::CloseRequested { api, .. } = event {
@@ -7050,6 +7229,9 @@ pub fn run() {
             }
             #[cfg(desktop)]
             {
+                if let Err(error) = install_app_menu(_app.handle()) {
+                    eprintln!("App menu install failed: {error}");
+                }
                 if let Ok(config_path) = cli_config_path(_app.handle()) {
                     match app_runtime_settings_from(&config_path) {
                         Ok(settings) => {
@@ -7169,6 +7351,7 @@ pub fn run() {
             auto_hunt_health,
             repair_auto_hunt,
             configure_execution_worker,
+            refresh_execution_worker_runtime,
             sync_execution_worker_labels,
             inspect_execution_workers,
             show_inbox_notification,

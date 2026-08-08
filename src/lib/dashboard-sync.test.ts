@@ -74,4 +74,24 @@ describe("dashboard delta merge", () => {
     expect(result.dashboard.conversationNotifications).toEqual([notification]);
     expect(result.dashboard.runs[0]).toBe(demoDashboard.runs[0]);
   });
+
+  it("replaces channel notifications from the organization projection", () => {
+    const notification = {
+      id: "channel-notification-1",
+      channelId: "channel-1",
+      channelName: "product",
+      rootMessageId: "channel-root-1",
+      body: "A channel reply arrived",
+      author: { id: "member", name: "Sam", image: null, provider: null },
+      reason: "thread_reply" as const,
+      createdAt: "2026-08-01T00:00:00.000Z",
+    };
+    const result = mergeDashboardDelta(
+      demoDashboard,
+      delta({ channelNotifications: [notification] }),
+    );
+
+    expect(result.dashboard.channelNotifications).toEqual([notification]);
+    expect(result.dashboard.runs[0]).toBe(demoDashboard.runs[0]);
+  });
 });

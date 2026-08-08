@@ -3,6 +3,7 @@ import {
   apiErrorIssueMessages,
   ApiError,
   addIssueDependency,
+  acceptChannelProposal,
   beginDeviceAuthorization,
   claimProjectAgentScheduleRun,
   completeProjectAgentScheduleRun,
@@ -29,7 +30,9 @@ import {
   loadRunEvents,
   loadSession,
   removeIssueDependency,
+  sendChannelMessage,
   reworkPausedHuntRun,
+  setChannelMember,
   updateProjectAgent,
   updateProjectAgentSchedule,
   updateOrganizationMemberRole,
@@ -79,6 +82,69 @@ describe("Project settings", () => {
 });
 
 describe("API errors", () => {
+  it("accepts a channel proposal in the selected project", async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response(JSON.stringify({
+        outcome: "accepted",
+        projectId: "project-2",
+        resultRunId: "run-2",
+      }), {
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      acceptChannelProposal(
+        "token",
+        "organization-1",
+        "channel-1",
+        "proposal-1",
+        "project-2",
+      ),
+    ).resolves.toEqual({
+      outcome: "accepted",
+      projectId: "project-2",
+      resultRunId: "run-2",
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "/organizations/organization-1/channels/channel-1/proposals/proposal-1/accept",
+      ),
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ projectId: "project-2" }),
+      }),
+    );
+  });
+
+  it("adds a member to a channel with the member role", async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response(JSON.stringify({ members: [] }), {
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await setChannelMember(
+      "token",
+      "organization-1",
+      "channel-1",
+      "user/1",
+      true,
+    );
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "/organizations/organization-1/channels/channel-1/members/user%2F1",
+      ),
+      expect.objectContaining({
+        method: "PUT",
+        body: JSON.stringify({ role: "member" }),
+      }),
+    );
+  });
+
   it("preserves API validation metadata when adding context to an error", () => {
     const original = new ApiError(
       400,
@@ -1623,5 +1689,86 @@ describe("API errors", () => {
       ),
       expect.objectContaining({ method: "DELETE" }),
     );
+  });
+});
+
+describe("channel message API", () => {
+  it("keeps attachment-only fields out of JSON channel messages", async () => {
+    const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
+      expect(JSON.parse(String(init?.body))).toEqual({
+        body: "Hello",
+        parentMessageId: null,
+        mentionedUserIds: [],
+        mentionedAgentIds: [],
+      });
+      return new Response(
+        JSON.stringify({ message: {}, agentReplies: [] }),
+        { status: 201, headers: { "Content-Type": "application/json" } },
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await sendChannelMessage("token", "org-1", "channel-1", {
+      body: "Hello",
+      parentMessageId: null,
+      mentionedUserIds: [],
+      mentionedAgentIds: [],
+      attachments: [],
+      attachmentReferences: [],
+    });
+
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it("uploads channel images and attachment references as multipart form data", async () => {
+    const reference = crypto.randomUUID();
+    const image = new File(["image"], "clipboard.png", { type: "image/png" });
+    const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
+      const form = init?.body as FormData;
+      expect(form).toBeInstanceOf(FormData);
+      expect(form.get("body")).toContain(`briar-attachment://${reference}`);
+      expect(form.get("mentionedAgentIds")).toBe(JSON.stringify(["agent-1"]));
+      expect(form.get("attachmentReferences")).toBe(JSON.stringify([reference]));
+      expect(form.getAll("attachments")).toEqual([image]);
+      return new Response(
+        JSON.stringify({
+          message: {
+            id: crypto.randomUUID(),
+            channelId: "channel-1",
+            parentMessageId: null,
+            author: {
+              type: "user",
+              id: "owner",
+              name: "Owner",
+              email: "owner@example.com",
+              image: null,
+            },
+            body: String(form.get("body")),
+            mentionedUserIds: [],
+            mentionedAgentIds: ["agent-1"],
+            attachments: [],
+            replyCount: 0,
+            lastReplyAt: null,
+            document: null,
+            proposal: null,
+            createdAt: "2026-08-07T00:00:00.000Z",
+          },
+          agentReplies: [],
+        }),
+        { status: 201, headers: { "Content-Type": "application/json" } },
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await sendChannelMessage("token", "org-1", "channel-1", {
+      body: `Screenshot\n\n![clipboard.png](briar-attachment://${reference})`,
+      parentMessageId: null,
+      mentionedUserIds: [],
+      mentionedAgentIds: ["agent-1"],
+      attachments: [image],
+      attachmentReferences: [reference],
+    });
+
+    expect(fetchMock).toHaveBeenCalledOnce();
   });
 });

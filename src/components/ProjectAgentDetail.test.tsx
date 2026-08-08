@@ -84,6 +84,20 @@ const dashboard = {
   runs: [],
 } as unknown as DashboardPayload;
 
+const dashboardWithWorker = {
+  ...dashboard,
+  workers: [{
+    id: "worker-1",
+    label: "Mac Studio",
+    agentProvider: "codex",
+    providers: ["codex"],
+    state: "online",
+    readiness: "available",
+    acceptingWork: true,
+    readinessDetail: "작업 수신 가능",
+  }],
+} as unknown as DashboardPayload;
+
 function ProjectAgentDetailHarness({
   dashboardValue = dashboard,
   onSettleTaskSession,
@@ -209,18 +223,18 @@ describe("ProjectAgentDetail", () => {
     expect(onBack).toHaveBeenCalledOnce();
   });
 
-  it("runs the saved responsibility without opening a local task dialog on mobile", async () => {
-    const onRunResponsibility = vi.fn(async () => undefined);
+  it("opens a direct task dialog and sends the selected Worker on mobile", async () => {
+    const onStartRemoteTask = vi.fn(async () => "remote-session");
     const container = await mount(
       <ProjectAgentDetail
         agent={agent}
         companionMode
-        dashboard={dashboard}
+        dashboard={dashboardWithWorker}
         error={null}
         isSidebarOpen
         onBack={() => undefined}
         onIssueOpen={() => undefined}
-        onRunResponsibility={onRunResponsibility}
+        onStartRemoteTask={onStartRemoteTask}
         onSettleTaskSession={() => undefined}
         onStopSession={async () => true}
         onStartAutoHunt={() => "dispatch-1"}
@@ -236,7 +250,16 @@ describe("ProjectAgentDetail", () => {
     expect(runButton?.textContent).toContain("지금 실행");
     await act(async () => runButton?.click());
 
-    expect(onRunResponsibility).toHaveBeenCalledOnce();
+    expect(document.querySelector('[role="dialog"]')).not.toBeNull();
+    await act(async () => {
+      document.querySelector<HTMLButtonElement>('button[type="submit"]')?.click();
+      await Promise.resolve();
+    });
+
+    expect(onStartRemoteTask).toHaveBeenCalledWith({
+      request: agent.responsibility,
+      workerId: "worker-1",
+    });
     expect(document.querySelector('[role="dialog"]')).toBeNull();
   });
 

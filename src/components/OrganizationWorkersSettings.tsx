@@ -1,5 +1,6 @@
 import {
   Cpu,
+  Download,
   ImagePlus,
   LoaderCircle,
   MonitorCog,
@@ -18,10 +19,15 @@ import { useI18n } from "../i18n";
 import {
   disableOrganizationExecutionWorker,
   loadOrganizationExecutionWorkers,
+  requestOrganizationExecutionWorkerUpdate,
   updateOrganizationExecutionWorkerConcurrency,
   updateOrganizationExecutionWorkerIcon,
 } from "../lib/api";
 import { isDesktopTauri } from "../lib/platform";
+import {
+  compareSemanticVersions,
+  isSemanticVersion,
+} from "../lib/semantic-version";
 import {
   isWorkerEmoji,
   maxWorkerEmojiLength,
@@ -92,6 +98,7 @@ export function OrganizationWorkersSettings({
   const [workers, setWorkers] = useState<OrganizationExecutionWorker[]>([]);
   const [localStatuses, setLocalStatuses] = useState<LocalWorkerStatus[]>([]);
   const [canManage, setCanManage] = useState(false);
+  const [latestVersion, setLatestVersion] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [savingProjectId, setSavingProjectId] = useState<string | null>(null);
   const [savingDeviceId, setSavingDeviceId] = useState<string | null>(null);
@@ -124,6 +131,7 @@ export function OrganizationWorkersSettings({
           : Promise.resolve([]),
       ]);
       setWorkers(remote.workers);
+      setLatestVersion(remote.latestVersion ?? null);
       setCanManage(remote.canManage);
       setLocalStatuses(local);
     } catch (caught) {
@@ -214,6 +222,23 @@ export function OrganizationWorkersSettings({
         organization.id,
         device.deviceId,
         Number(value),
+      );
+      await refresh();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : String(caught));
+    } finally {
+      setSavingDeviceId(null);
+    }
+  };
+
+  const requestUpdate = async (worker: OrganizationExecutionWorker) => {
+    setSavingDeviceId(worker.deviceId);
+    setError(null);
+    try {
+      await requestOrganizationExecutionWorkerUpdate(
+        token,
+        organization.id,
+        worker.deviceId,
       );
       await refresh();
     } catch (caught) {
@@ -383,6 +408,13 @@ export function OrganizationWorkersSettings({
           <div className="overflow-hidden rounded-xl border border-border bg-card shadow-xs">
             {workers.map((worker) => {
               const mayManage = canManage || worker.ownerUserId === userId;
+              const currentVersion = worker.versions?.briar ?? null;
+              const updateAvailable = Boolean(
+                latestVersion &&
+                  currentVersion &&
+                  isSemanticVersion(currentVersion) &&
+                  compareSemanticVersions(currentVersion, latestVersion) < 0,
+              );
               const maximumSlots = Math.max(1, worker.maxConcurrentSessions);
               const activeSlots = Math.min(
                 maximumSlots,
@@ -433,11 +465,46 @@ export function OrganizationWorkersSettings({
                           {t("organization.workerOwnedBy", {
                             name: worker.ownerName,
                           })}
+                          {currentVersion
+                            ? ` · ${t("organization.workerVersion", { version: currentVersion })}`
+                            : ""}
                         </Typography>
                       </div>
                     </div>
                     {mayManage ? (
                       <div className="ml-auto flex items-center gap-1.5">
+                        {worker.updateRequest ? (
+                          <Badge variant="warning">
+                            {t("organization.workerUpdatePending", {
+                              version: worker.updateRequest.targetVersion,
+                            })}
+                          </Badge>
+                        ) : null}
+                        <Button
+                          aria-label={t("organization.workerUpdate", {
+                            name: worker.label,
+                          })}
+                          disabled={
+                            savingDeviceId === worker.deviceId ||
+                            worker.state !== "online" ||
+                            !worker.remoteUpdateSupported ||
+                            !updateAvailable ||
+                            Boolean(worker.updateRequest)
+                          }
+                          onClick={() => void requestUpdate(worker)}
+                          size="icon-sm"
+                          title={
+                            worker.remoteUpdateSupported
+                              ? t("organization.workerUpdate", {
+                                  name: worker.label,
+                                })
+                              : t("organization.workerUpdateUnsupported")
+                          }
+                          type="button"
+                          variant="outline"
+                        >
+                          <Download size={14} />
+                        </Button>
                         <Button
                           aria-label={t("organization.workerIconEdit", {
                             name: worker.label,

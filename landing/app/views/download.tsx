@@ -112,6 +112,7 @@ export default function DownloadView({ locale }: { locale: Locale }) {
           </a>
           <nav aria-label={c.aria.mainMenu}>
             <a href={localizedPath(locale, "/tutorial")}>{c.nav.tutorial}</a>
+            <a href={localizedPath(locale, "/changelog")}>{c.nav.changelog}</a>
             <a href={localizedPath(locale, "/blog")}>{c.nav.blog}</a>
             <a className="is-current" href={localizedPath(locale, "/download")} aria-current="page">
               {c.nav.download}
@@ -254,6 +255,7 @@ export default function DownloadView({ locale }: { locale: Locale }) {
           <div>
             <a href={localizedPath(locale, "/")}>{d.home}</a>
             <a href={localizedPath(locale, "/tutorial")}>{c.nav.tutorial}</a>
+            <a href={localizedPath(locale, "/changelog")}>{c.nav.changelog}</a>
             <a href="#top">{d.backTop}</a>
           </div>
         </div>

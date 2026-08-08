@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { maxIssueMultipartBytes } from "../../src/lib/issue-attachments";
 import {
   readIssueMessageRequest,
+  readChannelMessageRequest,
   readIssueRequest,
   readIssueUpdateRequest,
 } from "./index";
@@ -106,6 +107,65 @@ describe("issue multipart input", () => {
         ),
       ),
     ).rejects.toThrow("Attachment references are invalid");
+  });
+});
+
+describe("channel image multipart input", () => {
+  it("parses image references and structured mentions", async () => {
+    const reference = "7316678b-e3d4-4de3-a045-b76a0fc2e765";
+    const image = new File(["image"], "screen.png", { type: "image/png" });
+    const form = new FormData();
+    form.set("body", `Screenshot\n\n![screen.png](briar-attachment://${reference})`);
+    form.set("parentMessageId", "11111111-1111-4111-8111-111111111111");
+    form.set("mentionedUserIds", JSON.stringify(["owner"]));
+    form.set(
+      "mentionedAgentIds",
+      JSON.stringify(["22222222-2222-4222-8222-222222222222"]),
+    );
+    form.set("attachmentReferences", JSON.stringify([reference]));
+    form.append("attachments", image, image.name);
+    const request = new Request("https://briar.example/channels/channel/messages", {
+      method: "POST",
+      headers: { "Content-Length": "2048" },
+      body: form,
+    });
+
+    const result = await readChannelMessageRequest(request);
+
+    expect(result.attachments).toHaveLength(1);
+    expect(result.attachments[0]).toEqual(
+      expect.objectContaining({
+        name: "screen.png",
+        type: "image/png",
+        size: image.size,
+      }),
+    );
+    expect(result.attachmentReferences).toEqual([reference]);
+    expect(result.input).toMatchObject({
+      parentMessageId: "11111111-1111-4111-8111-111111111111",
+      mentionedUserIds: ["owner"],
+      mentionedAgentIds: ["22222222-2222-4222-8222-222222222222"],
+    });
+  });
+
+  it("rejects non-image channel attachments", async () => {
+    const reference = "7316678b-e3d4-4de3-a045-b76a0fc2e765";
+    const form = new FormData();
+    form.set("body", `File\n\n![recording.mp4](briar-attachment://${reference})`);
+    form.set("attachmentReferences", JSON.stringify([reference]));
+    form.append(
+      "attachments",
+      new File(["video"], "recording.mp4", { type: "video/mp4" }),
+    );
+    const request = new Request("https://briar.example/channels/channel/messages", {
+      method: "POST",
+      headers: { "Content-Length": "2048" },
+      body: form,
+    });
+
+    await expect(readChannelMessageRequest(request)).rejects.toThrow(
+      "must be images",
+    );
   });
 });
 

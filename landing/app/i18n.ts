@@ -25,7 +25,13 @@ export function isLocale(value: string | undefined): value is Locale {
  * Single source of truth for routing, the sitemap, and robots.txt — add a
  * page here once and it is automatically routed, localized, and listed.
  */
-export const routePaths = ["/", "/tutorial", "/blog", "/download"] as const;
+export const routePaths = [
+  "/",
+  "/tutorial",
+  "/changelog",
+  "/blog",
+  "/download",
+] as const;
 
 export type RoutePath = (typeof routePaths)[number];
 
@@ -82,6 +88,7 @@ export const copy = {
       security: "보안",
       agents: "에이전트",
       tutorial: "튜토리얼",
+      changelog: "변경 기록",
       blog: "블로그",
       download: "다운로드",
       openWebApp: "웹에서 열기",
@@ -297,42 +304,6 @@ export const copy = {
       backToTop: "맨 위로 ↑",
     },
     mockup: {
-      columns: {
-        backlog: "백로그",
-        queued: "대기",
-        analyze: "분석",
-        implement: "구현",
-      },
-      cardMeta: [
-        "이슈 · 1시간 전",
-        "피드백 · 36분 전",
-        "이슈 · 14분 전",
-        "이슈 · 22분 전",
-        "이슈 · 6분 전",
-        "피드백 · 2분 전",
-        "Claude · 9분 전",
-      ],
-      taskQueue: "작업 큐",
-      taskCount: "8개 작업",
-      searchTasks: "작업 검색",
-      board: "보드",
-      filters: {
-        all: "전체",
-        inProgress: "진행 중",
-        needsAttention: "확인 필요",
-        completed: "완료",
-      },
-      issueLabel: "이슈",
-      implementProgress: "구현 · 72%",
-      signedIn: "로그인됨",
-      live: "실시간",
-      sidebar: {
-        inbox: "받은 편지함",
-        projects: "프로젝트",
-        issues: "이슈",
-        agents: "에이전트",
-        schedule: "스케줄",
-      },
       detail: {
         description: "설명",
         evidence: "증빙",
@@ -386,6 +357,7 @@ export const copy = {
       security: "Security",
       agents: "Agents",
       tutorial: "Tutorial",
+      changelog: "Changelog",
       blog: "Blog",
       download: "Download",
       openWebApp: "Open web app",
@@ -605,42 +577,6 @@ export const copy = {
       backToTop: "Back to top ↑",
     },
     mockup: {
-      columns: {
-        backlog: "Backlog",
-        queued: "Queued",
-        analyze: "Analyze",
-        implement: "Implement",
-      },
-      cardMeta: [
-        "Issue · 1h",
-        "Feedback · 36m",
-        "Issue · 14m",
-        "Issue · 22m",
-        "Issue · 6m",
-        "Feedback · 2m",
-        "Claude · 9m",
-      ],
-      taskQueue: "Task queue",
-      taskCount: "8 tasks",
-      searchTasks: "Search tasks",
-      board: "Board",
-      filters: {
-        all: "All",
-        inProgress: "In progress",
-        needsAttention: "Needs attention",
-        completed: "Completed",
-      },
-      issueLabel: "Issue",
-      implementProgress: "Implement · 72%",
-      signedIn: "Signed in",
-      live: "Live",
-      sidebar: {
-        inbox: "Inbox",
-        projects: "Projects",
-        issues: "Issues",
-        agents: "Agents",
-        schedule: "Schedule",
-      },
       detail: {
         description: "Description",
         evidence: "Evidence",

@@ -1,6 +1,7 @@
 import {
   AtSign,
   Bot,
+  Check,
   FileText,
   Hash,
   Headphones,
@@ -10,6 +11,7 @@ import {
   MessageSquare,
   MoreHorizontal,
   Paperclip,
+  Search,
   Send,
   Type,
   UserPlus,
@@ -23,20 +25,26 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type Dispatch,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
   type SetStateAction,
 } from "react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import { useI18n } from "../i18n";
 import {
   acceptChannelProposal,
   listChannelMessages,
   listChannels,
+  listOrganizationAgents,
   loadChannel,
   loadChannelDelta,
+  loadOrganizationMembers,
   sendChannelMessage,
+  setChannelAgent,
+  setChannelMember,
 } from "../lib/api";
+import type { OrganizationMember } from "../types";
 import type {
   ChannelAgentReply,
   ChannelAgentSummary,
@@ -50,6 +58,29 @@ import {
   retainedMentions,
   type MentionTarget,
 } from "../lib/channel-mentions";
+import {
+  dataTransferHasFiles,
+  filesFromDataTransfer,
+  maxIssueAttachmentCount,
+  normalizeIssueAttachmentFile,
+  validateIssueAttachments,
+} from "../lib/issue-attachments";
+import {
+  ChannelDraftImages,
+  ChannelMessageImages,
+  channelBodyWithImages,
+  draftChannelImage,
+  type DraftChannelImage,
+} from "./ChannelImages";
+import {
+  channelThreadWidthDefault,
+  channelThreadWidthMax,
+  channelThreadWidthMin,
+  clampChannelThreadWidth,
+  loadChannelThreadWidth,
+  saveChannelThreadWidth,
+} from "../lib/channel-thread-width";
+import { ChannelMessageText } from "./ChannelMessageText";
 
 /** Chat needs a tighter cadence than the 15s dashboard poll. */
 const CHANNEL_POLL_INTERVAL_MS = 3_000;
@@ -64,8 +95,17 @@ type ChannelsProps = {
   onChannelsChange: Dispatch<SetStateAction<ChannelSummary[]>>;
   onIssueCreated?: (runId: string) => void;
   onCreateAgent?: () => void;
-  onAddPeople?: () => void;
+  requestedMessage?: {
+    channelId: string;
+    messageId: string;
+    rootMessageId: string;
+  } | null;
+  onRequestedMessageOpen?: () => void;
 };
+
+type ChannelInviteCandidate =
+  | { type: "user"; id: string; member: OrganizationMember }
+  | { type: "agent"; id: string; agent: ChannelAgentSummary };
 
 const mergeMessages = (
   current: ChannelMessage[],
@@ -131,8 +171,9 @@ export function Channels({
   onChannelSelect,
   onChannelsChange,
   onIssueCreated,
+  requestedMessage,
+  onRequestedMessageOpen,
   onCreateAgent,
-  onAddPeople,
 }: ChannelsProps) {
   const { t, localeTag } = useI18n();
   const [members, setMembers] = useState<ChannelMember[]>([]);
@@ -143,14 +184,112 @@ export function Channels({
   const [threadMessages, setThreadMessages] = useState<ChannelMessage[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [inviteMembers, setInviteMembers] = useState<OrganizationMember[]>([]);
+  const [inviteAgents, setInviteAgents] = useState<ChannelAgentSummary[]>([]);
+  const [inviteLoading, setInviteLoading] = useState(false);
+  const [inviteSaving, setInviteSaving] = useState(false);
+  const [inviteError, setInviteError] = useState<string | null>(null);
+  const [threadWidth, setThreadWidth] = useState<number | null>(() =>
+    loadChannelThreadWidth(),
+  );
+  const [isResizingThread, setIsResizingThread] = useState(false);
   const cursor = useRef(0);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const channelsRef = useRef<HTMLDivElement | null>(null);
+  const threadWidthRef = useRef<number | null>(threadWidth);
+  threadWidthRef.current = threadWidth;
+  const activeThreadResizePointerRef = useRef<number | null>(null);
   const activeChannelIdRef = useRef(activeChannelId);
   activeChannelIdRef.current = activeChannelId;
 
   const activeChannel = useMemo(
     () => channels.find((channel) => channel.id === activeChannelId) ?? null,
     [channels, activeChannelId],
+  );
+
+  const openInvite = useCallback(() => {
+    if (!activeChannelId) return;
+    setInviteOpen(true);
+    setInviteLoading(true);
+    setInviteError(null);
+    setInviteMembers([]);
+    setInviteAgents([]);
+    void Promise.all([
+      loadOrganizationMembers(token, organizationId),
+      listOrganizationAgents(token, organizationId),
+    ])
+      .then(([organizationMembers, organizationAgents]) => {
+        setInviteMembers(organizationMembers);
+        setInviteAgents(organizationAgents.agents);
+      })
+      .catch((cause) => setInviteError(errorMessage(cause)))
+      .finally(() => setInviteLoading(false));
+  }, [activeChannelId, organizationId, token]);
+
+  const addInvitees = useCallback(
+    async (selected: ChannelInviteCandidate[]) => {
+      if (!activeChannelId || selected.length === 0) return;
+      setInviteSaving(true);
+      setInviteError(null);
+      const refreshRoster = async () => {
+        const refreshed = await loadChannel(
+          token,
+          organizationId,
+          activeChannelId,
+        );
+        setMembers(refreshed.members);
+        setAgents(refreshed.agents);
+        onChannelsChange((current) =>
+          current.map((channel) =>
+            channel.id === refreshed.channel.id ? refreshed.channel : channel,
+          ),
+        );
+      };
+      try {
+        const results = await Promise.allSettled(
+          selected.map((candidate) =>
+            candidate.type === "user"
+              ? setChannelMember(
+                  token,
+                  organizationId,
+                  activeChannelId,
+                  candidate.id,
+                  true,
+                )
+              : setChannelAgent(
+                  token,
+                  organizationId,
+                  activeChannelId,
+                  candidate.id,
+                  true,
+                ),
+          ),
+        );
+        const failed = results.find(
+          (result): result is PromiseRejectedResult =>
+            result.status === "rejected",
+        );
+        try {
+          await refreshRoster();
+        } catch (cause) {
+          setInviteError(errorMessage(failed?.reason ?? cause));
+          return;
+        }
+
+        if (failed) {
+          // Some idempotent roster writes may have succeeded. Keep the modal
+          // open with the refreshed roster so retrying the remaining entries
+          // is safe and cannot race an in-flight write.
+          setInviteError(errorMessage(failed.reason));
+          return;
+        }
+        setInviteOpen(false);
+      } finally {
+        setInviteSaving(false);
+      }
+    },
+    [activeChannelId, onChannelsChange, organizationId, token],
   );
 
   useEffect(() => {
@@ -183,8 +322,31 @@ export function Channels({
         setMembers(result.members);
         setAgents(result.agents);
         setMessages(result.messages);
-        setThreadParentId(null);
-        setThreadMessages([]);
+        const target = requestedMessage?.channelId === activeChannelId
+          ? requestedMessage
+          : null;
+        if (target && target.rootMessageId !== target.messageId) {
+          const threadResult = await listChannelMessages(
+            token,
+            organizationId,
+            activeChannelId,
+            target.rootMessageId,
+          );
+          if (cancelled) return;
+          setThreadParentId(target.rootMessageId);
+          setThreadMessages(threadResult.messages);
+        } else {
+          setThreadParentId(null);
+          setThreadMessages([]);
+        }
+        if (target) {
+          window.requestAnimationFrame(() => {
+            document
+              .querySelector(`[data-channel-message-id="${target.messageId}"]`)
+              ?.scrollIntoView?.({ block: "center" });
+            onRequestedMessageOpen?.();
+          });
+        }
       } catch (cause) {
         if (!cancelled) setError(errorMessage(cause));
       }
@@ -192,7 +354,13 @@ export function Channels({
     return () => {
       cancelled = true;
     };
-  }, [activeChannelId, organizationId, token]);
+  }, [
+    activeChannelId,
+    onRequestedMessageOpen,
+    organizationId,
+    requestedMessage,
+    token,
+  ]);
 
   // The change feed is organization-wide, so messages for other channels are
   // dropped here rather than filtered server-side.
@@ -292,7 +460,13 @@ export function Channels({
   );
 
   const send = useCallback(
-    async (body: string, mentions: MentionTarget[], parentMessageId: string | null) => {
+    async (
+      body: string,
+      mentions: MentionTarget[],
+      parentMessageId: string | null,
+      attachments: File[],
+      attachmentReferences: string[],
+    ) => {
       if (!activeChannelId || !body.trim()) return;
       setBusy(true);
       setError(null);
@@ -306,6 +480,8 @@ export function Channels({
           mentionedAgentIds: mentions
             .filter((mention) => mention.type === "agent")
             .map((mention) => mention.id),
+          attachments,
+          attachmentReferences,
         });
         setReplies((current) => [...current, ...result.agentReplies]);
         if (parentMessageId) {
@@ -354,11 +530,81 @@ export function Channels({
     (reply) => reply.status === "queued" || reply.status === "running",
   );
 
+  const effectiveThreadWidth = threadWidth ?? channelThreadWidthDefault;
+
+  const updateThreadWidthFromPointer = (clientX: number) => {
+    const layout = channelsRef.current;
+    if (!layout) return;
+    const bounds = layout.getBoundingClientRect();
+    const availableWidth = Math.max(1, bounds.width);
+    const paneWidth = Math.max(0, (bounds.right - clientX) / availableWidth);
+    const width = clampChannelThreadWidth(paneWidth * 100);
+    setThreadWidth(width);
+    threadWidthRef.current = width;
+  };
+
+  const startThreadResize = (event: ReactPointerEvent<HTMLDivElement>) => {
+    activeThreadResizePointerRef.current = event.pointerId;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setIsResizingThread(true);
+    event.preventDefault();
+  };
+
+  const moveThreadResize = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (activeThreadResizePointerRef.current !== event.pointerId) return;
+    updateThreadWidthFromPointer(event.clientX);
+  };
+
+  const finishThreadResize = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (activeThreadResizePointerRef.current !== event.pointerId) return;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    activeThreadResizePointerRef.current = null;
+    setIsResizingThread(false);
+    const width = threadWidthRef.current;
+    if (width !== null) saveChannelThreadWidth(width);
+  };
+
+  const resizeThreadWithKeyboard = (
+    event: ReactKeyboardEvent<HTMLDivElement>,
+  ) => {
+    let nextWidth: number | null = null;
+    if (event.key === "ArrowLeft") {
+      nextWidth = effectiveThreadWidth - 5;
+    }
+    if (event.key === "ArrowRight") {
+      nextWidth = effectiveThreadWidth + 5;
+    }
+    if (event.key === "Home") {
+      nextWidth = channelThreadWidthMin;
+    }
+    if (event.key === "End") {
+      nextWidth = channelThreadWidthMax;
+    }
+    if (nextWidth === null) return;
+    event.preventDefault();
+    const width = clampChannelThreadWidth(nextWidth);
+    setThreadWidth(width);
+    threadWidthRef.current = width;
+    saveChannelThreadWidth(width);
+  };
+
   const memberCount = Math.max(activeChannel?.memberCount ?? 0, members.length);
   let lastDay: string | null = null;
 
   return (
-    <div className="channels">
+    <div
+      className={`channels${isResizingThread ? " is-resizing-thread" : ""}`}
+      ref={channelsRef}
+      style={
+        threadWidth === null
+          ? undefined
+          : ({
+              "--channel-thread-width": `${threadWidth}%`,
+            } as CSSProperties)
+      }
+    >
       <section className="channel-main">
         {activeChannel ? (
           <>
@@ -384,7 +630,7 @@ export function Channels({
                   type="button"
                   className="channel-header-icon channel-header-members"
                   aria-label={t("channel.headerMembers", { count: memberCount })}
-                  onClick={onAddPeople}
+                  onClick={openInvite}
                 >
                   <Users size={16} aria-hidden="true" />
                   <span>{memberCount}</span>
@@ -414,7 +660,7 @@ export function Channels({
               <ChannelWelcome
                 channel={activeChannel}
                 onCreateAgent={onCreateAgent}
-                onAddPeople={onAddPeople}
+                onAddPeople={openInvite}
               />
 
               {messages.map((message) => {
@@ -431,12 +677,15 @@ export function Channels({
                       </div>
                     ) : null}
                     <MessageRow
+                      agents={agents}
                       message={message}
+                      members={members}
                       localeTag={localeTag}
                       currentUserId={currentUserId}
                       onAcceptProposal={() => void acceptProposal(message)}
                       onOpenThread={() => void openThread(message.id)}
                       busy={busy}
+                      token={token}
                     />
                   </div>
                 );
@@ -461,7 +710,10 @@ export function Channels({
               members={members}
               currentUserId={currentUserId}
               channelName={activeChannel.name}
-              onSend={(body, mentions) => void send(body, mentions, null)}
+              onInvite={openInvite}
+              onSend={(body, mentions, attachments, references) =>
+                void send(body, mentions, null, attachments, references)
+              }
             />
           </>
         ) : (
@@ -470,7 +722,23 @@ export function Channels({
       </section>
 
       {threadParentId && activeChannel ? (
-        <aside className="channel-thread">
+        <>
+          <div
+            aria-label={t("channel.resizeThread")}
+            aria-orientation="vertical"
+            aria-valuemax={channelThreadWidthMax}
+            aria-valuemin={channelThreadWidthMin}
+            aria-valuenow={effectiveThreadWidth}
+            className="channel-thread-resizer"
+            onKeyDown={resizeThreadWithKeyboard}
+            onPointerCancel={finishThreadResize}
+            onPointerDown={startThreadResize}
+            onPointerMove={moveThreadResize}
+            onPointerUp={finishThreadResize}
+            role="separator"
+            tabIndex={0}
+          />
+          <aside className="channel-thread">
           <header>
             <span>
               <MessageSquare size={15} /> {t("channel.thread")}
@@ -485,12 +753,15 @@ export function Channels({
           <div className="channel-messages">
             {threadMessages.map((message) => (
               <MessageRow
+                agents={agents}
                 key={message.id}
                 message={message}
+                members={members}
                 localeTag={localeTag}
                 currentUserId={currentUserId}
                 onAcceptProposal={() => void acceptProposal(message)}
                 busy={busy}
+                token={token}
               />
             ))}
           </div>
@@ -500,10 +771,37 @@ export function Channels({
             members={members}
             currentUserId={currentUserId}
             channelName={activeChannel.name}
+            onInvite={openInvite}
             placeholder={t("channel.threadPlaceholder")}
-            onSend={(body, mentions) => void send(body, mentions, threadParentId)}
+            onSend={(body, mentions, attachments, references) =>
+              void send(
+                body,
+                mentions,
+                threadParentId,
+                attachments,
+                references,
+              )
+            }
           />
-        </aside>
+          </aside>
+        </>
+      ) : null}
+
+      {inviteOpen && activeChannel ? (
+        <ChannelInviteDialog
+          agents={inviteAgents}
+          channel={activeChannel}
+          channelAgents={agents}
+          channelMembers={members}
+          loading={inviteLoading}
+          members={inviteMembers}
+          saving={inviteSaving}
+          error={inviteError}
+          onAdd={(selected) => void addInvitees(selected)}
+          onClose={() => {
+            if (!inviteSaving) setInviteOpen(false);
+          }}
+        />
       ) : null}
     </div>
   );
@@ -571,20 +869,235 @@ function ChannelWelcome({
   );
 }
 
+function ChannelInviteDialog({
+  agents,
+  channel,
+  channelAgents,
+  channelMembers,
+  error,
+  loading,
+  members,
+  saving,
+  onAdd,
+  onClose,
+}: {
+  agents: ChannelAgentSummary[];
+  channel: ChannelSummary;
+  channelAgents: ChannelAgentSummary[];
+  channelMembers: ChannelMember[];
+  error: string | null;
+  loading: boolean;
+  members: OrganizationMember[];
+  saving: boolean;
+  onAdd: (selected: ChannelInviteCandidate[]) => void;
+  onClose: () => void;
+}) {
+  const { t } = useI18n();
+  const titleId = useId();
+  const [query, setQuery] = useState("");
+  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !saving) onClose();
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [onClose, saving]);
+
+  const candidates = useMemo<ChannelInviteCandidate[]>(() => {
+    const channelMemberIds = new Set(
+      channelMembers.map((member) => member.userId),
+    );
+    const channelAgentIds = new Set(
+      channelAgents.map((agent) => agent.agentId),
+    );
+    return [
+      ...members
+        .filter((member) => !channelMemberIds.has(member.userId))
+        .map((member) => ({
+          type: "user" as const,
+          id: member.userId,
+          member,
+        })),
+      ...agents
+        .filter((agent) => !channelAgentIds.has(agent.agentId))
+        .map((agent) => ({
+          type: "agent" as const,
+          id: agent.agentId,
+          agent,
+        })),
+    ];
+  }, [agents, channelAgents, channelMembers, members]);
+
+  const normalizedQuery = query.trim().toLowerCase();
+  const filtered = candidates.filter((candidate) => {
+    if (!normalizedQuery) return true;
+    const searchable =
+      candidate.type === "user"
+        ? `${candidate.member.name} ${candidate.member.email}`
+        : `${candidate.agent.name} ${candidate.agent.handle ?? ""} ${candidate.agent.provider} ${candidate.agent.responsibility}`;
+    return searchable.toLowerCase().includes(normalizedQuery);
+  });
+
+  const toggle = (candidate: ChannelInviteCandidate) => {
+    const key = `${candidate.type}:${candidate.id}`;
+    setSelectedKeys((current) => {
+      const next = new Set(current);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const selected = candidates.filter((candidate) =>
+    selectedKeys.has(`${candidate.type}:${candidate.id}`),
+  );
+
+  return (
+    <div
+      className="channel-invite-overlay"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget && !saving) onClose();
+      }}
+    >
+      <section
+        aria-labelledby={titleId}
+        aria-modal="true"
+        className="channel-invite-dialog"
+        role="dialog"
+      >
+        <header>
+          <div>
+            <h2 id={titleId}>
+              {t("channel.inviteTitle", { name: channel.name })}
+            </h2>
+            <p>{t("channel.inviteDescription")}</p>
+          </div>
+          <button
+            aria-label={t("common.close")}
+            disabled={saving}
+            onClick={onClose}
+            type="button"
+          >
+            <X size={20} />
+          </button>
+        </header>
+
+        <label className="channel-invite-search">
+          <Search aria-hidden="true" size={17} />
+          <input
+            autoFocus
+            disabled={loading || saving}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder={t("channel.inviteSearchPlaceholder")}
+            type="search"
+            value={query}
+          />
+        </label>
+
+        <div className="channel-invite-results">
+          {loading ? (
+            <p className="channel-invite-status">
+              <LoaderCircle className="spin" size={16} />
+              {t("channel.inviteLoading")}
+            </p>
+          ) : filtered.length > 0 ? (
+            filtered.map((candidate) => {
+              const key = `${candidate.type}:${candidate.id}`;
+              const checked = selectedKeys.has(key);
+              const name =
+                candidate.type === "user"
+                  ? candidate.member.name
+                  : candidate.agent.name;
+              const detail =
+                candidate.type === "user"
+                  ? candidate.member.email
+                  : candidate.agent.projectId
+                    ? t("channel.projectAgent")
+                    : t("channel.orgAgent");
+              const image =
+                candidate.type === "user" ? candidate.member.image : null;
+              return (
+                <button
+                  aria-pressed={checked}
+                  className="channel-invite-candidate"
+                  disabled={saving}
+                  key={key}
+                  onClick={() => toggle(candidate)}
+                  type="button"
+                >
+                  <span className={`channel-invite-avatar ${candidate.type}`}>
+                    {image ? (
+                      <img alt="" src={image} />
+                    ) : candidate.type === "agent" ? (
+                      <Bot aria-hidden="true" size={18} />
+                    ) : (
+                      authorInitial(name)
+                    )}
+                  </span>
+                  <span>
+                    <strong>{name}</strong>
+                    <small>{detail}</small>
+                  </span>
+                  <i aria-hidden="true">{checked ? <Check size={15} /> : null}</i>
+                </button>
+              );
+            })
+          ) : (
+            <p className="channel-invite-status">
+              {candidates.length === 0
+                ? t("channel.inviteEveryoneAdded")
+                : t("channel.inviteNoResults")}
+            </p>
+          )}
+        </div>
+
+        {error ? (
+          <p className="channel-invite-error" role="alert">
+            {error}
+          </p>
+        ) : null}
+
+        <footer>
+          <span>
+            {selected.length > 0
+              ? t("channel.inviteSelected", { count: selected.length })
+              : t("channel.inviteSelectHint")}
+          </span>
+          <button
+            disabled={selected.length === 0 || loading || saving}
+            onClick={() => onAdd(selected)}
+            type="button"
+          >
+            {saving ? t("channel.inviting") : t("channel.inviteAdd")}
+          </button>
+        </footer>
+      </section>
+    </div>
+  );
+}
+
 function MessageRow({
+  agents,
   message,
+  members,
   localeTag,
   currentUserId,
   onOpenThread,
   onAcceptProposal,
   busy,
+  token,
 }: {
+  agents: ChannelAgentSummary[];
   message: ChannelMessage;
+  members: ChannelMember[];
   localeTag: string;
   currentUserId: string | null;
   onOpenThread?: () => void;
   onAcceptProposal: () => void;
   busy: boolean;
+  token: string;
 }) {
   const { t } = useI18n();
   const isAgent = message.author.type === "agent";
@@ -595,7 +1108,10 @@ function MessageRow({
     message.author.type === "user" ? message.author.image : null;
 
   return (
-    <article className={`channel-message ${message.author.type}`}>
+    <article
+      className={`channel-message ${message.author.type}`}
+      data-channel-message-id={message.id}
+    >
       <div className="channel-message-avatar" aria-hidden="true">
         {image ? (
           <img alt="" src={image} />
@@ -621,7 +1137,8 @@ function MessageRow({
             {formatMessageTime(message.createdAt, localeTag)}
           </time>
         </header>
-        <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.body}</ReactMarkdown>
+        <ChannelMessageText agents={agents} members={members} message={message} />
+        <ChannelMessageImages attachments={message.attachments} token={token} />
 
         {message.document ? (
           <div className="channel-document-card">
@@ -629,7 +1146,7 @@ function MessageRow({
             <div>
               <strong>{message.document.title}</strong>
               <span>
-                {t("channel.planDocument")} · v{message.document.version}
+                {t("channel.planDocument")}
                 {message.document.projectId ? "" : ` · ${t("channel.orgDocument")}`}
               </span>
             </div>
@@ -674,6 +1191,7 @@ function Composer({
   channelName,
   placeholder,
   busy,
+  onInvite,
   onSend,
 }: {
   agents: ChannelAgentSummary[];
@@ -682,7 +1200,13 @@ function Composer({
   channelName: string;
   placeholder?: string;
   busy: boolean;
-  onSend: (body: string, mentions: MentionTarget[]) => void;
+  onInvite: () => void;
+  onSend: (
+    body: string,
+    mentions: MentionTarget[],
+    attachments: File[],
+    attachmentReferences: string[],
+  ) => void;
 }) {
   const { t } = useI18n();
   const [body, setBody] = useState("");
@@ -692,7 +1216,11 @@ function Composer({
   // Mentions are tracked as picked entities, never re-parsed from the text:
   // the server trusts this list, so a handle typed by hand is just text.
   const [mentions, setMentions] = useState<MentionTarget[]>([]);
+  const [images, setImages] = useState<DraftChannelImage[]>([]);
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
+  const [dragging, setDragging] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const attachmentInputRef = useRef<HTMLInputElement | null>(null);
   const pendingCaret = useRef<number | null>(null);
   const mentionListId = useId();
 
@@ -778,17 +1306,73 @@ function Composer({
     textareaRef.current?.focus();
   };
 
+  const addImages = (files: readonly File[]) => {
+    const normalized = files.map(normalizeIssueAttachmentFile);
+    if (
+      normalized.length === 0 ||
+      normalized.some((file) => !file.type.startsWith("image/"))
+    ) {
+      setAttachmentError(t("channel.imageOnly"));
+      return;
+    }
+    const next = [...images, ...normalized.map(draftChannelImage)];
+    const validationError = validateIssueAttachments(
+      next.map((image) => image.file),
+    );
+    if (validationError) {
+      setAttachmentError(validationError);
+      return;
+    }
+    setImages(next);
+    setAttachmentError(null);
+  };
+
   const submit = () => {
-    if (!body.trim() || busy) return;
-    onSend(body, retainedMentions(body, mentions));
+    if ((!body.trim() && images.length === 0) || busy) return;
+    if (body.trim() === "/invite" && images.length === 0) {
+      onInvite();
+      setBody("");
+      setMentions([]);
+      setMentionDismissed(false);
+      return;
+    }
+    onSend(
+      channelBodyWithImages(body, images),
+      retainedMentions(body, mentions),
+      images.map((image) => image.file),
+      images.map((image) => image.reference),
+    );
     setBody("");
+    setImages([]);
     setMentions([]);
     setMentionDismissed(false);
   };
 
   return (
     <form
-      className="channel-composer"
+      className={`channel-composer${dragging ? " is-dragging" : ""}`}
+      onDragEnter={(event) => {
+        if (!dataTransferHasFiles(event.dataTransfer)) return;
+        event.preventDefault();
+        setDragging(true);
+      }}
+      onDragOver={(event) => {
+        if (!dataTransferHasFiles(event.dataTransfer)) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = "copy";
+        setDragging(true);
+      }}
+      onDragLeave={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+          setDragging(false);
+        }
+      }}
+      onDrop={(event) => {
+        if (!dataTransferHasFiles(event.dataTransfer)) return;
+        event.preventDefault();
+        setDragging(false);
+        addImages(filesFromDataTransfer(event.dataTransfer));
+      }}
       onSubmit={(event) => {
         event.preventDefault();
         submit();
@@ -830,6 +1414,15 @@ function Composer({
       ) : null}
 
       <div className="channel-composer-shell">
+        <ChannelDraftImages
+          images={images}
+          onRemove={(reference) => {
+            setImages((current) =>
+              current.filter((image) => image.reference !== reference),
+            );
+            setAttachmentError(null);
+          }}
+        />
         <textarea
           aria-activedescendant={
             showsSuggestions
@@ -879,6 +1472,14 @@ function Composer({
           onKeyUp={(event) =>
             setCaret(event.currentTarget.selectionStart ?? 0)
           }
+          onPaste={(event) => {
+            const pasted = filesFromDataTransfer(event.clipboardData).filter(
+              (file) => file.type.startsWith("image/"),
+            );
+            if (pasted.length === 0) return;
+            event.preventDefault();
+            addImages(pasted);
+          }}
           onClick={(event) => setCaret(event.currentTarget.selectionStart ?? 0)}
           ref={textareaRef}
           role="combobox"
@@ -899,11 +1500,23 @@ function Composer({
               type="button"
               className="channel-composer-tool"
               aria-label={t("channel.toolAttach")}
-              disabled
-              title={t("channel.toolComingSoon")}
+              disabled={busy || images.length >= maxIssueAttachmentCount}
+              onClick={() => attachmentInputRef.current?.click()}
             >
               <Paperclip size={16} />
             </button>
+            <input
+              accept="image/*"
+              className="channel-composer-file-input"
+              disabled={busy || images.length >= maxIssueAttachmentCount}
+              multiple
+              onChange={(event) => {
+                addImages(Array.from(event.currentTarget.files ?? []));
+                event.currentTarget.value = "";
+              }}
+              ref={attachmentInputRef}
+              type="file"
+            />
             <button
               type="button"
               className="channel-composer-tool"
@@ -917,12 +1530,15 @@ function Composer({
           <button
             aria-label={t("channel.send")}
             className="channel-composer-send"
-            disabled={busy || !body.trim()}
+            disabled={busy || (!body.trim() && images.length === 0)}
             type="submit"
           >
             <Send size={16} />
           </button>
         </div>
+        {attachmentError ? (
+          <p className="channel-composer-error">{attachmentError}</p>
+        ) : null}
       </div>
     </form>
   );

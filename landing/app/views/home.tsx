@@ -27,195 +27,23 @@ function Arrow() {
 }
 
 function ProductStage({ c }: { c: LandingCopy }) {
-  const m = c.mockup;
-  const columns = [
-    {
-      name: m.columns.backlog,
-      tone: "slate",
-      cards: [
-        { id: "AH-18", title: c.dashboard.issues[3], meta: m.cardMeta[0] },
-        { id: "AH-21", title: c.dashboard.issues[2], meta: m.cardMeta[1] },
-      ],
-    },
-    {
-      name: m.columns.queued,
-      tone: "amber",
-      cards: [
-        { id: "AH-23", title: c.dashboard.issues[1], meta: m.cardMeta[2] },
-        { id: "AH-26", title: c.dashboard.issues[4], meta: m.cardMeta[3] },
-      ],
-    },
-    {
-      name: m.columns.analyze,
-      tone: "blue",
-      cards: [
-        { id: "AH-27", title: c.dashboard.issues[5], meta: m.cardMeta[4] },
-        { id: "AH-28", title: c.dashboard.issues[6], meta: m.cardMeta[5] },
-      ],
-    },
-    {
-      name: m.columns.implement,
-      tone: "violet",
-      cards: [
-        {
-          id: "AH-24",
-          title: c.workflow.issueTitle,
-          meta: `Codex · ${c.dashboard.now}`,
-          active: true,
-        },
-        { id: "AH-19", title: c.workflow.writingTests, meta: m.cardMeta[6] },
-      ],
-    },
-  ] as const;
-
   return (
-    <div className="product-stage" role="img" aria-label={c.aria.productPreview}>
-      <div className="stage-glow" />
-      <div className="product-window board-window">
-        <div className="window-topbar">
-          <div className="window-traffic" aria-hidden="true">
-            <i />
-            <i />
-            <i />
-          </div>
-          <div className="window-project">
-            <span className="window-project-mark">B</span>
-            wordbricks / briar
-          </div>
-          <div className="window-live">
-            <span />
-            {m.live}
-          </div>
-        </div>
-
-        <div className="board-shell">
-          <aside className="board-rail" aria-hidden="true">
-            <img src="/briar-app-icon.png" alt="" />
-            <span>⌁</span>
-            <span>▦</span>
-            <span>⌕</span>
-            <i />
-            <span className="rail-active">◆</span>
-            <span>◇</span>
-            <span>＋</span>
-          </aside>
-
-          <aside className="board-sidebar">
-            <div className="board-sidebar-brand">
-              <strong>Briar</strong>
-              <span>⌄</span>
-            </div>
-            <div className="board-sidebar-link">
-              <span>⌂</span> {m.sidebar.inbox} <i>3</i>
-            </div>
-            <p>{m.sidebar.projects}</p>
-            <div className="board-project">
-              <div>
-                <span>⌘</span>
-                <strong>Briar</strong>
-                <i />
-              </div>
-              <div className="board-project-link board-project-active">
-                <span>⌁</span> {m.sidebar.issues} <em>8</em>
-              </div>
-              <div className="board-project-link">
-                <span>✦</span> {m.sidebar.agents}
-              </div>
-              <div className="board-project-link">
-                <span>□</span> {m.sidebar.schedule}
-              </div>
-            </div>
-            <div className="board-profile">
-              <span>J</span>
-              <div>
-                <strong>Jay</strong>
-                <small>demo@briar.local</small>
-              </div>
-            </div>
-          </aside>
-
-          <section className="board-main">
-            <div className="board-toolbar">
-              <div>
-                <strong>{m.taskQueue}</strong>
-                <small>{m.taskCount}</small>
-              </div>
-              <div className="board-toolbar-actions">
-                <span className="board-toolbar-primary">＋ {c.dashboard.newIssue.replace("+ ", "")}</span>
-                <span>⌕ {m.searchTasks}</span>
-                <i>▦ {m.board}</i>
-              </div>
-            </div>
-            <div className="board-filters">
-              <span className="is-selected">{m.filters.all} <i>8</i></span>
-              <span>{m.filters.inProgress} <i>4</i></span>
-              <span>{m.filters.needsAttention} <i>1</i></span>
-              <span>{m.filters.completed} <i>12</i></span>
-            </div>
-            <div className="kanban-board">
-              {columns.map((column) => (
-                <div className="kanban-column" key={column.name}>
-                  <div className="kanban-column-head">
-                    <span className={`column-dot ${column.tone}`} />
-                    <strong>{column.name}</strong>
-                    <i>{column.cards.length}</i>
-                  </div>
-                  <div className="kanban-card-list">
-                    {column.cards.map((card, index) => (
-                      <article
-                        className={`kanban-card ${"active" in card && card.active ? "is-running" : ""}`}
-                        key={`${card.id}-${index}`}
-                      >
-                        <div className="kanban-card-meta">
-                          <span>{card.id}</span>
-                          <i>{m.issueLabel}</i>
-                        </div>
-                        <strong>{card.title}</strong>
-                        {"active" in card && card.active ? (
-                          <div className="kanban-progress">
-                            <span>
-                              <i />
-                            </span>
-                            <em>{m.implementProgress}</em>
-                          </div>
-                        ) : null}
-                        <small>{card.meta}</small>
-                      </article>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-        </div>
-
-        <div className="board-statusbar">
-          <div>
-            <span>✦ Claude · {m.signedIn}</span>
-            <span>◉ Codex · {m.signedIn}</span>
-          </div>
-          <div>
-            <span>v1.2.22</span>
-            <strong>
-              <i /> {c.dashboard.active}
-            </strong>
-          </div>
-        </div>
-      </div>
-      <div className="floating-note floating-note-left">
-        <span className="note-icon">✓</span>
-        <div>
-          <strong>{c.dashboard.qaPassed}</strong>
-          <small>142 tests · 0 failures</small>
-        </div>
-      </div>
-      <div className="floating-note floating-note-right">
-        <span className="note-icon pr-note">↗</span>
-        <div>
-          <strong>{c.dashboard.prReady}</strong>
-          <small>3 files · +186 −24</small>
-        </div>
-      </div>
+    <div
+      className="product-stage product-stage-video"
+      role="img"
+      aria-label={c.aria.productPreview}
+    >
+      <video
+        className="product-demo-video"
+        aria-hidden="true"
+        autoPlay
+        loop
+        muted
+        playsInline
+        preload="auto"
+      >
+        <source src="/briar-x-demo-20s.mp4" type="video/mp4" />
+      </video>
     </div>
   );
 }
@@ -394,6 +222,7 @@ export default async function HomeView({ locale }: { locale: Locale }) {
           <Brand c={c} />
           <nav aria-label={c.aria.mainMenu}>
             <a href={localizedPath(locale, "/tutorial")}>{c.nav.tutorial}</a>
+            <a href={localizedPath(locale, "/changelog")}>{c.nav.changelog}</a>
             <a href={localizedPath(locale, "/blog")}>{c.nav.blog}</a>
             <a href={localizedPath(locale, "/download")}>{c.nav.download}</a>
           </nav>
@@ -749,6 +578,7 @@ export default async function HomeView({ locale }: { locale: Locale }) {
             </a>
             <a href="#security">{c.footer.security}</a>
             <a href={localizedPath(locale, "/tutorial")}>{c.nav.tutorial}</a>
+            <a href={localizedPath(locale, "/changelog")}>{c.nav.changelog}</a>
             <a href={localizedPath(locale, "/blog")}>{c.nav.blog}</a>
             <a href="#top">{c.footer.backToTop}</a>
           </div>

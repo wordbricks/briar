@@ -902,6 +902,52 @@
         }
       }
     },
+    "/projects/{projectId}/agent-tasks": {
+      "post": {
+        "operationId": "runProjectAgentTask",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ProjectId"
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectAgentTaskRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Direct saved-Agent task accepted for the selected Worker",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectAgentTaskResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
     "/organizations/{organizationId}/channels": {
       "get": {
         "operationId": "listChannels",
@@ -1055,6 +1101,67 @@
             "$ref": "#/components/responses/Error"
           },
           "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/organizations/{organizationId}/channels/{channelId}/proposals/{proposalId}/accept": {
+      "post": {
+        "operationId": "acceptChannelProposal",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OrganizationId"
+          },
+          {
+            "$ref": "#/components/parameters/ChannelId"
+          },
+          {
+            "name": "proposalId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcceptChannelProposalRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Accepted proposal and the issue it created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcceptChannelProposalResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
             "$ref": "#/components/responses/Error"
           }
         }
@@ -1865,6 +1972,12 @@
               "$ref": "#/components/schemas/ConversationNotification"
             }
           },
+          "channelNotifications": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChannelNotification"
+            }
+          },
           "cursor": {
             "type": "integer",
             "minimum": 0
@@ -1937,6 +2050,12 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/ConversationNotification"
+            }
+          },
+          "channelNotifications": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChannelNotification"
             }
           },
           "generatedAt": {
@@ -2111,6 +2230,33 @@
             "type": "string",
             "format": "date-time"
           }
+        },
+        "additionalProperties": true
+      },
+      "ChannelNotification": {
+        "type": "object",
+        "required": [
+          "id",
+          "channelId",
+          "channelName",
+          "rootMessageId",
+          "body",
+          "author",
+          "reason",
+          "createdAt"
+        ],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "channelId": { "type": "string", "format": "uuid" },
+          "channelName": { "type": "string" },
+          "rootMessageId": { "type": "string", "format": "uuid" },
+          "body": { "type": "string" },
+          "author": { "$ref": "#/components/schemas/MessageAuthor" },
+          "reason": {
+            "type": "string",
+            "enum": ["mention", "thread_reply"]
+          },
+          "createdAt": { "type": "string", "format": "date-time" }
         },
         "additionalProperties": true
       },
@@ -2893,6 +3039,14 @@
             "type": "string",
             "nullable": true
           },
+          "requestedWorkerId": {
+            "type": "string",
+            "nullable": true
+          },
+          "workerId": {
+            "type": "string",
+            "nullable": true
+          },
           "conversationId": {
             "type": "string",
             "nullable": true
@@ -2938,6 +3092,46 @@
             "items": {
               "$ref": "#/components/schemas/ProjectAgentSession"
             }
+          }
+        },
+        "additionalProperties": true
+      },
+      "ProjectAgentTaskRequest": {
+        "type": "object",
+        "required": [
+          "agentId",
+          "request",
+          "workerId",
+          "requestId"
+        ],
+        "properties": {
+          "agentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "request": {
+            "type": "string",
+            "minLength": 1
+          },
+          "workerId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ProjectAgentTaskResponse": {
+        "type": "object",
+        "required": [
+          "session"
+        ],
+        "properties": {
+          "session": {
+            "$ref": "#/components/schemas/ProjectAgentSession"
           }
         },
         "additionalProperties": true
@@ -3128,11 +3322,14 @@
             "additionalProperties": true
           },
           "proposal": {
-            "type": [
-              "object",
-              "null"
-            ],
-            "additionalProperties": true
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ChannelProposal"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "createdAt": {
             "type": "string",
@@ -3263,6 +3460,95 @@
           }
         },
         "additionalProperties": true
+      },
+      "ChannelProposal": {
+        "type": "object",
+        "required": [
+          "id",
+          "actionType",
+          "status",
+          "projectId",
+          "payload",
+          "resultRunId"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "actionType": {
+            "type": "string",
+            "enum": [
+              "request_issue_create",
+              "request_plan_document"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "accepted"
+            ]
+          },
+          "projectId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "payload": {},
+          "resultRunId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "AcceptChannelProposalRequest": {
+        "type": "object",
+        "required": [
+          "projectId"
+        ],
+        "properties": {
+          "projectId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "AcceptChannelProposalResponse": {
+        "type": "object",
+        "required": [
+          "outcome",
+          "projectId",
+          "resultRunId"
+        ],
+        "properties": {
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "accepted",
+              "already_accepted"
+            ]
+          },
+          "projectId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "resultRunId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
       }
     }
   }

@@ -375,7 +375,8 @@ describe("HuntDashboard", () => {
     );
 
     expect(markup).toContain('class="kanban-source"');
-    expect(markup).toContain('class="source-dot issue"');
+    expect(markup).toContain("이슈");
+    expect(markup).not.toContain('class="source-dot issue"');
     expect(markup).not.toContain("lucide-paperclip");
     expect(markup).not.toContain("screenshot.png");
     expect(markup).not.toContain("attachment-1");
@@ -884,7 +885,7 @@ describe("HuntDashboard", () => {
       ".run-page-process-now",
     );
     expect(processNow).not.toBeNull();
-    expect(processNow?.textContent).toContain("바로 처리");
+    expect(processNow?.getAttribute("aria-label")).toContain("바로 처리");
     expect(processNow?.disabled).toBe(true);
     expect(
       titlebarActions?.querySelector(".run-page-properties-toggle"),
@@ -955,12 +956,60 @@ describe("HuntDashboard", () => {
     );
     expect(processNow).not.toBeNull();
     expect(processNow?.disabled).toBe(false);
-    expect(processNow?.textContent).toContain("바로 처리하기");
+    expect(processNow?.getAttribute("aria-label")).toContain("바로 처리하기");
     await act(async () => processNow?.click());
     expect(onProcessIssueNow).toHaveBeenCalledWith(queuedRun);
 
     await act(async () => root.unmount());
     container.remove();
+  });
+
+  it("shows the assignee and assigned worker as avatars in the issue header", () => {
+    const member = demoDashboard.members?.[0];
+    if (!member) throw new Error("Demo assignee is required");
+    const run = {
+      ...demoDashboard.runs[0],
+      assigneeUserId: member.userId,
+      workerId: dashboardWorker.id,
+    };
+    const markup = renderToStaticMarkup(
+      <TooltipProvider>
+        <RunPage
+          assignedWorker={dashboardWorker}
+          isSidebarOpen
+          error={null}
+          isRecovering={false}
+          mentionMembers={[
+            {
+              userId: member.userId,
+              name: member.name,
+              email: member.email,
+              image: null,
+              role: member.role,
+              createdAt: member.createdAt,
+            },
+          ]}
+          onBack={() => undefined}
+          onCancel={async () => undefined}
+          onLoadAttachment={async () => new Blob()}
+          onLoadIssueMessages={async () => []}
+          onLoadRunEvidence={async () => []}
+          onMove={async () => undefined}
+          onRetry={async () => undefined}
+          onSendIssueMessage={async () => {
+            throw new Error("not implemented in this test");
+          }}
+          run={run}
+        />
+      </TooltipProvider>,
+    );
+
+    expect(markup).toContain('class="run-page-property-badge assignee"');
+    expect(markup).toContain("issue-assignee-avatar");
+    expect(markup).toContain('class="run-page-property-badge worker"');
+    expect(markup).toContain("worker-icon");
+    expect(markup).toContain(`담당자: ${member.name}`);
+    expect(markup).toContain(`배정된 Worker: ${dashboardWorker.label}`);
   });
 
   it("renders the companion queue directly in its parent", () => {
@@ -1771,17 +1820,57 @@ describe("HuntDashboard", () => {
     const root = createRoot(container);
     await act(async () =>
       root.render(
-        <HuntDashboard
-          {...dashboardProps}
-          dashboard={demoDashboard}
-          recoveryError="상태 이동에 실패했습니다."
-        />,
+        <ToastProvider>
+          <HuntDashboard
+            {...dashboardProps}
+            dashboard={demoDashboard}
+            recoveryError="상태 이동에 실패했습니다."
+          />
+        </ToastProvider>,
       ),
     );
 
-    expect(container.querySelector(".error-banner")?.textContent).toContain(
-      "상태 이동에 실패했습니다.",
+    expect(container.querySelector(".error-banner")).toBeNull();
+    expect(
+      document.body.querySelector('[data-testid="app-toast"].error')?.textContent,
+    ).toContain("상태 이동에 실패했습니다.");
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("shows issue detail errors as error toasts instead of inline banners", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () =>
+      root.render(
+        <ToastProvider>
+          <RunPage
+            error="이슈 상태를 저장하지 못했습니다."
+            isRecovering={false}
+            isSidebarOpen
+            onBack={() => undefined}
+            onCancel={async () => undefined}
+            onLoadAttachment={async () => new Blob()}
+            onLoadIssueMessages={async () => []}
+            onLoadRunEvidence={async () => []}
+            onMove={async () => undefined}
+            onRetry={async () => undefined}
+            onSendIssueMessage={async () => {
+              throw new Error("not implemented in this test");
+            }}
+            run={demoDashboard.runs[0]}
+          />
+        </ToastProvider>,
+      ),
     );
+
+    expect(container.querySelector(".error-banner")).toBeNull();
+    expect(container.querySelector(".run-status-error")).toBeNull();
+    expect(
+      document.body.querySelector('[data-testid="app-toast"].error')?.textContent,
+    ).toContain("이슈 상태를 저장하지 못했습니다.");
 
     await act(async () => root.unmount());
     container.remove();
@@ -1849,7 +1938,7 @@ describe("HuntDashboard", () => {
     expect(workflowStages[2]?.getAttribute("aria-label")).toContain("대기");
     expect(
       container.querySelectorAll(".run-page-property-badge"),
-    ).toHaveLength(4);
+    ).toHaveLength(3);
     const propertiesToggle = container.querySelector<HTMLButtonElement>(
       ".run-page-properties-toggle",
     );
@@ -2302,8 +2391,11 @@ describe("HuntDashboard", () => {
       demoDashboard.runs[0].title,
     );
     expect(container.querySelector(".run-page-actions-trigger")).not.toBeNull();
-    expect(container.querySelector(".run-page-process-now")).not.toBeNull();
-    expect(container.textContent).toContain("바로 처리");
+    const processNow = container.querySelector<HTMLButtonElement>(
+      ".run-page-process-now",
+    );
+    expect(processNow).not.toBeNull();
+    expect(processNow?.getAttribute("aria-label")).toContain("바로 처리");
     expect(container.querySelector(".run-page-meta")).toBeNull();
     expect(container.querySelector(".run-page-summary")).toBeNull();
 
@@ -3235,6 +3327,11 @@ describe("HuntDashboard", () => {
     await act(async () => textarea?.dispatchEvent(paste));
     expect(container.querySelector(".issue-composer-attachment")?.textContent)
       .toContain("clipboard.png");
+    expect(
+      container.querySelector(
+        ".issue-conversation > .issue-message-composer .issue-message-send .lucide-send",
+      ),
+    ).not.toBeNull();
 
     await act(async () => {
       container.querySelector<HTMLButtonElement>(
@@ -3542,6 +3639,172 @@ describe("HuntDashboard", () => {
     container.remove();
   });
 
+  it("edits and deletes messages the current user authored", async () => {
+    const createdAt = "2026-08-03T10:00:00.000Z";
+    const rootMessage: IssueMessage = {
+      id: "message-root",
+      runId: demoDashboard.runs[0].id,
+      parentMessageId: null,
+      body: "수정 전 원문",
+      author: { id: "jay", name: "Jay", image: null, provider: null },
+      replyCount: 1,
+      createdAt,
+      updatedAt: createdAt,
+    };
+    const reply: IssueMessage = {
+      ...rootMessage,
+      id: "message-reply",
+      parentMessageId: rootMessage.id,
+      body: "기존 답글",
+      replyCount: 0,
+      createdAt: "2026-08-03T10:01:00.000Z",
+      updatedAt: "2026-08-03T10:01:00.000Z",
+    };
+    const onEditIssueMessage = vi.fn(async () => ({
+      ...rootMessage,
+      body: "수정 후 본문",
+      updatedAt: "2026-08-03T10:02:00.000Z",
+    }));
+    const onDeleteIssueMessage = vi.fn(async () => undefined);
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(
+        <RunPage
+          currentUserId="jay"
+          isSidebarOpen
+          error={null}
+          isRecovering={false}
+          onBack={() => undefined}
+          onCancel={async () => undefined}
+          onDeleteIssueMessage={onDeleteIssueMessage}
+          onEditIssueMessage={onEditIssueMessage}
+          onLoadAttachment={async () => new Blob()}
+          onLoadIssueMessages={async () => [rootMessage, reply]}
+          onLoadRunEvidence={async () => []}
+          onMove={async () => undefined}
+          onRetry={async () => undefined}
+          onSendIssueMessage={async () => ({
+            message: rootMessage,
+            agentReply: null,
+          })}
+          run={demoDashboard.runs[0]}
+        />,
+      );
+    });
+
+    const groupByBody = (body: string) =>
+      Array.from(
+        container.querySelectorAll<HTMLElement>(".issue-message-group"),
+      ).find((group) =>
+        group
+          .querySelector(":scope > .issue-message > div > .issue-message-body")
+          ?.textContent?.includes(body),
+      );
+    const rootGroup = groupByBody("수정 전 원문");
+    expect(rootGroup).not.toBeUndefined();
+    const editButton = rootGroup?.querySelector<HTMLButtonElement>(
+      'button[title="메시지 수정"]',
+    );
+    const deleteButton = rootGroup?.querySelector<HTMLButtonElement>(
+      'button[title="메시지 삭제"]',
+    );
+    expect(editButton).not.toBeNull();
+    expect(deleteButton).not.toBeNull();
+
+    await act(async () => editButton?.click());
+    const editComposer = rootGroup?.querySelector<HTMLElement>(
+      ".issue-inline-reply-composer .issue-message-composer textarea",
+    ) as HTMLTextAreaElement | null;
+    expect(editComposer?.value).toBe("수정 전 원문");
+    expect(editComposer?.placeholder).toBe("메시지 수정…");
+    await act(async () => {
+      if (!editComposer) return;
+      Object.getOwnPropertyDescriptor(
+        HTMLTextAreaElement.prototype,
+        "value",
+      )?.set?.call(editComposer, "수정 후 본문");
+      editComposer.dispatchEvent(new Event("input", { bubbles: true }));
+      editComposer.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          bubbles: true,
+          cancelable: true,
+          key: "Enter",
+        }),
+      );
+      await Promise.resolve();
+    });
+    expect(onEditIssueMessage).toHaveBeenCalledWith(
+      rootMessage.id,
+      expect.objectContaining({ body: "수정 후 본문" }),
+    );
+    expect(container.textContent).toContain("수정 후 본문");
+
+    const confirmSpy = vi
+      .spyOn(window, "confirm")
+      .mockImplementation(() => true);
+    await act(async () => deleteButton?.click());
+    confirmSpy.mockRestore();
+    expect(onDeleteIssueMessage).toHaveBeenCalledWith(rootMessage.id);
+    expect(container.querySelector(".issue-message-group")).toBeNull();
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("hides edit and delete actions for messages the current user did not author", async () => {
+    const createdAt = "2026-08-03T10:00:00.000Z";
+    const agentMessage: IssueMessage = {
+      id: "message-agent",
+      runId: demoDashboard.runs[0].id,
+      parentMessageId: null,
+      body: "Briar의 답변",
+      author: {
+        id: null,
+        name: "Briar · Codex",
+        image: null,
+        provider: "codex",
+      },
+      replyCount: 0,
+      createdAt,
+      updatedAt: createdAt,
+    };
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(
+        <RunPage
+          currentUserId="jay"
+          isSidebarOpen
+          error={null}
+          isRecovering={false}
+          onBack={() => undefined}
+          onCancel={async () => undefined}
+          onLoadAttachment={async () => new Blob()}
+          onLoadIssueMessages={async () => [agentMessage]}
+          onLoadRunEvidence={async () => []}
+          onMove={async () => undefined}
+          onRetry={async () => undefined}
+          onSendIssueMessage={async () => ({
+            message: agentMessage,
+            agentReply: null,
+          })}
+          run={demoDashboard.runs[0]}
+        />,
+      );
+    });
+    expect(
+      container.querySelector('button[title="메시지 수정"]'),
+    ).toBeNull();
+    expect(
+      container.querySelector('button[title="메시지 삭제"]'),
+    ).toBeNull();
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
   it("inserts @briar and places the provider reply below its comment", async () => {
     const createdAt = new Date().toISOString();
     const userMessage: IssueMessage = {
@@ -3679,7 +3942,7 @@ describe("HuntDashboard", () => {
     container.remove();
   });
 
-  it("renders a member mention as a blue no-op link", async () => {
+  it("opens the mentioned member's profile from a conversation link", async () => {
     const createdAt = new Date().toISOString();
     const message: IssueMessage = {
       id: "member-mention-message",
@@ -3741,7 +4004,15 @@ describe("HuntDashboard", () => {
       bubbles: true,
       cancelable: true,
     });
-    expect(mentionLink?.dispatchEvent(click)).toBe(false);
+    await act(async () => {
+      expect(mentionLink?.dispatchEvent(click)).toBe(false);
+    });
+    const profile = document.body.querySelector<HTMLElement>(
+      ".profile-dialog[role='dialog']",
+    );
+    expect(profile?.textContent).toContain("Member One");
+    expect(profile?.textContent).toContain("member@example.com");
+    expect(profile?.textContent).toContain("멤버");
 
     await act(async () => root.unmount());
     container.remove();
@@ -3962,7 +4233,7 @@ describe("HuntDashboard", () => {
     expect(markup).toContain('class="recovery-panel"');
     expect(markup).toContain('class="run-page-property-badge red"');
     expect(markup).toContain(">실패</span>");
-    expect(markup).toContain('aria-expanded="false" class="run-page-properties-toggle"');
+    expect(markup).toContain('aria-expanded="false" aria-label="속성" class="run-page-properties-toggle"');
   });
 
   it("shows a concise paused checkpoint summary in the result tab", () => {

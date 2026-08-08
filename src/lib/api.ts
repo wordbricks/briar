@@ -19,16 +19,10 @@ import type {
   ChannelDelta,
   ChannelMember,
   ChannelMessage,
+  ChannelMessageAttachment,
   ChannelSummary,
   ChannelVisibility,
 } from "./channels-contract";
-import type {
-  IdeaDetail,
-  IdeaIssuePlanItem,
-  IdeaProvider,
-  IdeaStatus,
-  IdeaSummary,
-} from "./ideas-contract";
 import type {
   LinearImportConnectResult,
   LinearImportResult,
@@ -172,6 +166,8 @@ const projectAgentSessionSchema = z.object({
   workspaceRoot: z.null(),
   summary: z.string().nullable(),
   error: z.string().nullable(),
+  requestedWorkerId: z.string().nullable().optional(),
+  workerId: z.string().nullable().optional(),
   events: z.array(z.object({
     id: z.string(),
     type: z.enum([
@@ -652,9 +648,26 @@ export async function loadOrganizationExecutionWorkers(
 ) {
   return request<{
     workers: OrganizationExecutionWorker[];
+    latestVersion?: string | null;
     canManage: boolean;
     generatedAt: string;
   }>(`/organizations/${organizationId}/workers`, token);
+}
+
+export async function requestOrganizationExecutionWorkerUpdate(
+  token: string,
+  organizationId: string,
+  deviceId: string,
+) {
+  return request<{
+    outcome: "requested" | "already_current";
+    requestId?: string;
+    targetVersion: string;
+  }>(
+    `/organizations/${organizationId}/workers/${encodeURIComponent(deviceId)}/updates`,
+    token,
+    { method: "POST" },
+  );
 }
 
 export async function disableOrganizationExecutionWorker(
@@ -1056,6 +1069,32 @@ export async function loadProjectAgentSessions(
   );
 }
 
+export async function runProjectAgentTaskOnWorker(
+  token: string,
+  projectId: string,
+  input: {
+    agentId: string;
+    request: string;
+    workerId: string;
+  },
+): Promise<AutoHuntSession> {
+  const result = await request<{ session: unknown }>(
+    `/projects/${projectId}/agent-tasks`,
+    token,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        ...input,
+        requestId: crypto.randomUUID(),
+      }),
+    },
+  );
+  return {
+    ...projectAgentSessionSchema.parse(result.session),
+    localOwner: false,
+  } as AutoHuntSession;
+}
+
 export async function upsertProjectAgentSession(
   token: string,
   session: AutoHuntSession,
@@ -1079,6 +1118,8 @@ export async function upsertProjectAgentSession(
         startedAt: session.startedAt,
         completedAt: session.completedAt,
         conversationId: session.conversationId,
+        requestedWorkerId: session.requestedWorkerId ?? null,
+        workerId: session.workerId ?? null,
         summary: session.summary,
         error: session.error,
         events: session.events,
@@ -1454,16 +1495,57 @@ export async function sendChannelMessage(
     parentMessageId?: string | null;
     mentionedUserIds?: string[];
     mentionedAgentIds?: string[];
+    attachments?: File[];
+    attachmentReferences?: string[];
   },
 ) {
+  let body: BodyInit;
+  if (input.attachments?.length) {
+    const form = new FormData();
+    form.set("body", input.body);
+    form.set("parentMessageId", input.parentMessageId ?? "");
+    form.set("mentionedUserIds", JSON.stringify(input.mentionedUserIds ?? []));
+    form.set("mentionedAgentIds", JSON.stringify(input.mentionedAgentIds ?? []));
+    form.set(
+      "attachmentReferences",
+      JSON.stringify(input.attachmentReferences ?? []),
+    );
+    for (const attachment of input.attachments) {
+      form.append("attachments", attachment, attachment.name);
+    }
+    body = form;
+  } else {
+    const {
+      attachments: _attachments,
+      attachmentReferences: _attachmentReferences,
+      ...jsonInput
+    } = input;
+    body = JSON.stringify(jsonInput);
+  }
   return request<{
     message: ChannelMessage;
     agentReplies: ChannelAgentReply[];
   }>(
     `/organizations/${organizationId}/channels/${channelId}/messages`,
     token,
-    { method: "POST", body: JSON.stringify(input) },
+    { method: "POST", body },
   );
+}
+
+export async function loadChannelMessageAttachment(
+  token: string,
+  attachment: ChannelMessageAttachment,
+) {
+  if (!apiUrl || !attachment.url.startsWith("/")) {
+    throw new Error("첨부 이미지 경로가 유효하지 않습니다.");
+  }
+  const response = await fetch(`${apiUrl}${attachment.url}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) {
+    throw new Error(`첨부 이미지를 열 수 없습니다. (${response.status})`);
+  }
+  return response.blob();
 }
 
 export async function loadChannelAgentReplies(
@@ -1495,6 +1577,23 @@ export async function setChannelAgent(
   );
 }
 
+export async function setChannelMember(
+  token: string,
+  organizationId: string,
+  channelId: string,
+  userId: string,
+  present: boolean,
+) {
+  return request<{ members: ChannelMember[] }>(
+    `/organizations/${organizationId}/channels/${channelId}/members/${encodeURIComponent(userId)}`,
+    token,
+    {
+      method: present ? "PUT" : "DELETE",
+      body: present ? JSON.stringify({ role: "member" }) : undefined,
+    },
+  );
+}
+
 export async function acceptChannelProposal(
   token: string,
   organizationId: string,
@@ -1504,7 +1603,8 @@ export async function acceptChannelProposal(
 ) {
   return request<{
     outcome: "accepted" | "already_accepted";
-    resultRunId: string | null;
+    projectId: string;
+    resultRunId: string;
   }>(
     `/organizations/${organizationId}/channels/${channelId}/proposals/${proposalId}/accept`,
     token,
@@ -1561,139 +1661,6 @@ export async function deleteOrganizationAgent(
     `/organizations/${organizationId}/agents/${agentId}`,
     token,
     { method: "DELETE" },
-  );
-}
-
-export async function listOrganizationIdeas(
-  token: string,
-  organizationId: string,
-) {
-  return request<{ ideas: IdeaSummary[] }>(
-    `/organizations/${organizationId}/ideas`,
-    token,
-  );
-}
-
-export async function loadOrganizationIdea(
-  token: string,
-  organizationId: string,
-  ideaId: string,
-) {
-  return request<{ idea: IdeaDetail }>(
-    `/organizations/${organizationId}/ideas/${ideaId}`,
-    token,
-  );
-}
-
-export async function listIdeas(token: string, projectId: string) {
-  return request<{ ideas: IdeaSummary[] }>(`/projects/${projectId}/ideas`, token);
-}
-
-export async function createIdea(
-  token: string,
-  projectId: string,
-  input: { provider: IdeaProvider; model: string | null },
-) {
-  return request<{ idea: IdeaDetail }>(`/projects/${projectId}/ideas`, token, {
-    method: "POST",
-    body: JSON.stringify(input),
-  });
-}
-
-export async function loadIdea(token: string, projectId: string, ideaId: string) {
-  return request<{ idea: IdeaDetail }>(
-    `/projects/${projectId}/ideas/${ideaId}`,
-    token,
-  );
-}
-
-export async function updateIdea(
-  token: string,
-  projectId: string,
-  ideaId: string,
-  input: {
-    expectedVersion: number;
-    title?: string;
-    documentMarkdown?: string;
-    status?: Extract<IdeaStatus, "refining" | "ready" | "archived">;
-    provider?: IdeaProvider;
-    model?: string | null;
-  },
-) {
-  return request<{ idea: IdeaDetail }>(
-    `/projects/${projectId}/ideas/${ideaId}`,
-    token,
-    { method: "PATCH", body: JSON.stringify(input) },
-  );
-}
-
-export async function deleteIdea(token: string, projectId: string, ideaId: string) {
-  await request<void>(`/projects/${projectId}/ideas/${ideaId}`, token, {
-    method: "DELETE",
-  });
-}
-
-export async function sendIdeaMessage(
-  token: string,
-  projectId: string,
-  ideaId: string,
-  body: string,
-) {
-  return request<{ idea: IdeaDetail }>(
-    `/projects/${projectId}/ideas/${ideaId}/messages`,
-    token,
-    { method: "POST", body: JSON.stringify({ body }) },
-  );
-}
-
-export async function generateIdeaPlan(
-  token: string,
-  projectId: string,
-  ideaId: string,
-) {
-  return request<{ idea: IdeaDetail }>(
-    `/projects/${projectId}/ideas/${ideaId}/plan`,
-    token,
-    { method: "POST", body: "{}" },
-  );
-}
-
-export async function retryIdeaJob(
-  token: string,
-  projectId: string,
-  ideaId: string,
-  jobId: string,
-) {
-  return request<{ idea: IdeaDetail }>(
-    `/projects/${projectId}/ideas/${ideaId}/jobs/${jobId}/retry`,
-    token,
-    { method: "POST", body: "{}" },
-  );
-}
-
-export async function updateIdeaPlan(
-  token: string,
-  projectId: string,
-  ideaId: string,
-  input: { expectedVersion: number; items: IdeaIssuePlanItem[] },
-) {
-  return request<{ idea: IdeaDetail }>(
-    `/projects/${projectId}/ideas/${ideaId}/plan`,
-    token,
-    { method: "PATCH", body: JSON.stringify(input) },
-  );
-}
-
-export async function convertIdeaPlan(
-  token: string,
-  projectId: string,
-  ideaId: string,
-  planVersion: number,
-) {
-  return request<{ runIds: string[] }>(
-    `/projects/${projectId}/ideas/${ideaId}/convert`,
-    token,
-    { method: "POST", body: JSON.stringify({ planVersion }) },
   );
 }
 
@@ -1970,6 +1937,37 @@ export async function createIssueMessage(
     { method: "POST", body },
   );
   return result;
+}
+
+export async function editIssueMessage(
+  token: string,
+  projectId: string,
+  runId: string,
+  messageId: string,
+  input: {
+    body: string;
+    mentionedUserIds?: string[];
+  },
+) {
+  const result = await request<{ message: IssueMessage }>(
+    `/projects/${projectId}/runs/${runId}/messages/${messageId}`,
+    token,
+    { method: "PATCH", body: JSON.stringify(input) },
+  );
+  return result.message;
+}
+
+export async function deleteIssueMessage(
+  token: string,
+  projectId: string,
+  runId: string,
+  messageId: string,
+) {
+  await request<null>(
+    `/projects/${projectId}/runs/${runId}/messages/${messageId}`,
+    token,
+    { method: "DELETE" },
+  );
 }
 
 export async function waitForIssueAgentReply(

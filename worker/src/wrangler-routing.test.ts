@@ -13,7 +13,6 @@ describe("Cloudflare Worker routing", () => {
     expect(config.assets?.run_worker_first).toEqual(
       expect.arrayContaining([
         "/transcripts",
-        "/idea-job-claims*",
         "/issue-reply-claims*",
         "/queue*",
         "/run-events",

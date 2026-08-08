@@ -15,12 +15,14 @@ const listChannels = vi.fn();
 const loadChannel = vi.fn();
 const listChannelMessages = vi.fn();
 const sendChannelMessage = vi.fn();
+const acceptChannelProposal = vi.fn();
 
 vi.mock("../lib/api", () => ({
   listChannels: (...args: unknown[]) => listChannels(...args),
   loadChannel: (...args: unknown[]) => loadChannel(...args),
   listChannelMessages: (...args: unknown[]) => listChannelMessages(...args),
   sendChannelMessage: (...args: unknown[]) => sendChannelMessage(...args),
+  acceptChannelProposal: (...args: unknown[]) => acceptChannelProposal(...args),
 }));
 
 const { CompanionChannels } = await import("./CompanionChannels");
@@ -58,6 +60,7 @@ const message = (id: string, body: string, replyCount = 0): ChannelMessage => ({
   body,
   mentionedUserIds: [],
   mentionedAgentIds: [],
+  attachments: [],
   replyCount,
   lastReplyAt: null,
   document: null,
@@ -89,7 +92,11 @@ describe("CompanionChannels", () => {
   let container: HTMLDivElement;
   let root: ReturnType<typeof createRoot>;
 
-  const render = async () => {
+  const render = async (
+    onIssueOpen?: (projectId: string, runId: string) => void,
+    requestedMessage?: { channelId: string; messageId: string; rootMessageId: string },
+    onRequestedMessageOpen?: () => void,
+  ) => {
     await act(async () => {
       root.render(
         <I18nProvider>
@@ -102,6 +109,9 @@ describe("CompanionChannels", () => {
               { id: "project-2", name: "Sprout" },
             ]}
             token="token"
+            onIssueOpen={onIssueOpen}
+            requestedMessage={requestedMessage}
+            onRequestedMessageOpen={onRequestedMessageOpen}
           />
         </I18nProvider>,
       );
@@ -191,6 +201,190 @@ describe("CompanionChannels", () => {
     );
     expect(container.textContent).toContain("On it");
     expect(container.textContent).toContain("Thread");
+  });
+
+  it("opens a requested Inbox reply directly in its thread", async () => {
+    const rootMessage = message("m-root", "Thread root", 1);
+    const reply = {
+      ...message("m-reply", "Requested reply"),
+      parentMessageId: rootMessage.id,
+    };
+    loadChannel.mockResolvedValue({
+      channel: channel("c-common", "Welcome", null),
+      members: [],
+      agents: [],
+      messages: [rootMessage],
+    });
+    listChannelMessages.mockResolvedValue({ messages: [rootMessage, reply] });
+
+    await render(
+      undefined,
+      {
+        channelId: "c-common",
+        messageId: reply.id,
+        rootMessageId: rootMessage.id,
+      },
+      vi.fn(),
+    );
+    await vi.waitFor(() => {
+      expect(container.textContent).toContain("Requested reply");
+    });
+    expect(listChannelMessages).toHaveBeenCalledWith(
+      "token",
+      "org-1",
+      "c-common",
+      rootMessage.id,
+    );
+    expect(container.textContent).toContain("Thread");
+  });
+
+  it("requires a project for common-channel proposals, accepts it, and opens the result", async () => {
+    const proposal = message("m-proposal", "새 이슈를 제안합니다");
+    proposal.author = {
+      type: "agent",
+      id: "agent-1",
+      name: "Honey",
+      provider: "claude",
+    };
+    proposal.proposal = {
+      id: "proposal-1",
+      actionType: "request_issue_create",
+      status: "pending",
+      projectId: null,
+      payload: {},
+      resultRunId: null,
+    };
+    loadChannel.mockResolvedValue({
+      channel: channel("c-common", "Welcome", null),
+      members: [],
+      agents: [],
+      messages: [proposal],
+    });
+    acceptChannelProposal.mockResolvedValue({
+      outcome: "accepted",
+      projectId: "project-2",
+      resultRunId: "run-2",
+    });
+    const onIssueOpen = vi.fn();
+    await render(onIssueOpen);
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(
+        ".companion-channel-group button",
+      )!.click();
+    });
+    await act(async () => Promise.resolve());
+
+    const card = container.querySelector<HTMLElement>(
+      ".companion-channel-proposal",
+    );
+    const select = card!.querySelector<HTMLSelectElement>("select")!;
+    const accept = card!.querySelector<HTMLButtonElement>("button")!;
+    expect(accept.disabled).toBe(true);
+
+    await act(async () => {
+      select.value = "project-2";
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    expect(accept.disabled).toBe(false);
+    await act(async () => {
+      accept.click();
+    });
+    await act(async () => Promise.resolve());
+
+    expect(acceptChannelProposal).toHaveBeenCalledWith(
+      "token",
+      "org-1",
+      "c-common",
+      "proposal-1",
+      "project-2",
+    );
+    expect(onIssueOpen).toHaveBeenCalledWith("project-2", "run-2");
+  });
+
+  it("opens the result from an already accepted proposal", async () => {
+    const proposal = message("m-accepted", "이슈를 만들었습니다");
+    proposal.proposal = {
+      id: "proposal-2",
+      actionType: "request_issue_create",
+      status: "accepted",
+      projectId: "project-1",
+      payload: {},
+      resultRunId: "run-1",
+    };
+    loadChannel.mockResolvedValue({
+      channel: channel("c-common", "Welcome", null),
+      members: [],
+      agents: [],
+      messages: [proposal],
+    });
+    const onIssueOpen = vi.fn();
+    await render(onIssueOpen);
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(
+        ".companion-channel-group button",
+      )!.click();
+    });
+    await act(async () => Promise.resolve());
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(
+        ".companion-channel-proposal button",
+      )!.click();
+    });
+
+    expect(onIssueOpen).toHaveBeenCalledWith("project-1", "run-1");
+  });
+
+  it("uses the channel default project without showing a picker", async () => {
+    const proposal = message("m-default", "이슈를 제안합니다");
+    proposal.proposal = {
+      id: "proposal-default",
+      actionType: "request_issue_create",
+      status: "pending",
+      projectId: null,
+      payload: {},
+      resultRunId: null,
+    };
+    loadChannel.mockResolvedValue({
+      channel: channel("c-current", "Briar dev", "project-1"),
+      members: [],
+      agents: [],
+      messages: [proposal],
+    });
+    acceptChannelProposal.mockResolvedValue({
+      outcome: "accepted",
+      projectId: "project-1",
+      resultRunId: "run-default",
+    });
+    await render();
+
+    const channelButton = [
+      ...container.querySelectorAll<HTMLButtonElement>(
+        ".companion-channel-group button",
+      ),
+    ].find((button) => button.textContent?.includes("Briar dev"));
+    await act(async () => {
+      channelButton!.click();
+    });
+    await act(async () => Promise.resolve());
+
+    const card = container.querySelector<HTMLElement>(
+      ".companion-channel-proposal",
+    );
+    expect(card!.querySelector("select")).toBeNull();
+    await act(async () => {
+      card!.querySelector<HTMLButtonElement>("button")!.click();
+    });
+    await act(async () => Promise.resolve());
+
+    expect(acceptChannelProposal).toHaveBeenCalledWith(
+      "token",
+      "org-1",
+      "c-current",
+      "proposal-default",
+      "project-1",
+    );
   });
 
   it("presents channel messages with avatars, reply context, and a channel composer", async () => {
@@ -298,6 +492,8 @@ describe("CompanionChannels", () => {
       parentMessageId: "m-1",
       mentionedAgentIds: [],
       mentionedUserIds: [],
+      attachments: [],
+      attachmentReferences: [],
     });
   });
 
@@ -360,6 +556,70 @@ describe("CompanionChannels", () => {
       parentMessageId: null,
       mentionedAgentIds: ["agent-1"],
       mentionedUserIds: [],
+      attachments: [],
+      attachmentReferences: [],
     });
+  });
+
+  it("attaches a pasted image and sends an image-only message", async () => {
+    Object.defineProperty(URL, "createObjectURL", {
+      configurable: true,
+      value: vi.fn(() => "blob:companion-preview"),
+    });
+    Object.defineProperty(URL, "revokeObjectURL", {
+      configurable: true,
+      value: vi.fn(),
+    });
+    loadChannel.mockResolvedValue({
+      channel: channel("c-common", "Welcome", null),
+      members: [],
+      agents: [],
+      messages: [],
+    });
+    sendChannelMessage.mockResolvedValue({
+      message: message("m-image", "Image"),
+      agentReplies: [],
+    });
+    await render();
+    await act(async () => {
+      [
+        ...container.querySelectorAll<HTMLButtonElement>(
+          ".companion-channel-group button",
+        ),
+      ]
+        .find((button) => button.textContent?.includes("Welcome"))!
+        .click();
+    });
+    await act(async () => Promise.resolve());
+    const image = new File(["image"], "clipboard.png", { type: "image/png" });
+    const input = container.querySelector<HTMLInputElement>(
+      ".companion-channel-composer input[role='combobox']",
+    )!;
+    const paste = new Event("paste", { bubbles: true, cancelable: true });
+    Object.defineProperty(paste, "clipboardData", {
+      value: {
+        files: [image],
+        items: [{ kind: "file", getAsFile: () => image }],
+        types: ["Files"],
+      },
+    });
+
+    await act(async () => input.dispatchEvent(paste));
+    await act(async () => {
+      container
+        .querySelector("form.companion-channel-composer")!
+        .dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    });
+
+    expect(sendChannelMessage).toHaveBeenCalledWith(
+      "token",
+      "org-1",
+      "c-common",
+      expect.objectContaining({
+        attachments: [image],
+        attachmentReferences: [expect.any(String)],
+        body: expect.stringContaining("briar-attachment://"),
+      }),
+    );
   });
 });

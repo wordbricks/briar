@@ -91,7 +91,6 @@ final class CompanionNavigationModel: ObservableObject {
         case tasks
         case agents
         case inbox
-        case ideas
     }
 
     @Published var selectedTab: Tab = .tasks
@@ -100,6 +99,10 @@ final class CompanionNavigationModel: ObservableObject {
     @Published var pendingProjectID: UUID?
     @Published var pathIssueToken = 0
     @Published var pathSessionToken = 0
+    @Published var pendingChannelID: UUID?
+    @Published var pendingChannelMessageID: UUID?
+    @Published var pendingChannelRootMessageID: UUID?
+    @Published var pathChannelToken = 0
 
     func open(_ target: BriarLinkTarget) {
         pendingProjectID = target.projectID
@@ -125,6 +128,16 @@ final class CompanionNavigationModel: ObservableObject {
             }
         case .session:
             open(.session(projectID: message.projectId, sessionID: message.targetId))
+        case .channel:
+            guard let channelID = UUID(uuidString: message.targetId),
+                  let messageID = message.channelMessageId,
+                  let rootMessageID = message.rootMessageId else { return }
+            pendingProjectID = message.projectId
+            pendingChannelID = channelID
+            pendingChannelMessageID = messageID
+            pendingChannelRootMessageID = rootMessageID
+            selectedTab = .home
+            pathChannelToken &+= 1
         }
     }
 
@@ -136,5 +149,15 @@ final class CompanionNavigationModel: ObservableObject {
     func consumePendingSession() -> String? {
         defer { pendingSessionID = nil }
         return pendingSessionID
+    }
+
+    func consumePendingChannel() -> (channelID: UUID, messageID: UUID, rootMessageID: UUID)? {
+        guard let channelID = pendingChannelID,
+              let messageID = pendingChannelMessageID,
+              let rootMessageID = pendingChannelRootMessageID else { return nil }
+        pendingChannelID = nil
+        pendingChannelMessageID = nil
+        pendingChannelRootMessageID = nil
+        return (channelID, messageID, rootMessageID)
     }
 }

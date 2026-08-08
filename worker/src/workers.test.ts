@@ -19,6 +19,7 @@ import {
   attributeRunToWorker,
   bindExecutionWorkerProject,
   countExecutionWorkerDeviceSessions,
+  completeExecutionWorkerUpdates,
   countLeasedRuns,
   disableExecutionWorker,
   dispatchHuntRun,
@@ -27,6 +28,7 @@ import {
   leaseExpiryFrom,
   listExecutionWorkers,
   listOrganizationExecutionWorkers,
+  pendingExecutionWorkerUpdate,
   MAX_CLAIM_ATTEMPTS,
   MAX_TRANSCRIPT_PAYLOAD_BYTES,
   MAX_TRANSCRIPT_SESSIONS_PER_PROJECT,
@@ -34,6 +36,7 @@ import {
   readAgentTranscript,
   recordWorkerHeartbeat,
   registerExecutionWorker,
+  requestExecutionWorkerUpdate,
   renewHuntRunLease,
   TranscriptLimitError,
   unbindExecutionWorker,
@@ -153,6 +156,8 @@ describe("detached execution workers", () => {
       "migrations/0065_issue_rework_proposals.sql",
       "migrations/0067_issue_checkpoints.sql",
       "migrations/0068_issue_action_proposals.sql",
+      "migrations/0076_execution_worker_updates.sql",
+      "migrations/0077_project_agent_task_jobs.sql",
     ]) {
       await executeSql(db, await readFile(resolve(migration), "utf8"));
     }
@@ -222,7 +227,9 @@ describe("detached execution workers", () => {
        delete from briar_hunt_runs;
        delete from briar_project_execution_worker_allowlist;
        delete from briar_project_execution_worker_policies;
+       delete from briar_execution_worker_update_requests;
        delete from briar_execution_worker_credentials;
+       delete from briar_project_agent_task_jobs;
        delete from briar_execution_workers;
        delete from briar_execution_worker_devices;
        insert into briar_organization_members (
@@ -254,6 +261,57 @@ describe("detached execution workers", () => {
       versions: { briar: "1.1.1" },
       observedAt: atMinute(minute),
     });
+
+  it("keeps a remote update pending until the target Worker version reports", async () => {
+    const worker = await register("update");
+    const requested = await requestExecutionWorkerUpdate(db, {
+      id: "77777777-7777-4777-8777-777777777777",
+      organizationId: projectId,
+      deviceId: worker.device.id,
+      requestedByUserId: "owner",
+      targetVersion: "1.2.84",
+      requestedAt: atMinute(2),
+    });
+
+    expect(await pendingExecutionWorkerUpdate(db, worker.device.id)).toEqual(
+      requested,
+    );
+    await recordWorkerHeartbeat(db, projectId, {
+      workerId: worker.worker.id,
+      versions: { briar: "1.2.69" },
+      capabilities: {
+        providers: ["codex"],
+        remoteUpdates: { supported: true, protocol: 1 },
+      },
+      observedAt: atMinute(2),
+    });
+    const listed = await listOrganizationExecutionWorkers(
+      db,
+      projectId,
+      atMinute(2),
+    );
+    expect(listed[0]).toMatchObject({
+      versions: { briar: "1.2.69" },
+      remoteUpdateSupported: true,
+      updateRequest: requested,
+    });
+    await completeExecutionWorkerUpdates(
+      db,
+      worker.device.id,
+      "1.2.83",
+      atMinute(3),
+    );
+    expect(await pendingExecutionWorkerUpdate(db, worker.device.id)).toEqual(
+      requested,
+    );
+    await completeExecutionWorkerUpdates(
+      db,
+      worker.device.id,
+      "1.2.84",
+      atMinute(4),
+    );
+    expect(await pendingExecutionWorkerUpdate(db, worker.device.id)).toBeNull();
+  });
 
   it("dispatches a queued issue to a selected Worker without an Agent", async () => {
     const selected = await register("agentless");

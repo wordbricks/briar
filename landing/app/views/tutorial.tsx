@@ -504,6 +504,7 @@ export default function TutorialView({ locale }: { locale: Locale }) {
           </a>
           <p>{c.footer.tagline}</p>
           <div>
+            <a href={localizedPath(locale, "/changelog")}>{c.nav.changelog}</a>
             <a href={localizedPath(locale, "/")}>{t.backHome}</a>
             <a href="#top">{t.backTop}</a>
           </div>

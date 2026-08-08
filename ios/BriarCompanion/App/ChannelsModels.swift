@@ -27,10 +27,72 @@ struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
     let parentMessageId: UUID?
     let body: String
     let author: Author
+    let mentionedUserIds: [String]
+    let mentionedAgentIds: [UUID]
     let replyCount: Int
     let lastReplyAt: Date?
     let document: Document?
+    var proposal: Proposal?
     let createdAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case channelId
+        case parentMessageId
+        case body
+        case author
+        case mentionedUserIds
+        case mentionedAgentIds
+        case replyCount
+        case lastReplyAt
+        case document
+        case proposal
+        case createdAt
+    }
+
+    init(
+        id: UUID,
+        channelId: UUID,
+        parentMessageId: UUID?,
+        body: String,
+        author: Author,
+        mentionedUserIds: [String] = [],
+        mentionedAgentIds: [UUID] = [],
+        replyCount: Int,
+        lastReplyAt: Date?,
+        document: Document?,
+        proposal: Proposal?,
+        createdAt: Date
+    ) {
+        self.id = id
+        self.channelId = channelId
+        self.parentMessageId = parentMessageId
+        self.body = body
+        self.author = author
+        self.mentionedUserIds = mentionedUserIds
+        self.mentionedAgentIds = mentionedAgentIds
+        self.replyCount = replyCount
+        self.lastReplyAt = lastReplyAt
+        self.document = document
+        self.proposal = proposal
+        self.createdAt = createdAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        channelId = try container.decode(UUID.self, forKey: .channelId)
+        parentMessageId = try container.decodeIfPresent(UUID.self, forKey: .parentMessageId)
+        body = try container.decode(String.self, forKey: .body)
+        author = try container.decode(Author.self, forKey: .author)
+        mentionedUserIds = try container.decodeIfPresent([String].self, forKey: .mentionedUserIds) ?? []
+        mentionedAgentIds = try container.decodeIfPresent([UUID].self, forKey: .mentionedAgentIds) ?? []
+        replyCount = try container.decode(Int.self, forKey: .replyCount)
+        lastReplyAt = try container.decodeIfPresent(Date.self, forKey: .lastReplyAt)
+        document = try container.decodeIfPresent(Document.self, forKey: .document)
+        proposal = try container.decodeIfPresent(Proposal.self, forKey: .proposal)
+        createdAt = try container.decode(Date.self, forKey: .createdAt)
+    }
 
     struct Author: Codable, Hashable, Sendable {
         let type: Kind
@@ -45,9 +107,27 @@ struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
     }
 
     struct Document: Codable, Hashable, Sendable {
-        let ideaId: UUID
+        let messageId: UUID
         let title: String
         let projectId: UUID?
+    }
+
+    struct Proposal: Codable, Hashable, Identifiable, Sendable {
+        let id: UUID
+        let actionType: ActionType
+        let status: Status
+        let projectId: UUID?
+        let resultRunId: UUID?
+
+        enum ActionType: String, Codable, Hashable, Sendable {
+            case createIssue = "request_issue_create"
+            case createPlanDocument = "request_plan_document"
+        }
+
+        enum Status: String, Codable, Hashable, Sendable {
+            case pending
+            case accepted
+        }
     }
 }
 
@@ -75,6 +155,21 @@ struct CreateChannelMessageRequest: Codable, Sendable {
 
 struct CreateChannelMessageResponse: Codable, Sendable {
     let message: ChannelMessage
+}
+
+struct AcceptChannelProposalRequest: Codable, Equatable, Sendable {
+    let projectId: UUID?
+}
+
+struct AcceptChannelProposalResponse: Codable, Equatable, Sendable {
+    let outcome: Outcome
+    let projectId: UUID
+    let resultRunId: UUID
+
+    enum Outcome: String, Codable, Equatable, Sendable {
+        case accepted
+        case alreadyAccepted = "already_accepted"
+    }
 }
 
 struct ChannelMember: Codable, Equatable, Identifiable, Sendable {
@@ -154,6 +249,7 @@ enum ChannelMentions {
     ) -> [ChannelMentionTarget] {
         guard let query = query(in: body) else { return [] }
         let needle = query.text.lowercased()
+        if needle.isEmpty { return candidates }
         return candidates.filter {
             "\($0.handle) \($0.label)".lowercased().contains(needle)
         }
@@ -197,7 +293,7 @@ enum ChannelMentions {
         return Query(range: atIndex..<body.endIndex, text: String(body[tokenRange]))
     }
 
-    private static func normalizedHandle(_ value: String) -> String {
+    static func normalizedHandle(_ value: String) -> String {
         let allowed = value.lowercased().map { character -> Character in
             if character.isLetter || character.isNumber || "_.-".contains(character) {
                 return character
