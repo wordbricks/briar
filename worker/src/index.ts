@@ -7814,12 +7814,12 @@ async function route(
     }
     const agentReply =
       !agentProvider && shouldBriarReply(
-        (input.parentMessageId
+        (message.parent_message_id
           ? await listIssueThreadMessages(
               db,
               project.id,
               issueMessagesMatch[2],
-              input.parentMessageId,
+              message.parent_message_id,
             )
           : []
         ).map((threadMessage) => ({
@@ -7828,7 +7828,7 @@ async function route(
           body: threadMessage.body,
           author: { provider: threadMessage.author_agent_provider },
         })),
-        { body: input.body, parentMessageId: input.parentMessageId ?? null },
+        { body: input.body, parentMessageId: message.parent_message_id ?? null },
       )
         ? await enqueueIssueAgentReply(db, {
             id: crypto.randomUUID(),

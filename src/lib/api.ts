@@ -1898,13 +1898,14 @@ export async function createIssueMessage(
   },
 ) {
   const attachments = input.attachments ?? [];
+  const parentMessageId = input.parentMessageId?.toLowerCase() ?? null;
   let body: BodyInit;
   if (attachments.length > 0) {
     const attachmentError = validateIssueAttachments(attachments);
     if (attachmentError) throw new Error(attachmentError);
     const form = new FormData();
     form.set("body", input.body);
-    form.set("parentMessageId", input.parentMessageId ?? "");
+    form.set("parentMessageId", parentMessageId ?? "");
     form.set("mentionedUserIds", JSON.stringify(input.mentionedUserIds ?? []));
     form.set("agentConversationId", input.agentConversationId ?? "");
     form.set(
@@ -1921,7 +1922,7 @@ export async function createIssueMessage(
       attachmentReferences: _attachmentReferences,
       ...message
     } = input;
-    body = JSON.stringify(message);
+    body = JSON.stringify({ ...message, parentMessageId });
   }
   const result = await request<{
     message: IssueMessage;
