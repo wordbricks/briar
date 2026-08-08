@@ -31,6 +31,7 @@ struct ChannelsHomeView: View {
                         NavigationLink(value: channel) {
                             ChannelRow(channel: channel)
                         }
+                        .accessibilityIdentifier("channel-row-\(channel.id.uuidString.lowercased())")
                     }
                 } header: {
                     Text(group.label)
@@ -77,7 +78,6 @@ private struct ChannelRow: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .accessibilityIdentifier("channel-row-\(channel.id.uuidString.lowercased())")
     }
 }
 
@@ -100,12 +100,6 @@ struct ChannelMessagesView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            ChannelHeader(
-                channel: channel,
-                locale: locale,
-                showsStatusIcons: !dynamicTypeSize.isAccessibilitySize,
-                onBack: { dismiss() }
-            )
             ScrollView {
                 LazyVStack(spacing: 0) {
                     ForEach(channels.messages) { message in
@@ -150,6 +144,14 @@ struct ChannelMessagesView: View {
                         mentions: mentions
                     )
                 }
+            )
+        }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            ChannelHeader(
+                channel: channel,
+                locale: locale,
+                showsStatusIcons: !dynamicTypeSize.isAccessibilitySize,
+                onBack: { dismiss() }
             )
         }
         .toolbar(.hidden, for: .navigationBar)
@@ -259,6 +261,7 @@ private struct ChannelHeader: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
         .background(.bar)
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("channel-header")
     }
 }

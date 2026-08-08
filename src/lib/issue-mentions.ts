@@ -12,7 +12,7 @@ type IssueMentionTree = IssueMentionNode & {
 export const issueMentionUrlPrefix = "briar-mention://";
 
 const mentionPattern =
-  /(^|[^\p{L}\p{N}_.-])(@[\p{L}\p{N}_.-]+)(?=$|[^\p{L}\p{N}_.-])/gu;
+  /(^|[^\p{L}\p{N}_.-])(@[\p{L}\p{N}_-](?:[\p{L}\p{N}_.-]*[\p{L}\p{N}_-])?)(?=$|[^\p{L}\p{N}_-])/gu;
 const nonTextualNodeTypes = new Set([
   "code",
   "definition",

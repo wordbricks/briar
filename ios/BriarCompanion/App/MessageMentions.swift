@@ -5,7 +5,7 @@ import SwiftUI
 enum MessageMentions {
     /// Matches a whole @handle at a word boundary, same rule as web `issue-mentions`.
     private static let tokenPattern =
-        "(^|[^\\p{L}\\p{N}_.-])(@[\\p{L}\\p{N}_.-]+)(?=$|[^\\p{L}\\p{N}_.-])"
+        "(^|[^\\p{L}\\p{N}_.-])(@[\\p{L}\\p{N}_-](?:[\\p{L}\\p{N}_.-]*[\\p{L}\\p{N}_-])?)(?=$|[^\\p{L}\\p{N}_-])"
 
     struct Segment: Equatable, Sendable {
         enum Kind: Equatable, Sendable {

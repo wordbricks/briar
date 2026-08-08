@@ -46,12 +46,60 @@ struct ProjectAgentSession: Codable, Equatable, Identifiable, Sendable {
     let completedAt: Date?
     let conversationId: String?
     let workspaceRoot: String?
-    let requestedWorkerId: String? = nil
-    let workerId: String? = nil
+    let requestedWorkerId: String?
+    let workerId: String?
     let summary: String?
     let error: String?
     let events: [Event]?
     let updatedAt: Date?
+
+    init(
+        id: String,
+        projectId: UUID,
+        dispatchGroupId: String?,
+        agentId: UUID?,
+        sessionType: SessionType?,
+        trigger: Trigger?,
+        scheduleId: String?,
+        scheduleRunId: String?,
+        parentSessionId: String?,
+        request: String?,
+        status: Status,
+        issues: [Issue],
+        startedAt: Date,
+        completedAt: Date?,
+        conversationId: String?,
+        workspaceRoot: String?,
+        requestedWorkerId: String? = nil,
+        workerId: String? = nil,
+        summary: String?,
+        error: String?,
+        events: [Event]?,
+        updatedAt: Date?
+    ) {
+        self.id = id
+        self.projectId = projectId
+        self.dispatchGroupId = dispatchGroupId
+        self.agentId = agentId
+        self.sessionType = sessionType
+        self.trigger = trigger
+        self.scheduleId = scheduleId
+        self.scheduleRunId = scheduleRunId
+        self.parentSessionId = parentSessionId
+        self.request = request
+        self.status = status
+        self.issues = issues
+        self.startedAt = startedAt
+        self.completedAt = completedAt
+        self.conversationId = conversationId
+        self.workspaceRoot = workspaceRoot
+        self.requestedWorkerId = requestedWorkerId
+        self.workerId = workerId
+        self.summary = summary
+        self.error = error
+        self.events = events
+        self.updatedAt = updatedAt
+    }
 
     enum SessionType: String, Codable, Sendable {
         case task

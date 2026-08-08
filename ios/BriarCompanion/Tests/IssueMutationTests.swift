@@ -474,8 +474,8 @@ final class IssueMutationTests: XCTestCase {
         )
 
         let body = await recorder.recordedBody()
-        XCTAssertEqual(body?["body"] as? String, "@sam 확인해 줘")
-        XCTAssertEqual(body?["mentionedUserIds"] as? [String], ["user-2"])
+        XCTAssertEqual(body?.body, "@sam 확인해 줘")
+        XCTAssertEqual(body?.mentionedUserIds, ["user-2"])
     }
 
     func testConversationImageUsesMultipartUpload() async throws {
@@ -564,10 +564,15 @@ private actor AgentReplyAPIRecorder: MobileAPIClientProtocol {
     }
 }
 
-private actor MentionMessageAPIRecorder: MobileAPIClientProtocol {
-    private var bodyObject: [String: Any]?
+private struct MentionMessageBody: Decodable, Sendable {
+    let body: String
+    let mentionedUserIds: [String]
+}
 
-    func recordedBody() -> [String: Any]? { bodyObject }
+private actor MentionMessageAPIRecorder: MobileAPIClientProtocol {
+    private var bodyObject: MentionMessageBody?
+
+    func recordedBody() -> MentionMessageBody? { bodyObject }
 
     func send<Response: Decodable & Sendable>(
         _ path: String,
@@ -580,7 +585,7 @@ private actor MentionMessageAPIRecorder: MobileAPIClientProtocol {
             throw MobileAPIError.invalidRequest
         }
         let data = try JSONEncoder().encode(body)
-        bodyObject = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        bodyObject = try JSONDecoder.mobileContract.decode(MentionMessageBody.self, from: data)
         let payload = #"{"message":{"id":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","runId":"33333333-3333-4333-8333-333333333333","parentMessageId":null,"body":"@sam 확인해 줘","author":{"id":"fixture-user","name":"Briar User","image":null,"provider":null},"replyCount":0,"createdAt":"2026-08-02T01:00:00Z","updatedAt":"2026-08-02T01:00:00Z"},"agentReply":null}"#
         return try JSONDecoder.mobileContract.decode(Response.self, from: Data(payload.utf8))
     }

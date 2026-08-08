@@ -28,6 +28,12 @@ final class AgentsInboxSystemTests: XCTestCase {
         XCTAssertEqual(sessions.sessions.count, 1)
         XCTAssertEqual(sessions.sessions.first?.status, .completed)
         XCTAssertEqual(sessions.sessions.first?.issues.first?.runNumber, 3832)
+
+        let taskPayload = try XCTUnwrap(operations["runProjectAgentTask"]?["response"])
+        let taskData = try JSONSerialization.data(withJSONObject: taskPayload)
+        let task = try JSONDecoder.mobileContract.decode(ProjectAgentTaskResponse.self, from: taskData)
+        XCTAssertEqual(task.session.requestedWorkerId, "worker-1")
+        XCTAssertEqual(task.session.workerId, "worker-1")
     }
 
     func testEndpointPathsForAgentsAndSessions() {
