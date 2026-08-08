@@ -153,10 +153,10 @@ describe("workflow checkpoint policy persistence", () => {
 
   it("uses revision CAS and freezes the effective policy into each new run", async () => {
     const mandatory = [
-      { key: "project-before-pr", stage: "pr_open", position: "before" as const },
+      { key: "project-before-pr_open", stage: "pr_open", position: "before" as const },
     ];
     const defaults = [
-      { key: "user-after-implement", stage: "implementing", position: "after" as const },
+      { key: "user-after-implementing", stage: "implementing", position: "after" as const },
     ];
     const initial = await db
       .prepare(
@@ -189,8 +189,8 @@ describe("workflow checkpoint policy persistence", () => {
 
     const policy = await loadWorkflowCheckpointPolicy(db, projectId, "policy-user");
     expect(policy.effective.map((checkpoint) => checkpoint.key)).toEqual([
-      "user-after-implement",
-      "project-before-pr",
+      "user-after-implementing",
+      "project-before-pr_open",
     ]);
 
     const userRunId = await recordHuntEvent(
@@ -216,12 +216,12 @@ describe("workflow checkpoint policy persistence", () => {
       JSON.parse(userSnapshotBefore).execution.checkpoints.map(
         (checkpoint: { key: string }) => checkpoint.key,
       ),
-    ).toEqual(["user-after-implement", "project-before-pr"]);
+    ).toEqual(["user-after-implementing", "project-before-pr_open"]);
     expect(
       JSON.parse(byId.get(serviceRunId)!).execution.checkpoints.map(
         (checkpoint: { key: string }) => checkpoint.key,
       ),
-    ).toEqual(["project-before-pr"]);
+    ).toEqual(["project-before-pr_open"]);
 
     await expect(assertStoredCheckpointPoliciesCompatible(db, projectId, {
       version: 2,

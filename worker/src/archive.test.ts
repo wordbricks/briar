@@ -4,10 +4,10 @@ import { Miniflare } from "miniflare";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { HuntEventInput } from "./db";
 import {
-  claimNextQueuedHuntRun,
+  completeWorkflowStageLifecycle,
   deleteIssue,
   recordHuntEvent,
-  resumeHuntRun,
+  startWorkflowStageLifecycle,
 } from "./db";
 import {
   type ArchiveBucket,
@@ -174,38 +174,37 @@ describe("D1 to R2 log archives", () => {
          '${oldTime}', '${oldTime}'
        );
        insert into briar_project_settings (
-         project_id, velen_org, linear_enabled, workflow_json, created_at, updated_at
+         project_id, velen_org, linear_enabled, workflow_json,
+         mandatory_checkpoints_json, created_at, updated_at
        ) values (
          '${projectId}', null, 0,
          '{"version":2,"requirements":[],"stages":[{"id":"archive_analyzing","label":"Analyze","required":true},{"id":"archive_implementing","label":"Implement","required":true}],"execution":{"checkpoints":[]},"completion":{"requiredStages":["archive_analyzing","archive_implementing"]}}',
+         '[]',
          '${oldTime}', '${oldTime}'
        );`,
     );
 
-    for (const [stage, status, minute] of [
-      ["queued", "queued", 0],
-      ["analyzing", "running", 1],
-      ["implementing", "running", 2],
-    ] as const) {
-      await recordHuntEvent(db, projectId, event("large-run", stage, status, minute));
-    }
+    await recordHuntEvent(db, projectId, event("large-run", "queued", "queued", 0));
     runId = (await db
       .prepare(`select id from briar_hunt_runs where source_key = ?`)
       .bind("large-run")
       .first<string>("id")) ?? "";
-    await resumeHuntRun(db, projectId, {
-      runId,
-      requestId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-      actor: "archive-test",
-      occurredAt: new Date(Date.parse(oldTime) + 3 * 60_000).toISOString(),
-    });
-    await claimNextQueuedHuntRun(db, projectId, {
-      claimTokenHash: "a".repeat(64),
-      claimedBy: "archive-worker",
-      claimedAt: new Date(Date.parse(oldTime) + 3.1 * 60_000).toISOString(),
-      leaseExpiresAt: new Date(Date.parse(oldTime) + 8 * 60_000).toISOString(),
-      runId,
-    });
+    for (const [stageId, minute] of [
+      ["archive_analyzing", 2.1],
+      ["archive_implementing", 2.2],
+    ] as const) {
+      await startWorkflowStageLifecycle(db, projectId, {
+        runId,
+        stageId,
+        startedAt: new Date(Date.parse(oldTime) + minute * 60_000).toISOString(),
+        actor: "archive-test",
+      });
+      await completeWorkflowStageLifecycle(db, projectId, {
+        runId,
+        stageId,
+        finishedAt: new Date(Date.parse(oldTime) + (minute + 0.05) * 60_000).toISOString(),
+      });
+    }
     await recordHuntEvent(db, projectId, event("large-run", "completed", "completed", 3));
     await db
       .prepare(`update briar_hunt_runs set completed_at = ? where id = ?`)
@@ -386,24 +385,25 @@ describe("D1 to R2 log archives", () => {
 
   it("keeps D1 originals when an R2 upload or checksum verification fails", async () => {
     await recordHuntEvent(db, projectId, event("failure-run", "queued", "queued", 10));
-    await recordHuntEvent(db, projectId, event("failure-run", "analyzing", "running", 11));
-    await recordHuntEvent(db, projectId, event("failure-run", "implementing", "running", 12));
     secondRunId = (await db
       .prepare(`select id from briar_hunt_runs where source_key = 'failure-run'`)
       .first<string>("id")) ?? "";
-    await resumeHuntRun(db, projectId, {
-      runId: secondRunId,
-      requestId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
-      actor: "archive-test",
-      occurredAt: new Date(Date.parse(oldTime) + 13 * 60_000).toISOString(),
-    });
-    await claimNextQueuedHuntRun(db, projectId, {
-      claimTokenHash: "b".repeat(64),
-      claimedBy: "archive-worker",
-      claimedAt: new Date(Date.parse(oldTime) + 13.1 * 60_000).toISOString(),
-      leaseExpiresAt: new Date(Date.parse(oldTime) + 18 * 60_000).toISOString(),
-      runId: secondRunId,
-    });
+    for (const [stageId, minute] of [
+      ["archive_analyzing", 12.1],
+      ["archive_implementing", 12.2],
+    ] as const) {
+      await startWorkflowStageLifecycle(db, projectId, {
+        runId: secondRunId,
+        stageId,
+        startedAt: new Date(Date.parse(oldTime) + minute * 60_000).toISOString(),
+        actor: "archive-test",
+      });
+      await completeWorkflowStageLifecycle(db, projectId, {
+        runId: secondRunId,
+        stageId,
+        finishedAt: new Date(Date.parse(oldTime) + (minute + 0.05) * 60_000).toISOString(),
+      });
+    }
     await recordHuntEvent(db, projectId, event("failure-run", "completed", "completed", 13));
     expect(secondRunId).toBeTruthy();
     await db

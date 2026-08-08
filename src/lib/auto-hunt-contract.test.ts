@@ -136,11 +136,11 @@ describe("Auto Hunt workflow v2 contract", () => {
     })).toThrow(AutoHuntWorkflowValidationError);
   });
 
-  it("rejects v1 workflows after persisted data has been migrated", () => {
+  it("rejects workflow versions other than 2", () => {
     expect(() => normalizeAutoHuntWorkflow({
-      version: 1,
+      version: 3,
       stages,
-      execution: { pauseAfterStage: "pr_open" },
+      execution: { checkpoints: [] },
       completion: { requiredStages: stages.map((stage) => stage.id) },
     } as unknown as AutoHuntWorkflowInput)).toThrow("version must be 2");
   });
@@ -160,17 +160,17 @@ describe("Auto Hunt workflow v2 contract", () => {
     );
 
     expect(policy.projectMandatory.map((checkpoint) => checkpoint.key)).toEqual([
-      "project-before-pr",
-      "project-after-production",
+      "project-before-pr_open",
+      "project-after-production_qa",
     ]);
     expect(policy.userDefaults.map((checkpoint) => checkpoint.key)).toEqual([
-      "user-before-implement",
-      "user-before-pr",
+      "user-before-implementing",
+      "user-before-pr_open",
     ]);
     expect(policy.effective).toEqual([
-      { key: "user-before-implement", stage: "implementing", position: "before" },
-      { key: "project-before-pr", stage: "pr_open", position: "before" },
-      { key: "project-after-production", stage: "production_qa", position: "after" },
+      { key: "user-before-implementing", stage: "implementing", position: "before" },
+      { key: "project-before-pr_open", stage: "pr_open", position: "before" },
+      { key: "project-after-production_qa", stage: "production_qa", position: "after" },
     ]);
   });
 
@@ -179,14 +179,18 @@ describe("Auto Hunt workflow v2 contract", () => {
     const project = [{ key: "project-pr", stage: "pr_open", position: "after" as const }];
     const user = [{ key: "user-production", stage: "production_qa", position: "before" as const }];
 
-    expect(resolveCheckpointPolicy(workflow, project, []).effective).toEqual(project);
-    expect(resolveCheckpointPolicy(workflow, [], user).effective).toEqual(user);
+    expect(resolveCheckpointPolicy(workflow, project, []).effective).toEqual([
+      { key: "project-after-pr_open", stage: "pr_open", position: "after" },
+    ]);
+    expect(resolveCheckpointPolicy(workflow, [], user).effective).toEqual([
+      { key: "user-before-production_qa", stage: "production_qa", position: "before" },
+    ]);
     expect(resolveCheckpointPolicy(workflow, [], []).effective).toEqual([]);
   });
 
   it("writes a new effective snapshot without mutating the project workflow", () => {
     const workflow = normalizeAutoHuntWorkflow(v2([
-      { key: "legacy-pr", stage: "pr_open", position: "after" },
+      { key: "project-after-pr_open", stage: "pr_open", position: "after" },
     ]));
     const before = JSON.stringify(workflow);
     const snapshot = workflowWithEffectiveCheckpoints(
@@ -197,14 +201,14 @@ describe("Auto Hunt workflow v2 contract", () => {
 
     expect(JSON.stringify(workflow)).toBe(before);
     expect(snapshot.execution.checkpoints.map((checkpoint) => checkpoint.key)).toEqual([
-      "user-implement",
-      "project-production",
+      "user-after-implementing",
+      "project-before-production_qa",
     ]);
   });
 
   it("adds issue checkpoints without overriding inherited boundaries", () => {
     const workflow = normalizeAutoHuntWorkflow(v2([
-      { key: "project-before-pr", stage: "pr_open", position: "before" },
+      { key: "project-before-pr_open", stage: "pr_open", position: "before" },
     ]));
     const snapshot = workflowWithAdditionalCheckpoints(workflow, [
       { key: "issue-before-pr", stage: "pr_open", position: "before" },
@@ -212,8 +216,8 @@ describe("Auto Hunt workflow v2 contract", () => {
     ]);
 
     expect(snapshot.execution.checkpoints).toEqual([
-      { key: "project-before-pr", stage: "pr_open", position: "before" },
-      { key: "issue-after-pr", stage: "pr_open", position: "after" },
+      { key: "project-before-pr_open", stage: "pr_open", position: "before" },
+      { key: "issue-after-pr_open", stage: "pr_open", position: "after" },
     ]);
     expect(workflow.execution.checkpoints).toHaveLength(1);
   });

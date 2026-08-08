@@ -157,7 +157,7 @@ const runSeeds: DemoRunSeed[] = [
     workflowStage: "local_qa",
     pausedAt: ago(12),
     checkpoint: {
-      key: "legacy-after-local_qa",
+      key: "project-after-local_qa",
       stage: "local_qa",
       stageLabel: "Local validation",
       position: "after",
@@ -302,14 +302,14 @@ export const demoDashboard: DashboardPayload = {
         { stage: stage.id, stageLabel: stage.label, position: "after" as const },
       ]),
       projectMandatory: [
-        { key: "legacy-after-local_qa", stage: "local_qa", position: "after" },
+        { key: "project-after-local_qa", stage: "local_qa", position: "after" },
       ],
       userDefaults: [
         { key: "user-before-implementing", stage: "implementing", position: "before" },
       ],
       effective: [
         { key: "user-before-implementing", stage: "implementing", position: "before" },
-        { key: "legacy-after-local_qa", stage: "local_qa", position: "after" },
+        { key: "project-after-local_qa", stage: "local_qa", position: "after" },
       ],
       projectRevision: 1,
       userRevision: 1,

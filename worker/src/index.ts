@@ -194,7 +194,6 @@ import {
   reconcileGithubMergedRuns,
   completeWorkflowStageLifecycle,
   resumeWorkflowCheckpoint,
-  resumeHuntRun,
   reworkHuntRun,
   recordHuntEvent,
   recordRunEvidence,
@@ -1991,36 +1990,15 @@ const recoveryAgentInputSchema = recoveryUserInputSchema.extend({
 
 const resumeInputShape = z.object({
   requestId: z.string().uuid(),
-  checkpointKey: workflowStageIdSchema.optional(),
-  attempt: z.number().int().positive().optional(),
-  revision: z.number().int().positive().optional(),
+  checkpointKey: workflowStageIdSchema,
+  attempt: z.number().int().positive(),
+  revision: z.number().int().positive(),
 }).strict();
 
-const validateResumeInput = (input: {
-  checkpointKey?: string;
-  attempt?: number;
-  revision?: number;
-}, context: z.RefinementCtx) => {
-  const hasIdentity = input.checkpointKey !== undefined ||
-    input.attempt !== undefined || input.revision !== undefined;
-  if (hasIdentity &&
-    (input.checkpointKey === undefined ||
-      input.attempt === undefined ||
-      input.revision === undefined)) {
-    context.addIssue({
-      code: "custom",
-      message: "checkpointKey, attempt, and revision must be supplied together",
-      path: ["checkpointKey"],
-    });
-  }
-};
-
-const resumeUserInputSchema = resumeInputShape
-  .superRefine(validateResumeInput);
+const resumeUserInputSchema = resumeInputShape;
 
 const resumeAgentInputSchema = resumeInputShape
   .extend({ actor: z.string().trim().min(1).max(128) })
-  .superRefine(validateResumeInput)
   .strict();
 
 export const workflowStageLifecycleInputSchema = z
@@ -4754,55 +4732,15 @@ async function resumeRunWithCheckpointIdentity(
       terminalReviewOnly: false,
     };
   }
-  if (input.checkpointKey) {
-    return resumeWorkflowCheckpoint(db, projectId, {
-      runId,
-      checkpointKey: input.checkpointKey,
-      attempt: input.attempt!,
-      revision: input.revision!,
-      requestId: input.requestId,
-      actor,
-      approvedAt: new Date().toISOString(),
-    });
-  }
-  if (run.waiting_checkpoint_key) {
-    const rawWorkflow = JSON.parse(run.workflow_snapshot_json) as { version?: number };
-    if (rawWorkflow.version === 2) {
-      throw new HttpError(
-        400,
-        "checkpointKey, attempt, and revision are required for workflow v2",
-        "CHECKPOINT_IDENTITY_REQUIRED",
-      );
-    }
-    return resumeWorkflowCheckpoint(db, projectId, {
-      runId,
-      checkpointKey: run.waiting_checkpoint_key,
-      attempt: run.current_attempt,
-      revision: run.waiting_checkpoint_revision ?? run.current_revision,
-      requestId: input.requestId,
-      actor,
-      approvedAt: new Date().toISOString(),
-    });
-  }
-  const legacy = await resumeHuntRun(db, projectId, {
+  return resumeWorkflowCheckpoint(db, projectId, {
     runId,
+    checkpointKey: input.checkpointKey,
+    attempt: input.attempt,
+    revision: input.revision,
     requestId: input.requestId,
     actor,
-    occurredAt: new Date().toISOString(),
+    approvedAt: new Date().toISOString(),
   });
-  const workflow = normalizeAutoHuntWorkflow(
-    JSON.parse(run.workflow_snapshot_json),
-  );
-  const terminalReviewOnly = legacy.outcome !== "not_found" &&
-    run.workflow_stage === workflow.stages.at(-1)?.id;
-  return {
-    ...legacy,
-    checkpointKey: null,
-    attempt: run.current_attempt,
-    revision: run.current_revision,
-    nextStage: terminalReviewOnly ? null : legacy.workflowStage,
-    terminalReviewOnly,
-  };
 }
 
 async function route(
@@ -8769,7 +8707,7 @@ async function route(
     if (result.outcome === "not_found") {
       throw new HttpError(404, "Run not found");
     }
-    if (result.outcome === "ineligible" || result.outcome === "conflict") {
+    if (result.outcome === "conflict") {
       throw new HttpError(
         409,
         "The paused checkpoint changed before it could be resumed",
@@ -10272,7 +10210,7 @@ async function route(
     if (result.outcome === "not_found") {
       throw new HttpError(404, "Run not found");
     }
-    if (result.outcome === "ineligible" || result.outcome === "conflict") {
+    if (result.outcome === "conflict") {
       throw new HttpError(
         409,
         "The paused checkpoint changed before it could be resumed",

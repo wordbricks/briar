@@ -2,13 +2,12 @@ import {
   isTerminalTrackerState,
   additionalWorkflowCheckpoints,
   isRepositoryWorkflowPending,
+  canonicalizeCheckpointSet,
   cloneAutoHuntWorkflow,
   normalizeAutoHuntWorkflow,
   requiredWorkflowStages,
   repositoryWorkflowBootstrap,
   workflowCheckpointAt,
-  workflowPauseIndex,
-  workflowPauseStage,
   workflowWithAdditionalCheckpoints,
   type AutoHuntQaEnvironment,
   type AutoHuntQaStatus,
@@ -885,22 +884,6 @@ const workflowProgressRows = async (
       (checkpointOrder.get(right.checkpoint_key) ?? Number.MAX_SAFE_INTEGER),
   );
   return { stages, checkpoints };
-};
-
-const workflowProgressAvailable = async (db: D1Database, runId: string) => {
-  try {
-    const row = await db
-      .prepare(
-        `select 1 as present from briar_run_stage_progress where run_id = ? limit 1`,
-      )
-      .bind(runId)
-      .first<{ present: number }>();
-    return Boolean(row);
-  } catch {
-    // Existing app/CLI/worker deployments may be running before migration
-    // 0059. Their v1 event lifecycle remains the compatibility path.
-    return false;
-  }
 };
 
 const ensureWorkflowProgress = async (
@@ -3572,6 +3555,7 @@ export async function createProject(
     created_at: createdAt,
     updated_at: createdAt,
   };
+  const initialWorkflow = cloneAutoHuntWorkflow();
   await db.batch([
     db
       .prepare(
@@ -3592,12 +3576,14 @@ export async function createProject(
     db
       .prepare(
         `insert into briar_project_settings (
-           project_id, workflow_json, created_at, updated_at
-         ) values (?, ?, ?, ?)`,
+           project_id, workflow_json, mandatory_checkpoints_json,
+           created_at, updated_at
+         ) values (?, ?, ?, ?, ?)`,
       )
       .bind(
         project.id,
-        stableJson(cloneAutoHuntWorkflow()),
+        stableJson(initialWorkflow),
+        stableJson([]),
         createdAt,
         createdAt,
       ),
@@ -4877,12 +4863,24 @@ export async function updateProjectSettings(
   input: ProjectSettingsInput,
 ) {
   const updatedAt = new Date().toISOString();
+  const normalizedWorkflow = normalizeAutoHuntWorkflow(input.workflow);
+  const workflow = normalizeAutoHuntWorkflow({
+    ...normalizedWorkflow,
+    execution: {
+      checkpoints: canonicalizeCheckpointSet(
+        normalizedWorkflow,
+        normalizedWorkflow.execution.checkpoints,
+        "project",
+      ),
+    },
+  });
   await db
     .prepare(
       `insert into briar_project_settings (
          project_id, velen_org, data_source, linear_enabled, linear_source,
-         linear_team_key, github_repository, workflow_json, created_at, updated_at
-       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         linear_team_key, github_repository, workflow_json,
+         mandatory_checkpoints_json, created_at, updated_at
+       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        on conflict(project_id) do update set
          velen_org = excluded.velen_org,
          data_source = excluded.data_source,
@@ -4891,6 +4889,16 @@ export async function updateProjectSettings(
          linear_team_key = excluded.linear_team_key,
          github_repository = excluded.github_repository,
          workflow_json = excluded.workflow_json,
+         mandatory_checkpoints_json = case
+           when exists (
+             select 1 from json_each(
+               briar_project_settings.workflow_json,
+               '$.stages'
+             ) stage
+             where json_extract(stage.value, '$.id') = 'repository_workflow_pending'
+           ) then excluded.mandatory_checkpoints_json
+           else briar_project_settings.mandatory_checkpoints_json
+         end,
          updated_at = excluded.updated_at`,
     )
     .bind(
@@ -4901,7 +4909,8 @@ export async function updateProjectSettings(
       input.linear.enabled ? input.linear.source : null,
       input.linear.enabled ? input.linear.teamKey : null,
       input.githubRepository,
-      stableJson(normalizeAutoHuntWorkflow(input.workflow)),
+      stableJson(workflow),
+      stableJson(workflow.execution.checkpoints),
       updatedAt,
       updatedAt,
     )
@@ -6631,38 +6640,9 @@ const assertRunCompletionEligible = async (
   trackerState: string | null,
 ) => {
   const workflow = parseWorkflow(run.workflow_snapshot_json);
-  const hasWorkflowProgress = await workflowProgressAvailable(db, run.id);
-  if (hasWorkflowProgress) {
-    await assertWorkflowRunCompletion(db, projectId, run.id);
-  }
+  await assertWorkflowRunCompletion(db, projectId, run.id);
   const requiredStages = requiredWorkflowStages(workflow);
   const revisionRequirements = await loadStageRevisionRequirements(db, run);
-  if (!hasWorkflowProgress) {
-    const completedStages = await db
-      .prepare(
-        `select workflow_stage, revision from briar_hunt_events
-         where run_id = ? and attempt = ? and workflow_stage is not null`,
-      )
-      .bind(run.id, run.current_attempt)
-      .all<{ workflow_stage: AutoHuntWorkflowStageId; revision: number }>();
-    const completedStageIds = new Set(
-      completedStages.results
-        .filter(
-          (event) =>
-            event.revision >=
-            (revisionRequirements.get(event.workflow_stage) ?? 1),
-        )
-        .map((event) => event.workflow_stage),
-    );
-    const missingStages = requiredStages.filter(
-      (stage) => !completedStageIds.has(stage),
-    );
-    if (missingStages.length > 0) {
-      throw new HuntTransitionError(
-        `Run completion requires workflow stages: ${missingStages.join(", ")}`,
-      );
-    }
-  }
   const requiredEvidence = workflow.stages.flatMap((stage) =>
     requiredStages.includes(stage.id)
       ? (stage.evidence ?? []).map((type) => ({ stage: stage.id, type }))
@@ -6759,18 +6739,12 @@ const assertStageTransition = async (
       `Workflow stage is not configured for this run: ${input.workflowStage}`,
     );
   }
-  const pauseRank = workflowPauseIndex(workflow);
   const currentRank = run.workflow_stage
     ? workflow.stages.findIndex((stage) => stage.id === run.workflow_stage)
     : -1;
-  if (run.paused_at && nextRank > pauseRank) {
+  if (run.paused_at && nextRank !== currentRank) {
     throw new HuntTransitionError(
       "Run is paused; resume it before recording a later workflow stage",
-    );
-  }
-  if (nextRank > pauseRank && currentRank <= pauseRank) {
-    throw new HuntTransitionError(
-      `Workflow is paused after stage: ${workflowPauseStage(workflow)}`,
     );
   }
   const floorRank = currentRank;
@@ -6866,26 +6840,6 @@ export async function recordHuntEvent(
         baseWorkflowSnapshot,
         issueCheckpointSnapshot,
       );
-  const pauseRank = workflowPauseIndex(workflowSnapshot);
-  const requestedRank = normalizedInput.workflowStage
-    ? workflowSnapshot.stages.findIndex(
-        (stage) => stage.id === normalizedInput.workflowStage,
-      )
-    : -1;
-  const currentRank = existingRun?.workflow_stage
-    ? workflowSnapshot.stages.findIndex(
-        (stage) => stage.id === existingRun.workflow_stage,
-      )
-    : -1;
-  const pausesAtBoundary =
-    normalizedInput.status === "running" &&
-    requestedRank === pauseRank &&
-    !existingRun?.paused_at &&
-    // A final-stage pause resumes at that same stage so a replacement worker can
-    // perform the last review before recording completion. The resume marker
-    // prevents recreating the same checkpoint on its first progress event.
-    !(existingRun?.status === "queued" && currentRank === pauseRank) &&
-    !existingRun?.resume_requested_at;
   if (!existingRun && isRepositoryWorkflowPending(workflowSnapshot)) {
     throw new HuntTransitionError(
       "Repository workflow has not been generated for this project",
@@ -6902,43 +6856,8 @@ export async function recordHuntEvent(
       `Workflow stage is not configured for this run: ${normalizedInput.workflowStage ?? "none"}`,
     );
   }
-  if (normalizedInput.status === "running" && normalizedInput.workflowStage) {
-    if (existingRun?.paused_at && requestedRank > pauseRank) {
-      throw new HuntTransitionError(
-        "Run is paused; resume it before recording a later workflow stage",
-      );
-    }
-    if (requestedRank > pauseRank && currentRank <= pauseRank) {
-      throw new HuntTransitionError(
-        `Workflow is paused after stage: ${workflowPauseStage(workflowSnapshot)}`,
-      );
-    }
-  }
   const eventAttempt = existingRun?.current_attempt ?? 1;
   const eventRevision = existingRun?.current_revision ?? 1;
-  if (
-    existingRun &&
-    normalizedInput.status === "running" &&
-    normalizedInput.workflowStage &&
-    await workflowProgressAvailable(db, existingRun.id)
-  ) {
-    const progress = await getWorkflowProgress(db, projectId, existingRun.id, {
-      attempt: eventAttempt,
-      revision: eventRevision,
-    });
-    const lifecycleStage = progress
-      ? workflowStageRow(progress, normalizedInput.workflowStage)
-      : null;
-    if (
-      progress?.waitingCheckpoint ||
-      !lifecycleStage ||
-      !["running", "completed", "skipped"].includes(lifecycleStage.state)
-    ) {
-      throw new HuntTransitionError(
-        `Stage ${normalizedInput.workflowStage} must be started through the workflow lifecycle before recording status events`,
-      );
-    }
-  }
   const storedEventKey = await scopedRunKey(
     normalizedInput.eventKey,
     eventAttempt,
@@ -7224,31 +7143,6 @@ export async function recordHuntEvent(
         eventAttempt,
         eventId,
       ),
-    ...(pausesAtBoundary
-      ? [
-          db
-            .prepare(
-              `update briar_hunt_runs
-               set paused_at = ?, resume_requested_at = null,
-                   claim_token_hash = null, claimed_by = null,
-                   claimed_at = null, lease_expires_at = null,
-                   updated_at = max(updated_at, ?)
-               where id = ? and current_attempt = ? and last_event_at <= ?
-                 and exists (
-                   select 1 from briar_hunt_events
-                   where id = ? and run_id = briar_hunt_runs.id
-                 )`,
-            )
-            .bind(
-              normalizedInput.occurredAt,
-              recordedAt,
-              runId,
-              eventAttempt,
-              normalizedInput.occurredAt,
-              eventId,
-            ),
-        ]
-      : []),
   ]);
 
   if ((results[1]?.meta.changes ?? 0) === 0) {
@@ -7267,9 +7161,8 @@ export async function recordHuntEvent(
     }
   }
 
-  // A signed merge can arrive before a legacy/v1 run reaches its PR pause.
-  // Reconcile after the event is durable; retries also take this path through
-  // the duplicate-event branch above if a transient reconciliation fails.
+  // Reconcile signed merges after the event is durable. Retries also take this
+  // path through the duplicate-event branch if reconciliation fails transiently.
   if (
     normalizedInput.status === "running" &&
     normalizedInput.workflowStage === "pr_open"
@@ -7278,211 +7171,6 @@ export async function recordHuntEvent(
   }
 
   return runId;
-}
-
-export type HuntResumeOutcome =
-  | "resumed"
-  | "already_resumed"
-  | "not_found"
-  | "ineligible";
-
-export async function resumeHuntRun(
-  db: D1Database,
-  projectId: string,
-  input: {
-    runId: string;
-    requestId: string;
-    actor: string;
-    occurredAt: string;
-    requireAllGithubPullRequestsMerged?: boolean;
-  },
-): Promise<{
-  outcome: HuntResumeOutcome;
-  workflowStage: AutoHuntWorkflowStageId | null;
-}> {
-  const run = await getHuntRunForProject(db, projectId, input.runId);
-  if (!run) return { outcome: "not_found", workflowStage: null };
-
-  const eventKey = `workflow:resume:${input.requestId}`;
-  const existingEvent = await db
-    .prepare(
-      `select workflow_stage from briar_hunt_events
-       where run_id = ? and event_key = ?`,
-    )
-    .bind(run.id, eventKey)
-    .first<Pick<HuntEventRow, "workflow_stage">>();
-  if (existingEvent) {
-    return {
-      outcome: "already_resumed",
-      workflowStage: existingEvent.workflow_stage,
-    };
-  }
-  if (run.resume_requested_at) {
-    return {
-      outcome: "already_resumed",
-      workflowStage: run.workflow_stage,
-    };
-  }
-  if (run.status !== "running" || !run.paused_at || !run.workflow_stage) {
-    return {
-      outcome: "ineligible",
-      workflowStage: run.workflow_stage,
-    };
-  }
-
-  const workflow = parseWorkflow(run.workflow_snapshot_json);
-  const currentRank = workflow.stages.findIndex(
-    (stage) => stage.id === run.workflow_stage,
-  );
-  if (currentRank < 0) {
-    return { outcome: "ineligible", workflowStage: run.workflow_stage };
-  }
-  const nextStage = workflow.stages[currentRank + 1]?.id ?? null;
-  // Resuming always hands the run back to a worker. This is also necessary
-  // when the pause checkpoint is the final configured stage: the resumed
-  // worker must record the terminal completion after reviewing the existing
-  // final-stage evidence.
-  const targetWorkflowStage = nextStage ?? run.workflow_stage;
-  const targetStage = dashboardStageFor("running", targetWorkflowStage);
-  const eventStatus: AutoHuntPersistedRunStatus = "running";
-  const detail = nextStage
-    ? `사용자가 ${workflow.stages[currentRank]?.label ?? run.workflow_stage} 이후 워크플로우를 재개했습니다.`
-    : "사용자가 마지막 일시정지 지점에서 완료 검토를 재개했습니다.";
-  const eventId = crypto.randomUUID();
-  const recordedAt = new Date().toISOString();
-  const githubRunMergeGuard = input.requireAllGithubPullRequestsMerged
-    ? `and exists (
-         select 1 from briar_run_pull_requests link
-         where link.project_id = briar_hunt_runs.project_id
-           and link.run_id = briar_hunt_runs.id
-           and link.attempt = briar_hunt_runs.current_attempt
-           and link.revision = briar_hunt_runs.current_revision
-       )
-       and not exists (
-         select 1 from briar_run_pull_requests link
-         where link.project_id = briar_hunt_runs.project_id
-           and link.run_id = briar_hunt_runs.id
-           and link.attempt = briar_hunt_runs.current_attempt
-           and link.revision = briar_hunt_runs.current_revision
-           and (link.state <> 'merged' or link.last_delivery_id is null)
-       )
-       and not exists (
-         select 1 from briar_run_evidence evidence
-         where evidence.project_id = briar_hunt_runs.project_id
-           and evidence.run_id = briar_hunt_runs.id
-           and evidence.attempt = briar_hunt_runs.current_attempt
-           and evidence.revision = briar_hunt_runs.current_revision
-           and evidence.evidence_type = 'pull_request'
-           and evidence.status in ('pending', 'passed')
-           and not exists (
-             select 1 from briar_run_pull_requests link
-             where link.run_id = evidence.run_id
-               and link.attempt = evidence.attempt
-               and link.revision = evidence.revision
-               and link.repository_id = cast(json_extract(
-                 evidence.metadata_json,
-                 '$.githubPullRequest.repositoryId'
-               ) as integer)
-               and link.pull_request_id = cast(json_extract(
-                 evidence.metadata_json,
-                 '$.githubPullRequest.pullRequestId'
-               ) as integer)
-               and link.pull_request_node_id = json_extract(
-                 evidence.metadata_json,
-                 '$.githubPullRequest.pullRequestNodeId'
-               )
-               and link.pull_request_number = cast(json_extract(
-                 evidence.metadata_json,
-                 '$.githubPullRequest.pullRequestNumber'
-               ) as integer)
-           )
-       )`
-    : "";
-  const results = await db.batch([
-    db
-      .prepare(
-        `insert into briar_hunt_events (
-           id, run_id, event_key, attempt, revision, stage, status,
-           workflow_stage, detail, actor, branch, commit_sha, qa_status,
-           tracker_issue_state, pull_request_urls, target_sha,
-           occurred_at, recorded_at
-         )
-         select ?, id, ?, current_attempt, current_revision, ?, ?, ?, ?, ?,
-                branch, commit_sha, null, tracker_issue_state,
-                pull_request_urls, target_sha, ?, ?
-         from briar_hunt_runs
-         where id = ? and project_id = ? and status = 'running'
-           and paused_at is not null and workflow_stage = ?
-           and resume_requested_at is null
-           and last_event_at = ?
-           ${githubRunMergeGuard}
-         on conflict(run_id, event_key) do nothing`,
-      )
-      .bind(
-        eventId,
-        eventKey,
-        targetStage,
-        eventStatus,
-        targetWorkflowStage,
-        detail,
-        input.actor,
-        input.occurredAt,
-        recordedAt,
-        run.id,
-        projectId,
-        run.workflow_stage,
-        run.last_event_at,
-      ),
-    db
-      .prepare(
-        `update briar_hunt_runs
-         set stage = ?, status = 'running', workflow_stage = ?, detail = ?,
-             resume_requested_at = ?, claim_token_hash = null, claimed_by = null,
-             claimed_at = null, lease_expires_at = null, completed_at = null,
-             last_event_at = ?, updated_at = ?
-         where id = ? and project_id = ? and status = 'running'
-           and paused_at is not null and workflow_stage = ?
-           and resume_requested_at is null
-           and last_event_at = ?
-           ${githubRunMergeGuard}
-           and exists (
-             select 1 from briar_hunt_events
-             where id = ? and run_id = briar_hunt_runs.id
-           )`,
-      )
-      .bind(
-        targetStage,
-        targetWorkflowStage,
-        detail,
-        input.occurredAt,
-        input.occurredAt,
-        recordedAt,
-        run.id,
-        projectId,
-        run.workflow_stage,
-        run.last_event_at,
-        eventId,
-      ),
-  ]);
-
-  if ((results[1]?.meta.changes ?? 0) === 0) {
-    const duplicate = await db
-      .prepare(
-        `select workflow_stage from briar_hunt_events
-         where run_id = ? and event_key = ?`,
-      )
-      .bind(run.id, eventKey)
-      .first<Pick<HuntEventRow, "workflow_stage">>();
-    if (duplicate) {
-      return {
-        outcome: "already_resumed",
-        workflowStage: duplicate.workflow_stage,
-      };
-    }
-    return { outcome: "ineligible", workflowStage: run.workflow_stage };
-  }
-
-  return { outcome: "resumed", workflowStage: targetWorkflowStage };
 }
 
 const githubPullRequestStateRank: Record<GithubPullRequestState, number> = {
@@ -7836,22 +7524,6 @@ export async function resumeRunAfterGithubMerge(
   const approvedAt = latest.merged_at ?? latest.provider_updated_at ?? latest.updated_at;
   const requestId = `github:${latest.last_delivery_id}`;
   if (!run.waiting_checkpoint_key) {
-    if (
-      run.status === "running" &&
-      run.paused_at &&
-      run.workflow_stage === "pr_open"
-    ) {
-      const legacy = await resumeHuntRun(db, projectId, {
-        runId: run.id,
-        requestId,
-        actor,
-        occurredAt: approvedAt >= run.last_event_at
-          ? approvedAt
-          : run.last_event_at,
-        requireAllGithubPullRequestsMerged: true,
-      });
-      return { outcome: legacy.outcome };
-    }
     return { outcome: "ineligible" as const };
   }
   const checkpoint = await db
@@ -8254,15 +7926,9 @@ export async function recordRunEvidence(
       `Workflow stage is not configured for this run: ${input.stage}`,
     );
   }
-  const pauseRank = workflowPauseIndex(workflow);
-  const currentRank = run.workflow_stage
-    ? workflow.stages.findIndex((stage) => stage.id === run.workflow_stage)
-    : -1;
-  if (evidenceStageRank > pauseRank && currentRank <= pauseRank) {
+  if (run.paused_at && input.stage !== run.workflow_stage) {
     throw new HuntTransitionError(
-      run.paused_at
-        ? "Run is paused; resume it before recording later-stage evidence"
-        : `Workflow is paused after stage: ${workflowPauseStage(workflow)}`,
+      "Run is paused; resume it before recording later-stage evidence",
     );
   }
   let verifiedGithubPullRequest: {
@@ -8984,32 +8650,24 @@ export async function reworkHuntRun(
     );
   }
 
-  // Progress rows are additive to the legacy event lifecycle. When the
-  // migration is present, make the old revision's approvals visibly unusable;
-  // the revision identity still prevents reuse even if this compatibility
-  // cleanup races a legacy deployment.
-  try {
-    await db
-      .prepare(
-        `update briar_run_checkpoint_progress
-         set state = 'invalidated'
-         where run_id = ? and attempt = ? and revision = ?
-           and state in ('pending', 'waiting', 'approved')`,
-      )
-      .bind(run.id, run.current_attempt, run.current_revision)
-      .run();
-    await db
-      .prepare(
-        `update briar_hunt_runs
-         set waiting_checkpoint_key = null,
-             waiting_checkpoint_revision = null
-         where id = ? and project_id = ?`,
-      )
-      .bind(run.id, projectId)
-      .run();
-  } catch {
-    // Migration 0059 may not yet be installed on a v1 worker.
-  }
+  await db
+    .prepare(
+      `update briar_run_checkpoint_progress
+       set state = 'invalidated'
+       where run_id = ? and attempt = ? and revision = ?
+         and state in ('pending', 'waiting', 'approved')`,
+    )
+    .bind(run.id, run.current_attempt, run.current_revision)
+    .run();
+  await db
+    .prepare(
+      `update briar_hunt_runs
+       set waiting_checkpoint_key = null,
+           waiting_checkpoint_revision = null
+       where id = ? and project_id = ?`,
+    )
+    .bind(run.id, projectId)
+    .run();
 
   return {
     outcome: "reworked",
@@ -9244,18 +8902,9 @@ export async function moveHuntRun(
         `Workflow stage is not configured for this run: ${input.workflowStage ?? "none"}`,
       );
     }
-    const pauseRank = workflowPauseIndex(workflow);
-    const currentRank = run.workflow_stage
-      ? workflow.stages.findIndex((stage) => stage.id === run.workflow_stage)
-      : -1;
     if (run.paused_at) {
       throw new HuntTransitionError(
         "Run is paused; resume it before moving to another workflow stage",
-      );
-    }
-    if (targetRank > pauseRank && currentRank <= pauseRank) {
-      throw new HuntTransitionError(
-        `Workflow is paused after stage: ${workflowPauseStage(workflow)}`,
       );
     }
   } else if (input.workflowStage !== null) {

@@ -269,12 +269,12 @@ describe("project workflow generator", () => {
     );
   });
 
-  it("rejects legacy v1 output from the workflow agent", async () => {
+  it("rejects non-v2 output from the workflow agent", async () => {
     chatWithProjectLlm.mockResolvedValue({
       conversationId: "briar:project-1:thread-legacy",
       workspaceRoot: "/repo",
       message: JSON.stringify({
-        version: 1,
+        version: 3,
         requirements: [],
         stages: [{
           id: "implementing",
@@ -283,7 +283,7 @@ describe("project workflow generator", () => {
           evidence: ["diff"],
           checks: [],
         }],
-        execution: { pauseAfterStage: "implementing" },
+        execution: { checkpoints: [] },
         completion: { requiredStages: ["implementing"] },
       }),
     });

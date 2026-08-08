@@ -84,14 +84,21 @@ const event = (
   ...overrides,
 });
 
-const v1Snapshot = JSON.stringify({
-  version: 1,
+const frozenSnapshot = JSON.stringify({
+  version: 2,
+  requirements: [],
   stages: [
     { id: "implementing", label: "Implement", required: true },
     { id: "pr_open", label: "Open PR", required: true },
     { id: "production_qa", label: "Production QA", required: true },
   ],
-  execution: { pauseAfterStage: "pr_open" },
+  execution: {
+    checkpoints: [{
+      key: "project-after-pr_open",
+      stage: "pr_open",
+      position: "after",
+    }],
+  },
   completion: { requiredStages: ["implementing", "pr_open", "production_qa"] },
 });
 
@@ -106,9 +113,9 @@ const v2Workflow: AutoHuntWorkflow = normalizeAutoHuntWorkflow({
   ],
   execution: {
     checkpoints: [
-      { key: "approve-pr", stage: "pr_open", position: "before" },
-      { key: "review-pr", stage: "pr_open", position: "after" },
-      { key: "approve-production", stage: "production_qa", position: "before" },
+      { key: "project-before-pr_open", stage: "pr_open", position: "before" },
+      { key: "project-after-pr_open", stage: "pr_open", position: "after" },
+      { key: "project-before-production_qa", stage: "production_qa", position: "before" },
     ],
   },
   completion: {
@@ -126,6 +133,22 @@ describe("workflow v2 D1 persistence and transitions", () => {
   let projectId: string;
   let v2RunId: string;
   let snapshotsBeforeMigration: { settings: string; run: string };
+
+  const setProjectWorkflow = async (workflow: AutoHuntWorkflow | string) => {
+    const workflowJson = typeof workflow === "string"
+      ? workflow
+      : JSON.stringify(workflow);
+    const checkpoints = (JSON.parse(workflowJson) as AutoHuntWorkflow)
+      .execution.checkpoints;
+    await db
+      .prepare(
+        `update briar_project_settings
+         set workflow_json = ?, mandatory_checkpoints_json = ?
+         where project_id = ?`,
+      )
+      .bind(workflowJson, JSON.stringify(checkpoints), projectId)
+      .run();
+  };
 
   const claimResumedRun = async (runId: string, minute: number) => {
     const claimed = await claimNextQueuedHuntRun(db, projectId, {
@@ -152,6 +175,7 @@ describe("workflow v2 D1 persistence and transitions", () => {
       if ([
         "0059_workflow_v2_progress.sql",
         "0061_workflow_stage_status_events.sql",
+        "0078_workflow_v2_only.sql",
       ].includes(name)) continue;
       await executeMigration(db, await readFile(resolve("migrations", name), "utf8"));
     }
@@ -176,24 +200,18 @@ describe("workflow v2 D1 persistence and transitions", () => {
     });
     projectId = project.id;
 
-    // Create the run through the v2-only runtime, then seed pre-migration v1
-    // settings/run bytes directly. Migration 0059 must never rewrite them.
-    await db
-      .prepare(`update briar_project_settings set workflow_json = ? where project_id = ?`)
-      .bind(JSON.stringify(v2Workflow), projectId)
-      .run();
-    const legacyRunId = await recordHuntEvent(
+    // Migration 0059 only adds normalized progress storage and must not rewrite
+    // an already-frozen workflow snapshot.
+    await setProjectWorkflow(v2Workflow);
+    const frozenRunId = await recordHuntEvent(
       db,
       projectId,
-      event("legacy-snapshot", "legacy-snapshot:queued", at(1)),
+      event("frozen-snapshot", "frozen-snapshot:queued", at(1)),
     );
-    await db
-      .prepare(`update briar_project_settings set workflow_json = ? where project_id = ?`)
-      .bind(v1Snapshot, projectId)
-      .run();
+    await setProjectWorkflow(frozenSnapshot);
     await db
       .prepare(`update briar_hunt_runs set workflow_snapshot_json = ? where id = ?`)
-      .bind(v1Snapshot, legacyRunId)
+      .bind(frozenSnapshot, frozenRunId)
       .run();
     const beforeSettings = await db
       .prepare(`select workflow_json from briar_project_settings where project_id = ?`)
@@ -201,7 +219,7 @@ describe("workflow v2 D1 persistence and transitions", () => {
       .first<{ workflow_json: string }>();
     const beforeRun = await db
       .prepare(`select workflow_snapshot_json from briar_hunt_runs where id = ?`)
-      .bind(legacyRunId)
+      .bind(frozenRunId)
       .first<{ workflow_snapshot_json: string }>();
     snapshotsBeforeMigration = {
       settings: beforeSettings!.workflow_json,
@@ -218,7 +236,7 @@ describe("workflow v2 D1 persistence and transitions", () => {
            run_id, attempt, revision, stage_id, state, started_at, finished_at
          ) values (?, 1, 1, 'implementing', 'completed', ?, ?)`,
       )
-      .bind(legacyRunId, at(3), at(4))
+      .bind(frozenRunId, at(3), at(4))
       .run();
     await executeMigration(
       db,
@@ -231,7 +249,7 @@ describe("workflow v2 D1 persistence and transitions", () => {
       .prepare(
         `select event_count, last_event_at from briar_hunt_runs where id = ?`,
       )
-      .bind(legacyRunId)
+      .bind(frozenRunId)
       .first<{ event_count: number; last_event_at: string }>();
     expect(backfilled).toEqual({ event_count: 2, last_event_at: at(3) });
     expect(
@@ -240,7 +258,7 @@ describe("workflow v2 D1 persistence and transitions", () => {
           `select workflow_stage from briar_hunt_events
            where run_id = ? and event_key = 'workflow:stage-start:1:1:implementing'`,
         )
-        .bind(legacyRunId)
+        .bind(frozenRunId)
         .first<string>("workflow_stage"),
     ).toBe("implementing");
 
@@ -250,15 +268,12 @@ describe("workflow v2 D1 persistence and transitions", () => {
       .first<{ workflow_json: string }>();
     const afterRun = await db
       .prepare(`select workflow_snapshot_json from briar_hunt_runs where id = ?`)
-      .bind(legacyRunId)
+      .bind(frozenRunId)
       .first<{ workflow_snapshot_json: string }>();
     expect(afterSettings?.workflow_json).toBe(snapshotsBeforeMigration.settings);
     expect(afterRun?.workflow_snapshot_json).toBe(snapshotsBeforeMigration.run);
 
-    await db
-      .prepare(`update briar_project_settings set workflow_json = ? where project_id = ?`)
-      .bind(JSON.stringify(v2Workflow), projectId)
-      .run();
+    await setProjectWorkflow(v2Workflow);
     v2RunId = await recordHuntEvent(
       db,
       projectId,
@@ -270,7 +285,7 @@ describe("workflow v2 D1 persistence and transitions", () => {
     await miniflare.dispose();
   });
 
-  it("keeps legacy snapshots byte-for-byte unchanged and initializes normalized rows", async () => {
+  it("keeps frozen snapshots byte-for-byte unchanged and initializes normalized rows", async () => {
     const progress = await initializeWorkflowProgress(db, projectId, { runId: v2RunId });
 
     expect(progress?.attempt).toBe(1);
@@ -282,19 +297,19 @@ describe("workflow v2 D1 persistence and transitions", () => {
       ["production_qa", "pending"],
     ]);
     expect(progress?.checkpoints.map((checkpoint) => checkpoint.checkpoint_key)).toEqual([
-      "approve-pr",
-      "review-pr",
-      "approve-production",
+      "project-before-pr_open",
+      "project-after-pr_open",
+      "project-before-production_qa",
     ]);
 
-    const legacyRun = await db
+    const frozenRun = await db
       .prepare(
         `select waiting_checkpoint_key, waiting_checkpoint_revision
          from briar_hunt_runs where workflow_snapshot_json = ?`,
       )
       .bind(snapshotsBeforeMigration.run)
       .first<{ waiting_checkpoint_key: string | null; waiting_checkpoint_revision: number | null }>();
-    expect(legacyRun).toEqual({
+    expect(frozenRun).toEqual({
       waiting_checkpoint_key: null,
       waiting_checkpoint_revision: null,
     });
@@ -336,12 +351,12 @@ describe("workflow v2 D1 persistence and transitions", () => {
 
     expect((await reachWorkflowCheckpoint(db, projectId, {
       ...identity,
-      checkpointKey: "approve-pr",
+      checkpointKey: "project-before-pr_open",
       reachedAt: at(16),
     })).outcome).toBe("waiting");
     const paused = await getHuntRunForProject(db, projectId, v2RunId);
     expect(paused?.paused_at).toBe(at(16));
-    expect(paused?.waiting_checkpoint_key).toBe("approve-pr");
+    expect(paused?.waiting_checkpoint_key).toBe("project-before-pr_open");
     await expect(startWorkflowStage(db, projectId, {
       ...identity,
       stageId: "pr_open",
@@ -351,18 +366,18 @@ describe("workflow v2 D1 persistence and transitions", () => {
     const stale = await resumeWorkflowCheckpoint(db, projectId, {
       ...identity,
       revision: 2,
-      checkpointKey: "approve-pr",
+      checkpointKey: "project-before-pr_open",
       requestId: "11111111-1111-4111-8111-111111111111",
       actor: "pm",
       approvedAt: at(18),
     });
     expect(stale.outcome).toBe("conflict");
     expect((await getWorkflowProgress(db, projectId, v2RunId))?.waitingCheckpoint?.checkpoint_key)
-      .toBe("approve-pr");
+      .toBe("project-before-pr_open");
 
     const approved = await resumeWorkflowCheckpoint(db, projectId, {
       ...identity,
-      checkpointKey: "approve-pr",
+      checkpointKey: "project-before-pr_open",
       requestId: "11111111-1111-4111-8111-111111111111",
       actor: "pm",
       approvedAt: at(19),
@@ -377,7 +392,7 @@ describe("workflow v2 D1 persistence and transitions", () => {
     });
     const duplicate = await resumeWorkflowCheckpoint(db, projectId, {
       ...identity,
-      checkpointKey: "approve-pr",
+      checkpointKey: "project-before-pr_open",
       requestId: "11111111-1111-4111-8111-111111111111",
       actor: "pm",
       approvedAt: at(20),
@@ -398,13 +413,13 @@ describe("workflow v2 D1 persistence and transitions", () => {
     })).outcome).toBe("completed");
     expect((await reachWorkflowCheckpoint(db, projectId, {
       ...identity,
-      checkpointKey: "review-pr",
+      checkpointKey: "project-after-pr_open",
       reachedAt: at(23),
     })).outcome).toBe("waiting");
 
     const secondWaiting = await reachWorkflowCheckpoint(db, projectId, {
       ...identity,
-      checkpointKey: "approve-production",
+      checkpointKey: "project-before-production_qa",
       reachedAt: at(24),
     });
     expect(secondWaiting.outcome).toBe("conflict");
@@ -413,7 +428,7 @@ describe("workflow v2 D1 persistence and transitions", () => {
 
     const afterApproved = await resumeWorkflowCheckpoint(db, projectId, {
       ...identity,
-      checkpointKey: "review-pr",
+      checkpointKey: "project-after-pr_open",
       requestId: "22222222-2222-4222-8222-222222222222",
       actor: "pm",
       approvedAt: at(25),
@@ -442,18 +457,18 @@ describe("workflow v2 D1 persistence and transitions", () => {
       .rejects.toThrow(/terminal stage production_qa/u);
     expect((await reachWorkflowCheckpoint(db, projectId, {
       ...identity,
-      checkpointKey: "approve-production",
+      checkpointKey: "project-before-production_qa",
       reachedAt: at(28),
     })).outcome).toBe("waiting");
     await expect(assertWorkflowRunCompletion(db, projectId, v2RunId))
-      .rejects.toThrow(/waiting for checkpoint approve-production/u);
+      .rejects.toThrow(/waiting for checkpoint project-before-production_qa/u);
   });
 
   it("requires terminal completion, then invalidates all prior checkpoint approvals on rework", async () => {
     const identity = { runId: v2RunId, attempt: 1, revision: 1 };
     const approved = await resumeWorkflowCheckpoint(db, projectId, {
       ...identity,
-      checkpointKey: "approve-production",
+      checkpointKey: "project-before-production_qa",
       requestId: "33333333-3333-4333-8333-333333333333",
       actor: "pm",
       approvedAt: at(29),
@@ -496,7 +511,7 @@ describe("workflow v2 D1 persistence and transitions", () => {
     const invalidated = await db
       .prepare(
         `select state from briar_run_checkpoint_progress
-         where run_id = ? and revision = 1 and checkpoint_key = 'approve-production'`,
+         where run_id = ? and revision = 1 and checkpoint_key = 'project-before-production_qa'`,
       )
       .bind(v2RunId)
       .first<{ state: string }>();
@@ -512,7 +527,7 @@ describe("workflow v2 D1 persistence and transitions", () => {
     expect(newRevision?.revision).toBe(2);
     expect(newRevision?.stages.find((stage) => stage.stage_id === "implementing")?.state)
       .toBe("completed");
-    expect(newRevision?.checkpoints.find((checkpoint) => checkpoint.checkpoint_key === "approve-production")?.state)
+    expect(newRevision?.checkpoints.find((checkpoint) => checkpoint.checkpoint_key === "project-before-production_qa")?.state)
       .toBe("pending");
     await expect(startWorkflowStage(db, projectId, {
       runId: v2RunId,
@@ -520,12 +535,12 @@ describe("workflow v2 D1 persistence and transitions", () => {
       revision: 2,
       stageId: "pr_open",
       startedAt: at(41),
-    })).rejects.toThrow(/before checkpoint approve-pr/u);
+    })).rejects.toThrow(/before checkpoint project-before-pr_open/u);
     expect((await reachWorkflowCheckpoint(db, projectId, {
       runId: v2RunId,
       attempt: 1,
       revision: 2,
-      checkpointKey: "approve-pr",
+      checkpointKey: "project-before-pr_open",
       reachedAt: at(42),
     })).outcome).toBe("waiting");
   });
@@ -541,19 +556,16 @@ describe("workflow v2 D1 persistence and transitions", () => {
       ],
       execution: {
         checkpoints: [
-          { key: "before-pr", stage: "pr_open", position: "before" },
-          { key: "after-pr", stage: "pr_open", position: "after" },
-          { key: "after-production", stage: "production_qa", position: "after" },
+          { key: "project-before-pr_open", stage: "pr_open", position: "before" },
+          { key: "project-after-pr_open", stage: "pr_open", position: "after" },
+          { key: "project-after-production_qa", stage: "production_qa", position: "after" },
         ],
       },
       completion: {
         requiredStages: ["implementing", "pr_open", "production_qa"],
       },
     });
-    await db
-      .prepare(`update briar_project_settings set workflow_json = ? where project_id = ?`)
-      .bind(JSON.stringify(workflow), projectId)
-      .run();
+    await setProjectWorkflow(workflow);
     const runId = await recordHuntEvent(
       db,
       projectId,
@@ -579,11 +591,11 @@ describe("workflow v2 D1 persistence and transitions", () => {
     });
     expect(before).toMatchObject({
       outcome: "paused",
-      checkpoint: { key: "before-pr", position: "before" },
+      checkpoint: { key: "project-before-pr_open", position: "before" },
     });
     const resumedBefore = await resumeWorkflowCheckpoint(db, projectId, {
       ...identity,
-      checkpointKey: "before-pr",
+      checkpointKey: "project-before-pr_open",
       requestId: "55555555-5555-4555-8555-555555555555",
       actor: "pm",
       approvedAt: at(54),
@@ -607,11 +619,11 @@ describe("workflow v2 D1 persistence and transitions", () => {
     });
     expect(after).toMatchObject({
       outcome: "paused",
-      checkpoint: { key: "after-pr", position: "after" },
+      checkpoint: { key: "project-after-pr_open", position: "after" },
     });
     expect(await resumeWorkflowCheckpoint(db, projectId, {
       ...identity,
-      checkpointKey: "after-pr",
+      checkpointKey: "project-after-pr_open",
       requestId: "66666666-6666-4666-8666-666666666666",
       actor: "pm",
       approvedAt: at(57),
@@ -633,11 +645,11 @@ describe("workflow v2 D1 persistence and transitions", () => {
     });
     expect(terminalPause).toMatchObject({
       outcome: "paused",
-      checkpoint: { key: "after-production", position: "after" },
+      checkpoint: { key: "project-after-production_qa", position: "after" },
     });
     const terminalResume = await resumeWorkflowCheckpoint(db, projectId, {
       ...identity,
-      checkpointKey: "after-production",
+      checkpointKey: "project-after-production_qa",
       requestId: "77777777-7777-4777-8777-777777777777",
       actor: "pm",
       approvedAt: at(60),
@@ -673,10 +685,7 @@ describe("workflow v2 D1 persistence and transitions", () => {
       execution: { checkpoints: [] },
       completion: { requiredStages: ["implementing"] },
     });
-    await db
-      .prepare(`update briar_project_settings set workflow_json = ? where project_id = ?`)
-      .bind(JSON.stringify(workflow), projectId)
-      .run();
+    await setProjectWorkflow(workflow);
     const runId = await recordHuntEvent(
       db,
       projectId,
@@ -707,10 +716,7 @@ describe("workflow v2 D1 persistence and transitions", () => {
       execution: { checkpoints: [] },
       completion: { requiredStages: ["staging_qa"] },
     });
-    await db
-      .prepare(`update briar_project_settings set workflow_json = ? where project_id = ?`)
-      .bind(JSON.stringify(workflow), projectId)
-      .run();
+    await setProjectWorkflow(workflow);
     const sourceKey = "lifecycle-status-history";
     const runId = await recordHuntEvent(
       db,
@@ -751,15 +757,12 @@ describe("workflow v2 D1 persistence and transitions", () => {
       ],
       execution: {
         checkpoints: [
-          { key: "after-implementation", stage: "implementing", position: "after" },
+          { key: "project-after-implementing", stage: "implementing", position: "after" },
         ],
       },
       completion: { requiredStages: ["implementing", "pr_open"] },
     });
-    await db
-      .prepare(`update briar_project_settings set workflow_json = ? where project_id = ?`)
-      .bind(JSON.stringify(workflow), projectId)
-      .run();
+    await setProjectWorkflow(workflow);
     const runId = await recordHuntEvent(
       db,
       projectId,
@@ -784,11 +787,11 @@ describe("workflow v2 D1 persistence and transitions", () => {
       startedAt: at(83),
     })).toMatchObject({
       outcome: "paused",
-      checkpoint: { key: "after-implementation", position: "after" },
+      checkpoint: { key: "project-after-implementing", position: "after" },
     });
   });
 
-  it("does not let status events bypass lifecycle state", async () => {
+  it("keeps lifecycle progress authoritative when status events arrive", async () => {
     const workflow = normalizeAutoHuntWorkflow({
       version: 2,
       requirements: [],
@@ -798,10 +801,7 @@ describe("workflow v2 D1 persistence and transitions", () => {
       execution: { checkpoints: [] },
       completion: { requiredStages: ["implementing"] },
     });
-    await db
-      .prepare(`update briar_project_settings set workflow_json = ? where project_id = ?`)
-      .bind(JSON.stringify(workflow), projectId)
-      .run();
+    await setProjectWorkflow(workflow);
     const sourceKey = "lifecycle-event-guard";
     const runId = await recordHuntEvent(
       db,
@@ -816,7 +816,10 @@ describe("workflow v2 D1 persistence and transitions", () => {
         status: "running",
         workflowStage: "implementing",
       }),
-    )).rejects.toThrow(/must be started through the workflow lifecycle/u);
+    )).resolves.toBe(runId);
+    await expect(getWorkflowProgress(db, projectId, runId)).resolves.toMatchObject({
+      stages: [expect.objectContaining({ stage_id: "implementing", state: "pending" })],
+    });
     await startWorkflowStageLifecycle(db, projectId, {
       runId,
       attempt: 1,
@@ -843,15 +846,12 @@ describe("workflow v2 D1 persistence and transitions", () => {
       ],
       execution: {
         checkpoints: [
-          { key: "review-implementation", stage: "implementing", position: "after" },
+          { key: "project-after-implementing", stage: "implementing", position: "after" },
         ],
       },
       completion: { requiredStages: ["implementing"] },
     });
-    await db
-      .prepare(`update briar_project_settings set workflow_json = ? where project_id = ?`)
-      .bind(JSON.stringify(workflow), projectId)
-      .run();
+    await setProjectWorkflow(workflow);
     const sourceKey = "paused-current-stage-rework";
     const runId = await recordHuntEvent(
       db,
@@ -870,7 +870,7 @@ describe("workflow v2 D1 persistence and transitions", () => {
       finishedAt: at(102),
     })).toMatchObject({
       outcome: "paused",
-      checkpoint: { key: "review-implementation" },
+      checkpoint: { key: "project-after-implementing" },
     });
 
     await expect(reworkHuntRun(db, projectId, {
@@ -895,7 +895,7 @@ describe("workflow v2 D1 persistence and transitions", () => {
       reason: "Revise the copy and rerun the UI checks.",
       occurredAt: at(104),
       checkpoint: {
-        key: "review-implementation",
+        key: "project-after-implementing",
         attempt: 1,
         revision: 1,
       },
