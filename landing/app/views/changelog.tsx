@@ -26,6 +26,20 @@ export const changelogCopy = {
     backTop: "맨 위로 ↑",
     entries: [
       {
+        version: "1.2.88",
+        date: "2026년 8월 8일",
+        title: "원하는 Worker에서 에이전트를 바로 실행합니다",
+        summary:
+          "저장된 에이전트를 선택한 Worker의 최신 코드에서 실행하고, 데스크톱과 iOS에서 진행 상태와 결과를 더 안정적으로 이어서 확인할 수 있습니다.",
+        items: [
+          "저장된 에이전트 작업을 선택한 Worker에서 실행하고, 매 실행을 최신 main의 새 worktree에서 시작합니다.",
+          "프로젝트 에이전트 작업 잡을 서버에서 추적해 실행 상태와 결과를 안정적으로 동기화합니다.",
+          "iOS에서 프로젝트 에이전트를 실행하고 진행 상태와 결과를 확인할 수 있습니다.",
+          "채널 알림, 멘션 링크, 이슈 자동완성, 메시지 전송 동작과 채널 상세 헤더를 개선했습니다.",
+          "랜딩을 하나의 밝은 테마와 명시적인 한국어·영어 경로로 전면 개편했습니다.",
+        ],
+      },
+      {
         version: "1.2.87",
         date: "2026년 8월 7일",
         title: "조직 에이전트와 채널 실행 흐름을 확장했습니다",
@@ -144,6 +158,20 @@ export const changelogCopy = {
     home: "Home",
     backTop: "Back to top ↑",
     entries: [
+      {
+        version: "1.2.88",
+        date: "August 8, 2026",
+        title: "Run agents on the worker you choose",
+        summary:
+          "Run saved agents against the latest code on a selected worker, with more reliable progress and result tracking across desktop and iOS.",
+        items: [
+          "Run saved-agent tasks on a selected worker, with every run starting in a fresh worktree from the latest main branch.",
+          "Track project-agent task jobs on the server so execution state and results stay synchronized.",
+          "Run project agents from iOS and follow their progress and results.",
+          "Improved channel notifications, mention links, issue autocomplete, message sending, and the channel detail header.",
+          "Redesigned the landing site around one light theme with explicit English and Korean routes.",
+        ],
+      },
       {
         version: "1.2.87",
         date: "August 7, 2026",
@@ -324,9 +352,9 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <h1>{changelog.title}</h1>
           <p>{changelog.description}</p>
         </div>
-        <a href="#v1-2-87" className="changelog-current">
+        <a href="#v1-2-88" className="changelog-current">
           <span>{changelog.current}</span>
-          <strong>v1.2.87</strong>
+          <strong>v1.2.88</strong>
           <i aria-hidden="true">↓</i>
         </a>
       </section>
@@ -349,7 +377,9 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                 <div className="changelog-entry-meta">
                   <strong>v{entry.version}</strong>
                   {index === 0 ? <span>{changelog.latest}</span> : null}
-                  <time dateTime="2026-08-07">
+                  <time
+                    dateTime={entry.version === "1.2.88" ? "2026-08-08" : "2026-08-07"}
+                  >
                     {changelog.released} · {entry.date}
                   </time>
                 </div>
