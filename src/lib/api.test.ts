@@ -30,6 +30,7 @@ import {
   loadRunEvents,
   loadSession,
   removeIssueDependency,
+  runProjectAgentTaskOnWorker,
   sendChannelMessage,
   reworkPausedHuntRun,
   setChannelMember,
@@ -961,6 +962,58 @@ describe("API errors", () => {
         localOwner: false,
       }),
     ]);
+  });
+
+  it("canonicalizes the Agent ID before running a task on a Worker", async () => {
+    const projectId = "22222222-2222-4222-8222-222222222222";
+    const agentId = "AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA";
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body));
+      return new Response(JSON.stringify({
+        session: {
+          id: "session-1",
+          projectId,
+          dispatchGroupId: "session-1",
+          agentId: body.agentId,
+          sessionType: "task",
+          trigger: "manual",
+          scheduleId: null,
+          scheduleRunId: null,
+          parentSessionId: null,
+          request: body.request,
+          status: "running",
+          issues: [],
+          startedAt: "2026-07-30T00:00:00.000Z",
+          completedAt: null,
+          conversationId: null,
+          workspaceRoot: null,
+          requestedWorkerId: body.workerId,
+          workerId: body.workerId,
+          summary: null,
+          error: null,
+          events: [{
+            id: "event-1",
+            type: "started",
+            occurredAt: "2026-07-30T00:00:00.000Z",
+          }],
+          dispatchEvents: [],
+          workers: [],
+          updatedAt: "2026-07-30T00:00:00.000Z",
+        },
+      }), {
+        headers: { "Content-Type": "application/json" },
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await runProjectAgentTaskOnWorker("token", projectId, {
+      agentId,
+      request: "Review the repository",
+      workerId: "worker-1",
+    });
+
+    const body = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
+    expect(body.agentId).toBe(agentId.toLowerCase());
   });
 
   it("uploads only the shareable agent session snapshot", async () => {

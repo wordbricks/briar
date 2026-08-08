@@ -199,6 +199,24 @@ struct ProjectAgentTaskRequest: Codable, Equatable, Sendable {
     let request: String
     let workerId: String
     let requestId: UUID
+
+    private enum CodingKeys: String, CodingKey {
+        case agentId
+        case request
+        case workerId
+        case requestId
+    }
+
+    /// Agent IDs are stored as lowercase strings and compared case-sensitively.
+    /// Foundation's synthesized UUID encoding uses uppercase characters, so keep
+    /// both UUID request fields in the API's canonical form.
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(agentId.uuidString.lowercased(), forKey: .agentId)
+        try container.encode(request, forKey: .request)
+        try container.encode(workerId, forKey: .workerId)
+        try container.encode(requestId.uuidString.lowercased(), forKey: .requestId)
+    }
 }
 
 struct ProjectAgentTaskResponse: Codable, Equatable, Sendable {

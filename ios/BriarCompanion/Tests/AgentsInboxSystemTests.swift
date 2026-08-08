@@ -55,6 +55,26 @@ final class AgentsInboxSystemTests: XCTestCase {
         )
     }
 
+    func testProjectAgentTaskRequestEncodesCanonicalUUIDs() throws {
+        let agentID = UUID(uuidString: "AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA")!
+        let requestID = UUID(uuidString: "BBBBBBBB-BBBB-4BBB-8BBB-BBBBBBBBBBBB")!
+        let request = ProjectAgentTaskRequest(
+            agentId: agentID,
+            request: "저장된 Agent를 실행합니다.",
+            workerId: "worker-1",
+            requestId: requestID
+        )
+
+        let object = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder.mobileContract.encode(request)
+            ) as? [String: Any]
+        )
+
+        XCTAssertEqual(object["agentId"] as? String, agentID.uuidString.lowercased())
+        XCTAssertEqual(object["requestId"] as? String, requestID.uuidString.lowercased())
+    }
+
     @MainActor
     func testSelectQueuedRunsMatchesSharedAgentDispatchRules() {
         let readyOld = DashboardRun(

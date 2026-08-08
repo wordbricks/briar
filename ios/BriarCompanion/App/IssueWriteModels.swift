@@ -272,6 +272,16 @@ struct DispatchRunRequest: Codable, Sendable {
     let workerId: String?
     let requestId: UUID
 
+    private enum CodingKeys: String, CodingKey {
+        case agentId
+        case provider
+        case model
+        case effort
+        case persistPreferences
+        case workerId
+        case requestId
+    }
+
     init(
         agentId: UUID? = nil,
         provider: AgentProvider,
@@ -288,6 +298,17 @@ struct DispatchRunRequest: Codable, Sendable {
         self.persistPreferences = persistPreferences
         self.workerId = workerId
         self.requestId = requestId
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encodeIfPresent(agentId?.uuidString.lowercased(), forKey: .agentId)
+        try container.encode(provider, forKey: .provider)
+        try container.encodeIfPresent(model, forKey: .model)
+        try container.encodeIfPresent(effort, forKey: .effort)
+        try container.encode(persistPreferences, forKey: .persistPreferences)
+        try container.encodeIfPresent(workerId, forKey: .workerId)
+        try container.encode(requestId.uuidString.lowercased(), forKey: .requestId)
     }
 }
 
