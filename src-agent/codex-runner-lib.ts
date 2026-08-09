@@ -1,4 +1,17 @@
 import type { AgentAttachment } from "./runner-attachments";
+import {
+  normalizedActivityText,
+  normalizedActivityTitle,
+  type AgentActivityKind,
+  type AgentActivityStatus,
+  type NormalizedAgentEvent,
+} from "./normalized-agent-event";
+
+export type {
+  AgentActivityKind,
+  AgentActivityStatus,
+  NormalizedAgentEvent,
+} from "./normalized-agent-event";
 
 export type CodexRunnerRequest = {
   type: "run";
@@ -21,29 +34,6 @@ export type CodexApprovalResponse = {
   id: string;
   approved: boolean;
 };
-
-export type NormalizedAgentEvent =
-  | {
-      type: "messageStarted";
-      id: string;
-      phase: string | null;
-      text: string;
-    }
-  | {
-      type: "messageDelta";
-      id: string;
-      delta: string;
-    }
-  | {
-      type: "messageCompleted";
-      id: string;
-      phase: string | null;
-      text: string;
-    }
-  | {
-      type: "turnCompleted";
-      status: string;
-    };
 
 export type CodexRunnerOutput =
   | {
@@ -210,14 +200,24 @@ export function normalizeCodexAppServerMessage(
 
   if (method === "item/started" || method === "item/completed") {
     const item = asRecord(params.item);
-    if (item?.type !== "agentMessage" || typeof item.id !== "string") {
-      return undefined;
+    if (item?.type === "agentMessage" && typeof item.id === "string") {
+      return {
+        type: method === "item/started" ? "messageStarted" : "messageCompleted",
+        id: item.id,
+        phase: typeof item.phase === "string" ? item.phase : null,
+        text: typeof item.text === "string" ? item.text : "",
+      };
+    }
+    if (!item) return undefined;
+    const activity = codexActivity(item);
+    if (!activity) return undefined;
+    if (method === "item/started") {
+      return { type: "activityStarted", ...activity };
     }
     return {
-      type: method === "item/started" ? "messageStarted" : "messageCompleted",
-      id: item.id,
-      phase: typeof item.phase === "string" ? item.phase : null,
-      text: typeof item.text === "string" ? item.text : "",
+      type: "activityCompleted",
+      ...activity,
+      status: codexActivityStatus(item),
     };
   }
 
@@ -229,6 +229,19 @@ export function normalizeCodexAppServerMessage(
       : undefined;
   }
 
+  if (
+    method === "item/commandExecution/outputDelta" ||
+    method === "item/fileChange/outputDelta" ||
+    method === "item/mcpToolCall/progress" ||
+    method === "item/dynamicToolCall/outputDelta"
+  ) {
+    const id = typeof params.itemId === "string" ? params.itemId : undefined;
+    const delta = firstText(params.delta, params.output, params.message);
+    return id && delta !== undefined
+      ? { type: "activityDelta", id, delta: normalizedActivityText(delta) }
+      : undefined;
+  }
+
   if (method === "turn/completed") {
     const turn = asRecord(params.turn);
     return typeof turn?.status === "string"
@@ -236,6 +249,119 @@ export function normalizeCodexAppServerMessage(
       : undefined;
   }
   return undefined;
+}
+
+function codexActivity(item: Record<string, unknown> | null): {
+  id: string;
+  kind: AgentActivityKind;
+  title: string;
+  text: string;
+} | null {
+  if (!item || typeof item.id !== "string" || typeof item.type !== "string") {
+    return null;
+  }
+  const kind = codexActivityKind(item.type);
+  if (!kind) return null;
+  return {
+    id: item.id,
+    kind,
+    title: normalizedActivityTitle(codexActivityTitle(item)),
+    text: normalizedActivityText(codexActivityText(item)),
+  };
+}
+
+function codexActivityKind(type: string): AgentActivityKind | null {
+  if (type === "commandExecution") return "command";
+  if (type === "fileChange") return "fileChange";
+  if (type === "webSearch") return "webSearch";
+  if (
+    type === "mcpToolCall" ||
+    type === "dynamicToolCall" ||
+    type === "collabToolCall" ||
+    type === "collabAgentToolCall" ||
+    type === "imageView"
+  ) {
+    return "tool";
+  }
+  return null;
+}
+
+function codexActivityTitle(item: Record<string, unknown>): string {
+  if (item.type === "commandExecution") {
+    return firstText(item.command) ?? "Run command";
+  }
+  if (item.type === "fileChange") {
+    const paths = asArray(item.changes)
+      .map(asRecord)
+      .flatMap((change) => {
+        const path = firstText(change?.path, change?.filePath);
+        return path ? [path] : [];
+      });
+    return paths.length > 0 ? paths.join(", ") : "Change files";
+  }
+  if (item.type === "mcpToolCall") {
+    const server = firstText(item.server, item.serverName);
+    const tool = firstText(item.tool, item.toolName);
+    return [server, tool].filter(Boolean).join("/") || "MCP tool";
+  }
+  if (item.type === "webSearch") {
+    return firstText(item.query) ?? "Search the web";
+  }
+  if (item.type === "imageView") {
+    return firstText(item.path) ?? "View image";
+  }
+  return firstText(item.tool, item.toolName, item.title) ?? "Use tool";
+}
+
+function codexActivityText(item: Record<string, unknown>): string {
+  const direct = firstText(
+    item.aggregatedOutput,
+    item.output,
+    asRecord(item.error)?.message,
+    item.message,
+  );
+  if (direct !== undefined) return direct;
+  for (const value of [
+    item.result,
+    item.results,
+    item.rawOutput,
+    item.contentItems,
+    item.type === "fileChange" ? item.changes : undefined,
+  ]) {
+    if (value === undefined || value === null) continue;
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return String(value);
+    }
+  }
+  return "";
+}
+
+function codexActivityStatus(
+  item: Record<string, unknown>,
+): AgentActivityStatus {
+  const status = firstText(item.status)?.toLowerCase();
+  if (
+    status === "cancelled" ||
+    status === "canceled" ||
+    status === "declined" ||
+    status === "denied" ||
+    status === "aborted" ||
+    status === "interrupted"
+  ) {
+    return "cancelled";
+  }
+  if (
+    status === "failed" ||
+    status === "error" ||
+    item.success === false ||
+    item.error != null ||
+    (typeof item.exitCode === "number" && item.exitCode !== 0)
+  ) {
+    return "failed";
+  }
+  return "completed";
 }
 
 export function codexApprovalRequest(
@@ -424,4 +550,8 @@ function asRecord(value: unknown): Record<string, unknown> | null {
 
 function asArray(value: unknown): unknown[] {
   return Array.isArray(value) ? value : [];
+}
+
+function firstText(...values: unknown[]): string | undefined {
+  return values.find((value): value is string => typeof value === "string");
 }

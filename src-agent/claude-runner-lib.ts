@@ -6,7 +6,19 @@ import type {
   SDKUserMessage,
 } from "@anthropic-ai/claude-agent-sdk";
 import type { AgentAttachment } from "./runner-attachments";
+import {
+  normalizedActivityText,
+  normalizedActivityTitle,
+  type AgentActivityKind,
+  type NormalizedAgentEvent,
+} from "./normalized-agent-event";
 import { readAgentImage } from "./runner-attachments";
+
+export type {
+  AgentActivityKind,
+  AgentActivityStatus,
+  NormalizedAgentEvent,
+} from "./normalized-agent-event";
 
 export type ClaudeRunnerRequest = {
   type: "run";
@@ -32,32 +44,19 @@ export type ClaudeApprovalResponse = {
   approved: boolean;
 };
 
-export type NormalizedAgentEvent =
-  | {
-      type: "messageStarted";
-      id: string;
-      phase: string | null;
-      text: string;
-    }
-  | {
-      type: "messageDelta";
-      id: string;
-      delta: string;
-    }
-  | {
-      type: "messageCompleted";
-      id: string;
-      phase: string | null;
-      text: string;
-    }
-  | {
-      type: "turnCompleted";
-      status: string;
-    };
-
 export type ClaudeEventState = {
   activeMessageId: string | null;
   lastAssistantMessageId: string | null;
+  activities: Map<
+    string,
+    {
+      kind: AgentActivityKind;
+      title: string;
+      text: string;
+      started: boolean;
+      completed: boolean;
+    }
+  >;
 };
 
 export type ClaudeRunnerOutput =
@@ -94,6 +93,14 @@ const supportedClaudeImageMimeTypes = new Set([
   "image/png",
   "image/webp",
 ]);
+
+export function createClaudeEventState(): ClaudeEventState {
+  return {
+    activeMessageId: null,
+    lastAssistantMessageId: null,
+    activities: new Map(),
+  };
+}
 
 export async function* claudePrompt(
   request: ClaudeRunnerRequest,
@@ -232,7 +239,7 @@ function textContent(message: SDKMessage): string {
 export function normalizeClaudeMessage(
   message: SDKMessage,
   state: ClaudeEventState,
-): NormalizedAgentEvent | undefined {
+): NormalizedAgentEvent[] {
   if (message.type === "stream_event") {
     const event = message.event as unknown as Record<string, unknown>;
     if (event.type === "message_start") {
@@ -244,21 +251,22 @@ export function normalizeClaudeMessage(
         typeof startedMessage?.id === "string"
           ? startedMessage.id
           : message.uuid;
-      return;
+      return [];
     }
     const id = state.activeMessageId ?? message.uuid;
     if (event.type === "content_block_start") {
-      const block = event.content_block as
-        | { type?: unknown; text?: unknown }
-        | null
-        | undefined;
+      const block = record(event.content_block);
       if (block?.type === "text") {
-        return {
+        return [{
           type: "messageStarted",
           id,
           phase: "commentary",
           text: typeof block.text === "string" ? block.text : "",
-        };
+        }];
+      }
+      if (block?.type === "tool_use") {
+        const started = startClaudeActivity(block, state);
+        return started ? [started] : [];
       }
     }
     if (event.type === "content_block_delta") {
@@ -270,29 +278,79 @@ export function normalizeClaudeMessage(
         delta?.type === "text_delta" &&
         typeof delta.text === "string"
       ) {
-        return { type: "messageDelta", id, delta: delta.text };
+        return [{ type: "messageDelta", id, delta: delta.text }];
       }
     }
-    return;
+    return [];
   }
 
   if (message.type === "assistant") {
+    const events: NormalizedAgentEvent[] = [];
     const text = textContent(message);
-    if (!text) return;
     const id = message.message.id ?? message.uuid;
-    state.activeMessageId = null;
-    state.lastAssistantMessageId = id;
-    return {
-      type: "messageCompleted",
-      id,
-      phase: "commentary",
+    if (text) {
+      state.activeMessageId = null;
+      state.lastAssistantMessageId = id;
+      events.push({
+        type: "messageCompleted",
+        id,
+        phase: "commentary",
+        text,
+      });
+    }
+    if (Array.isArray(message.message.content)) {
+      for (const block of message.message.content) {
+        const started = startClaudeActivity(record(block), state);
+        if (started) events.push(started);
+      }
+    }
+    return events;
+  }
+
+  if (message.type === "user") {
+    const events: NormalizedAgentEvent[] = [];
+    const content = message.message.content;
+    if (!Array.isArray(content)) return events;
+    for (const block of content) {
+      const result = completeClaudeActivity(record(block), state);
+      if (result) events.push(result);
+    }
+    return events;
+  }
+
+  if (
+    message.type === "system" &&
+    message.subtype === "permission_denied"
+  ) {
+    const activity = state.activities.get(message.tool_use_id);
+    if (activity?.completed) return [];
+    const kind = activity?.kind ?? claudeActivityKind(message.tool_name);
+    const title = normalizedActivityTitle(
+      activity?.title || message.tool_name || "Use tool",
+    );
+    const text = normalizedActivityText(
+      message.decision_reason || "Permission denied",
+    );
+    state.activities.set(message.tool_use_id, {
+      kind,
+      title,
       text,
-    };
+      started: true,
+      completed: true,
+    });
+    return [{
+      type: "activityCompleted",
+      id: message.tool_use_id,
+      kind,
+      title,
+      text,
+      status: "cancelled",
+    }];
   }
 
   if (message.type === "result") {
     if (message.subtype === "success") {
-      return {
+      return [{
         type: "messageCompleted",
         id: state.lastAssistantMessageId ?? message.uuid,
         phase: "final",
@@ -300,9 +358,9 @@ export function normalizeClaudeMessage(
           message.structured_output === undefined
             ? message.result
             : JSON.stringify(message.structured_output),
-      };
+      }];
     }
-    return { type: "turnCompleted", status: "failed" };
+    return [{ type: "turnCompleted", status: "failed" }];
   }
 
   if (
@@ -310,8 +368,142 @@ export function normalizeClaudeMessage(
     message.subtype === "session_state_changed" &&
     message.state === "idle"
   ) {
-    return { type: "turnCompleted", status: "completed" };
+    return [{ type: "turnCompleted", status: "completed" }];
   }
+  return [];
+}
+
+function startClaudeActivity(
+  block: Record<string, unknown> | null,
+  state: ClaudeEventState,
+): Extract<NormalizedAgentEvent, { type: "activityStarted" }> | null {
+  if (
+    block?.type !== "tool_use" ||
+    typeof block.id !== "string" ||
+    typeof block.name !== "string"
+  ) {
+    return null;
+  }
+  const existing = state.activities.get(block.id);
+  if (existing?.started) return null;
+  const input = record(block.input);
+  const kind = claudeActivityKind(block.name);
+  const title = normalizedActivityTitle(
+    claudeActivityTitle(block.name, input),
+  );
+  const activity = {
+    kind,
+    title,
+    text: existing?.text ?? "",
+    started: true,
+    completed: false,
+  };
+  state.activities.set(block.id, activity);
+  return {
+    type: "activityStarted",
+    id: block.id,
+    kind,
+    title,
+    text: activity.text,
+  };
+}
+
+function completeClaudeActivity(
+  block: Record<string, unknown> | null,
+  state: ClaudeEventState,
+): Extract<NormalizedAgentEvent, { type: "activityCompleted" }> | null {
+  if (block?.type !== "tool_result" || typeof block.tool_use_id !== "string") {
+    return null;
+  }
+  const existing = state.activities.get(block.tool_use_id);
+  if (existing?.completed) return null;
+  const kind = existing?.kind ?? "tool";
+  const title = normalizedActivityTitle(
+    existing?.title ?? `Tool ${block.tool_use_id}`,
+  );
+  const text = normalizedActivityText(claudeToolResultText(block.content));
+  const status = block.is_error === true ? "failed" : "completed";
+  state.activities.set(block.tool_use_id, {
+    kind,
+    title,
+    text,
+    started: true,
+    completed: true,
+  });
+  return {
+    type: "activityCompleted",
+    id: block.tool_use_id,
+    kind,
+    title,
+    text,
+    status,
+  };
+}
+
+function claudeActivityKind(name: string): AgentActivityKind {
+  const normalized = name.toLowerCase();
+  if (normalized === "bash" || normalized === "shell") return "command";
+  if (
+    normalized === "edit" ||
+    normalized === "write" ||
+    normalized === "notebookedit" ||
+    normalized === "applypatch"
+  ) {
+    return "fileChange";
+  }
+  if (normalized === "webfetch" || normalized === "websearch") {
+    return "webSearch";
+  }
+  return "tool";
+}
+
+function claudeActivityTitle(
+  name: string,
+  input: Record<string, unknown> | null,
+): string {
+  if (name.toLowerCase() === "bash" && typeof input?.command === "string") {
+    return input.command;
+  }
+  if (
+    (name === "Edit" || name === "Write" || name === "NotebookEdit") &&
+    typeof input?.file_path === "string"
+  ) {
+    return input.file_path;
+  }
+  if (
+    (name === "WebFetch" || name === "WebSearch") &&
+    typeof input?.query === "string"
+  ) {
+    return input.query;
+  }
+  return name;
+}
+
+function claudeToolResultText(content: unknown): string {
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return content == null ? "" : jsonText(content);
+  return content
+    .flatMap((value) => {
+      const block = record(value);
+      return block?.type === "text" && typeof block.text === "string"
+        ? [block.text]
+        : [];
+    })
+    .join("");
+}
+
+function jsonText(value: unknown): string {
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+}
+
+function record(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
 }
 
 export function approvalResult(

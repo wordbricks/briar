@@ -246,11 +246,13 @@ async function main() {
           return;
         }
         const normalized = normalizeGrokSessionUpdate(rpc.params, state);
-        emit({
-          type: "event",
-          raw: normalized.raw,
-          ...(normalized.event ? { event: normalized.event } : {}),
-        });
+        if (normalized.events.length === 0) {
+          emit({ type: "event", raw: normalized.raw });
+        } else {
+          for (const event of normalized.events) {
+            emit({ type: "event", raw: normalized.raw, event });
+          }
+        }
       },
       onServerRequest: async (rpc) => {
         if (rpc.id === undefined || rpc.id === null) return;

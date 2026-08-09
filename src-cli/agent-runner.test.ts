@@ -605,7 +605,7 @@ describe("detached Agent runner", () => {
     });
   });
 
-  it("keeps streaming message deltas ephemeral", () => {
+  it("keeps streaming message and activity deltas ephemeral", () => {
     expect(
       shouldPersistDetachedTranscriptPayload({
         type: "event",
@@ -622,6 +622,19 @@ describe("detached Agent runner", () => {
     expect(
       shouldPersistDetachedTranscriptPayload({
         type: "event",
+        event: { type: "activityDelta", id: "command-1", delta: "output" },
+      }),
+    ).toBe(false);
+    expect(
+      shouldPersistDetachedTranscriptPayload({
+        type: "activityDelta",
+        id: "command-1",
+        delta: "output",
+      }),
+    ).toBe(false);
+    expect(
+      shouldPersistDetachedTranscriptPayload({
+        type: "event",
         event: {
           type: "messageCompleted",
           id: "message-1",
@@ -629,6 +642,36 @@ describe("detached Agent runner", () => {
         },
       }),
     ).toBe(true);
+  });
+
+  it("bounds oversized normalized activity payloads below the upload threshold", () => {
+    const payload = {
+      type: "event",
+      direction: "server",
+      raw: { output: "원격 명령 출력".repeat(20_000) },
+      event: {
+        type: "activityCompleted",
+        id: "command-1",
+        kind: "command",
+        title: "아주 긴 명령 ".repeat(4_000),
+        text: "아주 긴 실행 결과 ".repeat(20_000),
+        status: "completed",
+      },
+    };
+    const bounded = detachedTranscriptPayload(payload, JSON.stringify(payload));
+
+    expect(Buffer.byteLength(JSON.stringify(bounded), "utf8")).toBeLessThan(
+      28_000,
+    );
+    expect(bounded).toMatchObject({
+      type: "event",
+      event: {
+        type: "activityCompleted",
+        id: "command-1",
+        kind: "command",
+        status: "completed",
+      },
+    });
   });
 
   it("assigns transcript sequences only to persisted payloads", () => {

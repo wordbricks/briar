@@ -12,9 +12,9 @@ use std::{
 };
 
 use super::{
-    AgentBackend, AgentEvent, AgentEventDirection, AgentEventSink, AgentProviderEvent,
-    AgentProviderKind, ApprovalPolicy, AutoHuntExecution, ChatExecution, ModelEffort,
-    ProjectLlmRequest, ProjectLlmResponse, SandboxMode,
+    AgentActivityKind, AgentActivityStatus, AgentBackend, AgentEvent, AgentEventDirection,
+    AgentEventSink, AgentProviderEvent, AgentProviderKind, ApprovalPolicy, AutoHuntExecution,
+    ChatExecution, ModelEffort, ProjectLlmRequest, ProjectLlmResponse, SandboxMode,
 };
 use crate::host::{CommandRunner, CommandSpec};
 #[cfg(test)]
@@ -1830,28 +1830,54 @@ fn codex_agent_event(direction: AgentEventDirection, message: &Value) -> Option<
     match method {
         "item/started" | "item/completed" => {
             let item = params.get("item")?;
-            if item.get("type").and_then(Value::as_str) != Some("agentMessage") {
-                return None;
+            if item.get("type").and_then(Value::as_str) == Some("agentMessage") {
+                let id = item.get("id")?.as_str()?.to_string();
+                let phase = item
+                    .get("phase")
+                    .and_then(Value::as_str)
+                    .map(str::to_string);
+                let text = item
+                    .get("text")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default()
+                    .to_string();
+                return if method == "item/started" {
+                    Some(AgentEvent::MessageStarted { id, phase, text })
+                } else {
+                    Some(AgentEvent::MessageCompleted { id, phase, text })
+                };
             }
-            let id = item.get("id")?.as_str()?.to_string();
-            let phase = item
-                .get("phase")
-                .and_then(Value::as_str)
-                .map(str::to_string);
-            let text = item
-                .get("text")
-                .and_then(Value::as_str)
-                .unwrap_or_default()
-                .to_string();
+            let (id, kind, title, text) = codex_activity(item)?;
             if method == "item/started" {
-                Some(AgentEvent::MessageStarted { id, phase, text })
+                Some(AgentEvent::ActivityStarted {
+                    id,
+                    kind,
+                    title,
+                    text,
+                })
             } else {
-                Some(AgentEvent::MessageCompleted { id, phase, text })
+                Some(AgentEvent::ActivityCompleted {
+                    id,
+                    kind,
+                    title,
+                    text,
+                    status: codex_activity_status(item),
+                })
             }
         }
         "item/agentMessage/delta" => Some(AgentEvent::MessageDelta {
             id: params.get("itemId")?.as_str()?.to_string(),
             delta: params.get("delta")?.as_str()?.to_string(),
+        }),
+        "item/commandExecution/outputDelta"
+        | "item/fileChange/outputDelta"
+        | "item/mcpToolCall/progress"
+        | "item/dynamicToolCall/outputDelta" => Some(AgentEvent::ActivityDelta {
+            id: params.get("itemId")?.as_str()?.to_string(),
+            delta: bounded_activity_text(first_value_string(
+                params,
+                &["delta", "output", "message"],
+            )?),
         }),
         "turn/completed" => Some(AgentEvent::TurnCompleted {
             status: params
@@ -1861,6 +1887,157 @@ fn codex_agent_event(direction: AgentEventDirection, message: &Value) -> Option<
         }),
         _ => None,
     }
+}
+
+const MAX_NORMALIZED_ACTIVITY_TEXT_BYTES: usize = 16_000;
+const MAX_NORMALIZED_ACTIVITY_TITLE_BYTES: usize = 1_024;
+
+fn codex_activity(item: &Value) -> Option<(String, AgentActivityKind, String, String)> {
+    let id = item.get("id")?.as_str()?.to_string();
+    let item_type = item.get("type")?.as_str()?;
+    let kind = match item_type {
+        "commandExecution" => AgentActivityKind::Command,
+        "fileChange" => AgentActivityKind::FileChange,
+        "webSearch" => AgentActivityKind::WebSearch,
+        "mcpToolCall"
+        | "dynamicToolCall"
+        | "collabToolCall"
+        | "collabAgentToolCall"
+        | "imageView" => AgentActivityKind::Tool,
+        _ => return None,
+    };
+    let title = match item_type {
+        "commandExecution" => first_value_string(item, &["command"])
+            .unwrap_or("Run command")
+            .to_string(),
+        "fileChange" => {
+            let paths = item
+                .get("changes")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+                .filter_map(|change| first_value_string(change, &["path", "filePath"]))
+                .collect::<Vec<_>>();
+            if paths.is_empty() {
+                "Change files".to_string()
+            } else {
+                paths.join(", ")
+            }
+        }
+        "mcpToolCall" => {
+            let server = first_value_string(item, &["server", "serverName"]);
+            let tool = first_value_string(item, &["tool", "toolName"]);
+            match (server, tool) {
+                (Some(server), Some(tool)) => format!("{server}/{tool}"),
+                (Some(value), None) | (None, Some(value)) => value.to_string(),
+                (None, None) => "MCP tool".to_string(),
+            }
+        }
+        "webSearch" => first_value_string(item, &["query"])
+            .unwrap_or("Search the web")
+            .to_string(),
+        "imageView" => first_value_string(item, &["path"])
+            .unwrap_or("View image")
+            .to_string(),
+        _ => first_value_string(item, &["tool", "toolName", "title"])
+            .unwrap_or("Use tool")
+            .to_string(),
+    };
+    Some((
+        id,
+        kind,
+        bounded_activity_title(&title),
+        bounded_activity_text(&codex_activity_text(item)),
+    ))
+}
+
+fn codex_activity_text(item: &Value) -> String {
+    if let Some(value) = first_value_string(item, &["aggregatedOutput", "output", "message"]) {
+        return value.to_string();
+    }
+    if let Some(message) = item.pointer("/error/message").and_then(Value::as_str) {
+        return message.to_string();
+    }
+    for key in ["result", "results", "rawOutput", "contentItems"] {
+        if let Some(value) = item.get(key).filter(|value| !value.is_null()) {
+            return serde_json::to_string(value).unwrap_or_else(|_| value.to_string());
+        }
+    }
+    if item.get("type").and_then(Value::as_str) == Some("fileChange") {
+        if let Some(changes) = item.get("changes") {
+            return serde_json::to_string(changes).unwrap_or_else(|_| changes.to_string());
+        }
+    }
+    String::new()
+}
+
+fn codex_activity_status(item: &Value) -> AgentActivityStatus {
+    match item
+        .get("status")
+        .and_then(Value::as_str)
+        .map(str::to_ascii_lowercase)
+        .as_deref()
+    {
+        Some("cancelled" | "canceled" | "declined" | "denied" | "aborted" | "interrupted") => {
+            AgentActivityStatus::Cancelled
+        }
+        Some("failed" | "error") => AgentActivityStatus::Failed,
+        _ if item.get("success").and_then(Value::as_bool) == Some(false)
+            || item.get("error").is_some_and(|value| !value.is_null())
+            || item
+                .get("exitCode")
+                .and_then(Value::as_i64)
+                .is_some_and(|code| code != 0) =>
+        {
+            AgentActivityStatus::Failed
+        }
+        _ => AgentActivityStatus::Completed,
+    }
+}
+
+fn first_value_string<'a>(value: &'a Value, keys: &[&str]) -> Option<&'a str> {
+    keys.iter()
+        .find_map(|key| value.get(*key).and_then(Value::as_str))
+}
+
+fn bounded_activity_title(value: &str) -> String {
+    bounded_utf8_text(value, MAX_NORMALIZED_ACTIVITY_TITLE_BYTES, " … ")
+}
+
+fn bounded_activity_text(value: &str) -> String {
+    bounded_utf8_text(
+        value,
+        MAX_NORMALIZED_ACTIVITY_TEXT_BYTES,
+        "\n… output truncated …\n",
+    )
+}
+
+fn bounded_utf8_text(value: &str, byte_limit: usize, marker: &str) -> String {
+    if value.len() <= byte_limit {
+        return value.to_string();
+    }
+    let remaining = byte_limit.saturating_sub(marker.len());
+    let head_limit = remaining.div_ceil(2);
+    let tail_limit = remaining / 2;
+    let head_end = floor_char_boundary(value, head_limit);
+    let tail_start = ceil_char_boundary(value, value.len().saturating_sub(tail_limit));
+    format!("{}{}{}", &value[..head_end], marker, &value[tail_start..])
+}
+
+fn floor_char_boundary(value: &str, mut index: usize) -> usize {
+    index = index.min(value.len());
+    while index > 0 && !value.is_char_boundary(index) {
+        index -= 1;
+    }
+    index
+}
+
+fn ceil_char_boundary(value: &str, mut index: usize) -> usize {
+    index = index.min(value.len());
+    while index < value.len() && !value.is_char_boundary(index) {
+        index += 1;
+    }
+    index
 }
 
 fn approval_decision(method: &str, approved: bool) -> Option<Value> {
@@ -3022,6 +3199,64 @@ printf '%s\n' '{"method":"turn/completed","params":{"threadId":"thread-1","turn"
         )));
 
         fs::remove_dir_all(directory).expect("test directory should be removed");
+    }
+
+    #[test]
+    fn normalizes_app_server_activity_lifecycle() {
+        let started = json!({
+            "method": "item/started",
+            "params": {
+                "item": {
+                    "id": "command-1",
+                    "type": "commandExecution",
+                    "command": "bun test",
+                    "status": "inProgress"
+                }
+            }
+        });
+        assert!(matches!(
+            codex_agent_event(AgentEventDirection::Server, &started),
+            Some(AgentEvent::ActivityStarted {
+                id,
+                kind: AgentActivityKind::Command,
+                title,
+                text,
+            }) if id == "command-1" && title == "bun test" && text.is_empty()
+        ));
+
+        let delta = json!({
+            "method": "item/commandExecution/outputDelta",
+            "params": { "itemId": "command-1", "delta": "running\n" }
+        });
+        assert!(matches!(
+            codex_agent_event(AgentEventDirection::Server, &delta),
+            Some(AgentEvent::ActivityDelta { id, delta })
+                if id == "command-1" && delta == "running\n"
+        ));
+
+        let completed = json!({
+            "method": "item/completed",
+            "params": {
+                "item": {
+                    "id": "command-1",
+                    "type": "commandExecution",
+                    "command": "bun test",
+                    "status": "failed",
+                    "aggregatedOutput": "test failed",
+                    "exitCode": 1
+                }
+            }
+        });
+        assert!(matches!(
+            codex_agent_event(AgentEventDirection::Server, &completed),
+            Some(AgentEvent::ActivityCompleted {
+                id,
+                kind: AgentActivityKind::Command,
+                title,
+                text,
+                status: AgentActivityStatus::Failed,
+            }) if id == "command-1" && title == "bun test" && text == "test failed"
+        ));
     }
 
     #[test]

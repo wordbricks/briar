@@ -32,6 +32,26 @@ export type AutoHuntAgentEvent =
       delta: string;
     }
   | {
+      type: "activityStarted";
+      id: string;
+      kind: "command" | "fileChange" | "webSearch" | "tool";
+      title: string;
+      text: string;
+    }
+  | {
+      type: "activityDelta";
+      id: string;
+      delta: string;
+    }
+  | {
+      type: "activityCompleted";
+      id: string;
+      kind: "command" | "fileChange" | "webSearch" | "tool";
+      title: string;
+      text: string;
+      status: "completed" | "failed" | "cancelled";
+    }
+  | {
       type: "turnCompleted";
       status: string;
     };

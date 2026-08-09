@@ -153,6 +153,46 @@ function normalizedAgentEvent(
       delta: candidate.delta,
     };
   }
+  const normalizedActivityKind = activityKind(candidate.kind);
+  if (
+    (candidate.type === "activityStarted" ||
+      candidate.type === "activityCompleted") &&
+    typeof candidate.id === "string" &&
+    normalizedActivityKind &&
+    typeof candidate.title === "string" &&
+    typeof candidate.text === "string"
+  ) {
+    if (candidate.type === "activityStarted") {
+      return {
+        type: candidate.type,
+        id: `${sessionId}:${candidate.id}`,
+        kind: normalizedActivityKind,
+        title: candidate.title,
+        text: candidate.text,
+      };
+    }
+    const status = activityStatus(candidate.status);
+    if (!status) return undefined;
+    return {
+      type: candidate.type,
+      id: `${sessionId}:${candidate.id}`,
+      kind: normalizedActivityKind,
+      title: candidate.title,
+      text: candidate.text,
+      status,
+    };
+  }
+  if (
+    candidate.type === "activityDelta" &&
+    typeof candidate.id === "string" &&
+    typeof candidate.delta === "string"
+  ) {
+    return {
+      type: candidate.type,
+      id: `${sessionId}:${candidate.id}`,
+      delta: candidate.delta,
+    };
+  }
   if (
     candidate.type === "turnCompleted" &&
     typeof candidate.status === "string"
@@ -160,6 +200,25 @@ function normalizedAgentEvent(
     return { type: candidate.type, status: candidate.status };
   }
   return undefined;
+}
+
+function activityKind(
+  value: unknown,
+): "command" | "fileChange" | "webSearch" | "tool" | null {
+  return value === "command" ||
+      value === "fileChange" ||
+      value === "webSearch" ||
+      value === "tool"
+    ? value
+    : null;
+}
+
+function activityStatus(
+  value: unknown,
+): "completed" | "failed" | "cancelled" | null {
+  return value === "completed" || value === "failed" || value === "cancelled"
+    ? value
+    : null;
 }
 
 function record(value: unknown): Record<string, unknown> | null {

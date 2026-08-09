@@ -117,6 +117,47 @@ describe("project LLM gateway", () => {
           projectId: "project-1",
           provider: "codex",
           event: {
+            type: "activityStarted",
+            id: "command-1",
+            kind: "command",
+            title: "git status",
+            text: "",
+          },
+        },
+      });
+      progressHandler?.({
+        payload: {
+          requestId: invocation.request.progressId,
+          projectId: "project-1",
+          provider: "codex",
+          event: {
+            type: "activityDelta",
+            id: "command-1",
+            delta: "On branch main",
+          },
+        },
+      });
+      progressHandler?.({
+        payload: {
+          requestId: invocation.request.progressId,
+          projectId: "project-1",
+          provider: "codex",
+          event: {
+            type: "activityCompleted",
+            id: "command-1",
+            kind: "command",
+            title: "git status",
+            text: "On branch main",
+            status: "completed",
+          },
+        },
+      });
+      progressHandler?.({
+        payload: {
+          requestId: invocation.request.progressId,
+          projectId: "project-1",
+          provider: "codex",
+          event: {
             type: "messageStarted",
             id: "message-1",
             phase: "commentary",

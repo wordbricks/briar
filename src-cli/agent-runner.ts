@@ -681,9 +681,9 @@ export function detachedPayloadDirection(
 }
 
 /**
- * Provider runners already accumulate streaming message deltas and emit the
- * complete text in `messageCompleted`. Keep deltas ephemeral so one visible
- * message consumes one durable transcript event instead of hundreds.
+ * Provider runners already accumulate streaming deltas and emit the complete,
+ * bounded text in their completed event. Keep deltas ephemeral so one visible
+ * message or activity consumes one durable transcript event instead of hundreds.
  */
 export function shouldPersistDetachedTranscriptPayload(payload: unknown) {
   if (!payload || typeof payload !== "object") return true;
@@ -692,7 +692,7 @@ export function shouldPersistDetachedTranscriptPayload(payload: unknown) {
     record.type === "event" && record.event && typeof record.event === "object"
       ? (record.event as Record<string, unknown>)
       : record;
-  return event.type !== "messageDelta";
+  return event.type !== "messageDelta" && event.type !== "activityDelta";
 }
 
 export function createDetachedTranscriptSequencer(claimAttempt: number) {
@@ -724,10 +724,11 @@ export function detachedTranscriptPayload(payload: unknown, rawLine: string) {
     typeof original.event === "object"
   ) {
     return {
-      ...record,
       type: "event",
       ...(original.direction === "client" ? { direction: "client" } : {}),
-      event: original.event,
+      event: boundedNormalizedTranscriptEvent(
+        original.event as Record<string, unknown>,
+      ),
     };
   }
   if (record.type !== "session" || typeof record.sessionId !== "string") {
@@ -742,12 +743,50 @@ export function detachedTranscriptPayload(payload: unknown, rawLine: string) {
   };
 }
 
+function boundedNormalizedTranscriptEvent(
+  event: Record<string, unknown>,
+): Record<string, unknown> {
+  const bounded = { ...event };
+  const stringKeys = ["text", "title", "delta"] as const;
+  while (Buffer.byteLength(JSON.stringify(bounded), "utf8") > 24_000) {
+    const key = stringKeys
+      .filter((candidate) => typeof bounded[candidate] === "string")
+      .sort(
+        (left, right) =>
+          Buffer.byteLength(String(bounded[right]), "utf8") -
+          Buffer.byteLength(String(bounded[left]), "utf8"),
+      )[0];
+    if (!key) break;
+    const value = bounded[key] as string;
+    if (value.length <= 256) {
+      delete bounded[key];
+      continue;
+    }
+    const marker = "\n… truncated …\n";
+    const keep = Math.floor((value.length - marker.length) / 4);
+    bounded[key] = `${value.slice(0, keep)}${marker}${value.slice(-keep)}`;
+  }
+  return bounded;
+}
+
 export function boundedTranscriptPayload(payload: unknown, rawLine: string) {
   const serialized = JSON.stringify(payload);
   if (Buffer.byteLength(serialized, "utf8") <= 28_000) return payload;
   return {
     type: "truncated",
-    preview: rawLine.slice(0, 20_000),
+    preview: utf8Prefix(rawLine, 8_000),
     originalBytes: Buffer.byteLength(rawLine, "utf8"),
   };
+}
+
+function utf8Prefix(value: string, byteLimit: number): string {
+  let bytes = 0;
+  let output = "";
+  for (const character of value) {
+    const length = Buffer.byteLength(character, "utf8");
+    if (bytes + length > byteLimit) break;
+    output += character;
+    bytes += length;
+  }
+  return output;
 }

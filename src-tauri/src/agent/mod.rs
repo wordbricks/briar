@@ -81,6 +81,23 @@ pub(crate) enum AgentEventDirection {
     Server,
 }
 
+#[derive(Clone, Copy, Debug, serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) enum AgentActivityKind {
+    Command,
+    FileChange,
+    WebSearch,
+    Tool,
+}
+
+#[derive(Clone, Copy, Debug, serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) enum AgentActivityStatus {
+    Completed,
+    Failed,
+    Cancelled,
+}
+
 #[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub(crate) enum AgentEvent {
@@ -100,6 +117,23 @@ pub(crate) enum AgentEvent {
         id: String,
         phase: Option<String>,
         text: String,
+    },
+    ActivityStarted {
+        id: String,
+        kind: AgentActivityKind,
+        title: String,
+        text: String,
+    },
+    ActivityDelta {
+        id: String,
+        delta: String,
+    },
+    ActivityCompleted {
+        id: String,
+        kind: AgentActivityKind,
+        title: String,
+        text: String,
+        status: AgentActivityStatus,
     },
     TurnCompleted {
         status: String,
@@ -624,7 +658,10 @@ pub(crate) fn summarize_auto_hunt_dispatch(
 
 #[cfg(test)]
 mod tests {
-    use super::{AgentProviderKind, BundledRunnerFile, ProjectLlmRequest, BRIAR_SKILL_INSTRUCTION};
+    use super::{
+        AgentActivityKind, AgentActivityStatus, AgentEvent, AgentProviderKind, BundledRunnerFile,
+        ProjectLlmRequest, BRIAR_SKILL_INSTRUCTION,
+    };
     #[test]
     fn resolves_the_original_provider_from_a_project_conversation() {
         assert_eq!(
@@ -675,5 +712,29 @@ mod tests {
         let prepared = BundledRunnerFile::prepare(&bundle).expect("local runner file");
         assert_eq!(prepared.path(), bundle.to_string_lossy());
         assert!(bundle.is_file());
+    }
+
+    #[test]
+    fn deserializes_the_shared_activity_contract() {
+        let event: AgentEvent = serde_json::from_value(serde_json::json!({
+            "type": "activityCompleted",
+            "id": "tool-1",
+            "kind": "fileChange",
+            "title": "src/main.ts",
+            "text": "updated",
+            "status": "cancelled"
+        }))
+        .expect("activity event should deserialize");
+
+        assert!(matches!(
+            event,
+            AgentEvent::ActivityCompleted {
+                id,
+                kind: AgentActivityKind::FileChange,
+                title,
+                text,
+                status: AgentActivityStatus::Cancelled,
+            } if id == "tool-1" && title == "src/main.ts" && text == "updated"
+        ));
     }
 }

@@ -1,5 +1,17 @@
 import type { AgentAttachment } from "./runner-attachments";
+import {
+  normalizedActivityText,
+  normalizedActivityTitle,
+  type AgentActivityKind,
+  type NormalizedAgentEvent,
+} from "./normalized-agent-event";
 import { readAgentImage } from "./runner-attachments";
+
+export type {
+  AgentActivityKind,
+  AgentActivityStatus,
+  NormalizedAgentEvent,
+} from "./normalized-agent-event";
 
 /**
  * Grok CLI ACP client helpers.
@@ -31,34 +43,21 @@ export type GrokApprovalResponse = {
   approved: boolean;
 };
 
-export type NormalizedAgentEvent =
-  | {
-      type: "messageStarted";
-      id: string;
-      phase: string | null;
-      text: string;
-    }
-  | {
-      type: "messageDelta";
-      id: string;
-      delta: string;
-    }
-  | {
-      type: "messageCompleted";
-      id: string;
-      phase: string | null;
-      text: string;
-    }
-  | {
-      type: "turnCompleted";
-      status: string;
-    };
-
 export type GrokEventState = {
   activeMessageId: string | null;
   activeAssistantText: string;
   lastAssistantText: string;
   messageSequence: number;
+  activities: Map<
+    string,
+    {
+      kind: AgentActivityKind;
+      title: string;
+      text: string;
+      started: boolean;
+      completed: boolean;
+    }
+  >;
 };
 
 export type GrokRunnerOutput =
@@ -231,6 +230,7 @@ export function createGrokEventState(): GrokEventState {
     activeAssistantText: "",
     lastAssistantText: "",
     messageSequence: 0,
+    activities: new Map(),
   };
 }
 
@@ -255,7 +255,7 @@ function completeActiveGrokMessage(
 export function normalizeGrokSessionUpdate(
   params: unknown,
   state: GrokEventState,
-): { raw: unknown; event?: NormalizedAgentEvent } {
+): { raw: unknown; events: NormalizedAgentEvent[] } {
   const record =
     typeof params === "object" && params !== null
       ? (params as Record<string, unknown>)
@@ -276,7 +276,7 @@ export function normalizeGrokSessionUpdate(
       content?.type === "text" && typeof content.text === "string"
         ? content.text
         : "";
-    if (!text) return { raw: params };
+    if (!text) return { raw: params, events: [] };
 
     if (!state.activeMessageId) {
       state.messageSequence += 1;
@@ -287,34 +287,165 @@ export function normalizeGrokSessionUpdate(
       state.activeAssistantText = text;
       return {
         raw: params,
-        event: {
+        events: [{
           type: "messageStarted",
           id: state.activeMessageId,
           phase: "commentary",
           text,
-        },
+        }],
       };
     }
 
     state.activeAssistantText += text;
     return {
       raw: params,
-      event: {
+      events: [{
         type: "messageDelta",
         id: state.activeMessageId,
         delta: text,
-      },
+      }],
     };
   }
 
   if (kind === "tool_call" || kind === "tool_call_update") {
-    return {
-      raw: params,
-      event: completeActiveGrokMessage(state, "commentary"),
-    };
+    if (!update) return { raw: params, events: [] };
+    const events: NormalizedAgentEvent[] = [];
+    const completedMessage = completeActiveGrokMessage(state, "commentary");
+    if (completedMessage) events.push(completedMessage);
+    events.push(...normalizeGrokActivity(update, state));
+    return { raw: params, events };
   }
 
-  return { raw: params };
+  return { raw: params, events: [] };
+}
+
+function normalizeGrokActivity(
+  update: Record<string, unknown>,
+  state: GrokEventState,
+): NormalizedAgentEvent[] {
+  const id = typeof update.toolCallId === "string" ? update.toolCallId : null;
+  if (!id) return [];
+  const existing = state.activities.get(id);
+  const kind = grokActivityKind(
+    typeof update.kind === "string" ? update.kind : null,
+    existing?.kind,
+  );
+  const rawInput = asRecord(update.rawInput);
+  const title = normalizedActivityTitle(
+    (typeof update.title === "string" && update.title) ||
+      existing?.title ||
+      (kind === "command" && typeof rawInput?.command === "string"
+        ? rawInput.command
+        : "Use tool"),
+  );
+  const output = normalizedActivityText(
+    grokActivityOutput(update) ?? existing?.text ?? "",
+  );
+  const activity = {
+    kind,
+    title,
+    text: output,
+    started: existing?.started ?? false,
+    completed: existing?.completed ?? false,
+  };
+  const events: NormalizedAgentEvent[] = [];
+
+  if (!activity.started) {
+    activity.started = true;
+    events.push({
+      type: "activityStarted",
+      id,
+      kind,
+      title,
+      text: output,
+    });
+  } else if (
+    output &&
+    output !== existing?.text &&
+    output.startsWith(existing?.text ?? "")
+  ) {
+    events.push({
+      type: "activityDelta",
+      id,
+      delta: output.slice(existing?.text.length ?? 0),
+    });
+  }
+
+  const status = typeof update.status === "string"
+    ? update.status.toLowerCase()
+    : null;
+  const cancelled =
+    status === "cancelled" ||
+    status === "canceled" ||
+    status === "denied" ||
+    status === "aborted" ||
+    status === "interrupted";
+  if (
+    !activity.completed &&
+    (status === "completed" || status === "failed" || cancelled)
+  ) {
+    activity.completed = true;
+    events.push({
+      type: "activityCompleted",
+      id,
+      kind,
+      title,
+      text: output,
+      status: cancelled ? "cancelled" : status === "failed" ? "failed" : "completed",
+    });
+  }
+  state.activities.set(id, activity);
+  return events;
+}
+
+function grokActivityKind(
+  kind: string | null,
+  fallback: AgentActivityKind | undefined,
+): AgentActivityKind {
+  if (!kind) return fallback ?? "tool";
+  const normalized = kind.toLowerCase();
+  if (normalized === "execute") return "command";
+  if (
+    normalized === "edit" ||
+    normalized === "delete" ||
+    normalized === "move"
+  ) {
+    return "fileChange";
+  }
+  if (normalized === "fetch" || normalized === "search") return "webSearch";
+  return "tool";
+}
+
+function grokActivityOutput(update: Record<string, unknown>): string | null {
+  if (typeof update.rawOutput === "string") return update.rawOutput;
+  if (update.rawOutput != null) return jsonText(update.rawOutput);
+  if (!Array.isArray(update.content)) return null;
+  const text = update.content.flatMap((value) => activityContentText(value)).join("");
+  return text || null;
+}
+
+function activityContentText(value: unknown): string[] {
+  if (typeof value === "string") return [value];
+  const content = asRecord(value);
+  if (!content) return [];
+  if (typeof content.text === "string") return [content.text];
+  if (content.content !== undefined) return activityContentText(content.content);
+  if (typeof content.diff === "string") return [content.diff];
+  return [];
+}
+
+function jsonText(value: unknown): string {
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
 }
 
 export function finalizeGrokMessage(
