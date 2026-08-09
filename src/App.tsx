@@ -812,7 +812,7 @@ export function App() {
 
   const startProjectAgentTask = useCallback(async (
     agent: ProjectAgent,
-    input: { request: string; workerId: string },
+    input: { request: string; workerId: string; skillId?: string },
   ) => {
     if (!activeProject || !briar.token) {
       throw new Error("로그인이 필요합니다.");
@@ -824,6 +824,7 @@ export function App() {
         agentId: agent.id,
         request: input.request,
         workerId: input.workerId,
+        skillId: input.skillId,
       },
     );
     autoHunt.adoptRemoteSession(session);

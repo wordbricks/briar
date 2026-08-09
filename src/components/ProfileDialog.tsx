@@ -1,6 +1,9 @@
 import { AtSign, Bot, CalendarDays, Mail, ShieldCheck } from "lucide-react";
 import { useI18n } from "../i18n";
-import type { ChannelAgentProvider } from "../lib/channels-contract";
+import type {
+  ChannelAgentProvider,
+  ChannelAgentSkill,
+} from "../lib/channels-contract";
 import {
   Dialog,
   DialogContent,
@@ -28,6 +31,7 @@ export type ProfileTarget =
       provider: ChannelAgentProvider | null;
       model: string | null;
       responsibility: string | null;
+      skills: ChannelAgentSkill[];
       projectId: string | null;
       createdAt: string | null;
     };
@@ -59,6 +63,12 @@ export function ProfileDialog({
         day: "numeric",
       }).format(new Date(profile.createdAt))
     : null;
+  const agentRuntime =
+    profile?.type === "agent"
+      ? (profile.skills.find((skill) => skill.isDefault) ??
+        profile.skills[0] ??
+        profile)
+      : null;
 
   return (
     <Dialog open={profile !== null} onOpenChange={onOpenChange}>
@@ -105,14 +115,14 @@ export function ProfileDialog({
                 </dt>
                 <dd>{role}</dd>
               </div>
-              {profile.type === "agent" && profile.provider ? (
+              {profile.type === "agent" && agentRuntime?.provider ? (
                 <div>
                   <dt>
                     <Bot aria-hidden="true" size={16} /> {t("profile.provider")}
                   </dt>
                   <dd>
-                    {profile.provider}
-                    {profile.model ? ` · ${profile.model}` : ""}
+                    {agentRuntime.provider}
+                    {agentRuntime.model ? ` · ${agentRuntime.model}` : ""}
                   </dd>
                 </div>
               ) : null}
@@ -130,6 +140,19 @@ export function ProfileDialog({
               <section className="profile-dialog-responsibility">
                 <h3>{t("profile.responsibility")}</h3>
                 <p>{profile.responsibility}</p>
+              </section>
+            ) : null}
+            {profile.type === "agent" && profile.skills.length > 0 ? (
+              <section className="profile-dialog-responsibility profile-dialog-skills">
+                <h3>{t("agents.skills")}</h3>
+                <ul>
+                  {profile.skills.map((skill) => (
+                    <li key={skill.id}>
+                      <strong>{skill.name}</strong>
+                      {skill.instructions ? <span>{skill.instructions}</span> : null}
+                    </li>
+                  ))}
+                </ul>
               </section>
             ) : null}
           </>

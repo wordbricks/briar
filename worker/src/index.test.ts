@@ -7,6 +7,8 @@ import worker, {
   eventSchema,
   issueUpdateInputSchema,
   issueExecutionPreferencesSchema,
+  issueReplyExecutionConfig,
+  legacyAgentSkillInstructions,
   organizationLogoInputSchema,
   organizationInvitationInputSchema,
   organizationMemberRoleInputSchema,
@@ -32,6 +34,59 @@ import worker, {
 import { slackCreateIssueShortcutCallbackId } from "./slack";
 
 describe("Worker HTTP contract", () => {
+  it("uses execution settings only from sources matching the claimed reply provider", () => {
+    expect(
+      issueReplyExecutionConfig({
+        provider: "codex",
+        preferred: {
+          provider: "claude",
+          model: "claude-opus-4-1",
+          effort: "high",
+        },
+        requested: {
+          provider: "claude",
+          model: "claude-sonnet-4-0",
+          effort: "medium",
+        },
+        activeSkill: {
+          provider: "claude",
+          model: "claude-sonnet-4-0",
+          effort: "medium",
+        },
+        agent: {
+          provider: "codex",
+          model: "gpt-5.6-sol",
+          effort: "xhigh",
+        },
+      }),
+    ).toEqual({ model: "gpt-5.6-sol", effort: "xhigh" });
+    expect(
+      issueReplyExecutionConfig({
+        provider: "codex",
+        preferred: {
+          provider: "claude",
+          model: "claude-opus-4-1",
+          effort: "high",
+        },
+        requested: { provider: null, model: null, effort: null },
+        activeSkill: null,
+        agent: null,
+      }),
+    ).toEqual({ model: null, effort: null });
+  });
+
+  it("projects active Skill instructions through the legacy Agent field", () => {
+    expect(
+      legacyAgentSkillInstructions(
+        { instructions: "Perform the iOS release." },
+        "Legacy Agent instructions",
+      ),
+    ).toBe("Perform the iOS release.");
+    expect(
+      legacyAgentSkillInstructions(null, "Legacy Agent instructions"),
+    ).toBe("Legacy Agent instructions");
+  });
+
   it("classifies a malformed project workflow separately from checkpoint policy errors", () => {
     expect(() =>
       parseProjectSettingsInput({

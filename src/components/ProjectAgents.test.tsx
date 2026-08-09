@@ -5,7 +5,7 @@ import { createRoot } from "react-dom/client";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
 import { runProjectAgent } from "../lib/project-llm";
-import type { DashboardPayload } from "../types";
+import type { DashboardPayload, ProjectAgent } from "../types";
 import {
   CreateProjectAgentDialog,
   ProjectAgents,
@@ -19,6 +19,15 @@ vi.mock("../lib/project-llm", async (importOriginal) => {
   };
 });
 
+const { loadProjectAgents } = vi.hoisted(() => ({
+  loadProjectAgents: vi.fn(),
+}));
+
+vi.mock("../lib/api", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../lib/api")>()),
+  loadProjectAgents,
+}));
+
 const mounted: Array<{ container: HTMLDivElement; root: ReturnType<typeof createRoot> }> = [];
 
 beforeAll(() => {
@@ -30,6 +39,7 @@ beforeAll(() => {
 });
 
 afterEach(async () => {
+  loadProjectAgents.mockReset();
   while (mounted.length > 0) {
     const item = mounted.pop()!;
     await act(async () => item.root.unmount());
@@ -94,7 +104,8 @@ describe("ProjectAgents", () => {
     );
     await act(async () => Promise.resolve());
 
-    expect(container.textContent).toContain("이슈 처리 에이전트");
+    expect(container.textContent).toContain("개발자 에이전트");
+    expect(container.textContent).toContain("이슈 처리");
     expect(container.textContent).toContain("Sentry 오류 탐지 에이전트");
     expect(container.textContent).toContain("Feedback 분석 에이전트");
     expect(container.textContent).toContain(
@@ -104,7 +115,7 @@ describe("ProjectAgents", () => {
       ".project-agent-create-card",
     );
     expect(createCard?.textContent).toContain("에이전트 만들기");
-    expect(createCard?.textContent).toContain("책임과 프로바이더, 모델");
+    expect(createCard?.textContent).toContain("책임과 스킬");
 
     const providerIcons = [
       { provider: "codex", label: "Codex", element: "svg" },
@@ -120,6 +131,59 @@ describe("ProjectAgents", () => {
       expect(icon?.textContent).toBe("");
       expect(icon?.querySelector(element)).not.toBeNull();
     }
+  });
+
+  it("shows the default Skill runtime on an Agent card", async () => {
+    const runtimeAgent: ProjectAgent = {
+      id: "agent-runtime",
+      projectId: project.id,
+      name: "Release developer",
+      avatar: null,
+      codexPet: null,
+      provider: "codex",
+      model: "legacy-model",
+      effort: null,
+      responsibility: "릴리즈를 담당합니다.",
+      skill: "# Release developer",
+      skills: [
+        {
+          id: "skill-release",
+          agentId: "agent-runtime",
+          name: "Desktop release",
+          instructions: "데스크탑 앱을 릴리즈합니다.",
+          provider: "claude",
+          model: "runtime-model",
+          effort: "high",
+          kind: "custom",
+          isDefault: true,
+          position: 0,
+          createdAt: "2026-08-01T00:00:00.000Z",
+          updatedAt: "2026-08-01T00:00:00.000Z",
+        },
+      ],
+      calendarColor: "#3275d5",
+      createdAt: "2026-08-01T00:00:00.000Z",
+      updatedAt: "2026-08-01T00:00:00.000Z",
+    };
+    loadProjectAgents.mockResolvedValue([runtimeAgent]);
+
+    const container = await mount(
+      <ProjectAgents {...projectAgentsProps} token="token" />,
+    );
+    await act(async () => Promise.resolve());
+
+    const card = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Release developer 세부 정보 열기"]',
+    );
+    expect(
+      card?.querySelector(".project-agent-provider-icon.claude"),
+    ).not.toBeNull();
+    expect(card?.querySelector(".project-agent-runtime")?.textContent).toContain(
+      "runtime-model",
+    );
+    expect(card?.querySelector(".project-agent-runtime")?.textContent).not.toContain(
+      "legacy-model",
+    );
   });
 
   it("shows only the agent with an active session as running", async () => {
@@ -147,7 +211,7 @@ describe("ProjectAgents", () => {
 
     expect(
       container.querySelector<HTMLButtonElement>(
-        'button[aria-label="이슈 처리 에이전트 세부 정보 열기"]',
+        'button[aria-label="개발자 에이전트 세부 정보 열기"]',
       )?.textContent,
     ).toContain("실행 중");
     expect(
@@ -180,7 +244,7 @@ describe("ProjectAgents", () => {
     await act(async () => Promise.resolve());
 
     const runButton = container.querySelector<HTMLButtonElement>(
-      'button[aria-label="이슈 처리 에이전트 책임 실행"]',
+      'button[aria-label="개발자 에이전트 책임 실행"]',
     );
     expect(runButton).not.toBeNull();
 
@@ -259,7 +323,7 @@ describe("ProjectAgents", () => {
     await act(async () => {
       container
         .querySelector<HTMLButtonElement>(
-          'button[aria-label="이슈 처리 에이전트 책임 실행"]',
+          'button[aria-label="개발자 에이전트 책임 실행"]',
         )
         ?.click();
       await Promise.resolve();
@@ -279,6 +343,7 @@ describe("ProjectAgents", () => {
       expect.objectContaining({ id: "demo-agent-auto-hunt" }),
       {
         request: "대기 중인 모든 이슈를 처리합니다.",
+        skillId: "demo-skill-issue-processing",
         workerId: "worker-1",
       },
     );
@@ -347,7 +412,7 @@ describe("ProjectAgents", () => {
     await act(async () => Promise.resolve());
 
     const settingsButton = container.querySelector<HTMLButtonElement>(
-      'button[aria-label="이슈 처리 에이전트 설정"]',
+      'button[aria-label="개발자 에이전트 설정"]',
     );
     expect(settingsButton).not.toBeNull();
     expect(settingsButton?.textContent).toBe("");
@@ -363,7 +428,7 @@ describe("ProjectAgents", () => {
     const responsibility = form?.querySelector<HTMLTextAreaElement>("textarea");
     expect(settingsPage?.textContent).toContain("에이전트 설정");
     expect(settingsPage?.textContent).not.toContain("프로젝트 실행 기본값");
-    expect(name?.value).toBe("이슈 처리 에이전트");
+    expect(name?.value).toBe("개발자 에이전트");
     expect(responsibility?.value).toBe(
       "대기 중인 모든 이슈를 처리합니다.",
     );
@@ -412,7 +477,7 @@ describe("ProjectAgents", () => {
     await act(async () => {
       container
         .querySelector<HTMLButtonElement>(
-          'button[aria-label="이슈 처리 에이전트 설정"]',
+          'button[aria-label="개발자 에이전트 설정"]',
         )
         ?.click();
     });
@@ -422,7 +487,7 @@ describe("ProjectAgents", () => {
         ?.click();
     });
     expect(document.body.textContent).toContain(
-      "‘이슈 처리 에이전트’ 에이전트를 삭제할까요?",
+      "‘개발자 에이전트’ 에이전트를 삭제할까요?",
     );
 
     await act(async () => {
@@ -435,7 +500,7 @@ describe("ProjectAgents", () => {
     expect(container.querySelector("#project-agents")).not.toBeNull();
     expect(
       container.querySelector(
-        'button[aria-label="이슈 처리 에이전트 설정"]',
+        'button[aria-label="개발자 에이전트 설정"]',
       ),
     ).toBeNull();
   });
@@ -504,7 +569,7 @@ describe("ProjectAgents", () => {
     await act(async () => {
       container
         .querySelector<HTMLButtonElement>(
-          'button[aria-label="이슈 처리 에이전트 세부 정보 열기"]',
+          'button[aria-label="개발자 에이전트 세부 정보 열기"]',
         )
         ?.click();
     });

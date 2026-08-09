@@ -67,6 +67,130 @@ describe("D1 migrations", () => {
     );
   });
 
+  it("migrates every localized default Agent to a Developer Agent with an issue Skill", async () => {
+    const miniflare = new Miniflare({
+      modules: true,
+      script: "export default { fetch() { return new Response('ok') } }",
+      d1Databases: { DB: "briar-agent-skills-locale-migration-test" },
+    });
+    try {
+      const db = (await miniflare.getD1Database("DB")) as unknown as D1Database;
+      await db.prepare(
+        `create table briar_project_agents (
+           id text primary key not null,
+           name text not null,
+           responsibility text not null,
+           provider text not null,
+           model text,
+           effort text,
+           skill_markdown text not null,
+           created_at text not null,
+           updated_at text not null
+         )`,
+      ).run();
+      const rows = [
+        ["en", "Issue processing agent", "Process every queued issue."],
+        ["ko", "이슈 처리 에이전트", "대기 중인 모든 이슈를 처리합니다."],
+        [
+          "ko-legacy",
+          "자동 사냥 에이전트",
+          "모든 대기중인 이슈에 대해서 자동사냥을 수행하는것",
+        ],
+        ["zh", "问题处理智能体", "处理所有排队中的问题。"],
+        ["zh-legacy", "自动狩猎智能体", "对所有排队中的问题执行自动狩猎。"],
+        ["custom", "iOS release agent", "Release the iOS app."],
+      ] as const;
+      for (const [id, name, responsibility] of rows) {
+        await db.prepare(
+          `insert into briar_project_agents (
+             id, name, responsibility, provider, model, effort,
+             skill_markdown, created_at, updated_at
+           ) values (?, ?, ?, 'codex', null, null, ?, ?, ?)`,
+        ).bind(
+          id,
+          name,
+          responsibility,
+          `# ${name}\n\n## Responsibility\n\n${responsibility}\n`,
+          "2026-08-01T00:00:00.000Z",
+          "2026-08-01T00:00:00.000Z",
+        ).run();
+      }
+
+      const sql = await readFile(
+        resolve("migrations", "0079_agent_skills.sql"),
+        "utf8",
+      );
+      for (const statement of unstable_splitSqlQuery(sql)) {
+        await db.prepare(statement).run();
+      }
+
+      const result = await db.prepare(
+        `select agent.id, agent.name as agent_name, agent.responsibility,
+                agent.skill_markdown, skill.name as skill_name, skill.kind
+         from briar_project_agents agent
+         join briar_agent_skills skill on skill.agent_id = agent.id
+         order by agent.id`,
+      ).all<{
+        id: string;
+        agent_name: string;
+        responsibility: string;
+        skill_markdown: string;
+        skill_name: string;
+        kind: string;
+      }>();
+      expect(result.results).toEqual([
+        expect.objectContaining({
+          id: "custom",
+          agent_name: "iOS release agent",
+          skill_name: "iOS release agent",
+          kind: "custom",
+        }),
+        expect.objectContaining({
+          id: "en",
+          agent_name: "Developer agent",
+          responsibility: "Process every queued issue.",
+          skill_markdown: expect.stringContaining("# Developer agent\n"),
+          skill_name: "Issue processing",
+          kind: "issue_processing",
+        }),
+        expect.objectContaining({
+          id: "ko",
+          agent_name: "개발자 에이전트",
+          responsibility: "대기 중인 모든 이슈를 처리합니다.",
+          skill_markdown: expect.stringContaining("# 개발자 에이전트\n"),
+          skill_name: "이슈 처리",
+          kind: "issue_processing",
+        }),
+        expect.objectContaining({
+          id: "ko-legacy",
+          agent_name: "개발자 에이전트",
+          responsibility: "모든 대기중인 이슈에 대해서 자동사냥을 수행하는것",
+          skill_markdown: expect.stringContaining("# 개발자 에이전트\n"),
+          skill_name: "이슈 처리",
+          kind: "issue_processing",
+        }),
+        expect.objectContaining({
+          id: "zh",
+          agent_name: "开发者智能体",
+          responsibility: "处理所有排队中的问题。",
+          skill_markdown: expect.stringContaining("# 开发者智能体\n"),
+          skill_name: "问题处理",
+          kind: "issue_processing",
+        }),
+        expect.objectContaining({
+          id: "zh-legacy",
+          agent_name: "开发者智能体",
+          responsibility: "对所有排队中的问题执行自动狩猎。",
+          skill_markdown: expect.stringContaining("# 开发者智能体\n"),
+          skill_name: "问题处理",
+          kind: "issue_processing",
+        }),
+      ]);
+    } finally {
+      await miniflare.dispose();
+    }
+  });
+
   it("adds workflow v2 progress without rewriting stored snapshots", async () => {
     const sql = await readFile(
       resolve("migrations", "0059_workflow_v2_progress.sql"),

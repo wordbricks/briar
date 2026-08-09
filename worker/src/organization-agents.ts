@@ -3,6 +3,18 @@ import {
   type ChannelAgentProvider as AgentProvider,
   type ChannelAgentSummary,
 } from "../../src/lib/channels-contract";
+import {
+  assertAgentSkillReplacementAllowed,
+  agentSkillJson,
+  hydrateAgentSkills,
+  insertAgentSkillStatement,
+  normalizedAgentSkillRows,
+  replaceAgentSkillStatements,
+  updateDefaultAgentSkillFromLegacyStatement,
+  type AgentSkillEffort,
+  type AgentSkillInput,
+  type AgentSkillRow,
+} from "./agent-skills";
 
 export type OrganizationAgentRow = {
   id: string;
@@ -13,27 +25,31 @@ export type OrganizationAgentRow = {
   provider: AgentProvider;
   model: string | null;
   responsibility: string;
-  effort: string | null;
+  skill_markdown?: string;
+  effort: AgentSkillEffort | null;
   created_at: string;
   updated_at: string;
+  skills?: AgentSkillRow[];
 };
 
 export const organizationAgentJson = (
   row: OrganizationAgentRow,
-): ChannelAgentSummary => ({
+): ChannelAgentSummary & { skills: ReturnType<typeof agentSkillJson>[] } => ({
   agentId: row.id,
   handle: row.handle,
   name: row.name,
   provider: row.provider,
   model: row.model,
+  effort: row.effort,
   projectId: row.project_id,
   responsibility: row.responsibility,
+  skills: (row.skills ?? []).map(agentSkillJson),
   createdAt: row.created_at,
 });
 
 const agentSelect = `
   select id, organization_id, project_id, handle, name, provider, model,
-         responsibility, effort, created_at, updated_at
+         responsibility, skill_markdown, effort, created_at, updated_at
   from briar_project_agents`;
 
 /**
@@ -96,7 +112,7 @@ export async function listOrganizationAgents(
             )
             .bind(organizationId, options.projectId)
             .all<OrganizationAgentRow>();
-  return rows.results;
+  return hydrateAgentSkills(db, rows.results);
 }
 
 export async function getOrganizationAgent(
@@ -104,10 +120,12 @@ export async function getOrganizationAgent(
   organizationId: string,
   agentId: string,
 ) {
-  return db
+  const agent = await db
     .prepare(`${agentSelect} where organization_id = ? and id = ?`)
     .bind(organizationId, agentId)
     .first<OrganizationAgentRow>();
+  if (!agent) return null;
+  return (await hydrateAgentSkills(db, [agent]))[0];
 }
 
 export async function createOrganizationAgent(
@@ -120,7 +138,8 @@ export async function createOrganizationAgent(
     provider: AgentProvider;
     model: string | null;
     responsibility: string;
-    effort: string | null;
+    effort: AgentSkillEffort | null;
+    skills?: AgentSkillInput[];
     createdAt: string;
   },
 ) {
@@ -130,14 +149,26 @@ export async function createOrganizationAgent(
     input.handle ?? input.name,
     input.id,
   );
-  await db
-    .prepare(
+  const skillRows = normalizedAgentSkillRows(
+    input.id,
+    input.skills,
+    {
+      name: input.name,
+      instructions: input.responsibility,
+      provider: input.provider,
+      model: input.model,
+      effort: input.effort,
+      kind: "custom",
+    },
+    input.createdAt,
+  );
+  await db.batch([
+    db.prepare(
       `insert into briar_project_agents (
          id, organization_id, project_id, handle, name, provider, model,
          responsibility, effort, created_at, updated_at
        ) values (?, ?, null, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    )
-    .bind(
+    ).bind(
       input.id,
       input.organizationId,
       handle,
@@ -148,8 +179,9 @@ export async function createOrganizationAgent(
       input.effort,
       input.createdAt,
       input.createdAt,
-    )
-    .run();
+    ),
+    ...skillRows.map((skill) => insertAgentSkillStatement(db, skill)),
+  ]);
   return getOrganizationAgent(db, input.organizationId, input.id);
 }
 
@@ -163,7 +195,8 @@ export async function updateOrganizationAgent(
     provider: AgentProvider;
     model: string | null;
     responsibility: string;
-    effort: string | null;
+    effort: AgentSkillEffort | null;
+    skills?: AgentSkillInput[];
     updatedAt: string;
   },
 ) {
@@ -183,14 +216,12 @@ export async function updateOrganizationAgent(
           desired,
           input.agentId,
         );
-  await db
-    .prepare(
+  const updateStatement = db.prepare(
       `update briar_project_agents
        set handle = ?, name = ?, provider = ?, model = ?, responsibility = ?,
            effort = ?, updated_at = ?
        where id = ? and organization_id = ? and project_id is null`,
-    )
-    .bind(
+    ).bind(
       handle,
       input.name,
       input.provider,
@@ -200,8 +231,43 @@ export async function updateOrganizationAgent(
       input.updatedAt,
       input.agentId,
       input.organizationId,
-    )
-    .run();
+    );
+  const statements: D1PreparedStatement[] = [updateStatement];
+  if (input.skills !== undefined) {
+    const skillRows = normalizedAgentSkillRows(
+      input.agentId,
+      input.skills,
+      {
+        name: input.name,
+        instructions: input.responsibility,
+        provider: input.provider,
+        model: input.model,
+        effort: input.effort,
+        kind: "custom",
+      },
+      input.updatedAt,
+    );
+    await assertAgentSkillReplacementAllowed(
+      db,
+      input.agentId,
+      skillRows.map((skill) => skill.id),
+    );
+    statements.push(
+      ...replaceAgentSkillStatements(db, input.agentId, skillRows),
+    );
+  } else {
+    statements.push(
+      updateDefaultAgentSkillFromLegacyStatement(db, {
+        agentId: input.agentId,
+        instructions: input.responsibility,
+        provider: input.provider,
+        model: input.model,
+        effort: input.effort,
+        updatedAt: input.updatedAt,
+      }),
+    );
+  }
+  await db.batch(statements);
   return getOrganizationAgent(db, input.organizationId, input.agentId);
 }
 

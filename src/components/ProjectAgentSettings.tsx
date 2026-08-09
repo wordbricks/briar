@@ -27,6 +27,11 @@ import type { Project, ProjectAgent, UpdateProjectAgentInput } from "../types";
 import { CodexPetAttribution, CodexPetPicker } from "./CodexPetPicker";
 import { NativeSelect } from "./NativeSelect";
 import {
+  ProjectAgentSkillsEditor,
+  projectAgentSkillInputs,
+  projectAgentSkillsValid,
+} from "./ProjectAgentSkillsEditor";
+import {
   ErrorBanner,
   MainContent,
   PageHeader,
@@ -78,6 +83,9 @@ export function ProjectAgentSettings({
   const [effort, setEffort] = useState<ModelEffort | null>(agent.effort);
   const [responsibility, setResponsibility] = useState(agent.responsibility);
   const [calendarColor, setCalendarColor] = useState(agent.calendarColor);
+  const [skills, setSkills] = useState(() =>
+    projectAgentSkillInputs(agent.skills),
+  );
   const [savedProfile, setSavedProfile] = useState({
     name: agent.name,
     avatar: agent.avatar,
@@ -86,6 +94,7 @@ export function ProjectAgentSettings({
     model: agent.model ?? "",
     effort: agent.effort,
     responsibility: agent.responsibility,
+    skills: projectAgentSkillInputs(agent.skills),
     calendarColor: agent.calendarColor,
   });
   const [profileSaving, setProfileSaving] = useState(false);
@@ -103,13 +112,18 @@ export function ProjectAgentSettings({
     model !== savedProfile.model ||
     effort !== savedProfile.effort ||
     responsibility !== savedProfile.responsibility ||
+    JSON.stringify(skills) !== JSON.stringify(savedProfile.skills) ||
     calendarColor !== savedProfile.calendarColor;
   const selectedModelKnown = agentModels[provider].some(
     (option) => option.value === model,
   );
 
   const saveProfile = async () => {
-    if (!responsibility.trim() || profileSaving) return;
+    if (
+      !responsibility.trim() ||
+      !projectAgentSkillsValid(skills) ||
+      profileSaving
+    ) return;
     setProfileSaving(true);
     setProfileError(null);
     try {
@@ -121,6 +135,7 @@ export function ProjectAgentSettings({
         model: model || null,
         effort,
         responsibility: responsibility.trim(),
+        skills: projectAgentSkillInputs(skills),
         calendarColor,
       });
       const nextProfile = {
@@ -131,6 +146,7 @@ export function ProjectAgentSettings({
         model: saved.model ?? "",
         effort: saved.effort,
         responsibility: saved.responsibility,
+        skills: projectAgentSkillInputs(saved.skills),
         calendarColor: saved.calendarColor,
       };
       setName(nextProfile.name);
@@ -140,6 +156,7 @@ export function ProjectAgentSettings({
       setModel(nextProfile.model);
       setEffort(nextProfile.effort);
       setResponsibility(nextProfile.responsibility);
+      setSkills(nextProfile.skills);
       setCalendarColor(nextProfile.calendarColor);
       setSavedProfile(nextProfile);
     } catch (caught) {
@@ -173,7 +190,10 @@ export function ProjectAgentSettings({
           <Button
             className="project-agent-create project-agent-settings-save"
             disabled={
-              profileSaving || !responsibility.trim() || !profileChanged
+              profileSaving ||
+              !responsibility.trim() ||
+              !profileChanged ||
+              !projectAgentSkillsValid(skills)
             }
             onClick={() => void saveProfile()}
             type="button"
@@ -462,13 +482,24 @@ export function ProjectAgentSettings({
                     {t("agents.calendarColorHint")}
                   </Typography>
                 </div>
+                <ProjectAgentSkillsEditor
+                  defaultEffort={effort}
+                  defaultModel={model || null}
+                  defaultProvider={provider}
+                  disabled={profileSaving}
+                  onChange={setSkills}
+                  skills={skills}
+                />
               </div>
 
               <footer>
                 <Button
                   className="project-agent-settings-save"
                   disabled={
-                    profileSaving || !responsibility.trim() || !profileChanged
+                    profileSaving ||
+                    !responsibility.trim() ||
+                    !projectAgentSkillsValid(skills) ||
+                    !profileChanged
                   }
                   type="submit"
                 >

@@ -41,6 +41,7 @@ export function ChannelMessageText({
         provider: agent.provider,
         model: agent.model,
         responsibility: agent.responsibility,
+        skills: agent.skills,
         projectId: agent.projectId,
         createdAt: agent.createdAt,
       });

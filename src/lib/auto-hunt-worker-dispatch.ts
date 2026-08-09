@@ -31,7 +31,8 @@ export class NoQueuedAutoHuntIssuesError extends Error {
 export async function dispatchAutoHuntToWorkers(
   dependencies: AutoHuntWorkerDispatchDependencies,
   input: {
-    agent: Pick<ProjectAgent, "id" | "provider" | "model" | "effort">;
+    agent: Pick<ProjectAgent, "id" | "provider" | "model" | "effort"> &
+      Partial<Pick<ProjectAgent, "skills">>;
     runs: HuntRun[];
     maxIssues?: number;
     targetRunIds?: string[];
@@ -72,11 +73,20 @@ export async function dispatchAutoHuntToWorkers(
     throw new NoQueuedAutoHuntIssuesError();
   }
 
+  const issueSkill =
+    input.agent.skills?.find((skill) => skill.kind === "issue_processing") ??
+    input.agent.skills?.find((skill) => skill.isDefault) ??
+    input.agent.skills?.[0] ??
+    null;
+  const agentProvider = issueSkill?.provider ?? input.agent.provider;
+  const agentModel = issueSkill ? issueSkill.model : input.agent.model;
+  const agentEffort = issueSkill ? issueSkill.effort : input.agent.effort;
+
   for (const run of candidates) {
-    const provider = run.preferredProvider ?? input.agent.provider;
+    const provider = run.preferredProvider ?? agentProvider;
     const model =
       run.preferredModel ??
-      (run.preferredProvider ? null : (input.agent.model ?? null));
+      (run.preferredProvider ? null : (agentModel ?? null));
     await dependencies.dispatch(run, {
       agentId: input.agent.id,
       provider,
@@ -85,7 +95,7 @@ export async function dispatchAutoHuntToWorkers(
         ? (run.preferredEffort ?? null)
         : (run.preferredProvider
             ? null
-            : (input.agent.effort ?? null)),
+            : (agentEffort ?? null)),
       workerId: null,
       reassign: Boolean(run.dispatchedAt || run.workerId),
     });

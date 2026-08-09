@@ -31,6 +31,7 @@ const run: ClaimedProjectAgentScheduleRun = {
     effort: null,
     responsibility: "Audit the connected repository.",
     skill: "# Auditor\n\nAudit the connected repository.",
+    skills: [],
   },
   workflow: repositoryWorkflowBootstrap,
   status: "running",

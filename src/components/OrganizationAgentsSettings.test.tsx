@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const listOrganizationAgents = vi.fn();
 const createOrganizationAgent = vi.fn();
+const updateOrganizationAgent = vi.fn();
 const deleteOrganizationAgent = vi.fn();
 
 vi.mock("../lib/api", () => ({
@@ -13,6 +14,8 @@ vi.mock("../lib/api", () => ({
     listOrganizationAgents(...args),
   createOrganizationAgent: (...args: unknown[]) =>
     createOrganizationAgent(...args),
+  updateOrganizationAgent: (...args: unknown[]) =>
+    updateOrganizationAgent(...args),
   deleteOrganizationAgent: (...args: unknown[]) =>
     deleteOrganizationAgent(...args),
 }));
@@ -27,8 +30,25 @@ const organizationAgent = {
   name: "Honey",
   provider: "codex" as const,
   model: null,
+  effort: null,
   projectId: null,
   responsibility: "채널에서 제품 기획을 돕습니다.",
+  skills: [
+    {
+      id: "00000000-0000-4000-8000-000000000011",
+      agentId: "agent-1",
+      name: "Product planning",
+      instructions: "제품 기획 질문에 답합니다.",
+      provider: "codex" as const,
+      model: null,
+      effort: null,
+      kind: "custom" as const,
+      isDefault: true,
+      position: 0,
+      createdAt: "2026-08-07T00:00:00.000Z",
+      updatedAt: "2026-08-07T00:00:00.000Z",
+    },
+  ],
   createdAt: "2026-08-07T00:00:00.000Z",
 };
 
@@ -63,6 +83,7 @@ describe("OrganizationAgentsSettings", () => {
       canManage: true,
     });
     createOrganizationAgent.mockResolvedValue({ agent: organizationAgent });
+    updateOrganizationAgent.mockResolvedValue({ agent: organizationAgent });
     deleteOrganizationAgent.mockResolvedValue({ deleted: true });
     container = document.createElement("div");
     document.body.append(container);
@@ -99,6 +120,84 @@ describe("OrganizationAgentsSettings", () => {
     expect(container.textContent).toContain("@honey");
     expect(container.textContent).not.toContain("Builder");
     expect(container.textContent).not.toContain("스케줄");
+  });
+
+  it("shows the default Skill runtime on an organization Agent card", async () => {
+    listOrganizationAgents.mockResolvedValue({
+      agents: [
+        {
+          ...organizationAgent,
+          skills: [
+            {
+              ...organizationAgent.skills[0],
+              provider: "claude",
+              model: "sonnet",
+            },
+          ],
+        },
+      ],
+      canManage: true,
+    });
+    await render();
+
+    expect(container.textContent).toContain("Claude · sonnet");
+  });
+
+  it("saves per-Skill runtime settings for an organization Agent", async () => {
+    await render();
+
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>('button[aria-label="Honey · 스킬"]')!
+        .click();
+    });
+    await act(async () => {
+      Array.from(document.querySelectorAll<HTMLButtonElement>("button"))
+        .find((button) => button.textContent?.trim() === "저장")!
+        .click();
+    });
+
+    expect(updateOrganizationAgent).toHaveBeenCalledWith(
+      "token",
+      "organization-1",
+      "agent-1",
+      expect.objectContaining({
+        responsibility: organizationAgent.responsibility,
+        skills: [
+          expect.objectContaining({
+            id: "00000000-0000-4000-8000-000000000011",
+            name: "Product planning",
+            provider: "codex",
+            isDefault: true,
+          }),
+        ],
+      }),
+    );
+  });
+
+  it("shows Skill save failures inside the edit dialog", async () => {
+    updateOrganizationAgent.mockRejectedValue(
+      new Error("스킬 저장에 실패했습니다."),
+    );
+    await render();
+
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>('button[aria-label="Honey · 스킬"]')!
+        .click();
+    });
+    await act(async () => {
+      Array.from(document.querySelectorAll<HTMLButtonElement>("button"))
+        .find((button) => button.textContent?.trim() === "저장")!
+        .click();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(
+      document.querySelector<HTMLElement>('[role="dialog"] [role="alert"]')
+        ?.textContent,
+    ).toContain("스킬 저장에 실패했습니다.");
   });
 
   it("auto-generates an editable handle and creates an agent", async () => {

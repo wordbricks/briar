@@ -9,6 +9,7 @@ import {
   mapEffortToOpenCode,
   normalizeOpenCodeEvent,
   openCodeBlockedRetry,
+  openCodeSystemPrompt,
   openCodeTransientOverload,
   parseOpenCodeModel,
   parseOpenCodeServerUrl,
@@ -154,12 +155,13 @@ describe("OpenCode runner helpers", () => {
     ).toBeNull();
   });
 
-  it("combines instructions, schemas, and the user prompt", () => {
-    expect(
-      buildOpenCodePrompt(
-        request({ instructions: "Be concise", outputSchema: { type: "object" } }),
-      ),
-    ).toContain("Additional instructions for this turn:\nBe concise");
+  it("separates trusted system instructions from the user prompt", () => {
+    const input = request({
+      instructions: "Be concise",
+      outputSchema: { type: "object" },
+    });
+    expect(openCodeSystemPrompt(input)).toBe("Be concise");
+    expect(buildOpenCodePrompt(input)).not.toContain("Be concise");
     expect(buildOpenCodePrompt(request({ outputSchema: { type: "object" } }))).toContain(
       '"type":"object"',
     );

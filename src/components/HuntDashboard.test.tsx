@@ -58,6 +58,7 @@ const dashboardAgent: ProjectAgent = {
   effort: null,
   responsibility: "Process issues",
   skill: "# Agent",
+  skills: [],
   calendarColor: "#3275d5",
   createdAt: "2026-07-29T00:00:00.000Z",
   updatedAt: "2026-07-29T00:00:00.000Z",

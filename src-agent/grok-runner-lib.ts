@@ -175,15 +175,15 @@ export type GrokPromptPart =
   | { type: "text"; text: string }
   | { type: "image"; data: string; mimeType: string };
 
+export function grokSessionMeta(
+  request: GrokRunnerRequest,
+): { rules: string } | undefined {
+  const instructions = request.instructions?.trim();
+  return instructions ? { rules: instructions } : undefined;
+}
+
 export function buildPromptParts(request: GrokRunnerRequest): GrokPromptPart[] {
   const parts: GrokPromptPart[] = [];
-  const instructions = request.instructions?.trim();
-  if (instructions) {
-    parts.push({
-      type: "text",
-      text: `Additional instructions for this turn:\n${instructions}`,
-    });
-  }
   if (
     request.outputSchema !== null &&
     request.outputSchema !== undefined

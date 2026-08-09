@@ -27,6 +27,8 @@ const agent: ChannelAgentSummary = {
   name: "Honey",
   provider: "claude",
   model: "sonnet",
+  effort: null,
+  skills: [],
   projectId: null,
   responsibility: "Writing partner",
   createdAt: "2026-08-01T00:00:00.000Z",
@@ -116,6 +118,22 @@ describe("ChannelMessageText", () => {
               provider: agent.provider,
               model: agent.model,
               responsibility: agent.responsibility,
+              skills: [
+                {
+                  id: "skill-1",
+                  agentId: agent.agentId,
+                  name: "Issue processing",
+                  instructions: "Process queued issues.",
+                  provider: "codex",
+                  model: "gpt-5.6-sol",
+                  effort: "high",
+                  kind: "issue_processing",
+                  isDefault: true,
+                  position: 0,
+                  createdAt: agent.createdAt,
+                  updatedAt: agent.createdAt,
+                },
+              ],
               projectId: agent.projectId,
               createdAt: agent.createdAt,
             }}
@@ -129,6 +147,7 @@ describe("ChannelMessageText", () => {
     );
     expect(profile?.textContent).toContain("Honey");
     expect(profile?.textContent).toContain("Writing partner");
-    expect(profile?.textContent).toContain("claude · sonnet");
+    expect(profile?.textContent).toContain("codex · gpt-5.6-sol");
+    expect(profile?.textContent).not.toContain("claude · sonnet");
   });
 });

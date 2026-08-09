@@ -2,10 +2,13 @@ import { describe, expect, it } from "vitest";
 import {
   boundedTranscriptPayload,
   createDetachedTranscriptSequencer,
+  detachedAgentContext,
   detachedAgentPrompt,
+  detachedChannelReplyPrompt,
   detachedConversationIdFromPayload,
   detachedPayloadDirection,
   detachedIssueReplyPrompt,
+  detachedProjectAgentPrompt,
   detachedProviderRequest,
   detachedProviderBlockedRunEvent,
   detachedProviderBlockFromPayload,
@@ -26,6 +29,30 @@ const agent = {
   effort: "high" as const,
   responsibility: "Ship the assigned issue.",
   skill: "# Release Agent",
+  skills: [
+    {
+      id: "skill-issue",
+      name: "Issue handling",
+      instructions: "Investigate, implement, and verify an assigned issue.",
+      provider: "codex" as const,
+      model: "gpt-5",
+      effort: "high" as const,
+      kind: "issue_processing" as const,
+      isDefault: true,
+      position: 0,
+    },
+    {
+      id: "skill-desktop",
+      name: "Desktop release",
+      instructions: "Prepare and validate the desktop release.",
+      provider: "claude" as const,
+      model: "claude-sonnet",
+      effort: "medium" as const,
+      kind: "custom" as const,
+      isDefault: false,
+      position: 1,
+    },
+  ],
 };
 
 describe("detached Agent runner", () => {
@@ -199,6 +226,85 @@ describe("detached Agent runner", () => {
     });
   });
 
+  it("adds trusted identity, responsibility, and every skill to provider instructions", () => {
+    const configuredAgent = {
+      ...agent,
+      activeSkill: agent.skills[0],
+    };
+    const prompts = [
+      detachedAgentPrompt({
+        agent: configuredAgent,
+        snapshot: { sourceKey: "BRIAR-42", title: "Handle issue" },
+        workspacePath: "/worktree",
+      }),
+      detachedProjectAgentPrompt({
+        agent: configuredAgent,
+        request: "Run a release readiness check.",
+        workspacePath: "/repository",
+      }),
+      detachedIssueReplyPrompt({
+        agent: configuredAgent,
+        snapshot: { messages: [] },
+        userMessage: "What can you handle?",
+        workspaceAvailable: false,
+      }),
+      detachedChannelReplyPrompt({
+        agent: configuredAgent,
+        snapshot: { messages: [] },
+        workspaceAvailable: false,
+      }),
+    ];
+
+    for (const prompt of prompts) {
+      const launch = detachedProviderRequest({
+        agent: configuredAgent,
+        prompt,
+        workspacePath: "/worktree",
+        fullAccess: false,
+        agentBinary: "/bin/codex",
+      });
+      expect(prompt).not.toContain("## Trusted Agent profile");
+      expect(launch.request.instructions).toContain("## Trusted Agent profile");
+      expect(launch.request.instructions).toContain("- Name: Release Agent");
+      expect(launch.request.instructions).toContain("## Responsibility");
+      expect(launch.request.instructions).toContain("Ship the assigned issue.");
+      expect(launch.request.instructions).toContain(
+        "Issue handling (active, default)",
+      );
+      expect(launch.request.instructions).toContain(
+        "Investigate, implement, and verify an assigned issue.",
+      );
+      expect(launch.request.instructions).toContain("Desktop release");
+      expect(launch.request.instructions).toContain(
+        "Prepare and validate the desktop release.",
+      );
+    }
+  });
+
+  it("uses active skill instructions while retaining legacy skill fallback", () => {
+    const activeAgent = { ...agent, activeSkill: agent.skills[1] };
+    const launch = detachedProviderRequest({
+      agent: activeAgent,
+      prompt: "Release desktop",
+      workspacePath: "/worktree",
+      fullAccess: false,
+      agentBinary: "/bin/codex",
+    });
+    expect(launch.request.instructions).toContain(
+      "Prepare and validate the desktop release.",
+    );
+    expect(launch.request.instructions).toContain("Ship the assigned issue.");
+    expect(launch.request.instructions).toContain("Issue handling");
+
+    const legacyContext = detachedAgentContext({
+      ...agent,
+      skills: [],
+      skill: "Follow the legacy release checklist.",
+    });
+    expect(legacyContext).toContain("Legacy skill (default)");
+    expect(legacyContext).toContain("Follow the legacy release checklist.");
+  });
+
   it("continues the same provider conversation on a follow-up turn", () => {
     const launch = detachedProviderRequest({
       agent,
@@ -324,6 +430,7 @@ describe("detached Agent runner", () => {
 
   it("answers issue mentions read-only even without the issue worktree", () => {
     const prompt = detachedIssueReplyPrompt({
+      agent,
       snapshot: {
         run: { resultSummary: "Fixed the retry race.", branch: "briar/retry" },
         messages: [{ body: "@briar what changed?" }],

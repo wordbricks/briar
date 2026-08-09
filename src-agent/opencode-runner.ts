@@ -21,6 +21,7 @@ import {
   openCodePermissionInput,
   openCodeQuestionInput,
   openCodeResponseText,
+  openCodeSystemPrompt,
   parseOpenCodeModel,
   parseOpenCodeServerUrl,
   shouldAutoApproveOpenCodePermission,
@@ -308,6 +309,9 @@ async function main() {
     const parts = buildOpenCodeParts(request);
     const prompt = client.session.prompt({
       sessionID: sessionId,
+      ...(openCodeSystemPrompt(request)
+        ? { system: openCodeSystemPrompt(request) }
+        : {}),
       ...(model ? { model } : {}),
       ...(mapEffortToOpenCode(request.effort)
         ? { variant: mapEffortToOpenCode(request.effort) }

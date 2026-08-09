@@ -481,8 +481,33 @@ describe("organization channels", () => {
       model: null,
       responsibility: "Writing partner",
       effort: null,
+      skills: [
+        {
+          id: "ab000000-0000-4000-8000-000000000001",
+          name: "Writing",
+          instructions: "Write concise channel responses.",
+          provider: "claude",
+          model: null,
+          effort: null,
+          kind: "custom",
+          isDefault: true,
+          position: 0,
+        },
+        {
+          id: "ab000000-0000-4000-8000-000000000002",
+          name: "Product planning",
+          instructions: "Create implementation plans.",
+          provider: "grok",
+          model: null,
+          effort: "high",
+          kind: "custom",
+          isDefault: false,
+          position: 1,
+        },
+      ],
       createdAt: at(8),
     });
+    expect(agent?.skills).toHaveLength(2);
     expect(agent).toMatchObject({ handle: "honey", project_id: null });
     await addChannelAgent(db, {
       channelId,
@@ -510,7 +535,12 @@ describe("organization channels", () => {
       channelId,
       triggerMessageId: triggerId,
       parentMessageId: triggerId,
-      agents: [{ id: agent!.id, projectId: null, provider: "claude" }],
+      agents: [{
+        id: agent!.id,
+        projectId: null,
+        skillId: agent!.skills[0].id,
+        provider: "claude",
+      }],
       createdAt: at(9),
     });
     expect(jobs).toHaveLength(1);
@@ -525,6 +555,7 @@ describe("organization channels", () => {
     });
     expect(claimed).toMatchObject({
       agent_id: agent!.id,
+      skill_id: agent!.skills[0].id,
       project_id: null,
       status: "running",
     });

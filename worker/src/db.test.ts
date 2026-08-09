@@ -827,6 +827,14 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         "utf8",
       ),
     );
+    await executeSql(
+      db,
+      await readFile(resolve("migrations/0079_agent_skills.sql"), "utf8"),
+    );
+    await executeSql(
+      db,
+      await readFile(resolve("migrations/0080_agent_skill_jobs.sql"), "utf8"),
+    );
   }, 30_000);
 
   afterAll(async () => {
@@ -1435,19 +1443,57 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     await expect(listProjectAgents(db, projectId)).resolves.toEqual([
       expect.objectContaining({
         project_id: projectId,
-        name: "Auto Hunt agent",
+        name: "Developer agent",
         avatar: null,
         provider: "codex",
         model: null,
         responsibility: "Perform Auto Hunt for every queued issue.",
         skill_markdown: expect.stringContaining("attached project workflow"),
+        skills: [
+          expect.objectContaining({
+            name: "Issue processing",
+            provider: "codex",
+            kind: "issue_processing",
+            is_default: 1,
+          }),
+        ],
         calendar_color: "#3275d5",
       }),
     ]);
   });
 
+  it("localizes the default Developer Agent and Issue processing Skill", async () => {
+    const localizedProject = await createProject(db, {
+      ownerUserId: "owner",
+      organizationId: projectId,
+      name: "한국어 프로젝트",
+      agentTokenHash: "7".repeat(64),
+      locale: "ko",
+    });
+
+    await expect(listProjectAgents(db, localizedProject.id)).resolves.toEqual([
+      expect.objectContaining({
+        name: "개발자 에이전트",
+        responsibility: "대기 중인 모든 이슈를 처리합니다.",
+        skills: [
+          expect.objectContaining({
+            name: "이슈 처리",
+            instructions: "대기 중인 모든 이슈를 처리합니다.",
+            kind: "issue_processing",
+            is_default: 1,
+          }),
+        ],
+      }),
+    ]);
+
+    await expect(
+      deleteProject(db, localizedProject.id, "owner"),
+    ).resolves.toBe(true);
+  });
+
   it("pins a direct Agent task to the selected Worker through completion", async () => {
     const agent = (await listProjectAgents(db, projectId))[0];
+    const skill = agent.skills[0];
     const selected = await registerExecutionWorker(db, projectId, {
       id: "direct-task-worker-selected",
       deviceId: "direct-task-device-selected",
@@ -1490,6 +1536,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
           id: taskId,
           projectId,
           agentId: agent.id,
+          skillId: skill.id,
           request: "Summarize the repository without processing queued issues.",
           requestId,
           workerId: selected.worker.id,
@@ -1526,6 +1573,9 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         status: "running",
         attempts: 1,
         agent_provider: "codex",
+        agent_skill: skill.instructions,
+        selected_skill_id: skill.id,
+        selected_skill_instructions: skill.instructions,
       });
 
       await expect(
@@ -1590,7 +1640,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     });
     await expect(listProjectAgents(db, projectId)).resolves.toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ name: "Auto Hunt agent" }),
+        expect.objectContaining({ name: "Developer agent" }),
         agent,
       ]),
     );
@@ -1666,7 +1716,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     expect(schedule).toMatchObject({
       project_id: projectId,
       agent_id: agent.id,
-      agent_name: "Auto Hunt agent",
+      agent_name: "Developer agent",
       agent_provider: "codex",
       name: "Weekday repository audit",
       recurrence: "weekdays",
@@ -1805,9 +1855,14 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       schedule_name: "Daily project audit",
       agent_provider: "codex",
       agent_responsibility: "Perform Auto Hunt for every queued issue.",
-      agent_skill_markdown: expect.stringContaining(
-        "briar skills get briar-workflow",
-      ),
+      agent_skill_markdown: "Perform Auto Hunt for every queued issue.",
+      agent_skills: [
+        expect.objectContaining({
+          name: "Issue processing",
+          kind: "issue_processing",
+          is_default: 1,
+        }),
+      ],
       workflow_json: expect.any(String),
       status: "running",
       scheduled_for: "2026-07-27T09:00:00.000Z",
@@ -1849,7 +1904,10 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       expect.objectContaining({
         id: claimed!.id,
         agent_id: agent.id,
-        agent_name: "Auto Hunt agent",
+        agent_name: "Developer agent",
+        agent_skills: [
+          expect.objectContaining({ name: "Issue processing" }),
+        ],
         schedule_name: "Daily project audit",
         status: "completed",
         result_summary: "Daily audit completed.",
@@ -1989,6 +2047,29 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       model: "sonnet",
       effort: "high",
       responsibility: "Coordinates release checks and reports the result.",
+      skills: [
+        {
+          id: current.skills[0].id,
+          name: "Issue processing",
+          instructions: "Process queued issues.",
+          provider: "codex",
+          model: null,
+          effort: "medium",
+          kind: "issue_processing",
+          isDefault: false,
+          position: 0,
+        },
+        {
+          name: "Desktop release",
+          instructions: "Publish and verify the desktop release.",
+          provider: "claude",
+          model: "sonnet",
+          effort: "high",
+          kind: "custom",
+          isDefault: true,
+          position: 1,
+        },
+      ],
       calendarColor: "#0f9f76",
     });
 
@@ -2003,6 +2084,21 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       model: "sonnet",
       effort: "high",
       responsibility: "Coordinates release checks and reports the result.",
+      skills: [
+        expect.objectContaining({
+          name: "Issue processing",
+          provider: "codex",
+          kind: "issue_processing",
+          is_default: 0,
+        }),
+        expect.objectContaining({
+          name: "Desktop release",
+          provider: "claude",
+          model: "sonnet",
+          effort: "high",
+          is_default: 1,
+        }),
+      ],
       skill_markdown: expect.stringContaining(
         "Coordinates release checks and reports the result.",
       ),
@@ -2023,6 +2119,255 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         },
       ),
     ).resolves.toBeNull();
+  });
+
+  it("preserves retained Skill job references across name and default swaps", async () => {
+    const agent = await createProjectAgent(db, projectId, {
+      name: "Durable skill agent",
+      provider: "codex",
+      model: null,
+      effort: null,
+      responsibility: "Exercises durable Skill identity during profile edits.",
+      skills: [
+        {
+          name: "Issue processing",
+          instructions: "Process queued issues.",
+          provider: "codex",
+          model: null,
+          effort: "medium",
+          kind: "issue_processing",
+          isDefault: true,
+          position: 0,
+        },
+        {
+          name: "Desktop release",
+          instructions: "Publish the desktop release.",
+          provider: "claude",
+          model: "sonnet",
+          effort: "high",
+          kind: "custom",
+          isDefault: false,
+          position: 1,
+        },
+      ],
+      calendarColor: "#3275d5",
+    });
+    const issueSkill = agent.skills.find(
+      (skill) => skill.name === "Issue processing",
+    )!;
+    const releaseSkill = agent.skills.find(
+      (skill) => skill.name === "Desktop release",
+    )!;
+    const taskId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+
+    try {
+      await createProjectAgentTaskJob(db, {
+        id: taskId,
+        projectId,
+        agentId: agent.id,
+        skillId: releaseSkill.id,
+        request: "Run the retained release Skill.",
+        requestId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+        workerId: "legacy-worker",
+        createdAt: atMinute(20),
+      });
+
+      await expect(
+        updateProjectAgent(db, projectId, agent.id, {
+          name: "Must not partially update",
+          provider: agent.provider,
+          model: agent.model,
+          effort: agent.effort,
+          responsibility: agent.responsibility,
+          skills: [
+            {
+              id: issueSkill.id,
+              name: issueSkill.name,
+              instructions: issueSkill.instructions,
+              provider: issueSkill.provider,
+              model: issueSkill.model,
+              effort: issueSkill.effort,
+              kind: issueSkill.kind,
+              isDefault: true,
+              position: 0,
+            },
+          ],
+          calendarColor: agent.calendar_color,
+        }),
+      ).rejects.toThrow("cannot be deleted while queued or running work");
+      await expect(
+        db
+          .prepare(
+            `select skill_id from briar_project_agent_task_jobs where id = ?`,
+          )
+          .bind(taskId)
+          .first<{ skill_id: string | null }>(),
+      ).resolves.toEqual({ skill_id: releaseSkill.id });
+      expect(
+        (await listProjectAgents(db, projectId)).find(
+          (candidate) => candidate.id === agent.id,
+        )?.name,
+      ).toBe("Durable skill agent");
+
+      const updated = await updateProjectAgent(db, projectId, agent.id, {
+        name: agent.name,
+        provider: agent.provider,
+        model: agent.model,
+        effort: agent.effort,
+        responsibility: agent.responsibility,
+        skills: [
+          {
+            id: issueSkill.id,
+            name: "Desktop release",
+            instructions: issueSkill.instructions,
+            provider: issueSkill.provider,
+            model: issueSkill.model,
+            effort: issueSkill.effort,
+            kind: issueSkill.kind,
+            isDefault: false,
+            position: 0,
+          },
+          {
+            id: releaseSkill.id,
+            name: "Issue processing",
+            instructions: releaseSkill.instructions,
+            provider: releaseSkill.provider,
+            model: releaseSkill.model,
+            effort: releaseSkill.effort,
+            kind: releaseSkill.kind,
+            isDefault: true,
+            position: 1,
+          },
+        ],
+        calendarColor: agent.calendar_color,
+      });
+
+      expect(updated?.skills).toEqual([
+        expect.objectContaining({
+          id: issueSkill.id,
+          name: "Desktop release",
+          is_default: 0,
+        }),
+        expect.objectContaining({
+          id: releaseSkill.id,
+          name: "Issue processing",
+          is_default: 1,
+        }),
+      ]);
+      await expect(
+        db
+          .prepare(
+            `select skill_id from briar_project_agent_task_jobs where id = ?`,
+          )
+          .bind(taskId)
+          .first<{ skill_id: string | null }>(),
+      ).resolves.toEqual({ skill_id: releaseSkill.id });
+    } finally {
+      await db
+        .prepare(`delete from briar_project_agent_task_jobs where id = ?`)
+        .bind(taskId)
+        .run();
+      await deleteProjectAgent(db, projectId, agent.id);
+    }
+  });
+
+  it("applies legacy Agent execution updates to the default Skill", async () => {
+    const agent = await createProjectAgent(db, projectId, {
+      name: "Legacy settings agent",
+      provider: "codex",
+      model: null,
+      effort: null,
+      responsibility: "Run with the original default Skill settings.",
+      calendarColor: "#3275d5",
+    });
+
+    try {
+      const updated = await updateProjectAgent(db, projectId, agent.id, {
+        name: agent.name,
+        provider: "claude",
+        model: "sonnet",
+        effort: "high",
+        responsibility: "Run with the settings saved by a legacy client.",
+        calendarColor: agent.calendar_color,
+      });
+
+      expect(updated).toMatchObject({
+        provider: "claude",
+        model: "sonnet",
+        effort: "high",
+        responsibility: "Run with the settings saved by a legacy client.",
+        skills: [
+          expect.objectContaining({
+            id: agent.skills[0].id,
+            instructions: "Run with the settings saved by a legacy client.",
+            provider: "claude",
+            model: "sonnet",
+            effort: "high",
+            is_default: 1,
+          }),
+        ],
+      });
+    } finally {
+      await deleteProjectAgent(db, projectId, agent.id);
+    }
+  });
+
+  it("rolls back an Agent update when a Skill ID belongs to another Agent", async () => {
+    const owner = (await listProjectAgents(db, projectId))[0];
+    const agent = await createProjectAgent(db, projectId, {
+      name: "Collision target",
+      provider: "codex",
+      model: null,
+      effort: null,
+      responsibility: "Must remain unchanged after a conflicting update.",
+      calendarColor: "#3275d5",
+    });
+
+    try {
+      await expect(
+        updateProjectAgent(db, projectId, agent.id, {
+          name: "Must roll back",
+          provider: "claude",
+          model: "sonnet",
+          effort: "high",
+          responsibility: "This profile update must roll back atomically.",
+          skills: [
+            {
+              id: owner.skills[0].id,
+              name: "Stolen Skill",
+              instructions: "Must never move between Agents.",
+              provider: "claude",
+              model: "sonnet",
+              effort: "high",
+              kind: "custom",
+              isDefault: true,
+              position: 0,
+            },
+          ],
+          calendarColor: "#0f9f76",
+        }),
+      ).rejects.toThrow();
+
+      const persisted = (await listProjectAgents(db, projectId)).find(
+        (candidate) => candidate.id === agent.id,
+      );
+      expect(persisted).toMatchObject({
+        name: "Collision target",
+        provider: "codex",
+        model: null,
+        effort: null,
+        responsibility: "Must remain unchanged after a conflicting update.",
+        calendar_color: "#3275d5",
+      });
+      expect(persisted?.skills).toEqual([
+        expect.objectContaining({ id: agent.skills[0].id }),
+      ]);
+      expect(
+        (await listProjectAgents(db, projectId))[0].skills[0].id,
+      ).toBe(owner.skills[0].id);
+    } finally {
+      await deleteProjectAgent(db, projectId, agent.id);
+    }
   });
 
   it("allows duplicate organization names but enforces unique handles", async () => {

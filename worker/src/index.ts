@@ -24,6 +24,7 @@ import {
 import { agentExecutionMetricsSchema } from "../../src/lib/agent-execution-metrics";
 import {
   defaultProjectAgentCalendarColor,
+  normalizeProjectAgentLocale,
 } from "../../src/lib/project-agent";
 import {
   isValidProjectAgentScheduleTimeZone,
@@ -402,7 +403,19 @@ import {
   channelUpdateInputSchema,
   handleFromName,
   organizationAgentInputSchema,
+  channelAgentSkillInputSchema,
 } from "../../src/lib/channels-contract";
+import {
+  agentSkillConflictMessage,
+  agentSkillForMessage,
+  agentSkillJson,
+  defaultAgentSkillRow,
+  getAgentSkill,
+  hydrateAgentSkills,
+  issueProcessingAgentSkillRow,
+  type AgentSkillEffort,
+  type AgentSkillProvider,
+} from "./agent-skills";
 import {
   buildSlackCreateIssueModal,
   callSlackApi,
@@ -437,6 +450,38 @@ const corsHeaders = {
 const accountDeletionFreshAgeMs = 24 * 60 * 60 * 1_000;
 const organizationInvitationTtlMs = 7 * 24 * 60 * 60 * 1_000;
 const usageRangeFetchPaddingDays = 1;
+
+type IssueReplyExecutionSource = {
+  provider: AgentSkillProvider | null;
+  model: string | null;
+  effort: AgentSkillEffort | null;
+};
+
+export function issueReplyExecutionConfig(input: {
+  provider: AgentSkillProvider;
+  preferred: IssueReplyExecutionSource;
+  requested: IssueReplyExecutionSource;
+  activeSkill: IssueReplyExecutionSource | null;
+  agent: IssueReplyExecutionSource | null;
+}) {
+  const source = [
+    input.preferred,
+    input.requested,
+    input.activeSkill,
+    input.agent,
+  ].find((candidate) => candidate?.provider === input.provider);
+  return {
+    model: source?.model ?? null,
+    effort: source?.effort ?? null,
+  };
+}
+
+export function legacyAgentSkillInstructions(
+  activeSkill: { instructions: string } | null | undefined,
+  fallback: string,
+) {
+  return activeSkill?.instructions ?? fallback;
+}
 
 export const usageRangeDaysSchema = z.preprocess(
   (value) =>
@@ -848,13 +893,60 @@ const projectAgentInputSchema = z
       .nullable()
       .optional(),
     responsibility: z.string().trim().min(1).max(2_000),
+    skills: z.array(channelAgentSkillInputSchema).max(50).optional(),
     calendarColor: z
       .string()
       .trim()
       .regex(/^#[0-9a-f]{6}$/iu)
       .default(defaultProjectAgentCalendarColor),
   })
-  .strict();
+  .strict()
+  .superRefine((input, context) => {
+    if (!input.skills?.length) return;
+    if (input.skills.filter((skill) => skill.isDefault).length !== 1) {
+      context.addIssue({
+        code: "custom",
+        path: ["skills"],
+        message: "An Agent must have exactly one default Skill",
+      });
+    }
+    const names = new Set<string>();
+    input.skills.forEach((skill, index) => {
+      const key = skill.name.toLocaleLowerCase("en-US");
+      if (names.has(key)) {
+        context.addIssue({
+          code: "custom",
+          path: ["skills", index, "name"],
+          message: "Agent Skill names must be unique",
+        });
+      }
+      names.add(key);
+    });
+  });
+const organizationAgentWriteSchema = organizationAgentInputSchema.superRefine(
+  (input, context) => {
+    if (!input.skills?.length) return;
+    if (input.skills.filter((skill) => skill.isDefault).length !== 1) {
+      context.addIssue({
+        code: "custom",
+        path: ["skills"],
+        message: "An Agent must have exactly one default Skill",
+      });
+    }
+    const names = new Set<string>();
+    input.skills.forEach((skill, index) => {
+      const key = skill.name.toLocaleLowerCase("en-US");
+      if (names.has(key)) {
+        context.addIssue({
+          code: "custom",
+          path: ["skills", index, "name"],
+          message: "Agent Skill names must be unique",
+        });
+      }
+      names.add(key);
+    });
+  },
+);
 const projectAgentSessionEventSchema = z
   .object({
     id: z.string().min(1).max(128),
@@ -917,6 +1009,7 @@ export const projectAgentSessionInputSchema = z
 const projectAgentTaskInputSchema = z
   .object({
     agentId: z.string().uuid(),
+    skillId: z.string().uuid().nullable().optional(),
     request: z.string().trim().min(1).max(50_000),
     workerId: z.string().trim().min(1).max(128),
     requestId: z.string().uuid(),
@@ -2859,6 +2952,7 @@ const projectAgentJson = (row: ProjectAgentRow) => {
     effort: row.effort,
     responsibility: row.responsibility,
     skill: row.skill_markdown,
+    skills: (row.skills ?? []).map(agentSkillJson),
     calendarColor: row.calendar_color,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -2986,6 +3080,7 @@ const projectAgentScheduleRunJson = (
     effort: row.agent_effort,
     responsibility: row.agent_responsibility,
     skill: row.agent_skill_markdown,
+    skills: row.agent_skills.map(agentSkillJson),
   },
   workflow: normalizeAutoHuntWorkflow(JSON.parse(row.workflow_json)),
   status: row.status,
@@ -5370,7 +5465,7 @@ async function route(
     if (!canManageOrganization(role)) {
       throw new HttpError(403, "Organization admin access required");
     }
-    const input = organizationAgentInputSchema.parse(await readJson(request));
+    const input = organizationAgentWriteSchema.parse(await readJson(request));
     const agent = await createOrganizationAgent(db, {
       id: crypto.randomUUID(),
       organizationId,
@@ -5380,6 +5475,7 @@ async function route(
       model: input.model,
       responsibility: input.responsibility,
       effort: input.effort,
+      skills: input.skills,
       createdAt: new Date().toISOString(),
     });
     if (!agent) throw new HttpError(500, "Agent was not created");
@@ -5396,7 +5492,7 @@ async function route(
     if (!canManageOrganization(role)) {
       throw new HttpError(403, "Organization admin access required");
     }
-    const input = organizationAgentInputSchema.parse(await readJson(request));
+    const input = organizationAgentWriteSchema.parse(await readJson(request));
     const agent = await updateOrganizationAgent(db, {
       organizationId,
       agentId: organizationAgentMatch[2],
@@ -5406,6 +5502,7 @@ async function route(
       model: input.model,
       responsibility: input.responsibility,
       effort: input.effort,
+      skills: input.skills,
       updatedAt: new Date().toISOString(),
     });
     if (!agent) throw new HttpError(404, "Organization agent not found");
@@ -5511,11 +5608,12 @@ async function route(
       organizationChannelMatch[2],
       session.user.id,
     );
-    const [members, agents, messages] = await Promise.all([
+    const [members, channelAgents, messages] = await Promise.all([
       listChannelMembers(db, channel.id),
       listChannelAgents(db, channel.id),
       listChannelRootMessages(db, channel.id),
     ]);
+    const agents = await hydrateAgentSkills(db, channelAgents);
     return json({
       channel: channelJson(channel),
       members,
@@ -5651,7 +5749,10 @@ async function route(
       addedByUserId: session.user.id,
       createdAt: new Date().toISOString(),
     });
-    const agents = await listChannelAgents(db, channel.id);
+    const agents = await hydrateAgentSkills(
+      db,
+      await listChannelAgents(db, channel.id),
+    );
     return json({ agents: agents.map(organizationAgentJson) });
   }
   if (channelAgentMatch && request.method === "DELETE") {
@@ -5663,7 +5764,10 @@ async function route(
       session.user.id,
     );
     await removeChannelAgent(db, channel.id, channelAgentMatch[3]);
-    const agents = await listChannelAgents(db, channel.id);
+    const agents = await hydrateAgentSkills(
+      db,
+      await listChannelAgents(db, channel.id),
+    );
     return json({ agents: agents.map(organizationAgentJson) });
   }
 
@@ -5732,7 +5836,10 @@ async function route(
     }
     const { input: rawInput, attachments, attachmentReferences } =
       await readChannelMessageRequest(request);
-    const roster = await listChannelAgents(db, channel.id);
+    const roster = await hydrateAgentSkills(
+      db,
+      await listChannelAgents(db, channel.id),
+    );
     const mentionedAgents = rawInput.mentionedAgentIds.map((agentId) => {
       const agent = roster.find((candidate) => candidate.id === agentId);
       if (!agent) {
@@ -5767,6 +5874,13 @@ async function route(
         storedAttachments.map((attachment) => attachment.id),
       ) ?? rawInput.body,
     };
+    const invokedAgents = mentionedAgents.map((agent) => {
+      const activeSkill = agentSkillForMessage(agent.skills, input.body);
+      if (!activeSkill) {
+        throw new HttpError(409, "Mentioned Agent has no configured Skills");
+      }
+      return { agent, activeSkill };
+    });
     const uploadedKeys: string[] = [];
     let message = null;
     try {
@@ -5831,10 +5945,11 @@ async function route(
       channelId: channel.id,
       triggerMessageId: message.id,
       parentMessageId: message.parentMessageId ?? message.id,
-      agents: mentionedAgents.map((agent) => ({
+      agents: invokedAgents.map(({ agent, activeSkill }) => ({
         id: agent.id,
         projectId: agent.project_id,
-        provider: agent.provider,
+        skillId: activeSkill.id,
+        provider: activeSkill.provider,
       })),
       createdAt,
     });
@@ -6388,6 +6503,9 @@ async function route(
       organizationId: organization.id,
       name: input.name,
       agentTokenHash: tokenHash,
+      locale: normalizeProjectAgentLocale(
+        request.headers.get("accept-language"),
+      ),
     });
     project.organization_name = organization.name;
     project.member_role = organization.role;
@@ -6683,6 +6801,14 @@ async function route(
 
     const agent = await getProjectAgent(db, project.id, input.agentId);
     if (!agent) throw new HttpError(404, "Agent not found for this project");
+    const selectedSkill = await getAgentSkill(
+      db,
+      agent.id,
+      input.skillId ?? null,
+    );
+    if (!selectedSkill) {
+      throw new HttpError(404, "Agent Skill not found for this Agent");
+    }
     const worker = await db
       .prepare(
         `select worker.*, device.max_concurrent_sessions
@@ -6711,10 +6837,10 @@ async function route(
     ) {
       throw new HttpError(409, "Worker is not ready to accept agent tasks");
     }
-    if (!executionWorkerProviders(worker).includes(agent.provider)) {
+    if (!executionWorkerProviders(worker).includes(selectedSkill.provider)) {
       throw new HttpError(
         409,
-        `Worker does not support the ${agent.provider} provider`,
+        `Worker does not support the ${selectedSkill.provider} provider`,
       );
     }
     if (!(await isExecutionWorkerAllowedForProject(db, project.id, worker.id))) {
@@ -6750,6 +6876,7 @@ async function route(
         id: taskId,
         projectId: project.id,
         agentId: agent.id,
+        skillId: selectedSkill.id,
         request: input.request,
         requestId: input.requestId,
         workerId: worker.id,
@@ -6891,6 +7018,7 @@ async function route(
       model: input.model ?? null,
       effort: input.effort ?? null,
       responsibility: input.responsibility,
+      skills: input.skills,
       calendarColor: input.calendarColor,
     });
     return json({ agent: projectAgentJson(agent) }, 201);
@@ -7151,6 +7279,7 @@ async function route(
           model: input.model ?? null,
           effort: input.effort ?? null,
           responsibility: input.responsibility,
+          skills: input.skills,
           calendarColor: input.calendarColor,
         },
       );
@@ -9446,6 +9575,24 @@ async function route(
     const agent = run.agent_id
       ? await getProjectAgent(db, input.projectId, run.agent_id)
       : null;
+    const activeSkill = agent
+      ? issueProcessingAgentSkillRow(agent.skills)
+      : null;
+    const replyExecution = issueReplyExecutionConfig({
+      provider: job.agent_provider,
+      preferred: {
+        provider: run.preferred_agent_provider,
+        model: run.preferred_agent_model,
+        effort: run.preferred_agent_effort,
+      },
+      requested: {
+        provider: run.requested_agent_provider,
+        model: run.requested_agent_model,
+        effort: run.requested_agent_effort,
+      },
+      activeSkill,
+      agent,
+    });
     return json({
       work: {
         workType: "issueReply",
@@ -9456,8 +9603,24 @@ async function route(
         triggerMessageId: job.trigger_message_id,
         parentMessageId: job.parent_message_id,
         provider: job.agent_provider,
-        model:
-          agent?.provider === job.agent_provider ? agent.model : null,
+        model: replyExecution.model,
+        effort: replyExecution.effort,
+        activeSkill: activeSkill ? agentSkillJson(activeSkill) : null,
+        agent: agent
+          ? {
+              id: agent.id,
+              name: agent.name,
+              provider: job.agent_provider,
+              model: replyExecution.model,
+              effort: replyExecution.effort,
+              responsibility: agent.responsibility,
+              skill: legacyAgentSkillInstructions(
+                activeSkill,
+                agent.skill_markdown,
+              ),
+              skills: agent.skills.map(agentSkillJson),
+            }
+          : null,
         branch: run.branch,
         claimToken,
         claimedAt: job.claimed_at,
@@ -9466,6 +9629,21 @@ async function route(
           run: {
             ...dashboardRunJson(run, attachments),
             events: events.map(dashboardEventJson),
+            // Workers from before first-class Agent Skills ignore work.agent,
+            // but retain arbitrary fields inside snapshot.run. Keep the saved
+            // profile here as read-only context during a rolling upgrade.
+            agentProfile: agent
+              ? {
+                  id: agent.id,
+                  name: agent.name,
+                  responsibility: agent.responsibility,
+                  skill: legacyAgentSkillInstructions(
+                    activeSkill,
+                    agent.skill_markdown,
+                  ),
+                  skills: agent.skills.map(agentSkillJson),
+                }
+              : null,
           },
           messages: claimConversationJson(messages, attachments),
           agentTranscript:
@@ -9548,6 +9726,18 @@ async function route(
     if (!channel || !agent || !job.agent_provider) {
       throw new HttpError(409, "Reply job lost its channel context");
     }
+    const activeSkill = job.skill_id
+      ? agent.skills.find((skill) => skill.id === job.skill_id) ?? null
+      : defaultAgentSkillRow(agent.skills);
+    if (!activeSkill) {
+      throw new HttpError(409, "Reply job lost its selected Agent Skill");
+    }
+    const replyModel = activeSkill.provider === job.agent_provider
+      ? activeSkill.model
+      : null;
+    const replyEffort = activeSkill.provider === job.agent_provider
+      ? activeSkill.effort
+      : null;
     const project = job.project_id
       ? await getOrganizationProject(db, job.organization_id, job.project_id)
       : null;
@@ -9567,7 +9757,22 @@ async function route(
         triggerMessageId: job.trigger_message_id,
         parentMessageId: job.parent_message_id,
         provider: job.agent_provider,
-        model: agent.model,
+        model: replyModel,
+        effort: replyEffort,
+        activeSkill: agentSkillJson(activeSkill),
+        agent: {
+          id: agent.id,
+          name: agent.name,
+          provider: job.agent_provider,
+          model: replyModel,
+          effort: replyEffort,
+          responsibility: agent.responsibility,
+          skill: legacyAgentSkillInstructions(
+            activeSkill,
+            agent.skill_markdown ?? agent.responsibility,
+          ),
+          skills: agent.skills.map(agentSkillJson),
+        },
         claimToken,
         claimedAt: job.claimed_at,
         leaseExpiresAt: job.lease_expires_at,
@@ -9584,8 +9789,14 @@ async function route(
             name: agent.name,
             handle: agent.handle,
             responsibility: agent.responsibility,
-            provider: agent.provider,
-            model: agent.model,
+            skill: legacyAgentSkillInstructions(
+              activeSkill,
+              agent.skill_markdown ?? agent.responsibility,
+            ),
+            provider: job.agent_provider,
+            model: replyModel,
+            effort: replyEffort,
+            skills: agent.skills.map(agentSkillJson),
             projectId: agent.project_id,
           },
           project: project ? { id: project.id, name: project.name } : null,
@@ -9918,6 +10129,12 @@ async function route(
       leaseExpiresAt: leaseExpiryFrom(observedAt),
     });
     if (!job) return json({ work: null });
+    const activeSkill = job.agent_skills.find(
+      (skill) => skill.id === job.selected_skill_id,
+    );
+    if (!activeSkill) {
+      throw new HttpError(409, "Agent task lost its selected Skill");
+    }
     return json({
       work: {
         workType: "projectAgentTask",
@@ -9929,6 +10146,7 @@ async function route(
         claimedAt: job.claimed_at,
         leaseExpiresAt: job.lease_expires_at,
         request: job.request,
+        activeSkill: agentSkillJson(activeSkill),
         agent: {
           id: job.agent_id,
           name: job.agent_name,
@@ -9937,6 +10155,7 @@ async function route(
           effort: job.agent_effort,
           responsibility: job.agent_responsibility,
           skill: job.agent_skill,
+          skills: job.agent_skills.map(agentSkillJson),
         },
       },
     });
@@ -10094,9 +10313,13 @@ async function route(
     }
     const agent =
       run?.agent_id ? await getProjectAgent(db, projectId, run.agent_id) : null;
+    const activeSkill = agent
+      ? issueProcessingAgentSkillRow(agent.skills)
+      : null;
     const executionProvider = run
       ? run.preferred_agent_provider ??
         run.requested_agent_provider ??
+        activeSkill?.provider ??
         agent?.provider ??
         null
       : null;
@@ -10104,10 +10327,16 @@ async function route(
       ? run.preferred_agent_model
       : run?.requested_agent_provider
         ? run.requested_agent_model
-        : (agent?.model ?? null);
+        : activeSkill
+          ? activeSkill.model
+          : (agent?.model ?? null);
     const executionEffort = run?.preferred_agent_provider
       ? run.preferred_agent_effort
-      : (run?.requested_agent_effort ?? null);
+      : run?.requested_agent_provider
+        ? run.requested_agent_effort
+        : activeSkill
+          ? activeSkill.effort
+          : (agent?.effort ?? null);
     const [attachments, messages, reworkFeedbackEvent] = run
       ? await Promise.all([
           listIssueAttachments(db, projectId, run.id),
@@ -10165,6 +10394,7 @@ async function route(
                   effort: executionEffort,
                 }
               : null,
+            activeSkill: activeSkill ? agentSkillJson(activeSkill) : null,
             agent: agent
               ? {
                   id: agent.id,
@@ -10172,11 +10402,16 @@ async function route(
                   provider:
                     run.preferred_agent_provider ??
                     run.requested_agent_provider ??
+                    activeSkill?.provider ??
                     agent.provider,
                   model: executionModel,
                   effort: executionEffort,
                   responsibility: agent.responsibility,
-                  skill: agent.skill_markdown,
+                  skill: legacyAgentSkillInstructions(
+                    activeSkill,
+                    agent.skill_markdown,
+                  ),
+                  skills: agent.skills.map(agentSkillJson),
                 }
               : null,
           }
@@ -10843,6 +11078,10 @@ export default {
       const auth = createAuth(env, url.origin);
       return await route(request, auth, env.DB, env.ATTACHMENTS, env);
     } catch (error) {
+      const skillConflictMessage = agentSkillConflictMessage(error);
+      if (skillConflictMessage) {
+        return json({ message: skillConflictMessage }, 409);
+      }
       if (error instanceof HttpError) {
         return json(
           {
