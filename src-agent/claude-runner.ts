@@ -6,6 +6,7 @@ import {
 } from "@anthropic-ai/claude-agent-sdk";
 import {
   approvalResult,
+  claudePrompt,
   claudeOptions,
   normalizeClaudeMessage,
   type ClaudeApprovalResponse,
@@ -95,7 +96,10 @@ async function main() {
     | undefined;
 
   for await (const message of query({
-    prompt: request.message,
+    prompt:
+      request.attachments?.length
+        ? claudePrompt(request)
+        : request.message,
     options: claudeOptions(request, canUseTool),
   })) {
     if (message.type === "system" && message.subtype === "init") {

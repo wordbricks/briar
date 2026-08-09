@@ -10,7 +10,7 @@ import {
 import {
   approvedOpenCodeQuestionAnswers,
   buildOpenCodePermissionRules,
-  buildOpenCodePrompt,
+  buildOpenCodeParts,
   completeOpenCodeMessages,
   createOpenCodeEventState,
   isOpenCodeWritePermission,
@@ -305,13 +305,14 @@ async function main() {
     })();
 
     const model = parseOpenCodeModel(request.model);
+    const parts = buildOpenCodeParts(request);
     const prompt = client.session.prompt({
       sessionID: sessionId,
       ...(model ? { model } : {}),
       ...(mapEffortToOpenCode(request.effort)
         ? { variant: mapEffortToOpenCode(request.effort) }
         : {}),
-      parts: [{ type: "text", text: buildOpenCodePrompt(request) }],
+      parts,
     });
     const response = await Promise.race([
       prompt,

@@ -1,3 +1,5 @@
+import type { AgentAttachment } from "./runner-attachments";
+
 export type CodexRunnerRequest = {
   type: "run";
   message: string;
@@ -10,7 +12,7 @@ export type CodexRunnerRequest = {
   approvalPolicy: "untrusted" | "on-request" | "never";
   sandboxMode: "readOnly" | "workspaceWrite" | "dangerFullAccess";
   networkAccess: boolean;
-  imagePaths?: string[];
+  attachments?: AgentAttachment[];
   codexBinary: string;
 };
 
@@ -185,9 +187,9 @@ export function codexTurnRequest(
     approvalPolicy: request.approvalPolicy,
     input: [
       { type: "text", text: request.message },
-      ...(request.imagePaths ?? []).map((path) => ({
+      ...(request.attachments ?? []).map((attachment) => ({
         type: "localImage",
-        path,
+        path: attachment.path,
       })),
     ],
   };

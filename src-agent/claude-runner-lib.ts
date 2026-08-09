@@ -3,7 +3,10 @@ import type {
   Options,
   PermissionResult,
   SDKMessage,
+  SDKUserMessage,
 } from "@anthropic-ai/claude-agent-sdk";
+import type { AgentAttachment } from "./runner-attachments";
+import { readAgentImage } from "./runner-attachments";
 
 export type ClaudeRunnerRequest = {
   type: "run";
@@ -17,6 +20,7 @@ export type ClaudeRunnerRequest = {
   approvalPolicy: "untrusted" | "on-request" | "never";
   sandboxMode: "readOnly" | "workspaceWrite" | "dangerFullAccess";
   networkAccess: boolean;
+  attachments?: AgentAttachment[];
   /** Directories outside cwd the agent may write in (Auto Hunt worktrees). */
   additionalDirectories?: string[];
   claudeBinary: string;
@@ -84,6 +88,45 @@ export type ClaudeRunnerOutput =
     };
 
 const readOnlyTools = ["Read", "Glob", "Grep"] as const;
+const supportedClaudeImageMimeTypes = new Set([
+  "image/gif",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+]);
+
+export async function* claudePrompt(
+  request: ClaudeRunnerRequest,
+): AsyncIterable<SDKUserMessage> {
+  const content: Array<Record<string, unknown>> = [];
+  if (request.message.trim()) {
+    content.push({ type: "text", text: request.message });
+  }
+  for (const attachment of request.attachments ?? []) {
+    if (!supportedClaudeImageMimeTypes.has(attachment.mimeType)) {
+      throw new Error(
+        `Claude does not support image attachment type '${attachment.mimeType}'`,
+      );
+    }
+    content.push({
+      type: "image",
+      source: {
+        type: "base64",
+        media_type: attachment.mimeType,
+        data: Buffer.from(await readAgentImage(attachment)).toString("base64"),
+      },
+    });
+  }
+  yield {
+    type: "user",
+    session_id: "",
+    parent_tool_use_id: null,
+    message: {
+      role: "user",
+      content: content as unknown as SDKUserMessage["message"]["content"],
+    },
+  } as SDKUserMessage;
+}
 
 export function claudeOptions(
   request: ClaudeRunnerRequest,

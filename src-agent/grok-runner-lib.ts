@@ -1,3 +1,6 @@
+import type { AgentAttachment } from "./runner-attachments";
+import { readAgentImage } from "./runner-attachments";
+
 /**
  * Grok CLI ACP client helpers.
  *
@@ -18,6 +21,7 @@ export type GrokRunnerRequest = {
   approvalPolicy: "untrusted" | "on-request" | "never";
   sandboxMode: "readOnly" | "workspaceWrite" | "dangerFullAccess";
   networkAccess: boolean;
+  attachments?: AgentAttachment[];
   grokBinary: string;
 };
 
@@ -167,11 +171,12 @@ export function permissionDecisionResult(
   return { outcome: { outcome: "selected", optionId: allowId } };
 }
 
-export function buildPromptParts(request: GrokRunnerRequest): Array<{
-  type: "text";
-  text: string;
-}> {
-  const parts: Array<{ type: "text"; text: string }> = [];
+export type GrokPromptPart =
+  | { type: "text"; text: string }
+  | { type: "image"; data: string; mimeType: string };
+
+export function buildPromptParts(request: GrokRunnerRequest): GrokPromptPart[] {
+  const parts: GrokPromptPart[] = [];
   const instructions = request.instructions?.trim();
   if (instructions) {
     parts.push({
@@ -189,6 +194,20 @@ export function buildPromptParts(request: GrokRunnerRequest): Array<{
     });
   }
   parts.push({ type: "text", text: request.message });
+  return parts;
+}
+
+export async function buildGrokPromptParts(
+  request: GrokRunnerRequest,
+): Promise<GrokPromptPart[]> {
+  const parts = buildPromptParts(request);
+  for (const attachment of request.attachments ?? []) {
+    parts.push({
+      type: "image",
+      data: Buffer.from(await readAgentImage(attachment)).toString("base64"),
+      mimeType: attachment.mimeType,
+    });
+  }
   return parts;
 }
 

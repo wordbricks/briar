@@ -98,6 +98,14 @@ describe("channel reply image inputs", () => {
     expect(downloaded.paths).toEqual([
       join(channelReplyImageDirectory(workspacePath), `${attachmentId}.png`),
     ]);
+    expect(downloaded.attachments).toEqual([
+      {
+        type: "image",
+        path: downloaded.paths[0],
+        name: "private screen.png",
+        mimeType: "image/png",
+      },
+    ]);
     expect(new Uint8Array(await readFile(downloaded.paths[0]))).toEqual(imageBytes);
     expect((await stat(downloaded.paths[0])).mode & 0o777).toBe(0o600);
   });

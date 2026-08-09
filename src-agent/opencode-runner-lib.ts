@@ -3,6 +3,8 @@ import type {
   PermissionRuleset,
   QuestionRequest,
 } from "@opencode-ai/sdk/v2";
+import { pathToFileURL } from "node:url";
+import type { AgentAttachment } from "./runner-attachments";
 
 export type OpenCodeRunnerRequest = {
   type: "run";
@@ -16,6 +18,7 @@ export type OpenCodeRunnerRequest = {
   approvalPolicy: "untrusted" | "on-request" | "never";
   sandboxMode: "readOnly" | "workspaceWrite" | "dangerFullAccess";
   networkAccess: boolean;
+  attachments?: AgentAttachment[];
   opencodeBinary: string;
 };
 
@@ -140,6 +143,18 @@ export function buildOpenCodePrompt(request: OpenCodeRunnerRequest): string {
   }
   sections.push(request.message);
   return sections.join("\n\n");
+}
+
+export function buildOpenCodeParts(request: OpenCodeRunnerRequest) {
+  return [
+    { type: "text" as const, text: buildOpenCodePrompt(request) },
+    ...(request.attachments ?? []).map((attachment) => ({
+      type: "file" as const,
+      mime: attachment.mimeType,
+      filename: attachment.name,
+      url: pathToFileURL(attachment.path).href,
+    })),
+  ];
 }
 
 const writePermissions = new Set([

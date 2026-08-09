@@ -100,9 +100,19 @@ describe("Codex App Server runner", () => {
     const turn = codexTurnRequest(
       {
         ...request,
-        imagePaths: [
-          "/worktree/.briar-channel-images/first.png",
-          "/worktree/.briar-channel-images/second.jpg",
+        attachments: [
+          {
+            type: "image",
+            path: "/worktree/.briar-channel-images/first.png",
+            name: "first.png",
+            mimeType: "image/png",
+          },
+          {
+            type: "image",
+            path: "/worktree/.briar-channel-images/second.jpg",
+            name: "second.jpg",
+            mimeType: "image/jpeg",
+          },
         ],
       },
       "thread-1",

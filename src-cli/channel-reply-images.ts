@@ -2,6 +2,7 @@ import { mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { z } from "zod";
 import { channelReplyClaimTokenHeader } from "../src/lib/channels-contract";
+import type { AgentImageAttachment } from "../src-agent/runner-attachments";
 
 export const channelReplyImageDirectoryName = ".briar-channel-images";
 export { channelReplyClaimTokenHeader };
@@ -76,7 +77,13 @@ export async function downloadChannelReplyImages(input: {
     input.triggerMessageId,
   );
   const directory = channelReplyImageDirectory(input.workspacePath);
-  if (images.length === 0) return { directory, paths: [] as string[] };
+  if (images.length === 0) {
+    return {
+      directory,
+      paths: [] as string[],
+      attachments: [] as AgentImageAttachment[],
+    };
+  }
 
   const fetcher = input.fetcher ?? fetch;
   const paths: string[] = [];
@@ -115,7 +122,16 @@ export async function downloadChannelReplyImages(input: {
       await writeFile(path, bytes, { mode: 0o600 });
       paths.push(path);
     }
-    return { directory, paths };
+    return {
+      directory,
+      paths,
+      attachments: images.map((image, index) => ({
+        type: "image" as const,
+        path: paths[index]!,
+        name: image.filename,
+        mimeType: image.contentType,
+      })),
+    };
   } catch (error) {
     await rm(directory, { recursive: true, force: true });
     throw error;
