@@ -26,6 +26,19 @@ export const changelogCopy = {
     backTop: "맨 위로 ↑",
     entries: [
       {
+        version: "1.2.92",
+        date: "2026년 8월 9일",
+        title: "에이전트 작업을 이어가고 사용량을 더 선명하게 확인합니다",
+        summary:
+          "완료된 에이전트 세션에도 후속 요청을 이어서 보낼 수 있고, 사용량 현황과 첨부 파일 전달 흐름을 더 일관되게 확인할 수 있습니다.",
+        items: [
+          "완료된 프로젝트 에이전트 세션에서 같은 대화와 작업 공간을 유지한 채 후속 작업을 시작할 수 있습니다.",
+          "설정의 사용량 대시보드에서 에이전트 사용량을 더 자세히 확인할 수 있습니다.",
+          "지원되는 에이전트 실행 경로가 대화 첨부 파일을 같은 방식으로 전달해 이미지와 파일 입력의 연결을 안정화했습니다.",
+          "iOS에서 접근성 글자 크기에서도 프로젝트 전환 메뉴를 유지하고, 채널 메시지 이미지 첨부 흐름을 개선했습니다.",
+        ],
+      },
+      {
         version: "1.2.91",
         date: "2026년 8월 8일",
         title: "중요한 실행 순간만 놓치지 않도록 알림을 정리했습니다",
@@ -198,6 +211,19 @@ export const changelogCopy = {
     home: "Home",
     backTop: "Back to top ↑",
     entries: [
+      {
+        version: "1.2.92",
+        date: "August 9, 2026",
+        title: "Agent work can continue, with clearer usage visibility",
+        summary:
+          "Follow-up requests can now continue from completed agent sessions, while usage reporting and attachment delivery are more consistent.",
+        items: [
+          "Start follow-up work from a completed project-agent session while keeping the same conversation and workspace.",
+          "Review agent usage in greater detail from the usage dashboard in Settings.",
+          "Supported agent execution paths now hand off conversation attachments consistently, making image and file inputs more reliable.",
+          "The iOS project menu remains available at accessibility text sizes, with improved channel-message image attachments.",
+        ],
+      },
       {
         version: "1.2.91",
         date: "August 8, 2026",
@@ -432,9 +458,9 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <h1>{changelog.title}</h1>
           <p>{changelog.description}</p>
         </div>
-        <a href="#v1-2-91" className="changelog-current">
+        <a href="#v1-2-92" className="changelog-current">
           <span>{changelog.current}</span>
-          <strong>v1.2.91</strong>
+          <strong>v1.2.92</strong>
           <i aria-hidden="true">↓</i>
         </a>
       </section>
@@ -459,11 +485,14 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   {index === 0 ? <span>{changelog.latest}</span> : null}
                   <time
                     dateTime={
+                      entry.version === "1.2.92" ||
                       entry.version === "1.2.91" ||
                       entry.version === "1.2.90" ||
                       entry.version === "1.2.89" ||
                       entry.version === "1.2.88"
-                        ? "2026-08-08"
+                        ? entry.version === "1.2.92"
+                          ? "2026-08-09"
+                          : "2026-08-08"
                         : "2026-08-07"
                     }
                   >
