@@ -11,14 +11,24 @@ final class CompanionStore: ObservableObject {
     @Published private(set) var user: CurrentUserResponse.User?
     @Published private(set) var organizations: [OrganizationSummary] = []
     @Published private(set) var projects: [ProjectsResponse.Project] = []
-    @Published var selectedProjectID: UUID?
+    @Published var selectedProjectID: UUID? {
+        didSet {
+            persistSelectedProjectID()
+        }
+    }
     @Published private(set) var loading = false
     @Published private(set) var errorMessage: String?
 
     private let api: any MobileAPIClientProtocol
+    private let defaults: UserDefaults
 
-    init(api: any MobileAPIClientProtocol) {
+    private static func selectedProjectKey(for userID: String) -> String {
+        "companion.selectedProjectID.\(userID)"
+    }
+
+    init(api: any MobileAPIClientProtocol, defaults: UserDefaults = .standard) {
         self.api = api
+        self.defaults = defaults
     }
 
     func load(token: String) async throws {
@@ -48,9 +58,12 @@ final class CompanionStore: ObservableObject {
             ).compactMap { id, projects in
                 projects.first.map { OrganizationSummary(id: id, name: $0.organizationName) }
             }.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
-            if !projects.contains(where: { $0.id == selectedProjectID }) {
-                selectedProjectID = projects.first?.id
-            }
+            let storedProjectID = Self.storedProjectID(
+                for: loadedUser.user.id,
+                in: loadedProjects.projects,
+                defaults: defaults
+            )
+            selectedProjectID = storedProjectID ?? Self.defaultProjectID(for: loadedProjects.projects)
             errorMessage = nil
         } catch {
             errorMessage = Self.message(for: error)
@@ -64,6 +77,34 @@ final class CompanionStore: ObservableObject {
         projects = []
         selectedProjectID = nil
         errorMessage = nil
+    }
+
+    private static func storedProjectID(
+        for userID: String,
+        in projects: [ProjectsResponse.Project],
+        defaults: UserDefaults
+    ) -> UUID? {
+        guard let raw = defaults.string(forKey: selectedProjectKey(for: userID)),
+              let stored = UUID(uuidString: raw),
+              projects.contains(where: { $0.id == stored }) else {
+            return nil
+        }
+        return stored
+    }
+
+    static func defaultProjectID(for projects: [ProjectsResponse.Project]) -> UUID? {
+        // The API returns projects grouped by organization; the first project is
+        // the first project of the first organization, matching the web client.
+        projects.first?.id
+    }
+
+    private func persistSelectedProjectID() {
+        guard let userID = user?.id else { return }
+        if let selectedProjectID {
+            defaults.set(selectedProjectID.uuidString, forKey: Self.selectedProjectKey(for: userID))
+        } else {
+            defaults.removeObject(forKey: Self.selectedProjectKey(for: userID))
+        }
     }
 
     static func message(for error: Error) -> String {

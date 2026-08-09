@@ -111,7 +111,7 @@ final class DashboardSyncTests: XCTestCase {
             migrator: LegacyTauriSessionMigrator(applicationSupportURL: migrationDirectory)
         )
         try session.signIn(token: token)
-        let companion = CompanionStore(api: api)
+        let companion = CompanionStore(api: api, defaults: isolatedDefaults())
         try await companion.load(token: token)
         let dashboard = DashboardStore(api: api, pollInterval: .seconds(3_600))
         dashboard.select(projectID: companion.selectedProjectID, token: session.token)
@@ -183,6 +183,109 @@ final class DashboardSyncTests: XCTestCase {
         XCTAssertNil(store.errorMessage)
         XCTAssertEqual(store.snapshot?.runs.first?.title, "Back online")
         store.applicationDidEnterBackground()
+    }
+
+    @MainActor
+    func testFirstLoadFallsBackToFirstProjectWhenNothingPersisted() async throws {
+        let otherProject = ProjectsResponse.Project(
+            id: UUID(uuidString: "88888888-8888-4888-8888-888888888888")!,
+            name: "Briar Mobile",
+            icon: nil,
+            organizationId: project.organizationId,
+            organizationName: project.organizationName,
+            role: .owner,
+            createdAt: project.createdAt
+        )
+        let user = CurrentUserResponse(user: .init(
+            id: "user-persist",
+            username: "briar",
+            name: "Briar User",
+            email: "user@example.com",
+            image: nil
+        ))
+        let api = RoutingAPIClient(routes: [
+            MobileAPIContract.Endpoint.currentUser: [user],
+            MobileAPIContract.Endpoint.projects: [
+                ProjectsResponse(projects: [project, otherProject]),
+            ],
+        ])
+        let store = CompanionStore(api: api, defaults: isolatedDefaults())
+
+        try await store.load(token: "token")
+
+        XCTAssertEqual(store.selectedProjectID, project.id)
+    }
+
+    @MainActor
+    func testLoadRestoresLastSelectedProject() async throws {
+        let otherProject = ProjectsResponse.Project(
+            id: UUID(uuidString: "88888888-8888-4888-8888-888888888888")!,
+            name: "Briar Mobile",
+            icon: nil,
+            organizationId: project.organizationId,
+            organizationName: project.organizationName,
+            role: .owner,
+            createdAt: project.createdAt
+        )
+        let user = CurrentUserResponse(user: .init(
+            id: "user-persist",
+            username: "briar",
+            name: "Briar User",
+            email: "user@example.com",
+            image: nil
+        ))
+        let api = RoutingAPIClient(routes: [
+            MobileAPIContract.Endpoint.currentUser: [user],
+            MobileAPIContract.Endpoint.projects: [
+                ProjectsResponse(projects: [project, otherProject]),
+            ],
+        ])
+        let defaults = isolatedDefaults()
+        defaults.set(
+            otherProject.id.uuidString,
+            forKey: "companion.selectedProjectID.user-persist"
+        )
+        let store = CompanionStore(api: api, defaults: defaults)
+
+        try await store.load(token: "token")
+
+        XCTAssertEqual(store.selectedProjectID, otherProject.id)
+    }
+
+    @MainActor
+    func testLoadFallsBackWhenPersistedProjectIsGone() async throws {
+        let user = CurrentUserResponse(user: .init(
+            id: "user-persist",
+            username: "briar",
+            name: "Briar User",
+            email: "user@example.com",
+            image: nil
+        ))
+        let api = RoutingAPIClient(routes: [
+            MobileAPIContract.Endpoint.currentUser: [user],
+            MobileAPIContract.Endpoint.projects: [
+                ProjectsResponse(projects: [project]),
+            ],
+        ])
+        let defaults = isolatedDefaults()
+        defaults.set(
+            UUID().uuidString,
+            forKey: "companion.selectedProjectID.user-persist"
+        )
+        let store = CompanionStore(api: api, defaults: defaults)
+
+        try await store.load(token: "token")
+
+        XCTAssertEqual(store.selectedProjectID, project.id)
+    }
+
+    private func isolatedDefaults() -> UserDefaults {
+        let suiteName = "companion-store-tests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        addTeardownBlock {
+            UserDefaults(suiteName: suiteName)?.removePersistentDomain(forName: suiteName)
+        }
+        return defaults
     }
 
     private func snapshot(cursor: Int, title: String) -> DashboardSnapshot {
