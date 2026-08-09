@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { Miniflare } from "miniflare";
 import { unstable_splitSqlQuery } from "wrangler";
 import { describe, expect, it } from "vitest";
+import { executeD1Sql } from "./test-helpers/d1";
 
 describe("D1 migrations", () => {
   it.each([
@@ -120,9 +121,7 @@ describe("D1 migrations", () => {
         resolve("migrations", "0079_agent_skills.sql"),
         "utf8",
       );
-      for (const statement of unstable_splitSqlQuery(sql)) {
-        await db.prepare(statement).run();
-      }
+      await executeD1Sql(db, sql);
 
       const result = await db.prepare(
         `select agent.id, agent.name as agent_name, agent.responsibility,
@@ -332,9 +331,7 @@ describe("D1 migrations", () => {
         resolve("migrations", "0066_normalize_project_workflows_v2.sql"),
         "utf8",
       );
-      for (const statement of unstable_splitSqlQuery(sql)) {
-        await db.prepare(statement).run();
-      }
+      await executeD1Sql(db, sql);
       const firstPass = await db
         .prepare(
           `select project_id, workflow_json, updated_at
@@ -412,9 +409,7 @@ describe("D1 migrations", () => {
         (row) => row.updated_at === "2026-08-06T00:00:00.000Z",
       )).toBe(true);
 
-      for (const statement of unstable_splitSqlQuery(sql)) {
-        await db.prepare(statement).run();
-      }
+      await executeD1Sql(db, sql);
       const secondPass = await db
         .prepare(
           `select project_id, workflow_json, updated_at

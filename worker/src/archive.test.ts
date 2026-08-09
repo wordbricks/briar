@@ -1,5 +1,3 @@
-import { readdir, readFile } from "node:fs/promises";
-import { resolve } from "node:path";
 import { Miniflare } from "miniflare";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { HuntEventInput } from "./db";
@@ -25,31 +23,13 @@ import {
   processArchiveCleanupQueue,
   readArchivedTranscript,
 } from "./archive";
+import { applyD1Migrations, executeD1Sql } from "./test-helpers/d1";
 
 const projectId = "11111111-1111-4111-8111-111111111111";
 let runId = "";
 let secondRunId = "";
 const oldTime = "2020-01-01T00:00:00.000Z";
 const observedAt = "2028-01-01T00:00:00.000Z";
-
-const executeSql = async (db: D1Database, sql: string) => {
-  let statement: string[] = [];
-  let inTrigger = false;
-  for (const line of sql.split("\n")) {
-    const trimmed = line.trim();
-    if (!trimmed && statement.length === 0) continue;
-    statement.push(line);
-    if (/^create trigger\b/iu.test(trimmed)) inTrigger = true;
-    const complete = inTrigger ? /^end;$/iu.test(trimmed) : trimmed.endsWith(";");
-    if (!complete) continue;
-    await db.prepare(statement.join("\n")).run();
-    statement = [];
-    inTrigger = false;
-  }
-  if (statement.some((line) => line.trim())) {
-    throw new Error("Incomplete SQL migration statement");
-  }
-};
 
 const event = (
   sourceKey: string,
@@ -150,13 +130,8 @@ describe("D1 to R2 log archives", () => {
         await miniflareBucket.delete(keys);
       },
     };
-    const migrations = (await readdir(resolve("migrations")))
-      .filter((name) => /^\d+.*\.sql$/u.test(name))
-      .sort();
-    for (const migration of migrations) {
-      await executeSql(db, await readFile(resolve("migrations", migration), "utf8"));
-    }
-    await executeSql(
+    await applyD1Migrations(db);
+    await executeD1Sql(
       db,
       `insert into user (id, name, email, emailVerified, createdAt, updatedAt)
        values ('owner', 'Owner', 'owner@example.com', 1, '${oldTime}', '${oldTime}');
@@ -237,7 +212,7 @@ describe("D1 to R2 log archives", () => {
       );
     }
 
-    await executeSql(
+    await executeD1Sql(
       db,
       `insert into briar_run_evidence (
          id, project_id, run_id, attempt, revision, evidence_key,

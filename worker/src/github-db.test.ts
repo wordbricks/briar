@@ -1,7 +1,4 @@
-import { readdir, readFile } from "node:fs/promises";
-import { resolve } from "node:path";
 import { Miniflare } from "miniflare";
-import { unstable_splitSqlQuery } from "wrangler";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { normalizeAutoHuntWorkflow } from "../../src/lib/auto-hunt-contract";
 import type {
@@ -9,6 +6,7 @@ import type {
   HuntEventInput,
   RunPullRequestRow,
 } from "./db";
+import { applyD1Migrations } from "./test-helpers/d1";
 import {
   claimGithubDelivery,
   connectGithubInstallation,
@@ -45,18 +43,6 @@ const nextTime = () =>
 const nextDeliveryId = () => {
   deliveryNumber += 1;
   return `github-db-delivery-${deliveryNumber}`;
-};
-
-const applyAllMigrations = async (db: D1Database) => {
-  const names = (await readdir(resolve("migrations")))
-    .filter((name) => name.endsWith(".sql"))
-    .sort((left, right) => left.localeCompare(right));
-  for (const name of names) {
-    const sql = await readFile(resolve("migrations", name), "utf8");
-    for (const statement of unstable_splitSqlQuery(sql)) {
-      if (statement.trim()) await db.prepare(statement).run();
-    }
-  }
 };
 
 type Checkpoint = {
@@ -329,7 +315,7 @@ describe("GitHub pull request D1 integration", () => {
 
   beforeAll(async () => {
     db = (await miniflare.getD1Database("DB")) as unknown as D1Database;
-    await applyAllMigrations(db);
+    await applyD1Migrations(db);
     const createdAt = nextTime();
     await db
       .prepare(
