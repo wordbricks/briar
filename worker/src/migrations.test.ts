@@ -12,6 +12,7 @@ describe("D1 migrations", () => {
     "0053_issue_result_reviews.sql",
     "0055_agent_provider_opencode.sql",
     "0074_channel_delta_sync.sql",
+    "0081_optimize_dashboard_worker_device_sync.sql",
   ])("keeps each trigger in a separate Wrangler statement: %s", async (name) => {
     const sql = await readFile(resolve("migrations", name), "utf8");
     const statements = unstable_splitSqlQuery(sql);
@@ -21,6 +22,166 @@ describe("D1 migrations", () => {
 
     expect(Math.max(...triggerCounts)).toBeLessThanOrEqual(1);
     expect(triggerCounts.filter((count) => count === 1)).not.toHaveLength(0);
+  });
+
+  it("updates device fan-out cursors with indexed project lookups", async () => {
+    const miniflare = new Miniflare({
+      modules: true,
+      script: "export default { fetch() { return new Response('ok') } }",
+      d1Databases: { DB: "briar-dashboard-device-sync-migration-test" },
+    });
+    try {
+      const db = (await miniflare.getD1Database("DB")) as unknown as D1Database;
+      for (const statement of [
+        `create table briar_execution_worker_devices (
+           id text primary key not null,
+           updated_at text not null
+         )`,
+        `create table briar_execution_workers (
+           id text primary key not null,
+           project_id text not null,
+           device_id text not null
+         )`,
+        `create unique index briar_execution_workers_project_device_idx
+           on briar_execution_workers (project_id, device_id)`,
+        `create index briar_execution_workers_device_idx
+           on briar_execution_workers (device_id, project_id)`,
+        `create table briar_dashboard_changes (
+           version integer primary key autoincrement,
+           project_id text not null,
+           entity_type text not null,
+           entity_id text,
+           operation text not null,
+           created_at text not null
+         )`,
+        `create index briar_dashboard_changes_project_version_idx
+           on briar_dashboard_changes (project_id, version)`,
+        `create table briar_dashboard_sync_state (
+           project_id text primary key not null,
+           current_version integer not null
+         )`,
+        `create trigger briar_dashboard_worker_devices_update_sync
+         after update on briar_execution_worker_devices BEGIN
+           select new.id;
+         END`,
+      ]) {
+        await db.prepare(statement).run();
+      }
+      await db.prepare(
+        `insert into briar_execution_worker_devices (id, updated_at)
+         values ('device-1', '2026-08-10T00:00:00.000Z')`,
+      ).run();
+      await db.prepare(
+        `insert into briar_execution_workers (id, project_id, device_id)
+         values ('worker-1', 'project-1', 'device-1'),
+                ('worker-2', 'project-2', 'device-1')`,
+      ).run();
+      await db.prepare(
+        `insert into briar_dashboard_changes (
+           project_id, entity_type, entity_id, operation, created_at
+         ) values
+           ('project-1', 'run', 'run-1', 'upsert', '2026-08-10 00:00:00'),
+           ('project-2', 'run', 'run-2', 'upsert', '2026-08-10 00:00:00'),
+           ('project-3', 'run', 'run-3', 'upsert', '2026-08-10 00:00:00')`,
+      ).run();
+      await db.prepare(
+        `with recursive sequence(value) as (
+           select 1
+           union all
+           select value + 1 from sequence where value < 1000
+         )
+         insert into briar_dashboard_changes (
+           project_id, entity_type, entity_id, operation, created_at
+         )
+         select 'project-history', 'run', 'history-' || value, 'upsert',
+                '2026-08-10 00:00:00'
+         from sequence`,
+      ).run();
+      await db.prepare(
+        `insert into briar_dashboard_sync_state (project_id, current_version)
+         values ('project-1', 1), ('project-2', 2), ('project-3', 3)`,
+      ).run();
+
+      const sql = await readFile(
+        resolve(
+          "migrations",
+          "0081_optimize_dashboard_worker_device_sync.sql",
+        ),
+        "utf8",
+      );
+      for (const statement of unstable_splitSqlQuery(sql)) {
+        await db.prepare(statement).run();
+      }
+      const update = await db.prepare(
+        `update briar_execution_worker_devices
+         set updated_at = '2026-08-10T00:01:00.000Z'
+         where id = 'device-1'`,
+      ).run();
+      expect(update.meta.rows_read).toBeLessThan(50);
+
+      const changes = await db.prepare(
+        `select project_id, entity_id
+         from briar_dashboard_changes
+         where entity_type = 'worker'
+         order by project_id`,
+      ).all<{ project_id: string; entity_id: string }>();
+      expect(changes.results).toEqual([
+        { project_id: "project-1", entity_id: "worker-1" },
+        { project_id: "project-2", entity_id: "worker-2" },
+      ]);
+
+      const cursors = await db.prepare(
+        `select state.project_id, state.current_version,
+                max(change.version) as latest_version
+         from briar_dashboard_sync_state state
+         join briar_dashboard_changes change
+           on change.project_id = state.project_id
+         group by state.project_id, state.current_version
+         order by state.project_id`,
+      ).all<{
+        project_id: string;
+        current_version: number;
+        latest_version: number;
+      }>();
+      expect(cursors.results).toHaveLength(3);
+      expect(cursors.results).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            project_id: "project-1",
+            current_version: expect.any(Number),
+          }),
+          expect.objectContaining({
+            project_id: "project-2",
+            current_version: expect.any(Number),
+          }),
+          { project_id: "project-3", current_version: 3, latest_version: 3 },
+        ]),
+      );
+      expect(
+        cursors.results
+          .filter((row) => row.project_id !== "project-3")
+          .every((row) => row.current_version === row.latest_version),
+      ).toBe(true);
+
+      const plan = await db.prepare(
+        `explain query plan
+         select worker.project_id, (
+           select change.version
+             from briar_dashboard_changes change
+            where change.project_id = worker.project_id
+            order by change.version desc
+            limit 1
+         )
+         from briar_execution_workers worker
+         where worker.device_id = 'device-1'`,
+      ).all<{ detail: string }>();
+      const details = plan.results.map((row) => row.detail).join("\n");
+      expect(details).toContain("briar_execution_workers_device_idx");
+      expect(details).toContain("briar_dashboard_changes_project_version_idx");
+      expect(details).not.toMatch(/scan briar_dashboard_changes/iu);
+    } finally {
+      await miniflare.dispose();
+    }
   });
 
   it.each([
