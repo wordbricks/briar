@@ -1,7 +1,9 @@
 import type { HuntRun, IssueMessage, OrganizationMember } from "../types";
+import { mentionAtCaret as issueMentionAtCaret } from "./mention-token";
 import type { AgentProvider } from "./project-llm";
 
 export { mentionsBriar } from "./briar-mention";
+export { issueMentionAtCaret };
 
 type IssueSession = {
   projectId: string;
@@ -35,19 +37,6 @@ export function briarMentionAtCaret(body: string, caret: number) {
     return null;
   }
   return { start: mention.start, end: mention.end };
-}
-
-export function issueMentionAtCaret(body: string, caret: number) {
-  if (!Number.isInteger(caret) || caret < 0 || caret > body.length) return null;
-  const match = body
-    .slice(0, caret)
-    .match(/(^|[^\p{L}\p{N}_.-])@([\p{L}\p{N}_.-]*)$/u);
-  if (!match) return null;
-  return {
-    start: caret - match[2].length - 1,
-    end: caret,
-    query: match[2],
-  };
 }
 
 export function issueMentionHandle(

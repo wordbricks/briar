@@ -1,5 +1,6 @@
 import { CircleAlert, LoaderCircle, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback } from "react";
+import { useObjectUrl } from "../hooks/useObjectUrl";
 import type { ChannelMessageAttachment } from "../lib/channels-contract";
 import { loadChannelMessageAttachment } from "../lib/api";
 import { issueAttachmentMarkdown } from "../lib/issue-markdown";
@@ -65,12 +66,8 @@ function ChannelDraftImage({
   image: DraftChannelImage;
   onRemove: () => void;
 }) {
-  const [source, setSource] = useState("");
-  useEffect(() => {
-    const objectUrl = URL.createObjectURL(image.file);
-    setSource(objectUrl);
-    return () => URL.revokeObjectURL(objectUrl);
-  }, [image.file]);
+  const loadImage = useCallback(() => image.file, [image.file]);
+  const { source } = useObjectUrl(loadImage);
   return (
     <figure className="channel-image-draft">
       {source ? <img alt={image.file.name} src={source} /> : null}
@@ -114,25 +111,11 @@ function ChannelMessageImage({
   interactive: boolean;
   token: string;
 }) {
-  const [source, setSource] = useState<string | null>(null);
-  const [failed, setFailed] = useState(false);
-  useEffect(() => {
-    let active = true;
-    let objectUrl: string | null = null;
-    setSource(null);
-    setFailed(false);
-    void loadChannelMessageAttachment(token, attachment)
-      .then((blob) => {
-        if (!active) return;
-        objectUrl = URL.createObjectURL(blob);
-        setSource(objectUrl);
-      })
-      .catch(() => active && setFailed(true));
-    return () => {
-      active = false;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
-  }, [attachment.url, token]);
+  const loadImage = useCallback(
+    () => loadChannelMessageAttachment(token, attachment),
+    [attachment.url, token],
+  );
+  const { failed, source } = useObjectUrl(loadImage);
 
   if (failed) {
     return (

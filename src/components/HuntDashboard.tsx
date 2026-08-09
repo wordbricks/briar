@@ -97,6 +97,7 @@ import { ProjectAgentAvatar } from "./ProjectAgentAvatar";
 import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
 import { inboxIssueMessageVersion } from "../hooks/useInbox";
 import { useMobileBackHandler } from "../hooks/useMobileNavigation";
+import { useObjectUrl } from "../hooks/useObjectUrl";
 import { useProjectAgentWorkerEvents } from "../hooks/useProjectAgentWorkerEvents";
 import {
   agentMessagesFromAppServerEvents,
@@ -3234,32 +3235,15 @@ function IssueInlineAttachmentPreview({
   const file = draftInlineAttachmentFile(attachment);
   const previewSource =
     attachment.type === "new" ? attachment.file : attachment.attachment.url;
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [failed, setFailed] = useState(false);
-  useEffect(() => {
+  const loadPreview = useMemo(() => {
     if (attachment.type === "new") {
-      const url = URL.createObjectURL(attachment.file);
-      setPreviewUrl(url);
-      setFailed(false);
-      return () => URL.revokeObjectURL(url);
+      return () => attachment.file;
     }
-    if (!onLoadAttachment) return;
-    let active = true;
-    let objectUrl: string | null = null;
-    setPreviewUrl(null);
-    setFailed(false);
-    void onLoadAttachment(attachment.attachment)
-      .then((blob) => {
-        if (!active) return;
-        objectUrl = URL.createObjectURL(blob);
-        setPreviewUrl(objectUrl);
-      })
-      .catch(() => active && setFailed(true));
-    return () => {
-      active = false;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
+    return onLoadAttachment
+      ? () => onLoadAttachment(attachment.attachment)
+      : null;
   }, [onLoadAttachment, previewSource]);
+  const { failed, source: previewUrl } = useObjectUrl(loadPreview);
   const alt =
     attachment.type === "new" ? attachment.file.name : attachment.attachment.filename;
   return (
@@ -3297,32 +3281,15 @@ function SelectedAttachment({
   const { t } = useI18n();
   const previewSource =
     source.type === "new" ? source.file : source.attachment.url;
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [failed, setFailed] = useState(false);
-  useEffect(() => {
+  const loadPreview = useMemo(() => {
     if (source.type === "new") {
-      const url = URL.createObjectURL(source.file);
-      setPreviewUrl(url);
-      setFailed(false);
-      return () => URL.revokeObjectURL(url);
+      return () => source.file;
     }
-    if (!onLoadAttachment) return;
-    let active = true;
-    let objectUrl: string | null = null;
-    setPreviewUrl(null);
-    setFailed(false);
-    void onLoadAttachment(source.attachment)
-      .then((blob) => {
-        if (!active) return;
-        objectUrl = URL.createObjectURL(blob);
-        setPreviewUrl(objectUrl);
-      })
-      .catch(() => active && setFailed(true));
-    return () => {
-      active = false;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
+    return onLoadAttachment
+      ? () => onLoadAttachment(source.attachment)
+      : null;
   }, [onLoadAttachment, previewSource]);
+  const { failed, source: previewUrl } = useObjectUrl(loadPreview);
   const name = source.type === "new" ? source.file.name : source.attachment.filename;
   const bytes =
     source.type === "new" ? source.file.size : source.attachment.byteSize;
@@ -7413,26 +7380,9 @@ function RunEvidenceImagePreview({
   onLoadImage: (image: RunEvidenceImage) => Promise<Blob>;
 }) {
   const { t } = useI18n();
-  const [source, setSource] = useState<string | null>(null);
-  const [failed, setFailed] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
-  useEffect(() => {
-    let active = true;
-    let objectUrl: string | null = null;
-    setSource(null);
-    setFailed(false);
-    void onLoadImage(image)
-      .then((blob) => {
-        if (!active) return;
-        objectUrl = URL.createObjectURL(blob);
-        setSource(objectUrl);
-      })
-      .catch(() => active && setFailed(true));
-    return () => {
-      active = false;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
-  }, [image, onLoadImage]);
+  const loadImage = useCallback(() => onLoadImage(image), [image, onLoadImage]);
+  const { failed, source } = useObjectUrl(loadImage);
 
   return (
     <>
@@ -8580,12 +8530,8 @@ function MessageAttachmentPreview({
   file: File;
   onRemove: () => void;
 }) {
-  const [source, setSource] = useState("");
-  useEffect(() => {
-    const objectUrl = URL.createObjectURL(file);
-    setSource(objectUrl);
-    return () => URL.revokeObjectURL(objectUrl);
-  }, [file]);
+  const loadFile = useCallback(() => file, [file]);
+  const { source } = useObjectUrl(loadFile);
   return (
     <div className="issue-composer-attachment">
       {source ? <img alt="" src={source} /> : null}
@@ -8613,27 +8559,11 @@ function IssueMarkdownImage({
   const attachment = reference
     ? attachments.find((candidate) => candidate.id === reference) ?? null
     : null;
-  const [source, setSource] = useState<string | null>(null);
-  const [failed, setFailed] = useState(false);
-
-  useEffect(() => {
-    if (!reference || !attachment) return;
-    let active = true;
-    let objectUrl: string | null = null;
-    setSource(null);
-    setFailed(false);
-    void onLoadAttachment(attachment)
-      .then((blob) => {
-        if (!active) return;
-        objectUrl = URL.createObjectURL(blob);
-        setSource(objectUrl);
-      })
-      .catch(() => active && setFailed(true));
-    return () => {
-      active = false;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
+  const loadImage = useMemo(() => {
+    if (!reference || !attachment) return null;
+    return () => onLoadAttachment(attachment);
   }, [attachment?.url, onLoadAttachment, reference]);
+  const { failed, source } = useObjectUrl(loadImage);
 
   if (!reference) {
     return src ? <img alt={alt} loading="lazy" src={src} /> : null;
@@ -8689,25 +8619,11 @@ function IssueAttachmentPreview({
   onLoadAttachment: (attachment: IssueAttachment) => Promise<Blob>;
 }) {
   const { t } = useI18n();
-  const [source, setSource] = useState<string | null>(null);
-  const [failed, setFailed] = useState(false);
-  useEffect(() => {
-    let active = true;
-    let objectUrl: string | null = null;
-    setSource(null);
-    setFailed(false);
-    void onLoadAttachment(attachment)
-      .then((blob) => {
-        if (!active) return;
-        objectUrl = URL.createObjectURL(blob);
-        setSource(objectUrl);
-      })
-      .catch(() => active && setFailed(true));
-    return () => {
-      active = false;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
-  }, [attachment.url, onLoadAttachment]);
+  const loadAttachment = useCallback(
+    () => onLoadAttachment(attachment),
+    [attachment.url, onLoadAttachment],
+  );
+  const { failed, source } = useObjectUrl(loadAttachment);
   const isImage = isIssueAttachmentImage(
     attachment.contentType,
     attachment.filename,
