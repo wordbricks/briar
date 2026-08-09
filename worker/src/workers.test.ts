@@ -1,5 +1,3 @@
-import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
 import { Miniflare } from "miniflare";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
@@ -47,6 +45,7 @@ import {
   WorkerConflictError,
   workerStateAt,
 } from "./workers";
+import { applyD1Migrations, executeD1Sql } from "./test-helpers/d1";
 
 const projectId = "11111111-1111-4111-8111-111111111111";
 const secondProjectId = "22222222-2222-4222-8222-222222222222";
@@ -59,12 +58,6 @@ const fingerprint = (seed: string) =>
     .map((character) => character.charCodeAt(0).toString(16).padStart(2, "0"))
     .join("")
     .padEnd(64, "0");
-
-const executeSql = async (db: D1Database, sql: string) => {
-  for (const statement of sql.split(/;\s*(?:\n|$)/u)) {
-    if (statement.trim()) await db.prepare(statement).run();
-  }
-};
 
 const queuedEvent = (sourceKey: string, minute: number): HuntEventInput => ({
   source: "issue",
@@ -102,70 +95,70 @@ describe("detached execution workers", () => {
 
   beforeAll(async () => {
     db = (await miniflare.getD1Database("DB")) as unknown as D1Database;
-    for (const migration of [
-      "migrations/0001_briar.sql",
-      "migrations/0002_remove_repository_path.sql",
-      "migrations/0003_generalize_auto_hunt.sql",
-      "migrations/0004_auto_hunt_claims.sql",
-      "migrations/0005_auto_hunt_recovery.sql",
-      "migrations/0006_issue_attachments.sql",
-      "migrations/0007_configurable_workflows.sql",
-      "migrations/0008_organizations.sql",
-      "migrations/0009_auto_hunt_automation.sql",
-      "migrations/0010_issue_messages.sql",
-      "migrations/0011_issue_message_agents.sql",
-      "migrations/0012_organization_handles.sql",
-      "migrations/0013_execution_workers.sql",
-      "migrations/0014_agent_provider_grok.sql",
-      "migrations/0015_backlog_status.sql",
-      "migrations/0016_project_agents.sql",
-      "migrations/0017_default_auto_hunt_agent.sql",
-      "migrations/0018_project_agent_schedules.sql",
-      "migrations/0019_project_agent_schedule_runs.sql",
-      "migrations/0020_project_agent_calendar_color.sql",
-      "migrations/0021_run_evidence.sql",
-      "migrations/0022_remove_workflow_presets.sql",
-      "migrations/0023_project_agent_skills.sql",
-      "migrations/0024_project_agent_avatars.sql",
-      "migrations/0025_project_agent_codex_pets.sql",
-      "migrations/0026_flexible_project_agent_schedules.sql",
-      "migrations/0027_run_revisions.sql",
-      "migrations/0029_structured_agent_results.sql",
-      "migrations/0030_run_evidence_images.sql",
-      "migrations/0031_organization_logos.sql",
-      "migrations/0032_slack_integration.sql",
-      "migrations/0033_organization_logo_browser_formats.sql",
-      "migrations/0034_execution_worker_credentials.sql",
-      "migrations/0035_detached_worker_dispatch.sql",
-      "migrations/0036_execution_worker_concurrency.sql",
-      "migrations/0038_project_execution_worker_policies.sql",
-      "migrations/0039_project_agent_tokens.sql",
-      "migrations/0040_run_execution_provider.sql",
-      "migrations/0043_execution_worker_icons.sql",
-      "migrations/0044_issue_agent_reply_jobs.sql",
-      "migrations/0045_issue_execution_preferences.sql",
-      "migrations/0046_project_icons.sql",
-      "migrations/0047_project_icon_browser_formats.sql",
-      "migrations/0048_issue_dependencies.sql",
-      "migrations/0054_run_execution_metrics.sql",
-      "migrations/0058_workflow_pause_after_stage.sql",
-      "migrations/0059_workflow_v2_progress.sql",
-      "migrations/0060_workflow_checkpoint_policies.sql",
-      "migrations/0061_resume_requested_state.sql",
-      "migrations/0061_workflow_stage_status_events.sql",
-      "migrations/0062_issue_assignees.sql",
-      "migrations/0063_inbox_read_states.sql",
-      "migrations/0065_issue_rework_proposals.sql",
-      "migrations/0067_issue_checkpoints.sql",
-      "migrations/0068_issue_action_proposals.sql",
-      "migrations/0069_project_agent_effort.sql",
-      "migrations/0076_execution_worker_updates.sql",
-      "migrations/0077_project_agent_task_jobs.sql",
-      "migrations/0079_agent_skills.sql",
-    ]) {
-      await executeSql(db, await readFile(resolve(migration), "utf8"));
-    }
-    await executeSql(
+    await applyD1Migrations(db, {
+      files: [
+        "0001_briar.sql",
+        "0002_remove_repository_path.sql",
+        "0003_generalize_auto_hunt.sql",
+        "0004_auto_hunt_claims.sql",
+        "0005_auto_hunt_recovery.sql",
+        "0006_issue_attachments.sql",
+        "0007_configurable_workflows.sql",
+        "0008_organizations.sql",
+        "0009_auto_hunt_automation.sql",
+        "0010_issue_messages.sql",
+        "0011_issue_message_agents.sql",
+        "0012_organization_handles.sql",
+        "0013_execution_workers.sql",
+        "0014_agent_provider_grok.sql",
+        "0015_backlog_status.sql",
+        "0016_project_agents.sql",
+        "0017_default_auto_hunt_agent.sql",
+        "0018_project_agent_schedules.sql",
+        "0019_project_agent_schedule_runs.sql",
+        "0020_project_agent_calendar_color.sql",
+        "0021_run_evidence.sql",
+        "0022_remove_workflow_presets.sql",
+        "0023_project_agent_skills.sql",
+        "0024_project_agent_avatars.sql",
+        "0025_project_agent_codex_pets.sql",
+        "0026_flexible_project_agent_schedules.sql",
+        "0027_run_revisions.sql",
+        "0029_structured_agent_results.sql",
+        "0030_run_evidence_images.sql",
+        "0031_organization_logos.sql",
+        "0032_slack_integration.sql",
+        "0033_organization_logo_browser_formats.sql",
+        "0034_execution_worker_credentials.sql",
+        "0035_detached_worker_dispatch.sql",
+        "0036_execution_worker_concurrency.sql",
+        "0038_project_execution_worker_policies.sql",
+        "0039_project_agent_tokens.sql",
+        "0040_run_execution_provider.sql",
+        "0043_execution_worker_icons.sql",
+        "0044_issue_agent_reply_jobs.sql",
+        "0045_issue_execution_preferences.sql",
+        "0046_project_icons.sql",
+        "0047_project_icon_browser_formats.sql",
+        "0048_issue_dependencies.sql",
+        "0054_run_execution_metrics.sql",
+        "0058_workflow_pause_after_stage.sql",
+        "0059_workflow_v2_progress.sql",
+        "0060_workflow_checkpoint_policies.sql",
+        "0061_resume_requested_state.sql",
+        "0061_workflow_stage_status_events.sql",
+        "0062_issue_assignees.sql",
+        "0063_inbox_read_states.sql",
+        "0065_issue_rework_proposals.sql",
+        "0067_issue_checkpoints.sql",
+        "0068_issue_action_proposals.sql",
+        "0069_project_agent_effort.sql",
+        "0076_execution_worker_updates.sql",
+        "0077_project_agent_task_jobs.sql",
+        "0079_agent_skills.sql",
+      ],
+    });
+    await executeD1Sql(
       db,
       `
       insert into user (id, name, email, emailVerified, createdAt, updatedAt)
@@ -223,7 +216,7 @@ describe("detached execution workers", () => {
   });
 
   beforeEach(async () => {
-    await executeSql(
+    await executeD1Sql(
       db,
       `delete from briar_agent_transcripts;
        delete from briar_agent_transcript_sessions;

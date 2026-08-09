@@ -1,7 +1,4 @@
-import { readdir, readFile } from "node:fs/promises";
-import { resolve } from "node:path";
 import { Miniflare } from "miniflare";
-import { unstable_splitSqlQuery } from "wrangler";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import worker from "./index";
 import {
@@ -18,18 +15,7 @@ import {
   syncGithubConnectionRepositories,
 } from "./db";
 import { githubSha256Hex } from "./github";
-
-const applyAllMigrations = async (db: D1Database) => {
-  const names = (await readdir(resolve("migrations")))
-    .filter((name) => name.endsWith(".sql"))
-    .sort((left, right) => left.localeCompare(right));
-  for (const name of names) {
-    const sql = await readFile(resolve("migrations", name), "utf8");
-    for (const statement of unstable_splitSqlQuery(sql)) {
-      if (statement.trim()) await db.prepare(statement).run();
-    }
-  }
-};
+import { applyD1Migrations } from "./test-helpers/d1";
 
 describe("GitHub integration D1 state", () => {
   const miniflare = new Miniflare({
@@ -47,7 +33,7 @@ describe("GitHub integration D1 state", () => {
 
   beforeAll(async () => {
     db = (await miniflare.getD1Database("DB")) as unknown as D1Database;
-    await applyAllMigrations(db);
+    await applyD1Migrations(db);
     await db.prepare(
       `insert into user (id, name, email, emailVerified, createdAt, updatedAt)
        values (?, 'Owner', 'owner@example.com', 1, ?, ?)`,

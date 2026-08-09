@@ -1,5 +1,3 @@
-import { readdir, readFile } from "node:fs/promises";
-import { resolve } from "node:path";
 import { Miniflare } from "miniflare";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { normalizeAutoHuntWorkflow } from "../../src/lib/auto-hunt-contract";
@@ -17,22 +15,7 @@ import {
   isStoredWorkflowUnchanged,
   loadWorkflowCheckpointPolicy,
 } from "./workflow-policy";
-
-const executeMigration = async (db: D1Database, sql: string) => {
-  let statement: string[] = [];
-  let inTrigger = false;
-  for (const line of sql.split("\n")) {
-    const trimmed = line.trim();
-    if (!trimmed && statement.length === 0) continue;
-    statement.push(line);
-    if (/^create trigger\b/iu.test(trimmed)) inTrigger = true;
-    const complete = inTrigger ? /^end;$/iu.test(trimmed) : trimmed.endsWith(";");
-    if (!complete) continue;
-    await db.prepare(statement.join("\n")).run();
-    statement = [];
-    inTrigger = false;
-  }
-};
+import { applyD1Migrations } from "./test-helpers/d1";
 
 const queuedEvent = (
   sourceKey: string,
@@ -75,12 +58,7 @@ describe("workflow checkpoint policy persistence", () => {
 
   beforeAll(async () => {
     db = (await miniflare.getD1Database("DB")) as unknown as D1Database;
-    const migrations = (await readdir(resolve("migrations")))
-      .filter((name) => /^\d+_.*\.sql$/u.test(name))
-      .sort();
-    for (const migration of migrations) {
-      await executeMigration(db, await readFile(resolve("migrations", migration), "utf8"));
-    }
+    await applyD1Migrations(db);
     await db
       .prepare(
         `insert into user (id, name, email, emailVerified, createdAt, updatedAt)

@@ -1,5 +1,3 @@
-import { readdir, readFile } from "node:fs/promises";
-import { resolve } from "node:path";
 import { Miniflare } from "miniflare";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
@@ -25,6 +23,7 @@ import {
   createOrganizationAgent,
   listOrganizationAgents,
 } from "./organization-agents";
+import { applyD1Migrations } from "./test-helpers/d1";
 
 const organizationId = "a0000000-0000-4000-8000-000000000001";
 const otherOrganizationId = "a0000000-0000-4000-8000-000000000002";
@@ -36,44 +35,6 @@ const outsiderId = "outsider";
 const at = (minute: number) =>
   new Date(Date.UTC(2026, 0, 1, 0, minute)).toISOString();
 
-/**
- * Channel work spans migrations that rebuild tables, so this suite applies the
- * full migration directory to its own database instead of replaying a subset.
- */
-const splitStatements = (sql: string) => {
-  const statements: string[] = [];
-  let buffer: string[] = [];
-  let inTrigger = false;
-  for (const line of sql.split("\n")) {
-    const trimmed = line.trim();
-    buffer.push(line);
-    if (/^create\s+trigger/iu.test(trimmed)) inTrigger = true;
-    if (inTrigger) {
-      if (/^END;/iu.test(trimmed)) {
-        statements.push(buffer.join("\n"));
-        buffer = [];
-        inTrigger = false;
-      }
-      continue;
-    }
-    if (trimmed.endsWith(";")) {
-      statements.push(buffer.join("\n"));
-      buffer = [];
-    }
-  }
-  if (buffer.join("").trim()) statements.push(buffer.join("\n"));
-  return statements
-    .map((statement) =>
-      statement
-        .split("\n")
-        .filter((line) => !line.trim().startsWith("--"))
-        .join("\n")
-        .trim()
-        .replace(/;$/u, ""),
-    )
-    .filter((statement) => statement.length > 0);
-};
-
 describe("organization channels", () => {
   const miniflare = new Miniflare({
     modules: true,
@@ -84,16 +45,9 @@ describe("organization channels", () => {
 
   beforeAll(async () => {
     db = (await miniflare.getD1Database("DB")) as unknown as D1Database;
-    const files = (await readdir(resolve("migrations")))
-      .filter((name) => name.endsWith(".sql"))
-      .sort();
-    for (const file of files) {
-      for (const statement of splitStatements(
-        await readFile(resolve("migrations", file), "utf8"),
-      )) {
-        await db.prepare(statement).run();
-      }
-    }
+    // Channel work spans migrations that rebuild tables, so this suite applies
+    // the full migration directory instead of replaying a subset.
+    await applyD1Migrations(db);
 
     for (const [id, name] of [
       [ownerId, "Owner"],

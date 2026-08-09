@@ -105,6 +105,7 @@ import {
   upsertProjectAgentSession,
 } from "./db";
 import { registerExecutionWorker } from "./workers";
+import { executeD1Sql } from "./test-helpers/d1";
 
 const releaseWorkflow = normalizeAutoHuntWorkflow({
   version: 2,
@@ -276,30 +277,7 @@ const completedStructuredResult = {
   nextAction: null,
   dueAt: null,
 } as const;
-const executeSql = async (db: D1Database, sql: string) => {
-  for (const statement of sql.split(/;\s*(?:\n|$)/u)) {
-    if (statement.trim()) await db.prepare(statement).run();
-  }
-};
-
-const executeTriggerMigration = async (db: D1Database, sql: string) => {
-  let statement: string[] = [];
-  let inTrigger = false;
-  for (const line of sql.split("\n")) {
-    const trimmed = line.trim();
-    if (!trimmed && statement.length === 0) continue;
-    statement.push(line);
-    if (/^create trigger\b/iu.test(trimmed)) inTrigger = true;
-    const complete = inTrigger ? /^end;$/iu.test(trimmed) : trimmed.endsWith(";");
-    if (!complete) continue;
-    await db.prepare(statement.join("\n")).run();
-    statement = [];
-    inTrigger = false;
-  }
-  if (statement.some((line) => line.trim())) {
-    throw new Error("Incomplete dashboard sync migration statement");
-  }
-};
+const executeSql = executeD1Sql;
 
 const event = (
   stage: HuntEventInput["stage"],
@@ -672,11 +650,11 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       db,
       await readFile(resolve("migrations/0048_issue_dependencies.sql"), "utf8"),
     );
-    await executeTriggerMigration(
+    await executeSql(
       db,
       await readFile(resolve("migrations/0049_dashboard_delta_sync.sql"), "utf8"),
     );
-    await executeTriggerMigration(
+    await executeSql(
       db,
       await readFile(resolve("migrations/0050_hunt_run_event_count.sql"), "utf8"),
     );
@@ -695,7 +673,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         "utf8",
       ),
     );
-    await executeTriggerMigration(
+    await executeSql(
       db,
       await readFile(
         resolve("migrations/0053_issue_result_reviews.sql"),
@@ -738,7 +716,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         "utf8",
       ),
     );
-    await executeTriggerMigration(
+    await executeSql(
       db,
       await readFile(
         resolve("migrations/0061_workflow_stage_status_events.sql"),

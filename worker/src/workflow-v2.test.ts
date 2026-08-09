@@ -1,5 +1,3 @@
-import { readdir, readFile } from "node:fs/promises";
-import { resolve } from "node:path";
 import { Miniflare } from "miniflare";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
@@ -26,31 +24,11 @@ import {
   startWorkflowStage,
   HuntTransitionError,
 } from "./db";
+import { applyD1Migrations } from "./test-helpers/d1";
 
 const baseTime = Date.parse("2026-08-01T00:00:00Z");
 const at = (minute: number) =>
   new Date(baseTime + minute * 60_000).toISOString();
-
-const executeMigration = async (db: D1Database, sql: string) => {
-  let statement: string[] = [];
-  let inTrigger = false;
-  for (const line of sql.split("\n")) {
-    const trimmed = line.trim();
-    if (!trimmed && statement.length === 0) continue;
-    statement.push(line);
-    if (/^create trigger\b/iu.test(trimmed)) inTrigger = true;
-    const complete = inTrigger
-      ? /^end;$/iu.test(trimmed)
-      : trimmed.endsWith(";");
-    if (!complete) continue;
-    await db.prepare(statement.join("\n")).run();
-    statement = [];
-    inTrigger = false;
-  }
-  if (statement.some((line) => line.trim())) {
-    throw new Error("Incomplete migration statement");
-  }
-};
 
 const event = (
   sourceKey: string,
@@ -168,17 +146,13 @@ describe("workflow v2 D1 persistence and transitions", () => {
 
   beforeAll(async () => {
     db = (await miniflare.getD1Database("DB")) as unknown as D1Database;
-    const migrationNames = (await readdir(resolve("migrations")))
-      .filter((name) => /^\d+_.*\.sql$/u.test(name))
-      .sort();
-    for (const name of migrationNames) {
-      if ([
+    await applyD1Migrations(db, {
+      exclude: [
         "0059_workflow_v2_progress.sql",
         "0061_workflow_stage_status_events.sql",
         "0078_workflow_v2_only.sql",
-      ].includes(name)) continue;
-      await executeMigration(db, await readFile(resolve("migrations", name), "utf8"));
-    }
+      ],
+    });
 
     await db
       .prepare(
@@ -226,10 +200,9 @@ describe("workflow v2 D1 persistence and transitions", () => {
       run: beforeRun!.workflow_snapshot_json,
     };
 
-    await executeMigration(
-      db,
-      await readFile(resolve("migrations", "0059_workflow_v2_progress.sql"), "utf8"),
-    );
+    await applyD1Migrations(db, {
+      files: ["0059_workflow_v2_progress.sql"],
+    });
     await db
       .prepare(
         `insert into briar_run_stage_progress (
@@ -238,13 +211,9 @@ describe("workflow v2 D1 persistence and transitions", () => {
       )
       .bind(frozenRunId, at(3), at(4))
       .run();
-    await executeMigration(
-      db,
-      await readFile(
-        resolve("migrations", "0061_workflow_stage_status_events.sql"),
-        "utf8",
-      ),
-    );
+    await applyD1Migrations(db, {
+      files: ["0061_workflow_stage_status_events.sql"],
+    });
     const backfilled = await db
       .prepare(
         `select event_count, last_event_at from briar_hunt_runs where id = ?`,
