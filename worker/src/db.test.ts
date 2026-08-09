@@ -49,7 +49,6 @@ import {
   getOrganizationInvitationByTokenHash,
   getRunEvidenceImage,
   getIssueMessage,
-  getNextQueuedHuntRun,
   HuntClaimError,
   HuntTransitionError,
   listIssueAttachments,
@@ -3395,23 +3394,40 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
   });
 
   it("stores issue attachment metadata scoped to its project and run", async () => {
-    const run = await getNextQueuedHuntRun(db, projectId);
-    expect(run).not.toBeNull();
+    const runId = await recordHuntEvent(
+      db,
+      projectId,
+      event("queued", 19.5, {
+        sourceKey: "issue-attachment-run",
+        eventKey: "issue-attachment-run:queued",
+        title: "Issue attachment run",
+        branch: null,
+        commitSha: null,
+      }),
+    );
+    const run = await claimNextQueuedHuntRun(db, projectId, {
+      claimTokenHash: "6".repeat(64),
+      claimedBy: "attachment-worker",
+      claimedAt: atMinute(19.6),
+      leaseExpiresAt: atMinute(120),
+      runId,
+    });
+    expect(run?.id).toBe(runId);
     const attachmentId = "66666666-6666-4666-8666-666666666666";
-    await createIssueAttachments(db, projectId, run!.id, [
+    await createIssueAttachments(db, projectId, runId, [
       {
         id: attachmentId,
-        object_key: `issue-attachments/${projectId}/${run!.id}/${attachmentId}`,
+        object_key: `issue-attachments/${projectId}/${runId}/${attachmentId}`,
         filename: "screen.png",
         content_type: "image/png",
         byte_size: 2048,
       },
     ]);
 
-    expect(await listIssueAttachments(db, projectId, run!.id)).toEqual([
+    expect(await listIssueAttachments(db, projectId, runId)).toEqual([
       expect.objectContaining({
         id: attachmentId,
-        run_id: run!.id,
+        run_id: runId,
         project_id: projectId,
         filename: "screen.png",
         content_type: "image/png",
@@ -3419,7 +3435,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       }),
     ]);
     expect(
-      await getIssueAttachment(db, projectId, run!.id, attachmentId),
+      await getIssueAttachment(db, projectId, runId, attachmentId),
     ).toEqual(
       expect.objectContaining({
         object_key: expect.stringContaining(attachmentId),
@@ -3429,7 +3445,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       await getIssueAttachment(
         db,
         "99999999-9999-4999-8999-999999999999",
-        run!.id,
+        runId,
         attachmentId,
       ),
     ).toBeNull();
@@ -3773,7 +3789,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     );
   });
 
-  it("returns the highest-priority oldest queued run", async () => {
+  it("claims the highest-priority oldest queued run", async () => {
     await recordHuntEvent(
       db,
       projectId,
@@ -3801,12 +3817,27 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       }),
     );
 
-    const next = await getNextQueuedHuntRun(db, projectId);
+    const next = await claimNextQueuedHuntRun(db, projectId, {
+      claimTokenHash: "7".repeat(64),
+      claimedBy: "priority-worker",
+      claimedAt: atMinute(21),
+      leaseExpiresAt: atMinute(31),
+    });
 
     expect(next?.id).toBe(urgentId);
     expect(next?.title).toBe("Urgent queued issue");
     expect(next?.stage).toBe("queued");
     expect(next?.source_key).not.toBe("backlog-issue");
+
+    await db
+      .prepare(
+        `update briar_hunt_runs
+         set claim_token_hash = null, claimed_by = null, claimed_at = null,
+             lease_expires_at = null, claim_attempts = 0
+         where id = ?`,
+      )
+      .bind(urgentId)
+      .run();
   });
 
   it("claims queued runs atomically and safely reassigns expired leases", async () => {
@@ -3876,6 +3907,18 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
   });
 
   it("claims a specifically requested queued run without taking the queue head", async () => {
+    const queueHeadId = await recordHuntEvent(
+      db,
+      projectId,
+      event("queued", 21.4, {
+        sourceKey: "queue-head-issue",
+        eventKey: "queue-head-issue:queued:intake",
+        title: "Queue head issue",
+        priority: 1,
+        branch: null,
+        commitSha: null,
+      }),
+    );
     const requestedId = await recordHuntEvent(
       db,
       projectId,
@@ -3899,9 +3942,14 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
 
     expect(claimed?.id).toBe(requestedId);
     expect(claimed?.title).toBe("Requested queued issue");
-    expect((await getNextQueuedHuntRun(db, projectId))?.title).toBe(
-      "Urgent queued issue",
-    );
+    const queueHead = await claimNextQueuedHuntRun(db, projectId, {
+      claimTokenHash: "e".repeat(64),
+      claimedBy: "queue-worker",
+      claimedAt: atMinute(22),
+      leaseExpiresAt: atMinute(32),
+    });
+    expect(queueHead?.id).toBe(queueHeadId);
+    expect(queueHead?.title).toBe("Queue head issue");
   });
 
   it("retries failed runs as a new attempt while preserving prior evidence", async () => {
