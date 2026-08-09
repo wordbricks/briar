@@ -12,6 +12,7 @@ import {
   type ProjectAgentLocale,
 } from "./project-agent";
 import type { AgentProvider, ModelEffort } from "./project-llm";
+import type { UsageRangeDays } from "./agent-usage-overview";
 import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
 import type {
   ChannelAgentReply,
@@ -32,6 +33,7 @@ import type {
   CreateIssueInput,
   CreateProjectAgentInput,
   CreateProjectAgentScheduleInput,
+  AgentUsageRun,
   DashboardPayload,
   DashboardDeltaPayload,
   ExecutionWorker,
@@ -931,6 +933,20 @@ export async function loadDashboard(
     },
     runs: normalizeDashboardRuns(dashboard.runs),
   };
+}
+
+export async function loadAgentUsageRuns(
+  token: string,
+  organizationId: string,
+  days: UsageRangeDays = 90,
+  signal?: AbortSignal,
+): Promise<AgentUsageRun[]> {
+  const result = await request<{ runs: AgentUsageRun[] }>(
+    `/organizations/${encodeURIComponent(organizationId)}/usage/runs?days=${days}`,
+    token,
+    { signal },
+  );
+  return result.runs;
 }
 
 export async function loadDashboardDelta(

@@ -178,6 +178,7 @@ import {
   listRunStageRevisions,
   listOrganizationMembers,
   listOrganizationInvitations,
+  listOrganizationUsageRuns,
   listGithubConnectionRepositories,
   listOrganizationProjects,
   listOrganizations,
@@ -254,6 +255,7 @@ import {
   type ProjectSettingsRow,
   type OrganizationMemberRow,
   type OrganizationInvitationRow,
+  type OrganizationUsageRunRow,
   type OrganizationRole,
   type OrganizationRow,
   type RunEvidenceRow,
@@ -434,6 +436,23 @@ const corsHeaders = {
 };
 const accountDeletionFreshAgeMs = 24 * 60 * 60 * 1_000;
 const organizationInvitationTtlMs = 7 * 24 * 60 * 60 * 1_000;
+const usageRangeFetchPaddingDays = 1;
+
+export const usageRangeDaysSchema = z.preprocess(
+  (value) =>
+    typeof value === "string" && value.trim() !== ""
+      ? Number(value)
+      : value,
+  z.union([z.literal(7), z.literal(30), z.literal(90)]),
+);
+
+export const organizationUsageQuerySince = (
+  days: 7 | 30 | 90,
+  now: number = Date.now(),
+) =>
+  new Date(
+    now - (days + usageRangeFetchPaddingDays) * 24 * 60 * 60_000,
+  ).toISOString();
 
 const json = (body: unknown, status = 200) =>
   Response.json(body, { status, headers: corsHeaders });
@@ -4273,6 +4292,34 @@ const parseExecutionMetrics = (value: string | null) => {
   return result.success ? result.data : null;
 };
 
+const parseUsageExecutionMetrics = (value: string | null) => {
+  try {
+    return parseExecutionMetrics(value);
+  } catch {
+    return null;
+  }
+};
+
+export const organizationUsageRunJson = (run: OrganizationUsageRunRow) => ({
+  id: run.id,
+  projectId: run.project_id,
+  status: run.paused_at ? ("paused" as const) : run.status,
+  executionMetrics: parseUsageExecutionMetrics(run.execution_metrics_json),
+  claimedBy: run.claimed_by,
+  claimedAt: run.claimed_at,
+  claimAttempts: run.claim_attempts,
+  workerId: run.worker_id,
+  preferredProvider: run.preferred_agent_provider,
+  preferredModel: run.preferred_agent_model,
+  requestedProvider: run.requested_agent_provider,
+  requestedModel: run.requested_agent_model,
+  executionProvider: run.execution_provider,
+  executionModel: run.execution_model,
+  startedAt: run.started_at,
+  updatedAt: run.updated_at,
+  completedAt: run.completed_at,
+});
+
 const dashboardEventJson = (event: HuntEventRow) => ({
   id: event.id,
   attempt: event.attempt,
@@ -5010,6 +5057,29 @@ async function route(
     const session = await requireSession(auth, request);
     const organizations = await listOrganizations(db, session.user.id);
     return json({ organizations: organizations.map(organizationJson) });
+  }
+
+  const organizationUsageRunsMatch = pathname.match(
+    /^\/organizations\/([0-9a-f-]+)\/usage\/runs$/u,
+  );
+  if (organizationUsageRunsMatch && request.method === "GET") {
+    const session = await requireSession(auth, request);
+    const organizationId = organizationUsageRunsMatch[1];
+    const role = await getOrganizationRole(db, organizationId, session.user.id);
+    if (!role) throw new HttpError(404, "Organization not found");
+    const days = usageRangeDaysSchema.parse(
+      new URL(request.url).searchParams.get("days") ?? "90",
+    );
+    const generatedAt = Date.now();
+    const runs = await listOrganizationUsageRuns(
+      db,
+      organizationId,
+      organizationUsageQuerySince(days, generatedAt),
+    );
+    return json({
+      runs: runs.map(organizationUsageRunJson),
+      generatedAt: new Date(generatedAt).toISOString(),
+    });
   }
 
   if (

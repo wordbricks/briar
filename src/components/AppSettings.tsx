@@ -80,7 +80,7 @@ import { AgentUsageSettings } from "./AgentUsageSettings";
 import { AppearanceSettings } from "./AppearanceSettings";
 import { InboxNotificationSettings } from "./InboxNotificationSettings";
 import type { RepositoryReadiness } from "../lib/project-connection";
-import type { SessionUser } from "../types";
+import type { AgentUsageRun, SessionUser } from "../types";
 import { AccountDeletionSettings } from "./AccountDeletionSettings";
 import { AccountProfileSettings } from "./AccountProfileSettings";
 import { BrowserSettings } from "./BrowserSettings";
@@ -149,10 +149,12 @@ export function AppSettings({
   onBack,
   onAccountDelete,
   onAccountSave,
+  onLoadUsageRuns,
   onRefresh,
   projectId,
   projectName,
   readiness,
+  usageScopeKey,
   user,
 }: {
   error: string | null;
@@ -167,10 +169,12 @@ export function AppSettings({
     name: string;
     image: string | null;
   }) => Promise<SessionUser>;
+  onLoadUsageRuns?: () => Promise<readonly AgentUsageRun[]>;
   onRefresh: () => Promise<unknown>;
   projectId: string;
   projectName: string;
   readiness: RepositoryReadiness | null;
+  usageScopeKey?: string;
   user?: SessionUser;
 }) {
   const { t } = useI18n();
@@ -527,10 +531,12 @@ export function AppSettings({
 
       <SettingsMain isSidebarOpen={isSidebarOpen}>
         <SettingsScroll>
-          <SettingsPageHeader
-            description={sectionDescription}
-            title={activeItem?.label ?? t("appSettings.title")}
-          />
+          {activeSection !== "usage" ? (
+            <SettingsPageHeader
+              description={sectionDescription}
+              title={activeItem?.label ?? t("appSettings.title")}
+            />
+          ) : null}
 
           {activeSection === "account" ? (
             <SettingsContent>
@@ -551,6 +557,8 @@ export function AppSettings({
           ) : activeSection === "usage" ? (
             <AgentUsageSettings
               onManageAccounts={() => setActiveSection("providers")}
+              onLoadUsageRuns={onLoadUsageRuns}
+              usageScopeKey={usageScopeKey}
             />
           ) : activeSection === "notifications" ? (
             <SettingsContent>

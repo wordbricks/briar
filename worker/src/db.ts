@@ -394,6 +394,27 @@ export type HuntRunRow = {
   event_count: number;
 };
 
+export type OrganizationUsageRunRow = {
+  id: string;
+  project_id: string;
+  status: AutoHuntPersistedRunStatus;
+  paused_at: string | null;
+  execution_metrics_json: string | null;
+  claimed_by: string | null;
+  claimed_at: string | null;
+  claim_attempts: number;
+  worker_id: string | null;
+  preferred_agent_provider: ProjectAgentProvider | null;
+  preferred_agent_model: string | null;
+  requested_agent_provider: ProjectAgentProvider | null;
+  requested_agent_model: string | null;
+  execution_provider: ProjectAgentProvider | null;
+  execution_model: string | null;
+  started_at: string;
+  updated_at: string;
+  completed_at: string | null;
+};
+
 export type IssueResultReviewRow = {
   run_id: string;
   user_id: string;
@@ -4938,6 +4959,61 @@ export async function listDashboardRuns(db: D1Database, projectId: string) {
     )
     .bind(projectId)
     .all<HuntRunRow>();
+
+  return runs.results;
+}
+
+export async function listOrganizationUsageRuns(
+  db: D1Database,
+  organizationId: string,
+  since: string,
+) {
+  const runs = await db
+    .prepare(
+      `select run.id, run.project_id, run.status, run.paused_at,
+              run.execution_metrics_json,
+              run.claimed_by, run.claimed_at, run.claim_attempts, run.worker_id,
+              run.preferred_agent_provider, run.preferred_agent_model,
+              run.requested_agent_provider, run.requested_agent_model,
+              coalesce(
+                run.preferred_agent_provider,
+                run.requested_agent_provider
+              ) as execution_provider,
+              case
+                when run.preferred_agent_provider is not null
+                  then run.preferred_agent_model
+                when run.requested_agent_provider is not null
+                  then run.requested_agent_model
+                else null
+              end as execution_model,
+              run.started_at, run.updated_at, run.completed_at
+       from briar_hunt_runs run
+       join briar_projects project on project.id = run.project_id
+       where project.organization_id = ?
+         and unixepoch(coalesce(
+           run.completed_at,
+           run.updated_at,
+           run.started_at
+         )) >= unixepoch(?)
+         and (
+           run.execution_metrics_json is not null
+           or run.claimed_at is not null
+           or run.claimed_by is not null
+           or run.worker_id is not null
+           or run.claim_attempts > 0
+           or run.paused_at is not null
+           or run.status in (
+             'running', 'blocked', 'failed', 'completed', 'cancelled'
+           )
+         )
+       order by unixepoch(coalesce(
+         run.completed_at,
+         run.updated_at,
+         run.started_at
+       )), run.id`,
+    )
+    .bind(organizationId, since)
+    .all<OrganizationUsageRunRow>();
 
   return runs.results;
 }

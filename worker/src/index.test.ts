@@ -10,6 +10,8 @@ import worker, {
   organizationLogoInputSchema,
   organizationInvitationInputSchema,
   organizationMemberRoleInputSchema,
+  organizationUsageQuerySince,
+  organizationUsageRunJson,
   organizationUpdateInputSchema,
   pausedRunReworkInputSchema,
   parseProjectSettingsInput,
@@ -23,6 +25,7 @@ import worker, {
   runEvidenceInputSchema,
   runReworkInputSchema,
   transcriptSchema,
+  usageRangeDaysSchema,
   workflowStageLifecycleInputSchema,
   workerSettingsSchema,
 } from "./index";
@@ -134,6 +137,87 @@ describe("Worker HTTP contract", () => {
         events: [{ sequence: 1, direction: "server", payload: {} }],
       }),
     ).toThrow(/runId and runAttempt/iu);
+  });
+
+  it("bounds organization usage windows to the supported calendar ranges", () => {
+    expect(usageRangeDaysSchema.parse("7")).toBe(7);
+    expect(usageRangeDaysSchema.parse("30")).toBe(30);
+    expect(usageRangeDaysSchema.parse("90")).toBe(90);
+    for (const invalid of ["", "0", "91", "7.5", "all"]) {
+      expect(() => usageRangeDaysSchema.parse(invalid)).toThrow();
+    }
+    expect(
+      organizationUsageQuerySince(
+        90,
+        Date.parse("2026-08-09T12:00:00.000Z"),
+      ),
+    ).toBe("2026-05-10T12:00:00.000Z");
+  });
+
+  it("serializes only the lightweight usage run projection", () => {
+    const result = organizationUsageRunJson({
+      id: "11111111-1111-4111-8111-111111111111",
+      project_id: "22222222-2222-4222-8222-222222222222",
+      status: "running",
+      paused_at: "2026-08-01T00:01:00.000Z",
+      execution_metrics_json: JSON.stringify({
+        inputTokens: 100,
+        outputTokens: 20,
+        cacheReadTokens: 80,
+        cacheWriteTokens: null,
+        reasoningOutputTokens: 5,
+        totalTokens: 120,
+        durationMs: 1_000,
+      }),
+      claimed_by: "worker",
+      claimed_at: "2026-08-01T00:00:00.000Z",
+      claim_attempts: 1,
+      worker_id: "worker-1",
+      preferred_agent_provider: null,
+      preferred_agent_model: null,
+      requested_agent_provider: "codex",
+      requested_agent_model: "gpt-5.6-sol",
+      execution_provider: "codex",
+      execution_model: "gpt-5.6-sol",
+      started_at: "2026-08-01T00:00:00.000Z",
+      updated_at: "2026-08-01T00:01:00.000Z",
+      completed_at: null,
+    });
+
+    expect(result).toMatchObject({
+      projectId: "22222222-2222-4222-8222-222222222222",
+      status: "paused",
+      executionProvider: "codex",
+      executionModel: "gpt-5.6-sol",
+      executionMetrics: { totalTokens: 120 },
+    });
+    expect(result).not.toHaveProperty("workflow");
+    expect(result).not.toHaveProperty("attachments");
+    expect(result).not.toHaveProperty("events");
+    expect(
+      organizationUsageRunJson({
+        ...({
+          id: "11111111-1111-4111-8111-111111111111",
+          project_id: "22222222-2222-4222-8222-222222222222",
+          status: "completed",
+          paused_at: null,
+          claimed_by: null,
+          claimed_at: null,
+          claim_attempts: 1,
+          worker_id: null,
+          preferred_agent_provider: null,
+          preferred_agent_model: null,
+          requested_agent_provider: null,
+          requested_agent_model: null,
+          execution_provider: null,
+          execution_model: null,
+          started_at: "2026-08-01T00:00:00.000Z",
+          updated_at: "2026-08-01T00:01:00.000Z",
+          completed_at: "2026-08-01T00:01:00.000Z",
+        } as const),
+        execution_metrics_json: "not-json",
+      }).executionMetrics,
+    ).toBeNull();
   });
 
   it("accepts preferred provider and model on issue creation", async () => {

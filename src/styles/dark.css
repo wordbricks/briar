@@ -235,6 +235,11 @@
   color: var(--muted-foreground);
 }
 
+.dark .usage-overview {
+  --usage-codex-color:#eceee9;
+  --usage-unknown-color:#a8aaa5;
+}
+
 .dark .health-item {
   border-color: var(--border);
 }
