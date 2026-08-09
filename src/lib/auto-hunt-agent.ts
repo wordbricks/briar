@@ -268,14 +268,24 @@ export function agentMessagesFromAppServerEvents(
 ): AutoHuntAgentMessage[] {
   const messages = new Map<string, AutoHuntAgentMessage>();
   const order: string[] = [];
+  let turnSequence = 0;
 
   for (const event of events) {
+    if (
+      event.direction === "client" &&
+      (event.message.method === "turn/start" || event.message.type === "run")
+    ) {
+      turnSequence += 1;
+    }
     const normalized = event.event;
     if (normalized?.type === "messageStarted" || normalized?.type === "messageCompleted") {
-      const existing = messages.get(normalized.id);
-      if (!existing) order.push(normalized.id);
-      messages.set(normalized.id, {
-        id: normalized.id,
+      const id = turnSequence > 1
+        ? `turn:${turnSequence}:${normalized.id}`
+        : normalized.id;
+      const existing = messages.get(id);
+      if (!existing) order.push(id);
+      messages.set(id, {
+        id,
         phase: normalized.phase ?? existing?.phase ?? null,
         text: normalized.text || existing?.text || "",
         startedAtMs: existing?.startedAtMs ?? event.occurredAtMs,
@@ -285,10 +295,13 @@ export function agentMessagesFromAppServerEvents(
       continue;
     }
     if (normalized?.type === "messageDelta") {
-      const existing = messages.get(normalized.id);
-      if (!existing) order.push(normalized.id);
-      messages.set(normalized.id, {
-        id: normalized.id,
+      const id = turnSequence > 1
+        ? `turn:${turnSequence}:${normalized.id}`
+        : normalized.id;
+      const existing = messages.get(id);
+      if (!existing) order.push(id);
+      messages.set(id, {
+        id,
         phase: existing?.phase ?? null,
         text: `${existing?.text ?? ""}${normalized.delta}`,
         startedAtMs: existing?.startedAtMs ?? event.occurredAtMs,

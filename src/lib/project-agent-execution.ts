@@ -42,6 +42,7 @@ export type ProjectAgentTaskSessionStart = {
   sessionId: string;
   request: string;
   startedAt: string;
+  isFollowUp?: boolean;
 };
 
 export type ProjectAgentTaskSessionSettlement = {
@@ -94,7 +95,9 @@ export async function executeProjectAgentTask(
     sessionId?: string;
     startedAt?: string;
     conversationId?: string | null;
+    workspaceRoot?: string | null;
     recoveringAfterUpdate?: boolean;
+    isFollowUp?: boolean;
   },
 ) {
   const sessionId = input.sessionId ?? crypto.randomUUID();
@@ -106,6 +109,7 @@ export async function executeProjectAgentTask(
       sessionId,
       request: input.message,
       startedAt,
+      isFollowUp: input.isFollowUp,
     });
     sessionStarted = true;
     const result = await executeProjectAgentTurn(
@@ -151,8 +155,8 @@ export async function executeProjectAgentTask(
     if (sessionStarted) {
       dependencies.settleSession(sessionId, {
         status: "failed",
-        conversationId: null,
-        workspaceRoot: null,
+        conversationId: input.conversationId ?? null,
+        workspaceRoot: input.workspaceRoot ?? null,
         summary: null,
         error: caught instanceof Error ? caught.message : String(caught),
       });

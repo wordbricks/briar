@@ -52,6 +52,12 @@ export type AutoHuntSessionEvent = {
   occurredAt: string;
 };
 
+export type AutoHuntSessionFollowUp = {
+  id: string;
+  message: string;
+  sentAt: string;
+};
+
 export type AutoHuntSession = {
   id: string;
   dispatchGroupId: string;
@@ -63,6 +69,7 @@ export type AutoHuntSession = {
   scheduleRunId?: string;
   parentSessionId?: string;
   request?: string;
+  followUps?: AutoHuntSessionFollowUp[];
   status: AutoHuntSessionStatus;
   issues: AutoHuntSessionIssue[];
   startedAt: string;
@@ -118,6 +125,7 @@ function readSessions(): AutoHuntSession[] {
           storedSession.completedAt ??
           storedSession.startedAt,
         localOwner: storedSession.localOwner ?? true,
+        followUps: storedSession.followUps ?? [],
       };
       return session.status === "running" && session.localOwner
         ? {
@@ -484,6 +492,7 @@ export function useAutoHuntSessions(
       trigger?: "manual" | "scheduled";
       scheduleId?: string;
       scheduleRunId?: string;
+      isFollowUp?: boolean;
     },
   ) => {
     const existing = sessionsRef.current.find(
@@ -498,12 +507,30 @@ export function useAutoHuntSessions(
           session.id === existing.id
             ? {
                 ...session,
-                request: input.request,
+                request: input.isFollowUp
+                  ? session.request
+                  : input.request,
+                followUps: input.isFollowUp
+                  ? [
+                      ...(session.followUps ?? []),
+                      {
+                        id: crypto.randomUUID(),
+                        message: input.request,
+                        sentAt: input.startedAt,
+                      },
+                    ]
+                  : session.followUps ?? [],
                 status: "running" as const,
-                startedAt: input.startedAt,
+                startedAt: input.isFollowUp
+                  ? session.startedAt
+                  : input.startedAt,
                 completedAt: null,
-                conversationId: null,
-                workspaceRoot: null,
+                conversationId: input.isFollowUp
+                  ? session.conversationId
+                  : null,
+                workspaceRoot: input.isFollowUp
+                  ? session.workspaceRoot
+                  : null,
                 summary: null,
                 error: null,
                 updatedAt: input.startedAt,
@@ -527,6 +554,7 @@ export function useAutoHuntSessions(
       scheduleId: input.scheduleId,
       scheduleRunId: input.scheduleRunId,
       request: input.request,
+      followUps: [],
       status: "running",
       issues: [],
       startedAt: input.startedAt,

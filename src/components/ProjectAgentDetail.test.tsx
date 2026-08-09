@@ -420,6 +420,97 @@ describe("ProjectAgentDetail", () => {
     expect(document.body.textContent).toContain("릴리스 상태를 확인했습니다.");
   });
 
+  it("runs a follow-up in the completed session's provider conversation", async () => {
+    runProjectAgent.mockResolvedValue({
+      conversationId: "briar:project-1:thread-1",
+      workspaceRoot: "/repo",
+      action: "respond",
+      message: "커밋을 완료했습니다.",
+      maxIssues: null,
+      structuredResult: {
+        summary: "커밋을 완료했습니다.",
+        outcome: "completed",
+        importance: "routine",
+        urgency: "normal",
+        impact: "project",
+        humanActionRequired: false,
+        nextAction: null,
+        dueAt: null,
+      },
+    });
+    const completedSession: AutoHuntSession = {
+      id: "task-session",
+      dispatchGroupId: "",
+      projectId: agent.projectId,
+      agentId: agent.id,
+      sessionType: "task",
+      request: "릴리스 상태를 확인해 줘",
+      status: "completed",
+      issues: [],
+      startedAt: "2026-07-28T01:00:00.000Z",
+      completedAt: "2026-07-28T01:01:00.000Z",
+      conversationId: "briar:project-1:thread-1",
+      workspaceRoot: "/repo",
+      summary: "릴리스 상태를 확인했습니다.",
+      error: null,
+      events: [],
+      dispatchEvents: [],
+      workers: [],
+      localOwner: true,
+    };
+    const onStartTaskSession = vi.fn();
+    const onSettleTaskSession = vi.fn();
+    const container = await mount(
+      <ProjectAgentDetail
+        agent={agent}
+        dashboard={dashboard}
+        error={null}
+        isSidebarOpen
+        onBack={() => undefined}
+        onIssueOpen={() => undefined}
+        onSettleTaskSession={onSettleTaskSession}
+        onStopSession={async () => true}
+        onStartAutoHunt={() => "dispatch-1"}
+        onStartTaskSession={onStartTaskSession}
+        requestedSessionId={completedSession.id}
+        sessions={[completedSession]}
+      />,
+    );
+
+    const input = container.querySelector<HTMLTextAreaElement>(
+      'textarea[aria-label="후속 메시지"]',
+    );
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(
+        HTMLTextAreaElement.prototype,
+        "value",
+      )?.set?.call(input, "변경 내용을 커밋해 줘");
+      input?.dispatchEvent(new Event("input", { bubbles: true }));
+      await Promise.resolve();
+    });
+    await act(async () => {
+      container.querySelector<HTMLFormElement>(
+        ".auto-hunt-session-follow-up",
+      )?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+      await Promise.resolve();
+    });
+
+    expect(onStartTaskSession).toHaveBeenCalledWith(expect.objectContaining({
+      sessionId: completedSession.id,
+      request: "변경 내용을 커밋해 줘",
+      isFollowUp: true,
+    }));
+    expect(runProjectAgent).toHaveBeenCalledWith(expect.objectContaining({
+      sessionId: completedSession.id,
+      conversationId: completedSession.conversationId,
+      message: "변경 내용을 커밋해 줘",
+    }));
+    expect(onSettleTaskSession).toHaveBeenCalledWith(
+      completedSession.id,
+      expect.objectContaining({ status: "completed" }),
+    );
+  });
+
   it("records the coordinator session when handing Auto Hunt to the host", async () => {
     runProjectAgent.mockResolvedValue({
       conversationId: "briar:project-1:coordinator-1",
