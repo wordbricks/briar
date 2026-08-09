@@ -19,6 +19,10 @@ import type {
 } from "../types";
 import type { StructuredAgentResult } from "./agent-result";
 import type { ModelEffort } from "./project-llm";
+import {
+  agentWithSkillRuntime,
+  defaultAgentSkill,
+} from "./project-agent";
 
 export type ProjectAgentScheduleExecutionDependencies = {
   loadDashboard: (
@@ -81,6 +85,10 @@ export async function executeScheduledProjectAgent(
   ProjectLlmChatResponse & { structuredResult: StructuredAgentResult }
 > {
   const sessionId = dependencies.startSession?.(run) ?? null;
+  const selectedSkill = defaultAgentSkill(run.agent);
+  const runtimeAgent = selectedSkill
+    ? agentWithSkillRuntime(run.agent, selectedSkill)
+    : run.agent;
   try {
     const initialDashboard = await dependencies.loadDashboard(
       token,
@@ -115,7 +123,7 @@ export async function executeScheduledProjectAgent(
                   ),
               },
               {
-                agent: run.agent,
+                agent: runtimeAgent,
                 runs: dashboard.runs,
                 maxIssues: decision.maxIssues ?? undefined,
                 targetRunIds: decision.targetRunIds ?? undefined,
@@ -137,12 +145,12 @@ export async function executeScheduledProjectAgent(
       {
         projectId: run.projectId,
         sessionId: sessionId ?? crypto.randomUUID(),
-        agent: run.agent,
+        agent: runtimeAgent,
         message: [
           `Run the scheduled automation "${run.scheduleName}".`,
           `It was scheduled for ${run.scheduledFor}.`,
           "Fulfill your saved responsibility for this scheduled run:",
-          run.agent.responsibility,
+          selectedSkill?.instructions ?? run.agent.responsibility,
         ].join("\n"),
         conversationId: null,
         runs: projectAgentRunSnapshots(initialDashboard.runs),

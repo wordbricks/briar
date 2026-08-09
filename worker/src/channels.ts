@@ -8,6 +8,7 @@ import {
   type ChannelSummary,
   type ChannelVisibility,
 } from "../../src/lib/channels-contract";
+import type { AgentSkillEffort } from "./agent-skills";
 
 export type ChannelRow = {
   id: string;
@@ -73,6 +74,7 @@ export type ChannelReplyJobRow = {
   channel_id: string;
   project_id: string | null;
   agent_id: string;
+  skill_id: string | null;
   trigger_message_id: string;
   parent_message_id: string;
   reply_message_id: string;
@@ -502,7 +504,7 @@ export async function listChannelAgents(db: D1Database, channelId: string) {
       provider: AgentProvider;
       model: string | null;
       responsibility: string;
-      effort: string | null;
+      effort: AgentSkillEffort | null;
       created_at: string;
       updated_at: string;
     }>();
@@ -849,6 +851,7 @@ export async function enqueueChannelAgentReplies(
     agents: Array<{
       id: string;
       projectId: string | null;
+      skillId?: string | null;
       provider: AgentProvider;
     }>;
     createdAt: string;
@@ -860,10 +863,10 @@ export async function enqueueChannelAgentReplies(
       db
         .prepare(
           `insert into briar_channel_agent_reply_jobs (
-             id, organization_id, channel_id, project_id, agent_id,
+             id, organization_id, channel_id, project_id, agent_id, skill_id,
              trigger_message_id, parent_message_id, reply_message_id,
              agent_provider, created_at, updated_at
-           ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
            on conflict (channel_id, trigger_message_id, agent_id) do nothing`,
         )
         .bind(
@@ -872,6 +875,7 @@ export async function enqueueChannelAgentReplies(
           input.channelId,
           agent.projectId,
           agent.id,
+          agent.skillId ?? null,
           input.triggerMessageId,
           input.parentMessageId,
           crypto.randomUUID(),

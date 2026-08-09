@@ -1,4 +1,4 @@
-import { Bot, LoaderCircle, Plus, Trash2 } from "lucide-react";
+import { Bot, LoaderCircle, Pencil, Plus, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import { SettingsAlert, SettingsPageHeader } from "@/components/settings";
@@ -21,6 +21,7 @@ import {
   createOrganizationAgent,
   deleteOrganizationAgent,
   listOrganizationAgents,
+  updateOrganizationAgent,
 } from "../lib/api";
 import {
   handleFromName,
@@ -34,6 +35,12 @@ import {
 } from "../lib/project-llm";
 import { AgentProviderIcon } from "./AgentIcons";
 import { NativeSelect } from "./NativeSelect";
+import {
+  ProjectAgentSkillsEditor,
+  projectAgentSkillInputs,
+  projectAgentSkillsValid,
+} from "./ProjectAgentSkillsEditor";
+import type { ProjectAgentSkillInput } from "../types";
 
 const providers: ChannelAgentProvider[] = [
   "codex",
@@ -65,6 +72,12 @@ export function OrganizationAgentsSettings({
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [deletingAgent, setDeletingAgent] =
     useState<ChannelAgentSummary | null>(null);
+  const [editingAgent, setEditingAgent] =
+    useState<ChannelAgentSummary | null>(null);
+  const [editingSkills, setEditingSkills] =
+    useState<ProjectAgentSkillInput[]>([]);
+  const [isSavingSkills, setIsSavingSkills] = useState(false);
+  const [skillSaveError, setSkillSaveError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -122,6 +135,67 @@ export function OrganizationAgentsSettings({
       setError(caught instanceof Error ? caught.message : String(caught));
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  const editSkills = (agent: ChannelAgentSummary) => {
+    setSkillSaveError(null);
+    setEditingAgent(agent);
+    setEditingSkills(
+      projectAgentSkillInputs(
+        agent.skills.map((skill) => ({
+          id: skill.id,
+          name: skill.name,
+          instructions: skill.instructions,
+          provider: skill.provider,
+          model: skill.model,
+          effort: skill.effort,
+          kind: skill.kind,
+          isDefault: skill.isDefault,
+          position: skill.position,
+        })),
+      ),
+    );
+  };
+
+  const saveSkills = async () => {
+    if (
+      !editingAgent ||
+      isSavingSkills ||
+      !projectAgentSkillsValid(editingSkills)
+    ) return;
+    setIsSavingSkills(true);
+    setSkillSaveError(null);
+    setError(null);
+    try {
+      const result = await updateOrganizationAgent(
+        token,
+        organizationId,
+        editingAgent.agentId,
+        {
+          name: editingAgent.name,
+          handle: editingAgent.handle ?? undefined,
+          provider: editingAgent.provider,
+          model: editingAgent.model,
+          effort: editingAgent.effort,
+          responsibility: editingAgent.responsibility,
+          skills: projectAgentSkillInputs(editingSkills),
+        },
+      );
+      setAgents((current) =>
+        current.map((agent) =>
+          agent.agentId === result.agent.agentId ? result.agent : agent,
+        ),
+      );
+      setEditingAgent(null);
+      setEditingSkills([]);
+      setSkillSaveError(null);
+    } catch (caught) {
+      setSkillSaveError(
+        caught instanceof Error ? caught.message : String(caught),
+      );
+    } finally {
+      setIsSavingSkills(false);
     }
   };
 
@@ -188,15 +262,20 @@ export function OrganizationAgentsSettings({
           aria-label={t("organization.agentsList")}
           className="grid gap-3"
         >
-          {agents.map((agent) => (
-            <article
+          {agents.map((agent) => {
+            const defaultSkill =
+              agent.skills.find((skill) => skill.isDefault) ??
+              agent.skills[0];
+            const runtime = defaultSkill ?? agent;
+            return (
+              <article
               className="grid gap-4 rounded-xl border border-border bg-card p-5 shadow-xs md:grid-cols-[minmax(0,1fr)_auto]"
               key={agent.agentId}
             >
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="grid size-8 place-items-center rounded-lg bg-secondary text-foreground">
-                    <AgentProviderIcon provider={agent.provider} size={16} />
+                    <AgentProviderIcon provider={runtime.provider} size={16} />
                   </span>
                   <Typography as="h2" variant="bodyLg">
                     {agent.name}
@@ -208,10 +287,19 @@ export function OrganizationAgentsSettings({
                 <Typography className="mt-3 whitespace-pre-wrap" variant="bodySm">
                   {agent.responsibility}
                 </Typography>
+                {agent.skills.length > 0 ? (
+                  <div className="mt-3 flex flex-wrap gap-1.5">
+                    {agent.skills.map((skill) => (
+                      <Badge key={skill.id} variant="outline">
+                        {skill.name}
+                      </Badge>
+                    ))}
+                  </div>
+                ) : null}
                 <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-muted-foreground">
                   <Typography as="span" variant="caption">
-                    {providerLabels[agent.provider]}
-                    {agent.model ? ` · ${agent.model}` : ""}
+                    {providerLabels[runtime.provider]}
+                    {runtime.model ? ` · ${runtime.model}` : ""}
                   </Typography>
                   <time dateTime={agent.createdAt}>
                     <Typography as="span" variant="caption">
@@ -225,21 +313,34 @@ export function OrganizationAgentsSettings({
                 </div>
               </div>
               {canManage ? (
-                <Button
-                  aria-label={t("organization.agentsDelete", {
-                    name: agent.name,
-                  })}
-                  className="self-start text-muted-foreground hover:text-destructive"
-                  onClick={() => setDeletingAgent(agent)}
-                  size="icon-sm"
-                  type="button"
-                  variant="ghost"
-                >
-                  <Trash2 aria-hidden="true" size={15} />
-                </Button>
+                <div className="flex self-start">
+                  <Button
+                    aria-label={`${agent.name} · ${t("agents.skills")}`}
+                    className="text-muted-foreground"
+                    onClick={() => editSkills(agent)}
+                    size="icon-sm"
+                    type="button"
+                    variant="ghost"
+                  >
+                    <Pencil aria-hidden="true" size={15} />
+                  </Button>
+                  <Button
+                    aria-label={t("organization.agentsDelete", {
+                      name: agent.name,
+                    })}
+                    className="text-muted-foreground hover:text-destructive"
+                    onClick={() => setDeletingAgent(agent)}
+                    size="icon-sm"
+                    type="button"
+                    variant="ghost"
+                  >
+                    <Trash2 aria-hidden="true" size={15} />
+                  </Button>
+                </div>
               ) : null}
-            </article>
-          ))}
+              </article>
+            );
+          })}
         </section>
       )}
 
@@ -248,6 +349,65 @@ export function OrganizationAgentsSettings({
         onClose={() => setIsCreateOpen(false)}
         onCreate={createAgent}
       />
+
+      <Dialog
+        onOpenChange={(open) => {
+          if (!open && !isSavingSkills) {
+            setEditingAgent(null);
+            setEditingSkills([]);
+            setSkillSaveError(null);
+          }
+        }}
+        open={editingAgent !== null}
+      >
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>
+              {editingAgent?.name ?? ""} · {t("agents.skills")}
+            </DialogTitle>
+            <DialogDescription>{t("agents.skillsDescription")}</DialogDescription>
+          </DialogHeader>
+          {skillSaveError ? (
+            <SettingsAlert className="mt-0">{skillSaveError}</SettingsAlert>
+          ) : null}
+          {editingAgent ? (
+            <ProjectAgentSkillsEditor
+              defaultEffort={editingAgent.effort}
+              defaultModel={editingAgent.model}
+              defaultProvider={editingAgent.provider}
+              disabled={isSavingSkills}
+              onChange={setEditingSkills}
+              skills={editingSkills}
+            />
+          ) : null}
+          <DialogFooter>
+            <Button
+              disabled={isSavingSkills}
+              onClick={() => {
+                setEditingAgent(null);
+                setEditingSkills([]);
+                setSkillSaveError(null);
+              }}
+              type="button"
+              variant="outline"
+            >
+              {t("common.cancel")}
+            </Button>
+            <Button
+              disabled={
+                isSavingSkills || !projectAgentSkillsValid(editingSkills)
+              }
+              onClick={() => void saveSkills()}
+              type="button"
+            >
+              {isSavingSkills ? (
+                <LoaderCircle className="animate-spin" size={16} />
+              ) : null}
+              {t(isSavingSkills ? "common.saving" : "common.save")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         onOpenChange={(open) => {

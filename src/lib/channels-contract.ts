@@ -12,6 +12,22 @@ export const channelAgentProviders = [
 ] as const;
 export type ChannelAgentProvider = (typeof channelAgentProviders)[number];
 
+export const channelAgentEfforts = [
+  "low",
+  "medium",
+  "high",
+  "xhigh",
+  "max",
+  "ultra",
+] as const;
+export type ChannelAgentEffort = (typeof channelAgentEfforts)[number];
+
+export const channelAgentSkillKinds = [
+  "issue_processing",
+  "custom",
+] as const;
+export type ChannelAgentSkillKind = (typeof channelAgentSkillKinds)[number];
+
 export const channelVisibilities = ["public", "private"] as const;
 export type ChannelVisibility = (typeof channelVisibilities)[number];
 
@@ -43,6 +59,24 @@ export const channelNameSchema = z.string().trim().min(1).max(100);
 export const channelTopicSchema = z.string().trim().max(500);
 export const channelMessageBodySchema = z.string().trim().min(1).max(10_000);
 export const agentHandleSchema = channelSlugSchema;
+
+export const channelAgentSkillInputSchema = z
+  .object({
+    id: z.string().uuid().optional(),
+    name: z.string().trim().min(1).max(100),
+    instructions: z.string().trim().max(10_000).default(""),
+    provider: z.enum(channelAgentProviders),
+    model: z.string().trim().min(1).max(100).nullable().default(null),
+    effort: z.enum(channelAgentEfforts).nullable().default(null),
+    kind: z.enum(channelAgentSkillKinds).default("custom"),
+    isDefault: z.boolean().default(false),
+    position: z.number().int().min(0).max(999).default(0),
+  })
+  .strict();
+
+export type ChannelAgentSkillInput = z.input<
+  typeof channelAgentSkillInputSchema
+>;
 
 /**
  * Handles never carry meaning beyond identity, so anything outside the handle
@@ -103,10 +137,8 @@ export const organizationAgentInputSchema = z
     provider: z.enum(channelAgentProviders),
     model: z.string().trim().min(1).max(100).nullable().default(null),
     responsibility: z.string().trim().min(1).max(2000),
-    effort: z
-      .enum(["low", "medium", "high", "xhigh", "max", "ultra"])
-      .nullable()
-      .default(null),
+    effort: z.enum(channelAgentEfforts).nullable().default(null),
+    skills: z.array(channelAgentSkillInputSchema).min(1).max(50).optional(),
   })
   .strict();
 
@@ -142,6 +174,21 @@ export type ChannelMember = {
   createdAt: string;
 };
 
+export type ChannelAgentSkill = {
+  id: string;
+  agentId: string;
+  name: string;
+  instructions: string;
+  provider: ChannelAgentProvider;
+  model: string | null;
+  effort: ChannelAgentEffort | null;
+  kind: ChannelAgentSkillKind;
+  isDefault: boolean;
+  position: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
 /**
  * A roster entry is an Agent that can be mentioned in this channel.
  * `projectId` is null for organization Agents, which have no repository.
@@ -152,8 +199,10 @@ export type ChannelAgentSummary = {
   name: string;
   provider: ChannelAgentProvider;
   model: string | null;
+  effort: ChannelAgentEffort | null;
   projectId: string | null;
   responsibility: string;
+  skills: ChannelAgentSkill[];
   createdAt: string;
 };
 

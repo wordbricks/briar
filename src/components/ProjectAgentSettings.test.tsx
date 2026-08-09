@@ -28,6 +28,22 @@ describe("ProjectAgentSettings", () => {
       effort: null,
       responsibility: "Process queued issues.",
       skill: "# Issue processing agent\n\nProcess queued issues.",
+      skills: [
+        {
+          id: "skill-1",
+          agentId: "agent-1",
+          name: "Issue processing",
+          instructions: "Process queued issues.",
+          provider: "codex" as const,
+          model: null,
+          effort: null,
+          kind: "issue_processing" as const,
+          isDefault: true,
+          position: 0,
+          createdAt: "2026-07-26T00:00:00.000Z",
+          updatedAt: "2026-07-26T00:00:00.000Z",
+        },
+      ],
       calendarColor: "#3275d5",
       createdAt: "2026-07-26T00:00:00.000Z",
       updatedAt: "2026-07-26T00:00:00.000Z",
@@ -78,7 +94,7 @@ describe("ProjectAgentSettings", () => {
     ).not.toBeNull();
     expect(
       container.querySelector<HTMLInputElement>(
-        '.project-agent-settings-fields input[placeholder="예: Jay 이슈 처리 에이전트"]',
+        "#project-agent-settings-name",
       )?.value,
     ).toBe("Issue processing agent");
     expect(
@@ -90,7 +106,7 @@ describe("ProjectAgentSettings", () => {
     ).not.toBeNull();
     expect(
       container.querySelectorAll(".project-agent-settings-fields .native-select"),
-    ).toHaveLength(3);
+    ).toHaveLength(6);
     expect(container.textContent).toContain("실행 설정");
     expect(container.textContent).not.toContain("프로젝트 실행 기본값");
     expect(container.querySelector("#project-runtime-provider")).toBeNull();

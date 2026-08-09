@@ -34,6 +34,9 @@ import {
 } from "../lib/project-llm";
 import { demoProjectAgents } from "../lib/demo-project-agents";
 import {
+  agentWithSkillRuntime,
+  defaultAgentSkill,
+  issueProcessingAgentSkill,
   defaultProjectAgentCalendarColor,
   projectAgentSkill,
 } from "../lib/project-agent";
@@ -51,6 +54,7 @@ import type {
   HuntRun,
   Project,
   ProjectAgent,
+  ProjectAgentSkillInput,
   UpdateProjectAgentInput,
 } from "../types";
 import { AgentProviderIcon } from "./AgentIcons";
@@ -107,7 +111,7 @@ export function ProjectAgents({
   ) => string | Promise<string>;
   onStartRemoteTask?: (
     agent: ProjectAgent,
-    input: { request: string; workerId: string },
+    input: { request: string; workerId: string; skillId?: string },
   ) => string | Promise<string>;
   onStartTaskSession: (
     agent: ProjectAgent,
@@ -216,24 +220,7 @@ export function ProjectAgents({
       const createdAt = new Date().toISOString();
       const agent = token
         ? await createProjectAgent(token, project.id, input)
-        : {
-            id: crypto.randomUUID(),
-            projectId: project.id,
-            name: input.name ?? `${providerLabels[input.provider]} Agent`,
-            avatar: input.avatar ?? null,
-            codexPet: null,
-            provider: input.provider,
-            model: input.model,
-            effort: input.effort ?? null,
-            responsibility: input.responsibility,
-            skill: projectAgentSkill({
-              name: input.name ?? `${providerLabels[input.provider]} Agent`,
-              responsibility: input.responsibility,
-            }),
-            calendarColor: input.calendarColor,
-            createdAt,
-            updatedAt: createdAt,
-          };
+        : localProjectAgent(input, project.id, createdAt);
       setAgents((current) => [...current, agent]);
       setIsDialogOpen(false);
     } finally {
@@ -261,6 +248,12 @@ export function ProjectAgents({
           effort:
             input.effort === undefined ? agent.effort : input.effort,
           responsibility: input.responsibility,
+          skills: localProjectAgentSkills(
+            agent.id,
+            input.skills,
+            updatedAt,
+            agent.skills,
+          ),
           skill: projectAgentSkill({
             name: input.name ?? `${providerLabels[input.provider]} Agent`,
             responsibility: input.responsibility,
@@ -318,17 +311,22 @@ export function ProjectAgents({
         setSelectedAgent(agent);
         return;
       }
+      const selectedSkill = issueProcessingAgentSkill(agent);
+      const runtimeAgent = selectedSkill
+        ? agentWithSkillRuntime(agent, selectedSkill)
+        : agent;
       await executeProjectAgentTask(
         {
           runAgent: runProjectAgent,
-          startSession: (session) => onStartTaskSession(agent, session),
+          startSession: (session) => onStartTaskSession(runtimeAgent, session),
           settleSession: onSettleTaskSession,
-          startAutoHunt: (runs, options) => onStart(agent, runs, options),
+          startAutoHunt: (runs, options) =>
+            onStart(runtimeAgent, runs, options),
         },
         {
-          agent,
+          agent: runtimeAgent,
           dashboard,
-          message: agent.responsibility,
+          message: selectedSkill?.instructions ?? agent.responsibility,
         },
       );
     } catch (caught) {
@@ -471,6 +469,7 @@ export function ProjectAgents({
                   const isRunning =
                     runningAgentIds.has(agent.id) ||
                     executingAgentIds.has(agent.id);
+                  const runtime = defaultAgentSkill(agent) ?? agent;
                   return (
                     <article className="project-agent-card" key={agent.id}>
                       <button
@@ -494,18 +493,21 @@ export function ProjectAgents({
                         </header>
                         <div className="project-agent-runtime">
                           <span
-                            aria-label={providerLabels[agent.provider]}
-                            className={`project-agent-provider-icon ${agent.provider}`}
+                            aria-label={providerLabels[runtime.provider]}
+                            className={`project-agent-provider-icon ${runtime.provider}`}
                             role="img"
-                            title={providerLabels[agent.provider]}
+                            title={providerLabels[runtime.provider]}
                           >
                             <AgentProviderIcon
-                              provider={agent.provider}
+                              provider={runtime.provider}
                               size={14}
                             />
                           </span>
                           <span>
-                            {modelLabel(agent, t("agents.providerDefaultModel"))}
+                            {modelLabel(
+                              runtime,
+                              t("agents.providerDefaultModel"),
+                            )}
                           </span>
                           <span>
                             <i
@@ -519,6 +521,27 @@ export function ProjectAgents({
                         <section>
                           <small>{t("agents.responsibility")}</small>
                           <p>{agent.responsibility}</p>
+                          <div className="project-agent-card-skills">
+                            <small>{t("agents.skills")}</small>
+                            <ul>
+                              {agent.skills.slice(0, 3).map((skill) => (
+                                <li
+                                  className={skill.isDefault ? "default" : ""}
+                                  key={skill.id}
+                                  title={skill.instructions}
+                                >
+                                  {skill.name}
+                                </li>
+                              ))}
+                              {agent.skills.length > 3 ? (
+                                <li>
+                                  {t("agents.moreSkills", {
+                                    count: agent.skills.length - 3,
+                                  })}
+                                </li>
+                              ) : null}
+                            </ul>
+                          </div>
                         </section>
                       </button>
                       <footer>
@@ -603,7 +626,10 @@ export function ProjectAgents({
     </MainContent>
   );
 }
-function modelLabel(agent: ProjectAgent, providerDefault: string) {
+function modelLabel(
+  agent: Pick<ProjectAgent, "provider" | "model">,
+  providerDefault: string,
+) {
   if (!agent.model) return providerDefault;
   return (
     agentModels[agent.provider].find((model) => model.value === agent.model)
@@ -765,6 +791,9 @@ export function ProjectAgentDialog({
               />
             </label>
           </div>
+          <small className="project-agent-form-runtime-hint">
+            {t("agents.skillDefaultsHint")}
+          </small>
           <label>
             <span>
               {t("agents.responsibility")} <em>{t("common.required")}</em>
@@ -826,6 +855,69 @@ export function ProjectAgentDialog({
       </form>
     </div>
   );
+}
+
+function localProjectAgent(
+  input: CreateProjectAgentInput,
+  projectId: string,
+  createdAt: string,
+): ProjectAgent {
+  const id = crypto.randomUUID();
+  const name = input.name ?? `${providerLabels[input.provider]} Agent`;
+  const defaultSkills: ProjectAgentSkillInput[] = [
+    {
+      name,
+      instructions: input.responsibility,
+      provider: input.provider,
+      model: input.model,
+      effort: input.effort ?? null,
+      kind: "custom",
+      isDefault: true,
+      position: 0,
+    },
+  ];
+  return {
+    id,
+    projectId,
+    name,
+    avatar: input.avatar ?? null,
+    codexPet: null,
+    provider: input.provider,
+    model: input.model,
+    effort: input.effort ?? null,
+    responsibility: input.responsibility,
+    skill: projectAgentSkill({ name, responsibility: input.responsibility }),
+    skills: localProjectAgentSkills(
+      id,
+      input.skills?.length ? input.skills : defaultSkills,
+      createdAt,
+      [],
+    ),
+    calendarColor: input.calendarColor,
+    createdAt,
+    updatedAt: createdAt,
+  };
+}
+
+function localProjectAgentSkills(
+  agentId: string,
+  inputs: readonly ProjectAgentSkillInput[],
+  updatedAt: string,
+  existing: readonly ProjectAgent["skills"][number][],
+): ProjectAgent["skills"] {
+  return inputs.map((input, position) => {
+    const current = input.id
+      ? existing.find((skill) => skill.id === input.id)
+      : null;
+    return {
+      ...input,
+      id: input.id ?? crypto.randomUUID(),
+      agentId,
+      position,
+      createdAt: current?.createdAt ?? updatedAt,
+      updatedAt,
+    };
+  });
 }
 
 export function CreateProjectAgentDialog({

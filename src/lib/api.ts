@@ -16,6 +16,7 @@ import type { UsageRangeDays } from "./agent-usage-overview";
 import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
 import type {
   ChannelAgentReply,
+  ChannelAgentSkillInput,
   ChannelAgentSummary,
   ChannelDelta,
   ChannelMember,
@@ -129,6 +130,27 @@ const projectAgentSchema = z.object({
     .default(null),
   responsibility: z.string(),
   skill: z.string(),
+  skills: z
+    .array(
+      z.object({
+        id: z.string(),
+        agentId: z.string(),
+        name: z.string(),
+        instructions: z.string(),
+        provider: z.enum(["codex", "claude", "grok", "opencode"]),
+        model: z.string().nullable(),
+        effort: z
+          .enum(["low", "medium", "high", "xhigh", "max", "ultra"])
+          .nullable()
+          .default(null),
+        kind: z.enum(["issue_processing", "custom"]),
+        isDefault: z.boolean(),
+        position: z.number().int().nonnegative(),
+        createdAt: z.string(),
+        updatedAt: z.string(),
+      }),
+    )
+    .default([]),
   calendarColor: z
     .string()
     .regex(/^#[0-9a-f]{6}$/iu)
@@ -260,6 +282,7 @@ const projectAgentScheduleRunSchema = z.object({
     effort: true,
     responsibility: true,
     skill: true,
+    skills: true,
   }),
   workflow: autoHuntWorkflowSchema,
   status: z.enum(["running", "completed", "failed"]),
@@ -1097,6 +1120,7 @@ export async function runProjectAgentTaskOnWorker(
     agentId: string;
     request: string;
     workerId: string;
+    skillId?: string;
   },
 ): Promise<AutoHuntSession> {
   const result = await request<{ session: unknown }>(
@@ -1668,12 +1692,34 @@ export async function createOrganizationAgent(
     model: string | null;
     responsibility: string;
     effort?: ModelEffort | null;
+    skills?: ChannelAgentSkillInput[];
   },
 ) {
   return request<{ agent: ChannelAgentSummary }>(
     `/organizations/${organizationId}/agents`,
     token,
     { method: "POST", body: JSON.stringify(input) },
+  );
+}
+
+export async function updateOrganizationAgent(
+  token: string,
+  organizationId: string,
+  agentId: string,
+  input: {
+    name: string;
+    handle?: string;
+    provider: AgentProvider;
+    model: string | null;
+    responsibility: string;
+    effort?: ModelEffort | null;
+    skills: ChannelAgentSkillInput[];
+  },
+) {
+  return request<{ agent: ChannelAgentSummary }>(
+    `/organizations/${organizationId}/agents/${agentId}`,
+    token,
+    { method: "PATCH", body: JSON.stringify(input) },
   );
 }
 

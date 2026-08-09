@@ -18,6 +18,7 @@ const agent: ProjectAgent = {
   effort: null,
   responsibility: "Review the release.",
   skill: "# Release agent",
+  skills: [],
   calendarColor: "#3275d5",
   createdAt: "2026-07-28T00:00:00.000Z",
   updatedAt: "2026-07-28T00:00:00.000Z",

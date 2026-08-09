@@ -50,6 +50,7 @@ import {
   parseDetachedIssueReplyResult,
   parseDetachedJsonResult,
   shouldPersistDetachedTranscriptPayload,
+  type DetachedAgent,
 } from "./agent-runner";
 import { agentImageAttachments } from "../src-agent/runner-attachments";
 import {
@@ -1932,32 +1933,56 @@ const workerBindingSchema = workerRegistrationSchema.omit({
   workerToken: true,
 });
 
+const detachedAgentProviderSchema = z.enum([
+  "codex",
+  "claude",
+  "grok",
+  "opencode",
+]);
+
+const detachedAgentEffortSchema = z.enum([
+  "low",
+  "medium",
+  "high",
+  "xhigh",
+  "max",
+  "ultra",
+]);
+
+const detachedAgentSkillSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  instructions: z.string(),
+  provider: detachedAgentProviderSchema,
+  model: z.string().nullable(),
+  effort: detachedAgentEffortSchema.nullable(),
+  kind: z.enum(["issue_processing", "custom"]),
+  isDefault: z.boolean(),
+  position: z.number().int().nonnegative(),
+});
+
+const detachedAgentClaimSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  provider: detachedAgentProviderSchema,
+  model: z.string().nullable(),
+  effort: detachedAgentEffortSchema.nullable().default(null),
+  responsibility: z.string(),
+  skill: z.string().default(""),
+  skills: z.array(detachedAgentSkillSchema).default([]),
+});
+
 const claimedRunSchema = queuedIssueSchema.extend({
   execution: z
     .object({
-      provider: z.enum(["codex", "claude", "grok", "opencode"]),
+      provider: detachedAgentProviderSchema,
       model: z.string().nullable(),
-      effort: z
-        .enum(["low", "medium", "high", "xhigh", "max", "ultra"])
-        .nullable()
-        .default(null),
+      effort: detachedAgentEffortSchema.nullable().default(null),
     })
     .nullable()
     .optional(),
-  agent: z
-    .object({
-      id: z.string().uuid(),
-      name: z.string().min(1),
-      provider: z.enum(["codex", "claude", "grok", "opencode"]),
-      model: z.string().nullable(),
-      effort: z
-        .enum(["low", "medium", "high", "xhigh", "max", "ultra"])
-        .nullable()
-        .default(null),
-      responsibility: z.string(),
-      skill: z.string(),
-    })
-    .nullable(),
+  agent: detachedAgentClaimSchema.nullable(),
+  activeSkill: detachedAgentSkillSchema.nullable().optional(),
 });
 
 const claimedProjectAgentTaskSchema = z.object({
@@ -1970,17 +1995,8 @@ const claimedProjectAgentTaskSchema = z.object({
   claimedAt: z.string().datetime({ offset: true }),
   leaseExpiresAt: z.string().datetime({ offset: true }),
   request: z.string().min(1),
-  agent: z.object({
-    id: z.string().uuid(),
-    name: z.string().min(1),
-    provider: z.enum(["codex", "claude", "grok", "opencode"]),
-    model: z.string().nullable(),
-    effort: z
-      .enum(["low", "medium", "high", "xhigh", "max", "ultra"])
-      .nullable(),
-    responsibility: z.string(),
-    skill: z.string(),
-  }),
+  agent: detachedAgentClaimSchema,
+  activeSkill: detachedAgentSkillSchema.nullable().optional(),
 });
 
 type ClaimedProjectAgentTask = z.infer<typeof claimedProjectAgentTaskSchema>;
@@ -1993,8 +2009,11 @@ const claimedIssueReplySchema = z.object({
   title: z.string().min(1),
   triggerMessageId: z.string().uuid(),
   parentMessageId: z.string().uuid(),
-  provider: z.enum(["codex", "claude", "grok", "opencode"]),
+  provider: detachedAgentProviderSchema,
   model: z.string().nullable(),
+  effort: detachedAgentEffortSchema.nullable().optional(),
+  agent: detachedAgentClaimSchema.nullable().optional(),
+  activeSkill: detachedAgentSkillSchema.nullable().optional(),
   branch: z.string().nullable(),
   claimToken: z.string().startsWith("briar_reply_claim_"),
   claimedAt: z.string().datetime({ offset: true }),
@@ -2022,8 +2041,11 @@ const claimedChannelReplySchema = z.object({
   title: z.string().min(1),
   triggerMessageId: z.string().uuid(),
   parentMessageId: z.string().uuid(),
-  provider: z.enum(["codex", "claude", "grok", "opencode"]),
+  provider: detachedAgentProviderSchema,
   model: z.string().nullable(),
+  effort: detachedAgentEffortSchema.nullable().optional(),
+  agent: detachedAgentClaimSchema.nullable().optional(),
+  activeSkill: detachedAgentSkillSchema.nullable().optional(),
   claimToken: z.string().startsWith("briar_channel_claim_"),
   claimedAt: z.string().datetime({ offset: true }),
   leaseExpiresAt: z.string().datetime({ offset: true }),
@@ -2031,6 +2053,67 @@ const claimedChannelReplySchema = z.object({
 });
 
 type ClaimedChannelReply = z.infer<typeof claimedChannelReplySchema>;
+
+function detachedAgentWithActiveSkill(
+  agent: z.infer<typeof detachedAgentClaimSchema>,
+  activeSkill: z.infer<typeof detachedAgentSkillSchema> | null | undefined,
+): DetachedAgent {
+  return {
+    ...agent,
+    activeSkill: activeSkill ?? null,
+  };
+}
+
+function detachedReplyAgent(input: {
+  workId: string;
+  provider: z.infer<typeof detachedAgentProviderSchema>;
+  model: string | null;
+  effort?: z.infer<typeof detachedAgentEffortSchema> | null;
+  agent?: z.infer<typeof detachedAgentClaimSchema> | null;
+  activeSkill?: z.infer<typeof detachedAgentSkillSchema> | null;
+  snapshot: Record<string, unknown>;
+  fallbackName: string;
+}): DetachedAgent {
+  const snapshotAgent =
+    input.snapshot.agent && typeof input.snapshot.agent === "object" &&
+      !Array.isArray(input.snapshot.agent)
+      ? input.snapshot.agent as Record<string, unknown>
+      : null;
+  const snapshotSkills = detachedAgentSkillSchema.array().safeParse(
+    snapshotAgent?.skills,
+  );
+  const baseAgent = input.agent ?? {
+    id: typeof snapshotAgent?.id === "string" && snapshotAgent.id.trim()
+      ? snapshotAgent.id
+      : input.workId,
+    name: typeof snapshotAgent?.name === "string" && snapshotAgent.name.trim()
+      ? snapshotAgent.name
+      : input.fallbackName,
+    provider: input.provider,
+    model: input.model,
+    effort:
+      typeof snapshotAgent?.effort === "string" &&
+        detachedAgentEffortSchema.safeParse(snapshotAgent.effort).success
+        ? snapshotAgent.effort as z.infer<typeof detachedAgentEffortSchema>
+        : null,
+    responsibility: typeof snapshotAgent?.responsibility === "string"
+      ? snapshotAgent.responsibility
+      : "",
+    skill: typeof snapshotAgent?.skill === "string" ? snapshotAgent.skill : "",
+    skills: snapshotSkills.success ? snapshotSkills.data : [],
+  };
+  return {
+    ...baseAgent,
+    // The top-level execution fields are snapshotted by the server and remain
+    // authoritative during rolling upgrades, even when Agent defaults change.
+    provider: input.provider,
+    model: input.model,
+    effort: input.effort !== undefined
+      ? input.effort
+      : input.activeSkill?.effort ?? baseAgent.effort,
+    activeSkill: input.activeSkill ?? null,
+  };
+}
 
 async function runClaimedIssue(
   config: Config,
@@ -2131,8 +2214,11 @@ async function runClaimedIssueInRuntime(
       }
     }),
   );
+  const logicalAgent = issue.agent
+    ? detachedAgentWithActiveSkill(issue.agent, issue.activeSkill)
+    : null;
   const prompt = detachedAgentPrompt({
-    agent: issue.agent,
+    agent: logicalAgent,
     snapshot: {
       runId: issue.runId,
       runNumber: issue.runNumber,
@@ -2172,14 +2258,16 @@ async function runClaimedIssueInRuntime(
     BRIAR_CONFIG_HOME: runtimeDirectory,
   };
 
-  const detachedAgent = {
-    id: issue.agent?.id ?? issue.runId,
-    name: issue.agent?.name ?? "Briar Worker",
+  const detachedAgent: DetachedAgent = {
+    id: logicalAgent?.id ?? issue.runId,
+    name: logicalAgent?.name ?? "Briar Worker",
     provider: execution.provider,
     model: execution.model,
     effort: execution.effort,
-    responsibility: issue.agent?.responsibility ?? "",
-    skill: issue.agent?.skill ?? "",
+    responsibility: logicalAgent?.responsibility ?? "",
+    skill: logicalAgent?.skill ?? "",
+    skills: logicalAgent?.skills ?? [],
+    activeSkill: logicalAgent?.activeSkill ?? null,
   };
   const providerAttachments = agentImageAttachments(attachments);
 
@@ -2399,13 +2487,14 @@ async function runClaimedProjectAgentTask(
   signal: AbortSignal,
 ) {
   const workspacePath = project.repositoryPath;
+  const agent = detachedAgentWithActiveSkill(task.agent, task.activeSkill);
   const prompt = detachedProjectAgentPrompt({
-    agent: task.agent,
+    agent,
     request: task.request,
     workspacePath,
   });
   const turn = await runDetachedProviderTurn({
-    agent: task.agent,
+    agent,
     prompt,
     workspacePath,
     fullAccess: project.autoHunt?.sandbox?.fullAccess ?? true,
@@ -2528,7 +2617,18 @@ async function runClaimedIssueReply(
         })),
     );
     const attachments = agentImageAttachments(downloadedImages);
+    const agent = detachedReplyAgent({
+      workId: issue.workId,
+      provider,
+      model: issue.model,
+      effort: issue.effort,
+      agent: issue.agent,
+      activeSkill: issue.activeSkill,
+      snapshot: issue.snapshot,
+      fallbackName: "Briar",
+    });
     const prompt = detachedIssueReplyPrompt({
+      agent,
       snapshot: {
         ...issue.snapshot,
         downloadedImagePaths: attachments.map((attachment) => attachment.path),
@@ -2538,15 +2638,7 @@ async function runClaimedIssueReply(
     });
     let sequence = 0;
     const turn = await runDetachedProviderTurn({
-      agent: {
-        id: issue.workId,
-        name: "Briar",
-        provider,
-        model: issue.model,
-        effort: null,
-        responsibility: "",
-        skill: "",
-      },
+      agent,
       prompt,
       workspacePath,
       fullAccess: false,
@@ -2668,7 +2760,18 @@ async function runClaimedChannelReply(
       snapshot: reply.snapshot,
       workspacePath,
     });
+    const agent = detachedReplyAgent({
+      workId: reply.workId,
+      provider: reply.provider,
+      model: reply.model,
+      effort: reply.effort,
+      agent: reply.agent,
+      activeSkill: reply.activeSkill,
+      snapshot: reply.snapshot,
+      fallbackName: "Briar Channel",
+    });
     const prompt = detachedChannelReplyPrompt({
+      agent,
       snapshot: {
         ...reply.snapshot,
         downloadedImagePaths: downloadedImages.paths,
@@ -2676,15 +2779,7 @@ async function runClaimedChannelReply(
       workspaceAvailable: Boolean(analysisWorktree),
     });
     const turn = await runDetachedProviderTurn({
-      agent: {
-        id: reply.workId,
-        name: "Briar Channel",
-        provider: reply.provider,
-        model: reply.model,
-        effort: null,
-        responsibility: "",
-        skill: "",
-      },
+      agent,
       prompt,
       workspacePath,
       fullAccess: false,

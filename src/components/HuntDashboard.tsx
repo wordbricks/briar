@@ -7575,6 +7575,7 @@ function IssueConversation({
       provider: null,
       model: null,
       responsibility: t("profile.briarResponsibility"),
+      skills: [],
       projectId: null,
       createdAt: null,
     });

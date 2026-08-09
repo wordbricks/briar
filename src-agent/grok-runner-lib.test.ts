@@ -8,6 +8,7 @@ import {
   createGrokEventState,
   extractJsonObject,
   finalizeGrokMessage,
+  grokSessionMeta,
   mapEffortToGrok,
   normalizeGrokSessionUpdate,
   permissionDecisionResult,
@@ -103,7 +104,14 @@ describe("Grok runner", () => {
     });
   });
 
-  it("builds prompt parts with instructions and schema", () => {
+  it("passes trusted instructions as ACP session system rules", () => {
+    const longInstructions = "x".repeat(40_000);
+    expect(grokSessionMeta({ ...request, instructions: longInstructions }))
+      .toEqual({ rules: longInstructions });
+    expect(grokSessionMeta({ ...request, instructions: "  " })).toBeUndefined();
+  });
+
+  it("builds user prompt parts with the schema", () => {
     expect(
       buildPromptParts({
         ...request,
@@ -111,10 +119,6 @@ describe("Grok runner", () => {
         outputSchema: { type: "string" },
       }),
     ).toEqual([
-      {
-        type: "text",
-        text: "Additional instructions for this turn:\nBe concise",
-      },
       {
         type: "text",
         text: 'Return only the JSON value that matches this schema, without Markdown fences or commentary:\n{"type":"string"}',

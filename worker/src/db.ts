@@ -25,7 +25,9 @@ import type { AgentExecutionMetrics } from "../../src/lib/agent-execution-metric
 import {
   defaultProjectAgentCalendarColor,
   defaultProjectAgentCopy,
+  defaultProjectAgentSkillCopy,
   projectAgentSkill,
+  type ProjectAgentLocale,
 } from "../../src/lib/project-agent";
 import {
   nextProjectAgentScheduleRunAt,
@@ -36,10 +38,23 @@ import {
   type ProjectAgentScheduleRecurrence,
 } from "../../src/lib/project-agent-schedule";
 import { allocateAgentHandle } from "./organization-agents";
+import {
+  assertAgentSkillReplacementAllowed,
+  hydrateAgentSkills,
+  insertAgentSkillStatement,
+  listAgentSkills,
+  normalizedAgentSkillRows,
+  replaceAgentSkillStatements,
+  updateDefaultAgentSkillFromLegacyStatement,
+  type AgentSkillEffort,
+  type AgentSkillInput,
+  type AgentSkillProvider,
+  type AgentSkillRow,
+} from "./agent-skills";
 import { workflowSnapshotForRun } from "./workflow-policy";
 
-type ProjectAgentProvider = "codex" | "claude" | "grok" | "opencode";
-type ModelEffort = "low" | "medium" | "high" | "xhigh" | "max" | "ultra";
+type ProjectAgentProvider = AgentSkillProvider;
+type ModelEffort = AgentSkillEffort;
 
 export type ProjectRow = {
   id: string;
@@ -232,12 +247,13 @@ export type ProjectAgentRow = {
   avatar_spritesheet_object_key: string | null;
   provider: ProjectAgentProvider;
   model: string | null;
-  effort: string | null;
+  effort: AgentSkillEffort | null;
   responsibility: string;
   skill_markdown: string;
   calendar_color: string;
   created_at: string;
   updated_at: string;
+  skills?: AgentSkillRow[];
 };
 
 export type ProjectAgentSessionRow = {
@@ -256,6 +272,7 @@ export type ProjectAgentTaskJobRow = {
   id: string;
   project_id: string;
   agent_id: string;
+  skill_id: string | null;
   request: string;
   request_id: string;
   status: "queued" | "running" | "completed" | "failed";
@@ -275,9 +292,13 @@ export type ClaimedProjectAgentTaskRow = ProjectAgentTaskJobRow & {
   agent_name: string;
   agent_provider: ProjectAgentProvider;
   agent_model: string | null;
-  agent_effort: string | null;
+  agent_effort: AgentSkillEffort | null;
   agent_responsibility: string;
   agent_skill: string;
+  selected_skill_id: string;
+  selected_skill_name: string;
+  selected_skill_instructions: string;
+  agent_skills: AgentSkillRow[];
 };
 
 export type ProjectAgentScheduleRow = {
@@ -316,6 +337,7 @@ export type ProjectAgentScheduleRunRow = {
   agent_effort: string | null;
   agent_responsibility: string;
   agent_skill_markdown: string;
+  agent_skills: AgentSkillRow[];
   workflow_json: string;
   status: ProjectAgentScheduleRunStatus;
   scheduled_for: string;
@@ -3544,6 +3566,7 @@ export async function createProject(
     organizationId: string;
     name: string;
     agentTokenHash: string;
+    locale?: ProjectAgentLocale;
   },
 ) {
   const createdAt = new Date().toISOString();
@@ -3557,7 +3580,9 @@ export async function createProject(
     member_role: "owner",
     created_at: createdAt,
   };
-  const defaultAgentCopy = defaultProjectAgentCopy("en");
+  const locale = input.locale ?? "en";
+  const defaultAgentCopy = defaultProjectAgentCopy(locale);
+  const defaultSkillCopy = defaultProjectAgentSkillCopy(locale);
   const defaultAgent: ProjectAgentRow = {
     id: crypto.randomUUID(),
     project_id: project.id,
@@ -3570,12 +3595,35 @@ export async function createProject(
     effort: null,
     responsibility: defaultAgentCopy.responsibility,
     skill_markdown: projectAgentSkill({
-      ...defaultAgentCopy,
+      name: defaultAgentCopy.name,
+      responsibility: defaultAgentCopy.responsibility,
     }),
     calendar_color: defaultProjectAgentCalendarColor,
     created_at: createdAt,
     updated_at: createdAt,
   };
+  const [defaultSkill] = normalizedAgentSkillRows(
+    defaultAgent.id,
+    [{
+      name: defaultSkillCopy.name,
+      instructions: defaultSkillCopy.instructions,
+      provider: defaultAgent.provider,
+      model: defaultAgent.model,
+      effort: defaultAgent.effort,
+      kind: "issue_processing",
+      isDefault: true,
+      position: 0,
+    }],
+    {
+      name: defaultSkillCopy.name,
+      instructions: defaultSkillCopy.instructions,
+      provider: defaultAgent.provider,
+      model: defaultAgent.model,
+      effort: defaultAgent.effort,
+      kind: "issue_processing",
+    },
+    createdAt,
+  );
   const initialWorkflow = cloneAutoHuntWorkflow();
   await db.batch([
     db
@@ -3629,6 +3677,7 @@ export async function createProject(
         defaultAgent.created_at,
         defaultAgent.updated_at,
       ),
+    insertAgentSkillStatement(db, defaultSkill),
   ]);
   return project;
 }
@@ -3721,7 +3770,7 @@ export async function listProjectAgents(db: D1Database, projectId: string) {
     )
     .bind(projectId)
     .all<ProjectAgentRow>();
-  return result.results;
+  return hydrateAgentSkills(db, result.results);
 }
 
 export async function getProjectAgent(
@@ -3729,7 +3778,7 @@ export async function getProjectAgent(
   projectId: string,
   agentId: string,
 ) {
-  return db
+  const agent = await db
     .prepare(
       `select id, project_id, name, avatar, avatar_pet_json,
               avatar_spritesheet_object_key, provider, model, effort, responsibility,
@@ -3739,6 +3788,8 @@ export async function getProjectAgent(
     )
     .bind(agentId, projectId)
     .first<ProjectAgentRow>();
+  if (!agent) return null;
+  return (await hydrateAgentSkills(db, [agent]))[0];
 }
 
 export async function listProjectAgentSessions(
@@ -3824,6 +3875,7 @@ export async function createProjectAgentTaskJob(
     id: string;
     projectId: string;
     agentId: string;
+    skillId?: string | null;
     request: string;
     requestId: string;
     workerId: string;
@@ -3833,14 +3885,15 @@ export async function createProjectAgentTaskJob(
   const inserted = await db
     .prepare(
       `insert into briar_project_agent_task_jobs (
-         id, project_id, agent_id, request, request_id, status,
+         id, project_id, agent_id, skill_id, request, request_id, status,
          preferred_worker_id, created_at, updated_at
-       ) values (?, ?, ?, ?, ?, 'queued', ?, ?, ?)`,
+       ) values (?, ?, ?, ?, ?, ?, 'queued', ?, ?, ?)`,
     )
     .bind(
       input.id,
       input.projectId,
       input.agentId,
+      input.skillId ?? null,
       input.request,
       input.requestId,
       input.workerId,
@@ -3929,9 +3982,17 @@ export async function claimNextProjectAgentTask(
          select job.id
          from briar_project_agent_task_jobs job
          join briar_project_agents agent on agent.id = job.agent_id
+         join briar_agent_skills skill
+           on skill.agent_id = agent.id
+          and skill.id = coalesce(
+            job.skill_id,
+            (select default_skill.id from briar_agent_skills default_skill
+             where default_skill.agent_id = agent.id
+               and default_skill.is_default = 1)
+          )
          where job.project_id = ?
            and job.preferred_worker_id = ?
-           and agent.provider in (${providerPlaceholders})
+           and skill.provider in (${providerPlaceholders})
            and job.attempts < 3
            and (
              job.status = 'queued'
@@ -3955,18 +4016,32 @@ export async function claimNextProjectAgentTask(
     )
     .first<ProjectAgentTaskJobRow>();
   if (!claimed) return null;
-  return db
+  const selected = await db
     .prepare(
-      `select job.*, agent.name as agent_name, agent.provider as agent_provider,
-              agent.model as agent_model, agent.effort as agent_effort,
+      `select job.*, agent.name as agent_name, skill.provider as agent_provider,
+              skill.model as agent_model, skill.effort as agent_effort,
               agent.responsibility as agent_responsibility,
-              agent.skill_markdown as agent_skill
+              skill.instructions as agent_skill,
+              skill.id as selected_skill_id,
+              skill.name as selected_skill_name,
+              skill.instructions as selected_skill_instructions
        from briar_project_agent_task_jobs job
        join briar_project_agents agent on agent.id = job.agent_id
+       join briar_agent_skills skill
+         on skill.agent_id = agent.id
+        and skill.id = coalesce(
+          job.skill_id,
+          (select default_skill.id from briar_agent_skills default_skill
+           where default_skill.agent_id = agent.id
+             and default_skill.is_default = 1)
+        )
        where job.id = ? and job.project_id = ?`,
     )
     .bind(claimed.id, projectId)
-    .first<ClaimedProjectAgentTaskRow>();
+    .first<Omit<ClaimedProjectAgentTaskRow, "agent_skills">>();
+  if (!selected) return null;
+  const agentSkills = await hydrateAgentSkills(db, [{ id: selected.agent_id }]);
+  return { ...selected, agent_skills: agentSkills[0].skills };
 }
 
 export async function getClaimedProjectAgentTask(
@@ -4066,9 +4141,10 @@ export async function createProjectAgent(
     avatarSpritesheetObjectKey?: string | null;
     provider: ProjectAgentProvider;
     model: string | null;
-    effort: string | null;
+    effort: AgentSkillEffort | null;
     responsibility: string;
     calendarColor: string;
+    skills?: AgentSkillInput[];
   },
 ) {
   const createdAt = new Date().toISOString();
@@ -4104,8 +4180,21 @@ export async function createProjectAgent(
     input.name,
     agent.id,
   );
-  await db
-    .prepare(
+  const skillRows = normalizedAgentSkillRows(
+    agent.id,
+    input.skills,
+    {
+      name: input.name,
+      instructions: input.responsibility,
+      provider: input.provider,
+      model: input.model,
+      effort: input.effort,
+      kind: "custom",
+    },
+    createdAt,
+  );
+  await db.batch([
+    db.prepare(
       `insert into briar_project_agents (
          id, organization_id, handle, project_id, name, avatar,
          avatar_pet_json, avatar_spritesheet_object_key, provider, model,
@@ -4130,9 +4219,10 @@ export async function createProjectAgent(
       agent.calendar_color,
       agent.created_at,
       agent.updated_at,
-    )
-    .run();
-  return agent;
+    ),
+    ...skillRows.map((skill) => insertAgentSkillStatement(db, skill)),
+  ]);
+  return (await getProjectAgent(db, projectId, agent.id))!;
 }
 
 export async function deleteProjectAgent(
@@ -4408,10 +4498,15 @@ const scheduleRunSelect = `
   select run.id, run.project_id, run.schedule_id,
          schedule.name as schedule_name,
          run.agent_id, agent.name as agent_name,
-         agent.provider as agent_provider, agent.model as agent_model,
-         agent.effort as agent_effort,
+         coalesce(default_skill.provider, agent.provider) as agent_provider,
+         case when default_skill.id is not null
+           then default_skill.model else agent.model end as agent_model,
+         case when default_skill.id is not null
+           then default_skill.effort else agent.effort end as agent_effort,
          agent.responsibility as agent_responsibility,
-         agent.skill_markdown as agent_skill_markdown,
+         case when default_skill.id is not null
+           then default_skill.instructions else agent.skill_markdown
+         end as agent_skill_markdown,
          settings.workflow_json,
          run.status, run.scheduled_for, run.lease_expires_at,
          run.started_at, run.completed_at, run.result_summary,
@@ -4420,7 +4515,34 @@ const scheduleRunSelect = `
   from briar_project_agent_schedule_runs run
   join briar_project_agent_schedules schedule on schedule.id = run.schedule_id
   join briar_project_agents agent on agent.id = run.agent_id
+  left join briar_agent_skills default_skill
+    on default_skill.agent_id = agent.id and default_skill.is_default = 1
   join briar_project_settings settings on settings.project_id = run.project_id`;
+
+type UnhydratedProjectAgentScheduleRunRow = Omit<
+  ProjectAgentScheduleRunRow,
+  "agent_skills"
+>;
+
+async function hydrateScheduleRunAgentSkills(
+  db: D1Database,
+  rows: readonly UnhydratedProjectAgentScheduleRunRow[],
+): Promise<ProjectAgentScheduleRunRow[]> {
+  const skills = await listAgentSkills(
+    db,
+    [...new Set(rows.map((row) => row.agent_id))],
+  );
+  const byAgent = new Map<string, AgentSkillRow[]>();
+  for (const skill of skills) {
+    const current = byAgent.get(skill.agent_id) ?? [];
+    current.push(skill);
+    byAgent.set(skill.agent_id, current);
+  }
+  return rows.map((row) => ({
+    ...row,
+    agent_skills: byAgent.get(row.agent_id) ?? [],
+  }));
+}
 
 export async function listProjectAgentScheduleRuns(
   db: D1Database,
@@ -4433,8 +4555,8 @@ export async function listProjectAgentScheduleRuns(
        order by run.started_at desc, run.id`,
     )
     .bind(projectId)
-    .all<ProjectAgentScheduleRunRow>();
-  return result.results;
+    .all<UnhydratedProjectAgentScheduleRunRow>();
+  return hydrateScheduleRunAgentSkills(db, result.results);
 }
 
 export const PROJECT_AGENT_SCHEDULE_LEASE_MS = 2 * 60 * 60_000;
@@ -4540,10 +4662,12 @@ async function reclaimExpiredProjectAgentScheduleRun(
     )
     .first<{ id: string }>();
   if (!run) return null;
-  return db
+  const selected = await db
     .prepare(`${scheduleRunSelect} where run.id = ? and run.project_id = ?`)
     .bind(run.id, projectId)
-    .first<ProjectAgentScheduleRunRow>();
+    .first<UnhydratedProjectAgentScheduleRunRow>();
+  if (!selected) return null;
+  return (await hydrateScheduleRunAgentSkills(db, [selected]))[0];
 }
 
 export async function claimDueProjectAgentScheduleRun(
@@ -4664,10 +4788,12 @@ export async function claimDueProjectAgentScheduleRun(
         input.claimTokenHash,
       ),
   ]);
-  return db
+  const selected = await db
     .prepare(`${scheduleRunSelect} where run.id = ? and run.project_id = ?`)
     .bind(runId, projectId)
-    .first<ProjectAgentScheduleRunRow>();
+    .first<UnhydratedProjectAgentScheduleRunRow>();
+  if (!selected) return null;
+  return (await hydrateScheduleRunAgentSkills(db, [selected]))[0];
 }
 
 export async function completeProjectAgentScheduleRun(
@@ -4706,10 +4832,12 @@ export async function completeProjectAgentScheduleRun(
     )
     .first<{ id: string }>();
   if (!row) return null;
-  return db
+  const selected = await db
     .prepare(`${scheduleRunSelect} where run.id = ? and run.project_id = ?`)
     .bind(runId, projectId)
-    .first<ProjectAgentScheduleRunRow>();
+    .first<UnhydratedProjectAgentScheduleRunRow>();
+  if (!selected) return null;
+  return (await hydrateScheduleRunAgentSkills(db, [selected]))[0];
 }
 
 export async function renewProjectAgentScheduleRunLease(
@@ -4752,9 +4880,10 @@ export async function updateProjectAgent(
     } | null;
     provider: ProjectAgentProvider;
     model: string | null;
-    effort: string | null;
+    effort: AgentSkillEffort | null;
     responsibility: string;
     calendarColor: string;
+    skills?: AgentSkillInput[];
   },
 ) {
   const updatedAt = new Date().toISOString();
@@ -4764,8 +4893,7 @@ export async function updateProjectAgent(
     name: input.name,
     responsibility: input.responsibility,
   });
-  const result = await db
-    .prepare(
+  const updateStatement = db.prepare(
       `update briar_project_agents
        set name = ?, avatar = case when ? = 1 then ? else avatar end,
            avatar_pet_json = case when ? = 1 then ? else avatar_pet_json end,
@@ -4774,8 +4902,7 @@ export async function updateProjectAgent(
            provider = ?, model = ?, effort = ?, responsibility = ?,
            skill_markdown = ?, calendar_color = ?, updated_at = ?
        where id = ? and project_id = ?`,
-    )
-    .bind(
+    ).bind(
       input.name,
       input.avatar === undefined ? 0 : 1,
       input.avatar ?? null,
@@ -4792,19 +4919,43 @@ export async function updateProjectAgent(
       updatedAt,
       agentId,
       projectId,
-    )
-    .run();
-  if (result.meta.changes === 0) return null;
-  return db
-    .prepare(
-      `select id, project_id, name, avatar, avatar_pet_json,
-              avatar_spritesheet_object_key, provider, model, effort, responsibility, skill_markdown, calendar_color,
-              created_at, updated_at
-       from briar_project_agents
-       where id = ? and project_id = ?`,
-    )
-    .bind(agentId, projectId)
-    .first<ProjectAgentRow>();
+    );
+  const statements: D1PreparedStatement[] = [updateStatement];
+  if (input.skills !== undefined) {
+    const skillRows = normalizedAgentSkillRows(
+      agentId,
+      input.skills,
+      {
+        name: input.name,
+        instructions: input.responsibility,
+        provider: input.provider,
+        model: input.model,
+        effort: input.effort,
+        kind: "custom",
+      },
+      updatedAt,
+    );
+    await assertAgentSkillReplacementAllowed(
+      db,
+      agentId,
+      skillRows.map((row) => row.id),
+    );
+    statements.push(...replaceAgentSkillStatements(db, agentId, skillRows));
+  } else {
+    statements.push(
+      updateDefaultAgentSkillFromLegacyStatement(db, {
+        agentId,
+        instructions: input.responsibility,
+        provider: input.provider,
+        model: input.model,
+        effort: input.effort,
+        updatedAt,
+      }),
+    );
+  }
+  const results = await db.batch(statements);
+  if ((results[0]?.meta.changes ?? 0) === 0) return null;
+  return getProjectAgent(db, projectId, agentId);
 }
 
 export async function getProjectSettings(db: D1Database, projectId: string) {
@@ -5505,7 +5656,20 @@ export async function enqueueIssueAgentReply(
        )
        select ?, run.project_id, run.id, trigger.id, parent.id, ?,
               run.worker_id,
-              coalesce(run.requested_agent_provider, agent.provider),
+              coalesce(
+                run.requested_agent_provider,
+                (
+                  select skill.provider
+                  from briar_agent_skills skill
+                  where skill.agent_id = agent.id
+                  order by
+                    case when skill.kind = 'issue_processing' then 0 else 1 end,
+                    case when skill.is_default = 1 then 0 else 1 end,
+                    skill.position, skill.created_at, skill.id
+                  limit 1
+                ),
+                agent.provider
+              ),
               ?, ?
        from briar_hunt_runs run
        join briar_issue_messages trigger
@@ -6391,6 +6555,16 @@ export async function claimNextQueuedHuntRun(
                  preferred_agent_provider,
                  requested_agent_provider,
                  (
+                   select skill.provider
+                   from briar_agent_skills skill
+                   where skill.agent_id = briar_hunt_runs.agent_id
+                   order by
+                     case when skill.kind = 'issue_processing' then 0 else 1 end,
+                     case when skill.is_default = 1 then 0 else 1 end,
+                     skill.position, skill.created_at, skill.id
+                   limit 1
+                 ),
+                 (
                    select agent.provider from briar_project_agents agent
                    where agent.id = briar_hunt_runs.agent_id
                      and agent.project_id = briar_hunt_runs.project_id
@@ -6402,6 +6576,16 @@ export async function claimNextQueuedHuntRun(
                and coalesce(
                  preferred_agent_provider,
                  requested_agent_provider,
+                 (
+                   select skill.provider
+                   from briar_agent_skills skill
+                   where skill.agent_id = briar_hunt_runs.agent_id
+                   order by
+                     case when skill.kind = 'issue_processing' then 0 else 1 end,
+                     case when skill.is_default = 1 then 0 else 1 end,
+                     skill.position, skill.created_at, skill.id
+                   limit 1
+                 ),
                  (
                    select agent.provider from briar_project_agents agent
                    where agent.id = briar_hunt_runs.agent_id
@@ -6415,6 +6599,16 @@ export async function claimNextQueuedHuntRun(
                  preferred_agent_provider,
                  requested_agent_provider,
                  (
+                   select skill.provider
+                   from briar_agent_skills skill
+                   where skill.agent_id = briar_hunt_runs.agent_id
+                   order by
+                     case when skill.kind = 'issue_processing' then 0 else 1 end,
+                     case when skill.is_default = 1 then 0 else 1 end,
+                     skill.position, skill.created_at, skill.id
+                   limit 1
+                 ),
+                 (
                    select agent.provider from briar_project_agents agent
                    where agent.id = briar_hunt_runs.agent_id
                      and agent.project_id = briar_hunt_runs.project_id
@@ -6426,6 +6620,16 @@ export async function claimNextQueuedHuntRun(
                and coalesce(
                  preferred_agent_provider,
                  requested_agent_provider,
+                 (
+                   select skill.provider
+                   from briar_agent_skills skill
+                   where skill.agent_id = briar_hunt_runs.agent_id
+                   order by
+                     case when skill.kind = 'issue_processing' then 0 else 1 end,
+                     case when skill.is_default = 1 then 0 else 1 end,
+                     skill.position, skill.created_at, skill.id
+                   limit 1
+                 ),
                  (
                    select agent.provider from briar_project_agents agent
                    where agent.id = briar_hunt_runs.agent_id

@@ -591,6 +591,7 @@ describe("Sidebar", () => {
               effort: null,
               responsibility: "Inspect the design system",
               skill: "# Agent",
+              skills: [],
               calendarColor: "#3275d5",
               createdAt: "2026-07-28T00:00:00.000Z",
               updatedAt: "2026-07-28T00:00:00.000Z",

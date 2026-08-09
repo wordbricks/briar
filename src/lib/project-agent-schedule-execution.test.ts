@@ -24,6 +24,7 @@ const scheduledRun = (
     effort: null,
     responsibility: "Fulfill the saved responsibility.",
     skill: "# Agent",
+    skills: [],
   },
   workflow: repositoryWorkflowBootstrap,
   status: "running",
@@ -92,6 +93,39 @@ const dependencies = (): ProjectAgentScheduleExecutionDependencies => ({
 });
 
 describe("scheduled project agent execution", () => {
+  it("runs the Agent's default Skill with its own provider, model, and effort", async () => {
+    const current = dependencies();
+    const run = scheduledRun();
+    run.agent.skills = [{
+      id: "66666666-6666-4666-8666-666666666666",
+      agentId: run.agent.id,
+      name: "Desktop release",
+      instructions: "Publish the signed desktop release.",
+      provider: "claude",
+      model: "claude-sonnet-4-5",
+      effort: "high",
+      kind: "custom",
+      isDefault: true,
+      position: 0,
+      createdAt: "2026-07-27T00:00:00.000Z",
+      updatedAt: "2026-07-27T00:00:00.000Z",
+    }];
+
+    await executeScheduledProjectAgent(current, "token", run);
+
+    expect(current.runAgent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        agent: expect.objectContaining({
+          provider: "claude",
+          model: "claude-sonnet-4-5",
+          effort: "high",
+          skill: expect.stringContaining("Desktop release (active)"),
+        }),
+        message: expect.stringContaining("Publish the signed desktop release."),
+      }),
+    );
+  });
+
   it("runs a schedule through the same saved-Agent turn as a direct invocation", async () => {
     const current = dependencies();
 

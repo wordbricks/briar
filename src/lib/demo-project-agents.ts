@@ -2,6 +2,7 @@ import type { ProjectAgent } from "../types";
 import {
   defaultProjectAgentCopy,
   defaultProjectAgentCalendarColor,
+  defaultProjectAgentSkill,
   projectAgentSkill,
   type ProjectAgentLocale,
 } from "./project-agent";
@@ -12,6 +13,22 @@ export function demoProjectAgents(
 ): ProjectAgent[] {
   const createdAt = new Date("2026-07-26T09:00:00.000Z").toISOString();
   const defaultAgent = defaultProjectAgentCopy(locale);
+  const customSkill = (input: {
+    id: string;
+    agentId: string;
+    name: string;
+    instructions: string;
+    provider: ProjectAgent["provider"];
+    model: string | null;
+  }): ProjectAgent["skills"][number] => ({
+    ...input,
+    effort: null,
+    kind: "custom",
+    isDefault: true,
+    position: 0,
+    createdAt,
+    updatedAt: createdAt,
+  });
   return [
     {
       id: "demo-agent-auto-hunt",
@@ -24,6 +41,14 @@ export function demoProjectAgents(
       effort: null,
       responsibility: defaultAgent.responsibility,
       skill: projectAgentSkill(defaultAgent),
+      skills: [
+        defaultProjectAgentSkill({
+          id: "demo-skill-issue-processing",
+          agentId: "demo-agent-auto-hunt",
+          locale,
+          createdAt,
+        }),
+      ],
       calendarColor: defaultProjectAgentCalendarColor,
       createdAt,
       updatedAt: createdAt,
@@ -44,6 +69,17 @@ export function demoProjectAgents(
         responsibility:
           "Sentry의 에러 내역들을 보고 issue를 만들어서 배정하는 에이전트",
       }),
+      skills: [
+        customSkill({
+          id: "demo-skill-sentry",
+          agentId: "demo-agent-sentry",
+          name: "Sentry 오류 탐지",
+          instructions:
+            "Sentry의 에러 내역을 확인하고 필요한 이슈를 만들어 배정합니다.",
+          provider: "claude",
+          model: "opus",
+        }),
+      ],
       calendarColor: "#8b5cf6",
       createdAt,
       updatedAt: createdAt,
@@ -64,6 +100,17 @@ export function demoProjectAgents(
         responsibility:
           "유저 피드백 채널에 들어오는 피드백을 취합하고 분석해서 액션아이템을 만들어 이슈를 만드는 에이전트",
       }),
+      skills: [
+        customSkill({
+          id: "demo-skill-feedback",
+          agentId: "demo-agent-feedback",
+          name: "Feedback 분석",
+          instructions:
+            "채널 피드백을 취합하고 분석해 액션 아이템을 이슈로 만듭니다.",
+          provider: "grok",
+          model: "grok-4.5",
+        }),
+      ],
       calendarColor: "#0f9f76",
       createdAt,
       updatedAt: createdAt,

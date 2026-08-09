@@ -936,7 +936,7 @@ function ChannelInviteDialog({
     const searchable =
       candidate.type === "user"
         ? `${candidate.member.name} ${candidate.member.email}`
-        : `${candidate.agent.name} ${candidate.agent.handle ?? ""} ${candidate.agent.provider} ${candidate.agent.responsibility}`;
+        : `${candidate.agent.name} ${candidate.agent.handle ?? ""} ${candidate.agent.provider} ${candidate.agent.responsibility} ${candidate.agent.skills.map((skill) => skill.name).join(" ")}`;
     return searchable.toLowerCase().includes(normalizedQuery);
   });
 

@@ -215,6 +215,7 @@ export function ProjectSchedule({
                   effort: agent.effort,
                   responsibility: agent.responsibility,
                   skill: agent.skill,
+                  skills: agent.skills,
                 },
               },
             ]

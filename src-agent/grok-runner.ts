@@ -6,6 +6,7 @@ import {
   createGrokEventState,
   finalizeGrokMessage,
   GROK_OAUTH2_REFERRER_ENV,
+  grokSessionMeta,
   mapEffortToGrok,
   normalizeGrokSessionUpdate,
   permissionDecisionResult,
@@ -312,17 +313,20 @@ async function main() {
 
     let sessionId: string;
     const resumeId = request.conversationId?.trim();
+    const sessionMeta = grokSessionMeta(request);
     if (resumeId) {
       const loaded = (await connection.request("session/load", {
         sessionId: resumeId,
         cwd: request.workspaceRoot,
         mcpServers: [],
+        ...(sessionMeta ? { _meta: sessionMeta } : {}),
       })) as { sessionId?: string } | undefined;
       sessionId = loaded?.sessionId?.trim() || resumeId;
     } else {
       const created = (await connection.request("session/new", {
         cwd: request.workspaceRoot,
         mcpServers: [],
+        ...(sessionMeta ? { _meta: sessionMeta } : {}),
       })) as {
         sessionId?: string;
         models?: { currentModelId?: string };

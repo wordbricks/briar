@@ -70,6 +70,7 @@ const agent: ProjectAgent = {
   effort: null,
   responsibility: "릴리스 작업을 처리합니다.",
   skill: "# 릴리스 에이전트",
+  skills: [],
   calendarColor: "#3275d5",
   createdAt: "2026-07-28T00:00:00.000Z",
   updatedAt: "2026-07-28T00:00:00.000Z",
@@ -261,6 +262,113 @@ describe("ProjectAgentDetail", () => {
       workerId: "worker-1",
     });
     expect(document.querySelector('[role="dialog"]')).toBeNull();
+  });
+
+  it("opens the task dialog when a non-default Skill has an available Worker", async () => {
+    const multiSkillAgent: ProjectAgent = {
+      ...agent,
+      skills: [
+        {
+          id: "skill-default",
+          agentId: agent.id,
+          name: "이슈 처리",
+          instructions: "대기 이슈를 처리합니다.",
+          provider: "codex",
+          model: null,
+          effort: null,
+          kind: "issue_processing",
+          isDefault: true,
+          position: 0,
+          createdAt: agent.createdAt,
+          updatedAt: agent.updatedAt,
+        },
+        {
+          id: "skill-release",
+          agentId: agent.id,
+          name: "데스크탑 릴리즈",
+          instructions: "데스크탑 앱을 릴리즈합니다.",
+          provider: "claude",
+          model: "sonnet",
+          effort: "high",
+          kind: "custom",
+          isDefault: false,
+          position: 1,
+          createdAt: agent.createdAt,
+          updatedAt: agent.updatedAt,
+        },
+      ],
+    };
+    const claudeDashboard = {
+      ...dashboard,
+      workers: [
+        {
+          id: "worker-claude",
+          label: "Release Mac",
+          agentProvider: "claude",
+          providers: ["claude"],
+          state: "online",
+          readiness: "available",
+          acceptingWork: true,
+          readinessDetail: "작업 수신 가능",
+        },
+      ],
+    } as unknown as DashboardPayload;
+    const onStartRemoteTask = vi.fn(async () => "remote-session");
+    const container = await mount(
+      <ProjectAgentDetail
+        agent={multiSkillAgent}
+        companionMode
+        dashboard={claudeDashboard}
+        error={null}
+        isSidebarOpen
+        onBack={() => undefined}
+        onIssueOpen={() => undefined}
+        onStartRemoteTask={onStartRemoteTask}
+        onSettleTaskSession={() => undefined}
+        onStopSession={async () => true}
+        onStartAutoHunt={() => "dispatch-1"}
+        onStartTaskSession={() => undefined}
+        requestedSessionId={null}
+        sessions={[]}
+      />,
+    );
+
+    const runButton = container.querySelector<HTMLButtonElement>(
+      ".project-agent-run-task",
+    )!;
+    expect(runButton.disabled).toBe(false);
+    await act(async () => runButton.click());
+    expect(document.body.textContent).toContain(
+      "선택한 스킬을 실행할 수 있는 Worker가 없습니다. 다른 스킬을 선택해 주세요.",
+    );
+
+    const skillSelect = document.querySelector<HTMLButtonElement>(
+      '.native-select button[aria-label="스킬"]',
+    )!;
+    await act(async () => skillSelect.click());
+    await act(async () => {
+      document
+        .querySelector<HTMLButtonElement>(
+          '.select-menu-option[data-value="skill-release"]',
+        )!
+        .click();
+    });
+
+    expect(document.body.textContent).toContain("Release Mac");
+    await act(async () => {
+      document
+        .querySelector<HTMLFormElement>("#project-agent-task-form")!
+        .dispatchEvent(
+          new Event("submit", { bubbles: true, cancelable: true }),
+        );
+      await Promise.resolve();
+    });
+
+    expect(onStartRemoteTask).toHaveBeenCalledWith({
+      request: "데스크탑 앱을 릴리즈합니다.",
+      workerId: "worker-claude",
+      skillId: "skill-release",
+    });
   });
 
   it("opens the linked Auto Hunt dispatch instead of its coordinator task", async () => {

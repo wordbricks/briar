@@ -28,6 +28,10 @@ import {
   type ProjectAgentTaskSessionSettlement,
   type ProjectAgentTaskSessionStart,
 } from "../lib/project-agent-execution";
+import {
+  agentWithSkillRuntime,
+  defaultAgentSkill,
+} from "../lib/project-agent";
 import { runProjectAgent } from "../lib/project-llm";
 import type {
   DashboardPayload,
@@ -74,6 +78,7 @@ export function ProjectAgentDetail({
   onStartRemoteTask?: (input: {
     request: string;
     workerId: string;
+    skillId?: string;
   }) => string | Promise<string>;
   onSettleTaskSession: (
     sessionId: string,
@@ -97,19 +102,37 @@ export function ProjectAgentDetail({
   token?: string | null;
 }) {
   const { t } = useI18n();
+  const initialSkill = defaultAgentSkill(agent);
+  const [selectedSkillId, setSelectedSkillId] = useState(
+    initialSkill?.id ?? "",
+  );
+  const selectedSkill =
+    agent.skills.find((skill) => skill.id === selectedSkillId) ?? initialSkill;
+  const runtimeAgent = selectedSkill
+    ? agentWithSkillRuntime(agent, selectedSkill)
+    : agent;
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
-  const [request, setRequest] = useState(agent.responsibility);
+  const [request, setRequest] = useState(
+    initialSkill?.instructions ?? agent.responsibility,
+  );
   const [isRunning, setIsRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(
     requestedSessionId,
   );
-  const availableWorkers = (dashboard?.workers ?? []).filter(
-    (worker) =>
-      (worker.providers ?? [worker.agentProvider]).includes(agent.provider) &&
-      worker.acceptingWork &&
-      worker.readiness === "available",
-  );
+  const availableWorkersForProvider = (provider: ProjectAgent["provider"]) =>
+    (dashboard?.workers ?? []).filter(
+      (worker) =>
+        (worker.providers ?? [worker.agentProvider]).includes(provider) &&
+        worker.acceptingWork &&
+        worker.readiness === "available",
+    );
+  const availableWorkers = availableWorkersForProvider(runtimeAgent.provider);
+  const hasAvailableWorkerForAnySkill = (
+    agent.skills.length > 0
+      ? agent.skills.map((skill) => skill.provider)
+      : [agent.provider]
+  ).some((provider) => availableWorkersForProvider(provider).length > 0);
   const [selectedWorkerId, setSelectedWorkerId] = useState("");
   const selectedSession =
     sessions.find(
@@ -130,6 +153,11 @@ export function ProjectAgentDetail({
     },
     { enabled: companionMode, priority: 200 },
   );
+
+  useEffect(() => {
+    if (selectedSkill) return;
+    setSelectedSkillId(initialSkill?.id ?? "");
+  }, [initialSkill, selectedSkill]);
 
   useEffect(() => {
     if (
@@ -182,7 +210,7 @@ export function ProjectAgentDetail({
   ]);
 
   const openTaskDialog = () => {
-    setRequest(agent.responsibility);
+    setRequest(selectedSkill?.instructions ?? agent.responsibility);
     setError(null);
     setIsTaskDialogOpen(true);
   };
@@ -200,6 +228,7 @@ export function ProjectAgentDetail({
         const sessionId = await onStartRemoteTask({
           request: message,
           workerId: selectedWorkerId,
+          skillId: selectedSkill?.id,
         });
         setSelectedSessionId(sessionId);
         setIsTaskDialogOpen(false);
@@ -215,7 +244,7 @@ export function ProjectAgentDetail({
           startAutoHunt: onStartAutoHunt,
         },
         {
-          agent,
+          agent: runtimeAgent,
           dashboard,
           message,
           sessionId,
@@ -282,7 +311,7 @@ export function ProjectAgentDetail({
             disabled={
               isResponsibilityRunning ||
               !dashboard ||
-              (companionMode && availableWorkers.length === 0)
+              (companionMode && !hasAvailableWorkerForAnySkill)
             }
             onClick={openTaskDialog}
             type="button"
@@ -349,6 +378,30 @@ export function ProjectAgentDetail({
 
           {error ? <ErrorBanner>{error}</ErrorBanner> : null}
 
+          {agent.skills.length > 1 ? (
+            <label className="project-agent-run-worker-select">
+              <span>{t("agents.skill")}</span>
+              <NativeSelect
+                disabled={isRunning}
+                label={t("agents.skill")}
+                onValueChange={(skillId) => {
+                  const nextSkill = agent.skills.find(
+                    (skill) => skill.id === skillId,
+                  );
+                  setSelectedSkillId(skillId);
+                  if (nextSkill) setRequest(nextSkill.instructions);
+                }}
+                options={agent.skills.map((skill) => ({
+                  label: skill.isDefault
+                    ? `${skill.name} · ${t("agents.defaultSkill")}`
+                    : skill.name,
+                  value: skill.id,
+                }))}
+                value={selectedSkill?.id ?? ""}
+              />
+            </label>
+          ) : null}
+
           {companionMode ? (
             <label className="project-agent-run-worker-select">
               <span>실행 호스트</span>
@@ -367,7 +420,11 @@ export function ProjectAgentDetail({
           ) : null}
 
           {companionMode && availableWorkers.length === 0 ? (
-            <ErrorBanner>이 Agent를 실행할 수 있는 사용 가능한 Worker가 없습니다.</ErrorBanner>
+            <ErrorBanner>
+              {hasAvailableWorkerForAnySkill
+                ? t("agents.selectedSkillWorkerUnavailable")
+                : t("agents.agentWorkerUnavailable")}
+            </ErrorBanner>
           ) : null}
 
           <form

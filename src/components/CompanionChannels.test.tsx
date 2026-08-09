@@ -83,6 +83,8 @@ const agent: ChannelAgentSummary = {
   name: "Honey",
   provider: "claude",
   model: null,
+  effort: null,
+  skills: [],
   projectId: null,
   responsibility: "Writing partner",
   createdAt: "2026-08-01T00:00:00.000Z",

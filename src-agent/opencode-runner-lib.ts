@@ -132,10 +132,6 @@ export function mapEffortToOpenCode(
 
 export function buildOpenCodePrompt(request: OpenCodeRunnerRequest): string {
   const sections: string[] = [];
-  const instructions = request.instructions?.trim();
-  if (instructions) {
-    sections.push(`Additional instructions for this turn:\n${instructions}`);
-  }
   if (request.outputSchema !== null && request.outputSchema !== undefined) {
     sections.push(
       `Return only the JSON value that matches this schema, without Markdown fences or commentary:\n${JSON.stringify(request.outputSchema)}`,
@@ -143,6 +139,12 @@ export function buildOpenCodePrompt(request: OpenCodeRunnerRequest): string {
   }
   sections.push(request.message);
   return sections.join("\n\n");
+}
+
+export function openCodeSystemPrompt(
+  request: OpenCodeRunnerRequest,
+): string | undefined {
+  return request.instructions?.trim() || undefined;
 }
 
 export function buildOpenCodeParts(request: OpenCodeRunnerRequest) {

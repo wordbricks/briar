@@ -420,9 +420,41 @@ export type ProjectAgent = {
   effort: ModelEffort | null;
   responsibility: string;
   skill: string;
+  skills: ProjectAgentSkill[];
   calendarColor: string;
   createdAt: string;
   updatedAt: string;
+};
+
+export type ProjectAgentSkillKind = "issue_processing" | "custom";
+
+export type ProjectAgentSkill = {
+  id: string;
+  agentId: string;
+  name: string;
+  instructions: string;
+  provider: AgentProvider;
+  model: string | null;
+  effort: ModelEffort | null;
+  kind: ProjectAgentSkillKind;
+  isDefault: boolean;
+  position: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ProjectAgentSkillInput = Pick<
+  ProjectAgentSkill,
+  | "name"
+  | "instructions"
+  | "provider"
+  | "model"
+  | "effort"
+  | "kind"
+  | "isDefault"
+  | "position"
+> & {
+  id?: string;
 };
 
 export type CreateProjectAgentInput = {
@@ -433,6 +465,7 @@ export type CreateProjectAgentInput = {
   model: string | null;
   effort?: ModelEffort | null;
   responsibility: string;
+  skills?: ProjectAgentSkillInput[];
   calendarColor: string;
 };
 
@@ -478,7 +511,14 @@ export type ProjectAgentScheduleRun = {
   scheduleName: string;
   agent: Pick<
     ProjectAgent,
-    "id" | "name" | "provider" | "model" | "effort" | "responsibility" | "skill"
+    | "id"
+    | "name"
+    | "provider"
+    | "model"
+    | "effort"
+    | "responsibility"
+    | "skill"
+    | "skills"
   >;
   workflow: AutoHuntWorkflow;
   status: "running" | "completed" | "failed";
@@ -496,7 +536,12 @@ export type ClaimedProjectAgentScheduleRun = ProjectAgentScheduleRun & {
   claimToken: string;
 };
 
-export type UpdateProjectAgentInput = CreateProjectAgentInput;
+export type UpdateProjectAgentInput = Omit<
+  CreateProjectAgentInput,
+  "skills"
+> & {
+  skills: ProjectAgentSkillInput[];
+};
 
 export type Organization = {
   id: string;
