@@ -251,18 +251,24 @@ describe("detached Agent runner", () => {
     );
   });
 
-  it("passes downloaded channel images only to the Codex vision input", () => {
+  it("passes provider-neutral image attachments to every runner", () => {
+    const attachments = [{
+      type: "image" as const,
+      path: "/worktree/.briar-channel-images/screen.png",
+      name: "screen.png",
+      mimeType: "image/png",
+    }];
     const launch = detachedProviderRequest({
       agent,
       prompt: "Inspect the attached screenshot",
       workspacePath: "/worktree",
       fullAccess: false,
       readOnly: true,
-      imagePaths: ["/worktree/.briar-channel-images/screen.png"],
+      attachments,
       agentBinary: "/bin/codex",
     });
     expect(launch.request).toMatchObject({
-      imagePaths: ["/worktree/.briar-channel-images/screen.png"],
+      attachments,
       sandboxMode: "readOnly",
     });
 
@@ -272,10 +278,10 @@ describe("detached Agent runner", () => {
       workspacePath: "/worktree",
       fullAccess: false,
       readOnly: true,
-      imagePaths: ["/worktree/.briar-channel-images/screen.png"],
+      attachments,
       agentBinary: "/bin/claude",
     });
-    expect(claudeLaunch.request).not.toHaveProperty("imagePaths");
+    expect(claudeLaunch.request).toMatchObject({ attachments });
   });
 
   it("prevents terminal-stage replay after the final checkpoint resumes", () => {

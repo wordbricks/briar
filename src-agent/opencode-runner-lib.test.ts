@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildOpenCodeParts,
   buildOpenCodePermissionRules,
   buildOpenCodePrompt,
   completeOpenCodeMessages,
@@ -27,6 +28,25 @@ const request = (overrides: Partial<OpenCodeRunnerRequest> = {}): OpenCodeRunner
 });
 
 describe("OpenCode runner helpers", () => {
+  it("maps common image attachments to OpenCode file parts", () => {
+    expect(buildOpenCodeParts(request({
+      attachments: [{
+        type: "image",
+        path: "/tmp/briar images/screen.png",
+        name: "screen.png",
+        mimeType: "image/png",
+      }],
+    }))).toEqual([
+      { type: "text", text: "Fix the tests" },
+      {
+        type: "file",
+        mime: "image/png",
+        filename: "screen.png",
+        url: "file:///tmp/briar%20images/screen.png",
+      },
+    ]);
+  });
+
   it("parses the server URL and provider-qualified models", () => {
     expect(
       parseOpenCodeServerUrl("opencode server listening on http://127.0.0.1:4321\n"),

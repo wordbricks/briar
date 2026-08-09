@@ -1,7 +1,11 @@
 import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import {
   approvalResult,
+  claudePrompt,
   claudeOptions,
   normalizeClaudeMessage,
   type ClaudeEventState,
@@ -21,6 +25,39 @@ const request: ClaudeRunnerRequest = {
 };
 
 describe("Claude runner", () => {
+  it("embeds common image attachments as Claude base64 content blocks", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "briar-claude-image-"));
+    const path = join(directory, "screen.png");
+    await writeFile(path, new Uint8Array([1, 2, 3, 4]));
+    try {
+      let message;
+      for await (const item of claudePrompt({
+        ...request,
+        attachments: [{
+          type: "image",
+          path,
+          name: "screen.png",
+          mimeType: "image/png",
+        }],
+      })) {
+        message = item;
+      }
+      expect(message?.message.content).toEqual([
+        { type: "text", text: "Inspect the repository" },
+        {
+          type: "image",
+          source: {
+            type: "base64",
+            media_type: "image/png",
+            data: "AQIDBA==",
+          },
+        },
+      ]);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
   it("keeps read-only work offline and limits the tool surface", () => {
     const options = claudeOptions(request, vi.fn());
 

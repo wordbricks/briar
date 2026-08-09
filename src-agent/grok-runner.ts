@@ -2,7 +2,7 @@ import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { createInterface } from "node:readline";
 import {
   BRIAR_OAUTH_REFERRER,
-  buildPromptParts,
+  buildGrokPromptParts,
   createGrokEventState,
   finalizeGrokMessage,
   GROK_OAUTH2_REFERRER_ENV,
@@ -359,9 +359,10 @@ async function main() {
       }
     }
 
+    const prompt = await buildGrokPromptParts(request);
     const promptResult = (await connection.request("session/prompt", {
       sessionId,
-      prompt: buildPromptParts(request),
+      prompt,
     })) as { stopReason?: string; text?: string } | undefined;
 
     for (const event of finalizeGrokMessage(state, promptResult?.stopReason)) {

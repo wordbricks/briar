@@ -510,7 +510,7 @@ describe("Worker HTTP contract", () => {
           author_agent_provider: null,
           author_name: "Jay",
           author_image: null,
-          body: "Use all three requested articles.",
+          body: "Use all three requested articles.\n\n![screen](briar-attachment://attachment-1)",
           reply_count: 1,
           created_at: "2026-07-30T00:00:00.000Z",
           updated_at: "2026-07-30T00:00:00.000Z",
@@ -528,11 +528,29 @@ describe("Worker HTTP contract", () => {
           created_at: "2026-07-30T00:01:00.000Z",
           updated_at: "2026-07-30T00:01:00.000Z",
         },
+      ], [
+        {
+          id: "attachment-1",
+          run_id: "run-1",
+          project_id: "project-1",
+          object_key: "issues/run-1/attachment-1",
+          filename: "screen.png",
+          content_type: "image/png",
+          byte_size: 4,
+          created_at: "2026-07-30T00:00:00.000Z",
+        },
       ]),
     ).toEqual([
       expect.objectContaining({
         id: "message-1",
-        body: "Use all three requested articles.",
+        body: "Use all three requested articles.\n\n![screen](briar-attachment://attachment-1)",
+        attachments: [
+          expect.objectContaining({
+            id: "attachment-1",
+            filename: "screen.png",
+            contentType: "image/png",
+          }),
+        ],
         author: expect.objectContaining({ name: "Jay", provider: null }),
       }),
       expect.objectContaining({

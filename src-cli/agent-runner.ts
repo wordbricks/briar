@@ -1,4 +1,5 @@
 import { Buffer } from "node:buffer";
+import type { AgentAttachment } from "../src-agent/runner-attachments";
 
 // A detached run keeps one durable transcript session across retries and
 // checkpoint resumes. Each claim gets its own sequence range so a new worker
@@ -492,7 +493,7 @@ export function detachedProviderRequest(input: {
   fullAccess: boolean;
   conversationId?: string | null;
   readOnly?: boolean;
-  imagePaths?: string[];
+  attachments?: AgentAttachment[];
   agentBinary: string;
 }) {
   return {
@@ -514,12 +515,12 @@ export function detachedProviderRequest(input: {
           ? "dangerFullAccess"
           : "workspaceWrite",
       networkAccess: true,
+      ...(input.attachments?.length
+        ? { attachments: input.attachments }
+        : {}),
       ...(input.agent.provider === "codex"
         ? {
             codexBinary: input.agentBinary,
-            ...(input.imagePaths?.length
-              ? { imagePaths: input.imagePaths }
-              : {}),
           }
         : input.agent.provider === "claude"
           ? { claudeBinary: input.agentBinary }

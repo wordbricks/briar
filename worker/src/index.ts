@@ -4438,8 +4438,10 @@ const channelConversationNotificationJson = (
   createdAt: notification.created_at,
 });
 
-export const claimConversationJson = (messages: IssueMessageRow[]) =>
-  messages.map((message) => issueMessageJson(message));
+export const claimConversationJson = (
+  messages: IssueMessageRow[],
+  attachments: IssueAttachmentRow[] = [],
+) => messages.map((message) => issueMessageJson(message, attachments));
 
 const listIssueMessagesWithArchive = async (
   db: D1Database,
@@ -9389,7 +9391,7 @@ async function route(
             ...dashboardRunJson(run, attachments),
             events: events.map(dashboardEventJson),
           },
-          messages: claimConversationJson(messages),
+          messages: claimConversationJson(messages, attachments),
           agentTranscript:
             transcript?.events.flatMap((event) => {
               const payload = issueReplyTranscriptPayload(
@@ -10074,7 +10076,7 @@ async function route(
               JSON.parse(run.workflow_snapshot_json),
             ),
             attachments: attachments.map(attachmentJson),
-            messages: claimConversationJson(messages),
+            messages: claimConversationJson(messages, attachments),
             claimToken,
             claimedBy: run.claimed_by,
             claimedAt: run.claimed_at,

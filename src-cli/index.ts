@@ -1,11 +1,17 @@
 #!/usr/bin/env bun
 
 import { existsSync } from "node:fs";
-import { chmod, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import {
+  chmod,
+  mkdir,
+  mkdtemp,
+  readFile,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import { spawn } from "node:child_process";
 import { homedir, platform } from "node:os";
 import { basename, isAbsolute, join, resolve } from "node:path";
-import { createInterface } from "node:readline";
 import { z } from "zod";
 import packageJson from "../package.json";
 import {
@@ -33,21 +39,23 @@ import {
   createDetachedTranscriptSequencer,
   detachedAgentPrompt,
   detachedChannelReplyPrompt,
-  detachedConversationIdFromPayload,
   detachedIssueReplyPrompt,
   detachedProjectAgentPrompt,
   detachedPayloadDirection,
   detachedProviderBlockedRunEvent,
   detachedProviderBlockFromPayload,
-  detachedProviderRequest,
   detachedRunContinuationPrompt,
   detachedRunDisposition,
   detachedTranscriptPayload,
-  issueReplyTextFromPayload,
   parseDetachedIssueReplyResult,
   parseDetachedJsonResult,
   shouldPersistDetachedTranscriptPayload,
 } from "./agent-runner";
+import { agentImageAttachments } from "../src-agent/runner-attachments";
+import {
+  assertDetachedProviderTurnSucceeded,
+  runDetachedProviderTurn,
+} from "./detached-provider-turn";
 import {
   inspectWorkflowRequirements,
   workflowRequirementReadinessDetail,
@@ -890,6 +898,7 @@ const queuedIssueMessageSchema = z.object({
   runId: z.string().uuid(),
   parentMessageId: z.string().uuid().nullable(),
   body: z.string().min(1),
+  attachments: z.array(queuedAttachmentSchema).max(5).default([]),
   author: z.object({
     id: z.string().nullable(),
     name: z.string().min(1),
@@ -2098,11 +2107,6 @@ async function runClaimedIssueInRuntime(
   }
 
   const provider = execution.provider;
-  const binaryName = provider === "claude" ? "claude" : provider;
-  const agentBinary = Bun.which(binaryName);
-  if (!agentBinary) {
-    throw new Error(`${binaryName} coding agent is not installed on this Worker`);
-  }
   const attachments = await Promise.all(
     issue.attachments.map(async (attachment) => {
       try {
@@ -2177,19 +2181,7 @@ async function runClaimedIssueInRuntime(
     responsibility: issue.agent?.responsibility ?? "",
     skill: issue.agent?.skill ?? "",
   };
-  const runnerPath = (
-    await Promise.all(
-      [
-        resolve(import.meta.dir, `agent/${provider}-runner.js`),
-        resolve(import.meta.dir, `../dist-agent/${provider}-runner.js`),
-      ].map(async (path) => ((await Bun.file(path).exists()) ? path : null)),
-    )
-  ).find((path): path is string => Boolean(path));
-  if (!runnerPath) {
-    throw new Error(
-      `${provider} runner bundle is missing; run \`bun run agent:build\``,
-    );
-  }
+  const providerAttachments = agentImageAttachments(attachments);
 
   const executionStartedAt = Date.now();
   const transcriptSequencer = createDetachedTranscriptSequencer(
@@ -2202,93 +2194,25 @@ async function runClaimedIssueInRuntime(
   try {
     for (;;) {
       turnNumber += 1;
-      const launch = detachedProviderRequest({
+      let runnerBlock: ReturnType<typeof detachedProviderBlockFromPayload> = null;
+      const turn = await runDetachedProviderTurn({
         agent: detachedAgent,
         prompt: nextPrompt,
         workspacePath: workspace.path,
         fullAccess,
         conversationId,
-        agentBinary,
-      });
-      const runnerRequest = launch.request;
-      const child = spawn(process.execPath, [runnerPath], {
-        cwd: workspace.path,
-        env: environment,
-        stdio: ["pipe", "pipe", "pipe"],
-      });
-      const exitPromise = new Promise<number | null>((resolveExit, rejectExit) => {
-        child.once("error", rejectExit);
-        child.once("close", resolveExit);
-      });
-      let stderr = "";
-      let runnerError: string | null = null;
-      let runnerBlock: ReturnType<typeof detachedProviderBlockFromPayload> = null;
-      let completed = false;
-      const terminate = () => {
-        if (child.exitCode !== null || child.killed) return;
-        child.kill("SIGTERM");
-        setTimeout(() => {
-          if (child.exitCode === null) child.kill("SIGKILL");
-        }, 5_000).unref();
-      };
-      signal.addEventListener("abort", terminate, { once: true });
-      child.stderr.setEncoding("utf8");
-      child.stderr.on("data", (chunk: string) => {
-        stderr = `${stderr}${chunk}`.slice(-8_000);
-      });
-      child.stdin.write(`${JSON.stringify(runnerRequest)}\n`);
-
-      try {
-        const lines = createInterface({ input: child.stdout, crlfDelay: Infinity });
-        for await (const line of lines) {
-          if (!line.trim()) continue;
-          let payload: unknown = line;
-          try {
-            payload = JSON.parse(line);
-          } catch {
-            // Plain output is still useful in the remote transcript.
-          }
-          conversationId =
-            detachedConversationIdFromPayload(payload) ?? conversationId;
+        attachments:
+          turnNumber === 1 || !conversationId
+            ? providerAttachments
+            : undefined,
+        environment,
+        signal,
+        onPayload: async (rawPayload, line) => {
           tokenUsage =
-            agentExecutionTokenUsageFromPayload(provider, payload) ?? tokenUsage;
-          runnerBlock ??= detachedProviderBlockFromPayload(payload);
-          const direction = detachedPayloadDirection(payload);
-          payload = detachedTranscriptPayload(payload, line);
-          if (
-            payload &&
-            typeof payload === "object" &&
-            "type" in payload &&
-            (payload as { type?: string }).type === "approval" &&
-            "id" in payload &&
-            typeof payload.id === "string"
-          ) {
-            child.stdin.write(
-              `${JSON.stringify({
-                type: "approvalResponse",
-                id: payload.id,
-                approved: runnerRequest.sandboxMode !== "readOnly",
-              })}\n`,
-            );
-          }
-          if (
-            payload &&
-            typeof payload === "object" &&
-            "type" in payload &&
-            (payload as { type?: string }).type === "error"
-          ) {
-            runnerError = String(
-              (payload as { message?: unknown }).message ?? "Agent failed",
-            );
-          }
-          if (
-            payload &&
-            typeof payload === "object" &&
-            "type" in payload &&
-            (payload as { type?: string }).type === "result"
-          ) {
-            completed = true;
-          }
+            agentExecutionTokenUsageFromPayload(provider, rawPayload) ?? tokenUsage;
+          runnerBlock ??= detachedProviderBlockFromPayload(rawPayload);
+          const direction = detachedPayloadDirection(rawPayload);
+          const payload = detachedTranscriptPayload(rawPayload, line);
           const transcriptSequence = transcriptSequencer.nextForPayload(payload);
           if (transcriptSequence !== null) {
             try {
@@ -2315,44 +2239,28 @@ async function runClaimedIssueInRuntime(
               );
             }
           }
-        }
-        const exitCode = await exitPromise;
-        if (signal.aborted) {
-          throw signal.reason instanceof Error
-            ? signal.reason
-            : new Error("Worker execution was cancelled");
-        }
-        if (runnerBlock) {
-          await request(config.apiUrl, "/run-events", workerToken, {
-            method: "POST",
-            headers: { "X-Briar-Claim-Token": issue.claimToken },
-            body: JSON.stringify(
-              detachedProviderBlockedRunEvent({
-                block: runnerBlock,
-                runId: issue.runId,
-                attempt: issue.currentAttempt,
-                actor: `briar-worker:${activeProject.executionWorker?.workerId ?? "unknown"}`,
-                repository: issue.repository,
-                model: execution.model,
-                occurredAt: new Date().toISOString(),
-              }),
-            ),
-          });
-          return;
-        }
-        if (exitCode !== 0 || runnerError) {
-          throw new Error(
-            runnerError ?? (stderr.trim() || `Agent exited with ${exitCode}`),
-          );
-        }
-        if (!completed) {
-          throw new Error("Agent runner exited without a result");
-        }
-      } finally {
-        signal.removeEventListener("abort", terminate);
-        terminate();
-        await exitPromise.catch(() => null);
+        },
+      });
+      conversationId = turn.conversationId;
+      if (runnerBlock) {
+        await request(config.apiUrl, "/run-events", workerToken, {
+          method: "POST",
+          headers: { "X-Briar-Claim-Token": issue.claimToken },
+          body: JSON.stringify(
+            detachedProviderBlockedRunEvent({
+              block: runnerBlock,
+              runId: issue.runId,
+              attempt: issue.currentAttempt,
+              actor: `briar-worker:${activeProject.executionWorker?.workerId ?? "unknown"}`,
+              repository: issue.repository,
+              model: execution.model,
+              occurredAt: new Date().toISOString(),
+            }),
+          ),
+        });
+        return;
       }
+      assertDetachedProviderTurnSucceeded(turn);
 
       const runtimeConfig = configSchema.parse(
         JSON.parse(await readFile(join(runtimeDirectory, "config.json"), "utf8")),
@@ -2490,146 +2398,43 @@ async function runClaimedProjectAgentTask(
   workerId: string,
   signal: AbortSignal,
 ) {
-  const provider = task.agent.provider;
-  const binaryName = provider === "claude" ? "claude" : provider;
-  const agentBinary = Bun.which(binaryName);
-  if (!agentBinary) {
-    throw new Error(`${binaryName} coding agent is not installed on this Worker`);
-  }
   const workspacePath = project.repositoryPath;
   const prompt = detachedProjectAgentPrompt({
     agent: task.agent,
     request: task.request,
     workspacePath,
   });
-  const launch = detachedProviderRequest({
+  const turn = await runDetachedProviderTurn({
     agent: task.agent,
     prompt,
     workspacePath,
     fullAccess: project.autoHunt?.sandbox?.fullAccess ?? true,
-    agentBinary,
-  });
-  let command = agentBinary;
-  let commandArgs = launch.arguments;
-  if (launch.kind === "runner") {
-    const runnerPath = (
-      await Promise.all(
-        [
-          resolve(import.meta.dir, `agent/${provider}-runner.js`),
-          resolve(import.meta.dir, `../dist-agent/${provider}-runner.js`),
-        ].map(async (path) => ((await Bun.file(path).exists()) ? path : null)),
-      )
-    ).find((path): path is string => Boolean(path));
-    if (!runnerPath) {
-      throw new Error(
-        `${provider} runner bundle is missing; run \`bun run agent:build\``,
-      );
-    }
-    command = process.execPath;
-    commandArgs = [runnerPath];
-  }
-
-  const child = spawn(command, commandArgs, {
-    cwd: workspacePath,
-    env: {
+    environment: {
       ...process.env,
       PATH: workerExecutionPath(),
       BRIAR_CLI: workerCliPath(),
       BRIAR_WORKER_TOKEN: workerToken,
       BRIAR_PROJECT_ID: project.id,
     },
-    stdio: ["pipe", "pipe", "pipe"],
+    signal,
   });
-  const exitPromise = new Promise<number | null>((resolveExit, rejectExit) => {
-    child.once("error", rejectExit);
-    child.once("close", resolveExit);
-  });
-  let stderr = "";
-  let resultText: string | null = null;
-  let runnerError: string | null = null;
-  const terminate = () => {
-    if (child.exitCode !== null || child.killed) return;
-    child.kill("SIGTERM");
-    setTimeout(() => {
-      if (child.exitCode === null) child.kill("SIGKILL");
-    }, 5_000).unref();
-  };
-  signal.addEventListener("abort", terminate, { once: true });
-  child.stderr.setEncoding("utf8");
-  child.stderr.on("data", (chunk: string) => {
-    stderr = `${stderr}${chunk}`.slice(-8_000);
-  });
-  if (launch.request) child.stdin.write(`${JSON.stringify(launch.request)}\n`);
-  else child.stdin.end();
-
-  try {
-    const lines = createInterface({ input: child.stdout, crlfDelay: Infinity });
-    for await (const line of lines) {
-      if (!line.trim()) continue;
-      let payload: unknown = line;
-      try {
-        payload = JSON.parse(line);
-      } catch {
-        // Plain provider output remains a valid final summary fallback.
-      }
-      const candidate = issueReplyTextFromPayload(payload);
-      if (candidate) resultText = candidate;
-      if (
-        launch.request &&
-        payload &&
-        typeof payload === "object" &&
-        "type" in payload &&
-        (payload as { type?: string }).type === "approval" &&
-        "id" in payload &&
-        typeof payload.id === "string"
-      ) {
-        child.stdin.write(
-          `${JSON.stringify({ type: "approvalResponse", id: payload.id, approved: true })}\n`,
-        );
-      }
-      if (
-        payload &&
-        typeof payload === "object" &&
-        "type" in payload &&
-        (payload as { type?: string }).type === "error"
-      ) {
-        runnerError = String(
-          (payload as { message?: unknown }).message ?? "Agent failed",
-        );
-      }
-    }
-    const exitCode = await exitPromise;
-    if (signal.aborted) {
-      throw signal.reason instanceof Error
-        ? signal.reason
-        : new Error("Worker execution was cancelled");
-    }
-    if (exitCode !== 0 || runnerError) {
-      throw new Error(
-        runnerError ?? (stderr.trim() || `Agent exited with ${exitCode}`),
-      );
-    }
-    if (!resultText) throw new Error("Agent returned an empty direct-run summary");
-    await request(
-      config.apiUrl,
-      `/agent-task-claims/${task.workId}/complete`,
-      workerToken,
-      {
-        method: "POST",
-        body: JSON.stringify({
-          projectId: project.id,
-          workerId,
-          claimToken: task.claimToken,
-          summary: resultText.slice(0, 50_000),
-          conversationId: null,
-        }),
-      },
-    );
-  } finally {
-    signal.removeEventListener("abort", terminate);
-    terminate();
-    await exitPromise.catch(() => null);
-  }
+  assertDetachedProviderTurnSucceeded(turn);
+  if (!turn.resultText) throw new Error("Agent returned an empty direct-run summary");
+  await request(
+    config.apiUrl,
+    `/agent-task-claims/${task.workId}/complete`,
+    workerToken,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        projectId: project.id,
+        workerId,
+        claimToken: task.claimToken,
+        summary: turn.resultText.slice(0, 50_000),
+        conversationId: turn.conversationId,
+      }),
+    },
+  );
 }
 
 async function failClaimedProjectAgentTask(
@@ -2667,11 +2472,6 @@ async function runClaimedIssueReply(
   const registered = project.executionWorker;
   if (!registered) throw new Error("Worker registration is missing");
   const provider = issue.provider;
-  const binaryName = provider === "claude" ? "claude" : provider;
-  const agentBinary = Bun.which(binaryName);
-  if (!agentBinary) {
-    throw new Error(`${binaryName} coding agent is not installed on this Worker`);
-  }
 
   let workspacePath = project.repositoryPath;
   let workspaceAvailable = false;
@@ -2708,161 +2508,84 @@ async function runClaimedIssueReply(
     (message) => message.id === issue.triggerMessageId,
   );
   if (!trigger) throw new Error("Mention message is missing from the reply snapshot");
-  const prompt = detachedIssueReplyPrompt({
-    snapshot: issue.snapshot,
-    userMessage: trigger.body,
-    workspaceAvailable,
-  });
-  const launch = detachedProviderRequest({
-    agent: {
-      id: issue.workId,
-      name: "Briar",
-      provider,
-      model: issue.model,
-      effort: null,
-      responsibility: "",
-      skill: "",
-    },
-    prompt,
-    workspacePath,
-    fullAccess: false,
-    readOnly: true,
-    agentBinary,
-  });
-  let command = agentBinary;
-  let commandArgs = launch.arguments;
-  const runnerRequest = launch.request;
-  if (launch.kind === "runner") {
-    const runnerPath = (
-      await Promise.all(
-        [
-          resolve(import.meta.dir, `agent/${provider}-runner.js`),
-          resolve(import.meta.dir, `../dist-agent/${provider}-runner.js`),
-        ].map(async (path) => ((await Bun.file(path).exists()) ? path : null)),
-      )
-    ).find((path): path is string => Boolean(path));
-    if (!runnerPath) {
-      throw new Error(
-        `${provider} runner bundle is missing; run \`bun run agent:build\``,
-      );
-    }
-    command = process.execPath;
-    commandArgs = [runnerPath];
-  }
-
-  const child = spawn(command, commandArgs, {
-    cwd: workspacePath,
-    env: {
-      ...process.env,
-      PATH: workerExecutionPath(),
-      BRIAR_CLI: workerCliPath(),
-      BRIAR_WORKER_TOKEN: workerToken,
-      BRIAR_PROJECT_ID: project.id,
-    },
-    stdio: ["pipe", "pipe", "pipe"],
-  });
-  const exitPromise = new Promise<number | null>((resolveExit, rejectExit) => {
-    child.once("error", rejectExit);
-    child.once("close", resolveExit);
-  });
-  let sequence = 0;
-  let stderr = "";
-  let replyBody: string | null = null;
-  let runnerError: string | null = null;
-  const terminate = () => {
-    if (child.exitCode !== null || child.killed) return;
-    child.kill("SIGTERM");
-    setTimeout(() => {
-      if (child.exitCode === null) child.kill("SIGKILL");
-    }, 5_000).unref();
-  };
-  signal.addEventListener("abort", terminate, { once: true });
-  child.stderr.setEncoding("utf8");
-  child.stderr.on("data", (chunk: string) => {
-    stderr = `${stderr}${chunk}`.slice(-8_000);
-  });
-  if (runnerRequest) {
-    child.stdin.write(`${JSON.stringify(runnerRequest)}\n`);
-  } else {
-    child.stdin.end();
-  }
-
+  const imageDirectory = await mkdtemp(
+    join(workspacePath, ".briar-issue-reply-images-"),
+  );
   try {
-    const lines = createInterface({ input: child.stdout, crlfDelay: Infinity });
-    for await (const line of lines) {
-      if (!line.trim()) continue;
-      sequence += 1;
-      let payload: unknown = line;
-      try {
-        payload = JSON.parse(line);
-      } catch {
-        // Plain output remains useful as a transcript diagnostic.
-      }
-      const candidate = issueReplyTextFromPayload(payload);
-      if (candidate) replyBody = candidate;
-      const direction = detachedPayloadDirection(payload);
-      const bounded = detachedTranscriptPayload(payload, line);
-      if (
-        runnerRequest &&
-        payload &&
-        typeof payload === "object" &&
-        "type" in payload &&
-        (payload as { type?: string }).type === "approval" &&
-        "id" in payload &&
-        typeof payload.id === "string"
-      ) {
-        child.stdin.write(
-          `${JSON.stringify({
-            type: "approvalResponse",
-            id: payload.id,
-            approved: !(
-              "sandboxMode" in runnerRequest &&
-              runnerRequest.sandboxMode === "readOnly"
-            ),
-          })}\n`,
-        );
-      }
-      if (
-        payload &&
-        typeof payload === "object" &&
-        "type" in payload &&
-        (payload as { type?: string }).type === "error"
-      ) {
-        runnerError = String(
-          (payload as { message?: unknown }).message ?? "Agent failed",
-        );
-      }
-      if (shouldPersistDetachedTranscriptPayload(bounded)) {
-        try {
-          await request(config.apiUrl, "/transcripts", workerToken, {
-            method: "POST",
-            body: JSON.stringify({
-              projectId: project.id,
-              sessionId: `reply-${issue.workId}`,
-              runId: issue.runId,
-              workerId: registered.workerId,
-              agentProvider: provider,
-              events: [{ sequence, direction, payload: bounded }],
-            }),
-          });
-        } catch {
-          // The durable reply result is more important than optional transcript data.
+    const downloadedImages = await Promise.all(
+      trigger.attachments
+        .filter((attachment) => attachment.contentType.startsWith("image/"))
+        .map(async (attachment) => ({
+          ...attachment,
+          localPath: await downloadClaimAttachment(
+            config.apiUrl,
+            workerToken,
+            project.id,
+            issue.runId,
+            attachment,
+            imageDirectory,
+          ),
+        })),
+    );
+    const attachments = agentImageAttachments(downloadedImages);
+    const prompt = detachedIssueReplyPrompt({
+      snapshot: {
+        ...issue.snapshot,
+        downloadedImagePaths: attachments.map((attachment) => attachment.path),
+      },
+      userMessage: trigger.body,
+      workspaceAvailable,
+    });
+    let sequence = 0;
+    const turn = await runDetachedProviderTurn({
+      agent: {
+        id: issue.workId,
+        name: "Briar",
+        provider,
+        model: issue.model,
+        effort: null,
+        responsibility: "",
+        skill: "",
+      },
+      prompt,
+      workspacePath,
+      fullAccess: false,
+      readOnly: true,
+      attachments,
+      environment: {
+        ...process.env,
+        PATH: workerExecutionPath(),
+        BRIAR_CLI: workerCliPath(),
+        BRIAR_WORKER_TOKEN: workerToken,
+        BRIAR_PROJECT_ID: project.id,
+      },
+      signal,
+      onPayload: async (payload, line) => {
+        sequence += 1;
+        const direction = detachedPayloadDirection(payload);
+        const bounded = detachedTranscriptPayload(payload, line);
+        if (shouldPersistDetachedTranscriptPayload(bounded)) {
+          try {
+            await request(config.apiUrl, "/transcripts", workerToken, {
+              method: "POST",
+              body: JSON.stringify({
+                projectId: project.id,
+                sessionId: `reply-${issue.workId}`,
+                runId: issue.runId,
+                workerId: registered.workerId,
+                agentProvider: provider,
+                events: [{ sequence, direction, payload: bounded }],
+              }),
+            });
+          } catch {
+            // The durable reply result is more important than optional transcript data.
+          }
         }
-      }
-    }
-    const exitCode = await exitPromise;
-    if (signal.aborted) {
-      throw signal.reason instanceof Error
-        ? signal.reason
-        : new Error("Worker execution was cancelled");
-    }
-    if (exitCode !== 0 || runnerError) {
-      throw new Error(
-        runnerError ?? (stderr.trim() || `Agent exited with ${exitCode}`),
-      );
-    }
-    if (!replyBody) throw new Error("Agent returned an empty issue reply");
-    const result = parseDetachedIssueReplyResult(replyBody);
+      },
+    });
+    assertDetachedProviderTurnSucceeded(turn);
+    if (!turn.resultText) throw new Error("Agent returned an empty issue reply");
+    const result = parseDetachedIssueReplyResult(turn.resultText);
     if (!result.reply) throw new Error("Agent returned an empty issue reply");
     await request(
       config.apiUrl,
@@ -2880,8 +2603,7 @@ async function runClaimedIssueReply(
       },
     );
   } finally {
-    signal.removeEventListener("abort", terminate);
-    terminate();
+    await rm(imageDirectory, { recursive: true, force: true });
   }
 }
 
@@ -2919,11 +2641,6 @@ async function runClaimedChannelReply(
 ) {
   const registered = project.executionWorker;
   if (!registered) throw new Error("Worker registration is missing");
-  const binaryName = reply.provider === "claude" ? "claude" : reply.provider;
-  const agentBinary = Bun.which(binaryName);
-  if (!agentBinary) {
-    throw new Error(`${binaryName} coding agent is not installed on this Worker`);
-  }
   const analysisWorktree = reply.projectId
     ? await allocateAnalysisWorktree({
         repositoryPath: project.repositoryPath,
@@ -2958,7 +2675,7 @@ async function runClaimedChannelReply(
       },
       workspaceAvailable: Boolean(analysisWorktree),
     });
-    const launch = detachedProviderRequest({
+    const turn = await runDetachedProviderTurn({
       agent: {
         id: reply.workId,
         name: "Briar Channel",
@@ -2972,116 +2689,34 @@ async function runClaimedChannelReply(
       workspacePath,
       fullAccess: false,
       readOnly: true,
-      imagePaths: downloadedImages.paths,
-      agentBinary,
-    });
-    let command = agentBinary;
-    let commandArgs = launch.arguments;
-    if (launch.kind === "runner") {
-      const runnerPath = (
-        await Promise.all(
-          [
-            resolve(import.meta.dir, `agent/${reply.provider}-runner.js`),
-            resolve(import.meta.dir, `../dist-agent/${reply.provider}-runner.js`),
-          ].map(async (path) => ((await Bun.file(path).exists()) ? path : null)),
-        )
-      ).find((path): path is string => Boolean(path));
-      if (!runnerPath) {
-        throw new Error(
-          `${reply.provider} runner bundle is missing; run \`bun run agent:build\``,
-        );
-      }
-      command = process.execPath;
-      commandArgs = [runnerPath];
-    }
-    const child = spawn(command, commandArgs, {
-      cwd: workspacePath,
-      env: {
+      attachments: downloadedImages.attachments,
+      environment: {
         ...process.env,
         PATH: workerExecutionPath(),
         BRIAR_CLI: workerCliPath(),
         BRIAR_WORKER_TOKEN: workerToken,
       },
-      stdio: ["pipe", "pipe", "pipe"],
+      signal,
     });
-    const exitPromise = new Promise<number | null>((resolveExit, rejectExit) => {
-      child.once("error", rejectExit);
-      child.once("close", resolveExit);
-    });
-    let stderr = "";
-    let resultText: string | null = null;
-    let runnerError: string | null = null;
-    const terminate = () => {
-      if (child.exitCode !== null || child.killed) return;
-      child.kill("SIGTERM");
-      setTimeout(() => {
-        if (child.exitCode === null) child.kill("SIGKILL");
-      }, 5_000).unref();
-    };
-    signal.addEventListener("abort", terminate, { once: true });
-    child.stderr.setEncoding("utf8");
-    child.stderr.on("data", (chunk: string) => {
-      stderr = `${stderr}${chunk}`.slice(-8_000);
-    });
-    if (launch.request) child.stdin.write(`${JSON.stringify(launch.request)}\n`);
-    else child.stdin.end();
-
-    try {
-      const lines = createInterface({ input: child.stdout, crlfDelay: Infinity });
-      for await (const line of lines) {
-        if (!line.trim()) continue;
-        let payload: unknown = line;
-        try {
-          payload = JSON.parse(line);
-        } catch {
-          // Preserve plain provider output as the candidate result.
-        }
-        const candidate = issueReplyTextFromPayload(payload);
-        if (candidate) resultText = candidate;
-        if (
-          payload &&
-          typeof payload === "object" &&
-          "type" in payload &&
-          (payload as { type?: string }).type === "error"
-        ) {
-          runnerError = String(
-            (payload as { message?: unknown }).message ?? "Agent failed",
-          );
-        }
-      }
-      const exitCode = await exitPromise;
-      if (signal.aborted) {
-        throw signal.reason instanceof Error
-          ? signal.reason
-          : new Error("Worker execution was cancelled");
-      }
-      if (exitCode !== 0 || runnerError) {
-        throw new Error(
-          runnerError ?? (stderr.trim() || `Agent exited with ${exitCode}`),
-        );
-      }
-      if (!resultText) throw new Error("Agent returned an empty channel reply");
-      const result = channelReplyCompletionSchema.parse(
-        parseDetachedJsonResult(resultText),
-      );
-      await request(
-        config.apiUrl,
-        `/channel-reply-claims/${reply.workId}/complete`,
-        workerToken,
-        {
-          method: "POST",
-          body: JSON.stringify({
-            organizationId: reply.organizationId,
-            workerId: registered.workerId,
-            claimToken: reply.claimToken,
-            result,
-          }),
-        },
-      );
-    } finally {
-      signal.removeEventListener("abort", terminate);
-      terminate();
-    }
+    assertDetachedProviderTurnSucceeded(turn);
+    if (!turn.resultText) throw new Error("Agent returned an empty channel reply");
+    const result = channelReplyCompletionSchema.parse(
+      parseDetachedJsonResult(turn.resultText),
+    );
+    await request(
+      config.apiUrl,
+      `/channel-reply-claims/${reply.workId}/complete`,
+      workerToken,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          organizationId: reply.organizationId,
+          workerId: registered.workerId,
+          claimToken: reply.claimToken,
+          result,
+        }),
+      },
+    );
   } finally {
     try {
       await cleanupChannelReplyImages(

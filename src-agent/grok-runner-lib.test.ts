@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
+  buildGrokPromptParts,
   buildPromptParts,
   createGrokEventState,
   extractJsonObject,
@@ -28,6 +32,28 @@ const request: GrokRunnerRequest = {
 };
 
 describe("Grok runner", () => {
+  it("embeds common image attachments as ACP image blocks", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "briar-grok-image-"));
+    const path = join(directory, "screen.png");
+    await writeFile(path, new Uint8Array([1, 2, 3, 4]));
+    try {
+      expect(await buildGrokPromptParts({
+        ...request,
+        attachments: [{
+          type: "image",
+          path,
+          name: "screen.png",
+          mimeType: "image/png",
+        }],
+      })).toEqual([
+        { type: "text", text: "Inspect the repository" },
+        { type: "image", data: "AQIDBA==", mimeType: "image/png" },
+      ]);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
   it("prefers the API key auth method when XAI_API_KEY is set", () => {
     expect(resolveGrokAuthMethodId({ XAI_API_KEY: "sk-test" })).toBe(
       "xai.api_key",
