@@ -22,6 +22,7 @@ import {
   deleteProjectAgentSchedule,
   loadDashboard,
   loadDashboardDelta,
+  loadAgentUsageRuns,
   loadProjectAgentSessions,
   loadProjectAgentScheduleRuns,
   loadProjectAgents,
@@ -1128,6 +1129,60 @@ describe("API errors", () => {
 
     expect(dashboard.runs[0].currentRevision).toBe(1);
     expect(dashboard.runs[0]).not.toHaveProperty("events");
+  });
+
+  it("loads lightweight organization usage runs without dashboard requests", async () => {
+    const organizationId = "11111111-1111-4111-8111-111111111111";
+    const usageRun = {
+      id: "22222222-2222-4222-8222-222222222222",
+      projectId: "33333333-3333-4333-8333-333333333333",
+      status: "completed",
+      executionMetrics: {
+        inputTokens: 100,
+        outputTokens: 20,
+        cacheReadTokens: 80,
+        cacheWriteTokens: null,
+        reasoningOutputTokens: 5,
+        totalTokens: 120,
+        durationMs: 1_000,
+      },
+      claimedBy: "worker",
+      claimedAt: "2026-08-01T00:00:00.000Z",
+      claimAttempts: 1,
+      workerId: "worker-1",
+      preferredProvider: null,
+      preferredModel: null,
+      requestedProvider: "codex",
+      requestedModel: "gpt-5.6-sol",
+      executionProvider: "codex",
+      executionModel: "gpt-5.6-sol",
+      startedAt: "2026-08-01T00:00:00.000Z",
+      updatedAt: "2026-08-01T00:01:00.000Z",
+      completedAt: "2026-08-01T00:01:00.000Z",
+    };
+    const fetchMock = vi.fn(
+      async (_input: RequestInfo | URL, _init?: RequestInit) =>
+        new Response(JSON.stringify({
+          runs: [usageRun],
+          generatedAt: "2026-08-09T00:00:00.000Z",
+        }), {
+          headers: { "Content-Type": "application/json" },
+        }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      loadAgentUsageRuns("token", organizationId, 90),
+    ).resolves.toEqual([usageRun]);
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining(
+        `/organizations/${organizationId}/usage/runs?days=90`,
+      ),
+      expect.objectContaining({ headers: expect.any(Headers) }),
+    );
+    expect(
+      String(fetchMock.mock.calls[0]?.[0]),
+    ).not.toContain("/dashboard");
   });
 
   it("loads and normalizes timeline events from the run detail endpoint", async () => {

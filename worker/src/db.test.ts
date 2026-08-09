@@ -70,6 +70,7 @@ import {
   listOrganizations,
   listOrganizationInvitations,
   listOrganizationMembers,
+  listOrganizationUsageRuns,
   isOrganizationHandleAvailable,
   issueProjectAgentToken,
   listProjects,
@@ -1141,6 +1142,180 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     const details = plan.results.map((row) => row.detail).join("\n");
     expect(details).toContain("briar_hunt_runs");
     expect(details).not.toContain("briar_hunt_events");
+  });
+
+  it("loads uncapped lightweight usage runs across an organization", async () => {
+    const usageProject = await createProject(db, {
+      ownerUserId: "owner",
+      organizationId: projectId,
+      name: "Usage Project",
+      agentTokenHash: "1".repeat(64),
+    });
+    const recentAt = atMinute(200);
+    await db
+      .prepare(
+        `with recursive sequence(value) as (
+           values(1)
+           union all
+           select value + 1 from sequence where value < 205
+         )
+         insert into briar_hunt_runs (
+           id, project_id, source, source_key, title, stage, status,
+           repository, started_at, completed_at, last_event_at, created_at,
+           updated_at
+         )
+         select 'usage-cap-' || printf('%03d', value), ?, 'issue',
+                'usage-cap-' || printf('%03d', value),
+                'Usage run ' || value, 'completed', 'completed',
+                'example/usage', ?, ?, ?, ?, ?
+         from sequence`,
+      )
+      .bind(
+        usageProject.id,
+        recentAt,
+        recentAt,
+        recentAt,
+        recentAt,
+        recentAt,
+      )
+      .run();
+    await db
+      .prepare(
+        `update briar_hunt_runs
+         set execution_metrics_json = ?,
+             requested_agent_provider = 'claude',
+             requested_agent_model = 'opus'
+         where id = 'usage-cap-001'`,
+      )
+      .bind(JSON.stringify({
+        inputTokens: 10,
+        outputTokens: 5,
+        cacheReadTokens: 20,
+        cacheWriteTokens: 2,
+        reasoningOutputTokens: null,
+        totalTokens: 37,
+        durationMs: 1_000,
+      }))
+      .run();
+    const oldAt = atMinute(99);
+    await db
+      .prepare(
+        `insert into briar_hunt_runs (
+           id, project_id, source, source_key, title, stage, status,
+           repository, started_at, completed_at, last_event_at, created_at,
+           updated_at
+         ) values (
+           'usage-before-range', ?, 'issue', 'usage-before-range',
+           'Old usage run', 'completed', 'completed', 'example/usage',
+           ?, ?, ?, ?, ?
+         )`,
+      )
+      .bind(usageProject.id, oldAt, oldAt, oldAt, oldAt, oldAt)
+      .run();
+    await db
+      .prepare(
+        `insert into briar_hunt_runs (
+           id, project_id, source, source_key, title, stage, status,
+           repository, paused_at, started_at, completed_at, last_event_at,
+           created_at, updated_at
+         ) values
+           (
+             'usage-unclaimed', ?, 'issue', 'usage-unclaimed',
+             'Unclaimed backlog item', 'queued', 'backlog', 'example/usage',
+             null, ?, null, ?, ?, ?
+           ),
+           (
+             'usage-unclaimed-queued', ?, 'issue', 'usage-unclaimed-queued',
+             'Unclaimed queued item', 'queued', 'queued', 'example/usage',
+             null, ?, null, ?, ?, ?
+           ),
+           (
+             'usage-paused', ?, 'issue', 'usage-paused', 'Paused usage run',
+             'queued', 'queued', 'example/usage', ?, ?, null, ?, ?, ?
+           )`,
+      )
+      .bind(
+        usageProject.id,
+        recentAt,
+        recentAt,
+        recentAt,
+        recentAt,
+        usageProject.id,
+        recentAt,
+        recentAt,
+        recentAt,
+        recentAt,
+        usageProject.id,
+        recentAt,
+        recentAt,
+        recentAt,
+        recentAt,
+        recentAt,
+      )
+      .run();
+    const otherOrganization = await createOrganization(db, {
+      name: "Other Usage Organization",
+      handle: "other-usage-organization",
+      ownerUserId: "owner",
+    });
+    const otherProject = await createProject(db, {
+      ownerUserId: "owner",
+      organizationId: otherOrganization.id,
+      name: "Other Usage Project",
+      agentTokenHash: "f".repeat(64),
+    });
+    await db
+      .prepare(
+        `insert into briar_hunt_runs (
+           id, project_id, source, source_key, title, stage, status,
+           repository, started_at, completed_at, last_event_at, created_at,
+           updated_at
+         ) values (
+           'usage-other-organization', ?, 'issue', 'usage-other-organization',
+           'Other organization usage', 'completed', 'completed',
+           'example/other', ?, ?, ?, ?, ?
+         )`,
+      )
+      .bind(
+        otherProject.id,
+        recentAt,
+        recentAt,
+        recentAt,
+        recentAt,
+        recentAt,
+      )
+      .run();
+
+    const rows = await listOrganizationUsageRuns(
+      db,
+      projectId,
+      atMinute(100),
+    );
+    const usageProjectRows = rows.filter(
+      (row) => row.project_id === usageProject.id,
+    );
+
+    expect(
+      usageProjectRows.filter((row) => row.id.startsWith("usage-cap-")),
+    ).toHaveLength(205);
+    expect(rows.some((row) => row.id === "usage-before-range")).toBe(false);
+    expect(rows.some((row) => row.id === "usage-unclaimed")).toBe(false);
+    expect(
+      rows.some((row) => row.id === "usage-unclaimed-queued"),
+    ).toBe(false);
+    expect(rows.some((row) => row.id === "usage-paused")).toBe(true);
+    expect(
+      rows.some((row) => row.id === "usage-other-organization"),
+    ).toBe(false);
+    expect(usageProjectRows[0]).not.toHaveProperty("workflow_snapshot_json");
+    expect(
+      usageProjectRows.find((row) => row.id === "usage-cap-001"),
+    ).toMatchObject({
+      requested_agent_provider: "claude",
+      requested_agent_model: "opus",
+      execution_provider: "claude",
+      execution_model: "opus",
+    });
   });
 
   it("synchronizes the newest project agent session snapshot", async () => {

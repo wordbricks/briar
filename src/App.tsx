@@ -95,6 +95,7 @@ import {
   createChannel,
   dispatchHuntRun,
   listChannels,
+  loadAgentUsageRuns,
   loadDashboard,
   loadProjectAgents,
   runProjectAgentTaskOnWorker,
@@ -211,6 +212,14 @@ export function App() {
   const [statusTrayRunsByProject, setStatusTrayRunsByProject] = useState<
     Record<string, readonly HuntRun[]>
   >({});
+  const loadUsageRuns = useCallback(async () => {
+    if (!briar.token || !briar.activeOrganizationId) return [];
+    return loadAgentUsageRuns(
+      briar.token,
+      briar.activeOrganizationId,
+      90,
+    );
+  }, [briar.activeOrganizationId, briar.token]);
   useEffect(() => {
     autoHunt.configureSync(
       briar.token,
@@ -1263,6 +1272,7 @@ export function App() {
                 ? briar.refreshProjectReadiness(activeProject.id)
                 : Promise.resolve(null)
             }
+            onLoadUsageRuns={loadUsageRuns}
             projectId={activeProject?.id ?? ""}
             projectName={activeProject?.name ?? ""}
             readiness={
@@ -1270,6 +1280,7 @@ export function App() {
                 ? briar.projectReadiness[activeProject.id] ?? null
                 : null
             }
+            usageScopeKey={briar.activeOrganizationId ?? "none"}
             user={briar.user}
           />
         ) : activePage === "settings" &&
