@@ -294,6 +294,27 @@ export type HuntRun = {
   eventCount: number;
 };
 
+/** Lightweight execution projection used by the organization Usage page. */
+export type AgentUsageRun = {
+  id: string;
+  projectId: string;
+  status: HuntStatus;
+  executionMetrics: AgentExecutionMetrics | null;
+  claimedBy: string | null;
+  claimedAt: string | null;
+  claimAttempts: number;
+  workerId: string | null;
+  preferredProvider: AgentProvider | null;
+  preferredModel: string | null;
+  requestedProvider: AgentProvider | null;
+  requestedModel: string | null;
+  executionProvider: AgentProvider | null;
+  executionModel: string | null;
+  startedAt: string;
+  updatedAt: string;
+  completedAt: string | null;
+};
+
 export type IssueResultReview = {
   userId: string;
   name: string;
