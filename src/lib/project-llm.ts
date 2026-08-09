@@ -145,6 +145,22 @@ type ProjectLlmProviderEvent =
   | { type: "messageStarted"; id: string; phase: string | null; text: string }
   | { type: "messageDelta"; id: string; delta: string }
   | { type: "messageCompleted"; id: string; phase: string | null; text: string }
+  | {
+      type: "activityStarted";
+      id: string;
+      kind: "command" | "fileChange" | "webSearch" | "tool";
+      title: string;
+      text: string;
+    }
+  | { type: "activityDelta"; id: string; delta: string }
+  | {
+      type: "activityCompleted";
+      id: string;
+      kind: "command" | "fileChange" | "webSearch" | "tool";
+      title: string;
+      text: string;
+      status: "completed" | "failed" | "cancelled";
+    }
   | { type: "turnCompleted"; status: string };
 
 type ProjectLlmProgressPayload = {

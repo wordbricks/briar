@@ -6,11 +6,11 @@ import {
 } from "@anthropic-ai/claude-agent-sdk";
 import {
   approvalResult,
-  claudePrompt,
   claudeOptions,
+  claudePrompt,
+  createClaudeEventState,
   normalizeClaudeMessage,
   type ClaudeApprovalResponse,
-  type ClaudeEventState,
   type ClaudeRunnerOutput,
   type ClaudeRunnerRequest,
 } from "./claude-runner-lib";
@@ -87,10 +87,7 @@ async function main() {
     });
     return approvalResult(approved, input);
   };
-  const state: ClaudeEventState = {
-    activeMessageId: null,
-    lastAssistantMessageId: null,
-  };
+  const state = createClaudeEventState();
   let result:
     | Extract<SDKMessage, { type: "result"; subtype: "success" }>
     | undefined;
@@ -108,12 +105,14 @@ async function main() {
         emit({ type: "session", sessionId });
       }
     }
-    const event = normalizeClaudeMessage(message, state);
-    emit({
-      type: "event",
-      raw: message,
-      ...(event ? { event } : {}),
-    });
+    const normalizedEvents = normalizeClaudeMessage(message, state);
+    if (normalizedEvents.length === 0) {
+      emit({ type: "event", raw: message });
+    } else {
+      for (const event of normalizedEvents) {
+        emit({ type: "event", raw: message, event });
+      }
+    }
     if (message.type === "result") {
       if (message.subtype !== "success") {
         throw new Error(

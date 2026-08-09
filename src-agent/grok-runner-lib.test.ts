@@ -150,17 +150,17 @@ describe("Grok runner", () => {
       state,
     );
 
-    expect(started.event).toEqual({
+    expect(started.events).toEqual([{
       type: "messageStarted",
       id: "session-1:assistant:1",
       phase: "commentary",
       text: "Hel",
-    });
-    expect(delta.event).toEqual({
+    }]);
+    expect(delta.events).toEqual([{
       type: "messageDelta",
       id: "session-1:assistant:1",
       delta: "lo",
-    });
+    }]);
     expect(finalizeGrokMessage(state, "end_turn")).toEqual([
       {
         type: "messageCompleted",
@@ -202,13 +202,13 @@ describe("Grok runner", () => {
       state,
     );
 
-    expect(toolCall.event).toEqual({
+    expect(toolCall.events[0]).toEqual({
       type: "messageCompleted",
       id: "session-1:assistant:1",
       phase: "commentary",
       text: "Checking the repository.",
     });
-    expect(finalStarted.event).toEqual({
+    expect(finalStarted.events[0]).toEqual({
       type: "messageStarted",
       id: "session-1:assistant:2",
       phase: "commentary",
@@ -221,6 +221,103 @@ describe("Grok runner", () => {
       text: '{"action":"respond"}',
     });
     expect(state.lastAssistantText).toBe('{"action":"respond"}');
+  });
+
+  it("normalizes ACP tool output and terminal outcomes", () => {
+    const state = createGrokEventState();
+    const update = (value: Record<string, unknown>) =>
+      normalizeGrokSessionUpdate(
+        {
+          sessionId: "session-1",
+          update: value,
+        },
+        state,
+      ).events;
+
+    expect(update({
+      sessionUpdate: "tool_call",
+      toolCallId: "tool-ok",
+      kind: "execute",
+      title: "Run tests",
+      status: "in_progress",
+      rawInput: { command: "bun test" },
+    })).toEqual([{
+      type: "activityStarted",
+      id: "tool-ok",
+      kind: "command",
+      title: "Run tests",
+      text: "",
+    }]);
+    expect(update({
+      sessionUpdate: "tool_call_update",
+      toolCallId: "tool-ok",
+      rawOutput: "PASS first suite\n",
+    })).toEqual([{
+      type: "activityDelta",
+      id: "tool-ok",
+      delta: "PASS first suite\n",
+    }]);
+    expect(update({
+      sessionUpdate: "tool_call_update",
+      toolCallId: "tool-ok",
+      status: "completed",
+      rawOutput: "PASS first suite\nPASS second suite\n",
+    })).toEqual([
+      {
+        type: "activityDelta",
+        id: "tool-ok",
+        delta: "PASS second suite\n",
+      },
+      {
+        type: "activityCompleted",
+        id: "tool-ok",
+        kind: "command",
+        title: "Run tests",
+        text: "PASS first suite\nPASS second suite\n",
+        status: "completed",
+      },
+    ]);
+
+    update({
+      sessionUpdate: "tool_call",
+      toolCallId: "tool-failed",
+      kind: "execute",
+      title: "Run failing tests",
+      status: "in_progress",
+    });
+    expect(update({
+      sessionUpdate: "tool_call_update",
+      toolCallId: "tool-failed",
+      status: "failed",
+      rawOutput: "1 test failed",
+    })).toContainEqual({
+      type: "activityCompleted",
+      id: "tool-failed",
+      kind: "command",
+      title: "Run failing tests",
+      text: "1 test failed",
+      status: "failed",
+    });
+
+    update({
+      sessionUpdate: "tool_call",
+      toolCallId: "tool-cancelled",
+      kind: "execute",
+      title: "Push changes",
+      status: "pending",
+    });
+    expect(update({
+      sessionUpdate: "tool_call_update",
+      toolCallId: "tool-cancelled",
+      status: "cancelled",
+    })).toEqual([{
+      type: "activityCompleted",
+      id: "tool-cancelled",
+      kind: "command",
+      title: "Push changes",
+      text: "",
+      status: "cancelled",
+    }]);
   });
 
   it("extracts balanced JSON from fenced conversational output", () => {

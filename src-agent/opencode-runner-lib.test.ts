@@ -238,6 +238,104 @@ describe("OpenCode runner helpers", () => {
     ).toEqual([{ type: "messageDelta", id: "msg_1", delta: " there" }]);
   });
 
+  it("normalizes OpenCode tool output and terminal outcomes", () => {
+    const state = createOpenCodeEventState();
+    const toolPart = (
+      callID: string,
+      stateValue: Record<string, unknown>,
+    ) => ({
+      id: `part-${callID}`,
+      sessionID: "ses_1",
+      messageID: "msg_1",
+      type: "tool",
+      callID,
+      tool: "bash",
+      state: stateValue,
+    });
+    const updated = (part: ReturnType<typeof toolPart>) =>
+      normalizeOpenCodeEvent(
+        {
+          type: "message.part.updated",
+          properties: { sessionID: "ses_1", part },
+        },
+        "ses_1",
+        state,
+      );
+
+    expect(updated(toolPart("call-ok", {
+      status: "pending",
+      input: { command: "bun test" },
+      raw: "",
+    }))).toEqual([{
+      type: "activityStarted",
+      id: "call-ok",
+      kind: "command",
+      title: "bun test",
+      text: "",
+    }]);
+    expect(normalizeOpenCodeEvent(
+      {
+        type: "message.part.delta",
+        properties: {
+          sessionID: "ses_1",
+          messageID: "msg_1",
+          partID: "part-call-ok",
+          field: "output",
+          delta: "PASS first suite\n",
+        },
+      },
+      "ses_1",
+      state,
+    )).toEqual([{
+      type: "activityDelta",
+      id: "call-ok",
+      delta: "PASS first suite\n",
+    }]);
+    expect(updated(toolPart("call-ok", {
+      status: "completed",
+      input: { command: "bun test" },
+      output: "PASS first suite\nPASS second suite\n",
+      title: "Run tests",
+      metadata: {},
+      time: { start: 1, end: 2 },
+    }))).toEqual([{
+      type: "activityCompleted",
+      id: "call-ok",
+      kind: "command",
+      title: "Run tests",
+      text: "PASS first suite\nPASS second suite\n",
+      status: "completed",
+    }]);
+
+    expect(updated(toolPart("call-failed", {
+      status: "running",
+      input: { command: "bun test" },
+      title: "Run failing tests",
+      metadata: {},
+      time: { start: 3 },
+    }))).toEqual([{
+      type: "activityStarted",
+      id: "call-failed",
+      kind: "command",
+      title: "Run failing tests",
+      text: "",
+    }]);
+    expect(updated(toolPart("call-failed", {
+      status: "error",
+      input: { command: "bun test" },
+      error: "1 test failed",
+      metadata: {},
+      time: { start: 3, end: 4 },
+    }))).toEqual([{
+      type: "activityCompleted",
+      id: "call-failed",
+      kind: "command",
+      title: "Run failing tests",
+      text: "1 test failed",
+      status: "failed",
+    }]);
+  });
+
   it("skips empty starts and completes durable text under the message id", () => {
     const state = createOpenCodeEventState();
     normalizeOpenCodeEvent(

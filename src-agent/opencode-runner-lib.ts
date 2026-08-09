@@ -5,6 +5,18 @@ import type {
 } from "@opencode-ai/sdk/v2";
 import { pathToFileURL } from "node:url";
 import type { AgentAttachment } from "./runner-attachments";
+import {
+  normalizedActivityText,
+  normalizedActivityTitle,
+  type AgentActivityKind,
+  type NormalizedAgentEvent,
+} from "./normalized-agent-event";
+
+export type {
+  AgentActivityKind,
+  AgentActivityStatus,
+  NormalizedAgentEvent,
+} from "./normalized-agent-event";
 
 export type OpenCodeRunnerRequest = {
   type: "run";
@@ -27,22 +39,6 @@ export type OpenCodeApprovalResponse = {
   id: string;
   approved: boolean;
 };
-
-export type NormalizedAgentEvent =
-  | {
-      type: "messageStarted";
-      id: string;
-      phase: string | null;
-      text: string;
-    }
-  | { type: "messageDelta"; id: string; delta: string }
-  | {
-      type: "messageCompleted";
-      id: string;
-      phase: string | null;
-      text: string;
-    }
-  | { type: "turnCompleted"; status: string };
 
 export type OpenCodeRunnerOutput =
   | { type: "session"; sessionId: string }
@@ -84,6 +80,16 @@ export type OpenCodeEventState = {
   emittedText: Map<string, string>;
   startedMessages: Set<string>;
   completedMessages: Set<string>;
+  activities: Map<
+    string,
+    {
+      kind: AgentActivityKind;
+      title: string;
+      text: string;
+      started: boolean;
+      completed: boolean;
+    }
+  >;
 };
 
 export function createOpenCodeEventState(): OpenCodeEventState {
@@ -95,6 +101,7 @@ export function createOpenCodeEventState(): OpenCodeEventState {
     emittedText: new Map(),
     startedMessages: new Set(),
     completedMessages: new Set(),
+    activities: new Map(),
   };
 }
 
@@ -515,6 +522,9 @@ export function normalizeOpenCodeEvent(
     const part = properties.part as Part | undefined;
     if (!part?.id || !part.messageID) return [];
     state.parts.set(part.id, part);
+    if (part.type === "tool") {
+      return normalizeOpenCodeActivity(part, state);
+    }
     const text = textFromPart(part);
     if (text === undefined) return [];
     setPartText(state, part.messageID, part.id, text);
@@ -541,6 +551,17 @@ export function normalizeOpenCodeEvent(
       !delta
     ) {
       return [];
+    }
+    const part = state.parts.get(partID);
+    if (
+      part?.type === "tool" &&
+      (field === "output" || field === "state.output")
+    ) {
+      const id = part.callID || part.id;
+      const activity = state.activities.get(id);
+      if (!activity || activity.completed) return [];
+      activity.text = normalizedActivityText(`${activity.text}${delta}`);
+      return [{ type: "activityDelta", id, delta }];
     }
     // OpenCode streams text on field "text"; ignore tool-input and other fields.
     if (typeof field === "string" && field !== "text") return [];
@@ -582,6 +603,89 @@ export function normalizeOpenCodeEvent(
     return [{ type: "turnCompleted", status: "failed" }];
   }
   return [];
+}
+
+function normalizeOpenCodeActivity(
+  part: Extract<Part, { type: "tool" }>,
+  state: OpenCodeEventState,
+): NormalizedAgentEvent[] {
+  const id = part.callID || part.id;
+  const existing = state.activities.get(id);
+  const kind = openCodeActivityKind(part.tool);
+  const partState = part.state;
+  const title = normalizedActivityTitle(
+    openCodeActivityTitle(part.tool, partState, existing?.title),
+  );
+  const text = normalizedActivityText(
+    partState.status === "completed"
+      ? partState.output
+      : partState.status === "error"
+        ? partState.error
+        : existing?.text ?? "",
+  );
+  const activity = {
+    kind,
+    title,
+    text,
+    started: existing?.started ?? false,
+    completed: existing?.completed ?? false,
+  };
+  const events: NormalizedAgentEvent[] = [];
+  if (!activity.started) {
+    activity.started = true;
+    events.push({ type: "activityStarted", id, kind, title, text: "" });
+  }
+  if (
+    !activity.completed &&
+    (partState.status === "completed" || partState.status === "error")
+  ) {
+    activity.completed = true;
+    events.push({
+      type: "activityCompleted",
+      id,
+      kind,
+      title,
+      text,
+      status: partState.status === "error" ? "failed" : "completed",
+    });
+  }
+  state.activities.set(id, activity);
+  return events;
+}
+
+function openCodeActivityKind(tool: string): AgentActivityKind {
+  const normalized = tool.toLowerCase();
+  if (normalized === "bash" || normalized === "shell") return "command";
+  if (
+    normalized === "edit" ||
+    normalized === "write" ||
+    normalized === "patch" ||
+    normalized === "apply_patch"
+  ) {
+    return "fileChange";
+  }
+  if (normalized === "webfetch" || normalized === "websearch") {
+    return "webSearch";
+  }
+  return "tool";
+}
+
+function openCodeActivityTitle(
+  tool: string,
+  state: Extract<Part, { type: "tool" }>["state"],
+  previous: string | undefined,
+): string {
+  if ("title" in state && typeof state.title === "string" && state.title) {
+    return state.title;
+  }
+  if (previous) return previous;
+  if (tool.toLowerCase() === "bash" && typeof state.input.command === "string") {
+    return state.input.command;
+  }
+  for (const key of ["filePath", "file_path", "path"]) {
+    if (typeof state.input[key] === "string") return state.input[key];
+  }
+  return tool;
 }
 
 /**

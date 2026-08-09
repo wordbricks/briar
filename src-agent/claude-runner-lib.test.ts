@@ -7,6 +7,7 @@ import {
   approvalResult,
   claudePrompt,
   claudeOptions,
+  createClaudeEventState,
   normalizeClaudeMessage,
   type ClaudeEventState,
   type ClaudeRunnerRequest,
@@ -117,6 +118,7 @@ describe("Claude runner", () => {
     const state: ClaudeEventState = {
       activeMessageId: null,
       lastAssistantMessageId: null,
+      activities: new Map(),
     };
     const started = {
       type: "stream_event",
@@ -146,18 +148,156 @@ describe("Claude runner", () => {
       result: "hello",
     } as unknown as SDKMessage;
 
-    expect(normalizeClaudeMessage(started, state)).toBeUndefined();
-    expect(normalizeClaudeMessage(delta, state)).toEqual({
+    expect(normalizeClaudeMessage(started, state)).toEqual([]);
+    expect(normalizeClaudeMessage(delta, state)).toEqual([{
       type: "messageDelta",
       id: "message-1",
       delta: "hello",
-    });
-    expect(normalizeClaudeMessage(result, state)).toEqual({
+    }]);
+    expect(normalizeClaudeMessage(result, state)).toEqual([{
       type: "messageCompleted",
       id: "result-1",
       phase: "final",
       text: "hello",
-    });
+    }]);
+  });
+
+  it("normalizes Claude tool success, failure, and permission cancellation", () => {
+    const state = createClaudeEventState();
+    const toolStart = (id: string, command: string) => ({
+      type: "stream_event",
+      uuid: `stream-${id}`,
+      session_id: "session-1",
+      parent_tool_use_id: null,
+      event: {
+        type: "content_block_start",
+        index: 0,
+        content_block: {
+          type: "tool_use",
+          id,
+          name: "Bash",
+          input: { command },
+        },
+      },
+    }) as unknown as SDKMessage;
+    const toolResult = (
+      id: string,
+      text: string,
+      isError = false,
+    ) => ({
+      type: "user",
+      uuid: `result-${id}`,
+      session_id: "session-1",
+      parent_tool_use_id: null,
+      message: {
+        role: "user",
+        content: [{
+          type: "tool_result",
+          tool_use_id: id,
+          content: [{ type: "text", text }],
+          is_error: isError,
+        }],
+      },
+    }) as unknown as SDKMessage;
+
+    expect(normalizeClaudeMessage(toolStart("tool-ok", "bun test"), state)).toEqual([{
+      type: "activityStarted",
+      id: "tool-ok",
+      kind: "command",
+      title: "bun test",
+      text: "",
+    }]);
+    expect(normalizeClaudeMessage(toolResult("tool-ok", "38 tests passed"), state)).toEqual([{
+      type: "activityCompleted",
+      id: "tool-ok",
+      kind: "command",
+      title: "bun test",
+      text: "38 tests passed",
+      status: "completed",
+    }]);
+
+    normalizeClaudeMessage(toolStart("tool-failed", "bun test"), state);
+    expect(
+      normalizeClaudeMessage(toolResult("tool-failed", "1 test failed", true), state),
+    ).toEqual([{
+      type: "activityCompleted",
+      id: "tool-failed",
+      kind: "command",
+      title: "bun test",
+      text: "1 test failed",
+      status: "failed",
+    }]);
+
+    normalizeClaudeMessage(toolStart("tool-denied", "git push"), state);
+    expect(normalizeClaudeMessage({
+      type: "system",
+      subtype: "permission_denied",
+      tool_name: "Bash",
+      tool_use_id: "tool-denied",
+      decision_reason: "The user declined this command.",
+      message: "Permission denied",
+      uuid: "permission-tool-denied",
+      session_id: "session-1",
+    } as unknown as SDKMessage, state)).toEqual([{
+      type: "activityCompleted",
+      id: "tool-denied",
+      kind: "command",
+      title: "git push",
+      text: "The user declined this command.",
+      status: "cancelled",
+    }]);
+  });
+
+  it("keeps assistant text and parallel tool starts from the same frame", () => {
+    const state = createClaudeEventState();
+    const events = normalizeClaudeMessage({
+      type: "assistant",
+      uuid: "assistant-frame-1",
+      session_id: "session-1",
+      parent_tool_use_id: null,
+      message: {
+        id: "message-1",
+        role: "assistant",
+        content: [
+          { type: "text", text: "Checking both files." },
+          {
+            type: "tool_use",
+            id: "read-1",
+            name: "Read",
+            input: { file_path: "src/one.ts" },
+          },
+          {
+            type: "tool_use",
+            id: "read-2",
+            name: "Read",
+            input: { file_path: "src/two.ts" },
+          },
+        ],
+      },
+    } as unknown as SDKMessage, state);
+
+    expect(events).toEqual([
+      {
+        type: "messageCompleted",
+        id: "message-1",
+        phase: "commentary",
+        text: "Checking both files.",
+      },
+      {
+        type: "activityStarted",
+        id: "read-1",
+        kind: "tool",
+        title: "Read",
+        text: "",
+      },
+      {
+        type: "activityStarted",
+        id: "read-2",
+        kind: "tool",
+        title: "Read",
+        text: "",
+      },
+    ]);
   });
 
   it("maps Briar approval decisions to SDK permission results", () => {

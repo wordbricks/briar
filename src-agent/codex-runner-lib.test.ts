@@ -96,6 +96,102 @@ describe("Codex App Server runner", () => {
     ).toEqual({ type: "turnCompleted", status: "completed" });
   });
 
+  it("normalizes command activity output and terminal outcomes", () => {
+    expect(
+      normalizeCodexAppServerMessage({
+        method: "item/started",
+        params: {
+          item: {
+            id: "command-1",
+            type: "commandExecution",
+            command: "bun test",
+            status: "inProgress",
+            aggregatedOutput: null,
+            exitCode: null,
+          },
+        },
+      }),
+    ).toEqual({
+      type: "activityStarted",
+      id: "command-1",
+      kind: "command",
+      title: "bun test",
+      text: "",
+    });
+    expect(
+      normalizeCodexAppServerMessage({
+        method: "item/commandExecution/outputDelta",
+        params: { itemId: "command-1", delta: "PASS first suite\n" },
+      }),
+    ).toEqual({
+      type: "activityDelta",
+      id: "command-1",
+      delta: "PASS first suite\n",
+    });
+    expect(
+      normalizeCodexAppServerMessage({
+        method: "item/completed",
+        params: {
+          item: {
+            id: "command-1",
+            type: "commandExecution",
+            command: "bun test",
+            status: "completed",
+            aggregatedOutput: "PASS first suite\nPASS second suite\n",
+            exitCode: 0,
+          },
+        },
+      }),
+    ).toEqual({
+      type: "activityCompleted",
+      id: "command-1",
+      kind: "command",
+      title: "bun test",
+      text: "PASS first suite\nPASS second suite\n",
+      status: "completed",
+    });
+
+    expect(
+      normalizeCodexAppServerMessage({
+        method: "item/completed",
+        params: {
+          item: {
+            id: "command-failed",
+            type: "commandExecution",
+            command: "bun test",
+            status: "failed",
+            aggregatedOutput: "1 test failed",
+            exitCode: 1,
+          },
+        },
+      }),
+    ).toMatchObject({
+      type: "activityCompleted",
+      id: "command-failed",
+      text: "1 test failed",
+      status: "failed",
+    });
+    expect(
+      normalizeCodexAppServerMessage({
+        method: "item/completed",
+        params: {
+          item: {
+            id: "command-declined",
+            type: "commandExecution",
+            command: "git push",
+            status: "declined",
+            aggregatedOutput: null,
+            exitCode: null,
+          },
+        },
+      }),
+    ).toMatchObject({
+      type: "activityCompleted",
+      id: "command-declined",
+      status: "cancelled",
+    });
+  });
+
   it("adds local channel images to the same App Server turn as the text", () => {
     const turn = codexTurnRequest(
       {
