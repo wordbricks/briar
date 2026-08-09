@@ -1,6 +1,9 @@
 import type { AutoHuntWorkflow } from "./auto-hunt-contract";
-import type { AgentProvider, ModelEffort } from "./project-llm";
-import type { ProjectAgent, ProjectAgentSkill } from "../types";
+import type {
+  ChannelAgentEffort as ModelEffort,
+  ChannelAgentProvider as AgentProvider,
+  ChannelAgentSkill as ProjectAgentSkill,
+} from "./channels-contract";
 
 export type ProjectAgentLocale = "ko" | "en" | "zh";
 
@@ -18,6 +21,16 @@ export type DefaultProjectAgentSkillCopy = {
 };
 
 export type ProjectAgentSkillInput = DefaultProjectAgentCopy;
+
+type ProjectAgentRuntimeProfile = {
+  name: string;
+  provider: AgentProvider;
+  model: string | null;
+  effort: ModelEffort | null;
+  responsibility: string;
+  skill: string;
+  skills: ProjectAgentSkill[];
+};
 
 const defaultProjectAgentCopyByLocale: Record<
   ProjectAgentLocale,
@@ -124,7 +137,7 @@ ${execution}
 }
 
 export function defaultAgentSkill(
-  agent: Pick<ProjectAgent, "skills">,
+  agent: Pick<ProjectAgentRuntimeProfile, "skills">,
 ): ProjectAgentSkill | null {
   return (
     agent.skills.find((skill) => skill.isDefault) ?? agent.skills[0] ?? null
@@ -132,7 +145,7 @@ export function defaultAgentSkill(
 }
 
 export function issueProcessingAgentSkill(
-  agent: Pick<ProjectAgent, "skills">,
+  agent: Pick<ProjectAgentRuntimeProfile, "skills">,
 ): ProjectAgentSkill | null {
   return (
     agent.skills.find((skill) => skill.kind === "issue_processing") ??
@@ -141,7 +154,10 @@ export function issueProcessingAgentSkill(
 }
 
 function projectAgentSkillRoster(
-  agent: Pick<ProjectAgent, "name" | "responsibility" | "skills">,
+  agent: Pick<
+    ProjectAgentRuntimeProfile,
+    "name" | "responsibility" | "skills"
+  >,
   activeSkill: ProjectAgentSkill,
 ) {
   const skills = [...agent.skills]
@@ -178,16 +194,7 @@ Use **${activeSkill.name.trim()}** for this invocation. Follow its instructions 
 }
 
 export function agentWithSkillRuntime<
-  T extends Pick<
-    ProjectAgent,
-    | "name"
-    | "provider"
-    | "model"
-    | "effort"
-    | "responsibility"
-    | "skill"
-    | "skills"
-  >,
+  T extends ProjectAgentRuntimeProfile,
 >(
   agent: T,
   activeSkill: ProjectAgentSkill,
