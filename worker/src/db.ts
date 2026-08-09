@@ -6448,40 +6448,6 @@ export async function rollbackNewAppIssue(
   return result.meta.changes > 0;
 }
 
-export async function getNextQueuedHuntRun(db: D1Database, projectId: string) {
-  return await db
-    .prepare(
-      `select run.*
-       from briar_hunt_runs run
-       where run.project_id = ?
-         and (
-           run.status = 'queued'
-           or (
-             run.status = 'running' and run.paused_at is not null
-             and run.resume_requested_at is not null
-           )
-         )
-         and not exists (
-           select 1
-           from briar_issue_dependencies dependency
-           join briar_hunt_runs prerequisite
-             on prerequisite.id = dependency.prerequisite_run_id
-           where dependency.project_id = run.project_id
-             and dependency.dependent_run_id = run.id
-             and prerequisite.status != 'completed'
-         )
-       order by
-         case when run.resume_requested_at is not null then 0 else 1 end,
-         case when run.priority is null then 1 else 0 end,
-         run.priority asc,
-         coalesce(run.source_created_at, run.started_at) asc,
-         run.run_number asc
-       limit 1`,
-    )
-    .bind(projectId)
-    .first<HuntRunRow>();
-}
-
 export async function claimNextQueuedHuntRun(
   db: D1Database,
   projectId: string,
