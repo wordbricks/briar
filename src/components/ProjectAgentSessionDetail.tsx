@@ -1,5 +1,6 @@
 import {
   ArrowLeft,
+  Bot,
   Check,
   ChevronRight,
   CircleAlert,
@@ -8,11 +9,14 @@ import {
   Link2,
   OctagonX,
   Play,
+  Send,
+  User,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { MainContent, PageHeader } from "@/components/layout";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/toast";
 import type {
   AutoHuntSession,
@@ -35,6 +39,7 @@ export function ProjectAgentSessionDetail({
   issueKeyPrefix,
   onBack,
   onIssueOpen,
+  onFollowUp,
   onStop,
   session,
   token = null,
@@ -43,6 +48,7 @@ export function ProjectAgentSessionDetail({
   issueKeyPrefix?: string;
   onBack: () => void;
   onIssueOpen: (runId: string) => void;
+  onFollowUp?: (message: string) => Promise<void>;
   onStop: () => Promise<boolean>;
   session: AutoHuntSession;
   token?: string | null;
@@ -71,11 +77,32 @@ export function ProjectAgentSessionDetail({
   );
   const executionLogEntries = useMemo(
     () => [
+      ...(session.request?.trim()
+        ? [{
+            id: "request:initial",
+            isComplete: true,
+            occurredAtMs: Date.parse(session.startedAt),
+            phase: t("agents.you"),
+            role: "user" as const,
+            status: "completed",
+            text: session.request.trim(),
+          }]
+        : []),
+      ...(session.followUps ?? []).map((followUp) => ({
+        id: `request:${followUp.id}`,
+        isComplete: true,
+        occurredAtMs: Date.parse(followUp.sentAt),
+        phase: t("agents.you"),
+        role: "user" as const,
+        status: "completed",
+        text: followUp.message,
+      })),
       ...session.dispatchEvents.map((dispatchEvent) => ({
         id: `dispatch:${dispatchEvent.dispatchGroupId}:${dispatchEvent.cursor}`,
         isComplete: dispatchEvent.status !== "running",
         occurredAtMs: Date.parse(dispatchEvent.occurredAt),
         phase: t("autoHunt.workerTimeline"),
+        role: "agent" as const,
         status: dispatchEvent.status,
         text: naturalLanguageFromAgentMessage(dispatchEvent.message),
       })),
@@ -84,13 +111,37 @@ export function ProjectAgentSessionDetail({
         isComplete: message.isComplete,
         occurredAtMs: message.updatedAtMs,
         phase: agentMessagePhase(t, message.phase),
+        role: "agent" as const,
         status: message.isComplete ? "completed" : "running",
         text: message.text
           ? naturalLanguageFromAgentMessage(message.text)
           : t("autoHunt.agentMessage.writing"),
       })),
+      ...(agentMessages.length === 0 &&
+          session.dispatchEvents.length === 0 &&
+          (session.summary || session.error)
+        ? [{
+            id: "message:session-result",
+            isComplete: true,
+            occurredAtMs: Date.parse(session.completedAt ?? session.startedAt),
+            phase: agentMessagePhase(t, "final_answer"),
+            role: "agent" as const,
+            status: session.error ? "failed" : "completed",
+            text: session.error ?? session.summary ?? "",
+          }]
+        : []),
     ].sort((left, right) => left.occurredAtMs - right.occurredAtMs),
-    [agentMessages, session.dispatchEvents, t],
+    [
+      agentMessages,
+      session.dispatchEvents,
+      session.followUps,
+      session.completedAt,
+      session.error,
+      session.request,
+      session.summary,
+      session.startedAt,
+      t,
+    ],
   );
   const agentMessagesRef = useRef<HTMLDivElement>(null);
   const stickToBottomRef = useRef(true);
@@ -100,6 +151,9 @@ export function ProjectAgentSessionDetail({
   const [isStopping, setIsStopping] = useState(false);
   const [stopError, setStopError] = useState<string | null>(null);
   const [nowMs, setNowMs] = useState(() => Date.now());
+  const [followUp, setFollowUp] = useState("");
+  const [isSendingFollowUp, setIsSendingFollowUp] = useState(false);
+  const [followUpError, setFollowUpError] = useState<string | null>(null);
 
   useEffect(() => {
     const messageList = agentMessagesRef.current;
@@ -152,14 +206,27 @@ export function ProjectAgentSessionDetail({
     }
   };
 
+  const sendFollowUp = async () => {
+    const message = followUp.trim();
+    if (!message || !onFollowUp || isSendingFollowUp) return;
+    setFollowUpError(null);
+    setIsSendingFollowUp(true);
+    setFollowUp("");
+    try {
+      await onFollowUp(message);
+    } catch (caught) {
+      setFollowUp(message);
+      setFollowUpError(caught instanceof Error ? caught.message : String(caught));
+    } finally {
+      setIsSendingFollowUp(false);
+    }
+  };
+
   const exportSessionLog = () => {
     const lines = [
       sessionTitle(session, t),
       `${t("agents.sessionId")}: ${session.id}`,
       `${t("run.started")}: ${formatDate(session.startedAt, localeTag)}`,
-      "",
-      `${t("agents.sessionRequest")}:`,
-      session.request?.trim() || t("agents.sessionRequestEmpty"),
       "",
       `${t("agents.executionLog")}:`,
       ...executionLogEntries.flatMap((entry) => [
@@ -302,13 +369,6 @@ export function ProjectAgentSessionDetail({
                 {stopError}
               </div>
             ) : null}
-            <section className="auto-hunt-session-request-card">
-              <span>{t("agents.sessionRequest")}</span>
-              <p title={session.request?.trim() || undefined}>
-                {session.request?.trim() || t("agents.sessionRequestEmpty")}
-              </p>
-            </section>
-
             <div className="auto-hunt-session-layout">
               <div className="auto-hunt-session-main-column">
                 <section className="auto-hunt-dialog-section auto-hunt-app-server-section">
@@ -351,16 +411,18 @@ export function ProjectAgentSessionDetail({
                       ref={agentMessagesRef}
                       role="log"
                     >
-                      {executionLogEntries.map((entry, index) => (
+                      {executionLogEntries.map((entry) => (
                         <article
-                          className={`auto-hunt-agent-message ${entry.status}`}
+                          className={`auto-hunt-agent-message ${entry.status} ${entry.role}`}
                           key={entry.id}
                         >
                           <span
                             aria-hidden="true"
-                            className="auto-hunt-message-index"
+                            className="auto-hunt-message-avatar"
                           >
-                            {index + 1}
+                            {entry.role === "user"
+                              ? <User size={15} />
+                              : <Bot size={15} />}
                           </span>
                           <header>
                             <strong>{entry.phase}</strong>
@@ -381,6 +443,45 @@ export function ProjectAgentSessionDetail({
                       ))}
                     </div>
                   )}
+                  {onFollowUp &&
+                      session.sessionType === "task" &&
+                      session.localOwner !== false &&
+                      session.status !== "running" &&
+                      session.conversationId ? (
+                    <form
+                      className="auto-hunt-session-follow-up"
+                      onSubmit={(event) => {
+                        event.preventDefault();
+                        void sendFollowUp();
+                      }}
+                    >
+                      <Textarea
+                        aria-label={t("agents.followUpInput")}
+                        disabled={isSendingFollowUp}
+                        onChange={(event) => setFollowUp(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key !== "Enter" || event.shiftKey) return;
+                          event.preventDefault();
+                          void sendFollowUp();
+                        }}
+                        placeholder={t("agents.followUpPlaceholder")}
+                        value={followUp}
+                      />
+                      <Button
+                        aria-label={t("agents.sendFollowUp")}
+                        disabled={isSendingFollowUp || !followUp.trim()}
+                        size="icon"
+                        type="submit"
+                      >
+                        {isSendingFollowUp
+                          ? <LoaderCircle className="spin" />
+                          : <Send />}
+                      </Button>
+                      {followUpError ? (
+                        <p role="alert">{followUpError}</p>
+                      ) : null}
+                    </form>
+                  ) : null}
               </section>
             </div>
 

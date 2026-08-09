@@ -121,4 +121,48 @@ describe("executeProjectAgentTask", () => {
       );
     },
   );
+
+  it("continues an existing task session and preserves its conversation on failure", async () => {
+    const startSession = vi.fn();
+    const settleSession = vi.fn();
+    await expect(executeProjectAgentTask(
+      {
+        runAgent: vi.fn().mockRejectedValue(new Error("provider unavailable")),
+        startSession,
+        settleSession,
+        startAutoHunt: vi.fn(),
+      },
+      {
+        agent: {
+          id: "agent-1",
+          name: "Release agent",
+          provider: "codex",
+          model: null,
+          effort: null,
+          responsibility: "Publish releases.",
+          skill: "# Release agent",
+        },
+        dashboard: {
+          project: { id: "project-1" },
+          runs: [],
+        } as unknown as DashboardPayload,
+        message: "Retry the upload.",
+        sessionId: "session-1",
+        conversationId: "briar:project-1:thread-1",
+        workspaceRoot: "/repo",
+        isFollowUp: true,
+      },
+    )).rejects.toThrow("provider unavailable");
+
+    expect(startSession).toHaveBeenCalledWith(expect.objectContaining({
+      sessionId: "session-1",
+      request: "Retry the upload.",
+      isFollowUp: true,
+    }));
+    expect(settleSession).toHaveBeenCalledWith("session-1", expect.objectContaining({
+      status: "failed",
+      conversationId: "briar:project-1:thread-1",
+      workspaceRoot: "/repo",
+    }));
+  });
 });

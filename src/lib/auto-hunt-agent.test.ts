@@ -114,6 +114,39 @@ describe("agentMessagesFromAppServerEvents", () => {
     }]);
   });
 
+  it("keeps repeated provider message ids from follow-up turns", () => {
+    const turn = (
+      sequence: number,
+      message: string,
+    ): AutoHuntAppServerEvent[] => [{
+      sessionId: "session-1",
+      sequence,
+      occurredAtMs: sequence,
+      direction: "client",
+      message: { type: "run" },
+    }, {
+      sessionId: "session-1",
+      sequence: sequence + 1,
+      occurredAtMs: sequence + 1,
+      direction: "server",
+      message: {},
+      event: {
+        type: "messageCompleted",
+        id: "assistant:1",
+        phase: "final_answer",
+        text: message,
+      },
+    }];
+
+    expect(agentMessagesFromAppServerEvents([
+      ...turn(1, "첫 번째 답변"),
+      ...turn(3, "후속 답변"),
+    ])).toMatchObject([
+      { id: "assistant:1", text: "첫 번째 답변" },
+      { id: "turn:2:assistant:1", text: "후속 답변" },
+    ]);
+  });
+
   it("combines agent message deltas and hides non-message protocol events", () => {
     const events: AutoHuntAppServerEvent[] = [
       event(1, "initialize"),

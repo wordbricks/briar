@@ -226,6 +226,29 @@ describe("useAutoHuntSessions", () => {
       error: null,
     });
 
+    await act(async () => {
+      sessionsHook.startTaskSession("project-1", "agent-1", {
+        sessionId,
+        request: "Also inspect the release notes.",
+        startedAt: "2026-07-28T01:11:00.000Z",
+        isFollowUp: true,
+      });
+    });
+
+    expect(sessionsHook.sessions[0]).toMatchObject({
+      id: sessionId,
+      request: "Daily repository audit",
+      startedAt: "2026-07-28T01:00:00.000Z",
+      status: "running",
+      completedAt: null,
+      conversationId: "conversation-1",
+      workspaceRoot: "/repo",
+      followUps: [{
+        message: "Also inspect the release notes.",
+        sentAt: "2026-07-28T01:11:00.000Z",
+      }],
+    });
+
     await act(async () => root.unmount());
   });
 

@@ -62,6 +62,7 @@ async function mount(
   session: AutoHuntSession,
   onIssueOpen: (runId: string) => void = vi.fn(),
   issueKeyPrefix?: string,
+  onFollowUp?: (message: string) => Promise<void>,
 ) {
   const container = document.createElement("div");
   document.body.append(container);
@@ -75,6 +76,7 @@ async function mount(
           issueKeyPrefix={issueKeyPrefix}
           onBack={vi.fn()}
           onIssueOpen={onIssueOpen}
+          onFollowUp={onFollowUp}
           onStop={vi.fn().mockResolvedValue(true)}
           session={session}
         />
@@ -252,6 +254,54 @@ describe("ProjectAgentSessionDetail", () => {
       container.querySelector(".auto-hunt-agent-messages")
         ?.getAttribute("role"),
     ).toBe("log");
+  });
+
+  it("renders the session as a chat and sends a follow-up after the final message", async () => {
+    const onFollowUp = vi.fn().mockResolvedValue(undefined);
+    const container = await mount({
+      ...session,
+      id: "task-session-1",
+      dispatchGroupId: "",
+      sessionType: "task",
+      status: "completed",
+      completedAt: "2026-07-29T11:02:00.000Z",
+      conversationId: "briar:project-1:thread-1",
+      localOwner: true,
+      dispatchEvents: [],
+      summary: "초기 작업을 완료했습니다.",
+      followUps: [{
+        id: "follow-up-1",
+        message: "테스트 결과도 알려 줘",
+        sentAt: "2026-07-29T11:01:30.000Z",
+      }],
+    }, vi.fn(), undefined, onFollowUp);
+
+    const messages = container.querySelectorAll(".auto-hunt-agent-message");
+    expect(messages).toHaveLength(3);
+    expect(messages[0]?.classList.contains("user")).toBe(true);
+    expect(messages[0]?.textContent).toContain("대기 이슈를 처리해 줘");
+    expect(messages[1]?.textContent).toContain("테스트 결과도 알려 줘");
+    expect(messages[2]?.classList.contains("agent")).toBe(true);
+    expect(messages[2]?.textContent).toContain("초기 작업을 완료했습니다.");
+
+    const input = container.querySelector<HTMLTextAreaElement>(
+      'textarea[aria-label="후속 메시지"]',
+    );
+    expect(input).not.toBeNull();
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(
+        HTMLTextAreaElement.prototype,
+        "value",
+      )?.set;
+      setter?.call(input, "변경 내용을 커밋해 줘");
+      input?.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    const send = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="후속 메시지 보내기"]',
+    );
+    await act(async () => send?.click());
+
+    expect(onFollowUp).toHaveBeenCalledWith("변경 내용을 커밋해 줘");
   });
 
   it("shows a detached Worker's final result in the linked Agent session", async () => {

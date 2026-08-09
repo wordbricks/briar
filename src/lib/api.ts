@@ -147,6 +147,11 @@ const projectAgentSessionSchema = z.object({
   scheduleRunId: z.string().nullable(),
   parentSessionId: z.string().nullable(),
   request: z.string().nullable(),
+  followUps: z.array(z.object({
+    id: z.string(),
+    message: z.string(),
+    sentAt: z.string(),
+  })).default([]),
   status: z.enum(["running", "completed", "failed", "skipped", "interrupted"]),
   issues: z.array(z.object({
     runId: z.string(),
@@ -1132,6 +1137,7 @@ export async function upsertProjectAgentSession(
         scheduleRunId: session.scheduleRunId ?? null,
         parentSessionId: session.parentSessionId ?? null,
         request: session.request ?? null,
+        followUps: session.followUps ?? [],
         status: session.status,
         issues: session.issues,
         startedAt: session.startedAt,

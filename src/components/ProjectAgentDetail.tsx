@@ -228,6 +228,36 @@ export function ProjectAgentDetail({
     }
   };
 
+  const sendFollowUp = async (message: string) => {
+    if (
+      companionMode ||
+      !dashboard ||
+      !selectedSession ||
+      selectedSession.sessionType !== "task" ||
+      selectedSession.status === "running" ||
+      !selectedSession.conversationId
+    ) {
+      throw new Error(t("agents.followUpUnavailable"));
+    }
+    await executeProjectAgentTask(
+      {
+        runAgent: runProjectAgent,
+        startSession: onStartTaskSession,
+        settleSession: onSettleTaskSession,
+        startAutoHunt: onStartAutoHunt,
+      },
+      {
+        agent,
+        dashboard,
+        message,
+        sessionId: selectedSession.id,
+        conversationId: selectedSession.conversationId,
+        workspaceRoot: selectedSession.workspaceRoot,
+        isFollowUp: true,
+      },
+    );
+  };
+
   if (selectedSession) {
     return (
       <ProjectAgentSessionDetail
@@ -235,6 +265,7 @@ export function ProjectAgentDetail({
         issueKeyPrefix={dashboard?.project.issueKeyPrefix}
         onBack={() => setSelectedSessionId(null)}
         onIssueOpen={onIssueOpen}
+        onFollowUp={companionMode ? undefined : sendFollowUp}
         onStop={() => onStopSession(selectedSession.id)}
         session={selectedSession}
         token={token}
