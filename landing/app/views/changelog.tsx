@@ -26,6 +26,19 @@ export const changelogCopy = {
     backTop: "맨 위로 ↑",
     entries: [
       {
+        version: "1.2.93",
+        date: "2026년 8월 10일",
+        title: "에이전트마다 여러 스킬을 만들고 알맞은 작업에 사용합니다",
+        summary:
+          "하나의 에이전트에 목적별 스킬을 구성하고, 직접 실행·예약·이슈 처리·채널 대화에서 작업에 맞는 스킬을 선택해 실행할 수 있습니다.",
+        items: [
+          "프로젝트와 조직 에이전트에 여러 스킬을 만들고 각각 이름, 지침, 제공자, 모델과 추론 강도를 설정할 수 있습니다.",
+          "에이전트를 직접 실행할 때 원하는 스킬을 선택하고, 예약과 이슈 처리에는 지정된 기본·이슈 처리 스킬을 일관되게 사용합니다.",
+          "채널에서 에이전트와 저장된 스킬 이름을 함께 언급하면 해당 스킬로 답변하며, 일치하는 이름이 없으면 기본 스킬을 사용합니다.",
+          "대기 중이거나 실행 중인 작업이 참조하는 스킬을 안전하게 보존해 이름이나 기본값을 바꿔도 실행 맥락이 유지됩니다.",
+        ],
+      },
+      {
         version: "1.2.92",
         date: "2026년 8월 9일",
         title: "에이전트 작업을 이어가고 사용량을 더 선명하게 확인합니다",
@@ -211,6 +224,19 @@ export const changelogCopy = {
     home: "Home",
     backTop: "Back to top ↑",
     entries: [
+      {
+        version: "1.2.93",
+        date: "August 10, 2026",
+        title: "Give every agent the right skill for each job",
+        summary:
+          "Configure purpose-built skills on one agent, then select the right skill for direct runs, schedules, issue processing, and channel conversations.",
+        items: [
+          "Create multiple skills for project and organization agents, each with its own name, instructions, provider, model, and reasoning effort.",
+          "Choose a skill for direct agent runs while schedules and issue processing consistently use their configured default or issue-processing skill.",
+          "Mention an agent and a saved skill name in a channel to invoke that skill, with the default skill used when no name matches.",
+          "Queued and running work keeps a durable reference to its skill, preserving execution context across renames and default changes.",
+        ],
+      },
       {
         version: "1.2.92",
         date: "August 9, 2026",
@@ -458,9 +484,9 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <h1>{changelog.title}</h1>
           <p>{changelog.description}</p>
         </div>
-        <a href="#v1-2-92" className="changelog-current">
+        <a href="#v1-2-93" className="changelog-current">
           <span>{changelog.current}</span>
-          <strong>v1.2.92</strong>
+          <strong>v1.2.93</strong>
           <i aria-hidden="true">↓</i>
         </a>
       </section>
@@ -485,14 +511,17 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   {index === 0 ? <span>{changelog.latest}</span> : null}
                   <time
                     dateTime={
+                      entry.version === "1.2.93" ||
                       entry.version === "1.2.92" ||
                       entry.version === "1.2.91" ||
                       entry.version === "1.2.90" ||
                       entry.version === "1.2.89" ||
                       entry.version === "1.2.88"
-                        ? entry.version === "1.2.92"
-                          ? "2026-08-09"
-                          : "2026-08-08"
+                        ? entry.version === "1.2.93"
+                          ? "2026-08-10"
+                          : entry.version === "1.2.92"
+                            ? "2026-08-09"
+                            : "2026-08-08"
                         : "2026-08-07"
                     }
                   >
