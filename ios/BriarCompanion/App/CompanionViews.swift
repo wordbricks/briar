@@ -6,6 +6,7 @@ import UniformTypeIdentifiers
 struct CompanionShellView: View {
     @AppStorage("companion-appearance") private var appearance = CompanionAppearance.system.rawValue
     @AppStorage("companion-locale") private var localeRaw = CompanionLocale.ko.rawValue
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var showingSettings = false
     @State private var taskPath = NavigationPath()
     @State private var homePath = NavigationPath()
@@ -203,13 +204,18 @@ struct CompanionShellView: View {
                         )
                     }
                 } label: {
-                    HStack(spacing: 4) {
-                        Text(project.name)
-                            .font(.subheadline.weight(.semibold))
-                            .lineLimit(1)
-                        Image(systemName: "chevron.down")
-                            .font(.caption2.weight(.semibold))
-                            .foregroundStyle(.secondary)
+                    if dynamicTypeSize.isAccessibilitySize {
+                        Image(systemName: "folder")
+                            .imageScale(.large)
+                    } else {
+                        HStack(spacing: 4) {
+                            Text(project.name)
+                                .font(.subheadline.weight(.semibold))
+                                .lineLimit(1)
+                            Image(systemName: "chevron.down")
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
                 .accessibilityLabel("프로젝트, \(project.name)")
