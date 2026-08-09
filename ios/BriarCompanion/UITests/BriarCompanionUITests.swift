@@ -15,11 +15,9 @@ final class BriarCompanionUITests: XCTestCase {
 
         XCTAssertTrue(app.descendants(matching: .any)["login-title"].waitForExistence(timeout: 5))
         app.buttons["login-button"].tap()
-        XCTAssertTrue(app.navigationBars["프로젝트 선택"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.descendants(matching: .any)["organization-picker"].exists)
-        XCTAssertTrue(app.descendants(matching: .any)["project-picker"].exists)
-        app.buttons["project-continue-button"].tap()
 
+        // Project selection is skipped on load; the last used project is
+        // auto-selected (first project of the first organization on first use).
         let projectMenu = app.buttons["project-menu"]
         XCTAssertTrue(projectMenu.waitForExistence(timeout: 5))
         XCTAssertTrue(app.navigationBars["Tasks"].exists)
@@ -199,8 +197,6 @@ final class BriarCompanionUITests: XCTestCase {
         captureScreenshot(named: "companion-accessibility-xxxl")
 
         app.buttons["login-button"].tap()
-        XCTAssertTrue(app.buttons["project-continue-button"].waitForExistence(timeout: transitionTimeout))
-        app.buttons["project-continue-button"].tap()
         XCTAssertTrue(app.buttons["project-menu"].waitForExistence(timeout: transitionTimeout))
         XCTAssertTrue(app.staticTexts["iOS Native Companion 읽기 경험"].exists)
         try performAccessibilityAudit(on: app, for: [.textClipped])
@@ -310,8 +306,6 @@ final class BriarCompanionUITests: XCTestCase {
         app.launch()
         XCTAssertTrue(app.buttons["login-button"].waitForExistence(timeout: transitionTimeout))
         app.buttons["login-button"].tap()
-        XCTAssertTrue(app.buttons["project-continue-button"].waitForExistence(timeout: transitionTimeout))
-        app.buttons["project-continue-button"].tap()
         XCTAssertTrue(app.buttons["project-menu"].waitForExistence(timeout: transitionTimeout))
         XCTAssertTrue(app.navigationBars["Tasks"].waitForExistence(timeout: transitionTimeout))
         return app

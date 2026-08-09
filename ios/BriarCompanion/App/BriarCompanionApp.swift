@@ -25,7 +25,6 @@ struct BriarCompanionApp: App {
 private struct UITestCompanionFlow: View {
     @State private var signedIn = false
     @State private var selectedProjectID: UUID?
-    @State private var projectSelected = false
     @State private var createdRunStatus: DashboardRun.Status?
     @State private var dependencyAdded = false
     @StateObject private var navigation = CompanionNavigationModel()
@@ -74,13 +73,6 @@ private struct UITestCompanionFlow: View {
             }
         } else if !signedIn {
             CompanionLoginView(signingIn: false, errorMessage: nil) { signedIn = true }
-        } else if !projectSelected {
-            ProjectSelectionView(
-                projects: [project, alternateProject],
-                selectedProjectID: $selectedProjectID,
-                continueAction: { projectSelected = true },
-                signOut: { signedIn = false }
-            )
         } else {
             CompanionShellView(
                 navigation: navigation,
@@ -105,7 +97,7 @@ private struct UITestCompanionFlow: View {
                 refresh: { await refreshSnapshot() },
                 selectProject: { selectedProjectID = $0 },
                 signOut: {
-                    projectSelected = false
+                    selectedProjectID = project.id
                     signedIn = false
                 }
             )

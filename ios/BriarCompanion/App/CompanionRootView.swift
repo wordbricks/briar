@@ -108,8 +108,12 @@ struct CompanionRootView: View {
             do {
                 try await companion.load(token: token)
                 inbox.configure(token: token, userID: companion.user?.id)
-                projectSelectionComplete = false
                 applyPendingProjectIfNeeded()
+                // Auto-select a project after load: CompanionStore restores the
+                // last used project, or the first project of the first
+                // organization on first use. The selection screen only appears
+                // when the account has no projects at all.
+                projectSelectionComplete = companion.selectedProjectID != nil
             } catch let MobileAPIError.httpStatus(status, _) where status == 401 {
                 try? session.signOut()
             } catch {

@@ -23,7 +23,6 @@
 		587852F5E838090FEF48C797 /* InboxViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = E80FCA400D10FEE6AF26FBAA /* InboxViews.swift */; };
 		6822A46895420B4D8D2B0AE0 /* ProjectIconView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C50DB71AFF1E7CA7B051BEEB /* ProjectIconView.swift */; };
 		734B87FE5D6A7DF134A53FA9 /* InboxModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10A04D41AB039273FA6B91E /* InboxModels.swift */; };
-		76A6ED2D352DE471401FA320 /* companion-v1.json in Resources */ = {isa = PBXBuildFile; fileRef = F50AF263AB310A059E1FA86E /* companion-v1.json */; };
 		83E461C754E9D88F746961D2 /* InboxStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBD28955B6995BA7B485085B /* InboxStore.swift */; };
 		8C3ACBC240C3C93066779D21 /* CompanionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE917D55AAB7F8525B5D6FA0 /* CompanionStore.swift */; };
 		8CC0C5797E179B5BF4797415 /* AppSystemServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = B941ED81ECF5145E9F9BE24C /* AppSystemServices.swift */; };
@@ -42,6 +41,7 @@
 		D0963492D4565AF925843202 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 73C8DE502A3DAA054172B395 /* Assets.xcassets */; };
 		D2E5DCDCC649B4D9EEF58EFA /* CompanionLocale.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38415BB3EE4DDCA4212DB1F9 /* CompanionLocale.swift */; };
 		D3A6AD589D6C6456AC8B1345 /* MessageMentions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 151B809A488C8E38ABA12C73 /* MessageMentions.swift */; };
+		E2B8FABBFA662CC25D80B33D /* companion-v1.json in Resources */ = {isa = PBXBuildFile; fileRef = 28887A9FB508989BAD7EDE71 /* companion-v1.json */; };
 		EA3D7F4BD2F999AF67127AE8 /* AgentsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A17FF04740F5A18F25325D2C /* AgentsStore.swift */; };
 		EE5D250A1092057DAB5C1206 /* SessionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C3D7B1D017C131E8DD36044 /* SessionStore.swift */; };
 		EECEC6D146D6DF1526985D0A /* ProfileImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A1B95F49B19C05E7C2C20F0 /* ProfileImage.swift */; };
@@ -76,6 +76,7 @@
 		151B809A488C8E38ABA12C73 /* MessageMentions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageMentions.swift; sourceTree = "<group>"; };
 		2034C52B05B2B54DF7F3F3E5 /* BriarCompanionTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = BriarCompanionTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		216793AD86019D1D7BDF5133 /* SessionStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionStoreTests.swift; sourceTree = "<group>"; };
+		28887A9FB508989BAD7EDE71 /* companion-v1.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "companion-v1.json"; sourceTree = "<group>"; };
 		2A26E7B294AE842A63FE02C2 /* BriarCompanionUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = BriarCompanionUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		34368CFC402513DE2753ABCA /* DashboardModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardModels.swift; sourceTree = "<group>"; };
 		38415BB3EE4DDCA4212DB1F9 /* CompanionLocale.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionLocale.swift; sourceTree = "<group>"; };
@@ -117,10 +118,18 @@
 		E80FCA400D10FEE6AF26FBAA /* InboxViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InboxViews.swift; sourceTree = "<group>"; };
 		F10A04D41AB039273FA6B91E /* InboxModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InboxModels.swift; sourceTree = "<group>"; };
 		F137DEE3E6FF7F8A153AC8F6 /* ChannelsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelsStore.swift; sourceTree = "<group>"; };
-		F50AF263AB310A059E1FA86E /* companion-v1.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "companion-v1.json"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
+		0E7E7B844063F4CC57864B4B /* ios-앱-로딩시-프로젝트-선택-d22008cd */ = {
+			isa = PBXGroup;
+			children = (
+				49E930E583F4A141384E5E6D /* contracts */,
+			);
+			name = "ios-앱-로딩시-프로젝트-선택-d22008cd";
+			path = ../..;
+			sourceTree = "<group>";
+		};
 		199D6281C5C9968DA1B0EF3F /* Tests */ = {
 			isa = PBXGroup;
 			children = (
@@ -138,12 +147,20 @@
 			path = Tests;
 			sourceTree = "<group>";
 		};
-		49B76C7E45C9DDF7192B9BB1 /* mobile */ = {
+		378859CC3648966DC40933B8 /* mobile */ = {
 			isa = PBXGroup;
 			children = (
-				F17CDE6539DEAA4CCC8942E9 /* fixtures */,
+				B8B1B2D4BBB1516E3F026AC4 /* fixtures */,
 			);
 			path = mobile;
+			sourceTree = "<group>";
+		};
+		49E930E583F4A141384E5E6D /* contracts */ = {
+			isa = PBXGroup;
+			children = (
+				378859CC3648966DC40933B8 /* mobile */,
+			);
+			path = contracts;
 			sourceTree = "<group>";
 		};
 		4BCD825065EC73B0BFB812A0 /* Products */ = {
@@ -196,19 +213,11 @@
 			path = App;
 			sourceTree = "<group>";
 		};
-		6CF8D376E98EE96577FB0D9C /* contracts */ = {
-			isa = PBXGroup;
-			children = (
-				49B76C7E45C9DDF7192B9BB1 /* mobile */,
-			);
-			path = contracts;
-			sourceTree = "<group>";
-		};
 		995DC18713CA2D81749A5F1C = {
 			isa = PBXGroup;
 			children = (
 				61C931BA8B64C4D161851EBE /* App */,
-				B0C61233CF6B535D4FBA2FF8 /* ios-이슈-대화-탭-보내기-버튼-동작-04c75bc3 */,
+				0E7E7B844063F4CC57864B4B /* ios-앱-로딩시-프로젝트-선택-d22008cd */,
 				199D6281C5C9968DA1B0EF3F /* Tests */,
 				9E47CF88E04EB2D5307A8187 /* UITests */,
 				4BCD825065EC73B0BFB812A0 /* Products */,
@@ -223,19 +232,10 @@
 			path = UITests;
 			sourceTree = "<group>";
 		};
-		B0C61233CF6B535D4FBA2FF8 /* ios-이슈-대화-탭-보내기-버튼-동작-04c75bc3 */ = {
+		B8B1B2D4BBB1516E3F026AC4 /* fixtures */ = {
 			isa = PBXGroup;
 			children = (
-				6CF8D376E98EE96577FB0D9C /* contracts */,
-			);
-			name = "ios-이슈-대화-탭-보내기-버튼-동작-04c75bc3";
-			path = ../..;
-			sourceTree = "<group>";
-		};
-		F17CDE6539DEAA4CCC8942E9 /* fixtures */ = {
-			isa = PBXGroup;
-			children = (
-				F50AF263AB310A059E1FA86E /* companion-v1.json */,
+				28887A9FB508989BAD7EDE71 /* companion-v1.json */,
 			);
 			path = fixtures;
 			sourceTree = "<group>";
@@ -341,7 +341,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				76A6ED2D352DE471401FA320 /* companion-v1.json in Resources */,
+				E2B8FABBFA662CC25D80B33D /* companion-v1.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
