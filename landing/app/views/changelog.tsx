@@ -26,6 +26,19 @@ export const changelogCopy = {
     backTop: "맨 위로 ↑",
     entries: [
       {
+        version: "1.2.94",
+        date: "2026년 8월 10일",
+        title: "모든 에이전트의 작업 과정을 같은 흐름으로 보여줍니다",
+        summary:
+          "Codex, Claude, Grok, OpenCode가 보내는 진행 이벤트를 하나의 형식으로 맞춰 메시지와 도구 활동을 더 일관되고 안정적으로 표시합니다.",
+        items: [
+          "에이전트의 답변 시작·진행·완료와 턴 종료 상태를 제공자에 관계없이 같은 이벤트 흐름으로 처리합니다.",
+          "명령 실행, 파일 변경, 웹 검색과 기타 도구 활동의 시작·출력·완료 상태를 공통 형식으로 보여줍니다.",
+          "Worker에서 이어받은 활동 ID를 세션별로 분리해 여러 실행의 진행 이벤트가 서로 섞이지 않습니다.",
+          "아주 긴 활동 제목과 출력도 UTF-8 문자를 안전하게 보존하며 제한해 실시간 실행 화면을 안정적으로 유지합니다.",
+        ],
+      },
+      {
         version: "1.2.93",
         date: "2026년 8월 10일",
         title: "에이전트마다 여러 스킬을 만들고 알맞은 작업에 사용합니다",
@@ -224,6 +237,19 @@ export const changelogCopy = {
     home: "Home",
     backTop: "Back to top ↑",
     entries: [
+      {
+        version: "1.2.94",
+        date: "August 10, 2026",
+        title: "Every agent now reports work through one consistent flow",
+        summary:
+          "Progress events from Codex, Claude, Grok, and OpenCode now share one format, making messages and tool activity more consistent and reliable.",
+        items: [
+          "Process message start, progress, completion, and final turn status through the same event flow across providers.",
+          "Present command runs, file changes, web searches, and other tools with common start, output, and completion states.",
+          "Qualify restored worker activity IDs by session so progress from concurrent runs cannot collide.",
+          "Bound unusually large activity titles and output on safe UTF-8 boundaries to keep live execution views responsive.",
+        ],
+      },
       {
         version: "1.2.93",
         date: "August 10, 2026",
@@ -484,9 +510,9 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <h1>{changelog.title}</h1>
           <p>{changelog.description}</p>
         </div>
-        <a href="#v1-2-93" className="changelog-current">
+        <a href="#v1-2-94" className="changelog-current">
           <span>{changelog.current}</span>
-          <strong>v1.2.93</strong>
+          <strong>v1.2.94</strong>
           <i aria-hidden="true">↓</i>
         </a>
       </section>
@@ -511,13 +537,15 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   {index === 0 ? <span>{changelog.latest}</span> : null}
                   <time
                     dateTime={
+                      entry.version === "1.2.94" ||
                       entry.version === "1.2.93" ||
                       entry.version === "1.2.92" ||
                       entry.version === "1.2.91" ||
                       entry.version === "1.2.90" ||
                       entry.version === "1.2.89" ||
                       entry.version === "1.2.88"
-                        ? entry.version === "1.2.93"
+                        ? entry.version === "1.2.94" ||
+                          entry.version === "1.2.93"
                           ? "2026-08-10"
                           : entry.version === "1.2.92"
                             ? "2026-08-09"
