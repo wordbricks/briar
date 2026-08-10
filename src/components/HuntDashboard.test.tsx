@@ -839,7 +839,7 @@ describe("HuntDashboard", () => {
     await act(async () => root.unmount());
   });
 
-  it("shows copy ID and link beside the title and edit/delete in the actions menu", async () => {
+  it("shows inline save status beside the title and removes edit from the actions menu", async () => {
     const onDeleteIssue = vi.fn(async () => undefined);
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, "clipboard", {
@@ -897,7 +897,10 @@ describe("HuntDashboard", () => {
     expect(toastMessages().some((text) => text.includes("링크가 복사되었습니다")))
       .toBe(true);
     expect(titlebarActions?.querySelector(".run-page-share-status")).toBeNull();
-    expect(title?.nextElementSibling).toBe(titlebarActions);
+    const saveStatus = container.querySelector(".run-page-save-status");
+    expect(title?.nextElementSibling).toBe(saveStatus);
+    expect(saveStatus?.textContent).toContain("저장됨");
+    expect(saveStatus?.nextElementSibling).toBe(titlebarActions);
     expect(titlebarActions?.firstElementChild?.classList).toContain(
       "run-page-property-badges",
     );
@@ -921,7 +924,7 @@ describe("HuntDashboard", () => {
     });
     const menu = document.body.querySelector('[role="menu"]');
     expect(menu?.textContent).not.toContain("링크 공유");
-    expect(menu?.textContent).toContain("수정");
+    expect(menu?.textContent).not.toContain("수정");
     expect(menu?.textContent).toContain("삭제");
 
     const deleteItem = Array.from(
@@ -941,6 +944,163 @@ describe("HuntDashboard", () => {
 
     await act(async () => root.unmount());
     container.remove();
+  });
+
+  it("debounces inline title and description changes and reports the save state", async () => {
+    vi.useFakeTimers();
+    const onUpdateIssue = vi.fn(async () => undefined);
+    const run = { ...demoDashboard.runs[0], workerId: null };
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    try {
+      await act(async () => root.render(
+        <RunPage
+          isSidebarOpen
+          error={null}
+          isRecovering={false}
+          onBack={() => undefined}
+          onCancel={async () => undefined}
+          onLoadAttachment={async () => new Blob()}
+          onLoadIssueMessages={async () => []}
+          onLoadRunEvidence={async () => []}
+          onMove={async () => undefined}
+          onRetry={async () => undefined}
+          onSendIssueMessage={async () => {
+            throw new Error("not implemented in this test");
+          }}
+          onUpdateIssue={onUpdateIssue}
+          run={run}
+        />,
+      ));
+
+      const title = container.querySelector<HTMLInputElement>(
+        ".run-page-inline-title",
+      );
+      const description = container.querySelector<HTMLTextAreaElement>(
+        ".issue-description-inline-editor",
+      );
+      expect(title?.value).toBe(run.title);
+      expect(description?.value).toBe(run.issueDescription ?? "");
+      expect(container.querySelector(".run-page-save-status")?.textContent)
+        .toContain("저장됨");
+
+      await act(async () => {
+        Object.getOwnPropertyDescriptor(
+          HTMLInputElement.prototype,
+          "value",
+        )?.set?.call(title, " 인라인 제목 ");
+        title?.dispatchEvent(new Event("input", { bubbles: true }));
+        Object.getOwnPropertyDescriptor(
+          HTMLTextAreaElement.prototype,
+          "value",
+        )?.set?.call(description, " 인라인 본문 ");
+        description?.dispatchEvent(new Event("input", { bubbles: true }));
+      });
+
+      expect(container.querySelector(".run-page-save-status")?.textContent)
+        .toContain("저장 중");
+      expect(container.querySelector(".run-page-save-status .spin")).not.toBeNull();
+      expect(onUpdateIssue).not.toHaveBeenCalled();
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(600);
+      });
+      expect(onUpdateIssue).toHaveBeenCalledTimes(1);
+      expect(onUpdateIssue).toHaveBeenCalledWith({
+        title: "인라인 제목",
+        description: "인라인 본문",
+        priority: run.priority,
+        attachments: [],
+      });
+      expect(container.querySelector(".run-page-save-status")?.textContent)
+        .toContain("저장됨");
+    } finally {
+      await act(async () => root.unmount());
+      container.remove();
+      vi.useRealTimers();
+    }
+  });
+
+  it("serializes inline saves when the draft changes during a request", async () => {
+    vi.useFakeTimers();
+    let resolveFirstSave: () => void = () => undefined;
+    const firstSave = new Promise<void>((resolve) => {
+      resolveFirstSave = resolve;
+    });
+    const onUpdateIssue = vi
+      .fn<(_input: UpdateIssueInput) => Promise<void>>()
+      .mockReturnValueOnce(firstSave)
+      .mockResolvedValue(undefined);
+    const run = { ...demoDashboard.runs[0], workerId: null };
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    try {
+      await act(async () => root.render(
+        <RunPage
+          isSidebarOpen
+          error={null}
+          isRecovering={false}
+          onBack={() => undefined}
+          onCancel={async () => undefined}
+          onLoadAttachment={async () => new Blob()}
+          onLoadIssueMessages={async () => []}
+          onLoadRunEvidence={async () => []}
+          onMove={async () => undefined}
+          onRetry={async () => undefined}
+          onSendIssueMessage={async () => {
+            throw new Error("not implemented in this test");
+          }}
+          onUpdateIssue={onUpdateIssue}
+          run={run}
+        />,
+      ));
+      const title = container.querySelector<HTMLInputElement>(
+        ".run-page-inline-title",
+      );
+
+      await act(async () => {
+        Object.getOwnPropertyDescriptor(
+          HTMLInputElement.prototype,
+          "value",
+        )?.set?.call(title, "먼저 저장할 제목");
+        title?.dispatchEvent(new Event("input", { bubbles: true }));
+        await vi.advanceTimersByTimeAsync(600);
+      });
+      expect(onUpdateIssue).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        Object.getOwnPropertyDescriptor(
+          HTMLInputElement.prototype,
+          "value",
+        )?.set?.call(title, run.title);
+        title?.dispatchEvent(new Event("input", { bubbles: true }));
+        await vi.advanceTimersByTimeAsync(600);
+      });
+      expect(onUpdateIssue).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        resolveFirstSave();
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      expect(onUpdateIssue).toHaveBeenCalledTimes(2);
+      expect(onUpdateIssue).toHaveBeenLastCalledWith({
+        title: run.title,
+        description: run.issueDescription,
+        priority: run.priority,
+        attachments: [],
+      });
+      expect(container.querySelector(".run-page-save-status")?.textContent)
+        .toContain("저장됨");
+    } finally {
+      await act(async () => root.unmount());
+      container.remove();
+      vi.useRealTimers();
+    }
   });
 
   it("starts a queued issue from the issue detail process-now button", async () => {
@@ -1996,7 +2156,9 @@ describe("HuntDashboard", () => {
       `AH-${demoDashboard.runs[0].runNumber}`,
     );
     const windowTitle = container.querySelector(".run-page-window-title");
-    expect(windowTitle?.textContent).toBe(demoDashboard.runs[0].title);
+    expect((windowTitle as HTMLInputElement | null)?.value).toBe(
+      demoDashboard.runs[0].title,
+    );
     expect(windowTitle?.getAttribute("title")).toBe(demoDashboard.runs[0].title);
     expect(
       container
@@ -2101,7 +2263,10 @@ describe("HuntDashboard", () => {
     expect(descriptionPane).not.toBeNull();
     expect(descriptionPane?.querySelector(":scope > header")).toBeNull();
     expect(descriptionPane?.querySelector(".issue-description-markdown")).toBeNull();
-    expect(descriptionPane?.querySelector(".issue-description-empty")).not.toBeNull();
+    expect(
+      descriptionPane?.querySelector(".issue-description-inline-editor"),
+    ).not.toBeNull();
+    expect(descriptionPane?.querySelector(".issue-description-empty")).toBeNull();
     expect(descriptionPane?.textContent).not.toContain(demoDashboard.runs[0].detail);
     expect(container.querySelector(".issue-content-divider")).toBeNull();
     const conversation = container.querySelector(".issue-conversation");
@@ -2495,7 +2660,11 @@ describe("HuntDashboard", () => {
     expect(container.textContent).toContain(
       `AH-${demoDashboard.runs[0].runNumber}`,
     );
-    expect(container.querySelector("#run-page-title")?.textContent).toBe(
+    expect(
+      container.querySelector<HTMLInputElement>(
+        ".run-page-title-row .run-page-inline-title",
+      )?.value,
+    ).toBe(
       demoDashboard.runs[0].title,
     );
     expect(container.querySelector(".run-page-actions-trigger")).not.toBeNull();
