@@ -20,6 +20,7 @@ import {
   type AutoHuntWorkflowStageId,
 } from "../../src/lib/auto-hunt-contract";
 import type { StructuredAgentResult } from "../../src/lib/agent-result";
+import type { AgentExecutionCostRecord } from "../../src/lib/agent-execution-cost";
 import type {
   AgentExecutionMetrics,
   AgentExecutionUsageRecord,
@@ -477,6 +478,30 @@ export type OrganizationUsageRecordRow = {
   output_tokens: number | null;
   reasoning_output_tokens: number | null;
   total_tokens: number | null;
+  observed_at: string;
+  recorded_at: string;
+};
+
+export type OrganizationCostRecordRow = {
+  execution_id: string;
+  run_id: string;
+  project_id: string;
+  run_attempt: number;
+  claim_attempt: number;
+  worker_id: string | null;
+  claimed_at: string;
+  cost_key: string;
+  usage_key: string | null;
+  session_id: string | null;
+  turn_id: string | null;
+  scope_id: string | null;
+  agent_provider: ProjectAgentProvider;
+  model_provider: string | null;
+  model: string | null;
+  canonical_model: string | null;
+  model_source: AgentExecutionCostRecord["modelSource"];
+  source: string;
+  amount_usd_ticks: number;
   observed_at: string;
   recorded_at: string;
 };
@@ -5161,6 +5186,11 @@ export async function listOrganizationUsageRuns(
                    where usage.execution_id = attempt.id
                      and unixepoch(usage.observed_at) >= unixepoch(?)
                  )
+                 or exists (
+                   select 1 from briar_run_cost_records cost
+                   where cost.execution_id = attempt.id
+                     and unixepoch(cost.observed_at) >= unixepoch(?)
+                 )
                )
            )
          )
@@ -5186,7 +5216,7 @@ export async function listOrganizationUsageRuns(
          run.started_at
        )), run.id`,
     )
-    .bind(organizationId, since, since, since)
+    .bind(organizationId, since, since, since, since)
     .all<OrganizationUsageRunRow>();
 
   return runs.results;
@@ -5250,6 +5280,48 @@ export async function recordRunUsageRecords(
   return result.meta.changes ?? 0;
 }
 
+export async function recordRunCostRecords(
+  db: D1Database,
+  input: {
+    executionId: string;
+    records: AgentExecutionCostRecord[];
+    recordedAt: string;
+  },
+) {
+  if (input.records.length === 0) return 0;
+  const result = await db
+    .prepare(
+      `insert into briar_run_cost_records (
+         execution_id, cost_key, usage_key, session_id, turn_id, scope_id,
+         agent_provider, model_provider, model, canonical_model,
+         model_source, source, amount_usd_ticks, observed_at, recorded_at
+       )
+       select ?, json_extract(record.value, '$.costKey'),
+              json_extract(record.value, '$.usageKey'),
+              json_extract(record.value, '$.sessionId'),
+              json_extract(record.value, '$.turnId'),
+              json_extract(record.value, '$.scopeId'),
+              json_extract(record.value, '$.agentProvider'),
+              json_extract(record.value, '$.modelProvider'),
+              json_extract(record.value, '$.model'),
+              json_extract(record.value, '$.canonicalModel'),
+              json_extract(record.value, '$.modelSource'),
+              json_extract(record.value, '$.source'),
+              json_extract(record.value, '$.amountUsdTicks'),
+              json_extract(record.value, '$.observedAt'), ?
+       from json_each(?) record
+       where true
+       on conflict (execution_id, cost_key) do nothing`,
+    )
+    .bind(
+      input.executionId,
+      input.recordedAt,
+      JSON.stringify(input.records),
+    )
+    .run();
+  return result.meta.changes ?? 0;
+}
+
 export async function listOrganizationUsageExecutionAttempts(
   db: D1Database,
   organizationId: string,
@@ -5265,10 +5337,15 @@ export async function listOrganizationUsageExecutionAttempts(
            where usage.execution_id = briar_run_execution_attempts.id
              and unixepoch(usage.observed_at) >= unixepoch(?)
          )
+         or exists (
+           select 1 from briar_run_cost_records cost
+           where cost.execution_id = briar_run_execution_attempts.id
+             and unixepoch(cost.observed_at) >= unixepoch(?)
+         )
        )
        order by unixepoch(claimed_at), run_id, claim_attempt, id`,
     )
-    .bind(organizationId, since, since)
+    .bind(organizationId, since, since, since)
     .all<RunExecutionAttemptRow>();
   return result.results;
 }
@@ -5299,6 +5376,33 @@ export async function listOrganizationUsageRecords(
     )
     .bind(organizationId, since)
     .all<OrganizationUsageRecordRow>();
+  return result.results;
+}
+
+export async function listOrganizationUsageCostRecords(
+  db: D1Database,
+  organizationId: string,
+  since: string,
+) {
+  const result = await db
+    .prepare(
+      `select cost.execution_id, attempt.run_id, attempt.project_id,
+              attempt.run_attempt, attempt.claim_attempt, attempt.worker_id,
+              attempt.claimed_at, cost.cost_key, cost.usage_key,
+              cost.session_id, cost.turn_id, cost.scope_id,
+              cost.agent_provider, cost.model_provider, cost.model,
+              cost.canonical_model, cost.model_source, cost.source,
+              cost.amount_usd_ticks, cost.observed_at, cost.recorded_at
+       from briar_run_cost_records cost
+       join briar_run_execution_attempts attempt
+         on attempt.id = cost.execution_id
+       where attempt.organization_id = ?
+         and unixepoch(cost.observed_at) >= unixepoch(?)
+       order by unixepoch(cost.observed_at), attempt.run_id,
+                attempt.claim_attempt, cost.cost_key`,
+    )
+    .bind(organizationId, since)
+    .all<OrganizationCostRecordRow>();
   return result.results;
 }
 

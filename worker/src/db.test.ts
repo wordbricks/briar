@@ -837,6 +837,10 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       db,
       await readFile(resolve("migrations/0084_run_usage_ledger.sql"), "utf8"),
     );
+    await executeSql(
+      db,
+      await readFile(resolve("migrations/0085_run_cost_ledger.sql"), "utf8"),
+    );
   }, 30_000);
 
   afterAll(async () => {

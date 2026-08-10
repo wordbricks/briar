@@ -217,6 +217,17 @@ export function grokPromptResultEnvelope(
   );
 }
 
+export function grokPromptStartEnvelope(
+  invocation: ReturnType<typeof createGrokPromptInvocation>,
+) {
+  const { sessionId, messageId, _meta } = invocation.params;
+  return {
+    jsonrpc: "2.0" as const,
+    method: "briar/session/prompt_start",
+    params: { sessionId, messageId, _meta },
+  };
+}
+
 function hasReplayMeta(message: JsonRpcMessage): boolean {
   if (!message.params || typeof message.params !== "object") return false;
   const meta = (message.params as Record<string, unknown>)._meta;
@@ -430,6 +441,10 @@ async function main(runnerIo: GrokRunnerIo) {
 
     const prompt = await buildGrokPromptParts(request);
     const promptInvocation = createGrokPromptInvocation(sessionId, prompt);
+    emit({
+      type: "event",
+      raw: grokPromptStartEnvelope(promptInvocation),
+    });
     const promptResult = (await connection.request(
       "session/prompt",
       promptInvocation.params,

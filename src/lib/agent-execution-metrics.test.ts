@@ -1,16 +1,21 @@
 import { describe, expect, it } from "vitest";
 import {
+  agentExecutionCostObservationsFromPayload,
+  agentExecutionCostRecordsFromObservations,
   agentExecutionMetrics,
   agentExecutionTokenUsageFromPayload,
   agentExecutionTokenUsageFromObservations,
   agentExecutionUsageObservationsFromPayload,
   agentExecutionUsageRecordSchema,
   agentExecutionUsageRecordsFromObservations,
+  claudeExecutionCostObservationsFromPayload,
   claudeExecutionUsageObservationsFromPayload,
   codexExecutionUsageObservationsFromPayload,
   createAgentExecutionUsageCollector,
   formatExecutionDuration,
+  grokExecutionCostObservationsFromPayload,
   grokExecutionUsageObservationsFromPayload,
+  openCodeExecutionCostObservationsFromPayload,
   openCodeExecutionUsageObservationsFromPayload,
 } from "./agent-execution-metrics";
 
@@ -324,6 +329,147 @@ describe("agent execution metrics", () => {
       reasoningOutputTokens: null,
       totalTokens: 32,
     });
+  });
+
+  it("prefers a complete Claude model cost breakdown despite total mismatch", () => {
+    const payload = {
+      type: "event",
+      raw: {
+        type: "result",
+        uuid: "result-cost-1",
+        session_id: "session-1",
+        total_cost_usd: 9,
+        modelUsage: {
+          "claude-sonnet-4-6": {
+            inputTokens: 10,
+            outputTokens: 2,
+            costUSD: 0.12,
+            canonicalModel: "claude-sonnet-4-6-20260801",
+            provider: "firstParty",
+          },
+          "anthropic.claude-haiku-4-5-v1:0": {
+            inputTokens: 4,
+            outputTokens: 1,
+            costUSD: 0.34,
+            provider: "bedrock",
+          },
+        },
+      },
+    };
+
+    expect(claudeExecutionCostObservationsFromPayload(payload)).toEqual([
+      expect.objectContaining({
+        model: "claude-sonnet-4-6",
+        canonicalModel: "claude-sonnet-4-6-20260801",
+        modelProvider: "firstParty",
+        amountUsdTicks: 1_200_000_000,
+        source: "claude.result.modelUsage.costUSD",
+        usageKey:
+          "claude:session:result-cost-1:model:claude-sonnet-4-6:usage",
+      }),
+      expect.objectContaining({
+        model: "anthropic.claude-haiku-4-5-v1:0",
+        modelProvider: "bedrock",
+        amountUsdTicks: 3_400_000_000,
+      }),
+    ]);
+
+    const collector = createAgentExecutionUsageCollector("claude");
+    collector.observe(payload, "2026-08-10T01:00:00.000Z");
+    collector.observe(payload, "2026-08-10T02:00:00.000Z");
+    expect(
+      agentExecutionCostRecordsFromObservations(collector.finishCosts()),
+    ).toEqual([
+      expect.objectContaining({
+        costKey:
+          "claude:session:result-cost-1:model:claude-sonnet-4-6:cost",
+        agentProvider: "claude",
+        amountUsdTicks: 1_200_000_000,
+        observedAt: "2026-08-10T01:00:00.000Z",
+      }),
+      expect.objectContaining({ amountUsdTicks: 3_400_000_000 }),
+    ]);
+  });
+
+  it("falls back to Claude total_cost_usd unless every model cost is present", () => {
+    const incomplete = {
+      type: "result",
+      uuid: "result-cost-2",
+      session_id: "session-1",
+      total_cost_usd: 0.5,
+      usage: { input_tokens: 20, output_tokens: 5 },
+      modelUsage: {
+        "claude-sonnet-4-6": {
+          inputTokens: 10,
+          outputTokens: 2,
+          costUSD: 0.2,
+        },
+        "claude-haiku-4-5": { inputTokens: 10, outputTokens: 3 },
+      },
+    };
+    expect(claudeExecutionCostObservationsFromPayload(incomplete)).toEqual([
+      expect.objectContaining({
+        model: null,
+        amountUsdTicks: 5_000_000_000,
+        source: "claude.result.total_cost_usd",
+        usageKey: null,
+      }),
+    ]);
+    expect(
+      claudeExecutionCostObservationsFromPayload({
+        ...incomplete,
+        total_cost_usd: undefined,
+      }),
+    ).toEqual([]);
+
+    const collector = createAgentExecutionUsageCollector("claude", {
+      configuredModel: "claude-configured",
+    });
+    collector.observe({
+      type: "system",
+      subtype: "init",
+      session_id: "session-1",
+      model: "claude-runtime",
+    });
+    collector.observe(incomplete);
+    expect(collector.finishCosts()).toEqual([
+      expect.objectContaining({
+        model: null,
+        canonicalModel: null,
+        modelProvider: null,
+        modelSource: "unknown",
+      }),
+    ]);
+
+    const completeReplay = {
+      ...incomplete,
+      modelUsage: {
+        "claude-sonnet-4-6": {
+          inputTokens: 10,
+          outputTokens: 2,
+          costUSD: 0.2,
+        },
+        "claude-haiku-4-5": {
+          inputTokens: 10,
+          outputTokens: 3,
+          costUSD: 0.3,
+        },
+      },
+    };
+    collector.observe(completeReplay);
+    collector.observe(incomplete);
+    expect(collector.finishCosts()).toEqual([
+      expect.objectContaining({
+        source: "claude.result.modelUsage.costUSD",
+        model: "claude-sonnet-4-6",
+        amountUsdTicks: 2_000_000_000,
+      }),
+      expect.objectContaining({
+        source: "claude.result.modelUsage.costUSD",
+        model: "claude-haiku-4-5",
+        amountUsdTicks: 3_000_000_000,
+      }),
+    ]);
   });
 
   it("observes Codex effective defaults from config and model list responses", () => {
@@ -1019,6 +1165,111 @@ describe("agent execution metrics", () => {
     ]);
   });
 
+  it("prefers replay-safe OpenCode step costs and repairs their late model", () => {
+    const collector = createAgentExecutionUsageCollector("opencode");
+    const step = (
+      id: string,
+      cost: number,
+      input: number,
+    ) => ({
+      type: "event",
+      raw: {
+        type: "message.part.updated",
+        properties: {
+          part: {
+            id,
+            type: "step-finish",
+            sessionID: "session-cost",
+            messageID: "message-cost",
+            cost,
+            tokens: {
+              input,
+              output: 1,
+              reasoning: 0,
+              cache: { read: 0, write: 0 },
+              total: input + 1,
+            },
+          },
+        },
+      },
+    });
+    const firstStep = step("part-cost-1", 0.1 + 0.2, 10);
+    const secondStep = step("part-cost-2", 0.0000000001, 20);
+    const assistant = {
+      id: "message-cost",
+      role: "assistant",
+      sessionID: "session-cost",
+      parentID: "user-cost",
+      modelID: "deepseek-v4-flash",
+      providerID: "opencode-go",
+      cost: 99,
+      tokens: {
+        input: 30,
+        output: 2,
+        reasoning: 0,
+        cache: { read: 0, write: 0 },
+        total: 32,
+      },
+    };
+
+    collector.observe(firstStep, "2026-08-10T03:00:00.000Z");
+    collector.observe({ type: "event", raw: assistant });
+    collector.observe(secondStep);
+    collector.observe(firstStep, "2026-08-10T04:00:00.000Z");
+    collector.observe({
+      type: "event",
+      raw: {
+        info: assistant,
+        parts: [
+          firstStep.raw.properties.part,
+          secondStep.raw.properties.part,
+        ],
+      },
+    });
+
+    expect(collector.finishCosts()).toEqual([
+      expect.objectContaining({
+        source: "opencode.step.cost",
+        amountUsdTicks: 3_000_000_000,
+        model: "deepseek-v4-flash",
+        modelProvider: "opencode-go",
+        turnId: "user-cost",
+        usageKey: "opencode:part:part-cost-1:usage",
+        observedAt: "2026-08-10T03:00:00.000Z",
+      }),
+      expect.objectContaining({
+        source: "opencode.step.cost",
+        amountUsdTicks: 1,
+        model: "deepseek-v4-flash",
+        usageKey: "opencode:part:part-cost-2:usage",
+      }),
+    ]);
+  });
+
+  it("keeps OpenCode assistant cost as a fallback without step cost", () => {
+    const assistant = {
+      id: "message-fallback-cost",
+      role: "assistant",
+      sessionID: "session-cost",
+      parentID: "user-cost",
+      modelID: "big-pickle",
+      providerID: "opencode",
+      cost: 0.25,
+      tokens: { input: 2, output: 1, reasoning: 0, total: 3 },
+    };
+    expect(openCodeExecutionCostObservationsFromPayload(assistant)).toEqual([
+      expect.objectContaining({
+        source: "opencode.assistant.cost",
+        amountUsdTicks: 2_500_000_000,
+        model: "big-pickle",
+        usageKey: "opencode:message:message-fallback-cost:usage",
+      }),
+    ]);
+    expect(
+      agentExecutionCostObservationsFromPayload("codex", assistant),
+    ).toEqual([]);
+  });
+
   it("keeps every actual Grok modelUsage entry and normalizes inclusive input", () => {
     const payload = {
       type: "event",
@@ -1463,6 +1714,339 @@ describe("agent execution metrics", () => {
       outputTokens: 20,
       totalTokens: 300,
     });
+  });
+
+  it("keeps exact Grok model cost ticks instead of its aggregate", () => {
+    const payload = {
+      method: "_x.ai/session/update",
+      params: {
+        sessionId: "session-cost",
+        update: {
+          sessionUpdate: "turn_completed",
+          prompt_id: "prompt-cost",
+          usage: {
+            costUsdTicks: 999,
+            modelUsage: {
+              "grok-4.5-build": {
+                inputTokens: 10,
+                outputTokens: 2,
+                totalTokens: 12,
+                costUsdTicks: 123_456_789,
+              },
+              "grok-4.5-mini": {
+                inputTokens: 5,
+                outputTokens: 1,
+                totalTokens: 6,
+                costUsdTicks: 7,
+              },
+            },
+          },
+        },
+      },
+    };
+
+    expect(grokExecutionCostObservationsFromPayload(payload)).toEqual([
+      expect.objectContaining({
+        model: "grok-4.5-build",
+        amountUsdTicks: 123_456_789,
+        source: "grok.turnCompleted.modelUsage.costUsdTicks",
+        usageKey:
+          "grok:session:session-cost:prompt:prompt-cost:model:grok-4.5-build:usage",
+      }),
+      expect.objectContaining({
+        model: "grok-4.5-mini",
+        amountUsdTicks: 7,
+      }),
+    ]);
+  });
+
+  it("does not infer a model for Grok aggregate prompt cost", () => {
+    const collector = createAgentExecutionUsageCollector("grok", {
+      configuredModel: "grok-configured",
+    });
+    collector.observe({
+      method: "session/new",
+      result: {
+        sessionId: "session-aggregate-cost",
+        models: { currentModelId: "grok-session-model" },
+      },
+    });
+    collector.observe({
+      method: "session/prompt",
+      params: {
+        sessionId: "session-aggregate-cost",
+        _meta: { promptId: "prompt-aggregate-cost" },
+      },
+      result: {
+        stopReason: "end_turn",
+        _meta: {
+          modelId: "grok-result-model",
+          usage: { costUsdTicks: 321 },
+        },
+      },
+    });
+
+    expect(collector.finishCosts()).toEqual([
+      expect.objectContaining({
+        source: "grok.prompt.metaCostUsdTicks",
+        amountUsdTicks: 321,
+        model: null,
+        canonicalModel: null,
+        modelProvider: "xai",
+        modelSource: "unknown",
+      }),
+    ]);
+  });
+
+  it.each([
+    "usageIsIncomplete",
+    "usage_is_incomplete",
+    "costIsPartial",
+    "cost_is_partial",
+  ] as const)("ignores Grok cost marked by %s", (flag) => {
+    expect(
+      grokExecutionCostObservationsFromPayload({
+        method: "_x.ai/session/update",
+        params: {
+          sessionId: "session-cost",
+          update: {
+            sessionUpdate: "turn_completed",
+            prompt_id: "prompt-cost",
+            usage: {
+              [flag]: true,
+              costUsdTicks: 100,
+              modelUsage: {
+                "grok-4.5": { costUsdTicks: 100 },
+              },
+            },
+          },
+        },
+      }),
+    ).toEqual([]);
+  });
+
+  it.each(["ascending", "descending"] as const)(
+    "keeps only the strongest Grok cost tier in %s event order",
+    (order) => {
+      const sessionId = "session-cost-ranked";
+      const promptId = "prompt-cost-ranked";
+      const generic = {
+        method: "session/prompt",
+        params: { sessionId, _meta: { promptId } },
+        result: {
+          stopReason: "end_turn",
+          usage: { costUsdTicks: 10 },
+        },
+      };
+      const metaAggregate = {
+        method: "session/prompt",
+        params: { sessionId, _meta: { promptId } },
+        result: {
+          stopReason: "end_turn",
+          _meta: { usage: { costUsdTicks: 20 } },
+        },
+      };
+      const metaModels = {
+        method: "session/prompt",
+        params: { sessionId, _meta: { promptId } },
+        result: {
+          stopReason: "end_turn",
+          _meta: {
+            usage: {
+              modelUsage: {
+                "fallback-model-a": { costUsdTicks: 30 },
+                "fallback-model-b": { costUsdTicks: 40 },
+              },
+            },
+          },
+        },
+      };
+      const privateAggregate = {
+        method: "_x.ai/session/update",
+        params: {
+          sessionId,
+          update: {
+            sessionUpdate: "turn_completed",
+            prompt_id: promptId,
+            usage: { costUsdTicks: 50 },
+          },
+        },
+      };
+      const privateModels = {
+        method: "_x.ai/session/update",
+        params: {
+          sessionId,
+          update: {
+            sessionUpdate: "turn_completed",
+            prompt_id: promptId,
+            usage: {
+              modelUsage: {
+                "actual-model-a": { costUsdTicks: 60 },
+                "actual-model-b": { costUsdTicks: 70 },
+              },
+            },
+          },
+        },
+      };
+      const payloads = [
+        generic,
+        metaAggregate,
+        metaModels,
+        privateAggregate,
+        privateModels,
+      ];
+      const collector = createAgentExecutionUsageCollector("grok");
+      for (const payload of order === "ascending"
+        ? payloads
+        : [...payloads].reverse()) {
+        collector.observe(payload);
+      }
+
+      expect(collector.finishCosts()).toEqual([
+        expect.objectContaining({
+          source: "grok.turnCompleted.modelUsage.costUsdTicks",
+          model: "actual-model-a",
+          amountUsdTicks: 60,
+        }),
+        expect.objectContaining({
+          source: "grok.turnCompleted.modelUsage.costUsdTicks",
+          model: "actual-model-b",
+          amountUsdTicks: 70,
+        }),
+      ]);
+    },
+  );
+
+  it("turns Grok cumulative USD updates into one replaceable prompt cost", () => {
+    const collector = createAgentExecutionUsageCollector("grok", {
+      configuredModel: "must-not-be-attributed",
+    });
+    collector.observe({
+      method: "session/new",
+      result: {
+        sessionId: "session-cumulative",
+        models: { currentModelId: "grok-runtime" },
+      },
+    });
+    collector.observe({
+      method: "briar/session/prompt_start",
+      params: {
+        sessionId: "session-cumulative",
+        messageId: "prompt-1",
+        _meta: { promptId: "prompt-1", requestId: "prompt-1" },
+      },
+    });
+    expect(collector.finishCosts()).toEqual([]);
+
+    const usageUpdate = (amount: number) => ({
+      method: "session/update",
+      params: {
+        sessionId: "session-cumulative",
+        update: {
+          sessionUpdate: "usage_update",
+          size: 256_000,
+          used: 100,
+          cost: { amount, currency: "USD" },
+        },
+      },
+    });
+    collector.observe(usageUpdate(0), "2026-08-10T05:00:00.000Z");
+    expect(collector.finishCosts()).toEqual([
+      expect.objectContaining({
+        source: "grok.usageUpdate.cost",
+        amountUsdTicks: 0,
+        scopeId: "prompt-1",
+        model: null,
+        canonicalModel: null,
+        modelProvider: "xai",
+        modelSource: "unknown",
+      }),
+    ]);
+    collector.observe(usageUpdate(0.1), "2026-08-10T06:00:00.000Z");
+    collector.observe(usageUpdate(0.1), "2026-08-10T07:00:00.000Z");
+    collector.observe(usageUpdate(0.09));
+    expect(collector.finishCosts()).toEqual([
+      expect.objectContaining({
+        amountUsdTicks: 1_000_000_000,
+        observedAt: "2026-08-10T05:00:00.000Z",
+      }),
+    ]);
+
+    collector.observe({
+      method: "briar/session/prompt_start",
+      params: {
+        sessionId: "session-cumulative",
+        _meta: { promptId: "prompt-2" },
+      },
+    });
+    collector.observe(usageUpdate(0.15));
+    expect(collector.finishCosts()).toHaveLength(2);
+    expect(collector.finishCosts()[1]).toMatchObject({
+      scopeId: "prompt-2",
+      amountUsdTicks: 500_000_000,
+    });
+
+    collector.observe({
+      method: "_x.ai/session/update",
+      params: {
+        sessionId: "session-cumulative",
+        update: {
+          sessionUpdate: "turn_completed",
+          prompt_id: "prompt-2",
+          usage: { costUsdTicks: 777 },
+        },
+      },
+    });
+    expect(collector.finishCosts()).toEqual([
+      expect.objectContaining({
+        source: "grok.usageUpdate.cost",
+        scopeId: "prompt-1",
+      }),
+      expect.objectContaining({
+        source: "grok.turnCompleted.costUsdTicks",
+        scopeId: "prompt-2",
+        amountUsdTicks: 777,
+        model: null,
+        modelProvider: "xai",
+      }),
+    ]);
+  });
+
+  it("baselines an unseen loaded Grok session and ignores non-USD cost", () => {
+    const collector = createAgentExecutionUsageCollector("grok");
+    collector.observe({
+      method: "session/load",
+      params: { sessionId: "loaded-session" },
+      result: { sessionId: "loaded-session" },
+    });
+    collector.observe({
+      method: "briar/session/prompt_start",
+      params: {
+        sessionId: "loaded-session",
+        _meta: { promptId: "loaded-prompt" },
+      },
+    });
+    const update = (amount: number, currency: string) => ({
+      sessionId: "loaded-session",
+      update: {
+        sessionUpdate: "usage_update",
+        size: 256_000,
+        used: 100,
+        cost: { amount, currency },
+      },
+    });
+    collector.observe(update(9, "EUR"));
+    collector.observe(update(5, "USD"));
+    expect(collector.finishCosts()).toEqual([]);
+
+    collector.observe(update(5.25, "usd"));
+    expect(collector.finishCosts()).toEqual([
+      expect.objectContaining({
+        source: "grok.usageUpdate.cost",
+        amountUsdTicks: 2_500_000_000,
+        scopeId: "loaded-prompt",
+      }),
+    ]);
   });
 
   it("ignores Grok context usage updates and explicit load replays", () => {

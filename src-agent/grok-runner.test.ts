@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   createGrokPromptInvocation,
   grokPromptResultEnvelope,
+  grokPromptStartEnvelope,
   grokRpcResultEnvelope,
   shouldSuppressGrokNotification,
 } from "./grok-runner";
@@ -87,6 +88,18 @@ describe("Grok runner protocol preservation", () => {
     });
     expect(promptInvocation.params).toHaveProperty("prompt");
     expect(promptEnvelope.params).not.toHaveProperty("prompt");
+    expect(grokPromptStartEnvelope(promptInvocation)).toEqual({
+      jsonrpc: "2.0",
+      method: "briar/session/prompt_start",
+      params: {
+        sessionId: "session-1",
+        messageId: "prompt-1",
+        _meta: { promptId: "prompt-1", requestId: "prompt-1" },
+      },
+    });
+    expect(grokPromptStartEnvelope(promptInvocation).params).not.toHaveProperty(
+      "prompt",
+    );
   });
 
   it("suppresses load replay and _meta.isReplay session updates", () => {
