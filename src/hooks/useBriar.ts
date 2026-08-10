@@ -2116,11 +2116,17 @@ export function useBriar(options: UseBriarOptions = {}) {
             title: input.title.trim(),
             status: input.status,
             workflowStage: null,
-            workflow: workflowWithAdditionalCheckpoints(
-              baseWorkflow,
-              input.checkpoints ?? [],
-            ),
-            issueCheckpoints: input.checkpoints ?? [],
+            workflow: input.fullAuto
+              ? {
+                  ...baseWorkflow,
+                  execution: { checkpoints: [] },
+                }
+              : workflowWithAdditionalCheckpoints(
+                  baseWorkflow,
+                  input.checkpoints ?? [],
+                ),
+            issueCheckpoints: input.fullAuto ? [] : input.checkpoints ?? [],
+            fullAuto: input.fullAuto ?? false,
             progress: input.status === "backlog" ? 0 : 5,
             detail,
             priority: input.priority,
@@ -2148,6 +2154,7 @@ export function useBriar(options: UseBriarOptions = {}) {
               origin: "briar-app",
               issueId,
               attachmentCount: attachments.length,
+              fullAuto: input.fullAuto ?? false,
             },
             claimedBy: null,
             claimedAt: null,

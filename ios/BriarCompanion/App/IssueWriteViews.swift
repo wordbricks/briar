@@ -179,6 +179,9 @@ struct CreateIssueSheet: View {
                 Text("실행 대기").tag(DashboardRun.Status.queued)
                 Text("백로그").tag(DashboardRun.Status.backlog)
             }
+            Toggle("Full Auto", isOn: $draft.fullAuto)
+                .accessibilityHint("모든 체크포인트를 건너뛰고 중단 없이 처리합니다.")
+                .accessibilityIdentifier("create-issue-full-auto")
         }
     }
 

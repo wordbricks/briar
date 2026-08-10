@@ -1857,6 +1857,9 @@
               null
             ]
           },
+          "fullAuto": {
+            "type": "boolean"
+          },
           "requestedProvider": {
             "type": [
               "string",

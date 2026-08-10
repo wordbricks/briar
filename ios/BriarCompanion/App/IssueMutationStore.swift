@@ -59,7 +59,8 @@ final class IssueMutationStore: ObservableObject {
                         preferredModel: draft.preferredModel,
                         preferredEffort: draft.preferredProvider != nil && draft.preferredModel != nil
                             ? draft.preferredEffort
-                            : nil
+                            : nil,
+                        fullAuto: draft.fullAuto
                     ),
                     as: CreateIssueResponse.self
                 )
@@ -77,6 +78,7 @@ final class IssueMutationStore: ObservableObject {
                     "preferredEffort": draft.preferredProvider != nil && draft.preferredModel != nil
                         ? (draft.preferredEffort?.rawValue ?? "")
                         : "",
+                    "fullAuto": draft.fullAuto ? "true" : "false",
                 ],
                 files: attachments.map {
                     MultipartFile(
