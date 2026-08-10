@@ -157,6 +157,7 @@ describe("Inbox", () => {
         dueAt: null,
       },
     });
+    const onOpen = vi.fn();
 
     await act(async () =>
       root.render(
@@ -166,7 +167,7 @@ describe("Inbox", () => {
             messages={[message]}
             onMarkAllRead={vi.fn()}
             onMarkRead={vi.fn()}
-            onOpen={vi.fn()}
+            onOpen={onOpen}
             projects={projects}
             unreadCount={1}
           />
@@ -183,6 +184,11 @@ describe("Inbox", () => {
     );
     expect(row?.querySelector(".inbox-message-time")).not.toBeNull();
     expect(row?.querySelector(".inbox-next-action")).toBeNull();
+
+    await act(async () => {
+      row?.querySelector<HTMLButtonElement>(".inbox-message-open")?.click();
+    });
+    expect(onOpen).toHaveBeenCalledWith(message);
   });
 
   it("renders configured labels for custom workflow stages", async () => {

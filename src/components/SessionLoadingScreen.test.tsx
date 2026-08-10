@@ -1,28 +1,31 @@
-import { readFileSync } from "node:fs";
-import { renderToStaticMarkup } from "react-dom/server";
+/** @vitest-environment jsdom */
+
+import { act } from "react";
+import { createRoot } from "react-dom/client";
 import { describe, expect, it } from "vitest";
 import { SessionLoadingScreen } from "./SessionLoadingScreen";
 
-const styles = readFileSync(
-  new URL("../styles.css", import.meta.url),
-  "utf8",
-);
-
 describe("SessionLoadingScreen", () => {
-  it("renders the centered outline logo as an accessible status", () => {
-    const markup = renderToStaticMarkup(<SessionLoadingScreen />);
+  it("renders the restoring-session logo as an accessible busy status", async () => {
+    const container = document.createElement("div");
+    const root = createRoot(container);
+    await act(async () => root.render(<SessionLoadingScreen />));
 
-    expect(markup).toContain('data-testid="session-loading-screen"');
-    expect(markup).toContain('role="status"');
-    expect(markup).toContain('aria-busy="true"');
-    expect(markup).toContain("로그인 정보를 확인하는 중입니다");
-    expect(markup).toContain("briar-outline-gray.png");
-    expect(markup).toContain("--session-loading-logo");
-  });
+    const status = container.querySelector<HTMLElement>('[role="status"]');
+    expect(status?.dataset.testid).toBe("session-loading-screen");
+    expect(status?.getAttribute("aria-busy")).toBe("true");
+    expect(status?.getAttribute("aria-live")).toBe("polite");
+    expect(status?.textContent).toContain("로그인 정보를 확인하는 중입니다");
 
-  it("renders the restoring-session logo at one third of its original size", () => {
-    expect(styles).toContain(
-      ".session-loading-logo { width:clamp(50.6667px,4.6667vw,60px);",
+    const logo = status?.querySelector<HTMLElement>(".session-loading-logo");
+    const image = logo?.querySelector<HTMLImageElement>("img");
+    expect(image?.getAttribute("aria-hidden")).toBe("true");
+    expect(image?.getAttribute("alt")).toBe("");
+    expect(image?.src).toContain("briar-outline-gray.png");
+    expect(logo?.style.getPropertyValue("--session-loading-logo")).toContain(
+      "briar-outline-gray.png",
     );
+
+    await act(async () => root.unmount());
   });
 });
