@@ -23,6 +23,20 @@ export const changelogCopy = {
     backTop: "맨 위로 ↑",
     entries: [
       {
+        version: "1.2.95",
+        date: "2026년 8월 10일",
+        title: "에이전트 사용량과 비용을 실행별로 확인합니다",
+        summary:
+          "Codex, Claude, Grok, OpenCode 실행의 토큰 사용량과 제공자 비용을 서버에 기록해 Worker 상태와 운영 비용을 더 정확하게 파악할 수 있습니다.",
+        items: [
+          "실행별 입력·출력·캐시·추론 토큰과 제공자가 보고한 비용을 사용량 원장에 영구 저장합니다.",
+          "기존 Codex와 Claude에 더해 OpenCode와 Grok 사용량을 수집하고, 한도를 소진한 제공자는 Worker 실행 가능 목록에서 제외합니다.",
+          "직접 실행, 예약과 이슈 처리에서 사용할 에이전트 스킬을 명시적으로 선택해 작업마다 의도한 설정을 안정적으로 유지합니다.",
+          "이슈의 상태와 우선순위 배지를 바로 눌러 변경할 수 있고, 에이전트 오류는 화면을 가리는 배너 대신 토스트로 표시합니다.",
+          "채널과 이슈의 첨부 파일 처리, 멘션 입력, 패널 크기 조절과 모바일 화면의 공통 동작을 정리해 협업 흐름을 안정화했습니다.",
+        ],
+      },
+      {
         version: "1.2.94",
         date: "2026년 8월 10일",
         title: "모든 에이전트의 작업 과정을 같은 흐름으로 보여줍니다",
@@ -234,6 +248,20 @@ export const changelogCopy = {
     home: "Home",
     backTop: "Back to top ↑",
     entries: [
+      {
+        version: "1.2.95",
+        date: "August 10, 2026",
+        title: "See agent usage and cost for every run",
+        summary:
+          "Token usage and provider-reported costs from Codex, Claude, Grok, and OpenCode are now recorded on the server for clearer worker health and operating-cost visibility.",
+        items: [
+          "Persist input, output, cache, and reasoning tokens plus provider-reported cost in a durable ledger for each execution.",
+          "Collect OpenCode and Grok usage alongside Codex and Claude, and stop advertising providers whose usage allowance is exhausted.",
+          "Select an agent skill explicitly for direct runs, schedules, and issue processing so each job keeps the intended configuration.",
+          "Change issue status and priority directly from their badges, while agent failures appear as unobtrusive toasts instead of blocking banners.",
+          "Stabilize collaboration by sharing attachment handling, mention composition, pane resizing, and mobile presentation behavior across surfaces.",
+        ],
+      },
       {
         version: "1.2.94",
         date: "August 10, 2026",
@@ -458,9 +486,9 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <h1>{changelog.title}</h1>
           <p>{changelog.description}</p>
         </div>
-        <a href="#v1-2-94" className="changelog-current">
+        <a href="#v1-2-95" className="changelog-current">
           <span>{changelog.current}</span>
-          <strong>v1.2.94</strong>
+          <strong>v1.2.95</strong>
           <i aria-hidden="true">↓</i>
         </a>
       </section>
@@ -485,6 +513,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   {index === 0 ? <span>{changelog.latest}</span> : null}
                   <time
                     dateTime={
+                      entry.version === "1.2.95" ||
                       entry.version === "1.2.94" ||
                       entry.version === "1.2.93" ||
                       entry.version === "1.2.92" ||
@@ -492,7 +521,8 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                       entry.version === "1.2.90" ||
                       entry.version === "1.2.89" ||
                       entry.version === "1.2.88"
-                        ? entry.version === "1.2.94" ||
+                        ? entry.version === "1.2.95" ||
+                          entry.version === "1.2.94" ||
                           entry.version === "1.2.93"
                           ? "2026-08-10"
                           : entry.version === "1.2.92"
