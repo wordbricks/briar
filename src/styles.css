@@ -1626,12 +1626,12 @@ button.paused-review-state { width:100%; border:0; border-radius:8px; cursor:poi
 .issue-conversation-tab-panel[hidden] { display:none; }
 .issue-conversation-header { min-height:46px; flex:0 0 46px; padding:0 18px; display:flex; align-items:center; justify-content:space-between; gap:10px; border-bottom:1px solid var(--border); }
 .issue-conversation-header strong { min-width:0; display:flex; align-items:center; gap:7px; color:var(--foreground); font-size:var(--text-sm); }.issue-conversation-header strong span { color:var(--muted-foreground); font:500 var(--text-2xs) "DM Mono",monospace; }.issue-conversation-header small { overflow:hidden; color:var(--muted-foreground); font-size:var(--text-2xs); text-overflow:ellipsis; white-space:nowrap; }
-.issue-message-list { min-height:0; flex:1; margin:0 8px; display:grid; align-content:start; overflow-y:auto; overscroll-behavior:contain; scrollbar-gutter:stable; scrollbar-width:thin; }
+.issue-message-list { min-width:0; min-height:0; flex:1; margin:0 8px; display:grid; align-content:start; overflow-x:hidden; overflow-y:auto; overscroll-behavior:contain; scrollbar-gutter:stable; scrollbar-width:thin; }
 .issue-message-list::before,.issue-message-list::after { content:""; height:10px; }
 .issue-message-list::after { height:12px; }
-.issue-message-group { min-width:0; }
+.issue-message-group { min-width:0; max-width:100%; }
 .issue-message-group + .issue-message-group { margin-top:6px; padding-top:6px; border-top:1px solid var(--border); }
-.issue-message { min-width:0; position:relative; padding:6px 10px; display:grid; grid-template-columns:34px minmax(0,1fr); align-items:start; gap:10px; border-radius:10px; transition:background-color .12s ease-out; }
+.issue-message { min-width:0; max-width:100%; position:relative; padding:6px 10px; display:grid; grid-template-columns:34px minmax(0,1fr); align-items:start; gap:10px; border-radius:10px; transition:background-color .12s ease-out; }
 .issue-message:hover { background:var(--muted); }
 .issue-message-avatar { width:34px; height:34px; overflow:hidden; display:grid; place-items:center; border:1px solid rgba(83,72,118,.1); border-radius:9px; color:#fff; background:linear-gradient(145deg,#8068ce,#5943a4); object-fit:cover; font-size:var(--text-sm); font-weight:700; }
 .issue-message-avatar.agent { color:var(--accent-foreground); border-color:var(--border); background:var(--accent); }
@@ -1647,16 +1647,28 @@ button.conversation-reply-summary:focus-visible { outline:2px solid var(--ring);
 .conversation-reply-summary strong { flex:0 0 auto; font-weight:700; }
 .conversation-reply-summary small { min-width:0; overflow:hidden; color:var(--muted-foreground); font:inherit; text-overflow:ellipsis; white-space:nowrap; }
 .conversation-reply-separator { color:var(--muted-foreground); }
-.issue-message > div { min-width:0; }
-.issue-message > div > header { min-height:19px; display:flex; align-items:baseline; gap:7px; }
-.issue-message > div > header strong { overflow:hidden; color:var(--foreground); font-size:var(--text-xs); text-overflow:ellipsis; white-space:nowrap; }
-.issue-message > div > header time { color:var(--muted-foreground); font:500 var(--text-2xs) "DM Mono",monospace; }
-.issue-message-body { margin:2px 0 0; color:var(--foreground); font-size:var(--text-xs); line-height:1.65; overflow-wrap:anywhere; }
-.issue-message-body p { margin:0; white-space:pre-wrap; }
+.issue-message > div { min-width:0; max-width:100%; }
+.issue-message > div > header { min-width:0; min-height:19px; display:flex; align-items:baseline; gap:7px; }
+.issue-message > div > header strong { min-width:0; overflow:hidden; color:var(--foreground); font-size:var(--text-xs); text-overflow:ellipsis; white-space:nowrap; }
+.issue-message > div > header time { flex:0 0 auto; color:var(--muted-foreground); font:500 var(--text-2xs) "DM Mono",monospace; }
+.issue-message-body { min-width:0; max-width:100%; margin:2px 0 0; color:var(--foreground); font-size:var(--text-xs); line-height:1.65; overflow-wrap:anywhere; }
+.issue-message-body > :first-child { margin-top:0; }
+.issue-message-body > :last-child { margin-bottom:0; }
+.issue-message-body p { margin:0; white-space:pre-wrap; overflow-wrap:anywhere; }
+.issue-message-body a { overflow-wrap:anywhere; }
 .issue-message-body a.issue-mention-link { color:#2563eb; text-decoration-thickness:1px; text-underline-offset:2px; }
 .issue-message-body a.issue-mention-link:hover { color:#1d4ed8; }
 .dark .issue-message-body a.issue-mention-link { color:#60a5fa; }
 .dark .issue-message-body a.issue-mention-link:hover { color:#93c5fd; }
+.issue-message-body ul,.issue-message-body ol { margin:.45em 0; padding-left:1.45em; }
+.issue-message-body li + li { margin-top:.2em; }
+.issue-message-body blockquote { margin:.45em 0; padding:.25em 0 .25em .8em; border-left:3px solid var(--border); color:var(--muted-foreground); overflow-wrap:anywhere; }
+.issue-message-body code { padding:.12em .3em; border-radius:5px; color:var(--accent-foreground); background:var(--accent); font:500 .92em "DM Mono",monospace; overflow-wrap:anywhere; }
+.issue-message-body pre { max-width:100%; margin:.55em 0; overflow-x:auto; padding:8px 10px; border:1px solid var(--border); border-radius:8px; background:var(--muted); }
+.issue-message-body pre code { padding:0; color:var(--foreground); background:transparent; white-space:pre; }
+.issue-message-body table { width:100%; max-width:100%; margin:.55em 0; display:block; overflow-x:auto; border-collapse:collapse; border:1px solid var(--border); border-radius:8px; font-size:var(--text-2xs); }
+.issue-message-body th,.issue-message-body td { padding:5px 7px; border:1px solid var(--border); text-align:left; overflow-wrap:anywhere; }
+.issue-message-body th { color:var(--foreground); background:var(--muted); }
 
 .profile-dialog { width:min(430px,calc(100vw - 28px)); max-height:calc(100dvh - 32px); gap:22px; overflow-y:auto; border-radius:20px; padding:28px; }
 .profile-dialog-header { display:flex; flex-direction:row; align-items:center; gap:16px; padding-right:28px; text-align:left; }
@@ -1692,27 +1704,29 @@ button.conversation-reply-summary:focus-visible { outline:2px solid var(--ring);
 .issue-message-state,.issue-message-empty { min-height:86px; margin:0; display:flex; align-items:center; justify-content:center; gap:7px; border:1px dashed var(--border); border-radius:11px; color:var(--muted-foreground); background:var(--muted); font-size:var(--text-2xs); text-align:center; }
 button.issue-message-state { width:100%; cursor:pointer; }
 .issue-message-state.error { color:var(--foreground); border-color:color-mix(in srgb,var(--destructive) 36%,var(--border)); background:color-mix(in srgb,var(--destructive) 10%,var(--card)); }
-.issue-agent-reply-state { margin:4px 10px; padding:9px 11px; display:flex; align-items:center; gap:7px; border-radius:9px; color:var(--accent-foreground); background:var(--accent); font-size:var(--text-2xs); }
+.issue-agent-reply-state { min-width:0; margin:4px 10px; padding:9px 11px; display:flex; align-items:center; gap:7px; border-radius:9px; color:var(--accent-foreground); background:var(--accent); font-size:var(--text-2xs); overflow-wrap:anywhere; }
 .issue-message-group > .issue-agent-reply-state { margin-left:54px; }
 .issue-agent-reply-state.error { color:var(--foreground); background:color-mix(in srgb,var(--destructive) 10%,var(--card)); }
-.issue-rework-proposal { margin-top:10px; padding:11px; display:grid; gap:8px; border:1px solid color-mix(in srgb,var(--primary) 28%,var(--border)); border-radius:10px; background:color-mix(in srgb,var(--primary) 6%,var(--card)); }
-.issue-rework-proposal header { display:flex; align-items:center; justify-content:space-between; gap:10px; }
-.issue-rework-proposal header strong { font-size:var(--text-xs); }
-.issue-rework-proposal header small { color:var(--muted-foreground); font-size:var(--text-2xs); }
-.issue-rework-proposal p { margin:0; font-size:var(--text-xs); line-height:1.45; }
-.issue-action-proposal-fields { margin:0; display:grid; gap:7px; }
-.issue-action-proposal-fields div { display:grid; gap:2px; }
+.issue-rework-proposal { min-width:0; max-width:100%; margin-top:10px; padding:11px; display:grid; gap:8px; border:1px solid color-mix(in srgb,var(--primary) 28%,var(--border)); border-radius:10px; background:color-mix(in srgb,var(--primary) 6%,var(--card)); }
+.issue-rework-proposal header { min-width:0; display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.issue-rework-proposal header strong { min-width:0; font-size:var(--text-xs); overflow-wrap:anywhere; }
+.issue-rework-proposal header small { min-width:0; color:var(--muted-foreground); font-size:var(--text-2xs); overflow-wrap:anywhere; }
+.issue-rework-proposal p { margin:0; font-size:var(--text-xs); line-height:1.45; overflow-wrap:anywhere; }
+.issue-action-proposal-fields { margin:0; display:grid; gap:7px; min-width:0; }
+.issue-action-proposal-fields div { min-width:0; display:grid; gap:2px; }
 .issue-action-proposal-fields dt { color:var(--muted-foreground); font-size:var(--text-2xs); font-weight:650; }
-.issue-action-proposal-fields dd { margin:0; white-space:pre-wrap; font-size:var(--text-xs); line-height:1.45; }
-.issue-action-proposal-create { display:grid; gap:5px; }
-.issue-action-proposal-create > strong { font-size:var(--text-sm); }
+.issue-action-proposal-fields dd { min-width:0; margin:0; white-space:pre-wrap; overflow-wrap:anywhere; font-size:var(--text-xs); line-height:1.45; }
+.issue-action-proposal-create { min-width:0; display:grid; gap:5px; }
+.issue-action-proposal-create > strong { min-width:0; font-size:var(--text-sm); overflow-wrap:anywhere; }
+.issue-action-proposal-create > p { margin:0; overflow-wrap:anywhere; }
 .issue-action-proposal-create small { color:var(--muted-foreground); font-size:var(--text-2xs); }
-.issue-rework-proposal-accept { width:max-content; min-height:32px; padding:6px 10px; display:inline-flex; align-items:center; gap:6px; border:0; border-radius:8px; color:var(--primary-foreground); background:var(--primary); font-size:var(--text-xs); font-weight:650; }
+.issue-rework-proposal-accept { width:max-content; max-width:100%; min-height:32px; padding:6px 10px; display:inline-flex; align-items:center; gap:6px; border:0; border-radius:8px; color:var(--primary-foreground); background:var(--primary); font-size:var(--text-xs); font-weight:650; }
 .issue-rework-proposal-accept:disabled { opacity:.6; cursor:wait; }
-.issue-rework-proposal-accepted { display:flex; align-items:center; gap:6px; color:var(--primary); font-size:var(--text-xs); font-weight:650; }
-.issue-rework-proposal-error { display:flex; align-items:center; gap:6px; color:var(--destructive); }
-.issue-message-composer { position:relative; z-index:1; flex:0 0 auto; overflow:visible; display:grid; grid-template-rows:minmax(0,1fr) auto; border:1px solid var(--border); border-radius:16px; background:var(--card); box-shadow:0 5px 18px rgba(0,0,0,.08); transition:border-color .14s ease-out,box-shadow .14s ease-out; }
-.issue-conversation > .issue-message-composer { margin:0 14px 14px; }
+.issue-rework-proposal-accepted { display:flex; align-items:center; gap:6px; color:var(--primary); font-size:var(--text-xs); font-weight:650; overflow-wrap:anywhere; }
+.issue-rework-proposal-error { min-width:0; display:flex; align-items:center; gap:6px; color:var(--destructive); overflow-wrap:anywhere; }
+.issue-message-action-error { grid-column:1 / -1; min-width:0; margin:2px 0 0; display:flex; align-items:center; gap:6px; color:var(--destructive); font-size:var(--text-2xs); overflow-wrap:anywhere; }
+.issue-message-composer { position:relative; z-index:1; min-width:0; flex:0 0 auto; overflow:visible; display:grid; grid-template-rows:minmax(0,1fr) auto; border:1px solid var(--border); border-radius:16px; background:var(--card); box-shadow:0 5px 18px rgba(0,0,0,.08); transition:border-color .14s ease-out,box-shadow .14s ease-out; }
+.issue-conversation > .issue-message-composer { min-width:0; margin:0 14px 14px; }
 .issue-message-composer:focus-within { border-color:var(--input); box-shadow:0 0 0 3px color-mix(in srgb,var(--ring) 14%,transparent),0 7px 22px rgba(0,0,0,.1); }
 .issue-composer-mention-menu { position:absolute; z-index:3; right:12px; bottom:51px; left:12px; max-height:220px; padding:3px; overflow-y:auto; border:1px solid var(--border); border-radius:9px; background:var(--card); box-shadow:0 7px 20px rgba(0,0,0,.16); }
 .issue-composer-mention-menu button { width:100%; min-height:32px; padding:4px 8px; display:flex; align-items:center; gap:8px; border:0; border-radius:6px; color:var(--foreground); background:var(--accent); cursor:pointer; text-align:left; }
@@ -1740,8 +1754,8 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .issue-message-composer footer .issue-message-send:disabled { color:var(--muted-foreground); background:transparent; cursor:default; transform:none; }
 .issue-composer-error { margin:0; padding:0 10px 8px; display:flex; align-items:center; gap:5px; color:#b13f54; font-size:var(--text-2xs); }
 .issue-message-composer.compact { box-shadow:0 4px 14px rgba(43,42,37,.07); }
-.issue-inline-reply-composer { margin:7px 10px 7px 54px; }
-.issue-inline-reply-composer .issue-message-composer { border-radius:12px; }
+.issue-inline-reply-composer { min-width:0; max-width:100%; margin:7px 10px 7px 54px; }
+.issue-inline-reply-composer .issue-message-composer { min-width:0; border-radius:12px; }
 .issue-inline-reply-composer .issue-message-composer textarea { min-height:52px; padding:12px 14px 3px; font-size:var(--text-xs); }
 .issue-inline-reply-composer .issue-message-composer footer { min-height:42px; padding:3px 8px 7px; }
 @media (hover:none) {
