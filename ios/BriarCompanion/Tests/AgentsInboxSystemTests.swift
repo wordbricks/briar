@@ -22,8 +22,10 @@ final class AgentsInboxSystemTests: XCTestCase {
             agents.agents.first?.skills.first?.id,
             UUID(uuidString: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")
         )
-        XCTAssertNotNil(agents.agents.first?.avatar)
-        XCTAssertNotNil(ProfileImageSource.uiImage(from: agents.agents.first?.avatar))
+        guard case let .data(avatarData) = ProfileImageSource.parse(agents.agents.first?.avatar) else {
+            return XCTFail("shared agent fixture should contain a data URL avatar")
+        }
+        XCTAssertFalse(avatarData.isEmpty)
 
         let sessionsPayload = try XCTUnwrap(operations["listProjectAgentSessions"]?["response"])
         let sessionsData = try JSONSerialization.data(withJSONObject: sessionsPayload)

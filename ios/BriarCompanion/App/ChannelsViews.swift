@@ -501,13 +501,7 @@ private struct ChannelMessageRow: View {
     private var lastReplyText: String? {
         guard let lastReplyAt = message.lastReplyAt else { return nil }
         let formatter = RelativeDateTimeFormatter()
-        let localeIdentifier: String
-        switch locale {
-        case .ko: localeIdentifier = "ko_KR"
-        case .en: localeIdentifier = "en_US"
-        case .zh: localeIdentifier = "zh_CN"
-        }
-        formatter.locale = Locale(identifier: localeIdentifier)
+        formatter.locale = Locale(identifier: locale.foundationIdentifier)
         let relative = formatter.localizedString(for: lastReplyAt, relativeTo: Date())
         return String(
             format: L10n.text(.channelLastReply, locale: locale),

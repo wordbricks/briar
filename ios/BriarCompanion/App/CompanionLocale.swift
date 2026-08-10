@@ -16,11 +16,11 @@ enum CompanionLocale: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
-    var agentLocale: ProjectAgentLocale {
+    var foundationIdentifier: String {
         switch self {
-        case .ko: .ko
-        case .en: .en
-        case .zh: .zh
+        case .ko: "ko-KR"
+        case .en: "en-US"
+        case .zh: "zh-CN"
         }
     }
 }

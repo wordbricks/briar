@@ -353,19 +353,3 @@ struct ProjectAgentSessionSyncRequest: Codable, Sendable {
         }
     }
 }
-
-enum ProjectAgentLocale: String, CaseIterable, Identifiable, Sendable {
-    case ko
-    case en
-    case zh
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .ko: "한국어"
-        case .en: "English"
-        case .zh: "中文"
-        }
-    }
-}
