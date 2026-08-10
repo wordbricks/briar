@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 
 import { useI18n } from "../i18n";
 import {
+  inboxNotificationLabelKey,
   listenForInboxNotificationClicks,
   readInboxNotificationPreferences,
   sendInboxNotification,
@@ -67,7 +68,7 @@ export function useInboxNotifications(
       if (!preferences[category]) continue;
       void sendInboxNotification(
         message,
-        t(`inbox.category.${category}`),
+        t(inboxNotificationLabelKey(message, category)),
       ).catch((error) => {
         console.error("Failed to send inbox notification", error);
       });

@@ -330,6 +330,32 @@ export type InboxNotificationContent = {
   body: string;
 };
 
+export type InboxNotificationLabelKey =
+  | "status.paused"
+  | "status.completed"
+  | "status.failed"
+  | "status.blocked"
+  | `inbox.category.${InboxCategory}`;
+
+export function inboxNotificationLabelKey(
+  message: InboxMessage,
+  category: InboxCategory,
+): InboxNotificationLabelKey {
+  if (message.kind === "session") {
+    return `status.${message.status}`;
+  }
+  if (
+    message.kind === "issue" &&
+    (message.status === "paused" ||
+      message.status === "completed" ||
+      message.status === "failed" ||
+      message.status === "blocked")
+  ) {
+    return `status.${message.status}`;
+  }
+  return `inbox.category.${category}`;
+}
+
 function isReplyMessage(message: InboxMessage) {
   if (message.kind === "conversation") {
     return message.messageId !== message.rootMessageId;
@@ -351,7 +377,7 @@ function replyPreview(body: string) {
 
 export function inboxNotificationContent(
   message: InboxMessage,
-  categoryLabel: string,
+  notificationLabel: string,
 ): InboxNotificationContent {
   if (
     (message.kind === "conversation" || message.kind === "channel") &&
@@ -368,7 +394,7 @@ export function inboxNotificationContent(
   }
 
   return {
-    title: `Briar · ${categoryLabel}`,
+    title: `Briar · ${notificationLabel}`,
     body: message.projectName
       ? `${message.projectName} · ${message.title}`
       : message.title,
@@ -377,9 +403,9 @@ export function inboxNotificationContent(
 
 export async function sendInboxNotification(
   message: InboxMessage,
-  categoryLabel: string,
+  notificationLabel: string,
 ) {
-  const { title, body } = inboxNotificationContent(message, categoryLabel);
+  const { title, body } = inboxNotificationContent(message, notificationLabel);
   const target = inboxNotificationTarget(message);
 
   if (isTauriRuntime()) {

@@ -624,6 +624,10 @@ final class AgentsInboxSystemTests: XCTestCase {
             messages.first { $0.kind == .issue && $0.title == "Needs help" }
         )
         XCTAssertEqual(InboxMessageBuilder.classify(blockedMessage), .urgent)
+        XCTAssertEqual(
+            InboxNotificationPresentationBuilder.content(for: blockedMessage).title,
+            "Briar · 차단"
+        )
         let mention = try XCTUnwrap(messages.first { $0.kind == .conversation })
         XCTAssertEqual(InboxMessageBuilder.classify(mention), .actionRequired)
         // This reply also contains a mention. The message hierarchy, not the
@@ -648,6 +652,18 @@ final class AgentsInboxSystemTests: XCTestCase {
         XCTAssertEqual(navigation.pendingChannelMessageID, channelReply.channelMessageId)
         let failedSession = try XCTUnwrap(messages.first { $0.kind == .session })
         XCTAssertEqual(InboxMessageBuilder.classify(failedSession), .actionRequired)
+        XCTAssertEqual(
+            InboxNotificationPresentationBuilder.content(for: failedSession).title,
+            "Briar · 실패"
+        )
+
+        let completedMessage = try XCTUnwrap(
+            messages.first { $0.kind == .issue && $0.title == "Done" }
+        )
+        XCTAssertEqual(
+            InboxNotificationPresentationBuilder.content(for: completedMessage).title,
+            "Briar · 완료"
+        )
 
         // Importance filter keeps chronological order and drops excluded categories.
         XCTAssertEqual(
