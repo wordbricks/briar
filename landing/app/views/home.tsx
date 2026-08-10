@@ -1,30 +1,12 @@
 import { type LandingCopy, type Locale, copy, localizedPath } from "../i18n";
-import { LanguageSwitcher } from "../language-switcher";
 import { resolveOrigin } from "../seo";
-import { MobileMenu } from "../mobile-menu";
-
-
-// Stable redirect that always resolves to the current Production DMG.
-const MAC_DOWNLOAD_URL =
-  "https://briar-api.wbai.workers.dev/releases/latest/mac-aarch64.dmg";
-const GITHUB_URL = "https://github.com/wordbricks/briar";
-const ANDROID_DOWNLOAD_URL = `${GITHUB_URL}/releases/latest`;
-const WEB_APP_URL = "/app/";
-
-function Brand({ c }: { c: LandingCopy }) {
-  return (
-    <a className="brand" href="#top" aria-label={c.aria.brandHome}>
-      <span className="brand-mark">
-        <img src="/briar-app-icon.png" alt="" />
-      </span>
-      <span>briar</span>
-    </a>
-  );
-}
-
-function Arrow() {
-  return <span aria-hidden="true">↗</span>;
-}
+import { Arrow, SiteFooter, SiteHeader } from "../site-chrome";
+import {
+  GITHUB_LATEST_RELEASE_URL,
+  GITHUB_URL,
+  MAC_DOWNLOAD_URL,
+  WEB_APP_URL,
+} from "../site-links";
 
 function ProductStage({ c }: { c: LandingCopy }) {
   return (
@@ -217,47 +199,14 @@ export default async function HomeView({ locale }: { locale: Locale }) {
       <a className="skip-link" href="#main-content">
         {c.aria.skipToContent}
       </a>
-      <header className="site-header">
-        <div className="shell nav-shell">
-          <Brand c={c} />
-          <nav aria-label={c.aria.mainMenu}>
-            <a href={localizedPath(locale, "/tutorial")}>{c.nav.tutorial}</a>
-            <a href={localizedPath(locale, "/changelog")}>{c.nav.changelog}</a>
-            <a href={localizedPath(locale, "/blog")}>{c.nav.blog}</a>
-            <a href={localizedPath(locale, "/download")}>{c.nav.download}</a>
-          </nav>
-          <div className="header-actions">
-            <LanguageSwitcher
-              locale={locale}
-              label={c.language.label}
-              englishLabel={c.language.english}
-              koreanLabel={c.language.korean}
-              hrefs={hrefs}
-            />
-            <a
-              className="header-cta header-download"
-              href={WEB_APP_URL}
-              aria-label={c.aria.openWebApp}
-            >
-              <span className="header-cta-label">{c.nav.openWebApp}</span>{" "}
-              <Arrow />
-            </a>
-            <MobileMenu
-              navLabel={c.aria.mainMenu}
-              navLinks={[
-                { href: localizedPath(locale, "/tutorial"), label: c.nav.tutorial },
-                { href: localizedPath(locale, "/blog"), label: c.nav.blog },
-                { href: localizedPath(locale, "/download"), label: c.nav.download },
-              ]}
-              ctaHref={WEB_APP_URL}
-              ctaLabel={c.nav.openWebApp}
-              ctaAriaLabel={c.aria.openWebApp}
-              openLabel={c.aria.menuOpen}
-              closeLabel={c.aria.menuClose}
-            />
-          </div>
-        </div>
-      </header>
+      <SiteHeader
+        brandHref="#top"
+        copy={c}
+        ctaLabel={c.nav.openWebApp}
+        currentPath={PATH}
+        hrefs={hrefs}
+        locale={locale}
+      />
 
       <section className="hero" id="main-content" tabIndex={-1}>
         <div className="hero-content shell">
@@ -545,7 +494,7 @@ export default async function HomeView({ locale }: { locale: Locale }) {
           </a>
           <a
             className="button button-secondary"
-            href={ANDROID_DOWNLOAD_URL}
+            href={GITHUB_LATEST_RELEASE_URL}
             aria-label={c.aria.androidDownload}
           >
             {c.final.androidDownload} <span aria-hidden="true">↓</span>
@@ -564,26 +513,18 @@ export default async function HomeView({ locale }: { locale: Locale }) {
         </small>
       </section>
 
-      <footer>
-        <div className="shell footer-shell">
-          <Brand c={c} />
-          <p>{c.footer.tagline}</p>
-          <div>
-            <a
-              href={GITHUB_URL}
-              target="_blank"
-              rel="noreferrer"
-            >
-              GitHub
-            </a>
-            <a href="#security">{c.footer.security}</a>
-            <a href={localizedPath(locale, "/tutorial")}>{c.nav.tutorial}</a>
-            <a href={localizedPath(locale, "/changelog")}>{c.nav.changelog}</a>
-            <a href={localizedPath(locale, "/blog")}>{c.nav.blog}</a>
-            <a href="#top">{c.footer.backToTop}</a>
-          </div>
-        </div>
-      </footer>
+      <SiteFooter
+        brandHref="#top"
+        copy={c}
+        links={[
+          { external: true, href: GITHUB_URL, label: "GitHub" },
+          { href: "#security", label: c.footer.security },
+          { href: localizedPath(locale, "/tutorial"), label: c.nav.tutorial },
+          { href: localizedPath(locale, "/changelog"), label: c.nav.changelog },
+          { href: localizedPath(locale, "/blog"), label: c.nav.blog },
+          { href: "#top", label: c.footer.backToTop },
+        ]}
+      />
     </main>
   );
 }

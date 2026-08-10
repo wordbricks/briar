@@ -1,13 +1,10 @@
 import { type Locale, copy, localizedPath } from "../i18n";
-import { LanguageSwitcher } from "../language-switcher";
-import { MobileMenu } from "../mobile-menu";
-
-
-const MAC_DOWNLOAD_URL =
-  "https://briar-api.wbai.workers.dev/releases/latest/mac-aarch64.dmg";
-const GITHUB_RELEASES_URL =
-  "https://github.com/wordbricks/briar/releases/latest";
-const WEB_APP_URL = "/app/";
+import { Arrow, SiteFooter, SiteHeader } from "../site-chrome";
+import {
+  GITHUB_LATEST_RELEASE_URL,
+  MAC_DOWNLOAD_URL,
+  WEB_APP_URL,
+} from "../site-links";
 
 export const downloadCopy = {
   ko: {
@@ -76,10 +73,6 @@ export const downloadCopy = {
   },
 } as const satisfies Record<Locale, unknown>;
 
-function Arrow({ direction = "out" }: { direction?: "out" | "down" }) {
-  return <span aria-hidden="true">{direction === "out" ? "↗" : "↓"}</span>;
-}
-
 function PlatformIcon({ platform }: { platform: "mac" | "android" | "web" }) {
   const icons = { mac: "⌘", android: "●", web: "◎" } as const;
   return (
@@ -101,55 +94,15 @@ export default function DownloadView({ locale }: { locale: Locale }) {
 
   return (
     <main className="download-page" id="top">
-      <header className="site-header download-header">
-        <div className="shell nav-shell">
-          <a className="brand" href={localizedPath(locale, "/")} aria-label={c.aria.brandHome}>
-            <span className="brand-mark">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/briar-app-icon.png" alt="" />
-            </span>
-            <span>briar</span>
-          </a>
-          <nav aria-label={c.aria.mainMenu}>
-            <a href={localizedPath(locale, "/tutorial")}>{c.nav.tutorial}</a>
-            <a href={localizedPath(locale, "/changelog")}>{c.nav.changelog}</a>
-            <a href={localizedPath(locale, "/blog")}>{c.nav.blog}</a>
-            <a className="is-current" href={localizedPath(locale, "/download")} aria-current="page">
-              {c.nav.download}
-            </a>
-          </nav>
-          <div className="header-actions">
-            <LanguageSwitcher
-              locale={locale}
-              label={c.language.label}
-              englishLabel={c.language.english}
-              koreanLabel={c.language.korean}
-              hrefs={hrefs}
-            />
-            <a className="header-cta header-download" href={WEB_APP_URL}>
-              <span className="header-cta-label">{c.nav.openWebApp}</span>{" "}
-              <Arrow />
-            </a>
-            <MobileMenu
-              navLabel={c.aria.mainMenu}
-              navLinks={[
-                { href: localizedPath(locale, "/tutorial"), label: c.nav.tutorial },
-                { href: localizedPath(locale, "/blog"), label: c.nav.blog },
-                {
-                  href: localizedPath(locale, "/download"),
-                  label: c.nav.download,
-                  isCurrent: true,
-                },
-              ]}
-              ctaHref={WEB_APP_URL}
-              ctaLabel={c.nav.openWebApp}
-              ctaAriaLabel={c.aria.openWebApp}
-              openLabel={c.aria.menuOpen}
-              closeLabel={c.aria.menuClose}
-            />
-          </div>
-        </div>
-      </header>
+      <SiteHeader
+        brandHref={localizedPath(locale, "/")}
+        className="download-header"
+        copy={c}
+        ctaLabel={c.nav.openWebApp}
+        currentPath={PATH}
+        hrefs={hrefs}
+        locale={locale}
+      />
 
       <section className="download-hero shell">
         <span className="section-index">{d.eyebrow}</span>
@@ -200,7 +153,7 @@ export default function DownloadView({ locale }: { locale: Locale }) {
               </div>
               <a
                 className="button button-secondary"
-                href={GITHUB_RELEASES_URL}
+                href={GITHUB_LATEST_RELEASE_URL}
                 target="_blank"
                 rel="noreferrer"
               >
@@ -234,32 +187,23 @@ export default function DownloadView({ locale }: { locale: Locale }) {
 
         <p className="download-releases-note">
           {d.releasesPrefix}{" "}
-          <a href={GITHUB_RELEASES_URL} target="_blank" rel="noreferrer">
+          <a href={GITHUB_LATEST_RELEASE_URL} target="_blank" rel="noreferrer">
             {d.releasesLink} <Arrow />
           </a>
           {d.releasesSuffix}
         </p>
       </div>
 
-      <footer>
-        <div className="shell footer-shell">
-          {/* vinext currently hydrates next/link with a duplicate React instance. */}
-          <a className="brand" href={localizedPath(locale, "/")} aria-label={c.aria.brandHome}>
-            <span className="brand-mark">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/briar-app-icon.png" alt="" />
-            </span>
-            <span>briar</span>
-          </a>
-          <p>{c.footer.tagline}</p>
-          <div>
-            <a href={localizedPath(locale, "/")}>{d.home}</a>
-            <a href={localizedPath(locale, "/tutorial")}>{c.nav.tutorial}</a>
-            <a href={localizedPath(locale, "/changelog")}>{c.nav.changelog}</a>
-            <a href="#top">{d.backTop}</a>
-          </div>
-        </div>
-      </footer>
+      <SiteFooter
+        brandHref={localizedPath(locale, "/")}
+        copy={c}
+        links={[
+          { href: localizedPath(locale, "/"), label: d.home },
+          { href: localizedPath(locale, "/tutorial"), label: c.nav.tutorial },
+          { href: localizedPath(locale, "/changelog"), label: c.nav.changelog },
+          { href: "#top", label: d.backTop },
+        ]}
+      />
     </main>
   );
 }

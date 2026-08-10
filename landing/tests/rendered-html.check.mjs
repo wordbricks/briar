@@ -34,6 +34,27 @@ async function render({ acceptLanguage, cookie, path = "/" } = {}) {
   );
 }
 
+function headerNavigationBlocks(html) {
+  const header = html.match(
+    /<header class="site-header(?: [^"]+)?">([\s\S]*?)<\/header>/,
+  )?.[1] ?? "";
+  return [...header.matchAll(/<nav aria-label="[^"]+">([\s\S]*?)<\/nav>/g)]
+    .map((match) => match[1]);
+}
+
+function navigationHrefs(markup) {
+  return [...markup.matchAll(/<a\b[^>]*\bhref="([^"]+)"[^>]*>/g)]
+    .map((match) => match[1]);
+}
+
+function currentNavigationHrefs(markup) {
+  return [...markup.matchAll(/<a\b[^>]*>/g)]
+    .map((match) => match[0])
+    .filter((tag) => /\baria-current="page"/.test(tag))
+    .map((tag) => tag.match(/\bhref="([^"]+)"/)?.[1])
+    .filter(Boolean);
+}
+
 /**
  * Minimal well-formedness check for the sitemap: a real stack-based tag
  * matcher (open/close balance, no dangling tags), not a substring check.
@@ -249,16 +270,55 @@ test("server-renders the localized download catalog at /ko/download", async () =
   );
 });
 
-test("landing header links to tutorial, changelog, blog, and download without section navigation", async () => {
-  const response = await render({ acceptLanguage: "en-US,en;q=0.9" });
-  const html = await response.text();
-  const header = html.match(/<header class="site-header">([\s\S]*?)<\/header>/)?.[1] ?? "";
+test("standard pages render the same canonical desktop and mobile navigation", async () => {
+  const canonicalHrefs = ["/tutorial", "/changelog", "/blog", "/download"];
+  const pages = [
+    { path: "/", current: null, mobileExtras: [] },
+    { path: "/download", current: "/download", mobileExtras: [] },
+    {
+      path: "/blog",
+      current: "/blog",
+      mobileExtras: ["https://github.com/wordbricks/briar"],
+    },
+    { path: "/changelog", current: "/changelog", mobileExtras: [] },
+  ];
 
-  assert.match(header, /href="\/tutorial"/);
-  assert.match(header, /href="\/changelog"/);
-  assert.match(header, /href="\/blog"/);
-  assert.match(header, /href="\/download"/);
-  assert.doesNotMatch(header, /href="#(?:product|workflow|security|agents)"/);
+  for (const page of pages) {
+    const response = await render({
+      acceptLanguage: "en-US,en;q=0.9",
+      path: page.path,
+    });
+    assert.equal(response.status, 200);
+    const html = await response.text();
+    const [desktopNavigation, mobileNavigation] = headerNavigationBlocks(html);
+
+    assert.ok(desktopNavigation, `missing desktop navigation at ${page.path}`);
+    assert.ok(mobileNavigation, `missing mobile navigation at ${page.path}`);
+    assert.deepEqual(navigationHrefs(desktopNavigation), canonicalHrefs);
+    assert.deepEqual(
+      navigationHrefs(mobileNavigation),
+      [...canonicalHrefs, ...page.mobileExtras],
+    );
+    const expectedCurrent = page.current ? [page.current] : [];
+    assert.deepEqual(currentNavigationHrefs(desktopNavigation), expectedCurrent);
+    assert.deepEqual(currentNavigationHrefs(mobileNavigation), expectedCurrent);
+  }
+});
+
+test("tutorial keeps its custom anchor navigation on desktop and mobile", async () => {
+  const response = await render({ path: "/tutorial" });
+  assert.equal(response.status, 200);
+  const html = await response.text();
+  const [desktopNavigation, mobileNavigation] = headerNavigationBlocks(html);
+  const tutorialHrefs = [
+    "/",
+    "#run-auto-hunt",
+    "#review-result",
+    "#schedule-agents",
+  ];
+
+  assert.deepEqual(navigationHrefs(desktopNavigation), tutorialHrefs);
+  assert.deepEqual(navigationHrefs(mobileNavigation), tutorialHrefs);
 });
 
 test("server-renders the localized changelog from published releases", async () => {
