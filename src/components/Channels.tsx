@@ -27,12 +27,11 @@ import {
   useState,
   type CSSProperties,
   type Dispatch,
-  type KeyboardEvent as ReactKeyboardEvent,
-  type PointerEvent as ReactPointerEvent,
   type SetStateAction,
 } from "react";
 import { useI18n } from "../i18n";
 import { useChannelComposer } from "../hooks/useChannelComposer";
+import { useHorizontalPaneResize } from "../hooks/useHorizontalPaneResize";
 import {
   acceptChannelProposal,
   listChannelMessages,
@@ -177,16 +176,22 @@ export function Channels({
   const [inviteLoading, setInviteLoading] = useState(false);
   const [inviteSaving, setInviteSaving] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
-  const [threadWidth, setThreadWidth] = useState<number | null>(() =>
-    loadChannelThreadWidth(),
-  );
-  const [isResizingThread, setIsResizingThread] = useState(false);
+  const {
+    containerRef: channelsRef,
+    effectiveWidth: effectiveThreadWidth,
+    isResizing: isResizingThread,
+    separatorProps: threadResizeProps,
+    width: threadWidth,
+  } = useHorizontalPaneResize({
+    clamp: clampChannelThreadWidth,
+    defaultWidth: channelThreadWidthDefault,
+    load: loadChannelThreadWidth,
+    max: channelThreadWidthMax,
+    min: channelThreadWidthMin,
+    save: saveChannelThreadWidth,
+  });
   const cursor = useRef(0);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
-  const channelsRef = useRef<HTMLDivElement | null>(null);
-  const threadWidthRef = useRef<number | null>(threadWidth);
-  threadWidthRef.current = threadWidth;
-  const activeThreadResizePointerRef = useRef<number | null>(null);
   const activeChannelIdRef = useRef(activeChannelId);
   activeChannelIdRef.current = activeChannelId;
 
@@ -517,66 +522,6 @@ export function Channels({
     (reply) => reply.status === "queued" || reply.status === "running",
   );
 
-  const effectiveThreadWidth = threadWidth ?? channelThreadWidthDefault;
-
-  const updateThreadWidthFromPointer = (clientX: number) => {
-    const layout = channelsRef.current;
-    if (!layout) return;
-    const bounds = layout.getBoundingClientRect();
-    const availableWidth = Math.max(1, bounds.width);
-    const paneWidth = Math.max(0, (bounds.right - clientX) / availableWidth);
-    const width = clampChannelThreadWidth(paneWidth * 100);
-    setThreadWidth(width);
-    threadWidthRef.current = width;
-  };
-
-  const startThreadResize = (event: ReactPointerEvent<HTMLDivElement>) => {
-    activeThreadResizePointerRef.current = event.pointerId;
-    event.currentTarget.setPointerCapture(event.pointerId);
-    setIsResizingThread(true);
-    event.preventDefault();
-  };
-
-  const moveThreadResize = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (activeThreadResizePointerRef.current !== event.pointerId) return;
-    updateThreadWidthFromPointer(event.clientX);
-  };
-
-  const finishThreadResize = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (activeThreadResizePointerRef.current !== event.pointerId) return;
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    }
-    activeThreadResizePointerRef.current = null;
-    setIsResizingThread(false);
-    const width = threadWidthRef.current;
-    if (width !== null) saveChannelThreadWidth(width);
-  };
-
-  const resizeThreadWithKeyboard = (
-    event: ReactKeyboardEvent<HTMLDivElement>,
-  ) => {
-    let nextWidth: number | null = null;
-    if (event.key === "ArrowLeft") {
-      nextWidth = effectiveThreadWidth - 5;
-    }
-    if (event.key === "ArrowRight") {
-      nextWidth = effectiveThreadWidth + 5;
-    }
-    if (event.key === "Home") {
-      nextWidth = channelThreadWidthMin;
-    }
-    if (event.key === "End") {
-      nextWidth = channelThreadWidthMax;
-    }
-    if (nextWidth === null) return;
-    event.preventDefault();
-    const width = clampChannelThreadWidth(nextWidth);
-    setThreadWidth(width);
-    threadWidthRef.current = width;
-    saveChannelThreadWidth(width);
-  };
-
   const memberCount = Math.max(activeChannel?.memberCount ?? 0, members.length);
   let lastDay: string | null = null;
 
@@ -717,13 +662,9 @@ export function Channels({
             aria-valuemin={channelThreadWidthMin}
             aria-valuenow={effectiveThreadWidth}
             className="channel-thread-resizer"
-            onKeyDown={resizeThreadWithKeyboard}
-            onPointerCancel={finishThreadResize}
-            onPointerDown={startThreadResize}
-            onPointerMove={moveThreadResize}
-            onPointerUp={finishThreadResize}
             role="separator"
             tabIndex={0}
+            {...threadResizeProps}
           />
           <aside className="channel-thread">
           <header>

@@ -79,7 +79,6 @@ import {
   type ComponentProps,
   type ReactElement,
   type FormEvent,
-  type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
   type RefObject,
 } from "react";
@@ -99,6 +98,7 @@ import { inboxIssueMessageVersion } from "../hooks/useInbox";
 import { useMobileBackHandler } from "../hooks/useMobileNavigation";
 import { useObjectUrl } from "../hooks/useObjectUrl";
 import { useProjectAgentWorkerEvents } from "../hooks/useProjectAgentWorkerEvents";
+import { useHorizontalPaneResize } from "../hooks/useHorizontalPaneResize";
 import {
   agentMessagesFromAppServerEvents,
   naturalLanguageFromAgentMessage,
@@ -4393,15 +4393,20 @@ export function RunPage({
   );
   const [transferError, setTransferError] = useState<string | null>(null);
   const [isPropertiesOpen, setIsPropertiesOpen] = useState(false);
-  const [conversationPaneWidth, setConversationPaneWidth] = useState<
-    number | null
-  >(() => loadConversationPaneWidth());
-  const [isResizingConversation, setIsResizingConversation] = useState(false);
-  const runPageLayoutRef = useRef<HTMLDivElement | null>(null);
-  const activeConversationResizePointerRef = useRef<number | null>(null);
-  const conversationWidthRef = useRef<number | null>(
-    loadConversationPaneWidth(),
-  );
+  const {
+    containerRef: runPageLayoutRef,
+    effectiveWidth: effectiveConversationPaneWidth,
+    isResizing: isResizingConversation,
+    separatorProps: conversationResizeProps,
+    width: conversationPaneWidth,
+  } = useHorizontalPaneResize({
+    clamp: clampConversationPaneWidth,
+    defaultWidth: conversationPaneWidthDefault,
+    load: loadConversationPaneWidth,
+    max: conversationPaneWidthMax,
+    min: conversationPaneWidthMin,
+    save: saveConversationPaneWidth,
+  });
   const [isCompletingResultReview, setIsCompletingResultReview] =
     useState(false);
   const [isResumePending, setIsResumePending] = useState(false);
@@ -4501,70 +4506,6 @@ export function RunPage({
   useEffect(() => {
     void loadRunEvents();
   }, [loadRunEvents, run.eventCount, run.id]);
-  const effectiveConversationPaneWidth =
-    conversationPaneWidth ?? conversationPaneWidthDefault;
-  const updateConversationPaneWidthFromPointer = (clientX: number) => {
-    const layout = runPageLayoutRef.current;
-    if (!layout) return;
-    const bounds = layout.getBoundingClientRect();
-    const availableWidth = Math.max(1, bounds.width);
-    const paneWidth = Math.max(
-      0,
-      (bounds.right - clientX) / availableWidth,
-    );
-    const width = clampConversationPaneWidth(paneWidth * 100);
-    setConversationPaneWidth(width);
-    conversationWidthRef.current = width;
-  };
-  const startConversationResize = (
-    event: ReactPointerEvent<HTMLDivElement>,
-  ) => {
-    activeConversationResizePointerRef.current = event.pointerId;
-    event.currentTarget.setPointerCapture(event.pointerId);
-    setIsResizingConversation(true);
-    event.preventDefault();
-  };
-  const moveConversationResize = (
-    event: ReactPointerEvent<HTMLDivElement>,
-  ) => {
-    if (activeConversationResizePointerRef.current !== event.pointerId) return;
-    updateConversationPaneWidthFromPointer(event.clientX);
-  };
-  const finishConversationResize = (
-    event: ReactPointerEvent<HTMLDivElement>,
-  ) => {
-    if (activeConversationResizePointerRef.current !== event.pointerId) return;
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    }
-    activeConversationResizePointerRef.current = null;
-    setIsResizingConversation(false);
-    const width = conversationWidthRef.current;
-    if (width !== null) saveConversationPaneWidth(width);
-  };
-  const resizeConversationPaneWithKeyboard = (
-    event: ReactKeyboardEvent<HTMLDivElement>,
-  ) => {
-    let nextWidth: number | null = null;
-    if (event.key === "ArrowLeft") {
-      nextWidth = effectiveConversationPaneWidth - 5;
-    }
-    if (event.key === "ArrowRight") {
-      nextWidth = effectiveConversationPaneWidth + 5;
-    }
-    if (event.key === "Home") {
-      nextWidth = conversationPaneWidthMin;
-    }
-    if (event.key === "End") {
-      nextWidth = conversationPaneWidthMax;
-    }
-    if (nextWidth === null) return;
-    event.preventDefault();
-    const width = clampConversationPaneWidth(nextWidth);
-    setConversationPaneWidth(width);
-    conversationWidthRef.current = width;
-    saveConversationPaneWidth(width);
-  };
   const placementOptions = [
     { label: t("status.backlog"), value: "status:backlog" },
     { label: t("status.queued"), value: "status:queued" },
@@ -5893,13 +5834,9 @@ export function RunPage({
                     aria-valuemin={conversationPaneWidthMin}
                     aria-valuenow={effectiveConversationPaneWidth}
                     className="run-page-conversation-resizer"
-                    onKeyDown={resizeConversationPaneWithKeyboard}
-                    onPointerCancel={finishConversationResize}
-                    onPointerDown={startConversationResize}
-                    onPointerMove={moveConversationResize}
-                    onPointerUp={finishConversationResize}
                     role="separator"
                     tabIndex={0}
+                    {...conversationResizeProps}
                   />
                   <IssueConversation
                     currentUserId={currentUserId}
