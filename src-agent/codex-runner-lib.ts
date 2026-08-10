@@ -53,6 +53,14 @@ export type CodexRunnerOutput =
       message: string;
     }
   | {
+      type: "blocked";
+      reason: "mcp_auth_required";
+      provider: "codex";
+      message: string;
+      serverNames: string[];
+      nextRetryAt: null;
+    }
+  | {
       type: "error";
       message: string;
     };
@@ -75,6 +83,7 @@ export type CodexAppServerState = {
     | "initializing"
     | "readingConfig"
     | "listingModels"
+    | "readingApps"
     | "startingThread"
     | "startingTurn"
     | "running"
@@ -84,11 +93,51 @@ export type CodexAppServerState = {
   fallbackText: string | null;
   finalText: string | null;
   turnStatus: string | null;
+  configuredMcpServers: string[];
+  configuredPlugins: string[];
+  installedApps: CodexInstalledApp[];
+  invokedMcpServers: Set<string>;
+  invokedMcpCapabilities: Map<string, Set<string>>;
+  mcpFailures: Map<string, CodexMcpFailure>;
+  isolation: CodexMcpIsolation;
+};
+
+export type CodexMcpFailureReason =
+  | "authenticationRequired"
+  | "connectionFailed";
+
+export type CodexMcpIsolation = {
+  mcpServers: string[];
+  apps: string[];
+  disableApps: boolean;
+  disablePlugins: boolean;
+};
+
+export type CodexMcpFailure = {
+  serverName: string;
+  capabilityNames: string[];
+  reason: CodexMcpFailureReason;
+  message: string;
+  required: boolean;
+  isolation: CodexMcpIsolation;
+};
+
+export type CodexInstalledApp = {
+  id: string;
+  name: string;
+};
+
+export type CodexMcpTurnFailure = {
+  disposition: "recover" | "blocked";
+  message: string;
+  serverNames: string[];
+  isolation: CodexMcpIsolation;
 };
 
 export type CodexAppServerTransition = {
   outgoing: CodexRpcMessage[];
   completed: boolean;
+  mcpFailure?: CodexMcpTurnFailure;
 };
 
 const INITIALIZE_REQUEST_ID = 1;
@@ -96,6 +145,7 @@ const CONFIG_REQUEST_ID = 2;
 const MODEL_LIST_REQUEST_ID = 3;
 const THREAD_REQUEST_ID = 4;
 const TURN_REQUEST_ID = 5;
+const APPS_INSTALLED_REQUEST_ID = 6;
 
 const approvalMethods = new Set([
   "item/commandExecution/requestApproval",
@@ -104,7 +154,9 @@ const approvalMethods = new Set([
   "applyPatchApproval",
 ]);
 
-export function createCodexAppServerState(): CodexAppServerState {
+export function createCodexAppServerState(
+  isolation: CodexMcpIsolation = emptyCodexMcpIsolation(),
+): CodexAppServerState {
   return {
     phase: "initializing",
     threadId: null,
@@ -112,6 +164,13 @@ export function createCodexAppServerState(): CodexAppServerState {
     fallbackText: null,
     finalText: null,
     turnStatus: null,
+    configuredMcpServers: [],
+    configuredPlugins: [],
+    installedApps: [],
+    invokedMcpServers: new Set(),
+    invokedMcpCapabilities: new Map(),
+    mcpFailures: new Map(),
+    isolation,
   };
 }
 
@@ -126,6 +185,45 @@ export function codexAppServerArgs(
     );
   }
   return argumentsList;
+}
+
+export function codexMcpRecoveryPrompt(): string {
+  return [
+    "Continue the same task from the preceding failed turn.",
+    "One or more optional MCP integrations failed during startup and have now been disabled for this runner only.",
+    "Do not use those unavailable integrations; continue with the remaining tools and preserve all work already completed in this conversation.",
+  ].join(" ");
+}
+
+function emptyCodexMcpIsolation(): CodexMcpIsolation {
+  return {
+    mcpServers: [],
+    apps: [],
+    disableApps: false,
+    disablePlugins: false,
+  };
+}
+
+function codexMcpSessionConfig(
+  isolation: CodexMcpIsolation,
+): Record<string, unknown> | null {
+  const config: Record<string, unknown> = {};
+  const features: Record<string, boolean> = {};
+  if (isolation.disableApps) features.apps = false;
+  if (isolation.disablePlugins) features.plugins = false;
+  if (Object.keys(features).length > 0) config.features = features;
+  const apps = Object.fromEntries(
+    uniqueSorted(isolation.apps).map((appId) => [appId, { enabled: false }]),
+  );
+  if (Object.keys(apps).length > 0) config.apps = apps;
+  const mcpServers = Object.fromEntries(
+    uniqueSorted(isolation.mcpServers).map((serverName) => [
+      serverName,
+      { enabled: false },
+    ]),
+  );
+  if (Object.keys(mcpServers).length > 0) config.mcp_servers = mcpServers;
+  return Object.keys(config).length > 0 ? config : null;
 }
 
 export function codexInitializeRequest(): CodexRpcMessage {
@@ -164,14 +262,25 @@ export function codexModelListRequest(): CodexRpcMessage {
   };
 }
 
+export function codexAppsInstalledRequest(): CodexRpcMessage {
+  return {
+    method: "app/installed",
+    id: APPS_INSTALLED_REQUEST_ID,
+    params: { forceRefresh: false },
+  };
+}
+
 export function codexThreadRequest(
   request: CodexRunnerRequest,
+  isolation: CodexMcpIsolation = emptyCodexMcpIsolation(),
 ): CodexRpcMessage {
   const params: Record<string, unknown> = {
     cwd: request.workspaceRoot,
     sandbox: sandboxModeValue(request.sandboxMode),
     approvalPolicy: request.approvalPolicy,
   };
+  const config = codexMcpSessionConfig(isolation);
+  if (config) params.config = config;
   const instructions = request.instructions?.trim();
   if (instructions) params.developerInstructions = instructions;
 
@@ -213,6 +322,26 @@ export function normalizeCodexAppServerMessage(
   const method = message.method;
   const params = asRecord(message.params);
   if (!method || !params) return undefined;
+
+  if (method === "mcpServer/startupStatus/updated") {
+    const name = firstText(params.name)?.trim();
+    if (!name || firstText(params.status)?.toLowerCase() !== "failed") {
+      return undefined;
+    }
+    const detail =
+      firstText(params.error)?.trim() ||
+      (params.failureReason === "reauthenticationRequired"
+        ? "Authentication is required."
+        : "The MCP connection failed during startup.");
+    return {
+      type: "activityCompleted",
+      id: `mcp-startup:${name}`,
+      kind: "tool",
+      title: normalizedActivityTitle(`${name} MCP unavailable`),
+      text: normalizedActivityText(detail),
+      status: "failed",
+    };
+  }
 
   if (method === "item/started" || method === "item/completed") {
     const item = asRecord(params.item);
@@ -439,22 +568,31 @@ export function consumeCodexAppServerMessage(
   request: CodexRunnerRequest,
   message: CodexRpcMessage,
 ): CodexAppServerTransition {
+  captureCodexMcpMessage(state, message);
+
   if (message.method && message.id !== undefined && message.id !== null) {
     return { outgoing: [], completed: false };
   }
 
   if (message.id !== undefined && message.id !== null) {
     if (message.error) {
-      // Effective-model discovery is observational. Older App Server builds may
-      // not implement these RPCs, and usage attribution must never prevent the
-      // actual thread from running.
+      // Config and capability discovery are observational. Older App Server
+      // builds may not implement these RPCs, and discovery must never prevent
+      // the actual thread from running.
       if (
         message.id === CONFIG_REQUEST_ID ||
         message.id === MODEL_LIST_REQUEST_ID
       ) {
+        state.phase = "readingApps";
+        return {
+          outgoing: [codexAppsInstalledRequest()],
+          completed: false,
+        };
+      }
+      if (message.id === APPS_INSTALLED_REQUEST_ID) {
         state.phase = "startingThread";
         return {
-          outgoing: [codexThreadRequest(request)],
+          outgoing: [codexThreadRequest(request, state.isolation)],
           completed: false,
         };
       }
@@ -469,14 +607,11 @@ export function consumeCodexAppServerMessage(
     }
 
     if (message.id === INITIALIZE_REQUEST_ID) {
-      const configuredModel = request.model?.trim();
-      state.phase = configuredModel ? "startingThread" : "readingConfig";
+      state.phase = "readingConfig";
       return {
         outgoing: [
           codexInitializedNotification(),
-          configuredModel
-            ? codexThreadRequest(request)
-            : codexConfigReadRequest(request),
+          codexConfigReadRequest(request),
         ],
         completed: false,
       };
@@ -484,6 +619,10 @@ export function consumeCodexAppServerMessage(
 
     if (message.id === CONFIG_REQUEST_ID) {
       const config = asRecord(result.config);
+      state.configuredMcpServers = Object.keys(
+        asRecord(config?.mcp_servers) ?? {},
+      );
+      state.configuredPlugins = Object.keys(asRecord(config?.plugins) ?? {});
       const effectiveModel =
         typeof config?.model === "string" ? config.model.trim() : "";
       if (!request.model?.trim() && !effectiveModel) {
@@ -493,17 +632,31 @@ export function consumeCodexAppServerMessage(
           completed: false,
         };
       }
-      state.phase = "startingThread";
+      state.phase = "readingApps";
       return {
-        outgoing: [codexThreadRequest(request)],
+        outgoing: [codexAppsInstalledRequest()],
         completed: false,
       };
     }
 
     if (message.id === MODEL_LIST_REQUEST_ID) {
+      state.phase = "readingApps";
+      return {
+        outgoing: [codexAppsInstalledRequest()],
+        completed: false,
+      };
+    }
+
+    if (message.id === APPS_INSTALLED_REQUEST_ID) {
+      state.installedApps = asArray(result.apps).flatMap((value) => {
+        const app = asRecord(value);
+        const id = firstText(app?.id)?.trim();
+        const name = firstText(app?.runtimeName)?.trim();
+        return id && name ? [{ id, name }] : [];
+      });
       state.phase = "startingThread";
       return {
-        outgoing: [codexThreadRequest(request)],
+        outgoing: [codexThreadRequest(request, state.isolation)],
         completed: false,
       };
     }
@@ -545,12 +698,20 @@ export function consumeCodexAppServerMessage(
     const status = typeof turn?.status === "string" ? turn.status : "failed";
     state.turnStatus = status;
     for (const item of asArray(turn?.items)) {
-      captureAgentMessage(state, asRecord(item));
+      const record = asRecord(item);
+      captureCodexMcpItem(state, record);
+      captureAgentMessage(state, record);
     }
     if (status !== "completed") {
       const error = asRecord(turn?.error);
+      const message =
+        typeof error?.message === "string" ? error.message : status;
+      const mcpFailure = codexMcpTurnFailure(state, message);
+      if (mcpFailure) {
+        return { outgoing: [], completed: false, mcpFailure };
+      }
       throw new Error(
-        `Codex turn did not complete: ${typeof error?.message === "string" ? error.message : status}`,
+        `Codex turn did not complete: ${message}`,
       );
     }
     state.phase = "completed";
@@ -558,6 +719,312 @@ export function consumeCodexAppServerMessage(
   }
 
   return { outgoing: [], completed: false };
+}
+
+function captureCodexMcpMessage(
+  state: CodexAppServerState,
+  message: CodexRpcMessage,
+) {
+  const params = asRecord(message.params);
+  if (message.method === "mcpServer/startupStatus/updated" && params) {
+    const serverName = firstText(params.name)?.trim();
+    const status = firstText(params.status)?.toLowerCase();
+    if (!serverName) return;
+    if (status === "ready") {
+      state.mcpFailures.delete(serverName);
+      return;
+    }
+    if (status !== "failed") return;
+    const detail =
+      firstText(params.error)?.trim() ||
+      (params.failureReason === "reauthenticationRequired"
+        ? "Authentication is required."
+        : "MCP startup failed.");
+    const capabilityNames = codexMcpFailureCapabilities(
+      state,
+      serverName,
+      detail,
+    );
+    state.mcpFailures.set(serverName, {
+      serverName,
+      capabilityNames,
+      reason:
+        params.failureReason === "reauthenticationRequired" ||
+          mcpAuthenticationRequired(detail)
+          ? "authenticationRequired"
+          : "connectionFailed",
+      message: detail,
+      required: codexMcpCapabilityWasInvoked(
+        state,
+        serverName,
+        capabilityNames,
+      ),
+      isolation: codexMcpIsolation(state, serverName, capabilityNames),
+    });
+    return;
+  }
+
+  if (message.method === "item/started" || message.method === "item/completed") {
+    captureCodexMcpItem(state, asRecord(params?.item));
+  }
+}
+
+function captureCodexMcpItem(
+  state: CodexAppServerState,
+  item: Record<string, unknown> | null,
+) {
+  if (item?.type !== "mcpToolCall") return;
+  const serverName = firstText(item.server, item.serverName)?.trim();
+  if (!serverName) return;
+  state.invokedMcpServers.add(serverName);
+  const capabilityNames = codexMcpItemCapabilities(state, item);
+  const invokedCapabilities = state.invokedMcpCapabilities.get(serverName) ??
+    new Set<string>();
+  for (const capabilityName of capabilityNames) {
+    invokedCapabilities.add(normalizedCapabilityName(capabilityName));
+  }
+  state.invokedMcpCapabilities.set(serverName, invokedCapabilities);
+  const existing = state.mcpFailures.get(serverName);
+  if (
+    existing &&
+    codexMcpCapabilityWasInvoked(
+      state,
+      serverName,
+      existing.capabilityNames,
+    )
+  ) {
+    state.mcpFailures.set(serverName, { ...existing, required: true });
+  }
+  if (codexActivityStatus(item) !== "failed") return;
+  const detail = codexActivityText(item).trim() || "MCP tool call failed.";
+  state.mcpFailures.set(serverName, {
+    serverName,
+    capabilityNames: capabilityNames.length > 0
+      ? capabilityNames
+      : existing?.capabilityNames ?? [serverName],
+    reason: mcpAuthenticationRequired(detail)
+      ? "authenticationRequired"
+      : existing?.reason ?? "connectionFailed",
+    message: detail,
+    required: true,
+    isolation: existing?.isolation ??
+      codexMcpIsolation(state, serverName, capabilityNames),
+  });
+}
+
+function codexMcpTurnFailure(
+  state: CodexAppServerState,
+  turnError: string,
+): CodexMcpTurnFailure | null {
+  const failures = [...state.mcpFailures.values()];
+  if (failures.length === 0) return null;
+  const normalizedError = turnError.toLowerCase();
+  const required = failures.filter((failure) => failure.required);
+  const named = failures.filter((failure) =>
+    normalizedError.includes(failure.serverName.toLowerCase())
+  );
+  const relevant = required.length > 0
+    ? required
+    : named.length > 0
+      ? named
+      : mcpFailureText(turnError)
+        ? failures
+        : [];
+  if (relevant.length === 0) return null;
+
+  if (relevant.some((failure) => failure.required)) {
+    const authFailures = relevant.filter(
+      (failure) =>
+        failure.required && failure.reason === "authenticationRequired",
+    );
+    if (authFailures.length === 0) return null;
+    return {
+      disposition: "blocked",
+      message: turnError,
+      serverNames: uniqueCapabilityNames(
+        authFailures.flatMap((failure) =>
+          failure.capabilityNames.map(safeMcpServerLabel)
+        ),
+      ),
+      isolation: emptyCodexMcpIsolation(),
+    };
+  }
+
+  const isolation = mergeMcpIsolation(
+    relevant.map((failure) => failure.isolation),
+  );
+  if (
+    isolation.mcpServers.length === 0 &&
+    isolation.apps.length === 0 &&
+    !isolation.disableApps &&
+    !isolation.disablePlugins
+  ) {
+    return null;
+  }
+  return {
+    disposition: "recover",
+    message: turnError,
+    serverNames: uniqueCapabilityNames(
+      relevant.flatMap((failure) =>
+        failure.capabilityNames.map(safeMcpServerLabel)
+      ),
+    ),
+    isolation,
+  };
+}
+
+function codexMcpFailureCapabilities(
+  state: Pick<CodexAppServerState, "configuredPlugins" | "installedApps">,
+  serverName: string,
+  detail: string,
+): string[] {
+  const matchedPlugins = state.configuredPlugins.flatMap((pluginId) => {
+    const pluginName = pluginId.split("@", 1)[0]?.trim();
+    if (!pluginName) return [];
+    return normalizedCapabilityName(pluginName).length >= 3 &&
+        capabilityMentioned(detail, pluginName)
+      ? [pluginName]
+      : [];
+  });
+  const matchedApps = state.installedApps
+    .filter((app) => capabilityMentioned(detail, app.name))
+    .map((app) => app.name);
+  const matchedCapabilities = [...matchedApps, ...matchedPlugins];
+  return uniqueCapabilityNames(
+    matchedCapabilities.length > 0 ? matchedCapabilities : [serverName],
+  );
+}
+
+function capabilityMentioned(detail: string, capabilityName: string): boolean {
+  const words = capabilityName.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+  if (words.length === 0) return false;
+  return new RegExp(
+    `(?:^|[^a-z0-9])${words.join("[^a-z0-9]+")}(?=$|[^a-z0-9])`,
+    "i",
+  ).test(detail);
+}
+
+function codexMcpItemCapabilities(
+  state: Pick<CodexAppServerState, "installedApps">,
+  item: Record<string, unknown>,
+): string[] {
+  const appContext = asRecord(item.appContext);
+  const connectorId = firstText(appContext?.connectorId)?.trim();
+  const installedAppName = state.installedApps.find(
+    (app) => connectorId && app.id === connectorId,
+  )?.name;
+  const pluginId = firstText(item.pluginId)?.split("@", 1)[0]?.trim();
+  const capabilityName = firstText(appContext?.appName)?.trim() ||
+    installedAppName || pluginId || connectorId;
+  return capabilityName ? [capabilityName] : [];
+}
+
+function codexMcpCapabilityWasInvoked(
+  state: Pick<
+    CodexAppServerState,
+    "invokedMcpServers" | "invokedMcpCapabilities"
+  >,
+  serverName: string,
+  capabilityNames: string[],
+): boolean {
+  if (!state.invokedMcpServers.has(serverName)) return false;
+  if (normalizedCapabilityName(serverName) !== "codexapps") return true;
+  const specificCapabilities = capabilityNames
+    .map(normalizedCapabilityName)
+    .filter((name) => name && name !== "codexapps");
+  if (specificCapabilities.length === 0) return true;
+  const invoked = state.invokedMcpCapabilities.get(serverName);
+  if (!invoked || invoked.size === 0) return true;
+  return specificCapabilities.some((capability) => invoked.has(capability));
+}
+
+function codexMcpIsolation(
+  state: Pick<
+    CodexAppServerState,
+    "configuredMcpServers" | "configuredPlugins" | "installedApps"
+  >,
+  serverName: string,
+  capabilityNames: string[],
+): CodexMcpIsolation {
+  const normalizedServer = normalizedCapabilityName(serverName);
+  const mcpServers = state.configuredMcpServers.filter(
+    (candidate) => candidate.toLowerCase() === serverName.toLowerCase(),
+  );
+  const normalizedCapabilities = new Set(
+    capabilityNames.map(normalizedCapabilityName),
+  );
+  const plugins = state.configuredPlugins.filter((pluginId) => {
+    const pluginName = pluginId.split("@", 1)[0] ?? pluginId;
+    const normalizedPlugin = normalizedCapabilityName(pluginName);
+    return normalizedPlugin === normalizedServer ||
+      normalizedCapabilities.has(normalizedPlugin);
+  });
+  const apps = state.installedApps
+    .filter((app) =>
+      normalizedCapabilities.has(normalizedCapabilityName(app.id)) ||
+      normalizedCapabilities.has(normalizedCapabilityName(app.name))
+    )
+    .map((app) => app.id);
+  const disableApps = normalizedServer === "codexapps" && apps.length === 0;
+  return {
+    mcpServers: uniqueSorted(mcpServers),
+    apps: uniqueSorted(apps),
+    disableApps,
+    disablePlugins:
+      normalizedServer !== "codexapps" &&
+      mcpServers.length === 0 &&
+      apps.length === 0 &&
+      plugins.length > 0,
+  };
+}
+
+function mergeMcpIsolation(
+  values: CodexMcpIsolation[],
+): CodexMcpIsolation {
+  return {
+    mcpServers: uniqueSorted(values.flatMap((value) => value.mcpServers)),
+    apps: uniqueSorted(values.flatMap((value) => value.apps)),
+    disableApps: values.some((value) => value.disableApps),
+    disablePlugins: values.some((value) => value.disablePlugins),
+  };
+}
+
+function normalizedCapabilityName(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "");
+}
+
+function mcpAuthenticationRequired(value: string): boolean {
+  return /auth\s*required|authentication\s+(?:is\s+)?required|reauthentication|required to authenticate|not logged in|token\s+(?:is\s+)?expired|expired\s+(?:authentication\s+)?token|\b401\b/i.test(
+    value,
+  );
+}
+
+function mcpFailureText(value: string): boolean {
+  return /\bmcp\b|auth\s*required|reauthentication|transport\s+worker/i.test(
+    value,
+  );
+}
+
+function safeMcpServerLabel(value: string): string {
+  return value
+    .replace(/[\r\n\t]+/g, " ")
+    .replace(/[^\p{L}\p{N} ._@/-]+/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 200) || "MCP";
+}
+
+function uniqueSorted(values: string[]): string[] {
+  return [...new Set(values)].sort((left, right) => left.localeCompare(right));
+}
+
+function uniqueCapabilityNames(values: string[]): string[] {
+  const unique = new Map<string, string>();
+  for (const value of values) {
+    const key = normalizedCapabilityName(value) || value.toLowerCase();
+    if (!unique.has(key)) unique.set(key, value);
+  }
+  return [...unique.values()].sort((left, right) => left.localeCompare(right));
 }
 
 export function codexFinalMessage(state: CodexAppServerState): string | null {

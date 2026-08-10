@@ -911,7 +911,14 @@ body { overflow: hidden; font-synthesis: none; }
 .run-page-titlebar-back:active { transform:scale(.95); }
 .run-page-titlebar-back:focus-visible { outline:2px solid #8b70dd; outline-offset:2px; }
 .run-page-window-number { flex:0 0 auto; color:#8068ce; font:500 var(--text-sm)/1.25 "DM Mono",monospace; pointer-events:none; }
-.run-page-window-title { min-width:0; flex:1; overflow:hidden; color:var(--foreground); font-size:var(--text-lg); font-weight:650; letter-spacing:-.02em; line-height:1.25; text-overflow:ellipsis; white-space:nowrap; pointer-events:none; }
+.run-page-window-title { min-width:0; flex:1; overflow:hidden; color:var(--foreground); font-size:var(--text-lg); font-weight:650; letter-spacing:-.02em; line-height:1.25; text-overflow:ellipsis; white-space:nowrap; }
+.run-page-inline-title { min-width:0; margin:0; padding:3px 5px; border:1px solid transparent; border-radius:6px; outline:0; color:var(--foreground); background:transparent; font-family:inherit; font-size:var(--text-lg); font-weight:650; line-height:1.25; letter-spacing:-.025em; text-overflow:ellipsis; transition:border-color .15s ease,background-color .15s ease,box-shadow .15s ease; }
+.run-page-inline-title:hover:not(:read-only) { border-color:var(--border); background:var(--card); }
+.run-page-inline-title:focus { border-color:#a997df; background:var(--card); box-shadow:0 0 0 2px rgba(128,104,206,.12); }
+.run-page-inline-title:read-only { pointer-events:none; }
+.run-page-save-status { min-width:max-content; display:inline-flex; align-items:center; gap:5px; flex:0 0 auto; color:#3f8f74; font-size:var(--text-2xs); font-weight:600; }
+.run-page-save-status.saving { color:var(--muted-foreground); }
+.run-page-save-status.failed { color:var(--destructive); }
 .health-menu { margin-left: auto; position: relative; }
 .health-trigger { height: 22px; padding: 0 7px; display: inline-flex; align-items: center; gap: 6px; border: 1px solid transparent; border-radius: 7px; background: transparent; cursor: pointer; }
 .health-trigger:hover, .health-trigger[aria-expanded="true"] { border-color: var(--line); background: #f4f4ef; }
@@ -1044,7 +1051,7 @@ body { overflow: hidden; font-synthesis: none; }
 .run-page-overview { min-width:0; display:grid; gap:7px; }
 .run-page-title-row { min-width:0; display:flex; align-items:baseline; gap:10px; }
 .run-page-title-row small { flex:0 0 auto; color:#8068ce; }
-.run-page-title-row h1 { min-width:0; flex:0 1 auto; margin:0; overflow:hidden; color:var(--foreground); font-size:var(--text-lg); line-height:1.25; letter-spacing:-.025em; text-overflow:ellipsis; white-space:nowrap; }
+.run-page-title-row .run-page-inline-title { flex:1 1 auto; }
 .run-page-description { max-width:900px; max-height:3.2em; margin:0; overflow-y:auto; overscroll-behavior:contain; scrollbar-width:thin; white-space:pre-wrap; color:var(--muted-foreground); font-size:var(--text-xs); line-height:1.6; }
 .run-page-shell .run-page-window-title { flex:1 1 auto; }
 .run-page-titlebar-actions { min-width:0; margin-left:auto; display:flex; align-items:center; gap:6px; }
@@ -1582,6 +1589,10 @@ button.paused-review-state { width:100%; border:0; border-radius:8px; cursor:poi
 .issue-content-divider:hover::before,.issue-content-divider:focus-visible::before,.run-page-content.is-resizing .issue-content-divider::before { background:#a997df; box-shadow:0 0 0 1px rgba(128,104,206,.08); }
 .issue-content-divider:hover::after,.issue-content-divider:focus-visible::after,.run-page-content.is-resizing .issue-content-divider::after { border-color:#a997df; background:#f1edfc; opacity:1; }
 .issue-description-empty { margin:0; color:var(--muted-foreground); font-size:var(--text-2xs); }
+.issue-description-inline-editor { width:100%; min-height:220px; padding:8px 9px; resize:vertical; border:1px solid transparent; border-radius:9px; outline:0; color:var(--foreground); background:transparent; font:inherit; font-size:var(--text-xs); line-height:1.7; transition:border-color .15s ease,background-color .15s ease,box-shadow .15s ease; }
+.issue-description-inline-editor:hover { border-color:var(--border); background:var(--card); }
+.issue-description-inline-editor:focus { border-color:#a997df; background:var(--card); box-shadow:0 0 0 2px rgba(128,104,206,.12); }
+.issue-description-inline-editor::placeholder { color:var(--muted-foreground); }
 .issue-description-markdown { min-width:0; color:var(--foreground); font-size:var(--text-xs); line-height:1.7; overflow-wrap:anywhere; }
 .issue-description-markdown > :first-child { margin-top:0; }
 .issue-description-markdown > :last-child { margin-bottom:0; }

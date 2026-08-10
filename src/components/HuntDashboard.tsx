@@ -4060,7 +4060,7 @@ export function RunPage({
   run: HuntRun;
   token?: string | null;
 }) {
-  const { localeTag, t } = useI18n();
+  const { locale, localeTag, t } = useI18n();
   const meta = runMeta(run.status, run.workflowStage, run.workflow);
   const label = localizeStatus(t, run.status, run.workflowStage, meta.label);
   const needsAttention = ["paused", "blocked", "failed"].includes(run.status);
@@ -4091,7 +4091,6 @@ export function RunPage({
     toast(error, { tone: "error" });
   }, [error, toast]);
   const [confirmCancel, setConfirmCancel] = useState(false);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [isTransferDialogOpen, setIsTransferDialogOpen] = useState(false);
@@ -4125,6 +4124,25 @@ export function RunPage({
   const [reworkFeedback, setReworkFeedback] = useState("");
   const [reworkError, setReworkError] = useState<string | null>(null);
   const [isSubmittingRework, setIsSubmittingRework] = useState(false);
+  const [inlineTitle, setInlineTitle] = useState(run.title);
+  const [inlineDescription, setInlineDescription] = useState(
+    run.issueDescription ?? "",
+  );
+  const [inlineSaveStatus, setInlineSaveStatus] = useState<
+    "saved" | "saving" | "failed"
+  >("saved");
+  const inlineSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const inlineSaveSequenceRef = useRef(0);
+  const inlineSaveQueueRef = useRef<Promise<unknown>>(Promise.resolve());
+  const inlineSavePendingRef = useRef({ runId: run.id, count: 0 });
+  const inlineUpdateIssueRef = useRef(onUpdateIssue);
+  const canEditIssueInline = Boolean(onUpdateIssue);
+  const lastSavedInlineIssueRef = useRef({
+    runId: run.id,
+    title: run.title.trim(),
+    description: run.issueDescription?.trim() || null,
+  });
+  inlineUpdateIssueRef.current = onUpdateIssue;
   const [activeDetailTab, setActiveDetailTab] = useState<IssueDetailTab>(() =>
     defaultIssueDetailTab(run.status),
   );
@@ -4179,10 +4197,6 @@ export function RunPage({
         setIsDeleteDialogOpen(false);
         return true;
       }
-      if (isEditDialogOpen) {
-        setIsEditDialogOpen(false);
-        return true;
-      }
       if (confirmCancel) {
         setConfirmCancel(false);
         return true;
@@ -4210,6 +4224,128 @@ export function RunPage({
     setReworkError(null);
     setIsSubmittingRework(false);
   }, [run.id, run.status]);
+  useEffect(() => {
+    inlineSaveSequenceRef.current += 1;
+    if (inlineSaveTimerRef.current) {
+      clearTimeout(inlineSaveTimerRef.current);
+      inlineSaveTimerRef.current = null;
+    }
+    setInlineTitle(run.title);
+    setInlineDescription(run.issueDescription ?? "");
+    setInlineSaveStatus("saved");
+    lastSavedInlineIssueRef.current = {
+      runId: run.id,
+      title: run.title.trim(),
+      description: run.issueDescription?.trim() || null,
+    };
+    inlineSavePendingRef.current = { runId: run.id, count: 0 };
+  }, [run.id]);
+  useEffect(() => {
+    const lastSaved = lastSavedInlineIssueRef.current;
+    const currentTitle = inlineTitle.trim();
+    const currentDescription = inlineDescription.trim() || null;
+    if (
+      lastSaved.runId !== run.id ||
+      currentTitle !== lastSaved.title ||
+      currentDescription !== lastSaved.description
+    ) {
+      return;
+    }
+    const nextTitle = run.title.trim();
+    const nextDescription = run.issueDescription?.trim() || null;
+    lastSavedInlineIssueRef.current = {
+      runId: run.id,
+      title: nextTitle,
+      description: nextDescription,
+    };
+    setInlineTitle(run.title);
+    setInlineDescription(run.issueDescription ?? "");
+  }, [inlineDescription, inlineTitle, run.id, run.issueDescription, run.title]);
+  useEffect(() => {
+    if (inlineSaveTimerRef.current) {
+      clearTimeout(inlineSaveTimerRef.current);
+      inlineSaveTimerRef.current = null;
+    }
+    if (!canEditIssueInline) return;
+
+    const title = inlineTitle.trim();
+    const description = inlineDescription.trim() || null;
+    const lastSaved = lastSavedInlineIssueRef.current;
+    if (
+      lastSaved.runId === run.id &&
+      title === lastSaved.title &&
+      description === lastSaved.description &&
+      inlineSavePendingRef.current.runId === run.id &&
+      inlineSavePendingRef.current.count === 0
+    ) {
+      setInlineSaveStatus("saved");
+      return;
+    }
+    if (!title || !isIssueTitleWithinLimit(title)) {
+      setInlineSaveStatus("failed");
+      return;
+    }
+
+    setInlineSaveStatus("saving");
+    const sequence = ++inlineSaveSequenceRef.current;
+    inlineSaveTimerRef.current = setTimeout(() => {
+      inlineSaveTimerRef.current = null;
+      const update = inlineUpdateIssueRef.current;
+      if (!update) return;
+      if (inlineSavePendingRef.current.runId === run.id) {
+        inlineSavePendingRef.current.count += 1;
+      }
+      const save = inlineSaveQueueRef.current
+        .catch(() => undefined)
+        .then(() =>
+          update({
+            title,
+            description,
+            priority: run.priority,
+            attachments: [],
+          }),
+        );
+      inlineSaveQueueRef.current = save;
+      void save.then(
+        () => {
+          if (lastSavedInlineIssueRef.current.runId === run.id) {
+            lastSavedInlineIssueRef.current = {
+              runId: run.id,
+              title,
+              description,
+            };
+          }
+          if (inlineSavePendingRef.current.runId === run.id) {
+            inlineSavePendingRef.current.count = Math.max(
+              0,
+              inlineSavePendingRef.current.count - 1,
+            );
+          }
+          if (sequence === inlineSaveSequenceRef.current) {
+            setInlineSaveStatus("saved");
+          }
+        },
+        () => {
+          if (inlineSavePendingRef.current.runId === run.id) {
+            inlineSavePendingRef.current.count = Math.max(
+              0,
+              inlineSavePendingRef.current.count - 1,
+            );
+          }
+          if (sequence === inlineSaveSequenceRef.current) {
+            setInlineSaveStatus("failed");
+          }
+        },
+      );
+    }, 600);
+
+    return () => {
+      if (inlineSaveTimerRef.current) {
+        clearTimeout(inlineSaveTimerRef.current);
+        inlineSaveTimerRef.current = null;
+      }
+    };
+  }, [canEditIssueInline, inlineDescription, inlineTitle, run.id, run.priority]);
   useEffect(() => {
     void loadRunEvents();
   }, [loadRunEvents, run.eventCount, run.id]);
@@ -4663,6 +4799,28 @@ export function RunPage({
       </Tooltip>
     </TooltipProvider>
   );
+  const inlineSaveIndicator = onUpdateIssue ? (
+    <span
+      aria-live="polite"
+      className={`run-page-save-status ${inlineSaveStatus}`}
+      role="status"
+    >
+      {inlineSaveStatus === "saving" ? (
+        <LoaderCircle aria-hidden="true" className="spin" size={13} />
+      ) : inlineSaveStatus === "failed" ? (
+        <CircleAlert aria-hidden="true" size={13} />
+      ) : (
+        <Check aria-hidden="true" size={13} />
+      )}
+      {t(
+        inlineSaveStatus === "saving"
+          ? "common.saving"
+          : inlineSaveStatus === "failed"
+            ? "issue.saveFailed"
+            : "common.saved",
+      )}
+    </span>
+  ) : null;
   return (
     <MainContent className="run-page-shell" id="issue-detail">
       {!companionMode && (
@@ -4684,13 +4842,17 @@ export function RunPage({
           <small className="run-page-window-number">
             {formatIssueKey(issueKeyPrefix, run.runNumber)}
           </small>
-          <strong
-            className="run-page-window-title"
+          <input
+            aria-label={t("issue.title")}
+            className="run-page-window-title run-page-inline-title"
             id="run-page-title"
-            title={run.title}
-          >
-            {run.title}
-          </strong>
+            maxLength={issueTitleInputMaxLength(inlineTitle, locale)}
+            onChange={(event) => setInlineTitle(event.currentTarget.value)}
+            readOnly={!onUpdateIssue}
+            title={inlineTitle}
+            value={inlineTitle}
+          />
+          {inlineSaveIndicator}
           <div className="run-page-titlebar-actions">
             {compactProperties}
             {processNowButton}
@@ -4759,7 +4921,6 @@ export function RunPage({
                     }
                   : undefined
               }
-              onEdit={onUpdateIssue ? () => setIsEditDialogOpen(true) : undefined}
             />
           </div>
         </header>
@@ -4783,7 +4944,18 @@ export function RunPage({
                 <div className="run-page-overview">
                   <div className="run-page-title-row">
                     <small>{formatIssueKey(issueKeyPrefix, run.runNumber)}</small>
-                    <h1 id="run-page-title">{run.title}</h1>
+                    <input
+                      aria-label={t("issue.title")}
+                      className="run-page-inline-title"
+                      id="run-page-title"
+                      maxLength={issueTitleInputMaxLength(inlineTitle, locale)}
+                      onChange={(event) =>
+                        setInlineTitle(event.currentTarget.value)
+                      }
+                      readOnly={!onUpdateIssue}
+                      value={inlineTitle}
+                    />
+                    {inlineSaveIndicator}
                     <IssueActionsMenu
                       disabled={isUpdatingIssue || isDeletingIssue || isRecovering}
                       onCancel={
@@ -4808,11 +4980,6 @@ export function RunPage({
                               );
                               setIsTransferDialogOpen(true);
                             }
-                          : undefined
-                      }
-                      onEdit={
-                        onUpdateIssue
-                          ? () => setIsEditDialogOpen(true)
                           : undefined
                       }
                       onShare={() => void shareIssue()}
@@ -5026,7 +5193,17 @@ export function RunPage({
                           </div>
                         </section>
                       ) : null}
-                      {issueContent ? (
+                      {onUpdateIssue ? (
+                        <textarea
+                          aria-label={t("issue.description")}
+                          className="issue-description-inline-editor"
+                          onChange={(event) =>
+                            setInlineDescription(event.currentTarget.value)
+                          }
+                          placeholder={t("issue.descriptionPlaceholder")}
+                          value={inlineDescription}
+                        />
+                      ) : issueContent ? (
                         <div className="issue-description-markdown">
                           <ReactMarkdown
                             components={{
@@ -5046,9 +5223,12 @@ export function RunPage({
                       ) : (
                         <p className="issue-description-empty">{t("run.notSet")}</p>
                       )}
-                      {remainingAttachments.length > 0 && (
+                      {(onUpdateIssue ? run.attachments ?? [] : remainingAttachments)
+                        .length > 0 && (
                         <IssueAttachmentGallery
-                          attachments={remainingAttachments}
+                          attachments={
+                            onUpdateIssue ? run.attachments ?? [] : remainingAttachments
+                          }
                           onLoadAttachment={onLoadAttachment}
                         />
                       )}
@@ -5919,19 +6099,6 @@ export function RunPage({
           </div>
         </article>
       </div>
-      {isEditDialogOpen && onUpdateIssue && (
-        <EditIssueDialog
-          isSubmitting={isUpdatingIssue}
-          onClose={() => setIsEditDialogOpen(false)}
-          onLoadAttachment={onLoadAttachment}
-          onUpdate={async (input) => {
-            await onUpdateIssue(input);
-            setIsEditDialogOpen(false);
-          }}
-          run={run}
-          members={mentionMembers}
-        />
-      )}
       <Dialog
         onOpenChange={(open) => {
           if (isDeletingIssue) return;
@@ -6079,7 +6246,6 @@ function IssueActionsMenu({
   onUnassign,
   onDelete,
   onTransfer,
-  onEdit,
   onShare,
 }: {
   disabled: boolean;
@@ -6087,7 +6253,6 @@ function IssueActionsMenu({
   onUnassign?: () => void;
   onDelete?: () => void;
   onTransfer?: () => void;
-  onEdit?: () => void;
   onShare?: () => void;
 }) {
   const { t } = useI18n();
@@ -6120,15 +6285,6 @@ function IssueActionsMenu({
             >
               <Share2 size={14} />
               {t("issue.share")}
-            </DropdownMenu.Item>
-          ) : null}
-          {onEdit ? (
-            <DropdownMenu.Item
-              className="run-page-actions-item"
-              onSelect={onEdit}
-            >
-              <Pencil size={14} />
-              {t("issue.edit")}
             </DropdownMenu.Item>
           ) : null}
           {onTransfer ? (
