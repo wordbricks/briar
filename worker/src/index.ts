@@ -321,6 +321,7 @@ import {
   listExecutionAuditEvents,
   listExecutionWorkers,
   listOrganizationExecutionWorkers,
+  listOrganizationExecutionProviders,
   pendingExecutionWorkerUpdate,
   getProjectExecutionWorkerPolicy,
   hasExecutionWorkerReadinessChanged,
@@ -7565,7 +7566,7 @@ async function route(
       dependencies,
       resultReviews,
       workers,
-      organizationWorkers,
+      organizationProviders,
     ] =
       await Promise.all([
         changedRunIds.size > 0
@@ -7581,10 +7582,9 @@ async function route(
           ? listIssueResultReviews(db, project.id)
           : Promise.resolve([]),
         listExecutionWorkers(db, project.id, observedAt),
-        listOrganizationExecutionWorkers(
+        listOrganizationExecutionProviders(
           db,
           project.organization_id,
-          observedAt,
         ),
       ]);
     const attachmentsByRun = new Map<string, IssueAttachmentRow[]>();
@@ -7621,13 +7621,6 @@ async function route(
       changedRunIds.has(run.id),
     );
     const existingRunIds = new Set(changedRuns.map((run) => run.id));
-    const organizationProviders = [
-      ...new Set(
-        organizationWorkers.flatMap((worker) =>
-          worker.bindings.flatMap((binding) => binding.providers ?? []),
-        ),
-      ),
-    ];
     const metadata = metadataChanged
       ? await Promise.all([
           getProjectSettings(db, project.id),
@@ -7715,7 +7708,7 @@ async function route(
       dependencies,
       resultReviews,
       workers,
-      organizationWorkers,
+      organizationProviders,
       executionPolicy,
       members,
       conversationNotifications,
@@ -7729,10 +7722,9 @@ async function route(
         listIssueDependencies(db, project.id),
         listIssueResultReviews(db, project.id),
         listExecutionWorkers(db, project.id, observedAt),
-        listOrganizationExecutionWorkers(
+        listOrganizationExecutionProviders(
           db,
           project.organization_id,
-          observedAt,
         ),
         getProjectExecutionWorkerPolicy(db, project.id),
         listOrganizationMembers(db, project.organization_id),
@@ -7784,13 +7776,7 @@ async function route(
         ),
       ),
       workers: workers.map((worker) => workerJson(worker, observedAt)),
-      organizationProviders: [
-        ...new Set(
-          organizationWorkers.flatMap((worker) =>
-            worker.bindings.flatMap((binding) => binding.providers ?? []),
-          ),
-        ),
-      ],
+      organizationProviders,
       executionPolicy,
       members: members.map(organizationMemberJson),
       conversationNotifications: conversationNotifications.map(

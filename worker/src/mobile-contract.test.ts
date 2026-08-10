@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import worker from "./index";
 import {
   mobileClientIds,
+  mobileDashboardDeltaSchema,
+  mobileDashboardSnapshotSchema,
   mobileOperationSchemas,
   mobileProjectAgentTaskRequestSchema,
 } from "./mobile-contract";
@@ -69,6 +71,21 @@ describe("Companion mobile API contract", () => {
           .not.toThrow();
       }
     }
+  });
+
+  it("preserves organization providers in full and delta dashboard payloads", () => {
+    const organizationProviders = ["grok", "opencode", "codex"] as const;
+    const snapshot = mobileDashboardSnapshotSchema.parse({
+      ...(fixture.operations.getDashboardSnapshot.response as object),
+      organizationProviders,
+    });
+    const delta = mobileDashboardDeltaSchema.parse({
+      ...(fixture.operations.getDashboardDelta.response as object),
+      organizationProviders,
+    });
+
+    expect(snapshot.organizationProviders).toEqual(organizationProviders);
+    expect(delta.organizationProviders).toEqual(organizationProviders);
   });
 
   it("requires callers to choose an Agent Skill before running a task", () => {

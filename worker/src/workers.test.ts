@@ -23,10 +23,12 @@ import {
   disableExecutionWorker,
   dispatchHuntRun,
   executionWorkerBindingForProject,
+  executionWorkerProviders,
   getProjectExecutionWorkerPolicy,
   hasExecutionWorkerReadinessChanged,
   leaseExpiryFrom,
   listExecutionWorkers,
+  listOrganizationExecutionProviders,
   listOrganizationExecutionWorkers,
   pendingExecutionWorkerUpdate,
   MAX_CLAIM_ATTEMPTS,
@@ -903,6 +905,109 @@ describe("detached execution workers", () => {
     expect(
       organizationWorkers[0].bindings.map((binding) => binding.projectId),
     ).toEqual([projectId, secondProjectId]);
+  });
+
+  it("lists organization providers with the full Worker projection's semantics and order", async () => {
+    expect(
+      executionWorkerProviders({
+        agent_provider: "codex",
+        capabilities_json: "not-json",
+      }),
+    ).toEqual([]);
+
+    const newest = await register("providers-newest", 5);
+    const older = await register("providers-older", 2);
+    const legacy = await register("providers-legacy", 1);
+    const malformed = await register("providers-malformed", 0);
+    const unbound = await register("providers-unbound", 0);
+
+    await recordWorkerHeartbeat(db, projectId, {
+      workerId: newest.worker.id,
+      capabilities: {
+        providerHealth: {
+          codex: { healthy: false },
+          claude: { healthy: false },
+          grok: { healthy: true },
+          opencode: { healthy: true },
+        },
+      },
+      observedAt: atMinute(6),
+    });
+    await recordWorkerHeartbeat(db, projectId, {
+      workerId: older.worker.id,
+      capabilities: {
+        providerHealth: {
+          codex: { healthy: true },
+          claude: { healthy: false },
+          grok: { healthy: true },
+        },
+      },
+      observedAt: atMinute(3),
+    });
+    await recordWorkerHeartbeat(db, projectId, {
+      workerId: legacy.worker.id,
+      capabilities: { providers: ["claude"] },
+      observedAt: atMinute(1),
+    });
+    await recordWorkerHeartbeat(db, projectId, {
+      workerId: malformed.worker.id,
+      capabilities: {
+        providerHealth: {
+          codex: "healthy",
+          claude: { healthy: "true" },
+        },
+      },
+      observedAt: atMinute(0),
+    });
+    await db.batch([
+      db
+        .prepare(
+          `update briar_execution_worker_devices set state = 'disabled'
+           where id = ?`,
+        )
+        .bind(newest.device.id),
+      db
+        .prepare(
+          `update briar_execution_workers set state = 'disabled'
+           where id = ?`,
+        )
+        .bind(newest.worker.id),
+      db
+        .prepare(
+          `update briar_execution_worker_devices set state = 'stale'
+           where id = ?`,
+        )
+        .bind(older.device.id),
+      db
+        .prepare(
+          `update briar_execution_workers set state = 'stale'
+           where id = ?`,
+        )
+        .bind(older.worker.id),
+    ]);
+    await unbindExecutionWorker(
+      db,
+      unbound.device.id,
+      projectId,
+      atMinute(7),
+    );
+
+    const fullProjection = await listOrganizationExecutionWorkers(
+      db,
+      projectId,
+      atMinute(10),
+    );
+    const fullProjectionProviders = [
+      ...new Set(
+        fullProjection.flatMap((device) =>
+          device.bindings.flatMap((binding) => binding.providers),
+        ),
+      ),
+    ];
+    const providers = await listOrganizationExecutionProviders(db, projectId);
+
+    expect(providers).toEqual(fullProjectionProviders);
+    expect(providers).toEqual(["grok", "opencode", "codex"]);
   });
 
   it("renames a device and all of its project bindings together", async () => {

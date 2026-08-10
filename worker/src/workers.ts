@@ -1086,6 +1086,39 @@ export async function listOrganizationExecutionWorkers(
   return [...workers.values()];
 }
 
+export async function listOrganizationExecutionProviders(
+  db: D1Database,
+  organizationId: string,
+): Promise<AgentProvider[]> {
+  const result = await db
+    .prepare(
+      `select worker.agent_provider, worker.capabilities_json
+       from briar_execution_worker_devices device
+       join "user" owner on owner.id = device.owner_user_id
+       left join briar_execution_workers worker
+         on worker.device_id = device.id
+       left join briar_projects project on project.id = worker.project_id
+       where device.organization_id = ?
+       order by device.last_heartbeat_at desc, device.id, project.created_at`,
+    )
+    .bind(organizationId)
+    .all<{
+      agent_provider: AgentProvider | null;
+      capabilities_json: string | null;
+    }>();
+  const providers = new Set<AgentProvider>();
+  for (const row of result.results ?? []) {
+    if (!row.agent_provider || !row.capabilities_json) continue;
+    for (const provider of executionWorkerProviders({
+      agent_provider: row.agent_provider,
+      capabilities_json: row.capabilities_json,
+    })) {
+      providers.add(provider);
+    }
+  }
+  return [...providers];
+}
+
 export async function getProjectExecutionWorkerPolicy(
   db: D1Database,
   projectId: string,
