@@ -91,11 +91,12 @@ import {
 } from "./lib/issue-links";
 import { isRepositoryConnectedForImport } from "./lib/linear-import";
 import { settingsAccountSelection } from "./lib/settings-account-selection";
+import { LITELLM_MAIN_PRICING_SOURCE } from "./lib/agent-usage-pricing";
 import {
   createChannel,
   dispatchHuntRun,
   listChannels,
-  loadAgentUsageRuns,
+  loadAgentUsageReport,
   loadDashboard,
   loadProjectAgents,
   runProjectAgentTaskOnWorker,
@@ -212,9 +213,20 @@ export function App() {
   const [statusTrayRunsByProject, setStatusTrayRunsByProject] = useState<
     Record<string, readonly HuntRun[]>
   >({});
-  const loadUsageRuns = useCallback(async () => {
-    if (!briar.token || !briar.activeOrganizationId) return [];
-    return loadAgentUsageRuns(
+  const loadUsageReport = useCallback(async () => {
+    if (!briar.token || !briar.activeOrganizationId) {
+      return {
+        runs: [],
+        generatedAt: new Date().toISOString(),
+        pricing: {
+          status: "unavailable" as const,
+          source: LITELLM_MAIN_PRICING_SOURCE,
+          fetchedAt: null,
+          knownModels: 0,
+        },
+      };
+    }
+    return loadAgentUsageReport(
       briar.token,
       briar.activeOrganizationId,
       90,
@@ -1273,7 +1285,7 @@ export function App() {
                 ? briar.refreshProjectReadiness(activeProject.id)
                 : Promise.resolve(null)
             }
-            onLoadUsageRuns={loadUsageRuns}
+            onLoadUsageReport={loadUsageReport}
             projectId={activeProject?.id ?? ""}
             projectName={activeProject?.name ?? ""}
             readiness={
@@ -1666,6 +1678,9 @@ export function App() {
               setIsSidebarOpen(true);
               navigateToPage("settings");
             }}
+            organizationId={briar.activeOrganizationId}
+            token={briar.token}
+            userId={briar.user?.id ?? null}
             workers={briar.dashboard?.workers ?? []}
           />
           <AppVersionStatus />
