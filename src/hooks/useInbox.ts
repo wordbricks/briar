@@ -133,6 +133,22 @@ type InboxState = InboxStorage & {
   storageKey: string;
 };
 
+type InboxReadSyncGeneration = {
+  id: number;
+  active: boolean;
+  storageKey: string;
+  token: string;
+  userId: string;
+  remoteReadVersions: Record<string, string>;
+  pendingPush: Record<string, string>;
+  inFlightPush: Record<string, string>;
+  pushInFlight: boolean;
+  pushQueueRevision: number;
+  remoteMutationGeneration: number;
+  syncInFlight: boolean;
+  syncRequested: boolean;
+};
+
 const emptyStorage = (): InboxStorage => ({ messages: [], readVersions: {} });
 
 export function buildCurrentInboxMessages(
@@ -440,111 +456,290 @@ export function useInbox(
     storageKey,
     ...readInboxStorage(storageKey),
   }));
-  const remoteReadVersionsRef = useRef<Record<string, string>>({});
-  const pushQueueRef = useRef<Record<string, string>>({});
-  const pushInFlightRef = useRef(false);
+  const readSyncGenerationRef = useRef<InboxReadSyncGeneration | null>(null);
+  const nextReadSyncGenerationIdRef = useRef(0);
+
+  const applyRemoteReadVersions = useCallback(
+    (
+      generation: InboxReadSyncGeneration,
+      remote: Record<string, string>,
+      protectedLocal: Record<string, string>,
+    ) => {
+      if (
+        !generation.active ||
+        readSyncGenerationRef.current !== generation
+      ) {
+        return;
+      }
+      generation.remoteReadVersions = remote;
+      setState((current) => {
+        if (current.storageKey !== generation.storageKey) return current;
+        const readVersions = mergeInboxReadVersions(
+          mergeInboxReadVersions(current.readVersions, remote),
+          protectedLocal,
+        );
+        const next = { messages: current.messages, readVersions };
+        writeInboxStorage(generation.storageKey, next);
+        return { storageKey: generation.storageKey, ...next };
+      });
+    },
+    [],
+  );
+
+  const flushReadStatePush = useCallback(
+    (generation: InboxReadSyncGeneration) => {
+      const drain = () => {
+        if (
+          !generation.active ||
+          readSyncGenerationRef.current !== generation ||
+          generation.pushInFlight
+        ) {
+          return;
+        }
+        const payload = generation.pendingPush;
+        if (Object.keys(payload).length === 0) return;
+
+        generation.pendingPush = {};
+        generation.inFlightPush = payload;
+        generation.pushInFlight = true;
+        let failed = false;
+        let failedAtQueueRevision = generation.pushQueueRevision;
+
+        void saveInboxReadStates(generation.token, payload)
+          .then((remote) => {
+            if (
+              !generation.active ||
+              readSyncGenerationRef.current !== generation
+            ) {
+              return;
+            }
+            // A completed PUT is newer than any GET that was already waiting.
+            generation.remoteMutationGeneration += 1;
+            generation.inFlightPush = {};
+            applyRemoteReadVersions(
+              generation,
+              remote,
+              generation.pendingPush,
+            );
+          })
+          .catch(() => {
+            if (
+              !generation.active ||
+              readSyncGenerationRef.current !== generation
+            ) {
+              return;
+            }
+            // Keep the failed payload underneath any newer local intent. A
+            // later mark, focus, or visibility sync retries it; a permanent
+            // 4xx must not create an immediate recursive request loop.
+            generation.pendingPush = mergeInboxReadVersions(
+              payload,
+              generation.pendingPush,
+            );
+            generation.inFlightPush = {};
+            failed = true;
+            failedAtQueueRevision = generation.pushQueueRevision;
+          })
+          .finally(() => {
+            if (
+              !generation.active ||
+              readSyncGenerationRef.current !== generation
+            ) {
+              return;
+            }
+            generation.pushInFlight = false;
+            const hasPending =
+              Object.keys(generation.pendingPush).length > 0;
+            if (
+              hasPending &&
+              (!failed ||
+                generation.pushQueueRevision > failedAtQueueRevision)
+            ) {
+              drain();
+            }
+          });
+      };
+
+      drain();
+    },
+    [applyRemoteReadVersions],
+  );
+
+  const queueReadStatePushForGeneration = useCallback(
+    (
+      generation: InboxReadSyncGeneration,
+      readVersions: Record<string, string>,
+    ) => {
+      if (
+        !generation.active ||
+        readSyncGenerationRef.current !== generation
+      ) {
+        return;
+      }
+      const pending = inboxReadVersionsToPush(readVersions, {
+        ...generation.remoteReadVersions,
+        ...generation.inFlightPush,
+      });
+      let changed = false;
+      for (const [messageId, version] of Object.entries(pending)) {
+        if (generation.pendingPush[messageId] === version) continue;
+        generation.pendingPush[messageId] = version;
+        changed = true;
+      }
+      if (!changed) return;
+
+      // Invalidates GET responses that began before this explicit local read.
+      generation.remoteMutationGeneration += 1;
+      generation.pushQueueRevision += 1;
+      flushReadStatePush(generation);
+    },
+    [flushReadStatePush],
+  );
+
+  const synchronizeReadStates = useCallback(
+    (generation: InboxReadSyncGeneration) => {
+      const run = () => {
+        if (
+          !generation.active ||
+          readSyncGenerationRef.current !== generation
+        ) {
+          return;
+        }
+
+        // A focus/visibility sync is also the retry boundary for a failed PUT.
+        flushReadStatePush(generation);
+        if (generation.syncInFlight) {
+          generation.syncRequested = true;
+          return;
+        }
+
+        generation.syncInFlight = true;
+        const responseGeneration = generation.remoteMutationGeneration;
+        const localAtRequestStart = readInboxStorage(
+          generation.storageKey,
+        ).readVersions;
+
+        void loadInboxReadStates(generation.token)
+          .then((remote) => {
+            if (
+              !generation.active ||
+              readSyncGenerationRef.current !== generation ||
+              generation.remoteMutationGeneration !== responseGeneration
+            ) {
+              return;
+            }
+
+            // The server wins conflicts from an older persisted cache. Entries
+            // that have never reached the server, plus explicit pending or
+            // in-flight reads, remain local until their serial PUT succeeds.
+            const localOnly = Object.fromEntries(
+              Object.entries(localAtRequestStart).filter(
+                ([messageId]) =>
+                  !Object.prototype.hasOwnProperty.call(remote, messageId),
+              ),
+            );
+            const protectedLocal = mergeInboxReadVersions(
+              mergeInboxReadVersions(
+                localOnly,
+                generation.inFlightPush,
+              ),
+              generation.pendingPush,
+            );
+            applyRemoteReadVersions(generation, remote, protectedLocal);
+            if (Object.keys(localOnly).length > 0) {
+              queueReadStatePushForGeneration(generation, localOnly);
+            }
+          })
+          .catch(() => {
+            // Offline or auth race: keep local cache until the next sync.
+          })
+          .finally(() => {
+            if (
+              !generation.active ||
+              readSyncGenerationRef.current !== generation
+            ) {
+              return;
+            }
+            generation.syncInFlight = false;
+            if (generation.syncRequested) {
+              generation.syncRequested = false;
+              run();
+            }
+          });
+      };
+
+      run();
+    },
+    [
+      applyRemoteReadVersions,
+      flushReadStatePush,
+      queueReadStatePushForGeneration,
+    ],
+  );
 
   useEffect(() => {
-    remoteReadVersionsRef.current = {};
-    pushQueueRef.current = {};
+    const previous = readSyncGenerationRef.current;
+    if (previous) previous.active = false;
+    readSyncGenerationRef.current = null;
     setState({
       storageKey,
       ...readInboxStorage(storageKey),
     });
-  }, [storageKey]);
 
-  const flushReadStatePush = useCallback(async () => {
-    if (!token || !userId || pushInFlightRef.current) return;
-    const pending = pushQueueRef.current;
-    const entries = Object.entries(pending);
-    if (entries.length === 0) return;
-    pushInFlightRef.current = true;
-    pushQueueRef.current = {};
-    try {
-      const remote = await saveInboxReadStates(
-        token,
-        Object.fromEntries(entries),
-      );
-      remoteReadVersionsRef.current = mergeInboxReadVersions(
-        remoteReadVersionsRef.current,
-        remote,
-      );
-      setState((current) => {
-        if (current.storageKey !== storageKey) return current;
-        const readVersions = mergeInboxReadVersions(
-          current.readVersions,
-          remote,
-        );
-        const next = { messages: current.messages, readVersions };
-        writeInboxStorage(storageKey, next);
-        return { storageKey, ...next };
-      });
-    } catch {
-      // Keep local optimistic state and retry on the next mark/sync.
-      pushQueueRef.current = mergeInboxReadVersions(
-        Object.fromEntries(entries),
-        pushQueueRef.current,
-      );
-    } finally {
-      pushInFlightRef.current = false;
-      if (Object.keys(pushQueueRef.current).length > 0) {
-        void flushReadStatePush();
+    if (!token || !userId) return;
+    const generation: InboxReadSyncGeneration = {
+      id: ++nextReadSyncGenerationIdRef.current,
+      active: true,
+      storageKey,
+      token,
+      userId,
+      remoteReadVersions: {},
+      pendingPush: {},
+      inFlightPush: {},
+      pushInFlight: false,
+      pushQueueRevision: 0,
+      remoteMutationGeneration: 0,
+      syncInFlight: false,
+      syncRequested: false,
+    };
+    readSyncGenerationRef.current = generation;
+    synchronizeReadStates(generation);
+
+    const handleFocus = () => synchronizeReadStates(generation);
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        synchronizeReadStates(generation);
       }
-    }
-  }, [storageKey, token, userId]);
+    };
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      generation.active = false;
+      if (readSyncGenerationRef.current === generation) {
+        readSyncGenerationRef.current = null;
+      }
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [storageKey, synchronizeReadStates, token, userId]);
 
   const queueReadStatePush = useCallback(
     (readVersions: Record<string, string>) => {
-      if (!token || !userId) return;
-      const pending = inboxReadVersionsToPush(
-        readVersions,
-        remoteReadVersionsRef.current,
-      );
-      if (Object.keys(pending).length === 0) return;
-      pushQueueRef.current = mergeInboxReadVersions(
-        pushQueueRef.current,
-        pending,
-      );
-      void flushReadStatePush();
-    },
-    [flushReadStatePush, token, userId],
-  );
-
-  useEffect(() => {
-    if (!userId || !token) return;
-    let cancelled = false;
-    void (async () => {
-      try {
-        const remote = await loadInboxReadStates(token);
-        if (cancelled) return;
-        remoteReadVersionsRef.current = remote;
-        setState((current) => {
-          if (current.storageKey !== storageKey) return current;
-          const readVersions = mergeInboxReadVersions(
-            current.readVersions,
-            remote,
-          );
-          const next = { messages: current.messages, readVersions };
-          writeInboxStorage(storageKey, next);
-          return { storageKey, ...next };
-        });
-        const local = readInboxStorage(storageKey).readVersions;
-        const pending = inboxReadVersionsToPush(local, remote);
-        if (Object.keys(pending).length > 0) {
-          pushQueueRef.current = mergeInboxReadVersions(
-            pushQueueRef.current,
-            pending,
-          );
-          void flushReadStatePush();
-        }
-      } catch {
-        // Offline or auth race: keep local cache until the next successful sync.
+      const generation = readSyncGenerationRef.current;
+      if (
+        !generation ||
+        !generation.active ||
+        generation.storageKey !== storageKey ||
+        generation.token !== token ||
+        generation.userId !== userId
+      ) {
+        return;
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [flushReadStatePush, storageKey, token, userId]);
+      queueReadStatePushForGeneration(generation, readVersions);
+    },
+    [queueReadStatePushForGeneration, storageKey, token, userId],
+  );
 
   useEffect(() => {
     if (!userId) return;

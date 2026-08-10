@@ -82,7 +82,10 @@ struct InboxHomeView: View {
         }
         .navigationTitle("Inbox")
         .navigationBarTitleDisplayMode(.inline)
-        .refreshable { await refresh() }
+        .refreshable {
+            await refresh()
+            await inbox.refreshReadStates()
+        }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 if inbox.unreadCount > 0 {
@@ -133,7 +136,7 @@ struct InboxHomeView: View {
         } label: {
             HStack(alignment: .top, spacing: 10) {
                 Circle()
-                    .fill(message.isUnread ? Color.accentColor : Color.clear)
+                    .fill(showsUnreadIndicator(message) ? Color.accentColor : Color.clear)
                     .frame(width: 8, height: 8)
                     .padding(.top, 6)
                 VStack(alignment: .leading, spacing: 6) {
@@ -172,5 +175,9 @@ struct InboxHomeView: View {
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("inbox-message-\(message.id)")
+    }
+
+    private func showsUnreadIndicator(_ message: InboxMessage) -> Bool {
+        message.isUnread && InboxMessageBuilder.classify(message) != .activity
     }
 }
