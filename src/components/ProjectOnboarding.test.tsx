@@ -206,6 +206,8 @@ describe("ProjectOnboarding", () => {
       ".onboarding-provider-progress",
     );
     expect(providerProgress?.getAttribute("role")).toBe("status");
+    expect(providerProgress?.getAttribute("aria-live")).toBe("polite");
+    expect(providerProgress?.getAttribute("aria-atomic")).toBe("true");
     expect(providerProgress?.textContent).toContain("Codex");
     expect(providerProgress?.textContent).toContain("저장소 구조를 분석하고 있습니다.");
 
@@ -458,6 +460,9 @@ describe("ProjectOnboarding", () => {
     const providerProgress = container.querySelector(
       ".onboarding-provider-progress",
     );
+    expect(providerProgress?.getAttribute("role")).toBe("status");
+    expect(providerProgress?.getAttribute("aria-live")).toBe("polite");
+    expect(providerProgress?.getAttribute("aria-atomic")).toBe("true");
     expect(providerProgress?.textContent).toContain("Codex");
     expect(providerProgress?.textContent).toContain(
       "패키지 매니저와 테스트 도구를 확인하고 있습니다.",
