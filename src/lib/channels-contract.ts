@@ -335,8 +335,31 @@ export const channelReplyCompletionSchema = z
       .strict()
       .nullable()
       .default(null),
+    /**
+     * Organization Agents can hand one repository-specific question to an
+     * eligible Project Agent. The server remains authoritative for the target
+     * organization, project, channel roster, and recursion boundary.
+     */
+    delegation: z
+      .object({
+        projectId: z.string().uuid(),
+        agentId: z.string().uuid(),
+        request: channelMessageBodySchema,
+      })
+      .strict()
+      .nullable()
+      .default(null),
   })
-  .strict();
+  .strict()
+  .superRefine((reply, context) => {
+    if (reply.delegation && (reply.document || reply.issueProposal)) {
+      context.addIssue({
+        code: "custom",
+        message: "A delegated reply cannot also attach a document or issue proposal",
+        path: ["delegation"],
+      });
+    }
+  });
 
 export const channelReplyClaimInputSchema = z
   .object({

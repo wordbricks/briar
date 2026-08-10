@@ -14,57 +14,98 @@ final class ChannelsStore: ObservableObject {
 
     private let api: any MobileAPIClientProtocol
     private let attachmentReference: @Sendable () -> String
+    private let pollInterval: Duration
+    private let maxDeltaPagesPerRefresh: Int
     private var organizationID: UUID?
     private var token: String?
+    private var syncCursor: Int?
+    private var focusedChannelID: UUID?
+    private var focusedThreadParentID: UUID?
+    private var generation = 0
+    private var isForeground = true
+    private var pollingTask: Task<Void, Never>?
 
     init(
         api: any MobileAPIClientProtocol,
+        pollInterval: Duration = .seconds(3),
+        maxDeltaPagesPerRefresh: Int = 20,
         attachmentReference: @escaping @Sendable () -> String = {
             UUID().uuidString.lowercased()
         }
     ) {
         self.api = api
+        self.pollInterval = pollInterval
+        self.maxDeltaPagesPerRefresh = min(max(maxDeltaPagesPerRefresh, 1), 20)
         self.attachmentReference = attachmentReference
     }
 
     func select(organizationID: UUID?, token: String?) {
         guard self.organizationID != organizationID || self.token != token else { return }
+        generation += 1
+        pollingTask?.cancel()
+        pollingTask = nil
         self.organizationID = organizationID
         self.token = token
+        syncCursor = nil
+        focusedChannelID = nil
+        focusedThreadParentID = nil
         channels = []
         messages = []
         thread = []
         members = []
         agents = []
+        loading = false
+        errorMessage = nil
         guard organizationID != nil, token != nil else { return }
-        Task { await refresh() }
+        if isForeground { startPolling() }
     }
 
     func refresh() async {
         guard let organizationID, let token else { return }
+        let expectedGeneration = generation
         loading = channels.isEmpty
-        defer { loading = false }
+        defer {
+            if expectedGeneration == generation {
+                loading = false
+            }
+        }
         do {
             let response: ChannelsResponse = try await api.get(
                 MobileAPIContract.Endpoint.channels(organizationID: organizationID),
                 token: token,
                 as: ChannelsResponse.self
             )
+            guard !Task.isCancelled, expectedGeneration == generation else { return }
             channels = response.channels
+            // Only the first authoritative snapshot establishes the cursor.
+            // Advancing it on a later list-only refresh could skip messages.
+            if syncCursor == nil {
+                syncCursor = response.cursor
+            }
             errorMessage = nil
         } catch {
+            guard !Task.isCancelled, expectedGeneration == generation else { return }
             errorMessage = CompanionStore.message(for: error)
         }
     }
 
     func openChannel(_ channelID: UUID) async {
         guard let organizationID, let token else { return }
+        let expectedGeneration = generation
+        focusedChannelID = channelID
+        focusedThreadParentID = nil
         loading = true
         messages = []
         thread = []
         members = []
         agents = []
-        defer { loading = false }
+        defer {
+            if expectedGeneration == generation,
+               focusedChannelID == channelID,
+               focusedThreadParentID == nil {
+                loading = false
+            }
+        }
         do {
             let response: ChannelDetailResponse = try await api.get(
                 MobileAPIContract.Endpoint.channel(
@@ -74,20 +115,40 @@ final class ChannelsStore: ObservableObject {
                 token: token,
                 as: ChannelDetailResponse.self
             )
+            guard
+                !Task.isCancelled,
+                expectedGeneration == generation,
+                focusedChannelID == channelID
+            else { return }
             messages = response.messages
             members = response.members
             agents = response.agents
             errorMessage = nil
         } catch {
+            guard
+                !Task.isCancelled,
+                expectedGeneration == generation,
+                focusedChannelID == channelID,
+                focusedThreadParentID == nil
+            else { return }
             errorMessage = CompanionStore.message(for: error)
         }
     }
 
     func openThread(channelID: UUID, parentMessageID: UUID) async {
         guard let organizationID, let token else { return }
+        let expectedGeneration = generation
+        focusedChannelID = channelID
+        focusedThreadParentID = parentMessageID
         loading = true
         thread = []
-        defer { loading = false }
+        defer {
+            if expectedGeneration == generation,
+               focusedChannelID == channelID,
+               focusedThreadParentID == parentMessageID {
+                loading = false
+            }
+        }
         do {
             let response: ChannelMessagesResponse = try await api.get(
                 MobileAPIContract.Endpoint.channelMessages(
@@ -98,11 +159,83 @@ final class ChannelsStore: ObservableObject {
                 token: token,
                 as: ChannelMessagesResponse.self
             )
+            guard
+                !Task.isCancelled,
+                expectedGeneration == generation,
+                focusedChannelID == channelID,
+                focusedThreadParentID == parentMessageID
+            else { return }
             thread = response.messages
             errorMessage = nil
         } catch {
+            guard
+                !Task.isCancelled,
+                expectedGeneration == generation,
+                focusedChannelID == channelID,
+                focusedThreadParentID == parentMessageID
+            else { return }
             errorMessage = CompanionStore.message(for: error)
         }
+    }
+
+    /// Applies a bounded number of organization channel-change pages. The
+    /// server includes the changed reply's root message, so one feed keeps both
+    /// root reply counts and the currently open thread current.
+    func refreshChanges() async {
+        guard let organizationID, let token else { return }
+        // Do not advance the organization cursor while an authoritative
+        // channel/thread snapshot is loading. A slower snapshot could otherwise
+        // overwrite this delta and make the skipped reply unrecoverable.
+        guard !loading else { return }
+        guard syncCursor != nil else {
+            await refresh()
+            return
+        }
+        let expectedGeneration = generation
+        do {
+            for _ in 0..<maxDeltaPagesPerRefresh {
+                guard let requestedCursor = syncCursor else { return }
+                let response: ChannelDeltaResponse = try await api.get(
+                    MobileAPIContract.Endpoint.channelChanges(
+                        organizationID: organizationID,
+                        cursor: requestedCursor
+                    ),
+                    token: token,
+                    as: ChannelDeltaResponse.self
+                )
+                guard
+                    !Task.isCancelled,
+                    expectedGeneration == generation,
+                    self.organizationID == organizationID,
+                    self.token == token,
+                    !loading,
+                    syncCursor == requestedCursor
+                else { return }
+                guard response.cursor >= requestedCursor else {
+                    throw MobileAPIError.invalidResponse
+                }
+
+                apply(response)
+                syncCursor = response.cursor
+                errorMessage = nil
+                guard response.hasMore, response.cursor > requestedCursor else { return }
+            }
+        } catch {
+            guard !Task.isCancelled, expectedGeneration == generation else { return }
+            errorMessage = CompanionStore.message(for: error)
+        }
+    }
+
+    func applicationDidBecomeActive() {
+        isForeground = true
+        guard organizationID != nil, token != nil else { return }
+        startPolling()
+    }
+
+    func applicationDidEnterBackground() {
+        isForeground = false
+        pollingTask?.cancel()
+        pollingTask = nil
     }
 
     /// A nil `parentMessageID` posts to the channel; otherwise into that thread.
@@ -266,6 +399,102 @@ final class ChannelsStore: ObservableObject {
         } catch {
             errorMessage = CompanionStore.message(for: error)
             return nil
+        }
+    }
+
+    private func apply(_ delta: ChannelDeltaResponse) {
+        let removedChannelIDs = Set(delta.removedChannelIds)
+        var nextChannels = channels.filter { !removedChannelIDs.contains($0.id) }
+        for updated in delta.channels {
+            if let index = nextChannels.firstIndex(where: { $0.id == updated.id }) {
+                nextChannels[index] = updated
+            } else {
+                nextChannels.append(updated)
+            }
+        }
+        channels = nextChannels
+
+        if let focusedChannelID, removedChannelIDs.contains(focusedChannelID) {
+            self.focusedChannelID = nil
+            focusedThreadParentID = nil
+            messages = []
+            thread = []
+            members = []
+            agents = []
+            return
+        }
+
+        guard let focusedChannelID else { return }
+        let removedMessageIDs = Set(delta.removedMessageIds)
+        let relevant = delta.messages.filter { $0.channelId == focusedChannelID }
+        messages = Self.mergeMessages(
+            messages,
+            updates: relevant.filter { $0.parentMessageId == nil },
+            removing: removedMessageIDs
+        )
+
+        guard let focusedThreadParentID else { return }
+        thread = Self.mergeMessages(
+            thread,
+            updates: relevant.filter {
+                $0.id == focusedThreadParentID ||
+                    $0.parentMessageId == focusedThreadParentID
+            },
+            removing: removedMessageIDs
+        )
+    }
+
+    private static func mergeMessages(
+        _ current: [ChannelMessage],
+        updates: [ChannelMessage],
+        removing removedIDs: Set<UUID>
+    ) -> [ChannelMessage] {
+        var byID = Dictionary(
+            uniqueKeysWithValues: current
+                .filter { !removedIDs.contains($0.id) }
+                .map { ($0.id, $0) }
+        )
+        for message in updates where !removedIDs.contains(message.id) {
+            byID[message.id] = message
+        }
+        return byID.values.sorted { left, right in
+            if left.createdAt != right.createdAt {
+                return left.createdAt < right.createdAt
+            }
+            return left.id.uuidString < right.id.uuidString
+        }
+    }
+
+    private func startPolling() {
+        pollingTask?.cancel()
+        guard isForeground, organizationID != nil, token != nil else {
+            pollingTask = nil
+            return
+        }
+        let expectedGeneration = generation
+        let interval = pollInterval
+        pollingTask = Task { [weak self] in
+            if let self {
+                guard expectedGeneration == self.generation else { return }
+                if self.syncCursor == nil {
+                    await self.refresh()
+                } else {
+                    await self.refreshChanges()
+                }
+            }
+            while !Task.isCancelled {
+                do {
+                    try await Task.sleep(for: interval)
+                } catch {
+                    return
+                }
+                guard
+                    !Task.isCancelled,
+                    let self,
+                    expectedGeneration == self.generation
+                else { return }
+                await self.refreshChanges()
+            }
         }
     }
 

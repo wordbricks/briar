@@ -1,0 +1,66 @@
+import { describe, expect, it } from "vitest";
+import { channelReplyCompletionSchema } from "./channels-contract";
+
+const projectId = "11111111-1111-4111-8111-111111111111";
+const agentId = "22222222-2222-4222-8222-222222222222";
+
+describe("channel reply completion contract", () => {
+  it("keeps delegation null for rolling-compatible ordinary replies", () => {
+    expect(channelReplyCompletionSchema.parse({
+      body: "Answer",
+      document: null,
+      issueProposal: null,
+    })).toEqual({
+      body: "Answer",
+      document: null,
+      issueProposal: null,
+      delegation: null,
+    });
+  });
+
+  it("accepts one bounded structured Project Agent delegation", () => {
+    expect(channelReplyCompletionSchema.parse({
+      body: "I asked the project Agent to inspect the repository.",
+      document: null,
+      issueProposal: null,
+      delegation: {
+        projectId,
+        agentId,
+        request: "  Which module owns authentication?  ",
+      },
+    })).toMatchObject({
+      delegation: {
+        projectId,
+        agentId,
+        request: "Which module owns authentication?",
+      },
+    });
+  });
+
+  it("does not combine a delegation with an artifact or accept extra authority", () => {
+    const combined = channelReplyCompletionSchema.safeParse({
+      body: "Delegating and proposing.",
+      document: {
+        title: "Plan",
+        markdown: "# Plan",
+        projectId,
+      },
+      issueProposal: null,
+      delegation: { projectId, agentId, request: "Inspect it." },
+    });
+    expect(combined.success).toBe(false);
+
+    const expanded = channelReplyCompletionSchema.safeParse({
+      body: "Delegating.",
+      document: null,
+      issueProposal: null,
+      delegation: {
+        projectId,
+        agentId,
+        request: "Inspect it.",
+        provider: "codex",
+      },
+    });
+    expect(expanded.success).toBe(false);
+  });
+});

@@ -393,6 +393,12 @@ describe("organization channels", () => {
       effort: null,
       createdAt: at(8),
     });
+    await addChannelAgent(db, {
+      channelId,
+      agentId: agent!.id,
+      addedByUserId: ownerId,
+      createdAt: at(8),
+    });
     await createChannelMessage(db, {
       id: triggerId,
       channelId,
@@ -878,6 +884,12 @@ describe("organization channels", () => {
         at(12),
       )
       .run();
+    await addChannelAgent(db, {
+      channelId,
+      agentId,
+      addedByUserId: ownerId,
+      createdAt: at(12),
+    });
     expect(
       await listOrganizationAgents(db, organizationId, { projectId }),
     ).toEqual([
@@ -1144,6 +1156,12 @@ describe("organization channels", () => {
       effort: null,
       createdAt: at(17),
     });
+    await addChannelAgent(db, {
+      channelId,
+      agentId: agent!.id,
+      addedByUserId: ownerId,
+      createdAt: at(17),
+    });
     const triggerId = "f0000000-0000-4000-8000-000000000006";
     await createChannelMessage(db, {
       id: triggerId,
@@ -1158,7 +1176,7 @@ describe("organization channels", () => {
       mentionedAgentIds: [agent!.id],
       createdAt: at(18),
     });
-    await enqueueChannelAgentReplies(db, {
+    const jobs = await enqueueChannelAgentReplies(db, {
       organizationId,
       channelId,
       triggerMessageId: triggerId,
@@ -1166,6 +1184,7 @@ describe("organization channels", () => {
       agents: [{ id: agent!.id, projectId: null, provider: "codex" }],
       createdAt: at(18),
     });
+    expect(jobs).toHaveLength(1);
 
     expect(
       await claimNextChannelAgentReply(db, organizationId, {
@@ -1211,6 +1230,18 @@ describe("organization channels", () => {
       model: null,
       responsibility: "Research",
       effort: null,
+      createdAt: at(20),
+    });
+    await addChannelAgent(db, {
+      channelId,
+      agentId: first!.id,
+      addedByUserId: ownerId,
+      createdAt: at(20),
+    });
+    await addChannelAgent(db, {
+      channelId,
+      agentId: second!.id,
+      addedByUserId: ownerId,
       createdAt: at(20),
     });
     const triggerId = "f0000000-0000-4000-8000-000000000007";

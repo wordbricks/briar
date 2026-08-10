@@ -2041,6 +2041,24 @@ const claimedIssueReplySchema = z.object({
 
 type ClaimedIssueReply = z.infer<typeof claimedIssueReplySchema>;
 
+const channelDelegationTargetSchema = z.object({
+  agentId: z.string().uuid(),
+  agentName: z.string().trim().min(1).max(100),
+  projectId: z.string().uuid(),
+  projectName: z.string().trim().min(1).max(300),
+  responsibility: z.string().trim().min(1).max(2_000),
+  skills: z.array(z.object({
+    id: z.string().uuid(),
+    name: z.string().trim().min(1).max(100),
+  }).strict()).max(50),
+}).strict();
+
+const claimedChannelDelegationSchema = z.object({
+  delegatedByReplyId: z.string().uuid(),
+  delegatedByAgentId: z.string().uuid(),
+  delegatedByAgentName: z.string().trim().min(1).max(100),
+  request: z.string().trim().min(1).max(10_000),
+}).strict();
 
 const claimedChannelReplySchema = z.object({
   workType: z.literal("channelReply"),
@@ -2075,6 +2093,8 @@ const claimedChannelReplySchema = z.object({
   leaseExpiresAt: z.string().datetime({ offset: true }),
   organizationContext:
     organizationAgentContextDescriptorSchema.nullable().optional(),
+  delegation: claimedChannelDelegationSchema.nullable().default(null),
+  delegationTargets: z.array(channelDelegationTargetSchema).default([]),
   snapshot: z.record(z.string(), z.unknown()),
 }).superRefine((reply, context) => {
   const scope = reply.scope ?? (reply.projectId === null
@@ -2112,6 +2132,13 @@ const claimedChannelReplySchema = z.object({
         path: ["organizationContext", "snapshotAt"],
       });
     }
+    if (reply.delegation) {
+      context.addIssue({
+        code: "custom",
+        message: "Organization reply cannot itself be delegated",
+        path: ["delegation"],
+      });
+    }
     return;
   }
   if (reply.organizationContext) {
@@ -2126,6 +2153,13 @@ const claimedChannelReplySchema = z.object({
       code: "custom",
       message: "Project reply scope does not match its project",
       path: ["scope", "projectId"],
+    });
+  }
+  if (reply.delegationTargets.length > 0) {
+    context.addIssue({
+      code: "custom",
+      message: "Project reply cannot receive delegation targets",
+      path: ["delegationTargets"],
     });
   }
 }).transform((reply) => ({
@@ -2966,6 +3000,8 @@ async function runClaimedChannelReply(
       },
       workspaceAvailable: Boolean(analysisWorktree),
       organizationContextAvailable: organizationContext !== null,
+      delegationTargets: reply.delegationTargets,
+      delegation: reply.delegation,
     });
     const providerRuntime = await prepareReadOnlyAgentEnvironment(
       agent.provider,
@@ -2980,6 +3016,9 @@ async function runClaimedChannelReply(
       attachments: downloadedImages.attachments,
       organizationContextManifestPath:
         organizationContext?.manifestPath ?? null,
+      delegationTargets: reply.scope.kind === "organization"
+        ? reply.delegationTargets
+        : undefined,
       environment: providerRuntime.environment,
       signal,
     })

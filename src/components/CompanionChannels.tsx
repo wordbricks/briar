@@ -15,6 +15,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import {
@@ -22,6 +23,7 @@ import {
   listChannelMessages,
   listChannels,
   loadChannel,
+  loadChannelDelta,
   sendChannelMessage,
   toggleChannelMessageReaction,
 } from "../lib/api";
@@ -30,6 +32,7 @@ import {
   type ChannelGroupProject,
 } from "../lib/channel-grouping";
 import type {
+  ChannelAgentReply,
   ChannelAgentSummary,
   ChannelMember,
   ChannelMessage,
@@ -46,6 +49,51 @@ import {
 import { ChannelMentionMenu } from "./ChannelMentionMenu";
 import { ChannelMessageText } from "./ChannelMessageText";
 import { ChannelMessageReactions } from "./ChannelMessageReactions";
+
+/** Match the foreground chat cadence used by the desktop channel view. */
+const COMPANION_CHANNEL_POLL_INTERVAL_MS = 3_000;
+const MAX_DELTA_PAGES_PER_POLL = 20;
+
+const mergeMessages = (
+  current: ChannelMessage[],
+  incoming: ChannelMessage[],
+  removedIds: string[],
+) => {
+  const byId = new Map(current.map((item) => [item.id, item]));
+  for (const item of incoming) byId.set(item.id, item);
+  for (const id of removedIds) byId.delete(id);
+  return [...byId.values()].sort((left, right) =>
+    left.createdAt === right.createdAt
+      ? left.id.localeCompare(right.id)
+      : left.createdAt.localeCompare(right.createdAt),
+  );
+};
+
+const mergeChannels = (
+  current: ChannelSummary[],
+  incoming: ChannelSummary[],
+  removedIds: string[],
+) => {
+  const removed = new Set(removedIds);
+  const byId = new Map(
+    current
+      .filter((item) => !removed.has(item.id))
+      .map((item) => [item.id, item]),
+  );
+  for (const item of incoming) {
+    if (!removed.has(item.id)) byId.set(item.id, item);
+  }
+  return [...byId.values()];
+};
+
+const mergeReplies = (
+  current: ChannelAgentReply[],
+  incoming: ChannelAgentReply[],
+) => {
+  const byId = new Map(current.map((item) => [item.id, item]));
+  for (const item of incoming) byId.set(item.id, item);
+  return [...byId.values()];
+};
 
 type CompanionChannelsProps = {
   organizationId: string;
@@ -83,6 +131,7 @@ export function CompanionChannels({
   const [messages, setMessages] = useState<ChannelMessage[]>([]);
   const [members, setMembers] = useState<ChannelMember[]>([]);
   const [agents, setAgents] = useState<ChannelAgentSummary[]>([]);
+  const [replies, setReplies] = useState<ChannelAgentReply[]>([]);
   const [thread, setThread] = useState<ChannelMessage[] | null>(null);
   const [threadParentId, setThreadParentId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -91,14 +140,30 @@ export function CompanionChannels({
   const [proposalProjects, setProposalProjects] = useState<
     Record<string, string>
   >({});
+  const cursor = useRef(0);
+  const channelSelectionVersion = useRef(0);
 
   useEffect(() => {
     let cancelled = false;
+    channelSelectionVersion.current += 1;
+    cursor.current = 0;
+    setChannels([]);
+    setChannel(null);
+    setMessages([]);
+    setMembers([]);
+    setAgents([]);
+    setReplies([]);
+    setThread(null);
+    setThreadParentId(null);
+    setError(null);
     setLoading(true);
     void (async () => {
       try {
         const result = await listChannels(token, organizationId);
-        if (!cancelled) setChannels(result.channels);
+        if (!cancelled) {
+          cursor.current = result.cursor;
+          setChannels(result.channels);
+        }
       } catch (cause) {
         if (!cancelled) setError(message(cause));
       } finally {
@@ -123,33 +188,158 @@ export function CompanionChannels({
 
   const openChannel = useCallback(
     async (summary: ChannelSummary) => {
+      const selectionVersion = ++channelSelectionVersion.current;
       setChannel(summary);
       setThread(null);
       setThreadParentId(null);
       setMessages([]);
       setMembers([]);
       setAgents([]);
+      setReplies([]);
+      setError(null);
       setLoading(true);
       try {
         const result = await loadChannel(token, organizationId, summary.id);
+        if (selectionVersion !== channelSelectionVersion.current) return;
         setChannel(result.channel);
         setMessages(result.messages);
         setMembers(result.members);
         setAgents(result.agents);
       } catch (cause) {
-        setError(message(cause));
+        if (selectionVersion === channelSelectionVersion.current) {
+          setError(message(cause));
+        }
       } finally {
-        setLoading(false);
+        if (selectionVersion === channelSelectionVersion.current) {
+          setLoading(false);
+        }
       }
     },
     [organizationId, token],
   );
 
+  useEffect(() => {
+    const selectedChannelId = channel?.id;
+    // Keep the organization cursor behind an authoritative channel/thread
+    // load. Otherwise a delta can advance first and then be overwritten by a
+    // slower full response, permanently hiding that reply.
+    if (!selectedChannelId || loading) return;
+    const pollingSelectionVersion = channelSelectionVersion.current;
+    let stopped = false;
+    let inFlight = false;
+    const abortController = new AbortController();
+
+    const tick = async () => {
+      if (stopped || inFlight || document.hidden) return;
+      inFlight = true;
+      try {
+        for (let page = 0; page < MAX_DELTA_PAGES_PER_POLL; page += 1) {
+          const delta = await loadChannelDelta(
+            token,
+            organizationId,
+            cursor.current,
+            abortController.signal,
+          );
+          if (
+            stopped ||
+            pollingSelectionVersion !== channelSelectionVersion.current
+          ) return;
+          cursor.current = delta.cursor;
+
+          setChannels((current) =>
+            mergeChannels(
+              current,
+              delta.channels,
+              delta.removedChannelIds,
+            ),
+          );
+          if (delta.removedChannelIds.includes(selectedChannelId)) {
+            channelSelectionVersion.current += 1;
+            setChannel(null);
+            setMessages([]);
+            setMembers([]);
+            setAgents([]);
+            setReplies([]);
+            setThread(null);
+            setThreadParentId(null);
+            return;
+          }
+
+          const selectedSummary = delta.channels.find(
+            (item) => item.id === selectedChannelId,
+          );
+          if (selectedSummary) setChannel(selectedSummary);
+
+          const selectedMessages = delta.messages.filter(
+            (item) => item.channelId === selectedChannelId,
+          );
+          setMessages((current) =>
+            mergeMessages(
+              current,
+              selectedMessages.filter((item) => item.parentMessageId === null),
+              delta.removedMessageIds,
+            ),
+          );
+          if (threadParentId) {
+            setThread((current) =>
+              current
+                ? mergeMessages(
+                    current,
+                    selectedMessages.filter(
+                      (item) =>
+                        item.id === threadParentId ||
+                        item.parentMessageId === threadParentId,
+                    ),
+                    delta.removedMessageIds,
+                  )
+                : current,
+            );
+          }
+
+          const selectedReplies = delta.agentReplies.filter(
+            (item) => item.channelId === selectedChannelId,
+          );
+          if (selectedReplies.length > 0) {
+            setReplies((current) => mergeReplies(current, selectedReplies));
+            const failed = selectedReplies.find(
+              (item) => item.status === "failed",
+            );
+            if (failed) {
+              setError(
+                t("run.briarReplyFailed", {
+                  error: failed.error ?? t("run.failed"),
+                }),
+              );
+            }
+          }
+
+          if (!delta.hasMore) break;
+        }
+      } catch {
+        // Transient refresh failures retry on the next foreground interval.
+      } finally {
+        inFlight = false;
+      }
+    };
+
+    const timer = window.setInterval(
+      () => void tick(),
+      COMPANION_CHANNEL_POLL_INTERVAL_MS,
+    );
+    return () => {
+      stopped = true;
+      abortController.abort();
+      window.clearInterval(timer);
+    };
+  }, [channel?.id, loading, organizationId, t, threadParentId, token]);
+
   const openThread = useCallback(
     async (parent: ChannelMessage) => {
       if (!channel) return;
+      const selectionVersion = ++channelSelectionVersion.current;
       setThreadParentId(parent.id);
       setThread(null);
+      setError(null);
       setLoading(true);
       try {
         const result = await listChannelMessages(
@@ -158,11 +348,16 @@ export function CompanionChannels({
           channel.id,
           parent.id,
         );
+        if (selectionVersion !== channelSelectionVersion.current) return;
         setThread(result.messages);
       } catch (cause) {
-        setError(message(cause));
+        if (selectionVersion === channelSelectionVersion.current) {
+          setError(message(cause));
+        }
       } finally {
-        setLoading(false);
+        if (selectionVersion === channelSelectionVersion.current) {
+          setLoading(false);
+        }
       }
     },
     [channel, organizationId, token],
@@ -171,15 +366,23 @@ export function CompanionChannels({
   useEffect(() => {
     if (!requestedMessage) return;
     const summary = channels.find(
-      (candidate) => candidate.id === requestedMessage.channelId,
+      (candidate) =>
+        candidate.organizationId === organizationId &&
+        candidate.id === requestedMessage.channelId,
     );
     if (!summary) return;
+    const selectionVersion = ++channelSelectionVersion.current;
     let cancelled = false;
+    setReplies([]);
+    setError(null);
     setLoading(true);
     void (async () => {
       try {
         const result = await loadChannel(token, organizationId, summary.id);
-        if (cancelled) return;
+        if (
+          cancelled ||
+          selectionVersion !== channelSelectionVersion.current
+        ) return;
         setChannel(result.channel);
         setMessages(result.messages);
         setMembers(result.members);
@@ -191,7 +394,10 @@ export function CompanionChannels({
             summary.id,
             requestedMessage.rootMessageId,
           );
-          if (cancelled) return;
+          if (
+            cancelled ||
+            selectionVersion !== channelSelectionVersion.current
+          ) return;
           setThreadParentId(requestedMessage.rootMessageId);
           setThread(threadResult.messages);
         } else {
@@ -208,13 +414,26 @@ export function CompanionChannels({
           onRequestedMessageOpen?.();
         });
       } catch (cause) {
-        if (!cancelled) setError(message(cause));
+        if (
+          !cancelled &&
+          selectionVersion === channelSelectionVersion.current
+        ) {
+          setError(message(cause));
+        }
       } finally {
-        if (!cancelled) setLoading(false);
+        if (
+          !cancelled &&
+          selectionVersion === channelSelectionVersion.current
+        ) {
+          setLoading(false);
+        }
       }
     })();
     return () => {
       cancelled = true;
+      if (channelSelectionVersion.current === selectionVersion) {
+        channelSelectionVersion.current += 1;
+      }
     };
   }, [
     channels,
@@ -233,6 +452,7 @@ export function CompanionChannels({
     ) => {
       if (!channel || !body.trim()) return;
       setBusy(true);
+      setError(null);
       try {
         const result = await sendChannelMessage(token, organizationId, channel.id, {
           body: body.trim(),
@@ -246,10 +466,13 @@ export function CompanionChannels({
           attachments,
           attachmentReferences,
         });
+        setReplies((current) => mergeReplies(current, result.agentReplies));
         if (threadParentId) {
-          setThread((current) => [...(current ?? []), result.message]);
+          setThread((current) =>
+            mergeMessages(current ?? [], [result.message], []),
+          );
         } else {
-          setMessages((current) => [...current, result.message]);
+          setMessages((current) => mergeMessages(current, [result.message], []));
         }
       } catch (cause) {
         setError(message(cause));
@@ -258,6 +481,10 @@ export function CompanionChannels({
       }
     },
     [channel, organizationId, threadParentId, token],
+  );
+
+  const pendingReplies = replies.filter(
+    (item) => item.status === "queued" || item.status === "running",
   );
 
   const acceptProposal = useCallback(
@@ -334,8 +561,10 @@ export function CompanionChannels({
       <section className="companion-channels companion-channel-detail">
         <ChannelBar
           onBack={() => {
+            channelSelectionVersion.current += 1;
             setThreadParentId(null);
             setThread(null);
+            setLoading(false);
           }}
           title={t("companion.channelThread")}
         />
@@ -369,6 +598,12 @@ export function CompanionChannels({
               token={token}
             />
           ))}
+          {pendingReplies.length > 0 ? (
+            <div className="channel-typing companion-channel-typing">
+              <LoaderCircle className="spin" size={15} />
+              {t("channel.agentTyping")}
+            </div>
+          ) : null}
         </div>
         <CompanionChannelComposer
           agents={agents}
@@ -386,8 +621,11 @@ export function CompanionChannels({
       <section className="companion-channels companion-channel-detail">
         <ChannelBar
           onBack={() => {
+            channelSelectionVersion.current += 1;
             setChannel(null);
             setMessages([]);
+            setReplies([]);
+            setLoading(false);
           }}
           channel={channel}
         />
@@ -423,6 +661,12 @@ export function CompanionChannels({
               token={token}
             />
           ))}
+          {pendingReplies.length > 0 ? (
+            <div className="channel-typing companion-channel-typing">
+              <LoaderCircle className="spin" size={15} />
+              {t("channel.agentTyping")}
+            </div>
+          ) : null}
           {!loading && messages.length === 0 ? (
             <p className="companion-channel-empty">
               {t("companion.channelsEmpty")}

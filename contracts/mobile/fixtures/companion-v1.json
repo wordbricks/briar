@@ -870,6 +870,56 @@
         "cursor": 12
       }
     },
+    "getChannelDelta": {
+      "method": "GET",
+      "path": "/organizations/{organizationId}/channel-changes?since={since}",
+      "status": 200,
+      "response": {
+        "cursor": 13,
+        "hasMore": false,
+        "channels": [],
+        "removedChannelIds": [],
+        "messages": [
+          {
+            "id": "44444444-4444-4444-8444-444444444445",
+            "channelId": "33333333-3333-4333-8333-333333333333",
+            "parentMessageId": "44444444-4444-4444-8444-444444444444",
+            "body": "저장소를 확인한 Project Agent의 답변입니다.",
+            "author": {
+              "type": "agent",
+              "id": "66666666-6666-4666-8666-666666666666",
+              "name": "Honey",
+              "provider": "claude"
+            },
+            "mentionedUserIds": [],
+            "mentionedAgentIds": [],
+            "attachments": [],
+            "reactions": [],
+            "replyCount": 0,
+            "lastReplyAt": null,
+            "document": null,
+            "proposal": null,
+            "createdAt": "2026-08-06T00:04:00.000Z"
+          }
+        ],
+        "removedMessageIds": [],
+        "agentReplies": [
+          {
+            "id": "77777777-7777-4777-8777-777777777777",
+            "agentId": "66666666-6666-4666-8666-666666666666",
+            "channelId": "33333333-3333-4333-8333-333333333333",
+            "triggerMessageId": "44444444-4444-4444-8444-444444444444",
+            "parentMessageId": "44444444-4444-4444-8444-444444444444",
+            "replyMessageId": "44444444-4444-4444-8444-444444444445",
+            "status": "completed",
+            "attempts": 1,
+            "error": null,
+            "createdAt": "2026-08-06T00:03:30.000Z",
+            "updatedAt": "2026-08-06T00:04:00.000Z"
+          }
+        ]
+      }
+    },
     "getChannel": {
       "method": "GET",
       "path": "/organizations/{organizationId}/channels/{channelId}",
