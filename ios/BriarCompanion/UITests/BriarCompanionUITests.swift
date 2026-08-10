@@ -54,7 +54,7 @@ final class BriarCompanionUITests: XCTestCase {
 
         XCTAssertTrue(app.staticTexts["진행 중"].exists)
         XCTAssertTrue(app.staticTexts["완료"].exists)
-        XCTAssertTrue(app.staticTexts["확인 필요"].exists)
+        XCTAssertTrue(app.staticTexts["차단"].exists)
         XCTAssertTrue(app.staticTexts["실패"].exists)
         let workerIcon = app.descendants(matching: .any)["실행 Worker Mac Studio"]
         XCTAssertTrue(workerIcon.waitForExistence(timeout: 5))
