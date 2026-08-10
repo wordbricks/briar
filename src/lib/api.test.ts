@@ -630,6 +630,7 @@ describe("API errors", () => {
       preferredProvider: "claude",
       preferredModel: "sonnet",
       preferredEffort: "high",
+      fullAuto: true,
     });
 
     const body = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
@@ -638,6 +639,7 @@ describe("API errors", () => {
       preferredProvider: "claude",
       preferredModel: "sonnet",
       preferredEffort: "high",
+      fullAuto: true,
     });
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining(`/projects/${projectId}/issues`),

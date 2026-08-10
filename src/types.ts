@@ -52,6 +52,7 @@ export type CreateIssueInput = {
   preferredModel?: string | null;
   preferredEffort?: ModelEffort | null;
   checkpoints?: AutoHuntWorkflowCheckpoint[];
+  fullAuto?: boolean;
 };
 
 export type UpdateIssueInput = {
@@ -249,6 +250,7 @@ export type HuntRun = {
     terminalReviewOnly: boolean;
   } | null;
   issueCheckpoints?: AutoHuntWorkflowCheckpoint[];
+  fullAuto?: boolean;
   detail: string | null;
   priority: number | null;
   assigneeUserId?: string | null;
