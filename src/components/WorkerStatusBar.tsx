@@ -1,8 +1,16 @@
-import { Monitor, Settings } from "lucide-react";
-import { useEffect, useId, useRef, useState } from "react";
+import { Download, LoaderCircle, Monitor, Settings } from "lucide-react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { useI18n } from "../i18n";
+import {
+  loadOrganizationExecutionWorkers,
+  requestOrganizationExecutionWorkerUpdate,
+} from "../lib/api";
 import type { AgentProvider } from "../lib/project-llm";
-import type { ExecutionWorker } from "../types";
+import {
+  compareSemanticVersions,
+  isSemanticVersion,
+} from "../lib/semantic-version";
+import type { ExecutionWorker, OrganizationExecutionWorker } from "../types";
 import { WorkerIcon } from "./WorkerIcon";
 import { WorkerProviderIcons } from "./WorkerProviderIcons";
 
@@ -22,19 +30,92 @@ export function activeWorkerCount(workers: ExecutionWorker[]): number {
   return workers.filter((worker) => worker.state === "online").length;
 }
 
+export function workerBriarVersion(worker: ExecutionWorker): string | null {
+  const version = worker.versions?.briar;
+  return typeof version === "string" && version.length > 0 ? version : null;
+}
+
+export function workerRemoteUpdateSupported(worker: ExecutionWorker): boolean {
+  const capabilities = worker.capabilities as {
+    remoteUpdates?: { supported?: unknown; protocol?: unknown };
+  };
+  return (
+    capabilities.remoteUpdates?.supported === true &&
+    capabilities.remoteUpdates.protocol === 1
+  );
+}
+
+export function workerUpdateAvailable({
+  currentVersion,
+  latestVersion,
+}: {
+  currentVersion: string | null;
+  latestVersion: string | null;
+}): boolean {
+  return Boolean(
+    latestVersion &&
+      currentVersion &&
+      isSemanticVersion(currentVersion) &&
+      isSemanticVersion(latestVersion) &&
+      compareSemanticVersions(currentVersion, latestVersion) < 0,
+  );
+}
+
+type DeviceUpdateState = {
+  remoteUpdateSupported: boolean;
+  updateRequest: OrganizationExecutionWorker["updateRequest"];
+};
+
 export function WorkerStatusBar({
   onOpenSettings,
+  organizationId,
+  token,
+  userId,
   workers,
 }: {
   onOpenSettings: () => void;
+  organizationId?: string | null;
+  token?: string | null;
+  userId?: string | null;
   workers: ExecutionWorker[];
 }) {
   const { t } = useI18n();
   const [isOpen, setIsOpen] = useState(false);
+  const [latestVersion, setLatestVersion] = useState<string | null>(null);
+  const [canManage, setCanManage] = useState(false);
+  const [deviceUpdates, setDeviceUpdates] = useState<
+    Record<string, DeviceUpdateState>
+  >({});
+  const [updatingDeviceIds, setUpdatingDeviceIds] = useState<
+    Record<string, true>
+  >({});
+  const [updateError, setUpdateError] = useState<string | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const popoverId = useId();
   const activeCount = activeWorkerCount(workers);
+
+  const refreshUpdateMetadata = useCallback(async () => {
+    if (!token || !organizationId) return;
+    try {
+      const remote = await loadOrganizationExecutionWorkers(
+        token,
+        organizationId,
+      );
+      setLatestVersion(remote.latestVersion ?? null);
+      setCanManage(Boolean(remote.canManage));
+      const next: Record<string, DeviceUpdateState> = {};
+      for (const device of remote.workers) {
+        next[device.deviceId] = {
+          remoteUpdateSupported: Boolean(device.remoteUpdateSupported),
+          updateRequest: device.updateRequest ?? null,
+        };
+      }
+      setDeviceUpdates(next);
+    } catch {
+      // Version display still works from dashboard workers; update controls stay hidden.
+    }
+  }, [organizationId, token]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -55,6 +136,48 @@ export function WorkerStatusBar({
       document.removeEventListener("keydown", closeOnEscape);
     };
   }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    void refreshUpdateMetadata();
+  }, [isOpen, refreshUpdateMetadata]);
+
+  const hasPendingUpdate = Object.values(deviceUpdates).some(
+    (device) => Boolean(device.updateRequest),
+  );
+
+  useEffect(() => {
+    if (!isOpen || !hasPendingUpdate) return;
+    const timer = window.setInterval(() => {
+      void refreshUpdateMetadata();
+    }, 4000);
+    return () => window.clearInterval(timer);
+  }, [hasPendingUpdate, isOpen, refreshUpdateMetadata]);
+
+  const requestUpdate = async (worker: ExecutionWorker) => {
+    if (!token || !organizationId || !worker.deviceId) return;
+    setUpdateError(null);
+    setUpdatingDeviceIds((current) => ({
+      ...current,
+      [worker.deviceId]: true,
+    }));
+    try {
+      await requestOrganizationExecutionWorkerUpdate(
+        token,
+        organizationId,
+        worker.deviceId,
+      );
+      await refreshUpdateMetadata();
+    } catch (caught) {
+      setUpdateError(caught instanceof Error ? caught.message : String(caught));
+    } finally {
+      setUpdatingDeviceIds((current) => {
+        const next = { ...current };
+        delete next[worker.deviceId];
+        return next;
+      });
+    }
+  };
 
   if (workers.length === 0) return null;
 
@@ -107,6 +230,11 @@ export function WorkerStatusBar({
               </button>
             </span>
           </header>
+          {updateError ? (
+            <p className="worker-status-error" role="alert">
+              {updateError}
+            </p>
+          ) : null}
           <div className="worker-status-list">
             {workers.map((worker) => {
               const providers = workerProviders(worker);
@@ -120,11 +248,47 @@ export function WorkerStatusBar({
                 active: activeSlots,
                 maximum: maximumSlots,
               });
+              const currentVersion = workerBriarVersion(worker);
+              const versionLabel = currentVersion
+                ? t("organization.workerVersion", { version: currentVersion })
+                : null;
+              const deviceState = worker.deviceId
+                ? deviceUpdates[worker.deviceId]
+                : undefined;
+              const remoteUpdateSupported =
+                deviceState?.remoteUpdateSupported ??
+                workerRemoteUpdateSupported(worker);
+              const updateRequest = deviceState?.updateRequest ?? null;
+              const updateAvailable = workerUpdateAvailable({
+                currentVersion,
+                latestVersion,
+              });
+              const mayRequestUpdate =
+                Boolean(token && organizationId && worker.deviceId) &&
+                (canManage ||
+                  userId == null ||
+                  worker.ownerUserId == null ||
+                  worker.ownerUserId === userId);
+              const isUpdating = Boolean(
+                worker.deviceId && updatingDeviceIds[worker.deviceId],
+              );
+              const isPending = Boolean(updateRequest);
+              const showUpdateControl =
+                mayRequestUpdate &&
+                remoteUpdateSupported &&
+                (updateAvailable || isPending || isUpdating);
+              const titleParts = [
+                worker.label,
+                status,
+                slotUsage,
+                versionLabel,
+              ].filter(Boolean);
+
               return (
                 <div
                   className="worker-status-item"
                   key={worker.id}
-                  title={`${worker.label} · ${status} · ${slotUsage}`}
+                  title={titleParts.join(" · ")}
                 >
                   <i
                     aria-label={status}
@@ -155,10 +319,71 @@ export function WorkerStatusBar({
                           {activeSlots}/{maximumSlots}
                         </small>
                       </span>
+                      {versionLabel ? (
+                        <small className="worker-status-version">
+                          {versionLabel}
+                        </small>
+                      ) : null}
                     </span>
                   </span>
-                  <span className="worker-status-providers">
-                    <WorkerProviderIcons providers={providers} size={13} />
+                  <span className="worker-status-actions">
+                    <span className="worker-status-providers">
+                      <WorkerProviderIcons providers={providers} size={13} />
+                    </span>
+                    {showUpdateControl ? (
+                      <button
+                        aria-busy={isUpdating || isPending}
+                        aria-label={
+                          isPending
+                            ? t("organization.workerUpdatePending", {
+                                version:
+                                  updateRequest?.targetVersion ??
+                                  latestVersion ??
+                                  "",
+                              })
+                            : t("organization.workerUpdate", {
+                                name: worker.label,
+                              })
+                        }
+                        className="worker-status-update"
+                        disabled={
+                          isUpdating ||
+                          isPending ||
+                          worker.state !== "online" ||
+                          !updateAvailable
+                        }
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          void requestUpdate(worker);
+                        }}
+                        title={
+                          isPending
+                            ? t("organization.workerUpdatePending", {
+                                version:
+                                  updateRequest?.targetVersion ??
+                                  latestVersion ??
+                                  "",
+                              })
+                            : remoteUpdateSupported
+                              ? t("organization.workerUpdate", {
+                                  name: worker.label,
+                                })
+                              : t("organization.workerUpdateUnsupported")
+                        }
+                        type="button"
+                      >
+                        {isUpdating || isPending ? (
+                          <LoaderCircle
+                            aria-hidden
+                            className="spin"
+                            size={13}
+                            strokeWidth={1.8}
+                          />
+                        ) : (
+                          <Download aria-hidden size={13} strokeWidth={1.8} />
+                        )}
+                      </button>
+                    ) : null}
                   </span>
                 </div>
               );
