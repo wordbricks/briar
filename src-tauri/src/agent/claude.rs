@@ -1,29 +1,37 @@
-use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde::Serialize;
+use serde_json::Value;
 use std::{
     ffi::OsStr,
-    io::{BufRead, BufReader, Read, Write},
     path::{Path, PathBuf},
-    process::{Child, ChildStdin, ChildStdout},
-    sync::{Arc, Mutex},
-    thread,
+    sync::Arc,
 };
 
-#[cfg(test)]
-use crate::host::LocalRunner;
-use crate::host::{CommandRunner, CommandSpec};
+use crate::host::CommandRunner;
 
 use super::{
-    AgentEvent, AgentEventDirection, AgentProviderEvent, AgentProviderKind, ApprovalPolicy,
-    BundledRunnerFile, ChatExecution, ModelEffort, ProjectLlmRequest, ProjectLlmResponse,
-    SandboxMode,
+    sidecar::{
+        prepare_chat, run_chat, serialize_request, SidecarChatExecution, SidecarProviderConfig,
+        SidecarRuntime,
+    },
+    AgentProviderKind, ApprovalPolicy, ChatExecution, ModelEffort, ProjectLlmRequest,
+    ProjectLlmResponse, SandboxMode,
+};
+
+const CONFIG: SidecarProviderConfig = SidecarProviderConfig {
+    provider: AgentProviderKind::Claude,
+    conversation_namespace: "claude",
+    runner_name: "Claude Agent runner",
+    request_name: "Claude Agent",
+    empty_session_error: "Claude Agent SDK가 빈 대화 ID를 반환했습니다.",
+    missing_session_error: "Claude Agent SDK가 대화 ID를 반환하지 않았습니다.",
+    request_failure_prefix: "Claude Agent SDK 요청에 실패했습니다",
+    blocked_prefix: "Claude Agent 요청이 차단되었습니다",
+    invalid_conversation_error:
+        "이 Claude 대화는 다른 프로젝트 또는 에이전트에 속해 있어 이어갈 수 없습니다.",
 };
 
 pub(crate) struct ClaudeRuntime {
-    command_runner: Arc<dyn CommandRunner>,
-    bun_binary: String,
-    claude_binary: String,
-    runner: BundledRunnerFile,
+    inner: SidecarRuntime,
 }
 
 impl ClaudeRuntime {
@@ -31,32 +39,14 @@ impl ClaudeRuntime {
         command_runner: Arc<dyn CommandRunner>,
         runner_bundle: &Path,
     ) -> Result<Self, String> {
-        let bun_binary = command_runner.resolve_binary("bun").map_err(|_| {
-            "Claude Agent SDK 실행에 필요한 Bun을 로컬 환경에서 찾지 못했습니다.".to_string()
-        })?;
-        let claude_binary = command_runner.resolve_binary("claude")?;
-        let runner = BundledRunnerFile::prepare(runner_bundle)?;
         Ok(Self {
-            command_runner,
-            bun_binary,
-            claude_binary,
-            runner,
+            inner: SidecarRuntime::discover(
+                command_runner,
+                runner_bundle,
+                "claude",
+                "Claude Agent SDK 실행에 필요한 Bun을 로컬 환경에서 찾지 못했습니다.",
+            )?,
         })
-    }
-
-    #[cfg(test)]
-    fn for_test(bun_binary: PathBuf, claude_binary: PathBuf, runner: PathBuf) -> Self {
-        let command_runner: Arc<dyn CommandRunner> = Arc::new(LocalRunner::new(
-            std::env::var_os("PATH").unwrap_or_default(),
-            std::env::temp_dir(),
-        ));
-        let runner = BundledRunnerFile::prepare(&runner).unwrap();
-        Self {
-            command_runner,
-            bun_binary: bun_binary.to_string_lossy().into_owned(),
-            claude_binary: claude_binary.to_string_lossy().into_owned(),
-            runner,
-        }
     }
 }
 
@@ -88,7 +78,7 @@ struct ClaudeRunnerRequest<'a> {
     workspace_root: &'a str,
     conversation_id: Option<&'a str>,
     instructions: Option<&'a str>,
-    output_schema: Option<Value>,
+    output_schema: Option<&'a Value>,
     model: Option<&'a str>,
     effort: Option<ModelEffort>,
     approval_policy: ApprovalPolicy,
@@ -99,139 +89,6 @@ struct ClaudeRunnerRequest<'a> {
     claude_binary: &'a str,
 }
 
-#[derive(Deserialize)]
-#[serde(tag = "type", rename_all = "camelCase")]
-enum ClaudeRunnerMessage {
-    Session {
-        #[serde(rename = "sessionId")]
-        session_id: String,
-    },
-    Event {
-        raw: Value,
-        event: Option<AgentEvent>,
-    },
-    Approval {
-        id: String,
-        #[serde(rename = "toolName")]
-        tool_name: String,
-        input: Value,
-        title: Option<String>,
-    },
-    Result {
-        #[serde(rename = "sessionId")]
-        session_id: String,
-        message: String,
-    },
-    Error {
-        message: String,
-    },
-}
-
-struct ClaudeConnection {
-    child: Child,
-    stdin: ChildStdin,
-    stdout: BufReader<ChildStdout>,
-    stderr: Arc<Mutex<String>>,
-    stderr_thread: Option<thread::JoinHandle<()>>,
-}
-
-impl ClaudeConnection {
-    fn start(
-        runtime: &ClaudeRuntime,
-        workspace: &Path,
-        environment: &[(String, String)],
-    ) -> Result<Self, String> {
-        let mut spec = CommandSpec::new(&runtime.bun_binary)
-            .args([runtime.runner.path()])
-            .working_directory(workspace);
-        for (key, value) in environment {
-            spec = spec.env(key, value);
-        }
-        let mut child = runtime
-            .command_runner
-            .spawn_piped(&spec)
-            .map_err(|error| format!("Claude Agent runner를 시작하지 못했습니다: {error}"))?;
-        let stdin = child
-            .stdin
-            .take()
-            .ok_or_else(|| "Claude Agent runner 입력을 열지 못했습니다.".to_string())?;
-        let stdout = child
-            .stdout
-            .take()
-            .ok_or_else(|| "Claude Agent runner 출력을 열지 못했습니다.".to_string())?;
-        let mut child_stderr = child
-            .stderr
-            .take()
-            .ok_or_else(|| "Claude Agent runner 오류 출력을 열지 못했습니다.".to_string())?;
-        let stderr = Arc::new(Mutex::new(String::new()));
-        let stderr_capture = stderr.clone();
-        let stderr_thread = thread::spawn(move || {
-            let mut output = String::new();
-            let _ = child_stderr.read_to_string(&mut output);
-            if let Ok(mut captured) = stderr_capture.lock() {
-                *captured = output;
-            }
-        });
-        Ok(Self {
-            child,
-            stdin,
-            stdout: BufReader::new(stdout),
-            stderr,
-            stderr_thread: Some(stderr_thread),
-        })
-    }
-
-    fn send(&mut self, message: &Value) -> Result<(), String> {
-        serde_json::to_writer(&mut self.stdin, message)
-            .map_err(|error| format!("Claude Agent runner 요청을 만들지 못했습니다: {error}"))?;
-        self.stdin
-            .write_all(b"\n")
-            .and_then(|_| self.stdin.flush())
-            .map_err(|error| format!("Claude Agent runner에 요청을 보내지 못했습니다: {error}"))
-    }
-
-    fn read(&mut self) -> Result<Option<ClaudeRunnerMessage>, String> {
-        let mut line = String::new();
-        let bytes = self
-            .stdout
-            .read_line(&mut line)
-            .map_err(|error| format!("Claude Agent runner 응답을 읽지 못했습니다: {error}"))?;
-        if bytes == 0 {
-            return Ok(None);
-        }
-        serde_json::from_str(&line)
-            .map(Some)
-            .map_err(|error| format!("Claude Agent runner가 잘못된 응답을 보냈습니다: {error}"))
-    }
-
-    fn exit_error(&mut self) -> String {
-        let _ = self.child.wait();
-        if let Some(stderr_thread) = self.stderr_thread.take() {
-            let _ = stderr_thread.join();
-        }
-        let stderr = self
-            .stderr
-            .lock()
-            .map(|output| output.trim().to_string())
-            .unwrap_or_default();
-        if stderr.is_empty() {
-            "Claude Agent runner가 결과를 반환하지 않고 종료되었습니다.".to_string()
-        } else {
-            format!("Claude Agent runner가 종료되었습니다: {stderr}")
-        }
-    }
-}
-
-impl Drop for ClaudeConnection {
-    fn drop(&mut self) {
-        let _ = self.child.kill();
-        let _ = self.child.wait();
-        if let Some(stderr_thread) = self.stderr_thread.take() {
-            let _ = stderr_thread.join();
-        }
-    }
-}
-
 pub(crate) fn chat(
     runtime: &ClaudeRuntime,
     project_id: &str,
@@ -240,223 +97,33 @@ pub(crate) fn chat(
     request: ProjectLlmRequest,
     approve: &dyn Fn(&str, &Value) -> bool,
 ) -> Result<ProjectLlmResponse, String> {
-    let message = request.message.trim();
-    if message.is_empty() {
-        return Err("LLM에 보낼 메시지를 입력하세요.".to_string());
-    }
-    let workspace_root = runtime
-        .command_runner
-        .canonicalize(workspace_root)
-        .map_err(|error| format!("프로젝트 워크스페이스를 열지 못했습니다: {error}"))?;
-    let workspace = workspace_root
-        .to_str()
-        .ok_or_else(|| "프로젝트 워크스페이스 경로를 표시할 수 없습니다.".to_string())?;
-    let conversation_id = request
-        .conversation_id
-        .as_deref()
-        .map(|id| decode_conversation_id(project_id, id))
-        .transpose()?;
+    let prepared = prepare_chat(&runtime.inner, CONFIG, project_id, workspace_root, &request)?;
     let runner_request = ClaudeRunnerRequest {
         r#type: "run",
-        message,
-        workspace_root: workspace,
-        conversation_id,
+        message: prepared.message,
+        workspace_root: &prepared.workspace,
+        conversation_id: prepared.conversation_id,
         instructions: request.instructions.as_deref(),
-        output_schema: request.output_schema,
+        output_schema: request.output_schema.as_ref(),
         model: execution.model.as_deref(),
         effort: execution.effort,
         approval_policy: execution.approval_policy,
         sandbox_mode: execution.sandbox_mode,
         network_access: execution.network_access,
         additional_directories: &execution.workspace_write_roots,
-        claude_binary: &runtime.claude_binary,
+        claude_binary: runtime.inner.provider_binary(),
     };
-    let raw_request = serde_json::to_value(&runner_request)
-        .map_err(|error| format!("Claude Agent 요청을 만들지 못했습니다: {error}"))?;
-    if let Some(event_sink) = execution.event_sink.as_ref() {
-        event_sink(AgentProviderEvent {
-            provider: AgentProviderKind::Claude,
-            direction: AgentEventDirection::Client,
-            raw: raw_request.clone(),
-            event: None,
-        })?;
-    }
-
-    let mut connection = ClaudeConnection::start(runtime, &workspace_root, &execution.environment)?;
-    connection.send(&raw_request)?;
-    loop {
-        match connection.read()? {
-            Some(ClaudeRunnerMessage::Session { session_id }) => {
-                if session_id.trim().is_empty() {
-                    return Err("Claude Agent SDK가 빈 대화 ID를 반환했습니다.".to_string());
-                }
-                if let Some(event_sink) = execution.event_sink.as_ref() {
-                    let conversation_id = encode_conversation_id(project_id, &session_id);
-                    event_sink(AgentProviderEvent {
-                        provider: AgentProviderKind::Claude,
-                        direction: AgentEventDirection::Server,
-                        raw: json!({
-                            "type": "conversationStarted",
-                            "conversationId": conversation_id.clone(),
-                        }),
-                        event: Some(AgentEvent::ConversationStarted { conversation_id }),
-                    })?;
-                }
-            }
-            Some(ClaudeRunnerMessage::Event { raw, event }) => {
-                if let Some(event_sink) = execution.event_sink.as_ref() {
-                    event_sink(AgentProviderEvent {
-                        provider: AgentProviderKind::Claude,
-                        direction: AgentEventDirection::Server,
-                        raw,
-                        event,
-                    })?;
-                }
-            }
-            Some(ClaudeRunnerMessage::Approval {
-                id,
-                tool_name,
-                input,
-                title,
-            }) => {
-                let mut approval_input = input;
-                if let Some(title) = title {
-                    approval_input["reason"] = Value::String(title);
-                }
-                let approved = approve(&tool_name, &approval_input);
-                connection.send(&json!({
-                    "type": "approvalResponse",
-                    "id": id,
-                    "approved": approved
-                }))?;
-            }
-            Some(ClaudeRunnerMessage::Result {
-                session_id,
-                message,
-            }) => {
-                if session_id.trim().is_empty() {
-                    return Err("Claude Agent SDK가 대화 ID를 반환하지 않았습니다.".to_string());
-                }
-                return Ok(ProjectLlmResponse {
-                    conversation_id: encode_conversation_id(project_id, &session_id),
-                    message,
-                    workspace_root: workspace.to_string(),
-                });
-            }
-            Some(ClaudeRunnerMessage::Error { message }) => {
-                return Err(format!("Claude Agent SDK 요청에 실패했습니다: {message}"));
-            }
-            None => return Err(connection.exit_error()),
-        }
-    }
-}
-
-fn encode_conversation_id(project_id: &str, session_id: &str) -> String {
-    format!("briar:claude:{project_id}:{session_id}")
-}
-
-fn decode_conversation_id<'a>(
-    project_id: &str,
-    conversation_id: &'a str,
-) -> Result<&'a str, String> {
-    let prefix = format!("briar:claude:{project_id}:");
-    conversation_id
-        .strip_prefix(&prefix)
-        .filter(|session_id| !session_id.is_empty())
-        .ok_or_else(|| {
-            "이 Claude 대화는 다른 프로젝트 또는 에이전트에 속해 있어 이어갈 수 없습니다."
-                .to_string()
-        })
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::fs;
-
-    #[cfg(unix)]
-    #[test]
-    fn runs_the_claude_runner_and_maps_events_and_approvals() {
-        use std::os::unix::fs::PermissionsExt;
-
-        let directory = tempfile::tempdir().expect("temp directory should exist");
-        let runner = directory.path().join("fake-runner.sh");
-        fs::write(
-            &runner,
-            r#"#!/bin/sh
-read request
-echo '{"type":"session","sessionId":"session-1"}'
-echo '{"type":"event","raw":{"type":"assistant"},"event":{"type":"messageCompleted","id":"message-1","phase":"commentary","text":"working"}}'
-echo '{"type":"approval","id":"1","toolName":"Bash","input":{"command":"bun test"},"title":"Run tests"}'
-read approval
-echo '{"type":"result","sessionId":"session-1","message":"done"}'
-"#,
-        )
-        .expect("runner should be written");
-        fs::set_permissions(&runner, fs::Permissions::from_mode(0o700))
-            .expect("runner should be executable");
-        let runtime = ClaudeRuntime::for_test(
-            PathBuf::from("/bin/sh"),
-            PathBuf::from("/usr/bin/true"),
-            runner,
-        );
-        let events = Arc::new(Mutex::new(Vec::new()));
-        let captured_events = events.clone();
-        let response = chat(
-            &runtime,
-            "project-1",
-            directory.path(),
-            ChatExecution {
-                approval_policy: ApprovalPolicy::OnRequest,
-                sandbox_mode: SandboxMode::WorkspaceWrite,
-                network_access: true,
-                model: Some("sonnet".to_string()),
-                effort: Some(ModelEffort::High),
-                event_sink: Some(Arc::new(move |event| {
-                    captured_events
-                        .lock()
-                        .expect("events should lock")
-                        .push(event);
-                    Ok(())
-                })),
-                environment: Vec::new(),
-                workspace_write_roots: Vec::new(),
-            },
-            ProjectLlmRequest {
-                message: "Fix it".to_string(),
-                progress_id: None,
-                conversation_id: None,
-                instructions: None,
-                output_schema: None,
-            },
-            &|method, input| method == "Bash" && input["command"] == "bun test",
-        )
-        .expect("Claude runner should complete");
-
-        assert_eq!(response.conversation_id, "briar:claude:project-1:session-1");
-        assert_eq!(response.message, "done");
-        let events = events.lock().expect("events should lock");
-        assert_eq!(events.len(), 3);
-        assert_eq!(events[0].provider, AgentProviderKind::Claude);
-        assert_eq!(events[0].raw["effort"], "high");
-        assert!(matches!(
-            events[1].event,
-            Some(AgentEvent::ConversationStarted { ref conversation_id })
-                if conversation_id == "briar:claude:project-1:session-1"
-        ));
-        assert!(matches!(
-            events[2].event,
-            Some(AgentEvent::MessageCompleted { .. })
-        ));
-    }
-
-    #[test]
-    fn scopes_conversation_ids_to_claude_and_the_project() {
-        assert_eq!(
-            decode_conversation_id("project-1", "briar:claude:project-1:session-1"),
-            Ok("session-1")
-        );
-        assert!(decode_conversation_id("project-2", "briar:claude:project-1:session-1").is_err());
-        assert!(decode_conversation_id("project-1", "briar:project-1:thread-1").is_err());
-    }
+    let raw_request = serialize_request(CONFIG, &runner_request)?;
+    run_chat(
+        &runtime.inner,
+        CONFIG,
+        project_id,
+        prepared,
+        raw_request,
+        SidecarChatExecution {
+            environment: &execution.environment,
+            event_sink: execution.event_sink.as_ref(),
+        },
+        approve,
+    )
 }
