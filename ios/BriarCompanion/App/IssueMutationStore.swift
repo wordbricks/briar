@@ -9,18 +9,23 @@ final class IssueMutationStore: ObservableObject {
     private let projectID: UUID
     private let token: String
     private let requestID: @Sendable () -> UUID
+    private let attachmentReference: @Sendable () -> String
     private var pendingRequestIDs: [String: UUID] = [:]
 
     init(
         api: any MobileAPIClientProtocol,
         projectID: UUID,
         token: String,
-        requestID: @escaping @Sendable () -> UUID = UUID.init
+        requestID: @escaping @Sendable () -> UUID = UUID.init,
+        attachmentReference: @escaping @Sendable () -> String = {
+            UUID().uuidString.lowercased()
+        }
     ) {
         self.api = api
         self.projectID = projectID
         self.token = token
         self.requestID = requestID
+        self.attachmentReference = attachmentReference
     }
 
     func isActive(_ action: String) -> Bool { activeActions.contains(action) }
@@ -348,32 +353,21 @@ final class IssueMutationStore: ObservableObject {
                     as: CreateIssueMessageResponse.self
                 )
             } else {
-                let references = attachments.map { _ in UUID().uuidString.lowercased() }
-                let markdown = zip(attachments, references).map { attachment, reference in
-                    let name = attachment.filename.replacingOccurrences(of: "]", with: "\\]")
-                    return "![\(name)](briar-attachment://\(reference))"
-                }.joined(separator: "\n\n")
-                let messageBody = [trimmed, markdown].filter { !$0.isEmpty }.joined(separator: "\n\n")
+                let payload = try AttachmentMessagePayload(
+                    body: trimmed,
+                    attachments: attachments,
+                    referenceGenerator: attachmentReference
+                )
                 response = try await api.upload(
                     path,
                     fields: [
-                        "body": messageBody,
+                        "body": payload.body,
                         "parentMessageId": parentMessageID?.uuidString.lowercased() ?? "",
                         "mentionedUserIds": mentionedUserIdsJSON,
                         "agentConversationId": "",
-                        "attachmentReferences": String(
-                            data: try JSONEncoder().encode(references),
-                            encoding: .utf8
-                        ) ?? "[]",
+                        "attachmentReferences": payload.referencesJSON,
                     ],
-                    files: attachments.map {
-                        MultipartFile(
-                            fieldName: "attachments",
-                            filename: $0.filename,
-                            contentType: $0.contentType,
-                            data: $0.data
-                        )
-                    },
+                    files: payload.files,
                     token: token,
                     as: CreateIssueMessageResponse.self
                 )

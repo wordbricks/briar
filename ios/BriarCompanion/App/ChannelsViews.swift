@@ -1,6 +1,5 @@
 import PhotosUI
 import SwiftUI
-import UniformTypeIdentifiers
 
 /// Home: the organization's channels, grouped by project with section dividers.
 struct ChannelsHomeView: View {
@@ -719,7 +718,7 @@ private struct ChannelComposer: View {
                         1,
                         PendingIssueAttachment.maximumCount - attachments.count
                     ),
-                    matching: .images,
+                    matching: PhotoAttachmentImportPolicy.imagesOnly.pickerFilter,
                     preferredItemEncoding: .compatible
                 ) {
                     Image(systemName: "plus")
@@ -789,38 +788,11 @@ private struct ChannelComposer: View {
             selectedPhotos = []
         }
         do {
-            var loaded = attachments
-            for item in items.prefix(PendingIssueAttachment.maximumCount - loaded.count) {
-                guard let data = try await item.loadTransferable(type: Data.self) else {
-                    throw IssueMutationError.attachment("사진 앱에서 이미지를 읽지 못했습니다.")
-                }
-                let supportedType = item.supportedContentTypes.first { type in
-                    guard type.conforms(to: .image),
-                          let mimeType = type.preferredMIMEType else { return false }
-                    return PendingIssueAttachment.allowedContentTypes.contains(mimeType)
-                }
-                if let supportedType,
-                   let mimeType = supportedType.preferredMIMEType,
-                   mimeType.hasPrefix("image/") {
-                    loaded.append(PendingIssueAttachment(
-                        filename: "image-\(UUID().uuidString).\(supportedType.preferredFilenameExtension ?? "bin")",
-                        contentType: mimeType,
-                        data: data
-                    ))
-                } else if let jpegData = UIImage(data: data)?.jpegData(compressionQuality: 0.9) {
-                    loaded.append(PendingIssueAttachment(
-                        filename: "image-\(UUID().uuidString).jpg",
-                        contentType: "image/jpeg",
-                        data: jpegData
-                    ))
-                } else {
-                    throw IssueMutationError.attachment("선택한 이미지 형식을 첨부할 수 없습니다.")
-                }
-            }
-            if let message = PendingIssueAttachment.validationMessage(for: loaded) {
-                throw IssueMutationError.attachment(message)
-            }
-            attachments = loaded
+            attachments = try await PhotoAttachmentImporter.importItems(
+                items,
+                appendingTo: attachments,
+                policy: .imagesOnly
+            )
             attachmentError = nil
         } catch {
             attachmentError = error.localizedDescription

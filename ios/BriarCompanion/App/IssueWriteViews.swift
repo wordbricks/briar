@@ -127,7 +127,7 @@ struct CreateIssueSheet: View {
                                 PendingIssueAttachment.maximumCount - attachments.count
                             ),
                             selectionBehavior: .ordered,
-                            matching: .any(of: [.images, .videos]),
+                            matching: PhotoAttachmentImportPolicy.imagesAndVideos.pickerFilter,
                             preferredItemEncoding: .compatible
                         ) {
                             Image(systemName: "photo")
@@ -191,51 +191,14 @@ struct CreateIssueSheet: View {
         }
 
         do {
-            var loaded = attachments
-            for item in items.prefix(PendingIssueAttachment.maximumCount - loaded.count) {
-                guard let data = try await item.loadTransferable(type: Data.self) else {
-                    throw PhotoImportError.unreadable
-                }
-                let supportedType = item.supportedContentTypes.first(where: { contentType in
-                    guard let mimeType = contentType.preferredMIMEType else { return false }
-                    return PendingIssueAttachment.allowedContentTypes.contains(mimeType)
-                })
-                let contentType: String
-                let fileExtension: String
-                let kind: String
-                let attachmentData: Data
-                if let supportedType, let mimeType = supportedType.preferredMIMEType {
-                    contentType = mimeType
-                    fileExtension = supportedType.preferredFilenameExtension ?? "bin"
-                    kind = supportedType.conforms(to: .movie) ? "video" : "image"
-                    attachmentData = data
-                } else if item.supportedContentTypes.contains(where: { $0.conforms(to: .image) }),
-                          let jpegData = UIImage(data: data)?.jpegData(compressionQuality: 0.9) {
-                    // The Photos picker can return HEIC/HEIF even when compatible encoding is
-                    // requested. Convert those photos to the server-supported JPEG format.
-                    contentType = "image/jpeg"
-                    fileExtension = "jpg"
-                    kind = "image"
-                    attachmentData = jpegData
-                } else {
-                    throw PhotoImportError.unsupported
-                }
-                loaded.append(PendingIssueAttachment(
-                    filename: "\(kind)-\(UUID().uuidString).\(fileExtension)",
-                    contentType: contentType,
-                    data: attachmentData
-                ))
-            }
-            if let message = PendingIssueAttachment.validationMessage(for: loaded) {
-                errorMessage = message
-            } else {
-                attachments = loaded
-                errorMessage = nil
-            }
+            attachments = try await PhotoAttachmentImporter.importItems(
+                items,
+                appendingTo: attachments,
+                policy: .imagesAndVideos
+            )
+            errorMessage = nil
         } catch {
-            errorMessage = error is PhotoImportError
-                ? error.localizedDescription
-                : "사진 앱에서 선택한 항목을 읽지 못했습니다."
+            errorMessage = error.localizedDescription
         }
     }
 
@@ -356,20 +319,6 @@ private struct PreferredExecutionPicker: View {
             guard previous != provider else { return }
             model = nil
             effort = IssueDraft.defaultEffort
-        }
-    }
-}
-
-private enum PhotoImportError: LocalizedError {
-    case unreadable
-    case unsupported
-
-    var errorDescription: String? {
-        switch self {
-        case .unreadable:
-            "사진 앱에서 선택한 항목을 읽지 못했습니다."
-        case .unsupported:
-            "선택한 이미지·영상 형식을 첨부할 수 없습니다."
         }
     }
 }
