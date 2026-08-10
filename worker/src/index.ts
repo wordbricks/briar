@@ -323,6 +323,7 @@ import {
   listOrganizationExecutionWorkers,
   pendingExecutionWorkerUpdate,
   getProjectExecutionWorkerPolicy,
+  hasExecutionWorkerReadinessChanged,
   isExecutionWorkerAllowedForProject,
   MAX_WORKER_CONCURRENT_SESSIONS,
   MAX_TRANSCRIPT_EVENTS_PER_REQUEST,
@@ -9251,11 +9252,7 @@ async function route(
       db,
       principal.deviceId,
     );
-    if (
-      input.acceptingWork !== undefined ||
-      input.readinessState !== undefined ||
-      input.readinessDetail !== undefined
-    ) {
+    if (hasExecutionWorkerReadinessChanged(binding, worker)) {
       await auditExecutionEvent(db, {
         organizationId: principal.organizationId,
         projectId: binding.project_id,

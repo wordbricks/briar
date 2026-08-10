@@ -1,5 +1,7 @@
+import { createHash } from "node:crypto";
 import { Miniflare } from "miniflare";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import apiWorker from "./index";
 import {
   claimNextIssueAgentReply,
   claimNextQueuedHuntRun,
@@ -22,6 +24,7 @@ import {
   dispatchHuntRun,
   executionWorkerBindingForProject,
   getProjectExecutionWorkerPolicy,
+  hasExecutionWorkerReadinessChanged,
   leaseExpiryFrom,
   listExecutionWorkers,
   listOrganizationExecutionWorkers,
@@ -225,6 +228,7 @@ describe("detached execution workers", () => {
        delete from briar_project_execution_worker_policies;
        delete from briar_execution_worker_update_requests;
        delete from briar_execution_worker_credentials;
+       delete from briar_execution_audit_events;
        delete from briar_project_agent_task_jobs;
        delete from briar_execution_workers;
        delete from briar_execution_worker_devices;
@@ -236,7 +240,11 @@ describe("detached execution workers", () => {
     );
   });
 
-  const register = (seed: string, minute = 1) =>
+  const register = (
+    seed: string,
+    minute = 1,
+    credentialTokenHash = fingerprint(`token-${seed}`),
+  ) =>
     registerExecutionWorker(db, projectId, {
       id: `worker-${seed}`,
       deviceId: `device-${seed}`,
@@ -244,7 +252,7 @@ describe("detached execution workers", () => {
       ownerUserId: "owner",
       label: `worker ${seed}`,
       deviceIdentityHash: fingerprint(seed),
-      credentialTokenHash: fingerprint(`token-${seed}`),
+      credentialTokenHash,
       agentProvider: "codex",
       providers: ["codex"],
       providerHealth: {
@@ -257,6 +265,148 @@ describe("detached execution workers", () => {
       versions: { briar: "1.1.1" },
       observedAt: atMinute(minute),
     });
+
+  it("detects only persisted Worker readiness transitions", () => {
+    const ready = {
+      accepting_work: 1,
+      readiness_state: "ready" as const,
+      readiness_detail: null,
+    };
+
+    expect(hasExecutionWorkerReadinessChanged(ready, { ...ready })).toBe(false);
+    expect(
+      hasExecutionWorkerReadinessChanged(ready, {
+        ...ready,
+        accepting_work: 0,
+      }),
+    ).toBe(true);
+    expect(
+      hasExecutionWorkerReadinessChanged(ready, {
+        ...ready,
+        readiness_state: "busy",
+      }),
+    ).toBe(true);
+    expect(
+      hasExecutionWorkerReadinessChanged(ready, {
+        ...ready,
+        readiness_detail: "Checking repository",
+      }),
+    ).toBe(true);
+    expect(
+      hasExecutionWorkerReadinessChanged(
+        { ...ready, readiness_detail: "Checking repository" },
+        ready,
+      ),
+    ).toBe(true);
+  });
+
+  it("audits heartbeat readiness only when its persisted values transition", async () => {
+    const credential = "briar_worker_readiness-audit-test";
+    const registered = await register(
+      "readiness-audit",
+      1,
+      createHash("sha256").update(credential).digest("hex"),
+    );
+    const env = {
+      DB: db,
+      BETTER_AUTH_SECRET: "readiness-audit-test-secret-readiness-audit-test-secret",
+      GOOGLE_CLIENT_ID: "google-client-test",
+      GOOGLE_CLIENT_SECRET: "google-secret-test",
+    } as unknown as Env;
+    const heartbeat = async (body: Record<string, unknown>) => {
+      const response = await apiWorker.fetch(
+        new Request(
+          `https://briar-api.example/workers/${registered.worker.id}/heartbeat`,
+          {
+            method: "POST",
+            headers: {
+              authorization: `Bearer ${credential}`,
+              "content-type": "application/json",
+            },
+            body: JSON.stringify(body),
+          },
+        ),
+        env,
+      );
+      expect(response.status).toBe(200);
+    };
+    const auditCount = async () => {
+      const row = await db
+        .prepare(
+          `select count(*) as count
+           from briar_execution_audit_events
+           where worker_id = ? and action = 'worker_readiness_changed'`,
+        )
+        .bind(registered.worker.id)
+        .first<{ count: number }>();
+      return row?.count ?? 0;
+    };
+
+    await heartbeat({
+      versions: { briar: "1.2.95" },
+      capabilities: { providers: ["codex"], remoteUpdates: { supported: true } },
+    });
+    expect(await auditCount()).toBe(0);
+
+    await heartbeat({
+      acceptingWork: true,
+      readinessState: "ready",
+      readinessDetail: null,
+    });
+    expect(await auditCount()).toBe(0);
+
+    await heartbeat({ acceptingWork: false });
+    expect(await auditCount()).toBe(1);
+
+    await heartbeat({ readinessState: "busy" });
+    expect(await auditCount()).toBe(2);
+
+    await heartbeat({ readinessDetail: "Checking repository" });
+    expect(await auditCount()).toBe(3);
+
+    await heartbeat({ readinessDetail: null });
+    expect(await auditCount()).toBe(4);
+
+    await heartbeat({
+      acceptingWork: false,
+      readinessState: "busy",
+      readinessDetail: null,
+    });
+    expect(await auditCount()).toBe(4);
+
+    const events = await db
+      .prepare(
+        `select detail_json
+         from briar_execution_audit_events
+         where worker_id = ? and action = 'worker_readiness_changed'`,
+      )
+      .bind(registered.worker.id)
+      .all<{ detail_json: string }>();
+    expect(events.results.map((event) => JSON.parse(event.detail_json))).toEqual(
+      expect.arrayContaining([
+        {
+          acceptingWork: false,
+          readinessState: "ready",
+          readinessDetail: null,
+        },
+        {
+          acceptingWork: false,
+          readinessState: "busy",
+          readinessDetail: null,
+        },
+        {
+          acceptingWork: false,
+          readinessState: "busy",
+          readinessDetail: "Checking repository",
+        },
+        {
+          acceptingWork: false,
+          readinessState: "busy",
+          readinessDetail: null,
+        },
+      ]),
+    );
+  });
 
   it("keeps a remote update pending until the target Worker version reports", async () => {
     const worker = await register("update");
