@@ -6,7 +6,7 @@ with the `/create` slash command. The form lets a user choose a Briar project
 and enter a title, description, and attachments.
 `@Briar` mentions remain available as a quick text-only intake path. Each
 connected Slack workspace has one default Briar project, which an organization
-owner or admin can change in **Organization settings → Integrations**.
+owner or admin can change through the authenticated organization Slack API.
 
 ## 1. Create the Slack app
 
@@ -63,10 +63,19 @@ bun run worker:deploy
 
 ## 3. Connect a workspace
 
-1. In Briar, open **Organization settings → Integrations**.
-2. Choose the default project and click **Add Slack workspace**.
-3. Approve the requested Slack permissions.
-4. Return to Briar and refresh the Slack connection card.
+Slack connection is not currently exposed in **Organization settings →
+Integrations**. Use the authenticated Worker API until that UI is restored:
+
+1. As a Briar organization owner or admin, send `POST
+   /organizations/<organization-id>/slack` with a bearer token and JSON body
+   `{ "defaultProjectId": "<project-id>" }`.
+2. Open the returned `installUrl` and approve the requested Slack permissions.
+3. Confirm the installation with `GET
+   /organizations/<organization-id>/slack`.
+
+Change the default project with `PUT
+/organizations/<organization-id>/slack/installations/<team-id>` and the same
+JSON body. Disconnect with `DELETE` on that installation URL.
 
 The person connecting Slack must be a Briar organization owner or admin and
 must be permitted to install apps in the Slack workspace.
