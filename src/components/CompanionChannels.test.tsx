@@ -547,6 +547,8 @@ describe("CompanionChannels", () => {
         ".companion-channel-mention-menu button",
       ),
     ].find((button) => button.textContent?.includes("Honey"));
+    expect(honey?.textContent).toContain("Organization agent");
+    expect(honey?.textContent).not.toContain("조직 에이전트");
     await act(async () => honey!.click());
 
     setter.call(input, "@honey 확인해 줘");
