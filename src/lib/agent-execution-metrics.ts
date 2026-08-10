@@ -1,11 +1,15 @@
 import { z } from "zod";
-import type { AgentProvider } from "./agent-provider-contract";
+import {
+  agentProviders,
+  type AgentProvider,
+} from "./agent-provider-contract";
 
 const tokenCountSchema = z
   .number()
   .int()
   .nonnegative()
   .max(Number.MAX_SAFE_INTEGER);
+const observedAtSchema = z.string().datetime({ offset: true });
 
 export const agentExecutionMetricsSchema = z
   .object({
@@ -74,6 +78,71 @@ export type AgentExecutionTokenObservation =
 
 export type AgentExecutionUsageObservation =
   AgentExecutionModelObservation | AgentExecutionTokenObservation;
+
+export const agentExecutionUsageRecordSchema = z
+  .object({
+    usageKey: z.string().trim().min(1).max(512),
+    sessionId: z.string().trim().min(1).max(512).nullable(),
+    scopeId: z.string().trim().min(1).max(512).nullable(),
+    turnId: z.string().trim().min(1).max(512).nullable(),
+    agentProvider: z.enum(agentProviders),
+    modelProvider: z.string().trim().min(1).max(256).nullable(),
+    model: z.string().trim().min(1).max(512).nullable(),
+    canonicalModel: z.string().trim().min(1).max(512).nullable(),
+    modelSource: z.enum([
+      "providerReported",
+      "providerConfig",
+      "configuredFallback",
+      "unknown",
+    ]),
+    source: z.string().trim().min(1).max(128),
+    uncachedInputTokens: tokenCountSchema.nullable(),
+    cacheReadTokens: tokenCountSchema.nullable(),
+    cacheWriteTokens: tokenCountSchema.nullable(),
+    outputTokens: tokenCountSchema.nullable(),
+    reasoningOutputTokens: tokenCountSchema.nullable(),
+    totalTokens: tokenCountSchema.nullable(),
+    observedAt: observedAtSchema,
+  })
+  .strict()
+  .superRefine((record, context) => {
+    if (
+      record.uncachedInputTokens === null &&
+      record.cacheReadTokens === null &&
+      record.cacheWriteTokens === null &&
+      record.outputTokens === null &&
+      record.reasoningOutputTokens === null &&
+      record.totalTokens === null
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "usage records require at least one token value",
+      });
+    }
+    if (
+      record.reasoningOutputTokens !== null &&
+      (record.outputTokens === null ||
+        record.reasoningOutputTokens > record.outputTokens)
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "reasoningOutputTokens must be a subset of outputTokens",
+        path: ["reasoningOutputTokens"],
+      });
+    }
+    // Total equality is intentionally not enforced because provider total
+    // token semantics are not uniform.
+  });
+
+export type AgentExecutionUsageRecord = z.infer<
+  typeof agentExecutionUsageRecordSchema
+>;
+
+export type AgentExecutionCollectedTokenObservation =
+  AgentExecutionTokenObservation & {
+    dedupeKey: string;
+    observedAt: string;
+  };
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === "object" && !Array.isArray(value)
@@ -560,8 +629,8 @@ const aggregateTokenUsage = (
 };
 
 export type AgentExecutionUsageCollector = {
-  observe: (payload: unknown) => void;
-  finish: () => AgentExecutionTokenObservation[];
+  observe: (payload: unknown, observedAt?: string) => void;
+  finish: () => AgentExecutionCollectedTokenObservation[];
 };
 
 /**
@@ -578,11 +647,18 @@ export function createAgentExecutionUsageCollector(
   let currentCanonicalModel: string | null = null;
   let currentModelProvider: string | null = null;
   let sequence = 0;
-  const collected = new Map<string, AgentExecutionTokenObservation>();
+  const collected = new Map<
+    string,
+    AgentExecutionCollectedTokenObservation
+  >();
   const claudeQueryDeltaKeys = new Set<string>();
   let claudeQueryHasCumulativeUsage = false;
 
-  const observe = (payload: unknown) => {
+  const observe = (
+    payload: unknown,
+    observedAt = new Date().toISOString(),
+  ) => {
+    const normalizedObservedAt = observedAtSchema.parse(observedAt);
     const observations = agentExecutionUsageObservationsFromPayload(
       provider,
       payload,
@@ -658,7 +734,13 @@ export function createAgentExecutionUsageCollector(
       }
 
       const key = enriched.dedupeKey ?? `${provider}:observation:${sequence++}`;
-      collected.set(key, enriched);
+      collected.set(key, {
+        ...enriched,
+        dedupeKey: key,
+        // Provider replays replace an existing record without moving its
+        // occurrence into the time window of the retry.
+        observedAt: collected.get(key)?.observedAt ?? normalizedObservedAt,
+      });
       if (enriched.provider === "claude" && enriched.kind === "delta") {
         claudeQueryDeltaKeys.add(key);
       }
@@ -667,6 +749,54 @@ export function createAgentExecutionUsageCollector(
   };
 
   return { observe, finish: () => [...collected.values()] };
+}
+
+/**
+ * Convert normalized provider observations into the immutable ingestion
+ * contract. Codex includes cached input in inputTokens, while Claude reports
+ * cache reads and writes as separate buckets.
+ */
+export function agentExecutionUsageRecordsFromObservations(
+  observations: AgentExecutionCollectedTokenObservation[],
+): AgentExecutionUsageRecord[] {
+  return observations.map((observation) => {
+    const usage = observation.tokenUsage;
+    const uncachedInputTokens = usage.inputTokens === null
+      ? null
+      : observation.provider === "codex"
+        ? Math.max(
+            0,
+            usage.inputTokens -
+              (usage.cacheReadTokens ?? 0) -
+              (usage.cacheWriteTokens ?? 0),
+          )
+        : usage.inputTokens;
+    return {
+      usageKey: observation.dedupeKey,
+      sessionId: observation.sessionId,
+      scopeId: observation.scopeId,
+      turnId: observation.turnId,
+      agentProvider: observation.provider,
+      modelProvider: observation.modelProvider,
+      model: observation.model,
+      canonicalModel: observation.canonicalModel,
+      modelSource: observation.modelSource,
+      source: observation.source,
+      uncachedInputTokens,
+      cacheReadTokens: usage.cacheReadTokens,
+      cacheWriteTokens: usage.cacheWriteTokens,
+      outputTokens: usage.outputTokens,
+      reasoningOutputTokens: usage.reasoningOutputTokens,
+      totalTokens: usage.totalTokens,
+      observedAt: observation.observedAt,
+    } satisfies AgentExecutionUsageRecord;
+  });
+}
+
+export function agentExecutionTokenUsageFromObservations(
+  observations: AgentExecutionTokenObservation[],
+): AgentExecutionTokenUsage | null {
+  return aggregateTokenUsage(observations);
 }
 
 /**

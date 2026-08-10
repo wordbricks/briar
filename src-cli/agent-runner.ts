@@ -5,12 +5,21 @@ import type {
   ModelEffort,
 } from "../src/lib/agent-provider-contract";
 
-// A detached run keeps one durable transcript session across retries and
-// checkpoint resumes. Each claim gets its own sequence range so a new worker
-// process starting at local sequence 1 cannot collide with earlier output.
+// Older servers used one durable transcript session per run. New claims use an
+// execution-scoped session so transfer resets cannot collide across projects.
+// Each claim also keeps its own sequence range for rolling compatibility.
 // A claim may now contain several provider turns. Keep a wide range so long
 // transcripts can continue without colliding with the next claim attempt.
 const detachedTranscriptClaimStride = 1_000_000;
+
+export function detachedTranscriptSessionId(
+  runId: string,
+  executionId?: string | null,
+) {
+  return executionId
+    ? `detached-${runId}-${executionId}`
+    : `detached-${runId}`;
+}
 
 export function detachedTranscriptSequence(
   claimAttempt: number,

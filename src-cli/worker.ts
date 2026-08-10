@@ -25,6 +25,8 @@ export type {
 export type ClaimedIssue = {
   workType?: "issue" | "issueReply" | "channelReply" | "projectAgentTask";
   workId?: string;
+  /** Immutable identity of one run claim/execution attempt. */
+  executionId?: string;
   runId: string;
   sourceKey: string;
   title: string;

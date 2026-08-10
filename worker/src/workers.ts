@@ -2139,11 +2139,17 @@ export async function appendAgentTranscript(
   return { sessionId, stored, storedBytes, pruned: [] as string[] };
 }
 
+type TranscriptReadOptions = {
+  afterSequence?: number;
+  limit?: number;
+  tail?: boolean;
+};
+
 export async function readAgentTranscript(
   db: D1Database,
   projectId: string,
   sessionId: string,
-  options: { afterSequence?: number; limit?: number; tail?: boolean } = {},
+  options: TranscriptReadOptions = {},
 ) {
   const session = await db
     .prepare(
@@ -2174,4 +2180,24 @@ export async function readAgentTranscript(
     }>();
   const events = result.results ?? [];
   return { session, events: options.tail ? events.reverse() : events };
+}
+
+export async function readLatestAgentTranscriptForRun(
+  db: D1Database,
+  projectId: string,
+  runId: string,
+  options: TranscriptReadOptions = {},
+) {
+  const latest = await db
+    .prepare(
+      `select session_id from briar_agent_transcript_sessions
+       where project_id = ? and run_id = ?
+       order by last_event_at desc, started_at desc, session_id desc
+       limit 1`,
+    )
+    .bind(projectId, runId)
+    .first<{ session_id: string }>();
+  return latest
+    ? readAgentTranscript(db, projectId, latest.session_id, options)
+    : null;
 }

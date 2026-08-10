@@ -185,4 +185,84 @@ describe("useProjectAgentWorkerEvents", () => {
 
     await act(async () => root.unmount());
   });
+
+  it("resets the cursor when the run alias resolves to a new execution", async () => {
+    mockedLoadProjectAgentTranscript
+      .mockResolvedValueOnce({
+        session: {
+          sessionId: "detached-run-1-execution-1",
+          runId: "run-1",
+          workerId: "worker-1",
+          agentProvider: "codex",
+          startedAt: "2026-08-04T00:00:00.000Z",
+          lastEventAt: "2026-08-04T00:00:01.000Z",
+          eventCount: 2,
+        },
+        events: [{
+          sequence: 1,
+          direction: "server",
+          message: { type: "first-execution" },
+          recordedAt: "2026-08-04T00:00:01.000Z",
+        }],
+      })
+      // The alias changed underneath the old cursor. The hook must notice the
+      // actual session id even when that cursor filtered every new event out.
+      .mockResolvedValueOnce({
+        session: {
+          sessionId: "detached-run-1-execution-2",
+          runId: "run-1",
+          workerId: "worker-2",
+          agentProvider: "claude",
+          startedAt: "2026-08-04T00:02:00.000Z",
+          lastEventAt: "2026-08-04T00:02:01.000Z",
+          eventCount: 1,
+        },
+        events: [],
+      })
+      .mockResolvedValueOnce({
+        session: {
+          sessionId: "detached-run-1-execution-2",
+          runId: "run-1",
+          workerId: "worker-2",
+          agentProvider: "claude",
+          startedAt: "2026-08-04T00:02:00.000Z",
+          lastEventAt: "2026-08-04T00:02:01.000Z",
+          eventCount: 1,
+        },
+        events: [{
+          sequence: 1,
+          direction: "server",
+          message: { type: "second-execution" },
+          recordedAt: "2026-08-04T00:02:01.000Z",
+        }],
+      });
+
+    const container = document.createElement("div");
+    const root = createRoot(container);
+    await act(async () => root.render(<Harness />));
+    await act(async () => {
+      await new Promise((resolve) => window.setTimeout(resolve, 10));
+    });
+
+    expect(mockedLoadProjectAgentTranscript).toHaveBeenNthCalledWith(
+      2,
+      "token",
+      "project-1",
+      "detached-run-1",
+      1,
+    );
+    expect(mockedLoadProjectAgentTranscript).toHaveBeenNthCalledWith(
+      3,
+      "token",
+      "project-1",
+      "detached-run-1",
+      0,
+    );
+    expect(workerEvents.events.map((event) => event.sessionId)).toEqual([
+      "detached-run-1-execution-1",
+      "detached-run-1-execution-2",
+    ]);
+
+    await act(async () => root.unmount());
+  });
 });
