@@ -4886,6 +4886,68 @@ describe("HuntDashboard", () => {
     container.remove();
   });
 
+  it("hides the create-issue accept button when the accept handler is not wired", async () => {
+    // Inbox side panel used to render RunPage without onAcceptIssueAction,
+    // which hid the approve control for pending issue-create proposals.
+    const message: IssueMessage = {
+      id: "10101010-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      runId: demoDashboard.runs[1].id,
+      parentMessageId: null,
+      body: "후속 QA 이슈 생성을 제안했습니다.",
+      author: { id: null, name: "Briar · Codex", image: null, provider: "codex" },
+      replyCount: 0,
+      proposedAction: {
+        id: "20202020-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        type: "request_issue_create",
+        issue: {
+          title: "후속 QA",
+          description: "인박스 사이드 패널 승인 버튼 회귀를 확인합니다.",
+          priority: 2,
+          status: "backlog",
+        },
+        status: "pending",
+        acceptedAt: null,
+        resultRunId: null,
+      },
+      createdAt: "2026-08-06T01:00:00.000Z",
+      updatedAt: "2026-08-06T01:00:00.000Z",
+    };
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => root.render(
+      <TooltipProvider>
+        <RunPage
+          error={null}
+          isRecovering={false}
+          isSidebarOpen
+          onBack={() => undefined}
+          onCancel={async () => undefined}
+          onLoadAttachment={async () => new Blob()}
+          onLoadIssueMessages={async () => [message]}
+          onLoadRunEvidence={async () => []}
+          onMove={async () => undefined}
+          onOpenFullPage={() => undefined}
+          onRetry={async () => undefined}
+          onSendIssueMessage={async () => {
+            throw new Error("not implemented");
+          }}
+          run={demoDashboard.runs[1]}
+        />
+      </TooltipProvider>,
+    ));
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(container.textContent).toContain("후속 QA");
+    expect(container.textContent).toContain("새 이슈 생성 제안");
+    expect(container.querySelector(".issue-rework-proposal-accept")).toBeNull();
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
   it("does not show an error-like status banner for queued remote work", () => {
     const queuedRemoteRun = {
       ...demoDashboard.runs[0],
