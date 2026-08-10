@@ -282,6 +282,7 @@ describe("issue multipart input", () => {
       preferredProvider: null,
       preferredModel: null,
       preferredEffort: null,
+      fullAuto: false,
       checkpoints: [],
     });
     expect(result.attachments).toHaveLength(1);

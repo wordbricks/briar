@@ -793,6 +793,7 @@ export type HuntEventInput = {
   issueDescription: string | null;
   assigneeUserId?: string | null;
   issueCheckpoints?: AutoHuntWorkflowCheckpoint[];
+  fullAuto?: boolean;
   resultSummary: string | null;
   structuredResult: StructuredAgentResult | null;
   pullRequestUrls: string[];
@@ -7348,15 +7349,19 @@ export async function recordHuntEvent(
         db,
         projectId,
         normalizedInput.createdByUserId,
+        [],
+        normalizedInput.fullAuto === true,
       );
   const issueCheckpointSnapshot = existingRun
     ? (JSON.parse(
         existingRun.issue_checkpoints_json || "[]",
       ) as AutoHuntWorkflowCheckpoint[])
-    : additionalWorkflowCheckpoints(
-        baseWorkflowSnapshot,
-        normalizedInput.issueCheckpoints ?? [],
-      );
+    : normalizedInput.fullAuto
+      ? []
+      : additionalWorkflowCheckpoints(
+          baseWorkflowSnapshot,
+          normalizedInput.issueCheckpoints ?? [],
+        );
   const workflowSnapshot = existingRun
     ? baseWorkflowSnapshot
     : workflowWithAdditionalCheckpoints(
@@ -9959,6 +9964,21 @@ export async function updateIssueExecutionPreferences(
     .first<HuntRunRow>();
 }
 
+const runIsFullAuto = (run: Pick<HuntRunRow, "context_json">) => {
+  if (!run.context_json) return false;
+  try {
+    const context: unknown = JSON.parse(run.context_json);
+    return Boolean(
+      context &&
+        typeof context === "object" &&
+        !Array.isArray(context) &&
+        (context as Record<string, unknown>).fullAuto === true,
+    );
+  } catch {
+    return false;
+  }
+};
+
 export async function updateIssueCheckpoints(
   db: D1Database,
   projectId: string,
@@ -9968,6 +9988,7 @@ export async function updateIssueCheckpoints(
 ) {
   const run = await getHuntRunForProject(db, projectId, runId);
   if (!run) return "not_found" as const;
+  if (runIsFullAuto(run)) return "ineligible" as const;
   if (
     !["backlog", "queued"].includes(run.status) ||
     run.claim_token_hash ||
@@ -10115,6 +10136,7 @@ export async function transferIssue(
   const targetSettings = await getProjectSettings(db, input.targetProjectId);
   const adoptTargetWorkflow =
     run.status === "backlog" || run.status === "queued";
+  const fullAuto = runIsFullAuto(run);
   const targetBaseWorkflow = parseWorkflow(targetSettings?.workflow_json ?? null);
   const targetStageIds = new Set(targetBaseWorkflow.stages.map((stage) => stage.id));
   const targetBoundaries = new Set(
@@ -10122,7 +10144,7 @@ export async function transferIssue(
       (checkpoint) => `${checkpoint.stage}:${checkpoint.position}`,
     ),
   );
-  const compatibleIssueCheckpoints = adoptTargetWorkflow
+  const compatibleIssueCheckpoints = adoptTargetWorkflow && !fullAuto
     ? (JSON.parse(run.issue_checkpoints_json || "[]") as AutoHuntWorkflowCheckpoint[])
         .filter(
           (checkpoint) =>
@@ -10132,10 +10154,12 @@ export async function transferIssue(
     : [];
   const targetWorkflowJson = adoptTargetWorkflow
     ? stableJson(
-        workflowWithAdditionalCheckpoints(
-          targetBaseWorkflow,
-          compatibleIssueCheckpoints,
-        ),
+        fullAuto
+          ? { ...targetBaseWorkflow, execution: { checkpoints: [] } }
+          : workflowWithAdditionalCheckpoints(
+              targetBaseWorkflow,
+              compatibleIssueCheckpoints,
+            ),
       )
     : run.workflow_snapshot_json;
   const targetRepository = adoptTargetWorkflow

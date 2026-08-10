@@ -2318,6 +2318,7 @@ export function CreateIssueDialog({
   const [preferredEffort, setPreferredEffort] = useState(
     initialDraft?.preferredEffort ?? "high",
   );
+  const [fullAuto, setFullAuto] = useState(initialDraft?.fullAuto ?? false);
   const [projectId, setProjectId] = useState(() =>
     projects.some((project) => project.id === initialDraft?.projectId)
       ? initialDraft!.projectId
@@ -2362,6 +2363,7 @@ export function CreateIssueDialog({
       preferredProvider: preferredProvider || null,
       preferredModel: preferredModel || null,
       preferredEffort: preferredEffort || null,
+      ...(fullAuto ? { fullAuto: true } : {}),
       ...(checkpoints.length > 0 ? { checkpoints } : {}),
     });
   }, [
@@ -2371,6 +2373,7 @@ export function CreateIssueDialog({
     preferredModel,
     preferredProvider,
     preferredEffort,
+    fullAuto,
     checkpoints,
     priority,
     projectId,
@@ -2442,7 +2445,8 @@ export function CreateIssueDialog({
                 preferredProvider && preferredModel
                   ? ((preferredEffort || null) as ModelEffort | null)
                   : null,
-              ...(checkpoints.length > 0 ? { checkpoints } : {}),
+              fullAuto,
+              ...(!fullAuto && checkpoints.length > 0 ? { checkpoints } : {}),
               attachments: attachments.map(({ file }) => file),
               ...(attachments.length > 0
                 ? {
@@ -2569,12 +2573,31 @@ export function CreateIssueDialog({
             )}
           </div>
           <div className="issue-metadata-bar">
+            <label className="issue-full-auto-toggle">
+              <input
+                aria-describedby="issue-full-auto-description"
+                checked={fullAuto}
+                disabled={isSubmitting}
+                onChange={(event) => {
+                  const checked = event.currentTarget.checked;
+                  setFullAuto(checked);
+                  if (checked) setCheckpoints([]);
+                }}
+                type="checkbox"
+              />
+              <span>{t("issue.fullAuto")}</span>
+              <small id="issue-full-auto-description">
+                {t("issue.fullAutoDescription")}
+              </small>
+            </label>
             {workflow && projectId === workflowProjectId ? (
               <IssueCheckpointDropdown
                 checkpoints={checkpoints}
-                disabled={isSubmitting}
+                disabled={isSubmitting || fullAuto}
                 onChange={setCheckpoints}
-                workflow={workflow}
+                workflow={fullAuto
+                  ? { ...workflow, execution: { checkpoints: [] } }
+                  : workflow}
               />
             ) : null}
             <NativeSelect
@@ -3326,7 +3349,7 @@ function IssueContextMenu({
   const selectedIssueBoundaries = new Set(
     issueCheckpoints.map(checkpointBoundaryKey),
   );
-  const checkpointsEditable = canEditIssueCheckpoints(run);
+  const checkpointsEditable = !run.fullAuto && canEditIssueCheckpoints(run);
   const isClaimed =
     run.status === "queued" &&
     Boolean(run.leaseExpiresAt) &&
@@ -3466,13 +3489,18 @@ function IssueContextMenu({
           </ContextMenu.Sub>
 
           <ContextMenu.Sub>
-            <ContextMenu.SubTrigger className="issue-context-item">
+            <ContextMenu.SubTrigger
+              className="issue-context-item"
+              disabled={run.fullAuto}
+            >
               <Clock3 aria-hidden="true" size={17} />
               <span>{t("issue.checkpoints")}</span>
               <small>
-                {checkpointsEditable
-                  ? t("issue.checkpointCount", { count: issueCheckpoints.length })
-                  : t("issue.checkpointsLocked")}
+                {run.fullAuto
+                  ? t("issue.fullAuto")
+                  : checkpointsEditable
+                    ? t("issue.checkpointCount", { count: issueCheckpoints.length })
+                    : t("issue.checkpointsLocked")}
               </small>
               <ChevronRight aria-hidden="true" size={14} />
             </ContextMenu.SubTrigger>
@@ -5754,6 +5782,20 @@ export function RunPage({
                       />
                     </span>
                   </label>
+                  {run.fullAuto ? (
+                    <div
+                      aria-label={`${t("issue.fullAuto")}: ${t("issue.fullAutoDescription")}`}
+                      className="run-property"
+                      title={t("issue.fullAutoDescription")}
+                    >
+                      <span className="run-property-icon agent">
+                        <Bot size={15} />
+                      </span>
+                      <span className="run-property-copy">
+                        <strong>{t("issue.fullAuto")}</strong>
+                      </span>
+                    </div>
+                  ) : null}
                   <div
                     aria-label={`${t("issue.assignee")}: ${assignee?.name ?? t("run.unassigned")}`}
                     className="run-property"
@@ -6391,7 +6433,10 @@ function IssueWorkflowProgress({
   const effectiveBoundaries = new Set(
     run.workflow.execution.checkpoints.map(checkpointBoundaryKey),
   );
-  const editable = Boolean(onCheckpointsChange) && canEditIssueCheckpoints(run);
+  const editable =
+    !run.fullAuto &&
+    Boolean(onCheckpointsChange) &&
+    canEditIssueCheckpoints(run);
   const stateLabels: Record<IssueWorkflowProgressState, string> = {
     complete: t("status.completed"),
     active: t("status.running"),

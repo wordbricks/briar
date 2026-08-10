@@ -128,6 +128,7 @@ struct IssueDraft: Codable, Equatable, Sendable {
     var preferredProvider: AgentProvider? = nil
     var preferredModel: String? = nil
     var preferredEffort: ModelEffort? = defaultEffort
+    var fullAuto = false
 
     var isEmpty: Bool {
         title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
@@ -136,6 +137,7 @@ struct IssueDraft: Codable, Equatable, Sendable {
             assigneeUserId == nil &&
             preferredProvider == nil &&
             preferredModel == nil &&
+            !fullAuto &&
             (preferredEffort == nil || preferredEffort == Self.defaultEffort)
     }
 }
@@ -149,6 +151,7 @@ struct CreateIssueRequest: Codable, Sendable {
     let preferredProvider: AgentProvider?
     let preferredModel: String?
     let preferredEffort: ModelEffort?
+    let fullAuto: Bool
 }
 
 struct CreateIssueResponse: Codable, Sendable {

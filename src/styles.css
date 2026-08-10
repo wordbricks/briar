@@ -2100,6 +2100,7 @@ button.issue-message-state { width:100%; cursor:pointer; }
   border-top: 1px solid var(--border);
 }
 .issue-attachment-trigger,
+.issue-full-auto-toggle,
 .issue-checkpoint-trigger,
 .issue-dialog .issue-status-select.select-menu .select-menu-trigger,
 .issue-dialog .issue-assignee-select.select-menu .select-menu-trigger,
@@ -2122,6 +2123,24 @@ button.issue-message-state { width:100%; cursor:pointer; }
   font-size:var(--text-xs);
   font-weight: 500;
   line-height: 1;
+}
+.issue-full-auto-toggle {
+  position: relative;
+  cursor: pointer;
+}
+.issue-full-auto-toggle input {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  accent-color: var(--primary);
+}
+.issue-full-auto-toggle small {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
 }
 .issue-checkpoint-trigger { white-space:nowrap; cursor:pointer; }
 .issue-checkpoint-trigger > strong { min-width:17px; height:17px; padding:0 4px; display:grid; place-items:center; border-radius:999px; color:#fff; background:#765bd0; font-size:9px; }
@@ -4317,6 +4336,7 @@ button.issue-message-state { width:100%; cursor:pointer; }
 }
 .companion-shell .issue-metadata-bar::-webkit-scrollbar { display: none; }
 .companion-shell .issue-attachment-trigger,
+.companion-shell .issue-full-auto-toggle,
 .companion-shell .issue-dialog .issue-status-select.select-menu .select-menu-trigger,
 .companion-shell .issue-dialog .issue-assignee-select.select-menu .select-menu-trigger,
 .companion-shell .issue-dialog .issue-priority-select.select-menu .select-menu-trigger,
@@ -4456,6 +4476,7 @@ button.issue-message-state { width:100%; cursor:pointer; }
   }
   .issue-metadata-bar::-webkit-scrollbar { display: none; }
   .issue-attachment-trigger,
+  .issue-full-auto-toggle,
   .issue-dialog .issue-status-select.select-menu .select-menu-trigger,
   .issue-dialog .issue-assignee-select.select-menu .select-menu-trigger,
   .issue-dialog .issue-priority-select.select-menu .select-menu-trigger,

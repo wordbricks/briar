@@ -534,6 +534,7 @@ describe("Worker HTTP contract", () => {
             preferredProvider: "claude",
             preferredModel: "sonnet",
             preferredEffort: "high",
+            fullAuto: true,
           }),
         },
       );
@@ -541,6 +542,7 @@ describe("Worker HTTP contract", () => {
     expect(input.preferredProvider).toBe("claude");
     expect(input.preferredModel).toBe("sonnet");
     expect(input.preferredEffort).toBe("high");
+    expect(input.fullAuto).toBe(true);
   });
 
   it("rejects an effort preference without a provider on issue creation", async () => {
