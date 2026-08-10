@@ -13,11 +13,11 @@ import { useEffect, useMemo, useState } from "react";
 
 import {
   EmptyState,
-  ErrorBanner,
   MainContent,
   PageHeader,
 } from "@/components/layout";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/components/ui/toast";
 import { Typography } from "@/components/ui/typography";
 import { useI18n } from "../i18n";
 import {
@@ -120,6 +120,7 @@ export function ProjectAgents({
   token: string | null;
 }) {
   const { locale, localeTag, t } = useI18n();
+  const { toast } = useToast();
   const [agents, setAgents] = useState<ProjectAgent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -131,8 +132,12 @@ export function ProjectAgents({
   const [executingAgentIds, setExecutingAgentIds] = useState<Set<string>>(
     () => new Set(),
   );
-  const [executionError, setExecutionError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!appError) return;
+    toast(appError, { tone: "error" });
+  }, [appError, toast]);
   const runningAgentIds = useMemo(
     () =>
       new Set(
@@ -153,7 +158,6 @@ export function ProjectAgents({
       if (taskDialogAgent) {
         if (!executingAgentIds.has(taskDialogAgent.id)) {
           setTaskDialogAgent(null);
-          setExecutionError(null);
         }
         return true;
       }
@@ -202,7 +206,6 @@ export function ProjectAgents({
     setSelectedAgent(null);
     setSettingsAgent(null);
     setTaskDialogAgent(null);
-    setExecutionError(null);
   }, [project.id]);
 
   useEffect(() => {
@@ -314,7 +317,6 @@ export function ProjectAgents({
     ) {
       return;
     }
-    setExecutionError(null);
     setExecutingAgentIds((current) => new Set(current).add(agent.id));
     try {
       if (companionMode) {
@@ -347,8 +349,9 @@ export function ProjectAgents({
       );
       setTaskDialogAgent(null);
     } catch (caught) {
-      setExecutionError(
+      toast(
         caught instanceof Error ? caught.message : String(caught),
+        { tone: "error" },
       );
     } finally {
       setExecutingAgentIds((current) => {
@@ -379,7 +382,6 @@ export function ProjectAgents({
         agent={selectedAgent}
         companionMode={companionMode}
         dashboard={dashboard}
-        error={appError}
         isSidebarOpen={isSidebarOpen}
         onBack={() => setSelectedAgent(null)}
         onIssueOpen={onIssueOpen}
@@ -425,11 +427,6 @@ export function ProjectAgents({
         titleId="project-agents-title"
       />
       <div className="project-agents-scroll">
-        {appError || executionError ? (
-          <ErrorBanner className="m-4">
-            {executionError ?? appError}
-          </ErrorBanner>
-        ) : null}
         <section
           aria-labelledby="project-agents-title"
           className="project-agents-content"
@@ -577,7 +574,6 @@ export function ProjectAgents({
                             agent.skills.length === 0
                           }
                           onClick={() => {
-                            setExecutionError(null);
                             setTaskDialogAgent(agent);
                           }}
                           title={t("agents.runAgent", { name: agent.name })}
@@ -642,7 +638,6 @@ export function ProjectAgents({
         agent={taskDialogAgent}
         companionMode={companionMode}
         dashboard={dashboard}
-        error={executionError}
         isOpen={taskDialogAgent !== null}
         isSubmitting={
           taskDialogAgent
@@ -652,7 +647,6 @@ export function ProjectAgents({
         onOpenChange={(open) => {
           if (!open) {
             setTaskDialogAgent(null);
-            setExecutionError(null);
           }
         }}
         onSubmit={(input) => {

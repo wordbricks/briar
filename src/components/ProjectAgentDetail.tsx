@@ -2,11 +2,11 @@ import { ArrowLeft, LoaderCircle, Play } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import {
-  ErrorBanner,
   MainContent,
   PageHeader,
 } from "@/components/layout";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/components/ui/toast";
 import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
 import { useMobileBackHandler } from "../hooks/useMobileNavigation";
 import { useI18n } from "../i18n";
@@ -41,7 +41,6 @@ export function ProjectAgentDetail({
   agent,
   companionMode = false,
   dashboard,
-  error: appError,
   isSidebarOpen,
   onBack,
   onIssueOpen,
@@ -59,7 +58,6 @@ export function ProjectAgentDetail({
   agent: ProjectAgent;
   companionMode?: boolean;
   dashboard: DashboardPayload | null;
-  error: string | null;
   isSidebarOpen: boolean;
   onBack: () => void;
   onIssueOpen: (runId: string) => void;
@@ -91,9 +89,9 @@ export function ProjectAgentDetail({
   token?: string | null;
 }) {
   const { t } = useI18n();
+  const { toast } = useToast();
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(
     requestedSessionId,
   );
@@ -110,7 +108,6 @@ export function ProjectAgentDetail({
       if (isTaskDialogOpen) {
         if (!isRunning) {
           setIsTaskDialogOpen(false);
-          setError(null);
         }
         return true;
       }
@@ -167,13 +164,11 @@ export function ProjectAgentDetail({
   ]);
 
   const openTaskDialog = () => {
-    setError(null);
     setIsTaskDialogOpen(true);
   };
 
   const submit = async (input: ProjectAgentTaskDialogSubmit) => {
     if (isRunning || !dashboard) return;
-    setError(null);
     setIsRunning(true);
     try {
       if (companionMode) {
@@ -208,7 +203,10 @@ export function ProjectAgentDetail({
         },
       );
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : String(caught));
+      toast(
+        caught instanceof Error ? caught.message : String(caught),
+        { tone: "error" },
+      );
     } finally {
       setIsRunning(false);
     }
@@ -319,10 +317,6 @@ export function ProjectAgentDetail({
         titleId="project-agent-detail-title"
       />
       <div className="project-agent-run-scroll">
-        {appError ? (
-          <ErrorBanner className="m-4">{appError}</ErrorBanner>
-        ) : null}
-
         <ProjectAgentSessions
           agent={agent}
           onSessionOpen={setSelectedSessionId}
@@ -335,7 +329,6 @@ export function ProjectAgentDetail({
         agent={agent}
         companionMode={companionMode}
         dashboard={dashboard}
-        error={error}
         isOpen={isTaskDialogOpen}
         isSubmitting={isRunning}
         onOpenChange={setIsTaskDialogOpen}
