@@ -106,9 +106,7 @@ export function ProjectAgentDetail({
     () => {
       if (!companionMode) return false;
       if (isTaskDialogOpen) {
-        if (!isRunning) {
-          setIsTaskDialogOpen(false);
-        }
+        setIsTaskDialogOpen(false);
         return true;
       }
       if (selectedSessionId) {
@@ -167,6 +165,8 @@ export function ProjectAgentDetail({
     setIsTaskDialogOpen(true);
   };
 
+  const isAgentRunning = isResponsibilityRunning || isRunning;
+
   const submit = async (input: ProjectAgentTaskDialogSubmit) => {
     if (isRunning || !dashboard) return;
     setIsRunning(true);
@@ -181,7 +181,6 @@ export function ProjectAgentDetail({
           skillId: input.skill.id,
         });
         setSelectedSessionId(sessionId);
-        setIsTaskDialogOpen(false);
         return;
       }
       const sessionId = crypto.randomUUID();
@@ -276,20 +275,20 @@ export function ProjectAgentDetail({
           <Button
             className="project-agent-create project-agent-run-task"
             disabled={
-              isResponsibilityRunning ||
+              isAgentRunning ||
               !dashboard ||
               agent.skills.length === 0
             }
             onClick={openTaskDialog}
             type="button"
           >
-            {isResponsibilityRunning ? (
+            {isAgentRunning ? (
               <LoaderCircle className="spin" size={17} />
             ) : (
               <Play fill="currentColor" size={17} />
             )}
             {t(
-              isResponsibilityRunning
+              isAgentRunning
                 ? "agents.running"
                 : companionMode
                   ? "agents.runNow"
