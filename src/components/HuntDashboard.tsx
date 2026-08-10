@@ -97,6 +97,7 @@ import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
 import { inboxIssueMessageVersion } from "../hooks/useInbox";
 import { useMobileBackHandler } from "../hooks/useMobileNavigation";
 import { useObjectUrl } from "../hooks/useObjectUrl";
+import { useIssueDialogAttachments } from "../hooks/useIssueDialogAttachments";
 import { useProjectAgentWorkerEvents } from "../hooks/useProjectAgentWorkerEvents";
 import { useHorizontalPaneResize } from "../hooks/useHorizontalPaneResize";
 import {
@@ -1846,23 +1847,29 @@ export function EditIssueDialog({
     run.assigneeUserId ?? "",
   );
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [attachments, setAttachments] = useState<
-    Array<{ file: File; reference: string }>
-  >([]);
-  const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [keptAttachmentIds, setKeptAttachmentIds] = useState<string[]>(() =>
     (run.attachments ?? []).map((attachment) => attachment.id),
   );
-  const [isDraggingAttachments, setIsDraggingAttachments] = useState(false);
-  const attachmentDragDepthRef = useRef(0);
-  const descriptionEditorRef = useRef<HTMLDivElement>(null);
   const titleMaxLength = issueTitleInputMaxLength(title, locale);
   const titleLength = issueTitleLength(title);
   const titleTooLong =
     Boolean(title.trim()) && !isIssueTitleWithinLimit(title);
+  const {
+    addAttachments,
+    attachmentError,
+    attachments,
+    descriptionEditorRef,
+    formEventHandlers,
+    inlineAttachmentReferences,
+    isDraggingAttachments,
+    removeAttachment: removeNewAttachment,
+  } = useIssueDialogAttachments({
+    description,
+    isSubmitting,
+    setDescription,
+  });
 
   const existingAttachments = run.attachments ?? [];
-  const inlineAttachmentReferences = issueAttachmentReferences(description);
 
   useEffect(() => {
     const closeOnEscape = (event: KeyboardEvent) => {
@@ -1871,86 +1878,6 @@ export function EditIssueDialog({
     document.addEventListener("keydown", closeOnEscape);
     return () => document.removeEventListener("keydown", closeOnEscape);
   }, [isSubmitting, onClose]);
-
-  useEffect(() => {
-    if (!isSubmitting) return;
-    attachmentDragDepthRef.current = 0;
-    setIsDraggingAttachments(false);
-  }, [isSubmitting]);
-
-  const focusDescriptionAt = (offset: number) => {
-    const inputs = Array.from(
-      descriptionEditorRef.current?.querySelectorAll<HTMLTextAreaElement>(
-        ".issue-description-input",
-      ) ?? [],
-    );
-    const input =
-      inputs.find((candidate) => {
-        const start = Number(candidate.dataset.descriptionStart ?? 0);
-        const end = Number(candidate.dataset.descriptionEnd ?? start);
-        return offset >= start && offset <= end;
-      }) ?? inputs.at(-1);
-    if (!input) return;
-    const start = Number(input.dataset.descriptionStart ?? 0);
-    const caret = Math.max(0, Math.min(input.value.length, offset - start));
-    input.focus();
-    input.setSelectionRange(caret, caret);
-  };
-
-  const addAttachments = (
-    selected: File[],
-    insertImages = false,
-    selection?: { start: number; end: number },
-  ) => {
-    if (selected.length === 0) return;
-    const added = selected.map((file) => ({
-      file: normalizeIssueAttachmentFile(file),
-      reference: crypto.randomUUID(),
-    }));
-    const next = [...attachments, ...added];
-    const error = validateIssueAttachments(next.map(({ file }) => file));
-    setAttachmentError(error);
-    if (error) return;
-    setAttachments(next);
-
-    const inlineImages = insertImages
-      ? added.filter(({ file }) => file.type.startsWith("image/"))
-      : [];
-    if (inlineImages.length === 0) return;
-    const start = selection?.start ?? description.length;
-    const end = selection?.end ?? start;
-    const before = description.slice(0, start);
-    const after = description.slice(end);
-    const markdown = inlineImages
-      .map(({ file, reference }) => issueAttachmentMarkdown(reference, file.name))
-      .join("\n\n");
-    const prefix = before.length === 0 || before.endsWith("\n\n")
-      ? ""
-      : before.endsWith("\n")
-        ? "\n"
-        : "\n\n";
-    const suffix = after.length === 0 || after.startsWith("\n\n")
-      ? ""
-      : after.startsWith("\n")
-        ? "\n"
-        : "\n\n";
-    const insertion = `${prefix}${markdown}${suffix}`;
-    setDescription(`${before}${insertion}${after}`);
-    requestAnimationFrame(() => {
-      const caret = start + insertion.length;
-      focusDescriptionAt(caret);
-    });
-  };
-
-  const removeNewAttachment = (index: number, reference: string) => {
-    setAttachments((current) =>
-      current.filter((_, candidateIndex) => candidateIndex !== index),
-    );
-    setDescription((current) =>
-      removeIssueAttachmentMarkdown(current, reference),
-    );
-    setAttachmentError(null);
-  };
 
   const removeExistingAttachment = (attachmentId: string) => {
     setKeptAttachmentIds((current) =>
@@ -1997,92 +1924,7 @@ export function EditIssueDialog({
         className={`issue-dialog edit-issue-dialog${
           isDraggingAttachments ? " is-dragging-attachments" : ""
         }`}
-        onDragEnter={(event) => {
-          if (!dataTransferHasFiles(event.dataTransfer)) return;
-          event.preventDefault();
-          attachmentDragDepthRef.current += 1;
-          if (!isSubmitting) setIsDraggingAttachments(true);
-        }}
-        onDragLeave={(event) => {
-          if (!dataTransferHasFiles(event.dataTransfer)) return;
-          event.preventDefault();
-          attachmentDragDepthRef.current = Math.max(
-            0,
-            attachmentDragDepthRef.current - 1,
-          );
-          if (attachmentDragDepthRef.current === 0) {
-            setIsDraggingAttachments(false);
-          }
-        }}
-        onDragOver={(event) => {
-          if (!dataTransferHasFiles(event.dataTransfer)) return;
-          event.preventDefault();
-          if (!isSubmitting) event.dataTransfer.dropEffect = "copy";
-        }}
-        onDrop={(event) => {
-          if (!dataTransferHasFiles(event.dataTransfer)) return;
-          event.preventDefault();
-          attachmentDragDepthRef.current = 0;
-          setIsDraggingAttachments(false);
-          if (!isSubmitting) {
-            addAttachments(filesFromDataTransfer(event.dataTransfer), true);
-          }
-        }}
-        onKeyDown={(event) => {
-          const isTitleEnter =
-            event.target instanceof HTMLInputElement &&
-            event.target.classList.contains("issue-title-input") &&
-            !event.metaKey &&
-            !event.ctrlKey;
-          if (
-            event.key !== "Enter" ||
-            event.nativeEvent.isComposing ||
-            isSubmitting
-          ) {
-            return;
-          }
-          if (isTitleEnter) {
-            event.preventDefault();
-            event.currentTarget
-              .querySelector<HTMLTextAreaElement>(".issue-description-input")
-              ?.focus();
-            return;
-          }
-          if (event.metaKey || event.ctrlKey) {
-            event.preventDefault();
-            event.currentTarget.requestSubmit();
-          }
-        }}
-        onPaste={(event) => {
-          const items = Array.from(event.clipboardData.items);
-          const pastedImages = items
-            .filter((item) => item.kind === "file" && item.type.startsWith("image/"))
-            .map((item) => item.getAsFile())
-            .filter((file): file is File => file !== null);
-          const images = pastedImages.length > 0
-            ? pastedImages
-            : Array.from(event.clipboardData.files).filter((file) =>
-                file.type.startsWith("image/"),
-              );
-          if (images.length === 0) return;
-          event.preventDefault();
-          const target = event.target instanceof HTMLTextAreaElement
-            ? event.target
-            : null;
-          const segmentStart = Number(
-            target?.dataset.descriptionStart ?? description.length,
-          );
-          addAttachments(
-            images,
-            true,
-            target
-              ? {
-                  start: segmentStart + target.selectionStart,
-                  end: segmentStart + target.selectionEnd,
-                }
-              : undefined,
-          );
-        }}
+        {...formEventHandlers}
         onSubmit={(event) => {
           event.preventDefault();
           if (!title.trim() || isSubmitting) return;
@@ -2488,14 +2330,21 @@ export function CreateIssueDialog({
       ? initialDraft.checkpoints ?? []
       : [],
   );
-  const [attachments, setAttachments] = useState<
-    Array<{ file: File; reference: string }>
-  >([]);
-  const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [isDraggingAttachments, setIsDraggingAttachments] = useState(false);
-  const attachmentDragDepthRef = useRef(0);
-  const descriptionEditorRef = useRef<HTMLDivElement>(null);
+  const {
+    addAttachments,
+    attachmentError,
+    attachments,
+    descriptionEditorRef,
+    formEventHandlers,
+    inlineAttachmentReferences,
+    isDraggingAttachments,
+    removeAttachment,
+  } = useIssueDialogAttachments({
+    description,
+    isSubmitting,
+    setDescription,
+  });
 
   const persistDraft = useCallback(() => {
     const draftDescription = attachments.reduce(
@@ -2533,82 +2382,6 @@ export function CreateIssueDialog({
     persistDraft();
     onClose();
   }, [onClose, persistDraft]);
-
-  const focusDescriptionAt = (offset: number) => {
-    const inputs = Array.from(
-      descriptionEditorRef.current?.querySelectorAll<HTMLTextAreaElement>(
-        ".issue-description-input",
-      ) ?? [],
-    );
-    const input =
-      inputs.find((candidate) => {
-        const start = Number(candidate.dataset.descriptionStart ?? 0);
-        const end = Number(candidate.dataset.descriptionEnd ?? start);
-        return offset >= start && offset <= end;
-      }) ?? inputs.at(-1);
-    if (!input) return;
-    const start = Number(input.dataset.descriptionStart ?? 0);
-    const caret = Math.max(0, Math.min(input.value.length, offset - start));
-    input.focus();
-    input.setSelectionRange(caret, caret);
-  };
-
-  const addAttachments = (
-    selected: File[],
-    insertImages = false,
-    selection?: { start: number; end: number },
-  ) => {
-    if (selected.length === 0) return;
-    const added = selected.map((file) => ({
-      file: normalizeIssueAttachmentFile(file),
-      reference: crypto.randomUUID(),
-    }));
-    const next = [...attachments, ...added];
-    const error = validateIssueAttachments(next.map(({ file }) => file));
-    setAttachmentError(error);
-    if (error) return;
-    setAttachments(next);
-
-    const inlineImages = insertImages
-      ? added.filter(({ file }) => file.type.startsWith("image/"))
-      : [];
-    if (inlineImages.length === 0) return;
-    const start = selection?.start ?? description.length;
-    const end = selection?.end ?? start;
-    const before = description.slice(0, start);
-    const after = description.slice(end);
-    const markdown = inlineImages
-      .map(({ file, reference }) => issueAttachmentMarkdown(reference, file.name))
-      .join("\n\n");
-    const prefix = before.length === 0 || before.endsWith("\n\n")
-      ? ""
-      : before.endsWith("\n")
-        ? "\n"
-        : "\n\n";
-    const suffix = after.length === 0 || after.startsWith("\n\n")
-      ? ""
-      : after.startsWith("\n")
-        ? "\n"
-        : "\n\n";
-    const insertion = `${prefix}${markdown}${suffix}`;
-    setDescription(`${before}${insertion}${after}`);
-    requestAnimationFrame(() => {
-      const caret = start + insertion.length;
-      focusDescriptionAt(caret);
-    });
-  };
-
-  const removeAttachment = (index: number, reference: string) => {
-    setAttachments((current) =>
-      current.filter((_, candidateIndex) => candidateIndex !== index),
-    );
-    setDescription((current) =>
-      removeIssueAttachmentMarkdown(current, reference),
-    );
-    setAttachmentError(null);
-  };
-
-  const inlineAttachmentReferences = issueAttachmentReferences(description);
   const remainingAttachments = attachments.filter(
     ({ file, reference }) =>
       !file.type.startsWith("image/") ||
@@ -2627,12 +2400,6 @@ export function CreateIssueDialog({
     persistDraft();
   }, [persistDraft]);
 
-  useEffect(() => {
-    if (!isSubmitting) return;
-    attachmentDragDepthRef.current = 0;
-    setIsDraggingAttachments(false);
-  }, [isSubmitting]);
-
   return (
     <div
       className="dialog-backdrop issue-dialog-backdrop"
@@ -2644,92 +2411,7 @@ export function CreateIssueDialog({
         className={`issue-dialog${
           isDraggingAttachments ? " is-dragging-attachments" : ""
         }`}
-        onDragEnter={(event) => {
-          if (!dataTransferHasFiles(event.dataTransfer)) return;
-          event.preventDefault();
-          attachmentDragDepthRef.current += 1;
-          if (!isSubmitting) setIsDraggingAttachments(true);
-        }}
-        onDragLeave={(event) => {
-          if (!dataTransferHasFiles(event.dataTransfer)) return;
-          event.preventDefault();
-          attachmentDragDepthRef.current = Math.max(
-            0,
-            attachmentDragDepthRef.current - 1,
-          );
-          if (attachmentDragDepthRef.current === 0) {
-            setIsDraggingAttachments(false);
-          }
-        }}
-        onDragOver={(event) => {
-          if (!dataTransferHasFiles(event.dataTransfer)) return;
-          event.preventDefault();
-          if (!isSubmitting) event.dataTransfer.dropEffect = "copy";
-        }}
-        onDrop={(event) => {
-          if (!dataTransferHasFiles(event.dataTransfer)) return;
-          event.preventDefault();
-          attachmentDragDepthRef.current = 0;
-          setIsDraggingAttachments(false);
-          if (!isSubmitting) {
-            addAttachments(filesFromDataTransfer(event.dataTransfer), true);
-          }
-        }}
-        onKeyDown={(event) => {
-          const isTitleEnter =
-            event.target instanceof HTMLInputElement &&
-            event.target.classList.contains("issue-title-input") &&
-            !event.metaKey &&
-            !event.ctrlKey;
-          if (
-            event.key !== "Enter" ||
-            event.nativeEvent.isComposing ||
-            isSubmitting
-          ) {
-            return;
-          }
-          if (isTitleEnter) {
-            event.preventDefault();
-            event.currentTarget
-              .querySelector<HTMLTextAreaElement>(".issue-description-input")
-              ?.focus();
-            return;
-          }
-          if (event.metaKey || event.ctrlKey) {
-            event.preventDefault();
-            event.currentTarget.requestSubmit();
-          }
-        }}
-        onPaste={(event) => {
-          const items = Array.from(event.clipboardData.items);
-          const pastedImages = items
-            .filter((item) => item.kind === "file" && item.type.startsWith("image/"))
-            .map((item) => item.getAsFile())
-            .filter((file): file is File => file !== null);
-          const images = pastedImages.length > 0
-            ? pastedImages
-            : Array.from(event.clipboardData.files).filter((file) =>
-                file.type.startsWith("image/"),
-              );
-          if (images.length === 0) return;
-          event.preventDefault();
-          const target = event.target instanceof HTMLTextAreaElement
-            ? event.target
-            : null;
-          const segmentStart = Number(
-            target?.dataset.descriptionStart ?? description.length,
-          );
-          addAttachments(
-            images,
-            true,
-            target
-              ? {
-                  start: segmentStart + target.selectionStart,
-                  end: segmentStart + target.selectionEnd,
-                }
-              : undefined,
-          );
-        }}
+        {...formEventHandlers}
         onSubmit={(event) => {
           event.preventDefault();
           if (!title.trim() || isSubmitting) return;
