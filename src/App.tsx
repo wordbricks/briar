@@ -73,6 +73,8 @@ import {
 import type { MessageKey } from "./i18n/messages";
 import {
   inboxNotificationTarget,
+  isInboxChannelNavigationTarget,
+  isInboxRunDetailTarget,
   type InboxNotificationTarget,
 } from "./lib/inbox-notifications";
 import {
@@ -615,8 +617,9 @@ export function App() {
         (session) => session.id === requestedSessionId,
       ) ?? null
     : null;
+  // Channel targets open the Channels page, not the issue/session detail panel.
   const inboxDetailRun =
-    inboxDetailTarget && inboxDetailTarget.kind !== "session"
+    inboxDetailTarget && isInboxRunDetailTarget(inboxDetailTarget)
       ? briar.dashboard?.runs.find(
           (run) => run.id === inboxDetailTarget.targetId,
         ) ?? null
@@ -634,7 +637,7 @@ export function App() {
     : t("inbox.messages"));
   const isInboxDetailLoading = Boolean(
     inboxDetailTarget &&
-      inboxDetailTarget.kind !== "session" &&
+      isInboxRunDetailTarget(inboxDetailTarget) &&
       briar.dashboard?.project.id !== inboxDetailTarget.projectId,
   );
   const [issueAgents, setIssueAgents] = useState<ProjectAgent[]>([]);
@@ -1323,6 +1326,12 @@ export function App() {
             onMarkRead={inbox.markRead}
             onOpen={(message) => {
               const target = inboxNotificationTarget(message);
+              // Channel replies are not issues; open the channel thread instead
+              // of the inbox detail panel (which only loads runs/sessions).
+              if (isInboxChannelNavigationTarget(target)) {
+                setPendingInboxNotificationTarget(target);
+                return;
+              }
               inbox.markRead(message.id);
               if (target.projectId !== briar.activeProjectId) {
                 briar.setActiveProjectId(target.projectId);
