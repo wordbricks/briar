@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   codexAppServerArgs,
+  codexAppsInstalledRequest,
   codexApprovalRequest,
   codexConfigReadRequest,
   codexFinalMessage,
@@ -58,6 +59,23 @@ describe("Codex App Server runner", () => {
         developerInstructions: "Use the Briar workflow.",
       },
     });
+    expect(
+      codexThreadRequest(request, {
+        mcpServers: ["figma.v1"],
+        apps: ["connector_figma"],
+        disableApps: true,
+        disablePlugins: true,
+      }),
+    ).toMatchObject({
+      method: "thread/start",
+      params: {
+        config: {
+          features: { apps: false, plugins: false },
+          apps: { connector_figma: { enabled: false } },
+          mcp_servers: { "figma.v1": { enabled: false } },
+        },
+      },
+    });
     expect(codexTurnRequest(request, "thread-1")).toMatchObject({
       method: "turn/start",
       id: 5,
@@ -111,6 +129,25 @@ describe("Codex App Server runner", () => {
         params: { turn: { status: "completed" } },
       }),
     ).toEqual({ type: "turnCompleted", status: "completed" });
+    expect(
+      normalizeCodexAppServerMessage({
+        method: "mcpServer/startupStatus/updated",
+        params: {
+          threadId: "thread-1",
+          name: "figma",
+          status: "failed",
+          error: "AuthRequired",
+          failureReason: "reauthenticationRequired",
+        },
+      }),
+    ).toEqual({
+      type: "activityCompleted",
+      id: "mcp-startup:figma",
+      kind: "tool",
+      title: "figma MCP unavailable",
+      text: "AuthRequired",
+      status: "failed",
+    });
   });
 
   it("normalizes command activity output and terminal outcomes", () => {
@@ -265,7 +302,13 @@ describe("Codex App Server runner", () => {
       id: 2,
       result: { config: { model: "gpt-5.6-sol" } },
     });
-    expect(configured.outgoing[0]).toMatchObject({ method: "thread/start" });
+    expect(configured.outgoing).toEqual([codexAppsInstalledRequest()]);
+
+    const apps = consumeCodexAppServerMessage(state, defaultRequest, {
+      id: 6,
+      result: { apps: [] },
+    });
+    expect(apps.outgoing[0]).toMatchObject({ method: "thread/start" });
 
     const thread = consumeCodexAppServerMessage(state, defaultRequest, {
       id: 4,
@@ -305,7 +348,7 @@ describe("Codex App Server runner", () => {
     expect(codexFinalMessage(state)).toBe("Done");
   });
 
-  it("skips default-model discovery when a model was explicitly configured", () => {
+  it("reads isolation config but skips the model catalog when a model is explicit", () => {
     const state = createCodexAppServerState();
     const initialized = consumeCodexAppServerMessage(state, request, {
       id: 1,
@@ -313,7 +356,35 @@ describe("Codex App Server runner", () => {
     });
     expect(initialized.outgoing.map((message) => message.method)).toEqual([
       "initialized",
+      "config/read",
+    ]);
+
+    const configured = consumeCodexAppServerMessage(state, request, {
+      id: 2,
+      result: {
+        config: {
+          model: null,
+          mcp_servers: { playwright: { enabled: true } },
+          plugins: { "figma@openai-curated": { enabled: true } },
+        },
+      },
+    });
+    expect(configured.outgoing.map((message) => message.method)).toEqual([
+      "app/installed",
+    ]);
+    expect(state.configuredMcpServers).toEqual(["playwright"]);
+    expect(state.configuredPlugins).toEqual(["figma@openai-curated"]);
+    const apps = consumeCodexAppServerMessage(state, request, {
+      id: 6,
+      result: {
+        apps: [{ id: "connector_figma", runtimeName: "Figma" }],
+      },
+    });
+    expect(apps.outgoing.map((message) => message.method)).toEqual([
       "thread/start",
+    ]);
+    expect(state.installedApps).toEqual([
+      { id: "connector_figma", name: "Figma" },
     ]);
   });
 
@@ -337,7 +408,12 @@ describe("Codex App Server runner", () => {
         nextCursor: null,
       },
     });
-    expect(models.outgoing[0]).toMatchObject({ method: "thread/start", id: 4 });
+    expect(models.outgoing).toEqual([codexAppsInstalledRequest()]);
+    const apps = consumeCodexAppServerMessage(state, defaultRequest, {
+      id: 6,
+      result: { apps: [] },
+    });
+    expect(apps.outgoing[0]).toMatchObject({ method: "thread/start", id: 4 });
   });
 
   it("keeps running when model-discovery RPCs are unavailable", () => {
@@ -353,7 +429,14 @@ describe("Codex App Server runner", () => {
       error: { code: -32601, message: "Method not found" },
     });
 
-    expect(fallback.outgoing).toEqual([codexThreadRequest(defaultRequest)]);
+    expect(fallback.outgoing).toEqual([codexAppsInstalledRequest()]);
+    const appsFallback = consumeCodexAppServerMessage(state, defaultRequest, {
+      id: 6,
+      error: { code: -32601, message: "Method not found" },
+    });
+    expect(appsFallback.outgoing).toEqual([
+      codexThreadRequest(defaultRequest),
+    ]);
   });
 
   it("keeps approval handling compatible with the desktop decisions", () => {
@@ -374,6 +457,292 @@ describe("Codex App Server runner", () => {
     expect(codexServerRequestResponse(approval, false)).toEqual({
       id: 4,
       result: { decision: "decline" },
+    });
+  });
+
+  it("isolates unauthenticated optional Figma and lets an independent task continue", () => {
+    const state = createCodexAppServerState();
+    consumeCodexAppServerMessage(state, request, { id: 1, result: {} });
+    consumeCodexAppServerMessage(state, request, {
+      id: 2,
+      result: {
+        config: {
+          model: "gpt-5",
+          plugins: { "figma@openai-curated": { enabled: true } },
+        },
+      },
+    });
+    consumeCodexAppServerMessage(state, request, {
+      id: 6,
+      result: {
+        apps: [{ id: "connector_figma", runtimeName: "Figma" }],
+      },
+    });
+    consumeCodexAppServerMessage(state, request, {
+      id: 4,
+      result: { thread: { id: "thread-1" } },
+    });
+    consumeCodexAppServerMessage(state, request, {
+      id: 5,
+      result: { turn: { id: "turn-1" } },
+    });
+    consumeCodexAppServerMessage(state, request, {
+      method: "mcpServer/startupStatus/updated",
+      params: {
+        threadId: "thread-1",
+        name: "figma",
+        status: "failed",
+        error: "transport worker quit with fatal: AuthRequired",
+        failureReason: "reauthenticationRequired",
+      },
+    });
+
+    const failedTurn = consumeCodexAppServerMessage(state, request, {
+      method: "turn/completed",
+      params: {
+        threadId: "thread-1",
+        turn: {
+          id: "turn-1",
+          status: "failed",
+          error: {
+            message: "Figma MCP transport worker stopped after AuthRequired",
+          },
+          items: [],
+        },
+      },
+    });
+
+    expect(failedTurn.mcpFailure).toEqual({
+      disposition: "recover",
+      message: "Figma MCP transport worker stopped after AuthRequired",
+      serverNames: ["figma"],
+      isolation: {
+        mcpServers: [],
+        apps: ["connector_figma"],
+        disableApps: false,
+        disablePlugins: false,
+      },
+    });
+    expect(
+      codexThreadRequest(request, failedTurn.mcpFailure!.isolation),
+    ).toMatchObject({
+      params: {
+        config: { apps: { connector_figma: { enabled: false } } },
+      },
+    });
+
+    const recovered = createCodexAppServerState();
+    recovered.threadId = "thread-1";
+    recovered.turnId = "turn-2";
+    consumeCodexAppServerMessage(recovered, request, {
+      method: "item/completed",
+      params: {
+        item: {
+          id: "message-2",
+          type: "agentMessage",
+          phase: "final_answer",
+          text: "Static checks and review completed without Figma.",
+        },
+      },
+    });
+    const completed = consumeCodexAppServerMessage(recovered, request, {
+      method: "turn/completed",
+      params: {
+        turn: { id: "turn-2", status: "completed", items: [] },
+      },
+    });
+    expect(completed.completed).toBe(true);
+    expect(codexFinalMessage(recovered)).toContain("completed without Figma");
+  });
+
+  it("isolates a configured optional MCP after a connection failure", () => {
+    const state = createCodexAppServerState();
+    state.configuredMcpServers = ["design.preview"];
+    state.threadId = "thread-1";
+    state.turnId = "turn-1";
+    consumeCodexAppServerMessage(state, request, {
+      method: "mcpServer/startupStatus/updated",
+      params: {
+        name: "design.preview",
+        status: "failed",
+        error: "connection refused",
+        failureReason: null,
+      },
+    });
+
+    const failedTurn = consumeCodexAppServerMessage(state, request, {
+      method: "turn/completed",
+      params: {
+        turn: {
+          id: "turn-1",
+          status: "failed",
+          error: { message: "MCP startup failed" },
+          items: [],
+        },
+      },
+    });
+
+    expect(failedTurn.mcpFailure).toMatchObject({
+      disposition: "recover",
+      serverNames: ["design.preview"],
+      isolation: {
+        mcpServers: ["design.preview"],
+        apps: [],
+        disableApps: false,
+        disablePlugins: false,
+      },
+    });
+    expect(
+      codexThreadRequest(request, failedTurn.mcpFailure!.isolation),
+    ).toMatchObject({
+      params: {
+        config: {
+          mcp_servers: { "design.preview": { enabled: false } },
+        },
+      },
+    });
+  });
+
+  it("isolates the shared apps transport even without configured plugins", () => {
+    const state = createCodexAppServerState();
+    state.threadId = "thread-1";
+    state.turnId = "turn-1";
+    consumeCodexAppServerMessage(state, request, {
+      method: "mcpServer/startupStatus/updated",
+      params: {
+        threadId: "thread-1",
+        name: "codex_apps",
+        status: "failed",
+        error: "Figma connector transport worker quit with fatal: AuthRequired",
+        failureReason: "reauthenticationRequired",
+      },
+    });
+
+    const failedTurn = consumeCodexAppServerMessage(state, request, {
+      method: "turn/completed",
+      params: {
+        turn: {
+          id: "turn-1",
+          status: "failed",
+          error: { message: "codex_apps transport stopped after AuthRequired" },
+          items: [],
+        },
+      },
+    });
+
+    expect(failedTurn.mcpFailure).toEqual({
+      disposition: "recover",
+      message: "codex_apps transport stopped after AuthRequired",
+      serverNames: ["codex_apps"],
+      isolation: {
+        mcpServers: [],
+        apps: [],
+        disableApps: true,
+        disablePlugins: false,
+      },
+    });
+  });
+
+  it("does not treat another app on the shared transport as the failed dependency", () => {
+    const state = createCodexAppServerState();
+    state.configuredPlugins = [
+      "figma@openai-curated",
+      "github@openai-curated",
+    ];
+    state.installedApps = [
+      { id: "connector_figma", name: "Figma" },
+      { id: "connector_github", name: "GitHub" },
+    ];
+    state.threadId = "thread-1";
+    state.turnId = "turn-1";
+    consumeCodexAppServerMessage(state, request, {
+      method: "mcpServer/startupStatus/updated",
+      params: {
+        name: "codex_apps",
+        status: "failed",
+        error: "Figma connector transport worker quit with fatal: AuthRequired",
+        failureReason: "reauthenticationRequired",
+      },
+    });
+    consumeCodexAppServerMessage(state, request, {
+      method: "item/started",
+      params: {
+        item: {
+          id: "github-call-1",
+          type: "mcpToolCall",
+          server: "codex_apps",
+          tool: "get_pull_request",
+          pluginId: "github@openai-curated",
+          status: "inProgress",
+        },
+      },
+    });
+
+    const failedTurn = consumeCodexAppServerMessage(state, request, {
+      method: "turn/completed",
+      params: {
+        turn: {
+          id: "turn-1",
+          status: "failed",
+          error: { message: "Figma AuthRequired stopped the MCP transport" },
+          items: [],
+        },
+      },
+    });
+
+    expect(failedTurn.mcpFailure).toMatchObject({
+      disposition: "recover",
+      serverNames: ["Figma"],
+      isolation: {
+        apps: ["connector_figma"],
+        disableApps: false,
+      },
+    });
+  });
+
+  it("maps authentication failure for an invoked MCP to a blocked turn", () => {
+    const state = createCodexAppServerState();
+    state.configuredPlugins = ["figma@openai-curated"];
+    state.threadId = "thread-1";
+    state.turnId = "turn-1";
+    consumeCodexAppServerMessage(state, request, {
+      method: "mcpServer/startupStatus/updated",
+      params: {
+        threadId: "thread-1",
+        name: "figma",
+        status: "failed",
+        error: "AuthRequired",
+        failureReason: "reauthenticationRequired",
+      },
+    });
+    consumeCodexAppServerMessage(state, request, {
+      method: "item/started",
+      params: {
+        item: {
+          id: "figma-call-1",
+          type: "mcpToolCall",
+          server: "figma",
+          tool: "get_design_context",
+          status: "inProgress",
+        },
+      },
+    });
+
+    const failedTurn = consumeCodexAppServerMessage(state, request, {
+      method: "turn/completed",
+      params: {
+        turn: {
+          id: "turn-1",
+          status: "failed",
+          error: { message: "Figma MCP AuthRequired" },
+          items: [],
+        },
+      },
+    });
+
+    expect(failedTurn.mcpFailure).toMatchObject({
+      disposition: "blocked",
+      serverNames: ["figma"],
     });
   });
 

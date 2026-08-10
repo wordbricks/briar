@@ -121,6 +121,47 @@ describe("detached Agent runner", () => {
     expect(event.detail).toContain("transient HTTP 503");
   });
 
+  it("maps a required MCP authentication failure to an authentication wait", () => {
+    const block = detachedProviderBlockFromPayload({
+      type: "blocked",
+      reason: "mcp_auth_required",
+      provider: "codex",
+      message: "Authentication is required for MCP server(s): figma.",
+      nextRetryAt: null,
+      serverNames: ["figma", "figma"],
+    });
+    expect(block).toEqual({
+      reason: "mcp_auth_required",
+      provider: "codex",
+      message: "Authentication is required for MCP server(s): figma.",
+      nextRetryAt: null,
+      serverNames: ["figma"],
+    });
+
+    const event = detachedProviderBlockedRunEvent({
+      block: block!,
+      runId: "run-figma",
+      attempt: 1,
+      actor: "briar-worker:worker-1",
+      repository: "briar",
+      model: "gpt-5",
+      occurredAt: "2026-08-10T06:30:00.000Z",
+    });
+
+    expect(event.status).toBe("blocked");
+    expect(event.eventKey).toBe("detached:1:agent-blocked:mcp_auth_required");
+    expect(event.structuredResult).toMatchObject({
+      outcome: "blocked",
+      humanActionRequired: true,
+      dueAt: null,
+    });
+    expect(event.structuredResult.summary).toContain("실제로 필요한 MCP 연결");
+    expect(event.structuredResult.summary).toContain("전체 실패로 처리하지 않았");
+    expect(event.structuredResult.nextAction).toContain("다시 인증");
+    expect(event.structuredResult.nextAction).toContain("Briar 이슈 화면");
+    expect(event.detail).toContain("required MCP authentication");
+  });
+
   it("appends retry and resume output in a distinct transcript sequence range", () => {
     expect(detachedTranscriptSequence(1, 1)).toBe(1);
     expect(detachedTranscriptSequence(1, 37)).toBe(37);
