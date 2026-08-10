@@ -64,6 +64,7 @@ import {
   deleteIssueMessage,
   listInboxReadStates,
   listDashboardChanges,
+  pruneExpiredDashboardChanges,
   listDashboardRuns,
   listHuntRunEvents,
   listOrganizations,
@@ -1022,8 +1023,102 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       )
       .bind(projectId)
       .run();
+    await db
+      .prepare(
+        `update briar_dashboard_changes
+         set created_at = '2026-08-09 00:00:00'
+         where version = (
+           select max(version) from briar_dashboard_changes
+           where project_id = ?
+         )`,
+      )
+      .bind(projectId)
+      .run();
+    const retainedCursor = await getDashboardSyncCursor(db, projectId);
+    const beforeList = await db
+      .prepare(
+        `select count(*) as change_count from briar_dashboard_changes
+         where project_id = ?`,
+      )
+      .bind(projectId)
+      .first<{ change_count: number }>();
+    await listDashboardChanges(db, projectId, 0);
+    const afterList = await db
+      .prepare(
+        `select count(*) as change_count from briar_dashboard_changes
+         where project_id = ?`,
+      )
+      .bind(projectId)
+      .first<{ change_count: number }>();
+    expect(afterList?.change_count).toBe(beforeList?.change_count);
+
+    const prunePlan = await db
+      .prepare(
+        `explain query plan
+         delete from briar_dashboard_changes
+         where version in (
+           select version from briar_dashboard_changes
+           where created_at < ?
+           order by created_at
+           limit ?
+         )`,
+      )
+      .bind("2026-08-03 00:00:00", 25_000)
+      .all<{ detail: string }>();
+    const prunePlanDetails = prunePlan.results
+      .map((row) => row.detail)
+      .join("\n");
+    expect(prunePlanDetails).toContain("briar_dashboard_changes_created_idx");
+    expect(prunePlanDetails).not.toMatch(/scan briar_dashboard_changes/iu);
+
+    const staleBefore = await db
+      .prepare(
+        `select count(*) as change_count from briar_dashboard_changes
+         where created_at < '2026-08-03 00:00:00'`,
+      )
+      .first<{ change_count: number }>();
+    expect(staleBefore?.change_count).toBeGreaterThan(1);
+    await expect(
+      pruneExpiredDashboardChanges(db, "2026-08-10T00:00:00.000Z", 1),
+    ).resolves.toEqual({
+      cutoff: "2026-08-03 00:00:00",
+      deleted: 1,
+      reachedBatchLimit: true,
+    });
+    await expect(
+      pruneExpiredDashboardChanges(db, "2026-08-10T00:00:00.000Z"),
+    ).resolves.toEqual({
+      cutoff: "2026-08-03 00:00:00",
+      deleted: (staleBefore?.change_count ?? 0) - 1,
+      reachedBatchLimit: false,
+    });
+    await expect(
+      pruneExpiredDashboardChanges(db, "2026-08-10T00:00:00.000Z"),
+    ).resolves.toEqual({
+      cutoff: "2026-08-03 00:00:00",
+      deleted: 0,
+      reachedBatchLimit: false,
+    });
+    await expect(getDashboardSyncCursor(db, projectId)).resolves.toBe(
+      retainedCursor,
+    );
+    await expect(
+      db
+        .prepare(
+          `select count(*) as change_count from briar_dashboard_changes
+           where project_id = ? and created_at = '2026-08-09 00:00:00'`,
+        )
+        .bind(projectId)
+        .first<number>("change_count"),
+    ).resolves.toBe(1);
     await expect(listDashboardChanges(db, projectId, 0)).resolves.toMatchObject({
       expired: true,
+      changes: [],
+    });
+    await expect(
+      listDashboardChanges(db, projectId, retainedCursor),
+    ).resolves.toMatchObject({
+      expired: false,
       changes: [],
     });
   });
