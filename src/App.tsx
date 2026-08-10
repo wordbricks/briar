@@ -1666,6 +1666,9 @@ export function App() {
               setIsSidebarOpen(true);
               navigateToPage("settings");
             }}
+            organizationId={briar.activeOrganizationId}
+            token={briar.token}
+            userId={briar.user?.id ?? null}
             workers={briar.dashboard?.workers ?? []}
           />
           <AppVersionStatus />
