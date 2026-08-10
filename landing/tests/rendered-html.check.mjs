@@ -340,7 +340,8 @@ test("server-renders the localized changelog from published releases", async () 
   assert.match(koreanHtml, /<html lang="ko"[\s>]/i);
   assert.match(koreanHtml, /Briar 변경 기록/);
   assert.match(koreanHtml, /현재 안정 버전/);
-  assert.match(koreanHtml, /에이전트 사용량과 비용을 실행별로 확인합니다/);
+  assert.match(koreanHtml, /실행 비용과 Worker 상태를 더 정확하게 운영합니다/);
+  assert.match(koreanHtml, /v1\.2\.96/);
   assert.match(koreanHtml, /v1\.2\.95/);
   assert.match(koreanHtml, /v1\.2\.94/);
   assert.match(koreanHtml, /v1\.2\.93/);
@@ -356,7 +357,7 @@ test("server-renders the localized changelog from published releases", async () 
   assert.match(koreanHtml, /aria-current="page"[^>]*>변경 기록</);
   assert.match(
     koreanHtml,
-    /href="https:\/\/github\.com\/wordbricks\/briar\/releases\/tag\/v1\.2\.95"/,
+    /href="https:\/\/github\.com\/wordbricks\/briar\/releases\/tag\/v1\.2\.96"/,
   );
 
   const englishResponse = await render({ path: "/changelog" });
@@ -365,7 +366,7 @@ test("server-renders the localized changelog from published releases", async () 
   const englishHtml = await englishResponse.text();
   assert.match(englishHtml, /<html lang="en"[\s>]/i);
   assert.match(englishHtml, /Briar changelog/);
-  assert.match(englishHtml, /See agent usage and cost for every run/);
+  assert.match(englishHtml, /Operate with clearer run costs and worker health/);
   assert.match(englishHtml, /Current stable release/);
 });
 

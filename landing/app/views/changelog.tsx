@@ -23,6 +23,21 @@ export const changelogCopy = {
     backTop: "맨 위로 ↑",
     entries: [
       {
+        version: "1.2.96",
+        date: "2026년 8월 10일",
+        title: "실행 비용과 Worker 상태를 더 정확하게 운영합니다",
+        summary:
+          "에이전트 사용량 원장을 실제 운영 화면에 연결하고, 제공자 비용이 없는 실행도 현재 요금으로 추정해 Worker별 사용량과 비용을 한눈에 확인할 수 있습니다.",
+        items: [
+          "설정의 사용량 화면에서 실행 원장에 저장된 토큰과 제공자 비용을 Worker·제공자·모델별로 집계해 보여줍니다.",
+          "제공자가 비용을 보고하지 않은 실행은 현재 모델 요금표로 계산해 누락된 운영 비용을 보완합니다.",
+          "Worker 환경 패널에서 설치된 Briar 버전과 업데이트 가능 여부를 확인하고 원격 업데이트를 바로 요청할 수 있습니다.",
+          "이슈를 만들 때 Full Auto를 켜면 모든 체크포인트를 건너뛰고 중단 없이 처리하며, 데스크탑과 iOS에서 같은 설정을 사용합니다.",
+          "Inbox의 채널 답글 알림을 열면 채널 화면의 정확한 대화로 이동해 답글 맥락을 바로 확인할 수 있습니다.",
+          "프로젝트 에이전트 작업을 전달한 뒤 실행 대화상자가 즉시 닫혀 중복 요청 없이 결과 화면으로 자연스럽게 이어집니다.",
+        ],
+      },
+      {
         version: "1.2.95",
         date: "2026년 8월 10일",
         title: "에이전트 사용량과 비용을 실행별로 확인합니다",
@@ -248,6 +263,21 @@ export const changelogCopy = {
     home: "Home",
     backTop: "Back to top ↑",
     entries: [
+      {
+        version: "1.2.96",
+        date: "August 10, 2026",
+        title: "Operate with clearer run costs and worker health",
+        summary:
+          "The execution ledger now powers the operating views, while runs without provider-reported cost are priced from current rates for a clearer picture of usage and spend by worker.",
+        items: [
+          "Aggregate ledger tokens and provider-reported cost by worker, provider, and model in the usage settings view.",
+          "Estimate runs that do not report cost from the current model price table so operating totals include previously uncovered usage.",
+          "See each Worker's installed Briar version and update availability in the environment panel, then request a remote update directly.",
+          "Enable Full Auto when creating an issue to skip every checkpoint and run without pausing, with matching behavior on desktop and iOS.",
+          "Open a channel-reply Inbox notification on the Channels page at the exact conversation that produced it.",
+          "Close the project-agent task dialog immediately after dispatch so the interface proceeds to the run without inviting duplicate requests.",
+        ],
+      },
       {
         version: "1.2.95",
         date: "August 10, 2026",
@@ -486,9 +516,9 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <h1>{changelog.title}</h1>
           <p>{changelog.description}</p>
         </div>
-        <a href="#v1-2-95" className="changelog-current">
+        <a href="#v1-2-96" className="changelog-current">
           <span>{changelog.current}</span>
-          <strong>v1.2.95</strong>
+          <strong>v1.2.96</strong>
           <i aria-hidden="true">↓</i>
         </a>
       </section>
@@ -513,6 +543,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   {index === 0 ? <span>{changelog.latest}</span> : null}
                   <time
                     dateTime={
+                      entry.version === "1.2.96" ||
                       entry.version === "1.2.95" ||
                       entry.version === "1.2.94" ||
                       entry.version === "1.2.93" ||
@@ -521,7 +552,8 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                       entry.version === "1.2.90" ||
                       entry.version === "1.2.89" ||
                       entry.version === "1.2.88"
-                        ? entry.version === "1.2.95" ||
+                        ? entry.version === "1.2.96" ||
+                          entry.version === "1.2.95" ||
                           entry.version === "1.2.94" ||
                           entry.version === "1.2.93"
                           ? "2026-08-10"
