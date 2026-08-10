@@ -1709,12 +1709,43 @@ describe("detached execution workers", () => {
     ]);
 
     const requeued = await db
-      .prepare(`select status, claim_token_hash, lease_expires_at from briar_hunt_runs where id = ?`)
+      .prepare(
+        `select status, stage, workflow_stage, detail, claim_token_hash,
+                lease_expires_at
+         from briar_hunt_runs where id = ?`,
+      )
       .bind(claimed!.id)
-      .first<{ status: string; claim_token_hash: string | null; lease_expires_at: string | null }>();
+      .first<{
+        status: string;
+        stage: string;
+        workflow_stage: string | null;
+        detail: string | null;
+        claim_token_hash: string | null;
+        lease_expires_at: string | null;
+      }>();
     expect(requeued?.status).toBe("queued");
+    expect(requeued?.stage).toBe("queued");
+    expect(requeued?.workflow_stage).toBe("analyzing");
+    expect(requeued?.detail).toBe("워커가 응답하지 않아 대기열로 돌아갔습니다.");
     expect(requeued?.claim_token_hash).toBeNull();
     expect(requeued?.lease_expires_at).toBeNull();
+
+    const replacementClaim = await claimNextQueuedHuntRun(db, projectId, {
+      claimTokenHash: "e".repeat(64),
+      claimedBy: "worker-replacement",
+      claimedAt: atMinute(41),
+      leaseExpiresAt: leaseExpiryFrom(atMinute(41)),
+      runId: claimed!.id,
+    });
+    expect(replacementClaim).toMatchObject({
+      id: claimed!.id,
+      status: "running",
+      stage: "analyzing",
+      workflow_stage: "analyzing",
+      detail: "워커가 이전 작업 단계부터 이어받았습니다.",
+      claimed_by: "worker-replacement",
+      claim_attempts: 2,
+    });
 
     // A run that has burned through its attempts is blocked instead of looping.
     await db
