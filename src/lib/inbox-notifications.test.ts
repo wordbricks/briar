@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { InboxMessage } from "../hooks/useInbox";
 import {
   defaultInboxNotificationPreferences,
+  inboxNotificationContent,
   inboxNotificationTarget,
   listenForMacInboxNotificationClicks,
   listenForInboxNotificationClicks,
@@ -197,5 +198,82 @@ describe("inbox notification navigation", () => {
 
     stopListening();
     expect(unlisten).toHaveBeenCalledOnce();
+  });
+});
+
+describe("inbox notification content", () => {
+  it("shows an issue reply author, issue key, and at most three non-empty lines", () => {
+    const reply: InboxMessage = {
+      id: "conversation:reply-1",
+      kind: "conversation",
+      projectId: "project-1",
+      projectName: "Briar",
+      targetId: "run-1",
+      messageId: "reply-1",
+      rootMessageId: "root-1",
+      title: "Fix checkout",
+      issueKey: "WB-1321",
+      occurredAt: "2026-08-08T00:00:00.000Z",
+      version: "reply-1",
+      body: " First line \n\nSecond line\r\n Third line \nFourth line",
+      authorName: "Codex",
+      // A reply containing a mention is still a reply according to its
+      // message hierarchy, regardless of the notification reason.
+      reason: "mention",
+    };
+
+    expect(inboxNotificationContent(reply, "Needs review")).toEqual({
+      title: "Codex in WB-1321",
+      body: "First line\nSecond line\nThird line",
+    });
+  });
+
+  it("shows a channel reply author and channel name", () => {
+    const reply: InboxMessage = {
+      id: "channel:reply-1",
+      kind: "channel",
+      projectId: "project-1",
+      projectName: "Briar",
+      targetId: "channel-1",
+      channelId: "channel-1",
+      channelName: "general",
+      messageId: "reply-1",
+      rootMessageId: "root-1",
+      title: "general",
+      occurredAt: "2026-08-08T00:00:00.000Z",
+      version: "reply-1",
+      body: "Channel reply",
+      authorName: "Codex",
+      reason: "thread_reply",
+    };
+
+    expect(inboxNotificationContent(reply, "Needs review")).toEqual({
+      title: "Codex in #general",
+      body: "Channel reply",
+    });
+  });
+
+  it("keeps the importance wording for a top-level mention", () => {
+    const mention: InboxMessage = {
+      id: "conversation:mention-1",
+      kind: "conversation",
+      projectId: "project-1",
+      projectName: "Briar",
+      targetId: "run-1",
+      messageId: "mention-1",
+      rootMessageId: "mention-1",
+      title: "Fix checkout",
+      issueKey: "WB-1321",
+      occurredAt: "2026-08-08T00:00:00.000Z",
+      version: "mention-1",
+      body: "@Codex please review",
+      authorName: "Sam",
+      reason: "thread_reply",
+    };
+
+    expect(inboxNotificationContent(mention, "Needs review")).toEqual({
+      title: "Briar · Needs review",
+      body: "Briar · Fix checkout",
+    });
   });
 });
