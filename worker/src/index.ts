@@ -67,6 +67,11 @@ import {
 } from "../../src/lib/worker-icon-validation";
 import { createAuth, type BriarAuth } from "./auth";
 import {
+  contentDisposition,
+  prepareStoredAttachments,
+  uploadStoredAttachments,
+} from "./attachment-storage";
+import {
   mobileCurrentUserResponseSchema,
   mobileHealthResponseSchema,
   mobileProjectsResponseSchema,
@@ -242,7 +247,6 @@ import {
   syncGithubConnectionRepositories,
   type HuntEventRow,
   type HuntRunRow,
-  type IssueAttachmentInput,
   type IssueAttachmentRow,
   type IssueActionProposalRow,
   type IssueAgentReplyJobRow,
@@ -2274,12 +2278,6 @@ const pngResponse = (png: ArrayBuffer) =>
     },
   });
 
-const contentDisposition = (filename: string) =>
-  `inline; filename*=UTF-8''${encodeURIComponent(filename).replace(
-    /['()*]/gu,
-    (character) => `%${character.charCodeAt(0).toString(16).toUpperCase()}`,
-  )}`;
-
 const attachmentResponse = (
   attachment: Pick<
     IssueAttachmentRow,
@@ -2316,18 +2314,16 @@ async function createIssueWithAttachments(input: {
   const settings = await getProjectSettings(input.db, input.project.id);
   const issueStorageId = input.issueId ?? crypto.randomUUID();
   const occurredAt = input.occurredAt ?? new Date().toISOString();
-  const storedAttachments: Array<IssueAttachmentInput & { file: File }> =
-    input.attachments.map((file) => {
+  const storedAttachments = prepareStoredAttachments(
+    input.attachments,
+    () => {
       const id = crypto.randomUUID();
       return {
         id,
         object_key: `issue-attachments/${input.project.id}/${issueStorageId}/${id}`,
-        filename: file.name.normalize("NFC").trim(),
-        content_type: file.type,
-        byte_size: file.size,
-        file,
       };
-    });
+    },
+  );
   const uploadedKeys: string[] = [];
   const issueDescription = canonicalizeIssueAttachmentReferences(
     input.issue.description,
@@ -2336,23 +2332,15 @@ async function createIssueWithAttachments(input: {
   );
   let runId: string | null = null;
   try {
-    for (const attachment of storedAttachments) {
-      await input.attachmentsBucket.put(
-        attachment.object_key,
-        attachment.file.stream(),
-        {
-          httpMetadata: {
-            contentType: attachment.content_type,
-            contentDisposition: contentDisposition(attachment.filename),
-          },
-          customMetadata: {
-            attachmentId: attachment.id,
-            projectId: input.project.id,
-          },
-        },
-      );
-      uploadedKeys.push(attachment.object_key);
-    }
+    await uploadStoredAttachments(
+      input.attachmentsBucket,
+      storedAttachments,
+      uploadedKeys,
+      (attachment) => ({
+        attachmentId: attachment.id,
+        projectId: input.project.id,
+      }),
+    );
     runId = await recordHuntEvent(input.db, input.project.id, {
       source: "issue",
       sourceKey: input.sourceKey,
@@ -2465,18 +2453,16 @@ async function updateIssueWithAttachments(input: {
   const removed = existing.filter(
     (attachment) => !keptIds.has(attachment.id),
   );
-  const storedAttachments: Array<IssueAttachmentInput & { file: File }> =
-    input.attachments.map((file) => {
+  const storedAttachments = prepareStoredAttachments(
+    input.attachments,
+    () => {
       const id = crypto.randomUUID();
       return {
         id,
         object_key: `issue-attachments/${input.project.id}/${input.runId}/${id}`,
-        filename: file.name.normalize("NFC").trim(),
-        content_type: file.type,
-        byte_size: file.size,
-        file,
       };
-    });
+    },
+  );
   const uploadedKeys: string[] = [];
   const issueDescription = canonicalizeIssueAttachmentReferences(
     input.issue.description,
@@ -2484,23 +2470,15 @@ async function updateIssueWithAttachments(input: {
     storedAttachments.map((attachment) => attachment.id),
   );
   try {
-    for (const attachment of storedAttachments) {
-      await input.attachmentsBucket.put(
-        attachment.object_key,
-        attachment.file.stream(),
-        {
-          httpMetadata: {
-            contentType: attachment.content_type,
-            contentDisposition: contentDisposition(attachment.filename),
-          },
-          customMetadata: {
-            attachmentId: attachment.id,
-            projectId: input.project.id,
-          },
-        },
-      );
-      uploadedKeys.push(attachment.object_key);
-    }
+    await uploadStoredAttachments(
+      input.attachmentsBucket,
+      storedAttachments,
+      uploadedKeys,
+      (attachment) => ({
+        attachmentId: attachment.id,
+        projectId: input.project.id,
+      }),
+    );
     const run = await updateIssue(input.db, input.project.id, input.runId, {
       title: input.issue.title,
       description: issueDescription ?? null,
@@ -5833,16 +5811,12 @@ async function route(
     }
     const createdAt = new Date().toISOString();
     const messageId = crypto.randomUUID();
-    const storedAttachments = attachments.map((file) => {
+    const storedAttachments = prepareStoredAttachments(attachments, () => {
       const id = crypto.randomUUID();
       return {
         id,
         organization_id: organizationId,
         object_key: `channel-attachments/${organizationId}/${channel.id}/${messageId}/${id}`,
-        filename: file.name.normalize("NFC").trim(),
-        content_type: file.type,
-        byte_size: file.size,
-        file,
       };
     });
     const input = {
@@ -5860,25 +5834,17 @@ async function route(
     const uploadedKeys: string[] = [];
     let message = null;
     try {
-      for (const attachment of storedAttachments) {
-        await attachmentsBucket.put(
-          attachment.object_key,
-          attachment.file.stream(),
-          {
-            httpMetadata: {
-              contentType: attachment.content_type,
-              contentDisposition: contentDisposition(attachment.filename),
-            },
-            customMetadata: {
-              attachmentId: attachment.id,
-              channelId: channel.id,
-              messageId,
-              organizationId,
-            },
-          },
-        );
-        uploadedKeys.push(attachment.object_key);
-      }
+      await uploadStoredAttachments(
+        attachmentsBucket,
+        storedAttachments,
+        uploadedKeys,
+        (attachment) => ({
+          attachmentId: attachment.id,
+          channelId: channel.id,
+          messageId,
+          organizationId,
+        }),
+      );
       message = await createChannelMessage(db, {
         id: messageId,
         channelId: channel.id,
@@ -7889,18 +7855,16 @@ async function route(
     if (!project) throw new HttpError(404, "Project not found");
     const { input: rawInput, attachments, attachmentReferences } =
       await readIssueMessageRequest(request);
-    const storedAttachments: Array<IssueAttachmentInput & { file: File }> =
-      attachments.map((file) => {
+    const storedAttachments = prepareStoredAttachments(
+      attachments,
+      () => {
         const id = crypto.randomUUID();
         return {
           id,
           object_key: `issue-attachments/${project.id}/${issueMessagesMatch[2]}/${id}`,
-          filename: file.name.normalize("NFC").trim(),
-          content_type: file.type,
-          byte_size: file.size,
-          file,
         };
-      });
+      },
+    );
     const input = {
       ...rawInput,
       body: canonicalizeIssueAttachmentReferences(
@@ -7928,23 +7892,15 @@ async function route(
     const uploadedKeys: string[] = [];
     let message: IssueMessageRow | null = null;
     try {
-      for (const attachment of storedAttachments) {
-        await attachmentsBucket.put(
-          attachment.object_key,
-          attachment.file.stream(),
-          {
-            httpMetadata: {
-              contentType: attachment.content_type,
-              contentDisposition: contentDisposition(attachment.filename),
-            },
-            customMetadata: {
-              attachmentId: attachment.id,
-              projectId: project.id,
-            },
-          },
-        );
-        uploadedKeys.push(attachment.object_key);
-      }
+      await uploadStoredAttachments(
+        attachmentsBucket,
+        storedAttachments,
+        uploadedKeys,
+        (attachment) => ({
+          attachmentId: attachment.id,
+          projectId: project.id,
+        }),
+      );
       await createIssueAttachments(
         db,
         project.id,
