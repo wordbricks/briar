@@ -32,6 +32,15 @@ const projects: Project[] = [
   },
 ];
 
+function setInputValue(input: HTMLInputElement, value: string) {
+  const setter = Object.getOwnPropertyDescriptor(
+    HTMLInputElement.prototype,
+    "value",
+  )?.set;
+  setter?.call(input, value);
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
 describe("UnifiedSettingsSidebar", () => {
   it("groups settings and reveals nested project sections from the project name", async () => {
     window.localStorage.setItem("briar.locale.v1", "en");
@@ -168,6 +177,7 @@ describe("UnifiedSettingsSidebar", () => {
 
   it("keeps a deep-linked project and section expanded and selected", async () => {
     window.localStorage.setItem("briar.locale.v1", "en");
+    const onNavigate = vi.fn();
     const container = document.createElement("div");
     document.body.append(container);
     const root = createRoot(container);
@@ -183,7 +193,7 @@ describe("UnifiedSettingsSidebar", () => {
             }}
             isOpen
             onBack={() => undefined}
-            onNavigate={() => undefined}
+            onNavigate={onNavigate}
             organizations={[organization]}
             projects={projects}
           />
@@ -201,6 +211,90 @@ describe("UnifiedSettingsSidebar", () => {
         .querySelector('[data-project-settings-section="agent-configuration"]')
         ?.getAttribute("aria-current"),
     ).toBe("page");
+
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>(
+          '[data-project-settings="project-2"]',
+        )
+        ?.click();
+    });
+    expect(
+      container
+        .querySelector('[data-project-settings="project-2"]')
+        ?.getAttribute("aria-expanded"),
+    ).toBe("false");
+    expect(onNavigate).not.toHaveBeenCalled();
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("filters and force-expands the matching scope without mixing its routes", async () => {
+    window.localStorage.setItem("briar.locale.v1", "en");
+    const onNavigate = vi.fn();
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <I18nProvider>
+          <UnifiedSettingsSidebar
+            activeTarget={{ scope: "application", section: "general" }}
+            isOpen
+            onBack={() => undefined}
+            onNavigate={onNavigate}
+            organizations={[organization]}
+            projects={projects}
+          />
+        </I18nProvider>,
+      );
+    });
+
+    const search = container.querySelector<HTMLInputElement>(
+      'input[type="search"]',
+    )!;
+    await act(async () => setInputValue(search, "Members"));
+
+    expect(
+      container
+        .querySelector('[data-organization-settings="organization-1"]')
+        ?.getAttribute("aria-expanded"),
+    ).toBe("true");
+    expect(
+      container.querySelectorAll(
+        '[data-organization-settings-section="members"]',
+      ),
+    ).toHaveLength(1);
+    expect(
+      container.querySelector('[data-project-settings="project-1"]'),
+    ).toBeNull();
+
+    await act(async () => setInputValue(search, "Workflow"));
+
+    expect(
+      container.querySelector('[data-organization-settings="organization-1"]'),
+    ).toBeNull();
+    expect(
+      Array.from(
+        container.querySelectorAll('[data-project-settings]'),
+      ).map((node) => node.getAttribute("aria-expanded")),
+    ).toEqual(["true", "true"]);
+    expect(
+      container.querySelectorAll('[data-project-settings-section="workflow"]'),
+    ).toHaveLength(2);
+
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>('[data-project-settings="project-2"]')
+        ?.click();
+    });
+    expect(onNavigate).toHaveBeenLastCalledWith({
+      scope: "project",
+      projectId: "project-2",
+      section: "general",
+    });
 
     await act(async () => root.unmount());
     container.remove();
