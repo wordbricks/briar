@@ -1,6 +1,7 @@
 import { Bot } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useMemo } from "react";
 
+import { useObjectUrl } from "../hooks/useObjectUrl";
 import { loadProjectAgentSpriteSheet } from "../lib/api";
 import type { ProjectAgent } from "../types";
 
@@ -13,37 +14,13 @@ export function ProjectAgentAvatar({
   isRunning: boolean;
   token: string | null;
 }) {
-  const [spriteSheetObjectUrl, setSpriteSheetObjectUrl] = useState<
-    string | null
-  >(null);
   const codexPet = agent.codexPet;
   const shouldAnimate = Boolean(
     isRunning && token && codexPet?.spriteSheetUrl,
   );
-
-  useEffect(() => {
-    if (!shouldAnimate || !token) {
-      setSpriteSheetObjectUrl(null);
-      return;
-    }
-
-    let cancelled = false;
-    let objectUrl: string | null = null;
-    setSpriteSheetObjectUrl(null);
-    void loadProjectAgentSpriteSheet(token, agent.projectId, agent.id)
-      .then((spriteSheet) => {
-        if (cancelled) return;
-        objectUrl = URL.createObjectURL(spriteSheet);
-        setSpriteSheetObjectUrl(objectUrl);
-      })
-      .catch(() => {
-        if (!cancelled) setSpriteSheetObjectUrl(null);
-      });
-
-    return () => {
-      cancelled = true;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
+  const spriteSheetLoader = useMemo(() => {
+    if (!shouldAnimate || !token) return null;
+    return () => loadProjectAgentSpriteSheet(token, agent.projectId, agent.id);
   }, [
     agent.id,
     agent.projectId,
@@ -51,6 +28,7 @@ export function ProjectAgentAvatar({
     shouldAnimate,
     token,
   ]);
+  const { source: spriteSheetObjectUrl } = useObjectUrl(spriteSheetLoader);
 
   return (
     <span className={`project-agent-avatar ${agent.provider}`}>
