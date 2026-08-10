@@ -7,6 +7,7 @@ mod claude;
 mod codex;
 mod grok;
 mod opencode;
+mod sidecar;
 
 use std::{
     ffi::OsStr,

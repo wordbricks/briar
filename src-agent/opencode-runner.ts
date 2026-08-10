@@ -1,6 +1,5 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { createServer } from "node:net";
-import { createInterface } from "node:readline";
 import {
   createOpencodeClient,
   type OpencodeClient,
@@ -25,11 +24,11 @@ import {
   parseOpenCodeModel,
   parseOpenCodeServerUrl,
   shouldAutoApproveOpenCodePermission,
-  type OpenCodeApprovalResponse,
   type OpenCodeBlockedRetry,
   type OpenCodeRunnerOutput,
   type OpenCodeRunnerRequest,
 } from "./opencode-runner-lib";
+import { createRunnerIo } from "./runner-io";
 
 class OpenCodeBlockedError extends Error {
   constructor(readonly blocker: OpenCodeBlockedRetry) {
@@ -38,47 +37,10 @@ class OpenCodeBlockedError extends Error {
   }
 }
 
-const lines = createInterface({ input: process.stdin, crlfDelay: Infinity });
-
-function emit(output: OpenCodeRunnerOutput) {
-  process.stdout.write(`${JSON.stringify(output)}\n`);
-}
-
-let resolveRequest: ((request: OpenCodeRunnerRequest) => void) | undefined;
-let rejectRequest: ((error: Error) => void) | undefined;
-const requestPromise = new Promise<OpenCodeRunnerRequest>((resolve, reject) => {
-  resolveRequest = resolve;
-  rejectRequest = reject;
+const runnerIo = createRunnerIo<OpenCodeRunnerRequest, OpenCodeRunnerOutput>({
+  closeError: "Briar closed the OpenCode runner input.",
 });
-const approvalResolvers = new Map<string, (approved: boolean) => void>();
-
-lines.on("line", (line) => {
-  try {
-    const message = JSON.parse(line) as OpenCodeRunnerRequest | OpenCodeApprovalResponse;
-    if (message.type === "run") {
-      resolveRequest?.(message);
-      resolveRequest = undefined;
-      rejectRequest = undefined;
-      return;
-    }
-    if (message.type === "approvalResponse") {
-      approvalResolvers.get(message.id)?.(message.approved);
-      approvalResolvers.delete(message.id);
-    }
-  } catch (caught) {
-    rejectRequest?.(caught instanceof Error ? caught : new Error(String(caught)));
-  }
-});
-
-lines.on("close", () => {
-  rejectRequest?.(new Error("Briar closed the OpenCode runner input."));
-  for (const resolve of approvalResolvers.values()) resolve(false);
-  approvalResolvers.clear();
-});
-
-function waitForApproval(id: string): Promise<boolean> {
-  return new Promise((resolve) => approvalResolvers.set(id, resolve));
-}
+const { emit, request: requestPromise, waitForApproval } = runnerIo;
 
 async function availablePort(): Promise<number> {
   return new Promise((resolve, reject) => {
@@ -373,4 +335,4 @@ void main()
     }
     process.exitCode = 1;
   })
-  .finally(() => lines.close());
+  .finally(runnerIo.close);

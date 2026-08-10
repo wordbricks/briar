@@ -1,5 +1,4 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
-import { createInterface } from "node:readline";
 import {
   BRIAR_OAUTH_REFERRER,
   buildGrokPromptParts,
@@ -18,56 +17,16 @@ import {
   resolveGrokModelId,
   shouldAutoApprovePermission,
   shouldDenyWritePermission,
-  type GrokApprovalResponse,
   type GrokRunnerOutput,
   type GrokRunnerRequest,
   type JsonRpcMessage,
 } from "./grok-runner-lib";
+import { createRunnerIo } from "./runner-io";
 
-const lines = createInterface({
-  input: process.stdin,
-  crlfDelay: Infinity,
+const runnerIo = createRunnerIo<GrokRunnerRequest, GrokRunnerOutput>({
+  closeError: "Briar closed the Grok runner input.",
 });
-
-function emit(output: GrokRunnerOutput) {
-  process.stdout.write(`${JSON.stringify(output)}\n`);
-}
-
-let resolveRequest: ((request: GrokRunnerRequest) => void) | undefined;
-let rejectRequest: ((error: Error) => void) | undefined;
-const requestPromise = new Promise<GrokRunnerRequest>((resolve, reject) => {
-  resolveRequest = resolve;
-  rejectRequest = reject;
-});
-const approvalResolvers = new Map<string, (approved: boolean) => void>();
-
-lines.on("line", (line) => {
-  try {
-    const message = JSON.parse(line) as
-      | GrokRunnerRequest
-      | GrokApprovalResponse;
-    if (message.type === "run") {
-      resolveRequest?.(message);
-      resolveRequest = undefined;
-      rejectRequest = undefined;
-      return;
-    }
-    if (message.type === "approvalResponse") {
-      approvalResolvers.get(message.id)?.(message.approved);
-      approvalResolvers.delete(message.id);
-    }
-  } catch (caught) {
-    rejectRequest?.(
-      caught instanceof Error ? caught : new Error(String(caught)),
-    );
-  }
-});
-
-lines.on("close", () => {
-  rejectRequest?.(new Error("Briar closed the Grok runner input."));
-  for (const resolve of approvalResolvers.values()) resolve(false);
-  approvalResolvers.clear();
-});
+const { emit, request: requestPromise, waitForApproval } = runnerIo;
 
 class GrokAcpConnection {
   private nextId = 0;
@@ -215,12 +174,6 @@ class GrokAcpConnection {
     }
     this.pending.clear();
   }
-}
-
-async function waitForApproval(id: string): Promise<boolean> {
-  return new Promise((resolve) => {
-    approvalResolvers.set(id, resolve);
-  });
 }
 
 async function main() {
@@ -402,4 +355,4 @@ void main()
     });
     process.exitCode = 1;
   })
-  .finally(() => lines.close());
+  .finally(runnerIo.close);

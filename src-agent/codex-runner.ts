@@ -9,64 +9,29 @@ import {
   consumeCodexAppServerMessage,
   createCodexAppServerState,
   normalizeCodexAppServerMessage,
-  type CodexApprovalResponse,
   type CodexRunnerOutput,
   type CodexRunnerRequest,
   type CodexRpcMessage,
 } from "./codex-runner-lib";
+import { createRunnerIo } from "./runner-io";
 
-const lines = createInterface({ input: process.stdin, crlfDelay: Infinity });
-
-function emit(output: CodexRunnerOutput) {
-  process.stdout.write(`${JSON.stringify(output)}\n`);
-}
-
-let resolveRequest: ((request: CodexRunnerRequest) => void) | undefined;
-let rejectRequest: ((error: Error) => void) | undefined;
-const requestPromise = new Promise<CodexRunnerRequest>((resolve, reject) => {
-  resolveRequest = resolve;
-  rejectRequest = reject;
-});
-const approvalResolvers = new Map<string, (approved: boolean) => void>();
 let activeChild: ChildProcessWithoutNullStreams | null = null;
+const runnerIo = createRunnerIo<CodexRunnerRequest, CodexRunnerOutput>({
+  closeError: "Briar closed the Codex runner input.",
+  onClose: () => {
+    if (activeChild && activeChild.exitCode === null) {
+      activeChild.kill("SIGTERM");
+    }
+  },
+});
+const { emit, request: requestPromise, waitForApproval } = runnerIo;
 
 for (const signal of ["SIGTERM", "SIGINT"] as const) {
   process.once(signal, () => {
     if (activeChild && activeChild.exitCode === null) activeChild.kill(signal);
     process.exitCode = signal === "SIGINT" ? 130 : 143;
-    if (!activeChild) lines.close();
+    if (!activeChild) runnerIo.close();
   });
-}
-
-lines.on("line", (line) => {
-  try {
-    const message = JSON.parse(line) as CodexRunnerRequest | CodexApprovalResponse;
-    if (message.type === "run") {
-      resolveRequest?.(message);
-      resolveRequest = undefined;
-      rejectRequest = undefined;
-      return;
-    }
-    if (message.type === "approvalResponse") {
-      approvalResolvers.get(message.id)?.(message.approved);
-      approvalResolvers.delete(message.id);
-    }
-  } catch (caught) {
-    rejectRequest?.(
-      caught instanceof Error ? caught : new Error(String(caught)),
-    );
-  }
-});
-
-lines.on("close", () => {
-  rejectRequest?.(new Error("Briar closed the Codex runner input."));
-  for (const resolve of approvalResolvers.values()) resolve(false);
-  approvalResolvers.clear();
-  if (activeChild && activeChild.exitCode === null) activeChild.kill("SIGTERM");
-});
-
-function waitForApproval(id: string): Promise<boolean> {
-  return new Promise((resolve) => approvalResolvers.set(id, resolve));
 }
 
 function send(child: ChildProcessWithoutNullStreams, message: CodexRpcMessage) {
@@ -194,4 +159,4 @@ void main()
     });
     process.exitCode = 1;
   })
-  .finally(() => lines.close());
+  .finally(runnerIo.close);
