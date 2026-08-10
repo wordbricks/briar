@@ -1,6 +1,8 @@
 import { createHmac } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 import worker, {
+  approvedIssueCreation,
+  assertChannelProposalAuthorScope,
   claimConversationJson,
   accountDeletionInputSchema,
   accountProfileInputSchema,
@@ -26,6 +28,7 @@ import worker, {
   projectAgentScheduleRunCompletionSchema,
   readIssueRequest,
   readRunEvidenceRequest,
+  resolveChannelProposalTargetProjectId,
   runEvidenceInputSchema,
   runReworkInputSchema,
   transcriptSchema,
@@ -83,6 +86,84 @@ const scheduledEnv = {
 } as unknown as Env;
 
 describe("Worker HTTP contract", () => {
+  it("keeps issue creation approval separate from execution approval", () => {
+    expect(
+      approvedIssueCreation({ title: "Ship it", status: "queued" }),
+    ).toEqual({ title: "Ship it", status: "backlog", checkpoints: [] });
+  });
+
+  it("keeps an Agent-bound channel proposal on its proposed project", () => {
+    expect(
+      resolveChannelProposalTargetProjectId({
+        requestedProjectId: null,
+        proposedProjectId: "project-a",
+        defaultProjectId: "project-default",
+      }),
+    ).toBe("project-a");
+    expect(() =>
+      resolveChannelProposalTargetProjectId({
+        requestedProjectId: "project-b",
+        proposedProjectId: "project-a",
+        defaultProjectId: "project-default",
+      })
+    ).toThrow("must match the Agent proposal");
+    expect(
+      resolveChannelProposalTargetProjectId({
+        requestedProjectId: "project-b",
+        proposedProjectId: null,
+        defaultProjectId: "project-default",
+      }),
+    ).toBe("project-b");
+  });
+
+  it("rejects legacy Project Agent proposals whose stored target lost scope", () => {
+    const validProjectProposal = {
+      channelOrganizationId: "organization-a",
+      proposedProjectId: "project-a",
+      replyAuthorAgentId: "agent-a",
+      replyAuthorAgentOrganizationId: "organization-a",
+      replyAuthorAgentProjectId: "project-a",
+    };
+    expect(() => assertChannelProposalAuthorScope(validProjectProposal))
+      .not.toThrow();
+    expect(() =>
+      assertChannelProposalAuthorScope({
+        ...validProjectProposal,
+        proposedProjectId: null,
+      })
+    ).toThrow("Project Agent proposal scope is invalid");
+    expect(() =>
+      assertChannelProposalAuthorScope({
+        ...validProjectProposal,
+        proposedProjectId: "project-b",
+      })
+    ).toThrow("Project Agent proposal scope is invalid");
+  });
+
+  it("rejects proposals whose original Agent scope cannot be verified", () => {
+    const organizationProposal = {
+      channelOrganizationId: "organization-a",
+      proposedProjectId: "project-a",
+      replyAuthorAgentId: "agent-a",
+      replyAuthorAgentOrganizationId: "organization-a",
+      replyAuthorAgentProjectId: null,
+    };
+    expect(() => assertChannelProposalAuthorScope(organizationProposal))
+      .not.toThrow();
+    expect(() =>
+      assertChannelProposalAuthorScope({
+        ...organizationProposal,
+        replyAuthorAgentId: null,
+      })
+    ).toThrow("can no longer be verified");
+    expect(() =>
+      assertChannelProposalAuthorScope({
+        ...organizationProposal,
+        replyAuthorAgentOrganizationId: "organization-b",
+      })
+    ).toThrow("can no longer be verified");
+  });
+
   it("allows legacy Agent writes to omit Skills but rejects an empty roster", () => {
     const input = {
       provider: "codex" as const,

@@ -1,23 +1,25 @@
 import SwiftUI
 
 struct FoundationStatusView: View {
-    private let capabilities = [
-        Capability(
-            icon: "iphone.gen3",
-            title: "독립 앱",
-            detail: "기존 Companion과 함께 설치되는 개발 전용 SwiftUI 앱"
-        ),
-        Capability(
-            icon: "arrow.left.arrow.right",
-            title: "공유 API 계약",
-            detail: "iOS와 Android가 같은 로그인·사용자·프로젝트 형식을 사용"
-        ),
-        Capability(
-            icon: "checkmark.shield",
-            title: "회귀 보호",
-            detail: "네이티브 테스트와 기존 모바일 빌드를 한 CI에서 확인"
-        ),
-    ]
+    private var capabilities: [Capability] {
+        [
+            Capability(
+                icon: "iphone.gen3",
+                title: L10n.text("독립 앱"),
+                detail: L10n.text("기존 Companion과 함께 설치되는 개발 전용 SwiftUI 앱")
+            ),
+            Capability(
+                icon: "arrow.left.arrow.right",
+                title: L10n.text("공유 API 계약"),
+                detail: L10n.text("iOS와 Android가 같은 로그인·사용자·프로젝트 형식을 사용")
+            ),
+            Capability(
+                icon: "checkmark.shield",
+                title: L10n.text("회귀 보호"),
+                detail: L10n.text("네이티브 테스트와 기존 모바일 빌드를 한 CI에서 확인")
+            ),
+        ]
+    }
 
     var body: some View {
         NavigationStack {
@@ -31,7 +33,7 @@ struct FoundationStatusView: View {
                         Text("Briar Companion")
                             .font(.largeTitle.bold())
                             .accessibilityIdentifier("foundation-title")
-                        Text("iOS 네이티브 기반 준비됨")
+                        Text(L10n.text("iOS 네이티브 기반 준비됨"))
                             .font(.title3.weight(.medium))
                             .foregroundStyle(.secondary)
                             .accessibilityIdentifier("foundation-status")
@@ -43,7 +45,7 @@ struct FoundationStatusView: View {
                         }
                     }
 
-                    Text("이 화면은 전환 기반의 개발 상태를 확인하기 위한 것입니다. 실제 로그인과 프로젝트 화면은 모바일 API 계약 위에 단계적으로 추가됩니다.")
+                    Text(L10n.text("이 화면은 전환 기반의 개발 상태를 확인하기 위한 것입니다. 실제 로그인과 프로젝트 화면은 모바일 API 계약 위에 단계적으로 추가됩니다."))
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)

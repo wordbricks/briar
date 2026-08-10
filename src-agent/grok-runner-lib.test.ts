@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -9,14 +9,17 @@ import {
   extractJsonObject,
   finalizeGrokMessage,
   grokSessionMeta,
+  grokStopReasonSucceeded,
   mapEffortToGrok,
   normalizeGrokSessionUpdate,
   permissionDecisionResult,
+  permissionInput,
+  permissionToolName,
   resolveGrokAuthMethodId,
   resolveGrokFinalMessage,
   resolveGrokModelId,
   shouldAutoApprovePermission,
-  shouldDenyWritePermission,
+  shouldDenyGrokPermission,
   type GrokRunnerRequest,
 } from "./grok-runner-lib";
 
@@ -80,15 +83,172 @@ describe("Grok runner", () => {
     ).toBe(true);
   });
 
-  it("denies write-like tools in read-only mode", () => {
-    expect(shouldDenyWritePermission(request, "write_file")).toBe(true);
-    expect(shouldDenyWritePermission(request, "read_file")).toBe(false);
-    expect(
-      shouldDenyWritePermission(
-        { ...request, sandboxMode: "workspaceWrite" },
-        "write_file",
-      ),
-    ).toBe(false);
+  it("allows only explicit read tools and workspace-confined paths", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "briar-grok-permission-"));
+    const workspaceRoot = join(directory, "repo");
+    const sourceDirectory = join(workspaceRoot, "src");
+    const safeFile = join(sourceDirectory, "safe.ts");
+    const outsideDirectory = join(directory, "outside");
+    const outsideFile = join(outsideDirectory, "secret.txt");
+    await Promise.all([
+      mkdir(sourceDirectory, { recursive: true }),
+      mkdir(outsideDirectory, { recursive: true }),
+    ]);
+    await Promise.all([
+      writeFile(safeFile, "export const safe = true;\n"),
+      writeFile(outsideFile, "secret\n"),
+    ]);
+    await symlink(outsideDirectory, join(workspaceRoot, "linked-outside"));
+    await symlink(
+      join(directory, "future-outside"),
+      join(workspaceRoot, "dangling"),
+    );
+
+    const scopedRequest = { ...request, workspaceRoot };
+    try {
+      expect(
+        await shouldDenyGrokPermission(
+          scopedRequest,
+          "read_file",
+          { path: "src/safe.ts" },
+        ),
+      ).toBe(false);
+      expect(
+        await shouldDenyGrokPermission(
+          scopedRequest,
+          "ReadFile",
+          { target_file: safeFile },
+        ),
+      ).toBe(false);
+      expect(
+        await shouldDenyGrokPermission(
+          scopedRequest,
+          "glob",
+          { pattern: "src/**/*.ts" },
+        ),
+      ).toBe(false);
+      expect(
+        await shouldDenyGrokPermission(
+          scopedRequest,
+          "grep",
+          { pattern: "safe", options: { directory: "src" } },
+        ),
+      ).toBe(false);
+      expect(
+        await shouldDenyGrokPermission(scopedRequest, "list_dir"),
+      ).toBe(false);
+
+      expect(
+        await shouldDenyGrokPermission(
+          scopedRequest,
+          "read_file",
+          { path: outsideFile },
+        ),
+      ).toBe(true);
+      expect(
+        await shouldDenyGrokPermission(
+          scopedRequest,
+          "read_file",
+          { path: "../outside/secret.txt" },
+        ),
+      ).toBe(true);
+      expect(
+        await shouldDenyGrokPermission(
+          scopedRequest,
+          "read_file",
+          { path: "..\\outside\\secret.txt" },
+        ),
+      ).toBe(true);
+      expect(
+        await shouldDenyGrokPermission(
+          scopedRequest,
+          "read_file",
+          { path: "linked-outside/secret.txt" },
+        ),
+      ).toBe(true);
+      expect(
+        await shouldDenyGrokPermission(
+          scopedRequest,
+          "read_file",
+          { target: "dangling/secret.txt" },
+        ),
+      ).toBe(true);
+      expect(
+        await shouldDenyGrokPermission(
+          scopedRequest,
+          "glob",
+          { glob: "linked-outside/**/*.txt" },
+        ),
+      ).toBe(true);
+      expect(
+        await shouldDenyGrokPermission(
+          scopedRequest,
+          "glob",
+          { pattern: "{src,../outside}/**/*" },
+        ),
+      ).toBe(true);
+      expect(
+        await shouldDenyGrokPermission(
+          scopedRequest,
+          "read_file",
+          { path: 42 },
+        ),
+      ).toBe(true);
+      expect(
+        await shouldDenyGrokPermission(scopedRequest, "read_file"),
+      ).toBe(true);
+
+      for (const permission of [
+        "create_file",
+        "move_file",
+        "rename",
+        "execute",
+        "deploy",
+        "git_commit",
+        "custom_mcp_mutation",
+        "read_file_and_upload",
+      ]) {
+        expect(
+          await shouldDenyGrokPermission(scopedRequest, permission),
+        ).toBe(true);
+      }
+      expect(
+        await shouldDenyGrokPermission(scopedRequest, "web_search"),
+      ).toBe(true);
+      expect(
+        await shouldDenyGrokPermission(
+          { ...scopedRequest, networkAccess: true },
+          "web_search",
+        ),
+      ).toBe(false);
+      expect(
+        await shouldDenyGrokPermission(
+          { ...scopedRequest, sandboxMode: "workspaceWrite" },
+          "web_fetch",
+        ),
+      ).toBe(true);
+      expect(
+        await shouldDenyGrokPermission(
+          { ...scopedRequest, sandboxMode: "workspaceWrite" },
+          "write_file",
+        ),
+      ).toBe(false);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("uses the ACP tool identifier and raw input for permission checks", () => {
+    const params = {
+      toolCall: {
+        title: "Read configuration",
+        kind: "read",
+        toolName: "read_file",
+        rawInput: { path: "config.json" },
+      },
+    };
+    expect(permissionToolName(params)).toBe("read_file");
+    expect(permissionInput(params)).toEqual({ path: "config.json" });
   });
 
   it("selects allow/reject permission options", () => {
@@ -102,6 +262,18 @@ describe("Grok runner", () => {
     expect(permissionDecisionResult(options, false)).toEqual({
       outcome: { outcome: "selected", optionId: "reject-1" },
     });
+    expect(
+      permissionDecisionResult(
+        [{ optionId: "persist", kind: "allow_always" }],
+        true,
+      ),
+    ).toEqual({ outcome: { outcome: "cancelled" } });
+    expect(
+      permissionDecisionResult(
+        [{ optionId: "unsafe-fallback", kind: "allow_once" }],
+        false,
+      ),
+    ).toEqual({ outcome: { outcome: "cancelled" } });
   });
 
   it("passes trusted instructions as ACP session system rules", () => {
@@ -169,6 +341,13 @@ describe("Grok runner", () => {
         text: "Hello",
       },
       { type: "turnCompleted", status: "completed" },
+    ]);
+    expect(grokStopReasonSucceeded("end_turn")).toBe(true);
+    expect(grokStopReasonSucceeded("cancelled")).toBe(false);
+    expect(grokStopReasonSucceeded("max_tokens")).toBe(false);
+    expect(grokStopReasonSucceeded(undefined)).toBe(false);
+    expect(finalizeGrokMessage(createGrokEventState(), "max_tokens")).toEqual([
+      { type: "turnCompleted", status: "max_tokens" },
     ]);
   });
 

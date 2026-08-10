@@ -48,7 +48,7 @@ struct InboxHomeView: View {
                 ContentUnavailableView(
                     L10n.text(.inboxEmpty, locale: locale),
                     systemImage: "tray",
-                    description: Text("멘션, 이슈 변경, 완료된 세션이 이곳에 표시됩니다.")
+                    description: Text(L10n.text("멘션, 이슈 변경, 완료된 세션이 이곳에 표시됩니다.", locale: locale))
                 )
             } else {
                 // Importance filter: one toggle per urgency category, all on by default.
@@ -66,9 +66,9 @@ struct InboxHomeView: View {
 
                 if filteredMessages.isEmpty {
                     ContentUnavailableView(
-                        "선택한 필터에 메시지가 없습니다.",
+                        L10n.text("선택한 필터에 메시지가 없습니다.", locale: locale),
                         systemImage: "line.3.horizontal.decrease.circle",
-                        description: Text("다른 필터를 선택해 메시지를 확인해 보세요.")
+                        description: Text(L10n.text("다른 필터를 선택해 메시지를 확인해 보세요.", locale: locale))
                     )
                 } else {
                     // Single chronological feed: newest first, no urgency sections.
@@ -104,7 +104,7 @@ struct InboxHomeView: View {
             toggleCategory(category)
         } label: {
             HStack(spacing: 5) {
-                Text(category.title)
+                Text(category.title(locale: locale))
                 Text("\(inbox.messages(in: category).count)")
                     .font(.caption2.weight(.semibold))
                     .padding(.horizontal, 5)
@@ -143,7 +143,7 @@ struct InboxHomeView: View {
                             .foregroundStyle(.primary)
                             .multilineTextAlignment(.leading)
                         Spacer()
-                        Text(message.occurredAt, style: .relative)
+                        Text(L10n.relativeDate(message.occurredAt, locale: locale))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }

@@ -144,13 +144,15 @@ struct ProjectAgentSession: Codable, Equatable, Identifiable, Sendable {
         case skipped
         case interrupted
 
-        var displayName: String {
+        var displayName: String { displayName(locale: .current) }
+
+        func displayName(locale: CompanionLocale) -> String {
             switch self {
-            case .running: "실행 중"
-            case .completed: "완료"
-            case .failed: "실패"
-            case .skipped: "건너뜀"
-            case .interrupted: "중단"
+            case .running: L10n.text("실행 중", locale: locale)
+            case .completed: L10n.text("완료", locale: locale)
+            case .failed: L10n.text("실패", locale: locale)
+            case .skipped: L10n.text("건너뜀", locale: locale)
+            case .interrupted: L10n.text("중단", locale: locale)
             }
         }
     }
@@ -172,13 +174,15 @@ struct ProjectAgentSession: Codable, Equatable, Identifiable, Sendable {
             case failed
             case skipped
 
-            var displayName: String {
+            var displayName: String { displayName(locale: .current) }
+
+            func displayName(locale: CompanionLocale) -> String {
                 switch self {
-                case .pending: "대기"
-                case .completed: "완료"
-                case .blocked: "확인 필요"
-                case .failed: "실패"
-                case .skipped: "건너뜀"
+                case .pending: L10n.text("대기", locale: locale)
+                case .completed: L10n.text("완료", locale: locale)
+                case .blocked: L10n.text("확인 필요", locale: locale)
+                case .failed: L10n.text("실패", locale: locale)
+                case .skipped: L10n.text("건너뜀", locale: locale)
                 }
             }
         }

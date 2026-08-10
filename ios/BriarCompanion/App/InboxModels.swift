@@ -8,12 +8,14 @@ enum InboxCategory: String, CaseIterable, Identifiable, Sendable {
 
     var id: String { rawValue }
 
-    var title: String {
+    var title: String { title(locale: .current) }
+
+    func title(locale: CompanionLocale) -> String {
         switch self {
-        case .urgent: "긴급"
-        case .actionRequired: "확인 필요"
-        case .important: "중요 변경"
-        case .activity: "최근 활동"
+        case .urgent: L10n.text("긴급", locale: locale)
+        case .actionRequired: L10n.text("확인 필요", locale: locale)
+        case .important: L10n.text("중요 변경", locale: locale)
+        case .activity: L10n.text("최근 활동", locale: locale)
         }
     }
 }
@@ -99,7 +101,9 @@ enum InboxMessageBuilder {
                     version: notification.id.uuidString.lowercased(),
                     body: notification.body,
                     authorName: notification.author.name,
-                    statusLabel: notification.reason == "mention" ? "멘션" : "답글",
+                    statusLabel: notification.reason == "mention"
+                        ? L10n.text("멘션")
+                        : L10n.text("답글"),
                     requiresAttention: true,
                     priority: nil,
                     structuredResult: nil,
@@ -121,7 +125,9 @@ enum InboxMessageBuilder {
                     version: notification.id.uuidString.lowercased(),
                     body: notification.body,
                     authorName: notification.author.name,
-                    statusLabel: notification.reason == "mention" ? "멘션" : "답글",
+                    statusLabel: notification.reason == "mention"
+                        ? L10n.text("멘션")
+                        : L10n.text("답글"),
                     requiresAttention: true,
                     priority: nil,
                     structuredResult: nil,
