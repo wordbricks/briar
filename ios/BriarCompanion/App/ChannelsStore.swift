@@ -13,10 +13,19 @@ final class ChannelsStore: ObservableObject {
     @Published private(set) var errorMessage: String?
 
     private let api: any MobileAPIClientProtocol
+    private let attachmentReference: @Sendable () -> String
     private var organizationID: UUID?
     private var token: String?
 
-    init(api: any MobileAPIClientProtocol) { self.api = api }
+    init(
+        api: any MobileAPIClientProtocol,
+        attachmentReference: @escaping @Sendable () -> String = {
+            UUID().uuidString.lowercased()
+        }
+    ) {
+        self.api = api
+        self.attachmentReference = attachmentReference
+    }
 
     func select(organizationID: UUID?, token: String?) {
         guard self.organizationID != organizationID || self.token != token else { return }
@@ -143,16 +152,15 @@ final class ChannelsStore: ObservableObject {
                     as: CreateChannelMessageResponse.self
                 )
             } else {
-                let references = attachments.map { _ in UUID().uuidString.lowercased() }
-                let markdown = zip(attachments, references).map { attachment, reference in
-                    let name = attachment.filename.replacingOccurrences(of: "]", with: "\\]")
-                    return "![\(name)](briar-attachment://\(reference))"
-                }.joined(separator: "\n\n")
-                let messageBody = [trimmed, markdown].filter { !$0.isEmpty }.joined(separator: "\n\n")
+                let payload = try AttachmentMessagePayload(
+                    body: trimmed,
+                    attachments: attachments,
+                    referenceGenerator: attachmentReference
+                )
                 response = try await api.upload(
                     path,
                     fields: [
-                        "body": messageBody,
+                        "body": payload.body,
                         "parentMessageId": parentMessageID?.uuidString.lowercased() ?? "",
                         "mentionedUserIds": String(
                             data: try JSONEncoder().encode(mentionedUserIds),
@@ -164,19 +172,9 @@ final class ChannelsStore: ObservableObject {
                             ),
                             encoding: .utf8
                         ) ?? "[]",
-                        "attachmentReferences": String(
-                            data: try JSONEncoder().encode(references),
-                            encoding: .utf8
-                        ) ?? "[]",
+                        "attachmentReferences": payload.referencesJSON,
                     ],
-                    files: attachments.map {
-                        MultipartFile(
-                            fieldName: "attachments",
-                            filename: $0.filename,
-                            contentType: $0.contentType,
-                            data: $0.data
-                        )
-                    },
+                    files: payload.files,
                     token: token,
                     as: CreateChannelMessageResponse.self
                 )

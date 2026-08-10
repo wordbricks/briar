@@ -507,10 +507,11 @@ final class IssueMutationTests: XCTestCase {
         let store = IssueMutationStore(
             api: recorder,
             projectID: Self.projectID,
-            token: "token"
+            token: "token",
+            attachmentReference: { "fixed-ref" }
         )
         let attachment = PendingIssueAttachment(
-            filename: "clipboard.png",
+            filename: "clipboard [1].png",
             contentType: "image/png",
             data: Data([1, 2, 3])
         )
@@ -524,8 +525,12 @@ final class IssueMutationTests: XCTestCase {
 
         XCTAssertEqual(messages.first?.attachments?.first?.filename, "clipboard.png")
         let upload = await recorder.recordedUpload()
-        XCTAssertEqual(upload?.files.map(\.filename), ["clipboard.png"])
-        XCTAssertTrue(upload?.fields["body"]?.contains("briar-attachment://") == true)
+        XCTAssertEqual(upload?.files.map(\.filename), ["clipboard [1].png"])
+        XCTAssertEqual(
+            upload?.fields["body"],
+            #"![clipboard \[1\].png](briar-attachment://fixed-ref)"#
+        )
+        XCTAssertEqual(upload?.fields["attachmentReferences"], #"["fixed-ref"]"#)
     }
 
     private static let projectID = UUID(uuidString: "11111111-1111-4111-8111-111111111111")!

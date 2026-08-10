@@ -1,3 +1,4 @@
+import type { Locale } from "../i18n/locale";
 import type { AutoHuntWorkflow } from "./auto-hunt-contract";
 import type {
   ChannelAgentEffort as ModelEffort,
@@ -5,7 +6,7 @@ import type {
   ChannelAgentSkill as ProjectAgentSkill,
 } from "./channels-contract";
 
-export type ProjectAgentLocale = "ko" | "en" | "zh";
+export type ProjectAgentLocale = Locale;
 
 export const defaultProjectAgentCalendarColor = "#3275d5";
 export const projectAgentCalendarColorPattern = /^#[0-9a-f]{6}$/iu;

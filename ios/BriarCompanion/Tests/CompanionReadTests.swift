@@ -6,6 +6,14 @@ final class CompanionReadTests: XCTestCase {
     private let middle = Date(timeIntervalSince1970: 1_700_000_100)
     private let newer = Date(timeIntervalSince1970: 1_700_000_200)
 
+    func testCompanionLocalesMatchTheSharedMobileLocaleContract() {
+        XCTAssertEqual(CompanionLocale.allCases.map(\.rawValue), ["ko", "en", "zh"])
+        XCTAssertEqual(
+            CompanionLocale.allCases.map(\.foundationIdentifier),
+            ["ko-KR", "en-US", "zh-CN"]
+        )
+    }
+
     private var runs: [DashboardRun] {
         [
             DashboardRun(

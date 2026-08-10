@@ -100,7 +100,7 @@ struct CompanionRootView: View {
                 companion.clear()
                 dashboard.select(projectID: nil, token: nil)
                 channels.select(organizationID: nil, token: nil)
-                agents.select(projectID: nil, token: nil, locale: locale.agentLocale.rawValue)
+                agents.select(projectID: nil, token: nil, locale: locale.rawValue)
                 inbox.configure(token: nil, userID: nil)
                 projectSelectionComplete = false
                 return
@@ -201,7 +201,7 @@ struct CompanionRootView: View {
         agents.select(
             projectID: projectID,
             token: token,
-            locale: locale.agentLocale.rawValue
+            locale: locale.rawValue
         )
     }
 
@@ -241,7 +241,7 @@ struct CompanionRootView: View {
     private func signOut() {
         dashboard.select(projectID: nil, token: nil)
         channels.select(organizationID: nil, token: nil)
-        agents.select(projectID: nil, token: nil, locale: locale.agentLocale.rawValue)
+        agents.select(projectID: nil, token: nil, locale: locale.rawValue)
         companion.clear()
         projectSelectionComplete = false
         Task { await AppBadgeService.sync(count: 0) }

@@ -30,7 +30,7 @@ final class AgentsStore: ObservableObject {
     private let pollInterval: Duration
     private var projectID: UUID?
     private var token: String?
-    private var locale: String = ProjectAgentLocale.ko.rawValue
+    private var locale: String = CompanionLocale.ko.rawValue
     private var generation = 0
     private var pollingTask: Task<Void, Never>?
 

@@ -32,10 +32,66 @@ enum ProfileImageSource: Equatable, Sendable {
         guard metadata.hasPrefix("data:"), metadata.contains(";base64") else { return nil }
         return Data(base64Encoded: payload, options: [.ignoreUnknownCharacters])
     }
+}
 
-    static func uiImage(from raw: String?) -> UIImage? {
-        guard case let .data(data) = parse(raw) else { return nil }
-        return UIImage(data: data)
+/// Shared rendering primitive for Briar images stored as data URLs or remote URLs.
+/// Callers provide only their domain-specific placeholder and corner treatment.
+struct BriarImageIcon<Placeholder: View>: View {
+    let source: String?
+    let size: CGFloat
+    let cornerRadius: CGFloat
+    private let placeholder: () -> Placeholder
+
+    init(
+        source: String?,
+        size: CGFloat,
+        cornerRadius: CGFloat,
+        @ViewBuilder placeholder: @escaping () -> Placeholder
+    ) {
+        self.source = source
+        self.size = size
+        self.cornerRadius = cornerRadius
+        self.placeholder = placeholder
+    }
+
+    var body: some View {
+        Group {
+            if let source = ProfileImageSource.parse(source) {
+                switch source {
+                case let .data(data):
+                    if let image = UIImage(data: data) {
+                        Image(uiImage: image)
+                            .resizable()
+                            .scaledToFill()
+                    } else {
+                        placeholder()
+                    }
+                case let .remote(url):
+                    AsyncImage(url: url) { phase in
+                        switch phase {
+                        case let .success(image):
+                            image.resizable().scaledToFill()
+                        case .failure:
+                            placeholder()
+                        case .empty:
+                            ProgressView()
+                        @unknown default:
+                            placeholder()
+                        }
+                    }
+                }
+            } else {
+                placeholder()
+            }
+        }
+        .frame(width: size, height: size)
+        .background(Color.secondary.opacity(0.12))
+        .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                .stroke(Color.secondary.opacity(0.18), lineWidth: 1)
+        }
+        .accessibilityHidden(true)
     }
 }
 
@@ -51,43 +107,13 @@ struct ProfileImageView: View {
     }
 
     var body: some View {
-        Group {
-            if let source = ProfileImageSource.parse(image) {
-                switch source {
-                case let .data(data):
-                    if let uiImage = UIImage(data: data) {
-                        Image(uiImage: uiImage)
-                            .resizable()
-                            .scaledToFill()
-                    } else {
-                        fallback
-                    }
-                case let .remote(url):
-                    AsyncImage(url: url) { phase in
-                        switch phase {
-                        case let .success(image):
-                            image.resizable().scaledToFill()
-                        case .failure:
-                            fallback
-                        case .empty:
-                            ProgressView()
-                        @unknown default:
-                            fallback
-                        }
-                    }
-                }
-            } else {
-                fallback
-            }
+        BriarImageIcon(
+            source: image,
+            size: size,
+            cornerRadius: resolvedCornerRadius
+        ) {
+            fallback
         }
-        .frame(width: size, height: size)
-        .background(Color.secondary.opacity(0.12))
-        .clipShape(RoundedRectangle(cornerRadius: resolvedCornerRadius, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: resolvedCornerRadius, style: .continuous)
-                .stroke(Color.secondary.opacity(0.18), lineWidth: 1)
-        }
-        .accessibilityHidden(true)
     }
 
     @ViewBuilder

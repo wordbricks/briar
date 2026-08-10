@@ -11,12 +11,18 @@ describe("issue markdown attachments", () => {
   it("builds and reads an inline attachment image", () => {
     const markdown = issueAttachmentMarkdown("draft-1", "screen [1].png");
 
-    expect(markdown).toBe(
-      "![screen \\[1\\].png](briar-attachment://draft-1)",
-    );
+    expect(markdown).toBe("![screen \\[1\\].png](briar-attachment://draft-1)");
     expect(issueAttachmentReferences(markdown)).toEqual(new Set(["draft-1"]));
     expect(issueAttachmentReference("briar-attachment://draft-1")).toBe(
       "draft-1",
+    );
+  });
+
+  it("escapes filenames identically across web and native mobile payloads", () => {
+    expect(
+      issueAttachmentMarkdown("fixed-ref", "line\\[a]\r\nnext\nfinal].png"),
+    ).toBe(
+      "![line\\\\\\[a\\] next final\\].png](briar-attachment://fixed-ref)",
     );
   });
 

@@ -418,19 +418,7 @@ struct MobileAPIClient: MobileAPIClientProtocol, Sendable {
         body: (any Encodable & Sendable)?,
         as responseType: Response.Type = Response.self
     ) async throws -> Response {
-        guard let url = endpointURL(path) else { throw MobileAPIError.invalidRequest }
-        var request = URLRequest(url: url)
-        request.httpMethod = method
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-        if let token {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
-        if let body {
-            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            request.httpBody = try JSONEncoder.mobileContract.encode(AnyEncodable(body))
-        }
-        let (data, response) = try await session.data(for: request)
-        try validate(response: response, data: data)
+        let data = try await sendData(path, method: method, token: token, body: body)
         return try JSONDecoder.mobileContract.decode(responseType, from: data)
     }
 
@@ -440,6 +428,18 @@ struct MobileAPIClient: MobileAPIClientProtocol, Sendable {
         token: String?,
         body: (any Encodable & Sendable)?
     ) async throws {
+        _ = try await sendData(path, method: method, token: token, body: body)
+    }
+
+    /// Executes a JSON API request after applying Briar's shared URL, auth, encoding,
+    /// and HTTP error contract. Typed and body-less calls intentionally diverge only
+    /// after this transport boundary: `send` decodes the bytes while `sendVoid` ignores them.
+    private func sendData(
+        _ path: String,
+        method: String,
+        token: String?,
+        body: (any Encodable & Sendable)?
+    ) async throws -> Data {
         guard let url = endpointURL(path) else { throw MobileAPIError.invalidRequest }
         var request = URLRequest(url: url)
         request.httpMethod = method
@@ -453,6 +453,7 @@ struct MobileAPIClient: MobileAPIClientProtocol, Sendable {
         }
         let (data, response) = try await session.data(for: request)
         try validate(response: response, data: data)
+        return data
     }
 
     func upload<Response: Decodable & Sendable>(

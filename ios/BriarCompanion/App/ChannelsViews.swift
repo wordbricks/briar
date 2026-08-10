@@ -1,6 +1,5 @@
 import PhotosUI
 import SwiftUI
-import UniformTypeIdentifiers
 
 /// Home: the organization's channels, grouped by project with section dividers.
 struct ChannelsHomeView: View {
@@ -102,61 +101,19 @@ struct ChannelMessagesView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            ScrollView {
-                LazyVStack(spacing: 0) {
-                    ForEach(channels.messages) { message in
-                        ChannelMessageRow(
-                            acceptingProposalID: channels.acceptingProposalID,
-                            agents: channels.agents,
-                            channel: channel,
-                            members: channels.members,
-                            message: message,
-                            locale: locale,
-                            onAcceptProposal: { proposalID, projectID in
-                                await channels.acceptProposal(
-                                    channelID: channel.id,
-                                    proposalID: proposalID,
-                                    projectID: projectID
-                                )
-                            },
-                            onIssueOpen: onIssueOpen,
-                            onLoadAttachment: { attachment in
-                                try await channels.download(
-                                    path: attachment.url,
-                                    filename: attachment.filename
-                                )
-                            },
-                            onOpenAttachment: { previewFile = PreviewFile(url: $0) },
-                            projects: projects,
-                            showsThreadSummary: true
-                        )
-                    }
-                }
-            }
-            ChannelComposer(
-                draft: $draft,
-                sending: channels.sending,
-                candidates: ChannelMentions.candidates(
-                    members: channels.members,
-                    agents: channels.agents,
-                    currentUserId: currentUserID
-                ),
-                placeholder: String(
-                    format: L10n.text(.channelMessagePlaceholder, locale: locale),
-                    channel.name
-                ),
-                send: { body, mentions, attachments in
-                    await channels.send(
-                        channelID: channel.id,
-                        parentMessageID: nil,
-                        body: body,
-                        mentions: mentions,
-                        attachments: attachments
-                    )
-                }
-            )
-        }
+        ChannelConversationView(
+            channels: channels,
+            draft: $draft,
+            previewFile: $previewFile,
+            channel: channel,
+            currentUserID: currentUserID,
+            locale: locale,
+            messages: channels.messages,
+            onIssueOpen: onIssueOpen,
+            parentMessageID: nil,
+            projects: projects,
+            showsThreadSummary: true
+        )
         .safeAreaInset(edge: .top, spacing: 0) {
             ChannelHeader(
                 channel: channel,
@@ -297,10 +254,60 @@ struct ChannelThreadView: View {
     }
 
     var body: some View {
+        ChannelConversationView(
+            channels: channels,
+            draft: $draft,
+            previewFile: $previewFile,
+            channel: channel,
+            currentUserID: currentUserID,
+            locale: locale,
+            messages: channels.thread,
+            onIssueOpen: onIssueOpen,
+            parentMessageID: parent.id,
+            projects: projects,
+            showsThreadSummary: false
+        )
+        .navigationTitle(L10n.text(.channelThread, locale: locale))
+        .navigationBarTitleDisplayMode(.inline)
+        .sheet(item: $previewFile) { file in
+            QuickLookPreview(fileURL: file.url)
+        }
+        .task(id: parent.id) {
+            await channels.openThread(channelID: channel.id, parentMessageID: parent.id)
+        }
+    }
+}
+
+/// Shared channel and thread conversation surface. The two behavioral differences
+/// remain explicit inputs: replies carry `parentMessageID`, while only roots show
+/// navigation summaries for their threads.
+private struct ChannelConversationView: View {
+    @ObservedObject var channels: ChannelsStore
+    @Binding var draft: String
+    @Binding var previewFile: PreviewFile?
+
+    let channel: ChannelSummary
+    let currentUserID: String?
+    let locale: CompanionLocale
+    let messages: [ChannelMessage]
+    let onIssueOpen: (UUID, UUID) -> Void
+    let parentMessageID: UUID?
+    let projects: [ProjectsResponse.Project]
+    let showsThreadSummary: Bool
+
+    private var mentionCandidates: [ChannelMentionTarget] {
+        ChannelMentions.candidates(
+            members: channels.members,
+            agents: channels.agents,
+            currentUserId: currentUserID
+        )
+    }
+
+    var body: some View {
         VStack(spacing: 0) {
             ScrollView {
                 LazyVStack(spacing: 0) {
-                    ForEach(channels.thread) { message in
+                    ForEach(messages) { message in
                         ChannelMessageRow(
                             acceptingProposalID: channels.acceptingProposalID,
                             agents: channels.agents,
@@ -323,7 +330,8 @@ struct ChannelThreadView: View {
                                 )
                             },
                             onOpenAttachment: { previewFile = PreviewFile(url: $0) },
-                            projects: projects
+                            projects: projects,
+                            showsThreadSummary: showsThreadSummary
                         )
                     }
                 }
@@ -331,11 +339,7 @@ struct ChannelThreadView: View {
             ChannelComposer(
                 draft: $draft,
                 sending: channels.sending,
-                candidates: ChannelMentions.candidates(
-                    members: channels.members,
-                    agents: channels.agents,
-                    currentUserId: currentUserID
-                ),
+                candidates: mentionCandidates,
                 placeholder: String(
                     format: L10n.text(.channelMessagePlaceholder, locale: locale),
                     channel.name
@@ -343,21 +347,13 @@ struct ChannelThreadView: View {
                 send: { body, mentions, attachments in
                     await channels.send(
                         channelID: channel.id,
-                        parentMessageID: parent.id,
+                        parentMessageID: parentMessageID,
                         body: body,
                         mentions: mentions,
                         attachments: attachments
                     )
                 }
             )
-        }
-        .navigationTitle(L10n.text(.channelThread, locale: locale))
-        .navigationBarTitleDisplayMode(.inline)
-        .sheet(item: $previewFile) { file in
-            QuickLookPreview(fileURL: file.url)
-        }
-        .task(id: parent.id) {
-            await channels.openThread(channelID: channel.id, parentMessageID: parent.id)
         }
     }
 }
@@ -501,13 +497,7 @@ private struct ChannelMessageRow: View {
     private var lastReplyText: String? {
         guard let lastReplyAt = message.lastReplyAt else { return nil }
         let formatter = RelativeDateTimeFormatter()
-        let localeIdentifier: String
-        switch locale {
-        case .ko: localeIdentifier = "ko_KR"
-        case .en: localeIdentifier = "en_US"
-        case .zh: localeIdentifier = "zh_CN"
-        }
-        formatter.locale = Locale(identifier: localeIdentifier)
+        formatter.locale = Locale(identifier: locale.foundationIdentifier)
         let relative = formatter.localizedString(for: lastReplyAt, relativeTo: Date())
         return String(
             format: L10n.text(.channelLastReply, locale: locale),
@@ -725,7 +715,7 @@ private struct ChannelComposer: View {
                         1,
                         PendingIssueAttachment.maximumCount - attachments.count
                     ),
-                    matching: .images,
+                    matching: PhotoAttachmentImportPolicy.imagesOnly.pickerFilter,
                     preferredItemEncoding: .compatible
                 ) {
                     Image(systemName: "plus")
@@ -795,38 +785,11 @@ private struct ChannelComposer: View {
             selectedPhotos = []
         }
         do {
-            var loaded = attachments
-            for item in items.prefix(PendingIssueAttachment.maximumCount - loaded.count) {
-                guard let data = try await item.loadTransferable(type: Data.self) else {
-                    throw IssueMutationError.attachment("사진 앱에서 이미지를 읽지 못했습니다.")
-                }
-                let supportedType = item.supportedContentTypes.first { type in
-                    guard type.conforms(to: .image),
-                          let mimeType = type.preferredMIMEType else { return false }
-                    return PendingIssueAttachment.allowedContentTypes.contains(mimeType)
-                }
-                if let supportedType,
-                   let mimeType = supportedType.preferredMIMEType,
-                   mimeType.hasPrefix("image/") {
-                    loaded.append(PendingIssueAttachment(
-                        filename: "image-\(UUID().uuidString).\(supportedType.preferredFilenameExtension ?? "bin")",
-                        contentType: mimeType,
-                        data: data
-                    ))
-                } else if let jpegData = UIImage(data: data)?.jpegData(compressionQuality: 0.9) {
-                    loaded.append(PendingIssueAttachment(
-                        filename: "image-\(UUID().uuidString).jpg",
-                        contentType: "image/jpeg",
-                        data: jpegData
-                    ))
-                } else {
-                    throw IssueMutationError.attachment("선택한 이미지 형식을 첨부할 수 없습니다.")
-                }
-            }
-            if let message = PendingIssueAttachment.validationMessage(for: loaded) {
-                throw IssueMutationError.attachment(message)
-            }
-            attachments = loaded
+            attachments = try await PhotoAttachmentImporter.importItems(
+                items,
+                appendingTo: attachments,
+                policy: .imagesOnly
+            )
             attachmentError = nil
         } catch {
             attachmentError = error.localizedDescription
