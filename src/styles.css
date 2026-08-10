@@ -5921,10 +5921,12 @@ button.issue-message-state { width:100%; cursor:pointer; }
   pointer-events: auto;
 }
 .channel-emoji-picker {
-  position: absolute;
-  z-index: 8;
-  top: calc(100% + 6px);
-  left: 0;
+  position: fixed;
+  z-index: 90;
+  width: min(704px, calc(100vw - 24px));
+  height: min(320px, calc(100vh - 24px));
+  height: min(320px, calc(100dvh - 24px));
+  box-sizing: border-box;
   border-radius: 12px;
   box-shadow: 0 10px 28px rgba(0, 0, 0, .18);
   overflow: hidden;
@@ -5933,6 +5935,11 @@ button.issue-message-state { width:100%; cursor:pointer; }
   --rgb-background: 255, 255, 255;
   --rgb-input: 247, 244, 239;
   --rgb-color: 40, 38, 34;
+  min-width: 0;
+  width: 100%;
+  min-height: 0;
+  height: 100%;
+  box-sizing: border-box;
   border: 1px solid var(--border, #ded9d0);
   border-radius: 12px;
 }
