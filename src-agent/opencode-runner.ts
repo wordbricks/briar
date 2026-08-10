@@ -25,6 +25,7 @@ import {
   parseOpenCodeServerUrl,
   shouldAutoApproveOpenCodePermission,
   type OpenCodeBlockedRetry,
+  type OpenCodeEventState,
   type OpenCodeRunnerOutput,
   type OpenCodeRunnerRequest,
 } from "./opencode-runner-lib";
@@ -36,11 +37,6 @@ class OpenCodeBlockedError extends Error {
     this.name = "OpenCodeBlockedError";
   }
 }
-
-const runnerIo = createRunnerIo<OpenCodeRunnerRequest, OpenCodeRunnerOutput>({
-  closeError: "Briar closed the OpenCode runner input.",
-});
-const { emit, request: requestPromise, waitForApproval } = runnerIo;
 
 async function availablePort(): Promise<number> {
   return new Promise((resolve, reject) => {
@@ -178,7 +174,45 @@ async function resolveSession(
   return created.data.id;
 }
 
-async function main() {
+type OpenCodeFinalResponse = {
+  info: { id: string };
+  parts: readonly unknown[];
+};
+
+/**
+ * Build terminal runner events while keeping the complete SDK response on
+ * every event. In particular, step-finish parts carry provider/model/usage
+ * details that are not present on response.info alone.
+ */
+export function openCodeFinalTurnOutputs(
+  response: OpenCodeFinalResponse,
+  eventState: OpenCodeEventState,
+  message: string,
+): OpenCodeRunnerOutput[] {
+  return [
+    ...completeOpenCodeMessages(eventState, {
+      messageId: response.info.id,
+      text: message,
+      phase: "final",
+    }).map((event): OpenCodeRunnerOutput => ({
+      type: "event",
+      raw: response,
+      event,
+    })),
+    {
+      type: "event",
+      raw: response,
+      event: { type: "turnCompleted", status: "completed" },
+    },
+  ];
+}
+
+type OpenCodeRunnerIo = ReturnType<
+  typeof createRunnerIo<OpenCodeRunnerRequest, OpenCodeRunnerOutput>
+>;
+
+async function main(runnerIo: OpenCodeRunnerIo) {
+  const { emit, request: requestPromise, waitForApproval } = runnerIo;
   const request = await requestPromise;
   const server = await OpenCodeServer.start(
     request.opencodeBinary,
@@ -301,30 +335,27 @@ async function main() {
       );
     }
     const message = openCodeResponseText(response.data.parts);
-    for (const event of completeOpenCodeMessages(eventState, {
-      messageId: response.data.info.id,
-      text: message,
-      phase: "final",
-    })) {
-      emit({
-        type: "event",
-        raw: response.data,
-        event,
-      });
+    for (const output of openCodeFinalTurnOutputs(
+      response.data,
+      eventState,
+      message,
+    )) {
+      emit(output);
     }
-    emit({
-      type: "event",
-      raw: response.data.info,
-      event: { type: "turnCompleted", status: "completed" },
-    });
     emit({ type: "result", sessionId, message });
   } finally {
     server.close();
   }
 }
 
-void main()
-  .catch((caught) => {
+export async function runOpenCodeRunner() {
+  const runnerIo = createRunnerIo<OpenCodeRunnerRequest, OpenCodeRunnerOutput>({
+    closeError: "Briar closed the OpenCode runner input.",
+  });
+  const { emit } = runnerIo;
+  try {
+    await main(runnerIo);
+  } catch (caught) {
     if (caught instanceof OpenCodeBlockedError) {
       emit({ type: "blocked", ...caught.blocker });
     } else {
@@ -334,5 +365,11 @@ void main()
       });
     }
     process.exitCode = 1;
-  })
-  .finally(runnerIo.close);
+  } finally {
+    runnerIo.close();
+  }
+}
+
+if (import.meta.main) {
+  void runOpenCodeRunner();
+}

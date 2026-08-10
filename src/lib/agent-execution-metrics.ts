@@ -1,8 +1,5 @@
 import { z } from "zod";
-import {
-  agentProviders,
-  type AgentProvider,
-} from "./agent-provider-contract";
+import { agentProviders, type AgentProvider } from "./agent-provider-contract";
 
 const tokenCountSchema = z
   .number()
@@ -32,7 +29,7 @@ export type AgentExecutionUsageProvider = AgentProvider;
 
 type AgentExecutionUsageObservationBase = {
   /** Briar runtime provider, separate from the provider's billing namespace. */
-  provider: "codex" | "claude";
+  provider: AgentProvider;
   model: string | null;
   canonicalModel: string | null;
   /** Raw provider/billing namespace such as openai, bedrock, or vertex. */
@@ -57,7 +54,12 @@ export type AgentExecutionModelObservation =
       | "codex.thread"
       | "codex.turnRequest"
       | "codex.threadSettings"
-      | "codex.rerouted";
+      | "codex.rerouted"
+      | "opencode.assistant"
+      | "grok.session"
+      | "grok.sessionNew"
+      | "grok.sessionLoad"
+      | "grok.modelSet";
   };
 
 export type AgentExecutionTokenObservation =
@@ -73,7 +75,14 @@ export type AgentExecutionTokenObservation =
       | "claude.result.modelUsage"
       | "claude.result.usage"
       | "codex.threadTokenUsage"
-      | "codex.turnUsage";
+      | "codex.turnUsage"
+      | "opencode.step.usage"
+      | "opencode.assistant.usage"
+      | "grok.turnCompleted.modelUsage"
+      | "grok.turnCompleted.usage"
+      | "grok.prompt.metaModelUsage"
+      | "grok.prompt.metaUsage"
+      | "grok.prompt.usage";
   };
 
 export type AgentExecutionUsageObservation =
@@ -170,6 +179,11 @@ const tokenValue = (
     }
   }
   return null;
+};
+
+const tokenSum = (...values: Array<number | null>): number | null => {
+  const total = values.reduce<number>((sum, value) => sum + (value ?? 0), 0);
+  return Number.isSafeInteger(total) && total >= 0 ? total : null;
 };
 
 const runnerPayload = (payload: unknown) => {
@@ -588,6 +602,495 @@ export function codexExecutionUsageObservationsFromPayload(
     : [];
 }
 
+const openCodeTokenUsage = (
+  tokens: Record<string, unknown>,
+): AgentExecutionTokenUsage | null => {
+  const cache = asRecord(tokens.cache);
+  const inputTokens = tokenValue(tokens, "input");
+  const rawOutputTokens = tokenValue(tokens, "output");
+  const reasoningOutputTokens = tokenValue(tokens, "reasoning");
+  const cacheReadTokens = cache ? tokenValue(cache, "read") : null;
+  const cacheWriteTokens = cache ? tokenValue(cache, "write") : null;
+  const explicitTotal = tokenValue(tokens, "total");
+  if (
+    inputTokens === null &&
+    rawOutputTokens === null &&
+    reasoningOutputTokens === null &&
+    cacheReadTokens === null &&
+    cacheWriteTokens === null &&
+    explicitTotal === null
+  ) {
+    return null;
+  }
+
+  // OpenCode stores uncached input and reasoning as disjoint buckets. Briar's
+  // canonical contract keeps reasoning as a subset of output instead.
+  const outputTokens =
+    rawOutputTokens === null && reasoningOutputTokens === null
+      ? null
+      : tokenSum(rawOutputTokens, reasoningOutputTokens);
+  return {
+    inputTokens,
+    outputTokens,
+    cacheReadTokens,
+    cacheWriteTokens,
+    reasoningOutputTokens,
+    totalTokens:
+      explicitTotal ??
+      tokenSum(
+        inputTokens,
+        rawOutputTokens,
+        reasoningOutputTokens,
+        cacheReadTokens,
+        cacheWriteTokens,
+      ),
+  };
+};
+
+const openCodeAssistantObservations = (
+  assistant: Record<string, unknown>,
+  includeUsage: boolean,
+): AgentExecutionUsageObservation[] => {
+  if (assistant.role !== "assistant") return [];
+  const messageId = nonEmptyString(assistant.id);
+  const sessionId = nonEmptyString(assistant.sessionID);
+  const turnId = nonEmptyString(assistant.parentID);
+  const model = nonEmptyString(assistant.modelID);
+  const modelProvider = nonEmptyString(assistant.providerID);
+  const observations: AgentExecutionUsageObservation[] = [];
+
+  if (model) {
+    observations.push({
+      kind: "model",
+      provider: "opencode",
+      model,
+      canonicalModel: null,
+      modelProvider,
+      modelSource: "providerReported",
+      source: "opencode.assistant",
+      scopeId: messageId,
+      sessionId,
+      turnId,
+      dedupeKey: dedupeKey("opencode", "message", messageId, "model"),
+    });
+  }
+
+  const tokens = includeUsage ? asRecord(assistant.tokens) : null;
+  const tokenUsage = tokens ? openCodeTokenUsage(tokens) : null;
+  if (tokenUsage) {
+    observations.push({
+      kind: "delta",
+      provider: "opencode",
+      model,
+      canonicalModel: null,
+      modelProvider,
+      modelSource: model ? "providerReported" : "unknown",
+      tokenUsage,
+      source: "opencode.assistant.usage",
+      scopeId: messageId,
+      sessionId,
+      turnId,
+      dedupeKey: dedupeKey("opencode", "message", messageId, "usage"),
+    });
+  }
+  return observations;
+};
+
+const openCodeStepObservation = (
+  part: Record<string, unknown>,
+): AgentExecutionTokenObservation | null => {
+  if (part.type !== "step-finish") return null;
+  const tokens = asRecord(part.tokens);
+  const tokenUsage = tokens ? openCodeTokenUsage(tokens) : null;
+  if (!tokenUsage) return null;
+  const partId = nonEmptyString(part.id);
+  const messageId = nonEmptyString(part.messageID);
+  const sessionId = nonEmptyString(part.sessionID);
+  return {
+    kind: "delta",
+    provider: "opencode",
+    model: null,
+    canonicalModel: null,
+    modelProvider: null,
+    modelSource: "unknown",
+    tokenUsage,
+    source: "opencode.step.usage",
+    scopeId: messageId,
+    sessionId,
+    turnId: null,
+    dedupeKey: dedupeKey("opencode", "part", partId, "usage"),
+  };
+};
+
+export function openCodeExecutionUsageObservationsFromPayload(
+  payload: unknown,
+): AgentExecutionUsageObservation[] {
+  const message = runnerPayload(payload);
+  if (!message) return [];
+
+  const properties = asRecord(message.properties);
+  const eventAssistant =
+    message.type === "message.updated" ? asRecord(properties?.info) : null;
+  const responseAssistant = asRecord(message.info);
+  const directAssistant = message.role === "assistant" ? message : null;
+  const assistant = eventAssistant ?? responseAssistant ?? directAssistant;
+
+  const parts: Record<string, unknown>[] = [];
+  if (message.type === "message.part.updated") {
+    const part = asRecord(properties?.part);
+    if (part) parts.push(part);
+  } else if (message.type === "step-finish") {
+    parts.push(message);
+  }
+  if (Array.isArray(message.parts)) {
+    parts.push(
+      ...message.parts.flatMap((part) => {
+        const record = asRecord(part);
+        return record ? [record] : [];
+      }),
+    );
+  }
+
+  const stepObservations = parts.flatMap((part) => {
+    const observation = openCodeStepObservation(part);
+    return observation ? [observation] : [];
+  });
+  const assistantId = nonEmptyString(assistant?.id);
+  const hasAssistantStep = stepObservations.some(
+    (observation) =>
+      assistantId === null || observation.scopeId === assistantId,
+  );
+  return [
+    ...(assistant
+      ? openCodeAssistantObservations(assistant, !hasAssistantStep)
+      : []),
+    ...stepObservations,
+  ];
+}
+
+const grokTokenUsage = (
+  usage: Record<string, unknown>,
+  thoughtTokensAreSeparate: boolean,
+): AgentExecutionTokenUsage | null => {
+  const inputTokens = tokenValue(usage, "inputTokens", "input_tokens");
+  const rawOutputTokens = tokenValue(usage, "outputTokens", "output_tokens");
+  const proprietaryReasoningTokens = tokenValue(
+    usage,
+    "reasoningTokens",
+    "reasoningOutputTokens",
+    "reasoning_output_tokens",
+  );
+  const thoughtTokens = tokenValue(usage, "thoughtTokens", "thought_tokens");
+  const reasoningOutputTokens = proprietaryReasoningTokens ?? thoughtTokens;
+  const cacheReadTokens = tokenValue(
+    usage,
+    "cachedReadTokens",
+    "cacheReadTokens",
+    "cached_read_tokens",
+  );
+  const cacheWriteTokens = tokenValue(
+    usage,
+    "cacheCreationTokens",
+    "cachedWriteTokens",
+    "cacheWriteTokens",
+    "cached_write_tokens",
+  );
+  const explicitTotal = tokenValue(usage, "totalTokens", "total_tokens");
+  if (
+    inputTokens === null &&
+    rawOutputTokens === null &&
+    reasoningOutputTokens === null &&
+    cacheReadTokens === null &&
+    cacheWriteTokens === null &&
+    explicitTotal === null
+  ) {
+    return null;
+  }
+
+  // xAI's private turn_completed payload includes reasoning in output. The
+  // standard ACP PromptResponse names a separate thoughtTokens bucket, which
+  // must be folded into Briar's canonical output bucket.
+  const outputTokens = thoughtTokensAreSeparate
+    ? rawOutputTokens === null && thoughtTokens === null
+      ? null
+      : tokenSum(rawOutputTokens, thoughtTokens)
+    : rawOutputTokens === null && reasoningOutputTokens === null
+      ? null
+      : Math.max(rawOutputTokens ?? 0, reasoningOutputTokens ?? 0);
+  return {
+    inputTokens,
+    outputTokens,
+    cacheReadTokens,
+    cacheWriteTokens,
+    reasoningOutputTokens,
+    // Grok input includes cache reads/writes, while reasoning is already in
+    // output for the private payload (and folded into it above for ACP).
+    totalTokens: explicitTotal ?? tokenSum(inputTokens, outputTokens),
+  };
+};
+
+const grokPromptIdentifier = (
+  ...records: Array<Record<string, unknown> | null>
+): string | null => {
+  for (const record of records) {
+    if (!record) continue;
+    const value =
+      nonEmptyString(record.userMessageId) ??
+      nonEmptyString(record.messageId) ??
+      nonEmptyString(record.prompt_id) ??
+      nonEmptyString(record.promptId) ??
+      nonEmptyString(record.requestId) ??
+      nonEmptyString(record.eventId);
+    if (value) return value;
+  }
+  return null;
+};
+
+const grokPromptAggregateObservations = (input: {
+  usage: Record<string, unknown>;
+  sessionId: string | null;
+  promptId: string | null;
+  fallbackModel?: string | null;
+  modelUsageSource:
+    "grok.turnCompleted.modelUsage" | "grok.prompt.metaModelUsage";
+  usageSource: "grok.turnCompleted.usage" | "grok.prompt.metaUsage";
+}): AgentExecutionUsageObservation[] => {
+  const modelUsage = asRecord(input.usage.modelUsage);
+  if (modelUsage) {
+    const observations = Object.entries(modelUsage).flatMap(
+      ([reportedModel, value]): AgentExecutionUsageObservation[] => {
+        const model = nonEmptyString(reportedModel);
+        const usageRecord = asRecord(value);
+        const tokenUsage = usageRecord
+          ? grokTokenUsage(usageRecord, false)
+          : null;
+        if (!model || !tokenUsage) return [];
+        return [
+          {
+            kind: "delta",
+            provider: "grok",
+            model,
+            canonicalModel: null,
+            modelProvider: "xai",
+            modelSource: "providerReported",
+            tokenUsage,
+            source: input.modelUsageSource,
+            scopeId: input.promptId,
+            sessionId: input.sessionId,
+            turnId: input.promptId,
+            dedupeKey: dedupeKey(
+              "grok",
+              "session",
+              input.sessionId,
+              "prompt",
+              input.promptId,
+              "model",
+              model,
+              "usage",
+            ),
+          },
+        ];
+      },
+    );
+    if (observations.length > 0) return observations;
+  }
+
+  const tokenUsage = grokTokenUsage(input.usage, false);
+  return tokenUsage
+    ? [
+        {
+          kind: "delta",
+          provider: "grok",
+          model: input.fallbackModel ?? null,
+          canonicalModel: null,
+          modelProvider: "xai",
+          modelSource: input.fallbackModel ? "providerReported" : "unknown",
+          tokenUsage,
+          source: input.usageSource,
+          scopeId: input.promptId,
+          sessionId: input.sessionId,
+          turnId: input.promptId,
+          dedupeKey: dedupeKey(
+            "grok",
+            "session",
+            input.sessionId,
+            "prompt",
+            input.promptId,
+            "usage",
+          ),
+        },
+      ]
+    : [];
+};
+
+const grokTurnCompletedObservations = (
+  message: Record<string, unknown>,
+): AgentExecutionUsageObservation[] | null => {
+  const params = asRecord(message.params) ?? message;
+  const update = asRecord(params.update);
+  if (update?.sessionUpdate !== "turn_completed") return null;
+  const paramsMeta = asRecord(params._meta);
+  const updateMeta = asRecord(update._meta);
+  if (paramsMeta?.isReplay === true || updateMeta?.isReplay === true) {
+    return [];
+  }
+
+  const usage = asRecord(update.usage);
+  if (!usage) return [];
+  const sessionId = nonEmptyString(params.sessionId);
+  const promptId = grokPromptIdentifier(update, paramsMeta, updateMeta);
+  return grokPromptAggregateObservations({
+    usage,
+    sessionId,
+    promptId,
+    modelUsageSource: "grok.turnCompleted.modelUsage",
+    usageSource: "grok.turnCompleted.usage",
+  });
+};
+
+const grokPromptResultObservations = (
+  message: Record<string, unknown>,
+): AgentExecutionUsageObservation[] | null => {
+  const method = nonEmptyString(message.method);
+  const directPromptResponse =
+    method === null && nonEmptyString(message.stopReason) !== null;
+  if (method !== "session/prompt" && !directPromptResponse) return null;
+  const params = asRecord(message.params);
+  const result =
+    method === "session/prompt" ? asRecord(message.result) : message;
+  if (!result) return [];
+  const paramsMeta = asRecord(params?._meta);
+  const resultMeta = asRecord(result._meta);
+  // The client-generated prompt/request id is also echoed by xAI's private
+  // turn_completed notification. Prefer it over an agent-assigned userMessageId
+  // so the private aggregate can replace this standards fallback.
+  const promptId = grokPromptIdentifier(paramsMeta, params, resultMeta, result);
+  const sessionId =
+    nonEmptyString(params?.sessionId) ?? nonEmptyString(result.sessionId);
+  const resultModel =
+    nonEmptyString(resultMeta?.modelId) ?? nonEmptyString(result.model);
+  const metaUsage = asRecord(resultMeta?.usage);
+  if (metaUsage) {
+    return grokPromptAggregateObservations({
+      usage: metaUsage,
+      sessionId,
+      promptId,
+      fallbackModel: resultModel,
+      modelUsageSource: "grok.prompt.metaModelUsage",
+      usageSource: "grok.prompt.metaUsage",
+    });
+  }
+
+  const usage = asRecord(result.usage);
+  const tokenUsage = usage ? grokTokenUsage(usage, true) : null;
+  if (!tokenUsage) return [];
+  return [
+    {
+      kind: "delta",
+      provider: "grok",
+      model: resultModel,
+      canonicalModel: null,
+      modelProvider: "xai",
+      modelSource: resultModel ? "providerReported" : "unknown",
+      tokenUsage,
+      source: "grok.prompt.usage",
+      scopeId: promptId,
+      sessionId,
+      turnId: promptId,
+      dedupeKey: dedupeKey(
+        "grok",
+        "session",
+        sessionId,
+        "prompt",
+        promptId,
+        "usage",
+      ),
+    },
+  ];
+};
+
+const grokModelObservation = (
+  message: Record<string, unknown>,
+): AgentExecutionModelObservation | null => {
+  const method = nonEmptyString(message.method);
+  const params = asRecord(message.params);
+  const result = asRecord(message.result);
+  const resultModels = asRecord(result?.models);
+  const resultMeta = asRecord(result?._meta);
+  const metaModelState = asRecord(resultMeta?.modelState);
+  const sessionId =
+    nonEmptyString(result?.sessionId) ??
+    nonEmptyString(params?.sessionId) ??
+    nonEmptyString(message.sessionId);
+
+  let model: string | null = null;
+  let source: AgentExecutionModelObservation["source"] = "grok.session";
+  if (method === "session/set_model") {
+    model = nonEmptyString(params?.modelId);
+    source = "grok.modelSet";
+  } else if (method === "session/new") {
+    model =
+      nonEmptyString(resultModels?.currentModelId) ??
+      nonEmptyString(metaModelState?.currentModelId);
+    source = "grok.sessionNew";
+  } else if (method === "session/load") {
+    model =
+      nonEmptyString(resultModels?.currentModelId) ??
+      nonEmptyString(metaModelState?.currentModelId);
+    source = "grok.sessionLoad";
+  } else if (
+    method === "initialize" ||
+    message.type === "session" ||
+    resultModels !== null ||
+    metaModelState !== null
+  ) {
+    model =
+      nonEmptyString(resultModels?.currentModelId) ??
+      nonEmptyString(metaModelState?.currentModelId) ??
+      nonEmptyString(message.currentModelId) ??
+      nonEmptyString(message.model);
+  }
+  const isSessionLifecycle =
+    source === "grok.sessionNew" || source === "grok.sessionLoad";
+  if (!model && (!isSessionLifecycle || !sessionId)) return null;
+  const scopeId = sessionId ?? (method === "initialize" ? "initialize" : null);
+  return {
+    kind: "model",
+    provider: "grok",
+    model,
+    canonicalModel: null,
+    modelProvider: "xai",
+    modelSource: !model
+      ? "unknown"
+      : source === "grok.modelSet"
+        ? "providerConfig"
+        : "providerReported",
+    source,
+    scopeId,
+    sessionId,
+    turnId: null,
+    dedupeKey: sessionId
+      ? dedupeKey("grok", "session", sessionId, "model")
+      : method === "initialize"
+        ? "grok:initialize:model"
+        : null,
+  };
+};
+
+export function grokExecutionUsageObservationsFromPayload(
+  payload: unknown,
+): AgentExecutionUsageObservation[] {
+  const message = runnerPayload(payload);
+  if (!message) return [];
+
+  const turnCompleted = grokTurnCompletedObservations(message);
+  if (turnCompleted !== null) return turnCompleted;
+  const promptResult = grokPromptResultObservations(message);
+  if (promptResult !== null) return promptResult;
+  const model = grokModelObservation(message);
+  return model ? [model] : [];
+}
+
 export function agentExecutionUsageObservationsFromPayload(
   provider: AgentExecutionUsageProvider,
   payload: unknown,
@@ -598,9 +1101,10 @@ export function agentExecutionUsageObservationsFromPayload(
   if (provider === "codex") {
     return codexExecutionUsageObservationsFromPayload(payload);
   }
-  // OpenCode and Grok get native adapters in the provider-support PR. Do not
-  // guess at their payload shapes through the Claude/Codex field names.
-  return [];
+  if (provider === "opencode") {
+    return openCodeExecutionUsageObservationsFromPayload(payload);
+  }
+  return grokExecutionUsageObservationsFromPayload(payload);
 }
 
 const aggregateTokenUsage = (
@@ -647,17 +1151,34 @@ export function createAgentExecutionUsageCollector(
   let currentCanonicalModel: string | null = null;
   let currentModelProvider: string | null = null;
   let sequence = 0;
-  const collected = new Map<
+  const collected = new Map<string, AgentExecutionCollectedTokenObservation>();
+  const scopedModels = new Map<
     string,
-    AgentExecutionCollectedTokenObservation
+    Pick<
+      AgentExecutionUsageObservationBase,
+      | "model"
+      | "canonicalModel"
+      | "modelProvider"
+      | "modelSource"
+      | "sessionId"
+      | "turnId"
+    >
   >();
   const claudeQueryDeltaKeys = new Set<string>();
   let claudeQueryHasCumulativeUsage = false;
+  const openCodeFallbackKeyByMessage = new Map<string, string>();
+  const openCodeMessagesWithSteps = new Set<string>();
+  const grokUsageGroups = new Map<
+    string,
+    { rank: number; keys: Set<string> }
+  >();
 
-  const observe = (
-    payload: unknown,
-    observedAt = new Date().toISOString(),
-  ) => {
+  const scopedModelKey = (
+    observationProvider: AgentProvider,
+    scopeId: string,
+  ) => `${observationProvider}:${scopeId}`;
+
+  const observe = (payload: unknown, observedAt = new Date().toISOString()) => {
     const normalizedObservedAt = observedAtSchema.parse(observedAt);
     const observations = agentExecutionUsageObservationsFromPayload(
       provider,
@@ -671,6 +1192,42 @@ export function createAgentExecutionUsageCollector(
         ) {
           claudeQueryDeltaKeys.clear();
           claudeQueryHasCumulativeUsage = false;
+        }
+        if (observation.scopeId) {
+          scopedModels.set(
+            scopedModelKey(observation.provider, observation.scopeId),
+            {
+              model: observation.model,
+              canonicalModel: observation.canonicalModel,
+              modelProvider: observation.modelProvider,
+              modelSource: observation.modelSource,
+              sessionId: observation.sessionId,
+              turnId: observation.turnId,
+            },
+          );
+          // OpenCode may publish a step before the matching assistant snapshot.
+          // Repair any already-collected usage under that stable message id.
+          for (const [key, existing] of collected) {
+            if (
+              existing.provider === observation.provider &&
+              existing.scopeId === observation.scopeId
+            ) {
+              collected.set(key, {
+                ...existing,
+                model: observation.model ?? existing.model,
+                canonicalModel:
+                  observation.canonicalModel ?? existing.canonicalModel,
+                modelProvider:
+                  observation.modelProvider ?? existing.modelProvider,
+                modelSource:
+                  observation.modelSource === "unknown"
+                    ? existing.modelSource
+                    : observation.modelSource,
+                sessionId: observation.sessionId ?? existing.sessionId,
+                turnId: observation.turnId ?? existing.turnId,
+              });
+            }
+          }
         }
         if (observation.model) currentModel = observation.model;
         if (observation.modelSource !== "unknown") {
@@ -703,15 +1260,28 @@ export function createAgentExecutionUsageCollector(
         return observation;
       }
 
+      const scopedModel = observation.scopeId
+        ? scopedModels.get(
+            scopedModelKey(observation.provider, observation.scopeId),
+          )
+        : undefined;
       const enriched: AgentExecutionTokenObservation = {
         ...observation,
-        model: observation.model ?? currentModel,
-        canonicalModel: observation.canonicalModel ?? currentCanonicalModel,
-        modelProvider: observation.modelProvider ?? currentModelProvider,
+        model: observation.model ?? scopedModel?.model ?? currentModel,
+        canonicalModel:
+          observation.canonicalModel ??
+          scopedModel?.canonicalModel ??
+          currentCanonicalModel,
+        modelProvider:
+          observation.modelProvider ??
+          scopedModel?.modelProvider ??
+          currentModelProvider,
         modelSource:
           observation.modelSource === "unknown"
-            ? currentModelSource
+            ? (scopedModel?.modelSource ?? currentModelSource)
             : observation.modelSource,
+        sessionId: observation.sessionId ?? scopedModel?.sessionId ?? null,
+        turnId: observation.turnId ?? scopedModel?.turnId ?? null,
       };
       if (observation.model) currentModel = observation.model;
       if (observation.modelSource !== "unknown") {
@@ -733,6 +1303,59 @@ export function createAgentExecutionUsageCollector(
         if (claudeQueryHasCumulativeUsage) return enriched;
       }
 
+      if (
+        enriched.provider === "opencode" &&
+        enriched.source === "opencode.step.usage" &&
+        enriched.scopeId
+      ) {
+        openCodeMessagesWithSteps.add(enriched.scopeId);
+        const fallbackKey = openCodeFallbackKeyByMessage.get(enriched.scopeId);
+        if (fallbackKey) collected.delete(fallbackKey);
+        openCodeFallbackKeyByMessage.delete(enriched.scopeId);
+      }
+      if (
+        enriched.provider === "opencode" &&
+        enriched.source === "opencode.assistant.usage" &&
+        enriched.scopeId &&
+        openCodeMessagesWithSteps.has(enriched.scopeId)
+      ) {
+        return enriched;
+      }
+
+      const grokUsageRank =
+        enriched.provider !== "grok"
+          ? null
+          : enriched.source === "grok.prompt.usage"
+            ? 1
+            : enriched.source === "grok.prompt.metaUsage"
+              ? 2
+              : enriched.source === "grok.prompt.metaModelUsage"
+                ? 3
+                : enriched.source === "grok.turnCompleted.usage"
+                  ? 4
+                  : enriched.source === "grok.turnCompleted.modelUsage"
+                    ? 5
+                    : null;
+      const grokUsageGroupKey =
+        grokUsageRank !== null && enriched.scopeId
+          ? JSON.stringify([enriched.sessionId, enriched.scopeId])
+          : null;
+      if (grokUsageGroupKey && grokUsageRank !== null) {
+        const currentGroup = grokUsageGroups.get(grokUsageGroupKey);
+        if (currentGroup && grokUsageRank < currentGroup.rank) {
+          return enriched;
+        }
+        if (!currentGroup || grokUsageRank > currentGroup.rank) {
+          for (const priorKey of currentGroup?.keys ?? []) {
+            collected.delete(priorKey);
+          }
+          grokUsageGroups.set(grokUsageGroupKey, {
+            rank: grokUsageRank,
+            keys: new Set<string>(),
+          });
+        }
+      }
+
       const key = enriched.dedupeKey ?? `${provider}:observation:${sequence++}`;
       collected.set(key, {
         ...enriched,
@@ -744,6 +1367,16 @@ export function createAgentExecutionUsageCollector(
       if (enriched.provider === "claude" && enriched.kind === "delta") {
         claudeQueryDeltaKeys.add(key);
       }
+      if (
+        enriched.provider === "opencode" &&
+        enriched.source === "opencode.assistant.usage" &&
+        enriched.scopeId
+      ) {
+        openCodeFallbackKeyByMessage.set(enriched.scopeId, key);
+      }
+      if (grokUsageGroupKey) {
+        grokUsageGroups.get(grokUsageGroupKey)?.keys.add(key);
+      }
       return enriched;
     });
   };
@@ -753,24 +1386,25 @@ export function createAgentExecutionUsageCollector(
 
 /**
  * Convert normalized provider observations into the immutable ingestion
- * contract. Codex includes cached input in inputTokens, while Claude reports
- * cache reads and writes as separate buckets.
+ * contract. Codex and Grok include cached input in inputTokens, while Claude
+ * and OpenCode report cache reads and writes as separate buckets.
  */
 export function agentExecutionUsageRecordsFromObservations(
   observations: AgentExecutionCollectedTokenObservation[],
 ): AgentExecutionUsageRecord[] {
   return observations.map((observation) => {
     const usage = observation.tokenUsage;
-    const uncachedInputTokens = usage.inputTokens === null
-      ? null
-      : observation.provider === "codex"
-        ? Math.max(
-            0,
-            usage.inputTokens -
-              (usage.cacheReadTokens ?? 0) -
-              (usage.cacheWriteTokens ?? 0),
-          )
-        : usage.inputTokens;
+    const uncachedInputTokens =
+      usage.inputTokens === null
+        ? null
+        : observation.provider === "codex" || observation.provider === "grok"
+          ? Math.max(
+              0,
+              usage.inputTokens -
+                (usage.cacheReadTokens ?? 0) -
+                (usage.cacheWriteTokens ?? 0),
+            )
+          : usage.inputTokens;
     return {
       usageKey: observation.dedupeKey,
       sessionId: observation.sessionId,
