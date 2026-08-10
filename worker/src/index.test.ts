@@ -440,6 +440,30 @@ describe("Worker HTTP contract", () => {
           recorded_at: "2026-08-01T00:01:01.000Z",
         },
       ],
+      estimatedCostRecords: [
+        {
+          executionId: "44444444-4444-4444-8444-444444444444",
+          projectId: "22222222-2222-4222-8222-222222222222",
+          runAttempt: 1,
+          claimAttempt: 1,
+          workerId: "worker-1",
+          claimedAt: "2026-08-01T00:00:00.000Z",
+          usageKey: "codex:turn:turn-2:usage",
+          sessionId: "session-1",
+          scopeId: "turn-2",
+          turnId: "turn-2",
+          agentProvider: "codex",
+          modelProvider: "openai",
+          model: "gpt-5.6-sol",
+          canonicalModel: null,
+          modelSource: "providerReported",
+          usageSource: "codex.turn.completed.usage",
+          pricingKey: "gpt-5.6-sol",
+          amountUsdTicks: 2_500_000,
+          observedAt: "2026-08-01T00:02:00.000Z",
+          costSource: "modelPriced",
+        },
+      ],
     });
 
     expect(result).toMatchObject({
@@ -454,6 +478,14 @@ describe("Worker HTTP contract", () => {
           usageKey: "codex:turn:turn-1:usage",
           costSource: "providerReported",
           amountUsdTicks: 12_345_678,
+        },
+      ],
+      estimatedCostRecords: [
+        {
+          usageKey: "codex:turn:turn-2:usage",
+          pricingKey: "gpt-5.6-sol",
+          costSource: "modelPriced",
+          amountUsdTicks: 2_500_000,
         },
       ],
     });

@@ -8,6 +8,7 @@ import {
 } from "./lib/auto-hunt-contract";
 import type { StructuredAgentResult } from "./lib/agent-result";
 import type { AgentExecutionCostRecord } from "./lib/agent-execution-cost";
+import type { AgentUsagePricing } from "./lib/agent-usage-pricing";
 import type {
   AgentExecutionMetrics,
   AgentExecutionUsageRecord,
@@ -332,6 +333,33 @@ export type AgentUsageCostRecord = AgentExecutionCostRecord & {
   costSource: "providerReported";
 };
 
+export type AgentUsageEstimatedCostRecord = Pick<
+  AgentUsageRecord,
+  | "executionId"
+  | "projectId"
+  | "runAttempt"
+  | "claimAttempt"
+  | "workerId"
+  | "claimedAt"
+  | "usageKey"
+  | "sessionId"
+  | "scopeId"
+  | "turnId"
+  | "agentProvider"
+  | "modelProvider"
+  | "model"
+  | "canonicalModel"
+  | "modelSource"
+  | "observedAt"
+> & {
+  usageSource: string;
+  pricingKey: string;
+  amountUsdTicks: number;
+  costSource: "modelPriced";
+};
+
+export type { AgentUsagePricing } from "./lib/agent-usage-pricing";
+
 export type AgentUsageRun = {
   id: string;
   projectId: string;
@@ -356,6 +384,14 @@ export type AgentUsageRun = {
   usageRecords?: AgentUsageRecord[];
   /** Present on servers with immutable provider-reported cost ledgers. */
   costRecords?: AgentUsageCostRecord[];
+  /** Recalculated from current model prices whenever this report is read. */
+  estimatedCostRecords?: AgentUsageEstimatedCostRecord[];
+};
+
+export type AgentUsageReport = {
+  runs: AgentUsageRun[];
+  generatedAt: string;
+  pricing: AgentUsagePricing;
 };
 
 export type IssueResultReview = {

@@ -316,6 +316,10 @@ import {
   type StoredCodexPet,
 } from "./codex-pets";
 import {
+  estimateOrganizationUsageCosts,
+  loadAgentUsagePricing,
+} from "./usage-pricing";
+import {
   fetchLinearIssuesForTeams,
   fetchLinearViewerAndTeams,
   fetchLinearWorkflowStates,
@@ -4491,6 +4495,7 @@ export const organizationUsageRunJson = (
     attempts?: RunExecutionAttemptRow[];
     records?: OrganizationUsageRecordRow[];
     costRecords?: OrganizationCostRecordRow[];
+    estimatedCostRecords?: ReturnType<typeof estimateOrganizationUsageCosts>;
   } = {},
 ) => ({
   id: run.id,
@@ -4513,6 +4518,7 @@ export const organizationUsageRunJson = (
   executionAttempts: (ledger.attempts ?? []).map(usageExecutionAttemptJson),
   usageRecords: (ledger.records ?? []).map(organizationUsageRecordJson),
   costRecords: (ledger.costRecords ?? []).map(organizationCostRecordJson),
+  estimatedCostRecords: ledger.estimatedCostRecords ?? [],
 });
 
 const dashboardEventJson = (event: HuntEventRow) => ({
@@ -5299,12 +5305,14 @@ async function route(
     );
     const generatedAt = Date.now();
     const since = organizationUsageQuerySince(days, generatedAt);
-    const [runs, attempts, usageRecords, costRecords] = await Promise.all([
-      listOrganizationUsageRuns(db, organizationId, since),
-      listOrganizationUsageExecutionAttempts(db, organizationId, since),
-      listOrganizationUsageRecords(db, organizationId, since),
-      listOrganizationUsageCostRecords(db, organizationId, since),
-    ]);
+    const [runs, attempts, usageRecords, costRecords, loadedPricing] =
+      await Promise.all([
+        listOrganizationUsageRuns(db, organizationId, since),
+        listOrganizationUsageExecutionAttempts(db, organizationId, since),
+        listOrganizationUsageRecords(db, organizationId, since),
+        listOrganizationUsageCostRecords(db, organizationId, since),
+        loadAgentUsagePricing(),
+      ]);
     const attemptsByRun = new Map<string, RunExecutionAttemptRow[]>();
     for (const attempt of attempts) {
       attemptsByRun.set(attempt.run_id, [
@@ -5332,9 +5340,15 @@ async function route(
           attempts: attemptsByRun.get(run.id),
           records: usageRecordsByRun.get(run.id),
           costRecords: costRecordsByRun.get(run.id),
+          estimatedCostRecords: estimateOrganizationUsageCosts({
+            usageRecords: usageRecordsByRun.get(run.id) ?? [],
+            costRecords: costRecordsByRun.get(run.id) ?? [],
+            table: loadedPricing.table,
+          }),
         }),
       ),
       generatedAt: new Date(generatedAt).toISOString(),
+      pricing: loadedPricing.pricing,
     });
   }
 
