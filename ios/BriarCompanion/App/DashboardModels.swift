@@ -151,7 +151,7 @@ struct DashboardRun: Codable, Equatable, Identifiable, Sendable {
             case .queued: "실행 대기"
             case .running: "진행 중"
             case .paused: "검토 대기"
-            case .blocked: "확인 필요"
+            case .blocked: "차단"
             case .failed: "실패"
             case .completed: "완료"
             case .cancelled: "취소"

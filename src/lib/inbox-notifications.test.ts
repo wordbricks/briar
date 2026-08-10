@@ -5,6 +5,7 @@ import type { InboxMessage } from "../hooks/useInbox";
 import {
   defaultInboxNotificationPreferences,
   inboxNotificationContent,
+  inboxNotificationLabelKey,
   inboxNotificationTarget,
   isInboxChannelNavigationTarget,
   isInboxRunDetailTarget,
@@ -255,6 +256,46 @@ describe("inbox notification navigation", () => {
 });
 
 describe("inbox notification content", () => {
+  it.each([
+    ["paused", "action_required", "status.paused", "Awaiting review"],
+    ["completed", "important", "status.completed", "Completed"],
+    ["failed", "action_required", "status.failed", "Failed"],
+    ["blocked", "urgent", "status.blocked", "Blocked"],
+  ] as const)(
+    "uses the %s issue status instead of its %s importance category",
+    (status, category, labelKey, label) => {
+      const issue = { ...message, status };
+
+      expect(inboxNotificationLabelKey(issue, category)).toBe(labelKey);
+      expect(inboxNotificationContent(issue, label)).toEqual({
+        title: `Briar · ${label}`,
+        body: "Briar · Notification test",
+      });
+    },
+  );
+
+  it("uses a session result instead of its importance category", () => {
+    const session: InboxMessage = {
+      id: "session:session-1",
+      kind: "session",
+      projectId: "project-1",
+      projectName: "Briar",
+      targetId: "session-1",
+      title: "Process queued issues",
+      occurredAt: "2026-08-08T00:00:00.000Z",
+      version: "event-1",
+      status: "failed",
+      issueCount: 2,
+      error: "worker lost",
+      summary: null,
+      requiresAttention: true,
+    };
+
+    expect(inboxNotificationLabelKey(session, "action_required")).toBe(
+      "status.failed",
+    );
+  });
+
   it("shows an issue reply author, issue key, and at most three non-empty lines", () => {
     const reply: InboxMessage = {
       id: "conversation:reply-1",
