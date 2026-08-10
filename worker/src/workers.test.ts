@@ -10,8 +10,11 @@ import {
   enqueueIssueAgentReply,
   listIssueThreadMessages,
   listOrganizationUsageExecutionAttempts,
+  listOrganizationUsageCostRecords,
   listOrganizationUsageRecords,
+  listOrganizationUsageRuns,
   recordHuntEvent,
+  recordRunCostRecords,
   transferIssue,
   updateHuntRunExecutionMetrics,
   type HuntEventInput,
@@ -169,6 +172,7 @@ describe("detached execution workers", () => {
         "0077_project_agent_task_jobs.sql",
         "0079_agent_skills.sql",
         "0084_run_usage_ledger.sql",
+        "0085_run_cost_ledger.sql",
       ],
     });
     await executeD1Sql(
@@ -2209,6 +2213,23 @@ describe("detached execution workers", () => {
           observedAt: atMinute(3),
         },
       ],
+      costRecords: [
+        {
+          costKey: "codex:turn:turn-1:cost",
+          usageKey: "codex:turn:turn-1:usage",
+          sessionId: "usage-ledger-session",
+          scopeId: "turn-1",
+          turnId: "turn-1",
+          agentProvider: "codex",
+          modelProvider: "openai",
+          model: "gpt-5.6-sol",
+          canonicalModel: null,
+          modelSource: "providerReported",
+          source: "codex.turn.completed.cost",
+          amountUsdTicks: 12_345_678,
+          observedAt: atMinute(3),
+        },
+      ],
       events: [
         {
           sequence: 1,
@@ -2237,6 +2258,13 @@ describe("detached execution workers", () => {
     });
     expect(wrongWorkerResponse.status).toBe(403);
 
+    const wrongAttemptResponse = await postTranscript(firstCredential, {
+      ...transcriptBody,
+      sessionId: "usage-ledger-wrong-attempt",
+      runAttempt: transcriptBody.runAttempt + 1,
+    });
+    expect(wrongAttemptResponse.status).toBe(409);
+
     const tooEarlyResponse = await postTranscript(firstCredential, {
       ...transcriptBody,
       sessionId: "usage-ledger-too-early",
@@ -2246,6 +2274,9 @@ describe("detached execution workers", () => {
       })),
     });
     expect(tooEarlyResponse.status).toBe(400);
+    expect(await tooEarlyResponse.json()).toMatchObject({
+      message: "Usage observedAt is outside the execution attempt window",
+    });
     const futureResponse = await postTranscript(firstCredential, {
       ...transcriptBody,
       sessionId: "usage-ledger-future",
@@ -2255,13 +2286,60 @@ describe("detached execution workers", () => {
       })),
     });
     expect(futureResponse.status).toBe(400);
+    const costTooEarlyResponse = await postTranscript(firstCredential, {
+      ...transcriptBody,
+      sessionId: "usage-ledger-cost-too-early",
+      costRecords: transcriptBody.costRecords.map((record) => ({
+        ...record,
+        observedAt: atMinute(-10),
+      })),
+    });
+    expect(costTooEarlyResponse.status).toBe(400);
+    expect(await costTooEarlyResponse.json()).toMatchObject({
+      message: "Cost observedAt is outside the execution attempt window",
+    });
+    const costFutureResponse = await postTranscript(firstCredential, {
+      ...transcriptBody,
+      sessionId: "usage-ledger-cost-future",
+      costRecords: transcriptBody.costRecords.map((record) => ({
+        ...record,
+        observedAt: "2999-01-01T00:00:00.000Z",
+      })),
+    });
+    expect(costFutureResponse.status).toBe(400);
+    const mismatchedProviderResponse = await postTranscript(firstCredential, {
+      ...transcriptBody,
+      sessionId: "usage-ledger-cost-provider",
+      costRecords: transcriptBody.costRecords.map((record) => ({
+        ...record,
+        agentProvider: "claude",
+      })),
+    });
+    expect(mismatchedProviderResponse.status).toBe(400);
 
     const accepted = await postTranscript(firstCredential, transcriptBody);
     expect(accepted.status).toBe(202);
-    expect(await accepted.json()).toMatchObject({ stored: 1, usageStored: 1 });
+    expect(await accepted.json()).toMatchObject({
+      stored: 1,
+      usageStored: 1,
+      costStored: 1,
+    });
     const retry = await postTranscript(firstCredential, transcriptBody);
     expect(retry.status).toBe(202);
-    expect(await retry.json()).toMatchObject({ stored: 0, usageStored: 0 });
+    expect(await retry.json()).toMatchObject({
+      stored: 0,
+      usageStored: 0,
+      costStored: 0,
+    });
+    const conflictingRetry = await postTranscript(firstCredential, {
+      ...transcriptBody,
+      costRecords: transcriptBody.costRecords.map((record) => ({
+        ...record,
+        amountUsdTicks: 99_999_999,
+      })),
+    });
+    expect(conflictingRetry.status).toBe(202);
+    expect(await conflictingRetry.json()).toMatchObject({ costStored: 0 });
 
     const records = await listOrganizationUsageRecords(
       db,
@@ -2281,6 +2359,71 @@ describe("detached execution workers", () => {
         output_tokens: 30,
       }),
     ]);
+    const costs = await listOrganizationUsageCostRecords(
+      db,
+      projectId,
+      atMinute(0),
+    );
+    expect(costs).toEqual([
+      expect.objectContaining({
+        execution_id: firstClaim!.last_execution_id,
+        run_id: runId,
+        claim_attempt: 1,
+        worker_id: firstWorker.worker.id,
+        cost_key: "codex:turn:turn-1:cost",
+        usage_key: "codex:turn:turn-1:usage",
+        model: "gpt-5.6-sol",
+        amount_usd_ticks: 12_345_678,
+      }),
+    ]);
+  });
+
+  it("keeps cost-only runs and attempts inside the usage range", async () => {
+    const runId = await recordHuntEvent(
+      db,
+      projectId,
+      queuedEvent("issue-cost-only-range", 1),
+    );
+    const claim = await claimNextQueuedHuntRun(db, projectId, {
+      claimTokenHash: "6".repeat(64),
+      claimedBy: "cost-only-worker",
+      claimedAt: atMinute(2),
+      leaseExpiresAt: leaseExpiryFrom(atMinute(2)),
+      runId,
+    });
+    expect(claim?.last_execution_id).toEqual(expect.any(String));
+    await recordRunCostRecords(db, {
+      executionId: claim!.last_execution_id!,
+      recordedAt: atMinute(100),
+      records: [
+        {
+          costKey: "opencode:step:late-cost",
+          usageKey: null,
+          sessionId: "cost-only-session",
+          scopeId: "step-1",
+          turnId: null,
+          agentProvider: "opencode",
+          modelProvider: "anthropic",
+          model: "claude-sonnet-4-5",
+          canonicalModel: null,
+          modelSource: "providerReported",
+          source: "opencode.step.cost",
+          amountUsdTicks: 42,
+          observedAt: atMinute(100),
+        },
+      ],
+    });
+
+    const since = atMinute(50);
+    const attempts = await listOrganizationUsageExecutionAttempts(
+      db,
+      projectId,
+      since,
+    );
+    const runs = await listOrganizationUsageRuns(db, projectId, since);
+
+    expect(attempts.some((attempt) => attempt.id === claim!.last_execution_id)).toBe(true);
+    expect(runs.some((run) => run.id === runId)).toBe(true);
   });
 
   it("keeps historical attempts when a transferred run restarts claim numbering", async () => {

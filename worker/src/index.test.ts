@@ -334,6 +334,43 @@ describe("Worker HTTP contract", () => {
     ).toThrow(/runId and runAttempt/iu);
   });
 
+  it("accepts provider costs only for an exact execution attempt", () => {
+    const costRecord = {
+      costKey: "codex:turn:turn-1:cost",
+      usageKey: null,
+      sessionId: "session-1",
+      scopeId: "turn-1",
+      turnId: "turn-1",
+      agentProvider: "codex" as const,
+      modelProvider: "openai",
+      model: "gpt-5.6-sol",
+      canonicalModel: null,
+      modelSource: "providerReported" as const,
+      source: "codex.turn.completed.cost",
+      amountUsdTicks: 12_345_678,
+      observedAt: "2026-08-10T00:00:00.000Z",
+    };
+    const input = {
+      sessionId: "detached-run",
+      runId: "11111111-1111-4111-8111-111111111111",
+      runAttempt: 2,
+      executionId: "33333333-3333-4333-8333-333333333333",
+      projectId: "22222222-2222-4222-8222-222222222222",
+      workerId: "worker-1",
+      agentProvider: "codex" as const,
+      costRecords: [costRecord],
+      events: [{ sequence: 1, direction: "server" as const, payload: {} }],
+    };
+
+    expect(transcriptSchema.parse(input).costRecords).toEqual([costRecord]);
+    expect(() =>
+      transcriptSchema.parse({ ...input, executionId: undefined }),
+    ).toThrow(/executionId is required with costRecords/iu);
+    expect(() =>
+      transcriptSchema.parse({ ...input, runAttempt: undefined }),
+    ).toThrow(/runAttempt is required with costRecords/iu);
+  });
+
   it("bounds organization usage windows to the supported calendar ranges", () => {
     expect(usageRangeDaysSchema.parse("7")).toBe(7);
     expect(usageRangeDaysSchema.parse("30")).toBe(30);
@@ -377,6 +414,32 @@ describe("Worker HTTP contract", () => {
       started_at: "2026-08-01T00:00:00.000Z",
       updated_at: "2026-08-01T00:01:00.000Z",
       completed_at: null,
+    }, {
+      costRecords: [
+        {
+          execution_id: "33333333-3333-4333-8333-333333333333",
+          run_id: "11111111-1111-4111-8111-111111111111",
+          project_id: "22222222-2222-4222-8222-222222222222",
+          run_attempt: 1,
+          claim_attempt: 1,
+          worker_id: "worker-1",
+          claimed_at: "2026-08-01T00:00:00.000Z",
+          cost_key: "codex:turn:turn-1:cost",
+          usage_key: "codex:turn:turn-1:usage",
+          session_id: "session-1",
+          turn_id: "turn-1",
+          scope_id: "turn-1",
+          agent_provider: "codex",
+          model_provider: "openai",
+          model: "gpt-5.6-sol",
+          canonical_model: null,
+          model_source: "providerReported",
+          source: "codex.turn.completed.cost",
+          amount_usd_ticks: 12_345_678,
+          observed_at: "2026-08-01T00:01:00.000Z",
+          recorded_at: "2026-08-01T00:01:01.000Z",
+        },
+      ],
     });
 
     expect(result).toMatchObject({
@@ -385,6 +448,14 @@ describe("Worker HTTP contract", () => {
       executionProvider: "codex",
       executionModel: "gpt-5.6-sol",
       executionMetrics: { totalTokens: 120 },
+      costRecords: [
+        {
+          costKey: "codex:turn:turn-1:cost",
+          usageKey: "codex:turn:turn-1:usage",
+          costSource: "providerReported",
+          amountUsdTicks: 12_345_678,
+        },
+      ],
     });
     expect(result).not.toHaveProperty("workflow");
     expect(result).not.toHaveProperty("attachments");

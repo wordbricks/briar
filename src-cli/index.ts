@@ -25,6 +25,7 @@ import {
 } from "../src/lib/auto-hunt-contract";
 import { structuredAgentResultSchema } from "../src/lib/agent-result";
 import {
+  agentExecutionCostRecordsFromObservations,
   agentExecutionMetrics,
   agentExecutionTokenUsageFromObservations,
   agentExecutionUsageRecordsFromObservations,
@@ -63,6 +64,10 @@ import {
   assertDetachedProviderTurnSucceeded,
   runDetachedProviderTurn,
 } from "./detached-provider-turn";
+import {
+  HttpRequestError,
+  uploadExecutionMetricsWithCostCompatibility,
+} from "./execution-metrics-upload";
 import {
   inspectWorkflowRequirements,
   workflowRequirementReadinessDetail,
@@ -424,12 +429,14 @@ async function request<T>(
       })
       .passthrough()
       .safeParse(body);
-    throw new Error(
+    throw new HttpRequestError(
       (errorBody.success &&
         (errorBody.data.message ??
           errorBody.data.error_description ??
           errorBody.data.error)) ||
         `request failed (${response.status})`,
+      response.status,
+      body,
     );
   }
   return body as T;
@@ -2402,33 +2409,44 @@ async function runClaimedIssueInRuntime(
     const usageRecords = agentExecutionUsageRecordsFromObservations(
       usageObservations,
     );
+    const costRecords = agentExecutionCostRecordsFromObservations(
+      usageCollector.finishCosts(),
+    );
     const executionMetrics = agentExecutionMetrics(
       Date.now() - executionStartedAt,
       agentExecutionTokenUsageFromObservations(usageObservations),
     );
     try {
-      await request(config.apiUrl, "/transcripts", workerToken, {
-        method: "POST",
-        body: JSON.stringify({
-          projectId: project.id,
-          sessionId,
-          runId: issue.runId,
-          runAttempt: issue.currentAttempt,
-          ...(issue.executionId ? { executionId: issue.executionId } : {}),
-          workerId: activeProject.executionWorker?.workerId,
-          agentProvider: provider,
-          executionMetrics,
-          ...(issue.executionId && usageRecords.length > 0
-            ? { usageRecords }
-            : {}),
-          events: [
-            {
-              sequence: transcriptSequencer.next(),
-              direction: "server",
-              payload: { type: "execution.metrics", executionMetrics },
-            },
-          ],
-        }),
+      const metricsPayload = {
+        projectId: project.id,
+        sessionId,
+        runId: issue.runId,
+        runAttempt: issue.currentAttempt,
+        ...(issue.executionId ? { executionId: issue.executionId } : {}),
+        workerId: activeProject.executionWorker?.workerId,
+        agentProvider: provider,
+        executionMetrics,
+        ...(issue.executionId && usageRecords.length > 0
+          ? { usageRecords }
+          : {}),
+        ...(issue.executionId && costRecords.length > 0
+          ? { costRecords }
+          : {}),
+        events: [
+          {
+            sequence: transcriptSequencer.next(),
+            direction: "server",
+            payload: { type: "execution.metrics", executionMetrics },
+          },
+        ],
+      };
+      await uploadExecutionMetricsWithCostCompatibility({
+        payload: metricsPayload,
+        send: (payload) =>
+          request(config.apiUrl, "/transcripts", workerToken, {
+            method: "POST",
+            body: JSON.stringify(payload),
+          }),
       });
     } catch (error) {
       console.error(

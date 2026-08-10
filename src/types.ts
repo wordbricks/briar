@@ -7,6 +7,7 @@ import {
   type AutoHuntWorkflowStageId,
 } from "./lib/auto-hunt-contract";
 import type { StructuredAgentResult } from "./lib/agent-result";
+import type { AgentExecutionCostRecord } from "./lib/agent-execution-cost";
 import type {
   AgentExecutionMetrics,
   AgentExecutionUsageRecord,
@@ -319,6 +320,18 @@ export type AgentUsageRecord = AgentExecutionUsageRecord & {
   recordedAt: string;
 };
 
+export type AgentUsageCostRecord = AgentExecutionCostRecord & {
+  executionId: string;
+  /** Project that owned the run when this cost was observed. */
+  projectId: string;
+  runAttempt: number;
+  claimAttempt: number;
+  workerId: string | null;
+  claimedAt: string;
+  recordedAt: string;
+  costSource: "providerReported";
+};
+
 export type AgentUsageRun = {
   id: string;
   projectId: string;
@@ -341,6 +354,8 @@ export type AgentUsageRun = {
   executionAttempts?: AgentUsageExecutionAttempt[];
   /** Present on servers with immutable execution-attempt usage ledgers. */
   usageRecords?: AgentUsageRecord[];
+  /** Present on servers with immutable provider-reported cost ledgers. */
+  costRecords?: AgentUsageCostRecord[];
 };
 
 export type IssueResultReview = {

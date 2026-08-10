@@ -88,6 +88,71 @@ async function seedPreWorkflowProjectRun(db: D1Database) {
 }
 
 describe("D1 migrations", () => {
+  it("creates an exact immutable provider-cost ledger", async () => {
+    const miniflare = new Miniflare({
+      modules: true,
+      script: "export default { fetch() { return new Response('ok') } }",
+      d1Databases: { DB: "briar-run-cost-ledger-migration-test" },
+    });
+    try {
+      const db = (await miniflare.getD1Database("DB")) as unknown as D1Database;
+      await db.prepare(
+        `create table briar_run_execution_attempts (
+           id text primary key not null
+         )`,
+      ).run();
+      await executeD1Sql(
+        db,
+        await readFile(resolve("migrations/0085_run_cost_ledger.sql"), "utf8"),
+      );
+      await db.prepare(
+        `insert into briar_run_execution_attempts (id) values ('execution-1')`,
+      ).run();
+
+      const insertCost = (costKey: string, amountUsdTicks: number) =>
+        db.prepare(
+          `insert into briar_run_cost_records (
+             execution_id, cost_key, usage_key, session_id, turn_id, scope_id,
+             agent_provider, model_provider, model, canonical_model,
+             model_source, source, amount_usd_ticks, observed_at, recorded_at
+           ) values (
+             'execution-1', ?, null, 'session-1', null, 'scope-1',
+             'grok', 'xai', 'grok-4.5', null, 'providerReported',
+             'grok.prompt.cost', ?, '2026-08-10T00:00:00.000Z',
+             '2026-08-10T00:00:01.000Z'
+           )`,
+        ).bind(costKey, amountUsdTicks).run();
+
+      await expect(insertCost("cost-1", 12_345_678)).resolves.toBeDefined();
+      await expect(insertCost("cost-1", 99)).rejects.toThrow();
+      await expect(insertCost("negative", -1)).rejects.toThrow();
+      await expect(insertCost("fractional", 1.5)).rejects.toThrow();
+      await expect(
+        insertCost("unsafe", Number.MAX_SAFE_INTEGER + 1),
+      ).rejects.toThrow();
+
+      const indices = await db.prepare(
+        `select name from sqlite_master
+         where type = 'index' and name like 'briar_run_cost_records_%'
+         order by name`,
+      ).all<{ name: string }>();
+      expect(indices.results.map((index) => index.name)).toEqual([
+        "briar_run_cost_records_observed_idx",
+        "briar_run_cost_records_usage_idx",
+      ]);
+
+      await db.prepare(
+        `delete from briar_run_execution_attempts where id = 'execution-1'`,
+      ).run();
+      const remaining = await db.prepare(
+        `select count(*) as count from briar_run_cost_records`,
+      ).first<{ count: number }>();
+      expect(remaining?.count).toBe(0);
+    } finally {
+      await miniflare.dispose();
+    }
+  });
+
   it.each([
     "0049_dashboard_delta_sync.sql",
     "0050_hunt_run_event_count.sql",

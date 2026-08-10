@@ -1,5 +1,9 @@
 import { z } from "zod";
 import { agentProviders, type AgentProvider } from "./agent-provider-contract";
+import {
+  AGENT_EXECUTION_USD_TICKS_PER_DOLLAR,
+  type AgentExecutionCostRecord,
+} from "./agent-execution-cost";
 
 const tokenCountSchema = z
   .number()
@@ -87,6 +91,30 @@ export type AgentExecutionTokenObservation =
 
 export type AgentExecutionUsageObservation =
   AgentExecutionModelObservation | AgentExecutionTokenObservation;
+
+export type AgentExecutionCostObservation =
+  AgentExecutionUsageObservationBase & {
+    kind: "cost";
+    amountUsdTicks: number;
+    usageKey: string | null;
+    source:
+      | "claude.result.modelUsage.costUSD"
+      | "claude.result.total_cost_usd"
+      | "opencode.step.cost"
+      | "opencode.assistant.cost"
+      | "grok.usageUpdate.cost"
+      | "grok.prompt.costUsdTicks"
+      | "grok.prompt.metaCostUsdTicks"
+      | "grok.prompt.metaModelUsage.costUsdTicks"
+      | "grok.turnCompleted.costUsdTicks"
+      | "grok.turnCompleted.modelUsage.costUsdTicks";
+  };
+
+export type AgentExecutionCollectedCostObservation =
+  AgentExecutionCostObservation & {
+    dedupeKey: string;
+    observedAt: string;
+  };
 
 export const agentExecutionUsageRecordSchema = z
   .object({
@@ -185,6 +213,17 @@ const tokenSum = (...values: Array<number | null>): number | null => {
   const total = values.reduce<number>((sum, value) => sum + (value ?? 0), 0);
   return Number.isSafeInteger(total) && total >= 0 ? total : null;
 };
+
+const usdAmountToTicks = (value: unknown): number | null => {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
+    return null;
+  }
+  const ticks = Math.round(value * AGENT_EXECUTION_USD_TICKS_PER_DOLLAR);
+  return Number.isSafeInteger(ticks) && ticks >= 0 ? ticks : null;
+};
+
+const exactUsdTicks = (record: Record<string, unknown>): number | null =>
+  tokenValue(record, "costUsdTicks", "cost_usd_ticks");
 
 const runnerPayload = (payload: unknown) => {
   const root = asRecord(payload);
@@ -1107,6 +1146,438 @@ export function agentExecutionUsageObservationsFromPayload(
   return grokExecutionUsageObservationsFromPayload(payload);
 }
 
+export function claudeExecutionCostObservationsFromPayload(
+  payload: unknown,
+): AgentExecutionCostObservation[] {
+  const message = runnerPayload(payload);
+  if (!message || message.type !== "result") return [];
+  const sessionId = nonEmptyString(message.session_id);
+  const scopeId = nonEmptyString(message.uuid) ?? sessionId;
+  const modelUsage = asRecord(message.modelUsage);
+  if (modelUsage) {
+    const entries = Object.entries(modelUsage).flatMap(
+      ([reportedModel, value]) => {
+        const model = nonEmptyString(reportedModel);
+        const usage = asRecord(value);
+        return model && usage ? [{ model, usage }] : [];
+      },
+    );
+    const complete =
+      entries.length > 0 &&
+      entries.every(
+        ({ usage }) =>
+          usdAmountToTicks(usage.costUSD ?? usage.costUsd) !== null,
+      );
+    if (complete) {
+      return entries.map(({ model, usage }) => {
+        const usageKey = normalizedTokenUsage("claude", usage)
+          ? dedupeKey(
+              "claude",
+              "session",
+              scopeId,
+              "model",
+              model,
+              "usage",
+            )
+          : null;
+        return {
+          kind: "cost",
+          provider: "claude",
+          model,
+          canonicalModel: nonEmptyString(usage.canonicalModel),
+          modelProvider: nonEmptyString(usage.provider),
+          modelSource: "providerReported",
+          amountUsdTicks: usdAmountToTicks(usage.costUSD ?? usage.costUsd)!,
+          usageKey,
+          source: "claude.result.modelUsage.costUSD",
+          scopeId,
+          sessionId,
+          turnId: null,
+          dedupeKey: dedupeKey(
+            "claude",
+            "session",
+            scopeId,
+            "model",
+            model,
+            "cost",
+          ),
+        } satisfies AgentExecutionCostObservation;
+      });
+    }
+  }
+
+  const amountUsdTicks = usdAmountToTicks(
+    message.total_cost_usd ?? message.totalCostUsd,
+  );
+  if (amountUsdTicks === null) return [];
+  const usage = asRecord(message.usage);
+  const hasModelUsageTokens = modelUsage
+    ? Object.values(modelUsage).some((value) => {
+        const modelUsageRecord = asRecord(value);
+        return Boolean(
+          modelUsageRecord &&
+            normalizedTokenUsage("claude", modelUsageRecord),
+        );
+      })
+    : false;
+  const usageKey =
+    !hasModelUsageTokens && usage && normalizedTokenUsage("claude", usage)
+    ? dedupeKey("claude", "session", scopeId, "usage")
+    : null;
+  return [
+    {
+      kind: "cost",
+      provider: "claude",
+      model: null,
+      canonicalModel: null,
+      modelProvider: null,
+      modelSource: "unknown",
+      amountUsdTicks,
+      usageKey,
+      source: "claude.result.total_cost_usd",
+      scopeId,
+      sessionId,
+      turnId: null,
+      dedupeKey: dedupeKey("claude", "session", scopeId, "cost"),
+    },
+  ];
+}
+
+const openCodeAssistantCostObservation = (
+  assistant: Record<string, unknown>,
+): AgentExecutionCostObservation | null => {
+  if (assistant.role !== "assistant") return null;
+  const amountUsdTicks = usdAmountToTicks(assistant.cost);
+  if (amountUsdTicks === null) return null;
+  const messageId = nonEmptyString(assistant.id);
+  const sessionId = nonEmptyString(assistant.sessionID);
+  const turnId = nonEmptyString(assistant.parentID);
+  const model = nonEmptyString(assistant.modelID);
+  const tokens = asRecord(assistant.tokens);
+  return {
+    kind: "cost",
+    provider: "opencode",
+    model,
+    canonicalModel: null,
+    modelProvider: nonEmptyString(assistant.providerID),
+    modelSource: model ? "providerReported" : "unknown",
+    amountUsdTicks,
+    usageKey:
+      tokens && openCodeTokenUsage(tokens)
+        ? dedupeKey("opencode", "message", messageId, "usage")
+        : null,
+    source: "opencode.assistant.cost",
+    scopeId: messageId,
+    sessionId,
+    turnId,
+    dedupeKey: dedupeKey("opencode", "message", messageId, "cost"),
+  };
+};
+
+const openCodeStepCostObservation = (
+  part: Record<string, unknown>,
+): AgentExecutionCostObservation | null => {
+  if (part.type !== "step-finish") return null;
+  const amountUsdTicks = usdAmountToTicks(part.cost);
+  if (amountUsdTicks === null) return null;
+  const partId = nonEmptyString(part.id);
+  const messageId = nonEmptyString(part.messageID);
+  const sessionId = nonEmptyString(part.sessionID);
+  const tokens = asRecord(part.tokens);
+  return {
+    kind: "cost",
+    provider: "opencode",
+    model: null,
+    canonicalModel: null,
+    modelProvider: null,
+    modelSource: "unknown",
+    amountUsdTicks,
+    usageKey:
+      tokens && openCodeTokenUsage(tokens)
+        ? dedupeKey("opencode", "part", partId, "usage")
+        : null,
+    source: "opencode.step.cost",
+    scopeId: messageId,
+    sessionId,
+    turnId: null,
+    dedupeKey: dedupeKey("opencode", "part", partId, "cost"),
+  };
+};
+
+export function openCodeExecutionCostObservationsFromPayload(
+  payload: unknown,
+): AgentExecutionCostObservation[] {
+  const message = runnerPayload(payload);
+  if (!message) return [];
+  const properties = asRecord(message.properties);
+  const eventAssistant =
+    message.type === "message.updated" ? asRecord(properties?.info) : null;
+  const responseAssistant = asRecord(message.info);
+  const directAssistant = message.role === "assistant" ? message : null;
+  const assistant = eventAssistant ?? responseAssistant ?? directAssistant;
+
+  const parts: Record<string, unknown>[] = [];
+  if (message.type === "message.part.updated") {
+    const part = asRecord(properties?.part);
+    if (part) parts.push(part);
+  } else if (message.type === "step-finish") {
+    parts.push(message);
+  }
+  if (Array.isArray(message.parts)) {
+    parts.push(
+      ...message.parts.flatMap((part) => {
+        const record = asRecord(part);
+        return record ? [record] : [];
+      }),
+    );
+  }
+
+  const stepCosts = parts.flatMap((part) => {
+    const observation = openCodeStepCostObservation(part);
+    return observation ? [observation] : [];
+  });
+  const assistantId = nonEmptyString(assistant?.id);
+  const hasAssistantStepCost = stepCosts.some(
+    (observation) =>
+      assistantId === null || observation.scopeId === assistantId,
+  );
+  const assistantCost = assistant && !hasAssistantStepCost
+    ? openCodeAssistantCostObservation(assistant)
+    : null;
+  return [...(assistantCost ? [assistantCost] : []), ...stepCosts];
+}
+
+const grokUsageCostIsIncomplete = (usage: Record<string, unknown>) =>
+  usage.usageIsIncomplete === true ||
+  usage.usage_is_incomplete === true ||
+  usage.costIsPartial === true ||
+  usage.cost_is_partial === true;
+
+const grokPromptCostObservations = (input: {
+  usage: Record<string, unknown>;
+  sessionId: string | null;
+  promptId: string | null;
+  modelSource:
+    | "grok.turnCompleted.modelUsage.costUsdTicks"
+    | "grok.prompt.metaModelUsage.costUsdTicks";
+  aggregateSource:
+    | "grok.turnCompleted.costUsdTicks"
+    | "grok.prompt.metaCostUsdTicks";
+}): AgentExecutionCostObservation[] => {
+  if (grokUsageCostIsIncomplete(input.usage)) return [];
+  const modelUsage = asRecord(input.usage.modelUsage);
+  if (modelUsage) {
+    const entries = Object.entries(modelUsage).flatMap(
+      ([reportedModel, value]) => {
+        const model = nonEmptyString(reportedModel);
+        const usage = asRecord(value);
+        return model && usage ? [{ model, usage }] : [];
+      },
+    );
+    const complete =
+      entries.length > 0 &&
+      entries.every(
+        ({ usage }) =>
+          !grokUsageCostIsIncomplete(usage) && exactUsdTicks(usage) !== null,
+      );
+    if (complete) {
+      return entries.map(({ model, usage }) => {
+        const tokenUsage = grokTokenUsage(usage, false);
+        const usageKey = tokenUsage
+          ? dedupeKey(
+              "grok",
+              "session",
+              input.sessionId,
+              "prompt",
+              input.promptId,
+              "model",
+              model,
+              "usage",
+            )
+          : null;
+        return {
+          kind: "cost",
+          provider: "grok",
+          model,
+          canonicalModel: null,
+          modelProvider: "xai",
+          modelSource: "providerReported",
+          amountUsdTicks: exactUsdTicks(usage)!,
+          usageKey,
+          source: input.modelSource,
+          scopeId: input.promptId,
+          sessionId: input.sessionId,
+          turnId: input.promptId,
+          dedupeKey: dedupeKey(
+            "grok",
+            "session",
+            input.sessionId,
+            "prompt",
+            input.promptId,
+            "model",
+            model,
+            "cost",
+          ),
+        } satisfies AgentExecutionCostObservation;
+      });
+    }
+  }
+
+  const amountUsdTicks = exactUsdTicks(input.usage);
+  if (amountUsdTicks === null) return [];
+  const tokenUsage = grokTokenUsage(input.usage, false);
+  const hasModelUsageTokens = modelUsage
+    ? Object.values(modelUsage).some((value) => {
+        const modelUsageRecord = asRecord(value);
+        return Boolean(
+          modelUsageRecord && grokTokenUsage(modelUsageRecord, false),
+        );
+      })
+    : false;
+  return [
+    {
+      kind: "cost",
+      provider: "grok",
+      model: null,
+      canonicalModel: null,
+      modelProvider: "xai",
+      modelSource: "unknown",
+      amountUsdTicks,
+      usageKey: tokenUsage && !hasModelUsageTokens
+        ? dedupeKey(
+            "grok",
+            "session",
+            input.sessionId,
+            "prompt",
+            input.promptId,
+            "usage",
+          )
+        : null,
+      source: input.aggregateSource,
+      scopeId: input.promptId,
+      sessionId: input.sessionId,
+      turnId: input.promptId,
+      dedupeKey: dedupeKey(
+        "grok",
+        "session",
+        input.sessionId,
+        "prompt",
+        input.promptId,
+        "cost",
+      ),
+    },
+  ];
+};
+
+export function grokExecutionCostObservationsFromPayload(
+  payload: unknown,
+): AgentExecutionCostObservation[] {
+  const message = runnerPayload(payload);
+  if (!message) return [];
+
+  const params = asRecord(message.params) ?? message;
+  const update = asRecord(params.update);
+  if (update?.sessionUpdate === "turn_completed") {
+    const paramsMeta = asRecord(params._meta);
+    const updateMeta = asRecord(update._meta);
+    if (paramsMeta?.isReplay === true || updateMeta?.isReplay === true) {
+      return [];
+    }
+    const usage = asRecord(update.usage);
+    if (!usage) return [];
+    return grokPromptCostObservations({
+      usage,
+      sessionId: nonEmptyString(params.sessionId),
+      promptId: grokPromptIdentifier(update, paramsMeta, updateMeta),
+      modelSource: "grok.turnCompleted.modelUsage.costUsdTicks",
+      aggregateSource: "grok.turnCompleted.costUsdTicks",
+    });
+  }
+
+  const method = nonEmptyString(message.method);
+  const directPromptResponse =
+    method === null && nonEmptyString(message.stopReason) !== null;
+  if (method !== "session/prompt" && !directPromptResponse) return [];
+  const promptParams = asRecord(message.params);
+  const result =
+    method === "session/prompt" ? asRecord(message.result) : message;
+  if (!result) return [];
+  const paramsMeta = asRecord(promptParams?._meta);
+  const resultMeta = asRecord(result._meta);
+  const promptId = grokPromptIdentifier(
+    paramsMeta,
+    promptParams,
+    resultMeta,
+    result,
+  );
+  const sessionId =
+    nonEmptyString(promptParams?.sessionId) ?? nonEmptyString(result.sessionId);
+  const metaUsage = asRecord(resultMeta?.usage);
+  if (metaUsage) {
+    return grokPromptCostObservations({
+      usage: metaUsage,
+      sessionId,
+      promptId,
+      modelSource: "grok.prompt.metaModelUsage.costUsdTicks",
+      aggregateSource: "grok.prompt.metaCostUsdTicks",
+    });
+  }
+
+  const usage = asRecord(result.usage);
+  if (!usage || grokUsageCostIsIncomplete(usage)) return [];
+  const amountUsdTicks = exactUsdTicks(usage);
+  if (amountUsdTicks === null) return [];
+  return [
+    {
+      kind: "cost",
+      provider: "grok",
+      model: null,
+      canonicalModel: null,
+      modelProvider: "xai",
+      modelSource: "unknown",
+      amountUsdTicks,
+      usageKey: grokTokenUsage(usage, true)
+        ? dedupeKey(
+            "grok",
+            "session",
+            sessionId,
+            "prompt",
+            promptId,
+            "usage",
+          )
+        : null,
+      source: "grok.prompt.costUsdTicks",
+      scopeId: promptId,
+      sessionId,
+      turnId: promptId,
+      dedupeKey: dedupeKey(
+        "grok",
+        "session",
+        sessionId,
+        "prompt",
+        promptId,
+        "cost",
+      ),
+    },
+  ];
+}
+
+export function agentExecutionCostObservationsFromPayload(
+  provider: AgentExecutionUsageProvider,
+  payload: unknown,
+): AgentExecutionCostObservation[] {
+  if (provider === "claude") {
+    return claudeExecutionCostObservationsFromPayload(payload);
+  }
+  if (provider === "opencode") {
+    return openCodeExecutionCostObservationsFromPayload(payload);
+  }
+  if (provider === "grok") {
+    return grokExecutionCostObservationsFromPayload(payload);
+  }
+  return [];
+}
+
 const aggregateTokenUsage = (
   observations: AgentExecutionUsageObservation[],
 ): AgentExecutionTokenUsage | null => {
@@ -1135,6 +1606,7 @@ const aggregateTokenUsage = (
 export type AgentExecutionUsageCollector = {
   observe: (payload: unknown, observedAt?: string) => void;
   finish: () => AgentExecutionCollectedTokenObservation[];
+  finishCosts: () => AgentExecutionCollectedCostObservation[];
 };
 
 /**
@@ -1152,6 +1624,10 @@ export function createAgentExecutionUsageCollector(
   let currentModelProvider: string | null = null;
   let sequence = 0;
   const collected = new Map<string, AgentExecutionCollectedTokenObservation>();
+  const collectedCosts = new Map<
+    string,
+    AgentExecutionCollectedCostObservation
+  >();
   const scopedModels = new Map<
     string,
     Pick<
@@ -1172,11 +1648,275 @@ export function createAgentExecutionUsageCollector(
     string,
     { rank: number; keys: Set<string> }
   >();
+  const claudeCostGroups = new Map<
+    string,
+    { rank: number; keys: Set<string> }
+  >();
+  const openCodeCostFallbackKeyByMessage = new Map<string, string>();
+  const openCodeMessagesWithStepCosts = new Set<string>();
+  const grokCostGroups = new Map<
+    string,
+    { rank: number; keys: Set<string> }
+  >();
+  const grokSessionCosts = new Map<
+    string,
+    {
+      latestUsdTicks: number | null;
+      activePrompt: { promptId: string; baselineUsdTicks: number | null } | null;
+    }
+  >();
 
   const scopedModelKey = (
     observationProvider: AgentProvider,
     scopeId: string,
   ) => `${observationProvider}:${scopeId}`;
+
+  const prepareRankedCostGroup = (
+    groups: Map<string, { rank: number; keys: Set<string> }>,
+    groupKey: string,
+    rank: number,
+  ) => {
+    const currentGroup = groups.get(groupKey);
+    if (currentGroup && rank < currentGroup.rank) return false;
+    if (!currentGroup || rank > currentGroup.rank) {
+      for (const priorKey of currentGroup?.keys ?? []) {
+        collectedCosts.delete(priorKey);
+      }
+      groups.set(groupKey, { rank, keys: new Set<string>() });
+    }
+    return true;
+  };
+
+  const collectCostObservation = (
+    observation: AgentExecutionCostObservation,
+    observedAt: string,
+  ) => {
+    const scopedModel = observation.scopeId
+      ? scopedModels.get(
+          scopedModelKey(observation.provider, observation.scopeId),
+        )
+      : undefined;
+    const allowScopedModelFallback =
+      observation.provider === "opencode" &&
+      observation.source === "opencode.step.cost";
+    const enriched: AgentExecutionCostObservation = {
+      ...observation,
+      model:
+        observation.model ??
+        (allowScopedModelFallback ? scopedModel?.model ?? null : null),
+      canonicalModel:
+        observation.canonicalModel ??
+        (allowScopedModelFallback
+          ? scopedModel?.canonicalModel ?? null
+          : null),
+      modelProvider:
+        observation.modelProvider ??
+        (allowScopedModelFallback
+          ? scopedModel?.modelProvider ?? null
+          : null),
+      modelSource:
+        observation.modelSource === "unknown" && allowScopedModelFallback
+          ? (scopedModel?.modelSource ?? "unknown")
+          : observation.modelSource,
+      sessionId: observation.sessionId ?? scopedModel?.sessionId ?? null,
+      turnId: observation.turnId ?? scopedModel?.turnId ?? null,
+    };
+
+    if (
+      enriched.provider === "opencode" &&
+      enriched.source === "opencode.step.cost" &&
+      enriched.scopeId
+    ) {
+      openCodeMessagesWithStepCosts.add(enriched.scopeId);
+      const fallbackKey = openCodeCostFallbackKeyByMessage.get(
+        enriched.scopeId,
+      );
+      if (fallbackKey) collectedCosts.delete(fallbackKey);
+      openCodeCostFallbackKeyByMessage.delete(enriched.scopeId);
+    }
+    if (
+      enriched.provider === "opencode" &&
+      enriched.source === "opencode.assistant.cost" &&
+      enriched.scopeId &&
+      openCodeMessagesWithStepCosts.has(enriched.scopeId)
+    ) {
+      return;
+    }
+
+    const costGroupKey = enriched.scopeId
+      ? JSON.stringify([enriched.sessionId, enriched.scopeId])
+      : null;
+    const claudeCostRank =
+      enriched.source === "claude.result.total_cost_usd"
+        ? 1
+        : enriched.source === "claude.result.modelUsage.costUSD"
+          ? 2
+          : null;
+    if (
+      costGroupKey &&
+      claudeCostRank !== null &&
+      !prepareRankedCostGroup(
+        claudeCostGroups,
+        costGroupKey,
+        claudeCostRank,
+      )
+    ) {
+      return;
+    }
+
+    const grokCostRank =
+      enriched.source === "grok.usageUpdate.cost"
+        ? 0
+        : enriched.source === "grok.prompt.costUsdTicks"
+          ? 1
+          : enriched.source === "grok.prompt.metaCostUsdTicks"
+            ? 2
+            : enriched.source ===
+                "grok.prompt.metaModelUsage.costUsdTicks"
+              ? 3
+              : enriched.source === "grok.turnCompleted.costUsdTicks"
+                ? 4
+                : enriched.source ===
+                    "grok.turnCompleted.modelUsage.costUsdTicks"
+                  ? 5
+                  : null;
+    if (
+      costGroupKey &&
+      grokCostRank !== null &&
+      !prepareRankedCostGroup(grokCostGroups, costGroupKey, grokCostRank)
+    ) {
+      return;
+    }
+
+    const key =
+      enriched.dedupeKey ?? `${provider}:cost-observation:${sequence++}`;
+    collectedCosts.set(key, {
+      ...enriched,
+      dedupeKey: key,
+      observedAt: collectedCosts.get(key)?.observedAt ?? observedAt,
+    });
+    if (
+      enriched.provider === "opencode" &&
+      enriched.source === "opencode.assistant.cost" &&
+      enriched.scopeId
+    ) {
+      openCodeCostFallbackKeyByMessage.set(enriched.scopeId, key);
+    }
+    if (costGroupKey && claudeCostRank !== null) {
+      claudeCostGroups.get(costGroupKey)?.keys.add(key);
+    }
+    if (costGroupKey && grokCostRank !== null) {
+      grokCostGroups.get(costGroupKey)?.keys.add(key);
+    }
+  };
+
+  const grokCumulativeCostObservation = (
+    payload: unknown,
+  ): AgentExecutionCostObservation | null => {
+    const message = runnerPayload(payload);
+    if (!message) return null;
+    const method = nonEmptyString(message.method);
+    const params = asRecord(message.params);
+    const result = asRecord(message.result);
+
+    if (method === "session/new" || method === "session/load") {
+      const sessionId =
+        nonEmptyString(result?.sessionId) ?? nonEmptyString(params?.sessionId);
+      if (!sessionId) return null;
+      if (method === "session/new") {
+        grokSessionCosts.set(sessionId, {
+          latestUsdTicks: 0,
+          activePrompt: null,
+        });
+      } else {
+        const known = grokSessionCosts.get(sessionId);
+        if (known) {
+          known.activePrompt = null;
+        } else {
+          grokSessionCosts.set(sessionId, {
+            latestUsdTicks: null,
+            activePrompt: null,
+          });
+        }
+      }
+      return null;
+    }
+
+    if (method === "briar/session/prompt_start") {
+      const sessionId = nonEmptyString(params?.sessionId);
+      const paramsMeta = asRecord(params?._meta);
+      const promptId = grokPromptIdentifier(paramsMeta, params);
+      if (!sessionId || !promptId) return null;
+      const state = grokSessionCosts.get(sessionId) ?? {
+        latestUsdTicks: null,
+        activePrompt: null,
+      };
+      state.activePrompt = {
+        promptId,
+        baselineUsdTicks: state.latestUsdTicks,
+      };
+      grokSessionCosts.set(sessionId, state);
+      return null;
+    }
+
+    const updateParams = params ?? message;
+    const update = asRecord(updateParams.update);
+    if (update?.sessionUpdate !== "usage_update") return null;
+    const paramsMeta = asRecord(updateParams._meta);
+    const updateMeta = asRecord(update._meta);
+    if (paramsMeta?.isReplay === true || updateMeta?.isReplay === true) {
+      return null;
+    }
+    const cost = asRecord(update.cost);
+    const currency = nonEmptyString(cost?.currency)?.toUpperCase();
+    const currentUsdTicks = usdAmountToTicks(cost?.amount);
+    const sessionId = nonEmptyString(updateParams.sessionId);
+    if (currency !== "USD" || currentUsdTicks === null || !sessionId) {
+      return null;
+    }
+
+    const state = grokSessionCosts.get(sessionId) ?? {
+      latestUsdTicks: null,
+      activePrompt: null,
+    };
+    if (state.latestUsdTicks === null) {
+      state.latestUsdTicks = currentUsdTicks;
+      if (state.activePrompt?.baselineUsdTicks === null) {
+        state.activePrompt.baselineUsdTicks = currentUsdTicks;
+      }
+      grokSessionCosts.set(sessionId, state);
+      return null;
+    }
+    if (currentUsdTicks < state.latestUsdTicks) return null;
+    state.latestUsdTicks = currentUsdTicks;
+    grokSessionCosts.set(sessionId, state);
+    const activePrompt = state.activePrompt;
+    if (!activePrompt || activePrompt.baselineUsdTicks === null) return null;
+    const amountUsdTicks = currentUsdTicks - activePrompt.baselineUsdTicks;
+    return {
+      kind: "cost",
+      provider: "grok",
+      model: null,
+      canonicalModel: null,
+      modelProvider: "xai",
+      modelSource: "unknown",
+      amountUsdTicks,
+      usageKey: null,
+      source: "grok.usageUpdate.cost",
+      scopeId: activePrompt.promptId,
+      sessionId,
+      turnId: activePrompt.promptId,
+      dedupeKey: dedupeKey(
+        "grok",
+        "session",
+        sessionId,
+        "prompt",
+        activePrompt.promptId,
+        "usage-update",
+        "cost",
+      ),
+    };
+  };
 
   const observe = (payload: unknown, observedAt = new Date().toISOString()) => {
     const normalizedObservedAt = observedAtSchema.parse(observedAt);
@@ -1213,6 +1953,29 @@ export function createAgentExecutionUsageCollector(
               existing.scopeId === observation.scopeId
             ) {
               collected.set(key, {
+                ...existing,
+                model: observation.model ?? existing.model,
+                canonicalModel:
+                  observation.canonicalModel ?? existing.canonicalModel,
+                modelProvider:
+                  observation.modelProvider ?? existing.modelProvider,
+                modelSource:
+                  observation.modelSource === "unknown"
+                    ? existing.modelSource
+                    : observation.modelSource,
+                sessionId: observation.sessionId ?? existing.sessionId,
+                turnId: observation.turnId ?? existing.turnId,
+              });
+            }
+          }
+          for (const [key, existing] of collectedCosts) {
+            if (
+              existing.provider === observation.provider &&
+              existing.scopeId === observation.scopeId &&
+              existing.provider === "opencode" &&
+              existing.source === "opencode.step.cost"
+            ) {
+              collectedCosts.set(key, {
                 ...existing,
                 model: observation.model ?? existing.model,
                 canonicalModel:
@@ -1379,9 +2142,26 @@ export function createAgentExecutionUsageCollector(
       }
       return enriched;
     });
+
+    if (provider === "grok") {
+      const cumulativeCost = grokCumulativeCostObservation(payload);
+      if (cumulativeCost) {
+        collectCostObservation(cumulativeCost, normalizedObservedAt);
+      }
+    }
+    for (const costObservation of agentExecutionCostObservationsFromPayload(
+      provider,
+      payload,
+    )) {
+      collectCostObservation(costObservation, normalizedObservedAt);
+    }
   };
 
-  return { observe, finish: () => [...collected.values()] };
+  return {
+    observe,
+    finish: () => [...collected.values()],
+    finishCosts: () => [...collectedCosts.values()],
+  };
 }
 
 /**
@@ -1425,6 +2205,29 @@ export function agentExecutionUsageRecordsFromObservations(
       observedAt: observation.observedAt,
     } satisfies AgentExecutionUsageRecord;
   });
+}
+
+export function agentExecutionCostRecordsFromObservations(
+  observations: AgentExecutionCollectedCostObservation[],
+): AgentExecutionCostRecord[] {
+  return observations.map(
+    (observation) =>
+      ({
+        costKey: observation.dedupeKey,
+        usageKey: observation.usageKey,
+        sessionId: observation.sessionId,
+        scopeId: observation.scopeId,
+        turnId: observation.turnId,
+        agentProvider: observation.provider,
+        modelProvider: observation.modelProvider,
+        model: observation.model,
+        canonicalModel: observation.canonicalModel,
+        modelSource: observation.modelSource,
+        source: observation.source,
+        amountUsdTicks: observation.amountUsdTicks,
+        observedAt: observation.observedAt,
+      }) satisfies AgentExecutionCostRecord,
+  );
 }
 
 export function agentExecutionTokenUsageFromObservations(

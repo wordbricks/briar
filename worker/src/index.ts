@@ -21,6 +21,7 @@ import {
   structuredAgentResultSchema,
   type StructuredAgentResult,
 } from "../../src/lib/agent-result";
+import { agentExecutionCostRecordSchema } from "../../src/lib/agent-execution-cost";
 import {
   agentExecutionMetricsSchema,
   agentExecutionUsageRecordSchema,
@@ -202,6 +203,7 @@ import {
   listOrganizationInvitations,
   listOrganizationUsageRuns,
   listOrganizationUsageExecutionAttempts,
+  listOrganizationUsageCostRecords,
   listOrganizationUsageRecords,
   listGithubConnectionRepositories,
   listOrganizationProjects,
@@ -223,6 +225,7 @@ import {
   reworkHuntRun,
   recordHuntEvent,
   recordRunEvidence,
+  recordRunCostRecords,
   recordRunUsageRecords,
   removeOrganizationMember,
   revokeOrganizationInvitation,
@@ -281,6 +284,7 @@ import {
   type OrganizationMemberRow,
   type OrganizationInvitationRow,
   type OrganizationUsageRunRow,
+  type OrganizationCostRecordRow,
   type OrganizationUsageRecordRow,
   type RunExecutionAttemptRow,
   type OrganizationRole,
@@ -2050,6 +2054,11 @@ export const transcriptSchema = z
       .min(1)
       .max(1_000)
       .optional(),
+    costRecords: z
+      .array(agentExecutionCostRecordSchema)
+      .min(1)
+      .max(1_000)
+      .optional(),
     events: z
       .array(
         z
@@ -2096,6 +2105,20 @@ export const transcriptSchema = z
         path: ["usageRecords"],
       });
     }
+    if (input.costRecords && !input.executionId) {
+      context.addIssue({
+        code: "custom",
+        message: "executionId is required with costRecords",
+        path: ["costRecords"],
+      });
+    }
+    if (input.costRecords && input.runAttempt === undefined) {
+      context.addIssue({
+        code: "custom",
+        message: "runAttempt is required with costRecords",
+        path: ["costRecords"],
+      });
+    }
     if (
       input.usageRecords?.some(
         (record) => record.agentProvider !== input.agentProvider,
@@ -2105,6 +2128,17 @@ export const transcriptSchema = z
         code: "custom",
         message: "usage record providers must match agentProvider",
         path: ["usageRecords"],
+      });
+    }
+    if (
+      input.costRecords?.some(
+        (record) => record.agentProvider !== input.agentProvider,
+      )
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "cost record providers must match agentProvider",
+        path: ["costRecords"],
       });
     }
   });
@@ -4427,11 +4461,36 @@ const organizationUsageRecordJson = (record: OrganizationUsageRecordRow) => ({
   recordedAt: record.recorded_at,
 });
 
+const organizationCostRecordJson = (record: OrganizationCostRecordRow) => ({
+  executionId: record.execution_id,
+  projectId: record.project_id,
+  runAttempt: record.run_attempt,
+  claimAttempt: record.claim_attempt,
+  workerId: record.worker_id,
+  claimedAt: record.claimed_at,
+  costKey: record.cost_key,
+  usageKey: record.usage_key,
+  sessionId: record.session_id,
+  scopeId: record.scope_id,
+  turnId: record.turn_id,
+  agentProvider: record.agent_provider,
+  modelProvider: record.model_provider,
+  model: record.model,
+  canonicalModel: record.canonical_model,
+  modelSource: record.model_source,
+  source: record.source,
+  costSource: "providerReported" as const,
+  amountUsdTicks: record.amount_usd_ticks,
+  observedAt: record.observed_at,
+  recordedAt: record.recorded_at,
+});
+
 export const organizationUsageRunJson = (
   run: OrganizationUsageRunRow,
   ledger: {
     attempts?: RunExecutionAttemptRow[];
     records?: OrganizationUsageRecordRow[];
+    costRecords?: OrganizationCostRecordRow[];
   } = {},
 ) => ({
   id: run.id,
@@ -4453,6 +4512,7 @@ export const organizationUsageRunJson = (
   completedAt: run.completed_at,
   executionAttempts: (ledger.attempts ?? []).map(usageExecutionAttemptJson),
   usageRecords: (ledger.records ?? []).map(organizationUsageRecordJson),
+  costRecords: (ledger.costRecords ?? []).map(organizationCostRecordJson),
 });
 
 const dashboardEventJson = (event: HuntEventRow) => ({
@@ -5239,10 +5299,11 @@ async function route(
     );
     const generatedAt = Date.now();
     const since = organizationUsageQuerySince(days, generatedAt);
-    const [runs, attempts, usageRecords] = await Promise.all([
+    const [runs, attempts, usageRecords, costRecords] = await Promise.all([
       listOrganizationUsageRuns(db, organizationId, since),
       listOrganizationUsageExecutionAttempts(db, organizationId, since),
       listOrganizationUsageRecords(db, organizationId, since),
+      listOrganizationUsageCostRecords(db, organizationId, since),
     ]);
     const attemptsByRun = new Map<string, RunExecutionAttemptRow[]>();
     for (const attempt of attempts) {
@@ -5258,11 +5319,19 @@ async function route(
         record,
       ]);
     }
+    const costRecordsByRun = new Map<string, OrganizationCostRecordRow[]>();
+    for (const record of costRecords) {
+      costRecordsByRun.set(record.run_id, [
+        ...(costRecordsByRun.get(record.run_id) ?? []),
+        record,
+      ]);
+    }
     return json({
       runs: runs.map((run) =>
         organizationUsageRunJson(run, {
           attempts: attemptsByRun.get(run.id),
           records: usageRecordsByRun.get(run.id),
+          costRecords: costRecordsByRun.get(run.id),
         }),
       ),
       generatedAt: new Date(generatedAt).toISOString(),
@@ -9468,13 +9537,13 @@ async function route(
     ) {
       throw new HttpError(403, "Only execution workers can report run metrics");
     }
-    if (input.usageRecords && authenticatedExecutionAttempt) {
+    if (authenticatedExecutionAttempt) {
       const clockSkewMs = 5 * 60_000;
       const earliestObservedAt =
         Date.parse(authenticatedExecutionAttempt.claimed_at) - clockSkewMs;
       const latestObservedAt = Date.parse(recordedAt) + clockSkewMs;
       if (
-        input.usageRecords.some((record) => {
+        input.usageRecords?.some((record) => {
           const observedAt = Date.parse(record.observedAt);
           return observedAt < earliestObservedAt || observedAt > latestObservedAt;
         })
@@ -9484,11 +9553,29 @@ async function route(
           "Usage observedAt is outside the execution attempt window",
         );
       }
+      if (
+        input.costRecords?.some((record) => {
+          const observedAt = Date.parse(record.observedAt);
+          return observedAt < earliestObservedAt || observedAt > latestObservedAt;
+        })
+      ) {
+        throw new HttpError(
+          400,
+          "Cost observedAt is outside the execution attempt window",
+        );
+      }
     }
     const usageStored = input.usageRecords
       ? await recordRunUsageRecords(db, {
           executionId: input.executionId!,
           records: input.usageRecords,
+          recordedAt,
+        })
+      : 0;
+    const costStored = input.costRecords
+      ? await recordRunCostRecords(db, {
+          executionId: input.executionId!,
+          records: input.costRecords,
           recordedAt,
         })
       : 0;
@@ -9509,7 +9596,7 @@ async function route(
         metrics: input.executionMetrics,
       });
     }
-    return json({ ...result, usageStored }, 202);
+    return json({ ...result, usageStored, costStored }, 202);
   }
 
   const projectWorkersMatch = pathname.match(
