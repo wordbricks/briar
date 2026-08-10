@@ -167,6 +167,10 @@ import {
 } from "../lib/issue-mentions";
 import { ProfileDialog, type ProfileTarget } from "./ProfileDialog";
 import {
+  ConversationReplySummary,
+  type ConversationReplyParticipant,
+} from "./ConversationReplySummary";
+import {
   copyIssueId,
   copyIssueShareLink,
   shareIssueLink,
@@ -7284,6 +7288,17 @@ function RunEvidenceImagePreview({
   );
 }
 
+const issueReplyParticipant = (
+  author: IssueMessage["author"],
+): ConversationReplyParticipant => ({
+  id: author.provider
+    ? `agent:${author.provider}:${author.name}`
+    : `user:${author.id ?? author.name}`,
+  name: author.name,
+  image: author.image,
+  isAgent: author.provider !== null,
+});
+
 function IssueConversation({
   currentUserId = null,
   mentionMembers,
@@ -7370,6 +7385,41 @@ function IssueConversation({
       }),
     [messages],
   );
+  const replySummaries = useMemo(() => {
+    const summaries = new Map<
+      string,
+      {
+        lastReplyAt: string;
+        participants: ConversationReplyParticipant[];
+      }
+    >();
+    const replies = [...messages]
+      .filter((message) => message.parentMessageId)
+      .sort((left, right) => {
+        const byTime = right.createdAt.localeCompare(left.createdAt);
+        if (byTime !== 0) return byTime;
+        return right.id.localeCompare(left.id);
+      });
+    for (const reply of replies) {
+      const parentId = reply.parentMessageId;
+      if (!parentId) continue;
+      const summary = summaries.get(parentId) ?? {
+        lastReplyAt: reply.createdAt,
+        participants: [],
+      };
+      const participant = issueReplyParticipant(reply.author);
+      if (
+        summary.participants.length < 3 &&
+        !summary.participants.some(
+          (candidate) => candidate.id === participant.id,
+        )
+      ) {
+        summary.participants.push(participant);
+      }
+      summaries.set(parentId, summary);
+    }
+    return summaries;
+  }, [messages]);
   const pendingAgentReplyCount = Object.values(agentReplyStates).reduce(
     (total, state) => total + state.pending,
     0,
@@ -7558,8 +7608,32 @@ function IssueConversation({
           }
         }
       }
+      const deletedRepliesByParent = new Map<string, number>();
+      for (const message of messages) {
+        if (
+          !deletedIds.has(message.id) ||
+          !message.parentMessageId ||
+          deletedIds.has(message.parentMessageId)
+        ) {
+          continue;
+        }
+        deletedRepliesByParent.set(
+          message.parentMessageId,
+          (deletedRepliesByParent.get(message.parentMessageId) ?? 0) + 1,
+        );
+      }
       setMessages((current) =>
-        current.filter((message) => !deletedIds.has(message.id))
+        current
+          .filter((message) => !deletedIds.has(message.id))
+          .map((message) => {
+            const deletedReplyCount = deletedRepliesByParent.get(message.id) ?? 0;
+            return deletedReplyCount > 0
+              ? {
+                  ...message,
+                  replyCount: Math.max(0, message.replyCount - deletedReplyCount),
+                }
+              : message;
+          }),
       );
       setActiveEditMessageId((current) =>
         current && deletedIds.has(current) ? null : current,
@@ -7607,6 +7681,18 @@ function IssueConversation({
             const parentMessage = message.parentMessageId
               ? messagesById.get(message.parentMessageId) ?? null
               : null;
+            const replySummary = replySummaries.get(message.id);
+            const replyParticipants = [
+              issueReplyParticipant(message.author),
+              ...(replySummary?.participants ?? []),
+            ]
+              .filter(
+                (participant, index, participants) =>
+                  participants.findIndex(
+                    (candidate) => candidate.id === participant.id,
+                  ) === index,
+              )
+              .slice(0, 3);
             return (
               <div className="issue-message-group" key={message.id}>
                 <IssueMessageItem
@@ -7636,6 +7722,8 @@ function IssueConversation({
                     )
                   }
                   parentMessage={parentMessage}
+                  replyParticipants={replyParticipants}
+                  lastReplyAt={replySummary?.lastReplyAt ?? null}
                   replyComposerId={replyComposerId}
                   editComposerId={editComposerId}
                   actionProposalState={message.proposedAction
@@ -7746,6 +7834,8 @@ function IssueMessageItem({
   onLoadAttachment,
   onReply,
   parentMessage = null,
+  replyParticipants,
+  lastReplyAt,
   replyComposerId,
   editComposerId,
   actionProposalState,
@@ -7765,6 +7855,8 @@ function IssueMessageItem({
   onLoadAttachment: (attachment: IssueAttachment) => Promise<Blob>;
   onReply?: () => void;
   parentMessage?: IssueMessage | null;
+  replyParticipants: readonly ConversationReplyParticipant[];
+  lastReplyAt: string | null;
   replyComposerId?: string;
   editComposerId?: string;
   actionProposalState?: { accepting: boolean; error: string | null };
@@ -7924,6 +8016,17 @@ function IssueMessageItem({
               </p>
             ) : null}
           </section>
+        ) : null}
+        {message.replyCount > 0 ? (
+          <ConversationReplySummary
+            countLabel={t("run.replies", { count: message.replyCount })}
+            lastReplyLabel={lastReplyAt
+              ? t("conversation.lastReply", {
+                  time: relativeTime(lastReplyAt, t),
+                })
+              : null}
+            participants={replyParticipants}
+          />
         ) : null}
       </div>
       {(onReply || canManage) && (

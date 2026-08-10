@@ -93,6 +93,7 @@ export const ko = {
   "channel.viewIssue": "이슈 보기",
   "channel.replyCount": "답글 {count}개",
   "channel.replyInThread": "스레드에서 답글",
+  "conversation.lastReply": "마지막 답글 {time}",
   "channel.react": "React",
   "channel.reactWith": "{emoji} 리액션",
   "channel.reactionCount": "{emoji} {count}",
@@ -1664,6 +1665,7 @@ export type Messages = Record<MessageKey, string>;
 
 export const en: Messages = {
   ...ko,
+  "conversation.lastReply": "last reply {time}",
   "issue.saveFailed": "Save failed",
   "channel.selectProposalProject": "Select project",
   "channel.viewIssue": "View issue",
@@ -2502,6 +2504,7 @@ export const en: Messages = {
 };
 export const zh: Messages = {
   ...en,
+  "conversation.lastReply": "最后回复于{time}",
   "issue.saveFailed": "保存失败",
   "channel.selectProposalProject": "选择项目",
   "channel.viewIssue": "查看问题",

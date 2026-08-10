@@ -229,6 +229,50 @@ describe("Channels", () => {
     expect(container.querySelector(".channel-composer-shell")).not.toBeNull();
   });
 
+  it("shows reply participants, count, and last reply time", async () => {
+    const lastReplyAt = new Date(Date.now() - 3 * 60 * 60 * 1_000).toISOString();
+    const rootMessage = message({
+      id: "message-with-replies",
+      replyCount: 5,
+      lastReplyAt,
+      replyAuthors: [
+        {
+          type: "user",
+          id: "user-2",
+          name: "Mina",
+          email: "mina@example.com",
+          image: "https://example.com/mina.png",
+        },
+        {
+          type: "agent",
+          id: "agent-1",
+          name: "Honey",
+          provider: "codex",
+        },
+      ],
+    });
+    listChannelMessages.mockResolvedValue({ messages: [rootMessage] });
+    await render([rootMessage]);
+
+    const summary = container.querySelector<HTMLButtonElement>(
+      ".conversation-reply-summary",
+    );
+    expect(summary?.textContent).toContain("답글 5개");
+    expect(summary?.textContent).toContain("마지막 답글 3시간 전");
+    expect(summary?.querySelectorAll(".conversation-reply-avatar")).toHaveLength(3);
+    expect(summary?.querySelector(".conversation-reply-avatar img")?.getAttribute("src"))
+      .toBe("https://example.com/mina.png");
+    expect(summary?.querySelector(".conversation-reply-avatar.agent")).not.toBeNull();
+
+    await act(async () => summary?.click());
+    expect(listChannelMessages).toHaveBeenCalledWith(
+      "token",
+      "org-1",
+      channel.id,
+      rootMessage.id,
+    );
+  });
+
   it("shows hover quick reactions and toggles an existing reaction chip", async () => {
     const reacted = message({
       id: "message-reacted",
@@ -707,7 +751,9 @@ describe("Channels", () => {
     ]);
 
     await act(async () => {
-      container.querySelector<HTMLButtonElement>(".channel-thread-link")?.click();
+      container.querySelector<HTMLButtonElement>(
+        ".conversation-reply-summary",
+      )?.click();
     });
     await act(async () => {
       await Promise.resolve();

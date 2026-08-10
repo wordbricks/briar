@@ -1635,6 +1635,18 @@ button.paused-review-state { width:100%; border:0; border-radius:8px; cursor:poi
 .issue-message:hover { background:var(--muted); }
 .issue-message-avatar { width:34px; height:34px; overflow:hidden; display:grid; place-items:center; border:1px solid rgba(83,72,118,.1); border-radius:9px; color:#fff; background:linear-gradient(145deg,#8068ce,#5943a4); object-fit:cover; font-size:var(--text-sm); font-weight:700; }
 .issue-message-avatar.agent { color:var(--accent-foreground); border-color:var(--border); background:var(--accent); }
+.conversation-reply-summary { --conversation-reply-avatar-size:22px; width:max-content; max-width:100%; min-height:28px; margin-top:6px; padding:2px 5px; display:inline-flex; align-items:center; gap:6px; border:0; border-radius:8px; color:var(--primary); background:transparent; font:inherit; font-size:var(--text-2xs); line-height:1.3; text-align:left; }
+button.conversation-reply-summary { cursor:pointer; transition:background-color .12s ease-out,color .12s ease-out; }
+button.conversation-reply-summary:hover { color:var(--foreground); background:var(--muted); }
+button.conversation-reply-summary:focus-visible { outline:2px solid var(--ring); outline-offset:1px; }
+.conversation-reply-participants { min-width:var(--conversation-reply-avatar-size); display:inline-flex; align-items:center; padding-right:2px; }
+.conversation-reply-avatar { width:var(--conversation-reply-avatar-size); height:var(--conversation-reply-avatar-size); flex:0 0 var(--conversation-reply-avatar-size); overflow:hidden; display:grid; place-items:center; border:2px solid var(--card); border-radius:50%; color:#fff; background:linear-gradient(145deg,#6ec8c4,#3aa8a3); font-size:calc(var(--conversation-reply-avatar-size) * .48); font-weight:720; }
+.conversation-reply-avatar + .conversation-reply-avatar { margin-left:calc(var(--conversation-reply-avatar-size) * -.3); }
+.conversation-reply-avatar.agent { color:var(--primary); background:color-mix(in srgb,var(--primary) 13%,var(--card)); }
+.conversation-reply-avatar img { width:100%; height:100%; display:block; object-fit:cover; }
+.conversation-reply-summary strong { flex:0 0 auto; font-weight:700; }
+.conversation-reply-summary small { min-width:0; overflow:hidden; color:var(--muted-foreground); font:inherit; text-overflow:ellipsis; white-space:nowrap; }
+.conversation-reply-separator { color:var(--muted-foreground); }
 .issue-message > div { min-width:0; }
 .issue-message > div > header { min-height:19px; display:flex; align-items:baseline; gap:7px; }
 .issue-message > div > header strong { overflow:hidden; color:var(--foreground); font-size:var(--text-xs); text-overflow:ellipsis; white-space:nowrap; }
@@ -6008,6 +6020,7 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .channel-message-body > header { display: flex; align-items: baseline; gap: 7px; min-height: 20px; }
 .channel-message-body > header strong { font-size: 14px; font-weight: 720; letter-spacing: -0.01em; }
 .channel-message-body > header time { color: var(--muted-foreground, #9a948a); font-size: 12px; }
+.channel-message .conversation-reply-summary { --conversation-reply-avatar-size:26px; margin-top:2px; font-size:12px; }
 .channel-message-body p { margin: 0; overflow-wrap: anywhere; }
 .channel-message-text { min-width:0; }
 .channel-message-text > :first-child { margin-top:0; }
