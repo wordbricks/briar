@@ -23,6 +23,20 @@ export const changelogCopy = {
     backTop: "맨 위로 ↑",
     entries: [
       {
+        version: "1.2.98",
+        date: "2026년 8월 10일",
+        title: "대화와 실행 상태를 더 정확하게 확인합니다",
+        summary:
+          "답글 참여자, 실제 실행 상태와 인라인 편집을 더 분명하게 보여주고, 채널 이모지 선택과 에이전트 인증 실패를 더 안전하게 처리합니다.",
+        items: [
+          "대화 답글에 참여한 사람을 요약해 누가 대화에 참여했는지 바로 확인합니다.",
+          "이슈 내용을 화면에서 바로 수정하고, 알림 제목에도 실제 실행 상태를 표시합니다.",
+          "채널 이모지 피커가 화면 밖으로 잘리지 않도록 위치를 조정합니다.",
+          "선택 사항인 MCP 인증 실패를 전체 에이전트 실행 실패로 확장하지 않도록 격리합니다.",
+          "iOS 작업 화면에서 중복으로 표시되던 로딩 스피너를 제거했습니다.",
+        ],
+      },
+      {
         version: "1.2.97",
         date: "2026년 8월 10일",
         title: "채널 메시지에 이모지로 바로 반응합니다",
@@ -276,6 +290,20 @@ export const changelogCopy = {
     home: "Home",
     backTop: "Back to top ↑",
     entries: [
+      {
+        version: "1.2.98",
+        date: "August 10, 2026",
+        title: "See conversations and run status more clearly",
+        summary:
+          "Reply participants, real execution states, and inline issue editing are easier to see, while emoji positioning and optional agent authentication failures are handled more safely.",
+        items: [
+          "Summarize the people who participated in a conversation reply so its context is visible at a glance.",
+          "Edit issue content inline and show the actual execution state in notification titles.",
+          "Keep the channel emoji picker within the viewport instead of letting it open off-screen.",
+          "Isolate optional MCP authentication failures so they do not turn into a full agent-run failure.",
+          "Remove the duplicate loading spinner from the iOS task view.",
+        ],
+      },
       {
         version: "1.2.97",
         date: "August 10, 2026",
@@ -542,9 +570,9 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <h1>{changelog.title}</h1>
           <p>{changelog.description}</p>
         </div>
-        <a href="#v1-2-97" className="changelog-current">
+        <a href="#v1-2-98" className="changelog-current">
           <span>{changelog.current}</span>
-          <strong>v1.2.97</strong>
+          <strong>v1.2.98</strong>
           <i aria-hidden="true">↓</i>
         </a>
       </section>
@@ -569,6 +597,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   {index === 0 ? <span>{changelog.latest}</span> : null}
                   <time
                     dateTime={
+                      entry.version === "1.2.98" ||
                       entry.version === "1.2.97" ||
                       entry.version === "1.2.96" ||
                       entry.version === "1.2.95" ||
@@ -579,7 +608,8 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                       entry.version === "1.2.90" ||
                       entry.version === "1.2.89" ||
                       entry.version === "1.2.88"
-                        ? entry.version === "1.2.97" ||
+                        ? entry.version === "1.2.98" ||
+                          entry.version === "1.2.97" ||
                           entry.version === "1.2.96" ||
                           entry.version === "1.2.95" ||
                           entry.version === "1.2.94" ||
