@@ -7,6 +7,7 @@ import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
 import { requestMobileNavigationBack } from "../lib/mobile-navigation";
 import { runProjectAgent } from "../lib/project-llm";
 import type { DashboardPayload, ProjectAgent } from "../types";
+import { ToastProvider } from "./ui/toast";
 import {
   ProjectAgentDialog,
   ProjectAgents,
@@ -712,5 +713,61 @@ describe("ProjectAgents", () => {
         ?.click();
     });
     expect(container.querySelector("#project-agents")).not.toBeNull();
+  });
+
+  it("shows agent app and execution errors as toasts instead of banners", async () => {
+    vi.mocked(runProjectAgent).mockRejectedValue(
+      new Error("작업 실행에 실패했습니다."),
+    );
+    const container = await mount(
+      <ToastProvider>
+        <ProjectAgents
+          {...projectAgentsProps}
+          error="대시보드를 불러오지 못했습니다."
+        />
+      </ToastProvider>,
+    );
+    await act(async () => Promise.resolve());
+
+    expect(container.querySelector(".error-banner")).toBeNull();
+    expect(
+      document.body.querySelector('[data-testid="app-toast"].error')?.textContent,
+    ).toContain("대시보드를 불러오지 못했습니다.");
+
+    const runButton = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="개발자 에이전트 스킬 실행"]',
+    );
+    await act(async () => {
+      runButton?.click();
+      await Promise.resolve();
+    });
+    await act(async () => {
+      document
+        .querySelector<HTMLButtonElement>('.native-select button[aria-label="스킬"]')
+        ?.click();
+    });
+    await act(async () => {
+      document
+        .querySelector<HTMLButtonElement>(
+          '.select-menu-option[data-value="demo-skill-issue-processing"]',
+        )
+        ?.click();
+    });
+    await act(async () => {
+      document
+        .querySelector<HTMLFormElement>("#project-agent-task-form")
+        ?.dispatchEvent(
+          new Event("submit", { bubbles: true, cancelable: true }),
+        );
+      await Promise.resolve();
+    });
+    await act(async () => Promise.resolve());
+
+    expect(document.body.querySelector(".error-banner")).toBeNull();
+    expect(
+      Array.from(
+        document.body.querySelectorAll<HTMLElement>('[data-testid="app-toast"].error'),
+      ).some((toast) => toast.textContent?.includes("작업 실행에 실패했습니다.")),
+    ).toBe(true);
   });
 });
