@@ -570,10 +570,12 @@ export async function listChannelAgents(db: D1Database, channelId: string) {
   const rows = await db
     .prepare(
       `select agent.id, agent.organization_id, agent.project_id, agent.handle,
-              agent.name, agent.provider, agent.model, agent.responsibility,
+              project.name as project_name, agent.name, agent.avatar,
+              agent.provider, agent.model, agent.responsibility,
               agent.effort, agent.created_at, agent.updated_at
        from briar_channel_agents roster
        join briar_project_agents agent on agent.id = roster.agent_id
+       left join briar_projects project on project.id = agent.project_id
        where roster.channel_id = ?
        order by agent.name, agent.id`,
     )
@@ -582,8 +584,10 @@ export async function listChannelAgents(db: D1Database, channelId: string) {
       id: string;
       organization_id: string;
       project_id: string | null;
+      project_name: string | null;
       handle: string | null;
       name: string;
+      avatar: string | null;
       provider: AgentProvider;
       model: string | null;
       responsibility: string;

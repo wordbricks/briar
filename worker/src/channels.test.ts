@@ -601,12 +601,29 @@ describe("organization channels", () => {
     await db
       .prepare(
         `insert into briar_project_agents (
-           id, organization_id, project_id, handle, name, provider,
+           id, organization_id, project_id, handle, name, avatar, provider,
            responsibility, created_at, updated_at
-         ) values (?, ?, ?, 'bumble', 'Bumble', 'claude', 'Research', ?, ?)`,
+         ) values (?, ?, ?, 'bumble', 'Bumble', ?, 'claude', 'Research', ?, ?)`,
       )
-      .bind(agentId, organizationId, projectId, at(12), at(12))
+      .bind(
+        agentId,
+        organizationId,
+        projectId,
+        "data:image/png;base64,cHJvamVjdC1hdmF0YXI=",
+        at(12),
+        at(12),
+      )
       .run();
+    expect(
+      await listOrganizationAgents(db, organizationId, { projectId }),
+    ).toEqual([
+      expect.objectContaining({
+        id: agentId,
+        avatar: "data:image/png;base64,cHJvamVjdC1hdmF0YXI=",
+        project_id: projectId,
+        project_name: "Project",
+      }),
+    ]);
     const triggerId = "f0000000-0000-4000-8000-000000000005";
     await createChannelMessage(db, {
       id: triggerId,

@@ -20,8 +20,10 @@ export type OrganizationAgentRow = {
   id: string;
   organization_id: string;
   project_id: string | null;
+  project_name: string | null;
   handle: string | null;
   name: string;
+  avatar: string | null;
   provider: AgentProvider;
   model: string | null;
   responsibility: string;
@@ -38,19 +40,24 @@ export const organizationAgentJson = (
   agentId: row.id,
   handle: row.handle,
   name: row.name,
+  avatar: row.avatar,
   provider: row.provider,
   model: row.model,
   effort: row.effort,
   projectId: row.project_id,
+  projectName: row.project_name,
   responsibility: row.responsibility,
   skills: (row.skills ?? []).map(agentSkillJson),
   createdAt: row.created_at,
 });
 
 const agentSelect = `
-  select id, organization_id, project_id, handle, name, provider, model,
-         responsibility, skill_markdown, effort, created_at, updated_at
-  from briar_project_agents`;
+  select agent.id, agent.organization_id, agent.project_id,
+         project.name as project_name, agent.handle, agent.name, agent.avatar,
+         agent.provider, agent.model, agent.responsibility,
+         agent.skill_markdown, agent.effort, agent.created_at, agent.updated_at
+  from briar_project_agents agent
+  left join briar_projects project on project.id = agent.project_id`;
 
 /**
  * Handles are unique per organization, so a desired handle that is taken gets a
@@ -92,23 +99,23 @@ export async function listOrganizationAgents(
     options.projectId === undefined
       ? await db
           .prepare(
-            `${agentSelect} where organization_id = ?
-             order by project_id is not null, name, id`,
+            `${agentSelect} where agent.organization_id = ?
+             order by agent.project_id is not null, agent.name, agent.id`,
           )
           .bind(organizationId)
           .all<OrganizationAgentRow>()
       : options.projectId === null
         ? await db
             .prepare(
-              `${agentSelect} where organization_id = ? and project_id is null
-               order by name, id`,
+              `${agentSelect} where agent.organization_id = ? and agent.project_id is null
+               order by agent.name, agent.id`,
             )
             .bind(organizationId)
             .all<OrganizationAgentRow>()
         : await db
             .prepare(
-              `${agentSelect} where organization_id = ? and project_id = ?
-               order by name, id`,
+              `${agentSelect} where agent.organization_id = ? and agent.project_id = ?
+               order by agent.name, agent.id`,
             )
             .bind(organizationId, options.projectId)
             .all<OrganizationAgentRow>();
@@ -121,7 +128,7 @@ export async function getOrganizationAgent(
   agentId: string,
 ) {
   const agent = await db
-    .prepare(`${agentSelect} where organization_id = ? and id = ?`)
+    .prepare(`${agentSelect} where agent.organization_id = ? and agent.id = ?`)
     .bind(organizationId, agentId)
     .first<OrganizationAgentRow>();
   if (!agent) return null;

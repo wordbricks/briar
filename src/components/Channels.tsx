@@ -978,7 +978,7 @@ function ChannelInviteDialog({
     const searchable =
       candidate.type === "user"
         ? `${candidate.member.name} ${candidate.member.email}`
-        : `${candidate.agent.name} ${candidate.agent.handle ?? ""} ${candidate.agent.provider} ${candidate.agent.responsibility} ${candidate.agent.skills.map((skill) => skill.name).join(" ")}`;
+        : `${candidate.agent.name} ${candidate.agent.handle ?? ""} ${candidate.agent.projectName ?? ""} ${candidate.agent.provider} ${candidate.agent.responsibility} ${candidate.agent.skills.map((skill) => skill.name).join(" ")}`;
     return searchable.toLowerCase().includes(normalizedQuery);
   });
 
@@ -1056,10 +1056,14 @@ function ChannelInviteDialog({
                 candidate.type === "user"
                   ? candidate.member.email
                   : candidate.agent.projectId
-                    ? t("channel.projectAgent")
+                    ? candidate.agent.projectName
+                      ? `${t("channel.projectAgent")} · ${candidate.agent.projectName}`
+                      : t("channel.projectAgent")
                     : t("channel.orgAgent");
               const image =
-                candidate.type === "user" ? candidate.member.image : null;
+                candidate.type === "user"
+                  ? candidate.member.image
+                  : candidate.agent.avatar;
               return (
                 <button
                   aria-pressed={checked}
