@@ -270,8 +270,14 @@ enum InboxNotificationPresentationBuilder {
         }
 
         let fallbackBody = message.body?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let title: String
+        if message.kind == .issue || message.kind == .session {
+            title = "Briar · \(message.statusLabel ?? "새 알림")"
+        } else {
+            title = message.title
+        }
         return InboxNotificationPresentation(
-            title: message.title,
+            title: title,
             body: fallbackBody?.isEmpty == false
                 ? (message.body ?? message.statusLabel ?? "새 알림")
                 : (message.statusLabel ?? "새 알림")
