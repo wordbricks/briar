@@ -408,3 +408,36 @@ Build `1` of version `1.2.90`
 through the iOS execution-ID fix, notification filtering, and the 1.2.91
 release. Version `1.2.91 (1)` is therefore the final build handed off from
 the latest main commit.
+
+## 2026-08-10 — 1.2.99 (1)
+
+- App: Briar Companion (`app.briar.companion`)
+- Marketing version: `1.2.99`
+- App Store Connect build: `1`
+- App Store Connect build ID: `dbd60e93-fbaf-420b-b3a3-84199af3f663`
+- Latest main commit: `4462418a`
+- Release source commit: `4462418aa291f4967e9be7b60f5603e565fa9ca3`
+- Implementation: native SwiftUI
+- Toolchain: Xcode 26.6, iOS 26.5 SDK
+- Minimum iOS version: 17.0
+- App Store Connect processing state: `VALID`
+- TestFlight state: `IN_BETA_TESTING`
+- Internal group: `wordbricks` (`hasAccessToAllBuilds=true`)
+- Automatic tester notification: enabled
+- IPA SHA-256: `43bdcd09ffe535f17550a993825f43a6b4f90417c8807054a760eb784e34ef6c`
+
+The release includes concurrent project-agent runs, inline issue editing, full
+auto mode for issues, emoji reactions and reply participants in channel
+conversations, usage-ledger cost reporting, and the iOS tasks-loading fix. The
+latest-main gate exposed a stale blocked-status UI test expectation, which was
+corrected and merged in PR #867 before the release archive was created. The
+corrected source passed the shared API contract, Swift unit and UI tests,
+iPhone and iPad accessibility and layout tests, Production analyze and build
+checks, session/download/log security checks, and the Tauri iOS and Android
+regression builds. Archive identity, App Store provisioning, distribution
+signature, production entitlements, and all alternate app icons were verified
+before upload.
+
+The prior final handoff, `1.2.91 (1)`, remains `VALID`, but main advanced
+through the 1.2.99 release. Version `1.2.99 (1)` is therefore the final build
+handed off from the latest main commit.
