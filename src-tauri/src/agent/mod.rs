@@ -387,116 +387,11 @@ impl AgentBackend for CodexBackend {
     }
 }
 
-pub(crate) struct ClaudeBackend {
-    runtime: claude::ClaudeRuntime,
-}
-
-impl ClaudeBackend {
-    pub(crate) fn discover(
-        command_runner: Arc<dyn CommandRunner>,
-        runner_bundle: &Path,
-    ) -> Result<Self, String> {
-        Ok(Self {
-            runtime: claude::ClaudeRuntime::discover(command_runner, runner_bundle)?,
-        })
-    }
-}
-
-impl AgentBackend for ClaudeBackend {
-    fn run(
-        &self,
-        project_id: &str,
-        workspace_root: &Path,
-        execution: ChatExecution,
-        request: ProjectLlmRequest,
-        approve: &dyn Fn(&str, &serde_json::Value) -> bool,
-    ) -> Result<ProjectLlmResponse, String> {
-        claude::chat(
-            &self.runtime,
-            project_id,
-            workspace_root,
-            execution,
-            request,
-            approve,
-        )
-    }
-}
-
-pub(crate) struct GrokBackend {
-    runtime: grok::GrokRuntime,
-}
-
-pub(crate) struct OpenCodeBackend {
-    runtime: opencode::OpenCodeRuntime,
-}
-
-impl OpenCodeBackend {
-    pub(crate) fn discover(
-        command_runner: Arc<dyn CommandRunner>,
-        runner_bundle: &Path,
-    ) -> Result<Self, String> {
-        Ok(Self {
-            runtime: opencode::OpenCodeRuntime::discover(command_runner, runner_bundle)?,
-        })
-    }
-}
-
-impl AgentBackend for OpenCodeBackend {
-    fn run(
-        &self,
-        project_id: &str,
-        workspace_root: &Path,
-        execution: ChatExecution,
-        request: ProjectLlmRequest,
-        approve: &dyn Fn(&str, &serde_json::Value) -> bool,
-    ) -> Result<ProjectLlmResponse, String> {
-        opencode::chat(
-            &self.runtime,
-            project_id,
-            workspace_root,
-            execution,
-            request,
-            approve,
-        )
-    }
-}
-
-impl GrokBackend {
-    pub(crate) fn discover(
-        command_runner: Arc<dyn CommandRunner>,
-        runner_bundle: &Path,
-    ) -> Result<Self, String> {
-        Ok(Self {
-            runtime: grok::GrokRuntime::discover(command_runner, runner_bundle)?,
-        })
-    }
-}
-
-impl AgentBackend for GrokBackend {
-    fn run(
-        &self,
-        project_id: &str,
-        workspace_root: &Path,
-        execution: ChatExecution,
-        request: ProjectLlmRequest,
-        approve: &dyn Fn(&str, &serde_json::Value) -> bool,
-    ) -> Result<ProjectLlmResponse, String> {
-        grok::chat(
-            &self.runtime,
-            project_id,
-            workspace_root,
-            execution,
-            request,
-            approve,
-        )
-    }
-}
-
 pub(crate) enum AgentBackendHandle {
     Codex(CodexBackend),
-    Claude(ClaudeBackend),
-    Grok(GrokBackend),
-    Opencode(OpenCodeBackend),
+    Claude(sidecar::SidecarBackend),
+    Grok(sidecar::SidecarBackend),
+    Opencode(sidecar::SidecarBackend),
 }
 
 impl AgentBackend for AgentBackendHandle {
@@ -513,13 +408,7 @@ impl AgentBackend for AgentBackendHandle {
             Self::Codex(backend) => {
                 backend.run(project_id, workspace_root, execution, request, approve)
             }
-            Self::Claude(backend) => {
-                backend.run(project_id, workspace_root, execution, request, approve)
-            }
-            Self::Grok(backend) => {
-                backend.run(project_id, workspace_root, execution, request, approve)
-            }
-            Self::Opencode(backend) => {
+            Self::Claude(backend) | Self::Grok(backend) | Self::Opencode(backend) => {
                 backend.run(project_id, workspace_root, execution, request, approve)
             }
         }
@@ -540,13 +429,16 @@ pub(crate) fn discover_backend(
     match provider {
         AgentProviderKind::Codex => CodexBackend::discover(runner).map(AgentBackendHandle::Codex),
         AgentProviderKind::Claude => {
-            ClaudeBackend::discover(runner, runners.claude).map(AgentBackendHandle::Claude)
+            sidecar::SidecarBackend::discover(runner, runners.claude, claude::CONFIG)
+                .map(AgentBackendHandle::Claude)
         }
         AgentProviderKind::Grok => {
-            GrokBackend::discover(runner, runners.grok).map(AgentBackendHandle::Grok)
+            sidecar::SidecarBackend::discover(runner, runners.grok, grok::CONFIG)
+                .map(AgentBackendHandle::Grok)
         }
         AgentProviderKind::Opencode => {
-            OpenCodeBackend::discover(runner, runners.opencode).map(AgentBackendHandle::Opencode)
+            sidecar::SidecarBackend::discover(runner, runners.opencode, opencode::CONFIG)
+                .map(AgentBackendHandle::Opencode)
         }
     }
 }
@@ -586,15 +478,15 @@ pub(crate) fn codex_models(
 }
 
 pub(crate) fn claude_binary(home: &Path, execution_path: &OsStr) -> Result<PathBuf, String> {
-    claude::claude_binary(home, execution_path)
+    sidecar::provider_binary(claude::CONFIG, home, execution_path)
 }
 
 pub(crate) fn grok_binary(home: &Path, execution_path: &OsStr) -> Result<PathBuf, String> {
-    grok::grok_binary(home, execution_path)
+    sidecar::provider_binary(grok::CONFIG, home, execution_path)
 }
 
 pub(crate) fn opencode_binary(home: &Path, execution_path: &OsStr) -> Result<PathBuf, String> {
-    opencode::opencode_binary(home, execution_path)
+    sidecar::provider_binary(opencode::CONFIG, home, execution_path)
 }
 
 pub(crate) fn start_auto_hunt_worker(
