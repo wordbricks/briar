@@ -4054,9 +4054,6 @@ export function RunPage({
     (run.status !== "queued" && !canReassign) ||
     (isClaimed && !canReassign) ||
     isProcessing;
-  const priorityLabel = run.priority === null
-    ? t("run.notSet")
-    : t(`issue.priority${run.priority}` as MessageKey);
   const assignee = mentionMembers.find(
     (member) => member.userId === run.assigneeUserId,
   ) ?? null;
