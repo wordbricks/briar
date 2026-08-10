@@ -299,14 +299,61 @@ export async function requestInboxNotificationPermission() {
   return (await Notification.requestPermission()) === "granted";
 }
 
+export type InboxNotificationContent = {
+  title: string;
+  body: string;
+};
+
+function isReplyMessage(message: InboxMessage) {
+  if (message.kind === "conversation") {
+    return message.messageId !== message.rootMessageId;
+  }
+  if (message.kind === "channel") {
+    return message.messageId !== message.rootMessageId;
+  }
+  return false;
+}
+
+function replyPreview(body: string) {
+  return body
+    .split(/\r?\n/u)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .slice(0, 3)
+    .join("\n");
+}
+
+export function inboxNotificationContent(
+  message: InboxMessage,
+  categoryLabel: string,
+): InboxNotificationContent {
+  if (
+    (message.kind === "conversation" || message.kind === "channel") &&
+    isReplyMessage(message)
+  ) {
+    const destination =
+      message.kind === "channel"
+        ? `#${message.channelName}`
+        : (message.issueKey ?? message.title);
+    return {
+      title: `${message.authorName.trim() || "Briar"} in ${destination}`,
+      body: replyPreview(message.body),
+    };
+  }
+
+  return {
+    title: `Briar · ${categoryLabel}`,
+    body: message.projectName
+      ? `${message.projectName} · ${message.title}`
+      : message.title,
+  };
+}
+
 export async function sendInboxNotification(
   message: InboxMessage,
   categoryLabel: string,
 ) {
-  const title = `Briar · ${categoryLabel}`;
-  const body = message.projectName
-    ? `${message.projectName} · ${message.title}`
-    : message.title;
+  const { title, body } = inboxNotificationContent(message, categoryLabel);
   const target = inboxNotificationTarget(message);
 
   if (isTauriRuntime()) {

@@ -353,6 +353,7 @@ final class AgentsInboxSystemTests: XCTestCase {
         let project = ProjectsResponse.Project(
             id: UUID(uuidString: "11111111-1111-4111-8111-111111111111")!,
             name: "Briar",
+            issueKeyPrefix: "WB",
             icon: nil,
             organizationId: UUID(uuidString: "22222222-2222-4222-8222-222222222222")!,
             organizationName: "Wordbricks",
@@ -361,6 +362,7 @@ final class AgentsInboxSystemTests: XCTestCase {
         )
         let blocked = DashboardRun(
             id: UUID(uuidString: "55555555-5555-4555-8555-555555555555")!,
+            runNumber: 1321,
             title: "Needs help",
             status: .blocked,
             priority: 1,
@@ -399,7 +401,7 @@ final class AgentsInboxSystemTests: XCTestCase {
                     runId: blocked.id,
                     runTitle: blocked.title,
                     rootMessageId: UUID(uuidString: "88888888-8888-4888-8888-888888888888")!,
-                    body: "@you please look",
+                    body: "@you please look\n\nSecond line\nThird line\nFourth line",
                     author: IssueMessage.Author(id: "u1", name: "Alex", image: nil, provider: nil),
                     reason: "mention",
                     createdAt: Date(timeIntervalSince1970: 1_700_000_120)
@@ -466,8 +468,21 @@ final class AgentsInboxSystemTests: XCTestCase {
         XCTAssertEqual(InboxMessageBuilder.classify(blockedMessage), .urgent)
         let mention = try XCTUnwrap(messages.first { $0.kind == .conversation })
         XCTAssertEqual(InboxMessageBuilder.classify(mention), .actionRequired)
+        // This reply also contains a mention. The message hierarchy, not the
+        // reason label, controls the reply-specific system notification.
+        XCTAssertEqual(
+            InboxNotificationPresentationBuilder.content(for: mention),
+            InboxNotificationPresentation(
+                title: "Alex in WB-1321",
+                body: "@you please look\nSecond line\nThird line"
+            )
+        )
         let channelReply = try XCTUnwrap(messages.first { $0.kind == .channel })
         XCTAssertEqual(InboxMessageBuilder.classify(channelReply), .actionRequired)
+        XCTAssertEqual(
+            InboxNotificationPresentationBuilder.content(for: channelReply),
+            InboxNotificationPresentation(title: "Taylor in #product", body: "Thread reply")
+        )
         let navigation = CompanionNavigationModel()
         navigation.openInboxMessage(channelReply)
         XCTAssertEqual(navigation.selectedTab, .home)

@@ -189,7 +189,14 @@ describe("Inbox messages", () => {
     const messages = buildCurrentInboxMessages(
       {
         ...demoDashboard,
-        runs: [],
+        runs: [
+          {
+            ...demoDashboard.runs[0],
+            id: "run-thread",
+            runNumber: 1321,
+            status: "running",
+          },
+        ],
         conversationNotifications: [
           {
             id: "message-mention",
@@ -239,7 +246,9 @@ describe("Inbox messages", () => {
       expect.objectContaining({
         id: "conversation:message-reply",
         targetId: "run-thread",
+        messageId: "message-reply",
         rootMessageId: "message-root",
+        issueKey: `${demoDashboard.project.issueKeyPrefix ?? "AH"}-1321`,
         reason: "thread_reply",
       }),
     ]);

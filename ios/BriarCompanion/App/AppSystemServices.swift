@@ -228,11 +228,10 @@ final class LocalNotificationService: ObservableObject {
     }
 
     private func schedule(_ message: InboxMessage) async {
+        let presentation = InboxNotificationPresentationBuilder.content(for: message)
         let content = UNMutableNotificationContent()
-        content.title = message.title
-        content.body = message.body?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
-            ? (message.body ?? message.statusLabel ?? "새 알림")
-            : (message.statusLabel ?? "새 알림")
+        content.title = presentation.title
+        content.body = presentation.body
         content.sound = .default
         content.userInfo = [
             "briarInboxTarget": [
@@ -248,6 +247,56 @@ final class LocalNotificationService: ObservableObject {
             trigger: nil
         )
         try? await center.add(request)
+    }
+}
+
+struct InboxNotificationPresentation: Equatable {
+    let title: String
+    let body: String
+}
+
+enum InboxNotificationPresentationBuilder {
+    static func content(for message: InboxMessage) -> InboxNotificationPresentation {
+        if isReply(message) {
+            let destination = message.kind == .channel
+                ? "#\(message.channelName ?? message.title)"
+                : (message.issueKey ?? message.title)
+            let author = message.authorName?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let displayAuthor = author?.isEmpty == false ? author ?? "Briar" : "Briar"
+            return InboxNotificationPresentation(
+                title: "\(displayAuthor) in \(destination)",
+                body: replyPreview(message.body ?? "")
+            )
+        }
+
+        let fallbackBody = message.body?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return InboxNotificationPresentation(
+            title: message.title,
+            body: fallbackBody?.isEmpty == false
+                ? (message.body ?? message.statusLabel ?? "새 알림")
+                : (message.statusLabel ?? "새 알림")
+        )
+    }
+
+    private static func isReply(_ message: InboxMessage) -> Bool {
+        guard let rootMessageId = message.rootMessageId else { return false }
+        switch message.kind {
+        case .conversation:
+            return message.conversationMessageId != rootMessageId
+        case .channel:
+            return message.channelMessageId != rootMessageId
+        case .issue, .session:
+            return false
+        }
+    }
+
+    private static func replyPreview(_ body: String) -> String {
+        body
+            .components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .prefix(3)
+            .joined(separator: "\n")
     }
 }
 

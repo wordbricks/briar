@@ -41,8 +41,10 @@ struct InboxMessage: Identifiable, Equatable, Sendable {
     let priority: Int?
     let structuredResult: StructuredRunResult?
     let rootMessageId: UUID?
+    var conversationMessageId: UUID? = nil
     var channelMessageId: UUID? = nil
     var channelName: String? = nil
+    var issueKey: String? = nil
 
     var isUnread: Bool = true
 }
@@ -82,6 +84,10 @@ enum InboxMessageBuilder {
             }
 
             for notification in snapshot.conversationNotifications ?? [] {
+                let issueKey = snapshot.runs
+                    .first { $0.id == notification.runId }?
+                    .runNumber
+                    .map { project.issueKey(runNumber: $0) }
                 messages.append(InboxMessage(
                     id: "conversation:\(notification.id.uuidString.lowercased())",
                     kind: .conversation,
@@ -97,7 +103,9 @@ enum InboxMessageBuilder {
                     requiresAttention: true,
                     priority: nil,
                     structuredResult: nil,
-                    rootMessageId: notification.rootMessageId
+                    rootMessageId: notification.rootMessageId,
+                    conversationMessageId: notification.id,
+                    issueKey: issueKey
                 ))
             }
 

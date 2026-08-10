@@ -67,12 +67,15 @@ export type InboxConversationMessage = {
   projectId: string;
   projectName: string;
   targetId: string;
+  messageId: string;
   rootMessageId: string;
   title: string;
   occurredAt: string;
   version: string;
   body: string;
   authorName: string;
+  /** Human-readable project issue key used by reply notifications. */
+  issueKey?: string;
   reason: "mention" | "thread_reply";
 };
 
@@ -142,6 +145,7 @@ export function buildCurrentInboxMessages(
   const messages: InboxMessage[] = [];
 
   if (dashboard) {
+    const issueKeyPrefix = dashboard.project.issueKeyPrefix?.trim() || "AH";
     for (const run of dashboard.runs) {
       if (!inboxIssueNotifyingStatuses.has(run.status)) continue;
       messages.push({
@@ -171,18 +175,27 @@ export function buildCurrentInboxMessages(
     }
 
     for (const notification of dashboard.conversationNotifications ?? []) {
+      const runNumber = dashboard.runs.find(
+        (run) => run.id === notification.runId,
+      )?.runNumber;
       messages.push({
         id: `conversation:${notification.id}`,
         kind: "conversation",
         projectId: dashboard.project.id,
         projectName: dashboard.project.name,
         targetId: notification.runId,
+        messageId: notification.id,
         rootMessageId: notification.rootMessageId,
         title: notification.runTitle,
         occurredAt: notification.createdAt,
         version: notification.id,
         body: notification.body,
         authorName: notification.author.name,
+        ...(runNumber
+          ? {
+              issueKey: `${issueKeyPrefix}-${runNumber}`,
+            }
+          : {}),
         reason: notification.reason,
       });
     }
