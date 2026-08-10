@@ -5,6 +5,7 @@ import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { I18nProvider } from "../i18n";
 import type {
+  ChannelAgentReply,
   ChannelAgentSummary,
   ChannelMember,
   ChannelMessage,
@@ -13,6 +14,7 @@ import type {
 
 const listChannels = vi.fn();
 const loadChannel = vi.fn();
+const loadChannelDelta = vi.fn();
 const listChannelMessages = vi.fn();
 const sendChannelMessage = vi.fn();
 const acceptChannelProposal = vi.fn();
@@ -21,6 +23,7 @@ const toggleChannelMessageReaction = vi.fn();
 vi.mock("../lib/api", () => ({
   listChannels: (...args: unknown[]) => listChannels(...args),
   loadChannel: (...args: unknown[]) => loadChannel(...args),
+  loadChannelDelta: (...args: unknown[]) => loadChannelDelta(...args),
   listChannelMessages: (...args: unknown[]) => listChannelMessages(...args),
   sendChannelMessage: (...args: unknown[]) => sendChannelMessage(...args),
   acceptChannelProposal: (...args: unknown[]) => acceptChannelProposal(...args),
@@ -75,6 +78,34 @@ const message = (id: string, body: string, replyCount = 0): ChannelMessage => ({
   document: null,
   proposal: null,
   createdAt: "2026-08-01T01:00:00.000Z",
+});
+
+const agentReply = (
+  status: ChannelAgentReply["status"],
+  channelId = "c-common",
+  error: string | null = null,
+): ChannelAgentReply => ({
+  id: `reply-${channelId}`,
+  agentId: "agent-1",
+  channelId,
+  triggerMessageId: "m-1",
+  parentMessageId: "m-1",
+  replyMessageId: "m-agent",
+  status,
+  attempts: status === "queued" ? 0 : 1,
+  error,
+  createdAt: "2026-08-01T01:00:01.000Z",
+  updatedAt: "2026-08-01T01:00:02.000Z",
+});
+
+const emptyDelta = (cursor: number) => ({
+  cursor,
+  hasMore: false,
+  channels: [],
+  removedChannelIds: [],
+  messages: [],
+  removedMessageIds: [],
+  agentReplies: [],
 });
 
 const member: ChannelMember = {
@@ -135,6 +166,7 @@ describe("CompanionChannels", () => {
   };
 
   beforeEach(() => {
+    vi.useRealTimers();
     vi.clearAllMocks();
     listChannels.mockResolvedValue({
       channels: [
@@ -144,6 +176,7 @@ describe("CompanionChannels", () => {
       ],
       cursor: 1,
     });
+    loadChannelDelta.mockResolvedValue(emptyDelta(1));
     container = document.createElement("div");
     document.body.append(container);
     root = createRoot(container);
@@ -152,6 +185,7 @@ describe("CompanionChannels", () => {
   afterEach(() => {
     act(() => root.unmount());
     container.remove();
+    vi.useRealTimers();
   });
 
   it("groups channels as common, current project, then other projects", async () => {
@@ -220,6 +254,296 @@ describe("CompanionChannels", () => {
     );
     expect(container.textContent).toContain("On it");
     expect(container.textContent).toContain("Thread");
+  });
+
+  it("polls the selected channel for pending and completed Agent replies", async () => {
+    vi.useFakeTimers();
+    const initial = message("m-1", "Please investigate");
+    loadChannel.mockResolvedValue({
+      channel: channel("c-common", "Welcome", null),
+      members: [],
+      agents: [agent],
+      messages: [initial],
+    });
+    listChannelMessages.mockResolvedValue({ messages: [initial] });
+    let resolveFirst!: (value: unknown) => void;
+    loadChannelDelta
+      .mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveFirst = resolve;
+        }),
+      )
+      .mockResolvedValueOnce({
+        ...emptyDelta(3),
+        messages: [
+          {
+            ...initial,
+            replyCount: 1,
+            lastReplyAt: "2026-08-01T01:00:03.000Z",
+          },
+          {
+            ...message("m-agent", "Investigation complete"),
+            parentMessageId: "m-1",
+            author: {
+              type: "agent",
+              id: "agent-1",
+              name: "Honey",
+              provider: "claude",
+            },
+          },
+          {
+            ...message("m-other", "Other channel result"),
+            channelId: "c-other",
+          },
+        ],
+        agentReplies: [
+          agentReply("completed"),
+          agentReply("running", "c-other"),
+        ],
+      });
+    await render();
+    await act(async () => {
+      [
+        ...container.querySelectorAll<HTMLButtonElement>(
+          ".companion-channel-group button",
+        ),
+      ]
+        .find((button) => button.textContent?.includes("Welcome"))!
+        .click();
+      await Promise.resolve();
+    });
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>(".companion-channel-message-button")!
+        .click();
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3_000);
+    });
+    expect(loadChannelDelta).toHaveBeenCalledWith(
+      "token",
+      "org-1",
+      1,
+      expect.any(AbortSignal),
+    );
+    resolveFirst({
+      ...emptyDelta(2),
+      agentReplies: [agentReply("running")],
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(container.querySelector(".companion-channel-typing")?.textContent)
+      .toContain("An agent is writing a reply");
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3_000);
+    });
+    expect(loadChannelDelta).toHaveBeenLastCalledWith(
+      "token",
+      "org-1",
+      2,
+      expect.any(AbortSignal),
+    );
+    expect(container.textContent).toContain("Investigation complete");
+    expect(container.textContent).not.toContain("Other channel result");
+    expect(container.querySelector(".companion-channel-typing")).toBeNull();
+  });
+
+  it("does not advance the delta cursor behind a pending full channel load", async () => {
+    vi.useFakeTimers();
+    const initial = message("m-1", "Snapshot question");
+    let resolveChannel!: (value: unknown) => void;
+    loadChannel.mockReturnValue(
+      new Promise((resolve) => {
+        resolveChannel = resolve;
+      }),
+    );
+    loadChannelDelta.mockResolvedValue({
+      ...emptyDelta(2),
+      messages: [
+        { ...initial, replyCount: 1 },
+        {
+          ...message("m-agent", "Newer delegated reply"),
+          parentMessageId: "m-1",
+          author: {
+            type: "agent",
+            id: "agent-1",
+            name: "Honey",
+            provider: "claude",
+          },
+        },
+      ],
+    });
+    await render();
+    await act(async () => {
+      [
+        ...container.querySelectorAll<HTMLButtonElement>(
+          ".companion-channel-group button",
+        ),
+      ]
+        .find((button) => button.textContent?.includes("Welcome"))!
+        .click();
+      await vi.advanceTimersByTimeAsync(6_000);
+    });
+    expect(loadChannelDelta).not.toHaveBeenCalled();
+
+    await act(async () => {
+      resolveChannel({
+        channel: channel("c-common", "Welcome", null),
+        members: [],
+        agents: [agent],
+        messages: [initial],
+      });
+      await Promise.resolve();
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3_000);
+    });
+    expect(loadChannelDelta).toHaveBeenCalledWith(
+      "token",
+      "org-1",
+      1,
+      expect.any(AbortSignal),
+    );
+    expect(container.textContent).toContain("1 replies");
+  });
+
+  it("retains channel-list upserts and removals consumed by delta polling", async () => {
+    vi.useFakeTimers();
+    loadChannel.mockResolvedValue({
+      channel: channel("c-common", "Welcome", null),
+      members: [],
+      agents: [],
+      messages: [message("m-1", "Initial")],
+    });
+    loadChannelDelta.mockResolvedValue({
+      ...emptyDelta(2),
+      channels: [channel("c-new", "New channel", null)],
+      removedChannelIds: ["c-common"],
+    });
+    await render();
+    await act(async () => {
+      [
+        ...container.querySelectorAll<HTMLButtonElement>(
+          ".companion-channel-group button",
+        ),
+      ]
+        .find((button) => button.textContent?.includes("Welcome"))!
+        .click();
+      await Promise.resolve();
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3_000);
+    });
+
+    expect(container.textContent).toContain("New channel");
+    expect(container.textContent).not.toContain("Welcome");
+    expect(container.querySelector(".companion-channel-detail")).toBeNull();
+  });
+
+  it("does not overlap polls and stops applying them after leaving the channel", async () => {
+    vi.useFakeTimers();
+    loadChannel.mockImplementation(
+      (_token: string, _organizationId: string, channelId: string) =>
+        Promise.resolve({
+          channel: channel(
+            channelId,
+            channelId === "c-common" ? "Welcome" : "Briar dev",
+            channelId === "c-common" ? null : "project-1",
+          ),
+          members: [],
+          agents: [],
+          messages: channelId === "c-common"
+            ? [message("m-1", "Initial")]
+            : [],
+        }),
+    );
+    let resolvePoll!: (value: unknown) => void;
+    loadChannelDelta.mockReturnValue(
+      new Promise((resolve) => {
+        resolvePoll = resolve;
+      }),
+    );
+    await render();
+    await act(async () => {
+      [
+        ...container.querySelectorAll<HTMLButtonElement>(
+          ".companion-channel-group button",
+        ),
+      ]
+        .find((button) => button.textContent?.includes("Welcome"))!
+        .click();
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(9_000);
+    });
+    expect(loadChannelDelta).toHaveBeenCalledTimes(1);
+    const pollSignal = loadChannelDelta.mock.calls[0]?.[3] as AbortSignal;
+    expect(pollSignal.aborted).toBe(false);
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>(".companion-channel-bar-back")!
+        .click();
+    });
+    expect(pollSignal.aborted).toBe(true);
+    await act(async () => {
+      resolvePoll({
+        ...emptyDelta(2),
+        messages: [message("m-late", "Late reply")],
+      });
+      await Promise.resolve();
+      [
+        ...container.querySelectorAll<HTMLButtonElement>(
+          ".companion-channel-group button",
+        ),
+      ]
+        .find((button) => button.textContent?.includes("Briar dev"))!
+        .click();
+      await Promise.resolve();
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3_000);
+    });
+
+    expect(loadChannelDelta).toHaveBeenCalledTimes(2);
+    expect(loadChannelDelta.mock.calls[1]?.[2]).toBe(1);
+    expect(container.textContent).not.toContain("Late reply");
+  });
+
+  it("surfaces a failed asynchronous Agent reply in the existing error banner", async () => {
+    vi.useFakeTimers();
+    loadChannel.mockResolvedValue({
+      channel: channel("c-common", "Welcome", null),
+      members: [],
+      agents: [],
+      messages: [message("m-1", "Please investigate")],
+    });
+    loadChannelDelta.mockResolvedValue({
+      ...emptyDelta(2),
+      agentReplies: [agentReply("failed", "c-common", "worker unavailable")],
+    });
+    await render();
+    await act(async () => {
+      [
+        ...container.querySelectorAll<HTMLButtonElement>(
+          ".companion-channel-group button",
+        ),
+      ]
+        .find((button) => button.textContent?.includes("Welcome"))!
+        .click();
+      await Promise.resolve();
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3_000);
+    });
+
+    expect(container.querySelector(".companion-channel-error")?.textContent)
+      .toContain("worker unavailable");
   });
 
   it("opens a requested Inbox reply directly in its thread", async () => {

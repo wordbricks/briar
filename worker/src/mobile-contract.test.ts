@@ -43,7 +43,7 @@ describe("Companion mobile API contract", () => {
     );
 
     for (const [operationId, operation] of Object.entries(fixture.operations)) {
-      const documentedPath = operation.path.replace(/\?cursor=\{cursor\}$/u, "");
+      const documentedPath = operation.path.replace(/\?.*$/u, "");
       const documentedOperation = openapi.paths[documentedPath]?.[
         operation.method.toLowerCase()
       ];

@@ -155,7 +155,9 @@ enum MessageMentions {
                 recipientId: member.userId,
                 handle: issueHandle(for: member),
                 label: member.name,
-                detail: member.userId == currentUserId ? "나 · \(member.email)" : member.email,
+                detail: member.userId == currentUserId
+                    ? L10n.format("나 · %@", member.email)
+                    : member.email,
                 image: member.image
             )
         }

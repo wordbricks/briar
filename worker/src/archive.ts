@@ -940,6 +940,44 @@ const readArchiveObject = async (
   return lines.map((line) => archiveLineSchema.parse(JSON.parse(line)));
 };
 
+export async function readArchivedProjectAgentSession(
+  bucket: ArchiveBucket,
+  metadata: ArchiveMetadataRow,
+): Promise<ProjectAgentSessionRow> {
+  if (metadata.archive_kind !== "project_agent_sessions") {
+    throw new Error(
+      `Archive is not a project agent session: ${metadata.id}`,
+    );
+  }
+  if (metadata.status !== "verified" && metadata.status !== "complete") {
+    throw new Error(
+      `Project agent session archive is not readable: ${metadata.id}`,
+    );
+  }
+
+  const records = await readArchiveObject(bucket, metadata);
+  if (
+    metadata.row_count !== 1 ||
+    records.length !== 1 ||
+    records[0]?.recordType !== "project_agent_session"
+  ) {
+    throw new Error(
+      `Project agent session archive must contain exactly one session: ${metadata.id}`,
+    );
+  }
+
+  const session = projectAgentSessionSchema.parse(records[0].data);
+  if (
+    session.project_id !== metadata.project_id ||
+    session.id !== metadata.scope_id
+  ) {
+    throw new Error(
+      `Project agent session archive scope does not match metadata: ${metadata.id}`,
+    );
+  }
+  return session;
+}
+
 const completeVerifiedArchive = async (
   db: D1Database,
   bucket: ArchiveBucket,
@@ -1437,7 +1475,34 @@ export async function expireArchives(
       archive.object_key,
       ...(related.success ? related.data : []),
     ]);
-    await db.prepare(`delete from briar_log_archives where id = ?`).bind(archive.id).run();
+    if (archive.archive_kind === "project_agent_sessions") {
+      await db.batch([
+        db.prepare(`delete from briar_log_archives where id = ?`).bind(archive.id),
+        db.prepare(
+          `delete from briar_project_agent_session_context_membership
+           where project_id = ? and session_id = ?
+             and not exists (
+               select 1 from briar_project_agent_sessions session
+               where session.project_id = ? and session.id = ?
+             )
+             and not exists (
+               select 1 from briar_log_archives retained
+               where retained.project_id = ? and retained.scope_id = ?
+                 and retained.archive_kind = 'project_agent_sessions'
+                 and retained.status in ('verified', 'complete')
+             )`,
+        ).bind(
+          archive.project_id,
+          archive.scope_id,
+          archive.project_id,
+          archive.scope_id,
+          archive.project_id,
+          archive.scope_id,
+        ),
+      ]);
+    } else {
+      await db.prepare(`delete from briar_log_archives where id = ?`).bind(archive.id).run();
+    }
     deleted += 1;
   }
   return deleted;

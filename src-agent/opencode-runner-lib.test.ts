@@ -182,7 +182,29 @@ describe("OpenCode runner helpers", () => {
     ).toBe(false);
     expect(
       buildOpenCodePermissionRules(request({ sandboxMode: "readOnly" })),
-    ).toContainEqual({ permission: "edit", pattern: "*", action: "deny" });
+    ).toContainEqual({ permission: "*", pattern: "*", action: "deny" });
+    expect(
+      buildOpenCodePermissionRules(request({ sandboxMode: "readOnly" })),
+    ).toContainEqual({ permission: "read", pattern: "*", action: "allow" });
+    expect(
+      shouldAutoApproveOpenCodePermission(
+        request({ approvalPolicy: "never", sandboxMode: "readOnly" }),
+        "external_directory",
+      ),
+    ).toBe(false);
+    expect(
+      buildOpenCodePermissionRules(request({ sandboxMode: "readOnly" })),
+    ).toContainEqual({
+      permission: "external_directory",
+      pattern: "*",
+      action: "deny",
+    });
+    expect(
+      shouldAutoApproveOpenCodePermission(
+        request({ approvalPolicy: "never", sandboxMode: "readOnly" }),
+        "deploy",
+      ),
+    ).toBe(false);
     expect(
       shouldAutoApproveOpenCodePermission(
         request({ approvalPolicy: "never" }),

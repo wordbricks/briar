@@ -1612,10 +1612,12 @@ export async function loadChannelDelta(
   token: string,
   organizationId: string,
   since: number,
+  signal?: AbortSignal,
 ) {
   return request<ChannelDelta>(
     `/organizations/${organizationId}/channel-changes?since=${since}`,
     token,
+    { signal },
   );
 }
 

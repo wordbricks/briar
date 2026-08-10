@@ -332,7 +332,7 @@ final class IssueMutationStore: ObservableObject {
                 throw IssueMutationError.attachment(message)
             }
             guard attachments.allSatisfy({ $0.contentType.hasPrefix("image/") }) else {
-                throw IssueMutationError.attachment("대화에는 이미지만 첨부할 수 있습니다.")
+                throw IssueMutationError.attachment(L10n.text("대화에는 이미지만 첨부할 수 있습니다."))
             }
             let path = MobileAPIContract.Endpoint.runMessages(projectID: projectID, runID: runID)
             let uniqueMentionedUserIds = Array(Set(mentionedUserIds.filter { !$0.isEmpty })).sorted()
@@ -400,7 +400,7 @@ final class IssueMutationStore: ObservableObject {
                     return [response.message] + (polled.message.map { [$0] } ?? [])
                 case .failed:
                     throw IssueMutationError.agentReplyFailed(
-                        polled.agentReply.error ?? "Briar가 답변을 만들지 못했습니다."
+                        polled.agentReply.error ?? L10n.text("Briar가 답변을 만들지 못했습니다.")
                     )
                 case .queued, .running:
                     continue

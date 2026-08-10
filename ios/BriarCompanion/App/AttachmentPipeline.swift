@@ -29,9 +29,9 @@ enum PhotoAttachmentImportPolicy: Sendable {
     fileprivate var unsupportedMessage: String {
         switch self {
         case .imagesOnly:
-            "선택한 이미지 형식을 첨부할 수 없습니다."
+            L10n.text("선택한 이미지 형식을 첨부할 수 없습니다.")
         case .imagesAndVideos:
-            "선택한 이미지·영상 형식을 첨부할 수 없습니다."
+            L10n.text("선택한 이미지·영상 형식을 첨부할 수 없습니다.")
         }
     }
 }
@@ -67,7 +67,7 @@ enum PhotoAttachmentImportError: LocalizedError, Equatable {
     var errorDescription: String? {
         switch self {
         case .unreadable:
-            "사진 앱에서 선택한 항목을 읽지 못했습니다."
+            L10n.text("사진 앱에서 선택한 항목을 읽지 못했습니다.")
         case let .unsupported(message), let .validation(message):
             message
         }

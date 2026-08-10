@@ -832,7 +832,7 @@ private struct ChannelComposer: View {
                     isLoadingPhotos || sending ||
                         attachments.count >= PendingIssueAttachment.maximumCount
                 )
-                .accessibilityLabel("이미지 첨부")
+                .accessibilityLabel(L10n.text("이미지 첨부"))
                 .accessibilityIdentifier("channel-composer-attach")
                 TextField(placeholder, text: $draft, axis: .vertical)
                     .textFieldStyle(.plain)
@@ -923,7 +923,7 @@ private struct ChannelAttachmentDraft: View {
                     .foregroundStyle(.secondary)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("첨부 삭제")
+            .accessibilityLabel(L10n.text("첨부 삭제"))
         }
         .padding(.vertical, 5)
         .padding(.horizontal, 8)

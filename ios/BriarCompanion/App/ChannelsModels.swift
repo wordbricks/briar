@@ -159,6 +159,20 @@ struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
 
 struct ChannelsResponse: Codable, Sendable {
     let channels: [ChannelSummary]
+    /// Organization-wide change cursor returned with the channel snapshot.
+    /// Optional decoding keeps older development fixtures readable.
+    let cursor: Int?
+}
+
+/// Incremental organization channel changes. Reply-job metadata is deliberately
+/// omitted: native clients only need the resulting message/channel projections.
+struct ChannelDeltaResponse: Codable, Equatable, Sendable {
+    let cursor: Int
+    let hasMore: Bool
+    let channels: [ChannelSummary]
+    let removedChannelIds: [UUID]
+    let messages: [ChannelMessage]
+    let removedMessageIds: [UUID]
 }
 
 struct ChannelDetailResponse: Codable, Sendable {
@@ -270,7 +284,9 @@ enum ChannelMentions {
                 recipientId: member.userId,
                 handle: normalizedHandle(member.email.split(separator: "@").first.map(String.init) ?? member.userId),
                 label: member.name,
-                detail: member.userId == currentUserId ? "나 · \(member.email)" : member.email,
+                detail: member.userId == currentUserId
+                    ? L10n.format("나 · %@", member.email)
+                    : member.email,
                 image: member.image
             )
         }

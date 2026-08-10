@@ -7,6 +7,7 @@ import {
   detachedProviderRequest,
   issueReplyTextFromPayload,
   type DetachedAgent,
+  type DetachedDelegationTarget,
 } from "./agent-runner";
 
 export type DetachedProviderTurnResult = {
@@ -26,6 +27,8 @@ export async function runDetachedProviderTurn(input: {
   conversationId?: string | null;
   readOnly?: boolean;
   attachments?: AgentAttachment[];
+  organizationContextManifestPath?: string | null;
+  delegationTargets?: readonly DetachedDelegationTarget[];
   environment: NodeJS.ProcessEnv;
   signal: AbortSignal;
   onPayload?: (payload: unknown, rawLine: string) => void | Promise<void>;
@@ -62,6 +65,9 @@ export async function runDetachedProviderTurn(input: {
     conversationId: input.conversationId,
     readOnly: input.readOnly,
     attachments: input.attachments,
+    organizationContextManifestPath:
+      input.organizationContextManifestPath ?? null,
+    delegationTargets: input.delegationTargets,
     agentBinary,
   }).request;
   const child = spawn(process.execPath, [runnerPath], {

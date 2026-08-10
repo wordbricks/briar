@@ -4,7 +4,6 @@ import { existsSync } from "node:fs";
 import {
   chmod,
   mkdir,
-  mkdtemp,
   readFile,
   rm,
   writeFile,
@@ -37,6 +36,10 @@ import {
 } from "../src/lib/agent-provider-contract";
 import { validateEvidenceImages } from "../src/lib/evidence-images";
 import { channelReplyCompletionSchema } from "../src/lib/channels-contract";
+import {
+  organizationAgentContextCapability,
+  organizationAgentContextDescriptorSchema,
+} from "../src/lib/organization-agent-context-contract";
 import {
   issueTitleAbsoluteMaxLength,
   issueTitleOverLimitMessage,
@@ -93,7 +96,6 @@ import {
   allocateAnalysisWorktree,
   allocateIssueWorktree,
   defaultWorktreeRoot,
-  findExistingIssueWorktree,
   listCompletedWorktrees,
   listIssueWorktrees,
   maintainTerminalIssueWorktree,
@@ -117,6 +119,15 @@ import {
   cleanupChannelReplyImages,
   downloadChannelReplyImages,
 } from "./channel-reply-images";
+import { cleanupChannelReplyResources } from "./channel-reply-cleanup";
+import { assertChannelReplyWorkspaceScope } from "./channel-reply-scope";
+import {
+  cleanupOrphanedOrganizationAgentWorkspaces,
+  cleanupOrganizationAgentContext,
+  downloadOrganizationAgentContext,
+  prepareOrganizationAgentWorkspace,
+} from "./organization-agent-context";
+import { prepareReadOnlyAgentEnvironment } from "./read-only-agent-environment";
 import {
   healthyWorkerProviders,
   inspectWorkerProviderHealth,
@@ -2030,6 +2041,24 @@ const claimedIssueReplySchema = z.object({
 
 type ClaimedIssueReply = z.infer<typeof claimedIssueReplySchema>;
 
+const channelDelegationTargetSchema = z.object({
+  agentId: z.string().uuid(),
+  agentName: z.string().trim().min(1).max(100),
+  projectId: z.string().uuid(),
+  projectName: z.string().trim().min(1).max(300),
+  responsibility: z.string().trim().min(1).max(2_000),
+  skills: z.array(z.object({
+    id: z.string().uuid(),
+    name: z.string().trim().min(1).max(100),
+  }).strict()).max(50),
+}).strict();
+
+const claimedChannelDelegationSchema = z.object({
+  delegatedByReplyId: z.string().uuid(),
+  delegatedByAgentId: z.string().uuid(),
+  delegatedByAgentName: z.string().trim().min(1).max(100),
+  request: z.string().trim().min(1).max(10_000),
+}).strict();
 
 const claimedChannelReplySchema = z.object({
   workType: z.literal("channelReply"),
@@ -2038,6 +2067,17 @@ const claimedChannelReplySchema = z.object({
   channelId: z.string().uuid(),
   /** Null for an organization Agent: there is no repository to open. */
   projectId: z.string().uuid().nullable(),
+  scope: z.discriminatedUnion("kind", [
+    z.object({
+      kind: z.literal("organization"),
+      organizationId: z.string().uuid(),
+    }),
+    z.object({
+      kind: z.literal("project"),
+      organizationId: z.string().uuid(),
+      projectId: z.string().uuid(),
+    }),
+  ]).optional(),
   runId: z.string().uuid(),
   sourceKey: z.string().min(1),
   title: z.string().min(1),
@@ -2051,8 +2091,87 @@ const claimedChannelReplySchema = z.object({
   claimToken: z.string().startsWith("briar_channel_claim_"),
   claimedAt: z.string().datetime({ offset: true }),
   leaseExpiresAt: z.string().datetime({ offset: true }),
+  organizationContext:
+    organizationAgentContextDescriptorSchema.nullable().optional(),
+  delegation: claimedChannelDelegationSchema.nullable().default(null),
+  delegationTargets: z.array(channelDelegationTargetSchema).default([]),
   snapshot: z.record(z.string(), z.unknown()),
-});
+}).superRefine((reply, context) => {
+  const scope = reply.scope ?? (reply.projectId === null
+    ? { kind: "organization" as const, organizationId: reply.organizationId }
+    : {
+        kind: "project" as const,
+        organizationId: reply.organizationId,
+        projectId: reply.projectId,
+      });
+  if (scope.organizationId !== reply.organizationId) {
+    context.addIssue({
+      code: "custom",
+      message: "Channel reply organization scope does not match its claim",
+      path: ["scope", "organizationId"],
+    });
+  }
+  if (scope.kind === "organization") {
+    if (reply.projectId !== null) {
+      context.addIssue({
+        code: "custom",
+        message: "Organization reply cannot carry a project",
+        path: ["projectId"],
+      });
+    }
+    if (!reply.organizationContext) {
+      context.addIssue({
+        code: "custom",
+        message: "Organization reply requires complete context protocol metadata",
+        path: ["organizationContext"],
+      });
+    } else if (reply.organizationContext.snapshotAt !== reply.claimedAt) {
+      context.addIssue({
+        code: "custom",
+        message: "Organization context snapshot does not match its claim",
+        path: ["organizationContext", "snapshotAt"],
+      });
+    }
+    if (reply.delegation) {
+      context.addIssue({
+        code: "custom",
+        message: "Organization reply cannot itself be delegated",
+        path: ["delegation"],
+      });
+    }
+    return;
+  }
+  if (reply.organizationContext) {
+    context.addIssue({
+      code: "custom",
+      message: "Project reply cannot carry organization context",
+      path: ["organizationContext"],
+    });
+  }
+  if (reply.projectId !== scope.projectId) {
+    context.addIssue({
+      code: "custom",
+      message: "Project reply scope does not match its project",
+      path: ["scope", "projectId"],
+    });
+  }
+  if (reply.delegationTargets.length > 0) {
+    context.addIssue({
+      code: "custom",
+      message: "Project reply cannot receive delegation targets",
+      path: ["delegationTargets"],
+    });
+  }
+}).transform((reply) => ({
+  ...reply,
+  scope: reply.scope ?? (reply.projectId === null
+    ? { kind: "organization" as const, organizationId: reply.organizationId }
+    : {
+        kind: "project" as const,
+        organizationId: reply.organizationId,
+        projectId: reply.projectId,
+      }),
+}));
 
 type ClaimedChannelReply = z.infer<typeof claimedChannelReplySchema>;
 
@@ -2075,6 +2194,7 @@ function detachedReplyAgent(input: {
   activeSkill?: z.infer<typeof detachedAgentSkillSchema> | null;
   snapshot: Record<string, unknown>;
   fallbackName: string;
+  scope?: DetachedAgent["scope"];
 }): DetachedAgent {
   const snapshotAgent =
     input.snapshot.agent && typeof input.snapshot.agent === "object" &&
@@ -2114,6 +2234,7 @@ function detachedReplyAgent(input: {
       ? input.effort
       : input.activeSkill?.effort ?? baseAgent.effort,
     activeSkill: input.activeSkill ?? null,
+    scope: input.scope,
   };
 }
 
@@ -2515,7 +2636,12 @@ async function runClaimedProjectAgentTask(
   signal: AbortSignal,
 ) {
   const workspacePath = project.repositoryPath;
-  const agent = detachedAgentWithActiveSkill(task.agent, task.activeSkill);
+  const organizationId = project.executionWorker?.organizationId;
+  if (!organizationId) throw new Error("Worker registration is missing");
+  const agent: DetachedAgent = {
+    ...detachedAgentWithActiveSkill(task.agent, task.activeSkill),
+    scope: { kind: "project", organizationId, projectId: project.id },
+  };
   const prompt = detachedProjectAgentPrompt({
     agent,
     request: task.request,
@@ -2589,46 +2715,49 @@ async function runClaimedIssueReply(
   const registered = project.executionWorker;
   if (!registered) throw new Error("Worker registration is missing");
   const provider = issue.provider;
-
-  let workspacePath = project.repositoryPath;
-  let workspaceAvailable = false;
-  if (worktreesEnabled(project)) {
-    try {
-      const root = projectWorktreeRoot(
-        worktreeSettings(project).root,
-        project.id,
-      );
-      const originalSourceKey =
-        typeof issue.snapshot.run.sourceKey === "string"
-          ? issue.snapshot.run.sourceKey
-          : issue.sourceKey;
-      const worktree = findExistingIssueWorktree(
-        runGit,
-        project.repositoryPath,
-        root,
-        {
-          runId: issue.runId,
-          sourceKey: originalSourceKey,
-          title: issue.title,
-        },
-        issue.branch,
-      );
-      if (worktree) {
-        workspacePath = worktree.path;
-        workspaceAvailable = true;
-      }
-    } catch {
-      // A missing or unreadable worktree is an expected fallback condition.
-    }
-  }
   const trigger = issue.snapshot.messages.find(
     (message) => message.id === issue.triggerMessageId,
   );
   if (!trigger) throw new Error("Mention message is missing from the reply snapshot");
-  const imageDirectory = await mkdtemp(
-    join(workspacePath, ".briar-issue-reply-images-"),
-  );
+  // Conversational reads use a detached checkout that never copies ignored
+  // files such as .env.keys from .worktreeinclude. Existing execution
+  // worktrees can contain credentials and are therefore never model context.
+  const analysisWorktree = await allocateAnalysisWorktree({
+    repositoryPath: project.repositoryPath,
+    projectId: project.id,
+    workId: issue.workId,
+    settings: worktreeSettings(project),
+    git: runGit,
+  });
+  const workspacePath = analysisWorktree.path;
+  const imageDirectory = join(workspacePath, ".briar-issue-reply-images");
+  let imagesCleaned = false;
+  let workspaceCleaned = false;
+  const cleanupContext = () =>
+    cleanupChannelReplyResources([
+      {
+        label: "issue reply images",
+        run: async () => {
+          if (imagesCleaned) return;
+          await rm(imageDirectory, { recursive: true, force: true });
+          imagesCleaned = true;
+        },
+      },
+      {
+        label: "issue reply analysis worktree",
+        run: async () => {
+          if (workspaceCleaned) return;
+          await removeAnalysisWorktree({
+            repositoryPath: project.repositoryPath,
+            path: analysisWorktree.path,
+            git: runGit,
+          });
+          workspaceCleaned = true;
+        },
+      },
+    ]);
   try {
+    await mkdir(imageDirectory, { recursive: true, mode: 0o700 });
     const downloadedImages = await Promise.all(
       trigger.attachments
         .filter((attachment) => attachment.contentType.startsWith("image/"))
@@ -2654,6 +2783,11 @@ async function runClaimedIssueReply(
       activeSkill: issue.activeSkill,
       snapshot: issue.snapshot,
       fallbackName: "Briar",
+      scope: {
+        kind: "project",
+        organizationId: registered.organizationId,
+        projectId: project.id,
+      },
     });
     const prompt = detachedIssueReplyPrompt({
       agent,
@@ -2662,9 +2796,13 @@ async function runClaimedIssueReply(
         downloadedImagePaths: attachments.map((attachment) => attachment.path),
       },
       userMessage: trigger.body,
-      workspaceAvailable,
+      workspaceAvailable: true,
     });
     let sequence = 0;
+    const providerRuntime = await prepareReadOnlyAgentEnvironment(
+      agent.provider,
+      { workspaceRoot: workspacePath },
+    );
     const turn = await runDetachedProviderTurn({
       agent,
       prompt,
@@ -2672,13 +2810,7 @@ async function runClaimedIssueReply(
       fullAccess: false,
       readOnly: true,
       attachments,
-      environment: {
-        ...process.env,
-        PATH: workerExecutionPath(),
-        BRIAR_CLI: workerCliPath(),
-        BRIAR_WORKER_TOKEN: workerToken,
-        BRIAR_PROJECT_ID: project.id,
-      },
+      environment: providerRuntime.environment,
       signal,
       onPayload: async (payload, line) => {
         sequence += 1;
@@ -2702,11 +2834,15 @@ async function runClaimedIssueReply(
           }
         }
       },
-    });
+    })
+      .finally(providerRuntime.cleanup);
     assertDetachedProviderTurnSucceeded(turn);
     if (!turn.resultText) throw new Error("Agent returned an empty issue reply");
     const result = parseDetachedIssueReplyResult(turn.resultText);
     if (!result.reply) throw new Error("Agent returned an empty issue reply");
+    // Private images and the repository snapshot must be removed before the
+    // durable reply succeeds. Cleanup failure leaves the claim retryable.
+    await cleanupContext();
     await request(
       config.apiUrl,
       `/issue-reply-claims/${issue.workId}/complete`,
@@ -2723,7 +2859,7 @@ async function runClaimedIssueReply(
       },
     );
   } finally {
-    await rm(imageDirectory, { recursive: true, force: true });
+    await cleanupContext();
   }
 }
 
@@ -2761,6 +2897,7 @@ async function runClaimedChannelReply(
 ) {
   const registered = project.executionWorker;
   if (!registered) throw new Error("Worker registration is missing");
+  assertChannelReplyWorkspaceScope(reply, project.id);
   const analysisWorktree = reply.projectId
     ? await allocateAnalysisWorktree({
         repositoryPath: project.repositoryPath,
@@ -2774,10 +2911,66 @@ async function runClaimedChannelReply(
     analysisWorktree?.path ??
     join(configDirectory, "worker-sessions", `channel-${reply.workId}`);
   if (!analysisWorktree) {
-    await mkdir(workspacePath, { recursive: true });
+    // A prior hard-killed attempt may have left a path behind. Recreate the
+    // exact claim workspace so stale files or a planted symlink cannot become
+    // trusted Organization Agent context.
+    await prepareOrganizationAgentWorkspace(workspacePath);
   }
   const imageDirectory = channelReplyImageDirectory(workspacePath);
+  let organizationContextCleaned = false;
+  let imagesCleaned = false;
+  let workspaceCleaned = false;
+  const cleanupContext = () =>
+    cleanupChannelReplyResources([
+      ...(reply.scope.kind === "organization"
+        ? [{
+            label: "organization context",
+            run: async () => {
+              if (organizationContextCleaned) return;
+              await cleanupOrganizationAgentContext(workspacePath);
+              organizationContextCleaned = true;
+            },
+          }]
+        : []),
+      {
+        label: "channel images",
+        run: async () => {
+          if (imagesCleaned) return;
+          await cleanupChannelReplyImages(imageDirectory);
+          imagesCleaned = true;
+        },
+      },
+      {
+        label: analysisWorktree ? "analysis worktree" : "channel workspace",
+        run: async () => {
+          if (workspaceCleaned) return;
+          if (analysisWorktree) {
+            await removeAnalysisWorktree({
+              repositoryPath: project.repositoryPath,
+              path: analysisWorktree.path,
+              git: runGit,
+            });
+          } else {
+            await rm(workspacePath, { recursive: true, force: true });
+          }
+          workspaceCleaned = true;
+        },
+      },
+    ]);
   try {
+    const organizationContext = reply.scope.kind === "organization"
+      ? await downloadOrganizationAgentContext({
+          apiUrl: config.apiUrl,
+          workerToken,
+          organizationId: reply.organizationId,
+          workId: reply.workId,
+          workerId: registered.workerId,
+          claimToken: reply.claimToken,
+          snapshotAt: reply.organizationContext!.snapshotAt,
+          workspacePath,
+          signal,
+        })
+      : null;
     const downloadedImages = await downloadChannelReplyImages({
       apiUrl: config.apiUrl,
       workerToken,
@@ -2797,6 +2990,7 @@ async function runClaimedChannelReply(
       activeSkill: reply.activeSkill,
       snapshot: reply.snapshot,
       fallbackName: "Briar Channel",
+      scope: reply.scope,
     });
     const prompt = detachedChannelReplyPrompt({
       agent,
@@ -2805,7 +2999,14 @@ async function runClaimedChannelReply(
         downloadedImagePaths: downloadedImages.paths,
       },
       workspaceAvailable: Boolean(analysisWorktree),
+      organizationContextAvailable: organizationContext !== null,
+      delegationTargets: reply.delegationTargets,
+      delegation: reply.delegation,
     });
+    const providerRuntime = await prepareReadOnlyAgentEnvironment(
+      agent.provider,
+      { workspaceRoot: workspacePath },
+    );
     const turn = await runDetachedProviderTurn({
       agent,
       prompt,
@@ -2813,19 +3014,24 @@ async function runClaimedChannelReply(
       fullAccess: false,
       readOnly: true,
       attachments: downloadedImages.attachments,
-      environment: {
-        ...process.env,
-        PATH: workerExecutionPath(),
-        BRIAR_CLI: workerCliPath(),
-        BRIAR_WORKER_TOKEN: workerToken,
-      },
+      organizationContextManifestPath:
+        organizationContext?.manifestPath ?? null,
+      delegationTargets: reply.scope.kind === "organization"
+        ? reply.delegationTargets
+        : undefined,
+      environment: providerRuntime.environment,
       signal,
-    });
+    })
+      .finally(providerRuntime.cleanup);
     assertDetachedProviderTurnSucceeded(turn);
     if (!turn.resultText) throw new Error("Agent returned an empty channel reply");
     const result = channelReplyCompletionSchema.parse(
       parseDetachedJsonResult(turn.resultText),
     );
+    // Private context must be gone before the durable reply is marked complete.
+    // A cleanup failure leaves the claim retryable instead of silently
+    // succeeding with organization data on disk.
+    await cleanupContext();
     await request(
       config.apiUrl,
       `/channel-reply-claims/${reply.workId}/complete`,
@@ -2841,25 +3047,7 @@ async function runClaimedChannelReply(
       },
     );
   } finally {
-    try {
-      await cleanupChannelReplyImages(
-        imageDirectory,
-        analysisWorktree
-          ? () =>
-              removeAnalysisWorktree({
-                repositoryPath: project.repositoryPath,
-                path: analysisWorktree.path,
-                git: runGit,
-              })
-          : undefined,
-      );
-    } catch (error) {
-      console.error(
-        `Channel image and analysis worktree cleanup failed: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      );
-    }
+    await cleanupContext();
   }
 }
 
@@ -3106,6 +3294,9 @@ async function workerSyncLabelCommand() {
 
 async function workerCommand() {
   const config = await loadConfig();
+  await cleanupOrphanedOrganizationAgentWorkspaces({
+    workerSessionsDirectory: join(configDirectory, "worker-sessions"),
+  });
   const projectId = value("--project");
   const project = projectId
     ? config.projects.find((candidate) => candidate.id === projectId)
@@ -3164,6 +3355,7 @@ async function workerCommand() {
               supported: supportsRemoteWorkerUpdates(platform()),
               protocol: 1,
             },
+            organizationAgentContext: organizationAgentContextCapability,
           },
         }),
       },
@@ -3388,6 +3580,7 @@ async function workerCommand() {
                   supported: supportsRemoteWorkerUpdates(platform()),
                   protocol: 1,
                 },
+                organizationAgentContext: organizationAgentContextCapability,
                 workflowRequirements: requirementHealth.map((item) => ({
                   id: item.id,
                   healthy: item.healthy,
@@ -3467,6 +3660,7 @@ async function workerCommand() {
                         supported: supportsRemoteWorkerUpdates(platform()),
                         protocol: 1,
                       },
+                      organizationAgentContext: organizationAgentContextCapability,
                       workflowRequirements: refreshedHealth.map((item) => ({
                         id: item.id,
                         healthy: item.healthy,

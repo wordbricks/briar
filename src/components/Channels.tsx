@@ -627,7 +627,9 @@ export function Channels({
   );
 
   const pendingReplies = replies.filter(
-    (reply) => reply.status === "queued" || reply.status === "running",
+    (reply) =>
+      reply.channelId === activeChannelId &&
+      (reply.status === "queued" || reply.status === "running"),
   );
 
   const memberCount = Math.max(activeChannel?.memberCount ?? 0, members.length);

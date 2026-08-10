@@ -1,3 +1,12 @@
+import { lstat, realpath } from "node:fs/promises";
+import {
+  dirname,
+  isAbsolute,
+  relative,
+  resolve,
+  sep,
+  win32,
+} from "node:path";
 import type { AgentAttachment } from "./runner-attachments";
 import {
   normalizedActivityText,
@@ -112,21 +121,294 @@ export function shouldAutoApprovePermission(
   );
 }
 
-export function shouldDenyWritePermission(
+const grokWorkspaceReadPermissions = new Set([
+  "find",
+  "find_files",
+  "glob",
+  "grep",
+  "list",
+  "list_dir",
+  "list_directory",
+  "list_files",
+  "read",
+  "read_file",
+  "search_files",
+]);
+
+const grokNetworkReadPermissions = new Set([
+  "browser_search",
+  "http_get",
+  "web_fetch",
+  "web_search",
+]);
+
+const normalizedGrokPermission = (toolName: string) =>
+  toolName.trim().replace(/([a-z0-9])([A-Z])/gu, "$1_$2").toLowerCase()
+    .replace(/[^a-z0-9]+/gu, "_")
+    .replace(/^_+|_+$/gu, "");
+
+const grokRequiredPathPermissions = new Set(["read", "read_file"]);
+
+const directPathKeys = new Set([
+  "base",
+  "base_dir",
+  "base_directory",
+  "base_path",
+  "cwd",
+  "dir",
+  "dirs",
+  "directory",
+  "directories",
+  "file",
+  "files",
+  "file_name",
+  "filename",
+  "filepath",
+  "file_path",
+  "file_paths",
+  "folder",
+  "folders",
+  "location",
+  "locations",
+  "path",
+  "paths",
+  "root",
+  "roots",
+  "root_dir",
+  "root_directory",
+  "root_path",
+  "search_dir",
+  "search_directory",
+  "search_path",
+  "source",
+  "sources",
+  "target",
+  "targets",
+  "workspace",
+  "workspace_root",
+  "working_dir",
+  "working_directory",
+]);
+
+const globPathKeys = new Set([
+  "exclude",
+  "excludes",
+  "file_glob",
+  "file_globs",
+  "glob",
+  "globs",
+  "glob_pattern",
+  "glob_patterns",
+  "include",
+  "includes",
+  "pattern",
+  "patterns",
+]);
+
+type GrokPathCandidate = { value: string; glob: boolean };
+
+type GrokPathCollection = {
+  candidates: GrokPathCandidate[];
+  invalid: boolean;
+};
+
+const normalizedInputKey = (key: string) => normalizedGrokPermission(key);
+
+const isDirectPathKey = (key: string) => {
+  if (directPathKeys.has(key)) return true;
+  return [
+    "_cwd",
+    "_dir",
+    "_dirs",
+    "_directory",
+    "_directories",
+    "_file",
+    "_files",
+    "_folder",
+    "_folders",
+    "_location",
+    "_locations",
+    "_path",
+    "_paths",
+    "_root",
+    "_roots",
+  ].some((suffix) => key.endsWith(suffix));
+};
+
+const isGlobPathKey = (key: string) =>
+  globPathKeys.has(key) || key.includes("glob");
+
+const collectPathValue = (
+  value: unknown,
+  glob: boolean,
+  collection: GrokPathCollection,
+) => {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      collection.invalid = true;
+      return;
+    }
+    collection.candidates.push({ value: trimmed, glob });
+    return;
+  }
+  if (Array.isArray(value)) {
+    if (value.length === 0) collection.invalid = true;
+    for (const item of value) collectPathValue(item, glob, collection);
+    return;
+  }
+  if (value && typeof value === "object") {
+    const before = collection.candidates.length;
+    collectGrokPathInputs(
+      value as Record<string, unknown>,
+      collection,
+    );
+    if (collection.candidates.length === before) collection.invalid = true;
+    return;
+  }
+  collection.invalid = true;
+};
+
+const collectGrokPathInputs = (
+  input: Record<string, unknown>,
+  collection: GrokPathCollection = { candidates: [], invalid: false },
+) => {
+  for (const [rawKey, value] of Object.entries(input)) {
+    const key = normalizedInputKey(rawKey);
+    const glob = isGlobPathKey(key);
+    if (glob || isDirectPathKey(key)) {
+      collectPathValue(value, glob, collection);
+      continue;
+    }
+    if (value && typeof value === "object") {
+      if (Array.isArray(value)) {
+        for (const item of value) {
+          if (item && typeof item === "object" && !Array.isArray(item)) {
+            collectGrokPathInputs(
+              item as Record<string, unknown>,
+              collection,
+            );
+          }
+        }
+      } else {
+        collectGrokPathInputs(
+          value as Record<string, unknown>,
+          collection,
+        );
+      }
+    }
+  }
+  return collection;
+};
+
+const pathIsWithin = (root: string, candidate: string) => {
+  const fromRoot = relative(root, candidate);
+  return fromRoot === "" ||
+    (!fromRoot.startsWith(`..${sep}`) && fromRoot !== ".." &&
+      !isAbsolute(fromRoot));
+};
+
+const nearestExistingRealPath = async (candidate: string) => {
+  let current = candidate;
+  for (;;) {
+    try {
+      return await realpath(current);
+    } catch (error) {
+      const code = error && typeof error === "object" && "code" in error
+        ? String(error.code)
+        : null;
+      // A dangling/looping symlink is not equivalent to a missing leaf. Do not
+      // climb past it and accidentally approve a path whose eventual target is
+      // outside the workspace.
+      try {
+        if ((await lstat(current)).isSymbolicLink()) return null;
+      } catch (statError) {
+        const statCode = statError && typeof statError === "object" &&
+            "code" in statError
+          ? String(statError.code)
+          : null;
+        if (statCode !== "ENOENT" && statCode !== "ENOTDIR") return null;
+      }
+      if (code !== "ENOENT" && code !== "ENOTDIR") return null;
+      const parent = dirname(current);
+      if (parent === current) return null;
+      current = parent;
+    }
+  }
+};
+
+const unsafePathSyntax = (value: string) =>
+  value.includes("\0") ||
+  /^(?:file|https?|ftp):/iu.test(value) ||
+  /^~(?:[\\/]|$)/u.test(value) ||
+  /(^|[\\/,{])\.\.($|[\\/},])/u.test(value) ||
+  /%2e(?:%2e|\.)/iu.test(value);
+
+async function grokPathIsWithinWorkspace(
+  workspaceRoot: string,
+  candidate: GrokPathCandidate,
+) {
+  if (unsafePathSyntax(candidate.value)) return false;
+
+  const absoluteRoot = resolve(workspaceRoot);
+  let value = candidate.value;
+  // A leading ! is glob negation, not part of the path being constrained.
+  if (candidate.glob) value = value.replace(/^!+/u, "");
+  if (!value || (win32.isAbsolute(value) && !isAbsolute(value))) return false;
+
+  // Treat either slash style as a separator while validating traversal. Grok
+  // may normalize ACP inputs independently of the host Node implementation.
+  const portableValue = value.replaceAll("\\", "/");
+  const absoluteCandidate = isAbsolute(portableValue)
+    ? resolve(portableValue)
+    : resolve(absoluteRoot, portableValue);
+  if (!pathIsWithin(absoluteRoot, absoluteCandidate)) return false;
+
+  let canonicalRoot: string;
+  try {
+    canonicalRoot = await realpath(absoluteRoot);
+  } catch {
+    return false;
+  }
+  const canonicalCandidate = await nearestExistingRealPath(absoluteCandidate);
+  return canonicalCandidate !== null &&
+    pathIsWithin(canonicalRoot, canonicalCandidate);
+}
+
+async function grokWorkspaceReadInputIsAllowed(
   request: GrokRunnerRequest,
   toolName: string,
-): boolean {
-  if (request.sandboxMode !== "readOnly") return false;
-  const name = toolName.toLowerCase();
-  return (
-    name.includes("write") ||
-    name.includes("edit") ||
-    name.includes("bash") ||
-    name.includes("shell") ||
-    name.includes("terminal") ||
-    name.includes("apply_patch") ||
-    name.includes("delete")
+  input: Record<string, unknown>,
+) {
+  const collection = collectGrokPathInputs(input);
+  if (collection.invalid) return false;
+  if (
+    grokRequiredPathPermissions.has(toolName) &&
+    collection.candidates.length === 0
+  ) {
+    return false;
+  }
+  const decisions = await Promise.all(
+    collection.candidates.map((candidate) =>
+      grokPathIsWithinWorkspace(request.workspaceRoot, candidate)
+    ),
   );
+  return decisions.every(Boolean);
+}
+
+export async function shouldDenyGrokPermission(
+  request: GrokRunnerRequest,
+  toolName: string,
+  input: Record<string, unknown> = {},
+): Promise<boolean> {
+  const name = normalizedGrokPermission(toolName);
+  if (request.sandboxMode === "readOnly") {
+    if (grokWorkspaceReadPermissions.has(name)) {
+      return !(await grokWorkspaceReadInputIsAllowed(request, name, input));
+    }
+    return !(request.networkAccess && grokNetworkReadPermissions.has(name));
+  }
+  return !request.networkAccess && grokNetworkReadPermissions.has(name);
 }
 
 export function selectPermissionOptionId(
@@ -135,11 +417,7 @@ export function selectPermissionOptionId(
 ): string | undefined {
   const match = options.find((option) => option.kind === preferred);
   const optionId = match?.optionId?.trim();
-  if (optionId) return optionId;
-  if (preferred === "allow_always") {
-    return selectPermissionOptionId(options, "allow_once");
-  }
-  return options[0]?.optionId?.trim() || undefined;
+  return optionId || undefined;
 }
 
 export function permissionDecisionResult(
@@ -153,9 +431,9 @@ export function permissionDecisionResult(
     }
     return { outcome: { outcome: "cancelled" } };
   }
-  const allowId =
-    selectPermissionOptionId(options, "allow_always") ??
-    selectPermissionOptionId(options, "allow_once");
+  // Never persist a permission decision. Every call must be re-evaluated with
+  // its concrete path so a safe first read cannot authorize a later escape.
+  const allowId = selectPermissionOptionId(options, "allow_once");
   if (!allowId) {
     return { outcome: { outcome: "cancelled" } };
   }
@@ -449,12 +727,15 @@ export function finalizeGrokMessage(
   if (completed) events.push(completed);
   events.push({
     type: "turnCompleted",
-    status:
-      !stopReason || stopReason === "end_turn" || stopReason === "stop"
-        ? "completed"
-        : stopReason,
+    status: grokStopReasonSucceeded(stopReason)
+      ? "completed"
+      : stopReason || "failed",
   });
   return events;
+}
+
+export function grokStopReasonSucceeded(stopReason: string | undefined) {
+  return stopReason === "end_turn";
 }
 
 export function extractJsonObject(raw: string): string {
@@ -510,14 +791,14 @@ export function permissionToolName(params: unknown): string {
     record && typeof record.toolCall === "object" && record.toolCall !== null
       ? (record.toolCall as Record<string, unknown>)
       : null;
-  if (typeof toolCall?.title === "string" && toolCall.title.trim()) {
-    return toolCall.title.trim();
+  if (typeof toolCall?.toolName === "string" && toolCall.toolName.trim()) {
+    return toolCall.toolName.trim();
   }
   if (typeof toolCall?.kind === "string" && toolCall.kind.trim()) {
     return toolCall.kind.trim();
   }
-  if (typeof toolCall?.toolName === "string" && toolCall.toolName.trim()) {
-    return toolCall.toolName.trim();
+  if (typeof toolCall?.title === "string" && toolCall.title.trim()) {
+    return toolCall.title.trim();
   }
   return "tool";
 }

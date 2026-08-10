@@ -93,6 +93,7 @@ export async function downloadChannelReplyImages(input: {
       const response = await fetcher(
         `${input.apiUrl.replace(/\/$/u, "")}/organizations/${input.organizationId}/channel-reply-claims/${input.workId}/attachments/${image.id}`,
         {
+          redirect: "error",
           headers: {
             Accept: image.contentType,
             Authorization: `Bearer ${input.workerToken}`,

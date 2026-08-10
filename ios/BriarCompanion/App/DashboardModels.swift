@@ -145,16 +145,18 @@ struct DashboardRun: Codable, Equatable, Identifiable, Sendable {
         case completed
         case cancelled
 
-        var displayName: String {
+        var displayName: String { displayName(locale: .current) }
+
+        func displayName(locale: CompanionLocale) -> String {
             switch self {
-            case .backlog: "대기"
-            case .queued: "실행 대기"
-            case .running: "진행 중"
-            case .paused: "검토 대기"
-            case .blocked: "차단"
-            case .failed: "실패"
-            case .completed: "완료"
-            case .cancelled: "취소"
+            case .backlog: L10n.text("대기", locale: locale)
+            case .queued: L10n.text("실행 대기", locale: locale)
+            case .running: L10n.text("진행 중", locale: locale)
+            case .paused: L10n.text("검토 대기", locale: locale)
+            case .blocked: L10n.text("차단", locale: locale)
+            case .failed: L10n.text("실패", locale: locale)
+            case .completed: L10n.text("완료", locale: locale)
+            case .cancelled: L10n.text("취소", locale: locale)
             }
         }
 

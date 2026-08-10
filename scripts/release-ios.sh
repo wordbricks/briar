@@ -95,6 +95,7 @@ fi
 for command_name in base64 bun codesign git jq rsync security shasum xcodebuild xcrun; do
   require_command "$command_name"
 done
+[[ -x /usr/libexec/PlistBuddy ]] || fail "Missing required command: /usr/libexec/PlistBuddy"
 
 cd "$workspace_root"
 [[ -z "$(git status --porcelain --untracked-files=all)" ]] ||
@@ -119,6 +120,7 @@ fi
 : "${APPLE_API_KEY_CONTENT:?APPLE_API_KEY_CONTENT is required}"
 : "${IOS_DISTRIBUTION_CERTIFICATE:?IOS_DISTRIBUTION_CERTIFICATE is required}"
 : "${IOS_DISTRIBUTION_CERTIFICATE_PASSWORD:?IOS_DISTRIBUTION_CERTIFICATE_PASSWORD is required}"
+: "${IOS_PROVISIONING_PROFILE_UUID:?IOS_PROVISIONING_PROFILE_UUID is required}"
 : "${KEYCHAIN_PASSWORD:?KEYCHAIN_PASSWORD is required}"
 
 resolve_args=(resolve --channel "$channel")
@@ -175,7 +177,9 @@ authentication_args=(
   -authenticationKeyIssuerID "$APPLE_API_ISSUER"
 )
 common_build_settings=(
+  CODE_SIGN_STYLE=Manual
   CODE_SIGN_IDENTITY="Apple Distribution"
+  PROVISIONING_PROFILE_SPECIFIER="$IOS_PROVISIONING_PROFILE_UUID"
   DEVELOPMENT_TEAM=QFJZ2V3829
   PRODUCT_BUNDLE_IDENTIFIER="$bundle_id"
   MARKETING_VERSION="$marketing_version"
@@ -211,10 +215,17 @@ else
 fi
 
 scripts/verify-ios-archive.sh "$archive_path" "$bundle_id"
+export_options_path="$release_temp/ios-export-options.plist"
+cp "$workspace_root/config/ios-export-options.plist" "$export_options_path"
+/usr/libexec/PlistBuddy -c 'Set :signingStyle manual' "$export_options_path"
+/usr/libexec/PlistBuddy -c 'Add :provisioningProfiles dict' "$export_options_path"
+/usr/libexec/PlistBuddy \
+  -c "Add :provisioningProfiles:$bundle_id string $IOS_PROVISIONING_PROFILE_UUID" \
+  "$export_options_path"
 xcodebuild -exportArchive \
   -archivePath "$archive_path" \
   -exportPath "$export_path" \
-  -exportOptionsPlist config/ios-export-options.plist \
+  -exportOptionsPlist "$export_options_path" \
   "${authentication_args[@]}"
 
 ipa_path="$(find "$export_path" -maxdepth 1 -type f -name '*.ipa' -print -quit)"

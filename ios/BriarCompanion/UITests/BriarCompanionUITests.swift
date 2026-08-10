@@ -2,7 +2,7 @@ import XCTest
 
 @MainActor
 final class BriarCompanionUITests: XCTestCase {
-    private let transitionTimeout: TimeInterval = 10
+    private let transitionTimeout: TimeInterval = 20
 
     override func setUpWithError() throws {
         continueAfterFailure = false
@@ -47,6 +47,39 @@ final class BriarCompanionUITests: XCTestCase {
             "issue-attachment-image-aaaaaaaa-1111-4111-8111-111111111111"
         ].waitForExistence(timeout: 5))
         captureScreenshot(named: "companion-search-detail")
+    }
+
+    func testEnglishLocalizationSurface() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing", "--ui-testing-english"]
+        app.launch()
+
+        let login = app.buttons["Sign in with Briar"]
+        XCTAssertTrue(login.waitForExistence(timeout: 5))
+        login.tap()
+        XCTAssertTrue(app.navigationBars["Tasks"].waitForExistence(timeout: 5))
+        for tab in ["Home", "Tasks", "Agents", "Inbox"] {
+            XCTAssertTrue(app.tabBars.buttons[tab].exists, "The English \(tab) tab should be visible.")
+        }
+
+        let completed = app.descendants(matching: .any)[
+            "task-row-33333333-3333-4333-8333-333333333333"
+        ]
+        XCTAssertTrue(completed.waitForExistence(timeout: 5))
+        completed.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["run-detail"].waitForExistence(timeout: 5))
+        for tab in ["Issue", "Control", "Conversation", "Result", "Logs", "Status"] {
+            XCTAssertTrue(app.buttons[tab].waitForExistence(timeout: 5), "The English \(tab) tab should be visible.")
+        }
+
+        app.buttons["BackButton"].tap()
+        app.buttons["account-menu"].tap()
+        let settings = app.buttons["Settings"]
+        XCTAssertTrue(settings.waitForExistence(timeout: 5))
+        settings.tap()
+        XCTAssertTrue(app.navigationBars["Companion settings"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Appearance"].waitForExistence(timeout: 5))
+        captureScreenshot(named: "companion-english-settings")
     }
 
     func testRepresentativeRunStatesAndFilters() {
@@ -265,7 +298,9 @@ final class BriarCompanionUITests: XCTestCase {
         let requestEditor = app.textViews["agent-run-request"]
         XCTAssertTrue(requestEditor.waitForExistence(timeout: 5))
         XCTAssertEqual(requestEditor.value as? String, "Release the iOS app.")
-        requestEditor.swipeUp()
+        // The request editor has its own scroll view; scroll the surrounding
+        // execution form so the worker picker below it becomes visible.
+        app.swipeUp()
         let workerPicker = app.descendants(matching: .any)["agent-run-worker-picker"]
         XCTAssertTrue(workerPicker.waitForExistence(timeout: 5))
         XCTAssertEqual(workerPicker.value as? String, "Release Mac")

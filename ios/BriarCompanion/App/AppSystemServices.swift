@@ -11,12 +11,14 @@ enum AppIconName: String, CaseIterable, Identifiable, Sendable {
 
     var id: String { rawValue }
 
-    var title: String {
+    var title: String { title(locale: .current) }
+
+    func title(locale: CompanionLocale) -> String {
         switch self {
-        case .purple: "보라"
-        case .gray: "회색"
-        case .pink: "분홍"
-        case .green: "초록"
+        case .purple: L10n.text("보라", locale: locale)
+        case .gray: L10n.text("회색", locale: locale)
+        case .pink: L10n.text("분홍", locale: locale)
+        case .green: L10n.text("초록", locale: locale)
         }
     }
 
@@ -260,7 +262,7 @@ enum InboxNotificationPresentationBuilder {
         if message.kind == .session {
             let name = message.authorName?.trimmingCharacters(in: .whitespacesAndNewlines)
             let displayName = name?.isEmpty == false ? name ?? "Briar" : "Briar"
-            let status = message.statusLabel ?? "새 알림"
+            let status = message.statusLabel ?? L10n.text("새 알림")
             let finalMessage = message.body?.trimmingCharacters(in: .whitespacesAndNewlines)
             let body = preview(finalMessage?.isEmpty == false ? message.body ?? status : message.title)
             return InboxNotificationPresentation(
@@ -284,15 +286,15 @@ enum InboxNotificationPresentationBuilder {
         let fallbackBody = message.body?.trimmingCharacters(in: .whitespacesAndNewlines)
         let title: String
         if message.kind == .issue || message.kind == .session {
-            title = "Briar · \(message.statusLabel ?? "새 알림")"
+            title = L10n.format("Briar · %@", message.statusLabel ?? L10n.text("새 알림"))
         } else {
             title = message.title
         }
         return InboxNotificationPresentation(
             title: title,
             body: fallbackBody?.isEmpty == false
-                ? (message.body ?? message.statusLabel ?? "새 알림")
-                : (message.statusLabel ?? "새 알림")
+                ? (message.body ?? message.statusLabel ?? L10n.text("새 알림"))
+                : (message.statusLabel ?? L10n.text("새 알림"))
         )
     }
 

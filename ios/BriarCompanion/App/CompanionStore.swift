@@ -116,7 +116,7 @@ final class CompanionStore: ObservableObject {
            !description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             return description
         }
-        return "네트워크에 연결할 수 없습니다. 연결되면 다시 시도합니다."
+        return L10n.text("네트워크에 연결할 수 없습니다. 연결되면 다시 시도합니다.")
     }
 }
 

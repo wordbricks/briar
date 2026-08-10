@@ -5,6 +5,7 @@ import type {
   SDKMessage,
   SDKUserMessage,
 } from "@anthropic-ai/claude-agent-sdk";
+import { parse, resolve } from "node:path";
 import type { AgentAttachment } from "./runner-attachments";
 import {
   normalizedActivityText,
@@ -134,6 +135,7 @@ export function claudeOptions(
   canUseTool: CanUseTool,
 ): Options {
   const readOnly = request.sandboxMode === "readOnly";
+  const workspaceRoot = resolve(request.workspaceRoot);
   const dangerFullAccess = request.sandboxMode === "dangerFullAccess";
   const promptAppend = request.instructions?.trim();
   const autoApproveWithinSandbox =
@@ -155,8 +157,8 @@ export function claudeOptions(
       preset: "claude_code",
       ...(promptAppend ? { append: promptAppend } : {}),
     },
-    settingSources: ["user", "project", "local"],
-    skills: "all",
+    settingSources: readOnly ? [] : ["user", "project", "local"],
+    skills: readOnly ? [] : "all",
     includePartialMessages: true,
     ...(request.outputSchema !== null &&
     request.outputSchema !== undefined
@@ -200,6 +202,17 @@ export function claudeOptions(
             network: request.networkAccess
               ? { allowedDomains: ["*"] }
               : { deniedDomains: ["*"] },
+            ...(readOnly
+              ? {
+                  filesystem: {
+                    // Deny the host filesystem first, then narrowly re-allow
+                    // the claimed workspace. The SDK resolves symlink targets
+                    // against these rules, so links cannot escape it.
+                    denyRead: [parse(workspaceRoot).root],
+                    allowRead: [workspaceRoot],
+                  },
+                }
+              : {}),
           },
         }),
     ...(request.networkAccess

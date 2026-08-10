@@ -62,7 +62,7 @@ struct CompanionShellView: View {
                     refresh: refresh
                 )
                 .id(project.id)
-                .navigationTitle("Tasks")
+                .navigationTitle(L10n.text("Tasks", locale: companionLocale))
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar { companionToolbar(showsProjectMenu: true) }
                 .navigationDestination(for: UUID.self) { runID in
@@ -82,11 +82,11 @@ struct CompanionShellView: View {
                             refresh: refresh
                         )
                     } else {
-                        ContentUnavailableView("이슈를 찾을 수 없음", systemImage: "checklist")
+                        ContentUnavailableView(L10n.text("이슈를 찾을 수 없음"), systemImage: "checklist")
                     }
                 }
             }
-            .tabItem { Label("Tasks", systemImage: "checklist") }
+            .tabItem { Label(L10n.text("Tasks", locale: companionLocale), systemImage: "checklist") }
             .tag(CompanionNavigationModel.Tab.tasks)
 
             AgentsHomeView(
@@ -99,7 +99,7 @@ struct CompanionShellView: View {
                 refreshDashboard: refresh
             )
             .toolbar { companionToolbar() }
-            .tabItem { Label("Agents", systemImage: "cpu") }
+            .tabItem { Label(L10n.text("Agents", locale: companionLocale), systemImage: "cpu") }
             .tag(CompanionNavigationModel.Tab.agents)
             .badge(agents.sessions.filter { $0.status == .running }.count)
 
@@ -115,7 +115,7 @@ struct CompanionShellView: View {
                 )
                 .toolbar { companionToolbar(showsProjectMenu: true) }
             }
-            .tabItem { Label("Inbox", systemImage: "tray") }
+            .tabItem { Label(L10n.text("Inbox", locale: companionLocale), systemImage: "tray") }
             .tag(CompanionNavigationModel.Tab.inbox)
             .badge(inbox.unreadCount)
 
@@ -215,7 +215,7 @@ struct CompanionShellView: View {
                         }
                     }
                 }
-                .accessibilityLabel("프로젝트, \(project.name)")
+                .accessibilityLabel(L10n.format("프로젝트, %@", project.name))
                 .accessibilityIdentifier("project-menu")
             }
         } else {
@@ -225,9 +225,9 @@ struct CompanionShellView: View {
         }
         ToolbarItem(placement: .primaryAction) {
             Menu {
-                Button("설정") { showingSettings = true }
+                Button(L10n.text("설정")) { showingSettings = true }
                 Divider()
-                Button("로그아웃", role: .destructive, action: signOut)
+                Button(L10n.text("로그아웃"), role: .destructive, action: signOut)
             } label: {
                 ProfileImageView(
                     image: user?.image,
@@ -236,7 +236,7 @@ struct CompanionShellView: View {
                     size: 28
                 )
             }
-            .accessibilityLabel("계정 메뉴")
+            .accessibilityLabel(L10n.text("계정 메뉴"))
             .accessibilityIdentifier("account-menu")
         }
     }
@@ -291,7 +291,7 @@ struct TaskListView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Picker("작업 필터", selection: $filter) {
+            Picker(L10n.text("작업 필터"), selection: $filter) {
                 ForEach(TaskFilter.allCases) { option in
                     Text(option.title).tag(option)
                 }
@@ -314,12 +314,12 @@ struct TaskListView: View {
                     if snapshot == nil {
                         HStack {
                             Spacer()
-                            ProgressView("작업을 불러오는 중…")
+                            ProgressView(L10n.text("작업을 불러오는 중…"))
                             Spacer()
                         }
                     } else if runs.isEmpty {
                         ContentUnavailableView(
-                            filter == .all ? "작업 없음" : "필터 결과 없음",
+                            L10n.text(filter == .all ? "작업 없음" : "필터 결과 없음"),
                             systemImage: "tray"
                         )
                     } else {
@@ -358,11 +358,11 @@ struct TaskListView: View {
                                     Button {
                                         dispatchRun = run
                                     } label: {
-                                        Label("바로 처리", systemImage: "play.fill")
+                                        Label(L10n.text("바로 처리"), systemImage: "play.fill")
                                     }
                                     .tint(.blue)
                                     .disabled((run.waitingOnPrerequisiteCount ?? 0) > 0)
-                                    .accessibilityLabel("\(run.title) 바로 처리")
+                                    .accessibilityLabel(L10n.format("%@ 바로 처리", run.title))
                                     .accessibilityIdentifier(
                                         "task-process-now-\(run.id.uuidString.lowercased())"
                                     )
@@ -372,7 +372,7 @@ struct TaskListView: View {
                     }
                     if let generatedAt = snapshot?.generatedAt {
                         Section {
-                            Text("마지막 동기화 \(generatedAt.formatted(date: .omitted, time: .shortened))")
+                            Text(L10n.format("마지막 동기화 %@", L10n.time(generatedAt)))
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                                 .accessibilityIdentifier("dashboard-synced-at")
@@ -389,7 +389,7 @@ struct TaskListView: View {
                 Button { showingCreateIssue = true } label: {
                     Image(systemName: "plus")
                 }
-                .accessibilityLabel("새 이슈")
+                .accessibilityLabel(L10n.text("새 이슈"))
                 .accessibilityIdentifier("create-issue-button")
             }
         }
@@ -493,7 +493,7 @@ struct RunRow: View {
                     name: assignee.name,
                     size: 20
                 )
-                .accessibilityLabel("담당자 \(assignee.name)")
+                .accessibilityLabel(L10n.format("담당자 %@", assignee.name))
             }
             if let workerLabel {
                 RunWorkerIconView(worker: worker, label: workerLabel)
@@ -503,7 +503,7 @@ struct RunRow: View {
     }
 
     private var updatedMetadata: some View {
-        Text(run.updatedAt, style: .relative)
+        Text(L10n.relativeDate(run.updatedAt))
             .lineLimit(1)
             .fixedSize(horizontal: true, vertical: false)
     }
@@ -538,7 +538,7 @@ private struct RunWorkerIconView: View {
             }
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("실행 Worker \(label)")
+        .accessibilityLabel(L10n.format("실행 Worker %@", label))
         .help(label)
     }
 }
@@ -563,7 +563,7 @@ struct StatusBadge: View {
         .background(color.opacity(0.12), in: Capsule())
         .accessibilityLabel(
             reviewed
-                ? "\(status.displayName) · 검수 완료됨"
+                ? L10n.format("%@ · 검수 완료됨", status.displayName)
                 : status.displayName
         )
     }
@@ -585,11 +585,11 @@ struct OfflineStateView: View {
 
     var body: some View {
         ContentUnavailableView {
-            Label("오프라인", systemImage: "wifi.exclamationmark")
+            Label(L10n.text("오프라인"), systemImage: "wifi.exclamationmark")
         } description: {
             Text(message)
         } actions: {
-            Button("다시 시도") { Task { await refresh() } }
+            Button(L10n.text("다시 시도")) { Task { await refresh() } }
                 .accessibilityIdentifier("dashboard-retry-button")
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -607,14 +607,16 @@ private enum RunDetailTab: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
-    var title: String {
+    var title: String { title(locale: .current) }
+
+    func title(locale: CompanionLocale) -> String {
         switch self {
-        case .issue: "이슈"
-        case .control: "제어"
-        case .conversation: "대화"
-        case .result: "결과"
-        case .logs: "로그"
-        case .status: "상태"
+        case .issue: L10n.text("이슈", locale: locale)
+        case .control: L10n.text("제어", locale: locale)
+        case .conversation: L10n.text("대화", locale: locale)
+        case .result: L10n.text("결과", locale: locale)
+        case .logs: L10n.text("로그", locale: locale)
+        case .status: L10n.text("상태", locale: locale)
         }
     }
 }
@@ -749,14 +751,14 @@ struct RunDetailView: View {
                 .ignoresSafeArea()
         }
         .modifier(PreviewErrorAlertModifier(message: $previewError))
-        .alert("이슈를 삭제할까요?", isPresented: $confirmingDelete) {
-            Button("삭제", role: .destructive) { Task { await deleteIssue() } }
-            Button("취소", role: .cancel) {}
+        .alert(L10n.text("이슈를 삭제할까요?", locale: locale), isPresented: $confirmingDelete) {
+            Button(L10n.text("삭제", locale: locale), role: .destructive) { Task { await deleteIssue() } }
+            Button(L10n.text("취소", locale: locale), role: .cancel) {}
         } message: {
-            Text("활동 기록, 대화와 첨부가 영구적으로 삭제됩니다.")
+            Text(L10n.text("활동 기록, 대화와 첨부가 영구적으로 삭제됩니다.", locale: locale))
         }
         .confirmationDialog(
-            "다른 프로젝트로 이동",
+            L10n.text("다른 프로젝트로 이동", locale: locale),
             isPresented: $showingTransfer,
             titleVisibility: .visible
         ) {
@@ -766,9 +768,9 @@ struct RunDetailView: View {
                     Task { await transferIssue(to: project.id) }
                 }
             }
-            Button("취소", role: .cancel) {}
+            Button(L10n.text("취소", locale: locale), role: .cancel) {}
         } message: {
-            Text("선택한 프로젝트로 이슈와 대화·첨부·활동 기록이 함께 이동합니다. 의존성은 해제됩니다.")
+            Text(L10n.text("선택한 프로젝트로 이슈와 대화·첨부·활동 기록이 함께 이동합니다. 의존성은 해제됩니다.", locale: locale))
         }
         .sheet(isPresented: $showingEdit) {
             EditIssueSheet(
@@ -814,7 +816,7 @@ struct RunDetailView: View {
                             origin: BriarShareLinks.defaultOrigin
                         )
                         ShareLink(item: shareURL) {
-                            Label("이슈 공유", systemImage: "square.and.arrow.up")
+                            Label(L10n.text("이슈 공유", locale: locale), systemImage: "square.and.arrow.up")
                         }
                         Button {
                             ClipboardService.copy(shareURL.absoluteString)
@@ -824,14 +826,14 @@ struct RunDetailView: View {
                         }
                         .accessibilityIdentifier("issue-copy-link")
                         Divider()
-                        Button("수정") { showingEdit = true }
+                        Button(L10n.text("수정", locale: locale)) { showingEdit = true }
                         if !transferDestinations.isEmpty {
-                            Button("다른 프로젝트로 이동") {
+                            Button(L10n.text("다른 프로젝트로 이동", locale: locale)) {
                                 transferTargetProjectID = transferDestinations.first?.id
                                 showingTransfer = true
                             }
                         }
-                        Button("삭제", role: .destructive) { confirmingDelete = true }
+                        Button(L10n.text("삭제", locale: locale), role: .destructive) { confirmingDelete = true }
                     } label: {
                         Image(systemName: "ellipsis.circle")
                     }
@@ -863,9 +865,9 @@ struct RunDetailView: View {
 
     private var detailContent: some View {
         VStack(spacing: 0) {
-            Picker("이슈 상세 탭", selection: $selectedTab) {
+            Picker(L10n.text("이슈 상세 탭", locale: locale), selection: $selectedTab) {
                 ForEach(RunDetailTab.allCases) { tab in
-                    Text(tab.title)
+                    Text(tab.title(locale: locale))
                         .tag(tab)
                         .accessibilityIdentifier("run-detail-tab-\(tab.rawValue)")
                 }
@@ -910,7 +912,7 @@ struct RunDetailView: View {
         }
 
         if let description = run.issueDescription, !description.isEmpty {
-            Section("설명") {
+            Section(L10n.text("설명", locale: locale)) {
                 IssueDescriptionView(
                     markdown: description,
                     attachments: attachments,
@@ -926,7 +928,7 @@ struct RunDetailView: View {
         }
 
         if !remainingAttachments.isEmpty {
-            Section("첨부") {
+            Section(L10n.text("첨부", locale: locale)) {
                 ForEach(remainingAttachments) { attachment in
                     attachmentRow(attachment)
                 }
@@ -934,7 +936,7 @@ struct RunDetailView: View {
         }
 
         if run.issueDescription?.isEmpty != false, attachments.isEmpty {
-            Section { ContentUnavailableView("이슈 내용 없음", systemImage: "doc.text") }
+            Section { ContentUnavailableView(L10n.text("이슈 내용 없음", locale: locale), systemImage: "doc.text") }
         }
     }
 
@@ -984,8 +986,8 @@ struct RunDetailView: View {
     @ViewBuilder
     private var controlTabContent: some View {
         if localStatus == .paused, run.resumeRequestedAt != nil {
-            Section("검토 대기") {
-                Label("일시정지 상태를 유지하며 워커를 재할당하고 있습니다.",
+            Section(L10n.text("검토 대기", locale: locale)) {
+                Label(L10n.text("일시정지 상태를 유지하며 워커를 재할당하고 있습니다.", locale: locale),
                       systemImage: "arrow.triangle.2.circlepath")
                     .foregroundStyle(.secondary)
                 ProgressView().frame(maxWidth: .infinity)
@@ -994,8 +996,8 @@ struct RunDetailView: View {
             checkpointControl(checkpoint)
         }
 
-        Section("실행 제어") {
-            Picker("상태 이동", selection: placementBinding) {
+        Section(L10n.text("실행 제어", locale: locale)) {
+            Picker(L10n.text("상태 이동", locale: locale), selection: placementBinding) {
                 ForEach(availablePlacements) { placement in
                     Text(placement.label).tag(placement)
                 }
@@ -1004,7 +1006,7 @@ struct RunDetailView: View {
             .accessibilityIdentifier("run-status-picker")
 
             if localStatus == .backlog || localStatus == .queued {
-                Button("바로 처리") {
+                Button(L10n.text("바로 처리", locale: locale)) {
                     reassigning = false
                     showingDispatch = true
                 }
@@ -1012,41 +1014,41 @@ struct RunDetailView: View {
                 .accessibilityIdentifier("process-now-button")
             }
             if localStatus == .running {
-                Button("Worker 다시 배정") {
+                Button(L10n.text("Worker 다시 배정", locale: locale)) {
                     reassigning = true
                     showingDispatch = true
                 }
             }
             if localStatus == .blocked || localStatus == .failed {
-                Button("재시도") { Task { await recover(action: "retry") } }
+                Button(L10n.text("재시도", locale: locale)) { Task { await recover(action: "retry") } }
                     .accessibilityIdentifier("retry-run-button")
             }
             if localStatus != .completed && localStatus != .cancelled {
-                Button("실행 취소", role: .destructive) {
+                Button(L10n.text("실행 취소", locale: locale), role: .destructive) {
                     Task { await recover(action: "cancel") }
                 }
                 .accessibilityIdentifier("cancel-run-button")
             }
             if localStatus == .completed && !reviewCompleted {
-                Button("결과 검수 완료") { Task { await completeReview() } }
+                Button(L10n.text("결과 검수 완료", locale: locale)) { Task { await completeReview() } }
                     .accessibilityIdentifier("complete-review-button")
             } else if reviewCompleted {
-                Label("결과 검수 완료", systemImage: "checkmark.seal.fill")
+                Label(L10n.text("결과 검수 완료", locale: locale), systemImage: "checkmark.seal.fill")
                     .foregroundStyle(.green)
             }
         }
 
-        Section("실행 설정") {
-            Picker("프로바이더", selection: providerSelection) {
-                Text("기본값").tag(AgentProvider?.none)
+        Section(L10n.text("실행 설정", locale: locale)) {
+            Picker(L10n.text("프로바이더", locale: locale), selection: providerSelection) {
+                Text(L10n.text("기본값", locale: locale)).tag(AgentProvider?.none)
                 ForEach(providers.isEmpty ? AgentProvider.allCases : providers) {
                     Text($0.displayName).tag(AgentProvider?.some($0))
                 }
             }
             .disabled(mutations.isActive("preferences-\(run.id)"))
             .accessibilityIdentifier("execution-provider-picker")
-            Picker("모델", selection: modelSelection) {
-                Text("기본값").tag(String?.none)
+            Picker(L10n.text("모델", locale: locale), selection: modelSelection) {
+                Text(L10n.text("기본값", locale: locale)).tag(String?.none)
                 ForEach(preferences.provider?.models ?? [], id: \.self) {
                     Text($0).tag(String?.some($0))
                 }
@@ -1056,8 +1058,8 @@ struct RunDetailView: View {
                     mutations.isActive("preferences-\(run.id)")
             )
             .accessibilityIdentifier("execution-model-picker")
-            Picker("Effort", selection: effortSelection) {
-                Text("기본값").tag(ModelEffort?.none)
+            Picker(L10n.text("Effort", locale: locale), selection: effortSelection) {
+                Text(L10n.text("기본값", locale: locale)).tag(ModelEffort?.none)
                 ForEach(preferences.provider?.efforts ?? []) {
                     Text($0.rawValue).tag(ModelEffort?.some($0))
                 }
@@ -1075,19 +1077,23 @@ struct RunDetailView: View {
     }
 
     private func checkpointControl(_ checkpoint: WorkflowCheckpoint) -> some View {
-        Section("검토 대기") {
+        Section(L10n.text("검토 대기", locale: locale)) {
             Label {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(checkpoint.position == .before
-                         ? "\(checkpoint.stageLabel) 시작 전 확인"
-                         : "\(checkpoint.stageLabel) 완료 후 확인")
+                         ? L10n.format("%@ 시작 전 확인", locale: locale, checkpoint.stageLabel)
+                         : L10n.format("%@ 완료 후 확인", locale: locale, checkpoint.stageLabel))
                         .font(.headline)
-                    Text("리비전 \(checkpoint.revision)")
+                    Text(L10n.format("리비전 %d", locale: locale, checkpoint.revision))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Text(checkpoint.terminalReviewOnly
-                         ? "마지막 단계를 반복하지 않고 최종 검토 후 완료합니다."
-                         : "재개 후 \(checkpoint.nextStageLabel ?? checkpoint.nextStage ?? checkpoint.stageLabel)부터 자동 진행합니다.")
+                         ? L10n.text("마지막 단계를 반복하지 않고 최종 검토 후 완료합니다.", locale: locale)
+                         : L10n.format(
+                            "재개 후 %@부터 자동 진행합니다.",
+                            locale: locale,
+                            checkpoint.nextStageLabel ?? checkpoint.nextStage ?? checkpoint.stageLabel
+                        ))
                         .font(.subheadline)
                 }
             } icon: {
@@ -1099,28 +1105,34 @@ struct RunDetailView: View {
                 if mutations.isActive("resume-\(run.id)") {
                     ProgressView().frame(maxWidth: .infinity)
                 } else {
-                    Label("자동화 재개", systemImage: "play.fill")
+                    Label(L10n.text("자동화 재개", locale: locale), systemImage: "play.fill")
                         .frame(maxWidth: .infinity)
                 }
             }
             .disabled(mutations.isActive("resume-\(run.id)"))
-            .accessibilityLabel("\(checkpoint.stageLabel) 체크포인트 승인 후 자동화 재개")
+            .accessibilityLabel(
+                L10n.format(
+                    "%@ 체크포인트 승인 후 자동화 재개",
+                    locale: locale,
+                    checkpoint.stageLabel
+                )
+            )
             .accessibilityIdentifier("resume-run-button")
         }
     }
 
     @ViewBuilder
     private var dependenciesControl: some View {
-        Section("의존성") {
+        Section(L10n.text("의존성", locale: locale)) {
             if selectedDependencyReferences.isEmpty {
-                Text("선행 이슈가 없습니다.")
+                Text(L10n.text("선행 이슈가 없습니다.", locale: locale))
                     .foregroundStyle(.secondary)
             } else {
                 ForEach(selectedDependencyReferences) { dependency in
                     HStack {
                         VStack(alignment: .leading) {
                             Text(dependency.title)
-                            Text(verbatim: "\(issueKeyPrefix)-\(dependency.runNumber) · \(dependency.status.displayName)")
+                            Text(verbatim: "\(issueKeyPrefix)-\(dependency.runNumber) · \(dependency.status.displayName(locale: locale))")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -1136,7 +1148,9 @@ struct RunDetailView: View {
                         }
                         .buttonStyle(.borderless)
                         .disabled(mutations.isActive("dependency-\(run.id)-\(dependency.id)"))
-                        .accessibilityLabel("\(dependency.title) 의존성 제거")
+                        .accessibilityLabel(
+                            L10n.format("%@ 의존성 제거", locale: locale, dependency.title)
+                        )
                         .accessibilityIdentifier(
                             "remove-dependency-\(dependency.id.uuidString.lowercased())"
                         )
@@ -1147,7 +1161,7 @@ struct RunDetailView: View {
             Button {
                 showingDependencyPicker = true
             } label: {
-                Label("의존성 추가", systemImage: "plus.circle")
+                Label(L10n.text("의존성 추가", locale: locale), systemImage: "plus.circle")
             }
             .disabled(dependencyCandidates.isEmpty)
             .accessibilityIdentifier("add-dependency-button")
@@ -1220,15 +1234,19 @@ struct RunDetailView: View {
 
         if detail.messages.isEmpty, !detail.loading, detail.errorMessage == nil {
             Section {
-                ContentUnavailableView("대화 없음", systemImage: "bubble.left.and.bubble.right")
+                ContentUnavailableView(L10n.text("대화 없음", locale: locale), systemImage: "bubble.left.and.bubble.right")
             }
         } else if !detail.messages.isEmpty {
-            Section("대화") {
+            Section(L10n.text("대화", locale: locale)) {
                 ForEach(detail.messages) { message in messageRow(message) }
             }
         }
 
-        Section(replyTo == nil ? "메시지 보내기" : "\(replyTo?.author.name ?? "")에게 답글") {
+        Section(
+            replyTo == nil
+                ? L10n.text("메시지 보내기", locale: locale)
+                : L10n.format("%@에게 답글", locale: locale, replyTo?.author.name ?? "")
+        ) {
             if !issueMentionSuggestions.isEmpty {
                 ForEach(issueMentionSuggestions) { target in
                     Button {
@@ -1266,7 +1284,7 @@ struct RunDetailView: View {
                 }
                 .accessibilityIdentifier("issue-mention-menu")
             }
-            TextField("메시지 또는 @Briar 질문", text: $messageText, axis: .vertical)
+            TextField(L10n.text("메시지 또는 @Briar 질문", locale: locale), text: $messageText, axis: .vertical)
                 .lineLimit(2...6)
                 .accessibilityIdentifier("issue-message-field")
                 .onChange(of: messageText) { _, body in
@@ -1293,7 +1311,7 @@ struct RunDetailView: View {
             }
             HStack {
                 if replyTo != nil {
-                    Button("답글 취소") { replyTo = nil }
+                    Button(L10n.text("답글 취소", locale: locale)) { replyTo = nil }
                         .buttonStyle(.borderless)
                 }
                 PhotosPicker(
@@ -1305,7 +1323,7 @@ struct RunDetailView: View {
                     matching: PhotoAttachmentImportPolicy.imagesOnly.pickerFilter,
                     preferredItemEncoding: .compatible
                 ) {
-                    Label("갤러리", systemImage: "photo.on.rectangle")
+                    Label(L10n.text("갤러리", locale: locale), systemImage: "photo.on.rectangle")
                 }
                 .buttonStyle(.borderless)
                 .disabled(
@@ -1315,7 +1333,7 @@ struct RunDetailView: View {
                 Button {
                     pasteMessageImage()
                 } label: {
-                    Label("붙여넣기", systemImage: "doc.on.clipboard")
+                    Label(L10n.text("붙여넣기", locale: locale), systemImage: "doc.on.clipboard")
                 }
                 .buttonStyle(.borderless)
                 Spacer()
@@ -1331,7 +1349,7 @@ struct RunDetailView: View {
                             messageAttachments.isEmpty) ||
                             mutations.isActive("message-\(run.id)")
                     )
-                    .accessibilityLabel("보내기")
+                    .accessibilityLabel(L10n.text("보내기", locale: locale))
                     .accessibilityIdentifier("issue-message-send")
             }
         }
@@ -1354,7 +1372,7 @@ struct RunDetailView: View {
                 HStack {
                     Text(message.author.name).font(.headline)
                     Spacer()
-                    Text(message.createdAt, style: .relative)
+                    Text(L10n.relativeDate(message.createdAt, locale: locale))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -1409,27 +1427,34 @@ struct RunDetailView: View {
                 if let proposal = message.proposedAction {
                     VStack(alignment: .leading, spacing: 8) {
                         Text(
-                            proposal.type == .rework ? "Briar 재작업 제안" :
-                                proposal.type == .update ? "현재 이슈 수정 제안" : "새 이슈 생성 제안"
+                            proposal.type == .rework
+                                ? L10n.text("Briar 재작업 제안", locale: locale)
+                                : proposal.type == .update
+                                    ? L10n.text("현재 이슈 수정 제안", locale: locale)
+                                    : L10n.text("새 이슈 생성 제안", locale: locale)
                         )
                             .font(.subheadline.weight(.semibold))
                         if proposal.type == .rework {
-                            Text("\(proposal.workflowStage ?? "")부터 개정")
+                            Text(L10n.format("%@부터 개정", locale: locale, proposal.workflowStage ?? ""))
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                             Text(proposal.reason ?? "")
                                 .font(.subheadline)
                         } else if proposal.type == .update {
                             if proposal.changedFields?.contains("title") == true {
-                                LabeledContent("제목", value: proposal.changes?.title ?? "")
+                                LabeledContent(L10n.text("제목", locale: locale), value: proposal.changes?.title ?? "")
                             }
                             if proposal.changedFields?.contains("description") == true {
-                                LabeledContent("설명", value: proposal.changes?.description ?? "설정 안 함")
+                                LabeledContent(
+                                    L10n.text("설명", locale: locale),
+                                    value: proposal.changes?.description ?? L10n.text("설정 안 함", locale: locale)
+                                )
                             }
                             if proposal.changedFields?.contains("priority") == true {
                                 LabeledContent(
-                                    "우선순위",
-                                    value: proposal.changes?.priority.map { "P\($0)" } ?? "설정 안 함"
+                                    L10n.text("우선순위", locale: locale),
+                                    value: proposal.changes?.priority.map { "P\($0)" }
+                                        ?? L10n.text("설정 안 함", locale: locale)
                                 )
                             }
                         } else if let issue = proposal.issue {
@@ -1437,17 +1462,23 @@ struct RunDetailView: View {
                             if let description = issue.description, !description.isEmpty {
                                 Text(description).font(.subheadline)
                             }
-                            Text("\(issue.priority.map { "P\($0)" } ?? "우선순위 없음") · \(issue.status)")
+                            let issuePriority = issue.priority.map { "P\($0)" }
+                                ?? L10n.text("우선순위 없음", locale: locale)
+                            Text("\(issuePriority) · \(issue.status)")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
                         if proposal.status == .accepted {
                             Label(
                                 proposal.type == .rework
-                                    ? "리비전 \(proposal.appliedRevision.map(String.init) ?? "") 개정이 시작되었습니다."
+                                    ? L10n.format(
+                                        "리비전 %@ 개정이 시작되었습니다.",
+                                        locale: locale,
+                                        proposal.appliedRevision.map(String.init) ?? ""
+                                    )
                                     : proposal.type == .update
-                                        ? "이슈 내용이 수정되었습니다."
-                                        : "새 이슈가 생성되었습니다.",
+                                        ? L10n.text("이슈 내용이 수정되었습니다.", locale: locale)
+                                        : L10n.text("새 이슈가 생성되었습니다.", locale: locale),
                                 systemImage: "checkmark.seal.fill"
                             )
                             .font(.caption.weight(.semibold))
@@ -1460,8 +1491,11 @@ struct RunDetailView: View {
                                     ProgressView()
                                 } else {
                                     Label(
-                                        proposal.type == .rework ? "수락하고 개정 시작" :
-                                            proposal.type == .update ? "수락하고 이슈 수정" : "수락하고 이슈 만들기",
+                                        proposal.type == .rework
+                                            ? L10n.text("수락하고 개정 시작", locale: locale)
+                                            : proposal.type == .update
+                                                ? L10n.text("수락하고 이슈 수정", locale: locale)
+                                                : L10n.text("수락하고 이슈 만들기", locale: locale),
                                         systemImage: "play.fill"
                                     )
                                 }
@@ -1479,7 +1513,7 @@ struct RunDetailView: View {
                             .stroke(Color.accentColor.opacity(0.25))
                     }
                 }
-                Button("답글") { replyTo = message }.font(.caption)
+                Button(L10n.text("답글", locale: locale)) { replyTo = message }.font(.caption)
             }
         }
     }
@@ -1489,19 +1523,19 @@ struct RunDetailView: View {
         detailLoadingContent
 
         if let summary = run.structuredResult?.summary ?? run.resultSummary, !summary.isEmpty {
-            Section("결과") {
+            Section(L10n.text("결과", locale: locale)) {
                 MarkdownText(markdown: summary)
                 if let result = run.structuredResult {
-                    LabeledContent("결과 상태", value: result.outcome)
+                    LabeledContent(L10n.text("결과 상태", locale: locale), value: result.outcome)
                     if let nextAction = result.nextAction, !nextAction.isEmpty {
-                        LabeledContent("다음 조치", value: nextAction)
+                        LabeledContent(L10n.text("다음 조치", locale: locale), value: nextAction)
                     }
                 }
             }
         }
 
         if let reviews = run.resultReviews, !reviews.isEmpty {
-            Section("결과 리뷰") {
+            Section(L10n.text("결과 리뷰", locale: locale)) {
                 ForEach(reviews) { review in
                     HStack(spacing: 12) {
                         ProfileImageView(
@@ -1512,7 +1546,7 @@ struct RunDetailView: View {
                         )
                         VStack(alignment: .leading) {
                             Text(review.name)
-                            Text(review.completedAt, format: .dateTime)
+                            Text(L10n.dateTime(review.completedAt, locale: locale))
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -1524,13 +1558,13 @@ struct RunDetailView: View {
         }
 
         if !detail.evidence.isEmpty {
-            Section("증빙") {
+            Section(L10n.text("증빙", locale: locale)) {
                 ForEach(detail.evidence) { evidence in evidenceRow(evidence) }
             }
         }
 
         if resultIsEmpty, !detail.loading, detail.errorMessage == nil {
-            Section { ContentUnavailableView("결과 없음", systemImage: "checkmark.seal") }
+            Section { ContentUnavailableView(L10n.text("결과 없음", locale: locale), systemImage: "checkmark.seal") }
         }
     }
 
@@ -1548,7 +1582,7 @@ struct RunDetailView: View {
                 Image(systemName: passed ? "checkmark.circle.fill" : "circle")
                     .foregroundStyle(passed ? Color.green : Color.secondary)
                 Text(evidence.type).font(.headline)
-                if !evidence.canonical { Text("이전 버전").font(.caption2) }
+                if !evidence.canonical { Text(L10n.text("이전 버전", locale: locale)).font(.caption2) }
             }
             if let evidenceDetail = evidence.detail, !evidenceDetail.isEmpty {
                 Text(evidenceDetail).font(.subheadline)
@@ -1583,7 +1617,7 @@ struct RunDetailView: View {
                 }
             }
             if let url = evidence.url {
-                Link("연결된 결과 열기", destination: url)
+                Link(L10n.text("연결된 결과 열기", locale: locale), destination: url)
             }
         }
     }
@@ -1592,16 +1626,16 @@ struct RunDetailView: View {
     private var logsTabContent: some View {
         detailLoadingContent
         if detail.events.isEmpty, !detail.loading, detail.errorMessage == nil {
-            Section { ContentUnavailableView("로그 없음", systemImage: "text.alignleft") }
+            Section { ContentUnavailableView(L10n.text("로그 없음", locale: locale), systemImage: "text.alignleft") }
         } else if !detail.events.isEmpty {
-            Section("실행 로그") {
+            Section(L10n.text("실행 로그", locale: locale)) {
                 ForEach(detail.events) { event in
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
                             StatusBadge(status: event.status, reviewed: false)
                             if let stage = event.workflowStage { Text(stage).font(.caption) }
                             Spacer()
-                            Text(event.occurredAt, style: .relative).font(.caption)
+                            Text(L10n.relativeDate(event.occurredAt, locale: locale)).font(.caption)
                         }
                         if let eventDetail = event.detail, !eventDetail.isEmpty {
                             Text(eventDetail).font(.subheadline)
@@ -1616,18 +1650,18 @@ struct RunDetailView: View {
     @ViewBuilder
     private var detailLoadingContent: some View {
         if detail.loading {
-            Section { ProgressView("상세 기록을 불러오는 중…") }
+            Section { ProgressView(L10n.text("상세 기록을 불러오는 중…", locale: locale)) }
         }
         if let error = detail.errorMessage {
             Section {
                 Label(error, systemImage: "wifi.exclamationmark").foregroundStyle(.orange)
-                Button("상세 다시 시도") { Task { await detail.load() } }
+                Button(L10n.text("상세 다시 시도", locale: locale)) { Task { await detail.load() } }
             }
         }
     }
 
     private var statusTabContent: some View {
-        Section("현재 상태") {
+        Section(L10n.text("현재 상태", locale: locale)) {
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
                     StatusBadge(
@@ -1638,7 +1672,7 @@ struct RunDetailView: View {
                         Text(verbatim: "\(issueKeyPrefix)-\(runNumber)")
                     }
                     Spacer()
-                    Text(run.updatedAt, style: .relative)
+                    Text(L10n.relativeDate(run.updatedAt, locale: locale))
                 }
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -1649,17 +1683,18 @@ struct RunDetailView: View {
                     ProgressView(value: progress, total: 100)
                 }
                 LabeledContent(
-                    "담당자",
-                    value: members.first { $0.userId == run.assigneeUserId }?.name ?? "미배정"
+                    L10n.text("담당자", locale: locale),
+                    value: members.first { $0.userId == run.assigneeUserId }?.name
+                        ?? L10n.text("미배정", locale: locale)
                 )
-                LabeledContent("실행 Worker", value: assignedWorkerLabel)
+                LabeledContent(L10n.text("실행 Worker", locale: locale), value: assignedWorkerLabel)
             }
         }
     }
 
     private var assignedWorkerLabel: String {
         let workerID = run.workerId ?? run.requestedWorkerId
-        guard let workerID else { return "자동 배정" }
+        guard let workerID else { return L10n.text("자동 배정") }
         if let worker = workers.first(where: { $0.id == workerID }) {
             return worker.label
         }
@@ -1744,7 +1779,7 @@ struct RunDetailView: View {
             actionError = nil
             await refresh()
         } catch let error as MobileAPIError where error.statusCode == 409 {
-            actionError = "대기 지점이 이미 변경되었습니다. 최신 상태를 다시 불러왔습니다."
+            actionError = L10n.text("대기 지점이 이미 변경되었습니다. 최신 상태를 다시 불러왔습니다.", locale: locale)
             await refresh()
         } catch {
             actionError = error.localizedDescription
@@ -1912,7 +1947,7 @@ struct RunDetailView: View {
     private func pasteMessageImage() {
         guard let image = UIPasteboard.general.image,
               let data = image.pngData() else {
-            actionError = "클립보드에 붙여넣을 수 있는 이미지가 없습니다."
+            actionError = L10n.text("클립보드에 붙여넣을 수 있는 이미지가 없습니다.", locale: locale)
             return
         }
         let next = messageAttachments + [PendingIssueAttachment(
@@ -1971,13 +2006,13 @@ private struct PreviewErrorAlertModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content.alert(
-            "미리보기를 열 수 없음",
+            L10n.text("미리보기를 열 수 없음"),
             isPresented: Binding(
                 get: { message != nil },
                 set: { if !$0 { message = nil } }
             )
         ) {
-            Button("확인", role: .cancel) { message = nil }
+            Button(L10n.text("확인"), role: .cancel) { message = nil }
         } message: {
             Text(message ?? "")
         }
@@ -2022,14 +2057,14 @@ struct DependencyPickerSheet: View {
 
                 if filteredCandidates.isEmpty {
                     ContentUnavailableView(
-                        query.isEmpty ? "추가할 수 있는 이슈가 없습니다." : "검색 결과 없음",
+                        L10n.text(query.isEmpty ? "추가할 수 있는 이슈가 없습니다." : "검색 결과 없음"),
                         systemImage: query.isEmpty ? "checklist" : "magnifyingglass",
                         description: query.isEmpty
-                            ? Text("이미 추가했거나 추가할 수 없는 이슈만 남았습니다.")
-                            : Text("다른 제목이나 이슈 번호로 검색해 보세요.")
+                            ? Text(L10n.text("이미 추가했거나 추가할 수 없는 이슈만 남았습니다."))
+                            : Text(L10n.text("다른 제목이나 이슈 번호로 검색해 보세요."))
                     )
                 } else {
-                    Section("선행 이슈 선택") {
+                    Section(L10n.text("선행 이슈 선택")) {
                         ForEach(filteredCandidates) { candidate in
                             Button {
                                 Task { @MainActor in await add(candidate) }
@@ -2058,7 +2093,7 @@ struct DependencyPickerSheet: View {
                             }
                             .buttonStyle(.borderless)
                             .disabled(addingID != nil)
-                            .accessibilityLabel("\(candidate.title) 의존성 추가")
+                            .accessibilityLabel(L10n.format("%@ 의존성 추가", candidate.title))
                             .accessibilityIdentifier(
                                 "dependency-option-\(candidate.id.uuidString.lowercased())"
                             )
@@ -2067,12 +2102,12 @@ struct DependencyPickerSheet: View {
                 }
             }
             .listStyle(.insetGrouped)
-            .navigationTitle("의존성 추가")
+            .navigationTitle(L10n.text("의존성 추가"))
             .navigationBarTitleDisplayMode(.inline)
-            .searchable(text: $query, prompt: "이슈 검색")
+            .searchable(text: $query, prompt: L10n.text("이슈 검색"))
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("닫기") { dismiss() }
+                    Button(L10n.text("닫기")) { dismiss() }
                         .accessibilityIdentifier("dependency-picker-close")
                 }
             }
@@ -2218,12 +2253,17 @@ struct IssueDescriptionView: View {
                             )
                         } else {
                             Label {
-                                Text(alt.isEmpty ? "첨부 이미지" : alt)
+                                Text(alt.isEmpty ? L10n.text("첨부 이미지") : alt)
                             } icon: {
                                 Image(systemName: "photo.badge.exclamationmark")
                             }
                             .foregroundStyle(.secondary)
-                            .accessibilityLabel("\(alt.isEmpty ? "첨부 이미지" : alt) 이미지를 불러올 수 없음")
+                            .accessibilityLabel(
+                                L10n.format(
+                                    "%@ 이미지를 불러올 수 없음",
+                                    alt.isEmpty ? L10n.text("첨부 이미지") : alt
+                                )
+                            )
                         }
                     }
                 }

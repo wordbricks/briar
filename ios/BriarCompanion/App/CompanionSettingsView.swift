@@ -41,9 +41,9 @@ struct CompanionSettingsView: View {
                         }
                         .padding(.vertical, 4)
                         .accessibilityIdentifier("account-profile-photo")
-                        LabeledContent("이름", value: user.name)
+                        LabeledContent(L10n.text("이름", locale: locale), value: user.name)
                         if let username = user.username, !username.isEmpty {
-                            LabeledContent("사용자명", value: username)
+                            LabeledContent(L10n.text("사용자명", locale: locale), value: username)
                         }
                         LabeledContent(L10n.text(.profileEmail, locale: locale), value: user.email)
                     }
@@ -67,7 +67,7 @@ struct CompanionSettingsView: View {
                 Section {
                     Picker(L10n.text(.settingsAppIcon, locale: locale), selection: iconSelection) {
                         ForEach(AppIconName.allCases) { icon in
-                            Text(icon.title).tag(icon)
+                            Text(icon.title(locale: locale)).tag(icon)
                         }
                     }
                     .pickerStyle(.segmented)
@@ -95,7 +95,7 @@ struct CompanionSettingsView: View {
                                                     lineWidth: selectedIcon == icon ? 3 : 1
                                                 )
                                         }
-                                    Text(icon.title)
+                                    Text(icon.title(locale: locale))
                                         .font(.caption2)
                                         .foregroundStyle(.primary)
                                 }
@@ -117,7 +117,7 @@ struct CompanionSettingsView: View {
 
                 Section {
                     ForEach(InboxCategory.allCases) { category in
-                        Toggle(category.title, isOn: preferenceBinding(category))
+                        Toggle(category.title(locale: locale), isOn: preferenceBinding(category))
                             .accessibilityIdentifier("notification-toggle-\(category.rawValue)")
                     }
                 } header: {
@@ -127,7 +127,7 @@ struct CompanionSettingsView: View {
                 }
 
                 Section(L10n.text(.settingsPermissions, locale: locale)) {
-                    Label("읽기·쓰기", systemImage: "pencil.and.list.clipboard")
+                    Label(L10n.text("읽기·쓰기", locale: locale), systemImage: "pencil.and.list.clipboard")
                     Text(L10n.text(.settingsPermissionsDetail, locale: locale))
                         .font(.footnote)
                         .foregroundStyle(.secondary)
@@ -136,7 +136,7 @@ struct CompanionSettingsView: View {
             .navigationTitle(L10n.text(.settingsTitle, locale: locale))
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("완료", action: onDismiss)
+                    Button(L10n.text("완료", locale: locale), action: onDismiss)
                 }
             }
             .onAppear { selectedIcon = AppIconService.current }
@@ -175,7 +175,7 @@ struct CompanionSettingsView: View {
             try await AppIconService.set(icon)
             selectedIcon = icon
         } catch {
-            iconError = "이 기기에서 앱 아이콘을 변경할 수 없습니다."
+            iconError = L10n.text("이 기기에서 앱 아이콘을 변경할 수 없습니다.", locale: locale)
         }
     }
 }

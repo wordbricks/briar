@@ -170,6 +170,19 @@ const writePermissions = new Set([
   "write",
 ]);
 
+const readOnlyPermissions = new Set(["glob", "grep", "list", "read"]);
+
+function isOpenCodeReadOnlyPermission(
+  request: OpenCodeRunnerRequest,
+  permission: string,
+) {
+  const normalized = permission.trim().toLowerCase();
+  return readOnlyPermissions.has(normalized) ||
+    normalized === "question" ||
+    (request.networkAccess &&
+      (normalized === "webfetch" || normalized === "websearch"));
+}
+
 export function isOpenCodeWritePermission(permission: string): boolean {
   const normalized = permission.trim().toLowerCase();
   return (
@@ -185,11 +198,8 @@ export function shouldAutoApproveOpenCodePermission(
   request: OpenCodeRunnerRequest,
   permission: string,
 ): boolean {
-  if (
-    request.sandboxMode === "readOnly" &&
-    isOpenCodeWritePermission(permission)
-  ) {
-    return false;
+  if (request.sandboxMode === "readOnly") {
+    return isOpenCodeReadOnlyPermission(request, permission);
   }
   if (
     request.sandboxMode === "workspaceWrite" &&
@@ -206,19 +216,34 @@ export function shouldAutoApproveOpenCodePermission(
 export function buildOpenCodePermissionRules(
   request: OpenCodeRunnerRequest,
 ): PermissionRuleset {
-  const defaultAction =
-    request.sandboxMode === "dangerFullAccess" ||
+  const defaultAction = request.sandboxMode === "readOnly"
+    ? "deny"
+    : request.sandboxMode === "dangerFullAccess" ||
     request.approvalPolicy === "never"
       ? "allow"
       : "ask";
   return [
     { permission: "*", pattern: "*", action: defaultAction },
     ...(request.sandboxMode === "readOnly"
-      ? Array.from(writePermissions, (permission) => ({
-          permission,
-          pattern: "*",
-          action: "deny" as const,
-        }))
+      ? [
+          ...Array.from(readOnlyPermissions, (permission) => ({
+            permission,
+            pattern: "*",
+            action: "allow" as const,
+          })),
+          ...(request.networkAccess
+            ? ["webfetch", "websearch"].map((permission) => ({
+                permission,
+                pattern: "*",
+                action: "allow" as const,
+              }))
+            : []),
+          {
+            permission: "external_directory",
+            pattern: "*",
+            action: "deny" as const,
+          },
+        ]
       : request.sandboxMode === "workspaceWrite"
         ? [
             {
