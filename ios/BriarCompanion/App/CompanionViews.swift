@@ -19,7 +19,6 @@ struct CompanionShellView: View {
     let projects: [ProjectsResponse.Project]
     let project: ProjectsResponse.Project
     let snapshot: DashboardSnapshot?
-    let isRefreshing: Bool
     let errorMessage: String?
     let token: String
     let api: any MobileAPIClientProtocol
@@ -56,7 +55,6 @@ struct CompanionShellView: View {
                     project: project,
                     projects: projects,
                     snapshot: snapshot,
-                    isRefreshing: isRefreshing,
                     errorMessage: errorMessage,
                     token: token,
                     api: api,
@@ -253,7 +251,6 @@ struct TaskListView: View {
     let project: ProjectsResponse.Project
     let projects: [ProjectsResponse.Project]
     let snapshot: DashboardSnapshot?
-    let isRefreshing: Bool
     let errorMessage: String?
     let token: String
     let api: any MobileAPIClientProtocol
@@ -265,7 +262,6 @@ struct TaskListView: View {
         project: ProjectsResponse.Project,
         projects: [ProjectsResponse.Project] = [],
         snapshot: DashboardSnapshot?,
-        isRefreshing: Bool,
         errorMessage: String?,
         token: String,
         api: any MobileAPIClientProtocol,
@@ -275,7 +271,6 @@ struct TaskListView: View {
         self.project = project
         self.projects = projects
         self.snapshot = snapshot
-        self.isRefreshing = isRefreshing
         self.errorMessage = errorMessage
         self.token = token
         self.api = api
@@ -386,9 +381,6 @@ struct TaskListView: View {
                 }
                 .listStyle(.plain)
                 .refreshable { await refresh() }
-                .overlay(alignment: .top) {
-                    if isRefreshing { ProgressView().padding(.top, 6) }
-                }
                 .accessibilityIdentifier("task-list")
             }
         }
