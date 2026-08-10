@@ -23,6 +23,18 @@ export const changelogCopy = {
     backTop: "맨 위로 ↑",
     entries: [
       {
+        version: "1.2.99",
+        date: "2026년 8월 10일",
+        title: "동시 작업과 긴 대화를 더 안정적으로 처리합니다",
+        summary:
+          "같은 프로젝트 에이전트에서 여러 작업을 동시에 시작할 수 있고, 긴 링크·코드·표가 이슈 대화 패널 너비를 넘지 않도록 표시를 안정화했습니다.",
+        items: [
+          "첫 번째 작업이 실행 중이어도 같은 프로젝트 에이전트에서 다른 스킬 작업을 시작할 수 있습니다.",
+          "동시에 실행하는 작업을 별도 세션으로 추적해 각 작업의 진행과 결과를 독립적으로 확인합니다.",
+          "긴 URL, 코드 블록과 Markdown 표를 이슈 대화 패널 안에서 줄바꿈하거나 내부 스크롤로 표시해 가로 스크롤을 방지합니다.",
+        ],
+      },
+      {
         version: "1.2.98",
         date: "2026년 8월 10일",
         title: "대화와 실행 상태를 더 정확하게 확인합니다",
@@ -290,6 +302,18 @@ export const changelogCopy = {
     home: "Home",
     backTop: "Back to top ↑",
     entries: [
+      {
+        version: "1.2.99",
+        date: "August 10, 2026",
+        title: "Handle concurrent runs and long conversations more reliably",
+        summary:
+          "Start multiple tasks from the same project agent at once, while keeping long links, code, and tables inside the issue conversation pane.",
+        items: [
+          "Start another Skill task from a project agent while an earlier task is still running.",
+          "Track concurrent tasks as separate sessions so each run's progress and result remain independent.",
+          "Wrap long URLs and content, and scroll code blocks or Markdown tables inside the issue conversation pane instead of expanding the page horizontally.",
+        ],
+      },
       {
         version: "1.2.98",
         date: "August 10, 2026",
@@ -570,9 +594,9 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <h1>{changelog.title}</h1>
           <p>{changelog.description}</p>
         </div>
-        <a href="#v1-2-98" className="changelog-current">
+        <a href="#v1-2-99" className="changelog-current">
           <span>{changelog.current}</span>
-          <strong>v1.2.98</strong>
+          <strong>v1.2.99</strong>
           <i aria-hidden="true">↓</i>
         </a>
       </section>
@@ -597,6 +621,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   {index === 0 ? <span>{changelog.latest}</span> : null}
                   <time
                     dateTime={
+                      entry.version === "1.2.99" ||
                       entry.version === "1.2.98" ||
                       entry.version === "1.2.97" ||
                       entry.version === "1.2.96" ||
@@ -608,7 +633,8 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                       entry.version === "1.2.90" ||
                       entry.version === "1.2.89" ||
                       entry.version === "1.2.88"
-                        ? entry.version === "1.2.98" ||
+                        ? entry.version === "1.2.99" ||
+                          entry.version === "1.2.98" ||
                           entry.version === "1.2.97" ||
                           entry.version === "1.2.96" ||
                           entry.version === "1.2.95" ||
