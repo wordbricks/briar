@@ -256,6 +256,8 @@ export type ChannelMessage = {
   reactions: ChannelMessageReaction[];
   replyCount: number;
   lastReplyAt: string | null;
+  /** Up to three unique reply authors, ordered by their most recent reply. */
+  replyAuthors?: ChannelMessageAuthor[];
   document: ChannelMessageDocument | null;
   proposal: ChannelMessageProposal | null;
   createdAt: string;
