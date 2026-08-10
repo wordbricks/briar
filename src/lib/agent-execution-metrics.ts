@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { AgentProvider } from "./agent-provider-contract";
 
 const tokenCountSchema = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
 
@@ -61,7 +62,7 @@ const usageCandidates = (payload: unknown) => {
 };
 
 export function agentExecutionTokenUsageFromPayload(
-  provider: "codex" | "claude" | "grok" | "opencode",
+  provider: AgentProvider,
   payload: unknown,
 ): AgentExecutionTokenUsage | null {
   for (const usage of usageCandidates(payload)) {

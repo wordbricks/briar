@@ -14,6 +14,7 @@ import { useI18n } from "../i18n";
 import {
   agentEfforts,
   agentModels,
+  agentProviderLabels,
   agentProviders,
   type AgentProvider,
   type ModelEffort,
@@ -49,13 +50,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Typography } from "@/components/ui/typography";
-
-const providerLabels: Record<AgentProvider, string> = {
-  codex: "Codex",
-  claude: "Claude",
-  grok: "Grok",
-  opencode: "OpenCode",
-};
 
 export function ProjectAgentSettings({
   agent,
@@ -396,7 +390,7 @@ export function ProjectAgentSettings({
                         setEffort(null);
                       }}
                       options={agentProviders.map((candidate) => ({
-                        label: providerLabels[candidate],
+                        label: agentProviderLabels[candidate],
                         value: candidate,
                       }))}
                       value={provider}

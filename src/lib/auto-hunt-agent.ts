@@ -1,4 +1,5 @@
 import type { HuntRun, ProjectAgent } from "../types";
+import type { AgentProvider } from "./agent-provider-contract";
 import { briarApiUrl } from "./api";
 import { maxAutoHuntIssuesLimit } from "./auto-hunt-automation";
 
@@ -11,7 +12,7 @@ export type AutoHuntAppServerEvent = {
   occurredAtMs: number;
   direction: "client" | "server";
   message: Record<string, unknown>;
-  provider?: "codex" | "claude" | "grok" | "opencode";
+  provider?: AgentProvider;
   event?: AutoHuntAgentEvent;
 };
 

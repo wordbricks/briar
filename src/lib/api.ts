@@ -11,7 +11,12 @@ import {
   defaultProjectAgentCalendarColor,
   type ProjectAgentLocale,
 } from "./project-agent";
-import type { AgentProvider, ModelEffort } from "./project-llm";
+import {
+  agentProviders,
+  modelEfforts,
+  type AgentProvider,
+  type ModelEffort,
+} from "./agent-provider-contract";
 import type { UsageRangeDays } from "./agent-usage-overview";
 import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
 import type {
@@ -122,12 +127,9 @@ const projectAgentSchema = z.object({
     })
     .nullable()
     .default(null),
-  provider: z.enum(["codex", "claude", "grok", "opencode"]),
+  provider: z.enum(agentProviders),
   model: z.string().nullable(),
-  effort: z
-    .enum(["low", "medium", "high", "xhigh", "max", "ultra"])
-    .nullable()
-    .default(null),
+  effort: z.enum(modelEfforts).nullable().default(null),
   responsibility: z.string(),
   skill: z.string(),
   skills: z
@@ -137,12 +139,9 @@ const projectAgentSchema = z.object({
         agentId: z.string(),
         name: z.string(),
         instructions: z.string(),
-        provider: z.enum(["codex", "claude", "grok", "opencode"]),
+        provider: z.enum(agentProviders),
         model: z.string().nullable(),
-        effort: z
-          .enum(["low", "medium", "high", "xhigh", "max", "ultra"])
-          .nullable()
-          .default(null),
+        effort: z.enum(modelEfforts).nullable().default(null),
         kind: z.enum(["issue_processing", "custom"]),
         position: z.number().int().nonnegative(),
         createdAt: z.string(),
@@ -218,7 +217,7 @@ const projectAgentScheduleSchema = z.object({
   projectId: z.string().uuid(),
   agentId: z.string().uuid(),
   agentName: z.string(),
-  agentProvider: z.enum(["codex", "claude", "grok", "opencode"]),
+  agentProvider: z.enum(agentProviders),
   name: z.string(),
   recurrence: z.enum([
     "interval",

@@ -195,6 +195,7 @@ import type {
 import {
   agentEfforts,
   agentModels,
+  agentProviderLabels,
   agentProviders,
   type AgentProvider,
   type ModelEffort,
@@ -2944,7 +2945,7 @@ export function CreateIssueDialog({
               options={[
                 { label: t("issue.agentDefault"), value: "" },
                 ...availableProviders.map((provider) => ({
-                  label: providerDisplayName(provider),
+                  label: agentProviderLabels[provider],
                   value: provider,
                 })),
               ]}
@@ -3557,16 +3558,6 @@ function pullRequestDisplayName(url: string, index: number) {
   return index === 0 ? "PR" : `PR ${index + 1}`;
 }
 
-function providerDisplayName(provider: AgentProvider) {
-  return provider === "codex"
-    ? "Codex"
-    : provider === "claude"
-      ? "Claude"
-      : provider === "grok"
-        ? "Grok"
-        : "OpenCode";
-}
-
 function modelDisplayName(provider: AgentProvider, model: string) {
   return (
     agentModels[provider].find((option) => option.value === model)?.label ??
@@ -3636,7 +3627,7 @@ function IssueContextMenu({
     t("run.notSet");
   const currentProvider = run.preferredProvider ?? "none";
   const currentProviderLabel = run.preferredProvider
-    ? providerDisplayName(run.preferredProvider)
+    ? agentProviderLabels[run.preferredProvider]
     : t("issue.agentDefault");
   const currentModelLabel = run.preferredProvider
     ? run.preferredModel
@@ -3915,7 +3906,7 @@ function IssueContextMenu({
                           <Check aria-hidden="true" size={14} />
                         ) : null}
                       </ContextMenu.ItemIndicator>
-                      <span>{providerDisplayName(provider)}</span>
+                      <span>{agentProviderLabels[provider]}</span>
                     </ContextMenu.RadioItem>
                   ))}
                   {availableProviders.length === 0 ? (
@@ -4694,7 +4685,7 @@ export function RunPage({
         : performedAgentModel ?? null;
   const executionWorker = assignedWorker ?? null;
   const executionIdentityParts = [
-    executionProvider ? providerDisplayName(executionProvider) : null,
+    executionProvider ? agentProviderLabels[executionProvider] : null,
     executionProvider && executionModel
       ? modelDisplayName(executionProvider, executionModel)
       : null,
@@ -4727,7 +4718,7 @@ export function RunPage({
           <dt>{t("run.metricsProvider")}</dt>
           <dd className="run-result-metrics-provider">
             <AgentProviderIcon provider={executionProvider} size={13} />
-            <span>{providerDisplayName(executionProvider)}</span>
+            <span>{agentProviderLabels[executionProvider]}</span>
           </dd>
         </div>
       ) : null}
@@ -5998,7 +5989,7 @@ export function RunPage({
                             value: "",
                           },
                           ...availableProviders.map((provider) => ({
-                            label: providerDisplayName(provider),
+                            label: agentProviderLabels[provider],
                             value: provider,
                           })),
                         ]}
@@ -6950,7 +6941,7 @@ function IssueAgentActivityPanel({
               {t("autoHunt.live")}
             </i>
           ) : null}
-          {provider ? providerDisplayName(provider) : null}
+          {provider ? agentProviderLabels[provider] : null}
           {t("autoHunt.eventCount", { count: activity.length })}
         </span>
       </header>
@@ -6987,7 +6978,7 @@ function IssueAgentActivityPanel({
                 </span>
                 <strong>
                   {provider
-                    ? providerDisplayName(provider)
+                    ? agentProviderLabels[provider]
                     : message.phase === "final_answer" || message.phase === "final"
                       ? t("autoHunt.agentMessage.final")
                       : t("autoHunt.agentMessage.commentary")}

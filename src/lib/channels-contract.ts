@@ -1,26 +1,16 @@
 import { z } from "zod";
+import {
+  agentProviders,
+  modelEfforts,
+  type AgentProvider,
+  type ModelEffort,
+} from "./agent-provider-contract";
 
-/**
- * Declared here rather than imported from project-llm: this contract is shared
- * with the Cloudflare Worker, which cannot pull in browser-coupled modules.
- */
-export const channelAgentProviders = [
-  "codex",
-  "claude",
-  "grok",
-  "opencode",
-] as const;
-export type ChannelAgentProvider = (typeof channelAgentProviders)[number];
+export const channelAgentProviders = agentProviders;
+export type ChannelAgentProvider = AgentProvider;
 
-export const channelAgentEfforts = [
-  "low",
-  "medium",
-  "high",
-  "xhigh",
-  "max",
-  "ultra",
-] as const;
-export type ChannelAgentEffort = (typeof channelAgentEfforts)[number];
+export const channelAgentEfforts = modelEfforts;
+export type ChannelAgentEffort = ModelEffort;
 
 export const channelAgentSkillKinds = [
   "issue_processing",

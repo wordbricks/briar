@@ -9,19 +9,13 @@ import { useI18n } from "../i18n";
 import {
   agentEfforts,
   agentModels,
+  agentProviderLabels,
   agentProviders,
   type AgentProvider,
   type ModelEffort,
 } from "../lib/project-llm";
 import type { ProjectAgentSkillInput } from "../types";
 import { NativeSelect } from "./NativeSelect";
-
-const providerLabels: Record<AgentProvider, string> = {
-  codex: "Codex",
-  claude: "Claude",
-  grok: "Grok",
-  opencode: "OpenCode",
-};
 
 function positioned(skills: ProjectAgentSkillInput[]) {
   return skills.map((skill, position) => ({ ...skill, position }));
@@ -247,7 +241,7 @@ export function ProjectAgentSkillsEditor({
                           })
                         }
                         options={agentProviders.map((provider) => ({
-                          label: providerLabels[provider],
+                          label: agentProviderLabels[provider],
                           value: provider,
                         }))}
                         value={skill.provider}

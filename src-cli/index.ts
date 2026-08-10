@@ -29,6 +29,10 @@ import {
   agentExecutionTokenUsageFromPayload,
   type AgentExecutionTokenUsage,
 } from "../src/lib/agent-execution-metrics";
+import {
+  agentProviders,
+  modelEfforts,
+} from "../src/lib/agent-provider-contract";
 import { validateEvidenceImages } from "../src/lib/evidence-images";
 import { channelReplyCompletionSchema } from "../src/lib/channels-contract";
 import {
@@ -227,7 +231,7 @@ const projectConfigSchema = z
     apiUrl: z.string().url().optional(),
     repositoryRemote: z.string().optional(),
     llm: z
-      .object({ provider: z.enum(["codex", "claude", "grok", "opencode"]) })
+      .object({ provider: z.enum(agentProviders) })
       .passthrough()
       .optional(),
     autoHunt: autoHuntConfigSchema.optional(),
@@ -904,7 +908,7 @@ const queuedIssueMessageSchema = z.object({
     id: z.string().nullable(),
     name: z.string().min(1),
     image: z.string().nullable(),
-    provider: z.enum(["codex", "claude", "grok", "opencode"]).nullable(),
+    provider: z.enum(agentProviders).nullable(),
   }),
   replyCount: z.number().int().nonnegative(),
   createdAt: z.string().datetime({ offset: true }),
@@ -1933,21 +1937,9 @@ const workerBindingSchema = workerRegistrationSchema.omit({
   workerToken: true,
 });
 
-const detachedAgentProviderSchema = z.enum([
-  "codex",
-  "claude",
-  "grok",
-  "opencode",
-]);
+const detachedAgentProviderSchema = z.enum(agentProviders);
 
-const detachedAgentEffortSchema = z.enum([
-  "low",
-  "medium",
-  "high",
-  "xhigh",
-  "max",
-  "ultra",
-]);
+const detachedAgentEffortSchema = z.enum(modelEfforts);
 
 const detachedAgentSkillSchema = z.object({
   id: z.string().min(1),

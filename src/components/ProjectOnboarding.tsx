@@ -28,9 +28,9 @@ import {
   type AutoHuntWorkflow,
 } from "../lib/auto-hunt-contract";
 import { repositoryProjectName } from "../lib/project-workspace";
-import type {
-  AgentProvider,
-  ProjectLlmProgress,
+import {
+  agentProviderLabels,
+  type ProjectLlmProgress,
 } from "../lib/project-llm";
 import type { SessionUser } from "../types";
 import { useI18n } from "../i18n";
@@ -89,13 +89,6 @@ type OnboardingPhase =
   | "workflow-review"
   | "tools-loading"
   | "tools-review";
-
-const providerNames: Record<AgentProvider, string> = {
-  codex: "Codex",
-  claude: "Claude",
-  grok: "Grok",
-  opencode: "OpenCode",
-};
 
 function Progress({ current }: { current: 1 | 2 | 3 }) {
   return (
@@ -589,7 +582,7 @@ export function ProjectOnboarding({
                       <span>
                         <i aria-hidden="true" />
                         {workflowProgress
-                          ? providerNames[workflowProgress.provider]
+                          ? agentProviderLabels[workflowProgress.provider]
                           : t("onboarding.workflowProviderProgress")}
                       </span>
                       <p ref={workflowProgressMessage}>
@@ -658,7 +651,7 @@ export function ProjectOnboarding({
                       <span>
                         <i aria-hidden="true" />
                         {workflowProgress
-                          ? providerNames[workflowProgress.provider]
+                          ? agentProviderLabels[workflowProgress.provider]
                           : t("onboarding.workflowProviderProgress")}
                       </span>
                       <p ref={workflowProgressMessage}>

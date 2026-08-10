@@ -2,9 +2,13 @@ import { spawnSync } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import {
+  agentProviders,
+  type AgentProvider,
+} from "../src/lib/agent-provider-contract";
 
-export const workerProviderIds = ["codex", "claude", "grok", "opencode"] as const;
-export type WorkerProvider = (typeof workerProviderIds)[number];
+export const workerProviderIds = agentProviders;
+export type WorkerProvider = AgentProvider;
 
 export type WorkerProviderHealth = {
   installed: boolean;
