@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
+import { maxEvidenceMultipartBytes } from "../../src/lib/evidence-images";
 import { maxIssueMultipartBytes } from "../../src/lib/issue-attachments";
 import {
   readIssueMessageRequest,
   readChannelMessageRequest,
   readIssueRequest,
   readIssueUpdateRequest,
+  readRunEvidenceRequest,
 } from "./index";
 
 const issueRequest = (
@@ -27,6 +29,243 @@ const issueRequest = (
     body: form,
   });
 };
+
+const multipartReaders: Array<{
+  name: string;
+  maxBytes: number;
+  tooLargeMessage: string;
+  read: (request: Request) => Promise<unknown>;
+}> = [
+  {
+    name: "run evidence",
+    maxBytes: maxEvidenceMultipartBytes,
+    tooLargeMessage: "Evidence images exceed the 25MB total limit",
+    read: readRunEvidenceRequest,
+  },
+  {
+    name: "issue message",
+    maxBytes: maxIssueMultipartBytes,
+    tooLargeMessage: "Message attachments exceed the 25MB total limit",
+    read: readIssueMessageRequest,
+  },
+  {
+    name: "channel message",
+    maxBytes: maxIssueMultipartBytes,
+    tooLargeMessage: "Channel images exceed the 25MB total limit",
+    read: readChannelMessageRequest,
+  },
+  {
+    name: "issue create",
+    maxBytes: maxIssueMultipartBytes,
+    tooLargeMessage: "Issue attachments exceed the 25MB total limit",
+    read: readIssueRequest,
+  },
+  {
+    name: "issue update",
+    maxBytes: maxIssueMultipartBytes,
+    tooLargeMessage: "Issue attachments exceed the 25MB total limit",
+    read: readIssueUpdateRequest,
+  },
+];
+
+const invalidMultipartRequest = (contentLength?: number) =>
+  new Request("https://briar.example/multipart", {
+    method: "POST",
+    headers: {
+      "Content-Type": "multipart/form-data; boundary=invalid",
+      ...(contentLength === undefined
+        ? {}
+        : { "Content-Length": String(contentLength) }),
+    },
+    body: "not multipart data",
+  });
+
+const multipartFormRequest = (form: FormData) =>
+  new Request("https://briar.example/multipart", {
+    method: "POST",
+    headers: { "Content-Length": "8192" },
+    body: form,
+  });
+
+describe("shared multipart request envelope", () => {
+  it.each([
+    {
+      name: "run evidence",
+      read: readRunEvidenceRequest,
+      emptyField: "images",
+      body: {
+        evidenceKey: "LOCAL-1:qa:result",
+        stage: "qa",
+        type: "test",
+        status: "passed",
+        observedAt: "2026-08-10T00:00:00.000Z",
+        actor: "test",
+      },
+    },
+    {
+      name: "issue message",
+      read: readIssueMessageRequest,
+      emptyField: "attachments",
+      body: { body: "JSON issue message" },
+    },
+    {
+      name: "channel message",
+      read: readChannelMessageRequest,
+      emptyField: "attachments",
+      body: { body: "JSON channel message" },
+    },
+    {
+      name: "issue create",
+      read: readIssueRequest,
+      emptyField: "attachments",
+      body: { title: "JSON issue" },
+    },
+    {
+      name: "issue update",
+      read: readIssueUpdateRequest,
+      emptyField: "attachments",
+      body: { title: "JSON update", description: null, priority: null },
+    },
+  ])("keeps non-multipart $name requests on the JSON path", async ({
+    read,
+    emptyField,
+    body,
+  }) => {
+    const parsed = (await read(
+      new Request("https://briar.example/json", {
+        method: "POST",
+        headers: { "Content-Type": "application/json; charset=utf-8" },
+        body: JSON.stringify(body),
+      }),
+    )) as Record<string, unknown>;
+
+    expect(parsed[emptyField]).toEqual([]);
+  });
+
+  it.each(multipartReaders)(
+    "requires Content-Length for $name",
+    async ({ read }) => {
+      await expect(read(invalidMultipartRequest())).rejects.toMatchObject({
+        status: 411,
+        message: "Multipart Content-Length is required",
+      });
+    },
+  );
+
+  it.each(multipartReaders)(
+    "preserves the request-specific size error for $name",
+    async ({ read, maxBytes, tooLargeMessage }) => {
+      await expect(
+        read(invalidMultipartRequest(maxBytes + 1)),
+      ).rejects.toMatchObject({ status: 413, message: tooLargeMessage });
+    },
+  );
+
+  it.each(multipartReaders)(
+    "rejects malformed form data for $name",
+    async ({ read }) => {
+      await expect(read(invalidMultipartRequest(32))).rejects.toMatchObject({
+        status: 400,
+        message: "Invalid multipart form data",
+      });
+    },
+  );
+
+  it.each([
+    {
+      name: "evidence images",
+      fieldName: "images",
+      expectedMessage: "Evidence images must be files",
+      read: readRunEvidenceRequest,
+      prepare(form: FormData) {
+        form.set(
+          "evidence",
+          JSON.stringify({
+            evidenceKey: "LOCAL-1:qa:result",
+            stage: "qa",
+            type: "test",
+            status: "passed",
+            observedAt: "2026-08-10T00:00:00.000Z",
+            actor: "test",
+          }),
+        );
+      },
+    },
+    {
+      name: "issue attachments",
+      fieldName: "attachments",
+      expectedMessage: "Attachments must be files",
+      read: readIssueRequest,
+      prepare(form: FormData) {
+        form.set("title", "Invalid attachment");
+      },
+    },
+  ])("rejects non-file $name with the existing error", async ({
+    fieldName,
+    expectedMessage,
+    read,
+    prepare,
+  }) => {
+    const form = new FormData();
+    prepare(form);
+    form.set(fieldName, "not a file");
+
+    await expect(read(multipartFormRequest(form))).rejects.toMatchObject({
+      status: 400,
+      message: expectedMessage,
+    });
+  });
+
+  it.each([
+    {
+      name: "evidence images",
+      fieldName: "images",
+      expectedMessage: "Evidence images are limited to 5 files.",
+      read: readRunEvidenceRequest,
+      prepare(form: FormData) {
+        form.set(
+          "evidence",
+          JSON.stringify({
+            evidenceKey: "LOCAL-1:qa:result",
+            stage: "qa",
+            type: "test",
+            status: "passed",
+            observedAt: "2026-08-10T00:00:00.000Z",
+            actor: "test",
+          }),
+        );
+      },
+    },
+    {
+      name: "issue attachments",
+      fieldName: "attachments",
+      expectedMessage: "첨부 파일은 최대 5개까지 추가할 수 있습니다.",
+      read: readIssueRequest,
+      prepare(form: FormData) {
+        form.set("title", "Too many attachments");
+      },
+    },
+  ])("preserves the file-count validation for $name", async ({
+    fieldName,
+    expectedMessage,
+    read,
+    prepare,
+  }) => {
+    const form = new FormData();
+    prepare(form);
+    for (let index = 0; index < 6; index += 1) {
+      form.append(
+        fieldName,
+        new File(["image"], `image-${index}.png`, { type: "image/png" }),
+      );
+    }
+
+    await expect(read(multipartFormRequest(form))).rejects.toMatchObject({
+      status: 400,
+      message: expectedMessage,
+    });
+  });
+});
 
 describe("issue multipart input", () => {
   it("parses a bounded supported attachment", async () => {
