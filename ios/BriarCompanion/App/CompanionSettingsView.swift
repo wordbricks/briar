@@ -55,6 +55,7 @@ struct CompanionSettingsView: View {
                             Text(option.localizedTitle(locale: locale)).tag(option.rawValue)
                         }
                     }
+                    .accessibilityIdentifier("settings-theme-picker")
                     Picker(L10n.text(.settingsLanguage, locale: locale), selection: $localeRaw) {
                         ForEach(CompanionLocale.allCases) { option in
                             Text(option.title).tag(option.rawValue)

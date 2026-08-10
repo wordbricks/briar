@@ -92,10 +92,11 @@ final class CompanionReadTests: XCTestCase {
         }
     }
 
-    func testTaskRowUsesCompactWorkerIcon() {
-        let worker = DashboardWorker(
-            id: "worker-1",
-            label: "Mac Studio",
+    @MainActor
+    func testRunRowResolvesAssignedAndRequestedWorker() {
+        let assignedWorker = DashboardWorker(
+            id: "worker-assigned",
+            label: "Assigned Mac",
             icon: .init(type: .emoji, value: "🍋"),
             readiness: "available",
             acceptingWork: true,
@@ -103,16 +104,44 @@ final class CompanionReadTests: XCTestCase {
             activeSessions: 0,
             availableSessions: 1
         )
-        let run = DashboardRun(
+        let requestedWorker = DashboardWorker(
+            id: "worker-requested",
+            label: "Requested Mac",
+            icon: .init(type: .emoji, value: "🍏"),
+            readiness: "available",
+            acceptingWork: true,
+            readinessDetail: nil,
+            activeSessions: 0,
+            availableSessions: 1
+        )
+        let workers = [assignedWorker, requestedWorker]
+        let assignedRun = DashboardRun(
             id: UUID(),
-            title: "Merged task",
+            title: "Assigned task",
             status: .completed,
             workflowStage: "merged",
-            workerId: worker.id,
+            requestedWorkerId: requestedWorker.id,
+            workerId: assignedWorker.id,
+            updatedAt: newer
+        )
+        let requestedRun = DashboardRun(
+            id: UUID(),
+            title: "Requested task",
+            status: .queued,
+            requestedWorkerId: requestedWorker.id,
+            updatedAt: newer
+        )
+        let unknownRun = DashboardRun(
+            id: UUID(),
+            title: "Unknown worker task",
+            status: .completed,
+            workerId: "worker-unknown",
             updatedAt: newer
         )
 
-        XCTAssertEqual(RunRow.worker(for: run, workers: [worker]), worker)
+        XCTAssertEqual(RunRow.worker(for: assignedRun, workers: workers), assignedWorker)
+        XCTAssertEqual(RunRow.worker(for: requestedRun, workers: workers), requestedWorker)
+        XCTAssertNil(RunRow.worker(for: unknownRun, workers: workers))
     }
 
     func testAgentSkillWorkerEligibilityUsesAvailabilityAndHealthyProviders() {

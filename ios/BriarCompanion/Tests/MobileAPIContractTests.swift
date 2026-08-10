@@ -2,6 +2,11 @@ import XCTest
 @testable import BriarCompanion
 
 final class MobileAPIContractTests: XCTestCase {
+    private struct OpenAPIOperation {
+        let method: String
+        let path: String
+    }
+
     private var operations: [String: [String: Any]] = [:]
 
     override func setUpWithError() throws {
@@ -21,6 +26,58 @@ final class MobileAPIContractTests: XCTestCase {
         XCTAssertEqual(MobileAPIContract.iOSClientID, "briar-mobile")
         XCTAssertEqual(MobileAPIContract.androidClientID, "briar-android")
         XCTAssertEqual(DeviceCodeRequest(), DeviceCodeRequest(clientID: "briar-mobile"))
+    }
+
+    func testSharedFixtureOperationsMatchOpenAPI() throws {
+        let bundle = Bundle(for: Self.self)
+        let openAPIURL = try XCTUnwrap(
+            bundle.url(forResource: "companion.openapi", withExtension: "yaml")
+        )
+        let openAPIData = try Data(contentsOf: openAPIURL)
+        let document = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: openAPIData) as? [String: Any]
+        )
+        let info = try XCTUnwrap(document["info"] as? [String: Any])
+        XCTAssertEqual(info["version"] as? String, MobileAPIContract.version)
+
+        let paths = try XCTUnwrap(document["paths"] as? [String: Any])
+        let httpMethods: Set<String> = ["get", "post", "put", "patch", "delete"]
+        var openAPIOperations: [String: OpenAPIOperation] = [:]
+        for (path, rawPathItem) in paths {
+            let pathItem = try XCTUnwrap(rawPathItem as? [String: Any])
+            for (method, rawOperation) in pathItem where httpMethods.contains(method) {
+                let operation = try XCTUnwrap(rawOperation as? [String: Any])
+                let operationID = try XCTUnwrap(operation["operationId"] as? String)
+                let previous = openAPIOperations.updateValue(
+                    OpenAPIOperation(method: method, path: path),
+                    forKey: operationID
+                )
+                XCTAssertNil(previous, "OpenAPI operationId \(operationID)가 중복되었습니다.")
+            }
+        }
+
+        for (operationID, fixtureOperation) in operations {
+            let openAPIOperation = try XCTUnwrap(
+                openAPIOperations[operationID],
+                "fixture operation \(operationID)가 OpenAPI에 없습니다."
+            )
+            let fixtureMethod = try XCTUnwrap(fixtureOperation["method"] as? String)
+            let fixturePath = try XCTUnwrap(fixtureOperation["path"] as? String)
+            let pathParts = fixturePath.split(
+                separator: "?",
+                maxSplits: 1,
+                omittingEmptySubsequences: false
+            )
+
+            XCTAssertEqual(fixtureMethod.lowercased(), openAPIOperation.method)
+            XCTAssertEqual(String(pathParts[0]), openAPIOperation.path)
+            if pathParts.count == 2 {
+                XCTAssertEqual(operationID, "getDashboardDelta")
+                XCTAssertEqual(String(pathParts[1]), "cursor={cursor}")
+            } else if operationID == "getDashboardDelta" {
+                XCTFail("dashboard delta fixture에는 cursor query template이 필요합니다.")
+            }
+        }
     }
 
     func testDecodesEveryReadResponseFromSharedWorkerFixture() throws {
@@ -113,7 +170,7 @@ final class MobileAPIContractTests: XCTestCase {
         )
     }
 
-    func testEndpointPathsMatchOpenAPISubset() {
+    func testEndpointBuildersProduceExpectedPaths() {
         XCTAssertEqual(MobileAPIContract.Endpoint.health, "/health")
         XCTAssertEqual(MobileAPIContract.Endpoint.deviceCode, "/api/auth/device/code")
         XCTAssertEqual(MobileAPIContract.Endpoint.deviceToken, "/api/auth/device/token")
