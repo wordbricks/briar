@@ -159,6 +159,20 @@ struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
 
 struct ChannelsResponse: Codable, Sendable {
     let channels: [ChannelSummary]
+    /// Organization-wide change cursor returned with the channel snapshot.
+    /// Optional decoding keeps older development fixtures readable.
+    let cursor: Int?
+}
+
+/// Incremental organization channel changes. Reply-job metadata is deliberately
+/// omitted: native clients only need the resulting message/channel projections.
+struct ChannelDeltaResponse: Codable, Equatable, Sendable {
+    let cursor: Int
+    let hasMore: Bool
+    let channels: [ChannelSummary]
+    let removedChannelIds: [UUID]
+    let messages: [ChannelMessage]
+    let removedMessageIds: [UUID]
 }
 
 struct ChannelDetailResponse: Codable, Sendable {

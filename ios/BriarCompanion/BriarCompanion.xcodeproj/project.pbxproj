@@ -37,6 +37,7 @@
 		B525ECAE8E1C06357500E858 /* AgentsViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 500ADEC830355232DEACCCF8 /* AgentsViews.swift */; };
 		B707AC4876E81A81295890E1 /* AgentsInboxSystemTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A688D7BF6B6F7EB6394D3F7D /* AgentsInboxSystemTests.swift */; };
 		B9D870EFE863E945B4CBE764 /* DeepLinks.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4334565F76CAABE2AFAC90F /* DeepLinks.swift */; };
+		BB3F64F464D8A8BF1A9EC3EE /* ChannelsStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B39FE63A0EDED2FBB809F740 /* ChannelsStoreTests.swift */; };
 		BBAE36DF571DE6A26EB4C1BE /* IssueMutationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 798EBF3A4F42C2F3C5CC6639 /* IssueMutationTests.swift */; };
 		BD262102FD3DB68CD134EB04 /* CoreAPITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A25CB67D8121593018F56432 /* CoreAPITests.swift */; };
 		C0EC0DC1C9574D70F706AEF1 /* AttachmentPreviewTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71138859189D1A26707616E6 /* AttachmentPreviewTests.swift */; };
@@ -106,6 +107,7 @@
 		A297991CD3C3AB8A4642A0A8 /* companion.openapi.yaml */ = {isa = PBXFileReference; lastKnownFileType = text.yaml; path = companion.openapi.yaml; sourceTree = "<group>"; };
 		A688D7BF6B6F7EB6394D3F7D /* AgentsInboxSystemTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentsInboxSystemTests.swift; sourceTree = "<group>"; };
 		AB6CE869E2BC6D599E7D03D0 /* ChannelGroupingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelGroupingTests.swift; sourceTree = "<group>"; };
+		B39FE63A0EDED2FBB809F740 /* ChannelsStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelsStoreTests.swift; sourceTree = "<group>"; };
 		B941ED81ECF5145E9F9BE24C /* AppSystemServices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSystemServices.swift; sourceTree = "<group>"; };
 		BBD28955B6995BA7B485085B /* InboxStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InboxStore.swift; sourceTree = "<group>"; };
 		BE4A7257E57301E7AE968D86 /* BriarCompanion.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = BriarCompanion.entitlements; sourceTree = "<group>"; };
@@ -134,6 +136,7 @@
 				F35D1C669DD97F245139645C /* AttachmentPipelineTests.swift */,
 				71138859189D1A26707616E6 /* AttachmentPreviewTests.swift */,
 				AB6CE869E2BC6D599E7D03D0 /* ChannelGroupingTests.swift */,
+				B39FE63A0EDED2FBB809F740 /* ChannelsStoreTests.swift */,
 				6B5F0E3F338DC5E3C1A397CA /* CompanionReadTests.swift */,
 				A25CB67D8121593018F56432 /* CoreAPITests.swift */,
 				5AA73A269C0859E5CC863982 /* DashboardSyncTests.swift */,
@@ -374,6 +377,7 @@
 				95EA1BD09B301286DE638DEC /* AttachmentPipelineTests.swift in Sources */,
 				C0EC0DC1C9574D70F706AEF1 /* AttachmentPreviewTests.swift in Sources */,
 				98CB344FE29078919B0BD228 /* ChannelGroupingTests.swift in Sources */,
+				BB3F64F464D8A8BF1A9EC3EE /* ChannelsStoreTests.swift in Sources */,
 				967C64C6A88A080B5711C4CA /* CompanionReadTests.swift in Sources */,
 				BD262102FD3DB68CD134EB04 /* CoreAPITests.swift in Sources */,
 				EEE6E17CFBF66C47153E1380 /* DashboardSyncTests.swift in Sources */,

@@ -458,21 +458,33 @@ export const mobileToggleChannelMessageReactionResponseSchema = z.object({
   message: mobileChannelMessageSchema,
 });
 
+export const mobileChannelAgentReplySchema = z.object({
+  id: z.uuid(),
+  agentId: z.uuid(),
+  channelId: z.uuid(),
+  triggerMessageId: z.uuid(),
+  parentMessageId: z.uuid(),
+  replyMessageId: z.uuid(),
+  status: z.enum(["queued", "running", "completed", "failed"]),
+  attempts: z.number().int().nonnegative(),
+  error: z.string().nullable(),
+  createdAt: z.iso.datetime(),
+  updatedAt: z.iso.datetime(),
+});
+
 export const mobileCreateChannelMessageResponseSchema = z.object({
   message: mobileChannelMessageSchema,
-  agentReplies: z.array(z.object({
-    id: z.uuid(),
-    agentId: z.uuid(),
-    channelId: z.uuid(),
-    triggerMessageId: z.uuid(),
-    parentMessageId: z.uuid(),
-    replyMessageId: z.uuid(),
-    status: z.enum(["queued", "running", "completed", "failed"]),
-    attempts: z.number().int().nonnegative(),
-    error: z.string().nullable(),
-    createdAt: z.iso.datetime(),
-    updatedAt: z.iso.datetime(),
-  })),
+  agentReplies: z.array(mobileChannelAgentReplySchema),
+});
+
+export const mobileChannelDeltaResponseSchema = z.object({
+  cursor: z.number().int().nonnegative(),
+  hasMore: z.boolean(),
+  channels: z.array(mobileChannelSummarySchema),
+  removedChannelIds: z.array(z.uuid()),
+  messages: z.array(mobileChannelMessageSchema),
+  removedMessageIds: z.array(z.uuid()),
+  agentReplies: z.array(mobileChannelAgentReplySchema),
 });
 
 export const mobileAcceptChannelProposalRequestSchema = z.object({
@@ -853,6 +865,7 @@ export const mobileOperationSchemas = {
     response: mobileProjectAgentTaskResponseSchema,
   },
   listChannels: { response: mobileChannelsResponseSchema },
+  getChannelDelta: { response: mobileChannelDeltaResponseSchema },
   getChannel: { response: mobileChannelDetailResponseSchema },
   listChannelMessages: { response: mobileChannelMessagesResponseSchema },
   createChannelMessage: {

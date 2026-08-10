@@ -157,6 +157,7 @@ final class MobileAPIContractTests: XCTestCase {
         XCTAssertEqual(acceptedAction.proposal.type, .update)
         XCTAssertEqual(acceptedAction.proposal.changes?.description, "Use the revised acceptance criteria.")
         XCTAssertEqual(channels.channels.count, 2)
+        XCTAssertEqual(channels.cursor, 12)
         XCTAssertEqual(channel.messages.first?.body, "@honey 온보딩 개편 계획서를 정리해줘")
         XCTAssertEqual(
             channel.messages.first?.mentionedAgentIds,
@@ -209,6 +210,13 @@ final class MobileAPIContractTests: XCTestCase {
         let proposalID = UUID(uuidString: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee")!
         let organizationID = UUID(uuidString: "22222222-2222-4222-8222-222222222222")!
         let channelID = UUID(uuidString: "33333333-3333-4333-8333-333333333333")!
+        XCTAssertEqual(
+            MobileAPIContract.Endpoint.channelChanges(
+                organizationID: organizationID,
+                cursor: 12
+            ),
+            "/organizations/22222222-2222-4222-8222-222222222222/channel-changes?since=12"
+        )
         XCTAssertEqual(
             MobileAPIContract.Endpoint.acceptChannelProposal(
                 organizationID: organizationID,

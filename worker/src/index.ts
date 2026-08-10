@@ -10101,22 +10101,80 @@ async function route(
       const activeSkill = job.skill_id
         ? agent.skills.find((skill) => skill.id === job.skill_id) ?? null
         : null;
-      if (job.skill_id && !activeSkill) {
+      if (
+        job.selected_skill_id_snapshot !== job.skill_id ||
+        (job.skill_id && !activeSkill)
+      ) {
         throw new HttpError(409, "Reply job lost its selected Agent Skill");
       }
       const replyRuntime = activeSkill ?? agent;
-      const replyModel = replyRuntime.provider === job.agent_provider
-        ? replyRuntime.model
-        : null;
-      const replyEffort = replyRuntime.provider === job.agent_provider
-        ? replyRuntime.effort
-        : null;
+      if (replyRuntime.provider !== job.agent_provider) {
+        throw new HttpError(409, "Reply job provider was revoked");
+      }
+      const replyModel = replyRuntime.model;
+      const replyEffort = replyRuntime.effort;
       const project = job.project_id
         ? await getOrganizationProject(db, job.organization_id, job.project_id)
         : null;
       if (job.project_id !== null && !project) {
         throw new HttpError(409, "Reply job lost its project context");
       }
+      const channelAgents = agent.project_id === null
+        ? await hydrateAgentSkills(db, await listChannelAgents(db, job.channel_id))
+        : [];
+      let delegation: {
+        delegatedByReplyId: string;
+        delegatedByAgentId: string;
+        delegatedByAgentName: string;
+        request: string;
+      } | null = null;
+      if (job.delegated_by_reply_job_id) {
+        const delegatedByJob = await getChannelAgentReplyJob(
+          db,
+          job.organization_id,
+          job.delegated_by_reply_job_id,
+        );
+        if (
+          !delegatedByJob || delegatedByJob.project_id !== null ||
+          delegatedByJob.channel_id !== job.channel_id ||
+          delegatedByJob.trigger_message_id !== job.trigger_message_id ||
+          delegatedByJob.parent_message_id !== job.parent_message_id ||
+          !job.delegation_request
+        ) {
+          throw new HttpError(409, "Delegated reply lost its parent scope");
+        }
+        const delegatedByAgent = await getOrganizationAgent(
+          db,
+          job.organization_id,
+          delegatedByJob.agent_id,
+        );
+        if (!delegatedByAgent || delegatedByAgent.project_id !== null) {
+          throw new HttpError(409, "Delegated reply lost its Organization Agent");
+        }
+        delegation = {
+          delegatedByReplyId: delegatedByJob.id,
+          delegatedByAgentId: delegatedByAgent.id,
+          delegatedByAgentName: delegatedByAgent.name,
+          request: job.delegation_request,
+        };
+      }
+      const delegationTargets = agent.project_id === null
+        ? channelAgents.flatMap((target) =>
+            target.project_id
+              ? [{
+                  agentId: target.id,
+                  agentName: target.name,
+                  projectId: target.project_id,
+                  projectName: target.project_name ?? "Project",
+                  responsibility: target.responsibility,
+                  skills: target.skills.map((skill) => ({
+                    id: skill.id,
+                    name: skill.name,
+                  })),
+                }]
+              : []
+          )
+        : [];
       return json({
         work: {
           workType: "channelReply",
@@ -10168,6 +10226,8 @@ async function route(
                 snapshotAt: job.claimed_at,
               })
             : null,
+          delegation,
+          delegationTargets,
           snapshot: {
             channel: {
               id: channel.id,
@@ -10420,6 +10480,12 @@ async function route(
     );
     if (!agent) throw new HttpError(409, "Reply job lost its Agent");
     const result = input.result!;
+    if (
+      result.delegation &&
+      (agent.project_id !== null || job.delegated_by_reply_job_id !== null)
+    ) {
+      throw new HttpError(400, "Only an Organization Agent can delegate");
+    }
     for (const projectId of [
       result.document?.projectId,
       result.issueProposal?.projectId,
@@ -10443,6 +10509,43 @@ async function route(
           projectId: result.issueProposal.projectId ?? agent.project_id,
         }
       : null;
+    let delegation: {
+      projectId: string;
+      agentId: string;
+      skillId: string | null;
+      provider: AgentProvider;
+      request: string;
+    } | null = null;
+    if (result.delegation) {
+      const roster = await hydrateAgentSkills(
+        db,
+        await listChannelAgents(db, job.channel_id),
+      );
+      const target = roster.find(
+        (candidate) => candidate.id === result.delegation?.agentId,
+      );
+      if (
+        !target || !target.project_id ||
+        target.organization_id !== job.organization_id ||
+        target.project_id !== result.delegation.projectId
+      ) {
+        throw new HttpError(
+          400,
+          "Delegation target is not an eligible Project Agent in this channel",
+        );
+      }
+      const selectedSkill = agentSkillForMessage(
+        target.skills,
+        result.delegation.request,
+      );
+      delegation = {
+        projectId: target.project_id,
+        agentId: target.id,
+        skillId: selectedSkill?.id ?? null,
+        provider: selectedSkill?.provider ?? target.provider,
+        request: result.delegation.request,
+      };
+    }
     // A document or issue may only target a project inside this organization.
     for (const projectId of [
       document?.projectId,
@@ -10466,6 +10569,7 @@ async function route(
       body: result.body,
       document,
       issueProposal,
+      delegation,
       agentName: agent.name,
       agentProvider: job.agent_provider ?? agent.provider,
       completedAt: observedAt,

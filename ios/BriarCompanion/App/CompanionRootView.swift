@@ -147,9 +147,11 @@ struct CompanionRootView: View {
             switch phase {
             case .active:
                 dashboard.applicationDidBecomeActive()
+                channels.applicationDidBecomeActive()
                 agents.applicationDidBecomeActive()
             case .background:
                 dashboard.applicationDidEnterBackground()
+                channels.applicationDidEnterBackground()
                 agents.applicationDidEnterBackground()
             default: break
             }

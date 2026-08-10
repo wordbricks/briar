@@ -1,0 +1,737 @@
+import { createHash } from "node:crypto";
+import { Miniflare } from "miniflare";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { channelReplyClaimTokenHeader } from "../../src/lib/channels-contract";
+import {
+  addChannelAgent,
+  channelReplyJson,
+  completeChannelReply,
+  createChannel,
+  createChannelMessage,
+  enqueueChannelAgentReplies,
+  getChannelAgentReplyJob,
+  getChannelMessage,
+  listChannelAgentReplies,
+  removeChannelAgent,
+} from "./channels";
+import { createProjectAgent } from "./db";
+import apiWorker from "./index";
+import { createOrganizationAgent } from "./organization-agents";
+import { applyD1Migrations } from "./test-helpers/d1";
+
+const organizationId = "10000000-0000-4000-8000-000000000001";
+const projectId = "20000000-0000-4000-8000-000000000001";
+const otherProjectId = "20000000-0000-4000-8000-000000000002";
+const deviceId = "30000000-0000-4000-8000-000000000001";
+const projectWorkerId = "40000000-0000-4000-8000-000000000001";
+const otherWorkerId = "40000000-0000-4000-8000-000000000002";
+const channelId = "50000000-0000-4000-8000-000000000001";
+const organizationAgentId = "60000000-0000-4000-8000-000000000001";
+const ownerId = "delegation-owner";
+const workerToken = "briar_worker_channel-delegation-test";
+const sha256 = (value: string) =>
+  createHash("sha256").update(value).digest("hex");
+
+describe("Organization Agent channel delegation", () => {
+  const miniflare = new Miniflare({
+    modules: true,
+    script: "export default { fetch() { return new Response('ok') } }",
+    d1Databases: { DB: "briar-channel-agent-delegation-test" },
+    r2Buckets: ["ARCHIVES"],
+  });
+  let db: D1Database;
+  let archives: R2Bucket;
+  let projectAgent: Awaited<ReturnType<typeof createProjectAgent>>;
+  let otherProjectAgent: Awaited<ReturnType<typeof createProjectAgent>>;
+  let organizationAgent: NonNullable<
+    Awaited<ReturnType<typeof createOrganizationAgent>>
+  >;
+
+  beforeAll(async () => {
+    db = await miniflare.getD1Database("DB") as unknown as D1Database;
+    archives = await miniflare.getR2Bucket("ARCHIVES") as unknown as R2Bucket;
+    await applyD1Migrations(db);
+    const now = new Date().toISOString();
+    await db.batch([
+      db.prepare(
+        `insert into "user" (id, name, email, emailVerified, createdAt, updatedAt)
+         values (?, 'Owner', 'delegation@example.com', 1, ?, ?)`,
+      ).bind(ownerId, now, now),
+      db.prepare(
+        `insert into briar_organizations (id, name, handle, created_at, updated_at)
+         values (?, 'Delegation Org', 'delegation-org', ?, ?)`,
+      ).bind(organizationId, now, now),
+    ]);
+    await db.prepare(
+      `insert into briar_organization_members (
+         organization_id, user_id, role, created_at, updated_at
+       ) values (?, ?, 'owner', ?, ?)`,
+    ).bind(organizationId, ownerId, now, now).run();
+    for (const [id, name] of [
+      [projectId, "Briar"],
+      [otherProjectId, "Other"],
+    ]) {
+      await db.prepare(
+        `insert into briar_projects (
+           id, owner_user_id, organization_id, name, agent_token_hash,
+           created_at, updated_at
+         ) values (?, ?, ?, ?, ?, ?, ?)`,
+      ).bind(
+        id,
+        ownerId,
+        organizationId,
+        name,
+        id === projectId ? "a".repeat(64) : "c".repeat(64),
+        now,
+        now,
+      ).run();
+    }
+    await db.batch([
+      db.prepare(
+        `insert into briar_execution_worker_devices (
+           id, organization_id, owner_user_id, label, device_identity_hash,
+           state, last_heartbeat_at, created_at, updated_at
+         ) values (?, ?, ?, 'Delegation device', ?, 'online', ?, ?, ?)`,
+      ).bind(deviceId, organizationId, ownerId, "b".repeat(64), now, now, now),
+      db.prepare(
+        `insert into briar_execution_worker_credentials (
+           device_id, token_hash, created_at
+         ) values (?, ?, ?)`,
+      ).bind(deviceId, sha256(workerToken), now),
+    ]);
+    for (const [id, boundProjectId] of [
+      [projectWorkerId, projectId],
+      [otherWorkerId, otherProjectId],
+    ]) {
+      await db.prepare(
+        `insert into briar_execution_workers (
+           id, project_id, label, host_fingerprint, agent_provider, state,
+           accepting_work, readiness_state, capabilities_json,
+           last_heartbeat_at, created_at, updated_at, device_id
+         ) values (?, ?, 'Delegation worker', ?, 'claude', 'online', 1, 'ready',
+                   ?, ?, ?, ?, ?)`,
+      ).bind(
+        id,
+        boundProjectId,
+        id === projectWorkerId ? "d".repeat(64) : "e".repeat(64),
+        JSON.stringify({
+          providers: ["claude"],
+          providerHealth: { claude: { healthy: true } },
+          organizationAgentContext: { protocol: 1 },
+        }),
+        now,
+        now,
+        now,
+        deviceId,
+      ).run();
+    }
+    await createChannel(db, {
+      id: channelId,
+      organizationId,
+      slug: "delegation",
+      name: "Delegation",
+      topic: null,
+      visibility: "public",
+      defaultProjectId: projectId,
+      createdByUserId: ownerId,
+      createdAt: now,
+    });
+    organizationAgent = (await createOrganizationAgent(db, {
+      id: organizationAgentId,
+      organizationId,
+      name: "Organization Lead",
+      provider: "claude",
+      model: null,
+      responsibility: "Coordinate project questions.",
+      effort: null,
+      createdAt: now,
+    }))!;
+    projectAgent = await createProjectAgent(db, projectId, {
+      name: "Briar Guide",
+      provider: "claude",
+      model: null,
+      effort: null,
+      responsibility: "Answer repository questions for Briar.",
+      calendarColor: "#6f5a7e",
+      skills: [{
+        name: "Repository questions",
+        instructions: "Inspect the repository and answer read-only questions.",
+        provider: "claude",
+        model: null,
+        effort: null,
+        kind: "custom",
+        position: 0,
+      }],
+    });
+    otherProjectAgent = await createProjectAgent(db, otherProjectId, {
+      name: "Other Guide",
+      provider: "claude",
+      model: null,
+      effort: null,
+      responsibility: "Answer questions for the other project.",
+      calendarColor: "#6f5a7e",
+    });
+    await addChannelAgent(db, {
+      channelId,
+      agentId: organizationAgent.id,
+      addedByUserId: ownerId,
+      createdAt: now,
+    });
+    await addChannelAgent(db, {
+      channelId,
+      agentId: projectAgent.id,
+      addedByUserId: ownerId,
+      createdAt: now,
+    });
+  }, 60_000);
+
+  afterAll(async () => {
+    await miniflare.dispose();
+  });
+
+  const env = () => ({
+    DB: db,
+    ARCHIVES: archives,
+    BETTER_AUTH_SECRET: "delegation-test-secret-delegation-test-secret",
+    GOOGLE_CLIENT_ID: "google-client-test",
+    GOOGLE_CLIENT_SECRET: "google-secret-test",
+  }) as unknown as Env;
+
+  const workerRequest = (path: string, body: unknown) =>
+    new Request(`https://briar.example${path}`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${workerToken}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+
+  const queueOrganizationReply = async (body: string) => {
+    const now = new Date().toISOString();
+    const messageId = crypto.randomUUID();
+    await createChannelMessage(db, {
+      id: messageId,
+      channelId,
+      parentMessageId: null,
+      authorUserId: ownerId,
+      authorAgentId: null,
+      authorAgentName: null,
+      authorAgentProvider: null,
+      body,
+      mentionedUserIds: [],
+      mentionedAgentIds: [organizationAgent.id],
+      createdAt: now,
+    });
+    const jobs = await enqueueChannelAgentReplies(db, {
+      organizationId,
+      channelId,
+      triggerMessageId: messageId,
+      parentMessageId: messageId,
+      agents: [{
+        id: organizationAgent.id,
+        projectId: null,
+        provider: "claude",
+      }],
+      createdAt: now,
+    });
+    return jobs.find((job) => job.agent_id === organizationAgent.id)!;
+  };
+
+  const claim = async (workerId: string) => {
+    const response = await apiWorker.fetch(
+      workerRequest("/channel-reply-claims", { organizationId, workerId }),
+      env(),
+    );
+    expect(response.status).toBe(200);
+    return response.json() as Promise<{ work: Record<string, unknown> | null }>;
+  };
+
+  const queueDelegatedChild = async (request: string) => {
+    const parent = await queueOrganizationReply(request);
+    const parentClaim = await claim(otherWorkerId);
+    expect(parentClaim.work).toMatchObject({ workId: parent.id });
+    const response = await apiWorker.fetch(
+      workerRequest(`/channel-reply-claims/${parent.id}/complete`, {
+        organizationId,
+        workerId: otherWorkerId,
+        claimToken: String(parentClaim.work?.claimToken),
+        result: {
+          body: "Delegating to the Project Agent.",
+          document: null,
+          issueProposal: null,
+          delegation: { projectId, agentId: projectAgent.id, request },
+        },
+      }),
+      env(),
+    );
+    expect(response.status).toBe(200);
+    const jobs = await listChannelAgentReplies(
+      db,
+      channelId,
+      parent.trigger_message_id,
+    );
+    return jobs.find((job) => job.agent_id === projectAgent.id)!;
+  };
+
+  it("atomically hands a repository question to the exact rostered Project Agent", async () => {
+    const parent = await queueOrganizationReply(
+      "@organization-lead Which module owns authentication in Briar?",
+    );
+    const parentClaim = await claim(otherWorkerId);
+    expect(parentClaim.work).toMatchObject({
+      workId: parent.id,
+      projectId: null,
+      delegation: null,
+      delegationTargets: [{
+        agentId: projectAgent.id,
+        projectId,
+        agentName: "Briar Guide",
+        projectName: "Briar",
+        skills: [{ name: "Repository questions" }],
+      }],
+    });
+    const parentToken = String(parentClaim.work?.claimToken);
+    const completed = await apiWorker.fetch(
+      workerRequest(`/channel-reply-claims/${parent.id}/complete`, {
+        organizationId,
+        workerId: otherWorkerId,
+        claimToken: parentToken,
+        result: {
+          body: "Briar Guide에게 저장소 확인을 위임했습니다.",
+          document: null,
+          issueProposal: null,
+          delegation: {
+            projectId,
+            agentId: projectAgent.id,
+            request: "Repository questions: Which module owns authentication?",
+          },
+        },
+      }),
+      env(),
+    );
+    expect(completed.status).toBe(200);
+
+    const jobs = await listChannelAgentReplies(
+      db,
+      channelId,
+      parent.trigger_message_id,
+    );
+    const child = jobs.find((job) => job.agent_id === projectAgent.id)!;
+    expect(child).toMatchObject({
+      organization_id: organizationId,
+      channel_id: channelId,
+      project_id: projectId,
+      skill_id: projectAgent.skills[0].id,
+      status: "queued",
+      agent_provider: "claude",
+      delegated_by_reply_job_id: parent.id,
+      delegation_request:
+        "Repository questions: Which module owns authentication?",
+    });
+    const memberFacingReply = channelReplyJson(child);
+    expect(memberFacingReply).not.toHaveProperty("delegationRequest");
+    expect(memberFacingReply).not.toHaveProperty("delegatedByReplyId");
+    expect(JSON.stringify(memberFacingReply)).not.toContain(
+      "Which module owns authentication",
+    );
+
+    await expect(claim(otherWorkerId)).resolves.toEqual({ work: null });
+    const childClaim = await claim(projectWorkerId);
+    expect(childClaim.work).toMatchObject({
+      workId: child.id,
+      projectId,
+      delegationTargets: [],
+      delegation: {
+        delegatedByReplyId: parent.id,
+        delegatedByAgentId: organizationAgent.id,
+        delegatedByAgentName: organizationAgent.name,
+        request: "Repository questions: Which module owns authentication?",
+      },
+    });
+    const childToken = String(childClaim.work?.claimToken);
+
+    const recursive = await apiWorker.fetch(
+      workerRequest(`/channel-reply-claims/${child.id}/complete`, {
+        organizationId,
+        workerId: projectWorkerId,
+        claimToken: childToken,
+        result: {
+          body: "Trying to delegate again.",
+          document: null,
+          issueProposal: null,
+          delegation: {
+            projectId,
+            agentId: projectAgent.id,
+            request: "Delegate again.",
+          },
+        },
+      }),
+      env(),
+    );
+    expect(recursive.status).toBe(400);
+
+    const childCompleted = await apiWorker.fetch(
+      workerRequest(`/channel-reply-claims/${child.id}/complete`, {
+        organizationId,
+        workerId: projectWorkerId,
+        claimToken: childToken,
+        result: {
+          body: "Authentication is owned by src/auth.",
+          document: null,
+          issueProposal: null,
+          delegation: null,
+        },
+      }),
+      env(),
+    );
+    expect(childCompleted.status).toBe(200);
+    await expect(
+      getChannelMessage(db, channelId, child.reply_message_id),
+    ).resolves.toMatchObject({
+      author: { type: "agent", id: projectAgent.id, name: "Briar Guide" },
+      body: "Authentication is owned by src/auth.",
+    });
+  });
+
+  it("revalidates the roster atomically and never creates a child after revocation", async () => {
+    const parent = await queueOrganizationReply("Inspect the Briar repository.");
+    const parentClaim = await claim(otherWorkerId);
+    expect(parentClaim.work).toMatchObject({ workId: parent.id });
+    const parentToken = String(parentClaim.work?.claimToken);
+    await removeChannelAgent(db, channelId, projectAgent.id);
+
+    const claimed = await getChannelAgentReplyJob(db, organizationId, parent.id);
+    const completed = await completeChannelReply(db, claimed!, {
+      jobId: parent.id,
+      deviceId,
+      workerId: otherWorkerId,
+      claimTokenHash: sha256(parentToken),
+      body: "Delegating.",
+      document: null,
+      issueProposal: null,
+      delegation: {
+        projectId,
+        agentId: projectAgent.id,
+        skillId: projectAgent.skills[0].id,
+        provider: "claude",
+        request: "Inspect the repository.",
+      },
+      agentName: organizationAgent.name,
+      agentProvider: "claude",
+      completedAt: new Date().toISOString(),
+    });
+    expect(completed).toBeNull();
+    expect(
+      (await listChannelAgentReplies(db, channelId, parent.trigger_message_id))
+        .filter((job) => job.agent_id === projectAgent.id),
+    ).toHaveLength(0);
+    await expect(
+      getChannelMessage(db, channelId, parent.reply_message_id),
+    ).resolves.toBeNull();
+
+    await addChannelAgent(db, {
+      channelId,
+      agentId: projectAgent.id,
+      addedByUserId: ownerId,
+      createdAt: new Date().toISOString(),
+    });
+    await expect(
+      completeChannelReply(db, claimed!, {
+        jobId: parent.id,
+        deviceId,
+        workerId: otherWorkerId,
+        claimTokenHash: sha256(parentToken),
+        body: "The target was removed, so I did not delegate.",
+        document: null,
+        issueProposal: null,
+        delegation: null,
+        agentName: organizationAgent.name,
+        agentProvider: "claude",
+        completedAt: new Date().toISOString(),
+      }),
+    ).resolves.toMatchObject({ status: "completed" });
+  });
+
+  it("fails a delegated child instead of falling back after its selected Skill is deleted", async () => {
+    const skill = await db.prepare(
+      `select * from briar_agent_skills where id = ?`,
+    ).bind(projectAgent.skills[0].id).first<{
+      id: string;
+      agent_id: string;
+      name: string;
+      instructions: string;
+      provider: string;
+      model: string | null;
+      effort: string | null;
+      kind: string;
+      is_default: number;
+      position: number;
+      created_at: string;
+      updated_at: string;
+    }>();
+    const child = await queueDelegatedChild(
+      "Repository questions: inspect the authentication module.",
+    );
+    expect(child).toMatchObject({
+      skill_id: skill!.id,
+      selected_skill_id_snapshot: skill!.id,
+      agent_provider: "claude",
+    });
+
+    await db.prepare(`delete from briar_agent_skills where id = ?`)
+      .bind(skill!.id).run();
+    await expect(claim(projectWorkerId)).resolves.toEqual({ work: null });
+    await expect(
+      getChannelAgentReplyJob(db, organizationId, child.id),
+    ).resolves.toMatchObject({
+      status: "failed",
+      skill_id: null,
+      selected_skill_id_snapshot: skill!.id,
+      error: "Agent provider or selected Skill changed before reply execution.",
+    });
+
+    await db.prepare(
+      `insert into briar_agent_skills (
+         id, agent_id, name, instructions, provider, model, effort, kind,
+         is_default, position, created_at, updated_at
+       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(
+      skill!.id,
+      skill!.agent_id,
+      skill!.name,
+      skill!.instructions,
+      skill!.provider,
+      skill!.model,
+      skill!.effort,
+      skill!.kind,
+      skill!.is_default,
+      skill!.position,
+      skill!.created_at,
+      skill!.updated_at,
+    ).run();
+  });
+
+  it("fails a delegated child when its selected Skill provider changes", async () => {
+    const child = await queueDelegatedChild(
+      "Repository questions: inspect the authorization module.",
+    );
+    expect(child).toMatchObject({
+      skill_id: projectAgent.skills[0].id,
+      selected_skill_id_snapshot: projectAgent.skills[0].id,
+      agent_provider: "claude",
+    });
+
+    await db.prepare(
+      `update briar_agent_skills set provider = 'codex', updated_at = ?
+       where id = ?`,
+    ).bind(new Date().toISOString(), projectAgent.skills[0].id).run();
+    await expect(claim(projectWorkerId)).resolves.toEqual({ work: null });
+    await expect(
+      getChannelAgentReplyJob(db, organizationId, child.id),
+    ).resolves.toMatchObject({
+      status: "failed",
+      error: "Agent provider or selected Skill changed before reply execution.",
+    });
+    await db.prepare(
+      `update briar_agent_skills set provider = 'claude', updated_at = ?
+       where id = ?`,
+    ).bind(new Date().toISOString(), projectAgent.skills[0].id).run();
+  });
+
+  it("rejects non-roster and project-mismatched targets before completion", async () => {
+    const parent = await queueOrganizationReply("Inspect the other project.");
+    const parentClaim = await claim(otherWorkerId);
+    const parentToken = String(parentClaim.work?.claimToken);
+    for (const delegation of [
+      {
+        projectId: otherProjectId,
+        agentId: otherProjectAgent.id,
+        request: "Inspect the other project.",
+      },
+      {
+        projectId: otherProjectId,
+        agentId: projectAgent.id,
+        request: "Cross the project boundary.",
+      },
+    ]) {
+      const response = await apiWorker.fetch(
+        workerRequest(`/channel-reply-claims/${parent.id}/complete`, {
+          organizationId,
+          workerId: otherWorkerId,
+          claimToken: parentToken,
+          result: {
+            body: "Delegating.",
+            document: null,
+            issueProposal: null,
+            delegation,
+          },
+        }),
+        env(),
+      );
+      expect(response.status).toBe(400);
+    }
+    const ordinary = await apiWorker.fetch(
+      workerRequest(`/channel-reply-claims/${parent.id}/complete`, {
+        organizationId,
+        workerId: otherWorkerId,
+        claimToken: parentToken,
+        result: {
+          body: "No eligible Project Agent is in the channel.",
+          document: null,
+          issueProposal: null,
+          delegation: null,
+        },
+      }),
+      env(),
+    );
+    expect(ordinary.status).toBe(200);
+  });
+
+  it("revokes a claimed Organization Agent before it can create a delegated child", async () => {
+    const parent = await queueOrganizationReply("Inspect Briar after removal.");
+    const parentClaim = await claim(otherWorkerId);
+    const parentToken = String(parentClaim.work?.claimToken);
+
+    await removeChannelAgent(db, channelId, organizationAgent.id);
+    const completion = await apiWorker.fetch(
+      workerRequest(`/channel-reply-claims/${parent.id}/complete`, {
+        organizationId,
+        workerId: otherWorkerId,
+        claimToken: parentToken,
+        result: {
+          body: "Delegating after removal.",
+          document: null,
+          issueProposal: null,
+          delegation: {
+            projectId,
+            agentId: projectAgent.id,
+            request: "Inspect Briar after removal.",
+          },
+        },
+      }),
+      env(),
+    );
+    expect(completion.status).toBe(409);
+    await expect(
+      getChannelAgentReplyJob(db, organizationId, parent.id),
+    ).resolves.toMatchObject({
+      status: "failed",
+      claimed_device_id: null,
+      claimed_worker_id: null,
+      claim_token_hash: null,
+      error: "Agent was removed from the channel.",
+    });
+    expect(
+      (await listChannelAgentReplies(db, channelId, parent.trigger_message_id))
+        .filter((job) => job.agent_id === projectAgent.id),
+    ).toHaveLength(0);
+
+    await addChannelAgent(db, {
+      channelId,
+      agentId: organizationAgent.id,
+      addedByUserId: ownerId,
+      createdAt: new Date().toISOString(),
+    });
+  });
+
+  it("fails a delegated child when its roster authorization is removed", async () => {
+    const parent = await queueOrganizationReply("Inspect Briar again.");
+    const parentClaim = await claim(otherWorkerId);
+    const parentToken = String(parentClaim.work?.claimToken);
+    const completed = await apiWorker.fetch(
+      workerRequest(`/channel-reply-claims/${parent.id}/complete`, {
+        organizationId,
+        workerId: otherWorkerId,
+        claimToken: parentToken,
+        result: {
+          body: "Delegating.",
+          document: null,
+          issueProposal: null,
+          delegation: {
+            projectId,
+            agentId: projectAgent.id,
+            request: "Inspect Briar again.",
+          },
+        },
+      }),
+      env(),
+    );
+    expect(completed.status).toBe(200);
+    const jobs = await listChannelAgentReplies(
+      db,
+      channelId,
+      parent.trigger_message_id,
+    );
+    const child = jobs.find((job) => job.agent_id === projectAgent.id)!;
+    expect(child.status).toBe("queued");
+
+    await removeChannelAgent(db, channelId, projectAgent.id);
+    await expect(
+      getChannelAgentReplyJob(db, organizationId, child.id),
+    ).resolves.toMatchObject({
+      status: "failed",
+      claimed_device_id: null,
+      claimed_worker_id: null,
+      claim_token_hash: null,
+      error: "Agent was removed from the channel.",
+    });
+    await expect(claim(projectWorkerId)).resolves.toEqual({ work: null });
+    await addChannelAgent(db, {
+      channelId,
+      agentId: projectAgent.id,
+      addedByUserId: ownerId,
+      createdAt: new Date().toISOString(),
+    });
+  });
+
+  it("does not enqueue a stale reply after the Agent leaves the channel", async () => {
+    await removeChannelAgent(db, channelId, projectAgent.id);
+    const createdAt = new Date().toISOString();
+    const messageId = crypto.randomUUID();
+    await createChannelMessage(db, {
+      id: messageId,
+      channelId,
+      parentMessageId: null,
+      authorUserId: ownerId,
+      authorAgentId: null,
+      authorAgentName: null,
+      authorAgentProvider: null,
+      body: "@briar-guide inspect after removal",
+      mentionedUserIds: [],
+      mentionedAgentIds: [projectAgent.id],
+      createdAt,
+    });
+    await expect(
+      enqueueChannelAgentReplies(db, {
+        organizationId,
+        channelId,
+        triggerMessageId: messageId,
+        parentMessageId: messageId,
+        agents: [{
+          id: projectAgent.id,
+          projectId,
+          provider: "claude",
+        }],
+        createdAt,
+      }),
+    ).resolves.toEqual([]);
+
+    await addChannelAgent(db, {
+      channelId,
+      agentId: projectAgent.id,
+      addedByUserId: ownerId,
+      createdAt: new Date().toISOString(),
+    });
+    await expect(
+      listChannelAgentReplies(db, channelId, messageId),
+    ).resolves.toEqual([]);
+    await expect(claim(projectWorkerId)).resolves.toEqual({ work: null });
+  });
+
+  it("requires the claim token header for delegated attachment reads", async () => {
+    // Keep the public protocol constant covered so future attachment tests do
+    // not accidentally send the Worker bearer token as the claim authority.
+    expect(channelReplyClaimTokenHeader).toBe("X-Briar-Channel-Claim-Token");
+  });
+});

@@ -40,6 +40,10 @@ enum MobileAPIContract {
             "/organizations/\(organizationID.uuidString.lowercased())/channels"
         }
 
+        static func channelChanges(organizationID: UUID, cursor: Int) -> String {
+            "/organizations/\(organizationID.uuidString.lowercased())/channel-changes?since=\(cursor)"
+        }
+
         static func channel(organizationID: UUID, channelID: UUID) -> String {
             "\(channels(organizationID: organizationID))/\(channelID.uuidString.lowercased())"
         }

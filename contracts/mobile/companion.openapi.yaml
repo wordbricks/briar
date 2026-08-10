@@ -981,6 +981,51 @@
         }
       }
     },
+    "/organizations/{organizationId}/channel-changes": {
+      "get": {
+        "operationId": "getChannelDelta",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OrganizationId"
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Incremental visible channel, message, and Agent reply changes",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChannelDeltaResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
     "/organizations/{organizationId}/channels/{channelId}": {
       "get": {
         "operationId": "getChannel",
@@ -3550,6 +3595,130 @@
           "cursor": {
             "type": "integer",
             "minimum": 0
+          }
+        },
+        "additionalProperties": true
+      },
+      "ChannelAgentReply": {
+        "type": "object",
+        "required": [
+          "id",
+          "agentId",
+          "channelId",
+          "triggerMessageId",
+          "parentMessageId",
+          "replyMessageId",
+          "status",
+          "attempts",
+          "error",
+          "createdAt",
+          "updatedAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "agentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "channelId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "triggerMessageId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "parentMessageId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "replyMessageId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "running",
+              "completed",
+              "failed"
+            ]
+          },
+          "attempts": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": true
+      },
+      "ChannelDeltaResponse": {
+        "type": "object",
+        "required": [
+          "cursor",
+          "hasMore",
+          "channels",
+          "removedChannelIds",
+          "messages",
+          "removedMessageIds",
+          "agentReplies"
+        ],
+        "properties": {
+          "cursor": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "hasMore": {
+            "type": "boolean"
+          },
+          "channels": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChannelSummary"
+            }
+          },
+          "removedChannelIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChannelMessage"
+            }
+          },
+          "removedMessageIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "agentReplies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChannelAgentReply"
+            }
           }
         },
         "additionalProperties": true
