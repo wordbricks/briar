@@ -24,9 +24,9 @@ struct AgentsHomeView: View {
                 Section("Agents") {
                     if agents.agents.isEmpty {
                         ContentUnavailableView(
-                            "표시할 Agent 없음",
+                            L10n.text("표시할 Agent 없음"),
                             systemImage: "cpu",
-                            description: Text("프로젝트에 연결된 Agent가 여기에 표시됩니다.")
+                            description: Text(L10n.text("프로젝트에 연결된 Agent가 여기에 표시됩니다."))
                         )
                     } else {
                         ForEach(agents.agents) { agent in
@@ -38,10 +38,10 @@ struct AgentsHomeView: View {
                     }
                 }
 
-                Section("세션") {
+                Section(L10n.text("세션")) {
                     let sessions = agents.sessions
                     if sessions.isEmpty {
-                        Text("아직 동기화된 세션이 없습니다.")
+                        Text(L10n.text("아직 동기화된 세션이 없습니다."))
                             .foregroundStyle(.secondary)
                     } else {
                         ForEach(sessions.prefix(30)) { session in
@@ -59,7 +59,7 @@ struct AgentsHomeView: View {
                 }
 
                 if let workers = snapshot?.workers, !workers.isEmpty {
-                    Section("실행 Worker") {
+                    Section(L10n.text("실행 Worker")) {
                         ForEach(workers) { worker in
                             HStack(spacing: 12) {
                                 Image(systemName: "desktopcomputer")
@@ -71,7 +71,7 @@ struct AgentsHomeView: View {
                                         .foregroundStyle(.secondary)
                                 }
                                 Spacer()
-                                Text("\(worker.activeSessions) 실행 중")
+                                Text(L10n.format("%d 실행 중", worker.activeSessions))
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
@@ -99,7 +99,7 @@ struct AgentsHomeView: View {
                             onOpenSession: { path.append(AgentRoute.session($0)) }
                         )
                     } else {
-                        ContentUnavailableView("Agent를 찾을 수 없음", systemImage: "cpu")
+                        ContentUnavailableView(L10n.text("Agent를 찾을 수 없음"), systemImage: "cpu")
                     }
                 case let .session(id):
                     if let session = agents.session(id: id) {
@@ -113,7 +113,7 @@ struct AgentsHomeView: View {
                             refreshDashboard: refreshDashboard
                         )
                     } else {
-                        ContentUnavailableView("세션을 찾을 수 없음", systemImage: "list.bullet.rectangle")
+                        ContentUnavailableView(L10n.text("세션을 찾을 수 없음"), systemImage: "list.bullet.rectangle")
                     }
                 }
             }
@@ -123,11 +123,11 @@ struct AgentsHomeView: View {
             }
             .overlay {
                 if agents.isRefreshing && agents.agents.isEmpty {
-                    ProgressView("Agent를 불러오는 중…")
+                    ProgressView(L10n.text("Agent를 불러오는 중…"))
                 }
             }
             .alert(
-                "Agent 실행",
+                L10n.text("Agent 실행"),
                 isPresented: Binding(
                     get: { agents.executionError != nil },
                     set: { isPresented in
@@ -135,9 +135,9 @@ struct AgentsHomeView: View {
                     }
                 )
             ) {
-                Button("확인") { agents.clearExecutionError() }
+                Button(L10n.text("확인")) { agents.clearExecutionError() }
             } message: {
-                Text(agents.executionError ?? "실행 요청을 처리하지 못했습니다.")
+                Text(L10n.text(agents.executionError ?? "실행 요청을 처리하지 못했습니다."))
             }
         }
         .onChange(of: navigation.pathSessionToken) { _, _ in
@@ -289,7 +289,7 @@ struct AgentDetailView: View {
 
     var body: some View {
         List {
-            Section("프로필") {
+            Section(L10n.text("프로필")) {
                 HStack(spacing: 14) {
                     ProfileImageView(
                         image: agent.avatar,
@@ -304,7 +304,7 @@ struct AgentDetailView: View {
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                         if agent.avatar == nil {
-                            Text("등록된 프로필 사진 없음")
+                            Text(L10n.text("등록된 프로필 사진 없음"))
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -313,17 +313,17 @@ struct AgentDetailView: View {
                 .padding(.vertical, 4)
                 .accessibilityIdentifier("agent-profile-photo")
             }
-            Section("개요") {
+            Section(L10n.text("개요")) {
                 LabeledContent("Provider", value: agent.provider.rawValue)
                 if let model = agent.model {
                     LabeledContent("Model", value: model)
                 }
-                LabeledContent("색상", value: agent.calendarColor)
+                LabeledContent(L10n.text("색상"), value: agent.calendarColor)
                 Text(agent.responsibility)
             }
             Section("Skills") {
                 if sortedSkills.isEmpty {
-                    Text("등록된 Skill이 없습니다.")
+                    Text(L10n.text("등록된 Skill이 없습니다."))
                         .foregroundStyle(.secondary)
                 } else {
                     ForEach(sortedSkills) { skill in
@@ -338,7 +338,7 @@ struct AgentDetailView: View {
                             }
                             MarkdownText(markdown: skill.instructions)
                             if !workerSupports(skill) {
-                                Label("현재 실행 가능한 Worker 없음", systemImage: "exclamationmark.triangle")
+                                Label(L10n.text("현재 실행 가능한 Worker 없음"), systemImage: "exclamationmark.triangle")
                                     .font(.caption)
                                     .foregroundStyle(.orange)
                             }
@@ -348,9 +348,9 @@ struct AgentDetailView: View {
                     }
                 }
             }
-            Section("세션") {
+            Section(L10n.text("세션")) {
                 if sessions.isEmpty {
-                    Text("이 Agent의 세션이 아직 없습니다.")
+                    Text(L10n.text("이 Agent의 세션이 아직 없습니다."))
                         .foregroundStyle(.secondary)
                 } else {
                     ForEach(sessions) { session in
@@ -370,7 +370,7 @@ struct AgentDetailView: View {
                 Button {
                     showingRun = true
                 } label: {
-                    Label("Agent 실행", systemImage: "play.fill")
+                    Label(L10n.text("Agent 실행"), systemImage: "play.fill")
                 }
                 .disabled(agent.skills.isEmpty)
                 .accessibilityIdentifier("agent-run-button")
@@ -445,7 +445,7 @@ private struct AgentRunSheet: View {
             Form {
                 Section("Skill") {
                     Picker("Skill", selection: $selectedSkillID) {
-                        Text("Skill을 선택해 주세요")
+                        Text(L10n.text("Skill을 선택해 주세요"))
                             .tag(nil as UUID?)
                         ForEach(sortedSkills) { skill in
                             Text(skill.name)
@@ -459,27 +459,27 @@ private struct AgentRunSheet: View {
                     .accessibilityIdentifier("agent-run-skill-picker")
 
                     if let selectedRuntimeDescription {
-                        LabeledContent("실행 설정", value: selectedRuntimeDescription)
+                        LabeledContent(L10n.text("실행 설정"), value: selectedRuntimeDescription)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
                 }
 
-                Section("작업 요청") {
+                Section(L10n.text("작업 요청")) {
                     TextEditor(text: $request)
                         .frame(minHeight: 130)
                         .disabled(selectedSkill == nil || isRunning)
-                        .accessibilityLabel("에이전트 작업 요청")
+                        .accessibilityLabel(L10n.text("에이전트 작업 요청"))
                         .accessibilityIdentifier("agent-run-request")
                 }
 
-                Section("실행 호스트") {
+                Section(L10n.text("실행 호스트")) {
                     if selectedSkill == nil {
-                        Text("먼저 실행할 Skill을 선택해 주세요.")
+                        Text(L10n.text("먼저 실행할 Skill을 선택해 주세요."))
                             .foregroundStyle(.secondary)
                     } else if availableWorkers.isEmpty {
                         Label(
-                            "선택한 Skill을 실행할 수 있는 Worker가 없습니다.",
+                            L10n.text("선택한 Skill을 실행할 수 있는 Worker가 없습니다."),
                             systemImage: "exclamationmark.triangle"
                         )
                         .foregroundStyle(.orange)
@@ -494,7 +494,7 @@ private struct AgentRunSheet: View {
                         .accessibilityValue(selectedWorker?.label ?? "")
                         if let worker = selectedWorker {
                             Label(
-                                worker.readinessDetail ?? "실행 가능",
+                                worker.readinessDetail ?? L10n.text("실행 가능"),
                                 systemImage: "checkmark.circle.fill"
                             )
                             .font(.caption)
@@ -510,11 +510,11 @@ private struct AgentRunSheet: View {
                     }
                 }
             }
-            .navigationTitle("Agent 실행")
+            .navigationTitle(L10n.text("Agent 실행"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("취소") { dismiss() }
+                    Button(L10n.text("취소")) { dismiss() }
                         .disabled(isRunning)
                 }
                 ToolbarItem(placement: .confirmationAction) {
@@ -524,7 +524,7 @@ private struct AgentRunSheet: View {
                         if isRunning {
                             ProgressView()
                         } else {
-                            Text("실행")
+                            Text(L10n.text("실행"))
                         }
                     }
                     .disabled(
@@ -607,8 +607,8 @@ struct SessionDetailView: View {
 
     var body: some View {
         List {
-            Section("상태") {
-                LabeledContent("상태", value: session.status.displayName)
+            Section(L10n.text("상태")) {
+                LabeledContent(L10n.text("상태"), value: session.status.displayName(locale: locale))
                 if let agent {
                     HStack {
                         Text("Agent")
@@ -625,35 +625,35 @@ struct SessionDetailView: View {
                     }
                 }
                 if let trigger = session.trigger {
-                    LabeledContent("트리거", value: trigger.rawValue)
+                    LabeledContent(L10n.text("트리거"), value: trigger.rawValue)
                 }
                 if let type = session.sessionType {
-                    LabeledContent("유형", value: type.rawValue)
+                    LabeledContent(L10n.text("유형"), value: type.rawValue)
                 }
                 if let workerID = session.workerId ?? session.requestedWorkerId {
-                    LabeledContent("실행 Worker", value: workerID)
+                    LabeledContent(L10n.text("실행 Worker"), value: workerID)
                 }
-                LabeledContent("시작", value: session.startedAt.formatted())
+                LabeledContent(L10n.text("시작"), value: L10n.dateTime(session.startedAt, locale: locale))
                 if let completedAt = session.completedAt {
-                    LabeledContent("완료", value: completedAt.formatted())
+                    LabeledContent(L10n.text("완료"), value: L10n.dateTime(completedAt, locale: locale))
                 }
             }
 
             if let request = session.request, !request.isEmpty {
-                Section("요청") { Text(request) }
+                Section(L10n.text("요청")) { Text(request) }
             }
             if let summary = session.summary, !summary.isEmpty {
-                Section("요약") { MarkdownText(markdown: summary) }
+                Section(L10n.text("요약")) { MarkdownText(markdown: summary) }
             }
             if let error = session.error, !error.isEmpty {
-                Section("오류") {
+                Section(L10n.text("오류")) {
                     Text(error).foregroundStyle(.red)
                 }
             }
 
-            Section("이슈") {
+            Section(L10n.text("이슈")) {
                 if session.issues.isEmpty {
-                    Text("연결된 이슈 없음").foregroundStyle(.secondary)
+                    Text(L10n.text("연결된 이슈 없음")).foregroundStyle(.secondary)
                 } else {
                     ForEach(session.issues) { issue in
                         if let runID = UUID(uuidString: issue.runId),
@@ -681,12 +681,12 @@ struct SessionDetailView: View {
             }
 
             if let events = session.events, !events.isEmpty {
-                Section("이벤트") {
+                Section(L10n.text("이벤트")) {
                     ForEach(events) { event in
                         HStack {
                             Text(event.type.rawValue)
                             Spacer()
-                            Text(event.occurredAt, style: .relative)
+                            Text(L10n.relativeDate(event.occurredAt, locale: locale))
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -694,7 +694,7 @@ struct SessionDetailView: View {
                 }
             }
         }
-        .navigationTitle("세션")
+        .navigationTitle(L10n.text("세션"))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
@@ -705,7 +705,7 @@ struct SessionDetailView: View {
                         origin: BriarShareLinks.defaultOrigin
                     )
                     ShareLink(item: shareURL) {
-                        Label("세션 공유", systemImage: "square.and.arrow.up")
+                        Label(L10n.text("세션 공유"), systemImage: "square.and.arrow.up")
                     }
                     Button {
                         ClipboardService.copy(shareURL.absoluteString)
@@ -728,7 +728,7 @@ struct SessionDetailView: View {
         VStack(alignment: .leading, spacing: 4) {
             Text("\(project.issueKey(runNumber: issue.runNumber)) \(issue.title)")
                 .font(.headline)
-            Text(issue.outcome.displayName)
+            Text(issue.outcome.displayName(locale: locale))
                 .font(.caption)
                 .foregroundStyle(.secondary)
             if let summary = issue.summary, !summary.isEmpty {

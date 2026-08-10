@@ -6,7 +6,8 @@ struct BriarCompanionApp: App {
         WindowGroup {
             if ProcessInfo.processInfo.arguments.contains("--ui-testing") {
                 UITestCompanionFlow(
-                    offline: ProcessInfo.processInfo.arguments.contains("--ui-testing-offline")
+                    offline: ProcessInfo.processInfo.arguments.contains("--ui-testing-offline"),
+                    locale: ProcessInfo.processInfo.arguments.contains("--ui-testing-english") ? .en : .ko
                 )
             } else {
                 CompanionRootView(api: MobileAPIClient(baseURL: Self.apiBaseURL))
@@ -34,6 +35,7 @@ private struct UITestCompanionFlow: View {
     @StateObject private var notifications = LocalNotificationService()
 
     let offline: Bool
+    let locale: CompanionLocale
     private let api = UITestAPIClient()
     private let project = ProjectsResponse.Project(
         id: UUID(uuidString: "11111111-1111-4111-8111-111111111111")!,
@@ -54,8 +56,10 @@ private struct UITestCompanionFlow: View {
         createdAt: Date(timeIntervalSince1970: 1_775_260_900)
     )
 
-    init(offline: Bool) {
+    init(offline: Bool, locale: CompanionLocale) {
         self.offline = offline
+        self.locale = locale
+        UserDefaults.standard.set(locale.rawValue, forKey: "companion-locale")
         _selectedProjectID = State(initialValue: project.id)
         _agents = StateObject(wrappedValue: AgentsStore(api: UITestAPIClient()))
         _channels = StateObject(wrappedValue: ChannelsStore(api: UITestAPIClient()))
@@ -65,7 +69,7 @@ private struct UITestCompanionFlow: View {
         if offline {
             NavigationStack {
                 OfflineStateView(
-                    message: "네트워크에 연결할 수 없습니다. 연결되면 다시 시도합니다.",
+                    message: L10n.text("네트워크에 연결할 수 없습니다. 연결되면 다시 시도합니다."),
                     refresh: {}
                 )
                 .navigationTitle("Tasks")
@@ -101,7 +105,7 @@ private struct UITestCompanionFlow: View {
                 }
             )
             .task {
-                agents.select(projectID: selectedProject.id, token: "ui-test-token", locale: "ko")
+                agents.select(projectID: selectedProject.id, token: "ui-test-token", locale: locale.rawValue)
                 channels.select(
                     organizationID: selectedProject.organizationId,
                     token: "ui-test-token"

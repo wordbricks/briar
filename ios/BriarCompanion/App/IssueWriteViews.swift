@@ -38,7 +38,7 @@ struct CreateIssueSheet: View {
             Form {
                 issueSection
                 attributesSection
-                Section("선호 실행") {
+                Section(L10n.text("선호 실행")) {
                     PreferredExecutionPicker(
                         provider: $draft.preferredProvider,
                         model: $draft.preferredModel,
@@ -56,7 +56,7 @@ struct CreateIssueSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("취소") {
+                    Button(L10n.text("취소")) {
                         persistence.save(draft)
                         dismiss()
                     }
@@ -71,7 +71,7 @@ struct CreateIssueSheet: View {
                         } else if mutations.isActive("create") {
                             ProgressView()
                         } else {
-                            Text("등록")
+                            Text(L10n.text("등록"))
                         }
                     }
                     .disabled(
@@ -80,7 +80,9 @@ struct CreateIssueSheet: View {
                             didSubmitSuccessfully
                     )
                     .accessibilityLabel(
-                        didSubmitSuccessfully ? "등록 완료" : (mutations.isActive("create") ? "등록 중" : "등록")
+                        didSubmitSuccessfully
+                            ? L10n.text("등록 완료")
+                            : (mutations.isActive("create") ? L10n.text("등록 중") : L10n.text("등록"))
                     )
                     .accessibilityIdentifier("create-issue-submit")
                 }
@@ -95,8 +97,8 @@ struct CreateIssueSheet: View {
     }
 
     private var issueSection: some View {
-        Section("이슈") {
-            TextField("제목", text: $draft.title)
+        Section(L10n.text("이슈")) {
+            TextField(L10n.text("제목"), text: $draft.title)
                 .onChange(of: draft.title) { _, value in
                     let max = IssueTitleLimits.maxLength(for: value)
                     if value.count > max {
@@ -108,7 +110,7 @@ struct CreateIssueSheet: View {
             // bottom-trailing corner of the writing area.
             VStack(alignment: .leading, spacing: 8) {
                 ZStack(alignment: .bottomTrailing) {
-                    TextField("설명", text: $draft.description, axis: .vertical)
+                    TextField(L10n.text("설명"), text: $draft.description, axis: .vertical)
                         .lineLimit(4...10)
                         .padding(.trailing, 72)
                         .padding(.bottom, 28)
@@ -118,7 +120,7 @@ struct CreateIssueSheet: View {
                             Task { await importPastedImages(providers) }
                         }
                         .labelStyle(.iconOnly)
-                        .accessibilityLabel("클립보드 이미지 붙여넣기")
+                        .accessibilityLabel(L10n.text("클립보드 이미지 붙여넣기"))
                         .accessibilityIdentifier("create-issue-paste-attachment")
                         PhotosPicker(
                             selection: $selectedPhotoItems,
@@ -136,7 +138,7 @@ struct CreateIssueSheet: View {
                                 .frame(width: 32, height: 32)
                                 .contentShape(Rectangle())
                         }
-                        .accessibilityLabel("이미지·영상 첨부")
+                        .accessibilityLabel(L10n.text("이미지·영상 첨부"))
                         .accessibilityIdentifier("create-issue-attachment")
                     }
                     .buttonStyle(.borderless)
@@ -153,7 +155,7 @@ struct CreateIssueSheet: View {
                             attachments.removeAll { $0.id == attachment.id }
                         }
                     }
-                    Text("첨부 \(attachments.count)/5 · 파일당 20MB, 전체 25MB")
+                    Text(L10n.format("첨부 %d/5 · 파일당 20MB, 전체 25MB", attachments.count))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -162,25 +164,25 @@ struct CreateIssueSheet: View {
     }
 
     private var attributesSection: some View {
-        Section("속성") {
-            Picker("담당자", selection: $draft.assigneeUserId) {
-                Text("미배정").tag(String?.none)
+        Section(L10n.text("속성")) {
+            Picker(L10n.text("담당자"), selection: $draft.assigneeUserId) {
+                Text(L10n.text("미배정")).tag(String?.none)
                 ForEach(members) { member in
                     Text(member.name).tag(String?.some(member.userId))
                 }
             }
-            Picker("우선순위", selection: $draft.priority) {
-                Text("없음").tag(Int?.none)
+            Picker(L10n.text("우선순위"), selection: $draft.priority) {
+                Text(L10n.text("없음")).tag(Int?.none)
                 ForEach(1...4, id: \.self) { priority in
                     Text("P\(priority)").tag(Int?.some(priority))
                 }
             }
-            Picker("등록 위치", selection: $draft.status) {
-                Text("실행 대기").tag(DashboardRun.Status.queued)
-                Text("백로그").tag(DashboardRun.Status.backlog)
+            Picker(L10n.text("등록 위치"), selection: $draft.status) {
+                Text(L10n.text("실행 대기")).tag(DashboardRun.Status.queued)
+                Text(L10n.text("백로그")).tag(DashboardRun.Status.backlog)
             }
             Toggle("Full Auto", isOn: $draft.fullAuto)
-                .accessibilityHint("모든 체크포인트를 건너뛰고 중단 없이 처리합니다.")
+                .accessibilityHint(L10n.text("모든 체크포인트를 건너뛰고 중단 없이 처리합니다."))
                 .accessibilityIdentifier("create-issue-full-auto")
         }
     }
@@ -230,7 +232,7 @@ struct CreateIssueSheet: View {
             }
         }
         if loaded.count == attachments.count {
-            errorMessage = "클립보드에서 붙여넣을 이미지를 읽지 못했습니다."
+            errorMessage = L10n.text("클립보드에서 붙여넣을 이미지를 읽지 못했습니다.")
         } else if let message = PendingIssueAttachment.validationMessage(for: loaded) {
             errorMessage = message
         } else {
@@ -294,24 +296,24 @@ private struct PreferredExecutionPicker: View {
     }
 
     var body: some View {
-        Picker("프로바이더", selection: $provider) {
-            Text("기본값").tag(AgentProvider?.none)
+        Picker(L10n.text("프로바이더"), selection: $provider) {
+            Text(L10n.text("기본값")).tag(AgentProvider?.none)
             ForEach(providers) { provider in
                 Text(provider.displayName)
                     .tag(AgentProvider?.some(provider))
             }
         }
         .accessibilityIdentifier("create-issue-provider")
-        Picker("모델", selection: $model) {
-            Text("기본값").tag(String?.none)
+        Picker(L10n.text("모델"), selection: $model) {
+            Text(L10n.text("기본값")).tag(String?.none)
             ForEach(availableModels, id: \.self) { model in
                 Text(model).tag(String?.some(model))
             }
         }
         .disabled(provider == nil)
         .accessibilityIdentifier("create-issue-model")
-        Picker("Effort", selection: $effort) {
-            Text("기본값").tag(ModelEffort?.none)
+        Picker(L10n.text("Effort"), selection: $effort) {
+            Text(L10n.text("기본값")).tag(ModelEffort?.none)
             ForEach(provider?.efforts ?? []) { effort in
                 Text(effort.rawValue).tag(ModelEffort?.some(effort))
             }
@@ -358,7 +360,7 @@ struct EditIssueSheet: View {
     var body: some View {
         NavigationStack {
             Form {
-                TextField("제목", text: $draft.title)
+                TextField(L10n.text("제목"), text: $draft.title)
                     .onChange(of: draft.title) { _, value in
                         let max = IssueTitleLimits.maxLength(for: value)
                         if value.count > max {
@@ -366,25 +368,25 @@ struct EditIssueSheet: View {
                         }
                     }
                     .accessibilityIdentifier("edit-issue-title")
-                TextField("설명", text: $draft.description, axis: .vertical)
+                TextField(L10n.text("설명"), text: $draft.description, axis: .vertical)
                     .lineLimit(5...12)
-                Picker("담당자", selection: $draft.assigneeUserId) {
-                    Text("미배정").tag(String?.none)
+                Picker(L10n.text("담당자"), selection: $draft.assigneeUserId) {
+                    Text(L10n.text("미배정")).tag(String?.none)
                     ForEach(members) { member in
                         Text(member.name).tag(String?.some(member.userId))
                     }
                 }
-                Picker("우선순위", selection: $draft.priority) {
-                    Text("없음").tag(Int?.none)
+                Picker(L10n.text("우선순위"), selection: $draft.priority) {
+                    Text(L10n.text("없음")).tag(Int?.none)
                     ForEach(1...4, id: \.self) { Text("P\($0)").tag(Int?.some($0)) }
                 }
                 if let errorMessage { Text(errorMessage).foregroundStyle(.red) }
             }
-            .navigationTitle("이슈 수정")
+            .navigationTitle(L10n.text("이슈 수정"))
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("취소") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) { Button(L10n.text("취소")) { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("저장") { Task { await save() } }
+                    Button(L10n.text("저장")) { Task { await save() } }
                         .disabled(mutations.isActive("update-\(runID)"))
                         .accessibilityIdentifier("edit-issue-save")
                 }
@@ -444,18 +446,18 @@ struct DispatchIssueSheet: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("실행 설정") {
-                    Picker("프로바이더", selection: $preferences.provider) {
+                Section(L10n.text("실행 설정")) {
+                    Picker(L10n.text("프로바이더"), selection: $preferences.provider) {
                         ForEach(providers) { Text($0.displayName).tag(AgentProvider?.some($0)) }
                     }
-                    Picker("모델", selection: $preferences.model) {
-                        Text("기본값").tag(String?.none)
+                    Picker(L10n.text("모델"), selection: $preferences.model) {
+                        Text(L10n.text("기본값")).tag(String?.none)
                         ForEach(preferences.provider?.models ?? [], id: \.self) {
                             Text($0).tag(String?.some($0))
                         }
                     }
-                    Picker("Effort", selection: $preferences.effort) {
-                        Text("기본값").tag(ModelEffort?.none)
+                    Picker(L10n.text("Effort"), selection: $preferences.effort) {
+                        Text(L10n.text("기본값")).tag(ModelEffort?.none)
                         ForEach(preferences.provider?.efforts ?? []) {
                             Text($0.rawValue).tag(ModelEffort?.some($0))
                         }
@@ -463,8 +465,8 @@ struct DispatchIssueSheet: View {
                     .disabled(preferences.model == nil)
                 }
                 Section("Worker") {
-                    Picker("실행 환경", selection: $workerID) {
-                        Text("사용 가능한 Worker 자동 선택").tag(String?.none)
+                    Picker(L10n.text("실행 환경"), selection: $workerID) {
+                        Text(L10n.text("사용 가능한 Worker 자동 선택")).tag(String?.none)
                         ForEach(compatibleWorkers) { worker in
                             Text("\(worker.label) · \(worker.readiness)").tag(String?.some(worker.id))
                         }
@@ -472,9 +474,9 @@ struct DispatchIssueSheet: View {
                 }
                 if let errorMessage { Text(errorMessage).foregroundStyle(.red) }
             }
-            .navigationTitle(reassign ? "다시 배정" : "바로 처리")
+            .navigationTitle(L10n.text(reassign ? "다시 배정" : "바로 처리"))
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("취소") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) { Button(L10n.text("취소")) { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
                     Button { Task { await dispatch() } } label: {
                         if didDispatchSuccessfully {
@@ -483,7 +485,7 @@ struct DispatchIssueSheet: View {
                         } else if mutations.isActive("dispatch-\(runID)") {
                             ProgressView()
                         } else {
-                            Text(reassign ? "재할당" : "실행")
+                            Text(L10n.text(reassign ? "재할당" : "실행"))
                         }
                     }
                         .disabled(
@@ -493,10 +495,10 @@ struct DispatchIssueSheet: View {
                         )
                         .accessibilityLabel(
                             didDispatchSuccessfully
-                                ? "실행 완료"
+                                ? L10n.text("실행 완료")
                                 : (mutations.isActive("dispatch-\(runID)")
-                                    ? "실행 중"
-                                    : (reassign ? "재할당" : "실행"))
+                                    ? L10n.text("실행 중")
+                                    : L10n.text(reassign ? "재할당" : "실행"))
                         )
                         .accessibilityIdentifier("dispatch-issue-submit")
                 }

@@ -58,7 +58,7 @@ struct CompanionRootView: View {
                     Task { await signIn() }
                 }
             } else if companion.loading && companion.user == nil {
-                ProgressView("계정을 불러오는 중…")
+                ProgressView(L10n.text("계정을 불러오는 중…", locale: locale))
             } else if companion.user != nil, !projectSelectionComplete {
                 ProjectSelectionView(
                     projects: companion.projects,
@@ -173,16 +173,16 @@ struct CompanionRootView: View {
 
     private var recoveryView: some View {
         ContentUnavailableView {
-            Label("연결할 수 없음", systemImage: "wifi.exclamationmark")
+            Label(L10n.text("연결할 수 없음", locale: locale), systemImage: "wifi.exclamationmark")
         } description: {
-            Text(companion.errorMessage ?? "계정 정보를 불러오지 못했습니다.")
+            Text(L10n.text(companion.errorMessage ?? "계정 정보를 불러오지 못했습니다.", locale: locale))
         } actions: {
-            Button("다시 시도") {
+            Button(L10n.text("다시 시도", locale: locale)) {
                 guard let token = session.token else { return }
                 Task { try? await companion.load(token: token) }
             }
             .accessibilityIdentifier("account-retry-button")
-            Button("로그아웃", role: .destructive) { signOut() }
+            Button(L10n.text("로그아웃", locale: locale), role: .destructive) { signOut() }
         }
     }
 
@@ -233,7 +233,7 @@ struct CompanionRootView: View {
         } catch DeviceAuthorizationError.cancelled {
             return
         } catch {
-            authError = "로그인을 완료하지 못했습니다. 잠시 후 다시 시도해 주세요."
+            authError = L10n.text("로그인을 완료하지 못했습니다. 잠시 후 다시 시도해 주세요.", locale: locale)
         }
     }
 
@@ -263,7 +263,7 @@ struct CompanionLoginView: View {
                 Text("Briar Companion")
                     .font(.largeTitle.bold())
                     .accessibilityIdentifier("login-title")
-                Text("프로젝트 진행 상황을 iPhone에서 안전하게 확인하세요.")
+                Text(L10n.text("프로젝트 진행 상황을 iPhone에서 안전하게 확인하세요."))
                     .multilineTextAlignment(.center)
                     .foregroundStyle(.secondary)
             }
@@ -271,7 +271,7 @@ struct CompanionLoginView: View {
                 if signingIn {
                     ProgressView().tint(.white)
                 } else {
-                    Text("Briar로 로그인")
+                    Text(L10n.text("Briar로 로그인"))
                 }
             }
             .buttonStyle(.borderedProminent)
@@ -330,17 +330,17 @@ struct ProjectSelectionView: View {
     var body: some View {
         if projects.isEmpty {
             ContentUnavailableView {
-                Label("연결된 프로젝트 없음", systemImage: "folder.badge.questionmark")
+                Label(L10n.text("연결된 프로젝트 없음"), systemImage: "folder.badge.questionmark")
             } description: {
-                Text("Briar Desktop에서 프로젝트와 저장소를 연결한 뒤 다시 확인해 주세요.")
+                Text(L10n.text("Briar Desktop에서 프로젝트와 저장소를 연결한 뒤 다시 확인해 주세요."))
             } actions: {
-                Button("로그아웃", role: .destructive, action: signOut)
+                Button(L10n.text("로그아웃"), role: .destructive, action: signOut)
             }
         } else {
             NavigationStack {
                 Form {
-                    Section("조직") {
-                        Picker("조직", selection: organizationSelection) {
+                    Section(L10n.text("조직")) {
+                        Picker(L10n.text("조직"), selection: organizationSelection) {
                             ForEach(organizations) { organization in
                                 Text(organization.name).tag(Optional(organization.id))
                             }
@@ -370,18 +370,18 @@ struct ProjectSelectionView: View {
                             .accessibilityIdentifier("project-picker")
                         }
                     } header: {
-                        Text("확인할 프로젝트")
+                        Text(L10n.text("확인할 프로젝트"))
                     } footer: {
-                        Text("Companion은 선택한 프로젝트의 정보를 읽기 전용으로 표시합니다.")
+                        Text(L10n.text("Companion은 선택한 프로젝트의 정보를 읽기 전용으로 표시합니다."))
                     }
                     Section {
-                        Button("계속") { continueAction() }
+                        Button(L10n.text("계속")) { continueAction() }
                             .frame(maxWidth: .infinity)
                             .disabled(selectedProjectID == nil)
                             .accessibilityIdentifier("project-continue-button")
                     }
                 }
-                .navigationTitle("프로젝트 선택")
+                .navigationTitle(L10n.text("프로젝트 선택"))
             }
         }
     }
@@ -394,13 +394,7 @@ enum CompanionAppearance: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
-    var title: String {
-        switch self {
-        case .system: "시스템"
-        case .light: "라이트"
-        case .dark: "다크"
-        }
-    }
+    var title: String { localizedTitle(locale: .current) }
 
     var colorScheme: ColorScheme? {
         switch self {

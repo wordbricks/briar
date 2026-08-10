@@ -307,20 +307,20 @@ enum MobileAPIError: LocalizedError, Equatable {
     var errorDescription: String? {
         switch self {
         case .invalidResponse:
-            return "서버 응답을 해석하지 못했습니다. 잠시 후 다시 시도해 주세요."
+            return L10n.text("서버 응답을 해석하지 못했습니다. 잠시 후 다시 시도해 주세요.")
         case let .httpStatus(status, message):
             if status == 401 {
-                return "세션이 만료되었습니다. 다시 로그인해 주세요."
+                return L10n.text("세션이 만료되었습니다. 다시 로그인해 주세요.")
             } else {
                 let trimmed = message.trimmingCharacters(in: .whitespacesAndNewlines)
                 return trimmed.isEmpty
-                    ? "요청에 실패했습니다. (HTTP \(status))"
+                    ? L10n.format("요청에 실패했습니다. (HTTP %d)", status)
                     : trimmed
             }
         case .invalidRequest:
-            return "요청을 준비하지 못했습니다. 입력값을 확인해 주세요."
+            return L10n.text("요청을 준비하지 못했습니다. 입력값을 확인해 주세요.")
         case .invalidDownload:
-            return "파일을 내려받지 못했습니다. 잠시 후 다시 시도해 주세요."
+            return L10n.text("파일을 내려받지 못했습니다. 잠시 후 다시 시도해 주세요.")
         }
     }
 }

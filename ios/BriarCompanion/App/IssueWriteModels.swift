@@ -74,29 +74,29 @@ struct PendingIssueAttachment: Identifiable, Equatable, Sendable {
 
     static func validationMessage(for attachments: [Self]) -> String? {
         guard attachments.count <= maximumCount else {
-            return "첨부 파일은 최대 5개까지 추가할 수 있습니다."
+            return L10n.text("첨부 파일은 최대 5개까지 추가할 수 있습니다.")
         }
         var total = 0
         for attachment in attachments {
             let name = attachment.filename.precomposedStringWithCanonicalMapping
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             guard !name.isEmpty, name.count <= 255, !name.contains("\0") else {
-                return "첨부 파일 이름이 유효하지 않습니다."
+                return L10n.text("첨부 파일 이름이 유효하지 않습니다.")
             }
             guard allowedContentTypes.contains(attachment.contentType) else {
-                return "\(name)은(는) 지원하지 않는 이미지·영상 형식입니다."
+                return L10n.format("%@은(는) 지원하지 않는 이미지·영상 형식입니다.", name)
             }
             guard !attachment.data.isEmpty else {
-                return "\(name)은(는) 빈 파일입니다."
+                return L10n.format("%@은(는) 빈 파일입니다.", name)
             }
             guard attachment.data.count <= maximumFileBytes else {
-                return "\(name)은(는) 파일당 20MB 제한을 넘습니다."
+                return L10n.format("%@은(는) 파일당 20MB 제한을 넘습니다.", name)
             }
             total += attachment.data.count
         }
         return total <= maximumTotalBytes
             ? nil
-            : "첨부 파일의 전체 크기는 25MB를 넘을 수 없습니다."
+            : L10n.text("첨부 파일의 전체 크기는 25MB를 넘을 수 없습니다.")
     }
 
     /// Decodes clipboard image data and wraps it as a server-supported JPEG attachment.
@@ -403,16 +403,16 @@ enum IssueMutationError: LocalizedError, Equatable {
 
     var errorDescription: String? {
         switch self {
-        case .duplicateAction: "이미 요청을 처리하고 있습니다."
-        case .invalidTitle: "이슈 제목을 입력해 주세요."
+        case .duplicateAction: L10n.text("이미 요청을 처리하고 있습니다.")
+        case .invalidTitle: L10n.text("이슈 제목을 입력해 주세요.")
         case let .titleTooLong(max, count):
-            "제목이 너무 깁니다. \(max)자 이내로 줄여 주세요. (현재 \(count)자)"
-        case .invalidMessage: "메시지를 입력해 주세요."
-        case .invalidPreferences: "모델과 effort를 선택하려면 프로바이더와 모델을 순서대로 선택해 주세요."
+            L10n.format("제목이 너무 깁니다. %d자 이내로 줄여 주세요. (현재 %d자)", max, count)
+        case .invalidMessage: L10n.text("메시지를 입력해 주세요.")
+        case .invalidPreferences: L10n.text("모델과 effort를 선택하려면 프로바이더와 모델을 순서대로 선택해 주세요.")
         case let .attachment(message): message
-        case .agentReplyTimedOut: "Briar 답변이 아직 대기 중입니다. 잠시 후 다시 확인해 주세요."
+        case .agentReplyTimedOut: L10n.text("Briar 답변이 아직 대기 중입니다. 잠시 후 다시 확인해 주세요.")
         case .agentReplyPollingFailed:
-            "메시지는 전송됐지만 Briar 답변 상태를 확인하지 못했습니다. 상세를 새로고침해 주세요."
+            L10n.text("메시지는 전송됐지만 Briar 답변 상태를 확인하지 못했습니다. 상세를 새로고침해 주세요.")
         case let .agentReplyFailed(message): message
         }
     }

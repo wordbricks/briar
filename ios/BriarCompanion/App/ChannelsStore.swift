@@ -121,7 +121,7 @@ final class ChannelsStore: ObservableObject {
             return
         }
         guard attachments.allSatisfy({ $0.contentType.hasPrefix("image/") }) else {
-            errorMessage = "채널에는 이미지만 첨부할 수 있습니다."
+            errorMessage = L10n.text("채널에는 이미지만 첨부할 수 있습니다.")
             return
         }
         sending = true

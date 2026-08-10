@@ -270,7 +270,9 @@ enum ChannelMentions {
                 recipientId: member.userId,
                 handle: normalizedHandle(member.email.split(separator: "@").first.map(String.init) ?? member.userId),
                 label: member.name,
-                detail: member.userId == currentUserId ? "나 · \(member.email)" : member.email,
+                detail: member.userId == currentUserId
+                    ? L10n.format("나 · %@", member.email)
+                    : member.email,
                 image: member.image
             )
         }
