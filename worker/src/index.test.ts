@@ -5,6 +5,7 @@ import worker, {
   accountDeletionInputSchema,
   accountProfileInputSchema,
   eventSchema,
+  handleScheduledTask,
   issueUpdateInputSchema,
   issueExecutionPreferencesSchema,
   issueReplyExecutionConfig,
@@ -31,8 +32,55 @@ import worker, {
   usageRangeDaysSchema,
   workflowStageLifecycleInputSchema,
   workerSettingsSchema,
+  type ScheduledTaskDependencies,
 } from "./index";
 import { slackCreateIssueShortcutCallbackId } from "./slack";
+
+const createScheduledTaskDependencies = (): ScheduledTaskDependencies => ({
+  archiveCompletedLogs: vi.fn(async () => ({
+    attemptedObjects: 0,
+    completedObjects: 0,
+    archivedRows: 0,
+    failures: [],
+  })),
+  expireArchives: vi.fn(async () => 0),
+  processArchiveCleanupQueue: vi.fn(async () => ({ deleted: 0, failed: 0 })),
+  pruneExpiredDashboardChanges: vi.fn(async () => ({
+    cutoff: "2026-08-03 00:00:00",
+    deleted: 0,
+    reachedBatchLimit: false,
+  })),
+  reconcileGithubMergedRuns: vi.fn(async () => ({
+    examined: 0,
+    resumed: 0,
+    alreadyResumed: 0,
+    deferred: 0,
+  })),
+});
+
+const scheduledController = (cron: string): ScheduledController => ({
+  cron,
+  scheduledTime: Date.parse("2026-08-10T00:17:00.000Z"),
+  noRetry: vi.fn(),
+});
+
+const scheduledContext = () => {
+  const pending: Promise<unknown>[] = [];
+  return {
+    context: {
+      waitUntil(promise: Promise<unknown>) {
+        pending.push(promise);
+      },
+    } as unknown as ExecutionContext,
+    pending,
+  };
+};
+
+const scheduledEnv = {
+  DB: {} as D1Database,
+  ARCHIVES: {} as R2Bucket,
+  ATTACHMENTS: {} as R2Bucket,
+} as unknown as Env;
 
 describe("Worker HTTP contract", () => {
   it("allows legacy Agent writes to omit Skills but rejects an empty roster", () => {
@@ -45,6 +93,85 @@ describe("Worker HTTP contract", () => {
     expect(
       projectAgentInputSchema.safeParse({ ...input, skills: [] }).success,
     ).toBe(false);
+  });
+
+  it("routes minute and six-hour scheduled work separately", async () => {
+    const minuteDependencies = createScheduledTaskDependencies();
+    const minute = scheduledContext();
+    await handleScheduledTask(
+      scheduledController("* * * * *"),
+      scheduledEnv,
+      minute.context,
+      minuteDependencies,
+    );
+    await Promise.all(minute.pending);
+    expect(minuteDependencies.reconcileGithubMergedRuns).toHaveBeenCalledOnce();
+    expect(
+      minuteDependencies.pruneExpiredDashboardChanges,
+    ).not.toHaveBeenCalled();
+    expect(minuteDependencies.archiveCompletedLogs).not.toHaveBeenCalled();
+
+    const sweepDependencies = createScheduledTaskDependencies();
+    const sweep = scheduledContext();
+    await handleScheduledTask(
+      scheduledController("17 */6 * * *"),
+      scheduledEnv,
+      sweep.context,
+      sweepDependencies,
+    );
+    await Promise.all(sweep.pending);
+    expect(
+      sweepDependencies.pruneExpiredDashboardChanges,
+    ).toHaveBeenCalledOnce();
+    expect(sweepDependencies.archiveCompletedLogs).toHaveBeenCalledOnce();
+    expect(sweepDependencies.expireArchives).toHaveBeenCalledOnce();
+    expect(sweepDependencies.processArchiveCleanupQueue).toHaveBeenCalledOnce();
+    expect(sweepDependencies.reconcileGithubMergedRuns).toHaveBeenCalledOnce();
+
+    const unknownDependencies = createScheduledTaskDependencies();
+    const unknown = scheduledContext();
+    const unknownController = scheduledController("0 0 * * *");
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      await handleScheduledTask(
+        unknownController,
+        scheduledEnv,
+        unknown.context,
+        unknownDependencies,
+      );
+      expect(unknown.pending).toHaveLength(0);
+      expect(unknownController.noRetry).toHaveBeenCalledOnce();
+      expect(
+        unknownDependencies.pruneExpiredDashboardChanges,
+      ).not.toHaveBeenCalled();
+      expect(unknownDependencies.reconcileGithubMergedRuns).not.toHaveBeenCalled();
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
+  it("keeps scheduled maintenance running when dashboard pruning fails", async () => {
+    const dependencies = createScheduledTaskDependencies();
+    dependencies.pruneExpiredDashboardChanges = vi.fn(async () => {
+      throw new Error("D1 prune unavailable");
+    });
+    const scheduled = scheduledContext();
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      await handleScheduledTask(
+        scheduledController("17 */6 * * *"),
+        scheduledEnv,
+        scheduled.context,
+        dependencies,
+      );
+      await expect(scheduled.pending[0]).rejects.toThrow("D1 prune unavailable");
+      expect(dependencies.archiveCompletedLogs).toHaveBeenCalledOnce();
+      expect(dependencies.expireArchives).toHaveBeenCalledOnce();
+      expect(dependencies.processArchiveCleanupQueue).toHaveBeenCalledOnce();
+      expect(dependencies.reconcileGithubMergedRuns).toHaveBeenCalledOnce();
+    } finally {
+      consoleError.mockRestore();
+    }
   });
 
   it("uses execution settings only from sources matching the claimed reply provider", () => {

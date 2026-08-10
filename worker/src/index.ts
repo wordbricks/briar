@@ -194,6 +194,7 @@ import {
   listSlackInstallations,
   moveHuntRun,
   planAccountDeletion,
+  pruneExpiredDashboardChanges,
   issueProjectAgentToken,
   recoverHuntRun,
   reconcileGithubMergedRuns,
@@ -10852,64 +10853,118 @@ async function route(
   throw new HttpError(404, "Not found");
 }
 
-export default {
-  async scheduled(
-    controller: ScheduledController,
-    env: Env,
-    ctx: ExecutionContext,
-  ): Promise<void> {
-    const observedAt = new Date(controller.scheduledTime).toISOString();
-    if (controller.cron === "* * * * *") {
-      ctx.waitUntil((async () => {
-        try {
-          const github = await reconcileGithubMergedRuns(env.DB);
-          console.log(JSON.stringify({
-            message: "GitHub merge reconciliation completed",
-            observedAt,
-            github,
-          }));
-        } catch (error) {
-          console.error(JSON.stringify({
-            message: "GitHub merge reconciliation failed",
-            observedAt,
-            error: error instanceof Error ? error.message : String(error),
-          }));
-          throw error;
-        }
-      })());
-      return;
-    }
+export type ScheduledTaskDependencies = {
+  archiveCompletedLogs: typeof archiveCompletedLogs;
+  expireArchives: typeof expireArchives;
+  processArchiveCleanupQueue: typeof processArchiveCleanupQueue;
+  pruneExpiredDashboardChanges: typeof pruneExpiredDashboardChanges;
+  reconcileGithubMergedRuns: typeof reconcileGithubMergedRuns;
+};
+
+const scheduledTaskDependencies: ScheduledTaskDependencies = {
+  archiveCompletedLogs,
+  expireArchives,
+  processArchiveCleanupQueue,
+  pruneExpiredDashboardChanges,
+  reconcileGithubMergedRuns,
+};
+const GITHUB_RECONCILIATION_CRON = "* * * * *";
+const LOG_MAINTENANCE_CRON = "17 */6 * * *";
+
+export async function handleScheduledTask(
+  controller: ScheduledController,
+  env: Env,
+  ctx: ExecutionContext,
+  dependencies = scheduledTaskDependencies,
+): Promise<void> {
+  const observedAt = new Date(controller.scheduledTime).toISOString();
+  if (controller.cron === GITHUB_RECONCILIATION_CRON) {
     ctx.waitUntil((async () => {
       try {
-        const [archive, expired, cleanup, github] = await Promise.all([
-          archiveCompletedLogs(env.DB, env.ARCHIVES, observedAt),
-          expireArchives(env.DB, env.ARCHIVES, observedAt),
-          processArchiveCleanupQueue(
-            env.DB,
-            env.ARCHIVES,
-            env.ATTACHMENTS,
-            observedAt,
-          ),
-          reconcileGithubMergedRuns(env.DB),
-        ]);
+        const github = await dependencies.reconcileGithubMergedRuns(env.DB);
         console.log(JSON.stringify({
-          message: "log archive sweep completed",
+          message: "GitHub merge reconciliation completed",
           observedAt,
-          archive,
-          expiredObjects: expired,
-          cleanup,
           github,
         }));
       } catch (error) {
         console.error(JSON.stringify({
-          message: "log archive sweep failed",
+          message: "GitHub merge reconciliation failed",
           observedAt,
           error: error instanceof Error ? error.message : String(error),
         }));
         throw error;
       }
     })());
-  },
+    return;
+  }
+  if (controller.cron !== LOG_MAINTENANCE_CRON) {
+    console.error(JSON.stringify({
+      message: "Unknown scheduled task ignored",
+      observedAt,
+      cron: controller.cron,
+    }));
+    controller.noRetry();
+    return;
+  }
+  ctx.waitUntil((async () => {
+    try {
+      // Keep the bounded delete separate from the other D1 maintenance writers.
+      let dashboardChanges: Awaited<
+        ReturnType<typeof pruneExpiredDashboardChanges>
+      > | null = null;
+      let dashboardChangePruneFailed = false;
+      let dashboardChangePruneError: unknown = null;
+      try {
+        dashboardChanges = await dependencies.pruneExpiredDashboardChanges(
+          env.DB,
+          observedAt,
+        );
+      } catch (error) {
+        dashboardChangePruneFailed = true;
+        dashboardChangePruneError = error;
+        console.error(JSON.stringify({
+          message: "Dashboard change prune failed",
+          observedAt,
+          error: error instanceof Error ? error.message : String(error),
+        }));
+      }
+      const [archive, expired, cleanup, github] = await Promise.all([
+        dependencies.archiveCompletedLogs(env.DB, env.ARCHIVES, observedAt),
+        dependencies.expireArchives(env.DB, env.ARCHIVES, observedAt),
+        dependencies.processArchiveCleanupQueue(
+          env.DB,
+          env.ARCHIVES,
+          env.ATTACHMENTS,
+          observedAt,
+        ),
+        dependencies.reconcileGithubMergedRuns(env.DB),
+      ]);
+      if (dashboardChangePruneFailed) {
+        throw dashboardChangePruneError;
+      }
+      console.log(JSON.stringify({
+        message: "log archive sweep completed",
+        observedAt,
+        dashboardChanges,
+        archive,
+        expiredObjects: expired,
+        cleanup,
+        github,
+      }));
+    } catch (error) {
+      console.error(JSON.stringify({
+        message: "log archive sweep failed",
+        observedAt,
+        error: error instanceof Error ? error.message : String(error),
+      }));
+      throw error;
+    }
+  })());
+}
+
+export default {
+  scheduled: handleScheduledTask,
   async fetch(
     request: Request,
     env: Env,
