@@ -32,6 +32,7 @@ import {
   type SetStateAction,
 } from "react";
 import { useI18n } from "../i18n";
+import { useChannelComposer } from "../hooks/useChannelComposer";
 import {
   acceptChannelProposal,
   listChannelMessages,
@@ -52,25 +53,11 @@ import type {
   ChannelMessage,
   ChannelSummary,
 } from "../lib/channels-contract";
-import {
-  mentionAtCaret,
-  mentionHandle,
-  retainedMentions,
-  type MentionTarget,
-} from "../lib/channel-mentions";
-import {
-  dataTransferHasFiles,
-  filesFromDataTransfer,
-  maxIssueAttachmentCount,
-  normalizeIssueAttachmentFile,
-  validateIssueAttachments,
-} from "../lib/issue-attachments";
+import type { MentionTarget } from "../lib/channel-mentions";
+import { maxIssueAttachmentCount } from "../lib/issue-attachments";
 import {
   ChannelDraftImages,
   ChannelMessageImages,
-  channelBodyWithImages,
-  draftChannelImage,
-  type DraftChannelImage,
 } from "./ChannelImages";
 import {
   channelThreadWidthDefault,
@@ -1209,174 +1196,52 @@ function Composer({
   ) => void;
 }) {
   const { t } = useI18n();
-  const [body, setBody] = useState("");
-  const [caret, setCaret] = useState(0);
-  const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(0);
-  const [mentionDismissed, setMentionDismissed] = useState(false);
-  // Mentions are tracked as picked entities, never re-parsed from the text:
-  // the server trusts this list, so a handle typed by hand is just text.
-  const [mentions, setMentions] = useState<MentionTarget[]>([]);
-  const [images, setImages] = useState<DraftChannelImage[]>([]);
-  const [attachmentError, setAttachmentError] = useState<string | null>(null);
-  const [dragging, setDragging] = useState(false);
-  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const attachmentInputRef = useRef<HTMLInputElement | null>(null);
-  const pendingCaret = useRef<number | null>(null);
-  const mentionListId = useId();
+  const {
+    activeSuggestionIndex,
+    attachmentError,
+    attachmentInputRef,
+    body,
+    dragging,
+    handleCaret,
+    handleChange,
+    handleDragEnter,
+    handleDragLeave,
+    handleDragOver,
+    handleDrop,
+    handleFileChange,
+    handleKeyDown,
+    handlePaste,
+    handleSubmit,
+    images,
+    inputRef: textareaRef,
+    insertAtCaret,
+    mentionListId,
+    pickSuggestion,
+    removeImage,
+    setActiveSuggestionIndex,
+    showsSuggestions,
+    suggestions,
+  } = useChannelComposer<HTMLTextAreaElement>({
+    agents,
+    busy,
+    currentUserId,
+    members,
+    onInvite,
+    onSend,
+    submitOnEnter: true,
+  });
 
   const resolvedPlaceholder =
     placeholder ?? t("channel.messagePlaceholder", { name: channelName });
 
-  const candidates = useMemo<MentionTarget[]>(
-    () => [
-      ...agents.map((agent) => ({
-        type: "agent" as const,
-        id: agent.agentId,
-        handle: mentionHandle(agent.handle?.trim() || agent.name),
-        label: agent.name,
-        detail: agent.projectId
-          ? t("channel.projectAgent")
-          : t("channel.orgAgent"),
-      })),
-      ...members.map((member) => ({
-        type: "user" as const,
-        id: member.userId,
-        handle: mentionHandle(member.email.split("@")[0] || member.userId),
-        label: member.name,
-        detail:
-          member.userId === currentUserId
-            ? t("channel.mentionSelf", { email: member.email })
-            : member.email,
-        image: member.image,
-      })),
-    ],
-    [agents, members, currentUserId, t],
-  );
-
-  const query = mentionAtCaret(body, caret);
-  const suggestions = query
-    ? candidates
-        .filter((candidate) =>
-          `${candidate.handle} ${candidate.label}`
-            .toLowerCase()
-            .includes(query.query.toLowerCase()),
-        )
-        .slice(0, 6)
-    : [];
-  const showsSuggestions = !mentionDismissed && suggestions.length > 0;
-
-  useEffect(() => {
-    setActiveSuggestionIndex(0);
-  }, [query?.query]);
-
-  useEffect(() => {
-    if (pendingCaret.current === null) return;
-    const nextCaret = pendingCaret.current;
-    pendingCaret.current = null;
-    textareaRef.current?.focus();
-    textareaRef.current?.setSelectionRange(nextCaret, nextCaret);
-  }, [body]);
-
-  const pick = (target: MentionTarget) => {
-    if (!query) return;
-    const inserted = `@${target.handle} `;
-    const nextCaret = query.start + inserted.length;
-    setBody(`${body.slice(0, query.start)}${inserted}${body.slice(query.end)}`);
-    setCaret(nextCaret);
-    pendingCaret.current = nextCaret;
-    setMentionDismissed(true);
-    setMentions((current) =>
-      current.some(
-        (mention) => mention.id === target.id && mention.type === target.type,
-      )
-        ? current
-        : [...current, target],
-    );
-  };
-
-  const insertAt = (text: string) => {
-    const start = textareaRef.current?.selectionStart ?? body.length;
-    const end = textareaRef.current?.selectionEnd ?? body.length;
-    const next = `${body.slice(0, start)}${text}${body.slice(end)}`;
-    const nextCaret = start + text.length;
-    setBody(next);
-    setCaret(nextCaret);
-    pendingCaret.current = nextCaret;
-    setMentionDismissed(false);
-    textareaRef.current?.focus();
-  };
-
-  const addImages = (files: readonly File[]) => {
-    const normalized = files.map(normalizeIssueAttachmentFile);
-    if (
-      normalized.length === 0 ||
-      normalized.some((file) => !file.type.startsWith("image/"))
-    ) {
-      setAttachmentError(t("channel.imageOnly"));
-      return;
-    }
-    const next = [...images, ...normalized.map(draftChannelImage)];
-    const validationError = validateIssueAttachments(
-      next.map((image) => image.file),
-    );
-    if (validationError) {
-      setAttachmentError(validationError);
-      return;
-    }
-    setImages(next);
-    setAttachmentError(null);
-  };
-
-  const submit = () => {
-    if ((!body.trim() && images.length === 0) || busy) return;
-    if (body.trim() === "/invite" && images.length === 0) {
-      onInvite();
-      setBody("");
-      setMentions([]);
-      setMentionDismissed(false);
-      return;
-    }
-    onSend(
-      channelBodyWithImages(body, images),
-      retainedMentions(body, mentions),
-      images.map((image) => image.file),
-      images.map((image) => image.reference),
-    );
-    setBody("");
-    setImages([]);
-    setMentions([]);
-    setMentionDismissed(false);
-  };
-
   return (
     <form
       className={`channel-composer${dragging ? " is-dragging" : ""}`}
-      onDragEnter={(event) => {
-        if (!dataTransferHasFiles(event.dataTransfer)) return;
-        event.preventDefault();
-        setDragging(true);
-      }}
-      onDragOver={(event) => {
-        if (!dataTransferHasFiles(event.dataTransfer)) return;
-        event.preventDefault();
-        event.dataTransfer.dropEffect = "copy";
-        setDragging(true);
-      }}
-      onDragLeave={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
-          setDragging(false);
-        }
-      }}
-      onDrop={(event) => {
-        if (!dataTransferHasFiles(event.dataTransfer)) return;
-        event.preventDefault();
-        setDragging(false);
-        addImages(filesFromDataTransfer(event.dataTransfer));
-      }}
-      onSubmit={(event) => {
-        event.preventDefault();
-        submit();
-      }}
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+      onSubmit={handleSubmit}
     >
       {showsSuggestions ? (
         <ul
@@ -1391,7 +1256,7 @@ function Composer({
                 aria-selected={index === activeSuggestionIndex}
                 className={index === activeSuggestionIndex ? "active" : undefined}
                 id={`${mentionListId}-option-${index}`}
-                onClick={() => pick(target)}
+                onClick={() => pickSuggestion(target)}
                 onMouseEnter={() => setActiveSuggestionIndex(index)}
                 role="option"
                 type="button"
@@ -1414,15 +1279,7 @@ function Composer({
       ) : null}
 
       <div className="channel-composer-shell">
-        <ChannelDraftImages
-          images={images}
-          onRemove={(reference) => {
-            setImages((current) =>
-              current.filter((image) => image.reference !== reference),
-            );
-            setAttachmentError(null);
-          }}
-        />
+        <ChannelDraftImages images={images} onRemove={removeImage} />
         <textarea
           aria-activedescendant={
             showsSuggestions
@@ -1436,51 +1293,11 @@ function Composer({
           disabled={busy}
           placeholder={resolvedPlaceholder}
           value={body}
-          onChange={(event) => {
-            setBody(event.target.value);
-            setCaret(event.target.selectionStart ?? event.target.value.length);
-            setMentionDismissed(false);
-          }}
-          onKeyDown={(event) => {
-            if (showsSuggestions) {
-              if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-                event.preventDefault();
-                const offset = event.key === "ArrowDown" ? 1 : -1;
-                setActiveSuggestionIndex(
-                  (index) =>
-                    (index + offset + suggestions.length) % suggestions.length,
-                );
-                return;
-              }
-              if (event.key === "Enter" || event.key === "Tab") {
-                event.preventDefault();
-                const target = suggestions[activeSuggestionIndex] ?? suggestions[0];
-                if (target) pick(target);
-                return;
-              }
-              if (event.key === "Escape") {
-                event.preventDefault();
-                setMentionDismissed(true);
-                return;
-              }
-            }
-            if (event.key === "Enter" && !event.shiftKey) {
-              event.preventDefault();
-              submit();
-            }
-          }}
-          onKeyUp={(event) =>
-            setCaret(event.currentTarget.selectionStart ?? 0)
-          }
-          onPaste={(event) => {
-            const pasted = filesFromDataTransfer(event.clipboardData).filter(
-              (file) => file.type.startsWith("image/"),
-            );
-            if (pasted.length === 0) return;
-            event.preventDefault();
-            addImages(pasted);
-          }}
-          onClick={(event) => setCaret(event.currentTarget.selectionStart ?? 0)}
+          onChange={handleChange}
+          onKeyDown={handleKeyDown}
+          onKeyUp={handleCaret}
+          onPaste={handlePaste}
+          onClick={handleCaret}
           ref={textareaRef}
           role="combobox"
           rows={1}
@@ -1491,7 +1308,7 @@ function Composer({
               type="button"
               className="channel-composer-tool"
               aria-label={t("channel.toolMention")}
-              onClick={() => insertAt("@")}
+              onClick={() => insertAtCaret("@")}
               disabled={busy}
             >
               <AtSign size={16} />
@@ -1510,10 +1327,7 @@ function Composer({
               className="channel-composer-file-input"
               disabled={busy || images.length >= maxIssueAttachmentCount}
               multiple
-              onChange={(event) => {
-                addImages(Array.from(event.currentTarget.files ?? []));
-                event.currentTarget.value = "";
-              }}
+              onChange={handleFileChange}
               ref={attachmentInputRef}
               type="file"
             />
