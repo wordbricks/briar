@@ -67,6 +67,11 @@ import {
 } from "../../src/lib/worker-icon-validation";
 import { createAuth, type BriarAuth } from "./auth";
 import {
+  contentDisposition,
+  prepareStoredAttachments,
+  uploadStoredAttachments,
+} from "./attachment-storage";
+import {
   mobileCurrentUserResponseSchema,
   mobileHealthResponseSchema,
   mobileProjectsResponseSchema,
@@ -242,7 +247,6 @@ import {
   syncGithubConnectionRepositories,
   type HuntEventRow,
   type HuntRunRow,
-  type IssueAttachmentInput,
   type IssueAttachmentRow,
   type IssueActionProposalRow,
   type IssueAgentReplyJobRow,
@@ -514,6 +518,63 @@ class HttpError extends Error {
     readonly code?: string,
   ) {
     super(message);
+  }
+}
+
+async function readBoundedMultipartForm(
+  request: Request,
+  maxBytes: number,
+  tooLargeMessage: string,
+): Promise<FormData | null> {
+  const contentType = request.headers.get("content-type") ?? "";
+  if (!contentType.toLowerCase().startsWith("multipart/form-data;")) {
+    return null;
+  }
+
+  const declaredLength = Number(request.headers.get("content-length") ?? "0");
+  if (!Number.isSafeInteger(declaredLength) || declaredLength <= 0) {
+    throw new HttpError(411, "Multipart Content-Length is required");
+  }
+  if (declaredLength > maxBytes) {
+    throw new HttpError(413, tooLargeMessage);
+  }
+
+  try {
+    return await request.formData();
+  } catch {
+    throw new HttpError(400, "Invalid multipart form data");
+  }
+}
+
+function readMultipartFiles(
+  form: FormData,
+  fieldName: string,
+  invalidFilesMessage: string,
+  validate: (files: readonly File[]) => string | null,
+) {
+  const values = form.getAll(fieldName);
+  if (values.some((value) => !(value instanceof File))) {
+    throw new HttpError(400, invalidFilesMessage);
+  }
+  const files = values as File[];
+  const validationError = validate(files);
+  if (validationError) throw new HttpError(400, validationError);
+  return files;
+}
+
+function readMultipartJsonArray(
+  form: FormData,
+  fieldName: string,
+  invalidMessage = `${fieldName} is invalid`,
+) {
+  const value = form.get(fieldName);
+  if (typeof value !== "string" || !value) return [] as unknown[];
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (!Array.isArray(parsed)) throw new Error("not an array");
+    return parsed;
+  } catch {
+    throw new HttpError(400, invalidMessage);
   }
 }
 
@@ -805,27 +866,16 @@ export const runEvidenceInputSchema = z
   .strict();
 
 export async function readRunEvidenceRequest(request: Request) {
-  const contentType = request.headers.get("content-type") ?? "";
-  if (!contentType.toLowerCase().startsWith("multipart/form-data;")) {
+  const form = await readBoundedMultipartForm(
+    request,
+    maxEvidenceMultipartBytes,
+    "Evidence images exceed the 25MB total limit",
+  );
+  if (!form) {
     return {
       input: runEvidenceInputSchema.parse(await readJson(request)),
       images: [] as File[],
     };
-  }
-
-  const declaredLength = Number(request.headers.get("content-length") ?? "0");
-  if (!Number.isSafeInteger(declaredLength) || declaredLength <= 0) {
-    throw new HttpError(411, "Multipart Content-Length is required");
-  }
-  if (declaredLength > maxEvidenceMultipartBytes) {
-    throw new HttpError(413, "Evidence images exceed the 25MB total limit");
-  }
-
-  let form: FormData;
-  try {
-    form = await request.formData();
-  } catch {
-    throw new HttpError(400, "Invalid multipart form data");
   }
   const payload = form.get("evidence");
   if (typeof payload !== "string") {
@@ -837,13 +887,12 @@ export async function readRunEvidenceRequest(request: Request) {
   } catch {
     throw new HttpError(400, "Invalid multipart evidence JSON");
   }
-  const rawImages = form.getAll("images");
-  if (rawImages.some((image) => !(image instanceof File))) {
-    throw new HttpError(400, "Evidence images must be files");
-  }
-  const images = rawImages as File[];
-  const imageError = validateEvidenceImages(images);
-  if (imageError) throw new HttpError(400, imageError);
+  const images = readMultipartFiles(
+    form,
+    "images",
+    "Evidence images must be files",
+    validateEvidenceImages,
+  );
   return { input: runEvidenceInputSchema.parse(input), images };
 }
 
@@ -1420,49 +1469,31 @@ const issueMessageEditInputSchema = z
   .strict();
 
 export async function readIssueMessageRequest(request: Request) {
-  const contentType = request.headers.get("content-type") ?? "";
-  if (!contentType.toLowerCase().startsWith("multipart/form-data;")) {
+  const form = await readBoundedMultipartForm(
+    request,
+    maxIssueMultipartBytes,
+    "Message attachments exceed the 25MB total limit",
+  );
+  if (!form) {
     return {
       input: issueMessageInputSchema.parse(await readJson(request, 16_384)),
       attachments: [] as File[],
       attachmentReferences: [] as string[],
     };
   }
-  const declaredLength = Number(request.headers.get("content-length") ?? "0");
-  if (!Number.isSafeInteger(declaredLength) || declaredLength <= 0) {
-    throw new HttpError(411, "Multipart Content-Length is required");
-  }
-  if (declaredLength > maxIssueMultipartBytes) {
-    throw new HttpError(413, "Message attachments exceed the 25MB total limit");
-  }
-  let form: FormData;
-  try {
-    form = await request.formData();
-  } catch {
-    throw new HttpError(400, "Invalid multipart form data");
-  }
-  const rawAttachments = form.getAll("attachments");
-  if (rawAttachments.some((attachment) => !(attachment instanceof File))) {
-    throw new HttpError(400, "Attachments must be files");
-  }
-  const attachments = rawAttachments as File[];
-  const attachmentError = validateIssueAttachments(attachments);
-  if (attachmentError) throw new HttpError(400, attachmentError);
+  const attachments = readMultipartFiles(
+    form,
+    "attachments",
+    "Attachments must be files",
+    validateIssueAttachments,
+  );
   if (attachments.some((attachment) => !attachment.type.startsWith("image/"))) {
     throw new HttpError(400, "Conversation attachments must be images");
   }
-  const parseArray = (name: string) => {
-    const value = form.get(name);
-    if (typeof value !== "string" || !value) return [] as unknown[];
-    try {
-      const parsed: unknown = JSON.parse(value);
-      if (!Array.isArray(parsed)) throw new Error("not an array");
-      return parsed;
-    } catch {
-      throw new HttpError(400, `${name} is invalid`);
-    }
-  };
-  const attachmentReferences = parseArray("attachmentReferences");
+  const attachmentReferences = readMultipartJsonArray(
+    form,
+    "attachmentReferences",
+  );
   if (
     attachmentReferences.length !== attachments.length ||
     !attachmentReferences.every(isIssueAttachmentReference)
@@ -1476,7 +1507,7 @@ export async function readIssueMessageRequest(request: Request) {
   if (!attachmentReferences.every((reference) => bodyReferences.has(String(reference)))) {
     throw new HttpError(400, "Every message attachment must be referenced in the body");
   }
-  const mentionedUserIds = parseArray("mentionedUserIds");
+  const mentionedUserIds = readMultipartJsonArray(form, "mentionedUserIds");
   const parentMessageId = form.get("parentMessageId");
   const agentConversationId = form.get("agentConversationId");
   return {
@@ -1498,49 +1529,31 @@ export async function readIssueMessageRequest(request: Request) {
 }
 
 export async function readChannelMessageRequest(request: Request) {
-  const contentType = request.headers.get("content-type") ?? "";
-  if (!contentType.toLowerCase().startsWith("multipart/form-data;")) {
+  const form = await readBoundedMultipartForm(
+    request,
+    maxIssueMultipartBytes,
+    "Channel images exceed the 25MB total limit",
+  );
+  if (!form) {
     return {
       input: channelMessageInputSchema.parse(await readJson(request, 32_768)),
       attachments: [] as File[],
       attachmentReferences: [] as string[],
     };
   }
-  const declaredLength = Number(request.headers.get("content-length") ?? "0");
-  if (!Number.isSafeInteger(declaredLength) || declaredLength <= 0) {
-    throw new HttpError(411, "Multipart Content-Length is required");
-  }
-  if (declaredLength > maxIssueMultipartBytes) {
-    throw new HttpError(413, "Channel images exceed the 25MB total limit");
-  }
-  let form: FormData;
-  try {
-    form = await request.formData();
-  } catch {
-    throw new HttpError(400, "Invalid multipart form data");
-  }
-  const rawAttachments = form.getAll("attachments");
-  if (rawAttachments.some((attachment) => !(attachment instanceof File))) {
-    throw new HttpError(400, "Attachments must be files");
-  }
-  const attachments = rawAttachments as File[];
-  const attachmentError = validateIssueAttachments(attachments);
-  if (attachmentError) throw new HttpError(400, attachmentError);
+  const attachments = readMultipartFiles(
+    form,
+    "attachments",
+    "Attachments must be files",
+    validateIssueAttachments,
+  );
   if (attachments.some((attachment) => !attachment.type.startsWith("image/"))) {
     throw new HttpError(400, "Channel attachments must be images");
   }
-  const parseArray = (name: string) => {
-    const value = form.get(name);
-    if (typeof value !== "string" || !value) return [] as unknown[];
-    try {
-      const parsed: unknown = JSON.parse(value);
-      if (!Array.isArray(parsed)) throw new Error("not an array");
-      return parsed;
-    } catch {
-      throw new HttpError(400, `${name} is invalid`);
-    }
-  };
-  const attachmentReferences = parseArray("attachmentReferences");
+  const attachmentReferences = readMultipartJsonArray(
+    form,
+    "attachmentReferences",
+  );
   if (
     attachmentReferences.length !== attachments.length ||
     !attachmentReferences.every(isIssueAttachmentReference)
@@ -1562,8 +1575,8 @@ export async function readChannelMessageRequest(request: Request) {
         typeof parentMessageId === "string" && parentMessageId
           ? parentMessageId
           : null,
-      mentionedUserIds: parseArray("mentionedUserIds"),
-      mentionedAgentIds: parseArray("mentionedAgentIds"),
+      mentionedUserIds: readMultipartJsonArray(form, "mentionedUserIds"),
+      mentionedAgentIds: readMultipartJsonArray(form, "mentionedAgentIds"),
     }),
     attachments,
     attachmentReferences: attachmentReferences as string[],
@@ -1635,53 +1648,40 @@ const issueAgentReplyLeaseSchema = z
   .strict();
 
 export async function readIssueRequest(request: Request) {
-  const contentType = request.headers.get("content-type") ?? "";
-  if (!contentType.toLowerCase().startsWith("multipart/form-data;")) {
+  const form = await readBoundedMultipartForm(
+    request,
+    maxIssueMultipartBytes,
+    "Issue attachments exceed the 25MB total limit",
+  );
+  if (!form) {
     return {
       input: issueInputSchema.parse(await readJson(request)),
       attachments: [] as File[],
       attachmentReferences: [] as string[],
     };
   }
-
-  const declaredLength = Number(request.headers.get("content-length") ?? "0");
-  if (!Number.isSafeInteger(declaredLength) || declaredLength <= 0) {
-    throw new HttpError(411, "Multipart Content-Length is required");
-  }
-  if (declaredLength > maxIssueMultipartBytes) {
-    throw new HttpError(413, "Issue attachments exceed the 25MB total limit");
-  }
-
-  let form: FormData;
-  try {
-    form = await request.formData();
-  } catch {
-    throw new HttpError(400, "Invalid multipart form data");
-  }
-  const rawAttachments = form.getAll("attachments");
-  if (rawAttachments.some((attachment) => !(attachment instanceof File))) {
-    throw new HttpError(400, "Attachments must be files");
-  }
-  const attachments = rawAttachments as File[];
-  const attachmentError = validateIssueAttachments(attachments);
-  if (attachmentError) throw new HttpError(400, attachmentError);
+  const attachments = readMultipartFiles(
+    form,
+    "attachments",
+    "Attachments must be files",
+    validateIssueAttachments,
+  );
 
   const rawAttachmentReferences = form.get("attachmentReferences");
   let attachmentReferences: string[] = [];
   if (typeof rawAttachmentReferences === "string" && rawAttachmentReferences) {
-    try {
-      const parsed: unknown = JSON.parse(rawAttachmentReferences);
-      if (
-        !Array.isArray(parsed) ||
-        parsed.length !== attachments.length ||
-        !parsed.every(isIssueAttachmentReference)
-      ) {
-        throw new Error("invalid attachment references");
-      }
-      attachmentReferences = parsed;
-    } catch {
+    const parsed = readMultipartJsonArray(
+      form,
+      "attachmentReferences",
+      "Attachment references are invalid",
+    );
+    if (
+      parsed.length !== attachments.length ||
+      !parsed.every(isIssueAttachmentReference)
+    ) {
       throw new HttpError(400, "Attachment references are invalid");
     }
+    attachmentReferences = parsed as string[];
   }
 
   const description = form.get("description");
@@ -1736,8 +1736,12 @@ export async function readIssueRequest(request: Request) {
 const issueKeptAttachmentIdsSchema = z.array(z.string().uuid()).max(50);
 
 export async function readIssueUpdateRequest(request: Request) {
-  const contentType = request.headers.get("content-type") ?? "";
-  if (!contentType.toLowerCase().startsWith("multipart/form-data;")) {
+  const form = await readBoundedMultipartForm(
+    request,
+    maxIssueMultipartBytes,
+    "Issue attachments exceed the 25MB total limit",
+  );
+  if (!form) {
     const raw = await readJson(request);
     const { keptAttachmentIds, ...fields } = (raw ?? {}) as {
       keptAttachmentIds?: unknown;
@@ -1753,53 +1757,40 @@ export async function readIssueUpdateRequest(request: Request) {
           : issueKeptAttachmentIdsSchema.parse(keptAttachmentIds),
     };
   }
-
-  const declaredLength = Number(request.headers.get("content-length") ?? "0");
-  if (!Number.isSafeInteger(declaredLength) || declaredLength <= 0) {
-    throw new HttpError(411, "Multipart Content-Length is required");
-  }
-  if (declaredLength > maxIssueMultipartBytes) {
-    throw new HttpError(413, "Issue attachments exceed the 25MB total limit");
-  }
-
-  let form: FormData;
-  try {
-    form = await request.formData();
-  } catch {
-    throw new HttpError(400, "Invalid multipart form data");
-  }
-  const rawAttachments = form.getAll("attachments");
-  if (rawAttachments.some((attachment) => !(attachment instanceof File))) {
-    throw new HttpError(400, "Attachments must be files");
-  }
-  const attachments = rawAttachments as File[];
-  const attachmentError = validateIssueAttachments(attachments);
-  if (attachmentError) throw new HttpError(400, attachmentError);
+  const attachments = readMultipartFiles(
+    form,
+    "attachments",
+    "Attachments must be files",
+    validateIssueAttachments,
+  );
 
   const rawAttachmentReferences = form.get("attachmentReferences");
   let attachmentReferences: string[] = [];
   if (typeof rawAttachmentReferences === "string" && rawAttachmentReferences) {
-    try {
-      const parsed: unknown = JSON.parse(rawAttachmentReferences);
-      if (
-        !Array.isArray(parsed) ||
-        parsed.length !== attachments.length ||
-        !parsed.every(isIssueAttachmentReference)
-      ) {
-        throw new Error("invalid attachment references");
-      }
-      attachmentReferences = parsed;
-    } catch {
+    const parsed = readMultipartJsonArray(
+      form,
+      "attachmentReferences",
+      "Attachment references are invalid",
+    );
+    if (
+      parsed.length !== attachments.length ||
+      !parsed.every(isIssueAttachmentReference)
+    ) {
       throw new HttpError(400, "Attachment references are invalid");
     }
+    attachmentReferences = parsed as string[];
   }
 
   const rawKeptAttachmentIds = form.get("keptAttachmentIds");
   let keptAttachmentIds: string[] | undefined;
   if (typeof rawKeptAttachmentIds === "string" && rawKeptAttachmentIds) {
     try {
-      const parsed: unknown = JSON.parse(rawKeptAttachmentIds);
-      if (!Array.isArray(parsed) || !parsed.every((id) => typeof id === "string")) {
+      const parsed = readMultipartJsonArray(
+        form,
+        "keptAttachmentIds",
+        "Kept attachment IDs are invalid",
+      );
+      if (!parsed.every((id) => typeof id === "string")) {
         throw new Error("invalid kept attachment ids");
       }
       keptAttachmentIds = issueKeptAttachmentIdsSchema.parse(parsed);
@@ -2287,12 +2278,6 @@ const pngResponse = (png: ArrayBuffer) =>
     },
   });
 
-const contentDisposition = (filename: string) =>
-  `inline; filename*=UTF-8''${encodeURIComponent(filename).replace(
-    /['()*]/gu,
-    (character) => `%${character.charCodeAt(0).toString(16).toUpperCase()}`,
-  )}`;
-
 const attachmentResponse = (
   attachment: Pick<
     IssueAttachmentRow,
@@ -2329,18 +2314,16 @@ async function createIssueWithAttachments(input: {
   const settings = await getProjectSettings(input.db, input.project.id);
   const issueStorageId = input.issueId ?? crypto.randomUUID();
   const occurredAt = input.occurredAt ?? new Date().toISOString();
-  const storedAttachments: Array<IssueAttachmentInput & { file: File }> =
-    input.attachments.map((file) => {
+  const storedAttachments = prepareStoredAttachments(
+    input.attachments,
+    () => {
       const id = crypto.randomUUID();
       return {
         id,
         object_key: `issue-attachments/${input.project.id}/${issueStorageId}/${id}`,
-        filename: file.name.normalize("NFC").trim(),
-        content_type: file.type,
-        byte_size: file.size,
-        file,
       };
-    });
+    },
+  );
   const uploadedKeys: string[] = [];
   const issueDescription = canonicalizeIssueAttachmentReferences(
     input.issue.description,
@@ -2349,23 +2332,15 @@ async function createIssueWithAttachments(input: {
   );
   let runId: string | null = null;
   try {
-    for (const attachment of storedAttachments) {
-      await input.attachmentsBucket.put(
-        attachment.object_key,
-        attachment.file.stream(),
-        {
-          httpMetadata: {
-            contentType: attachment.content_type,
-            contentDisposition: contentDisposition(attachment.filename),
-          },
-          customMetadata: {
-            attachmentId: attachment.id,
-            projectId: input.project.id,
-          },
-        },
-      );
-      uploadedKeys.push(attachment.object_key);
-    }
+    await uploadStoredAttachments(
+      input.attachmentsBucket,
+      storedAttachments,
+      uploadedKeys,
+      (attachment) => ({
+        attachmentId: attachment.id,
+        projectId: input.project.id,
+      }),
+    );
     runId = await recordHuntEvent(input.db, input.project.id, {
       source: "issue",
       sourceKey: input.sourceKey,
@@ -2478,18 +2453,16 @@ async function updateIssueWithAttachments(input: {
   const removed = existing.filter(
     (attachment) => !keptIds.has(attachment.id),
   );
-  const storedAttachments: Array<IssueAttachmentInput & { file: File }> =
-    input.attachments.map((file) => {
+  const storedAttachments = prepareStoredAttachments(
+    input.attachments,
+    () => {
       const id = crypto.randomUUID();
       return {
         id,
         object_key: `issue-attachments/${input.project.id}/${input.runId}/${id}`,
-        filename: file.name.normalize("NFC").trim(),
-        content_type: file.type,
-        byte_size: file.size,
-        file,
       };
-    });
+    },
+  );
   const uploadedKeys: string[] = [];
   const issueDescription = canonicalizeIssueAttachmentReferences(
     input.issue.description,
@@ -2497,23 +2470,15 @@ async function updateIssueWithAttachments(input: {
     storedAttachments.map((attachment) => attachment.id),
   );
   try {
-    for (const attachment of storedAttachments) {
-      await input.attachmentsBucket.put(
-        attachment.object_key,
-        attachment.file.stream(),
-        {
-          httpMetadata: {
-            contentType: attachment.content_type,
-            contentDisposition: contentDisposition(attachment.filename),
-          },
-          customMetadata: {
-            attachmentId: attachment.id,
-            projectId: input.project.id,
-          },
-        },
-      );
-      uploadedKeys.push(attachment.object_key);
-    }
+    await uploadStoredAttachments(
+      input.attachmentsBucket,
+      storedAttachments,
+      uploadedKeys,
+      (attachment) => ({
+        attachmentId: attachment.id,
+        projectId: input.project.id,
+      }),
+    );
     const run = await updateIssue(input.db, input.project.id, input.runId, {
       title: input.issue.title,
       description: issueDescription ?? null,
@@ -5846,16 +5811,12 @@ async function route(
     }
     const createdAt = new Date().toISOString();
     const messageId = crypto.randomUUID();
-    const storedAttachments = attachments.map((file) => {
+    const storedAttachments = prepareStoredAttachments(attachments, () => {
       const id = crypto.randomUUID();
       return {
         id,
         organization_id: organizationId,
         object_key: `channel-attachments/${organizationId}/${channel.id}/${messageId}/${id}`,
-        filename: file.name.normalize("NFC").trim(),
-        content_type: file.type,
-        byte_size: file.size,
-        file,
       };
     });
     const input = {
@@ -5873,25 +5834,17 @@ async function route(
     const uploadedKeys: string[] = [];
     let message = null;
     try {
-      for (const attachment of storedAttachments) {
-        await attachmentsBucket.put(
-          attachment.object_key,
-          attachment.file.stream(),
-          {
-            httpMetadata: {
-              contentType: attachment.content_type,
-              contentDisposition: contentDisposition(attachment.filename),
-            },
-            customMetadata: {
-              attachmentId: attachment.id,
-              channelId: channel.id,
-              messageId,
-              organizationId,
-            },
-          },
-        );
-        uploadedKeys.push(attachment.object_key);
-      }
+      await uploadStoredAttachments(
+        attachmentsBucket,
+        storedAttachments,
+        uploadedKeys,
+        (attachment) => ({
+          attachmentId: attachment.id,
+          channelId: channel.id,
+          messageId,
+          organizationId,
+        }),
+      );
       message = await createChannelMessage(db, {
         id: messageId,
         channelId: channel.id,
@@ -7902,18 +7855,16 @@ async function route(
     if (!project) throw new HttpError(404, "Project not found");
     const { input: rawInput, attachments, attachmentReferences } =
       await readIssueMessageRequest(request);
-    const storedAttachments: Array<IssueAttachmentInput & { file: File }> =
-      attachments.map((file) => {
+    const storedAttachments = prepareStoredAttachments(
+      attachments,
+      () => {
         const id = crypto.randomUUID();
         return {
           id,
           object_key: `issue-attachments/${project.id}/${issueMessagesMatch[2]}/${id}`,
-          filename: file.name.normalize("NFC").trim(),
-          content_type: file.type,
-          byte_size: file.size,
-          file,
         };
-      });
+      },
+    );
     const input = {
       ...rawInput,
       body: canonicalizeIssueAttachmentReferences(
@@ -7941,23 +7892,15 @@ async function route(
     const uploadedKeys: string[] = [];
     let message: IssueMessageRow | null = null;
     try {
-      for (const attachment of storedAttachments) {
-        await attachmentsBucket.put(
-          attachment.object_key,
-          attachment.file.stream(),
-          {
-            httpMetadata: {
-              contentType: attachment.content_type,
-              contentDisposition: contentDisposition(attachment.filename),
-            },
-            customMetadata: {
-              attachmentId: attachment.id,
-              projectId: project.id,
-            },
-          },
-        );
-        uploadedKeys.push(attachment.object_key);
-      }
+      await uploadStoredAttachments(
+        attachmentsBucket,
+        storedAttachments,
+        uploadedKeys,
+        (attachment) => ({
+          attachmentId: attachment.id,
+          projectId: project.id,
+        }),
+      );
       await createIssueAttachments(
         db,
         project.id,
