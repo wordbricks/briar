@@ -14,6 +14,23 @@ final class CompanionReadTests: XCTestCase {
         )
     }
 
+    func testEnglishTranslationsCoverNativeStatusAndFormattedMessages() {
+        XCTAssertEqual(L10n.text("실행 중", locale: .en), "Running")
+        XCTAssertEqual(DashboardRun.Status.blocked.displayName(locale: .en), "Blocked")
+        XCTAssertEqual(ProjectAgentSession.Status.skipped.displayName(locale: .en), "Skipped")
+        XCTAssertEqual(L10n.format("%d 실행 중", locale: .en, 3), "3 running")
+        XCTAssertEqual(
+            L10n.format(
+                "제목이 너무 깁니다. %d자 이내로 줄여 주세요. (현재 %d자)",
+                locale: .en,
+                80,
+                92
+            ),
+            "The title is too long. Shorten it to 80 characters or fewer (currently 92)."
+        )
+        XCTAssertEqual(L10n.text("계정 메뉴", locale: .en), "Account menu")
+    }
+
     private var runs: [DashboardRun] {
         [
             DashboardRun(

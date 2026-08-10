@@ -159,7 +159,7 @@ struct AuthenticatedImagePreview: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("\(filename) 크게 보기")
+                .accessibilityLabel(L10n.format("%@ 크게 보기", filename))
             } else if failed {
                 Button {
                     Task { await loadImage(force: true) }
@@ -167,7 +167,7 @@ struct AuthenticatedImagePreview: View {
                     Label {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(filename)
-                            Text("이미지를 불러올 수 없음 · 다시 시도")
+                            Text(L10n.text("이미지를 불러올 수 없음 · 다시 시도"))
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -177,7 +177,7 @@ struct AuthenticatedImagePreview: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
-                .accessibilityLabel("\(filename) 이미지를 다시 불러오기")
+                .accessibilityLabel(L10n.format("%@ 이미지를 다시 불러오기", filename))
             } else {
                 VStack(spacing: 8) {
                     ProgressView()
@@ -188,7 +188,7 @@ struct AuthenticatedImagePreview: View {
                 }
                 .frame(maxWidth: .infinity, minHeight: 160)
                 .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
-                .accessibilityLabel("\(filename) 이미지 불러오는 중")
+                .accessibilityLabel(L10n.format("%@ 이미지 불러오는 중", filename))
             }
         }
         .accessibilityIdentifier(accessibilityID)
