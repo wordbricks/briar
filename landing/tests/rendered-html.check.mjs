@@ -1,5 +1,16 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
+
+test("production Worker config retains named asset and image bindings", async () => {
+  const configUrl = new URL("../dist/server/wrangler.json", import.meta.url);
+  const config = JSON.parse(await readFile(configUrl, "utf8"));
+
+  assert.equal(config.assets?.binding, "ASSETS");
+  assert.equal(config.assets?.directory, "../client");
+  assert.equal(config.images?.binding, "IMAGES");
+  assert.ok(config.assets?.run_worker_first?.includes("/_vinext/image"));
+});
 
 async function render({ acceptLanguage, cookie, path = "/" } = {}) {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);

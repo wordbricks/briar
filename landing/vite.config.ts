@@ -16,6 +16,7 @@ const localBindingConfig = {
   main: "./worker/index.ts",
   compatibility_flags: ["nodejs_compat"],
   assets: {
+    binding: "ASSETS",
     run_worker_first: [
       // Every localized page must reach the Worker; anything not listed here
       // is served straight from static assets and 404s. Derived from the
