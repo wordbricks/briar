@@ -73,6 +73,7 @@ describe("channel reply image inputs", () => {
         `https://api.example/organizations/${organizationId}/channel-reply-claims/${workId}/attachments/${attachmentId}`,
       );
       const headers = new Headers(init?.headers);
+      expect(init?.redirect).toBe("error");
       expect(headers.get("Authorization")).toBe("Bearer briar_worker_secret");
       expect(headers.get(channelReplyClaimTokenHeader)).toBe(
         "briar_channel_claim_secret",

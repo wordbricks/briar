@@ -20,6 +20,9 @@ import {
   type AgentProvider,
   type ModelEffort,
 } from "../../src/lib/agent-provider-contract";
+import {
+  organizationAgentContextCapability,
+} from "../../src/lib/organization-agent-context-contract";
 
 export type {
   AgentProvider,
@@ -318,6 +321,28 @@ export function executionWorkerProviders(
     // Invalid or legacy capability payloads are not safe dispatch targets.
   }
   return [];
+}
+
+/**
+ * Organization Agent jobs expose claim-scoped organization data. Only Workers
+ * that explicitly advertise this exact protocol version may receive them.
+ */
+export function executionWorkerSupportsOrganizationAgentContext(
+  worker: Pick<ExecutionWorkerRow, "capabilities_json">,
+) {
+  try {
+    const capabilities = JSON.parse(worker.capabilities_json) as {
+      organizationAgentContext?: unknown;
+    };
+    const context = capabilities.organizationAgentContext;
+    return Boolean(
+      context && typeof context === "object" && !Array.isArray(context) &&
+        (context as { protocol?: unknown }).protocol ===
+          organizationAgentContextCapability.protocol,
+    );
+  } catch {
+    return false;
+  }
 }
 
 export type ExecutionDispatchRow = {

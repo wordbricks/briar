@@ -30,6 +30,7 @@ import {
   dispatchHuntRun,
   executionWorkerBindingForProject,
   executionWorkerProviders,
+  executionWorkerSupportsOrganizationAgentContext,
   getProjectExecutionWorkerPolicy,
   hasExecutionWorkerReadinessChanged,
   leaseExpiryFrom,
@@ -927,6 +928,24 @@ describe("detached execution workers", () => {
         capabilities_json: "not-json",
       }),
     ).toEqual([]);
+    expect(
+      executionWorkerSupportsOrganizationAgentContext({
+        capabilities_json: JSON.stringify({
+          organizationAgentContext: { protocol: 1 },
+        }),
+      }),
+    ).toBe(true);
+    for (const capabilities_json of [
+      "not-json",
+      "{}",
+      JSON.stringify({ organizationAgentContext: { protocol: true } }),
+      JSON.stringify({ organizationAgentContext: { protocol: 2 } }),
+      JSON.stringify({ organizationAgentContext: [1] }),
+    ]) {
+      expect(
+        executionWorkerSupportsOrganizationAgentContext({ capabilities_json }),
+      ).toBe(false);
+    }
 
     const newest = await register("providers-newest", 5);
     const older = await register("providers-older", 2);

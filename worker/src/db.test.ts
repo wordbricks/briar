@@ -841,6 +841,13 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       db,
       await readFile(resolve("migrations/0085_run_cost_ledger.sql"), "utf8"),
     );
+    await executeSql(
+      db,
+      await readFile(
+        resolve("migrations/0088_organization_agent_context.sql"),
+        "utf8",
+      ),
+    );
   }, 30_000);
 
   afterAll(async () => {
@@ -1457,7 +1464,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       started_at: atMinute(2),
       completed_at: null,
       updated_at: atMinute(2),
-    });
+    }, atMinute(2));
     await upsertProjectAgentSession(db, {
       project_id: projectId,
       id: sessionId,
@@ -1468,7 +1475,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       started_at: atMinute(2),
       completed_at: atMinute(1),
       updated_at: atMinute(1),
-    });
+    }, atMinute(3));
 
     const sessions = await listProjectAgentSessions(db, projectId);
     expect(sessions).toEqual([
@@ -1492,7 +1499,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       started_at: atMinute(2),
       completed_at: atMinute(3),
       updated_at: atMinute(3),
-    });
+    }, atMinute(3));
 
     await expect(
       db.prepare(

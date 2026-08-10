@@ -77,6 +77,15 @@ import {
   maxWorkerEmojiLength,
   maxWorkerLogoDataUrlLength,
 } from "../../src/lib/worker-icon-validation";
+import {
+  organizationAgentContextAgentsPageSchema,
+  organizationAgentContextDescriptorSchema,
+  organizationAgentContextIssuePullRequestsPageSchema,
+  organizationAgentContextIssuesPageSchema,
+  organizationAgentContextProjectsPageSchema,
+  organizationAgentContextQuerySchema,
+  organizationAgentContextSessionsPageSchema,
+} from "../../src/lib/organization-agent-context-contract";
 import { createAuth, type BriarAuth } from "./auth";
 import {
   contentDisposition,
@@ -347,6 +356,7 @@ import {
   executionWorkerBindingForProject,
   executionWorkerDeviceForBinding,
   executionWorkerProviders,
+  executionWorkerSupportsOrganizationAgentContext,
   leaseExpiryFrom,
   listExecutionAuditEvents,
   listExecutionWorkers,
@@ -388,7 +398,6 @@ import {
   channelMessageJson,
   channelReplyJson,
   claimNextChannelAgentReply,
-  channelReplyProjectTargets,
   completeChannelReply,
   createChannel,
   createChannelMessage,
@@ -400,12 +409,12 @@ import {
   getChannelAgentReplyJob,
   getChannelById,
   getClaimedChannelReplyAttachment,
+  getActiveOrganizationChannelReplyContextClaim,
   getChannelMessage,
   getChannelMessageAttachment,
   getChannelSyncCursor,
   getClaimedChannelReply,
   getOrganizationProject,
-  listOrganizationProjectTargets,
   listChannelAgentReplies,
   listChannelAttachmentObjectKeys,
   listChannelAgents,
@@ -429,6 +438,15 @@ import {
   organizationAgentJson,
   updateOrganizationAgent,
 } from "./organization-agents";
+import {
+  listOrganizationAgentContextAgentsPage,
+  listOrganizationAgentContextIssuePullRequestsPage,
+  listOrganizationAgentContextIssuesPage,
+  listOrganizationAgentContextProjectsPage,
+  listOrganizationAgentContextSessionsPage,
+  OrganizationAgentContextCursorError,
+  OrganizationAgentContextPageTooLargeError,
+} from "./organization-agent-context";
 import {
   channelInputSchema,
   channelIssueProposalPayloadSchema,
@@ -483,7 +501,7 @@ import {
 
 const corsHeaders = {
   "Access-Control-Allow-Headers":
-    "authorization, content-type, x-briar-claim-token",
+    "authorization, content-type, x-briar-claim-token, x-briar-channel-claim-token",
   "Access-Control-Allow-Methods": "DELETE, GET, HEAD, PATCH, POST, PUT, OPTIONS",
   "Access-Control-Allow-Origin": "*",
 };
@@ -541,6 +559,14 @@ export const organizationUsageQuerySince = (
 
 const json = (body: unknown, status = 200) =>
   Response.json(body, { status, headers: corsHeaders });
+
+const privateNoStoreJson = (body: unknown) =>
+  Response.json(body, {
+    headers: {
+      ...corsHeaders,
+      "Cache-Control": "private, no-store",
+    },
+  });
 
 class HttpError extends Error {
   constructor(
@@ -3149,7 +3175,7 @@ async function syncProjectAgentTaskSession(
     started_at: current.started_at,
     completed_at: nextPayload.completedAt as string | null,
     updated_at: job.updated_at,
-  });
+  }, job.updated_at);
   return updated ? projectAgentSessionJson(updated) : null;
 }
 
@@ -7219,7 +7245,7 @@ async function route(
       started_at: observedAt,
       completed_at: null,
       updated_at: observedAt,
-    });
+    }, observedAt);
     if (!createdSession) {
       throw new HttpError(409, "Agent task session could not be created");
     }
@@ -7258,6 +7284,7 @@ async function route(
     );
     if (!project) throw new HttpError(404, "Project not found");
     const input = projectAgentSessionInputSchema.parse(await readJson(request));
+    const observedAt = new Date().toISOString();
     const row = await upsertProjectAgentSession(db, {
       project_id: project.id,
       id: projectAgentSessionMatch[2],
@@ -7268,7 +7295,7 @@ async function route(
       started_at: input.startedAt,
       completed_at: input.completedAt,
       updated_at: input.updatedAt,
-    });
+    }, observedAt);
     if (!row) throw new HttpError(409, "Agent session could not be synchronized");
     return json({ session: projectAgentSessionJson(row) });
   }
@@ -10049,6 +10076,8 @@ async function route(
       deviceId: principal.deviceId,
       workerId: binding.id,
       providers,
+      supportsOrganizationAgentContext:
+        executionWorkerSupportsOrganizationAgentContext(binding),
       claimTokenHash,
       claimedAt: observedAt,
       leaseExpiresAt: leaseExpiryFrom(observedAt),
@@ -10088,10 +10117,6 @@ async function route(
       if (job.project_id !== null && !project) {
         throw new HttpError(409, "Reply job lost its project context");
       }
-      const organizationProjects = await listOrganizationProjectTargets(
-        db,
-        job.organization_id,
-      );
       return json({
         work: {
           workType: "channelReply",
@@ -10137,6 +10162,12 @@ async function route(
           claimToken,
           claimedAt: job.claimed_at,
           leaseExpiresAt: job.lease_expires_at,
+          organizationContext: agent.project_id === null
+            ? organizationAgentContextDescriptorSchema.parse({
+                schemaVersion: 1,
+                snapshotAt: job.claimed_at,
+              })
+            : null,
           snapshot: {
             channel: {
               id: channel.id,
@@ -10161,10 +10192,9 @@ async function route(
               projectId: agent.project_id,
             },
             project: project ? { id: project.id, name: project.name } : null,
-            projectTargets: channelReplyProjectTargets(
-              agent.project_id,
-              organizationProjects,
-            ),
+            projectTargets: project
+              ? [{ id: project.id, name: project.name }]
+              : [],
             messages,
           },
         },
@@ -10180,6 +10210,115 @@ async function route(
       });
       throw error;
     }
+  }
+
+  const organizationContextMatch = pathname.match(
+    /^\/organizations\/([0-9a-f-]+)\/channel-reply-claims\/([0-9a-f-]+)\/organization-context\/projects(?:\/([0-9a-f-]+)\/(agents|issues|issue-pull-requests|agent-sessions))?$/u,
+  );
+  if (organizationContextMatch && request.method === "GET") {
+    const organizationId = organizationContextMatch[1];
+    const workId = organizationContextMatch[2];
+    const projectId = organizationContextMatch[3] ?? null;
+    const resource = organizationContextMatch[4] ?? "projects";
+    const query = organizationAgentContextQuerySchema.parse(
+      Object.fromEntries(new URL(request.url).searchParams),
+    );
+    const principal = await requireWorkerOrganization(
+      db,
+      request,
+      organizationId,
+    );
+    const claimToken = request.headers.get(channelReplyClaimTokenHeader)?.trim();
+    if (
+      !claimToken?.startsWith("briar_channel_claim_") ||
+      claimToken.length > 200
+    ) {
+      throw new HttpError(401, "Channel reply claim token required");
+    }
+    const job = await getActiveOrganizationChannelReplyContextClaim(db, {
+      organizationId,
+      jobId: workId,
+      deviceId: principal.deviceId,
+      workerId: query.workerId,
+      claimTokenHash: await sha256(claimToken),
+      observedAt: new Date().toISOString(),
+    });
+    if (!job?.claimed_at) {
+      throw new HttpError(409, "Organization Agent claim is no longer active");
+    }
+
+    if (resource === "projects") {
+      const page = await listOrganizationAgentContextProjectsPage(db, {
+        organizationId,
+        workId,
+        snapshotAt: job.claimed_at,
+        limit: query.limit,
+        cursor: query.cursor,
+      });
+      return privateNoStoreJson(
+        organizationAgentContextProjectsPageSchema.parse(page),
+      );
+    }
+
+    if (!projectId) {
+      throw new HttpError(404, "Project not found");
+    }
+    const project = await getOrganizationProject(db, organizationId, projectId);
+    if (!project) throw new HttpError(404, "Project not found");
+    if (resource === "agents") {
+      const page = await listOrganizationAgentContextAgentsPage(db, {
+        organizationId,
+        workId,
+        projectId,
+        snapshotAt: job.claimed_at,
+        limit: query.limit,
+        cursor: query.cursor,
+      });
+      return privateNoStoreJson(
+        organizationAgentContextAgentsPageSchema.parse(page),
+      );
+    }
+    if (resource === "issues") {
+      const page = await listOrganizationAgentContextIssuesPage(db, {
+        organizationId,
+        workId,
+        projectId,
+        snapshotAt: job.claimed_at,
+        limit: query.limit,
+        cursor: query.cursor,
+      });
+      return privateNoStoreJson(
+        organizationAgentContextIssuesPageSchema.parse(page),
+      );
+    }
+    if (resource === "issue-pull-requests") {
+      const page = await listOrganizationAgentContextIssuePullRequestsPage(db, {
+        organizationId,
+        workId,
+        projectId,
+        snapshotAt: job.claimed_at,
+        limit: query.limit,
+        cursor: query.cursor,
+      });
+      return privateNoStoreJson(
+        organizationAgentContextIssuePullRequestsPageSchema.parse(page),
+      );
+    }
+    const page = await listOrganizationAgentContextSessionsPage(
+      db,
+      env.ARCHIVES,
+      {
+        organizationId,
+        workId,
+        projectId,
+        snapshotAt: job.claimed_at,
+        limit: query.limit,
+        cursor: query.cursor,
+      },
+    );
+    return privateNoStoreJson(
+      organizationAgentContextSessionsPageSchema.parse(page),
+    );
   }
 
   const channelReplyAttachmentMatch = pathname.match(
@@ -10237,6 +10376,7 @@ async function route(
         deviceId: principal.deviceId,
         workerId: input.workerId,
         claimTokenHash: await sha256(input.claimToken),
+        observedAt,
         leaseExpiresAt: leaseExpiryFrom(observedAt),
       });
       if (!renewed) throw new HttpError(409, "Reply claim is no longer active");
@@ -10250,16 +10390,17 @@ async function route(
       input.organizationId,
     );
     const claimTokenHash = await sha256(input.claimToken);
+    const observedAt = new Date().toISOString();
     const job = await getClaimedChannelReply(db, {
       jobId: channelReplyClaimMatch[1],
       deviceId: principal.deviceId,
       workerId: input.workerId,
       claimTokenHash,
+      observedAt,
     });
     if (!job || job.organization_id !== input.organizationId) {
       throw new HttpError(409, "Reply claim is no longer active");
     }
-    const observedAt = new Date().toISOString();
     if (input.error) {
       const failed = await failChannelReply(db, {
         jobId: job.id,
@@ -11560,6 +11701,12 @@ export default {
         return json({ message: error.message }, 409);
       }
       if (error instanceof TranscriptLimitError) {
+        return json({ message: error.message }, 413);
+      }
+      if (error instanceof OrganizationAgentContextCursorError) {
+        return json({ message: error.message }, 400);
+      }
+      if (error instanceof OrganizationAgentContextPageTooLargeError) {
         return json({ message: error.message }, 413);
       }
       if (error instanceof z.ZodError) {

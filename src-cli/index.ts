@@ -37,6 +37,10 @@ import {
 import { validateEvidenceImages } from "../src/lib/evidence-images";
 import { channelReplyCompletionSchema } from "../src/lib/channels-contract";
 import {
+  organizationAgentContextCapability,
+  organizationAgentContextDescriptorSchema,
+} from "../src/lib/organization-agent-context-contract";
+import {
   issueTitleAbsoluteMaxLength,
   issueTitleOverLimitMessage,
 } from "../src/lib/issue-title";
@@ -117,6 +121,12 @@ import {
 } from "./channel-reply-images";
 import { cleanupChannelReplyResources } from "./channel-reply-cleanup";
 import { assertChannelReplyWorkspaceScope } from "./channel-reply-scope";
+import {
+  cleanupOrphanedOrganizationAgentWorkspaces,
+  cleanupOrganizationAgentContext,
+  downloadOrganizationAgentContext,
+  prepareOrganizationAgentWorkspace,
+} from "./organization-agent-context";
 import { prepareReadOnlyAgentEnvironment } from "./read-only-agent-environment";
 import {
   healthyWorkerProviders,
@@ -2063,6 +2073,8 @@ const claimedChannelReplySchema = z.object({
   claimToken: z.string().startsWith("briar_channel_claim_"),
   claimedAt: z.string().datetime({ offset: true }),
   leaseExpiresAt: z.string().datetime({ offset: true }),
+  organizationContext:
+    organizationAgentContextDescriptorSchema.nullable().optional(),
   snapshot: z.record(z.string(), z.unknown()),
 }).superRefine((reply, context) => {
   const scope = reply.scope ?? (reply.projectId === null
@@ -2087,7 +2099,27 @@ const claimedChannelReplySchema = z.object({
         path: ["projectId"],
       });
     }
+    if (!reply.organizationContext) {
+      context.addIssue({
+        code: "custom",
+        message: "Organization reply requires complete context protocol metadata",
+        path: ["organizationContext"],
+      });
+    } else if (reply.organizationContext.snapshotAt !== reply.claimedAt) {
+      context.addIssue({
+        code: "custom",
+        message: "Organization context snapshot does not match its claim",
+        path: ["organizationContext", "snapshotAt"],
+      });
+    }
     return;
+  }
+  if (reply.organizationContext) {
+    context.addIssue({
+      code: "custom",
+      message: "Project reply cannot carry organization context",
+      path: ["organizationContext"],
+    });
   }
   if (reply.projectId !== scope.projectId) {
     context.addIssue({
@@ -2845,13 +2877,27 @@ async function runClaimedChannelReply(
     analysisWorktree?.path ??
     join(configDirectory, "worker-sessions", `channel-${reply.workId}`);
   if (!analysisWorktree) {
-    await mkdir(workspacePath, { recursive: true });
+    // A prior hard-killed attempt may have left a path behind. Recreate the
+    // exact claim workspace so stale files or a planted symlink cannot become
+    // trusted Organization Agent context.
+    await prepareOrganizationAgentWorkspace(workspacePath);
   }
   const imageDirectory = channelReplyImageDirectory(workspacePath);
+  let organizationContextCleaned = false;
   let imagesCleaned = false;
   let workspaceCleaned = false;
   const cleanupContext = () =>
     cleanupChannelReplyResources([
+      ...(reply.scope.kind === "organization"
+        ? [{
+            label: "organization context",
+            run: async () => {
+              if (organizationContextCleaned) return;
+              await cleanupOrganizationAgentContext(workspacePath);
+              organizationContextCleaned = true;
+            },
+          }]
+        : []),
       {
         label: "channel images",
         run: async () => {
@@ -2878,6 +2924,19 @@ async function runClaimedChannelReply(
       },
     ]);
   try {
+    const organizationContext = reply.scope.kind === "organization"
+      ? await downloadOrganizationAgentContext({
+          apiUrl: config.apiUrl,
+          workerToken,
+          organizationId: reply.organizationId,
+          workId: reply.workId,
+          workerId: registered.workerId,
+          claimToken: reply.claimToken,
+          snapshotAt: reply.organizationContext!.snapshotAt,
+          workspacePath,
+          signal,
+        })
+      : null;
     const downloadedImages = await downloadChannelReplyImages({
       apiUrl: config.apiUrl,
       workerToken,
@@ -2906,6 +2965,7 @@ async function runClaimedChannelReply(
         downloadedImagePaths: downloadedImages.paths,
       },
       workspaceAvailable: Boolean(analysisWorktree),
+      organizationContextAvailable: organizationContext !== null,
     });
     const providerRuntime = await prepareReadOnlyAgentEnvironment(
       agent.provider,
@@ -2918,6 +2978,8 @@ async function runClaimedChannelReply(
       fullAccess: false,
       readOnly: true,
       attachments: downloadedImages.attachments,
+      organizationContextManifestPath:
+        organizationContext?.manifestPath ?? null,
       environment: providerRuntime.environment,
       signal,
     })
@@ -3193,6 +3255,9 @@ async function workerSyncLabelCommand() {
 
 async function workerCommand() {
   const config = await loadConfig();
+  await cleanupOrphanedOrganizationAgentWorkspaces({
+    workerSessionsDirectory: join(configDirectory, "worker-sessions"),
+  });
   const projectId = value("--project");
   const project = projectId
     ? config.projects.find((candidate) => candidate.id === projectId)
@@ -3251,6 +3316,7 @@ async function workerCommand() {
               supported: supportsRemoteWorkerUpdates(platform()),
               protocol: 1,
             },
+            organizationAgentContext: organizationAgentContextCapability,
           },
         }),
       },
@@ -3475,6 +3541,7 @@ async function workerCommand() {
                   supported: supportsRemoteWorkerUpdates(platform()),
                   protocol: 1,
                 },
+                organizationAgentContext: organizationAgentContextCapability,
                 workflowRequirements: requirementHealth.map((item) => ({
                   id: item.id,
                   healthy: item.healthy,
@@ -3554,6 +3621,7 @@ async function workerCommand() {
                         supported: supportsRemoteWorkerUpdates(platform()),
                         protocol: 1,
                       },
+                      organizationAgentContext: organizationAgentContextCapability,
                       workflowRequirements: refreshedHealth.map((item) => ({
                         id: item.id,
                         healthy: item.healthy,
