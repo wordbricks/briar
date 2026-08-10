@@ -95,6 +95,8 @@ targets:
       - path: Tests
       - path: ../../contracts/mobile/fixtures/companion-v1.json
         buildPhase: resources
+      - path: ../../contracts/mobile/companion.openapi.yaml
+        buildPhase: resources
     dependencies:
       - target: BriarCompanion
     settings:

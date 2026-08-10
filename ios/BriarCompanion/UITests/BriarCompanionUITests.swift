@@ -56,6 +56,10 @@ final class BriarCompanionUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["완료"].exists)
         XCTAssertTrue(app.staticTexts["확인 필요"].exists)
         XCTAssertTrue(app.staticTexts["실패"].exists)
+        let workerIcon = app.descendants(matching: .any)["실행 Worker Mac Studio"]
+        XCTAssertTrue(workerIcon.waitForExistence(timeout: 5))
+        XCTAssertLessThanOrEqual(workerIcon.frame.width, 24)
+        XCTAssertLessThanOrEqual(workerIcon.frame.height, 24)
         captureScreenshot(named: "companion-task-icons")
 
         app.segmentedControls.buttons["Attention"].tap()
@@ -273,8 +277,30 @@ final class BriarCompanionUITests: XCTestCase {
         settingsButton.tap()
         XCTAssertTrue(app.navigationBars["Companion 설정"].waitForExistence(timeout: 5))
         // Settings sheet exposes profile, theme, language, icons, and notification toggles.
-        XCTAssertTrue(app.staticTexts["계정"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.switches.count > 0 || app.buttons["완료"].exists)
+        let settingsIdentifiers = [
+            "account-profile-photo",
+            "settings-theme-picker",
+            "settings-locale-picker",
+            "settings-app-icon-picker",
+            "app-icon-purple",
+            "app-icon-gray",
+            "app-icon-pink",
+            "app-icon-green",
+            "notification-toggle-urgent",
+            "notification-toggle-action_required",
+            "notification-toggle-important",
+            "notification-toggle-activity",
+        ]
+        for identifier in settingsIdentifiers {
+            let element = app.descendants(matching: .any)[identifier]
+            for _ in 0..<4 where !element.exists {
+                app.swipeUp()
+            }
+            XCTAssertTrue(
+                element.waitForExistence(timeout: 5),
+                "설정 제어 \(identifier)가 표시되어야 합니다."
+            )
+        }
         captureScreenshot(named: "companion-settings-icons")
     }
 
