@@ -129,6 +129,25 @@ export function tightestUsageWindow(provider: AgentUsageProvider) {
   );
 }
 
+/**
+ * True when any known quota window is fully consumed.
+ * Unknown or failed usage reads are not treated as exhausted so workers stay
+ * available until a positive 100% reading is observed.
+ */
+export function isProviderUsageExhausted(
+  provider: Pick<
+    AgentUsageProvider,
+    "status" | "session" | "weekly" | "monthly"
+  >,
+  thresholdPercent = 100,
+): boolean {
+  if (provider.status !== "ok") return false;
+  const windows = [provider.session, provider.weekly, provider.monthly].filter(
+    (window): window is AgentUsageWindow => window !== null,
+  );
+  return windows.some((window) => window.usedPercent >= thresholdPercent);
+}
+
 export function formatUsageDuration(milliseconds: number) {
   const minutes = Math.max(0, Math.ceil(milliseconds / 60_000));
   if (minutes < 60) return `${minutes}m`;
