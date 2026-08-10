@@ -4,7 +4,6 @@ import {
   createWorkerDeviceIdentity,
   defaultWorkerLabel,
   errorDelayMs,
-  hostFingerprint,
   launchdPlist,
   runWorkerLoop,
   restartInstalledServices,
@@ -385,32 +384,6 @@ describe("worker identity", () => {
     expect(() => createWorkerDeviceIdentity(() => "not-random")).toThrow(
       "32 random bytes",
     );
-  });
-
-  it("derives a stable fingerprint from machine facts only", () => {
-    const first = hostFingerprint({
-      host: "build-box",
-      platform: "linux",
-      arch: "arm64",
-      home: "/home/dev",
-    });
-    expect(first).toMatch(/^[0-9a-f]{64}$/u);
-    expect(
-      hostFingerprint({
-        host: "build-box",
-        platform: "linux",
-        arch: "arm64",
-        home: "/home/dev",
-      }),
-    ).toBe(first);
-    expect(
-      hostFingerprint({
-        host: "other-box",
-        platform: "linux",
-        arch: "arm64",
-        home: "/home/dev",
-      }),
-    ).not.toBe(first);
   });
 
   it("labels a worker after its host", () => {

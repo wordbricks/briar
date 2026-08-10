@@ -178,7 +178,7 @@ export function installKeybindingShortcuts(
   onShortcut: (id: KeybindingId) => void,
 ): () => void {
   const handleKeyDown = (event: KeyboardEvent) => {
-    if (event.isComposing || recordingKeybinding) return;
+    if (event.isComposing || getRecordingKeybinding()) return;
     const keybindings = loadKeybindings();
     for (const id of keybindingIds) {
       if (matchesShortcut(event, keybindings[id])) {

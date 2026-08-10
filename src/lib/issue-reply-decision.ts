@@ -7,6 +7,12 @@ export type IssueReplyContextMessage = {
   author: { provider: string | null };
 };
 
+export function agentReplyParentMessageId(
+  message: Pick<IssueReplyContextMessage, "id" | "parentMessageId">,
+) {
+  return message.parentMessageId ?? message.id;
+}
+
 export function shouldBriarReply(
   messages: readonly IssueReplyContextMessage[],
   input: { body: string; parentMessageId: string | null },

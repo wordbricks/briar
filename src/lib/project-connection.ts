@@ -144,12 +144,6 @@ export async function pickGitRepository(): Promise<string | null> {
   return invoke<string>("validate_repository_path", { path: selected });
 }
 
-export async function projectWorkspaceRoot(): Promise<string | null> {
-  if (!isTauri()) return null;
-  const { invoke } = await import("@tauri-apps/api/core");
-  return invoke<string>("project_workspace_root");
-}
-
 export async function createProjectWorkspace(
   name: string,
 ): Promise<CreatedProjectWorkspace> {

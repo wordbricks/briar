@@ -14,7 +14,6 @@ import {
 import {
   appendAgentTranscript,
   authenticateExecutionWorker,
-  attributeRunToWorker,
   bindExecutionWorkerProject,
   countExecutionWorkerDeviceSessions,
   completeExecutionWorkerUpdates,
@@ -1603,18 +1602,15 @@ describe("detached execution workers", () => {
   });
 
   it("does not treat backlog work as held or leased Auto Hunt work", async () => {
-    await register("backlog");
+    const registration = await register("backlog");
     await recordHuntEvent(db, projectId, queuedEvent("issue-backlog", 1));
     const claimed = await claimNextQueuedHuntRun(db, projectId, {
       claimTokenHash: "f".repeat(64),
       claimedBy: "worker-backlog",
       claimedAt: atMinute(2),
       leaseExpiresAt: leaseExpiryFrom(atMinute(2)),
-    });
-    await attributeRunToWorker(db, projectId, {
-      runId: claimed!.id,
-      workerId: "worker-backlog",
-      observedAt: atMinute(2),
+      workerId: registration.worker.id,
+      workerDeviceId: registration.device.id,
     });
     await db
       .prepare(
@@ -1631,7 +1627,7 @@ describe("detached execution workers", () => {
   });
 
   it("renews a lease for the holder and rejects a superseded token", async () => {
-    await register("f");
+    const registration = await register("f");
     await recordHuntEvent(db, projectId, queuedEvent("issue-lease", 1));
     const claimTokenHash = "b".repeat(64);
     const claimed = await claimNextQueuedHuntRun(db, projectId, {
@@ -1639,11 +1635,8 @@ describe("detached execution workers", () => {
       claimedBy: "worker-f",
       claimedAt: atMinute(2),
       leaseExpiresAt: leaseExpiryFrom(atMinute(2)),
-    });
-    await attributeRunToWorker(db, projectId, {
-      runId: claimed!.id,
-      workerId: "worker-f",
-      observedAt: atMinute(2),
+      workerId: registration.worker.id,
+      workerDeviceId: registration.device.id,
     });
 
     const renewed = await renewHuntRunLease(db, projectId, {
@@ -1673,7 +1666,7 @@ describe("detached execution workers", () => {
   });
 
   it("requeues a run whose worker stopped reporting, then blocks it after the ceiling", async () => {
-    await register("g");
+    const registration = await register("g");
     await recordHuntEvent(db, projectId, queuedEvent("issue-stall", 1));
     const claimTokenHash = "d".repeat(64);
     const claimed = await claimNextQueuedHuntRun(db, projectId, {
@@ -1681,11 +1674,8 @@ describe("detached execution workers", () => {
       claimedBy: "worker-g",
       claimedAt: atMinute(2),
       leaseExpiresAt: leaseExpiryFrom(atMinute(2)),
-    });
-    await attributeRunToWorker(db, projectId, {
-      runId: claimed!.id,
-      workerId: "worker-g",
-      observedAt: atMinute(2),
+      workerId: registration.worker.id,
+      workerDeviceId: registration.device.id,
     });
     // Move the run out of `queued`, where the claim check no longer gates writes.
     await recordHuntEvent(db, projectId, {

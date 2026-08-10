@@ -1793,21 +1793,6 @@ export async function countExecutionWorkerDeviceSessions(
   return row?.active_sessions ?? 0;
 }
 
-export async function attributeRunToWorker(
-  db: D1Database,
-  projectId: string,
-  input: { runId: string; workerId: string; observedAt: string },
-) {
-  await db
-    .prepare(
-      `update briar_hunt_runs
-       set worker_id = ?, updated_at = ?
-       where id = ? and project_id = ?`,
-    )
-    .bind(input.workerId, input.observedAt, input.runId, projectId)
-    .run();
-}
-
 /**
  * Extend the lease of a run the caller proved it holds. Without this a long
  * run silently loses its claim 15 minutes in and can be taken by another
@@ -2104,16 +2089,6 @@ export async function appendAgentTranscript(
     .run();
 
   return { sessionId, stored, storedBytes, pruned: [] as string[] };
-}
-
-/**
- * Legacy compatibility helper. Destructive pruning is intentionally disabled;
- * callers must use the R2 archival flow instead.
- */
-export async function pruneAgentTranscriptSessions(db: D1Database, projectId: string) {
-  void db;
-  void projectId;
-  return [] as string[];
 }
 
 export async function readAgentTranscript(

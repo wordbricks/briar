@@ -50,7 +50,3 @@ export const structuredAgentResultSchema = z
 export type StructuredAgentResult = z.infer<
   typeof structuredAgentResultSchema
 >;
-
-export function parseStructuredAgentResult(value: unknown) {
-  return structuredAgentResultSchema.safeParse(value);
-}

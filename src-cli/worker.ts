@@ -8,9 +8,9 @@
  * keeping a socket alive.
  */
 
-import { createHash, randomBytes } from "node:crypto";
+import { randomBytes } from "node:crypto";
 import { chmod, mkdir, writeFile } from "node:fs/promises";
-import { homedir, hostname, platform, arch } from "node:os";
+import { homedir, hostname, platform } from "node:os";
 import { delimiter, isAbsolute, join } from "node:path";
 
 export type AgentProvider = "codex" | "claude" | "grok" | "opencode";
@@ -108,22 +108,6 @@ export function workerExecutionPath(
     .split(delimiter)
     .filter((path) => path.length > 0 && path !== localBin);
   return [localBin, ...paths].join(delimiter);
-}
-
-/**
- * Stable per-machine identity. Deliberately derived from machine facts only:
- * repository paths stay in this machine's own config and never reach D1.
- */
-export function hostFingerprint(
-  input: { host?: string; platform?: string; arch?: string; home?: string } = {},
-): string {
-  const identity = [
-    input.host ?? hostname(),
-    input.platform ?? platform(),
-    input.arch ?? arch(),
-    input.home ?? homedir(),
-  ].join("\u0000");
-  return createHash("sha256").update(identity).digest("hex");
 }
 
 /** Random, opaque identity persisted in Briar's 0600 local config. */

@@ -85,7 +85,6 @@ import {
   reworkHuntRun,
   recordHuntEvent,
   recordRunEvidence,
-  recordQaResult,
   resumeWorkflowCheckpoint,
   removeOrganizationMember,
   revokeOrganizationInvitation,
