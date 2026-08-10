@@ -4,10 +4,12 @@ import {
   type ChannelAgentReply,
   type ChannelMessage,
   type ChannelMessageAttachment,
+  type ChannelMessageReaction,
   type ChannelReplyStatus,
   type ChannelSummary,
   type ChannelVisibility,
 } from "../../src/lib/channels-contract";
+import { isWorkerEmoji } from "../../src/lib/worker-icon-validation";
 import type { AgentSkillEffort } from "./agent-skills";
 
 export type ChannelRow = {
@@ -179,6 +181,7 @@ export const channelMessageJson = (
   row: ChannelMessageRow,
   mentions: { users: string[]; agents: string[] } = { users: [], agents: [] },
   attachments: ChannelMessageAttachment[] = [],
+  reactions: ChannelMessageReaction[] = [],
 ): ChannelMessage => ({
   id: row.id,
   channelId: row.channel_id,
@@ -201,6 +204,7 @@ export const channelMessageJson = (
   mentionedUserIds: mentions.users,
   mentionedAgentIds: mentions.agents,
   attachments,
+  reactions,
   replyCount: row.reply_count,
   lastReplyAt: row.last_reply_at,
   document: row.document_message_id
@@ -222,6 +226,55 @@ export const channelMessageJson = (
     : null,
   createdAt: row.created_at,
 });
+
+/** One grapheme emoji, same rule as Worker icons so flags and ZWJ stay valid. */
+export function isChannelReactionEmoji(value: string) {
+  return isWorkerEmoji(value);
+}
+
+function aggregateReactions(
+  rows: Array<{ message_id: string; user_id: string; emoji: string; created_at: string }>,
+): Map<string, ChannelMessageReaction[]> {
+  const byMessage = new Map<
+    string,
+    Map<string, { userIds: string[]; firstCreatedAt: string }>
+  >();
+  for (const row of rows) {
+    let emojiMap = byMessage.get(row.message_id);
+    if (!emojiMap) {
+      emojiMap = new Map();
+      byMessage.set(row.message_id, emojiMap);
+    }
+    const current = emojiMap.get(row.emoji);
+    if (current) {
+      current.userIds.push(row.user_id);
+    } else {
+      emojiMap.set(row.emoji, {
+        userIds: [row.user_id],
+        firstCreatedAt: row.created_at,
+      });
+    }
+  }
+  const result = new Map<string, ChannelMessageReaction[]>();
+  for (const [messageId, emojiMap] of byMessage) {
+    const reactions = [...emojiMap.entries()]
+      .map(([emoji, value]) => ({
+        emoji,
+        count: value.userIds.length,
+        userIds: value.userIds,
+        firstCreatedAt: value.firstCreatedAt,
+      }))
+      .sort((left, right) => {
+        if (left.firstCreatedAt !== right.firstCreatedAt) {
+          return left.firstCreatedAt.localeCompare(right.firstCreatedAt);
+        }
+        return left.emoji.localeCompare(right.emoji);
+      })
+      .map(({ firstCreatedAt: _firstCreatedAt, ...reaction }) => reaction);
+    result.set(messageId, reactions);
+  }
+  return result;
+}
 
 export async function listChannels(
   db: D1Database,
@@ -567,7 +620,7 @@ async function attachMessageRelations(
   if (rows.length === 0) return [];
   const ids = rows.map((row) => row.id);
   const placeholders = ids.map(() => "?").join(", ");
-  const [userMentions, agentMentions, attachments] = await Promise.all([
+  const [userMentions, agentMentions, attachments, reactions] = await Promise.all([
     db
       .prepare(
         `select message_id, user_id from briar_channel_message_mentions
@@ -592,6 +645,20 @@ async function attachMessageRelations(
       )
       .bind(...ids)
       .all<ChannelMessageAttachmentRow>(),
+    db
+      .prepare(
+        `select message_id, user_id, emoji, created_at
+         from briar_channel_message_reactions
+         where message_id in (${placeholders})
+         order by created_at, emoji, user_id`,
+      )
+      .bind(...ids)
+      .all<{
+        message_id: string;
+        user_id: string;
+        emoji: string;
+        created_at: string;
+      }>(),
   ]);
   const byMessage = new Map<string, { users: string[]; agents: string[] }>();
   for (const row of rows) byMessage.set(row.id, { users: [], agents: [] });
@@ -607,13 +674,62 @@ async function attachMessageRelations(
     current.push(channelMessageAttachmentJson(attachment));
     attachmentsByMessage.set(attachment.message_id, current);
   }
+  const reactionsByMessage = aggregateReactions(reactions.results);
   return rows.map((row) =>
     channelMessageJson(
       row,
       byMessage.get(row.id) ?? { users: [], agents: [] },
       attachmentsByMessage.get(row.id) ?? [],
+      reactionsByMessage.get(row.id) ?? [],
     ),
   );
+}
+
+/**
+ * Toggle a user's emoji reaction on a channel message. Returns the refreshed
+ * message, or null when the message is not in the channel.
+ */
+export async function toggleChannelMessageReaction(
+  db: D1Database,
+  input: {
+    channelId: string;
+    messageId: string;
+    userId: string;
+    emoji: string;
+    createdAt: string;
+  },
+) {
+  const message = await getChannelMessage(db, input.channelId, input.messageId);
+  if (!message) return null;
+
+  const existing = await db
+    .prepare(
+      `select 1 as present from briar_channel_message_reactions
+       where message_id = ? and user_id = ? and emoji = ?`,
+    )
+    .bind(input.messageId, input.userId, input.emoji)
+    .first<{ present: number }>();
+
+  if (existing) {
+    await db
+      .prepare(
+        `delete from briar_channel_message_reactions
+         where message_id = ? and user_id = ? and emoji = ?`,
+      )
+      .bind(input.messageId, input.userId, input.emoji)
+      .run();
+  } else {
+    await db
+      .prepare(
+        `insert into briar_channel_message_reactions (
+           message_id, user_id, emoji, created_at
+         ) values (?, ?, ?, ?)`,
+      )
+      .bind(input.messageId, input.userId, input.emoji, input.createdAt)
+      .run();
+  }
+
+  return getChannelMessage(db, input.channelId, input.messageId);
 }
 
 export async function listChannelRootMessages(

@@ -5803,7 +5803,158 @@ button.issue-message-state { width:100%; cursor:pointer; }
   font-weight: 620;
 }
 
+.channel-message-actions {
+  position: absolute;
+  z-index: 3;
+  top: 2px;
+  right: 10px;
+  padding: 3px 4px;
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  border: 1px solid var(--border, #ded9d0);
+  border-radius: 999px;
+  background: var(--card, #fff);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .12);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(2px);
+  transition: opacity .12s ease-out, transform .12s ease-out;
+}
+.channel-message:hover .channel-message-actions,
+.channel-message:focus-within .channel-message-actions,
+.channel-message.is-reacting .channel-message-actions {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+.channel-message-actions-divider {
+  width: 1px;
+  height: 18px;
+  margin: 0 3px;
+  background: var(--border, #ded9d0);
+}
+.channel-quick-reaction {
+  width: 30px;
+  height: 28px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  color: var(--foreground);
+  background: transparent;
+  cursor: pointer;
+  font-size: 15px;
+  line-height: 1;
+  transition: background-color .12s ease-out, transform .1s ease-out;
+}
+.channel-quick-reaction:hover {
+  background: var(--secondary, #f0ebe3);
+}
+.channel-quick-reaction:active { transform: scale(.94); }
+.channel-quick-reaction:disabled { opacity: .55; cursor: wait; }
+.channel-quick-reaction.open-picker,
+.channel-quick-reaction.open-thread {
+  color: var(--muted-foreground, #777168);
+}
+.channel-message-reactions {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+}
+.channel-reaction-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.channel-reaction-chip,
+.channel-reaction-add {
+  min-height: 28px;
+  padding: 2px 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--border, #ded9d0);
+  border-radius: 999px;
+  color: var(--foreground);
+  background: color-mix(in srgb, var(--muted, #f7f4ef) 80%, transparent);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1;
+  transition: background-color .12s ease-out, border-color .12s ease-out;
+}
+.channel-reaction-chip:hover,
+.channel-reaction-add:hover {
+  background: var(--secondary, #f0ebe3);
+}
+.channel-reaction-chip.is-mine {
+  border-color: color-mix(in srgb, var(--primary, #5943a4) 45%, var(--border));
+  background: color-mix(in srgb, var(--primary, #5943a4) 10%, var(--card, #fff));
+}
+.channel-reaction-chip:disabled,
+.channel-reaction-add:disabled {
+  opacity: .55;
+  cursor: wait;
+}
+.channel-reaction-add {
+  color: var(--muted-foreground, #777168);
+}
+.channel-reaction-add span:last-child {
+  font-size: 12px;
+  font-weight: 700;
+}
+.channel-reaction-add.standalone {
+  opacity: 0;
+  pointer-events: none;
+}
+.channel-message:hover .channel-reaction-add,
+.channel-message:focus-within .channel-reaction-add,
+.channel-message.is-reacting .channel-reaction-add,
+.channel-message-reactions.always-show-add .channel-reaction-add {
+  opacity: 1;
+  pointer-events: auto;
+}
+.channel-emoji-picker {
+  position: absolute;
+  z-index: 8;
+  top: calc(100% + 6px);
+  left: 0;
+  border-radius: 12px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, .18);
+  overflow: hidden;
+}
+.channel-emoji-picker em-emoji-picker {
+  --rgb-background: 255, 255, 255;
+  --rgb-input: 247, 244, 239;
+  --rgb-color: 40, 38, 34;
+  border: 1px solid var(--border, #ded9d0);
+  border-radius: 12px;
+}
+.dark .channel-emoji-picker em-emoji-picker {
+  --rgb-background: 28, 27, 25;
+  --rgb-input: 40, 38, 34;
+  --rgb-color: 240, 236, 228;
+}
+@media (hover: none) {
+  .channel-message-actions {
+    opacity: 1;
+    pointer-events: auto;
+    transform: none;
+  }
+  .channel-reaction-add,
+  .channel-reaction-add.standalone {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
 .channel-message {
+  position: relative;
   display: grid;
   grid-template-columns: 40px minmax(0, 1fr);
   gap: 10px;

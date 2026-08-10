@@ -237,6 +237,13 @@ export type ChannelMessageAttachment = {
   url: string;
 };
 
+/** Aggregated emoji reaction on a channel message. */
+export type ChannelMessageReaction = {
+  emoji: string;
+  count: number;
+  userIds: string[];
+};
+
 export type ChannelMessage = {
   id: string;
   channelId: string;
@@ -246,12 +253,27 @@ export type ChannelMessage = {
   mentionedUserIds: string[];
   mentionedAgentIds: string[];
   attachments: ChannelMessageAttachment[];
+  reactions: ChannelMessageReaction[];
   replyCount: number;
   lastReplyAt: string | null;
   document: ChannelMessageDocument | null;
   proposal: ChannelMessageProposal | null;
   createdAt: string;
 };
+
+/** Quick-react chips shown on hover; order matches Slack-like defaults. */
+export const channelQuickReactionEmojis = [
+  "👍",
+  "❤️",
+  "😂",
+  "🎉",
+] as const;
+
+export const channelMessageReactionInputSchema = z
+  .object({
+    emoji: z.string().trim().min(1).max(32),
+  })
+  .strict();
 
 export type ChannelAgentReply = {
   id: string;

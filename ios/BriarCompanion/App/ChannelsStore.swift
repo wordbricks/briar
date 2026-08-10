@@ -190,6 +190,34 @@ final class ChannelsStore: ObservableObject {
         }
     }
 
+    /// Toggles the current user's emoji reaction on a channel message.
+    func toggleReaction(channelID: UUID, messageID: UUID, emoji: String) async {
+        guard let organizationID, let token else { return }
+        let trimmed = emoji.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        do {
+            let response: ToggleChannelMessageReactionResponse = try await api.send(
+                MobileAPIContract.Endpoint.channelMessageReactions(
+                    organizationID: organizationID,
+                    channelID: channelID,
+                    messageID: messageID
+                ),
+                method: "PUT",
+                token: token,
+                body: ToggleChannelMessageReactionRequest(emoji: trimmed),
+                as: ToggleChannelMessageReactionResponse.self
+            )
+            let apply: (ChannelMessage) -> ChannelMessage = { candidate in
+                candidate.id == response.message.id ? response.message : candidate
+            }
+            messages = messages.map(apply)
+            thread = thread.map(apply)
+            errorMessage = nil
+        } catch {
+            errorMessage = CompanionStore.message(for: error)
+        }
+    }
+
     /// Downloads a channel message attachment for previewing.
     func download(path: String, filename: String) async throws -> URL {
         guard let token else { throw MobileAPIError.invalidRequest }

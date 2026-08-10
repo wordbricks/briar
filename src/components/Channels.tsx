@@ -43,6 +43,7 @@ import {
   sendChannelMessage,
   setChannelAgent,
   setChannelMember,
+  toggleChannelMessageReaction,
 } from "../lib/api";
 import type { OrganizationMember } from "../types";
 import type {
@@ -68,6 +69,7 @@ import {
   saveChannelThreadWidth,
 } from "../lib/channel-thread-width";
 import { ChannelMessageText } from "./ChannelMessageText";
+import { ChannelMessageReactions } from "./ChannelMessageReactions";
 
 /** Chat needs a tighter cadence than the 15s dashboard poll. */
 const CHANNEL_POLL_INTERVAL_MS = 3_000;
@@ -519,6 +521,32 @@ export function Channels({
     ],
   );
 
+  const toggleReaction = useCallback(
+    async (message: ChannelMessage, emoji: string) => {
+      if (!activeChannelId) return;
+      setBusy(true);
+      setError(null);
+      try {
+        const result = await toggleChannelMessageReaction(
+          token,
+          organizationId,
+          activeChannelId,
+          message.id,
+          emoji,
+        );
+        setMessages((current) => mergeMessages(current, [result.message], []));
+        setThreadMessages((current) =>
+          mergeMessages(current, [result.message], []),
+        );
+      } catch (cause) {
+        setError(errorMessage(cause));
+      } finally {
+        setBusy(false);
+      }
+    },
+    [activeChannelId, organizationId, token],
+  );
+
   const pendingReplies = replies.filter(
     (reply) => reply.status === "queued" || reply.status === "running",
   );
@@ -617,6 +645,9 @@ export function Channels({
                       currentUserId={currentUserId}
                       onAcceptProposal={() => void acceptProposal(message)}
                       onOpenThread={() => void openThread(message.id)}
+                      onToggleReaction={(emoji) =>
+                        void toggleReaction(message, emoji)
+                      }
                       busy={busy}
                       token={token}
                     />
@@ -689,6 +720,9 @@ export function Channels({
                 localeTag={localeTag}
                 currentUserId={currentUserId}
                 onAcceptProposal={() => void acceptProposal(message)}
+                onToggleReaction={(emoji) =>
+                  void toggleReaction(message, emoji)
+                }
                 busy={busy}
                 token={token}
               />
@@ -1015,6 +1049,7 @@ function MessageRow({
   currentUserId,
   onOpenThread,
   onAcceptProposal,
+  onToggleReaction,
   busy,
   token,
 }: {
@@ -1025,10 +1060,12 @@ function MessageRow({
   currentUserId: string | null;
   onOpenThread?: () => void;
   onAcceptProposal: () => void;
+  onToggleReaction: (emoji: string) => void;
   busy: boolean;
   token: string;
 }) {
   const { t } = useI18n();
+  const [reacting, setReacting] = useState(false);
   const isAgent = message.author.type === "agent";
   const isSelf =
     message.author.type === "user" && message.author.id === currentUserId;
@@ -1038,7 +1075,7 @@ function MessageRow({
 
   return (
     <article
-      className={`channel-message ${message.author.type}`}
+      className={`channel-message ${message.author.type}${reacting ? " is-reacting" : ""}`}
       data-channel-message-id={message.id}
     >
       <div className="channel-message-avatar" aria-hidden="true">
@@ -1099,6 +1136,16 @@ function MessageRow({
             ) : null}
           </div>
         ) : null}
+
+        <ChannelMessageReactions
+          busy={busy}
+          currentUserId={currentUserId}
+          message={message}
+          onOpenThread={onOpenThread}
+          onReactingChange={setReacting}
+          onToggle={onToggleReaction}
+          showHoverActions
+        />
 
         {onOpenThread ? (
           <button className="channel-thread-link" onClick={onOpenThread}>

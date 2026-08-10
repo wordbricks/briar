@@ -380,6 +380,15 @@ export const mobileChannelMessageSchema = z.object({
   mentionedUserIds: z.array(z.string()).default([]),
   mentionedAgentIds: z.array(z.uuid()).default([]),
   attachments: z.array(mobileIssueAttachmentSchema).default([]),
+  reactions: z
+    .array(
+      z.object({
+        emoji: z.string().min(1).max(32),
+        count: z.number().int().positive(),
+        userIds: z.array(z.string()).min(1),
+      }),
+    )
+    .default([]),
   replyCount: z.number().int().nonnegative(),
   lastReplyAt: z.iso.datetime().nullable(),
   document: z
@@ -439,6 +448,14 @@ export const mobileCreateChannelMessageRequestSchema = z.object({
   parentMessageId: z.uuid().nullable().default(null),
   mentionedUserIds: z.array(z.string()).default([]),
   mentionedAgentIds: z.array(z.uuid()).default([]),
+});
+
+export const mobileToggleChannelMessageReactionRequestSchema = z.object({
+  emoji: z.string().trim().min(1).max(32),
+});
+
+export const mobileToggleChannelMessageReactionResponseSchema = z.object({
+  message: mobileChannelMessageSchema,
 });
 
 export const mobileCreateChannelMessageResponseSchema = z.object({
@@ -840,6 +857,10 @@ export const mobileOperationSchemas = {
   createChannelMessage: {
     request: mobileCreateChannelMessageRequestSchema,
     response: mobileCreateChannelMessageResponseSchema,
+  },
+  toggleChannelMessageReaction: {
+    request: mobileToggleChannelMessageReactionRequestSchema,
+    response: mobileToggleChannelMessageReactionResponseSchema,
   },
   acceptChannelProposal: {
     request: mobileAcceptChannelProposalRequestSchema,

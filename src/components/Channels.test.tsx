@@ -22,6 +22,7 @@ const loadOrganizationMembers = vi.fn();
 const listOrganizationAgents = vi.fn();
 const setChannelMember = vi.fn();
 const setChannelAgent = vi.fn();
+const toggleChannelMessageReaction = vi.fn();
 
 vi.mock("../lib/api", () => ({
   listChannels: (...args: unknown[]) => listChannels(...args),
@@ -36,6 +37,13 @@ vi.mock("../lib/api", () => ({
   listOrganizationAgents: (...args: unknown[]) => listOrganizationAgents(...args),
   setChannelMember: (...args: unknown[]) => setChannelMember(...args),
   setChannelAgent: (...args: unknown[]) => setChannelAgent(...args),
+  toggleChannelMessageReaction: (...args: unknown[]) =>
+    toggleChannelMessageReaction(...args),
+}));
+
+vi.mock("@emoji-mart/data", () => ({ default: {} }));
+vi.mock("@emoji-mart/react", () => ({
+  default: () => null,
 }));
 
 const { Channels } = await import("./Channels");
@@ -114,6 +122,7 @@ const message = (overrides: Partial<ChannelMessage> = {}): ChannelMessage => ({
   mentionedUserIds: [],
   mentionedAgentIds: [],
   attachments: [],
+  reactions: [],
   replyCount: 0,
   lastReplyAt: null,
   document: null,
@@ -215,6 +224,41 @@ describe("Channels", () => {
     expect(container.textContent).toContain("에이전트 만들기");
     expect(container.textContent).toContain("사람 추가");
     expect(container.querySelector(".channel-composer-shell")).not.toBeNull();
+  });
+
+  it("shows hover quick reactions and toggles an existing reaction chip", async () => {
+    const reacted = message({
+      id: "message-reacted",
+      reactions: [
+        { emoji: "👍", count: 1, userIds: ["user-1"] },
+      ],
+    });
+    toggleChannelMessageReaction.mockResolvedValue({
+      message: message({
+        id: reacted.id,
+        reactions: [],
+      }),
+    });
+    await render([reacted]);
+
+    expect(container.querySelector(".channel-message-actions")).not.toBeNull();
+    expect(container.querySelector(".channel-reaction-chip")).not.toBeNull();
+    expect(container.textContent).toContain("React");
+
+    const chip = container.querySelector<HTMLButtonElement>(
+      ".channel-reaction-chip",
+    );
+    await act(async () => {
+      chip?.click();
+      await Promise.resolve();
+    });
+    expect(toggleChannelMessageReaction).toHaveBeenCalledWith(
+      "token",
+      "org-1",
+      channel.id,
+      reacted.id,
+      "👍",
+    );
   });
 
   it("requests organization agent creation from the channel welcome action", async () => {

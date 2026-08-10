@@ -16,6 +16,7 @@ const loadChannel = vi.fn();
 const listChannelMessages = vi.fn();
 const sendChannelMessage = vi.fn();
 const acceptChannelProposal = vi.fn();
+const toggleChannelMessageReaction = vi.fn();
 
 vi.mock("../lib/api", () => ({
   listChannels: (...args: unknown[]) => listChannels(...args),
@@ -23,6 +24,13 @@ vi.mock("../lib/api", () => ({
   listChannelMessages: (...args: unknown[]) => listChannelMessages(...args),
   sendChannelMessage: (...args: unknown[]) => sendChannelMessage(...args),
   acceptChannelProposal: (...args: unknown[]) => acceptChannelProposal(...args),
+  toggleChannelMessageReaction: (...args: unknown[]) =>
+    toggleChannelMessageReaction(...args),
+}));
+
+vi.mock("@emoji-mart/data", () => ({ default: {} }));
+vi.mock("@emoji-mart/react", () => ({
+  default: () => null,
 }));
 
 const { CompanionChannels } = await import("./CompanionChannels");
@@ -61,6 +69,7 @@ const message = (id: string, body: string, replyCount = 0): ChannelMessage => ({
   mentionedUserIds: [],
   mentionedAgentIds: [],
   attachments: [],
+  reactions: [],
   replyCount,
   lastReplyAt: null,
   document: null,
