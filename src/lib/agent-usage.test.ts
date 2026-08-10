@@ -5,6 +5,7 @@ import {
   clearAgentUsageHistory,
   formatUsageDuration,
   formatUsageWindowLabel,
+  isProviderUsageExhausted,
   readAgentUsageHistory,
   recordAgentUsageSnapshot,
   tightestUsageWindow,
@@ -33,6 +34,38 @@ const provider: AgentUsageProvider = {
 describe("agent usage presentation", () => {
   it("selects the most consumed window for the thin status bar", () => {
     expect(tightestUsageWindow(provider)).toEqual(provider.weekly);
+  });
+
+  it("treats only fully consumed ok usage as exhausted", () => {
+    expect(isProviderUsageExhausted(provider)).toBe(false);
+    expect(
+      isProviderUsageExhausted({
+        ...provider,
+        weekly: { ...provider.weekly!, usedPercent: 100 },
+      }),
+    ).toBe(true);
+    expect(
+      isProviderUsageExhausted({
+        ...provider,
+        session: { ...provider.session!, usedPercent: 100 },
+        weekly: { ...provider.weekly!, usedPercent: 40 },
+      }),
+    ).toBe(true);
+    expect(
+      isProviderUsageExhausted({
+        ...provider,
+        status: "error",
+        weekly: { ...provider.weekly!, usedPercent: 100 },
+      }),
+    ).toBe(false);
+    expect(
+      isProviderUsageExhausted({
+        ...provider,
+        session: null,
+        weekly: null,
+        monthly: null,
+      }),
+    ).toBe(false);
   });
 
   it("formats compact reset durations", () => {
