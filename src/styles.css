@@ -5324,7 +5324,7 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .auto-hunt-session-main-column .auto-hunt-app-server-section > header p { font-size:var(--text-xs); }
 .auto-hunt-session-main-column .auto-hunt-event-state { flex:1; }
 .auto-hunt-session-execution-timeline { flex:1; min-height:0; max-height:none; padding:4px 8px 20px; overflow-y:auto; display:flex; flex-direction:column; gap:18px; border:0; border-radius:0; background:transparent; }
-.auto-hunt-session-execution-timeline .auto-hunt-agent-message { width:max-content; max-width:min(84%,760px); min-height:0; position:relative; padding:0 0 0 44px; border:0; }
+.auto-hunt-session-execution-timeline .auto-hunt-agent-message { width:max-content; max-width:min(84%,760px); min-height:0; position:relative; flex:0 0 auto; padding:0 0 0 44px; border:0; }
 .auto-hunt-session-execution-timeline .auto-hunt-agent-message + .auto-hunt-agent-message { border:0; }
 .auto-hunt-session-execution-timeline .auto-hunt-agent-message.user { margin-left:auto; padding:0 44px 0 0; }
 .auto-hunt-message-avatar { width:32px; height:32px; position:absolute; top:21px; left:0; display:grid; place-items:center; border:1px solid var(--border); border-radius:50%; color:var(--muted-foreground); background:var(--muted); }
