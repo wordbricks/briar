@@ -6,6 +6,8 @@ import {
   defaultInboxNotificationPreferences,
   inboxNotificationContent,
   inboxNotificationTarget,
+  isInboxChannelNavigationTarget,
+  isInboxRunDetailTarget,
   listenForMacInboxNotificationClicks,
   listenForInboxNotificationClicks,
   readInboxNotificationPreferences,
@@ -126,6 +128,57 @@ describe("inbox notification navigation", () => {
       channelMessageId: "message-1",
       rootMessageId: "root-1",
     });
+  });
+
+  it("routes channel targets to the channel page instead of the run detail panel", () => {
+    const channelTarget = inboxNotificationTarget({
+      id: "channel:message-1",
+      kind: "channel",
+      projectId: "project-1",
+      projectName: "Briar",
+      targetId: "channel-1",
+      channelId: "channel-1",
+      channelName: "product",
+      messageId: "message-1",
+      rootMessageId: "root-1",
+      title: "product",
+      occurredAt: "2026-08-08T00:00:00.000Z",
+      version: "message-1",
+      body: "A reply",
+      authorName: "Sam",
+      reason: "thread_reply",
+    });
+    const issueTarget = inboxNotificationTarget(message);
+    const conversationTarget = inboxNotificationTarget({
+      id: "conversation:message-2",
+      kind: "conversation",
+      projectId: "project-1",
+      projectName: "Briar",
+      targetId: "run-1",
+      messageId: "message-2",
+      rootMessageId: "root-2",
+      title: "Issue title",
+      occurredAt: "2026-08-08T00:00:00.000Z",
+      version: "message-2",
+      body: "A mention",
+      authorName: "Sam",
+      reason: "mention",
+    });
+    const sessionTarget = {
+      messageId: "session:session-1",
+      projectId: "project-1",
+      targetId: "session-1",
+      kind: "session" as const,
+    };
+
+    expect(isInboxChannelNavigationTarget(channelTarget)).toBe(true);
+    expect(isInboxRunDetailTarget(channelTarget)).toBe(false);
+    expect(isInboxChannelNavigationTarget(issueTarget)).toBe(false);
+    expect(isInboxRunDetailTarget(issueTarget)).toBe(true);
+    expect(isInboxChannelNavigationTarget(conversationTarget)).toBe(false);
+    expect(isInboxRunDetailTarget(conversationTarget)).toBe(true);
+    expect(isInboxChannelNavigationTarget(sessionTarget)).toBe(false);
+    expect(isInboxRunDetailTarget(sessionTarget)).toBe(false);
   });
 
   it("falls back to the stored target for iOS action payloads", () => {
