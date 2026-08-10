@@ -1,22 +1,14 @@
 import {
-  Activity,
-  Bell,
   Bot,
   Building2,
   Cpu,
   ChevronDown,
   Download,
   GitBranch,
-  Globe2,
-  Keyboard,
-  Link2,
-  Palette,
   Plug,
-  Settings2,
   ShieldCheck,
   SlidersHorizontal,
   Users,
-  UserRound,
 } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
@@ -31,7 +23,10 @@ import {
 import { cn } from "@/lib/utils";
 import { useI18n } from "../i18n";
 import type { Organization, Project } from "../types";
-import type { SettingsSection } from "./AppSettings";
+import {
+  appSettingsNavigationItems,
+  type SettingsSection,
+} from "./app-settings-navigation";
 import type { OrganizationSettingsSection } from "./OrganizationSettings";
 import type { ProjectSettingsSection } from "./ProjectSettings";
 import { ProjectIcon } from "./ProjectIcon";
@@ -89,63 +84,15 @@ export function UnifiedSettingsSidebar({
   }, [activeTarget]);
 
   const applicationItems = useMemo<NavigationItem<SettingsSection>[]>(
-    () => [
-      {
-        id: "account",
-        icon: <UserRound size={16} strokeWidth={1.75} />,
-        label: t("account.profile"),
-      },
-      {
-        id: "general",
-        icon: <SlidersHorizontal size={16} strokeWidth={1.75} />,
-        label: t("appSettings.general"),
-      },
-      {
-        id: "appearance",
-        icon: <Palette size={16} strokeWidth={1.75} />,
-        label: t("appSettings.appearance"),
-      },
-      {
-        id: "notifications",
-        icon: <Bell size={16} strokeWidth={1.75} />,
-        label: t("notifications.title"),
-      },
-      {
-        id: "keybindings",
-        icon: <Keyboard size={16} strokeWidth={1.75} />,
-        label: t("appSettings.keybindings"),
-      },
-      {
-        id: "usage",
-        icon: <Activity size={16} strokeWidth={1.75} />,
-        label: t("usage.title"),
-      },
-      {
-        id: "providers",
-        icon: <Bot size={16} strokeWidth={1.75} />,
-        label: t("appSettings.providers"),
-      },
-      {
-        id: "browser",
-        icon: <Globe2 size={16} strokeWidth={1.75} />,
-        label: t("appSettings.browser"),
-      },
-      {
-        id: "source-control",
-        icon: <GitBranch size={16} strokeWidth={1.75} />,
-        label: t("appSettings.sourceControl"),
-      },
-      {
-        id: "connections",
-        icon: <Link2 size={16} strokeWidth={1.75} />,
-        label: t("appSettings.connections"),
-      },
-      {
-        id: "archive",
-        icon: <Settings2 size={16} strokeWidth={1.75} />,
-        label: t("appSettings.archive"),
-      },
-    ],
+    () =>
+      appSettingsNavigationItems.map((item) => {
+        const Icon = item.icon;
+        return {
+          id: item.id,
+          icon: <Icon size={16} strokeWidth={1.75} />,
+          label: t(item.labelKey),
+        };
+      }),
     [t],
   );
   const organizationItems = useMemo<

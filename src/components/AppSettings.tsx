@@ -1,24 +1,14 @@
 import {
-  Activity,
-  Archive,
-  Bell,
-  Bot,
   CircleCheck,
   ChevronDown,
   Download,
   Github,
   GitBranch,
-  Globe2,
-  Keyboard,
-  Link2,
   LoaderCircle,
   Moon,
-  Palette,
   RefreshCw,
   Settings2,
-  SlidersHorizontal,
   SquareTerminal,
-  UserRound,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 
@@ -85,19 +75,13 @@ import { AccountDeletionSettings } from "./AccountDeletionSettings";
 import { AccountProfileSettings } from "./AccountProfileSettings";
 import { BrowserSettings } from "./BrowserSettings";
 import { KeybindingsSettings } from "./KeybindingsSettings";
+import {
+  appSettingsNavigationGroups,
+  appSettingsNavigationItems,
+  type SettingsSection,
+} from "./app-settings-navigation";
 
-export type SettingsSection =
-  | "account"
-  | "general"
-  | "appearance"
-  | "notifications"
-  | "keybindings"
-  | "usage"
-  | "providers"
-  | "browser"
-  | "source-control"
-  | "connections"
-  | "archive";
+export type { SettingsSection } from "./app-settings-navigation";
 
 type ProviderToggle = "git" | "github";
 
@@ -380,87 +364,19 @@ export function AppSettings({
   };
 
   const navigationGroups: NavGroup[] = useMemo(
-    () => [
-      {
-        id: "setup",
-        label: t("appSettings.groupSetup"),
-        items: [
-          {
-            id: "account",
-            icon: <UserRound size={16} strokeWidth={1.75} />,
-            label: t("account.profile"),
-          },
-          {
-            id: "general",
-            icon: <SlidersHorizontal size={16} strokeWidth={1.75} />,
-            label: t("appSettings.general"),
-          },
-          {
-            id: "appearance",
-            icon: <Palette size={16} strokeWidth={1.75} />,
-            label: t("appSettings.appearance"),
-          },
-          {
-            id: "notifications",
-            icon: <Bell size={16} strokeWidth={1.75} />,
-            label: t("notifications.title"),
-          },
-          {
-            id: "keybindings",
-            icon: <Keyboard size={16} strokeWidth={1.75} />,
-            label: t("appSettings.keybindings"),
-          },
-        ],
-      },
-      {
-        id: "ai",
-        label: t("appSettings.groupAi"),
-        items: [
-          {
-            id: "usage",
-            icon: <Activity size={16} strokeWidth={1.75} />,
-            label: t("usage.title"),
-          },
-          {
-            id: "providers",
-            icon: <Bot size={16} strokeWidth={1.75} />,
-            label: t("appSettings.providers"),
-          },
-        ],
-      },
-      {
-        id: "workflows",
-        label: t("appSettings.groupWorkflows"),
-        items: [
-          {
-            id: "browser",
-            icon: <Globe2 size={16} strokeWidth={1.75} />,
-            label: t("appSettings.browser"),
-          },
-          {
-            id: "source-control",
-            icon: <GitBranch size={16} strokeWidth={1.75} />,
-            label: t("appSettings.sourceControl"),
-          },
-          {
-            id: "connections",
-            icon: <Link2 size={16} strokeWidth={1.75} />,
-            label: t("appSettings.connections"),
-          },
-        ],
-      },
-      {
-        id: "data",
-        label: t("appSettings.groupData"),
-        items: [
-          {
-            id: "archive",
-            icon: <Archive size={16} strokeWidth={1.75} />,
-            label: t("appSettings.archive"),
-          },
-        ],
-      },
-    ],
+    () =>
+      appSettingsNavigationGroups.map((group) => ({
+        id: group.id,
+        label: t(group.labelKey),
+        items: group.items.map((item) => {
+          const Icon = item.icon;
+          return {
+            id: item.id,
+            icon: <Icon size={16} strokeWidth={1.75} />,
+            label: t(item.labelKey),
+          };
+        }),
+      })),
     [t],
   );
 
@@ -483,20 +399,12 @@ export function AppSettings({
   }, [navigationGroups, searchQuery]);
 
   const activeItem = flatNavigation.find((item) => item.id === activeSection);
-  const sectionDescriptions: Record<SettingsSection, string> = {
-    account: t("account.profileDescription"),
-    general: t("appSettings.generalDescription"),
-    appearance: t("appSettings.appearanceDescription"),
-    notifications: t("notifications.description"),
-    keybindings: t("appSettings.keybindingsDescription"),
-    usage: t("usage.settingsDescription"),
-    providers: t("appSettings.providersDescription"),
-    browser: t("appSettings.browserDescription"),
-    "source-control": t("appSettings.sourceControlDescription"),
-    connections: t("appSettings.connectionsDescription"),
-    archive: t("appSettings.archiveDescription"),
-  };
-  const sectionDescription = sectionDescriptions[activeSection];
+  const activeDefinition = appSettingsNavigationItems.find(
+    (item) => item.id === activeSection,
+  );
+  const sectionDescription = activeDefinition
+    ? t(activeDefinition.descriptionKey)
+    : undefined;
 
   return (
     <SettingsShell>
