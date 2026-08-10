@@ -5,10 +5,13 @@ import {
   codexApprovalRequest,
   codexFinalMessage,
   codexInitializeRequest,
+  codexMcpRecoveryPrompt,
   codexServerRequestResponse,
   consumeCodexAppServerMessage,
   createCodexAppServerState,
   normalizeCodexAppServerMessage,
+  type CodexMcpIsolation,
+  type CodexMcpTurnFailure,
   type CodexRunnerOutput,
   type CodexRunnerRequest,
   type CodexRpcMessage,
@@ -48,12 +51,25 @@ function childExit(
   });
 }
 
-async function main() {
-  const request = await requestPromise;
-  if (!request.message.trim()) {
-    throw new Error("Codex runner received an empty message.");
-  }
+type CodexAttemptResult =
+  | {
+      type: "completed";
+      threadId: string;
+      message: string;
+    }
+  | {
+      type: "mcpFailure";
+      threadId: string | null;
+      failure: CodexMcpTurnFailure;
+    };
 
+const maxOptionalMcpRecoveries = 3;
+
+async function runCodexAttempt(
+  request: CodexRunnerRequest,
+  isolation: CodexMcpIsolation,
+  emittedSessions: Set<string>,
+): Promise<CodexAttemptResult> {
   const child = spawn(request.codexBinary, codexAppServerArgs(request), {
     cwd: request.workspaceRoot,
     env: process.env,
@@ -67,9 +83,9 @@ async function main() {
     stderr = `${stderr}${chunk}`.slice(-8_000);
   });
   const exitPromise = childExit(child);
-  const state = createCodexAppServerState();
-  let sessionEmitted = false;
+  const state = createCodexAppServerState(isolation);
   let completed = false;
+  let mcpFailure: CodexMcpTurnFailure | null = null;
 
   try {
     send(child, codexInitializeRequest());
@@ -118,11 +134,17 @@ async function main() {
       }
 
       const transition = consumeCodexAppServerMessage(state, request, message);
-      if (state.threadId && !sessionEmitted) {
-        sessionEmitted = true;
+      if (state.threadId && !emittedSessions.has(state.threadId)) {
+        emittedSessions.add(state.threadId);
         emit({ type: "session", sessionId: state.threadId });
       }
       for (const outgoing of transition.outgoing) send(child, outgoing);
+      if (transition.mcpFailure) {
+        mcpFailure = transition.mcpFailure;
+        child.stdin.end();
+        if (child.exitCode === null) child.kill("SIGTERM");
+        break;
+      }
       if (transition.completed) {
         completed = true;
         child.stdin.end();
@@ -136,6 +158,13 @@ async function main() {
     serverLines.close();
 
     const exitCode = await exitPromise;
+    if (mcpFailure) {
+      return {
+        type: "mcpFailure",
+        threadId: state.threadId,
+        failure: mcpFailure,
+      };
+    }
     if (!completed) {
       throw new Error(
         stderr.trim() ||
@@ -144,11 +173,108 @@ async function main() {
     }
     const message = codexFinalMessage(state);
     if (!message) throw new Error("Codex App Server returned no final message.");
-    emit({ type: "result", sessionId: state.threadId ?? "codex", message });
+    return {
+      type: "completed",
+      threadId: state.threadId ?? "codex",
+      message,
+    };
   } finally {
     if (activeChild === child) activeChild = null;
     if (child.exitCode === null) child.kill("SIGTERM");
   }
+}
+
+async function main() {
+  const request = await requestPromise;
+  if (!request.message.trim()) {
+    throw new Error("Codex runner received an empty message.");
+  }
+
+  const emittedSessions = new Set<string>();
+  let isolation: CodexMcpIsolation = {
+    mcpServers: [],
+    apps: [],
+    disableApps: false,
+    disablePlugins: false,
+  };
+  let attemptRequest = request;
+  let recoveryCount = 0;
+
+  for (;;) {
+    const result = await runCodexAttempt(
+      attemptRequest,
+      isolation,
+      emittedSessions,
+    );
+    if (result.type === "completed") {
+      emit({
+        type: "result",
+        sessionId: result.threadId,
+        message: result.message,
+      });
+      return;
+    }
+
+    if (result.failure.disposition === "blocked") {
+      emit({
+        type: "blocked",
+        reason: "mcp_auth_required",
+        provider: "codex",
+        message: `Authentication is required for MCP server(s): ${result.failure.serverNames.join(", ")}.`,
+        serverNames: result.failure.serverNames,
+        nextRetryAt: null,
+      });
+      return;
+    }
+
+    if (recoveryCount >= maxOptionalMcpRecoveries) {
+      throw new Error(
+        "Codex could not continue after isolating optional MCP startup failures.",
+      );
+    }
+    const nextIsolation = mergeIsolation(isolation, result.failure.isolation);
+    if (isolationKey(nextIsolation) === isolationKey(isolation)) {
+      throw new Error(
+        "Codex could not isolate the optional MCP startup failure.",
+      );
+    }
+    if (!result.threadId) {
+      throw new Error(
+        "Codex App Server did not return a thread ID for MCP recovery.",
+      );
+    }
+
+    recoveryCount += 1;
+    isolation = nextIsolation;
+    attemptRequest = {
+      ...request,
+      conversationId: result.threadId,
+      message: codexMcpRecoveryPrompt(),
+      attachments: [],
+    };
+  }
+}
+
+function mergeIsolation(
+  current: CodexMcpIsolation,
+  incoming: CodexMcpIsolation,
+): CodexMcpIsolation {
+  return {
+    mcpServers: [...new Set([...current.mcpServers, ...incoming.mcpServers])]
+      .sort(),
+    apps: [...new Set([...current.apps, ...incoming.apps])].sort(),
+    disableApps: current.disableApps || incoming.disableApps,
+    disablePlugins: current.disablePlugins || incoming.disablePlugins,
+  };
+}
+
+function isolationKey(value: CodexMcpIsolation): string {
+  return JSON.stringify([
+    value.mcpServers,
+    value.apps,
+    value.disableApps,
+    value.disablePlugins,
+  ]);
 }
 
 void main()
