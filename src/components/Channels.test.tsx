@@ -18,6 +18,7 @@ const sendChannelMessage = vi.fn();
 const acceptChannelProposal = vi.fn();
 const listChannelMessages = vi.fn();
 const createChannel = vi.fn();
+const loadChannelMessageAttachment = vi.fn();
 const loadOrganizationMembers = vi.fn();
 const listOrganizationAgents = vi.fn();
 const setChannelMember = vi.fn();
@@ -32,6 +33,8 @@ vi.mock("../lib/api", () => ({
   acceptChannelProposal: (...args: unknown[]) => acceptChannelProposal(...args),
   listChannelMessages: (...args: unknown[]) => listChannelMessages(...args),
   createChannel: (...args: unknown[]) => createChannel(...args),
+  loadChannelMessageAttachment: (...args: unknown[]) =>
+    loadChannelMessageAttachment(...args),
   loadOrganizationMembers: (...args: unknown[]) =>
     loadOrganizationMembers(...args),
   listOrganizationAgents: (...args: unknown[]) => listOrganizationAgents(...args),
@@ -70,11 +73,13 @@ const agent: ChannelAgentSummary = {
   agentId: "agent-1",
   handle: "honey",
   name: "Honey",
+  avatar: null,
   provider: "claude",
   model: null,
   effort: null,
   skills: [],
   projectId: null,
+  projectName: null,
   responsibility: "Writing partner",
   createdAt: "2026-08-01T00:00:00.000Z",
 };
@@ -101,11 +106,13 @@ const availableAgent: ChannelAgentSummary = {
   agentId: "agent-2",
   handle: "reviewer",
   name: "Reviewer",
+  avatar: "data:image/png;base64,cHJvamVjdC1hdmF0YXI=",
   provider: "codex",
   model: null,
   effort: null,
   skills: [],
   projectId: "project-1",
+  projectName: "Briar",
   responsibility: "Review changes",
   createdAt: "2026-08-01T00:00:00.000Z",
 };
@@ -476,6 +483,12 @@ describe("Channels", () => {
     expect(dialog?.textContent).toContain("#Welcome에 멤버 추가");
     expect(dialog?.textContent).toContain("Alex");
     expect(dialog?.textContent).toContain("Reviewer");
+    expect(dialog?.textContent).toContain("프로젝트 에이전트 · Briar");
+    expect(
+      dialog?.querySelector<HTMLImageElement>(
+        '.channel-invite-avatar.agent img[src="data:image/png;base64,cHJvamVjdC1hdmF0YXI="]',
+      ),
+    ).not.toBeNull();
     expect(dialog?.textContent).not.toContain("Sam");
 
     const candidates = dialog!.querySelectorAll<HTMLButtonElement>(

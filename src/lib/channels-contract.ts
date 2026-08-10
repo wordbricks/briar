@@ -189,10 +189,12 @@ export type ChannelAgentSummary = {
   agentId: string;
   handle: string | null;
   name: string;
+  avatar: string | null;
   provider: ChannelAgentProvider;
   model: string | null;
   effort: ChannelAgentEffort | null;
   projectId: string | null;
+  projectName: string | null;
   responsibility: string;
   skills: ChannelAgentSkill[];
   createdAt: string;

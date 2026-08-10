@@ -90,11 +90,13 @@ const agent: ChannelAgentSummary = {
   agentId: "agent-1",
   handle: "honey",
   name: "Honey",
+  avatar: null,
   provider: "claude",
   model: null,
   effort: null,
   skills: [],
   projectId: null,
+  projectName: null,
   responsibility: "Writing partner",
   createdAt: "2026-08-01T00:00:00.000Z",
 };
