@@ -120,25 +120,3 @@ export function EmptyState({
   );
 }
 
-export function ErrorBanner({
-  children,
-  className,
-  icon,
-}: {
-  children: ReactNode;
-  className?: string;
-  icon?: ReactNode;
-}) {
-  return (
-    <div
-      className={cn(
-        "error-banner flex items-center gap-2 rounded-lg border border-destructive/25 bg-destructive/8 px-3 py-2.5 text-xs text-destructive",
-        className,
-      )}
-      role="alert"
-    >
-      {icon}
-      <span className="min-w-0">{children}</span>
-    </div>
-  );
-}

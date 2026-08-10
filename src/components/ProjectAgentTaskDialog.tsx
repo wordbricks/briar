@@ -1,7 +1,6 @@
 import { LoaderCircle, Play } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
-import { ErrorBanner } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -51,7 +50,6 @@ export function ProjectAgentTaskDialog({
   agent,
   companionMode = false,
   dashboard,
-  error,
   isOpen,
   isSubmitting,
   onOpenChange,
@@ -60,7 +58,6 @@ export function ProjectAgentTaskDialog({
   agent: ProjectAgent | null;
   companionMode?: boolean;
   dashboard: DashboardPayload | null;
-  error: string | null;
   isOpen: boolean;
   isSubmitting: boolean;
   onOpenChange: (open: boolean) => void;
@@ -117,8 +114,6 @@ export function ProjectAgentTaskDialog({
           <DialogDescription>{t("agents.taskDescription")}</DialogDescription>
         </DialogHeader>
 
-        {error ? <ErrorBanner>{error}</ErrorBanner> : null}
-
         <label className="project-agent-run-worker-select">
           <span>{t("agents.skill")}</span>
           <NativeSelect
@@ -141,7 +136,9 @@ export function ProjectAgentTaskDialog({
         </label>
 
         {agent && agent.skills.length === 0 ? (
-          <ErrorBanner>{t("agents.noRunnableSkills")}</ErrorBanner>
+          <p className="text-xs text-destructive" role="alert">
+            {t("agents.noRunnableSkills")}
+          </p>
         ) : null}
 
         {companionMode && selectedSkill ? (
@@ -162,11 +159,11 @@ export function ProjectAgentTaskDialog({
         ) : null}
 
         {companionMode && selectedSkill && availableWorkers.length === 0 ? (
-          <ErrorBanner>
+          <p className="text-xs text-destructive" role="alert">
             {hasWorkerForAnySkill
               ? t("agents.selectedSkillWorkerUnavailable")
               : t("agents.agentWorkerUnavailable")}
-          </ErrorBanner>
+          </p>
         ) : null}
 
         <form

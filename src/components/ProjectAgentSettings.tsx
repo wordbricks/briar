@@ -33,11 +33,11 @@ import {
   projectAgentSkillsValid,
 } from "./ProjectAgentSkillsEditor";
 import {
-  ErrorBanner,
   MainContent,
   PageHeader,
 } from "@/components/layout";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/components/ui/toast";
 import {
   Dialog,
   DialogContent,
@@ -69,6 +69,7 @@ export function ProjectAgentSettings({
   project: Project;
 }) {
   const { t } = useI18n();
+  const { toast } = useToast();
   const [name, setName] = useState(agent.name);
   const [avatar, setAvatar] = useState(agent.avatar);
   const [codexPet, setCodexPet] = useState(agent.codexPet);
@@ -92,7 +93,6 @@ export function ProjectAgentSettings({
     calendarColor: agent.calendarColor,
   });
   const [profileSaving, setProfileSaving] = useState(false);
-  const [profileError, setProfileError] = useState<string | null>(null);
 
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -119,7 +119,6 @@ export function ProjectAgentSettings({
       profileSaving
     ) return;
     setProfileSaving(true);
-    setProfileError(null);
     try {
       const saved = await onSave({
         name: name.trim() || null,
@@ -154,8 +153,9 @@ export function ProjectAgentSettings({
       setCalendarColor(nextProfile.calendarColor);
       setSavedProfile(nextProfile);
     } catch (caught) {
-      setProfileError(
+      toast(
         caught instanceof Error ? caught.message : String(caught),
+        { tone: "error" },
       );
     } finally {
       setProfileSaving(false);
@@ -245,12 +245,6 @@ export function ProjectAgentSettings({
               </div>
             </header>
 
-            {profileError ? (
-              <ErrorBanner className="project-agent-settings-error mb-4" icon={<CircleAlert size={14} />}>
-                {profileError}
-              </ErrorBanner>
-            ) : null}
-
             <form
               className="project-agent-settings-card"
               onSubmit={(event) => {
@@ -299,14 +293,15 @@ export function ProjectAgentSettings({
                             const file = event.currentTarget.files?.[0];
                             event.currentTarget.value = "";
                             if (!file) return;
-                            setProfileError(null);
                             void projectAgentAvatarFromFile(file)
                               .then((nextAvatar) => {
                                 setAvatar(nextAvatar);
                                 setCodexPet(null);
                               })
                               .catch(() =>
-                                setProfileError(t("agents.avatarUploadFailed")),
+                                toast(t("agents.avatarUploadFailed"), {
+                                  tone: "error",
+                                }),
                               );
                           }}
                           type="file"
@@ -319,7 +314,6 @@ export function ProjectAgentSettings({
                           onClick={() => {
                             setAvatar(null);
                             setCodexPet(null);
-                            setProfileError(null);
                           }}
                           type="button"
                           variant="outline"
@@ -338,7 +332,6 @@ export function ProjectAgentSettings({
                     <CodexPetPicker
                       disabled={profileSaving}
                       onSelect={async (pet) => {
-                        setProfileError(null);
                         const nextAvatar =
                           await projectAgentAvatarFromCodexPet(pet);
                         setAvatar(nextAvatar);

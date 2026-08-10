@@ -120,6 +120,7 @@ import {
 import {
   healthyWorkerProviders,
   inspectWorkerProviderHealth,
+  providerHealthReadinessDetail,
 } from "./provider-health";
 import {
   configureBrowserSkillGuide,
@@ -3356,7 +3357,7 @@ async function workerCommand() {
           ? "needs_attention"
           : readinessState;
         const nextReadinessDetail = !hasHealthyProvider
-          ? "로그인되어 사용할 수 있는 coding agent가 없습니다."
+          ? providerHealthReadinessDetail(providerHealth)
           : requirementDetail;
         const heartbeat = await request<{
           worker: { maxConcurrentSessions?: number };
@@ -3456,7 +3457,7 @@ async function workerCommand() {
                     acceptingWork: false,
                     readinessState: "needs_attention",
                     readinessDetail: !hasHealthyProvider
-                      ? "로그인되어 사용할 수 있는 coding agent가 없습니다."
+                      ? providerHealthReadinessDetail(providerHealth)
                       : refreshedDetail,
                     capabilities: {
                       providers,

@@ -9,6 +9,7 @@ import {
   useState,
   type CSSProperties,
   type KeyboardEvent,
+  type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
 
@@ -53,23 +54,29 @@ export function SelectMenu({
   align = "start",
   className,
   disabled = false,
+  hideChevron = false,
   id,
   label,
+  leadingIcon,
   onValueChange,
   options,
   placeholder,
   size = "medium",
+  title,
   value,
 }: {
   align?: "start" | "end";
   className?: string;
   disabled?: boolean;
+  hideChevron?: boolean;
   id?: string;
   label: string;
+  leadingIcon?: ReactNode;
   onValueChange: (value: string) => void;
   options: SelectMenuOption[];
   placeholder?: string;
   size?: "small" | "medium" | "large";
+  title?: string;
   value: string;
 }) {
   const generatedId = useId().replaceAll(":", "");
@@ -291,9 +298,15 @@ export function SelectMenu({
         onKeyDown={onTriggerKeyDown}
         ref={triggerRef}
         role="combobox"
+        title={title}
         type="button"
       >
         <span className="select-menu-trigger-copy">
+          {leadingIcon ? (
+            <span aria-hidden="true" className="select-menu-leading-icon">
+              {leadingIcon}
+            </span>
+          ) : null}
           {selectedOption?.icon ? (
             <img
               alt=""
@@ -307,12 +320,14 @@ export function SelectMenu({
             {selectedOption?.label ?? placeholder ?? label}
           </span>
         </span>
-        <ChevronDown
-          aria-hidden="true"
-          className="select-menu-chevron"
-          size={15}
-          strokeWidth={1.9}
-        />
+        {hideChevron ? null : (
+          <ChevronDown
+            aria-hidden="true"
+            className="select-menu-chevron"
+            size={15}
+            strokeWidth={1.9}
+          />
+        )}
       </button>
       {isOpen && menuPosition
         ? createPortal(

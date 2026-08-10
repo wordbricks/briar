@@ -4054,9 +4054,6 @@ export function RunPage({
     (run.status !== "queued" && !canReassign) ||
     (isClaimed && !canReassign) ||
     isProcessing;
-  const priorityLabel = run.priority === null
-    ? t("run.notSet")
-    : t(`issue.priority${run.priority}` as MessageKey);
   const assignee = mentionMembers.find(
     (member) => member.userId === run.assigneeUserId,
   ) ?? null;
@@ -4201,6 +4198,19 @@ export function RunPage({
     { label: t("status.cancelled"), value: "status:cancelled" },
   ];
   const placementValue = placementIdForRun(run);
+  const statusSelectOptions = placementOptions.some(
+    (option) => option.value === placementValue,
+  )
+    ? placementOptions
+    : [{ label, value: placementValue }, ...placementOptions];
+  const priorityOptions = [
+    { label: t("run.notSet"), value: "none" },
+    { label: t("issue.priority1"), value: "1" },
+    { label: t("issue.priority2"), value: "2" },
+    { label: t("issue.priority3"), value: "3" },
+    { label: t("issue.priority4"), value: "4" },
+  ];
+  const priorityValue = run.priority === null ? "none" : String(run.priority);
   const issueContent = run.issueDescription?.trim() || null;
   const issueAttachmentsRef = useRef(run.attachments ?? []);
   issueAttachmentsRef.current = run.attachments ?? [];
@@ -4429,6 +4439,19 @@ export function RunPage({
       // The hook exposes the actionable error on this page.
     }
   };
+  const updateIssuePriority = (value: string) => {
+    if (!onUpdateIssue) return;
+    const nextPriority = value === "none" ? null : Number(value);
+    if (nextPriority === run.priority) return;
+    void runAction(() =>
+      onUpdateIssue({
+        title: run.title,
+        description: run.issueDescription,
+        priority: nextPriority,
+        attachments: [],
+      }),
+    );
+  };
   const resumePausedRun = async () => {
     if (isResumePending || isRecovering || run.resumeRequestedAt) return;
     setIsResumePending(true);
@@ -4513,27 +4536,51 @@ export function RunPage({
     }
   };
   const reviewed = hasResultReviews(run);
+  const statusBadgeTitle = reviewed
+    ? `${t("dashboard.status")}: ${t("run.resultReviewed")}`
+    : t("dashboard.status");
   const compactProperties = (
     <div className="run-page-property-badges" aria-label={t("run.properties")}>
-      <span
-        className={`run-page-property-badge ${meta.tone}${reviewed ? " reviewed" : ""}`}
-        title={
-          reviewed
-            ? `${t("dashboard.status")}: ${t("run.resultReviewed")}`
-            : t("dashboard.status")
+      <SelectMenu
+        align="start"
+        className={`run-page-property-select status ${meta.tone}${reviewed ? " reviewed" : ""}`}
+        disabled={isRecovering}
+        hideChevron
+        label={t("dashboard.status")}
+        leadingIcon={
+          reviewed ? (
+            <BadgeCheck
+              aria-hidden="true"
+              className="status-pill-review-icon"
+              size={13}
+            />
+          ) : (
+            <Activity aria-hidden="true" size={13} />
+          )
         }
-      >
-        {reviewed ? (
-          <BadgeCheck aria-hidden="true" className="status-pill-review-icon" size={13} />
-        ) : (
-          <Activity aria-hidden="true" size={13} />
-        )}
-        {label}
-      </span>
-      <span className="run-page-property-badge priority" title={t("issue.priority")}>
-        <Signal aria-hidden="true" size={13} />
-        {priorityLabel}
-      </span>
+        onValueChange={(value) => {
+          const placement = placementForId(value);
+          if (!placement || placementMatchesRun(run, placement)) return;
+          void runAction(() => onMove(placement));
+        }}
+        options={statusSelectOptions}
+        size="small"
+        title={statusBadgeTitle}
+        value={placementValue}
+      />
+      <SelectMenu
+        align="start"
+        className="run-page-property-select priority"
+        disabled={isUpdatingIssue || !onUpdateIssue}
+        hideChevron
+        label={t("issue.priority")}
+        leadingIcon={<Signal aria-hidden="true" size={13} />}
+        onValueChange={updateIssuePriority}
+        options={priorityOptions}
+        size="small"
+        title={t("issue.priority")}
+        value={priorityValue}
+      />
       {assignee && (
         <span
           aria-label={`${t("issue.assignee")}: ${assignee.name}`}
@@ -5571,21 +5618,28 @@ export function RunPage({
                           if (!placement || placementMatchesRun(run, placement)) return;
                           void runAction(() => onMove(placement));
                         }}
-                        options={placementOptions}
+                        options={statusSelectOptions}
                         size="small"
                         value={placementValue}
                       />
                     </span>
                     {isRecovering && <LoaderCircle className="spin" size={14} />}
                   </label>
-                  <div
-                    aria-label={`${t("issue.priority")}: ${priorityLabel}`}
-                    className="run-property"
-                    title={t("issue.priority")}
-                  >
+                  <label className="run-property">
                     <span className="run-property-icon priority"><Signal size={15} /></span>
-                    <span className="run-property-copy"><strong>{priorityLabel}</strong></span>
-                  </div>
+                    <span className="run-property-copy">
+                      <SelectMenu
+                        align="end"
+                        className="run-priority-select"
+                        disabled={isUpdatingIssue || !onUpdateIssue}
+                        label={t("issue.priority")}
+                        onValueChange={updateIssuePriority}
+                        options={priorityOptions}
+                        size="small"
+                        value={priorityValue}
+                      />
+                    </span>
+                  </label>
                   <label className="run-property">
                     <span className="run-property-icon provider">
                       <Waypoints size={15} />

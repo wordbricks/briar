@@ -8,7 +8,9 @@ import {
   healthyWorkerProviders,
   inspectWorkerProviderHealth,
   parseClaudeAuthStatus,
+  providerHealthReadinessDetail,
   type WorkerProvider,
+  type WorkerProviderHealthMap,
 } from "./provider-health";
 
 const enabled = { codex: true, claude: true, grok: true, opencode: true };
@@ -50,6 +52,11 @@ describe("inspectWorkerProviderHealth", () => {
       authenticated: vi.fn(async (provider: WorkerProvider) =>
         provider === "codex",
       ),
+      usage: vi.fn(async () => ({
+        exhausted: false,
+        maxUsedPercent: 12,
+        error: null,
+      })),
     });
 
     expect(health).toEqual({
@@ -58,6 +65,8 @@ describe("inspectWorkerProviderHealth", () => {
         authenticated: true,
         healthy: true,
         reason: null,
+        usageExhausted: false,
+        maxUsedPercent: 12,
       },
       claude: {
         installed: true,
@@ -81,13 +90,71 @@ describe("inspectWorkerProviderHealth", () => {
     expect(healthyWorkerProviders(health)).toEqual(["codex"]);
   });
 
+  it("disables providers whose usage is fully exhausted", async () => {
+    const usage = vi.fn(async (provider: WorkerProvider) =>
+      provider === "codex"
+        ? { exhausted: true, maxUsedPercent: 100, error: null }
+        : { exhausted: false, maxUsedPercent: 10, error: null },
+    );
+    const health = await inspectWorkerProviderHealth(enabled, {
+      which: (provider) => `/usr/local/bin/${provider}`,
+      authenticated: vi.fn(async () => true),
+      usage,
+    });
+
+    expect(health.codex).toMatchObject({
+      healthy: false,
+      reason: "usage_exhausted",
+      usageExhausted: true,
+      maxUsedPercent: 100,
+    });
+    expect(health.claude.healthy).toBe(true);
+    expect(healthyWorkerProviders(health)).toEqual([
+      "claude",
+      "grok",
+      "opencode",
+    ]);
+    expect(usage).toHaveBeenCalled();
+  });
+
+  it("keeps providers healthy when usage cannot be determined", async () => {
+    const health = await inspectWorkerProviderHealth(enabled, {
+      which: (provider) => `/usr/local/bin/${provider}`,
+      authenticated: vi.fn(async () => true),
+      usage: vi.fn(async () => ({
+        exhausted: false,
+        maxUsedPercent: null,
+        error: "probe failed",
+      })),
+    });
+
+    expect(health.codex).toMatchObject({
+      healthy: true,
+      reason: null,
+      usageExhausted: false,
+      maxUsedPercent: null,
+    });
+    expect(healthyWorkerProviders(health)).toEqual([
+      "codex",
+      "claude",
+      "grok",
+      "opencode",
+    ]);
+  });
+
   it("does not probe disabled providers", async () => {
     const authenticated = vi.fn(async () => true);
+    const usage = vi.fn(async () => ({
+      exhausted: false,
+      maxUsedPercent: 0,
+      error: null,
+    }));
     const health = await inspectWorkerProviderHealth(
       { codex: false, claude: true, grok: false, opencode: false },
       {
         which: (provider) => `/usr/local/bin/${provider}`,
         authenticated,
+        usage,
       },
     );
 
@@ -98,10 +165,41 @@ describe("inspectWorkerProviderHealth", () => {
       expect.any(String),
       expect.any(Number),
     );
+    expect(usage).toHaveBeenCalledTimes(1);
     expect(healthyWorkerProviders(health)).toEqual(["claude"]);
     expect(health.codex.reason).toBe("disabled");
     expect(health.grok.reason).toBe("disabled");
     expect(health.opencode.reason).toBe("disabled");
+  });
+
+  it("explains readiness when remaining providers are usage-exhausted", () => {
+    const health = {
+      codex: {
+        installed: true,
+        authenticated: true,
+        healthy: false,
+        reason: "usage_exhausted",
+      },
+      claude: {
+        installed: true,
+        authenticated: false,
+        healthy: false,
+        reason: "not_authenticated",
+      },
+      grok: {
+        installed: false,
+        authenticated: false,
+        healthy: false,
+        reason: "not_installed",
+      },
+      opencode: {
+        installed: false,
+        authenticated: false,
+        healthy: false,
+        reason: "disabled",
+      },
+    } satisfies WorkerProviderHealthMap;
+    expect(providerHealthReadinessDetail(health)).toContain("사용량 한도");
   });
 
   it("rejects an expired Grok login and accepts a current one", async () => {

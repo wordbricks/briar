@@ -4,6 +4,7 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { ProjectAgentSettings } from "./ProjectAgentSettings";
+import { ToastProvider } from "./ui/toast";
 
 beforeAll(() => {
   (
@@ -186,6 +187,96 @@ describe("ProjectAgentSettings", () => {
       await Promise.resolve();
     });
     expect(onDelete).toHaveBeenCalledTimes(1);
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("shows profile save errors as toasts instead of banners", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    const agent = {
+      id: "agent-1",
+      projectId: "project-1",
+      name: "Issue processing agent",
+      avatar: null,
+      codexPet: null,
+      provider: "codex" as const,
+      model: null,
+      effort: null,
+      responsibility: "Process queued issues.",
+      skill: "# Issue processing agent\n\nProcess queued issues.",
+      skills: [
+        {
+          id: "skill-1",
+          agentId: "agent-1",
+          name: "Issue processing",
+          instructions: "Process queued issues.",
+          provider: "codex" as const,
+          model: null,
+          effort: null,
+          kind: "issue_processing" as const,
+          position: 0,
+          createdAt: "2026-07-26T00:00:00.000Z",
+          updatedAt: "2026-07-26T00:00:00.000Z",
+        },
+      ],
+      calendarColor: "#3275d5",
+      createdAt: "2026-07-26T00:00:00.000Z",
+      updatedAt: "2026-07-26T00:00:00.000Z",
+    };
+    const onSave = vi.fn(async () => {
+      throw new Error("프로필을 저장하지 못했습니다.");
+    });
+
+    await act(async () => {
+      root.render(
+        <ToastProvider>
+          <ProjectAgentSettings
+            agent={agent}
+            isDeleteDisabled={false}
+            isSidebarOpen
+            onBack={() => undefined}
+            onDelete={async () => undefined}
+            onSave={onSave}
+            project={{
+              id: "project-1",
+              name: "Briar",
+              createdAt: "2026-07-26T00:00:00.000Z",
+            }}
+          />
+        </ToastProvider>,
+      );
+      await Promise.resolve();
+    });
+
+    const [providerTrigger] = Array.from(
+      container.querySelectorAll<HTMLButtonElement>(
+        ".project-agent-settings-fields .native-select button",
+      ),
+    );
+    await act(async () => providerTrigger?.click());
+    await act(async () => {
+      document
+        .querySelector<HTMLButtonElement>(
+          '.select-menu-option[data-value="claude"]',
+        )
+        ?.click();
+    });
+    await act(async () => {
+      container
+        .querySelector<HTMLFormElement>("form.project-agent-settings-card")
+        ?.dispatchEvent(
+          new Event("submit", { bubbles: true, cancelable: true }),
+        );
+      await Promise.resolve();
+    });
+
+    expect(container.querySelector(".error-banner")).toBeNull();
+    expect(
+      document.body.querySelector('[data-testid="app-toast"].error')?.textContent,
+    ).toContain("프로필을 저장하지 못했습니다.");
 
     await act(async () => root.unmount());
     container.remove();

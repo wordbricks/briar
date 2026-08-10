@@ -21,6 +21,7 @@ import {
   type ProjectAgentTaskSessionSettlement,
   type ProjectAgentTaskSessionStart,
 } from "./ProjectAgentDetail";
+import { ToastProvider } from "./ui/toast";
 
 const mounted: Array<{
   container: HTMLDivElement;
@@ -161,7 +162,6 @@ function ProjectAgentDetailHarness({
     <ProjectAgentDetail
       agent={agent}
       dashboard={dashboardValue}
-      error={null}
       isSidebarOpen={true}
       onBack={() => undefined}
       onIssueOpen={() => undefined}
@@ -224,7 +224,6 @@ describe("ProjectAgentDetail", () => {
       <ProjectAgentDetail
         agent={agent}
         dashboard={dashboard}
-        error={null}
         isSidebarOpen={true}
         onBack={onBack}
         onIssueOpen={() => undefined}
@@ -265,7 +264,6 @@ describe("ProjectAgentDetail", () => {
         agent={agent}
         companionMode
         dashboard={dashboardWithWorker}
-        error={null}
         isSidebarOpen
         onBack={() => undefined}
         onIssueOpen={() => undefined}
@@ -316,7 +314,6 @@ describe("ProjectAgentDetail", () => {
         agent={agent}
         companionMode
         dashboard={dashboardWithWorker}
-        error={null}
         isSidebarOpen
         onBack={onBack}
         onIssueOpen={() => undefined}
@@ -357,7 +354,6 @@ describe("ProjectAgentDetail", () => {
         agent={agent}
         companionMode
         dashboard={dashboardWithWorker}
-        error={null}
         isSidebarOpen
         onBack={onBack}
         onIssueOpen={() => undefined}
@@ -412,7 +408,6 @@ describe("ProjectAgentDetail", () => {
         agent={claudeOnlyAgent}
         companionMode
         dashboard={dashboardWithWorker}
-        error={null}
         isSidebarOpen
         onBack={() => undefined}
         onIssueOpen={() => undefined}
@@ -490,7 +485,6 @@ describe("ProjectAgentDetail", () => {
         agent={multiSkillAgent}
         companionMode
         dashboard={claudeDashboard}
-        error={null}
         isSidebarOpen
         onBack={() => undefined}
         onIssueOpen={() => undefined}
@@ -579,7 +573,6 @@ describe("ProjectAgentDetail", () => {
       <ProjectAgentDetail
         agent={agent}
         dashboard={dashboard}
-        error={null}
         isSidebarOpen={true}
         onBack={() => undefined}
         onIssueOpen={onIssueOpen}
@@ -738,7 +731,6 @@ describe("ProjectAgentDetail", () => {
       <ProjectAgentDetail
         agent={agent}
         dashboard={dashboard}
-        error={null}
         isSidebarOpen
         onBack={() => undefined}
         onIssueOpen={() => undefined}
@@ -962,5 +954,46 @@ describe("ProjectAgentDetail", () => {
     });
 
     expect(onStopSession).toHaveBeenCalledWith("task-session");
+  });
+
+  it("shows task execution errors as toasts instead of banners", async () => {
+    runProjectAgent.mockRejectedValue(new Error("작업 실행에 실패했습니다."));
+    const container = await mount(
+      <ToastProvider>
+        <ProjectAgentDetail
+          agent={agent}
+          dashboard={dashboard}
+          isSidebarOpen
+          onBack={() => undefined}
+          onIssueOpen={() => undefined}
+          onSettleTaskSession={() => undefined}
+          onStopSession={async () => true}
+          onStartAutoHunt={() => "session"}
+          onStartTaskSession={() => undefined}
+          requestedSessionId={null}
+          sessions={[]}
+        />
+      </ToastProvider>,
+    );
+
+    await act(async () => {
+      Array.from(container.querySelectorAll<HTMLButtonElement>("button"))
+        .find((button) => button.textContent?.trim() === "작업 실행")
+        ?.click();
+    });
+    await chooseTaskSkill();
+    await act(async () => {
+      document.querySelector<HTMLFormElement>("form")?.dispatchEvent(
+        new Event("submit", { bubbles: true, cancelable: true }),
+      );
+      await Promise.resolve();
+    });
+    await act(async () => Promise.resolve());
+
+    expect(container.querySelector(".error-banner")).toBeNull();
+    expect(document.body.querySelector(".error-banner")).toBeNull();
+    expect(
+      document.body.querySelector('[data-testid="app-toast"].error')?.textContent,
+    ).toContain("작업 실행에 실패했습니다.");
   });
 });
