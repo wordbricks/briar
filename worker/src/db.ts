@@ -6473,6 +6473,27 @@ export async function claimNextQueuedHuntRun(
        set claim_token_hash = ?, claimed_by = ?, claimed_at = ?,
            lease_expires_at = ?, claim_attempts = claim_attempts + 1,
            worker_id = coalesce(?, worker_id),
+           status = case
+             when status = 'queued' and workflow_stage is not null
+               then 'running'
+             else status
+           end,
+           stage = case
+             when status = 'queued' and workflow_stage is not null then
+               case
+                 when workflow_stage in (
+                   'analyzing', 'implementing', 'pr_open',
+                   'staging_qa', 'production_qa'
+                 ) then workflow_stage
+                 else 'implementing'
+               end
+             else stage
+           end,
+           detail = case
+             when status = 'queued' and workflow_stage is not null
+               then '워커가 이전 작업 단계부터 이어받았습니다.'
+             else detail
+           end,
            paused_at = case
              when resume_requested_at is not null then null else paused_at end,
            updated_at = ?
