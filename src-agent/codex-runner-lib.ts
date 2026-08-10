@@ -29,12 +29,6 @@ export type CodexRunnerRequest = {
   codexBinary: string;
 };
 
-export type CodexApprovalResponse = {
-  type: "approvalResponse";
-  id: string;
-  approved: boolean;
-};
-
 export type CodexRunnerOutput =
   | {
       type: "session";

@@ -953,22 +953,3 @@ function localProjectAgentSkills(
     };
   });
 }
-
-export function CreateProjectAgentDialog({
-  isSubmitting,
-  onClose,
-  onCreate,
-}: {
-  isSubmitting: boolean;
-  onClose: () => void;
-  onCreate: (input: CreateProjectAgentInput) => Promise<void>;
-}) {
-  return (
-    <ProjectAgentDialog
-      agent={null}
-      isSubmitting={isSubmitting}
-      onClose={onClose}
-      onSubmit={onCreate}
-    />
-  );
-}

@@ -556,5 +556,3 @@ export function parseGitHubWebhook(
     providerUpdatedAt: normalizeGitHubTimestamp(issue.updated_at),
   };
 }
-
-export type ParsedGitHubWebhook = ReturnType<typeof parseGitHubWebhook>;

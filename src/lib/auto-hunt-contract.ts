@@ -644,22 +644,7 @@ export const dashboardStages = [
 export type DashboardStage = (typeof dashboardStages)[number];
 
 export const autoHuntQaStatuses = ["pending", "passed", "skipped"] as const;
-export const autoHuntQaEnvironments = ["staging", "production"] as const;
 export type AutoHuntQaStatus = (typeof autoHuntQaStatuses)[number];
-export type AutoHuntQaEnvironment = (typeof autoHuntQaEnvironments)[number];
-
-export const dashboardStageProgress: Record<DashboardStage, number> = {
-  queued: 5,
-  analyzing: 25,
-  implementing: 45,
-  pr_open: 65,
-  staging_qa: 80,
-  production_qa: 92,
-  completed: 100,
-  blocked: 50,
-  failed: 50,
-  cancelled: 0,
-};
 
 export const terminalTrackerStates = new Set([
   "canceled",

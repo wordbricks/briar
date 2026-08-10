@@ -5,7 +5,6 @@ import {
   buildCurrentInboxMessages,
   classifyInboxMessage,
   filterInboxMessagesByOrganization,
-  groupInboxMessages,
   inboxReadVersionsToPush,
   isInboxMessageUnread,
   mergeInboxMessages,
@@ -404,7 +403,7 @@ describe("Inbox messages", () => {
     });
   });
 
-  it("separates urgent, actionable, important, and routine updates", () => {
+  it("classifies urgent, actionable, important, and routine updates", () => {
     const baseRun = demoDashboard.runs[0];
     const messages = buildCurrentInboxMessages(
       {
@@ -470,20 +469,6 @@ describe("Inbox messages", () => {
       [project],
     ).map((message) => ({ ...message, isUnread: true }));
 
-    const grouped = groupInboxMessages(messages);
-
-    expect(grouped.urgent.map((message) => message.targetId)).toEqual([
-      "urgent",
-    ]);
-    expect(grouped.action_required.map((message) => message.targetId)).toEqual([
-      "action",
-    ]);
-    expect(grouped.important.map((message) => message.targetId)).toEqual([
-      "important",
-    ]);
-    expect(grouped.activity.map((message) => message.targetId)).toEqual([
-      "activity",
-    ]);
     expect(messages.map(classifyInboxMessage)).toEqual([
       "urgent",
       "action_required",

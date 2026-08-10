@@ -38,12 +38,6 @@ export type ClaudeRunnerRequest = {
   claudeBinary: string;
 };
 
-export type ClaudeApprovalResponse = {
-  type: "approvalResponse";
-  id: string;
-  approved: boolean;
-};
-
 export type ClaudeEventState = {
   activeMessageId: string | null;
   lastAssistantMessageId: string | null;

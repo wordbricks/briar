@@ -1,7 +1,4 @@
-import type { HuntRun, ProjectAgent } from "../types";
 import type { AgentProvider } from "./agent-provider-contract";
-import { briarApiUrl } from "./api";
-import { maxAutoHuntIssuesLimit } from "./auto-hunt-automation";
 
 export const autoHuntAppServerEventName = "auto-hunt-app-server-event";
 export const autoHuntDispatchEventName = "auto-hunt-dispatch-event";
@@ -66,25 +63,19 @@ export type AutoHuntAgentMessage = {
   isComplete: boolean;
 };
 
-export type AutoHuntAgentIssue = Pick<
-  HuntRun,
-  "id" | "runNumber" | "sourceKey" | "title"
->;
-
-export type AutoHuntAgentIssueResult = {
-  sourceKey: string;
-  title: string;
-  outcome: "completed" | "blocked" | "failed" | "skipped";
-  summary: string;
-};
-
 export type AutoHuntWorkerResult = {
   sessionId: string;
   runId: string;
   sourceKey: string;
   conversationId: string | null;
   workspaceRoot: string | null;
-  outcome: AutoHuntAgentIssueResult["outcome"] | "pending" | "cancelled";
+  outcome:
+    | "pending"
+    | "completed"
+    | "blocked"
+    | "failed"
+    | "skipped"
+    | "cancelled";
   summary: string;
   evidence: Array<Record<string, unknown>>;
 };
@@ -138,90 +129,8 @@ export type AutoHuntDispatchGroup = {
   events: AutoHuntDispatchEvent[];
 };
 
-export type AutoHuntAgentResponse = {
-  dispatchGroupId: string;
-  conversationId: string;
-  workspaceRoot: string;
-  workers: AutoHuntWorkerResult[];
-  result: {
-    summary: string;
-    issues: AutoHuntAgentIssueResult[];
-  };
-};
-
 const isTauri = () =>
   typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
-
-export async function startProjectAutoHunt(
-  projectId: string,
-  issues: AutoHuntAgentIssue[],
-  sessionId: string,
-  agent: Pick<
-    ProjectAgent,
-    "id" | "name" | "provider" | "model" | "responsibility" | "skill"
-  >,
-  options: {
-    coordinatorConversationId?: string | null;
-  } = {},
-): Promise<AutoHuntAgentResponse> {
-  if (!isTauri()) {
-    throw new Error("대기 이슈 자동 처리는 Briar 데스크톱 앱에서 사용할 수 있습니다.");
-  }
-  if (!briarApiUrl) {
-    throw new Error("대기 이슈를 처리하려면 Briar API URL이 필요합니다.");
-  }
-  if (issues.length === 0) {
-    throw new Error("대기 상태인 이슈가 없습니다.");
-  }
-  if (issues.length > maxAutoHuntIssuesLimit) {
-    throw new Error(
-      `한 번의 이슈 처리 세션에서는 최대 ${maxAutoHuntIssuesLimit}개의 이슈만 처리할 수 있습니다.`,
-    );
-  }
-  const { invoke } = await import("@tauri-apps/api/core");
-  return invoke<AutoHuntAgentResponse>("start_project_auto_hunt", {
-    projectId,
-    request: {
-      sessionId,
-      apiUrl: briarApiUrl,
-      agentId: agent.id,
-      coordinatorConversationId: options.coordinatorConversationId ?? null,
-      agentName: agent.name,
-      agentProvider: agent.provider,
-      agentModel: agent.model,
-      responsibility: agent.responsibility,
-      skill: agent.skill,
-      issues: issues.map((issue) => ({
-        runId: issue.id,
-        runNumber: issue.runNumber,
-        sourceKey: issue.sourceKey,
-        title: issue.title,
-      })),
-    },
-  });
-}
-
-export async function retryProjectAutoHuntRun(
-  projectId: string,
-  runId: string,
-  reason: string,
-) {
-  if (!isTauri()) {
-    throw new Error("이슈 처리 재시도는 Briar 데스크톱 앱에서 사용할 수 있습니다.");
-  }
-  const { invoke } = await import("@tauri-apps/api/core");
-  return invoke<{
-    runId: string;
-    outcome: string;
-    attempt: number;
-    stage: string;
-  }>("retry_project_auto_hunt_run", {
-    projectId,
-    runId,
-    requestId: crypto.randomUUID(),
-    reason,
-  });
-}
 
 export async function loadAutoHuntAppServerEvents(
   sessionId: string,

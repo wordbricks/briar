@@ -366,25 +366,6 @@ export function classifyInboxMessage(
   return "activity";
 }
 
-export function groupInboxMessages(
-  messages: InboxMessageWithReadState[],
-): Record<InboxCategory, InboxMessageWithReadState[]> {
-  return {
-    urgent: messages.filter(
-      (message) => classifyInboxMessage(message) === "urgent",
-    ),
-    action_required: messages.filter(
-      (message) => classifyInboxMessage(message) === "action_required",
-    ),
-    important: messages.filter(
-      (message) => classifyInboxMessage(message) === "important",
-    ),
-    activity: messages.filter(
-      (message) => classifyInboxMessage(message) === "activity",
-    ),
-  };
-}
-
 export function filterInboxMessagesByOrganization<T extends InboxMessage>(
   messages: T[],
   projects: Project[],

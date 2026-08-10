@@ -342,7 +342,3 @@ export const channelIssueProposalPayloadSchema = z.object({
     })
     .strict(),
 });
-
-export type ChannelReplyCompletion = z.infer<
-  typeof channelReplyCompletionSchema
->;
