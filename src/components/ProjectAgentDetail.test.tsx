@@ -341,7 +341,7 @@ describe("ProjectAgentDetail", () => {
     expect(onBack).not.toHaveBeenCalled();
   });
 
-  it("keeps the Skill picker open and consumes Back while a mobile run is pending", async () => {
+  it("closes the Skill picker and allows Back while a mobile run is pending", async () => {
     const onBack = vi.fn();
     let resolveRemoteTask: ((sessionId: string) => void) | undefined;
     const onStartRemoteTask = vi.fn(
@@ -382,11 +382,11 @@ describe("ProjectAgentDetail", () => {
       await Promise.resolve();
     });
 
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
     await act(async () => {
       expect(requestMobileNavigationBack()).toBe(true);
     });
-    expect(document.querySelector('[role="dialog"]')).not.toBeNull();
-    expect(onBack).not.toHaveBeenCalled();
+    expect(onBack).toHaveBeenCalledOnce();
 
     await act(async () => {
       resolveRemoteTask?.("remote-session");

@@ -374,6 +374,7 @@ describe("CreateIssueDialog attachments", () => {
         assigneeUserId: null,
         attachments: [],
         description: null,
+        fullAuto: false,
         preferredEffort: null,
         preferredModel: null,
         preferredProvider: null,
@@ -559,6 +560,7 @@ describe("CreateIssueDialog attachments", () => {
       {
         attachments: [],
         description: null,
+        fullAuto: false,
         preferredEffort: null,
         preferredModel: null,
         preferredProvider: null,
@@ -970,6 +972,70 @@ describe("CreateIssueDialog attachments", () => {
         })],
       }),
     );
+    await act(async () => root.unmount());
+  });
+
+  it("submits Full Auto and clears issue-specific checkpoints", async () => {
+    const onCreate = vi.fn(async (
+      _projectId: string,
+      _input: CreateIssueInput,
+    ) => undefined);
+    const root = createRoot(container);
+    await act(async () => root.render(
+      <CreateIssueDialog
+        {...projectProps}
+        isSubmitting={false}
+        onClose={() => undefined}
+        onCreate={onCreate}
+        workflow={demoDashboard.settings.workflow}
+        workflowProjectId="project-1"
+      />,
+    ));
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(
+        ".issue-checkpoint-trigger",
+      )?.dispatchEvent(
+        new MouseEvent("pointerdown", { bubbles: true, button: 0 }),
+      );
+    });
+    const checkpoint = Array.from(
+      document.body.querySelectorAll<HTMLElement>(
+        '[role="menuitemcheckbox"]:not([data-disabled])',
+      ),
+    ).find((item) => item.getAttribute("data-state") === "unchecked");
+    await act(async () => checkpoint?.click());
+
+    const fullAuto = container.querySelector<HTMLInputElement>(
+      ".issue-full-auto-toggle input",
+    );
+    await act(async () => fullAuto?.click());
+    expect(fullAuto?.checked).toBe(true);
+    expect(
+      container.querySelector<HTMLButtonElement>(".issue-checkpoint-trigger")
+        ?.disabled,
+    ).toBe(true);
+
+    const title = container.querySelector<HTMLInputElement>(
+      ".issue-title-input",
+    );
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        "value",
+      )?.set?.call(title, "Full Auto issue");
+      title?.dispatchEvent(new Event("input", { bubbles: true }));
+      container.querySelector<HTMLFormElement>("form")?.requestSubmit();
+    });
+
+    expect(onCreate).toHaveBeenCalledWith(
+      "project-1",
+      expect.objectContaining({
+        fullAuto: true,
+        title: "Full Auto issue",
+      }),
+    );
+    expect(onCreate.mock.calls[0]?.[1]).not.toHaveProperty("checkpoints");
     await act(async () => root.unmount());
   });
 

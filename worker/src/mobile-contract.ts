@@ -186,6 +186,7 @@ export const mobileDashboardRunSchema = z.object({
   preferredProvider: mobileProviderSchema.nullable().optional(),
   preferredModel: z.string().nullable().optional(),
   preferredEffort: mobileEffortSchema.nullable().optional(),
+  fullAuto: z.boolean().optional(),
   requestedProvider: mobileProviderSchema.nullable().optional(),
   requestedModel: z.string().nullable().optional(),
   requestedEffort: mobileEffortSchema.nullable().optional(),
@@ -546,6 +547,7 @@ const mobileIssueWriteBaseSchema = z
     preferredProvider: mobileProviderSchema.nullable().optional(),
     preferredModel: z.string().nullable().optional(),
     preferredEffort: mobileEffortSchema.nullable().optional(),
+    fullAuto: z.boolean().default(false),
   })
   .strict();
 

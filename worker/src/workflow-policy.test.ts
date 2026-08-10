@@ -299,4 +299,40 @@ describe("workflow checkpoint policy persistence", () => {
       ),
     ).resolves.toBe("ineligible");
   });
+
+  it("removes every effective checkpoint for Full Auto issues", async () => {
+    const event = queuedEvent("full-auto-run", "policy-user");
+    event.fullAuto = true;
+    event.issueCheckpoints = [{
+      key: "issue-after-pr_open",
+      stage: "pr_open",
+      position: "after",
+    }];
+    event.context = { origin: "briar-app", fullAuto: true };
+
+    const runId = await recordHuntEvent(db, projectId, event);
+    const created = await db
+      .prepare(
+        `select workflow_snapshot_json, issue_checkpoints_json
+         from briar_hunt_runs where id = ?`,
+      )
+      .bind(runId)
+      .first<{
+        workflow_snapshot_json: string;
+        issue_checkpoints_json: string;
+      }>();
+
+    expect(JSON.parse(created!.workflow_snapshot_json).execution.checkpoints)
+      .toEqual([]);
+    expect(JSON.parse(created!.issue_checkpoints_json)).toEqual([]);
+    await expect(
+      updateIssueCheckpoints(
+        db,
+        projectId,
+        runId,
+        event.issueCheckpoints,
+        "2026-08-04T01:00:00.000Z",
+      ),
+    ).resolves.toBe("ineligible");
+  });
 });

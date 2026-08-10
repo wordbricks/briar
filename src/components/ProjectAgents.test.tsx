@@ -300,6 +300,7 @@ describe("ProjectAgents", () => {
         sessionId: startedSession.sessionId,
       }),
     );
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
     expect(runButton?.disabled).toBe(true);
 
     await act(async () => {

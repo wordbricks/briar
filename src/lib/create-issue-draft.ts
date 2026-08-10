@@ -12,6 +12,7 @@ export type CreateIssueDraft = {
   preferredProvider?: string | null;
   preferredModel?: string | null;
   preferredEffort?: string | null;
+  fullAuto?: boolean;
   checkpoints?: Array<{
     key: string;
     stage: string;
@@ -33,6 +34,7 @@ function isCreateIssueDraft(value: unknown): value is CreateIssueDraft {
       draft.priority === "3" ||
       draft.priority === "4") &&
     typeof draft.projectId === "string" &&
+    (draft.fullAuto === undefined || typeof draft.fullAuto === "boolean") &&
     (draft.checkpoints === undefined ||
       (Array.isArray(draft.checkpoints) &&
         draft.checkpoints.length <= 100 &&
@@ -78,6 +80,7 @@ export function saveCreateIssueDraft(draft: CreateIssueDraft) {
     if (
       !draft.title.trim() &&
       !draft.description.trim() &&
+      !draft.fullAuto &&
       !draft.checkpoints?.length
     ) {
       window.localStorage.removeItem(createIssueDraftStorageKey);

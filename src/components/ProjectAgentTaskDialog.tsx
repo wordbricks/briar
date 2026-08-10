@@ -103,9 +103,7 @@ export function ProjectAgentTaskDialog({
 
   return (
     <Dialog
-      onOpenChange={(open) => {
-        if (!isSubmitting) onOpenChange(open);
-      }}
+      onOpenChange={onOpenChange}
       open={isOpen}
     >
       <DialogContent className="project-agent-task-dialog">
@@ -180,11 +178,13 @@ export function ProjectAgentTaskDialog({
               !dashboard ||
               (companionMode && !selectedWorkerId)
             ) return;
-            void onSubmit({
+            const submission = onSubmit({
               request: message,
               skill: selectedSkill,
               workerId: companionMode ? selectedWorkerId : null,
             });
+            onOpenChange(false);
+            void submission;
           }}
         >
           <Textarea

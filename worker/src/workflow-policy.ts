@@ -87,6 +87,7 @@ export async function workflowSnapshotForRun(
   projectId: string,
   userId?: string | null,
   issueCheckpoints: AutoHuntWorkflowCheckpoint[] = [],
+  fullAuto = false,
 ): Promise<AutoHuntWorkflow> {
   const policy = await loadWorkflowCheckpointPolicy(db, projectId, userId);
   const effective = workflowWithEffectiveCheckpoints(
@@ -94,6 +95,12 @@ export async function workflowSnapshotForRun(
     policy.projectMandatory,
     policy.userDefaults,
   );
+  if (fullAuto) {
+    return {
+      ...effective,
+      execution: { checkpoints: [] },
+    };
+  }
   return workflowWithAdditionalCheckpoints(effective, issueCheckpoints);
 }
 

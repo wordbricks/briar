@@ -127,7 +127,8 @@ final class IssueMutationTests: XCTestCase {
             status: .queued,
             preferredProvider: .claude,
             preferredModel: "sonnet",
-            preferredEffort: .high
+            preferredEffort: .high,
+            fullAuto: true
         )
         let data = try JSONEncoder.mobileContract.encode(request)
         let object = try XCTUnwrap(
@@ -136,6 +137,7 @@ final class IssueMutationTests: XCTestCase {
         XCTAssertEqual(object["preferredProvider"] as? String, "claude")
         XCTAssertEqual(object["preferredModel"] as? String, "sonnet")
         XCTAssertEqual(object["preferredEffort"] as? String, "high")
+        XCTAssertEqual(object["fullAuto"] as? Bool, true)
     }
 
     func testCreateIssueMessageRequestEncodesCanonicalParentMessageID() throws {
@@ -170,6 +172,7 @@ final class IssueMutationTests: XCTestCase {
         draft.preferredProvider = .claude
         draft.preferredModel = "sonnet"
         draft.preferredEffort = .high
+        draft.fullAuto = true
 
         _ = try await store.createIssue(draft: draft, attachments: [])
 
@@ -181,6 +184,7 @@ final class IssueMutationTests: XCTestCase {
         XCTAssertEqual(body["preferredProvider"] as? String, "claude")
         XCTAssertEqual(body["preferredModel"] as? String, "sonnet")
         XCTAssertEqual(body["preferredEffort"] as? String, "high")
+        XCTAssertEqual(body["fullAuto"] as? Bool, true)
     }
 
     func testDispatchRunRequestEncodesWorkerSelection() throws {

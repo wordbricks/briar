@@ -1308,6 +1308,7 @@ const issueInputBaseSchema = z
     preferredProvider: z.enum(agentProviders).nullable().optional(),
     preferredModel: z.string().trim().min(1).max(100).nullable().optional(),
     preferredEffort: z.enum(modelEfforts).nullable().optional(),
+    fullAuto: z.boolean().default(false),
     checkpoints: z.array(workflowCheckpointSchema).max(100).default([]),
   })
   .strict();
@@ -1693,6 +1694,7 @@ export async function readIssueRequest(request: Request) {
   const preferredProvider = form.get("preferredProvider");
   const preferredModel = form.get("preferredModel");
   const preferredEffort = form.get("preferredEffort");
+  const fullAuto = form.get("fullAuto");
   const rawCheckpoints = form.get("checkpoints");
   let checkpoints: unknown = [];
   if (typeof rawCheckpoints === "string" && rawCheckpoints) {
@@ -1728,6 +1730,14 @@ export async function readIssueRequest(request: Request) {
         typeof preferredEffort === "string" && preferredEffort.trim()
           ? preferredEffort
           : null,
+      fullAuto:
+        fullAuto === null
+          ? undefined
+          : fullAuto === "true"
+            ? true
+            : fullAuto === "false"
+              ? false
+              : fullAuto,
       checkpoints,
     }),
     attachments,
@@ -2373,7 +2383,9 @@ async function createIssueWithAttachments(input: {
   db: D1Database;
   attachmentsBucket: R2Bucket;
   project: Pick<ProjectRow, "id" | "name">;
-  issue: z.infer<typeof issueInputSchema>;
+  issue: Omit<z.infer<typeof issueInputSchema>, "fullAuto"> & {
+    fullAuto?: boolean;
+  };
   attachments: File[];
   attachmentReferences?: string[];
   sourceKey: string;
@@ -2429,6 +2441,7 @@ async function createIssueWithAttachments(input: {
       priority: input.issue.priority ?? null,
       assigneeUserId: input.issue.assigneeUserId ?? null,
       issueCheckpoints: input.issue.checkpoints,
+      fullAuto: input.issue.fullAuto ?? false,
       branch: null,
       commitSha: null,
       tracker: null,
@@ -2445,6 +2458,7 @@ async function createIssueWithAttachments(input: {
         ...input.context,
         issueId: issueStorageId,
         attachmentCount: storedAttachments.length,
+        fullAuto: input.issue.fullAuto ?? false,
       },
       createdByUserId: input.createdByUserId,
       preferredAgentProvider: input.issue.preferredProvider ?? null,
@@ -4815,6 +4829,7 @@ function dashboardRunJson(
 ) {
   const status = run.paused_at ? ("paused" as const) : run.status;
   const workflow = normalizeAutoHuntWorkflow(JSON.parse(run.workflow_snapshot_json));
+  const context = parseJsonObject(run.context_json);
   const dependencyStatus = (
     rawStatus: AutoHuntRunStatus,
     pausedAt: string | null,
@@ -4878,6 +4893,9 @@ function dashboardRunJson(
         }
       : null,
     issueCheckpoints: JSON.parse(run.issue_checkpoints_json || "[]"),
+    fullAuto:
+      context !== null &&
+      (context as Record<string, unknown>).fullAuto === true,
     detail: run.detail,
     priority: run.priority,
     assigneeUserId: run.assignee_user_id,
@@ -4933,7 +4951,7 @@ function dashboardRunJson(
     productionQaStatus: run.production_qa_status,
     stagingQaDetail: run.staging_qa_detail,
     productionQaDetail: run.production_qa_detail,
-    context: parseJsonObject(run.context_json),
+    context,
     claimedBy: run.claimed_by,
     claimedAt: run.claimed_at,
     leaseExpiresAt: run.lease_expires_at,
