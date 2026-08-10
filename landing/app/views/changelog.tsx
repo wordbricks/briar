@@ -23,6 +23,19 @@ export const changelogCopy = {
     backTop: "맨 위로 ↑",
     entries: [
       {
+        version: "1.2.97",
+        date: "2026년 8월 10일",
+        title: "채널 메시지에 이모지로 바로 반응합니다",
+        summary:
+          "채널 대화에서 빠른 이모지와 전체 피커를 사용해 메시지에 반응하고, 데스크탑·Companion·iOS 어디서든 같은 반응을 확인할 수 있습니다.",
+        items: [
+          "메시지에 마우스를 올려 👍, ❤️, 😂, 🎉 빠른 반응을 남기거나 전체 이모지 피커에서 원하는 반응을 선택합니다.",
+          "반응 칩에 참여 인원과 내가 남긴 반응을 표시하고, 같은 이모지를 다시 누르면 반응을 취소합니다.",
+          "채널 델타 동기화가 반응 추가와 삭제를 즉시 전달해 여러 기기에서 메시지 상태를 일관되게 유지합니다.",
+          "데스크탑과 Companion 웹, iOS Companion이 같은 반응 모델과 토글 동작을 사용합니다.",
+        ],
+      },
+      {
         version: "1.2.96",
         date: "2026년 8월 10일",
         title: "실행 비용과 Worker 상태를 더 정확하게 운영합니다",
@@ -263,6 +276,19 @@ export const changelogCopy = {
     home: "Home",
     backTop: "Back to top ↑",
     entries: [
+      {
+        version: "1.2.97",
+        date: "August 10, 2026",
+        title: "React to channel messages with any emoji",
+        summary:
+          "Use quick reactions or the full emoji picker in channel conversations, with the same synchronized reactions across desktop, Companion, and iOS.",
+        items: [
+          "Hover over a message to add a quick 👍, ❤️, 😂, or 🎉 reaction, or choose any reaction from the full emoji picker.",
+          "See participant counts and your own state on reaction chips, then select the same emoji again to remove your reaction.",
+          "Propagate reaction additions and removals through channel delta sync so message state stays current across devices.",
+          "Use the same reaction model and toggle behavior on desktop, Companion web, and iOS Companion.",
+        ],
+      },
       {
         version: "1.2.96",
         date: "August 10, 2026",
@@ -516,9 +542,9 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <h1>{changelog.title}</h1>
           <p>{changelog.description}</p>
         </div>
-        <a href="#v1-2-96" className="changelog-current">
+        <a href="#v1-2-97" className="changelog-current">
           <span>{changelog.current}</span>
-          <strong>v1.2.96</strong>
+          <strong>v1.2.97</strong>
           <i aria-hidden="true">↓</i>
         </a>
       </section>
@@ -543,6 +569,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   {index === 0 ? <span>{changelog.latest}</span> : null}
                   <time
                     dateTime={
+                      entry.version === "1.2.97" ||
                       entry.version === "1.2.96" ||
                       entry.version === "1.2.95" ||
                       entry.version === "1.2.94" ||
@@ -552,7 +579,8 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                       entry.version === "1.2.90" ||
                       entry.version === "1.2.89" ||
                       entry.version === "1.2.88"
-                        ? entry.version === "1.2.96" ||
+                        ? entry.version === "1.2.97" ||
+                          entry.version === "1.2.96" ||
                           entry.version === "1.2.95" ||
                           entry.version === "1.2.94" ||
                           entry.version === "1.2.93"
