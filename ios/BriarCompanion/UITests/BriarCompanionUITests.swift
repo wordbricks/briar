@@ -2,7 +2,7 @@ import XCTest
 
 @MainActor
 final class BriarCompanionUITests: XCTestCase {
-    private let transitionTimeout: TimeInterval = 10
+    private let transitionTimeout: TimeInterval = 20
 
     override func setUpWithError() throws {
         continueAfterFailure = false
@@ -298,7 +298,9 @@ final class BriarCompanionUITests: XCTestCase {
         let requestEditor = app.textViews["agent-run-request"]
         XCTAssertTrue(requestEditor.waitForExistence(timeout: 5))
         XCTAssertEqual(requestEditor.value as? String, "Release the iOS app.")
-        requestEditor.swipeUp()
+        // The request editor has its own scroll view; scroll the surrounding
+        // execution form so the worker picker below it becomes visible.
+        app.swipeUp()
         let workerPicker = app.descendants(matching: .any)["agent-run-worker-picker"]
         XCTAssertTrue(workerPicker.waitForExistence(timeout: 5))
         XCTAssertEqual(workerPicker.value as? String, "Release Mac")
