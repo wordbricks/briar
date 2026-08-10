@@ -6,15 +6,30 @@ import {
   agentProviders,
   type AgentProvider,
 } from "../src/lib/agent-provider-contract";
+import {
+  probeWorkerProviderUsage,
+  type ProviderUsageProbe,
+  type ProviderUsageProbeDependencies,
+} from "./provider-usage";
 
 export const workerProviderIds = agentProviders;
 export type WorkerProvider = AgentProvider;
+
+export type WorkerProviderHealthReason =
+  | "disabled"
+  | "not_installed"
+  | "not_authenticated"
+  | "usage_exhausted"
+  | null;
 
 export type WorkerProviderHealth = {
   installed: boolean;
   authenticated: boolean;
   healthy: boolean;
-  reason: "disabled" | "not_installed" | "not_authenticated" | null;
+  reason: WorkerProviderHealthReason;
+  /** Present when usage was successfully read or known exhausted. */
+  usageExhausted?: boolean;
+  maxUsedPercent?: number | null;
 };
 
 export type WorkerProviderHealthMap = Record<
@@ -32,6 +47,17 @@ type ProviderHealthDependencies = {
     home: string,
     now: number,
   ) => Promise<boolean>;
+  /**
+   * Probe remaining provider quota. Return `exhausted: true` only when usage
+   * is known to be fully consumed. Unknown/error results keep the provider
+   * selectable (fail open) so transient probe failures do not offline hosts.
+   */
+  usage: (
+    provider: WorkerProvider,
+    binary: string | null,
+    home: string,
+    now: number,
+  ) => Promise<ProviderUsageProbe>;
 };
 
 const commandResult = (binary: string, args: string[]) =>
@@ -106,13 +132,35 @@ const defaultDependencies: ProviderHealthDependencies = {
     }
     return grokAuthenticated(home, now);
   },
+  usage: async (provider, binary, home, now) =>
+    probeWorkerProviderUsage(provider, {
+      home,
+      now: () => now,
+      which: () => binary,
+    }),
 };
 
 export async function inspectWorkerProviderHealth(
   enabled: Record<WorkerProvider, boolean>,
-  dependencies: Partial<ProviderHealthDependencies> = {},
+  dependencies: Partial<
+    ProviderHealthDependencies & {
+      usageProbe?: Partial<ProviderUsageProbeDependencies>;
+    }
+  > = {},
 ): Promise<WorkerProviderHealthMap> {
-  const resolved = { ...defaultDependencies, ...dependencies };
+  const resolved: ProviderHealthDependencies = {
+    ...defaultDependencies,
+    ...dependencies,
+    usage:
+      dependencies.usage ??
+      (async (provider, binary, home, now) =>
+        probeWorkerProviderUsage(provider, {
+          home,
+          now: () => now,
+          which: () => binary,
+          ...dependencies.usageProbe,
+        })),
+  };
   const entries = await Promise.all(
     workerProviderIds.map(async (provider) => {
       const binary = resolved.which(provider);
@@ -126,20 +174,68 @@ export async function inspectWorkerProviderHealth(
               resolved.now(),
             )
           : false;
-      const healthy = enabled[provider] && installed && authenticated;
+      if (!enabled[provider]) {
+        return [
+          provider,
+          {
+            installed,
+            authenticated: false,
+            healthy: false,
+            reason: "disabled" as const,
+          },
+        ] as const;
+      }
+      if (!installed) {
+        return [
+          provider,
+          {
+            installed: false,
+            authenticated: false,
+            healthy: false,
+            reason: "not_installed" as const,
+          },
+        ] as const;
+      }
+      if (!authenticated) {
+        return [
+          provider,
+          {
+            installed: true,
+            authenticated: false,
+            healthy: false,
+            reason: "not_authenticated" as const,
+          },
+        ] as const;
+      }
+
+      const usage = await resolved.usage(
+        provider,
+        binary,
+        resolved.home,
+        resolved.now(),
+      );
+      if (usage.exhausted) {
+        return [
+          provider,
+          {
+            installed: true,
+            authenticated: true,
+            healthy: false,
+            reason: "usage_exhausted" as const,
+            usageExhausted: true,
+            maxUsedPercent: usage.maxUsedPercent,
+          },
+        ] as const;
+      }
       return [
         provider,
         {
-          installed,
-          authenticated,
-          healthy,
-          reason: healthy
-            ? null
-            : !enabled[provider]
-              ? "disabled"
-              : !installed
-                ? "not_installed"
-                : "not_authenticated",
+          installed: true,
+          authenticated: true,
+          healthy: true,
+          reason: null,
+          usageExhausted: false,
+          maxUsedPercent: usage.maxUsedPercent,
         },
       ] as const;
     }),
@@ -151,4 +247,26 @@ export function healthyWorkerProviders(
   health: WorkerProviderHealthMap,
 ): WorkerProvider[] {
   return workerProviderIds.filter((provider) => health[provider].healthy);
+}
+
+/** Readiness copy when no healthy provider remains after install/auth/usage checks. */
+export function providerHealthReadinessDetail(
+  health: WorkerProviderHealthMap,
+): string {
+  const values = workerProviderIds.map((provider) => health[provider]);
+  if (
+    values.some((entry) => entry.reason === "usage_exhausted") &&
+    values.every(
+      (entry) =>
+        !entry.healthy &&
+        (entry.reason === "usage_exhausted" ||
+          entry.reason === "disabled" ||
+          entry.reason === "not_installed" ||
+          entry.reason === "not_authenticated"),
+    ) &&
+    values.some((entry) => entry.authenticated)
+  ) {
+    return "사용량 한도에 도달해 실행할 수 있는 coding agent가 없습니다.";
+  }
+  return "로그인되어 사용할 수 있는 coding agent가 없습니다.";
 }
