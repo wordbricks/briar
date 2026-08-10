@@ -101,61 +101,19 @@ struct ChannelMessagesView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            ScrollView {
-                LazyVStack(spacing: 0) {
-                    ForEach(channels.messages) { message in
-                        ChannelMessageRow(
-                            acceptingProposalID: channels.acceptingProposalID,
-                            agents: channels.agents,
-                            channel: channel,
-                            members: channels.members,
-                            message: message,
-                            locale: locale,
-                            onAcceptProposal: { proposalID, projectID in
-                                await channels.acceptProposal(
-                                    channelID: channel.id,
-                                    proposalID: proposalID,
-                                    projectID: projectID
-                                )
-                            },
-                            onIssueOpen: onIssueOpen,
-                            onLoadAttachment: { attachment in
-                                try await channels.download(
-                                    path: attachment.url,
-                                    filename: attachment.filename
-                                )
-                            },
-                            onOpenAttachment: { previewFile = PreviewFile(url: $0) },
-                            projects: projects,
-                            showsThreadSummary: true
-                        )
-                    }
-                }
-            }
-            ChannelComposer(
-                draft: $draft,
-                sending: channels.sending,
-                candidates: ChannelMentions.candidates(
-                    members: channels.members,
-                    agents: channels.agents,
-                    currentUserId: currentUserID
-                ),
-                placeholder: String(
-                    format: L10n.text(.channelMessagePlaceholder, locale: locale),
-                    channel.name
-                ),
-                send: { body, mentions, attachments in
-                    await channels.send(
-                        channelID: channel.id,
-                        parentMessageID: nil,
-                        body: body,
-                        mentions: mentions,
-                        attachments: attachments
-                    )
-                }
-            )
-        }
+        ChannelConversationView(
+            channels: channels,
+            draft: $draft,
+            previewFile: $previewFile,
+            channel: channel,
+            currentUserID: currentUserID,
+            locale: locale,
+            messages: channels.messages,
+            onIssueOpen: onIssueOpen,
+            parentMessageID: nil,
+            projects: projects,
+            showsThreadSummary: true
+        )
         .safeAreaInset(edge: .top, spacing: 0) {
             ChannelHeader(
                 channel: channel,
@@ -296,10 +254,60 @@ struct ChannelThreadView: View {
     }
 
     var body: some View {
+        ChannelConversationView(
+            channels: channels,
+            draft: $draft,
+            previewFile: $previewFile,
+            channel: channel,
+            currentUserID: currentUserID,
+            locale: locale,
+            messages: channels.thread,
+            onIssueOpen: onIssueOpen,
+            parentMessageID: parent.id,
+            projects: projects,
+            showsThreadSummary: false
+        )
+        .navigationTitle(L10n.text(.channelThread, locale: locale))
+        .navigationBarTitleDisplayMode(.inline)
+        .sheet(item: $previewFile) { file in
+            QuickLookPreview(fileURL: file.url)
+        }
+        .task(id: parent.id) {
+            await channels.openThread(channelID: channel.id, parentMessageID: parent.id)
+        }
+    }
+}
+
+/// Shared channel and thread conversation surface. The two behavioral differences
+/// remain explicit inputs: replies carry `parentMessageID`, while only roots show
+/// navigation summaries for their threads.
+private struct ChannelConversationView: View {
+    @ObservedObject var channels: ChannelsStore
+    @Binding var draft: String
+    @Binding var previewFile: PreviewFile?
+
+    let channel: ChannelSummary
+    let currentUserID: String?
+    let locale: CompanionLocale
+    let messages: [ChannelMessage]
+    let onIssueOpen: (UUID, UUID) -> Void
+    let parentMessageID: UUID?
+    let projects: [ProjectsResponse.Project]
+    let showsThreadSummary: Bool
+
+    private var mentionCandidates: [ChannelMentionTarget] {
+        ChannelMentions.candidates(
+            members: channels.members,
+            agents: channels.agents,
+            currentUserId: currentUserID
+        )
+    }
+
+    var body: some View {
         VStack(spacing: 0) {
             ScrollView {
                 LazyVStack(spacing: 0) {
-                    ForEach(channels.thread) { message in
+                    ForEach(messages) { message in
                         ChannelMessageRow(
                             acceptingProposalID: channels.acceptingProposalID,
                             agents: channels.agents,
@@ -322,7 +330,8 @@ struct ChannelThreadView: View {
                                 )
                             },
                             onOpenAttachment: { previewFile = PreviewFile(url: $0) },
-                            projects: projects
+                            projects: projects,
+                            showsThreadSummary: showsThreadSummary
                         )
                     }
                 }
@@ -330,11 +339,7 @@ struct ChannelThreadView: View {
             ChannelComposer(
                 draft: $draft,
                 sending: channels.sending,
-                candidates: ChannelMentions.candidates(
-                    members: channels.members,
-                    agents: channels.agents,
-                    currentUserId: currentUserID
-                ),
+                candidates: mentionCandidates,
                 placeholder: String(
                     format: L10n.text(.channelMessagePlaceholder, locale: locale),
                     channel.name
@@ -342,21 +347,13 @@ struct ChannelThreadView: View {
                 send: { body, mentions, attachments in
                     await channels.send(
                         channelID: channel.id,
-                        parentMessageID: parent.id,
+                        parentMessageID: parentMessageID,
                         body: body,
                         mentions: mentions,
                         attachments: attachments
                     )
                 }
             )
-        }
-        .navigationTitle(L10n.text(.channelThread, locale: locale))
-        .navigationBarTitleDisplayMode(.inline)
-        .sheet(item: $previewFile) { file in
-            QuickLookPreview(fileURL: file.url)
-        }
-        .task(id: parent.id) {
-            await channels.openThread(channelID: channel.id, parentMessageID: parent.id)
         }
     }
 }

@@ -115,6 +115,29 @@ final class BriarCompanionUITests: XCTestCase {
         captureScreenshot(named: "companion-channel-composer")
     }
 
+    func testChannelThreadUsesReplyConversationWithoutNestedThreadSummaries() {
+        let app = launchInsideCompanion()
+
+        app.tabBars.buttons["홈"].tap()
+        let channel = app.buttons[
+            "channel-row-cccccccc-cccc-4ccc-8ccc-cccccccccccc"
+        ]
+        XCTAssertTrue(channel.waitForExistence(timeout: 5))
+        channel.tap()
+
+        let rootThreadLink = app.staticTexts["스레드에서 답글"]
+        XCTAssertTrue(rootThreadLink.waitForExistence(timeout: 5))
+        rootThreadLink.tap()
+
+        XCTAssertTrue(app.navigationBars["스레드"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)[
+            "channel-message-eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"
+        ].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["channel-composer-attach"].exists)
+        XCTAssertFalse(app.staticTexts["답글 1개"].exists)
+        captureScreenshot(named: "companion-channel-thread")
+    }
+
     func testCompletedIssueOpensResultTabFirst() {
         let app = launchInsideCompanion()
 
