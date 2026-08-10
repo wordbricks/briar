@@ -1057,6 +1057,7 @@ export const ko = {
   "worker.slotUsage": "슬롯 {active}/{maximum}개 사용 중",
   "worker.saveConcurrency": "저장",
   "issue.edit": "수정",
+  "issue.saveFailed": "저장 실패",
   "issue.share": "링크 공유",
   "issue.copyLink": "링크 복사",
   "issue.linkCopied": "링크가 복사되었습니다",
@@ -1663,6 +1664,7 @@ export type Messages = Record<MessageKey, string>;
 
 export const en: Messages = {
   ...ko,
+  "issue.saveFailed": "Save failed",
   "channel.selectProposalProject": "Select project",
   "channel.viewIssue": "View issue",
   "settings.issueKeyPrefix": "Issue key prefix",
@@ -2500,6 +2502,7 @@ export const en: Messages = {
 };
 export const zh: Messages = {
   ...en,
+  "issue.saveFailed": "保存失败",
   "channel.selectProposalProject": "选择项目",
   "channel.viewIssue": "查看问题",
   "settings.issueKeyPrefix": "问题键前缀",
