@@ -2,6 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   agentExecutionMetrics,
   agentExecutionTokenUsageFromPayload,
+  agentExecutionUsageObservationsFromPayload,
+  claudeExecutionUsageObservationsFromPayload,
+  codexExecutionUsageObservationsFromPayload,
+  createAgentExecutionUsageCollector,
   formatExecutionDuration,
 } from "./agent-execution-metrics";
 
@@ -23,6 +27,30 @@ describe("agent execution metrics", () => {
       cacheWriteTokens: null,
       reasoningOutputTokens: null,
       totalTokens: 1_250,
+    });
+  });
+
+  it("keeps compatibility with Codex usage directly under RPC params", () => {
+    expect(
+      agentExecutionTokenUsageFromPayload("codex", {
+        type: "event",
+        raw: {
+          method: "turn/completed",
+          params: {
+            turnId: "turn-1",
+            usage: {
+              inputTokens: 90,
+              cachedInputTokens: 40,
+              outputTokens: 10,
+            },
+          },
+        },
+      }),
+    ).toMatchObject({
+      inputTokens: 90,
+      cacheReadTokens: 40,
+      outputTokens: 10,
+      totalTokens: 100,
     });
   });
 
@@ -49,31 +77,569 @@ describe("agent execution metrics", () => {
     });
   });
 
-  it("normalizes Codex App Server turn usage from the raw RPC event", () => {
+  it("observes Claude's provider-selected model and assistant token delta", () => {
     expect(
-      agentExecutionTokenUsageFromPayload("codex", {
+      claudeExecutionUsageObservationsFromPayload({
         type: "event",
         raw: {
-          method: "turn/completed",
-          params: {
-            turn: {
-              usage: {
-                input_tokens: 900,
-                cached_input_tokens: 700,
-                output_tokens: 180,
-              },
+          type: "system",
+          subtype: "init",
+          session_id: "session-1",
+          model: "claude-sonnet-4-6",
+        },
+      }),
+    ).toEqual([
+      {
+        kind: "model",
+        provider: "claude",
+        model: "claude-sonnet-4-6",
+        canonicalModel: null,
+        modelProvider: null,
+        modelSource: "providerReported",
+        source: "claude.init",
+        scopeId: "session-1",
+        sessionId: "session-1",
+        turnId: null,
+        dedupeKey: "claude:session:session-1:model",
+      },
+    ]);
+
+    expect(
+      claudeExecutionUsageObservationsFromPayload({
+        type: "event",
+        raw: {
+          type: "assistant",
+          uuid: "assistant-envelope-1",
+          session_id: "session-1",
+          message: {
+            id: "message-1",
+            model: "claude-opus-4-6-20260801",
+            usage: {
+              input_tokens: 10,
+              output_tokens: 5,
+              cache_read_input_tokens: 4,
+              cache_creation_input_tokens: 2,
             },
           },
         },
       }),
-    ).toEqual({
-      inputTokens: 900,
-      outputTokens: 180,
-      cacheReadTokens: 700,
-      cacheWriteTokens: null,
+    ).toEqual([
+      expect.objectContaining({
+        kind: "delta",
+        provider: "claude",
+        model: "claude-opus-4-6-20260801",
+        source: "claude.assistant.usage",
+        scopeId: "message-1",
+        sessionId: "session-1",
+        dedupeKey: "claude:message:message-1:usage",
+        tokenUsage: expect.objectContaining({ totalTokens: 21 }),
+      }),
+    ]);
+  });
+
+  it("keeps every Claude result model usage and billing provider", () => {
+    const payload = {
+      type: "event",
+      raw: {
+        type: "result",
+        subtype: "success",
+        uuid: "result-1",
+        session_id: "session-1",
+        modelUsage: {
+          "claude-sonnet-4-6-20260801": {
+            inputTokens: 100,
+            outputTokens: 50,
+            cacheReadInputTokens: 25,
+            cacheCreationInputTokens: 10,
+            canonicalModel: "claude-sonnet-4-6",
+            provider: "firstParty",
+          },
+          "anthropic.claude-haiku-4-5-v1:0": {
+            inputTokens: 30,
+            outputTokens: 20,
+            cacheReadInputTokens: 5,
+            cacheCreationInputTokens: 0,
+            canonicalModel: "claude-haiku-4-5",
+            provider: "bedrock",
+          },
+        },
+        // This aggregate must not become a third usage observation.
+        usage: {
+          input_tokens: 130,
+          output_tokens: 70,
+          cache_read_input_tokens: 30,
+          cache_creation_input_tokens: 10,
+        },
+      },
+    };
+
+    expect(
+      agentExecutionUsageObservationsFromPayload("claude", payload),
+    ).toEqual([
+      expect.objectContaining({
+        kind: "cumulative",
+        provider: "claude",
+        model: "claude-sonnet-4-6-20260801",
+        canonicalModel: "claude-sonnet-4-6",
+        modelProvider: "firstParty",
+        source: "claude.result.modelUsage",
+        scopeId: "result-1",
+        sessionId: "session-1",
+        dedupeKey:
+          "claude:session:result-1:model:claude-sonnet-4-6-20260801:usage",
+        tokenUsage: expect.objectContaining({ totalTokens: 185 }),
+      }),
+      expect.objectContaining({
+        kind: "cumulative",
+        provider: "claude",
+        model: "anthropic.claude-haiku-4-5-v1:0",
+        canonicalModel: "claude-haiku-4-5",
+        modelProvider: "bedrock",
+        tokenUsage: expect.objectContaining({ totalTokens: 55 }),
+      }),
+    ]);
+    expect(agentExecutionTokenUsageFromPayload("claude", payload)).toEqual({
+      inputTokens: 130,
+      outputTokens: 70,
+      cacheReadTokens: 30,
+      cacheWriteTokens: 10,
       reasoningOutputTokens: null,
-      totalTokens: 1_080,
+      totalTokens: 240,
     });
+  });
+
+  it("lets Claude cumulative model usage replace assistant deltas", () => {
+    const collector = createAgentExecutionUsageCollector("claude");
+    collector.observe({
+      type: "event",
+      raw: {
+        type: "assistant",
+        session_id: "session-1",
+        message: {
+          id: "message-1",
+          model: "claude-sonnet-4-6",
+          usage: { input_tokens: 10, output_tokens: 5 },
+        },
+      },
+    });
+    expect(collector.finish()).toHaveLength(1);
+
+    collector.observe({
+      type: "event",
+      raw: {
+        type: "result",
+        session_id: "session-1",
+        modelUsage: {
+          "claude-sonnet-4-6": {
+            inputTokens: 40,
+            outputTokens: 20,
+            cacheReadInputTokens: 5,
+            cacheCreationInputTokens: 0,
+            provider: "vertex",
+          },
+        },
+      },
+    });
+
+    expect(collector.finish()).toEqual([
+      expect.objectContaining({
+        kind: "cumulative",
+        model: "claude-sonnet-4-6",
+        modelProvider: "vertex",
+        tokenUsage: expect.objectContaining({ totalTokens: 65 }),
+      }),
+    ]);
+  });
+
+  it("keeps resumed Claude query totals that share one session", () => {
+    const collector = createAgentExecutionUsageCollector("claude");
+    const observeQuery = (messageId: string, resultId: string, input: number) => {
+      collector.observe({
+        type: "event",
+        raw: {
+          type: "system",
+          subtype: "init",
+          session_id: "session-1",
+          model: "claude-sonnet-4-6",
+        },
+      });
+      collector.observe({
+        type: "event",
+        raw: {
+          type: "assistant",
+          session_id: "session-1",
+          message: {
+            id: messageId,
+            model: "claude-sonnet-4-6",
+            usage: { input_tokens: input, output_tokens: 1 },
+          },
+        },
+      });
+      collector.observe({
+        type: "event",
+        raw: {
+          type: "result",
+          uuid: resultId,
+          session_id: "session-1",
+          modelUsage: {
+            "claude-sonnet-4-6": {
+              inputTokens: input,
+              outputTokens: 1,
+              cacheReadInputTokens: 0,
+              cacheCreationInputTokens: 0,
+            },
+          },
+        },
+      });
+    };
+
+    observeQuery("message-1", "result-1", 10);
+    observeQuery("message-2", "result-2", 20);
+
+    expect(collector.finish()).toEqual([
+      expect.objectContaining({
+        scopeId: "result-1",
+        tokenUsage: expect.objectContaining({ totalTokens: 11 }),
+      }),
+      expect.objectContaining({
+        scopeId: "result-2",
+        tokenUsage: expect.objectContaining({ totalTokens: 21 }),
+      }),
+    ]);
+  });
+
+  it("observes Codex effective defaults from config and model list responses", () => {
+    expect(
+      codexExecutionUsageObservationsFromPayload({
+        type: "event",
+        direction: "server",
+        raw: {
+          id: 2,
+          result: {
+            config: {
+              model: "gpt-5.6-sol",
+              model_provider: "openai",
+            },
+          },
+        },
+      }),
+    ).toEqual([
+      expect.objectContaining({
+        kind: "model",
+        model: "gpt-5.6-sol",
+        modelProvider: "openai",
+        source: "codex.config",
+      }),
+    ]);
+
+    expect(
+      codexExecutionUsageObservationsFromPayload({
+        type: "event",
+        direction: "server",
+        raw: {
+          id: 3,
+          result: {
+            data: [
+              { id: "gpt-5.6-mini", model: "gpt-5.6-mini", isDefault: false },
+              { id: "gpt-5.6-sol", model: "gpt-5.6-sol", isDefault: true },
+            ],
+          },
+        },
+      }),
+    ).toEqual([
+      expect.objectContaining({
+        kind: "model",
+        model: "gpt-5.6-sol",
+        source: "codex.modelDefault",
+      }),
+    ]);
+  });
+
+  it("observes the model and billing provider resolved by a Codex thread", () => {
+    expect(
+      codexExecutionUsageObservationsFromPayload({
+        type: "event",
+        direction: "server",
+        raw: {
+          id: 4,
+          result: {
+            thread: { id: "thread-1" },
+            model: "gpt-5.6-sol",
+            modelProvider: "openai",
+          },
+        },
+      }),
+    ).toEqual([
+      {
+        kind: "model",
+        provider: "codex",
+        model: "gpt-5.6-sol",
+        canonicalModel: null,
+        modelProvider: "openai",
+        modelSource: "providerReported",
+        source: "codex.thread",
+        scopeId: "thread-1",
+        sessionId: "thread-1",
+        turnId: null,
+        dedupeKey: "codex:thread:thread-1:model",
+      },
+    ]);
+  });
+
+  it("combines a catalog default with a thread's provider-only response", () => {
+    const collector = createAgentExecutionUsageCollector("codex");
+    collector.observe({
+      result: {
+        data: [{ model: "gpt-5.6-sol", isDefault: true }],
+      },
+    });
+    collector.observe({
+      result: {
+        thread: { id: "thread-1" },
+        modelProvider: "openai",
+      },
+    });
+    collector.observe({
+      method: "thread/tokenUsage/updated",
+      params: {
+        threadId: "thread-1",
+        turnId: "turn-1",
+        tokenUsage: {
+          last: { inputTokens: 10, outputTokens: 5, totalTokens: 15 },
+        },
+      },
+    });
+    expect(collector.finish()).toEqual([
+      expect.objectContaining({
+        model: "gpt-5.6-sol",
+        modelProvider: "openai",
+        modelSource: "providerConfig",
+      }),
+    ]);
+  });
+
+  it("updates the observed Codex model when App Server reroutes a turn", () => {
+    expect(
+      codexExecutionUsageObservationsFromPayload({
+        type: "event",
+        direction: "server",
+        raw: {
+          method: "model/rerouted",
+          params: {
+            threadId: "thread-1",
+            turnId: "turn-1",
+            fromModel: "gpt-5.6-sol",
+            toModel: "gpt-5.6-mini",
+            reason: "highRiskCyberActivity",
+          },
+        },
+      }),
+    ).toEqual([
+      expect.objectContaining({
+        kind: "model",
+        provider: "codex",
+        model: "gpt-5.6-mini",
+        source: "codex.rerouted",
+        scopeId: "turn-1",
+        sessionId: "thread-1",
+        turnId: "turn-1",
+        dedupeKey: "codex:turn:turn-1:model",
+      }),
+    ]);
+  });
+
+  it("observes Codex thread settings updates", () => {
+    expect(
+      codexExecutionUsageObservationsFromPayload({
+        method: "thread/settings/updated",
+        params: {
+          threadId: "thread-1",
+          threadSettings: {
+            model: "gpt-5.6-terra",
+            modelProvider: "openai",
+          },
+        },
+      }),
+    ).toEqual([
+      expect.objectContaining({
+        kind: "model",
+        model: "gpt-5.6-terra",
+        modelProvider: "openai",
+        source: "codex.threadSettings",
+        sessionId: "thread-1",
+      }),
+    ]);
+  });
+
+  it("resets a prior reroute from each explicit Codex turn request", () => {
+    const collector = createAgentExecutionUsageCollector("codex", {
+      configuredModel: "gpt-5.6-sol",
+    });
+    collector.observe({
+      method: "model/rerouted",
+      params: {
+        threadId: "thread-1",
+        turnId: "turn-1",
+        toModel: "gpt-5.6-mini",
+      },
+    });
+    const turnRequest = {
+      type: "event",
+      direction: "client",
+      raw: {
+        method: "turn/start",
+        id: 5,
+        params: { threadId: "thread-1", model: "gpt-5.6-sol" },
+      },
+    };
+    expect(codexExecutionUsageObservationsFromPayload(turnRequest)).toEqual([
+      expect.objectContaining({
+        kind: "model",
+        model: "gpt-5.6-sol",
+        modelSource: "configuredFallback",
+        source: "codex.turnRequest",
+        sessionId: "thread-1",
+      }),
+    ]);
+    collector.observe(turnRequest);
+    collector.observe({
+      method: "thread/tokenUsage/updated",
+      params: {
+        threadId: "thread-1",
+        turnId: "turn-2",
+        tokenUsage: {
+          last: { inputTokens: 10, outputTokens: 5, totalTokens: 15 },
+        },
+      },
+    });
+    expect(collector.finish()).toEqual([
+      expect.objectContaining({
+        model: "gpt-5.6-sol",
+        modelSource: "configuredFallback",
+        turnId: "turn-2",
+      }),
+    ]);
+  });
+
+  it("normalizes and deduplicates Codex per-turn token deltas", () => {
+    const payload = {
+      type: "event",
+      direction: "server",
+      raw: {
+        method: "thread/tokenUsage/updated",
+        params: {
+          threadId: "thread-1",
+          turnId: "turn-1",
+          tokenUsage: {
+            last: {
+              inputTokens: 900,
+              cachedInputTokens: 700,
+              cacheWriteInputTokens: 40,
+              outputTokens: 180,
+              reasoningOutputTokens: 120,
+              totalTokens: 1_080,
+            },
+            total: {
+              inputTokens: 9_000,
+              cachedInputTokens: 7_000,
+              cacheWriteInputTokens: 400,
+              outputTokens: 1_800,
+              reasoningOutputTokens: 1_200,
+              totalTokens: 10_800,
+            },
+          },
+        },
+      },
+    };
+    expect(codexExecutionUsageObservationsFromPayload(payload)).toEqual([
+      expect.objectContaining({
+        kind: "delta",
+        provider: "codex",
+        model: null,
+        source: "codex.threadTokenUsage",
+        scopeId: "turn-1",
+        sessionId: "thread-1",
+        turnId: "turn-1",
+        dedupeKey: "codex:turn:turn-1:usage",
+        tokenUsage: {
+          inputTokens: 900,
+          outputTokens: 180,
+          cacheReadTokens: 700,
+          cacheWriteTokens: 40,
+          reasoningOutputTokens: 120,
+          totalTokens: 1_080,
+        },
+      }),
+    ]);
+
+    const collector = createAgentExecutionUsageCollector("codex");
+    collector.observe({
+      result: {
+        config: { model: "gpt-5.6-sol", model_provider: "openai" },
+      },
+    });
+    collector.observe(payload);
+    collector.observe(payload);
+    expect(collector.finish()).toEqual([
+      expect.objectContaining({
+        model: "gpt-5.6-sol",
+        modelProvider: "openai",
+        modelSource: "providerConfig",
+        tokenUsage: expect.objectContaining({ totalTokens: 1_080 }),
+      }),
+    ]);
+
+    // App Server may report a safety reroute after the usage snapshot; the
+    // already-collected turn must still carry the model that served it.
+    collector.observe({
+      method: "model/rerouted",
+      params: {
+        threadId: "thread-1",
+        turnId: "turn-1",
+        fromModel: "gpt-5.6-sol",
+        toModel: "gpt-5.6-mini",
+      },
+    });
+    expect(collector.finish()).toEqual([
+      expect.objectContaining({
+        model: "gpt-5.6-mini",
+        modelSource: "providerReported",
+      }),
+    ]);
+  });
+
+  it("marks configured model enrichment as fallback rather than provider-reported", () => {
+    const collector = createAgentExecutionUsageCollector("codex", {
+      configuredModel: "gpt-5.6-sol",
+    });
+    collector.observe({
+      method: "thread/tokenUsage/updated",
+      params: {
+        threadId: "thread-1",
+        turnId: "turn-1",
+        tokenUsage: {
+          last: { inputTokens: 10, outputTokens: 5, totalTokens: 15 },
+        },
+      },
+    });
+    expect(collector.finish()).toEqual([
+      expect.objectContaining({
+        model: "gpt-5.6-sol",
+        modelSource: "configuredFallback",
+      }),
+    ]);
+  });
+
+  it("does not guess OpenCode or Grok usage through another provider adapter", () => {
+    const lookalikePayload = {
+      usage: { input_tokens: 10, output_tokens: 5 },
+    };
+    expect(
+      agentExecutionUsageObservationsFromPayload("opencode", lookalikePayload),
+    ).toEqual([]);
+    expect(
+      agentExecutionUsageObservationsFromPayload("grok", lookalikePayload),
+    ).toEqual([]);
   });
 
   it("records duration even when a provider does not report tokens", () => {
