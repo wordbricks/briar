@@ -1,9 +1,6 @@
 import { type Locale, copy, localizedPath } from "../i18n";
-import { LanguageSwitcher } from "../language-switcher";
-import { MobileMenu } from "../mobile-menu";
-
-const WEB_APP_URL = "/app/";
-const GITHUB_RELEASES_URL = "https://github.com/wordbricks/briar/releases";
+import { Arrow, SiteFooter, SiteHeader } from "../site-chrome";
+import { GITHUB_RELEASES_URL } from "../site-links";
 
 export const changelogCopy = {
   ko: {
@@ -432,10 +429,6 @@ export const changelogCopy = {
   },
 } as const satisfies Record<Locale, unknown>;
 
-function Arrow() {
-  return <span aria-hidden="true">↗</span>;
-}
-
 const PATH = "/changelog" as const;
 
 export default function ChangelogView({ locale }: { locale: Locale }) {
@@ -448,61 +441,16 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
 
   return (
     <main className="changelog-page" id="top">
-      <header className="site-header changelog-header">
-        <div className="shell nav-shell">
-          {/* vinext currently hydrates next/link with a duplicate React instance. */}
-          <a className="brand" href={localizedPath(locale, "/")} aria-label={c.aria.brandHome}>
-            <span className="brand-mark">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/briar-app-icon.png" alt="" />
-            </span>
-            <span>briar</span>
-          </a>
-          <nav aria-label={c.aria.mainMenu}>
-            <a href={localizedPath(locale, "/tutorial")}>{c.nav.tutorial}</a>
-            <a className="is-current" href={localizedPath(locale, "/changelog")} aria-current="page">
-              {c.nav.changelog}
-            </a>
-            <a href={localizedPath(locale, "/blog")}>{c.nav.blog}</a>
-            <a href={localizedPath(locale, "/download")}>{c.nav.download}</a>
-          </nav>
-          <div className="header-actions">
-            <LanguageSwitcher
-              locale={locale}
-              label={c.language.label}
-              englishLabel={c.language.english}
-              koreanLabel={c.language.korean}
-              hrefs={hrefs}
-            />
-            <a
-              className="header-cta header-download"
-              href={WEB_APP_URL}
-              aria-label={c.aria.openWebApp}
-            >
-              <span className="header-cta-label">{changelog.openApp}</span>{" "}
-              <Arrow />
-            </a>
-            <MobileMenu
-              navLabel={c.aria.mainMenu}
-              navLinks={[
-                { href: localizedPath(locale, "/tutorial"), label: c.nav.tutorial },
-                {
-                  href: localizedPath(locale, "/changelog"),
-                  label: c.nav.changelog,
-                  isCurrent: true,
-                },
-                { href: localizedPath(locale, "/blog"), label: c.nav.blog },
-                { href: localizedPath(locale, "/download"), label: c.nav.download },
-              ]}
-              ctaHref={WEB_APP_URL}
-              ctaLabel={c.nav.openWebApp}
-              ctaAriaLabel={c.aria.openWebApp}
-              openLabel={c.aria.menuOpen}
-              closeLabel={c.aria.menuClose}
-            />
-          </div>
-        </div>
-      </header>
+      <SiteHeader
+        brandHref={localizedPath(locale, "/")}
+        className="changelog-header"
+        copy={c}
+        ctaLabel={changelog.openApp}
+        currentPath={PATH}
+        hrefs={hrefs}
+        locale={locale}
+        mobileCtaLabel={c.nav.openWebApp}
+      />
 
       <section className="changelog-hero shell">
         <div>
@@ -579,24 +527,16 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
         </a>
       </section>
 
-      <footer>
-        <div className="shell footer-shell">
-          <a className="brand" href={localizedPath(locale, "/")} aria-label={c.aria.brandHome}>
-            <span className="brand-mark">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/briar-app-icon.png" alt="" />
-            </span>
-            <span>briar</span>
-          </a>
-          <p>{c.footer.tagline}</p>
-          <div>
-            <a href={localizedPath(locale, "/")}>{changelog.home}</a>
-            <a href={localizedPath(locale, "/tutorial")}>{c.nav.tutorial}</a>
-            <a href={localizedPath(locale, "/download")}>{c.nav.download}</a>
-            <a href="#top">{changelog.backTop}</a>
-          </div>
-        </div>
-      </footer>
+      <SiteFooter
+        brandHref={localizedPath(locale, "/")}
+        copy={c}
+        links={[
+          { href: localizedPath(locale, "/"), label: changelog.home },
+          { href: localizedPath(locale, "/tutorial"), label: c.nav.tutorial },
+          { href: localizedPath(locale, "/download"), label: c.nav.download },
+          { href: "#top", label: changelog.backTop },
+        ]}
+      />
     </main>
   );
 }

@@ -1,10 +1,6 @@
 import { type Locale, copy, localizedPath } from "../i18n";
-import { LanguageSwitcher } from "../language-switcher";
-import { MobileMenu } from "../mobile-menu";
-
-
-const WEB_APP_URL = "/app/";
-const GITHUB_URL = "https://github.com/wordbricks/briar";
+import { SiteFooter, SiteHeader } from "../site-chrome";
+import { GITHUB_URL } from "../site-links";
 
 export const blogCopy = {
   ko: {
@@ -39,10 +35,6 @@ export const blogCopy = {
   },
 } as const satisfies Record<Locale, unknown>;
 
-function Arrow() {
-  return <span aria-hidden="true">↗</span>;
-}
-
 const PATH = "/blog" as const;
 
 export default function BlogView({ locale }: { locale: Locale }) {
@@ -55,65 +47,21 @@ export default function BlogView({ locale }: { locale: Locale }) {
 
   return (
     <main className="blog-page" id="top">
-      <header className="site-header blog-header">
-        <div className="shell nav-shell">
-          <a className="brand" href={localizedPath(locale, "/")} aria-label={c.aria.brandHome}>
-            <span className="brand-mark">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/briar-app-icon.png" alt="" />
-            </span>
-            <span>briar</span>
-          </a>
-          <nav aria-label={c.aria.mainMenu}>
-            <a href={localizedPath(locale, "/tutorial")}>{c.nav.tutorial}</a>
-            <a href={localizedPath(locale, "/changelog")}>{c.nav.changelog}</a>
-            <a className="is-current" href={localizedPath(locale, "/blog")} aria-current="page">
-              {c.nav.blog}
-            </a>
-            <a href={localizedPath(locale, "/download")}>{c.nav.download}</a>
-          </nav>
-          <div className="header-actions">
-            <LanguageSwitcher
-              locale={locale}
-              label={c.language.label}
-              englishLabel={c.language.english}
-              koreanLabel={c.language.korean}
-              hrefs={hrefs}
-            />
-            <a
-              className="header-cta header-github"
-              href={GITHUB_URL}
-              target="_blank"
-              rel="noreferrer"
-              aria-label={c.aria.githubLink}
-            >
-              GitHub <Arrow />
-            </a>
-            <a className="header-cta header-download" href={WEB_APP_URL}>
-              <span className="header-cta-label">{c.nav.openWebApp}</span>{" "}
-              <Arrow />
-            </a>
-            <MobileMenu
-              navLabel={c.aria.mainMenu}
-              navLinks={[
-                { href: localizedPath(locale, "/tutorial"), label: c.nav.tutorial },
-                { href: localizedPath(locale, "/blog"), label: c.nav.blog, isCurrent: true },
-                { href: localizedPath(locale, "/download"), label: c.nav.download },
-                {
-                  href: GITHUB_URL,
-                  label: "GitHub",
-                  external: true,
-                },
-              ]}
-              ctaHref={WEB_APP_URL}
-              ctaLabel={c.nav.openWebApp}
-              ctaAriaLabel={c.aria.openWebApp}
-              openLabel={c.aria.menuOpen}
-              closeLabel={c.aria.menuClose}
-            />
-          </div>
-        </div>
-      </header>
+      <SiteHeader
+        brandHref={localizedPath(locale, "/")}
+        className="blog-header"
+        copy={c}
+        ctaLabel={c.nav.openWebApp}
+        currentPath={PATH}
+        hrefs={hrefs}
+        locale={locale}
+        secondaryAction={{
+          ariaLabel: c.aria.githubLink,
+          external: true,
+          href: GITHUB_URL,
+          label: "GitHub",
+        }}
+      />
 
       <section className="blog-hero shell">
         <span className="section-index">{b.eyebrow}</span>
@@ -129,25 +77,17 @@ export default function BlogView({ locale }: { locale: Locale }) {
         </div>
       </section>
 
-      <footer>
-        <div className="shell footer-shell">
-          <a className="brand" href={localizedPath(locale, "/")} aria-label={c.aria.brandHome}>
-            <span className="brand-mark">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/briar-app-icon.png" alt="" />
-            </span>
-            <span>briar</span>
-          </a>
-          <p>{c.footer.tagline}</p>
-          <div>
-            <a href={localizedPath(locale, "/")}>{b.home}</a>
-            <a href={localizedPath(locale, "/tutorial")}>{c.nav.tutorial}</a>
-            <a href={localizedPath(locale, "/changelog")}>{c.nav.changelog}</a>
-            <a href={localizedPath(locale, "/download")}>{c.nav.download}</a>
-            <a href="#top">{b.backTop}</a>
-          </div>
-        </div>
-      </footer>
+      <SiteFooter
+        brandHref={localizedPath(locale, "/")}
+        copy={c}
+        links={[
+          { href: localizedPath(locale, "/"), label: b.home },
+          { href: localizedPath(locale, "/tutorial"), label: c.nav.tutorial },
+          { href: localizedPath(locale, "/changelog"), label: c.nav.changelog },
+          { href: localizedPath(locale, "/download"), label: c.nav.download },
+          { href: "#top", label: b.backTop },
+        ]}
+      />
     </main>
   );
 }

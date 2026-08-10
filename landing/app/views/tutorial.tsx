@@ -1,11 +1,6 @@
 import { type Locale, copy, localizedPath } from "../i18n";
-import { LanguageSwitcher } from "../language-switcher";
-import { MobileMenu } from "../mobile-menu";
-
-
-const WEB_APP_URL = "/app/";
-const MAC_DOWNLOAD_URL =
-  "https://briar-api.wbai.workers.dev/releases/latest/mac-aarch64.dmg";
+import { Arrow, SiteFooter, SiteHeader } from "../site-chrome";
+import { MAC_DOWNLOAD_URL, WEB_APP_URL } from "../site-links";
 
 export const tutorialCopy = {
   ko: {
@@ -316,10 +311,6 @@ export const tutorialCopy = {
   },
 } as const satisfies Record<Locale, unknown>;
 
-function Arrow() {
-  return <span aria-hidden="true">↗</span>;
-}
-
 const PATH = "/tutorial" as const;
 
 export default function TutorialView({ locale }: { locale: Locale }) {
@@ -332,50 +323,21 @@ export default function TutorialView({ locale }: { locale: Locale }) {
 
   return (
     <main className="tutorial-page" id="top">
-      <header className="site-header tutorial-header">
-        <div className="shell nav-shell">
-          {/* vinext currently hydrates next/link with a duplicate React instance. */}
-          <a className="brand" href={localizedPath(locale, "/")} aria-label={c.aria.brandHome}>
-            <span className="brand-mark">
-              <img src="/briar-app-icon.png" alt="" />
-            </span>
-            <span>briar</span>
-          </a>
-          <nav aria-label={c.aria.mainMenu}>
-            <a href={localizedPath(locale, "/")}>{t.backHome}</a>
-            <a href="#run-auto-hunt">{t.steps[2].nav}</a>
-            <a href="#review-result">{t.steps[4].nav}</a>
-            <a href="#schedule-agents">{t.steps[7].nav}</a>
-          </nav>
-          <div className="header-actions">
-            <LanguageSwitcher
-              locale={locale}
-              label={c.language.label}
-              hrefs={hrefs}
-              englishLabel={c.language.english}
-              koreanLabel={c.language.korean}
-            />
-            <a className="header-cta header-download" href={WEB_APP_URL}>
-              <span className="header-cta-label">{t.openApp}</span>{" "}
-              <Arrow />
-            </a>
-            <MobileMenu
-              navLabel={c.aria.mainMenu}
-              navLinks={[
-                { href: localizedPath(locale, "/"), label: t.backHome },
-                { href: "#run-auto-hunt", label: t.steps[2].nav },
-                { href: "#review-result", label: t.steps[4].nav },
-                { href: "#schedule-agents", label: t.steps[7].nav },
-              ]}
-              ctaHref={WEB_APP_URL}
-              ctaLabel={t.openApp}
-              ctaAriaLabel={c.aria.openWebApp}
-              openLabel={c.aria.menuOpen}
-              closeLabel={c.aria.menuClose}
-            />
-          </div>
-        </div>
-      </header>
+      <SiteHeader
+        brandHref={localizedPath(locale, "/")}
+        className="tutorial-header"
+        copy={c}
+        ctaLabel={t.openApp}
+        currentPath={PATH}
+        hrefs={hrefs}
+        locale={locale}
+        navLinks={[
+          { href: localizedPath(locale, "/"), label: t.backHome },
+          { href: "#run-auto-hunt", label: t.steps[2].nav },
+          { href: "#review-result", label: t.steps[4].nav },
+          { href: "#schedule-agents", label: t.steps[7].nav },
+        ]}
+      />
 
       <section className="tutorial-hero shell">
         <div className="tutorial-hero-copy">
@@ -494,22 +456,15 @@ export default function TutorialView({ locale }: { locale: Locale }) {
         </div>
       </section>
 
-      <footer>
-        <div className="shell footer-shell">
-          <a className="brand" href={localizedPath(locale, "/")} aria-label={c.aria.brandHome}>
-            <span className="brand-mark">
-              <img src="/briar-app-icon.png" alt="" />
-            </span>
-            <span>briar</span>
-          </a>
-          <p>{c.footer.tagline}</p>
-          <div>
-            <a href={localizedPath(locale, "/changelog")}>{c.nav.changelog}</a>
-            <a href={localizedPath(locale, "/")}>{t.backHome}</a>
-            <a href="#top">{t.backTop}</a>
-          </div>
-        </div>
-      </footer>
+      <SiteFooter
+        brandHref={localizedPath(locale, "/")}
+        copy={c}
+        links={[
+          { href: localizedPath(locale, "/changelog"), label: c.nav.changelog },
+          { href: localizedPath(locale, "/"), label: t.backHome },
+          { href: "#top", label: t.backTop },
+        ]}
+      />
     </main>
   );
 }
