@@ -3,6 +3,4 @@ export {
   ErrorBanner,
   MainContent,
   PageHeader,
-  PageHero,
-  StatusPill,
 } from "./page";
