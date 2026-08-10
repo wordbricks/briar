@@ -58,6 +58,37 @@ describe("SelectMenu", () => {
     container.remove();
   });
 
+  it("renders an optional leading icon and can hide the chevron", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <SelectMenu
+          hideChevron
+          id="badge-select"
+          label="Status"
+          leadingIcon={<span data-testid="leading-icon">icon</span>}
+          onValueChange={() => undefined}
+          options={[{ label: "Queued", value: "queued" }]}
+          value="queued"
+        />,
+      );
+    });
+
+    expect(
+      container.querySelector('[data-testid="leading-icon"]')?.textContent,
+    ).toBe("icon");
+    expect(container.querySelector(".select-menu-chevron")).toBeNull();
+    expect(
+      container.querySelector(".select-menu-leading-icon"),
+    ).not.toBeNull();
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
   it("opens from the keyboard and moves focus through enabled options", async () => {
     const container = document.createElement("div");
     document.body.append(container);

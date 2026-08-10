@@ -1032,6 +1032,80 @@ describe("HuntDashboard", () => {
     expect(markup).toContain(`배정된 Worker: ${dashboardWorker.label}`);
   });
 
+  it("lets users change status and priority from compact property badges", async () => {
+    const onMove = vi.fn(async () => undefined);
+    const onUpdateIssue = vi.fn(async () => undefined);
+    const run = {
+      ...demoDashboard.runs[0],
+      status: "queued" as const,
+      workflowStage: null,
+      priority: 4,
+    };
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <TooltipProvider>
+          <RunPage
+            isSidebarOpen
+            error={null}
+            isRecovering={false}
+            onBack={() => undefined}
+            onCancel={async () => undefined}
+            onLoadAttachment={async () => new Blob()}
+            onLoadIssueMessages={async () => []}
+            onLoadRunEvidence={async () => []}
+            onMove={onMove}
+            onRetry={async () => undefined}
+            onSendIssueMessage={async () => {
+              throw new Error("not implemented in this test");
+            }}
+            onUpdateIssue={onUpdateIssue}
+            run={run}
+          />
+        </TooltipProvider>,
+      );
+    });
+
+    const statusTrigger = container.querySelector<HTMLButtonElement>(
+      ".run-page-property-select.status .select-menu-trigger",
+    );
+    const priorityTrigger = container.querySelector<HTMLButtonElement>(
+      ".run-page-property-select.priority .select-menu-trigger",
+    );
+    expect(statusTrigger?.textContent).toContain("대기");
+    expect(priorityTrigger?.textContent).toContain("P4");
+
+    await act(async () => statusTrigger?.click());
+    const backlogOption = Array.from(
+      document.body.querySelectorAll<HTMLButtonElement>('[role="option"]'),
+    ).find((option) => option.textContent?.includes("백로그"));
+    expect(backlogOption).not.toBeUndefined();
+    await act(async () => backlogOption?.click());
+    expect(onMove).toHaveBeenCalledWith({
+      status: "backlog",
+      workflowStage: null,
+    });
+
+    await act(async () => priorityTrigger?.click());
+    const highPriority = Array.from(
+      document.body.querySelectorAll<HTMLButtonElement>('[role="option"]'),
+    ).find((option) => option.textContent?.includes("P1"));
+    expect(highPriority).not.toBeUndefined();
+    await act(async () => highPriority?.click());
+    expect(onUpdateIssue).toHaveBeenCalledWith({
+      title: run.title,
+      description: run.issueDescription,
+      priority: 1,
+      attachments: [],
+    });
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
   it("renders the companion queue directly in its parent", () => {
     const markup = renderToStaticMarkup(
       <HuntDashboard
@@ -1957,8 +2031,17 @@ describe("HuntDashboard", () => {
     expect(workflowStages[1]?.getAttribute("aria-label")).toContain("진행 중");
     expect(workflowStages[2]?.getAttribute("aria-label")).toContain("대기");
     expect(
+      container.querySelectorAll(".run-page-property-select"),
+    ).toHaveLength(2);
+    expect(
       container.querySelectorAll(".run-page-property-badge"),
-    ).toHaveLength(3);
+    ).toHaveLength(1);
+    expect(
+      container.querySelector(".run-page-property-select.status .select-menu-trigger"),
+    ).not.toBeNull();
+    expect(
+      container.querySelector(".run-page-property-select.priority .select-menu-trigger"),
+    ).not.toBeNull();
     const propertiesToggle = container.querySelector<HTMLButtonElement>(
       ".run-page-properties-toggle",
     );
@@ -1972,7 +2055,7 @@ describe("HuntDashboard", () => {
     expect(properties?.textContent).toContain("시도");
     expect(properties?.textContent).toContain("리비전");
     expect(
-      properties?.querySelector('[aria-label^="우선순위:"]'),
+      properties?.querySelector('.run-priority-select [aria-label="우선순위"]'),
     ).not.toBeNull();
     expect(properties?.querySelectorAll(".run-property-copy small")).toHaveLength(0);
     expect(properties?.querySelector(".run-status-control")).not.toBeNull();
@@ -4256,7 +4339,7 @@ describe("HuntDashboard", () => {
     );
     expect(markup).toContain("작업 취소");
     expect(markup).toContain('class="recovery-panel"');
-    expect(markup).toContain('class="run-page-property-badge red"');
+    expect(markup).toContain("run-page-property-select status red");
     expect(markup).toContain(">실패</span>");
     expect(markup).toContain('aria-expanded="false" aria-label="속성" class="run-page-properties-toggle"');
   });
@@ -4301,7 +4384,7 @@ describe("HuntDashboard", () => {
     expect(markup.match(/<li>/g)).toHaveLength(3);
     expect(markup).toContain("승인하고 계속");
     expect(markup).toContain("증빙 자세히 보기");
-    expect(markup).toContain('class="run-page-property-badge amber"');
+    expect(markup).toContain("run-page-property-select status amber");
     expect(markup).toContain('class="run-result-panel"');
     expect(markup).not.toContain('class="recovery-panel paused"');
     expect(markup).not.toContain('class="issue-description-markdown"');
@@ -4640,7 +4723,7 @@ describe("HuntDashboard", () => {
     expect(markup).not.toContain('class="recovery-panel"');
     expect(markup).not.toContain("사용자가 특정 Worker에 작업을 배정했습니다.");
     // Status remains visible in compact property badges, not as an error card.
-    expect(markup).toContain('class="run-page-property-badge');
+    expect(markup).toContain("run-page-property-select status");
     expect(markup).toContain(">대기</span>");
   });
 
@@ -4865,7 +4948,7 @@ describe("HuntDashboard", () => {
       ),
     ).not.toBeNull();
     expect(
-      container.querySelector(".run-page-property-badge.reviewed"),
+      container.querySelector(".run-page-property-select.reviewed"),
     ).not.toBeNull();
     const reviewButton = container.querySelector<HTMLButtonElement>(
       ".run-result-review-complete",
