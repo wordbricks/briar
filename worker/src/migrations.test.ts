@@ -3,7 +3,89 @@ import { resolve } from "node:path";
 import { Miniflare } from "miniflare";
 import { unstable_splitSqlQuery } from "wrangler";
 import { describe, expect, it } from "vitest";
-import { executeD1Sql } from "./test-helpers/d1";
+import { applyD1Migrations, executeD1Sql } from "./test-helpers/d1";
+
+async function withPreWorkflowMigrationDatabase(
+  name: string,
+  test: (db: D1Database) => Promise<void>,
+) {
+  const miniflare = new Miniflare({
+    modules: true,
+    script: "export default { fetch() { return new Response('ok') } }",
+    d1Databases: { DB: name },
+  });
+  try {
+    const db = (await miniflare.getD1Database("DB")) as unknown as D1Database;
+    await applyD1Migrations(db, {
+      through: "0058_workflow_pause_after_stage.sql",
+    });
+    await test(db);
+  } finally {
+    await miniflare.dispose();
+  }
+}
+
+const migrationFixture = {
+  userId: "migration-owner",
+  organizationId: "migration-organization",
+  projectId: "migration-project",
+  runId: "migration-run",
+  now: "2026-08-10T00:00:00.000Z",
+  pausedAt: "2026-08-10T00:05:00.000Z",
+  workflow: JSON.stringify({
+    version: 1,
+    stages: [{ id: "implementing", label: "Implement", required: true }],
+    completion: { requiredStages: ["implementing"] },
+    release: { enabled: false },
+  }),
+} as const;
+
+async function seedPreWorkflowProjectRun(db: D1Database) {
+  const fixture = migrationFixture;
+  await db.prepare(
+    `insert into "user" (id, name, email, emailVerified, createdAt, updatedAt)
+     values (?, 'Migration Owner', 'migration@example.com', 1, ?, ?)`,
+  ).bind(fixture.userId, fixture.now, fixture.now).run();
+  await db.prepare(
+    `insert into briar_organizations (id, name, handle, created_at, updated_at)
+     values (?, 'Migration Organization', 'migration-organization', ?, ?)`,
+  ).bind(fixture.organizationId, fixture.now, fixture.now).run();
+  await db.prepare(
+    `insert into briar_projects (
+       id, owner_user_id, organization_id, name, agent_token_hash,
+       created_at, updated_at
+     ) values (?, ?, ?, 'Migration Project', ?, ?, ?)`,
+  ).bind(
+    fixture.projectId,
+    fixture.userId,
+    fixture.organizationId,
+    "a".repeat(64),
+    fixture.now,
+    fixture.now,
+  ).run();
+  await db.prepare(
+    `insert into briar_project_settings (
+       project_id, workflow_json, created_at, updated_at
+     ) values (?, ?, ?, ?)`,
+  ).bind(fixture.projectId, fixture.workflow, fixture.now, fixture.now).run();
+  await db.prepare(
+    `insert into briar_hunt_runs (
+       id, project_id, source, source_key, title, stage, repository,
+       started_at, last_event_at, created_at, updated_at,
+       workflow_snapshot_json, status, paused_at
+     ) values (?, ?, 'issue', 'migration-issue', 'Migration run',
+               'implementing', 'example/repository', ?, ?, ?, ?, ?, 'running', ?)`,
+  ).bind(
+    fixture.runId,
+    fixture.projectId,
+    fixture.now,
+    fixture.now,
+    fixture.now,
+    fixture.now,
+    fixture.workflow,
+    fixture.pausedAt,
+  ).run();
+}
 
 describe("D1 migrations", () => {
   it.each([
@@ -783,55 +865,226 @@ describe("D1 migrations", () => {
     }
   });
 
-  it("adds workflow v2 progress without rewriting stored snapshots", async () => {
-    const sql = await readFile(
-      resolve("migrations", "0059_workflow_v2_progress.sql"),
-      "utf8",
+  it("adds workflow progress and policy state while preserving legacy rows", async () => {
+    await withPreWorkflowMigrationDatabase(
+      "briar-additive-workflow-migrations-test",
+      async (db) => {
+        await seedPreWorkflowProjectRun(db);
+        await db.prepare(
+          `insert into "user" (id, name, email, emailVerified, createdAt, updatedAt)
+           values ('migration-assignee', 'Assignee', 'assignee@example.com', 1, ?, ?)`,
+        ).bind(migrationFixture.now, migrationFixture.now).run();
+
+        await applyD1Migrations(db, {
+          files: [
+            "0059_workflow_v2_progress.sql",
+            "0060_workflow_checkpoint_policies.sql",
+            "0061_resume_requested_state.sql",
+            "0062_issue_assignees.sql",
+            "0067_issue_checkpoints.sql",
+          ],
+        });
+
+        const settings = await db.prepare(
+          `select workflow_json, updated_at, mandatory_checkpoints_json,
+                  checkpoint_policy_revision
+           from briar_project_settings where project_id = ?`,
+        ).bind(migrationFixture.projectId).first<{
+          workflow_json: string;
+          updated_at: string;
+          mandatory_checkpoints_json: string | null;
+          checkpoint_policy_revision: number;
+        }>();
+        expect(settings).toEqual({
+          workflow_json: migrationFixture.workflow,
+          updated_at: migrationFixture.now,
+          mandatory_checkpoints_json: null,
+          checkpoint_policy_revision: 1,
+        });
+
+        const run = await db.prepare(
+          `select workflow_snapshot_json, updated_at, paused_at,
+                  waiting_checkpoint_key, waiting_checkpoint_revision,
+                  resume_requested_at, assignee_user_id, issue_checkpoints_json
+           from briar_hunt_runs where id = ?`,
+        ).bind(migrationFixture.runId).first<{
+          workflow_snapshot_json: string;
+          updated_at: string;
+          paused_at: string;
+          waiting_checkpoint_key: string | null;
+          waiting_checkpoint_revision: number | null;
+          resume_requested_at: string | null;
+          assignee_user_id: string | null;
+          issue_checkpoints_json: string;
+        }>();
+        expect(run).toEqual({
+          workflow_snapshot_json: migrationFixture.workflow,
+          updated_at: migrationFixture.now,
+          paused_at: migrationFixture.pausedAt,
+          waiting_checkpoint_key: null,
+          waiting_checkpoint_revision: null,
+          resume_requested_at: null,
+          assignee_user_id: null,
+          issue_checkpoints_json: "[]",
+        });
+
+        const schemaObjects = await db.prepare(
+          `select name from sqlite_master
+           where name in (
+             'briar_run_stage_progress',
+             'briar_run_checkpoint_progress',
+             'briar_run_checkpoint_waiting_unique_idx',
+             'briar_user_workflow_checkpoint_defaults',
+             'briar_hunt_runs_resume_requested_idx',
+             'briar_hunt_runs_assignee_idx'
+           ) order by name`,
+        ).all<{ name: string }>();
+        expect(schemaObjects.results.map((row) => row.name)).toEqual([
+          "briar_hunt_runs_assignee_idx",
+          "briar_hunt_runs_resume_requested_idx",
+          "briar_run_checkpoint_progress",
+          "briar_run_checkpoint_waiting_unique_idx",
+          "briar_run_stage_progress",
+          "briar_user_workflow_checkpoint_defaults",
+        ]);
+
+        await db.prepare(
+          `insert into briar_run_stage_progress (
+             run_id, attempt, revision, stage_id, state, started_at, finished_at
+           ) values (?, 1, 1, 'implementing', 'completed', ?, ?)`,
+        ).bind(migrationFixture.runId, migrationFixture.now, migrationFixture.now).run();
+        await db.prepare(
+          `insert into briar_run_checkpoint_progress (
+             run_id, attempt, revision, checkpoint_key, stage_id,
+             position, state, reached_at
+           ) values (?, 1, 1, 'before-merge', 'implementing',
+                     'after', 'waiting', ?)`,
+        ).bind(migrationFixture.runId, migrationFixture.now).run();
+        await expect(db.prepare(
+          `insert into briar_run_checkpoint_progress (
+             run_id, attempt, revision, checkpoint_key, stage_id,
+             position, state, reached_at
+           ) values (?, 1, 1, 'before-release', 'implementing',
+                     'after', 'waiting', ?)`,
+        ).bind(migrationFixture.runId, migrationFixture.now).run()).rejects.toThrow();
+        await db.prepare(
+          `insert into briar_run_checkpoint_progress (
+             run_id, attempt, revision, checkpoint_key, stage_id,
+             position, state
+           ) values (?, 1, 1, 'before-release', 'implementing',
+                     'after', 'pending')`,
+        ).bind(migrationFixture.runId).run();
+
+        await db.prepare(
+          `insert into briar_user_workflow_checkpoint_defaults (
+             project_id, user_id, created_at, updated_at
+           ) values (?, ?, ?, ?)`,
+        ).bind(
+          migrationFixture.projectId,
+          migrationFixture.userId,
+          migrationFixture.now,
+          migrationFixture.now,
+        ).run();
+        expect(await db.prepare(
+          `select checkpoints_json, revision
+           from briar_user_workflow_checkpoint_defaults
+           where project_id = ? and user_id = ?`,
+        ).bind(
+          migrationFixture.projectId,
+          migrationFixture.userId,
+        ).first()).toEqual({ checkpoints_json: "[]", revision: 1 });
+
+        await db.prepare(
+          `update briar_hunt_runs
+           set resume_requested_at = ?, assignee_user_id = 'migration-assignee'
+           where id = ?`,
+        ).bind("2026-08-10T00:10:00.000Z", migrationFixture.runId).run();
+        await db.prepare(`delete from "user" where id = 'migration-assignee'`).run();
+        expect(await db.prepare(
+          `select paused_at, resume_requested_at, assignee_user_id
+           from briar_hunt_runs where id = ?`,
+        ).bind(migrationFixture.runId).first()).toEqual({
+          paused_at: migrationFixture.pausedAt,
+          resume_requested_at: "2026-08-10T00:10:00.000Z",
+          assignee_user_id: null,
+        });
+        await expect(db.prepare(
+          `update briar_hunt_runs set issue_checkpoints_json = '{}' where id = ?`,
+        ).bind(migrationFixture.runId).run()).rejects.toThrow();
+      },
     );
+  }, 30_000);
 
-    expect(sql).toMatch(/alter\s+table\s+briar_hunt_runs\s+add\s+column\s+waiting_checkpoint_key/iu);
-    expect(sql).toMatch(/create\s+table\s+briar_run_stage_progress/iu);
-    expect(sql).toMatch(/create\s+table\s+briar_run_checkpoint_progress/iu);
-    expect(sql).toMatch(/create\s+unique\s+index\s+briar_run_checkpoint_waiting_unique_idx[\s\S]*where\s+state\s*=\s*'waiting'/iu);
-    expect(sql).not.toMatch(/\bupdate\s+briar_(project_settings|hunt_runs)\b/iu);
-  });
+  it("stores valid issue proposals without changing their source run", async () => {
+    await withPreWorkflowMigrationDatabase(
+      "briar-issue-proposal-migration-test",
+      async (db) => {
+        await seedPreWorkflowProjectRun(db);
+        await applyD1Migrations(db, {
+          files: ["0068_issue_action_proposals.sql"],
+        });
 
-  it("adds checkpoint policy storage without rewriting workflow snapshots", async () => {
-    const sql = await readFile(
-      resolve("migrations", "0060_workflow_checkpoint_policies.sql"),
-      "utf8",
+        for (const [id, actionType, triggerId, replyId] of [
+          ["proposal-update", "request_issue_update", "trigger-update", "reply-update"],
+          ["proposal-create", "request_issue_create", "trigger-create", "reply-create"],
+        ] as const) {
+          await db.prepare(
+            `insert into briar_issue_action_proposals (
+               id, project_id, conversation_run_id, trigger_message_id,
+               reply_message_id, action_type, payload_json,
+               expected_run_updated_at, created_at, updated_at
+             ) values (?, ?, ?, ?, ?, ?, '{}', ?, ?, ?)`,
+          ).bind(
+            id,
+            migrationFixture.projectId,
+            migrationFixture.runId,
+            triggerId,
+            replyId,
+            actionType,
+            migrationFixture.now,
+            migrationFixture.now,
+            migrationFixture.now,
+          ).run();
+        }
+
+        const proposals = await db.prepare(
+          `select id, action_type, status from briar_issue_action_proposals
+           order by id`,
+        ).all<{ id: string; action_type: string; status: string }>();
+        expect(proposals.results).toEqual([
+          {
+            id: "proposal-create",
+            action_type: "request_issue_create",
+            status: "pending",
+          },
+          {
+            id: "proposal-update",
+            action_type: "request_issue_update",
+            status: "pending",
+          },
+        ]);
+        await expect(db.prepare(
+          `insert into briar_issue_action_proposals (
+             id, project_id, conversation_run_id, trigger_message_id,
+             reply_message_id, action_type, payload_json, created_at, updated_at
+           ) values ('proposal-invalid', ?, ?, 'trigger-invalid', 'reply-invalid',
+                     'delete_issue', '{}', ?, ?)`,
+        ).bind(
+          migrationFixture.projectId,
+          migrationFixture.runId,
+          migrationFixture.now,
+          migrationFixture.now,
+        ).run()).rejects.toThrow();
+        expect(await db.prepare(
+          `select workflow_snapshot_json, updated_at
+           from briar_hunt_runs where id = ?`,
+        ).bind(migrationFixture.runId).first()).toEqual({
+          workflow_snapshot_json: migrationFixture.workflow,
+          updated_at: migrationFixture.now,
+        });
+      },
     );
-
-    expect(sql).toMatch(/add\s+column\s+mandatory_checkpoints_json/iu);
-    expect(sql).toMatch(/add\s+column\s+checkpoint_policy_revision/iu);
-    expect(sql).toMatch(/create\s+table\s+briar_user_workflow_checkpoint_defaults/iu);
-    expect(sql).not.toMatch(/\bupdate\s+briar_(project_settings|hunt_runs)\b/iu);
-  });
-
-  it("adds per-issue checkpoint storage without rewriting existing runs", async () => {
-    const sql = await readFile(
-      resolve("migrations", "0067_issue_checkpoints.sql"),
-      "utf8",
-    );
-
-    expect(sql).toMatch(
-      /alter\s+table\s+briar_hunt_runs\s+add\s+column\s+issue_checkpoints_json/iu,
-    );
-    expect(sql).toMatch(/default\s+'\[\]'/iu);
-    expect(sql).not.toMatch(/\bupdate\s+briar_hunt_runs\b/iu);
-  });
-
-  it("stores conversation issue writes as approval proposals", async () => {
-    const sql = await readFile(
-      resolve("migrations", "0068_issue_action_proposals.sql"),
-      "utf8",
-    );
-
-    expect(sql).toMatch(/create\s+table\s+briar_issue_action_proposals/iu);
-    expect(sql).toMatch(/request_issue_update/iu);
-    expect(sql).toMatch(/request_issue_create/iu);
-    expect(sql).not.toMatch(/\bupdate\s+briar_hunt_runs\b/iu);
-  });
+  }, 30_000);
 
   it("leaves already-canonical workflow snapshots stable", async () => {
     const miniflare = new Miniflare({
@@ -1022,74 +1275,230 @@ describe("D1 migrations", () => {
     }
   });
 
-  it("tracks resume requests without rewriting paused runs", async () => {
-    const sql = await readFile(
-      resolve("migrations", "0061_resume_requested_state.sql"),
-      "utf8",
+  it("scopes inbox read state by account and cascades deleted accounts", async () => {
+    await withPreWorkflowMigrationDatabase(
+      "briar-inbox-read-state-migration-test",
+      async (db) => {
+        await seedPreWorkflowProjectRun(db);
+        await db.prepare(
+          `insert into "user" (id, name, email, emailVerified, createdAt, updatedAt)
+           values ('migration-reader', 'Reader', 'reader@example.com', 1, ?, ?)`,
+        ).bind(migrationFixture.now, migrationFixture.now).run();
+        await applyD1Migrations(db, {
+          files: ["0063_inbox_read_states.sql"],
+        });
+
+        for (const row of [
+          [migrationFixture.userId, "message-1", "version-owner"],
+          [migrationFixture.userId, "message-2", "version-owner-2"],
+          ["migration-reader", "message-1", "version-reader"],
+        ] as const) {
+          await db.prepare(
+            `insert into briar_inbox_read_states (
+               user_id, message_id, version, updated_at
+             ) values (?, ?, ?, ?)`,
+          ).bind(...row, migrationFixture.now).run();
+        }
+        await expect(db.prepare(
+          `insert into briar_inbox_read_states (
+             user_id, message_id, version, updated_at
+           ) values (?, 'message-1', 'duplicate', ?)`,
+        ).bind(migrationFixture.userId, migrationFixture.now).run()).rejects.toThrow();
+
+        expect(await db.prepare(
+          `select name from sqlite_master
+           where type = 'index'
+             and name = 'briar_inbox_read_states_user_updated_idx'`,
+        ).first("name")).toBe("briar_inbox_read_states_user_updated_idx");
+        await db.prepare(`delete from "user" where id = ?`)
+          .bind(migrationFixture.userId).run();
+        const remaining = await db.prepare(
+          `select user_id, message_id, version from briar_inbox_read_states`,
+        ).all();
+        expect(remaining.results).toEqual([{
+          user_id: "migration-reader",
+          message_id: "message-1",
+          version: "version-reader",
+        }]);
+      },
     );
+  }, 30_000);
 
-    expect(sql).toMatch(/add\s+column\s+resume_requested_at/iu);
-    expect(sql).not.toMatch(/\bupdate\s+briar_hunt_runs\b/iu);
-  });
+  it("migrates GitHub identity storage without backfilling URL-only evidence", async () => {
+    await withPreWorkflowMigrationDatabase(
+      "briar-github-storage-migration-test",
+      async (db) => {
+        await seedPreWorkflowProjectRun(db);
+        await db.prepare(
+          `insert into briar_run_evidence (
+             id, project_id, run_id, attempt, revision, evidence_key,
+             workflow_stage, evidence_type, status, url, actor,
+             observed_at, recorded_at
+           ) values ('migration-evidence', ?, ?, 1, 1, 'legacy-pr',
+                     'pr_open', 'pull_request', 'passed',
+                     'https://github.com/example/repository/pull/1',
+                     'migration', ?, ?)`,
+        ).bind(
+          migrationFixture.projectId,
+          migrationFixture.runId,
+          migrationFixture.now,
+          migrationFixture.now,
+        ).run();
+        await applyD1Migrations(db, {
+          files: [
+            "0063_github_pull_request_sync.sql",
+            "0064_github_integration.sql",
+          ],
+        });
 
-  it("adds optional issue assignees without rewriting existing runs", async () => {
-    const sql = await readFile(
-      resolve("migrations", "0062_issue_assignees.sql"),
-      "utf8",
+        expect(await db.prepare(
+          `select id, url, github_association_started_at
+           from briar_run_evidence where id = 'migration-evidence'`,
+        ).first()).toEqual({
+          id: "migration-evidence",
+          url: "https://github.com/example/repository/pull/1",
+          github_association_started_at: null,
+        });
+        expect(await db.prepare(
+          `select count(*) as count from briar_run_pull_requests`,
+        ).first<number>("count")).toBe(0);
+
+        await db.prepare(
+          `insert into briar_github_deliveries (
+             delivery_id, event_name, action, status, claimed_at
+           ) values ('delivery-1', 'pull_request', 'opened', 'processing', ?)`,
+        ).bind(migrationFixture.now).run();
+        await expect(db.prepare(
+          `insert into briar_github_deliveries (
+             delivery_id, event_name, status, claimed_at
+           ) values ('delivery-1', 'pull_request', 'processing', ?)`,
+        ).bind(migrationFixture.now).run()).rejects.toThrow();
+        await db.prepare(
+          `update briar_github_deliveries
+           set status = 'completed', completed_at = ?
+           where delivery_id = 'delivery-1'`,
+        ).bind(migrationFixture.now).run();
+
+        const sharedUrl = "https://github.com/example/repository/pull/1";
+        for (const [repositoryId, pullRequestId, repository] of [
+          [101, 1001, "example/repository"],
+          [102, 1002, "example/recreated-repository"],
+        ] as const) {
+          await db.prepare(
+            `insert into briar_github_pull_requests (
+               repository_id, pull_request_number, repository,
+               pull_request_id, pull_request_node_id, url, state, draft,
+               head_sha, base_sha, opened_at, provider_updated_at,
+               last_delivery_id, briar_issue_links_json, created_at, updated_at
+             ) values (?, 1, ?, ?, ?, ?, 'open', 0,
+                       'abcdef1', '1234567', ?, ?, 'delivery-1', '[]', ?, ?)`,
+          ).bind(
+            repositoryId,
+            repository,
+            pullRequestId,
+            `PR_${pullRequestId}`,
+            sharedUrl,
+            migrationFixture.now,
+            migrationFixture.now,
+            migrationFixture.now,
+            migrationFixture.now,
+          ).run();
+        }
+        expect(await db.prepare(
+          `select count(*) as count from briar_github_pull_requests
+           where url = ?`,
+        ).bind(sharedUrl).first<number>("count")).toBe(2);
+
+        for (const revision of [1, 2]) {
+          await db.prepare(
+            `insert into briar_run_pull_requests (
+               project_id, run_id, attempt, revision, revision_started_at,
+               url, repository_id, repository, pull_request_id,
+               pull_request_node_id, pull_request_number, created_at, updated_at
+             ) values (?, ?, 1, ?, ?, ?, 101, 'example/repository',
+                       1001, 'PR_1001', 1, ?, ?)`,
+          ).bind(
+            migrationFixture.projectId,
+            migrationFixture.runId,
+            revision,
+            migrationFixture.now,
+            sharedUrl,
+            migrationFixture.now,
+            migrationFixture.now,
+          ).run();
+        }
+        await expect(db.prepare(
+          `insert into briar_run_pull_requests (
+             project_id, run_id, attempt, revision, revision_started_at,
+             url, repository_id, repository, pull_request_id,
+             pull_request_node_id, pull_request_number, created_at, updated_at
+           ) values (?, ?, 1, 2, ?, ?, 101, 'example/repository',
+                     1001, 'PR_1001', 1, ?, ?)`,
+        ).bind(
+          migrationFixture.projectId,
+          migrationFixture.runId,
+          migrationFixture.now,
+          sharedUrl,
+          migrationFixture.now,
+          migrationFixture.now,
+        ).run()).rejects.toThrow();
+
+        await db.prepare(
+          `insert into briar_github_connections (
+             installation_id, organization_id, installation_account_id,
+             account_login, account_avatar_url, authorized_github_user_id,
+             authorized_github_user_login, connected_by_user_id, status,
+             connected_at, updated_at
+           ) values (501, ?, 601, 'example', 'https://example.com/avatar.png',
+                     701, 'migration-user', ?, 'connected', ?, ?)`,
+        ).bind(
+          migrationFixture.organizationId,
+          migrationFixture.userId,
+          migrationFixture.now,
+          migrationFixture.now,
+        ).run();
+        await db.prepare(
+          `insert into briar_github_oauth_states (
+             state_hash, organization_id, user_id, pkce_verifier,
+             installation_id, expires_at, created_at, updated_at
+           ) values (?, ?, ?, ?, 501, ?, ?, ?)`,
+        ).bind(
+          "b".repeat(64),
+          migrationFixture.organizationId,
+          migrationFixture.userId,
+          "c".repeat(43),
+          "2026-08-10T01:00:00.000Z",
+          migrationFixture.now,
+          migrationFixture.now,
+        ).run();
+        await expect(db.prepare(
+          `insert into briar_github_connections (
+             installation_id, organization_id, installation_account_id,
+             account_login, account_avatar_url, authorized_github_user_id,
+             authorized_github_user_login, status, connected_at, updated_at
+           ) values (502, ?, 602, 'other', 'https://example.com/other.png',
+                     702, 'other-user', 'connected', ?, ?)`,
+        ).bind(
+          migrationFixture.organizationId,
+          migrationFixture.now,
+          migrationFixture.now,
+        ).run()).rejects.toThrow();
+
+        const connectionColumns = await db.prepare(
+          `pragma table_info(briar_github_connections)`,
+        ).all<{ name: string }>();
+        const oauthColumns = await db.prepare(
+          `pragma table_info(briar_github_oauth_states)`,
+        ).all<{ name: string }>();
+        const persistedColumnNames = [
+          ...connectionColumns.results,
+          ...oauthColumns.results,
+        ].map((column) => column.name);
+        expect(persistedColumnNames).toContain("pkce_verifier");
+        expect(persistedColumnNames.join("\n")).not.toMatch(
+          /(?:access|refresh)_?token/iu,
+        );
+      },
     );
-
-    expect(sql).toMatch(
-      /add\s+column\s+assignee_user_id\s+text\s+references\s+"user"\s*\(id\)\s+on\s+delete\s+set\s+null/iu,
-    );
-    expect(sql).toMatch(/briar_hunt_runs_assignee_idx/iu);
-    expect(sql).not.toMatch(/\bupdate\s+briar_hunt_runs\b/iu);
-  });
-
-  it("adds account-scoped inbox read state storage", async () => {
-    const sql = await readFile(
-      resolve("migrations", "0063_inbox_read_states.sql"),
-      "utf8",
-    );
-
-    expect(sql).toMatch(/create\s+table\s+briar_inbox_read_states/iu);
-    expect(sql).toMatch(/primary\s+key\s*\(\s*user_id\s*,\s*message_id\s*\)/iu);
-    expect(sql).toMatch(/briar_inbox_read_states_user_updated_idx/iu);
-    expect(sql).not.toMatch(/\bupdate\s+briar_/iu);
-  });
-
-  it("adds idempotent GitHub delivery and revision-scoped PR state", async () => {
-    const sql = await readFile(
-      resolve("migrations", "0063_github_pull_request_sync.sql"),
-      "utf8",
-    );
-
-    expect(sql).toMatch(/create\s+table\s+briar_github_deliveries/iu);
-    expect(sql).toMatch(
-      /alter\s+table\s+briar_run_evidence\s+add\s+column\s+github_association_started_at\s+text/iu,
-    );
-    expect(sql).toMatch(/delivery_id\s+text\s+primary\s+key/iu);
-    expect(sql).toMatch(/create\s+table\s+briar_github_pull_requests/iu);
-    expect(sql).not.toMatch(/url\s+text\s+not\s+null\s+unique/iu);
-    expect(sql).toMatch(/briar_github_pull_requests_url_idx/iu);
-    expect(sql).toMatch(/create\s+table\s+briar_run_pull_requests/iu);
-    expect(sql).toMatch(
-      /primary\s+key\s*\(\s*run_id,\s*attempt,\s*revision,\s*repository_id,\s*pull_request_number\s*\)/iu,
-    );
-    expect(sql).toMatch(/revision_started_at\s+text\s+not\s+null/iu);
-    expect(sql).not.toMatch(/insert\s+into\s+briar_run_pull_requests/iu);
-    expect(sql).not.toMatch(/\bupdate\s+briar_hunt_runs\b/iu);
-  });
-
-  it("stores verified GitHub connections without persisting OAuth tokens", async () => {
-    const sql = await readFile(
-      resolve("migrations", "0064_github_integration.sql"),
-      "utf8",
-    );
-
-    expect(sql).toMatch(/create\s+table\s+briar_github_connections/iu);
-    expect(sql).toMatch(/status\s+text\s+not\s+null[\s\S]*'disconnected'/iu);
-    expect(sql).toMatch(/create\s+table\s+briar_github_oauth_states/iu);
-    expect(sql).toMatch(/pkce_verifier\s+text\s+not\s+null/iu);
-    expect(sql).not.toMatch(/(?:access|refresh)_token/iu);
-  });
+  }, 30_000);
 });
