@@ -98,6 +98,32 @@ export function inboxNotificationTarget(
   };
 }
 
+/** Issue and conversation targets open the inbox run detail panel. */
+export function isInboxRunDetailTarget(
+  target: Pick<InboxNotificationTarget, "kind">,
+): boolean {
+  return target.kind === "issue" || target.kind === "conversation";
+}
+
+/**
+ * Channel targets navigate to the Channels page (thread context), not the
+ * issue/session detail panel. Companion and OS notification clicks already
+ * use this path; desktop inbox open must too.
+ */
+export function isInboxChannelNavigationTarget(
+  target: InboxNotificationTarget,
+): target is InboxNotificationTarget & {
+  kind: "channel";
+  channelMessageId: string;
+  rootMessageId: string;
+} {
+  return (
+    target.kind === "channel" &&
+    typeof target.channelMessageId === "string" &&
+    typeof target.rootMessageId === "string"
+  );
+}
+
 function isInboxNotificationTarget(
   value: unknown,
 ): value is InboxNotificationTarget {
