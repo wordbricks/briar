@@ -23,6 +23,7 @@ import {
   listChannels,
   loadChannel,
   sendChannelMessage,
+  toggleChannelMessageReaction,
 } from "../lib/api";
 import {
   groupChannels,
@@ -44,6 +45,7 @@ import {
 } from "./ChannelImages";
 import { ChannelMentionMenu } from "./ChannelMentionMenu";
 import { ChannelMessageText } from "./ChannelMessageText";
+import { ChannelMessageReactions } from "./ChannelMessageReactions";
 
 type CompanionChannelsProps = {
   organizationId: string;
@@ -301,6 +303,32 @@ export function CompanionChannels({
     [channel, onIssueOpen, organizationId, proposalProjects, token],
   );
 
+  const toggleReaction = useCallback(
+    async (item: ChannelMessage, emoji: string) => {
+      if (!channel) return;
+      setBusy(true);
+      setError(null);
+      try {
+        const result = await toggleChannelMessageReaction(
+          token,
+          organizationId,
+          channel.id,
+          item.id,
+          emoji,
+        );
+        const apply = (candidate: ChannelMessage) =>
+          candidate.id === result.message.id ? result.message : candidate;
+        setMessages((current) => current.map(apply));
+        setThread((current) => current?.map(apply) ?? null);
+      } catch (cause) {
+        setError(message(cause));
+      } finally {
+        setBusy(false);
+      }
+    },
+    [channel, organizationId, token],
+  );
+
   if (channel && threadParentId) {
     return (
       <section className="companion-channels companion-channel-detail">
@@ -319,6 +347,7 @@ export function CompanionChannels({
               agents={agents}
               busy={busy}
               channel={channel}
+              currentUserId={currentUserId}
               key={item.id}
               members={members}
               message={item}
@@ -332,6 +361,7 @@ export function CompanionChannels({
                   [proposalId]: projectId,
                 }));
               }}
+              onToggleReaction={(emoji) => void toggleReaction(item, emoji)}
               projects={projects}
               selectedProjectId={
                 item.proposal ? proposalProjects[item.proposal.id] ?? null : null
@@ -369,6 +399,7 @@ export function CompanionChannels({
               agents={agents}
               busy={busy}
               channel={channel}
+              currentUserId={currentUserId}
               key={item.id}
               members={members}
               message={item}
@@ -383,6 +414,7 @@ export function CompanionChannels({
                   [proposalId]: projectId,
                 }));
               }}
+              onToggleReaction={(emoji) => void toggleReaction(item, emoji)}
               projects={projects}
               selectedProjectId={
                 item.proposal ? proposalProjects[item.proposal.id] ?? null : null
@@ -503,12 +535,14 @@ function MessageRow({
   agents,
   busy,
   channel,
+  currentUserId,
   members,
   message,
   onAcceptProposal,
   onIssueOpen,
   onOpenThread,
   onProjectChange,
+  onToggleReaction,
   projects,
   selectedProjectId,
   showThreadSummary = false,
@@ -517,12 +551,14 @@ function MessageRow({
   agents: ChannelAgentSummary[];
   busy: boolean;
   channel: ChannelSummary;
+  currentUserId: string | null;
   members: ChannelMember[];
   message: ChannelMessage;
   onAcceptProposal: () => void;
   onIssueOpen?: (projectId: string, runId: string) => void;
   onOpenThread?: () => void;
   onProjectChange: (projectId: string) => void;
+  onToggleReaction: (emoji: string) => void;
   projects: readonly ChannelGroupProject[];
   selectedProjectId: string | null;
   showThreadSummary?: boolean;
@@ -610,6 +646,13 @@ function MessageRow({
             ) : null}
           </div>
         ) : null}
+        <ChannelMessageReactions
+          alwaysShowAdd
+          busy={busy}
+          currentUserId={currentUserId}
+          message={message}
+          onToggle={onToggleReaction}
+        />
         {showThreadSummary && onOpenThread ? (
           <button
             aria-label={`${t("run.viewThread")}: ${message.author.name} — ${message.body}`}

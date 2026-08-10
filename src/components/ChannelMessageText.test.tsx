@@ -49,6 +49,7 @@ const message: ChannelMessage = {
   mentionedUserIds: [member.userId],
   mentionedAgentIds: [agent.agentId],
   attachments: [],
+  reactions: [],
   replyCount: 0,
   lastReplyAt: null,
   document: null,

@@ -29,6 +29,14 @@ struct ChannelMessageAttachment: Codable, Hashable, Identifiable, Sendable {
     let url: String
 }
 
+struct ChannelMessageReaction: Codable, Hashable, Identifiable, Sendable {
+    let emoji: String
+    let count: Int
+    let userIds: [String]
+
+    var id: String { emoji }
+}
+
 struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
     let id: UUID
     let channelId: UUID
@@ -38,6 +46,7 @@ struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
     let mentionedUserIds: [String]
     let mentionedAgentIds: [UUID]
     let attachments: [ChannelMessageAttachment]
+    let reactions: [ChannelMessageReaction]
     let replyCount: Int
     let lastReplyAt: Date?
     let document: Document?
@@ -53,6 +62,7 @@ struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
         case mentionedUserIds
         case mentionedAgentIds
         case attachments
+        case reactions
         case replyCount
         case lastReplyAt
         case document
@@ -69,6 +79,7 @@ struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
         mentionedUserIds: [String] = [],
         mentionedAgentIds: [UUID] = [],
         attachments: [ChannelMessageAttachment] = [],
+        reactions: [ChannelMessageReaction] = [],
         replyCount: Int,
         lastReplyAt: Date?,
         document: Document?,
@@ -83,6 +94,7 @@ struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
         self.mentionedUserIds = mentionedUserIds
         self.mentionedAgentIds = mentionedAgentIds
         self.attachments = attachments
+        self.reactions = reactions
         self.replyCount = replyCount
         self.lastReplyAt = lastReplyAt
         self.document = document
@@ -100,6 +112,7 @@ struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
         mentionedUserIds = try container.decodeIfPresent([String].self, forKey: .mentionedUserIds) ?? []
         mentionedAgentIds = try container.decodeIfPresent([UUID].self, forKey: .mentionedAgentIds) ?? []
         attachments = try container.decodeIfPresent([ChannelMessageAttachment].self, forKey: .attachments) ?? []
+        reactions = try container.decodeIfPresent([ChannelMessageReaction].self, forKey: .reactions) ?? []
         replyCount = try container.decode(Int.self, forKey: .replyCount)
         lastReplyAt = try container.decodeIfPresent(Date.self, forKey: .lastReplyAt)
         document = try container.decodeIfPresent(Document.self, forKey: .document)
@@ -167,6 +180,14 @@ struct CreateChannelMessageRequest: Codable, Sendable {
 }
 
 struct CreateChannelMessageResponse: Codable, Sendable {
+    let message: ChannelMessage
+}
+
+struct ToggleChannelMessageReactionRequest: Codable, Sendable {
+    let emoji: String
+}
+
+struct ToggleChannelMessageReactionResponse: Codable, Sendable {
     let message: ChannelMessage
 }
 

@@ -206,7 +206,8 @@
               "provider": null
             },
             "reason": "thread_reply",
-            "createdAt": "2026-08-02T01:01:00.000Z"
+            "createdAt": "2026-08-02T01:01:00.000Z",
+            "reactions": []
           }
         ],
         "members": [
@@ -928,7 +929,8 @@
             "lastReplyAt": "2026-08-06T00:04:00.000Z",
             "document": null,
             "proposal": null,
-            "createdAt": "2026-08-06T00:03:00.000Z"
+            "createdAt": "2026-08-06T00:03:00.000Z",
+            "reactions": []
           }
         ]
       }
@@ -968,7 +970,8 @@
                 "byteSize": 2048,
                 "url": "/organizations/cccccccc-1111-4111-8111-111111111111/channels/33333333-3333-4333-8333-333333333333/messages/44444444-4444-4444-8444-444444444444/attachments/aaaaaaaa-1111-4111-8111-111111111111"
               }
-            ]
+            ],
+            "reactions": []
           },
           {
             "id": "55555555-5555-4555-8555-555555555555",
@@ -1001,7 +1004,8 @@
               },
               "resultRunId": null
             },
-            "createdAt": "2026-08-06T00:04:00.000Z"
+            "createdAt": "2026-08-06T00:04:00.000Z",
+            "reactions": []
           }
         ]
       }
@@ -1048,7 +1052,8 @@
               "byteSize": 2048,
               "url": "/organizations/cccccccc-1111-4111-8111-111111111111/channels/33333333-3333-4333-8333-333333333333/messages/44444444-4444-4444-8444-444444444444/attachments/aaaaaaaa-1111-4111-8111-111111111111"
             }
-          ]
+          ],
+          "reactions": []
         },
         "agentReplies": [
           {
@@ -1078,6 +1083,56 @@
         "outcome": "accepted",
         "projectId": "11111111-1111-4111-8111-111111111111",
         "resultRunId": "33333333-3333-4333-8333-333333333333"
+      }
+    },
+    "toggleChannelMessageReaction": {
+      "method": "PUT",
+      "path": "/organizations/{organizationId}/channels/{channelId}/messages/{messageId}/reactions",
+      "status": 200,
+      "request": {
+        "emoji": "👍"
+      },
+      "response": {
+        "message": {
+          "id": "44444444-4444-4444-8444-444444444444",
+          "channelId": "33333333-3333-4333-8333-333333333333",
+          "parentMessageId": null,
+          "body": "@honey 온보딩 개편 계획서를 정리해줘",
+          "author": {
+            "type": "user",
+            "id": "user-fixture-1",
+            "name": "Jay",
+            "email": "jay@example.com",
+            "image": null
+          },
+          "mentionedUserIds": [],
+          "mentionedAgentIds": [
+            "66666666-6666-4666-8666-666666666666"
+          ],
+          "replyCount": 1,
+          "lastReplyAt": "2026-08-06T00:04:00.000Z",
+          "document": null,
+          "proposal": null,
+          "createdAt": "2026-08-06T00:03:00.000Z",
+          "attachments": [
+            {
+              "id": "aaaaaaaa-1111-4111-8111-111111111111",
+              "filename": "design.png",
+              "contentType": "image/png",
+              "byteSize": 2048,
+              "url": "/organizations/cccccccc-1111-4111-8111-111111111111/channels/33333333-3333-4333-8333-333333333333/messages/44444444-4444-4444-8444-444444444444/attachments/aaaaaaaa-1111-4111-8111-111111111111"
+            }
+          ],
+          "reactions": [
+            {
+              "emoji": "👍",
+              "count": 1,
+              "userIds": [
+                "user-fixture-1"
+              ]
+            }
+          ]
+        }
       }
     }
   }

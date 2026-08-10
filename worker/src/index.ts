@@ -413,9 +413,11 @@ import {
   listChannelThreadMessages,
   listChannels,
   loadChannelDelta,
+  isChannelReactionEmoji,
   removeChannelAgent,
   removeChannelMember,
   renewChannelReplyLease,
+  toggleChannelMessageReaction,
   updateChannel,
 } from "./channels";
 import {
@@ -431,6 +433,7 @@ import {
   channelIssueProposalPayloadSchema,
   channelMemberInputSchema,
   channelMessageInputSchema,
+  channelMessageReactionInputSchema,
   channelProposalAcceptInputSchema,
   channelReplyClaimTokenHeader,
   channelReplyClaimInputSchema,
@@ -6115,6 +6118,37 @@ async function route(
       },
       201,
     );
+  }
+
+  const channelMessageReactionMatch = pathname.match(
+    /^\/organizations\/([0-9a-f-]+)\/channels\/([0-9a-f-]+)\/messages\/([0-9a-f-]+)\/reactions$/u,
+  );
+  if (channelMessageReactionMatch && request.method === "PUT") {
+    const session = await requireSession(auth, request);
+    const channel = await requireChannelAccess(
+      db,
+      channelMessageReactionMatch[1],
+      channelMessageReactionMatch[2],
+      session.user.id,
+    );
+    if (channel.archived_at) {
+      throw new HttpError(409, "Channel is archived");
+    }
+    const input = channelMessageReactionInputSchema.parse(
+      await readJson(request, 1_024),
+    );
+    if (!isChannelReactionEmoji(input.emoji)) {
+      throw new HttpError(400, "Reaction must be a single emoji");
+    }
+    const message = await toggleChannelMessageReaction(db, {
+      channelId: channel.id,
+      messageId: channelMessageReactionMatch[3],
+      userId: session.user.id,
+      emoji: input.emoji,
+      createdAt: new Date().toISOString(),
+    });
+    if (!message) throw new HttpError(404, "Message not found");
+    return json({ message });
   }
 
   const channelAgentRepliesMatch = pathname.match(

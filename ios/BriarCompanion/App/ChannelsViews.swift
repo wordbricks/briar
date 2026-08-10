@@ -312,6 +312,7 @@ private struct ChannelConversationView: View {
                             acceptingProposalID: channels.acceptingProposalID,
                             agents: channels.agents,
                             channel: channel,
+                            currentUserID: currentUserID,
                             members: channels.members,
                             message: message,
                             locale: locale,
@@ -330,6 +331,13 @@ private struct ChannelConversationView: View {
                                 )
                             },
                             onOpenAttachment: { previewFile = PreviewFile(url: $0) },
+                            onToggleReaction: { emoji in
+                                await channels.toggleReaction(
+                                    channelID: channel.id,
+                                    messageID: message.id,
+                                    emoji: emoji
+                                )
+                            },
                             projects: projects,
                             showsThreadSummary: showsThreadSummary
                         )
@@ -359,9 +367,12 @@ private struct ChannelConversationView: View {
 }
 
 private struct ChannelMessageRow: View {
+    private static let quickReactionEmojis = ["👍", "❤️", "😂", "🎉"]
+
     let acceptingProposalID: UUID?
     let agents: [ChannelAgentSummary]
     let channel: ChannelSummary
+    let currentUserID: String?
     let members: [ChannelMember]
     let message: ChannelMessage
     let locale: CompanionLocale
@@ -369,6 +380,7 @@ private struct ChannelMessageRow: View {
     let onIssueOpen: (UUID, UUID) -> Void
     let onLoadAttachment: @MainActor (ChannelMessageAttachment) async throws -> URL
     let onOpenAttachment: @MainActor (URL) -> Void
+    let onToggleReaction: (String) async -> Void
     let projects: [ProjectsResponse.Project]
     var showsThreadSummary = false
 
@@ -461,6 +473,14 @@ private struct ChannelMessageRow: View {
                     )
                     .padding(.top, 5)
                 }
+                ChannelReactionBar(
+                    currentUserID: currentUserID,
+                    locale: locale,
+                    message: message,
+                    onToggleReaction: onToggleReaction,
+                    quickEmojis: Self.quickReactionEmojis
+                )
+                .padding(.top, 4)
                 if showsThreadSummary {
                     NavigationLink(value: message) {
                         HStack(spacing: 6) {
@@ -503,6 +523,89 @@ private struct ChannelMessageRow: View {
             format: L10n.text(.channelLastReply, locale: locale),
             relative
         )
+    }
+}
+
+private struct ChannelReactionBar: View {
+    let currentUserID: String?
+    let locale: CompanionLocale
+    let message: ChannelMessage
+    let onToggleReaction: (String) async -> Void
+    let quickEmojis: [String]
+
+    var body: some View {
+        FlowReactionRow {
+            ForEach(message.reactions) { reaction in
+                let mine = currentUserID.map { reaction.userIds.contains($0) } ?? false
+                Button {
+                    Task { await onToggleReaction(reaction.emoji) }
+                } label: {
+                    HStack(spacing: 4) {
+                        Text(reaction.emoji)
+                        Text("\(reaction.count)")
+                            .font(.caption.weight(.semibold))
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 5)
+                    .background(
+                        Capsule(style: .continuous)
+                            .fill(mine ? Color.accentColor.opacity(0.14) : Color.secondary.opacity(0.12))
+                    )
+                    .overlay(
+                        Capsule(style: .continuous)
+                            .strokeBorder(
+                                mine ? Color.accentColor.opacity(0.45) : Color.secondary.opacity(0.2),
+                                lineWidth: 1
+                            )
+                    )
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier(
+                    "channel-reaction-\(message.id.uuidString.lowercased())-\(reaction.emoji)"
+                )
+            }
+
+            Menu {
+                ForEach(quickEmojis, id: \.self) { emoji in
+                    Button(emoji) {
+                        Task { await onToggleReaction(emoji) }
+                    }
+                }
+            } label: {
+                Label(
+                    L10n.text(.channelReact, locale: locale),
+                    systemImage: "face.smiling"
+                )
+                .labelStyle(.iconOnly)
+                .font(.caption.weight(.semibold))
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
+                .background(
+                    Capsule(style: .continuous)
+                        .fill(Color.secondary.opacity(0.12))
+                )
+            }
+            .accessibilityLabel(L10n.text(.channelReact, locale: locale))
+            .accessibilityIdentifier(
+                "channel-react-\(message.id.uuidString.lowercased())"
+            )
+        }
+    }
+}
+
+/// Lightweight wrapping row for reaction chips without a third-party layout dependency.
+private struct FlowReactionRow<Content: View>: View {
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        // iOS 16+ Layout that wraps; fall back to a simple HStack-style wrap via LazyVGrid.
+        LazyVGrid(
+            columns: [GridItem(.adaptive(minimum: 44), spacing: 6, alignment: .leading)],
+            alignment: .leading,
+            spacing: 6
+        ) {
+            content
+        }
     }
 }
 

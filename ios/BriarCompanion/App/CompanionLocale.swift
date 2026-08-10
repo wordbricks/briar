@@ -66,6 +66,7 @@ enum L10n {
         case channelReplies
         case channelReplyInThread
         case channelLastReply
+        case channelReact
         case channelMessagePlaceholder
         case channelHome
         case channelIssueProposal
@@ -107,6 +108,7 @@ enum L10n {
             case .channelReplies: "답글 %d개"
             case .channelReplyInThread: "스레드에서 답글"
             case .channelLastReply: "마지막 답글 %@"
+            case .channelReact: "React"
             case .channelMessagePlaceholder: "#%@에 메시지 보내기"
             case .channelHome: "홈"
             case .channelIssueProposal: "이슈 생성 제안"
@@ -151,6 +153,7 @@ enum L10n {
             case .channelReplies: "%d replies"
             case .channelReplyInThread: "Reply in thread"
             case .channelLastReply: "last reply %@"
+            case .channelReact: "React"
             case .channelMessagePlaceholder: "Message #%@"
             case .channelHome: "Home"
             case .channelIssueProposal: "Issue proposal"
@@ -195,6 +198,7 @@ enum L10n {
             case .channelReplies: "%d 条回复"
             case .channelReplyInThread: "在线程中回复"
             case .channelLastReply: "最后回复于%@"
+            case .channelReact: "React"
             case .channelMessagePlaceholder: "发送消息到 #%@"
             case .channelHome: "主页"
             case .channelIssueProposal: "创建问题建议"

@@ -1541,6 +1541,21 @@ export async function loadChannelMessageAttachment(
   return response.blob();
 }
 
+/** Toggle the current user's emoji reaction on a channel message. */
+export async function toggleChannelMessageReaction(
+  token: string,
+  organizationId: string,
+  channelId: string,
+  messageId: string,
+  emoji: string,
+) {
+  return request<{ message: ChannelMessage }>(
+    `/organizations/${organizationId}/channels/${channelId}/messages/${messageId}/reactions`,
+    token,
+    { method: "PUT", body: JSON.stringify({ emoji }) },
+  );
+}
+
 export async function setChannelAgent(
   token: string,
   organizationId: string,

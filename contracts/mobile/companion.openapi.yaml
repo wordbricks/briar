@@ -1106,6 +1106,64 @@
         }
       }
     },
+    "/organizations/{organizationId}/channels/{channelId}/messages/{messageId}/reactions": {
+      "put": {
+        "operationId": "toggleChannelMessageReaction",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OrganizationId"
+          },
+          {
+            "$ref": "#/components/parameters/ChannelId"
+          },
+          {
+            "name": "messageId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ToggleChannelMessageReactionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Message with updated reactions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ToggleChannelMessageReactionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
     "/organizations/{organizationId}/channels/{channelId}/proposals/{proposalId}/accept": {
       "post": {
         "operationId": "acceptChannelProposal",
@@ -3401,6 +3459,12 @@
               "format": "uuid"
             }
           },
+          "reactions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChannelMessageReaction"
+            }
+          },
           "replyCount": {
             "type": "integer",
             "minimum": 0
@@ -3432,6 +3496,33 @@
           "createdAt": {
             "type": "string",
             "format": "date-time"
+          }
+        },
+        "additionalProperties": true
+      },
+      "ChannelMessageReaction": {
+        "type": "object",
+        "required": [
+          "emoji",
+          "count",
+          "userIds"
+        ],
+        "properties": {
+          "emoji": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 32
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "userIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1
           }
         },
         "additionalProperties": true
@@ -3502,6 +3593,32 @@
             "items": {
               "$ref": "#/components/schemas/ChannelMessage"
             }
+          }
+        },
+        "additionalProperties": true
+      },
+      "ToggleChannelMessageReactionRequest": {
+        "type": "object",
+        "required": [
+          "emoji"
+        ],
+        "properties": {
+          "emoji": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 32
+          }
+        },
+        "additionalProperties": false
+      },
+      "ToggleChannelMessageReactionResponse": {
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "properties": {
+          "message": {
+            "$ref": "#/components/schemas/ChannelMessage"
           }
         },
         "additionalProperties": true

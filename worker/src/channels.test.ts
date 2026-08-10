@@ -13,11 +13,13 @@ import {
   getClaimedChannelReplyAttachment,
   getChannelMessage,
   getChannelMessageAttachment,
+  getChannelSyncCursor,
   listChannelAgents,
   listChannelRootMessages,
   listChannelThreadMessages,
   listChannels,
   loadChannelDelta,
+  toggleChannelMessageReaction,
 } from "./channels";
 import {
   createOrganizationAgent,
@@ -877,5 +879,94 @@ describe("organization channels", () => {
       "e0000000-0000-4000-8000-000000000004",
     );
     expect(agents.map((agent) => agent.handle)).toEqual(["honey"]);
+  });
+
+  it("toggles emoji reactions and refreshes them through channel deltas", async () => {
+    const channelId = "e0000000-0000-4000-8000-0000000000a1";
+    const messageId = "f0000000-0000-4000-8000-0000000000a1";
+    await createChannel(db, {
+      id: channelId,
+      organizationId,
+      slug: "reactions",
+      name: "Reactions",
+      topic: null,
+      visibility: "public",
+      defaultProjectId: null,
+      createdByUserId: ownerId,
+      createdAt: at(50),
+    });
+    await createChannelMessage(db, {
+      id: messageId,
+      channelId,
+      parentMessageId: null,
+      authorUserId: ownerId,
+      authorAgentId: null,
+      authorAgentName: null,
+      authorAgentProvider: null,
+      body: "React to this",
+      mentionedUserIds: [],
+      mentionedAgentIds: [],
+      createdAt: at(51),
+    });
+    const before = await getChannelSyncCursor(db, organizationId);
+
+    const added = await toggleChannelMessageReaction(db, {
+      channelId,
+      messageId,
+      userId: ownerId,
+      emoji: "👍",
+      createdAt: at(52),
+    });
+    expect(added?.reactions).toEqual([
+      { emoji: "👍", count: 1, userIds: [ownerId] },
+    ]);
+
+    const second = await toggleChannelMessageReaction(db, {
+      channelId,
+      messageId,
+      userId: outsiderId,
+      emoji: "👍",
+      createdAt: at(53),
+    });
+    expect(second?.reactions[0]?.count).toBe(2);
+    expect(second?.reactions[0]?.userIds).toEqual(
+      expect.arrayContaining([ownerId, outsiderId]),
+    );
+
+    const heart = await toggleChannelMessageReaction(db, {
+      channelId,
+      messageId,
+      userId: ownerId,
+      emoji: "❤️",
+      createdAt: at(54),
+    });
+    expect(heart?.reactions.map((reaction) => reaction.emoji)).toEqual([
+      "👍",
+      "❤️",
+    ]);
+
+    const removed = await toggleChannelMessageReaction(db, {
+      channelId,
+      messageId,
+      userId: ownerId,
+      emoji: "👍",
+      createdAt: at(55),
+    });
+    expect(removed?.reactions).toEqual([
+      { emoji: "👍", count: 1, userIds: [outsiderId] },
+      { emoji: "❤️", count: 1, userIds: [ownerId] },
+    ]);
+
+    const listed = await listChannelRootMessages(db, channelId);
+    expect(listed[0]?.reactions).toEqual(removed?.reactions);
+
+    const delta = await loadChannelDelta(db, organizationId, ownerId, before);
+    expect(delta.messages.some((message) => message.id === messageId)).toBe(
+      true,
+    );
+    const deltaMessage = delta.messages.find(
+      (message) => message.id === messageId,
+    );
+    expect(deltaMessage?.reactions).toEqual(removed?.reactions);
   });
 });
