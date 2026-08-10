@@ -184,6 +184,7 @@ describe("organization channels", () => {
       mentionedAgentIds: [],
       createdAt: at(4),
     });
+    const cursorBeforeReply = await getChannelSyncCursor(db, organizationId);
     const replyId = "f0000000-0000-4000-8000-000000000002";
     await createChannelMessage(db, {
       id: replyId,
@@ -204,9 +205,25 @@ describe("organization channels", () => {
     expect(roots[0]).toMatchObject({
       id: rootId,
       replyCount: 1,
+      lastReplyAt: at(5),
       mentionedUserIds: [outsiderId],
     });
     expect(roots[0]?.author).toMatchObject({ type: "user", id: ownerId });
+    expect(roots[0]?.replyAuthors).toEqual([
+      expect.objectContaining({ type: "user", id: outsiderId, name: "Outsider" }),
+    ]);
+
+    const delta = await loadChannelDelta(
+      db,
+      organizationId,
+      ownerId,
+      cursorBeforeReply,
+    );
+    expect(delta.messages.find((message) => message.id === rootId)).toMatchObject({
+      replyCount: 1,
+      lastReplyAt: at(5),
+      replyAuthors: [expect.objectContaining({ id: outsiderId })],
+    });
 
     const thread = await listChannelThreadMessages(db, channelId, rootId);
     expect(thread.map((message) => message.id)).toEqual([rootId, replyId]);

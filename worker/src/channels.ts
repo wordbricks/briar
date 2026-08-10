@@ -53,6 +53,20 @@ export type ChannelMessageRow = {
   created_at: string;
 };
 
+type ChannelReplyAuthorRow = Pick<
+  ChannelMessageRow,
+  | "author_user_id"
+  | "author_name"
+  | "author_email"
+  | "author_image"
+  | "author_agent_id"
+  | "author_agent_name"
+  | "author_agent_provider"
+> & {
+  parent_message_id: string;
+  last_reply_at: string;
+};
+
 export type ChannelMessageAttachmentRow = {
   id: string;
   organization_id: string;
@@ -177,29 +191,44 @@ export const channelReplyJson = (
   updatedAt: row.updated_at,
 });
 
-export const channelMessageJson = (
-  row: ChannelMessageRow,
-  mentions: { users: string[]; agents: string[] } = { users: [], agents: [] },
-  attachments: ChannelMessageAttachment[] = [],
-  reactions: ChannelMessageReaction[] = [],
-): ChannelMessage => ({
-  id: row.id,
-  channelId: row.channel_id,
-  parentMessageId: row.parent_message_id,
-  author: row.author_agent_name
+const channelMessageAuthorJson = (
+  row: Pick<
+    ChannelMessageRow,
+    | "author_user_id"
+    | "author_name"
+    | "author_email"
+    | "author_image"
+    | "author_agent_id"
+    | "author_agent_name"
+    | "author_agent_provider"
+  >,
+) =>
+  row.author_agent_name
     ? {
-        type: "agent",
+        type: "agent" as const,
         id: row.author_agent_id,
         name: row.author_agent_name,
         provider: row.author_agent_provider,
       }
     : {
-        type: "user",
+        type: "user" as const,
         id: row.author_user_id ?? "",
         name: row.author_name ?? "",
         email: row.author_email ?? "",
         image: row.author_image,
-      },
+      };
+
+export const channelMessageJson = (
+  row: ChannelMessageRow,
+  mentions: { users: string[]; agents: string[] } = { users: [], agents: [] },
+  attachments: ChannelMessageAttachment[] = [],
+  reactions: ChannelMessageReaction[] = [],
+  replyAuthors: ChannelMessage["replyAuthors"] = [],
+): ChannelMessage => ({
+  id: row.id,
+  channelId: row.channel_id,
+  parentMessageId: row.parent_message_id,
+  author: channelMessageAuthorJson(row),
   body: row.body,
   mentionedUserIds: mentions.users,
   mentionedAgentIds: mentions.agents,
@@ -207,6 +236,7 @@ export const channelMessageJson = (
   reactions,
   replyCount: row.reply_count,
   lastReplyAt: row.last_reply_at,
+  replyAuthors,
   document: row.document_message_id
     ? {
         messageId: row.document_message_id,
@@ -620,7 +650,7 @@ async function attachMessageRelations(
   if (rows.length === 0) return [];
   const ids = rows.map((row) => row.id);
   const placeholders = ids.map(() => "?").join(", ");
-  const [userMentions, agentMentions, attachments, reactions] = await Promise.all([
+  const [userMentions, agentMentions, attachments, reactions, replyAuthors] = await Promise.all([
     db
       .prepare(
         `select message_id, user_id from briar_channel_message_mentions
@@ -659,6 +689,39 @@ async function attachMessageRelations(
         emoji: string;
         created_at: string;
       }>(),
+    db
+      .prepare(
+        `with reply_authors as (
+           select reply.parent_message_id, reply.author_user_id,
+                  author.name as author_name, author.email as author_email,
+                  author.image as author_image,
+                  reply.author_agent_id, reply.author_agent_name,
+                  reply.author_agent_provider,
+                  max(reply.created_at) as last_reply_at
+           from briar_channel_messages reply
+           left join "user" author on author.id = reply.author_user_id
+           where reply.parent_message_id in (${placeholders})
+           group by reply.parent_message_id, reply.author_user_id,
+                    author.name, author.email, author.image,
+                    reply.author_agent_id, reply.author_agent_name,
+                    reply.author_agent_provider
+         ), ranked_reply_authors as (
+           select *, row_number() over (
+             partition by parent_message_id
+             order by last_reply_at desc,
+                      coalesce(author_user_id, author_agent_id, author_agent_name)
+           ) as author_rank
+           from reply_authors
+         )
+         select parent_message_id, author_user_id, author_name, author_email,
+                author_image, author_agent_id, author_agent_name,
+                author_agent_provider, last_reply_at
+         from ranked_reply_authors
+         where author_rank <= 3
+         order by parent_message_id, author_rank`,
+      )
+      .bind(...ids)
+      .all<ChannelReplyAuthorRow>(),
   ]);
   const byMessage = new Map<string, { users: string[]; agents: string[] }>();
   for (const row of rows) byMessage.set(row.id, { users: [], agents: [] });
@@ -675,12 +738,22 @@ async function attachMessageRelations(
     attachmentsByMessage.set(attachment.message_id, current);
   }
   const reactionsByMessage = aggregateReactions(reactions.results);
+  const replyAuthorsByMessage = new Map<
+    string,
+    NonNullable<ChannelMessage["replyAuthors"]>
+  >();
+  for (const replyAuthor of replyAuthors.results) {
+    const current = replyAuthorsByMessage.get(replyAuthor.parent_message_id) ?? [];
+    current.push(channelMessageAuthorJson(replyAuthor));
+    replyAuthorsByMessage.set(replyAuthor.parent_message_id, current);
+  }
   return rows.map((row) =>
     channelMessageJson(
       row,
       byMessage.get(row.id) ?? { users: [], agents: [] },
       attachmentsByMessage.get(row.id) ?? [],
       reactionsByMessage.get(row.id) ?? [],
+      replyAuthorsByMessage.get(row.id) ?? [],
     ),
   );
 }
@@ -1426,6 +1499,19 @@ export async function loadChannelDelta(
           .all<ChannelRow>()
       ).results
     : [];
+  if (messageIds.size) {
+    const changedMessageIds = [...messageIds];
+    const parentRows = await db
+      .prepare(
+        `select distinct parent_message_id
+         from briar_channel_messages
+         where id in (${changedMessageIds.map(() => "?").join(", ")})
+           and parent_message_id is not null`,
+      )
+      .bind(...changedMessageIds)
+      .all<{ parent_message_id: string }>();
+    for (const row of parentRows.results) messageIds.add(row.parent_message_id);
+  }
   const messageRows = messageIds.size
     ? (
         await db

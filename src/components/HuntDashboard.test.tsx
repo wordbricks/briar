@@ -3643,6 +3643,7 @@ describe("HuntDashboard", () => {
       id: "message-reply",
       parentMessageId: rootMessage.id,
       body: "기존 답글",
+      author: { id: "mina", name: "Mina", image: null, provider: null },
       replyCount: 0,
       createdAt: "2026-08-03T10:01:00.000Z",
       updatedAt: "2026-08-03T10:01:00.000Z",
@@ -3709,6 +3710,16 @@ describe("HuntDashboard", () => {
     expect(replyGroup.textContent).toContain("기존 답글");
 
     const messageGroup = messageGroups[0];
+    const replySummary = messageGroup.querySelector<HTMLElement>(
+      ".conversation-reply-summary",
+    );
+    expect(replySummary?.textContent).toContain("답장 1개");
+    expect(replySummary?.textContent).toContain("마지막 답글");
+    expect(replySummary?.querySelector(".conversation-reply-avatar")?.textContent)
+      .toBe("J");
+    expect(
+      replySummary?.querySelectorAll(".conversation-reply-avatar"),
+    ).toHaveLength(2);
     const replyButton = messageGroup.querySelector<HTMLButtonElement>(
       ".issue-reply-trigger",
     );
@@ -3802,6 +3813,12 @@ describe("HuntDashboard", () => {
       await pendingAgentReply;
     });
     expect(messageList.textContent).toContain(agentReply.body);
+    expect(
+      messageGroup.querySelectorAll(".conversation-reply-avatar"),
+    ).toHaveLength(3);
+    expect(
+      messageGroup.querySelector(".conversation-reply-avatar.agent"),
+    ).not.toBeNull();
     expect(
       messageGroup.querySelector(":scope > .issue-agent-reply-state"),
     ).toBeNull();
@@ -4021,6 +4038,15 @@ describe("HuntDashboard", () => {
     const confirmSpy = vi
       .spyOn(window, "confirm")
       .mockImplementation(() => true);
+    const replyGroup = groupByBody("기존 답글");
+    await act(async () =>
+      replyGroup
+        ?.querySelector<HTMLButtonElement>('button[title="메시지 삭제"]')
+        ?.click()
+    );
+    expect(onDeleteIssueMessage).toHaveBeenCalledWith(reply.id);
+    expect(rootGroup?.querySelector(".conversation-reply-summary")).toBeNull();
+
     await act(async () => deleteButton?.click());
     confirmSpy.mockRestore();
     expect(onDeleteIssueMessage).toHaveBeenCalledWith(rootMessage.id);

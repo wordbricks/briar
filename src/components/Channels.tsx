@@ -70,6 +70,10 @@ import {
 } from "../lib/channel-thread-width";
 import { ChannelMessageText } from "./ChannelMessageText";
 import { ChannelMessageReactions } from "./ChannelMessageReactions";
+import {
+  ConversationReplySummary,
+  type ConversationReplyParticipant,
+} from "./ConversationReplySummary";
 
 /** Chat needs a tighter cadence than the 15s dashboard poll. */
 const CHANNEL_POLL_INTERVAL_MS = 3_000;
@@ -150,6 +154,64 @@ const formatMessageTime = (iso: string, localeTag: string) =>
 
 const authorInitial = (name: string) =>
   name.trim().charAt(0).toUpperCase() || "?";
+
+type Translate = ReturnType<typeof useI18n>["t"];
+
+const replyRelativeTime = (value: string, t: Translate) => {
+  const minutes = Math.max(
+    1,
+    Math.round((Date.now() - new Date(value).getTime()) / 60_000),
+  );
+  if (minutes < 60) return t("time.minutesAgo", { count: minutes });
+  if (minutes < 1_440) {
+    return t("time.hoursAgo", { count: Math.floor(minutes / 60) });
+  }
+  return t("time.daysAgo", { count: Math.floor(minutes / 1_440) });
+};
+
+const channelAuthorId = (author: ChannelMessage["author"]) =>
+  author.type === "agent"
+    ? `agent:${author.id ?? `${author.provider ?? "agent"}:${author.name}`}`
+    : `user:${author.id || author.email || author.name}`;
+
+const channelReplyParticipants = (
+  message: ChannelMessage,
+): ConversationReplyParticipant[] =>
+  [message.author, ...(message.replyAuthors ?? [])]
+    .filter(
+      (author, index, authors) =>
+        authors.findIndex(
+          (candidate) => channelAuthorId(candidate) === channelAuthorId(author),
+        ) === index,
+    )
+    .slice(0, 3)
+    .map((author) => ({
+      id: channelAuthorId(author),
+      name: author.name,
+      image: author.type === "user" ? author.image : null,
+      isAgent: author.type === "agent",
+    }));
+
+const appendChannelReplySummary = (
+  parent: ChannelMessage,
+  reply: ChannelMessage,
+): ChannelMessage => {
+  const replyAuthors: NonNullable<ChannelMessage["replyAuthors"]> = [];
+  const seen = new Set<string>();
+  for (const author of [reply.author, ...(parent.replyAuthors ?? [])]) {
+    const id = channelAuthorId(author);
+    if (seen.has(id)) continue;
+    seen.add(id);
+    replyAuthors.push(author);
+    if (replyAuthors.length === 3) break;
+  }
+  return {
+    ...parent,
+    replyCount: parent.replyCount + 1,
+    lastReplyAt: reply.createdAt,
+    replyAuthors,
+  };
+};
 
 export function Channels({
   organizationId,
@@ -480,7 +542,24 @@ export function Channels({
         });
         setReplies((current) => [...current, ...result.agentReplies]);
         if (parentMessageId) {
-          setThreadMessages((current) => mergeMessages(current, [result.message], []));
+          setMessages((current) =>
+            current.map((message) =>
+              message.id === parentMessageId
+                ? appendChannelReplySummary(message, result.message)
+                : message,
+            ),
+          );
+          setThreadMessages((current) =>
+            mergeMessages(
+              current.map((message) =>
+                message.id === parentMessageId
+                  ? appendChannelReplySummary(message, result.message)
+                  : message,
+              ),
+              [result.message],
+              [],
+            ),
+          );
         } else {
           setMessages((current) => mergeMessages(current, [result.message], []));
         }
@@ -1147,14 +1226,29 @@ function MessageRow({
           showHoverActions
         />
 
-        {onOpenThread ? (
-          <button className="channel-thread-link" onClick={onOpenThread}>
-            <MessageSquare size={13} />
-            {message.replyCount > 0
-              ? t("channel.replyCount", { count: message.replyCount })
-              : t("channel.replyInThread")}
-          </button>
-        ) : null}
+        {onOpenThread
+          ? message.replyCount > 0
+            ? (
+              <ConversationReplySummary
+                countLabel={t("channel.replyCount", {
+                  count: message.replyCount,
+                })}
+                lastReplyLabel={message.lastReplyAt
+                  ? t("conversation.lastReply", {
+                      time: replyRelativeTime(message.lastReplyAt, t),
+                    })
+                  : null}
+                onClick={onOpenThread}
+                participants={channelReplyParticipants(message)}
+              />
+            )
+            : (
+              <button className="channel-thread-link" onClick={onOpenThread}>
+                <MessageSquare size={13} />
+                {t("channel.replyInThread")}
+              </button>
+            )
+          : null}
       </div>
     </article>
   );
