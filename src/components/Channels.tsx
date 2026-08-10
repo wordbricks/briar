@@ -58,6 +58,7 @@ import {
   ChannelDraftImages,
   ChannelMessageImages,
 } from "./ChannelImages";
+import { ChannelMentionMenu } from "./ChannelMentionMenu";
 import {
   channelThreadWidthDefault,
   channelThreadWidthMax,
@@ -1185,38 +1186,15 @@ function Composer({
       onSubmit={handleSubmit}
     >
       {showsSuggestions ? (
-        <ul
-          aria-label={t("channel.mentionCandidates")}
-          className="channel-mention-menu"
+        <ChannelMentionMenu
+          activeSuggestionIndex={activeSuggestionIndex}
+          ariaLabel={t("channel.mentionCandidates")}
           id={mentionListId}
-          role="listbox"
-        >
-          {suggestions.map((target, index) => (
-            <li key={`${target.type}:${target.id}`}>
-              <button
-                aria-selected={index === activeSuggestionIndex}
-                className={index === activeSuggestionIndex ? "active" : undefined}
-                id={`${mentionListId}-option-${index}`}
-                onClick={() => pickSuggestion(target)}
-                onMouseEnter={() => setActiveSuggestionIndex(index)}
-                role="option"
-                type="button"
-              >
-                {target.image ? (
-                  <img alt="" src={target.image} />
-                ) : target.type === "agent" ? (
-                  <Bot size={15} />
-                ) : (
-                  <span className="channel-mention-avatar">
-                    {target.label.trim().charAt(0).toUpperCase() || "?"}
-                  </span>
-                )}
-                <strong>@{target.handle}</strong>
-                <span>{target.detail}</span>
-              </button>
-            </li>
-          ))}
-        </ul>
+          onActiveSuggestionIndexChange={setActiveSuggestionIndex}
+          onPickSuggestion={pickSuggestion}
+          suggestions={suggestions}
+          variant="desktop"
+        />
       ) : null}
 
       <div className="channel-composer-shell">
