@@ -3856,9 +3856,28 @@ export async function getProjectAgentSession(
 export async function upsertProjectAgentSession(
   db: D1Database,
   input: ProjectAgentSessionRow,
+  observedAt: string,
 ) {
-  await db
-    .prepare(
+  await db.batch([
+    db.prepare(
+      `insert into briar_project_agent_session_context_membership (
+         project_id, session_id, visible_at
+       ) values (?, ?, ?)
+       on conflict (project_id, session_id) do update set
+         visible_at = excluded.visible_at
+       where not exists (
+         select 1 from briar_project_agent_sessions session
+         where session.project_id = excluded.project_id
+           and session.id = excluded.session_id
+       ) and not exists (
+         select 1 from briar_log_archives archive
+         where archive.project_id = excluded.project_id
+           and archive.scope_id = excluded.session_id
+           and archive.archive_kind = 'project_agent_sessions'
+           and archive.status in ('verified', 'complete')
+       )`,
+    ).bind(input.project_id, input.id, observedAt),
+    db.prepare(
       `insert into briar_project_agent_sessions (
          project_id, id, agent_id, status, session_type, payload_json,
          started_at, completed_at, updated_at
@@ -3883,8 +3902,8 @@ export async function upsertProjectAgentSession(
       input.started_at,
       input.completed_at,
       input.updated_at,
-    )
-    .run();
+    ),
+  ]);
   return db
     .prepare(
       `select project_id, id, agent_id, status, session_type, payload_json,
