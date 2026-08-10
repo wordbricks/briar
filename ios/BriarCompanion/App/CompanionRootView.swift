@@ -81,7 +81,6 @@ struct CompanionRootView: View {
                     projects: companion.projects,
                     project: project,
                     snapshot: dashboard.snapshot,
-                    isRefreshing: dashboard.isRefreshing,
                     errorMessage: dashboard.errorMessage,
                     token: token,
                     api: api,

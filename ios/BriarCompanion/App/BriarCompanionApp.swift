@@ -83,7 +83,6 @@ private struct UITestCompanionFlow: View {
                 projects: [project, alternateProject],
                 project: selectedProject,
                 snapshot: snapshot,
-                isRefreshing: false,
                 errorMessage: nil,
                 token: "ui-test-token",
                 api: api,
