@@ -98,29 +98,50 @@ final class AgentsStore: ObservableObject {
 
     func run(
         agent: ProjectAgent,
+        skill: ProjectAgent.Skill,
         request: String,
         workerID: String
     ) async throws -> ProjectAgentSession {
         guard let projectID, let token else {
             throw MobileAPIError.invalidRequest
         }
-        let response: ProjectAgentTaskResponse = try await api.send(
-            MobileAPIContract.Endpoint.projectAgentTasks(projectID: projectID),
-            method: "POST",
-            token: token,
-            body: ProjectAgentTaskRequest(
-                agentId: agent.id,
-                request: request,
-                workerId: workerID,
-                requestId: UUID()
-            ),
-            as: ProjectAgentTaskResponse.self
-        )
-        sessions = Self.collapseLinked(
-            [response.session] + sessions.filter { $0.id != response.session.id }
-        ).sorted { $0.displayTimestamp > $1.displayTimestamp }
-        errorMessage = nil
-        return response.session
+        guard
+            agent.projectId == projectID,
+            skill.agentId == agent.id,
+            agent.skills.contains(where: { $0.id == skill.id })
+        else {
+            throw MobileAPIError.invalidRequest
+        }
+        guard executingAgentIDs.insert(agent.id).inserted else {
+            executionError = AgentsStoreError.duplicateExecution.localizedDescription
+            throw AgentsStoreError.duplicateExecution
+        }
+        defer { executingAgentIDs.remove(agent.id) }
+
+        executionError = nil
+        do {
+            let response: ProjectAgentTaskResponse = try await api.send(
+                MobileAPIContract.Endpoint.projectAgentTasks(projectID: projectID),
+                method: "POST",
+                token: token,
+                body: ProjectAgentTaskRequest(
+                    agentId: agent.id,
+                    skillId: skill.id,
+                    request: request,
+                    workerId: workerID,
+                    requestId: UUID()
+                ),
+                as: ProjectAgentTaskResponse.self
+            )
+            sessions = Self.collapseLinked(
+                [response.session] + sessions.filter { $0.id != response.session.id }
+            ).sorted { $0.displayTimestamp > $1.displayTimestamp }
+            errorMessage = nil
+            return response.session
+        } catch {
+            executionError = CompanionStore.message(for: error)
+            throw error
+        }
     }
 
     /// Legacy issue-dispatch entry point retained for existing native callers.

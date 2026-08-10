@@ -75,8 +75,6 @@ export async function dispatchAutoHuntToWorkers(
 
   const issueSkill =
     input.agent.skills?.find((skill) => skill.kind === "issue_processing") ??
-    input.agent.skills?.find((skill) => skill.isDefault) ??
-    input.agent.skills?.[0] ??
     null;
   const agentProvider = issueSkill?.provider ?? input.agent.provider;
   const agentModel = issueSkill ? issueSkill.model : input.agent.model;

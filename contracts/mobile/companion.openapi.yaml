@@ -2087,6 +2087,7 @@
           "id",
           "label",
           "readiness",
+          "acceptingWork",
           "readinessDetail",
           "activeSessions",
           "availableSessions"
@@ -2131,6 +2132,9 @@
           },
           "readiness": {
             "type": "string"
+          },
+          "acceptingWork": {
+            "type": "boolean"
           },
           "readinessDetail": {
             "type": [
@@ -2786,6 +2790,83 @@
         },
         "additionalProperties": true
       },
+      "ProjectAgentSkill": {
+        "type": "object",
+        "required": [
+          "id",
+          "agentId",
+          "name",
+          "instructions",
+          "provider",
+          "model",
+          "effort",
+          "kind",
+          "position",
+          "createdAt",
+          "updatedAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "agentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "instructions": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string",
+            "enum": [
+              "codex",
+              "claude",
+              "grok",
+              "opencode"
+            ]
+          },
+          "model": {
+            "type": "string",
+            "nullable": true
+          },
+          "effort": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high",
+              "xhigh",
+              "max",
+              "ultra"
+            ],
+            "nullable": true
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "issue_processing",
+              "custom"
+            ]
+          },
+          "position": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": true
+      },
       "ProjectAgent": {
         "type": "object",
         "required": [
@@ -2797,6 +2878,7 @@
           "model",
           "responsibility",
           "skill",
+          "skills",
           "calendarColor",
           "createdAt",
           "updatedAt"
@@ -2861,6 +2943,12 @@
           },
           "skill": {
             "type": "string"
+          },
+          "skills": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProjectAgentSkill"
+            }
           },
           "calendarColor": {
             "type": "string"
@@ -2985,6 +3073,11 @@
             "format": "uuid",
             "nullable": true
           },
+          "skillId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
           "sessionType": {
             "type": "string",
             "enum": [
@@ -3100,12 +3193,17 @@
         "type": "object",
         "required": [
           "agentId",
+          "skillId",
           "request",
           "workerId",
           "requestId"
         ],
         "properties": {
           "agentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "skillId": {
             "type": "string",
             "format": "uuid"
           },

@@ -109,7 +109,6 @@ export function defaultProjectAgentSkill(input: {
     model: input.model ?? null,
     effort: input.effort ?? null,
     kind: "issue_processing",
-    isDefault: true,
     position: 0,
     createdAt: input.createdAt,
     updatedAt: input.updatedAt ?? input.createdAt,
@@ -136,21 +135,10 @@ ${execution}
 `;
 }
 
-export function defaultAgentSkill(
-  agent: Pick<ProjectAgentRuntimeProfile, "skills">,
-): ProjectAgentSkill | null {
-  return (
-    agent.skills.find((skill) => skill.isDefault) ?? agent.skills[0] ?? null
-  );
-}
-
 export function issueProcessingAgentSkill(
   agent: Pick<ProjectAgentRuntimeProfile, "skills">,
 ): ProjectAgentSkill | null {
-  return (
-    agent.skills.find((skill) => skill.kind === "issue_processing") ??
-    defaultAgentSkill(agent)
-  );
+  return agent.skills.find((skill) => skill.kind === "issue_processing") ?? null;
 }
 
 function projectAgentSkillRoster(
@@ -158,13 +146,13 @@ function projectAgentSkillRoster(
     ProjectAgentRuntimeProfile,
     "name" | "responsibility" | "skills"
   >,
-  activeSkill: ProjectAgentSkill,
+  activeSkill: ProjectAgentSkill | null,
 ) {
   const skills = [...agent.skills]
     .sort((left, right) => left.position - right.position)
     .map(
       (skill) => `### ${skill.name.trim()}${
-        skill.id === activeSkill.id ? " (active)" : ""
+        skill.id === activeSkill?.id ? " (active)" : ""
       }
 
 ${skill.instructions.trim()}`,
@@ -178,11 +166,15 @@ ${agent.responsibility.trim()}
 
 ## Available skills
 
-${skills}
+${skills || "No skills are configured for this Agent."}
 
-## Active skill
+${activeSkill
+    ? `## Active skill
 
-Use **${activeSkill.name.trim()}** for this invocation. Follow its instructions while remaining aware of the other skills you can perform.
+Use **${activeSkill.name.trim()}** for this invocation. Follow its instructions while remaining aware of the other skills you can perform.`
+    : `## Skill selection
+
+No Skill was preselected for this invocation. Choose the one available Skill that best matches the request. Apply only that Skill's instructions while staying within the Agent's responsibility. If none applies, act only within the responsibility.`}
 
 ## Execution
 
@@ -191,6 +183,15 @@ Use **${activeSkill.name.trim()}** for this invocation. Follow its instructions 
 - Follow the invocation's workspace and execution-mode instructions; do not infer queue work.
 - Report only results that were actually observed.
 `;
+}
+
+export function agentWithSkillsRuntime<
+  T extends ProjectAgentRuntimeProfile,
+>(agent: T): T {
+  return {
+    ...agent,
+    skill: projectAgentSkillRoster(agent, null),
+  } as T;
 }
 
 export function agentWithSkillRuntime<

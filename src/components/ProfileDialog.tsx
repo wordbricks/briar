@@ -63,12 +63,7 @@ export function ProfileDialog({
         day: "numeric",
       }).format(new Date(profile.createdAt))
     : null;
-  const agentRuntime =
-    profile?.type === "agent"
-      ? (profile.skills.find((skill) => skill.isDefault) ??
-        profile.skills[0] ??
-        profile)
-      : null;
+  const agentRuntime = profile?.type === "agent" ? profile : null;
 
   return (
     <Dialog open={profile !== null} onOpenChange={onOpenChange}>

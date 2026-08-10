@@ -205,6 +205,7 @@ export const mobileDashboardWorkerSchema = z.object({
   agentProvider: z.enum(["codex", "claude", "grok", "opencode"]).optional(),
   providers: z.array(z.enum(["codex", "claude", "grok", "opencode"])).optional(),
   readiness: z.string(),
+  acceptingWork: z.boolean(),
   readinessDetail: z.string().nullable(),
   activeSessions: z.number().int().nonnegative(),
   availableSessions: z.number().int().nonnegative(),
@@ -671,6 +672,20 @@ export const mobileAcceptIssueActionProposalResponseSchema = z.object({
 });
 export const mobileResultReviewSchema = mobileDashboardRunSchema.shape.resultReviews.unwrap().element;
 
+export const mobileProjectAgentSkillSchema = z.object({
+  id: z.uuid(),
+  agentId: z.uuid(),
+  name: z.string(),
+  instructions: z.string(),
+  provider: mobileProviderSchema,
+  model: z.string().nullable(),
+  effort: mobileEffortSchema.nullable(),
+  kind: z.enum(["issue_processing", "custom"]),
+  position: z.number().int().nonnegative(),
+  createdAt: z.iso.datetime(),
+  updatedAt: z.iso.datetime(),
+});
+
 export const mobileProjectAgentSchema = z.object({
   id: z.uuid(),
   projectId: z.uuid(),
@@ -688,6 +703,7 @@ export const mobileProjectAgentSchema = z.object({
   model: z.string().nullable(),
   responsibility: z.string(),
   skill: z.string(),
+  skills: z.array(mobileProjectAgentSkillSchema),
   calendarColor: z.string(),
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
@@ -702,6 +718,7 @@ export const mobileProjectAgentSessionSchema = z.object({
   projectId: z.uuid(),
   dispatchGroupId: z.string().optional(),
   agentId: z.uuid().nullable().optional(),
+  skillId: z.uuid().nullable().optional(),
   sessionType: z.enum(["task", "dispatch"]).optional(),
   trigger: z.enum(["manual", "scheduled"]).nullable().optional(),
   scheduleId: z.string().nullable().optional(),
@@ -748,6 +765,7 @@ export const mobileProjectAgentSessionsResponseSchema = z.object({
 
 export const mobileProjectAgentTaskRequestSchema = z.object({
   agentId: z.uuid(),
+  skillId: z.uuid(),
   request: z.string().trim().min(1).max(50_000),
   workerId: z.string().trim().min(1).max(128),
   requestId: z.uuid(),

@@ -40,7 +40,6 @@ describe("ProjectAgentSkillsEditor", () => {
       model: "gpt-5.6-sol",
       effort: "high" as const,
       kind: "issue_processing" as const,
-      isDefault: true,
       position: 9,
       createdAt: "2026-08-01T00:00:00.000Z",
       updatedAt: "2026-08-02T00:00:00.000Z",
@@ -55,7 +54,6 @@ describe("ProjectAgentSkillsEditor", () => {
         model: "gpt-5.6-sol",
         effort: "high",
         kind: "issue_processing",
-        isDefault: true,
         position: 0,
       },
     ]);
@@ -83,7 +81,6 @@ describe("ProjectAgentSkillsEditor", () => {
               model: null,
               effort: null,
               kind: "issue_processing",
-              isDefault: true,
               position: 0,
             },
             {
@@ -94,7 +91,6 @@ describe("ProjectAgentSkillsEditor", () => {
               model: "sonnet",
               effort: "high",
               kind: "custom",
-              isDefault: false,
               position: 1,
             },
           ]}
@@ -118,5 +114,7 @@ describe("ProjectAgentSkillsEditor", () => {
         "데스크탑 릴리즈 · Effort",
       ]),
     );
+    expect(container.textContent).not.toContain("기본 스킬");
+    expect(container.textContent).not.toContain("기본으로 설정");
   });
 });

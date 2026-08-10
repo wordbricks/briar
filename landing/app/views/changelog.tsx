@@ -46,9 +46,9 @@ export const changelogCopy = {
           "하나의 에이전트에 목적별 스킬을 구성하고, 직접 실행·예약·이슈 처리·채널 대화에서 작업에 맞는 스킬을 선택해 실행할 수 있습니다.",
         items: [
           "프로젝트와 조직 에이전트에 여러 스킬을 만들고 각각 이름, 지침, 제공자, 모델과 추론 강도를 설정할 수 있습니다.",
-          "에이전트를 직접 실행할 때 원하는 스킬을 선택하고, 예약과 이슈 처리에는 지정된 기본·이슈 처리 스킬을 일관되게 사용합니다.",
-          "채널에서 에이전트와 저장된 스킬 이름을 함께 언급하면 해당 스킬로 답변하며, 일치하는 이름이 없으면 기본 스킬을 사용합니다.",
-          "대기 중이거나 실행 중인 작업이 참조하는 스킬을 안전하게 보존해 이름이나 기본값을 바꿔도 실행 맥락이 유지됩니다.",
+          "에이전트를 직접 실행할 때마다 원하는 스킬을 선택하고, 이슈 처리에는 전용 스킬을 사용하며 예약 실행에는 전체 스킬 목록을 전달합니다.",
+          "채널에서 에이전트와 저장된 스킬 이름을 함께 언급하면 해당 스킬로 답변하고, 일치하는 이름이 없으면 에이전트의 책임과 전체 스킬 목록 안에서 판단합니다.",
+          "대기 중이거나 실행 중인 작업이 선택한 스킬을 안전하게 보존해 이름이나 실행 설정을 바꿔도 실행 맥락이 유지됩니다.",
         ],
       },
       {
@@ -258,9 +258,9 @@ export const changelogCopy = {
           "Configure purpose-built skills on one agent, then select the right skill for direct runs, schedules, issue processing, and channel conversations.",
         items: [
           "Create multiple skills for project and organization agents, each with its own name, instructions, provider, model, and reasoning effort.",
-          "Choose a skill for direct agent runs while schedules and issue processing consistently use their configured default or issue-processing skill.",
-          "Mention an agent and a saved skill name in a channel to invoke that skill, with the default skill used when no name matches.",
-          "Queued and running work keeps a durable reference to its skill, preserving execution context across renames and default changes.",
+          "Choose a skill for every direct agent run, while issue processing uses its dedicated skill and schedules see the agent's full skill roster.",
+          "Mention an agent and a saved skill name in a channel to invoke that skill; unmatched requests stay within the agent's responsibility and full skill roster.",
+          "Queued and running work keeps a durable reference to its selected skill, preserving execution context across renames and edits.",
         ],
       },
       {

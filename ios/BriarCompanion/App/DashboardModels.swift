@@ -241,6 +241,7 @@ struct DashboardWorker: Codable, Equatable, Identifiable, Sendable {
     let agentProvider: AgentProvider?
     let providers: [AgentProvider]?
     let readiness: String
+    let acceptingWork: Bool
     let readinessDetail: String?
     let activeSessions: Int
     let availableSessions: Int
@@ -252,6 +253,7 @@ struct DashboardWorker: Codable, Equatable, Identifiable, Sendable {
         agentProvider: AgentProvider? = nil,
         providers: [AgentProvider]? = nil,
         readiness: String,
+        acceptingWork: Bool,
         readinessDetail: String?,
         activeSessions: Int,
         availableSessions: Int
@@ -262,6 +264,7 @@ struct DashboardWorker: Codable, Equatable, Identifiable, Sendable {
         self.agentProvider = agentProvider
         self.providers = providers
         self.readiness = readiness
+        self.acceptingWork = acceptingWork
         self.readinessDetail = readinessDetail
         self.activeSessions = activeSessions
         self.availableSessions = availableSessions

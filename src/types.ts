@@ -437,7 +437,6 @@ export type ProjectAgentSkill = {
   model: string | null;
   effort: ModelEffort | null;
   kind: ProjectAgentSkillKind;
-  isDefault: boolean;
   position: number;
   createdAt: string;
   updatedAt: string;
@@ -451,7 +450,6 @@ export type ProjectAgentSkillInput = Pick<
   | "model"
   | "effort"
   | "kind"
-  | "isDefault"
   | "position"
 > & {
   id?: string;

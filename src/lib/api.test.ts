@@ -1011,6 +1011,7 @@ describe("API errors", () => {
       agentId,
       request: "Review the repository",
       workerId: "worker-1",
+      skillId: "33333333-3333-4333-8333-333333333333",
     });
 
     const body = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
@@ -1808,7 +1809,6 @@ describe("API errors", () => {
               model: "sonnet",
               effort: null,
               kind: "custom",
-              isDefault: true,
               position: 0,
             },
           ],

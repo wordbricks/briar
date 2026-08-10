@@ -4,6 +4,7 @@ import { act, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
+import { requestMobileNavigationBack } from "../lib/mobile-navigation";
 import type { DashboardPayload, ProjectAgent } from "../types";
 
 const { runProjectAgent } = vi.hoisted(() => ({
@@ -59,6 +60,22 @@ async function mount(node: React.ReactNode) {
   return container;
 }
 
+async function chooseTaskSkill(skillId = "skill-release") {
+  await act(async () => {
+    document
+      .querySelector<HTMLButtonElement>('.native-select button[aria-label="스킬"]')
+      ?.click();
+  });
+  await act(async () => {
+    document
+      .querySelector<HTMLButtonElement>(
+        `.select-menu-option[data-value="${skillId}"]`,
+      )
+      ?.click();
+    await Promise.resolve();
+  });
+}
+
 const agent: ProjectAgent = {
   id: "agent-1",
   projectId: "project-1",
@@ -70,7 +87,21 @@ const agent: ProjectAgent = {
   effort: null,
   responsibility: "릴리스 작업을 처리합니다.",
   skill: "# 릴리스 에이전트",
-  skills: [],
+  skills: [
+    {
+      id: "skill-release",
+      agentId: "agent-1",
+      name: "릴리스",
+      instructions: "릴리스 작업을 처리합니다.",
+      provider: "codex",
+      model: null,
+      effort: null,
+      kind: "custom",
+      position: 0,
+      createdAt: "2026-07-28T00:00:00.000Z",
+      updatedAt: "2026-07-28T00:00:00.000Z",
+    },
+  ],
   calendarColor: "#3275d5",
   createdAt: "2026-07-28T00:00:00.000Z",
   updatedAt: "2026-07-28T00:00:00.000Z",
@@ -159,6 +190,9 @@ function ProjectAgentDetailHarness({
             dispatchGroupId: "",
             projectId: agent.projectId,
             agentId: agent.id,
+            ...(session.skillId !== undefined
+              ? { skillId: session.skillId }
+              : {}),
             sessionType: "task",
             trigger: "manual",
             request: session.request,
@@ -252,19 +286,158 @@ describe("ProjectAgentDetail", () => {
     await act(async () => runButton?.click());
 
     expect(document.querySelector('[role="dialog"]')).not.toBeNull();
+    expect(
+      document.querySelector<HTMLButtonElement>(
+        'button[form="project-agent-task-form"]',
+      )?.disabled,
+    ).toBe(true);
+    await chooseTaskSkill();
     await act(async () => {
-      document.querySelector<HTMLButtonElement>('button[type="submit"]')?.click();
+      document
+        .querySelector<HTMLFormElement>("#project-agent-task-form")
+        ?.dispatchEvent(
+          new Event("submit", { bubbles: true, cancelable: true }),
+        );
       await Promise.resolve();
     });
 
     expect(onStartRemoteTask).toHaveBeenCalledWith({
       request: agent.responsibility,
+      skillId: "skill-release",
       workerId: "worker-1",
     });
     expect(document.querySelector('[role="dialog"]')).toBeNull();
   });
 
-  it("opens the task dialog when a non-default Skill has an available Worker", async () => {
+  it("closes the Skill picker before navigating back on mobile", async () => {
+    const onBack = vi.fn();
+    const container = await mount(
+      <ProjectAgentDetail
+        agent={agent}
+        companionMode
+        dashboard={dashboardWithWorker}
+        error={null}
+        isSidebarOpen
+        onBack={onBack}
+        onIssueOpen={() => undefined}
+        onStartRemoteTask={async () => "remote-session"}
+        onSettleTaskSession={() => undefined}
+        onStopSession={async () => true}
+        onStartAutoHunt={() => "dispatch-1"}
+        onStartTaskSession={() => undefined}
+        requestedSessionId={null}
+        sessions={[]}
+      />,
+    );
+
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>(".project-agent-run-task")
+        ?.click();
+    });
+    expect(document.querySelector('[role="dialog"]')).not.toBeNull();
+
+    await act(async () => {
+      expect(requestMobileNavigationBack()).toBe(true);
+    });
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+    expect(onBack).not.toHaveBeenCalled();
+  });
+
+  it("keeps the Skill picker open and consumes Back while a mobile run is pending", async () => {
+    const onBack = vi.fn();
+    let resolveRemoteTask: ((sessionId: string) => void) | undefined;
+    const onStartRemoteTask = vi.fn(
+      () => new Promise<string>((resolve) => {
+        resolveRemoteTask = resolve;
+      }),
+    );
+    const container = await mount(
+      <ProjectAgentDetail
+        agent={agent}
+        companionMode
+        dashboard={dashboardWithWorker}
+        error={null}
+        isSidebarOpen
+        onBack={onBack}
+        onIssueOpen={() => undefined}
+        onStartRemoteTask={onStartRemoteTask}
+        onSettleTaskSession={() => undefined}
+        onStopSession={async () => true}
+        onStartAutoHunt={() => "dispatch-1"}
+        onStartTaskSession={() => undefined}
+        requestedSessionId={null}
+        sessions={[]}
+      />,
+    );
+
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>(".project-agent-run-task")
+        ?.click();
+    });
+    await chooseTaskSkill();
+    await act(async () => {
+      document
+        .querySelector<HTMLFormElement>("#project-agent-task-form")
+        ?.dispatchEvent(
+          new Event("submit", { bubbles: true, cancelable: true }),
+        );
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      expect(requestMobileNavigationBack()).toBe(true);
+    });
+    expect(document.querySelector('[role="dialog"]')).not.toBeNull();
+    expect(onBack).not.toHaveBeenCalled();
+
+    await act(async () => {
+      resolveRemoteTask?.("remote-session");
+      await Promise.resolve();
+    });
+  });
+
+  it("opens the Skill picker even when no Skill currently has a compatible Worker", async () => {
+    const claudeOnlyAgent: ProjectAgent = {
+      ...agent,
+      skills: [{
+        ...agent.skills[0],
+        id: "skill-claude",
+        provider: "claude",
+      }],
+    };
+    const container = await mount(
+      <ProjectAgentDetail
+        agent={claudeOnlyAgent}
+        companionMode
+        dashboard={dashboardWithWorker}
+        error={null}
+        isSidebarOpen
+        onBack={() => undefined}
+        onIssueOpen={() => undefined}
+        onStartRemoteTask={async () => "remote-session"}
+        onSettleTaskSession={() => undefined}
+        onStopSession={async () => true}
+        onStartAutoHunt={() => "dispatch-1"}
+        onStartTaskSession={() => undefined}
+        requestedSessionId={null}
+        sessions={[]}
+      />,
+    );
+
+    const runButton = container.querySelector<HTMLButtonElement>(
+      ".project-agent-run-task",
+    )!;
+    expect(runButton.disabled).toBe(false);
+    await act(async () => runButton.click());
+    await chooseTaskSkill("skill-claude");
+    expect(document.body.textContent).toContain(
+      "이 Agent를 실행할 수 있는 사용 가능한 Worker가 없습니다.",
+    );
+  });
+
+  it("opens the task dialog when a Skill has an available Worker", async () => {
     const multiSkillAgent: ProjectAgent = {
       ...agent,
       skills: [
@@ -277,7 +450,6 @@ describe("ProjectAgentDetail", () => {
           model: null,
           effort: null,
           kind: "issue_processing",
-          isDefault: true,
           position: 0,
           createdAt: agent.createdAt,
           updatedAt: agent.updatedAt,
@@ -291,7 +463,6 @@ describe("ProjectAgentDetail", () => {
           model: "sonnet",
           effort: "high",
           kind: "custom",
-          isDefault: false,
           position: 1,
           createdAt: agent.createdAt,
           updatedAt: agent.updatedAt,
@@ -338,21 +509,14 @@ describe("ProjectAgentDetail", () => {
     )!;
     expect(runButton.disabled).toBe(false);
     await act(async () => runButton.click());
+    expect(document.body.textContent).not.toContain(
+      "선택한 스킬을 실행할 수 있는 Worker가 없습니다. 다른 스킬을 선택해 주세요.",
+    );
+    await chooseTaskSkill("skill-default");
     expect(document.body.textContent).toContain(
       "선택한 스킬을 실행할 수 있는 Worker가 없습니다. 다른 스킬을 선택해 주세요.",
     );
-
-    const skillSelect = document.querySelector<HTMLButtonElement>(
-      '.native-select button[aria-label="스킬"]',
-    )!;
-    await act(async () => skillSelect.click());
-    await act(async () => {
-      document
-        .querySelector<HTMLButtonElement>(
-          '.select-menu-option[data-value="skill-release"]',
-        )!
-        .click();
-    });
+    await chooseTaskSkill("skill-release");
 
     expect(document.body.textContent).toContain("Release Mac");
     await act(async () => {
@@ -483,6 +647,7 @@ describe("ProjectAgentDetail", () => {
         .find((button) => button.textContent?.trim() === "작업 실행")
         ?.click();
     });
+    await chooseTaskSkill();
     const textarea = document.querySelector<HTMLTextAreaElement>("textarea");
     expect(textarea?.value).toBe(agent.responsibility);
     await act(async () => {
@@ -551,6 +716,7 @@ describe("ProjectAgentDetail", () => {
       dispatchGroupId: "",
       projectId: agent.projectId,
       agentId: agent.id,
+      skillId: "skill-release",
       sessionType: "task",
       request: "릴리스 상태를 확인해 줘",
       status: "completed",
@@ -612,6 +778,9 @@ describe("ProjectAgentDetail", () => {
       sessionId: completedSession.id,
       conversationId: completedSession.conversationId,
       message: "변경 내용을 커밋해 줘",
+      agent: expect.objectContaining({
+        skill: expect.stringContaining("릴리스 (active)"),
+      }),
     }));
     expect(onSettleTaskSession).toHaveBeenCalledWith(
       completedSession.id,
@@ -643,6 +812,7 @@ describe("ProjectAgentDetail", () => {
         .find((button) => button.textContent?.trim() === "작업 실행")
         ?.click();
     });
+    await chooseTaskSkill();
     const textarea = document.querySelector<HTMLTextAreaElement>("textarea");
     await act(async () => {
       Object.getOwnPropertyDescriptor(
@@ -661,7 +831,11 @@ describe("ProjectAgentDetail", () => {
     expect(runProjectAgent).toHaveBeenCalledWith({
       projectId: "project-1",
       sessionId: "task-session",
-      agent,
+      agent: expect.objectContaining({
+        id: agent.id,
+        provider: "codex",
+        skill: expect.stringContaining("릴리스 (active)"),
+      }),
       message: "Auto Hunt로 대기 이슈 세 건을 처리해 줘",
       conversationId: null,
       runs: [],
@@ -735,6 +909,7 @@ describe("ProjectAgentDetail", () => {
         .find((button) => button.textContent?.trim() === "작업 실행")
         ?.click();
     });
+    await chooseTaskSkill();
     await act(async () => {
       document.querySelector<HTMLFormElement>("form")?.dispatchEvent(
         new Event("submit", { bubbles: true, cancelable: true }),
@@ -770,6 +945,7 @@ describe("ProjectAgentDetail", () => {
         .find((button) => button.textContent?.trim() === "작업 실행")
         ?.click();
     });
+    await chooseTaskSkill();
     await act(async () => {
       document.querySelector<HTMLFormElement>("form")?.dispatchEvent(
         new Event("submit", { bubbles: true, cancelable: true }),

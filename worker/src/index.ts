@@ -409,7 +409,6 @@ import {
   agentSkillConflictMessage,
   agentSkillForMessage,
   agentSkillJson,
-  defaultAgentSkillRow,
   getAgentSkill,
   hydrateAgentSkills,
   issueProcessingAgentSkillRow,
@@ -868,7 +867,7 @@ export const projectIssueKeyPrefixInputSchema = z
       .regex(/^[A-Z0-9]{1,3}$/u),
   })
   .strict();
-const projectAgentInputSchema = z
+export const projectAgentInputSchema = z
   .object({
     name: z.string().trim().min(1).max(100).nullable().optional(),
     avatar: z
@@ -893,7 +892,7 @@ const projectAgentInputSchema = z
       .nullable()
       .optional(),
     responsibility: z.string().trim().min(1).max(2_000),
-    skills: z.array(channelAgentSkillInputSchema).max(50).optional(),
+    skills: z.array(channelAgentSkillInputSchema).min(1).max(50).optional(),
     calendarColor: z
       .string()
       .trim()
@@ -903,13 +902,6 @@ const projectAgentInputSchema = z
   .strict()
   .superRefine((input, context) => {
     if (!input.skills?.length) return;
-    if (input.skills.filter((skill) => skill.isDefault).length !== 1) {
-      context.addIssue({
-        code: "custom",
-        path: ["skills"],
-        message: "An Agent must have exactly one default Skill",
-      });
-    }
     const names = new Set<string>();
     input.skills.forEach((skill, index) => {
       const key = skill.name.toLocaleLowerCase("en-US");
@@ -926,13 +918,6 @@ const projectAgentInputSchema = z
 const organizationAgentWriteSchema = organizationAgentInputSchema.superRefine(
   (input, context) => {
     if (!input.skills?.length) return;
-    if (input.skills.filter((skill) => skill.isDefault).length !== 1) {
-      context.addIssue({
-        code: "custom",
-        path: ["skills"],
-        message: "An Agent must have exactly one default Skill",
-      });
-    }
     const names = new Set<string>();
     input.skills.forEach((skill, index) => {
       const key = skill.name.toLocaleLowerCase("en-US");
@@ -981,6 +966,7 @@ export const projectAgentSessionInputSchema = z
   .object({
     dispatchGroupId: z.string().max(128),
     agentId: z.string().uuid().nullable(),
+    skillId: z.string().uuid().nullable().optional(),
     sessionType: z.enum(["task", "dispatch"]),
     trigger: z.enum(["manual", "scheduled"]).nullable(),
     scheduleId: z.string().max(128).nullable(),
@@ -5876,9 +5862,6 @@ async function route(
     };
     const invokedAgents = mentionedAgents.map((agent) => {
       const activeSkill = agentSkillForMessage(agent.skills, input.body);
-      if (!activeSkill) {
-        throw new HttpError(409, "Mentioned Agent has no configured Skills");
-      }
       return { agent, activeSkill };
     });
     const uploadedKeys: string[] = [];
@@ -5948,8 +5931,8 @@ async function route(
       agents: invokedAgents.map(({ agent, activeSkill }) => ({
         id: agent.id,
         projectId: agent.project_id,
-        skillId: activeSkill.id,
-        provider: activeSkill.provider,
+        skillId: activeSkill?.id ?? null,
+        provider: activeSkill?.provider ?? agent.provider,
       })),
       createdAt,
     });
@@ -6801,6 +6784,9 @@ async function route(
 
     const agent = await getProjectAgent(db, project.id, input.agentId);
     if (!agent) throw new HttpError(404, "Agent not found for this project");
+    if (!input.skillId && agent.skills.length !== 1) {
+      throw new HttpError(400, "Choose an Agent Skill before running the Agent");
+    }
     const selectedSkill = await getAgentSkill(
       db,
       agent.id,
@@ -6876,7 +6862,7 @@ async function route(
         id: taskId,
         projectId: project.id,
         agentId: agent.id,
-        skillId: selectedSkill.id,
+        skill: selectedSkill,
         request: input.request,
         requestId: input.requestId,
         workerId: worker.id,
@@ -6895,6 +6881,7 @@ async function route(
     const payload = {
       dispatchGroupId: taskId,
       agentId: agent.id,
+      skillId: selectedSkill.id,
       sessionType: "task" as const,
       trigger: "manual" as const,
       scheduleId: null,
@@ -9728,15 +9715,16 @@ async function route(
     }
     const activeSkill = job.skill_id
       ? agent.skills.find((skill) => skill.id === job.skill_id) ?? null
-      : defaultAgentSkillRow(agent.skills);
-    if (!activeSkill) {
+      : null;
+    if (job.skill_id && !activeSkill) {
       throw new HttpError(409, "Reply job lost its selected Agent Skill");
     }
-    const replyModel = activeSkill.provider === job.agent_provider
-      ? activeSkill.model
+    const replyRuntime = activeSkill ?? agent;
+    const replyModel = replyRuntime.provider === job.agent_provider
+      ? replyRuntime.model
       : null;
-    const replyEffort = activeSkill.provider === job.agent_provider
-      ? activeSkill.effort
+    const replyEffort = replyRuntime.provider === job.agent_provider
+      ? replyRuntime.effort
       : null;
     const project = job.project_id
       ? await getOrganizationProject(db, job.organization_id, job.project_id)
@@ -9759,7 +9747,7 @@ async function route(
         provider: job.agent_provider,
         model: replyModel,
         effort: replyEffort,
-        activeSkill: agentSkillJson(activeSkill),
+        activeSkill: activeSkill ? agentSkillJson(activeSkill) : null,
         agent: {
           id: agent.id,
           name: agent.name,

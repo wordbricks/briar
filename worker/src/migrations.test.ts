@@ -351,6 +351,112 @@ describe("D1 migrations", () => {
     }
   });
 
+  it("backfills claimable work before retiring implicit Skill selection", async () => {
+    const miniflare = new Miniflare({
+      modules: true,
+      script: "export default { fetch() { return new Response('ok') } }",
+      d1Databases: { DB: "briar-explicit-agent-skill-migration-test" },
+    });
+    try {
+      const db = (await miniflare.getD1Database("DB")) as unknown as D1Database;
+      await db.prepare(
+         `create table briar_agent_skills (
+           id text primary key not null,
+           agent_id text not null,
+           is_default integer not null default 0,
+           position integer not null default 0,
+           created_at text not null
+         )`,
+      ).run();
+      await db.prepare(
+        `create unique index briar_agent_skills_default_idx
+         on briar_agent_skills (agent_id) where is_default = 1`,
+      ).run();
+      await db.prepare(
+        `create table briar_project_agent_task_jobs (
+           id text primary key not null,
+           agent_id text not null,
+           skill_id text,
+           status text not null
+         )`,
+      ).run();
+      await db.prepare(
+        `create table briar_channel_agent_reply_jobs (
+           id text primary key not null,
+           agent_id text not null,
+           skill_id text,
+           status text not null
+         )`,
+      ).run();
+      await db.batch([
+        db.prepare(
+          `insert into briar_agent_skills
+             (id, agent_id, is_default, position, created_at)
+           values ('skill-issue', 'agent-1', 1, 0, '2026-08-09T00:00:00.000Z')`,
+        ),
+        db.prepare(
+          `insert into briar_agent_skills
+             (id, agent_id, is_default, position, created_at)
+           values ('skill-release', 'agent-1', 0, 1, '2026-08-09T00:00:00.000Z')`,
+        ),
+        db.prepare(
+          `insert into briar_project_agent_task_jobs
+             (id, agent_id, skill_id, status)
+           values ('task-queued', 'agent-1', null, 'queued')`,
+        ),
+        db.prepare(
+          `insert into briar_project_agent_task_jobs
+             (id, agent_id, skill_id, status)
+           values ('task-completed', 'agent-1', null, 'completed')`,
+        ),
+        db.prepare(
+          `insert into briar_channel_agent_reply_jobs
+             (id, agent_id, skill_id, status)
+           values ('reply-running', 'agent-1', null, 'running')`,
+        ),
+        db.prepare(
+          `insert into briar_channel_agent_reply_jobs
+             (id, agent_id, skill_id, status)
+           values ('reply-explicit', 'agent-1', 'skill-release', 'queued')`,
+        ),
+      ]);
+
+      const sql = await readFile(
+        resolve("migrations", "0082_explicit_agent_skill_selection.sql"),
+        "utf8",
+      );
+      for (const statement of unstable_splitSqlQuery(sql)) {
+        await db.prepare(statement).run();
+      }
+
+      const taskJobs = await db.prepare(
+        `select id, skill_id from briar_project_agent_task_jobs order by id`,
+      ).all<{ id: string; skill_id: string | null }>();
+      expect(taskJobs.results).toEqual([
+        { id: "task-completed", skill_id: null },
+        { id: "task-queued", skill_id: "skill-issue" },
+      ]);
+      const replyJobs = await db.prepare(
+        `select id, skill_id from briar_channel_agent_reply_jobs order by id`,
+      ).all<{ id: string; skill_id: string | null }>();
+      expect(replyJobs.results).toEqual([
+        { id: "reply-explicit", skill_id: "skill-release" },
+        { id: "reply-running", skill_id: "skill-issue" },
+      ]);
+      const skillFlags = await db.prepare(
+        `select id, is_default from briar_agent_skills order by id`,
+      ).all<{ id: string; is_default: number }>();
+      expect(skillFlags.results.every((skill) => skill.is_default === 0)).toBe(true);
+      const retiredIndex = await db.prepare(
+        `select name from sqlite_master
+         where type = 'index' and name = 'briar_agent_skills_default_idx'`,
+      ).first<{ name: string }>();
+      expect(retiredIndex).toBeNull();
+    } finally {
+      await miniflare.dispose();
+    }
+  });
+
   it("adds workflow v2 progress without rewriting stored snapshots", async () => {
     const sql = await readFile(
       resolve("migrations", "0059_workflow_v2_progress.sql"),

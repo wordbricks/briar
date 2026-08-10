@@ -16,6 +16,12 @@ final class AgentsInboxSystemTests: XCTestCase {
         XCTAssertEqual(agents.agents.count, 1)
         XCTAssertEqual(agents.agents.first?.name, "Issue processing agent")
         XCTAssertEqual(agents.agents.first?.provider, .codex)
+        XCTAssertEqual(agents.agents.first?.skills.count, 1)
+        XCTAssertEqual(agents.agents.first?.skills.first?.name, "Issue processing")
+        XCTAssertEqual(
+            agents.agents.first?.skills.first?.id,
+            UUID(uuidString: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")
+        )
         XCTAssertNotNil(agents.agents.first?.avatar)
         XCTAssertNotNil(ProfileImageSource.uiImage(from: agents.agents.first?.avatar))
 
@@ -32,6 +38,10 @@ final class AgentsInboxSystemTests: XCTestCase {
         let taskPayload = try XCTUnwrap(operations["runProjectAgentTask"]?["response"])
         let taskData = try JSONSerialization.data(withJSONObject: taskPayload)
         let task = try JSONDecoder.mobileContract.decode(ProjectAgentTaskResponse.self, from: taskData)
+        XCTAssertEqual(
+            task.session.skillId,
+            UUID(uuidString: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")
+        )
         XCTAssertEqual(task.session.requestedWorkerId, "worker-1")
         XCTAssertEqual(task.session.workerId, "worker-1")
     }
@@ -57,9 +67,11 @@ final class AgentsInboxSystemTests: XCTestCase {
 
     func testProjectAgentTaskRequestEncodesCanonicalUUIDs() throws {
         let agentID = UUID(uuidString: "AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA")!
-        let requestID = UUID(uuidString: "BBBBBBBB-BBBB-4BBB-8BBB-BBBBBBBBBBBB")!
+        let skillID = UUID(uuidString: "BBBBBBBB-BBBB-4BBB-8BBB-BBBBBBBBBBBB")!
+        let requestID = UUID(uuidString: "CCCCCCCC-CCCC-4CCC-8CCC-CCCCCCCCCCCC")!
         let request = ProjectAgentTaskRequest(
             agentId: agentID,
+            skillId: skillID,
             request: "저장된 Agent를 실행합니다.",
             workerId: "worker-1",
             requestId: requestID
@@ -72,7 +84,137 @@ final class AgentsInboxSystemTests: XCTestCase {
         )
 
         XCTAssertEqual(object["agentId"] as? String, agentID.uuidString.lowercased())
+        XCTAssertEqual(object["skillId"] as? String, skillID.uuidString.lowercased())
         XCTAssertEqual(object["requestId"] as? String, requestID.uuidString.lowercased())
+    }
+
+    @MainActor
+    func testDirectAgentTaskSendsTheExplicitSelectedSkill() async throws {
+        let projectID = UUID(uuidString: "11111111-1111-4111-8111-111111111111")!
+        let agentID = UUID(uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!
+        let skillID = UUID(uuidString: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")!
+        let createdAt = Date(timeIntervalSince1970: 1_700_000_000)
+        let skill = ProjectAgent.Skill(
+            id: skillID,
+            agentId: agentID,
+            name: "iOS 릴리즈",
+            instructions: "iOS 앱을 릴리즈합니다.",
+            provider: .claude,
+            model: "sonnet",
+            effort: .high,
+            kind: .custom,
+            position: 1,
+            createdAt: createdAt,
+            updatedAt: createdAt
+        )
+        let agent = ProjectAgent(
+            id: agentID,
+            projectId: projectID,
+            name: "개발자 Agent",
+            avatar: nil,
+            codexPet: nil,
+            provider: .codex,
+            model: nil,
+            effort: nil,
+            responsibility: "제품 개발을 담당합니다.",
+            skill: "legacy runtime profile",
+            skills: [skill],
+            calendarColor: "#3275d5",
+            createdAt: createdAt,
+            updatedAt: createdAt
+        )
+        let api = AgentExecutionAPIRecorder(projectID: projectID)
+        let store = AgentsStore(api: api)
+        store.select(projectID: projectID, token: "token", locale: "ko")
+
+        let session = try await store.run(
+            agent: agent,
+            skill: skill,
+            request: skill.instructions,
+            workerID: "worker-claude"
+        )
+        XCTAssertEqual(session.agentId, agentID)
+        XCTAssertEqual(session.request, skill.instructions)
+
+        let requests = await api.requests()
+        let taskRequest = try XCTUnwrap(requests.first {
+            $0.method == "POST" && $0.path.hasSuffix("/agent-tasks")
+        })
+        let body = try XCTUnwrap(taskRequest.body)
+        let object = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: body) as? [String: Any]
+        )
+        XCTAssertEqual(object["agentId"] as? String, agentID.uuidString.lowercased())
+        XCTAssertEqual(object["skillId"] as? String, skillID.uuidString.lowercased())
+        XCTAssertEqual(object["request"] as? String, skill.instructions)
+        XCTAssertEqual(object["workerId"] as? String, "worker-claude")
+    }
+
+    @MainActor
+    func testDirectAgentTaskRejectsDuplicateWhileTheFirstRequestIsPending() async throws {
+        let projectID = UUID(uuidString: "11111111-1111-4111-8111-111111111111")!
+        let agentID = UUID(uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!
+        let skillID = UUID(uuidString: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")!
+        let createdAt = Date(timeIntervalSince1970: 1_700_000_000)
+        let skill = ProjectAgent.Skill(
+            id: skillID,
+            agentId: agentID,
+            name: "iOS 릴리즈",
+            instructions: "iOS 앱을 릴리즈합니다.",
+            provider: .claude,
+            model: "sonnet",
+            effort: .high,
+            kind: .custom,
+            position: 1,
+            createdAt: createdAt,
+            updatedAt: createdAt
+        )
+        let agent = ProjectAgent(
+            id: agentID,
+            projectId: projectID,
+            name: "개발자 Agent",
+            avatar: nil,
+            codexPet: nil,
+            provider: .codex,
+            model: nil,
+            effort: nil,
+            responsibility: "제품 개발을 담당합니다.",
+            skill: "legacy runtime profile",
+            skills: [skill],
+            calendarColor: "#3275d5",
+            createdAt: createdAt,
+            updatedAt: createdAt
+        )
+        let api = AgentExecutionAPIRecorder(projectID: projectID, suspendDirectTasks: true)
+        let store = AgentsStore(api: api)
+        store.select(projectID: projectID, token: "token", locale: "ko")
+
+        let firstRun = Task {
+            try await store.run(
+                agent: agent,
+                skill: skill,
+                request: skill.instructions,
+                workerID: "worker-claude"
+            )
+        }
+        await api.waitForDirectTaskStart()
+        XCTAssertTrue(store.executingAgentIDs.contains(agentID))
+
+        do {
+            _ = try await store.run(
+                agent: agent,
+                skill: skill,
+                request: skill.instructions,
+                workerID: "worker-claude"
+            )
+            XCTFail("A second run for the same Agent should be rejected")
+        } catch {
+            XCTAssertEqual(error as? AgentsStoreError, .duplicateExecution)
+        }
+
+        await api.releaseDirectTask()
+        _ = try await firstRun.value
+        XCTAssertFalse(store.executingAgentIDs.contains(agentID))
     }
 
     @MainActor
@@ -214,7 +356,7 @@ final class AgentsInboxSystemTests: XCTestCase {
         let data = try JSONEncoder.mobileContract.encode(ProjectAgentSessionSyncRequest(session: session))
         let object = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
         XCTAssertEqual(Set(object.keys), Set([
-            "dispatchGroupId", "agentId", "sessionType", "trigger", "scheduleId",
+            "dispatchGroupId", "agentId", "skillId", "sessionType", "trigger", "scheduleId",
             "scheduleRunId", "parentSessionId", "request", "status", "issues",
             "startedAt", "completedAt", "conversationId", "summary", "error", "events",
             "updatedAt",
@@ -242,6 +384,7 @@ final class AgentsInboxSystemTests: XCTestCase {
     func testRunningAgentDispatchesReadyIssuesWithAgentConfiguration() async throws {
         let projectID = UUID(uuidString: "11111111-1111-4111-8111-111111111111")!
         let agentID = UUID(uuidString: "22222222-2222-4222-8222-222222222222")!
+        let skillID = UUID(uuidString: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")!
         let runID = UUID(uuidString: "33333333-3333-4333-8333-333333333333")!
         let api = AgentExecutionAPIRecorder(projectID: projectID)
         let store = AgentsStore(api: api)
@@ -259,6 +402,19 @@ final class AgentsInboxSystemTests: XCTestCase {
             effort: .high,
             responsibility: "queued 이슈를 처리합니다.",
             skill: "skill",
+            skills: [ProjectAgent.Skill(
+                id: skillID,
+                agentId: agentID,
+                name: "이슈 처리",
+                instructions: "queued 이슈를 처리합니다.",
+                provider: .codex,
+                model: "gpt-5.6-sol",
+                effort: .high,
+                kind: .issueProcessing,
+                position: 0,
+                createdAt: Date(timeIntervalSince1970: 1_700_000_000),
+                updatedAt: Date(timeIntervalSince1970: 1_700_000_000)
+            )],
             calendarColor: "#22c55e",
             createdAt: Date(timeIntervalSince1970: 1_700_000_000),
             updatedAt: Date(timeIntervalSince1970: 1_700_000_000)
@@ -596,13 +752,30 @@ private actor AgentExecutionAPIRecorder: MobileAPIClientProtocol {
     }
 
     private let projectID: UUID
+    private let suspendDirectTasks: Bool
     private var recorded: [Request] = []
+    private var directTaskStarted = false
+    private var directTaskStartWaiters: [CheckedContinuation<Void, Never>] = []
+    private var directTaskRelease: CheckedContinuation<Void, Never>?
 
-    init(projectID: UUID) {
+    init(projectID: UUID, suspendDirectTasks: Bool = false) {
         self.projectID = projectID
+        self.suspendDirectTasks = suspendDirectTasks
     }
 
     func requests() -> [Request] { recorded }
+
+    func waitForDirectTaskStart() async {
+        if directTaskStarted { return }
+        await withCheckedContinuation { continuation in
+            directTaskStartWaiters.append(continuation)
+        }
+    }
+
+    func releaseDirectTask() {
+        directTaskRelease?.resume()
+        directTaskRelease = nil
+    }
 
     func send<Response: Decodable & Sendable>(
         _ path: String,
@@ -626,6 +799,56 @@ private actor AgentExecutionAPIRecorder: MobileAPIClientProtocol {
             session["projectId"] = projectID.uuidString.lowercased()
             return try response(
                 ["session": session],
+                as: responseType
+            )
+        }
+        if method == "POST", path.hasSuffix("/agent-tasks") {
+            if suspendDirectTasks {
+                directTaskStarted = true
+                let waiters = directTaskStartWaiters
+                directTaskStartWaiters = []
+                waiters.forEach { $0.resume() }
+                await withCheckedContinuation { continuation in
+                    directTaskRelease = continuation
+                }
+            }
+            guard let request = try JSONSerialization.jsonObject(
+                with: try XCTUnwrap(bodyData)
+            ) as? [String: Any] else {
+                throw MobileAPIError.invalidRequest
+            }
+            return try response(
+                [
+                    "session": [
+                        "id": "session-direct-1",
+                        "projectId": projectID.uuidString.lowercased(),
+                        "dispatchGroupId": "session-direct-1",
+                        "agentId": request["agentId"] ?? NSNull(),
+                        "skillId": request["skillId"] ?? NSNull(),
+                        "sessionType": "task",
+                        "trigger": "manual",
+                        "scheduleId": NSNull(),
+                        "scheduleRunId": NSNull(),
+                        "parentSessionId": NSNull(),
+                        "request": request["request"] ?? NSNull(),
+                        "status": "running",
+                        "issues": [],
+                        "startedAt": "2026-08-10T00:00:00.000Z",
+                        "completedAt": NSNull(),
+                        "conversationId": NSNull(),
+                        "workspaceRoot": NSNull(),
+                        "requestedWorkerId": request["workerId"] ?? NSNull(),
+                        "workerId": request["workerId"] ?? NSNull(),
+                        "summary": NSNull(),
+                        "error": NSNull(),
+                        "events": [[
+                            "id": "event-direct-1",
+                            "type": "started",
+                            "occurredAt": "2026-08-10T00:00:00.000Z",
+                        ]],
+                        "updatedAt": "2026-08-10T00:00:00.000Z",
+                    ],
+                ],
                 as: responseType
             )
         }

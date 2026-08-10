@@ -16,7 +16,6 @@ export type AgentSkillInput = {
   model: string | null;
   effort: AgentSkillEffort | null;
   kind: AgentSkillKind;
-  isDefault: boolean;
   position: number;
 };
 
@@ -68,17 +67,14 @@ export function normalizedAgentSkillRows(
   fallback: AgentSkillFallback,
   observedAt: string,
 ): AgentSkillRow[] {
-  const requested = input?.length
-    ? input
-    : [{
-        ...fallback,
-        kind: fallback.kind ?? "custom",
-        isDefault: true,
-        position: 0,
-      }];
-  if (requested.filter((skill) => skill.isDefault).length !== 1) {
-    throw new Error("An Agent must have exactly one default Skill");
+  if (input && input.length === 0) {
+    throw new Error("An Agent must have at least one Skill");
   }
+  const requested = input ?? [{
+    ...fallback,
+    kind: fallback.kind ?? "custom",
+    position: 0,
+  }];
   const names = new Set<string>();
   const ids = new Set<string>();
   return requested.map((skill, index) => {
@@ -110,7 +106,7 @@ export function normalizedAgentSkillRows(
       model: normalizedModel,
       effort: skill.effort,
       kind: skill.kind,
-      is_default: skill.isDefault ? 1 : 0,
+      is_default: 0,
       position: skill.position ?? index,
       created_at: observedAt,
       updated_at: observedAt,
@@ -165,12 +161,37 @@ const activeAgentSkillJobPredicate = (skillAlias: string) => `
       and reply.status in ('queued', 'running')
   )`;
 
+const activeDirectAgentSkillJobPredicate = (skillAlias: string) => `
+  exists (
+    select 1 from briar_project_agent_task_jobs task
+    where task.skill_id = ${skillAlias}.id
+      and task.status in ('queued', 'running')
+  )`;
+
+const agentSkillRuntimeChanged = (
+  current: Pick<
+    AgentSkillRow,
+    "instructions" | "provider" | "model" | "effort"
+  >,
+  requested: Pick<
+    AgentSkillRow,
+    "instructions" | "provider" | "model" | "effort"
+  >,
+) =>
+  current.instructions !== requested.instructions ||
+  current.provider !== requested.provider ||
+  current.model !== requested.model ||
+  current.effort !== requested.effort;
+
 export async function assertAgentSkillReplacementAllowed(
   db: D1Database,
   agentId: string,
-  retainedSkillIds: readonly string[],
+  skills: readonly AgentSkillRow[],
 ) {
-  if (retainedSkillIds.length === 0) return;
+  if (skills.length === 0) {
+    throw new Error("An Agent must have at least one Skill");
+  }
+  const retainedSkillIds = skills.map((skill) => skill.id);
   const placeholders = retainedSkillIds.map(() => "?").join(", ");
   const blocked = await db
     .prepare(
@@ -188,6 +209,80 @@ export async function assertAgentSkillReplacementAllowed(
       `Agent Skill "${blocked.name}" cannot be deleted while queued or running work still references it`,
     );
   }
+
+  const active = await db
+    .prepare(
+      `select skill.id, skill.name, skill.instructions, skill.provider,
+              skill.model, skill.effort
+       from briar_agent_skills skill
+       where skill.agent_id = ? and skill.id in (${placeholders})
+         and (${activeDirectAgentSkillJobPredicate("skill")})
+       order by skill.position, skill.created_at, skill.id`,
+    )
+    .bind(agentId, ...retainedSkillIds)
+    .all<
+      Pick<
+        AgentSkillRow,
+        "id" | "name" | "instructions" | "provider" | "model" | "effort"
+      >
+    >();
+  const requestedById = new Map(skills.map((skill) => [skill.id, skill]));
+  const changed = active.results.find((current) => {
+    const requested = requestedById.get(current.id);
+    return requested ? agentSkillRuntimeChanged(current, requested) : false;
+  });
+  if (changed) {
+    throw new AgentSkillConflictError(
+      `Agent Skill "${changed.name}" cannot change instructions or execution settings while queued or running direct Agent work still references it`,
+    );
+  }
+}
+
+function guardActiveDirectAgentSkillRuntimeStatement(
+  db: D1Database,
+  agentId: string,
+  skills: readonly AgentSkillRow[],
+) {
+  const requestedRuntimeJson = JSON.stringify(
+    skills.map((skill) => ({
+      id: skill.id,
+      instructions: skill.instructions,
+      provider: skill.provider,
+      model: skill.model,
+      effort: skill.effort,
+    })),
+  );
+  return db
+    .prepare(
+      `with requested as (
+         select json_extract(value, '$.id') as id,
+                json_extract(value, '$.instructions') as instructions,
+                json_extract(value, '$.provider') as provider,
+                json_extract(value, '$.model') as model,
+                json_extract(value, '$.effort') as effort
+         from json_each(?)
+       )
+       insert into briar_agent_skills (
+         id, agent_id, name, instructions, provider, model, effort, kind,
+         is_default, position, created_at, updated_at
+       )
+       select skill.id, skill.agent_id, skill.name, skill.instructions,
+              skill.provider, skill.model, skill.effort, skill.kind,
+              skill.is_default, skill.position, skill.created_at,
+              skill.updated_at
+       from briar_agent_skills skill
+       join requested on requested.id = skill.id
+       where skill.agent_id = ?
+         and (${activeDirectAgentSkillJobPredicate("skill")})
+         and (
+           skill.instructions is not requested.instructions
+           or skill.provider is not requested.provider
+           or skill.model is not requested.model
+           or skill.effort is not requested.effort
+         )
+       limit 1`,
+    )
+    .bind(requestedRuntimeJson, agentId);
 }
 
 /**
@@ -196,8 +291,8 @@ export async function assertAgentSkillReplacementAllowed(
  * The statements must run in one D1 batch. First, a copied-row insert turns an
  * ID owned by another Agent into a deliberate primary-key failure, so the
  * entire batch rolls back instead of silently adopting or ignoring it. Existing
- * names/defaults are then moved out of the unique indexes before the final
- * upserts, which makes name swaps and default changes safe. Only omitted IDs
+ * names are then moved out of the unique index before the final
+ * upserts, which makes name swaps safe. Only omitted IDs
  * are deleted (and therefore only those job references can be set to null).
  */
 export function replaceAgentSkillStatements(
@@ -210,9 +305,6 @@ export function replaceAgentSkillStatements(
   }
   if (skills.some((skill) => skill.agent_id !== agentId)) {
     throw new Error("Agent Skill rows must belong to the Agent being updated");
-  }
-  if (skills.filter((skill) => skill.is_default === 1).length !== 1) {
-    throw new Error("An Agent must have exactly one default Skill");
   }
   const ids = skills.map((skill) => skill.id);
   if (new Set(ids).size !== ids.length) {
@@ -233,6 +325,12 @@ export function replaceAgentSkillStatements(
          limit 1`,
       )
       .bind(...ids, agentId),
+    // Runtime settings are read when a direct task is claimed. Changing them
+    // while that task is queued or running can make its pinned Worker
+    // ineligible or resume it with a different provider. The self-insert turns
+    // a preflight race into the same retryable primary-key conflict used by the
+    // deletion guard below.
+    guardActiveDirectAgentSkillRuntimeStatement(db, agentId, skills),
     // Close the race between the friendly preflight check and this atomic
     // batch. Copying a still-referenced removed row conflicts with its own
     // primary key and rolls the complete Agent update back.
@@ -299,15 +397,13 @@ export function insertAgentSkillStatement(
 
 /**
  * A client from before first-class Skills omits the `skills` field and expects
- * the Agent execution controls to affect the next run. Keep that rolling
- * compatibility behavior scoped to the default Skill; current clients submit
- * the complete roster and therefore keep Agent-level new-Skill defaults
- * independent from existing Skill runtimes.
+ * the Agent execution controls to affect the next run. Preserve that behavior
+ * only when the Agent has one unambiguous Skill. A multi-Skill roster must
+ * never be changed by an implicit selection.
  */
-export function updateDefaultAgentSkillFromLegacyStatement(
-  db: D1Database,
+export function soleAgentSkillRowFromLegacy(
+  skills: readonly AgentSkillRow[],
   input: {
-    agentId: string;
     instructions: string;
     provider: AgentSkillProvider;
     model: string | null;
@@ -315,20 +411,16 @@ export function updateDefaultAgentSkillFromLegacyStatement(
     updatedAt: string;
   },
 ) {
-  return db
-    .prepare(
-      `update briar_agent_skills
-       set instructions = ?, provider = ?, model = ?, effort = ?, updated_at = ?
-       where agent_id = ? and is_default = 1`,
-    )
-    .bind(
-      input.instructions.trim(),
-      input.provider,
-      input.model?.trim() || null,
-      input.effort,
-      input.updatedAt,
-      input.agentId,
-    );
+  if (skills.length !== 1) return null;
+  return {
+    ...skills[0],
+    instructions: input.instructions.trim(),
+    provider: input.provider,
+    model: input.model?.trim() || null,
+    effort: input.effort,
+    is_default: 0,
+    updated_at: input.updatedAt,
+  } satisfies AgentSkillRow;
 }
 
 export async function listAgentSkills(
@@ -369,18 +461,30 @@ export async function getAgentSkill(
   agentId: string,
   skillId?: string | null,
 ) {
-  const condition = skillId ? "id = ?" : "is_default = 1";
-  return db
+  if (skillId) {
+    return db
+      .prepare(
+        `select id, agent_id, name, instructions, provider, model, effort, kind,
+                is_default, position, created_at, updated_at
+         from briar_agent_skills
+         where agent_id = ? and id = ?
+         limit 1`,
+      )
+      .bind(agentId, skillId)
+      .first<AgentSkillRow>();
+  }
+  const result = await db
     .prepare(
       `select id, agent_id, name, instructions, provider, model, effort, kind,
               is_default, position, created_at, updated_at
        from briar_agent_skills
-       where agent_id = ? and ${condition}
+       where agent_id = ?
        order by position, created_at, id
-       limit 1`,
+       limit 2`,
     )
-    .bind(...(skillId ? [agentId, skillId] : [agentId]))
-    .first<AgentSkillRow>();
+    .bind(agentId)
+    .all<AgentSkillRow>();
+  return result.results.length === 1 ? result.results[0] : null;
 }
 
 export async function hydrateAgentSkills<T extends { id: string }>(
@@ -409,39 +513,34 @@ export const agentSkillJson = (skill: AgentSkillRow) => ({
   model: skill.model,
   effort: skill.effort,
   kind: skill.kind,
-  isDefault: skill.is_default === 1,
+  // Workers from before explicit Skill selection require this wire field.
+  // It is always false and has no selection or persistence semantics.
+  isDefault: false,
   position: skill.position,
   createdAt: skill.created_at,
   updatedAt: skill.updated_at,
 });
 
-export const defaultAgentSkillRow = (skills: readonly AgentSkillRow[]) =>
-  skills.find((skill) => skill.is_default === 1) ?? null;
-
 export const issueProcessingAgentSkillRow = (
   skills: readonly AgentSkillRow[],
-) =>
-  skills.find((skill) => skill.kind === "issue_processing") ??
-  defaultAgentSkillRow(skills);
+) => skills.find((skill) => skill.kind === "issue_processing") ?? null;
 
 /**
  * A channel invocation can name one of the Agent's saved Skills in plain
  * language. Prefer the longest matching name so a specific Skill such as
- * "iOS release" wins over a broader "release" Skill; otherwise use the
- * configured default.
+ * "iOS release" wins over a broader "release" Skill. When no Skill is named,
+ * the Agent receives its whole roster and chooses within its responsibility.
  */
 export function agentSkillForMessage(
   skills: readonly AgentSkillRow[],
   message: string,
 ) {
   const normalizedMessage = message.normalize("NFKC").toLocaleLowerCase();
-  return (
-    [...skills]
-      .sort((left, right) => right.name.length - left.name.length)
-      .find((skill) =>
-        normalizedMessage.includes(
-          skill.name.normalize("NFKC").toLocaleLowerCase(),
-        ),
-      ) ?? defaultAgentSkillRow(skills)
-  );
+  return [...skills]
+    .sort((left, right) => right.name.length - left.name.length)
+    .find((skill) =>
+      normalizedMessage.includes(
+        skill.name.normalize("NFKC").toLocaleLowerCase(),
+      ),
+    ) ?? null;
 }

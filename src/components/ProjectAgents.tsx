@@ -35,8 +35,6 @@ import {
 import { demoProjectAgents } from "../lib/demo-project-agents";
 import {
   agentWithSkillRuntime,
-  defaultAgentSkill,
-  issueProcessingAgentSkill,
   defaultProjectAgentCalendarColor,
   projectAgentSkill,
 } from "../lib/project-agent";
@@ -62,6 +60,10 @@ import { NativeSelect } from "./NativeSelect";
 import { ProjectAgentAvatar } from "./ProjectAgentAvatar";
 import { ProjectAgentDetail } from "./ProjectAgentDetail";
 import { ProjectAgentSettings } from "./ProjectAgentSettings";
+import {
+  ProjectAgentTaskDialog,
+  type ProjectAgentTaskDialogSubmit,
+} from "./ProjectAgentTaskDialog";
 
 const providerLabels: Record<AgentProvider, string> = {
   codex: "Codex",
@@ -111,7 +113,7 @@ export function ProjectAgents({
   ) => string | Promise<string>;
   onStartRemoteTask?: (
     agent: ProjectAgent,
-    input: { request: string; workerId: string; skillId?: string },
+    input: { request: string; workerId: string; skillId: string },
   ) => string | Promise<string>;
   onStartTaskSession: (
     agent: ProjectAgent,
@@ -129,6 +131,8 @@ export function ProjectAgents({
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [settingsAgent, setSettingsAgent] = useState<ProjectAgent | null>(null);
   const [selectedAgent, setSelectedAgent] = useState<ProjectAgent | null>(null);
+  const [taskDialogAgent, setTaskDialogAgent] =
+    useState<ProjectAgent | null>(null);
   const [executingAgentIds, setExecutingAgentIds] = useState<Set<string>>(
     () => new Set(),
   );
@@ -151,6 +155,13 @@ export function ProjectAgents({
   useMobileBackHandler(
     () => {
       if (!companionMode) return false;
+      if (taskDialogAgent) {
+        if (!executingAgentIds.has(taskDialogAgent.id)) {
+          setTaskDialogAgent(null);
+          setExecutionError(null);
+        }
+        return true;
+      }
       if (isDialogOpen) {
         setIsDialogOpen(false);
         return true;
@@ -195,6 +206,7 @@ export function ProjectAgents({
   useEffect(() => {
     setSelectedAgent(null);
     setSettingsAgent(null);
+    setTaskDialogAgent(null);
     setExecutionError(null);
   }, [project.id]);
 
@@ -296,7 +308,10 @@ export function ProjectAgents({
     setIsDialogOpen(false);
   };
 
-  const runResponsibility = async (agent: ProjectAgent) => {
+  const runTask = async (
+    agent: ProjectAgent,
+    input: ProjectAgentTaskDialogSubmit,
+  ) => {
     if (
       !dashboard ||
       runningAgentIds.has(agent.id) ||
@@ -308,13 +323,18 @@ export function ProjectAgents({
     setExecutingAgentIds((current) => new Set(current).add(agent.id));
     try {
       if (companionMode) {
-        setSelectedAgent(agent);
+        if (!onStartRemoteTask || !input.workerId) {
+          throw new Error(t("agents.selectRunnableWorker"));
+        }
+        await onStartRemoteTask(agent, {
+          request: input.request,
+          workerId: input.workerId,
+          skillId: input.skill.id,
+        });
+        setTaskDialogAgent(null);
         return;
       }
-      const selectedSkill = issueProcessingAgentSkill(agent);
-      const runtimeAgent = selectedSkill
-        ? agentWithSkillRuntime(agent, selectedSkill)
-        : agent;
+      const runtimeAgent = agentWithSkillRuntime(agent, input.skill);
       await executeProjectAgentTask(
         {
           runAgent: runProjectAgent,
@@ -326,9 +346,11 @@ export function ProjectAgents({
         {
           agent: runtimeAgent,
           dashboard,
-          message: selectedSkill?.instructions ?? agent.responsibility,
+          message: input.request,
+          skillId: input.skill.id,
         },
       );
+      setTaskDialogAgent(null);
     } catch (caught) {
       setExecutionError(
         caught instanceof Error ? caught.message : String(caught),
@@ -367,7 +389,6 @@ export function ProjectAgents({
         onBack={() => setSelectedAgent(null)}
         onIssueOpen={onIssueOpen}
         onRequestedSessionOpen={onRequestedSessionOpen}
-        onRunResponsibility={() => runResponsibility(selectedAgent)}
         onStartRemoteTask={
           onStartRemoteTask
             ? (input) => onStartRemoteTask(selectedAgent, input)
@@ -469,7 +490,6 @@ export function ProjectAgents({
                   const isRunning =
                     runningAgentIds.has(agent.id) ||
                     executingAgentIds.has(agent.id);
-                  const runtime = defaultAgentSkill(agent) ?? agent;
                   return (
                     <article className="project-agent-card" key={agent.id}>
                       <button
@@ -493,19 +513,19 @@ export function ProjectAgents({
                         </header>
                         <div className="project-agent-runtime">
                           <span
-                            aria-label={providerLabels[runtime.provider]}
-                            className={`project-agent-provider-icon ${runtime.provider}`}
+                            aria-label={providerLabels[agent.provider]}
+                            className={`project-agent-provider-icon ${agent.provider}`}
                             role="img"
-                            title={providerLabels[runtime.provider]}
+                            title={providerLabels[agent.provider]}
                           >
                             <AgentProviderIcon
-                              provider={runtime.provider}
+                              provider={agent.provider}
                               size={14}
                             />
                           </span>
                           <span>
                             {modelLabel(
-                              runtime,
+                              agent,
                               t("agents.providerDefaultModel"),
                             )}
                           </span>
@@ -526,7 +546,6 @@ export function ProjectAgents({
                             <ul>
                               {agent.skills.slice(0, 3).map((skill) => (
                                 <li
-                                  className={skill.isDefault ? "default" : ""}
                                   key={skill.id}
                                   title={skill.instructions}
                                 >
@@ -557,13 +576,14 @@ export function ProjectAgents({
                             name: agent.name,
                           })}
                           className="project-agent-run-button"
-                          disabled={isRunning || !dashboard}
+                          disabled={
+                            isRunning ||
+                            !dashboard ||
+                            agent.skills.length === 0
+                          }
                           onClick={() => {
-                            if (companionMode) {
-                              setSelectedAgent(agent);
-                            } else {
-                              void runResponsibility(agent);
-                            }
+                            setExecutionError(null);
+                            setTaskDialogAgent(agent);
                           }}
                           title={t("agents.runAgent", { name: agent.name })}
                           type="button"
@@ -623,6 +643,28 @@ export function ProjectAgents({
           onSubmit={addAgent}
         />
       )}
+      <ProjectAgentTaskDialog
+        agent={taskDialogAgent}
+        companionMode={companionMode}
+        dashboard={dashboard}
+        error={executionError}
+        isOpen={taskDialogAgent !== null}
+        isSubmitting={
+          taskDialogAgent
+            ? executingAgentIds.has(taskDialogAgent.id)
+            : false
+        }
+        onOpenChange={(open) => {
+          if (!open) {
+            setTaskDialogAgent(null);
+            setExecutionError(null);
+          }
+        }}
+        onSubmit={(input) => {
+          if (!taskDialogAgent) return;
+          return runTask(taskDialogAgent, input);
+        }}
+      />
     </MainContent>
   );
 }
@@ -864,7 +906,7 @@ function localProjectAgent(
 ): ProjectAgent {
   const id = crypto.randomUUID();
   const name = input.name ?? `${providerLabels[input.provider]} Agent`;
-  const defaultSkills: ProjectAgentSkillInput[] = [
+  const initialSkills: ProjectAgentSkillInput[] = [
     {
       name,
       instructions: input.responsibility,
@@ -872,7 +914,6 @@ function localProjectAgent(
       model: input.model,
       effort: input.effort ?? null,
       kind: "custom",
-      isDefault: true,
       position: 0,
     },
   ];
@@ -889,7 +930,7 @@ function localProjectAgent(
     skill: projectAgentSkill({ name, responsibility: input.responsibility }),
     skills: localProjectAgentSkills(
       id,
-      input.skills?.length ? input.skills : defaultSkills,
+      input.skills?.length ? input.skills : initialSkills,
       createdAt,
       [],
     ),

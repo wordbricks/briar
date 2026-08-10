@@ -1,8 +1,4 @@
-import {
-  ArrowLeft,
-  LoaderCircle,
-  Play,
-} from "lucide-react";
+import { ArrowLeft, LoaderCircle, Play } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import {
@@ -11,15 +7,6 @@ import {
   PageHeader,
 } from "@/components/layout";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
 import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
 import { useMobileBackHandler } from "../hooks/useMobileNavigation";
 import { useI18n } from "../i18n";
@@ -30,7 +17,7 @@ import {
 } from "../lib/project-agent-execution";
 import {
   agentWithSkillRuntime,
-  defaultAgentSkill,
+  agentWithSkillsRuntime,
 } from "../lib/project-agent";
 import { runProjectAgent } from "../lib/project-llm";
 import type {
@@ -38,9 +25,12 @@ import type {
   HuntRun,
   ProjectAgent,
 } from "../types";
-import { NativeSelect } from "./NativeSelect";
 import { ProjectAgentSessionDetail } from "./ProjectAgentSessionDetail";
 import { ProjectAgentSessions } from "./ProjectAgentSessions";
+import {
+  ProjectAgentTaskDialog,
+  type ProjectAgentTaskDialogSubmit,
+} from "./ProjectAgentTaskDialog";
 
 export type {
   ProjectAgentTaskSessionSettlement,
@@ -74,11 +64,10 @@ export function ProjectAgentDetail({
   onBack: () => void;
   onIssueOpen: (runId: string) => void;
   onRequestedSessionOpen?: () => void;
-  onRunResponsibility?: () => void | Promise<void>;
   onStartRemoteTask?: (input: {
     request: string;
     workerId: string;
-    skillId?: string;
+    skillId: string;
   }) => string | Promise<string>;
   onSettleTaskSession: (
     sessionId: string,
@@ -102,38 +91,12 @@ export function ProjectAgentDetail({
   token?: string | null;
 }) {
   const { t } = useI18n();
-  const initialSkill = defaultAgentSkill(agent);
-  const [selectedSkillId, setSelectedSkillId] = useState(
-    initialSkill?.id ?? "",
-  );
-  const selectedSkill =
-    agent.skills.find((skill) => skill.id === selectedSkillId) ?? initialSkill;
-  const runtimeAgent = selectedSkill
-    ? agentWithSkillRuntime(agent, selectedSkill)
-    : agent;
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
-  const [request, setRequest] = useState(
-    initialSkill?.instructions ?? agent.responsibility,
-  );
   const [isRunning, setIsRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(
     requestedSessionId,
   );
-  const availableWorkersForProvider = (provider: ProjectAgent["provider"]) =>
-    (dashboard?.workers ?? []).filter(
-      (worker) =>
-        (worker.providers ?? [worker.agentProvider]).includes(provider) &&
-        worker.acceptingWork &&
-        worker.readiness === "available",
-    );
-  const availableWorkers = availableWorkersForProvider(runtimeAgent.provider);
-  const hasAvailableWorkerForAnySkill = (
-    agent.skills.length > 0
-      ? agent.skills.map((skill) => skill.provider)
-      : [agent.provider]
-  ).some((provider) => availableWorkersForProvider(provider).length > 0);
-  const [selectedWorkerId, setSelectedWorkerId] = useState("");
   const selectedSession =
     sessions.find(
       (session) =>
@@ -144,6 +107,13 @@ export function ProjectAgentDetail({
   useMobileBackHandler(
     () => {
       if (!companionMode) return false;
+      if (isTaskDialogOpen) {
+        if (!isRunning) {
+          setIsTaskDialogOpen(false);
+          setError(null);
+        }
+        return true;
+      }
       if (selectedSessionId) {
         setSelectedSessionId(null);
         return true;
@@ -153,11 +123,6 @@ export function ProjectAgentDetail({
     },
     { enabled: companionMode, priority: 200 },
   );
-
-  useEffect(() => {
-    if (selectedSkill) return;
-    setSelectedSkillId(initialSkill?.id ?? "");
-  }, [initialSkill, selectedSkill]);
 
   useEffect(() => {
     if (
@@ -182,14 +147,6 @@ export function ProjectAgentDetail({
   ]);
 
   useEffect(() => {
-    if (!companionMode) return;
-    if (availableWorkers.some((worker) => worker.id === selectedWorkerId)) {
-      return;
-    }
-    setSelectedWorkerId(availableWorkers[0]?.id ?? "");
-  }, [availableWorkers, companionMode, selectedWorkerId]);
-
-  useEffect(() => {
     if (selectedSession) setIsTaskDialogOpen(false);
   }, [selectedSession]);
 
@@ -210,25 +167,23 @@ export function ProjectAgentDetail({
   ]);
 
   const openTaskDialog = () => {
-    setRequest(selectedSkill?.instructions ?? agent.responsibility);
     setError(null);
     setIsTaskDialogOpen(true);
   };
 
-  const submit = async () => {
-    const message = request.trim();
-    if (!message || isRunning || !dashboard) return;
+  const submit = async (input: ProjectAgentTaskDialogSubmit) => {
+    if (isRunning || !dashboard) return;
     setError(null);
     setIsRunning(true);
     try {
       if (companionMode) {
-        if (!onStartRemoteTask || !selectedWorkerId) {
-          throw new Error("실행할 수 있는 Worker를 선택해 주세요.");
+        if (!onStartRemoteTask || !input.workerId) {
+          throw new Error(t("agents.selectRunnableWorker"));
         }
         const sessionId = await onStartRemoteTask({
-          request: message,
-          workerId: selectedWorkerId,
-          skillId: selectedSkill?.id,
+          request: input.request,
+          workerId: input.workerId,
+          skillId: input.skill.id,
         });
         setSelectedSessionId(sessionId);
         setIsTaskDialogOpen(false);
@@ -236,6 +191,7 @@ export function ProjectAgentDetail({
       }
       const sessionId = crypto.randomUUID();
       setSelectedSessionId(sessionId);
+      const runtimeAgent = agentWithSkillRuntime(agent, input.skill);
       await executeProjectAgentTask(
         {
           runAgent: runProjectAgent,
@@ -246,8 +202,9 @@ export function ProjectAgentDetail({
         {
           agent: runtimeAgent,
           dashboard,
-          message,
+          message: input.request,
           sessionId,
+          skillId: input.skill.id,
         },
       );
     } catch (caught) {
@@ -268,6 +225,17 @@ export function ProjectAgentDetail({
     ) {
       throw new Error(t("agents.followUpUnavailable"));
     }
+    const selectedSkill = selectedSession.skillId
+      ? agent.skills.find((skill) => skill.id === selectedSession.skillId)
+      : null;
+    if (selectedSession.skillId && !selectedSkill) {
+      throw new Error(t("agents.followUpUnavailable"));
+    }
+    const runtimeAgent = selectedSkill
+      ? agentWithSkillRuntime(agent, selectedSkill)
+      : selectedSession.trigger === "scheduled"
+        ? agentWithSkillsRuntime(agent)
+        : agent;
     await executeProjectAgentTask(
       {
         runAgent: runProjectAgent,
@@ -276,9 +244,10 @@ export function ProjectAgentDetail({
         startAutoHunt: onStartAutoHunt,
       },
       {
-        agent,
+        agent: runtimeAgent,
         dashboard,
         message,
+        skillId: selectedSession.skillId,
         sessionId: selectedSession.id,
         conversationId: selectedSession.conversationId,
         workspaceRoot: selectedSession.workspaceRoot,
@@ -311,7 +280,7 @@ export function ProjectAgentDetail({
             disabled={
               isResponsibilityRunning ||
               !dashboard ||
-              (companionMode && !hasAvailableWorkerForAnySkill)
+              agent.skills.length === 0
             }
             onClick={openTaskDialog}
             type="button"
@@ -362,109 +331,16 @@ export function ProjectAgentDetail({
         />
       </div>
 
-      <Dialog
-        onOpenChange={(open) => {
-          if (!isRunning) setIsTaskDialogOpen(open);
-        }}
-        open={isTaskDialogOpen}
-      >
-        <DialogContent className="project-agent-task-dialog">
-          <DialogHeader>
-            <DialogTitle>{t("agents.taskTitle")}</DialogTitle>
-            <DialogDescription>
-              {t("agents.taskDescription")}
-            </DialogDescription>
-          </DialogHeader>
-
-          {error ? <ErrorBanner>{error}</ErrorBanner> : null}
-
-          {agent.skills.length > 1 ? (
-            <label className="project-agent-run-worker-select">
-              <span>{t("agents.skill")}</span>
-              <NativeSelect
-                disabled={isRunning}
-                label={t("agents.skill")}
-                onValueChange={(skillId) => {
-                  const nextSkill = agent.skills.find(
-                    (skill) => skill.id === skillId,
-                  );
-                  setSelectedSkillId(skillId);
-                  if (nextSkill) setRequest(nextSkill.instructions);
-                }}
-                options={agent.skills.map((skill) => ({
-                  label: skill.isDefault
-                    ? `${skill.name} · ${t("agents.defaultSkill")}`
-                    : skill.name,
-                  value: skill.id,
-                }))}
-                value={selectedSkill?.id ?? ""}
-              />
-            </label>
-          ) : null}
-
-          {companionMode ? (
-            <label className="project-agent-run-worker-select">
-              <span>실행 호스트</span>
-              <NativeSelect
-                disabled={isRunning || availableWorkers.length === 0}
-                label="실행 호스트"
-                onValueChange={setSelectedWorkerId}
-                options={availableWorkers.map((worker) => ({
-                  label: `${worker.icon?.type === "emoji" ? `${worker.icon.value} ` : ""}${worker.label}`,
-                  value: worker.id,
-                }))}
-                placeholder="Worker 선택"
-                value={selectedWorkerId}
-              />
-            </label>
-          ) : null}
-
-          {companionMode && availableWorkers.length === 0 ? (
-            <ErrorBanner>
-              {hasAvailableWorkerForAnySkill
-                ? t("agents.selectedSkillWorkerUnavailable")
-                : t("agents.agentWorkerUnavailable")}
-            </ErrorBanner>
-          ) : null}
-
-          <form
-            className="project-agent-run-composer"
-            id="project-agent-task-form"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void submit();
-            }}
-          >
-            <Textarea
-              aria-label={t("agents.taskInput")}
-              disabled={isRunning}
-              onChange={(event) => setRequest(event.target.value)}
-              placeholder={t("agents.taskPlaceholder")}
-              value={request}
-            />
-          </form>
-
-          <DialogFooter>
-            <Button
-              disabled={
-                isRunning ||
-                request.trim().length === 0 ||
-                !dashboard ||
-                (companionMode && !selectedWorkerId)
-              }
-              form="project-agent-task-form"
-              type="submit"
-            >
-              {isRunning ? (
-                <LoaderCircle className="spin" size={16} />
-              ) : (
-                <Play size={16} />
-              )}
-              {isRunning ? t("agents.running") : t("agents.runTask")}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ProjectAgentTaskDialog
+        agent={agent}
+        companionMode={companionMode}
+        dashboard={dashboard}
+        error={error}
+        isOpen={isTaskDialogOpen}
+        isSubmitting={isRunning}
+        onOpenChange={setIsTaskDialogOpen}
+        onSubmit={submit}
+      />
     </MainContent>
   );
 }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  agentWithSkillsRuntime,
   agentWithSkillRuntime,
-  defaultAgentSkill,
   defaultProjectAgentCopy,
   defaultProjectAgentSkillCopy,
   issueProcessingAgentSkill,
@@ -43,7 +43,7 @@ describe("default project agent copy", () => {
 });
 
 describe("project agent skills", () => {
-  it("selects the default and issue-processing skill and applies its runtime", () => {
+  it("selects issue processing only by kind and applies an explicit runtime", () => {
     const agent = demoProjectAgents("project-1", "en")[0]!;
     const issueSkill = agent.skills[0]!;
     const customSkill = {
@@ -55,15 +55,13 @@ describe("project agent skills", () => {
       model: "opus",
       effort: "high" as const,
       kind: "custom" as const,
-      isDefault: true,
       position: 1,
     };
     const agentWithMultipleSkills = {
       ...agent,
-      skills: [{ ...issueSkill, isDefault: false }, customSkill],
+      skills: [issueSkill, customSkill],
     };
 
-    expect(defaultAgentSkill(agentWithMultipleSkills)?.id).toBe("skill-release");
     expect(issueProcessingAgentSkill(agentWithMultipleSkills)?.id).toBe(
       issueSkill.id,
     );
@@ -73,6 +71,20 @@ describe("project agent skills", () => {
       effort: "high",
       skill: expect.stringContaining("Desktop release (active)"),
     });
+    expect(agentWithSkillsRuntime(agentWithMultipleSkills)).toMatchObject({
+      provider: agent.provider,
+      model: agent.model,
+      effort: agent.effort,
+      skill: expect.stringContaining("No Skill was preselected"),
+    });
+  });
+
+  it("does not substitute an unrelated Skill for issue processing", () => {
+    const agent = demoProjectAgents("project-1", "en")[0]!;
+    expect(issueProcessingAgentSkill({
+      ...agent,
+      skills: [{ ...agent.skills[0]!, kind: "custom" }],
+    })).toBeNull();
   });
 
   it("creates the same repository workflow contract for every agent", () => {

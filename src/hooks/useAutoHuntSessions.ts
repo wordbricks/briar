@@ -63,6 +63,7 @@ export type AutoHuntSession = {
   dispatchGroupId: string;
   projectId: string;
   agentId?: string;
+  skillId?: string | null;
   sessionType?: "task" | "dispatch";
   trigger?: "manual" | "scheduled";
   scheduleId?: string;
@@ -488,6 +489,7 @@ export function useAutoHuntSessions(
     input: {
       sessionId?: string;
       request: string;
+      skillId?: string | null;
       startedAt: string;
       trigger?: "manual" | "scheduled";
       scheduleId?: string;
@@ -510,6 +512,9 @@ export function useAutoHuntSessions(
                 request: input.isFollowUp
                   ? session.request
                   : input.request,
+                ...(input.skillId !== undefined
+                  ? { skillId: input.skillId }
+                  : {}),
                 followUps: input.isFollowUp
                   ? [
                       ...(session.followUps ?? []),
@@ -549,6 +554,7 @@ export function useAutoHuntSessions(
       dispatchGroupId: "",
       projectId,
       agentId,
+      ...(input.skillId !== undefined ? { skillId: input.skillId } : {}),
       sessionType: "task",
       trigger: input.trigger ?? "manual",
       scheduleId: input.scheduleId,

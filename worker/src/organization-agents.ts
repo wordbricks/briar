@@ -10,7 +10,7 @@ import {
   insertAgentSkillStatement,
   normalizedAgentSkillRows,
   replaceAgentSkillStatements,
-  updateDefaultAgentSkillFromLegacyStatement,
+  soleAgentSkillRowFromLegacy,
   type AgentSkillEffort,
   type AgentSkillInput,
   type AgentSkillRow,
@@ -250,22 +250,25 @@ export async function updateOrganizationAgent(
     await assertAgentSkillReplacementAllowed(
       db,
       input.agentId,
-      skillRows.map((skill) => skill.id),
+      skillRows,
     );
     statements.push(
       ...replaceAgentSkillStatements(db, input.agentId, skillRows),
     );
   } else {
-    statements.push(
-      updateDefaultAgentSkillFromLegacyStatement(db, {
-        agentId: input.agentId,
+    const legacySkill = soleAgentSkillRowFromLegacy(existing.skills ?? [], {
         instructions: input.responsibility,
         provider: input.provider,
         model: input.model,
         effort: input.effort,
         updatedAt: input.updatedAt,
-      }),
-    );
+      });
+    if (legacySkill) {
+      await assertAgentSkillReplacementAllowed(db, input.agentId, [legacySkill]);
+      statements.push(
+        ...replaceAgentSkillStatements(db, input.agentId, [legacySkill]),
+      );
+    }
   }
   await db.batch(statements);
   return getOrganizationAgent(db, input.organizationId, input.agentId);
