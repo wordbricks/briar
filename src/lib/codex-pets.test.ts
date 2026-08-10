@@ -222,7 +222,9 @@ describe("Codex Pet catalog", () => {
       "image/webp",
       0.9,
     );
-    expect(objectUrls.createObjectURL).toHaveBeenCalledWith(expect.any(Blob));
+    expect(objectUrls.createObjectURL).toHaveBeenCalledWith(
+      expect.objectContaining({ size: 13, type: "image/webp" }),
+    );
     expect(objectUrls.revokeObjectURL).toHaveBeenCalledWith("blob:codex-pet");
   });
 

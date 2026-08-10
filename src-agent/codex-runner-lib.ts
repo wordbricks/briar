@@ -73,6 +73,8 @@ export type CodexRpcMessage = {
 export type CodexAppServerState = {
   phase:
     | "initializing"
+    | "readingConfig"
+    | "listingModels"
     | "startingThread"
     | "startingTurn"
     | "running"
@@ -90,8 +92,10 @@ export type CodexAppServerTransition = {
 };
 
 const INITIALIZE_REQUEST_ID = 1;
-const THREAD_REQUEST_ID = 2;
-const TURN_REQUEST_ID = 3;
+const CONFIG_REQUEST_ID = 2;
+const MODEL_LIST_REQUEST_ID = 3;
+const THREAD_REQUEST_ID = 4;
+const TURN_REQUEST_ID = 5;
 
 const approvalMethods = new Set([
   "item/commandExecution/requestApproval",
@@ -140,6 +144,24 @@ export function codexInitializeRequest(): CodexRpcMessage {
 
 export function codexInitializedNotification(): CodexRpcMessage {
   return { method: "initialized", params: {} };
+}
+
+export function codexConfigReadRequest(
+  request: Pick<CodexRunnerRequest, "workspaceRoot">,
+): CodexRpcMessage {
+  return {
+    method: "config/read",
+    id: CONFIG_REQUEST_ID,
+    params: { cwd: request.workspaceRoot, includeLayers: false },
+  };
+}
+
+export function codexModelListRequest(): CodexRpcMessage {
+  return {
+    method: "model/list",
+    id: MODEL_LIST_REQUEST_ID,
+    params: { includeHidden: false },
+  };
 }
 
 export function codexThreadRequest(
@@ -358,9 +380,7 @@ function codexActivityStatus(
   return "completed";
 }
 
-export function codexApprovalRequest(
-  message: CodexRpcMessage,
-): {
+export function codexApprovalRequest(message: CodexRpcMessage): {
   id: string;
   toolName: string;
   input: Record<string, unknown>;
@@ -425,6 +445,19 @@ export function consumeCodexAppServerMessage(
 
   if (message.id !== undefined && message.id !== null) {
     if (message.error) {
+      // Effective-model discovery is observational. Older App Server builds may
+      // not implement these RPCs, and usage attribution must never prevent the
+      // actual thread from running.
+      if (
+        message.id === CONFIG_REQUEST_ID ||
+        message.id === MODEL_LIST_REQUEST_ID
+      ) {
+        state.phase = "startingThread";
+        return {
+          outgoing: [codexThreadRequest(request)],
+          completed: false,
+        };
+      }
       throw new Error(
         message.error.message?.trim() ||
           "Codex App Server returned an RPC error.",
@@ -436,9 +469,41 @@ export function consumeCodexAppServerMessage(
     }
 
     if (message.id === INITIALIZE_REQUEST_ID) {
+      const configuredModel = request.model?.trim();
+      state.phase = configuredModel ? "startingThread" : "readingConfig";
+      return {
+        outgoing: [
+          codexInitializedNotification(),
+          configuredModel
+            ? codexThreadRequest(request)
+            : codexConfigReadRequest(request),
+        ],
+        completed: false,
+      };
+    }
+
+    if (message.id === CONFIG_REQUEST_ID) {
+      const config = asRecord(result.config);
+      const effectiveModel =
+        typeof config?.model === "string" ? config.model.trim() : "";
+      if (!request.model?.trim() && !effectiveModel) {
+        state.phase = "listingModels";
+        return {
+          outgoing: [codexModelListRequest()],
+          completed: false,
+        };
+      }
       state.phase = "startingThread";
       return {
-        outgoing: [codexInitializedNotification(), codexThreadRequest(request)],
+        outgoing: [codexThreadRequest(request)],
+        completed: false,
+      };
+    }
+
+    if (message.id === MODEL_LIST_REQUEST_ID) {
+      state.phase = "startingThread";
+      return {
+        outgoing: [codexThreadRequest(request)],
         completed: false,
       };
     }

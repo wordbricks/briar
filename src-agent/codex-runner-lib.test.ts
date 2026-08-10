@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   codexAppServerArgs,
   codexApprovalRequest,
+  codexConfigReadRequest,
   codexFinalMessage,
   codexInitializeRequest,
+  codexModelListRequest,
   codexServerRequestResponse,
   codexThreadRequest,
   codexTurnRequest,
@@ -48,7 +50,7 @@ describe("Codex App Server runner", () => {
     });
     expect(codexThreadRequest(request)).toMatchObject({
       method: "thread/start",
-      id: 2,
+      id: 4,
       params: {
         cwd: "/worktree",
         sandbox: "workspace-write",
@@ -58,13 +60,23 @@ describe("Codex App Server runner", () => {
     });
     expect(codexTurnRequest(request, "thread-1")).toMatchObject({
       method: "turn/start",
-      id: 3,
+      id: 5,
       params: {
         threadId: "thread-1",
         cwd: "/worktree",
         model: "gpt-5",
         effort: "high",
       },
+    });
+    expect(codexConfigReadRequest(request)).toEqual({
+      method: "config/read",
+      id: 2,
+      params: { cwd: "/worktree", includeLayers: false },
+    });
+    expect(codexModelListRequest()).toEqual({
+      method: "model/list",
+      id: 3,
+      params: { includeHidden: false },
     });
   });
 
@@ -73,7 +85,12 @@ describe("Codex App Server runner", () => {
       normalizeCodexAppServerMessage({
         method: "item/started",
         params: {
-          item: { id: "message-1", type: "agentMessage", phase: "commentary", text: "Working" },
+          item: {
+            id: "message-1",
+            type: "agentMessage",
+            phase: "commentary",
+            text: "Working",
+          },
         },
       }),
     ).toEqual({
@@ -232,19 +249,26 @@ describe("Codex App Server runner", () => {
     });
   });
 
-  it("drives initialize, thread, turn, and final-message transitions", () => {
+  it("reads effective config before starting a thread and turn", () => {
     const state = createCodexAppServerState();
-    const initialized = consumeCodexAppServerMessage(state, request, {
+    const defaultRequest = { ...request, model: null };
+    const initialized = consumeCodexAppServerMessage(state, defaultRequest, {
       id: 1,
       result: {},
     });
     expect(initialized.outgoing.map((message) => message.method)).toEqual([
       "initialized",
-      "thread/start",
+      "config/read",
     ]);
 
-    const thread = consumeCodexAppServerMessage(state, request, {
+    const configured = consumeCodexAppServerMessage(state, defaultRequest, {
       id: 2,
+      result: { config: { model: "gpt-5.6-sol" } },
+    });
+    expect(configured.outgoing[0]).toMatchObject({ method: "thread/start" });
+
+    const thread = consumeCodexAppServerMessage(state, defaultRequest, {
+      id: 4,
       result: { thread: { id: "thread-1" } },
     });
     expect(state.threadId).toBe("thread-1");
@@ -253,11 +277,11 @@ describe("Codex App Server runner", () => {
       params: { threadId: "thread-1" },
     });
 
-    consumeCodexAppServerMessage(state, request, {
-      id: 3,
+    consumeCodexAppServerMessage(state, defaultRequest, {
+      id: 5,
       result: { turn: { id: "turn-1" } },
     });
-    consumeCodexAppServerMessage(state, request, {
+    consumeCodexAppServerMessage(state, defaultRequest, {
       method: "item/completed",
       params: {
         threadId: "thread-1",
@@ -270,7 +294,7 @@ describe("Codex App Server runner", () => {
         },
       },
     });
-    const completed = consumeCodexAppServerMessage(state, request, {
+    const completed = consumeCodexAppServerMessage(state, defaultRequest, {
       method: "turn/completed",
       params: {
         threadId: "thread-1",
@@ -279,6 +303,57 @@ describe("Codex App Server runner", () => {
     });
     expect(completed.completed).toBe(true);
     expect(codexFinalMessage(state)).toBe("Done");
+  });
+
+  it("skips default-model discovery when a model was explicitly configured", () => {
+    const state = createCodexAppServerState();
+    const initialized = consumeCodexAppServerMessage(state, request, {
+      id: 1,
+      result: {},
+    });
+    expect(initialized.outgoing.map((message) => message.method)).toEqual([
+      "initialized",
+      "thread/start",
+    ]);
+  });
+
+  it("falls back to the provider model catalog when config has no model", () => {
+    const state = createCodexAppServerState();
+    const defaultRequest = { ...request, model: null };
+    consumeCodexAppServerMessage(state, defaultRequest, {
+      id: 1,
+      result: {},
+    });
+    const config = consumeCodexAppServerMessage(state, defaultRequest, {
+      id: 2,
+      result: { config: { model: null } },
+    });
+    expect(config.outgoing).toEqual([codexModelListRequest()]);
+
+    const models = consumeCodexAppServerMessage(state, defaultRequest, {
+      id: 3,
+      result: {
+        data: [{ model: "gpt-5.6-sol", isDefault: true }],
+        nextCursor: null,
+      },
+    });
+    expect(models.outgoing[0]).toMatchObject({ method: "thread/start", id: 4 });
+  });
+
+  it("keeps running when model-discovery RPCs are unavailable", () => {
+    const state = createCodexAppServerState();
+    const defaultRequest = { ...request, model: null };
+    consumeCodexAppServerMessage(state, defaultRequest, {
+      id: 1,
+      result: {},
+    });
+
+    const fallback = consumeCodexAppServerMessage(state, defaultRequest, {
+      id: 2,
+      error: { code: -32601, message: "Method not found" },
+    });
+
+    expect(fallback.outgoing).toEqual([codexThreadRequest(defaultRequest)]);
   });
 
   it("keeps approval handling compatible with the desktop decisions", () => {
