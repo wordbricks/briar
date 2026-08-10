@@ -1562,6 +1562,11 @@ export function App() {
                       inboxDetailRun.id,
                       prerequisiteRunId,
                     )}
+                  onAcceptIssueAction={(proposal) =>
+                    briar.acceptConversationIssueAction(
+                      inboxDetailRun.id,
+                      proposal,
+                    )}
                   onBack={() => setInboxDetailTarget(null)}
                   onCancel={() => briar.cancelRun(inboxDetailRun.id)}
                   onDelete={async () => {
