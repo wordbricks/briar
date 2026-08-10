@@ -63,6 +63,7 @@ export type AutoHuntSession = {
   dispatchGroupId: string;
   projectId: string;
   agentId?: string;
+  agentName?: string | null;
   skillId?: string | null;
   sessionType?: "task" | "dispatch";
   trigger?: "manual" | "scheduled";
@@ -489,6 +490,7 @@ export function useAutoHuntSessions(
     input: {
       sessionId?: string;
       request: string;
+      agentName?: string | null;
       skillId?: string | null;
       startedAt: string;
       trigger?: "manual" | "scheduled";
@@ -512,6 +514,9 @@ export function useAutoHuntSessions(
                 request: input.isFollowUp
                   ? session.request
                   : input.request,
+                ...(input.agentName !== undefined
+                  ? { agentName: input.agentName }
+                  : {}),
                 ...(input.skillId !== undefined
                   ? { skillId: input.skillId }
                   : {}),
@@ -554,6 +559,7 @@ export function useAutoHuntSessions(
       dispatchGroupId: "",
       projectId,
       agentId,
+      agentName: input.agentName ?? null,
       ...(input.skillId !== undefined ? { skillId: input.skillId } : {}),
       sessionType: "task",
       trigger: input.trigger ?? "manual",
@@ -582,7 +588,7 @@ export function useAutoHuntSessions(
 
   const startWorkerDispatchSession = useCallback((
     projectId: string,
-    agent: Pick<ProjectAgent, "id">,
+    agent: Pick<ProjectAgent, "id" | "name">,
     runs: readonly HuntRun[],
     input: {
       dispatchId: string;
@@ -612,6 +618,7 @@ export function useAutoHuntSessions(
       dispatchGroupId: input.dispatchId,
       projectId,
       agentId: agent.id,
+      agentName: agent.name,
       sessionType: "dispatch",
       trigger: parent?.trigger ?? "manual",
       parentSessionId: parent?.id,
@@ -750,6 +757,7 @@ export function useAutoHuntSessions(
     input: {
       sessionId: string;
       request: string;
+      agentName?: string | null;
       startedAt: string;
       status: "completed" | "failed" | "skipped";
       conversationId: string | null;
@@ -761,6 +769,7 @@ export function useAutoHuntSessions(
     const sessionId = startTaskSession(projectId, agentId, {
       sessionId: input.sessionId,
       request: input.request,
+      agentName: input.agentName,
       startedAt: input.startedAt,
     });
     settleTaskSession(sessionId, input);

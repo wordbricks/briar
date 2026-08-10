@@ -55,6 +55,7 @@ export type InboxSessionMessage = {
   occurredAt: string;
   version: string;
   status: "completed" | "failed";
+  agentName: string | null;
   issueCount: number;
   error: string | null;
   summary: string | null;
@@ -246,6 +247,7 @@ export function buildCurrentInboxMessages(
         finalEvent?.id ??
         `${session.status}:${session.completedAt ?? session.startedAt}`,
       status: session.status,
+      agentName: session.agentName?.trim() || null,
       issueCount: session.issues.length,
       error: session.error,
       summary: session.summary,

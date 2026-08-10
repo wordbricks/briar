@@ -25,6 +25,7 @@ function session(
     workers: [],
     dispatchEvents: [],
     projectId: project.id,
+    agentName: "Inbox Agent",
     status,
     issues: [
       {
@@ -182,6 +183,7 @@ describe("Inbox messages", () => {
       "session:session-completed",
       "session:session-failed",
     ]);
+    expect(messages[0]).toMatchObject({ agentName: "Inbox Agent" });
   });
 
   it("creates actionable inbox messages for mentions and thread replies", () => {

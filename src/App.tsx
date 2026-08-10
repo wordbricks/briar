@@ -151,6 +151,7 @@ export function App() {
     deferDefaultOrganization: invitationToken !== null,
     startScheduledAgentSession: (run) =>
       autoHunt.startTaskSession(run.projectId, run.agent.id, {
+        agentName: run.agent.name,
         request: run.scheduleName,
         startedAt: run.startedAt,
         trigger: "scheduled",
@@ -873,7 +874,7 @@ export function App() {
                 autoHunt.startTaskSession(
                   recovery.projectId,
                   recovery.request.agentId,
-                  session,
+                  { ...session, agentName: agent.name },
                 ),
               settleSession: autoHunt.settleTaskSession,
               startAutoHunt: (runs, options) =>
@@ -1424,7 +1425,10 @@ export function App() {
             onStartRemoteTask={startProjectAgentTask}
             onStartTaskSession={(agent, session) => {
               rememberIssueAgent(agent);
-              autoHunt.startTaskSession(activeProject.id, agent.id, session);
+              autoHunt.startTaskSession(activeProject.id, agent.id, {
+                ...session,
+                agentName: agent.name,
+              });
             }}
             project={activeProject}
             requestedSessionId={requestedSessionId}
@@ -1850,7 +1854,10 @@ export function App() {
               onStartRemoteTask={startProjectAgentTask}
               onStartTaskSession={(agent, session) => {
                 rememberIssueAgent(agent);
-                autoHunt.startTaskSession(activeProject.id, agent.id, session);
+                autoHunt.startTaskSession(activeProject.id, agent.id, {
+                  ...session,
+                  agentName: agent.name,
+                });
               }}
               project={activeProject}
               requestedSessionId={requestedSessionId}

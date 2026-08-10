@@ -35,6 +35,7 @@ final class AgentsInboxSystemTests: XCTestCase {
         )
         XCTAssertEqual(sessions.sessions.count, 1)
         XCTAssertEqual(sessions.sessions.first?.status, .completed)
+        XCTAssertEqual(sessions.sessions.first?.agentName, "Issue processing agent")
         XCTAssertEqual(sessions.sessions.first?.issues.first?.runNumber, 3832)
 
         let taskPayload = try XCTUnwrap(operations["runProjectAgentTask"]?["response"])
@@ -46,6 +47,7 @@ final class AgentsInboxSystemTests: XCTestCase {
         )
         XCTAssertEqual(task.session.requestedWorkerId, "worker-1")
         XCTAssertEqual(task.session.workerId, "worker-1")
+        XCTAssertEqual(task.session.agentName, "Issue processing agent")
     }
 
     func testEndpointPathsForAgentsAndSessions() {
@@ -342,6 +344,7 @@ final class AgentsInboxSystemTests: XCTestCase {
             projectId: projectID,
             dispatchGroupId: "dispatch-1",
             agentId: agentID,
+            agentName: "Inbox Agent",
             sessionType: .dispatch,
             trigger: .manual,
             scheduleId: nil,
@@ -374,12 +377,13 @@ final class AgentsInboxSystemTests: XCTestCase {
         let data = try JSONEncoder.mobileContract.encode(ProjectAgentSessionSyncRequest(session: session))
         let object = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
         XCTAssertEqual(Set(object.keys), Set([
-            "dispatchGroupId", "agentId", "skillId", "sessionType", "trigger", "scheduleId",
+            "dispatchGroupId", "agentId", "agentName", "skillId", "sessionType", "trigger", "scheduleId",
             "scheduleRunId", "parentSessionId", "request", "status", "issues",
             "startedAt", "completedAt", "conversationId", "summary", "error", "events",
             "updatedAt",
         ]))
         XCTAssertEqual(object["dispatchGroupId"] as? String, "dispatch-1")
+        XCTAssertEqual(object["agentName"] as? String, "Inbox Agent")
         XCTAssertEqual(object["sessionType"] as? String, "dispatch")
         XCTAssertEqual(object["status"] as? String, "running")
         XCTAssertNil(object["workspaceRoot"])
@@ -601,6 +605,7 @@ final class AgentsInboxSystemTests: XCTestCase {
             projectId: project.id,
             dispatchGroupId: "d1",
             agentId: nil,
+            agentName: "Review Agent",
             sessionType: .task,
             trigger: .manual,
             scheduleId: nil,
@@ -614,7 +619,7 @@ final class AgentsInboxSystemTests: XCTestCase {
             conversationId: nil,
             workspaceRoot: nil,
             summary: nil,
-            error: "worker lost",
+            error: "First line\n\nSecond line\nThird line\nFourth line",
             events: [
                 .init(id: "e1", type: .failed, occurredAt: Date(timeIntervalSince1970: 1_700_000_080)),
             ],
@@ -669,8 +674,11 @@ final class AgentsInboxSystemTests: XCTestCase {
         let failedSession = try XCTUnwrap(messages.first { $0.kind == .session })
         XCTAssertEqual(InboxMessageBuilder.classify(failedSession), .actionRequired)
         XCTAssertEqual(
-            InboxNotificationPresentationBuilder.content(for: failedSession).title,
-            "Briar · 실패"
+            InboxNotificationPresentationBuilder.content(for: failedSession),
+            InboxNotificationPresentation(
+                title: "Review Agent · 실패",
+                body: "First line\nSecond line\nThird line"
+            )
         )
 
         let completedMessage = try XCTUnwrap(

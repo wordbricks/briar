@@ -54,6 +54,7 @@ struct ProjectAgentSession: Codable, Equatable, Identifiable, Sendable {
     let projectId: UUID
     let dispatchGroupId: String?
     let agentId: UUID?
+    let agentName: String?
     let skillId: UUID?
     let sessionType: SessionType?
     let trigger: Trigger?
@@ -79,6 +80,7 @@ struct ProjectAgentSession: Codable, Equatable, Identifiable, Sendable {
         projectId: UUID,
         dispatchGroupId: String?,
         agentId: UUID?,
+        agentName: String? = nil,
         skillId: UUID? = nil,
         sessionType: SessionType?,
         trigger: Trigger?,
@@ -103,6 +105,7 @@ struct ProjectAgentSession: Codable, Equatable, Identifiable, Sendable {
         self.projectId = projectId
         self.dispatchGroupId = dispatchGroupId
         self.agentId = agentId
+        self.agentName = agentName
         self.skillId = skillId
         self.sessionType = sessionType
         self.trigger = trigger
@@ -260,6 +263,7 @@ struct ProjectAgentSessionResponse: Codable, Equatable, Sendable {
 struct ProjectAgentSessionSyncRequest: Codable, Sendable {
     let dispatchGroupId: String
     let agentId: UUID?
+    let agentName: String?
     let skillId: UUID?
     let sessionType: ProjectAgentSession.SessionType
     let trigger: ProjectAgentSession.Trigger?
@@ -280,6 +284,7 @@ struct ProjectAgentSessionSyncRequest: Codable, Sendable {
     init(session: ProjectAgentSession) {
         dispatchGroupId = session.dispatchGroupId ?? session.id
         agentId = session.agentId
+        agentName = session.agentName
         skillId = session.skillId
         sessionType = session.sessionType ?? .dispatch
         trigger = session.trigger
@@ -301,6 +306,7 @@ struct ProjectAgentSessionSyncRequest: Codable, Sendable {
     private enum CodingKeys: String, CodingKey {
         case dispatchGroupId
         case agentId
+        case agentName
         case skillId
         case sessionType
         case trigger
@@ -323,6 +329,7 @@ struct ProjectAgentSessionSyncRequest: Codable, Sendable {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(dispatchGroupId, forKey: .dispatchGroupId)
         try encode(agentId, forKey: .agentId, into: &container)
+        try encode(agentName, forKey: .agentName, into: &container)
         try encode(skillId, forKey: .skillId, into: &container)
         try container.encode(sessionType, forKey: .sessionType)
         try encode(trigger, forKey: .trigger, into: &container)

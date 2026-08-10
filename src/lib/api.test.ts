@@ -1047,6 +1047,7 @@ describe("API errors", () => {
       projectId,
       dispatchGroupId: "",
       agentId: undefined,
+      agentName: "Inbox Agent",
       sessionType: "task",
       trigger: "manual",
       request: "Review the repository",
@@ -1070,6 +1071,7 @@ describe("API errors", () => {
     expect(body).not.toHaveProperty("localOwner");
     expect(body).toMatchObject({
       agentId: null,
+      agentName: "Inbox Agent",
       status: "running",
       updatedAt: "2026-07-30T00:00:00.000Z",
     });

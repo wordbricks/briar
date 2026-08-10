@@ -3134,6 +3134,10 @@
             "format": "uuid",
             "nullable": true
           },
+          "agentName": {
+            "type": "string",
+            "nullable": true
+          },
           "skillId": {
             "type": "string",
             "format": "uuid",

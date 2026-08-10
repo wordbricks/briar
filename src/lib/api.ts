@@ -163,6 +163,7 @@ const projectAgentSessionSchema = z.object({
   projectId: z.string().uuid(),
   dispatchGroupId: z.string(),
   agentId: z.string().uuid().nullable(),
+  agentName: z.string().nullable().optional(),
   skillId: z.string().uuid().nullable().optional(),
   sessionType: z.enum(["task", "dispatch"]),
   trigger: z.enum(["manual", "scheduled"]).nullable(),
@@ -1098,6 +1099,7 @@ export async function upsertProjectAgentSession(
       body: JSON.stringify({
         dispatchGroupId: session.dispatchGroupId,
         agentId: session.agentId ?? null,
+        agentName: session.agentName ?? null,
         skillId: session.skillId ?? null,
         sessionType: session.sessionType ?? "dispatch",
         trigger: session.trigger ?? null,
