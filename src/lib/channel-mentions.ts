@@ -13,11 +13,7 @@ export type MentionTarget = {
   image?: string | null;
 };
 
-export type MentionQuery = {
-  start: number;
-  end: number;
-  query: string;
-};
+export { mentionAtCaret, type MentionQuery } from "./mention-token";
 
 /** Produces a token the mention parser can recognize even for a display name. */
 export function mentionHandle(value: string) {
@@ -27,26 +23,6 @@ export function mentionHandle(value: string) {
       .replace(/[^\p{L}\p{N}_.-]+/gu, "-")
       .replace(/^-+|-+$/gu, "") || "member"
   );
-}
-
-/**
- * Finds the `@` token the caret sits inside, if any. Mirrors the issue
- * conversation rule that a mention must start at a word boundary.
- */
-export function mentionAtCaret(
-  body: string,
-  caret: number,
-): MentionQuery | null {
-  if (!Number.isInteger(caret) || caret < 0 || caret > body.length) return null;
-  const match = body
-    .slice(0, caret)
-    .match(/(^|[^\p{L}\p{N}_.-])@([\p{L}\p{N}_.-]*)$/u);
-  if (!match) return null;
-  return {
-    start: caret - match[2].length - 1,
-    end: caret,
-    query: match[2],
-  };
 }
 
 /**
