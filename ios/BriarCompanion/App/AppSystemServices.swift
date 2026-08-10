@@ -257,6 +257,18 @@ struct InboxNotificationPresentation: Equatable {
 
 enum InboxNotificationPresentationBuilder {
     static func content(for message: InboxMessage) -> InboxNotificationPresentation {
+        if message.kind == .session {
+            let name = message.authorName?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let displayName = name?.isEmpty == false ? name ?? "Briar" : "Briar"
+            let status = message.statusLabel ?? "새 알림"
+            let finalMessage = message.body?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let body = preview(finalMessage?.isEmpty == false ? message.body ?? status : message.title)
+            return InboxNotificationPresentation(
+                title: "\(displayName) · \(status)",
+                body: body.isEmpty ? status : body
+            )
+        }
+
         if isReply(message) {
             let destination = message.kind == .channel
                 ? "#\(message.channelName ?? message.title)"
@@ -265,7 +277,7 @@ enum InboxNotificationPresentationBuilder {
             let displayAuthor = author?.isEmpty == false ? author ?? "Briar" : "Briar"
             return InboxNotificationPresentation(
                 title: "\(displayAuthor) in \(destination)",
-                body: replyPreview(message.body ?? "")
+                body: preview(message.body ?? "")
             )
         }
 
@@ -296,7 +308,7 @@ enum InboxNotificationPresentationBuilder {
         }
     }
 
-    private static func replyPreview(_ body: String) -> String {
+    private static func preview(_ body: String) -> String {
         body
             .components(separatedBy: .newlines)
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }

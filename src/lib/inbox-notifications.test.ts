@@ -274,7 +274,7 @@ describe("inbox notification content", () => {
     },
   );
 
-  it("uses a session result instead of its importance category", () => {
+  it("shows the agent, completed status, and at most three final-message lines", () => {
     const session: InboxMessage = {
       id: "session:session-1",
       kind: "session",
@@ -284,16 +284,21 @@ describe("inbox notification content", () => {
       title: "Process queued issues",
       occurredAt: "2026-08-08T00:00:00.000Z",
       version: "event-1",
-      status: "failed",
+      status: "completed",
+      agentName: "Release Agent",
       issueCount: 2,
-      error: "worker lost",
-      summary: null,
-      requiresAttention: true,
+      error: null,
+      summary: " First line \n\nSecond line\r\n Third line \nFourth line",
+      requiresAttention: false,
     };
 
-    expect(inboxNotificationLabelKey(session, "action_required")).toBe(
-      "status.failed",
+    expect(inboxNotificationLabelKey(session, "activity")).toBe(
+      "status.completed",
     );
+    expect(inboxNotificationContent(session, "Completed")).toEqual({
+      title: "Release Agent · Completed",
+      body: "First line\nSecond line\nThird line",
+    });
   });
 
   it("shows an issue reply author, issue key, and at most three non-empty lines", () => {

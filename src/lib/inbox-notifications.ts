@@ -366,7 +366,7 @@ function isReplyMessage(message: InboxMessage) {
   return false;
 }
 
-function replyPreview(body: string) {
+function notificationPreview(body: string) {
   return body
     .split(/\r?\n/u)
     .map((line) => line.trim())
@@ -379,6 +379,18 @@ export function inboxNotificationContent(
   message: InboxMessage,
   notificationLabel: string,
 ): InboxNotificationContent {
+  if (message.kind === "session") {
+    const finalMessage = [message.summary, message.error, message.title].find(
+      (value) => value?.trim(),
+    );
+    return {
+      title: `${message.agentName?.trim() || "Briar"} · ${notificationLabel}`,
+      body:
+        notificationPreview(finalMessage ?? notificationLabel) ||
+        notificationLabel,
+    };
+  }
+
   if (
     (message.kind === "conversation" || message.kind === "channel") &&
     isReplyMessage(message)
@@ -389,7 +401,7 @@ export function inboxNotificationContent(
         : (message.issueKey ?? message.title);
     return {
       title: `${message.authorName.trim() || "Briar"} in ${destination}`,
-      body: replyPreview(message.body),
+      body: notificationPreview(message.body),
     };
   }
 

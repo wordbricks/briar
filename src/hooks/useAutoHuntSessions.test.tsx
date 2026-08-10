@@ -35,12 +35,13 @@ describe("useAutoHuntSessions", () => {
     await act(async () => {
       sessionsHook.startTaskSession("project-1", "agent-1", {
         sessionId: "task-session-1",
+        agentName: "Inbox Agent",
         request: "대기 이슈를 처리해 줘",
         startedAt: "2026-07-28T01:00:00.000Z",
       });
       sessionsHook.startWorkerDispatchSession(
         "project-1",
-        { id: "agent-1" },
+        { id: "agent-1", name: "Inbox Agent" },
         [{
           id: "run-1",
           runNumber: 1,
@@ -61,6 +62,7 @@ describe("useAutoHuntSessions", () => {
     )!;
     expect(dispatch).toMatchObject({
       parentSessionId: "task-session-1",
+      agentName: "Inbox Agent",
       status: "running",
       issues: [{ runId: "run-1", outcome: "pending" }],
     });

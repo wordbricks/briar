@@ -73,6 +73,16 @@ describe("Companion mobile API contract", () => {
     }
   });
 
+  it("carries the Agent name with session snapshots", () => {
+    const listResponse = mobileOperationSchemas.listProjectAgentSessions.response
+      .parse(fixture.operations.listProjectAgentSessions.response);
+    const taskResponse = mobileOperationSchemas.runProjectAgentTask.response
+      .parse(fixture.operations.runProjectAgentTask.response);
+
+    expect(listResponse.sessions[0]?.agentName).toBe("Issue processing agent");
+    expect(taskResponse.session.agentName).toBe("Issue processing agent");
+  });
+
   it("preserves organization providers in full and delta dashboard payloads", () => {
     const organizationProviders = ["grok", "opencode", "codex"] as const;
     const snapshot = mobileDashboardSnapshotSchema.parse({

@@ -1048,6 +1048,7 @@ export const projectAgentSessionInputSchema = z
   .object({
     dispatchGroupId: z.string().max(128),
     agentId: z.string().uuid().nullable(),
+    agentName: z.string().trim().min(1).max(200).nullable().optional(),
     skillId: z.string().uuid().nullable().optional(),
     sessionType: z.enum(["task", "dispatch"]),
     trigger: z.enum(["manual", "scheduled"]).nullable(),
@@ -7105,6 +7106,7 @@ async function route(
     const payload = {
       dispatchGroupId: taskId,
       agentId: agent.id,
+      agentName: agent.name,
       skillId: selectedSkill.id,
       sessionType: "task" as const,
       trigger: "manual" as const,

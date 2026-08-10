@@ -741,6 +741,7 @@ export const mobileProjectAgentSessionSchema = z.object({
   projectId: z.uuid(),
   dispatchGroupId: z.string().optional(),
   agentId: z.uuid().nullable().optional(),
+  agentName: z.string().nullable().optional(),
   skillId: z.uuid().nullable().optional(),
   sessionType: z.enum(["task", "dispatch"]).optional(),
   trigger: z.enum(["manual", "scheduled"]).nullable().optional(),

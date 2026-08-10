@@ -827,6 +827,7 @@ describe("Worker HTTP contract", () => {
     const snapshot = {
         dispatchGroupId: "dispatch-1",
         agentId: "11111111-1111-4111-8111-111111111111",
+        agentName: "Inbox Agent",
         sessionType: "dispatch",
         trigger: "manual",
         scheduleId: null,
@@ -854,7 +855,10 @@ describe("Worker HTTP contract", () => {
         }],
         updatedAt: "2026-07-30T00:00:00.000Z",
       };
-    expect(projectAgentSessionInputSchema.parse(snapshot).status).toBe("running");
+    expect(projectAgentSessionInputSchema.parse(snapshot)).toMatchObject({
+      agentName: "Inbox Agent",
+      status: "running",
+    });
     expect(
       projectAgentSessionInputSchema.parse({
         ...snapshot,
