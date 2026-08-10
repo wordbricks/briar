@@ -9,8 +9,21 @@ import type { ExecutionWorker } from "../types";
 import {
   activeWorkerCount,
   WorkerStatusBar,
+  workerBriarVersion,
   workerProviders,
+  workerRemoteUpdateSupported,
+  workerUpdateAvailable,
 } from "./WorkerStatusBar";
+
+vi.mock("../lib/api", () => ({
+  loadOrganizationExecutionWorkers: vi.fn(),
+  requestOrganizationExecutionWorkerUpdate: vi.fn(),
+}));
+
+import {
+  loadOrganizationExecutionWorkers,
+  requestOrganizationExecutionWorkerUpdate,
+} from "../lib/api";
 
 const worker = (overrides: Partial<ExecutionWorker> = {}): ExecutionWorker => ({
   id: "worker-1",
@@ -38,6 +51,14 @@ describe("WorkerStatusBar", () => {
     (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean })
       .IS_REACT_ACT_ENVIRONMENT = true;
     localStorage.setItem("briar.locale.v1", "ko");
+    vi.mocked(loadOrganizationExecutionWorkers).mockReset();
+    vi.mocked(requestOrganizationExecutionWorkerUpdate).mockReset();
+    vi.mocked(loadOrganizationExecutionWorkers).mockResolvedValue({
+      workers: [],
+      latestVersion: null,
+      canManage: true,
+      generatedAt: "2026-07-29T00:00:00Z",
+    });
   });
 
   afterEach(() => {
@@ -141,6 +162,313 @@ describe("WorkerStatusBar", () => {
     await act(async () => root.unmount());
   });
 
+  it("shows each worker's current Briar version", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <I18nProvider>
+          <WorkerStatusBar
+            onOpenSettings={() => undefined}
+            workers={[worker({ versions: { briar: "1.2.69" } })]}
+          />
+        </I18nProvider>,
+      );
+    });
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>(".worker-status-trigger")
+        ?.click();
+    });
+
+    expect(container.querySelector(".worker-status-version")?.textContent).toBe(
+      "v1.2.69",
+    );
+
+    await act(async () => root.unmount());
+  });
+
+  it("shows an update control when a Worker is behind the latest version", async () => {
+    vi.mocked(loadOrganizationExecutionWorkers).mockResolvedValue({
+      workers: [
+        {
+          deviceId: "device-1",
+          ownerUserId: "owner-1",
+          ownerName: "Owner",
+          label: "Janet's Mac",
+          state: "online",
+          maxConcurrentSessions: 1,
+          activeSessions: 0,
+          lastHeartbeatAt: "2026-07-29T00:00:00Z",
+          createdAt: "2026-07-29T00:00:00Z",
+          versions: { briar: "1.2.69" },
+          remoteUpdateSupported: true,
+          updateRequest: null,
+          bindings: [],
+        },
+      ],
+      latestVersion: "1.2.84",
+      canManage: true,
+      generatedAt: "2026-07-29T00:00:00Z",
+    });
+
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <I18nProvider>
+          <WorkerStatusBar
+            onOpenSettings={() => undefined}
+            organizationId="organization-1"
+            token="token"
+            userId="owner-1"
+            workers={[
+              worker({
+                versions: { briar: "1.2.69" },
+                capabilities: {
+                  remoteUpdates: { supported: true, protocol: 1 },
+                },
+              }),
+            ]}
+          />
+        </I18nProvider>,
+      );
+    });
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>(".worker-status-trigger")
+        ?.click();
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    const update = container.querySelector<HTMLButtonElement>(
+      ".worker-status-update",
+    );
+    expect(update).not.toBeNull();
+    expect(update?.disabled).toBe(false);
+    expect(update?.getAttribute("aria-label")).toBe("Janet's Mac Worker 업데이트");
+
+    await act(async () => root.unmount());
+  });
+
+  it("spins while requesting an update and hides the control once current", async () => {
+    let resolveRequest: ((value: {
+      outcome: "requested";
+      requestId: string;
+      targetVersion: string;
+    }) => void) | null = null;
+    vi.mocked(requestOrganizationExecutionWorkerUpdate).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveRequest = resolve;
+        }),
+    );
+    vi.mocked(loadOrganizationExecutionWorkers)
+      .mockResolvedValueOnce({
+        workers: [
+          {
+            deviceId: "device-1",
+            ownerUserId: "owner-1",
+            ownerName: "Owner",
+            label: "Janet's Mac",
+            state: "online",
+            maxConcurrentSessions: 1,
+            activeSessions: 0,
+            lastHeartbeatAt: "2026-07-29T00:00:00Z",
+            createdAt: "2026-07-29T00:00:00Z",
+            versions: { briar: "1.2.69" },
+            remoteUpdateSupported: true,
+            updateRequest: null,
+            bindings: [],
+          },
+        ],
+        latestVersion: "1.2.84",
+        canManage: true,
+        generatedAt: "2026-07-29T00:00:00Z",
+      })
+      .mockResolvedValueOnce({
+        workers: [
+          {
+            deviceId: "device-1",
+            ownerUserId: "owner-1",
+            ownerName: "Owner",
+            label: "Janet's Mac",
+            state: "online",
+            maxConcurrentSessions: 1,
+            activeSessions: 0,
+            lastHeartbeatAt: "2026-07-29T00:00:00Z",
+            createdAt: "2026-07-29T00:00:00Z",
+            versions: { briar: "1.2.69" },
+            remoteUpdateSupported: true,
+            updateRequest: {
+              id: "77777777-7777-4777-8777-777777777777",
+              targetVersion: "1.2.84",
+              status: "requested",
+              requestedAt: "2026-07-29T00:01:00Z",
+            },
+            bindings: [],
+          },
+        ],
+        latestVersion: "1.2.84",
+        canManage: true,
+        generatedAt: "2026-07-29T00:01:00Z",
+      });
+
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <I18nProvider>
+          <WorkerStatusBar
+            onOpenSettings={() => undefined}
+            organizationId="organization-1"
+            token="token"
+            userId="owner-1"
+            workers={[
+              worker({
+                versions: { briar: "1.2.69" },
+                capabilities: {
+                  remoteUpdates: { supported: true, protocol: 1 },
+                },
+              }),
+            ]}
+          />
+        </I18nProvider>,
+      );
+    });
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>(".worker-status-trigger")
+        ?.click();
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    const update = container.querySelector<HTMLButtonElement>(
+      ".worker-status-update",
+    );
+    expect(update).not.toBeNull();
+
+    await act(async () => {
+      update?.click();
+    });
+    expect(update?.getAttribute("aria-busy")).toBe("true");
+    expect(container.querySelector(".spin")).not.toBeNull();
+
+    await act(async () => {
+      resolveRequest?.({
+        outcome: "requested",
+        requestId: "77777777-7777-4777-8777-777777777777",
+        targetVersion: "1.2.84",
+      });
+      await Promise.resolve();
+    });
+
+    expect(requestOrganizationExecutionWorkerUpdate).toHaveBeenCalledWith(
+      "token",
+      "organization-1",
+      "device-1",
+    );
+    expect(
+      container
+        .querySelector(".worker-status-update")
+        ?.getAttribute("aria-busy"),
+    ).toBe("true");
+    expect(container.querySelector(".spin")).not.toBeNull();
+
+    await act(async () => {
+      root.render(
+        <I18nProvider>
+          <WorkerStatusBar
+            onOpenSettings={() => undefined}
+            organizationId="organization-1"
+            token="token"
+            userId="owner-1"
+            workers={[
+              worker({
+                versions: { briar: "1.2.84" },
+                capabilities: {
+                  remoteUpdates: { supported: true, protocol: 1 },
+                },
+              }),
+            ]}
+          />
+        </I18nProvider>,
+      );
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    // Re-open after re-render if needed; control should not show once current.
+    await act(async () => {
+      vi.mocked(loadOrganizationExecutionWorkers).mockResolvedValue({
+        workers: [
+          {
+            deviceId: "device-1",
+            ownerUserId: "owner-1",
+            ownerName: "Owner",
+            label: "Janet's Mac",
+            state: "online",
+            maxConcurrentSessions: 1,
+            activeSessions: 0,
+            lastHeartbeatAt: "2026-07-29T00:00:00Z",
+            createdAt: "2026-07-29T00:00:00Z",
+            versions: { briar: "1.2.84" },
+            remoteUpdateSupported: true,
+            updateRequest: null,
+            bindings: [],
+          },
+        ],
+        latestVersion: "1.2.84",
+        canManage: true,
+        generatedAt: "2026-07-29T00:02:00Z",
+      });
+      container
+        .querySelector<HTMLButtonElement>(".worker-status-trigger")
+        ?.click();
+    });
+    await act(async () => {
+      // ensure open
+      if (!container.querySelector(".worker-status-popover")) {
+        container
+          .querySelector<HTMLButtonElement>(".worker-status-trigger")
+          ?.click();
+      }
+      await Promise.resolve();
+    });
+
+    // Force refresh by toggling open again after version is current
+    await act(async () => {
+      const trigger = container.querySelector<HTMLButtonElement>(
+        ".worker-status-trigger",
+      );
+      if (container.querySelector(".worker-status-popover")) {
+        trigger?.click();
+      }
+      trigger?.click();
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(container.querySelector(".worker-status-version")?.textContent).toBe(
+      "v1.2.84",
+    );
+    expect(container.querySelector(".worker-status-update")).toBeNull();
+
+    await act(async () => root.unmount());
+  });
+
   it("opens Worker settings from the popover header", async () => {
     const container = document.createElement("div");
     document.body.append(container);
@@ -202,5 +530,31 @@ describe("WorkerStatusBar", () => {
         worker({ id: "worker-3", state: "disabled", readiness: "disabled" }),
       ]),
     ).toBe(1);
+  });
+
+  it("detects Briar versions and remote update support", () => {
+    expect(workerBriarVersion(worker({ versions: { briar: "1.2.69" } }))).toBe(
+      "1.2.69",
+    );
+    expect(workerBriarVersion(worker())).toBeNull();
+    expect(
+      workerRemoteUpdateSupported(
+        worker({
+          capabilities: { remoteUpdates: { supported: true, protocol: 1 } },
+        }),
+      ),
+    ).toBe(true);
+    expect(
+      workerUpdateAvailable({
+        currentVersion: "1.2.69",
+        latestVersion: "1.2.84",
+      }),
+    ).toBe(true);
+    expect(
+      workerUpdateAvailable({
+        currentVersion: "1.2.84",
+        latestVersion: "1.2.84",
+      }),
+    ).toBe(false);
   });
 });
