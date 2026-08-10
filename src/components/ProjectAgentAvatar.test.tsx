@@ -107,6 +107,17 @@ describe("ProjectAgentAvatar", () => {
     await act(async () => {
       root.render(
         <ProjectAgentAvatar
+          agent={{ ...agent }}
+          isRunning
+          token="access-token"
+        />,
+      );
+    });
+    expect(loadProjectAgentSpriteSheet).toHaveBeenCalledOnce();
+
+    await act(async () => {
+      root.render(
+        <ProjectAgentAvatar
           agent={agent}
           isRunning={false}
           token="access-token"
