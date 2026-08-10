@@ -22,6 +22,7 @@ import {
   maxArchiveUncompressedBytes,
   processArchiveCleanupQueue,
   readArchivedTranscript,
+  readLatestArchivedTranscriptForRun,
 } from "./archive";
 import { applyD1Migrations, executeD1Sql } from "./test-helpers/d1";
 
@@ -339,6 +340,10 @@ describe("D1 to R2 log archives", () => {
     expect(
       (await readArchivedTranscript(db, bucket, projectId, "session-archive"))?.events,
     ).toHaveLength(2);
+    expect(
+      (await readLatestArchivedTranscriptForRun(db, bucket, projectId, runId))
+        ?.session.session_id,
+    ).toBe("session-archive");
     expect(await listArchivedProjectAgentSessions(db, bucket, projectId)).toHaveLength(1);
 
     const secondPass = await archiveCompletedLogs(db, bucket, observedAt, {

@@ -7,7 +7,10 @@ import {
   type AutoHuntWorkflowStageId,
 } from "./lib/auto-hunt-contract";
 import type { StructuredAgentResult } from "./lib/agent-result";
-import type { AgentExecutionMetrics } from "./lib/agent-execution-metrics";
+import type {
+  AgentExecutionMetrics,
+  AgentExecutionUsageRecord,
+} from "./lib/agent-execution-metrics";
 import type { ProjectAgentCodexPet } from "./lib/codex-pets";
 import type { AgentProvider, ModelEffort } from "./lib/project-llm";
 import type {
@@ -293,6 +296,29 @@ export type HuntRun = {
 };
 
 /** Lightweight execution projection used by the organization Usage page. */
+export type AgentUsageExecutionAttempt = {
+  executionId: string;
+  /** Project that owned the run when this claim was created. */
+  projectId: string;
+  runAttempt: number;
+  claimAttempt: number;
+  workerId: string | null;
+  claimedBy: string | null;
+  claimedAt: string;
+  recordedAt: string;
+};
+
+export type AgentUsageRecord = AgentExecutionUsageRecord & {
+  executionId: string;
+  /** Project that owned the run when this usage was observed. */
+  projectId: string;
+  runAttempt: number;
+  claimAttempt: number;
+  workerId: string | null;
+  claimedAt: string;
+  recordedAt: string;
+};
+
 export type AgentUsageRun = {
   id: string;
   projectId: string;
@@ -311,6 +337,10 @@ export type AgentUsageRun = {
   startedAt: string;
   updatedAt: string;
   completedAt: string | null;
+  /** Present on servers with immutable execution-attempt usage ledgers. */
+  executionAttempts?: AgentUsageExecutionAttempt[];
+  /** Present on servers with immutable execution-attempt usage ledgers. */
+  usageRecords?: AgentUsageRecord[];
 };
 
 export type IssueResultReview = {

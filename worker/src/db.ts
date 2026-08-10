@@ -20,7 +20,10 @@ import {
   type AutoHuntWorkflowStageId,
 } from "../../src/lib/auto-hunt-contract";
 import type { StructuredAgentResult } from "../../src/lib/agent-result";
-import type { AgentExecutionMetrics } from "../../src/lib/agent-execution-metrics";
+import type {
+  AgentExecutionMetrics,
+  AgentExecutionUsageRecord,
+} from "../../src/lib/agent-execution-metrics";
 import {
   defaultProjectAgentCalendarColor,
   defaultProjectAgentCopy,
@@ -391,6 +394,7 @@ export type HuntRunRow = {
   claimed_at: string | null;
   lease_expires_at: string | null;
   claim_attempts: number;
+  last_execution_id: string | null;
   paused_at: string | null;
   resume_requested_at: string | null;
   waiting_checkpoint_key: string | null;
@@ -434,6 +438,47 @@ export type OrganizationUsageRunRow = {
   started_at: string;
   updated_at: string;
   completed_at: string | null;
+};
+
+export type RunExecutionAttemptRow = {
+  id: string;
+  organization_id: string;
+  project_id: string;
+  run_id: string;
+  run_attempt: number;
+  claim_attempt: number;
+  worker_id: string | null;
+  claimed_by: string | null;
+  claimed_at: string;
+  recorded_at: string;
+};
+
+export type OrganizationUsageRecordRow = {
+  execution_id: string;
+  run_id: string;
+  project_id: string;
+  run_attempt: number;
+  claim_attempt: number;
+  worker_id: string | null;
+  claimed_at: string;
+  usage_key: string;
+  session_id: string | null;
+  turn_id: string | null;
+  scope_id: string | null;
+  agent_provider: ProjectAgentProvider;
+  model_provider: string | null;
+  model: string | null;
+  canonical_model: string | null;
+  model_source: AgentExecutionUsageRecord["modelSource"];
+  source: string;
+  uncached_input_tokens: number | null;
+  cache_read_tokens: number | null;
+  cache_write_tokens: number | null;
+  output_tokens: number | null;
+  reasoning_output_tokens: number | null;
+  total_tokens: number | null;
+  observed_at: string;
+  recorded_at: string;
 };
 
 export type IssueResultReviewRow = {
@@ -5099,11 +5144,26 @@ export async function listOrganizationUsageRuns(
        from briar_hunt_runs run
        join briar_projects project on project.id = run.project_id
        where project.organization_id = ?
-         and unixepoch(coalesce(
-           run.completed_at,
-           run.updated_at,
-           run.started_at
-         )) >= unixepoch(?)
+         and (
+           unixepoch(coalesce(
+             run.completed_at,
+             run.updated_at,
+             run.started_at
+           )) >= unixepoch(?)
+           or exists (
+             select 1 from briar_run_execution_attempts attempt
+             where attempt.run_id = run.id
+               and attempt.organization_id = project.organization_id
+               and (
+                 unixepoch(attempt.claimed_at) >= unixepoch(?)
+                 or exists (
+                   select 1 from briar_run_usage_records usage
+                   where usage.execution_id = attempt.id
+                     and unixepoch(usage.observed_at) >= unixepoch(?)
+                 )
+               )
+           )
+         )
          and (
            run.execution_metrics_json is not null
            or run.claimed_at is not null
@@ -5114,6 +5174,11 @@ export async function listOrganizationUsageRuns(
            or run.status in (
              'running', 'blocked', 'failed', 'completed', 'cancelled'
            )
+           or exists (
+             select 1 from briar_run_execution_attempts attempt
+             where attempt.run_id = run.id
+               and attempt.organization_id = project.organization_id
+           )
          )
        order by unixepoch(coalesce(
          run.completed_at,
@@ -5121,10 +5186,120 @@ export async function listOrganizationUsageRuns(
          run.started_at
        )), run.id`,
     )
-    .bind(organizationId, since)
+    .bind(organizationId, since, since, since)
     .all<OrganizationUsageRunRow>();
 
   return runs.results;
+}
+
+export async function getRunExecutionAttempt(
+  db: D1Database,
+  executionId: string,
+) {
+  return db
+    .prepare(`select * from briar_run_execution_attempts where id = ?`)
+    .bind(executionId)
+    .first<RunExecutionAttemptRow>();
+}
+
+export async function recordRunUsageRecords(
+  db: D1Database,
+  input: {
+    executionId: string;
+    records: AgentExecutionUsageRecord[];
+    recordedAt: string;
+  },
+) {
+  if (input.records.length === 0) return 0;
+  const result = await db
+    .prepare(
+      `insert into briar_run_usage_records (
+         execution_id, usage_key, session_id, turn_id, scope_id,
+         agent_provider, model_provider, model, canonical_model,
+         model_source, source, uncached_input_tokens, cache_read_tokens,
+         cache_write_tokens, output_tokens, reasoning_output_tokens,
+         total_tokens, observed_at, recorded_at
+       )
+       select ?, json_extract(record.value, '$.usageKey'),
+              json_extract(record.value, '$.sessionId'),
+              json_extract(record.value, '$.turnId'),
+              json_extract(record.value, '$.scopeId'),
+              json_extract(record.value, '$.agentProvider'),
+              json_extract(record.value, '$.modelProvider'),
+              json_extract(record.value, '$.model'),
+              json_extract(record.value, '$.canonicalModel'),
+              json_extract(record.value, '$.modelSource'),
+              json_extract(record.value, '$.source'),
+              json_extract(record.value, '$.uncachedInputTokens'),
+              json_extract(record.value, '$.cacheReadTokens'),
+              json_extract(record.value, '$.cacheWriteTokens'),
+              json_extract(record.value, '$.outputTokens'),
+              json_extract(record.value, '$.reasoningOutputTokens'),
+              json_extract(record.value, '$.totalTokens'),
+              json_extract(record.value, '$.observedAt'), ?
+       from json_each(?) record
+       where true
+       on conflict (execution_id, usage_key) do nothing`,
+    )
+    .bind(
+      input.executionId,
+      input.recordedAt,
+      JSON.stringify(input.records),
+    )
+    .run();
+  return result.meta.changes ?? 0;
+}
+
+export async function listOrganizationUsageExecutionAttempts(
+  db: D1Database,
+  organizationId: string,
+  since: string,
+) {
+  const result = await db
+    .prepare(
+      `select * from briar_run_execution_attempts
+       where organization_id = ? and (
+         unixepoch(claimed_at) >= unixepoch(?)
+         or exists (
+           select 1 from briar_run_usage_records usage
+           where usage.execution_id = briar_run_execution_attempts.id
+             and unixepoch(usage.observed_at) >= unixepoch(?)
+         )
+       )
+       order by unixepoch(claimed_at), run_id, claim_attempt, id`,
+    )
+    .bind(organizationId, since, since)
+    .all<RunExecutionAttemptRow>();
+  return result.results;
+}
+
+export async function listOrganizationUsageRecords(
+  db: D1Database,
+  organizationId: string,
+  since: string,
+) {
+  const result = await db
+    .prepare(
+      `select usage.execution_id, attempt.run_id, attempt.project_id,
+              attempt.run_attempt, attempt.claim_attempt, attempt.worker_id,
+              attempt.claimed_at, usage.usage_key, usage.session_id,
+              usage.turn_id, usage.scope_id, usage.agent_provider,
+              usage.model_provider, usage.model, usage.canonical_model,
+              usage.model_source, usage.source, usage.uncached_input_tokens,
+              usage.cache_read_tokens, usage.cache_write_tokens,
+              usage.output_tokens, usage.reasoning_output_tokens,
+              usage.total_tokens, usage.observed_at, usage.recorded_at
+       from briar_run_usage_records usage
+       join briar_run_execution_attempts attempt
+         on attempt.id = usage.execution_id
+       where attempt.organization_id = ?
+         and unixepoch(usage.observed_at) >= unixepoch(?)
+       order by unixepoch(usage.observed_at), attempt.run_id,
+                attempt.claim_attempt, usage.usage_key`,
+    )
+    .bind(organizationId, since)
+    .all<OrganizationUsageRecordRow>();
+  return result.results;
 }
 
 export async function listIssueResultReviews(
@@ -5153,6 +5328,7 @@ export async function updateHuntRunExecutionMetrics(
     runId: string;
     attempt: number;
     workerId: string;
+    executionId?: string;
     metrics: AgentExecutionMetrics;
   },
 ) {
@@ -5161,7 +5337,8 @@ export async function updateHuntRunExecutionMetrics(
       `update briar_hunt_runs
        set execution_metrics_json = ?
        where id = ? and project_id = ? and current_attempt = ?
-         and worker_id = ?`,
+         and worker_id = ?
+         and (? is null or last_execution_id = ?)`,
     )
     .bind(
       stableJson(input.metrics),
@@ -5169,6 +5346,8 @@ export async function updateHuntRunExecutionMetrics(
       projectId,
       input.attempt,
       input.workerId,
+      input.executionId ?? null,
+      input.executionId ?? null,
     )
     .run();
   return result.meta.changes > 0;
@@ -6423,12 +6602,14 @@ export async function claimNextQueuedHuntRun(
   const allowedProviders =
     input.agentProviders ??
     (input.agentProvider ? [input.agentProvider] : undefined);
-  return await db
+  const executionId = crypto.randomUUID();
+  const claimStatement = db
     .prepare(
       `update briar_hunt_runs
        set claim_token_hash = ?, claimed_by = ?, claimed_at = ?,
            lease_expires_at = ?, claim_attempts = claim_attempts + 1,
-           worker_id = coalesce(?, worker_id),
+           last_execution_id = ?,
+           worker_id = ?,
            status = case
              when status = 'queued' and workflow_stage is not null
                then 'running'
@@ -6607,6 +6788,7 @@ export async function claimNextQueuedHuntRun(
       input.claimedBy,
       input.claimedAt,
       input.leaseExpiresAt,
+      executionId,
       input.workerId ?? null,
       input.claimedAt,
       projectId,
@@ -6627,8 +6809,29 @@ export async function claimNextQueuedHuntRun(
       input.workerDeviceId ?? null,
       input.claimedAt,
       input.workerDeviceId ?? null,
+    );
+  const attemptStatement = db
+    .prepare(
+      `insert into briar_run_execution_attempts (
+         id, organization_id, project_id, run_id, run_attempt, claim_attempt,
+         worker_id, claimed_by, claimed_at, recorded_at
+       )
+       select ?, project.organization_id, run.project_id, run.id,
+              run.current_attempt, run.claim_attempts, ?,
+              run.claimed_by, run.claimed_at, ?
+       from briar_hunt_runs run
+       join briar_projects project on project.id = run.project_id
+       where run.project_id = ? and run.last_execution_id = ?`,
     )
-    .first<HuntRunRow>();
+    .bind(
+      executionId,
+      input.workerId ?? null,
+      input.claimedAt,
+      projectId,
+      executionId,
+    );
+  const [claimResult] = await db.batch([claimStatement, attemptStatement]);
+  return (claimResult.results[0] as HuntRunRow | undefined) ?? null;
 }
 
 export async function assertQueuedHuntClaim(
@@ -9854,6 +10057,7 @@ export async function transferIssue(
            claimed_at = null,
            lease_expires_at = null,
            claim_attempts = 0,
+           last_execution_id = null,
            dispatch_mode = null,
            dispatch_request_id = null,
            dispatched_at = null,

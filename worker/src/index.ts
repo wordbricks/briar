@@ -21,7 +21,10 @@ import {
   structuredAgentResultSchema,
   type StructuredAgentResult,
 } from "../../src/lib/agent-result";
-import { agentExecutionMetricsSchema } from "../../src/lib/agent-execution-metrics";
+import {
+  agentExecutionMetricsSchema,
+  agentExecutionUsageRecordSchema,
+} from "../../src/lib/agent-execution-metrics";
 import {
   agentProviderAllowsEffort,
   agentProviderAllowsModel,
@@ -99,6 +102,7 @@ import {
   listArchiveObjectsForDeletion,
   processArchiveCleanupQueue,
   readArchivedTranscript,
+  readLatestArchivedTranscriptForRun,
 } from "./archive";
 import {
   acceptOrganizationInvitation,
@@ -171,6 +175,7 @@ import {
   getClaimedProjectAgentTask,
   getDashboardSyncCursor,
   getHuntRunForProject,
+  getRunExecutionAttempt,
   HuntClaimError,
   HuntTransitionError,
   initializeWorkflowProgress,
@@ -196,6 +201,8 @@ import {
   listOrganizationMembers,
   listOrganizationInvitations,
   listOrganizationUsageRuns,
+  listOrganizationUsageExecutionAttempts,
+  listOrganizationUsageRecords,
   listGithubConnectionRepositories,
   listOrganizationProjects,
   listOrganizations,
@@ -216,6 +223,7 @@ import {
   reworkHuntRun,
   recordHuntEvent,
   recordRunEvidence,
+  recordRunUsageRecords,
   removeOrganizationMember,
   revokeOrganizationInvitation,
   renewProjectAgentScheduleRunLease,
@@ -273,6 +281,8 @@ import {
   type OrganizationMemberRow,
   type OrganizationInvitationRow,
   type OrganizationUsageRunRow,
+  type OrganizationUsageRecordRow,
+  type RunExecutionAttemptRow,
   type OrganizationRole,
   type OrganizationRow,
   type RunEvidenceRow,
@@ -343,6 +353,7 @@ import {
   WORKER_STALE_AFTER_MS,
   reapStalledHuntRuns,
   readAgentTranscript,
+  readLatestAgentTranscriptForRun,
   recordWorkerHeartbeat,
   registerExecutionWorker,
   requestExecutionWorkerUpdate,
@@ -2029,10 +2040,16 @@ export const transcriptSchema = z
       .regex(/^[A-Za-z0-9_-]+$/u),
     runId: z.string().uuid().nullable().optional(),
     runAttempt: z.number().int().positive().optional(),
+    executionId: z.string().uuid().optional(),
     projectId: z.string().uuid().optional(),
     workerId: z.string().trim().min(1).max(128).nullable().optional(),
     agentProvider: z.enum(agentProviders),
     executionMetrics: agentExecutionMetricsSchema.optional(),
+    usageRecords: z
+      .array(agentExecutionUsageRecordSchema)
+      .min(1)
+      .max(1_000)
+      .optional(),
     events: z
       .array(
         z
@@ -2047,15 +2064,50 @@ export const transcriptSchema = z
       .max(MAX_TRANSCRIPT_EVENTS_PER_REQUEST),
   })
   .strict()
-  .refine(
-    (input) =>
-      input.executionMetrics === undefined ||
-      (Boolean(input.runId) && input.runAttempt !== undefined),
-    {
-      message: "runId and runAttempt are required with executionMetrics",
-      path: ["executionMetrics"],
-    },
-  );
+  .superRefine((input, context) => {
+    if (
+      input.executionMetrics !== undefined &&
+      (!input.runId || input.runAttempt === undefined)
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "runId and runAttempt are required with executionMetrics",
+        path: ["executionMetrics"],
+      });
+    }
+    if (input.executionId && !input.runId) {
+      context.addIssue({
+        code: "custom",
+        message: "runId is required with executionId",
+        path: ["executionId"],
+      });
+    }
+    if (input.usageRecords && !input.executionId) {
+      context.addIssue({
+        code: "custom",
+        message: "executionId is required with usageRecords",
+        path: ["usageRecords"],
+      });
+    }
+    if (input.usageRecords && input.runAttempt === undefined) {
+      context.addIssue({
+        code: "custom",
+        message: "runAttempt is required with usageRecords",
+        path: ["usageRecords"],
+      });
+    }
+    if (
+      input.usageRecords?.some(
+        (record) => record.agentProvider !== input.agentProvider,
+      )
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "usage record providers must match agentProvider",
+        path: ["usageRecords"],
+      });
+    }
+  });
 
 const recoveryUserInputSchema = z
   .object({
@@ -4337,7 +4389,51 @@ const parseUsageExecutionMetrics = (value: string | null) => {
   }
 };
 
-export const organizationUsageRunJson = (run: OrganizationUsageRunRow) => ({
+const usageExecutionAttemptJson = (attempt: RunExecutionAttemptRow) => ({
+  executionId: attempt.id,
+  projectId: attempt.project_id,
+  runAttempt: attempt.run_attempt,
+  claimAttempt: attempt.claim_attempt,
+  workerId: attempt.worker_id,
+  claimedBy: attempt.claimed_by,
+  claimedAt: attempt.claimed_at,
+  recordedAt: attempt.recorded_at,
+});
+
+const organizationUsageRecordJson = (record: OrganizationUsageRecordRow) => ({
+  executionId: record.execution_id,
+  projectId: record.project_id,
+  runAttempt: record.run_attempt,
+  claimAttempt: record.claim_attempt,
+  workerId: record.worker_id,
+  claimedAt: record.claimed_at,
+  usageKey: record.usage_key,
+  sessionId: record.session_id,
+  scopeId: record.scope_id,
+  turnId: record.turn_id,
+  agentProvider: record.agent_provider,
+  modelProvider: record.model_provider,
+  model: record.model,
+  canonicalModel: record.canonical_model,
+  modelSource: record.model_source,
+  source: record.source,
+  uncachedInputTokens: record.uncached_input_tokens,
+  cacheReadTokens: record.cache_read_tokens,
+  cacheWriteTokens: record.cache_write_tokens,
+  outputTokens: record.output_tokens,
+  reasoningOutputTokens: record.reasoning_output_tokens,
+  totalTokens: record.total_tokens,
+  observedAt: record.observed_at,
+  recordedAt: record.recorded_at,
+});
+
+export const organizationUsageRunJson = (
+  run: OrganizationUsageRunRow,
+  ledger: {
+    attempts?: RunExecutionAttemptRow[];
+    records?: OrganizationUsageRecordRow[];
+  } = {},
+) => ({
   id: run.id,
   projectId: run.project_id,
   status: run.paused_at ? ("paused" as const) : run.status,
@@ -4355,6 +4451,8 @@ export const organizationUsageRunJson = (run: OrganizationUsageRunRow) => ({
   startedAt: run.started_at,
   updatedAt: run.updated_at,
   completedAt: run.completed_at,
+  executionAttempts: (ledger.attempts ?? []).map(usageExecutionAttemptJson),
+  usageRecords: (ledger.records ?? []).map(organizationUsageRecordJson),
 });
 
 const dashboardEventJson = (event: HuntEventRow) => ({
@@ -4546,6 +4644,38 @@ const listIssueMessagesWithArchive = async (
       left.created_at.localeCompare(right.created_at) ||
       left.id.localeCompare(right.id),
   );
+};
+
+const readLatestTranscriptForRunWithArchive = async (
+  db: D1Database,
+  archivesBucket: R2Bucket,
+  projectId: string,
+  runId: string,
+  options: { afterSequence?: number; limit?: number; tail?: boolean } = {},
+) => {
+  const hot = await readLatestAgentTranscriptForRun(
+    db,
+    projectId,
+    runId,
+    options,
+  );
+  if (hot) return hot;
+  const archived = await readLatestArchivedTranscriptForRun(
+    db,
+    archivesBucket,
+    projectId,
+    runId,
+  );
+  if (!archived) return null;
+  const afterSequence = options.afterSequence ?? 0;
+  const filtered = archived.events.filter(
+    (event) => event.sequence > afterSequence,
+  );
+  const limit = Math.min(options.limit ?? 1_000, 5_000);
+  return {
+    ...archived,
+    events: options.tail ? filtered.slice(-limit) : filtered.slice(0, limit),
+  };
 };
 
 const removeOrphanedIssueAttachments = async (
@@ -5108,13 +5238,33 @@ async function route(
       new URL(request.url).searchParams.get("days") ?? "90",
     );
     const generatedAt = Date.now();
-    const runs = await listOrganizationUsageRuns(
-      db,
-      organizationId,
-      organizationUsageQuerySince(days, generatedAt),
-    );
+    const since = organizationUsageQuerySince(days, generatedAt);
+    const [runs, attempts, usageRecords] = await Promise.all([
+      listOrganizationUsageRuns(db, organizationId, since),
+      listOrganizationUsageExecutionAttempts(db, organizationId, since),
+      listOrganizationUsageRecords(db, organizationId, since),
+    ]);
+    const attemptsByRun = new Map<string, RunExecutionAttemptRow[]>();
+    for (const attempt of attempts) {
+      attemptsByRun.set(attempt.run_id, [
+        ...(attemptsByRun.get(attempt.run_id) ?? []),
+        attempt,
+      ]);
+    }
+    const usageRecordsByRun = new Map<string, OrganizationUsageRecordRow[]>();
+    for (const record of usageRecords) {
+      usageRecordsByRun.set(record.run_id, [
+        ...(usageRecordsByRun.get(record.run_id) ?? []),
+        record,
+      ]);
+    }
     return json({
-      runs: runs.map(organizationUsageRunJson),
+      runs: runs.map((run) =>
+        organizationUsageRunJson(run, {
+          attempts: attemptsByRun.get(run.id),
+          records: usageRecordsByRun.get(run.id),
+        }),
+      ),
       generatedAt: new Date(generatedAt).toISOString(),
     });
   }
@@ -9264,7 +9414,9 @@ async function route(
 
   if (pathname === "/transcripts" && request.method === "POST") {
     const input = transcriptSchema.parse(await readJson(request));
+    const recordedAt = new Date().toISOString();
     let authenticatedWorkerId: string | null = null;
+    let authenticatedExecutionAttempt: RunExecutionAttemptRow | null = null;
     const projectId = bearerToken(request).startsWith("briar_worker_")
       ? (() => {
           if (!input.projectId) {
@@ -9281,12 +9433,34 @@ async function route(
         input.workerId ?? undefined,
       );
       authenticatedWorkerId = worker.binding.id;
-      if (
+      if (input.executionId) {
+        authenticatedExecutionAttempt = await getRunExecutionAttempt(
+          db,
+          input.executionId,
+        );
+        if (
+          !authenticatedExecutionAttempt ||
+          authenticatedExecutionAttempt.project_id !== projectId ||
+          authenticatedExecutionAttempt.worker_id !== authenticatedWorkerId ||
+          authenticatedExecutionAttempt.run_id !== input.runId
+        ) {
+          throw new HttpError(403, "Execution attempt is not assigned to this worker");
+        }
+        if (
+          input.runAttempt !== undefined &&
+          input.runAttempt !== authenticatedExecutionAttempt.run_attempt
+        ) {
+          throw new HttpError(409, "Execution attempt does not match runAttempt");
+        }
+      } else if (
         input.runId &&
         (await requireRunExecutionProject(db, request, input.runId)) !== projectId
       ) {
         throw new HttpError(403, "Run is not assigned to this worker");
       }
+    }
+    if (input.executionId && !authenticatedExecutionAttempt) {
+      throw new HttpError(403, "Only execution workers can report an execution");
     }
     if (
       input.executionMetrics &&
@@ -9294,23 +9468,48 @@ async function route(
     ) {
       throw new HttpError(403, "Only execution workers can report run metrics");
     }
+    if (input.usageRecords && authenticatedExecutionAttempt) {
+      const clockSkewMs = 5 * 60_000;
+      const earliestObservedAt =
+        Date.parse(authenticatedExecutionAttempt.claimed_at) - clockSkewMs;
+      const latestObservedAt = Date.parse(recordedAt) + clockSkewMs;
+      if (
+        input.usageRecords.some((record) => {
+          const observedAt = Date.parse(record.observedAt);
+          return observedAt < earliestObservedAt || observedAt > latestObservedAt;
+        })
+      ) {
+        throw new HttpError(
+          400,
+          "Usage observedAt is outside the execution attempt window",
+        );
+      }
+    }
+    const usageStored = input.usageRecords
+      ? await recordRunUsageRecords(db, {
+          executionId: input.executionId!,
+          records: input.usageRecords,
+          recordedAt,
+        })
+      : 0;
     const result = await appendAgentTranscript(db, projectId, {
       sessionId: input.sessionId,
       runId: input.runId ?? null,
       workerId: authenticatedWorkerId ?? input.workerId ?? null,
       agentProvider: input.agentProvider,
       events: input.events,
-      observedAt: new Date().toISOString(),
+      observedAt: recordedAt,
     });
     if (input.executionMetrics) {
       await updateHuntRunExecutionMetrics(db, projectId, {
         runId: input.runId!,
         attempt: input.runAttempt!,
         workerId: authenticatedWorkerId!,
+        executionId: input.executionId,
         metrics: input.executionMetrics,
       });
     }
-    return json(result, 202);
+    return json({ ...result, usageStored }, 202);
   }
 
   const projectWorkersMatch = pathname.match(
@@ -9341,25 +9540,37 @@ async function route(
       new URL(request.url).searchParams.get("afterSequence") ?? "0",
       10,
     );
-    const hotTranscript = await readAgentTranscript(
-      db,
-      projectId,
-      transcriptMatch[2],
-      {
-        afterSequence:
-          Number.isFinite(afterSequence) && afterSequence > 0
-            ? afterSequence
-            : 0,
-      },
-    );
+    const requestedSessionId = transcriptMatch[2];
+    const detachedRunId = requestedSessionId.startsWith("detached-")
+      ? z.string().uuid().safeParse(requestedSessionId.slice("detached-".length))
+      : null;
+    const normalizedAfterSequence =
+      Number.isFinite(afterSequence) && afterSequence > 0 ? afterSequence : 0;
+    const hotTranscript = detachedRunId?.success
+      ? await readLatestAgentTranscriptForRun(
+          db,
+          projectId,
+          detachedRunId.data,
+          { afterSequence: normalizedAfterSequence },
+        )
+      : await readAgentTranscript(db, projectId, requestedSessionId, {
+          afterSequence: normalizedAfterSequence,
+        });
     const archivedTranscript = hotTranscript
       ? null
-      : await readArchivedTranscript(
-          db,
-          env.ARCHIVES,
-          projectId,
-          transcriptMatch[2],
-        );
+      : detachedRunId?.success
+        ? await readLatestArchivedTranscriptForRun(
+            db,
+            env.ARCHIVES,
+            projectId,
+            detachedRunId.data,
+          )
+        : await readArchivedTranscript(
+            db,
+            env.ARCHIVES,
+            projectId,
+            requestedSessionId,
+          );
     const transcript =
       hotTranscript ??
       (archivedTranscript
@@ -9368,9 +9579,7 @@ async function route(
             events: archivedTranscript.events.filter(
               (event) =>
                 event.sequence >
-                (Number.isFinite(afterSequence) && afterSequence > 0
-                  ? afterSequence
-                  : 0),
+                normalizedAfterSequence,
             ),
           }
         : null);
@@ -9452,10 +9661,11 @@ async function route(
           job.run_id,
         ),
         listRunEvidence(db, input.projectId, job.run_id),
-        readAgentTranscript(
+        readLatestTranscriptForRunWithArchive(
           db,
+          env.ARCHIVES,
           input.projectId,
-          `detached-${job.run_id}`,
+          job.run_id,
           { limit: 200, tail: true },
         ),
       ]);
@@ -10274,6 +10484,7 @@ async function route(
             attachments: attachments.map(attachmentJson),
             messages: claimConversationJson(messages, attachments),
             claimToken,
+            executionId: run.last_execution_id,
             claimedBy: run.claimed_by,
             claimedAt: run.claimed_at,
             leaseExpiresAt: run.lease_expires_at,

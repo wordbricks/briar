@@ -26,8 +26,9 @@ import {
 import { structuredAgentResultSchema } from "../src/lib/agent-result";
 import {
   agentExecutionMetrics,
-  agentExecutionTokenUsageFromPayload,
-  type AgentExecutionTokenUsage,
+  agentExecutionTokenUsageFromObservations,
+  agentExecutionUsageRecordsFromObservations,
+  createAgentExecutionUsageCollector,
 } from "../src/lib/agent-execution-metrics";
 import {
   agentProviders,
@@ -51,6 +52,7 @@ import {
   detachedRunContinuationPrompt,
   detachedRunDisposition,
   detachedTranscriptPayload,
+  detachedTranscriptSessionId,
   parseDetachedIssueReplyResult,
   parseDetachedJsonResult,
   shouldPersistDetachedTranscriptPayload,
@@ -916,6 +918,7 @@ const queuedIssueMessageSchema = z.object({
 });
 
 const queuedIssueSchema = z.object({
+  executionId: z.string().uuid().optional(),
   runId: z.string().uuid(),
   runNumber: z.number().int().positive(),
   currentAttempt: z.number().int().positive(),
@@ -2239,7 +2242,10 @@ async function runClaimedIssueInRuntime(
     resumeContext: issue.resumeContext,
   });
   const fullAccess = activeProject.autoHunt?.sandbox?.fullAccess ?? true;
-  const sessionId = `detached-${issue.runId}`;
+  const sessionId = detachedTranscriptSessionId(
+    issue.runId,
+    issue.executionId,
+  );
   const environment = {
     ...process.env,
     PATH: workerExecutionPath(),
@@ -2266,7 +2272,9 @@ async function runClaimedIssueInRuntime(
   const transcriptSequencer = createDetachedTranscriptSequencer(
     issue.claimAttempts,
   );
-  let tokenUsage: AgentExecutionTokenUsage | null = null;
+  const usageCollector = createAgentExecutionUsageCollector(provider, {
+    configuredModel: execution.model,
+  });
   let conversationId: string | null = null;
   let nextPrompt = prompt;
   let turnNumber = 0;
@@ -2287,8 +2295,7 @@ async function runClaimedIssueInRuntime(
         environment,
         signal,
         onPayload: async (rawPayload, line) => {
-          tokenUsage =
-            agentExecutionTokenUsageFromPayload(provider, rawPayload) ?? tokenUsage;
+          usageCollector.observe(rawPayload, new Date().toISOString());
           runnerBlock ??= detachedProviderBlockFromPayload(rawPayload);
           const direction = detachedPayloadDirection(rawPayload);
           const payload = detachedTranscriptPayload(rawPayload, line);
@@ -2301,6 +2308,9 @@ async function runClaimedIssueInRuntime(
                   projectId: project.id,
                   sessionId,
                   runId: issue.runId,
+                  ...(issue.executionId
+                    ? { executionId: issue.executionId }
+                    : {}),
                   workerId: activeProject.executionWorker?.workerId,
                   agentProvider: provider,
                   events: [{
@@ -2387,9 +2397,13 @@ async function runClaimedIssueInRuntime(
     }
     throw error;
   } finally {
+    const usageObservations = usageCollector.finish();
+    const usageRecords = agentExecutionUsageRecordsFromObservations(
+      usageObservations,
+    );
     const executionMetrics = agentExecutionMetrics(
       Date.now() - executionStartedAt,
-      tokenUsage,
+      agentExecutionTokenUsageFromObservations(usageObservations),
     );
     try {
       await request(config.apiUrl, "/transcripts", workerToken, {
@@ -2399,9 +2413,13 @@ async function runClaimedIssueInRuntime(
           sessionId,
           runId: issue.runId,
           runAttempt: issue.currentAttempt,
+          ...(issue.executionId ? { executionId: issue.executionId } : {}),
           workerId: activeProject.executionWorker?.workerId,
           agentProvider: provider,
           executionMetrics,
+          ...(issue.executionId && usageRecords.length > 0
+            ? { usageRecords }
+            : {}),
           events: [
             {
               sequence: transcriptSequencer.next(),

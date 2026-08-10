@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   agentExecutionMetrics,
   agentExecutionTokenUsageFromPayload,
+  agentExecutionTokenUsageFromObservations,
   agentExecutionUsageObservationsFromPayload,
+  agentExecutionUsageRecordSchema,
+  agentExecutionUsageRecordsFromObservations,
   claudeExecutionUsageObservationsFromPayload,
   codexExecutionUsageObservationsFromPayload,
   createAgentExecutionUsageCollector,
@@ -296,7 +299,8 @@ describe("agent execution metrics", () => {
     observeQuery("message-1", "result-1", 10);
     observeQuery("message-2", "result-2", 20);
 
-    expect(collector.finish()).toEqual([
+    const observations = collector.finish();
+    expect(observations).toEqual([
       expect.objectContaining({
         scopeId: "result-1",
         tokenUsage: expect.objectContaining({ totalTokens: 11 }),
@@ -306,6 +310,14 @@ describe("agent execution metrics", () => {
         tokenUsage: expect.objectContaining({ totalTokens: 21 }),
       }),
     ]);
+    expect(agentExecutionTokenUsageFromObservations(observations)).toEqual({
+      inputTokens: 30,
+      outputTokens: 2,
+      cacheReadTokens: 0,
+      cacheWriteTokens: 0,
+      reasoningOutputTokens: null,
+      totalTokens: 32,
+    });
   });
 
   it("observes Codex effective defaults from config and model list responses", () => {
@@ -606,6 +618,132 @@ describe("agent execution metrics", () => {
         modelSource: "providerReported",
       }),
     ]);
+  });
+
+  it("returns ledger-ready Codex records with disjoint input and a stable timestamp", () => {
+    const collector = createAgentExecutionUsageCollector("codex", {
+      configuredModel: "gpt-5.6-sol",
+    });
+    collector.observe(
+      {
+        type: "turn.completed",
+        usage: {
+          input_tokens: 1_000,
+          cached_input_tokens: 800,
+          cache_write_input_tokens: 50,
+          output_tokens: 250,
+          reasoning_output_tokens: 100,
+          total_tokens: 1_250,
+        },
+      },
+      "2026-08-10T01:02:03.000Z",
+    );
+
+    const observations = collector.finish();
+    expect(observations).toEqual([
+      expect.objectContaining({
+        dedupeKey: "codex:observation:0",
+        observedAt: "2026-08-10T01:02:03.000Z",
+      }),
+    ]);
+    expect(agentExecutionUsageRecordsFromObservations(observations)).toEqual([
+      {
+        usageKey: "codex:observation:0",
+        sessionId: null,
+        scopeId: null,
+        turnId: null,
+        agentProvider: "codex",
+        modelProvider: null,
+        model: "gpt-5.6-sol",
+        canonicalModel: null,
+        modelSource: "configuredFallback",
+        source: "codex.turnUsage",
+        uncachedInputTokens: 150,
+        cacheReadTokens: 800,
+        cacheWriteTokens: 50,
+        outputTokens: 250,
+        reasoningOutputTokens: 100,
+        totalTokens: 1_250,
+        observedAt: "2026-08-10T01:02:03.000Z",
+      },
+    ]);
+    // reasoningOutputTokens is a subset of outputTokens, not an extra bucket.
+    expect(agentExecutionTokenUsageFromObservations(observations)).toMatchObject({
+      inputTokens: 1_000,
+      outputTokens: 250,
+      reasoningOutputTokens: 100,
+      totalTokens: 1_250,
+    });
+  });
+
+  it("keeps the first occurrence time when a provider event is replayed", () => {
+    const collector = createAgentExecutionUsageCollector("codex");
+    const payload = {
+      method: "thread/tokenUsage/updated",
+      params: {
+        threadId: "thread-1",
+        turnId: "turn-1",
+        tokenUsage: {
+          last: { inputTokens: 10, outputTokens: 5, totalTokens: 15 },
+        },
+      },
+    };
+    collector.observe(payload, "2026-08-10T01:00:00.000Z");
+    collector.observe(payload, "2026-08-10T02:00:00.000Z");
+
+    expect(collector.finish()).toEqual([
+      expect.objectContaining({
+        dedupeKey: "codex:turn:turn-1:usage",
+        observedAt: "2026-08-10T01:00:00.000Z",
+      }),
+    ]);
+  });
+
+  it("rejects empty or internally inconsistent ledger token records", () => {
+    const record = {
+      usageKey: "codex:turn:turn-1:usage",
+      sessionId: "thread-1",
+      scopeId: "turn-1",
+      turnId: "turn-1",
+      agentProvider: "codex" as const,
+      modelProvider: "openai",
+      model: "gpt-5.6-sol",
+      canonicalModel: null,
+      modelSource: "providerReported" as const,
+      source: "codex.threadTokenUsage",
+      uncachedInputTokens: null,
+      cacheReadTokens: null,
+      cacheWriteTokens: null,
+      outputTokens: null,
+      reasoningOutputTokens: null,
+      totalTokens: null,
+      observedAt: "2026-08-10T01:00:00.000Z",
+    };
+
+    expect(agentExecutionUsageRecordSchema.safeParse(record).success).toBe(false);
+    expect(
+      agentExecutionUsageRecordSchema.safeParse({
+        ...record,
+        outputTokens: 10,
+        reasoningOutputTokens: 11,
+        totalTokens: 10,
+      }).success,
+    ).toBe(false);
+    expect(
+      agentExecutionUsageRecordSchema.safeParse({
+        ...record,
+        reasoningOutputTokens: 1,
+        totalTokens: 1,
+      }).success,
+    ).toBe(false);
+    expect(
+      agentExecutionUsageRecordSchema.safeParse({
+        ...record,
+        outputTokens: 10,
+        reasoningOutputTokens: 4,
+        totalTokens: 10,
+      }).success,
+    ).toBe(true);
   });
 
   it("marks configured model enrichment as fallback rather than provider-reported", () => {

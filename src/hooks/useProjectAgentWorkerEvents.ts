@@ -28,6 +28,7 @@ export function useProjectAgentWorkerEvents(
     let hasLoadedEvents = false;
     const sequences = new Map<string, number>();
     const receivedEventCounts = new Map<string, number>();
+    const activeSessionIds = new Map<string, string>();
     setEvents([]);
     setError(null);
     setIsLoading(Boolean(token && runIds.length));
@@ -36,13 +37,32 @@ export function useProjectAgentWorkerEvents(
     const refresh = async () => {
       const loaded = await Promise.allSettled(
         runIds.map(async (runId) => {
-          const sessionId = `detached-${runId}`;
-          const transcript = await loadProjectAgentTranscript(
+          const sessionAlias = `detached-${runId}`;
+          const previousSessionId = activeSessionIds.get(runId);
+          let transcript = await loadProjectAgentTranscript(
             token,
             projectId,
-            sessionId,
-            sequences.get(sessionId) ?? 0,
+            sessionAlias,
+            previousSessionId
+              ? (sequences.get(previousSessionId) ?? 0)
+              : 0,
           );
+          // The alias resolves to the newest execution-scoped session. When a
+          // retry or transfer creates a new session, its sequence starts over;
+          // reload from zero instead of applying the previous session cursor.
+          if (
+            previousSessionId &&
+            transcript.session.sessionId !== previousSessionId
+          ) {
+            transcript = await loadProjectAgentTranscript(
+              token,
+              projectId,
+              sessionAlias,
+              0,
+            );
+          }
+          const sessionId = transcript.session.sessionId;
+          activeSessionIds.set(runId, sessionId);
           const receivedEventCount =
             (receivedEventCounts.get(sessionId) ?? 0) + transcript.events.length;
           receivedEventCounts.set(sessionId, receivedEventCount);

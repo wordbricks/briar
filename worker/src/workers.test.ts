@@ -9,7 +9,10 @@ import {
   createIssueMessage,
   enqueueIssueAgentReply,
   listIssueThreadMessages,
+  listOrganizationUsageExecutionAttempts,
+  listOrganizationUsageRecords,
   recordHuntEvent,
+  transferIssue,
   updateHuntRunExecutionMetrics,
   type HuntEventInput,
 } from "./db";
@@ -35,6 +38,7 @@ import {
   MAX_TRANSCRIPT_PAYLOAD_BYTES,
   reapStalledHuntRuns,
   readAgentTranscript,
+  readLatestAgentTranscriptForRun,
   recordWorkerHeartbeat,
   registerExecutionWorker,
   requestExecutionWorkerUpdate,
@@ -138,12 +142,15 @@ describe("detached execution workers", () => {
         "0038_project_execution_worker_policies.sql",
         "0039_project_agent_tokens.sql",
         "0040_run_execution_provider.sql",
+        "0041_issue_message_mentions.sql",
         "0043_execution_worker_icons.sql",
         "0044_issue_agent_reply_jobs.sql",
         "0045_issue_execution_preferences.sql",
         "0046_project_icons.sql",
         "0047_project_icon_browser_formats.sql",
         "0048_issue_dependencies.sql",
+        "0049_dashboard_delta_sync.sql",
+        "0051_log_archives.sql",
         "0054_run_execution_metrics.sql",
         "0058_workflow_pause_after_stage.sql",
         "0059_workflow_v2_progress.sql",
@@ -152,13 +159,16 @@ describe("detached execution workers", () => {
         "0061_workflow_stage_status_events.sql",
         "0062_issue_assignees.sql",
         "0063_inbox_read_states.sql",
+        "0063_github_pull_request_sync.sql",
         "0065_issue_rework_proposals.sql",
         "0067_issue_checkpoints.sql",
         "0068_issue_action_proposals.sql",
         "0069_project_agent_effort.sql",
+        "0070_project_issue_key_prefix.sql",
         "0076_execution_worker_updates.sql",
         "0077_project_agent_task_jobs.sql",
         "0079_agent_skills.sql",
+        "0084_run_usage_ledger.sql",
       ],
     });
     await executeD1Sql(
@@ -2074,6 +2084,268 @@ describe("detached execution workers", () => {
     expect(await countLeasedRuns(db, projectId, atMinute(40))).toBe(0);
   });
 
+  it("keeps claim attempts immutable and accepts idempotent late usage uploads", async () => {
+    const firstCredential = "briar_worker_usage-ledger-first";
+    const secondCredential = "briar_worker_usage-ledger-second";
+    const firstWorker = await register(
+      "usage-ledger-first",
+      1,
+      createHash("sha256").update(firstCredential).digest("hex"),
+    );
+    const secondWorker = await register(
+      "usage-ledger-second",
+      1,
+      createHash("sha256").update(secondCredential).digest("hex"),
+    );
+    const runId = await recordHuntEvent(
+      db,
+      projectId,
+      queuedEvent("issue-usage-ledger", 1),
+    );
+    const firstClaim = await claimNextQueuedHuntRun(db, projectId, {
+      claimTokenHash: "1".repeat(64),
+      claimedBy: "usage-ledger-first",
+      claimedAt: atMinute(2),
+      leaseExpiresAt: leaseExpiryFrom(atMinute(2)),
+      runId,
+      workerId: firstWorker.worker.id,
+      workerDeviceId: firstWorker.device.id,
+    });
+    expect(firstClaim?.last_execution_id).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u,
+    );
+
+    await db
+      .prepare(
+        `update briar_hunt_runs set status = 'running', stage = 'analyzing'
+         where id = ?`,
+      )
+      .bind(runId)
+      .run();
+    await reapStalledHuntRuns(db, projectId, atMinute(40));
+    const secondClaim = await claimNextQueuedHuntRun(db, projectId, {
+      claimTokenHash: "2".repeat(64),
+      claimedBy: "usage-ledger-second",
+      claimedAt: atMinute(41),
+      leaseExpiresAt: leaseExpiryFrom(atMinute(41)),
+      runId,
+      workerId: secondWorker.worker.id,
+      workerDeviceId: secondWorker.device.id,
+    });
+    expect(secondClaim?.last_execution_id).not.toBe(
+      firstClaim?.last_execution_id,
+    );
+    expect(secondClaim?.claim_attempts).toBe(2);
+
+    const attempts = await listOrganizationUsageExecutionAttempts(
+      db,
+      projectId,
+      atMinute(0),
+    );
+    expect(attempts.filter((attempt) => attempt.run_id === runId)).toEqual([
+      expect.objectContaining({
+        id: firstClaim!.last_execution_id,
+        run_attempt: firstClaim!.current_attempt,
+        claim_attempt: 1,
+        worker_id: firstWorker.worker.id,
+      }),
+      expect.objectContaining({
+        id: secondClaim!.last_execution_id,
+        run_attempt: secondClaim!.current_attempt,
+        claim_attempt: 2,
+        worker_id: secondWorker.worker.id,
+      }),
+    ]);
+    await expect(
+      claimNextQueuedHuntRun(db, projectId, {
+        claimTokenHash: "3".repeat(64),
+        claimedBy: "usage-ledger-missing",
+        claimedAt: atMinute(42),
+        leaseExpiresAt: leaseExpiryFrom(atMinute(42)),
+        runId: "99999999-9999-4999-8999-999999999999",
+      }),
+    ).resolves.toBeNull();
+    const attemptCount = await db
+      .prepare(
+        `select count(*) as count from briar_run_execution_attempts
+         where run_id = ?`,
+      )
+      .bind(runId)
+      .first<{ count: number }>();
+    expect(attemptCount?.count).toBe(2);
+
+    const env = {
+      DB: db,
+      BETTER_AUTH_SECRET: "usage-ledger-test-secret-usage-ledger-test-secret",
+      GOOGLE_CLIENT_ID: "google-client-test",
+      GOOGLE_CLIENT_SECRET: "google-secret-test",
+    } as unknown as Env;
+    const transcriptBody = {
+      sessionId: "usage-ledger-session",
+      runId,
+      runAttempt: firstClaim!.current_attempt,
+      executionId: firstClaim!.last_execution_id,
+      projectId,
+      workerId: firstWorker.worker.id,
+      agentProvider: "codex",
+      usageRecords: [
+        {
+          usageKey: "codex:turn:turn-1:usage",
+          sessionId: "usage-ledger-session",
+          scopeId: "turn-1",
+          turnId: "turn-1",
+          agentProvider: "codex",
+          modelProvider: "openai",
+          model: "gpt-5.6-sol",
+          canonicalModel: null,
+          modelSource: "providerReported",
+          source: "codex.threadTokenUsage",
+          uncachedInputTokens: 120,
+          cacheReadTokens: 80,
+          cacheWriteTokens: null,
+          outputTokens: 30,
+          reasoningOutputTokens: 10,
+          totalTokens: 230,
+          observedAt: atMinute(3),
+        },
+      ],
+      events: [
+        {
+          sequence: 1,
+          direction: "server",
+          payload: { method: "thread/tokenUsage/updated" },
+        },
+      ],
+    };
+    const postTranscript = (credential: string, body: typeof transcriptBody) =>
+      apiWorker.fetch(
+        new Request("https://briar-api.example/transcripts", {
+          method: "POST",
+          headers: {
+            authorization: `Bearer ${credential}`,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify(body),
+        }),
+        env,
+      );
+
+    const wrongWorkerResponse = await postTranscript(secondCredential, {
+      ...transcriptBody,
+      sessionId: "usage-ledger-wrong-worker",
+      workerId: secondWorker.worker.id,
+    });
+    expect(wrongWorkerResponse.status).toBe(403);
+
+    const tooEarlyResponse = await postTranscript(firstCredential, {
+      ...transcriptBody,
+      sessionId: "usage-ledger-too-early",
+      usageRecords: transcriptBody.usageRecords.map((record) => ({
+        ...record,
+        observedAt: atMinute(-10),
+      })),
+    });
+    expect(tooEarlyResponse.status).toBe(400);
+    const futureResponse = await postTranscript(firstCredential, {
+      ...transcriptBody,
+      sessionId: "usage-ledger-future",
+      usageRecords: transcriptBody.usageRecords.map((record) => ({
+        ...record,
+        observedAt: "2999-01-01T00:00:00.000Z",
+      })),
+    });
+    expect(futureResponse.status).toBe(400);
+
+    const accepted = await postTranscript(firstCredential, transcriptBody);
+    expect(accepted.status).toBe(202);
+    expect(await accepted.json()).toMatchObject({ stored: 1, usageStored: 1 });
+    const retry = await postTranscript(firstCredential, transcriptBody);
+    expect(retry.status).toBe(202);
+    expect(await retry.json()).toMatchObject({ stored: 0, usageStored: 0 });
+
+    const records = await listOrganizationUsageRecords(
+      db,
+      projectId,
+      atMinute(0),
+    );
+    expect(records).toEqual([
+      expect.objectContaining({
+        execution_id: firstClaim!.last_execution_id,
+        run_id: runId,
+        claim_attempt: 1,
+        worker_id: firstWorker.worker.id,
+        usage_key: "codex:turn:turn-1:usage",
+        model: "gpt-5.6-sol",
+        uncached_input_tokens: 120,
+        cache_read_tokens: 80,
+        output_tokens: 30,
+      }),
+    ]);
+  });
+
+  it("keeps historical attempts when a transferred run restarts claim numbering", async () => {
+    const runId = await recordHuntEvent(
+      db,
+      projectId,
+      queuedEvent("issue-usage-transfer", 1),
+    );
+    const sourceClaim = await claimNextQueuedHuntRun(db, projectId, {
+      claimTokenHash: "4".repeat(64),
+      claimedBy: "source-project-worker",
+      claimedAt: atMinute(2),
+      leaseExpiresAt: leaseExpiryFrom(atMinute(2)),
+      runId,
+    });
+    expect(sourceClaim?.claim_attempts).toBe(1);
+
+    await expect(
+      transferIssue(db, {
+        sourceProjectId: projectId,
+        targetProjectId: secondProjectId,
+        targetProjectName: "Second",
+        runId,
+        observedAt: atMinute(40),
+      }),
+    ).resolves.toBe("transferred");
+    const targetClaim = await claimNextQueuedHuntRun(db, secondProjectId, {
+      claimTokenHash: "5".repeat(64),
+      claimedBy: "target-project-worker",
+      claimedAt: atMinute(41),
+      leaseExpiresAt: leaseExpiryFrom(atMinute(41)),
+      runId,
+    });
+    expect(targetClaim).toMatchObject({
+      id: runId,
+      project_id: secondProjectId,
+      claim_attempts: 1,
+      last_execution_id: expect.any(String),
+    });
+    expect(targetClaim?.last_execution_id).not.toBe(
+      sourceClaim?.last_execution_id,
+    );
+
+    const attempts = await db
+      .prepare(
+        `select id, project_id, claim_attempt
+         from briar_run_execution_attempts where run_id = ?
+         order by claimed_at`,
+      )
+      .bind(runId)
+      .all<{ id: string; project_id: string; claim_attempt: number }>();
+    expect(attempts.results).toEqual([
+      {
+        id: sourceClaim!.last_execution_id!,
+        project_id: projectId,
+        claim_attempt: 1,
+      },
+      {
+        id: targetClaim!.last_execution_id!,
+        project_id: secondProjectId,
+        claim_attempt: 1,
+      },
+    ]);
+  });
+
   it("stores a transcript and reads it back in order", async () => {
     const result = await appendAgentTranscript(db, projectId, {
       sessionId: "session-1",
@@ -2104,6 +2376,72 @@ describe("detached execution workers", () => {
     });
     expect(boundedTail?.events.map((event) => event.sequence)).toEqual([2, 3]);
     expect(await readAgentTranscript(db, projectId, "session-missing")).toBeNull();
+  });
+
+  it("reads the newest hot transcript session for a run", async () => {
+    const runId = await recordHuntEvent(
+      db,
+      projectId,
+      queuedEvent("latest-hot-transcript", 1),
+    );
+    await appendAgentTranscript(db, projectId, {
+      sessionId: "attempt-old",
+      runId,
+      workerId: null,
+      agentProvider: "codex",
+      observedAt: atMinute(2),
+      events: [{ sequence: 1, direction: "server", payload: { attempt: 1 } }],
+    });
+    await appendAgentTranscript(db, projectId, {
+      sessionId: "attempt-new",
+      runId,
+      workerId: null,
+      agentProvider: "codex",
+      observedAt: atMinute(3),
+      events: [
+        { sequence: 1, direction: "server", payload: { attempt: 2 } },
+        { sequence: 2, direction: "server", payload: { result: true } },
+      ],
+    });
+
+    const latest = await readLatestAgentTranscriptForRun(
+      db,
+      projectId,
+      runId,
+      { limit: 1, tail: true },
+    );
+    expect(latest?.session.session_id).toBe("attempt-new");
+    expect(latest?.events.map((event) => event.sequence)).toEqual([2]);
+
+    const sessionToken = "latest-hot-transcript-session-token";
+    await db
+      .prepare(
+        `insert into "session" (
+           id, expiresAt, token, createdAt, updatedAt, userId
+         ) values (?, '2099-01-01T00:00:00.000Z', ?, ?, ?, 'owner')`,
+      )
+      .bind("latest-hot-transcript-session", sessionToken, atMinute(1), atMinute(1))
+      .run();
+    const response = await apiWorker.fetch(
+      new Request(
+        `https://briar-api.example/projects/${projectId}/sessions/detached-${runId}/transcript`,
+        { headers: { authorization: `Bearer ${sessionToken}` } },
+      ),
+      {
+        DB: db,
+        BETTER_AUTH_SECRET: "latest-transcript-secret-latest-transcript-secret",
+        GOOGLE_CLIENT_ID: "google-client-test",
+        GOOGLE_CLIENT_SECRET: "google-secret-test",
+      } as unknown as Env,
+    );
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      session: { sessionId: "attempt-new", runId },
+      events: [
+        { sequence: 1, message: { attempt: 2 } },
+        { sequence: 2, message: { result: true } },
+      ],
+    });
   });
 
   it("charges a retried batch only once", async () => {

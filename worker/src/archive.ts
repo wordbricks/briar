@@ -1206,6 +1206,10 @@ export async function readArchivedTranscript(
     kind: "agent_transcript",
     scopeId: sessionId,
   });
+  return archivedTranscriptFromRecords(records);
+}
+
+const archivedTranscriptFromRecords = (records: ArchiveRecord[]) => {
   const sessionRecord = records.find(
     (record) => record.recordType === "transcript_session",
   );
@@ -1217,6 +1221,27 @@ export async function readArchivedTranscript(
       .map((record) => transcriptEventSchema.parse(record.data))
       .sort((left, right) => left.sequence - right.sequence),
   };
+};
+
+export async function readLatestArchivedTranscriptForRun(
+  db: D1Database,
+  bucket: ArchiveBucket,
+  projectId: string,
+  runId: string,
+) {
+  const metadata = await db
+    .prepare(
+      `select * from briar_log_archives
+       where project_id = ? and run_id = ?
+         and archive_kind = 'agent_transcript' and status = 'complete'
+       order by period_end desc, completed_at desc, id desc
+       limit 1`,
+    )
+    .bind(projectId, runId)
+    .first<ArchiveMetadataRow>();
+  return metadata
+    ? archivedTranscriptFromRecords(await readArchiveObject(bucket, metadata))
+    : null;
 }
 
 export async function listArchivedProjectAgentSessions(

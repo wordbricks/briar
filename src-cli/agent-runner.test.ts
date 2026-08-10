@@ -15,6 +15,7 @@ import {
   detachedRunContinuationPrompt,
   detachedRunDisposition,
   detachedTranscriptSequence,
+  detachedTranscriptSessionId,
   detachedTranscriptPayload,
   issueReplyTextFromPayload,
   parseDetachedIssueReplyResult,
@@ -125,6 +126,19 @@ describe("detached Agent runner", () => {
     expect(detachedTranscriptSequence(1, 37)).toBe(37);
     expect(detachedTranscriptSequence(2, 1)).toBe(1_000_001);
     expect(detachedTranscriptSequence(3, 1)).toBe(2_000_001);
+  });
+
+  it("names transcript sessions by execution so transfer resets cannot collide", () => {
+    const runId = "11111111-1111-4111-8111-111111111111";
+    expect(
+      detachedTranscriptSessionId(
+        runId,
+        "22222222-2222-4222-8222-222222222222",
+      ),
+    ).toBe(
+      "detached-11111111-1111-4111-8111-111111111111-22222222-2222-4222-8222-222222222222",
+    );
+    expect(detachedTranscriptSessionId(runId)).toBe(`detached-${runId}`);
   });
 
   it("builds a neutral issue prompt when no logical Agent is assigned", () => {
