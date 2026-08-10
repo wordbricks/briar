@@ -79,7 +79,6 @@ describe("worktree naming", () => {
       title: "Fix login redirect",
     };
     expect(worktreeNameFor(issue)).toBe("fix-login-redirect-3f6b9c21");
-    expect(worktreeNameFor(issue)).toBe(worktreeNameFor(issue));
   });
 
   it("falls back to the source key tail when the title is unusable", () => {

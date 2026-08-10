@@ -5,6 +5,7 @@ import { createRoot } from "react-dom/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createOrganizationInvitation,
+  listOrganizationAgents,
   loadOrganizationExecutionWorkers,
   loadOrganizationInvitations,
   loadOrganizationMembers,
@@ -17,14 +18,18 @@ import type { OrganizationMember } from "../types";
 import { OrganizationSettings } from "./OrganizationSettings";
 
 vi.mock("../lib/api", () => ({
+  createOrganizationAgent: vi.fn(),
   createOrganizationInvitation: vi.fn(),
+  deleteOrganizationAgent: vi.fn(),
   disableOrganizationExecutionWorker: vi.fn(),
+  listOrganizationAgents: vi.fn(),
   loadOrganizationExecutionWorkers: vi.fn(),
   loadOrganizationInvitations: vi.fn(),
   loadOrganizationMembers: vi.fn(),
   removeOrganizationMember: vi.fn(),
   revokeOrganizationInvitation: vi.fn(),
   updateOrganizationMemberRole: vi.fn(),
+  updateOrganizationAgent: vi.fn(),
   updateOrganizationExecutionWorkerConcurrency: vi.fn(),
 }));
 vi.mock("../lib/organization-logo", () => ({
@@ -102,6 +107,10 @@ describe("OrganizationSettings", () => {
       workers: [],
       canManage: true,
       generatedAt: "2026-07-29T00:00:00Z",
+    });
+    vi.mocked(listOrganizationAgents).mockResolvedValue({
+      agents: [],
+      canManage: true,
     });
     vi.mocked(organizationLogoFromFile).mockResolvedValue(
       "data:image/webp;base64,bG9nbw==",
@@ -253,6 +262,45 @@ describe("OrganizationSettings", () => {
 
     expect(onRename).toHaveBeenCalledWith("organization-1", "Briar Labs");
     expect(container.textContent).toContain("조직 이름을 저장했습니다.");
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("opens organization agents as its own initial settings section", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <OrganizationSettings
+          initialSection="agents"
+          organization={{
+            id: "organization-1",
+            name: "Wordbricks",
+            handle: "wordbricks",
+            logo: null,
+            role: "owner",
+            createdAt: "2023-12-01T00:00:00Z",
+          }}
+          onBack={() => undefined}
+          onLogoChange={vi.fn()}
+          onRename={vi.fn()}
+          token="token"
+        />,
+      );
+    });
+
+    expect(listOrganizationAgents).toHaveBeenCalledWith(
+      "token",
+      "organization-1",
+    );
+    expect(container.querySelector("header h1")?.textContent).toBe(
+      "조직 에이전트",
+    );
+    expect(container.textContent).toContain("아직 조직 에이전트가 없습니다.");
+    expect(loadOrganizationExecutionWorkers).not.toHaveBeenCalled();
 
     await act(async () => root.unmount());
     container.remove();

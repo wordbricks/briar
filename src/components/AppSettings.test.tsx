@@ -141,6 +141,7 @@ describe("AppSettings", () => {
     const container = document.createElement("div");
     document.body.append(container);
     const root = createRoot(container);
+    const onBack = vi.fn();
     await act(async () => {
       root.render(
         <I18nProvider>
@@ -155,7 +156,7 @@ describe("AppSettings", () => {
               email: "jay@example.com",
               ...input,
             })}
-            onBack={() => undefined}
+            onBack={onBack}
             onRefresh={() => Promise.resolve(readiness)}
             projectId="project-1"
             projectName="Briar"
@@ -174,6 +175,28 @@ describe("AppSettings", () => {
     expect(container.textContent).toContain("Profile information");
     expect(container.textContent).toContain("Delete account and data");
     expect(container.textContent).toContain("Delete account");
+
+    const shell = container.querySelector<HTMLElement>("main.settings-shell");
+    const sidebar = shell?.querySelector<HTMLElement>(
+      'aside[aria-label="Settings navigation"]',
+    );
+    expect(sidebar?.getAttribute("aria-hidden")).toBe("false");
+    expect(sidebar?.querySelector('input[type="search"]')?.getAttribute("aria-label"))
+      .toBe("Search settings");
+    expect(sidebar?.querySelectorAll("nav > .settings-nav-group").length)
+      .toBeGreaterThan(0);
+
+    const settingsMain = shell?.querySelector<HTMLElement>(
+      "section.settings-main",
+    );
+    expect(settingsMain?.querySelector("header h1")?.textContent).toBe(
+      "My account",
+    );
+    await act(async () => {
+      sidebar?.querySelector<HTMLButtonElement>("button.settings-back")?.click();
+    });
+    expect(onBack).toHaveBeenCalledOnce();
+
     await act(async () => root.unmount());
     container.remove();
   });

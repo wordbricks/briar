@@ -148,6 +148,7 @@ describe("Channels", () => {
     messages: ChannelMessage[],
     requestedMessage?: { channelId: string; messageId: string; rootMessageId: string },
     onRequestedMessageOpen?: () => void,
+    onCreateAgent?: () => void,
   ) => {
     listChannels.mockResolvedValue({ channels: [channel], cursor: 7 });
     loadChannel.mockResolvedValue({
@@ -180,6 +181,7 @@ describe("Channels", () => {
           currentUserId="user-1"
           onChannelSelect={() => undefined}
           onChannelsChange={() => undefined}
+          onCreateAgent={onCreateAgent}
           organizationId="org-1"
           requestedMessage={requestedMessage}
           token="token"
@@ -213,6 +215,21 @@ describe("Channels", () => {
     expect(container.textContent).toContain("에이전트 만들기");
     expect(container.textContent).toContain("사람 추가");
     expect(container.querySelector(".channel-composer-shell")).not.toBeNull();
+  });
+
+  it("requests organization agent creation from the channel welcome action", async () => {
+    const onCreateAgent = vi.fn();
+    await render([], undefined, undefined, onCreateAgent);
+
+    const createAgent = Array.from(
+      container.querySelectorAll<HTMLButtonElement>(
+        ".channel-welcome-actions button",
+      ),
+    ).find((button) => button.textContent?.includes("에이전트 만들기"));
+    expect(createAgent?.disabled).toBe(false);
+
+    await act(async () => createAgent?.click());
+    expect(onCreateAgent).toHaveBeenCalledOnce();
   });
 
   it("opens a requested reply in its channel thread", async () => {

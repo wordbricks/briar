@@ -5,6 +5,7 @@ import { unstable_splitSqlQuery } from "wrangler";
 type ApplyD1MigrationsOptions = {
   files?: readonly string[];
   exclude?: readonly string[];
+  through?: string;
 };
 
 export async function executeD1Sql(db: D1Database, sql: string) {
@@ -18,11 +19,12 @@ export async function applyD1Migrations(
   options: ApplyD1MigrationsOptions = {},
 ) {
   const excluded = new Set(options.exclude ?? []);
-  const files = options.files
+  const files = (options.files
     ? [...options.files]
     : (await readdir(resolve("migrations")))
       .filter((name) => /^\d+_.*\.sql$/u.test(name))
-      .sort((left, right) => left.localeCompare(right));
+      .sort((left, right) => left.localeCompare(right)))
+    .filter((name) => !options.through || name.localeCompare(options.through) <= 0);
 
   for (const file of files) {
     if (excluded.has(file)) continue;

@@ -183,7 +183,7 @@ function avatarFromFirstSpriteFrame(image: HTMLImageElement): string {
   return avatar;
 }
 
-export function opaquePixelBounds(image: ImageData) {
+function opaquePixelBounds(image: ImageData) {
   let left = image.width;
   let top = image.height;
   let right = -1;
