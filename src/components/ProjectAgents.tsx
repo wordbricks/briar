@@ -156,9 +156,7 @@ export function ProjectAgents({
     () => {
       if (!companionMode) return false;
       if (taskDialogAgent) {
-        if (!executingAgentIds.has(taskDialogAgent.id)) {
-          setTaskDialogAgent(null);
-        }
+        setTaskDialogAgent(null);
         return true;
       }
       if (isDialogOpen) {
@@ -328,7 +326,6 @@ export function ProjectAgents({
           workerId: input.workerId,
           skillId: input.skill.id,
         });
-        setTaskDialogAgent(null);
         return;
       }
       const runtimeAgent = agentWithSkillRuntime(agent, input.skill);
@@ -347,7 +344,6 @@ export function ProjectAgents({
           skillId: input.skill.id,
         },
       );
-      setTaskDialogAgent(null);
     } catch (caught) {
       toast(
         caught instanceof Error ? caught.message : String(caught),
