@@ -441,3 +441,30 @@ before upload.
 The prior final handoff, `1.2.91 (1)`, remains `VALID`, but main advanced
 through the 1.2.99 release. Version `1.2.99 (1)` is therefore the final build
 handed off from the latest main commit.
+
+## 2026-08-11 — 1.2.99 (2)
+
+- App: Briar Companion (`app.briar.companion`)
+- Marketing version: `1.2.99`
+- App Store Connect build: `2`
+- App Store Connect build ID: `8ffbbb10-7713-4643-ad62-ef93fb78a870`
+- Release base main commit: `513a3dde`
+- Release source commit: `eeb6af7a40b45e3e55a4c494647b7255d81f01b0`
+- Implementation: native SwiftUI
+- Toolchain: Xcode 26.6, iOS 26.5 SDK
+- Minimum iOS version: 17.0
+- App Store Connect processing state: `VALID`
+- TestFlight state: `IN_BETA_TESTING`
+- Internal group: `wordbricks` (`hasAccessToAllBuilds=true`)
+- Automatic tester notification: enabled
+- IPA SHA-256: `5f574e70206a7a16b35ae57e720938a0c648319ab63108075cced40b68c8a175`
+
+The release passed the shared API contract, Swift unit and UI tests, iPhone
+and iPad accessibility and layout tests, Production analyze and build checks,
+session/download/log security checks, and the Tauri iOS and Android regression
+builds. Archive and IPA export used the Apple Distribution identity and the
+App Store provisioning profile with the production Associated Domains
+entitlement verified before upload. The release gate also increased the native
+UI transition wait to tolerate slow simulator startup. The checked-in default
+implementation remains Tauri and `nativeStabilization` remains unset pending
+the internal observation checklist.
