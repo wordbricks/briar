@@ -421,12 +421,6 @@ export function extractBriarIssueLinks(
   return links;
 }
 
-export function extractBriarIssueLink(
-  body: string | null | undefined,
-): BriarIssueLink | null {
-  return extractBriarIssueLinks(body)[0] ?? null;
-}
-
 function normalizeGitHubTimestamp(value: string) {
   return new Date(value).toISOString();
 }

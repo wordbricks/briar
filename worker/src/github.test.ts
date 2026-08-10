@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   exchangeGithubOAuthCode,
-  extractBriarIssueLink,
   extractBriarIssueLinks,
   githubPkceChallenge,
   parseGitHubWebhook,
@@ -262,10 +261,10 @@ describe("GitHub webhooks", () => {
     expect(links[0]).toEqual({ projectId, runId });
     expect(new Set(links.map((link) => `${link.projectId}:${link.runId}`)).size)
       .toBe(20);
-    expect(extractBriarIssueLink(`[Briar issue](${issueUrl})`)).toEqual({
+    expect(extractBriarIssueLinks(`[Briar issue](${issueUrl})`)).toEqual([{
       projectId,
       runId,
-    });
+    }]);
     expect(extractBriarIssueLinks(null)).toEqual([]);
   });
 

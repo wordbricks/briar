@@ -21,15 +21,10 @@ export type IssueAgentConversation = {
 };
 
 export {
+  agentReplyParentMessageId,
   shouldBriarReply,
   type IssueReplyContextMessage,
 } from "./issue-reply-decision";
-
-export function agentReplyParentMessageId(
-  message: Pick<IssueMessage, "id" | "parentMessageId">,
-) {
-  return message.parentMessageId ?? message.id;
-}
 
 export function briarMentionAtCaret(body: string, caret: number) {
   const mention = issueMentionAtCaret(body, caret);

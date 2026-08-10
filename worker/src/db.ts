@@ -9,7 +9,6 @@ import {
   repositoryWorkflowBootstrap,
   workflowCheckpointAt,
   workflowWithAdditionalCheckpoints,
-  type AutoHuntQaEnvironment,
   type AutoHuntQaStatus,
   type AutoHuntPersistedRunStatus,
   type AutoHuntRunStatus,
@@ -1566,70 +1565,6 @@ export async function completeWorkflowStageLifecycle(
     revision,
     stage: input.stageId,
     checkpoint: null,
-  };
-}
-
-export async function skipWorkflowStage(
-  db: D1Database,
-  projectId: string,
-  input: WorkflowProgressInput & {
-    stageId: AutoHuntWorkflowStageId;
-    finishedAt: string;
-  },
-): Promise<{
-  outcome: WorkflowStageTransitionOutcome;
-  stage: WorkflowStageProgressRow | null;
-}> {
-  const initialized = await ensureWorkflowProgress(db, projectId, input);
-  if (!initialized) return { outcome: "not_found", stage: null };
-  const { run, workflow, attempt, revision } = initialized;
-  const stage = workflow.stages.find((candidate) => candidate.id === input.stageId);
-  if (!stage) throw new HuntTransitionError(`Missing stage: ${input.stageId}`);
-  if (stage.required) {
-    throw new HuntTransitionError(`Required stage cannot be skipped: ${input.stageId}`);
-  }
-  const progress = await getWorkflowProgress(db, projectId, run.id, { attempt, revision });
-  if (!progress) throw new HuntTransitionError("Workflow progress is unavailable");
-  const row = progress ? workflowStageRow(progress, input.stageId) : null;
-  if (!row) throw new HuntTransitionError(`Missing stage progress: ${input.stageId}`);
-  if (row.state === "skipped") return { outcome: "skipped", stage: row };
-  if (row.state === "completed") return { outcome: "completed", stage: row };
-  const rank = workflowStageRank(workflow, input.stageId);
-  const currentRank = run.workflow_stage
-    ? workflowStageRank(workflow, run.workflow_stage)
-    : -1;
-  if (currentRank > rank) {
-    throw new HuntTransitionError(
-      `Stage ${input.stageId} cannot be skipped after the run moved to a later stage`,
-    );
-  }
-  assertEarlierWorkflowCheckpointsResolved(progress, workflow, input.stageId);
-  const previousStages = progress.stages.filter(
-    (stageProgress) => workflowStageRank(workflow, stageProgress.stage_id) < rank,
-  );
-  if (previousStages.some((stageProgress) =>
-    stageProgress.state !== "completed" && stageProgress.state !== "skipped"
-  )) {
-    throw new HuntTransitionError(
-      `Stage ${input.stageId} cannot be skipped before earlier stages are complete`,
-    );
-  }
-  const result = await db
-    .prepare(
-      `update briar_run_stage_progress
-       set state = 'skipped', finished_at = ?
-       where run_id = ? and attempt = ? and revision = ? and stage_id = ?
-         and state in ('pending', 'running')`,
-    )
-    .bind(input.finishedAt, run.id, attempt, revision, input.stageId)
-    .run();
-  if (result.meta.changes === 0) {
-    throw new HuntTransitionError("Stage progress changed while skipping the stage");
-  }
-  const updated = await getWorkflowProgress(db, projectId, run.id, { attempt, revision });
-  return {
-    outcome: "skipped",
-    stage: updated ? workflowStageRow(updated, input.stageId) : null,
   };
 }
 
@@ -9582,124 +9517,6 @@ export async function importLinearHuntRuns(
   }
 
   return { imported, skipped, failed };
-}
-
-export type QaActionOutcome =
-  | "passed"
-  | "already_passed"
-  | "skipped"
-  | "already_skipped"
-  | "ineligible"
-  | "not_found";
-
-export async function recordQaResult(
-  db: D1Database,
-  projectId: string,
-  input: {
-    runId: string;
-    environment: AutoHuntQaEnvironment;
-    result: "passed" | "skipped";
-    actor: string;
-    observedAt: string;
-    detail: string | null;
-  },
-): Promise<QaActionOutcome> {
-  const run = await db
-    .prepare(`select * from briar_hunt_runs where id = ? and project_id = ?`)
-    .bind(input.runId, projectId)
-    .first<HuntRunRow>();
-  if (!run) return "not_found";
-
-  const statusColumn =
-    input.environment === "staging"
-      ? "staging_qa_status"
-      : "production_qa_status";
-  const expectedStage =
-    input.environment === "staging" ? "staging_qa" : "production_qa";
-  const currentStatus = run[statusColumn];
-  if (currentStatus === input.result) return `already_${input.result}`;
-  const eligible =
-    input.result === "passed"
-      ? run.stage === expectedStage && currentStatus === "pending"
-      : currentStatus === "pending" &&
-        [expectedStage, "blocked", "failed"].includes(run.stage);
-  if (!eligible) return "ineligible";
-
-  const eventId = crypto.randomUUID();
-  const eventKey = `admin:qa-${input.result === "passed" ? "pass" : "skip"}:${input.environment}:attempt-${run.current_attempt}:revision-${run.current_revision}`;
-  const detail =
-    input.detail ??
-    (input.result === "passed"
-      ? `${input.environment === "staging" ? "Stage" : "Production"} QA를 완료했습니다.`
-      : `${input.environment === "staging" ? "Stage" : "Production"} QA를 건너뛰었습니다.`);
-  const recordedAt = new Date().toISOString();
-  const results = await db.batch([
-    db
-      .prepare(
-        `insert into briar_hunt_events (
-           id, run_id, event_key, attempt, revision, stage, status, workflow_stage,
-           detail, actor, branch, commit_sha,
-           qa_status, tracker_issue_state, pull_request_urls, target_sha,
-           occurred_at, recorded_at
-         ) values (?, ?, ?, ?, ?, ?, 'running', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-         on conflict(run_id, event_key) do nothing`,
-      )
-      .bind(
-        eventId,
-        run.id,
-        eventKey,
-        run.current_attempt,
-        run.current_revision,
-        expectedStage,
-        expectedStage,
-        detail,
-        input.actor,
-        run.branch,
-        run.commit_sha,
-        input.result,
-        run.tracker_issue_state,
-        run.pull_request_urls,
-        run.target_sha,
-        input.observedAt,
-        recordedAt,
-      ),
-    db
-      .prepare(
-        `update briar_hunt_runs
-         set ${statusColumn} = ?, detail = ?, last_event_at = max(last_event_at, ?),
-             updated_at = ?
-         where id = ? and project_id = ? and current_attempt = ?
-           and exists (
-             select 1 from briar_hunt_events
-             where id = ? and run_id = briar_hunt_runs.id
-           )`,
-      )
-      .bind(
-        input.result,
-        detail,
-        input.observedAt,
-        recordedAt,
-        run.id,
-        projectId,
-        run.current_attempt,
-        eventId,
-      ),
-  ]);
-
-  if ((results[1]?.meta.changes ?? 0) === 0) return "ineligible";
-
-  if ((results[0]?.meta.changes ?? 0) === 0) {
-    const existing = await db
-      .prepare(
-        `select qa_status from briar_hunt_events
-         where run_id = ? and event_key = ?`,
-      )
-      .bind(run.id, eventKey)
-      .first<AutoHuntQaStatus>("qa_status");
-    if (existing !== input.result) throw new EventKeyConflictError();
-    return `already_${input.result}`;
-  }
-  return input.result;
 }
 
 export async function getHuntRunForProject(

@@ -2851,12 +2851,6 @@ struct CreatedProjectWorkspace {
 }
 
 #[tauri::command]
-async fn project_workspace_root(app: tauri::AppHandle) -> Result<String, String> {
-    let home = app.path().home_dir().map_err(|error| error.to_string())?;
-    path_display_string(briar_workspace_root(&home))
-}
-
-#[tauri::command]
 async fn create_project_workspace(
     app: tauri::AppHandle,
     name: String,
@@ -7402,7 +7396,6 @@ pub fn run() {
             set_app_icon,
             set_app_badge_count,
             validate_repository_path,
-            project_workspace_root,
             create_project_workspace,
             inspect_repository_readiness,
             discover_repository_icon,

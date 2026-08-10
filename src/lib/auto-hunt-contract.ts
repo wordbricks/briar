@@ -598,10 +598,6 @@ export function normalizeAutoHuntWorkflow(
   };
 }
 
-export function orderedWorkflowCheckpoints(workflow: AutoHuntWorkflow) {
-  return [...workflow.execution.checkpoints];
-}
-
 export function workflowCheckpointAt(
   workflow: AutoHuntWorkflow,
   stage: AutoHuntWorkflowStageId,
@@ -613,21 +609,8 @@ export function workflowCheckpointAt(
   ) ?? null;
 }
 
-export function terminalWorkflowStage(workflow: AutoHuntWorkflow) {
-  return workflow.stages.at(-1) ?? null;
-}
-
-export function executableWorkflowStages(workflow: AutoHuntWorkflow) {
-  return [...workflow.stages];
-}
-
 export function requiredWorkflowStages(workflow: AutoHuntWorkflow) {
   return [...new Set(workflow.completion.requiredStages)];
-}
-
-/** @deprecated Use requiredWorkflowStages. */
-export function requiredExecutableWorkflowStages(workflow: AutoHuntWorkflow) {
-  return requiredWorkflowStages(workflow);
 }
 
 export function progressForAutoHuntRun(

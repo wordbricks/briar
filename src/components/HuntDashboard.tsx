@@ -154,6 +154,7 @@ import {
   saveConversationPaneWidth,
 } from "../lib/conversation-pane-width";
 import {
+  agentReplyParentMessageId,
   issueMentionAtCaret,
   issueMentionHandle,
   mentionsIssueHandle,
@@ -7575,8 +7576,7 @@ function IssueConversation({
     });
     appendMessage(result.message);
     if (!result.agentReply) return;
-    const replyThreadId =
-      result.message.parentMessageId ?? result.message.id;
+    const replyThreadId = agentReplyParentMessageId(result.message);
     setAgentReplyStates((current) => ({
       ...current,
       [replyThreadId]: {

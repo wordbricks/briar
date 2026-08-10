@@ -49,7 +49,10 @@ import {
   isIssueAttachmentReference,
   issueAttachmentReferences,
 } from "../../src/lib/issue-markdown";
-import { shouldBriarReply } from "../../src/lib/issue-reply-decision";
+import {
+  agentReplyParentMessageId,
+  shouldBriarReply,
+} from "../../src/lib/issue-reply-decision";
 import {
   issueTitleAbsoluteMaxLength,
   issueTitleOverLimitMessage,
@@ -5927,7 +5930,7 @@ async function route(
       organizationId,
       channelId: channel.id,
       triggerMessageId: message.id,
-      parentMessageId: message.parentMessageId ?? message.id,
+      parentMessageId: agentReplyParentMessageId(message),
       agents: invokedAgents.map(({ agent, activeSkill }) => ({
         id: agent.id,
         projectId: agent.project_id,
@@ -8029,7 +8032,10 @@ async function route(
             projectId: project.id,
             runId: issueMessagesMatch[2],
             triggerMessageId: message.id,
-            parentMessageId: message.parent_message_id ?? message.id,
+            parentMessageId: agentReplyParentMessageId({
+              id: message.id,
+              parentMessageId: message.parent_message_id,
+            }),
             replyMessageId: crypto.randomUUID(),
             createdAt,
           })

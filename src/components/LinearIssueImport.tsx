@@ -14,6 +14,7 @@ import {
 } from "../lib/auto-hunt-contract";
 import {
   buildDefaultStatusMapping,
+  canImportLinearIssues,
   isCompleteStatusMapping,
   parsePlacementKey,
   placementKey,
@@ -82,9 +83,10 @@ export function LinearIssueImport({
   const [result, setResult] = useState<LinearImportResult | null>(null);
 
   const firstStageId = workflow?.stages[0]?.id ?? null;
-  const hasProjectStatuses = Boolean(
-    repositoryConnected && workflow && workflow.stages.length > 0,
-  );
+  const hasProjectStatuses = canImportLinearIssues({
+    repositoryConnected,
+    workflowStageCount: workflow?.stages.length ?? 0,
+  });
   const placementOptions = useMemo(() => {
     const stages = workflow?.stages ?? [];
     return [
