@@ -33,7 +33,6 @@ import {
   pendingExecutionWorkerUpdate,
   MAX_CLAIM_ATTEMPTS,
   MAX_TRANSCRIPT_PAYLOAD_BYTES,
-  MAX_TRANSCRIPT_SESSIONS_PER_PROJECT,
   reapStalledHuntRuns,
   readAgentTranscript,
   recordWorkerHeartbeat,
@@ -2163,11 +2162,10 @@ describe("detached execution workers", () => {
   it(
     "retains old sessions until the verified archive job removes them",
     async () => {
-      for (
-        let index = 0;
-        index < MAX_TRANSCRIPT_SESSIONS_PER_PROJECT + 3;
-        index += 1
-      ) {
+      // Exceed the former automatic-pruning threshold to guard against
+      // reintroducing history loss before R2 archive verification.
+      const retainedSessionCount = 53;
+      for (let index = 0; index < retainedSessionCount; index += 1) {
         await appendAgentTranscript(db, projectId, {
           sessionId: `session-${String(index).padStart(3, "0")}`,
           runId: null,
@@ -2184,7 +2182,7 @@ describe("detached execution workers", () => {
         )
         .bind(projectId)
         .first<{ sessions: number }>();
-      expect(remaining?.sessions).toBe(MAX_TRANSCRIPT_SESSIONS_PER_PROJECT + 3);
+      expect(remaining?.sessions).toBe(retainedSessionCount);
 
       // Overflow no longer destroys history before R2 verification.
       expect(await readAgentTranscript(db, projectId, "session-000")).not.toBeNull();

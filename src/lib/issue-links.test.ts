@@ -4,12 +4,10 @@ import {
   copyIssueId,
   copyIssueShareLink,
   copySessionShareLink,
-  issueDeepLinkUrl,
   issueShareUrl,
   parseBriarLink,
   parseIssueLink,
   parseSessionLink,
-  sessionDeepLinkUrl,
   sessionShareUrl,
   shareIssueLink,
 } from "./issue-links";
@@ -45,14 +43,11 @@ afterEach(() => {
 });
 
 describe("issue links", () => {
-  it("builds matching HTTPS share and app deep links", () => {
+  it("builds a deterministic HTTPS issue share link", () => {
     expect(
       issueShareUrl(projectId, runId, "https://briar-api.example/base"),
     ).toBe(
       `https://briar-api.example/open/issues/${projectId}/${runId}`,
-    );
-    expect(issueDeepLinkUrl(projectId, runId)).toBe(
-      `briar-companion://issues/${projectId}/${runId}`,
     );
   });
 
@@ -70,14 +65,11 @@ describe("issue links", () => {
       .toBeNull();
   });
 
-  it("builds and parses matching session share and app deep links", () => {
+  it("builds and parses session share and app deep links", () => {
     expect(
       sessionShareUrl(projectId, sessionId, "https://briar-api.example/base"),
     ).toBe(
       `https://briar-api.example/open/sessions/${projectId}/${sessionId}`,
-    );
-    expect(sessionDeepLinkUrl(projectId, sessionId)).toBe(
-      `briar-companion://sessions/${projectId}/${sessionId}`,
     );
     expect(
       parseSessionLink(

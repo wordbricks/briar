@@ -8,7 +8,7 @@ import { requestMobileNavigationBack } from "../lib/mobile-navigation";
 import { runProjectAgent } from "../lib/project-llm";
 import type { DashboardPayload, ProjectAgent } from "../types";
 import {
-  CreateProjectAgentDialog,
+  ProjectAgentDialog,
   ProjectAgents,
 } from "./ProjectAgents";
 
@@ -425,10 +425,11 @@ describe("ProjectAgents", () => {
   it("submits provider, default model, and a concrete responsibility", async () => {
     const onCreate = vi.fn(async () => undefined);
     const container = await mount(
-      <CreateProjectAgentDialog
+      <ProjectAgentDialog
+        agent={null}
         isSubmitting={false}
         onClose={() => undefined}
-        onCreate={onCreate}
+        onSubmit={onCreate}
       />,
     );
 

@@ -2,8 +2,6 @@
 
 import { describe, expect, it } from "vitest";
 import {
-  isOrganizationLogoDataUrl,
-  maxOrganizationLogoDataUrlLength,
   maxOrganizationLogoSourceBytes,
   organizationLogoFromFile,
 } from "./organization-logo";
@@ -18,17 +16,13 @@ const adapters = [
   {
     name: "organization logo",
     fromFile: organizationLogoFromFile,
-    isDataUrl: isOrganizationLogoDataUrl,
     maxSourceBytes: maxOrganizationLogoSourceBytes,
-    maxDataUrlLength: maxOrganizationLogoDataUrlLength,
     invalidSourceError: "invalid-organization-logo",
   },
   {
     name: "project agent avatar",
     fromFile: projectAgentAvatarFromFile,
-    isDataUrl: isProjectAgentAvatarDataUrl,
     maxSourceBytes: maxProjectAgentAvatarSourceBytes,
-    maxDataUrlLength: maxProjectAgentAvatarDataUrlLength,
     invalidSourceError: "invalid-avatar",
   },
 ] as const;
@@ -54,18 +48,20 @@ describe.each(adapters)("$name image adapter", (adapter) => {
       adapter.invalidSourceError,
     );
   });
+});
 
+describe("project agent avatar output validation", () => {
   it("accepts supported browser image data URLs", () => {
-    expect(adapter.isDataUrl("data:image/png;base64,aA==")).toBe(true);
-    expect(adapter.isDataUrl("data:image/jpeg;base64,aA==")).toBe(true);
-    expect(adapter.isDataUrl("data:image/webp;base64,aA==")).toBe(true);
+    expect(isProjectAgentAvatarDataUrl("data:image/png;base64,aA==")).toBe(true);
+    expect(isProjectAgentAvatarDataUrl("data:image/jpeg;base64,aA==")).toBe(true);
+    expect(isProjectAgentAvatarDataUrl("data:image/webp;base64,aA==")).toBe(true);
   });
 
   it("rejects unsupported or oversized output", () => {
-    expect(adapter.isDataUrl("data:image/gif;base64,aA==")).toBe(false);
+    expect(isProjectAgentAvatarDataUrl("data:image/gif;base64,aA==")).toBe(false);
     expect(
-      adapter.isDataUrl(
-        `data:image/png;base64,${"a".repeat(adapter.maxDataUrlLength)}`,
+      isProjectAgentAvatarDataUrl(
+        `data:image/png;base64,${"a".repeat(maxProjectAgentAvatarDataUrlLength)}`,
       ),
     ).toBe(false);
   });

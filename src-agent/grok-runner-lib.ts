@@ -37,12 +37,6 @@ export type GrokRunnerRequest = {
   grokBinary: string;
 };
 
-export type GrokApprovalResponse = {
-  type: "approvalResponse";
-  id: string;
-  approved: boolean;
-};
-
 export type GrokEventState = {
   activeMessageId: string | null;
   activeAssistantText: string;
@@ -101,8 +95,6 @@ export const BRIAR_OAUTH_REFERRER = "briar";
 export const GROK_API_KEY_ENV = "XAI_API_KEY";
 export const GROK_AUTH_METHOD_API_KEY = "xai.api_key";
 export const GROK_AUTH_METHOD_CACHED_TOKEN = "cached_token";
-export const DEFAULT_GROK_MODEL = "grok-4.5";
-
 export function resolveGrokAuthMethodId(
   environment: NodeJS.ProcessEnv = process.env,
 ): string {

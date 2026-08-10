@@ -1,5 +1,4 @@
 import type { Locale } from "../i18n/locale";
-import type { AutoHuntWorkflow } from "./auto-hunt-contract";
 import type {
   ChannelAgentEffort as ModelEffort,
   ChannelAgentProvider as AgentProvider,
@@ -9,7 +8,6 @@ import type {
 export type ProjectAgentLocale = Locale;
 
 export const defaultProjectAgentCalendarColor = "#3275d5";
-export const projectAgentCalendarColorPattern = /^#[0-9a-f]{6}$/iu;
 
 type DefaultProjectAgentCopy = {
   name: string;
@@ -136,12 +134,6 @@ ${execution}
 `;
 }
 
-export function issueProcessingAgentSkill(
-  agent: Pick<ProjectAgentRuntimeProfile, "skills">,
-): ProjectAgentSkill | null {
-  return agent.skills.find((skill) => skill.kind === "issue_processing") ?? null;
-}
-
 function projectAgentSkillRoster(
   agent: Pick<
     ProjectAgentRuntimeProfile,
@@ -208,23 +200,4 @@ export function agentWithSkillRuntime<
     effort: activeSkill.effort,
     skill: projectAgentSkillRoster(agent, activeSkill),
   } as T;
-}
-
-export function projectAgentRuntimeInstructions(input: {
-  skill: string;
-  workflow: AutoHuntWorkflow;
-  invocation: string;
-}) {
-  return `${input.invocation.trim()}
-
-## Agent skill
-
-${input.skill.trim()}
-
-## Project workflow
-
-Follow these stages in order. A claimed run's workflow snapshot overrides this project-level snapshot.
-
-${JSON.stringify(input.workflow, null, 2)}
-`;
 }

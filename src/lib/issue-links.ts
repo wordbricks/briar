@@ -41,10 +41,6 @@ export function issueShareUrl(
   return url.toString();
 }
 
-export function issueDeepLinkUrl(projectId: string, runId: string): string {
-  return `briar-companion://issues/${encodeURIComponent(projectId)}/${encodeURIComponent(runId)}`;
-}
-
 export function sessionShareUrl(
   projectId: string,
   sessionId: string,
@@ -55,13 +51,6 @@ export function sessionShareUrl(
   url.search = "";
   url.hash = "";
   return url.toString();
-}
-
-export function sessionDeepLinkUrl(
-  projectId: string,
-  sessionId: string,
-): string {
-  return `briar-companion://sessions/${encodeURIComponent(projectId)}/${encodeURIComponent(sessionId)}`;
 }
 
 export function parseIssueLink(value: string): IssueLinkTarget | null {
@@ -212,18 +201,6 @@ export function listenForLinks<T>(
     disposed = true;
     stopListening?.();
   };
-}
-
-export function listenForIssueLinks(
-  onIssueLink: (target: IssueLinkTarget) => void,
-): () => void {
-  return listenForLinks(parseIssueLink, onIssueLink);
-}
-
-export function listenForSessionLinks(
-  onSessionLink: (target: SessionLinkTarget) => void,
-): () => void {
-  return listenForLinks(parseSessionLink, onSessionLink);
 }
 
 export function listenForBriarLinks(

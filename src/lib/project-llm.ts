@@ -237,18 +237,6 @@ export type ProjectAgentRunResponse = {
   retryReason?: string | null;
 };
 
-export type ProjectChatMessage = {
-  message: string;
-  instructions?: string | null;
-  outputSchema?: JsonSchema | null;
-};
-
-export type ProjectChat = {
-  readonly projectId: string;
-  readonly conversationId: string | null;
-  send(input: string | ProjectChatMessage): Promise<ProjectLlmChatResponse>;
-};
-
 const isTauri = () =>
   typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
@@ -442,40 +430,4 @@ export async function updateProjectSandboxSettings(
     projectId,
     settings,
   });
-}
-
-/**
- * Creates a stateful project chat while keeping the provider conversation id opaque.
- * Sends are serialized so two turns cannot race on the same conversation.
- */
-export function createProjectChat(
-  projectId: string,
-  conversationId: string | null = null,
-): ProjectChat {
-  let activeConversationId = conversationId;
-  let queue: Promise<void> = Promise.resolve();
-
-  return {
-    projectId,
-    get conversationId() {
-      return activeConversationId;
-    },
-    send(input) {
-      const message = typeof input === "string" ? { message: input } : input;
-      const pending = queue.then(async () => {
-        const response = await chatWithProjectLlm({
-          projectId,
-          conversationId: activeConversationId,
-          ...message,
-        });
-        activeConversationId = response.conversationId;
-        return response;
-      });
-      queue = pending.then(
-        () => undefined,
-        () => undefined,
-      );
-      return pending;
-    },
-  };
 }

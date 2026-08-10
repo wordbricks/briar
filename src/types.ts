@@ -1,5 +1,4 @@
 import {
-  autoHuntRunStatuses,
   type AutoHuntQaStatus,
   type AutoHuntRunStatus,
   type AutoHuntSource,
@@ -17,7 +16,6 @@ import type {
   ProjectAgentScheduleRecurrence,
 } from "./lib/project-agent-schedule";
 
-export const huntStatuses = autoHuntRunStatuses;
 export type HuntStatus = AutoHuntRunStatus;
 export type HuntSource = AutoHuntSource;
 

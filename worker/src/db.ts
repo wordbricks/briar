@@ -1065,8 +1065,6 @@ export async function getWorkflowProgress(
   };
 }
 
-export const listWorkflowProgress = getWorkflowProgress;
-
 const workflowStageRow = (
   progress: WorkflowProgress,
   stageId: AutoHuntWorkflowStageId,

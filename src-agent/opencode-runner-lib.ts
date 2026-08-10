@@ -34,12 +34,6 @@ export type OpenCodeRunnerRequest = {
   opencodeBinary: string;
 };
 
-export type OpenCodeApprovalResponse = {
-  type: "approvalResponse";
-  id: string;
-  approved: boolean;
-};
-
 export type OpenCodeRunnerOutput =
   | { type: "session"; sessionId: string }
   | { type: "event"; raw: unknown; event?: NormalizedAgentEvent }

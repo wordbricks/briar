@@ -73,9 +73,3 @@ export function eventMeta(
       }
     : statusDisplay;
 }
-
-export const sourceLabel = {
-  issue: "이슈",
-  feedback: "피드백",
-  error: "에러",
-} as const;

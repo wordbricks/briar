@@ -10,7 +10,6 @@ vi.mock("@tauri-apps/api/event", () => ({ listen }));
 
 import {
   chatWithProjectLlm,
-  createProjectChat,
   loadAppProviderSettings,
   loadProjectLlmSettings,
   loadProjectSandboxSettings,
@@ -333,34 +332,6 @@ describe("project LLM gateway", () => {
         workspaceBranch: null,
       }),
     );
-  });
-
-  it("continues and serializes a project conversation", async () => {
-    invoke
-      .mockResolvedValueOnce({
-        conversationId: "briar:project-1:thread-1",
-        message: "first",
-        workspaceRoot: "/repo",
-      })
-      .mockResolvedValueOnce({
-        conversationId: "briar:project-1:thread-1",
-        message: "second",
-        workspaceRoot: "/repo",
-      });
-    const chat = createProjectChat("project-1");
-
-    const first = chat.send("first question");
-    const second = chat.send("follow-up question");
-
-    await expect(first).resolves.toMatchObject({ message: "first" });
-    await expect(second).resolves.toMatchObject({ message: "second" });
-    expect(invoke.mock.calls[0]?.[1]).toMatchObject({
-      request: { conversationId: null },
-    });
-    expect(invoke.mock.calls[1]?.[1]).toMatchObject({
-      request: { conversationId: "briar:project-1:thread-1" },
-    });
-    expect(chat.conversationId).toBe("briar:project-1:thread-1");
   });
 
   it("loads and updates the project approval policy", async () => {

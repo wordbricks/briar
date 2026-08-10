@@ -4,6 +4,4 @@ function enabled(value: string | undefined) {
 
 export const featureFlags = Object.freeze({});
 
-export type FeatureFlags = typeof featureFlags;
-
 export { enabled };

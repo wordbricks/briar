@@ -4,9 +4,7 @@ import {
   agentWithSkillRuntime,
   defaultProjectAgentCopy,
   defaultProjectAgentSkillCopy,
-  issueProcessingAgentSkill,
   normalizeProjectAgentLocale,
-  projectAgentRuntimeInstructions,
   projectAgentSkill,
 } from "./project-agent";
 import { demoProjectAgents } from "./demo-project-agents";
@@ -43,7 +41,7 @@ describe("default project agent copy", () => {
 });
 
 describe("project agent skills", () => {
-  it("selects issue processing only by kind and applies an explicit runtime", () => {
+  it("applies explicit and unselected skill runtimes", () => {
     const agent = demoProjectAgents("project-1", "en")[0]!;
     const issueSkill = agent.skills[0]!;
     const customSkill = {
@@ -62,9 +60,6 @@ describe("project agent skills", () => {
       skills: [issueSkill, customSkill],
     };
 
-    expect(issueProcessingAgentSkill(agentWithMultipleSkills)?.id).toBe(
-      issueSkill.id,
-    );
     expect(agentWithSkillRuntime(agentWithMultipleSkills, customSkill)).toMatchObject({
       provider: "claude",
       model: "opus",
@@ -77,14 +72,6 @@ describe("project agent skills", () => {
       effort: agent.effort,
       skill: expect.stringContaining("No Skill was preselected"),
     });
-  });
-
-  it("does not substitute an unrelated Skill for issue processing", () => {
-    const agent = demoProjectAgents("project-1", "en")[0]!;
-    expect(issueProcessingAgentSkill({
-      ...agent,
-      skills: [{ ...agent.skills[0]!, kind: "custom" }],
-    })).toBeNull();
   });
 
   it("creates the same repository workflow contract for every agent", () => {
@@ -104,28 +91,5 @@ describe("project agent skills", () => {
     expect(skill).toContain("# Auditor");
     expect(skill).toContain("attached project workflow");
     expect(skill).not.toContain("briar queue claim");
-  });
-
-  it("attaches the agent skill and ordered project workflow at invocation", () => {
-    const instructions = projectAgentRuntimeInstructions({
-      skill: "# Auditor\n\nAudit the repository.",
-      workflow: {
-        version: 2,
-        requirements: [],
-        stages: [
-          { id: "analyzing", label: "Analyze", required: true },
-          { id: "local_qa", label: "Local QA", required: true },
-        ],
-        execution: { checkpoints: [] },
-        completion: { requiredStages: ["analyzing", "local_qa"] },
-      },
-      invocation: "Run the scheduled automation.",
-    });
-
-    expect(instructions).toContain("# Auditor");
-    expect(instructions.indexOf('"analyzing"')).toBeLessThan(
-      instructions.indexOf('"local_qa"'),
-    );
-    expect(instructions).toContain("workflow snapshot overrides");
   });
 });

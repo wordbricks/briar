@@ -286,7 +286,6 @@ export const MAX_TRANSCRIPT_EVENTS_PER_REQUEST = 200;
 export const MAX_TRANSCRIPT_REQUEST_BYTES = 1024 * 1024;
 export const MAX_TRANSCRIPT_SESSION_EVENTS = 5_000;
 export const MAX_TRANSCRIPT_SESSION_BYTES = 8 * 1024 * 1024;
-export const MAX_TRANSCRIPT_SESSIONS_PER_PROJECT = 50;
 
 export class WorkerConflictError extends Error {}
 export class TranscriptLimitError extends Error {}
