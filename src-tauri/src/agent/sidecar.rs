@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{
+    ffi::OsStr,
     io::{BufRead, BufReader, Read, Write},
     path::{Path, PathBuf},
     process::{Child, ChildStdin, ChildStdout},
@@ -13,9 +14,19 @@ use crate::host::LocalRunner;
 use crate::host::{CommandRunner, CommandSpec};
 
 use super::{
-    AgentEvent, AgentEventDirection, AgentEventSink, AgentProviderEvent, AgentProviderKind,
-    BundledRunnerFile, ProjectLlmRequest, ProjectLlmResponse,
+    AgentBackend, AgentEvent, AgentEventDirection, AgentEventSink, AgentProviderEvent,
+    AgentProviderKind, ApprovalPolicy, BundledRunnerFile, ChatExecution, ModelEffort,
+    ProjectLlmRequest, ProjectLlmResponse, SandboxMode,
 };
+
+#[derive(Clone, Copy)]
+pub(super) struct SidecarExecutableConfig {
+    pub(super) name: &'static str,
+    pub(super) request_key: &'static str,
+    pub(super) home_candidates: &'static [&'static str],
+    pub(super) absolute_candidates: &'static [&'static str],
+    pub(super) missing_error: &'static str,
+}
 
 #[derive(Clone, Copy)]
 pub(super) struct SidecarProviderConfig {
@@ -23,6 +34,9 @@ pub(super) struct SidecarProviderConfig {
     pub(super) conversation_namespace: &'static str,
     pub(super) runner_name: &'static str,
     pub(super) request_name: &'static str,
+    pub(super) executable: SidecarExecutableConfig,
+    pub(super) missing_bun_error: &'static str,
+    pub(super) forwards_additional_directories: bool,
     pub(super) empty_session_error: &'static str,
     pub(super) missing_session_error: &'static str,
     pub(super) request_failure_prefix: &'static str,
@@ -30,7 +44,7 @@ pub(super) struct SidecarProviderConfig {
     pub(super) invalid_conversation_error: &'static str,
 }
 
-pub(super) struct SidecarRuntime {
+struct SidecarRuntime {
     command_runner: Arc<dyn CommandRunner>,
     bun_binary: String,
     provider_binary: String,
@@ -38,16 +52,15 @@ pub(super) struct SidecarRuntime {
 }
 
 impl SidecarRuntime {
-    pub(super) fn discover(
+    fn discover(
         command_runner: Arc<dyn CommandRunner>,
         runner_bundle: &Path,
-        provider_binary_name: &str,
-        missing_bun_error: &str,
+        config: SidecarProviderConfig,
     ) -> Result<Self, String> {
         let bun_binary = command_runner
             .resolve_binary("bun")
-            .map_err(|_| missing_bun_error.to_string())?;
-        let provider_binary = command_runner.resolve_binary(provider_binary_name)?;
+            .map_err(|_| config.missing_bun_error.to_string())?;
+        let provider_binary = command_runner.resolve_binary(config.executable.name)?;
         let runner = BundledRunnerFile::prepare(runner_bundle)?;
         Ok(Self {
             command_runner,
@@ -55,10 +68,6 @@ impl SidecarRuntime {
             provider_binary,
             runner,
         })
-    }
-
-    pub(super) fn provider_binary(&self) -> &str {
-        &self.provider_binary
     }
 
     #[cfg(test)]
@@ -77,14 +86,81 @@ impl SidecarRuntime {
     }
 }
 
-pub(super) struct PreparedSidecarChat<'a> {
-    pub(super) message: &'a str,
-    pub(super) workspace_root: PathBuf,
-    pub(super) workspace: String,
-    pub(super) conversation_id: Option<&'a str>,
+pub(crate) struct SidecarBackend {
+    config: SidecarProviderConfig,
+    runtime: SidecarRuntime,
 }
 
-pub(super) fn prepare_chat<'a>(
+impl SidecarBackend {
+    pub(super) fn discover(
+        command_runner: Arc<dyn CommandRunner>,
+        runner_bundle: &Path,
+        config: SidecarProviderConfig,
+    ) -> Result<Self, String> {
+        Ok(Self {
+            config,
+            runtime: SidecarRuntime::discover(command_runner, runner_bundle, config)?,
+        })
+    }
+}
+
+impl AgentBackend for SidecarBackend {
+    fn run(
+        &self,
+        project_id: &str,
+        workspace_root: &Path,
+        execution: ChatExecution,
+        request: ProjectLlmRequest,
+        approve: &dyn Fn(&str, &Value) -> bool,
+    ) -> Result<ProjectLlmResponse, String> {
+        chat(
+            &self.runtime,
+            self.config,
+            project_id,
+            workspace_root,
+            execution,
+            request,
+            approve,
+        )
+    }
+}
+
+pub(super) fn provider_binary(
+    config: SidecarProviderConfig,
+    home: &Path,
+    execution_path: &OsStr,
+) -> Result<PathBuf, String> {
+    if let Ok(path) = which::which_in(config.executable.name, Some(execution_path), home) {
+        return Ok(path);
+    }
+    for candidate in config
+        .executable
+        .home_candidates
+        .iter()
+        .map(|candidate| home.join(candidate))
+        .chain(
+            config
+                .executable
+                .absolute_candidates
+                .iter()
+                .map(PathBuf::from),
+        )
+    {
+        if candidate.is_file() {
+            return Ok(candidate);
+        }
+    }
+    Err(config.executable.missing_error.to_string())
+}
+
+struct PreparedSidecarChat<'a> {
+    message: &'a str,
+    workspace_root: PathBuf,
+    workspace: String,
+    conversation_id: Option<&'a str>,
+}
+
+fn prepare_chat<'a>(
     runtime: &SidecarRuntime,
     config: SidecarProviderConfig,
     project_id: &str,
@@ -116,12 +192,64 @@ pub(super) fn prepare_chat<'a>(
     })
 }
 
-pub(super) fn serialize_request(
+fn serialize_request(
     config: SidecarProviderConfig,
     request: &impl Serialize,
 ) -> Result<Value, String> {
     serde_json::to_value(request)
         .map_err(|error| format!("{} 요청을 만들지 못했습니다: {error}", config.request_name))
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SidecarRunnerRequest<'a> {
+    r#type: &'static str,
+    message: &'a str,
+    workspace_root: &'a str,
+    conversation_id: Option<&'a str>,
+    instructions: Option<&'a str>,
+    output_schema: Option<&'a Value>,
+    model: Option<&'a str>,
+    effort: Option<ModelEffort>,
+    approval_policy: ApprovalPolicy,
+    sandbox_mode: SandboxMode,
+    network_access: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    additional_directories: Option<&'a [String]>,
+}
+
+fn runner_request(
+    runtime: &SidecarRuntime,
+    config: SidecarProviderConfig,
+    prepared: &PreparedSidecarChat<'_>,
+    execution: &ChatExecution,
+    request: &ProjectLlmRequest,
+) -> Result<Value, String> {
+    let runner_request = SidecarRunnerRequest {
+        r#type: "run",
+        message: prepared.message,
+        workspace_root: &prepared.workspace,
+        conversation_id: prepared.conversation_id,
+        instructions: request.instructions.as_deref(),
+        output_schema: request.output_schema.as_ref(),
+        model: execution.model.as_deref(),
+        effort: execution.effort,
+        approval_policy: execution.approval_policy,
+        sandbox_mode: execution.sandbox_mode,
+        network_access: execution.network_access,
+        additional_directories: config
+            .forwards_additional_directories
+            .then_some(execution.workspace_write_roots.as_slice()),
+    };
+    let mut raw_request = serialize_request(config, &runner_request)?;
+    raw_request
+        .as_object_mut()
+        .expect("sidecar runner request should serialize as an object")
+        .insert(
+            config.executable.request_key.to_string(),
+            Value::String(runtime.provider_binary.clone()),
+        );
+    Ok(raw_request)
 }
 
 #[derive(Deserialize)]
@@ -272,12 +400,37 @@ impl Drop for SidecarConnection {
     }
 }
 
-pub(super) struct SidecarChatExecution<'a> {
-    pub(super) environment: &'a [(String, String)],
-    pub(super) event_sink: Option<&'a AgentEventSink>,
+struct SidecarChatExecution<'a> {
+    environment: &'a [(String, String)],
+    event_sink: Option<&'a AgentEventSink>,
 }
 
-pub(super) fn run_chat(
+fn chat(
+    runtime: &SidecarRuntime,
+    config: SidecarProviderConfig,
+    project_id: &str,
+    workspace_root: &Path,
+    execution: ChatExecution,
+    request: ProjectLlmRequest,
+    approve: &dyn Fn(&str, &Value) -> bool,
+) -> Result<ProjectLlmResponse, String> {
+    let prepared = prepare_chat(runtime, config, project_id, workspace_root, &request)?;
+    let raw_request = runner_request(runtime, config, &prepared, &execution, &request)?;
+    run_chat(
+        runtime,
+        config,
+        project_id,
+        prepared,
+        raw_request,
+        SidecarChatExecution {
+            environment: &execution.environment,
+            event_sink: execution.event_sink.as_ref(),
+        },
+        approve,
+    )
+}
+
+fn run_chat(
     runtime: &SidecarRuntime,
     config: SidecarProviderConfig,
     project_id: &str,
@@ -419,21 +572,13 @@ fn decode_conversation_id<'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::agent::{ApprovalPolicy, ChatExecution, ModelEffort, SandboxMode};
+    use crate::{
+        agent::{claude, grok, opencode},
+        host::CommandOutput,
+    };
     use std::fs;
 
-    const TEST_CONFIG: SidecarProviderConfig = SidecarProviderConfig {
-        provider: AgentProviderKind::Opencode,
-        conversation_namespace: "opencode",
-        runner_name: "OpenCode runner",
-        request_name: "OpenCode",
-        empty_session_error: "OpenCode가 빈 대화 ID를 반환했습니다.",
-        missing_session_error: "OpenCode가 대화 ID를 반환하지 않았습니다.",
-        request_failure_prefix: "OpenCode 요청에 실패했습니다",
-        blocked_prefix: "OpenCode 요청이 차단되었습니다",
-        invalid_conversation_error:
-            "이 OpenCode 대화는 다른 프로젝트 또는 에이전트에 속해 있어 이어갈 수 없습니다.",
-    };
+    const TEST_CONFIG: SidecarProviderConfig = opencode::CONFIG;
 
     fn request() -> ProjectLlmRequest {
         ProjectLlmRequest {
@@ -455,6 +600,268 @@ mod tests {
             event_sink,
             environment: Vec::new(),
             workspace_write_roots: Vec::new(),
+        }
+    }
+
+    fn provider_configs() -> [SidecarProviderConfig; 3] {
+        [claude::CONFIG, grok::CONFIG, opencode::CONFIG]
+    }
+
+    #[test]
+    fn serializes_each_provider_request_contract() {
+        let directory = tempfile::tempdir().expect("temp directory should exist");
+        let runner = directory.path().join("runner.js");
+        fs::write(&runner, "").expect("runner should be written");
+        let runtime = SidecarRuntime::for_test(
+            PathBuf::from("/bin/sh"),
+            PathBuf::from("/provider/bin"),
+            runner,
+        );
+        let request = ProjectLlmRequest {
+            message: " Fix it ".to_string(),
+            progress_id: None,
+            conversation_id: None,
+            instructions: Some("Be careful".to_string()),
+            output_schema: Some(json!({"type": "object"})),
+        };
+        let mut execution = execution(None);
+        execution.workspace_write_roots = vec!["/tmp/auto-hunt".to_string()];
+
+        for config in provider_configs() {
+            let prepared = prepare_chat(&runtime, config, "project-1", directory.path(), &request)
+                .expect("chat should prepare");
+            let raw = runner_request(&runtime, config, &prepared, &execution, &request)
+                .expect("request should serialize");
+
+            assert_eq!(raw["type"], "run");
+            assert_eq!(raw["message"], "Fix it");
+            assert_eq!(raw["workspaceRoot"], prepared.workspace);
+            assert!(raw["conversationId"].is_null());
+            assert_eq!(raw["instructions"], "Be careful");
+            assert_eq!(raw["outputSchema"], json!({"type": "object"}));
+            assert_eq!(raw["model"], "test-model");
+            assert_eq!(raw["effort"], "high");
+            assert_eq!(raw["approvalPolicy"], "on-request");
+            assert_eq!(raw["sandboxMode"], "workspaceWrite");
+            assert_eq!(raw["networkAccess"], true);
+            assert_eq!(raw[config.executable.request_key], "/provider/bin");
+
+            for key in ["claudeBinary", "grokBinary", "opencodeBinary"] {
+                assert_eq!(
+                    raw.get(key).is_some(),
+                    key == config.executable.request_key,
+                    "unexpected executable key for {}",
+                    config.executable.name
+                );
+            }
+            if config.forwards_additional_directories {
+                assert_eq!(raw["additionalDirectories"], json!(["/tmp/auto-hunt"]));
+            } else {
+                assert!(raw.get("additionalDirectories").is_none());
+            }
+        }
+    }
+
+    #[test]
+    fn keeps_empty_additional_directories_for_claude_only() {
+        let directory = tempfile::tempdir().expect("temp directory should exist");
+        let runner = directory.path().join("runner.js");
+        fs::write(&runner, "").expect("runner should be written");
+        let runtime = SidecarRuntime::for_test(
+            PathBuf::from("/bin/sh"),
+            PathBuf::from("/provider/bin"),
+            runner,
+        );
+        let request = request();
+        let execution = execution(None);
+
+        for config in provider_configs() {
+            let prepared = prepare_chat(&runtime, config, "project-1", directory.path(), &request)
+                .expect("chat should prepare");
+            let raw = runner_request(&runtime, config, &prepared, &execution, &request)
+                .expect("request should serialize");
+            if config.provider == AgentProviderKind::Claude {
+                assert_eq!(raw["additionalDirectories"], json!([]));
+            } else {
+                assert!(raw.get("additionalDirectories").is_none());
+            }
+        }
+    }
+
+    #[test]
+    fn preserves_provider_executable_candidates_in_order() {
+        assert_eq!(
+            claude::CONFIG.executable.home_candidates,
+            [".local/bin/claude", ".bun/bin/claude"]
+        );
+        assert_eq!(
+            grok::CONFIG.executable.home_candidates,
+            [".local/bin/grok", ".grok/bin/grok", ".bun/bin/grok"]
+        );
+        assert_eq!(
+            opencode::CONFIG.executable.home_candidates,
+            [
+                ".opencode/bin/opencode",
+                ".local/bin/opencode",
+                ".bun/bin/opencode"
+            ]
+        );
+        for config in provider_configs() {
+            assert_eq!(
+                config.executable.absolute_candidates,
+                [
+                    format!("/opt/homebrew/bin/{}", config.executable.name),
+                    format!("/usr/local/bin/{}", config.executable.name),
+                ]
+            );
+        }
+    }
+
+    #[test]
+    fn preserves_provider_specific_error_text() {
+        assert_eq!(
+            claude::CONFIG.executable.missing_error,
+            "Claude Code가 필요합니다. Claude를 설치하고 `claude auth login`을 실행한 뒤 다시 시도하세요."
+        );
+        assert_eq!(
+            claude::CONFIG.missing_bun_error,
+            "Claude Agent SDK 실행에 필요한 Bun을 로컬 환경에서 찾지 못했습니다."
+        );
+        assert_eq!(
+            grok::CONFIG.executable.missing_error,
+            "Grok CLI가 필요합니다. Grok을 설치하고 `grok login`을 실행한 뒤 다시 시도하세요."
+        );
+        assert_eq!(
+            grok::CONFIG.missing_bun_error,
+            "Grok runner 실행에 필요한 Bun을 로컬 환경에서 찾지 못했습니다."
+        );
+        assert_eq!(
+            opencode::CONFIG.executable.missing_error,
+            "OpenCode CLI가 필요합니다. OpenCode를 설치하고 `opencode auth login`을 실행한 뒤 다시 시도하세요."
+        );
+        assert_eq!(
+            opencode::CONFIG.missing_bun_error,
+            "OpenCode runner 실행에 필요한 Bun을 로컬 환경에서 찾지 못했습니다."
+        );
+    }
+
+    #[test]
+    fn resolves_the_first_existing_provider_candidate() {
+        for config in provider_configs() {
+            let directory = tempfile::tempdir().expect("temp directory should exist");
+            let home = directory.path();
+            let first = home.join(config.executable.home_candidates[0]);
+            let second = home.join(config.executable.home_candidates[1]);
+            fs::create_dir_all(first.parent().expect("candidate should have a parent"))
+                .expect("candidate directory should exist");
+            fs::create_dir_all(second.parent().expect("candidate should have a parent"))
+                .expect("candidate directory should exist");
+            fs::write(&first, "first").expect("first candidate should exist");
+            fs::write(&second, "second").expect("second candidate should exist");
+
+            assert_eq!(provider_binary(config, home, OsStr::new("")), Ok(first));
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn prefers_an_executable_on_path_over_provider_candidates() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let directory = tempfile::tempdir().expect("temp directory should exist");
+        let path_directory = directory.path().join("path");
+        let home = directory.path().join("home");
+        fs::create_dir_all(&path_directory).expect("path directory should exist");
+        let path_binary = path_directory.join("claude");
+        fs::write(&path_binary, "#!/bin/sh\n").expect("path binary should exist");
+        fs::set_permissions(&path_binary, fs::Permissions::from_mode(0o700))
+            .expect("path binary should be executable");
+        let fallback = home.join(".local/bin/claude");
+        fs::create_dir_all(fallback.parent().expect("fallback should have a parent"))
+            .expect("fallback directory should exist");
+        fs::write(&fallback, "fallback").expect("fallback should exist");
+        let execution_path = std::env::join_paths([&path_directory]).expect("valid path");
+
+        assert_eq!(
+            provider_binary(claude::CONFIG, &home, &execution_path),
+            Ok(path_binary)
+        );
+    }
+
+    struct RecordingRunner {
+        resolutions: Arc<Mutex<Vec<String>>>,
+        fail_bun: bool,
+    }
+
+    impl CommandRunner for RecordingRunner {
+        fn resolve_binary(&self, tool: &str) -> Result<String, String> {
+            self.resolutions
+                .lock()
+                .expect("resolutions should lock")
+                .push(tool.to_string());
+            if self.fail_bun && tool == "bun" {
+                Err("missing bun".to_string())
+            } else {
+                Ok(format!("/resolved/{tool}"))
+            }
+        }
+
+        fn run(&self, _spec: &CommandSpec) -> Result<CommandOutput, String> {
+            panic!("run is not used during discovery")
+        }
+
+        fn spawn_piped(&self, _spec: &CommandSpec) -> Result<Child, String> {
+            panic!("spawn is not used during discovery")
+        }
+
+        fn canonicalize(&self, path: &Path) -> Result<PathBuf, String> {
+            Ok(path.to_path_buf())
+        }
+    }
+
+    #[test]
+    fn discovers_each_runtime_from_its_provider_config() {
+        let directory = tempfile::tempdir().expect("temp directory should exist");
+        let runner_bundle = directory.path().join("runner.js");
+        fs::write(&runner_bundle, "").expect("runner should be written");
+
+        for config in provider_configs() {
+            let resolutions = Arc::new(Mutex::new(Vec::new()));
+            let command_runner: Arc<dyn CommandRunner> = Arc::new(RecordingRunner {
+                resolutions: resolutions.clone(),
+                fail_bun: false,
+            });
+            let runtime = SidecarRuntime::discover(command_runner, &runner_bundle, config)
+                .expect("runtime should discover");
+
+            assert_eq!(runtime.bun_binary, "/resolved/bun");
+            assert_eq!(
+                runtime.provider_binary,
+                format!("/resolved/{}", config.executable.name)
+            );
+            assert_eq!(
+                *resolutions.lock().expect("resolutions should lock"),
+                ["bun", config.executable.name]
+            );
+        }
+    }
+
+    #[test]
+    fn reports_each_provider_specific_missing_bun_error() {
+        let directory = tempfile::tempdir().expect("temp directory should exist");
+        let runner_bundle = directory.path().join("runner.js");
+        fs::write(&runner_bundle, "").expect("runner should be written");
+
+        for config in provider_configs() {
+            let command_runner: Arc<dyn CommandRunner> = Arc::new(RecordingRunner {
+                resolutions: Arc::new(Mutex::new(Vec::new())),
+                fail_bun: true,
+            });
+            let error = match SidecarRuntime::discover(command_runner, &runner_bundle, config) {
+                Ok(_) => panic!("missing bun should fail discovery"),
+                Err(error) => error,
+            };
+            assert_eq!(error, config.missing_bun_error);
         }
     }
 
@@ -486,7 +893,6 @@ echo '{"type":"result","sessionId":"session-1","message":"done"}'
         );
         let events = Arc::new(Mutex::new(Vec::new()));
         let captured_events = events.clone();
-        let request = request();
         let execution = execution(Some(Arc::new(move |event| {
             captured_events
                 .lock()
@@ -494,24 +900,13 @@ echo '{"type":"result","sessionId":"session-1","message":"done"}'
                 .push(event);
             Ok(())
         })));
-        let prepared = prepare_chat(
+        let response = chat(
             &runtime,
             TEST_CONFIG,
             "project-1",
             directory.path(),
-            &request,
-        )
-        .expect("chat should prepare");
-        let response = run_chat(
-            &runtime,
-            TEST_CONFIG,
-            "project-1",
-            prepared,
-            json!({"type": "run", "effort": "high"}),
-            SidecarChatExecution {
-                environment: &execution.environment,
-                event_sink: execution.event_sink.as_ref(),
-            },
+            execution,
+            request(),
             &|method, input| {
                 method == "Bash" && input["command"] == "bun test" && input["reason"] == "Run tests"
             },
@@ -527,6 +922,8 @@ echo '{"type":"result","sessionId":"session-1","message":"done"}'
         assert_eq!(events.len(), 3);
         assert_eq!(events[0].provider, AgentProviderKind::Opencode);
         assert_eq!(events[0].raw["effort"], "high");
+        assert_eq!(events[0].raw["opencodeBinary"], "/usr/bin/true");
+        assert!(events[0].raw.get("additionalDirectories").is_none());
         assert!(matches!(
             events[1].event,
             Some(AgentEvent::ConversationStarted { ref conversation_id })
@@ -560,26 +957,14 @@ echo '{"type":"blocked","reason":"free_tier_limit","provider":"opencode","messag
             PathBuf::from("/usr/bin/true"),
             runner,
         );
-        let request = request();
         let execution = execution(None);
-        let prepared = prepare_chat(
+        let error = chat(
             &runtime,
             TEST_CONFIG,
             "project-1",
             directory.path(),
-            &request,
-        )
-        .expect("chat should prepare");
-        let error = run_chat(
-            &runtime,
-            TEST_CONFIG,
-            "project-1",
-            prepared,
-            json!({"type": "run"}),
-            SidecarChatExecution {
-                environment: &execution.environment,
-                event_sink: None,
-            },
+            execution,
+            request(),
             &|_, _| false,
         )
         .expect_err("blocked sidecar output should stop the request");
@@ -592,22 +977,20 @@ echo '{"type":"blocked","reason":"free_tier_limit","provider":"opencode","messag
 
     #[test]
     fn scopes_conversation_ids_to_the_provider_and_project() {
-        assert_eq!(
-            decode_conversation_id(
-                TEST_CONFIG,
-                "project-1",
-                "briar:opencode:project-1:session-1"
-            ),
-            Ok("session-1")
-        );
-        assert!(decode_conversation_id(
-            TEST_CONFIG,
-            "project-2",
-            "briar:opencode:project-1:session-1"
-        )
-        .is_err());
-        assert!(
-            decode_conversation_id(TEST_CONFIG, "project-1", "briar:project-1:thread-1").is_err()
-        );
+        for config in provider_configs() {
+            let conversation_id = format!(
+                "briar:{}:project-1:session-1",
+                config.conversation_namespace
+            );
+            assert_eq!(
+                decode_conversation_id(config, "project-1", &conversation_id),
+                Ok("session-1")
+            );
+            assert!(decode_conversation_id(config, "project-2", &conversation_id).is_err());
+            assert!(
+                decode_conversation_id(config, "project-1", "briar:codex:project-1:thread-1")
+                    .is_err()
+            );
+        }
     }
 }

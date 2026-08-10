@@ -1,27 +1,23 @@
-use serde::Serialize;
-use serde_json::Value;
-use std::{
-    ffi::OsStr,
-    path::{Path, PathBuf},
-    sync::Arc,
-};
-
-use crate::host::CommandRunner;
-
 use super::{
-    sidecar::{
-        prepare_chat, run_chat, serialize_request, SidecarChatExecution, SidecarProviderConfig,
-        SidecarRuntime,
-    },
-    AgentProviderKind, ApprovalPolicy, ChatExecution, ModelEffort, ProjectLlmRequest,
-    ProjectLlmResponse, SandboxMode,
+    sidecar::{SidecarExecutableConfig, SidecarProviderConfig},
+    AgentProviderKind,
 };
 
-const CONFIG: SidecarProviderConfig = SidecarProviderConfig {
+pub(super) const CONFIG: SidecarProviderConfig = SidecarProviderConfig {
     provider: AgentProviderKind::Grok,
     conversation_namespace: "grok",
     runner_name: "Grok Agent runner",
     request_name: "Grok Agent",
+    executable: SidecarExecutableConfig {
+        name: "grok",
+        request_key: "grokBinary",
+        home_candidates: &[".local/bin/grok", ".grok/bin/grok", ".bun/bin/grok"],
+        absolute_candidates: &["/opt/homebrew/bin/grok", "/usr/local/bin/grok"],
+        missing_error:
+            "Grok CLI가 필요합니다. Grok을 설치하고 `grok login`을 실행한 뒤 다시 시도하세요.",
+    },
+    missing_bun_error: "Grok runner 실행에 필요한 Bun을 로컬 환경에서 찾지 못했습니다.",
+    forwards_additional_directories: false,
     empty_session_error: "Grok Agent가 빈 대화 ID를 반환했습니다.",
     missing_session_error: "Grok Agent가 대화 ID를 반환하지 않았습니다.",
     request_failure_prefix: "Grok Agent 요청에 실패했습니다",
@@ -29,99 +25,3 @@ const CONFIG: SidecarProviderConfig = SidecarProviderConfig {
     invalid_conversation_error:
         "이 Grok 대화는 다른 프로젝트 또는 에이전트에 속해 있어 이어갈 수 없습니다.",
 };
-
-pub(crate) struct GrokRuntime {
-    inner: SidecarRuntime,
-}
-
-impl GrokRuntime {
-    pub(crate) fn discover(
-        command_runner: Arc<dyn CommandRunner>,
-        runner_bundle: &Path,
-    ) -> Result<Self, String> {
-        Ok(Self {
-            inner: SidecarRuntime::discover(
-                command_runner,
-                runner_bundle,
-                "grok",
-                "Grok runner 실행에 필요한 Bun을 로컬 환경에서 찾지 못했습니다.",
-            )?,
-        })
-    }
-}
-
-pub(crate) fn grok_binary(home: &Path, execution_path: &OsStr) -> Result<PathBuf, String> {
-    if let Ok(path) = which::which_in("grok", Some(execution_path), home) {
-        return Ok(path);
-    }
-    for candidate in [
-        home.join(".local/bin/grok"),
-        home.join(".grok/bin/grok"),
-        home.join(".bun/bin/grok"),
-        PathBuf::from("/opt/homebrew/bin/grok"),
-        PathBuf::from("/usr/local/bin/grok"),
-    ] {
-        if candidate.is_file() {
-            return Ok(candidate);
-        }
-    }
-    Err(
-        "Grok CLI가 필요합니다. Grok을 설치하고 `grok login`을 실행한 뒤 다시 시도하세요."
-            .to_string(),
-    )
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct GrokRunnerRequest<'a> {
-    r#type: &'static str,
-    message: &'a str,
-    workspace_root: &'a str,
-    conversation_id: Option<&'a str>,
-    instructions: Option<&'a str>,
-    output_schema: Option<&'a Value>,
-    model: Option<&'a str>,
-    effort: Option<ModelEffort>,
-    approval_policy: ApprovalPolicy,
-    sandbox_mode: SandboxMode,
-    network_access: bool,
-    grok_binary: &'a str,
-}
-
-pub(crate) fn chat(
-    runtime: &GrokRuntime,
-    project_id: &str,
-    workspace_root: &Path,
-    execution: ChatExecution,
-    request: ProjectLlmRequest,
-    approve: &dyn Fn(&str, &Value) -> bool,
-) -> Result<ProjectLlmResponse, String> {
-    let prepared = prepare_chat(&runtime.inner, CONFIG, project_id, workspace_root, &request)?;
-    let runner_request = GrokRunnerRequest {
-        r#type: "run",
-        message: prepared.message,
-        workspace_root: &prepared.workspace,
-        conversation_id: prepared.conversation_id,
-        instructions: request.instructions.as_deref(),
-        output_schema: request.output_schema.as_ref(),
-        model: execution.model.as_deref(),
-        effort: execution.effort,
-        approval_policy: execution.approval_policy,
-        sandbox_mode: execution.sandbox_mode,
-        network_access: execution.network_access,
-        grok_binary: runtime.inner.provider_binary(),
-    };
-    let raw_request = serialize_request(CONFIG, &runner_request)?;
-    run_chat(
-        &runtime.inner,
-        CONFIG,
-        project_id,
-        prepared,
-        raw_request,
-        SidecarChatExecution {
-            environment: &execution.environment,
-            event_sink: execution.event_sink.as_ref(),
-        },
-        approve,
-    )
-}
