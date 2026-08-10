@@ -70,7 +70,7 @@ import { AgentUsageSettings } from "./AgentUsageSettings";
 import { AppearanceSettings } from "./AppearanceSettings";
 import { InboxNotificationSettings } from "./InboxNotificationSettings";
 import type { RepositoryReadiness } from "../lib/project-connection";
-import type { AgentUsageRun, SessionUser } from "../types";
+import type { AgentUsageReport, SessionUser } from "../types";
 import { AccountDeletionSettings } from "./AccountDeletionSettings";
 import { AccountProfileSettings } from "./AccountProfileSettings";
 import { BrowserSettings } from "./BrowserSettings";
@@ -133,7 +133,7 @@ export function AppSettings({
   onBack,
   onAccountDelete,
   onAccountSave,
-  onLoadUsageRuns,
+  onLoadUsageReport,
   onRefresh,
   projectId,
   projectName,
@@ -153,7 +153,7 @@ export function AppSettings({
     name: string;
     image: string | null;
   }) => Promise<SessionUser>;
-  onLoadUsageRuns?: () => Promise<readonly AgentUsageRun[]>;
+  onLoadUsageReport?: () => Promise<AgentUsageReport>;
   onRefresh: () => Promise<unknown>;
   projectId: string;
   projectName: string;
@@ -465,7 +465,7 @@ export function AppSettings({
           ) : activeSection === "usage" ? (
             <AgentUsageSettings
               onManageAccounts={() => setActiveSection("providers")}
-              onLoadUsageRuns={onLoadUsageRuns}
+              onLoadUsageReport={onLoadUsageReport}
               usageScopeKey={usageScopeKey}
             />
           ) : activeSection === "notifications" ? (

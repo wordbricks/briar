@@ -236,6 +236,7 @@
 }
 
 .dark .usage-overview {
+  --muted-foreground:#9b9ba3;
   --usage-codex-color:#eceee9;
   --usage-unknown-color:#a8aaa5;
 }
