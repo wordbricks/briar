@@ -686,6 +686,71 @@ describe("ProjectAgentDetail", () => {
     expect(document.body.textContent).toContain("릴리스 상태를 확인했습니다.");
   });
 
+  it("starts a second task while the first task is still running", async () => {
+    const randomUUID = vi.fn()
+      .mockReturnValueOnce("task-session-1")
+      .mockReturnValueOnce("task-session-2");
+    vi.stubGlobal("crypto", { randomUUID });
+    runProjectAgent.mockImplementation(
+      () => new Promise(() => undefined),
+    );
+    const onStartTaskSession = vi.fn();
+    const container = await mount(
+      <ProjectAgentDetailHarness
+        onSettleTaskSession={() => undefined}
+        onStartAutoHunt={() => "dispatch-1"}
+        onStartTaskSession={onStartTaskSession}
+      />,
+    );
+
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>(".project-agent-run-task")
+        ?.click();
+    });
+    await chooseTaskSkill();
+    await act(async () => {
+      document.querySelector<HTMLFormElement>("form")?.dispatchEvent(
+        new Event("submit", { bubbles: true, cancelable: true }),
+      );
+      await Promise.resolve();
+    });
+
+    expect(container.querySelector("#project-agent-session")).not.toBeNull();
+    expect(onStartTaskSession).toHaveBeenCalledWith(
+      expect.objectContaining({ sessionId: "task-session-1" }),
+    );
+
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>(".auto-hunt-session-back")
+        ?.click();
+    });
+    const runButton = container.querySelector<HTMLButtonElement>(
+      ".project-agent-run-task",
+    );
+    expect(runButton?.disabled).toBe(false);
+
+    await act(async () => runButton?.click());
+    await chooseTaskSkill();
+    await act(async () => {
+      document.querySelector<HTMLFormElement>("form")?.dispatchEvent(
+        new Event("submit", { bubbles: true, cancelable: true }),
+      );
+      await Promise.resolve();
+    });
+
+    expect(onStartTaskSession).toHaveBeenCalledTimes(2);
+    expect(onStartTaskSession).toHaveBeenLastCalledWith(
+      expect.objectContaining({ sessionId: "task-session-2" }),
+    );
+    expect(runProjectAgent.mock.calls.map(([input]) => input.sessionId)).toEqual([
+      "task-session-1",
+      "task-session-2",
+    ]);
+    expect(container.querySelector("#project-agent-session")).not.toBeNull();
+  });
+
   it("runs a follow-up in the completed session's provider conversation", async () => {
     runProjectAgent.mockResolvedValue({
       conversationId: "briar:project-1:thread-1",

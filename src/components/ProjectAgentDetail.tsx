@@ -51,7 +51,7 @@ export function ProjectAgentDetail({
   onStartAutoHunt,
   onStartTaskSession,
   requestedSessionId,
-  isRunning: isResponsibilityRunning = false,
+  isStarting: isExternalStartPending = false,
   sessions,
   token = null,
 }: {
@@ -84,14 +84,14 @@ export function ProjectAgentDetail({
   ) => string | Promise<string>;
   onStartTaskSession: (session: ProjectAgentTaskSessionStart) => void;
   requestedSessionId: string | null;
-  isRunning?: boolean;
+  isStarting?: boolean;
   sessions: AutoHuntSession[];
   token?: string | null;
 }) {
   const { t } = useI18n();
   const { toast } = useToast();
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
-  const [isRunning, setIsRunning] = useState(false);
+  const [isStarting, setIsStarting] = useState(false);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(
     requestedSessionId,
   );
@@ -165,11 +165,11 @@ export function ProjectAgentDetail({
     setIsTaskDialogOpen(true);
   };
 
-  const isAgentRunning = isResponsibilityRunning || isRunning;
+  const isTaskStarting = isExternalStartPending || isStarting;
 
   const submit = async (input: ProjectAgentTaskDialogSubmit) => {
-    if (isRunning || !dashboard) return;
-    setIsRunning(true);
+    if (isTaskStarting || !dashboard) return;
+    setIsStarting(true);
     try {
       if (companionMode) {
         if (!onStartRemoteTask || !input.workerId) {
@@ -189,7 +189,10 @@ export function ProjectAgentDetail({
       await executeProjectAgentTask(
         {
           runAgent: runProjectAgent,
-          startSession: onStartTaskSession,
+          startSession: (session) => {
+            onStartTaskSession(session);
+            setIsStarting(false);
+          },
           settleSession: onSettleTaskSession,
           startAutoHunt: onStartAutoHunt,
         },
@@ -207,7 +210,7 @@ export function ProjectAgentDetail({
         { tone: "error" },
       );
     } finally {
-      setIsRunning(false);
+      setIsStarting(false);
     }
   };
 
@@ -275,20 +278,20 @@ export function ProjectAgentDetail({
           <Button
             className="project-agent-create project-agent-run-task"
             disabled={
-              isAgentRunning ||
+              isTaskStarting ||
               !dashboard ||
               agent.skills.length === 0
             }
             onClick={openTaskDialog}
             type="button"
           >
-            {isAgentRunning ? (
+            {isTaskStarting ? (
               <LoaderCircle className="spin" size={17} />
             ) : (
               <Play fill="currentColor" size={17} />
             )}
             {t(
-              isAgentRunning
+              isTaskStarting
                 ? "agents.running"
                 : companionMode
                   ? "agents.runNow"
@@ -329,7 +332,7 @@ export function ProjectAgentDetail({
         companionMode={companionMode}
         dashboard={dashboard}
         isOpen={isTaskDialogOpen}
-        isSubmitting={isRunning}
+        isSubmitting={isStarting}
         onOpenChange={setIsTaskDialogOpen}
         onSubmit={submit}
       />

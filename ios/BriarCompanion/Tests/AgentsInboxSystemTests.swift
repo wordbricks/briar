@@ -153,7 +153,7 @@ final class AgentsInboxSystemTests: XCTestCase {
     }
 
     @MainActor
-    func testDirectAgentTaskRejectsDuplicateWhileTheFirstRequestIsPending() async throws {
+    func testDirectAgentTaskAllowsConcurrentRunsForTheSameAgent() async throws {
         let projectID = UUID(uuidString: "11111111-1111-4111-8111-111111111111")!
         let agentID = UUID(uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!
         let skillID = UUID(uuidString: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")!
@@ -199,24 +199,40 @@ final class AgentsInboxSystemTests: XCTestCase {
                 workerID: "worker-claude"
             )
         }
-        await api.waitForDirectTaskStart()
+        await api.waitForDirectTaskStarts(1)
         XCTAssertTrue(store.executingAgentIDs.contains(agentID))
 
-        do {
-            _ = try await store.run(
+        let secondRun = Task {
+            try await store.run(
                 agent: agent,
                 skill: skill,
                 request: skill.instructions,
                 workerID: "worker-claude"
             )
-            XCTFail("A second run for the same Agent should be rejected")
-        } catch {
-            XCTAssertEqual(error as? AgentsStoreError, .duplicateExecution)
         }
+        await api.waitForDirectTaskStarts(2)
+
+        let requests = await api.requests().filter {
+            $0.method == "POST" && $0.path.hasSuffix("/agent-tasks")
+        }
+        XCTAssertEqual(requests.count, 2)
+        let requestIDs = try requests.map { request in
+            let body = try XCTUnwrap(request.body)
+            let object = try XCTUnwrap(
+                JSONSerialization.jsonObject(with: body) as? [String: Any]
+            )
+            return try XCTUnwrap(object["requestId"] as? String)
+        }
+        XCTAssertEqual(Set(requestIDs).count, 2)
 
         await api.releaseDirectTask()
         _ = try await firstRun.value
+        XCTAssertTrue(store.executingAgentIDs.contains(agentID))
+
+        await api.releaseDirectTask()
+        _ = try await secondRun.value
         XCTAssertFalse(store.executingAgentIDs.contains(agentID))
+        XCTAssertEqual(store.sessions.count, 2)
     }
 
     @MainActor
@@ -772,9 +788,12 @@ private actor AgentExecutionAPIRecorder: MobileAPIClientProtocol {
     private let projectID: UUID
     private let suspendDirectTasks: Bool
     private var recorded: [Request] = []
-    private var directTaskStarted = false
-    private var directTaskStartWaiters: [CheckedContinuation<Void, Never>] = []
-    private var directTaskRelease: CheckedContinuation<Void, Never>?
+    private var directTaskStartCount = 0
+    private var directTaskStartWaiters: [(
+        count: Int,
+        continuation: CheckedContinuation<Void, Never>
+    )] = []
+    private var directTaskReleases: [CheckedContinuation<Void, Never>] = []
 
     init(projectID: UUID, suspendDirectTasks: Bool = false) {
         self.projectID = projectID
@@ -783,16 +802,16 @@ private actor AgentExecutionAPIRecorder: MobileAPIClientProtocol {
 
     func requests() -> [Request] { recorded }
 
-    func waitForDirectTaskStart() async {
-        if directTaskStarted { return }
+    func waitForDirectTaskStarts(_ count: Int) async {
+        if directTaskStartCount >= count { return }
         await withCheckedContinuation { continuation in
-            directTaskStartWaiters.append(continuation)
+            directTaskStartWaiters.append((count, continuation))
         }
     }
 
     func releaseDirectTask() {
-        directTaskRelease?.resume()
-        directTaskRelease = nil
+        guard !directTaskReleases.isEmpty else { return }
+        directTaskReleases.removeFirst().resume()
     }
 
     func send<Response: Decodable & Sendable>(
@@ -822,12 +841,16 @@ private actor AgentExecutionAPIRecorder: MobileAPIClientProtocol {
         }
         if method == "POST", path.hasSuffix("/agent-tasks") {
             if suspendDirectTasks {
-                directTaskStarted = true
-                let waiters = directTaskStartWaiters
-                directTaskStartWaiters = []
-                waiters.forEach { $0.resume() }
+                directTaskStartCount += 1
+                let waiters = directTaskStartWaiters.filter {
+                    $0.count <= directTaskStartCount
+                }
+                directTaskStartWaiters.removeAll {
+                    $0.count <= directTaskStartCount
+                }
+                waiters.forEach { $0.continuation.resume() }
                 await withCheckedContinuation { continuation in
-                    directTaskRelease = continuation
+                    directTaskReleases.append(continuation)
                 }
             }
             guard let request = try JSONSerialization.jsonObject(
@@ -835,12 +858,13 @@ private actor AgentExecutionAPIRecorder: MobileAPIClientProtocol {
             ) as? [String: Any] else {
                 throw MobileAPIError.invalidRequest
             }
+            let sessionID = request["requestId"] as? String ?? "session-direct-1"
             return try response(
                 [
                     "session": [
-                        "id": "session-direct-1",
+                        "id": sessionID,
                         "projectId": projectID.uuidString.lowercased(),
-                        "dispatchGroupId": "session-direct-1",
+                        "dispatchGroupId": sessionID,
                         "agentId": request["agentId"] ?? NSNull(),
                         "skillId": request["skillId"] ?? NSNull(),
                         "sessionType": "task",
@@ -860,7 +884,7 @@ private actor AgentExecutionAPIRecorder: MobileAPIClientProtocol {
                         "summary": NSNull(),
                         "error": NSNull(),
                         "events": [[
-                            "id": "event-direct-1",
+                            "id": "event-\(sessionID)",
                             "type": "started",
                             "occurredAt": "2026-08-10T00:00:00.000Z",
                         ]],
