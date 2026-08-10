@@ -22,6 +22,7 @@ import {
   deleteProjectAgentSchedule,
   loadDashboard,
   loadDashboardDelta,
+  loadAgentUsageReport,
   loadAgentUsageRuns,
   loadProjectAgentSessions,
   loadProjectAgentScheduleRuns,
@@ -1166,6 +1167,12 @@ describe("API errors", () => {
         new Response(JSON.stringify({
           runs: [usageRun],
           generatedAt: "2026-08-09T00:00:00.000Z",
+          pricing: {
+            status: "live",
+            source: "https://example.com/current-rates.json",
+            fetchedAt: "2026-08-09T00:00:00.000Z",
+            knownModels: 2_500,
+          },
         }), {
           headers: { "Content-Type": "application/json" },
         }),
@@ -1175,6 +1182,12 @@ describe("API errors", () => {
     await expect(
       loadAgentUsageRuns("token", organizationId, 90),
     ).resolves.toEqual([usageRun]);
+    await expect(
+      loadAgentUsageReport("token", organizationId, 90),
+    ).resolves.toMatchObject({
+      runs: [usageRun],
+      pricing: { status: "live", knownModels: 2_500 },
+    });
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining(
         `/organizations/${organizationId}/usage/runs?days=90`,
@@ -1184,6 +1197,32 @@ describe("API errors", () => {
     expect(
       String(fetchMock.mock.calls[0]?.[0]),
     ).not.toContain("/dashboard");
+  });
+
+  it("normalizes usage reports from servers without pricing metadata", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json({
+          runs: [],
+          generatedAt: "2026-08-09T00:00:00.000Z",
+        }),
+      ),
+    );
+
+    await expect(
+      loadAgentUsageReport(
+        "token",
+        "11111111-1111-4111-8111-111111111111",
+      ),
+    ).resolves.toMatchObject({
+      runs: [],
+      pricing: {
+        status: "unavailable",
+        fetchedAt: null,
+        knownModels: 0,
+      },
+    });
   });
 
   it("loads and normalizes timeline events from the run detail endpoint", async () => {

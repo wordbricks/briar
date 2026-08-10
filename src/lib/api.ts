@@ -18,6 +18,7 @@ import {
   type ModelEffort,
 } from "./agent-provider-contract";
 import type { UsageRangeDays } from "./agent-usage-overview";
+import { LITELLM_MAIN_PRICING_SOURCE } from "./agent-usage-pricing";
 import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
 import type {
   ChannelAgentReply,
@@ -39,6 +40,7 @@ import type {
   CreateIssueInput,
   CreateProjectAgentInput,
   CreateProjectAgentScheduleInput,
+  AgentUsageReport,
   AgentUsageRun,
   DashboardPayload,
   DashboardDeltaPayload,
@@ -889,12 +891,33 @@ export async function loadAgentUsageRuns(
   days: UsageRangeDays = 90,
   signal?: AbortSignal,
 ): Promise<AgentUsageRun[]> {
-  const result = await request<{ runs: AgentUsageRun[] }>(
+  return (await loadAgentUsageReport(token, organizationId, days, signal)).runs;
+}
+
+export async function loadAgentUsageReport(
+  token: string,
+  organizationId: string,
+  days: UsageRangeDays = 90,
+  signal?: AbortSignal,
+): Promise<AgentUsageReport> {
+  const result = await request<
+    Omit<AgentUsageReport, "pricing"> & {
+      pricing?: AgentUsageReport["pricing"];
+    }
+  >(
     `/organizations/${encodeURIComponent(organizationId)}/usage/runs?days=${days}`,
     token,
     { signal },
   );
-  return result.runs;
+  return {
+    ...result,
+    pricing: result.pricing ?? {
+      status: "unavailable",
+      source: LITELLM_MAIN_PRICING_SOURCE,
+      fetchedAt: null,
+      knownModels: 0,
+    },
+  };
 }
 
 export async function loadDashboardDelta(
