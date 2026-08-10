@@ -33,9 +33,12 @@ import {
 import {
   aggregateAgentUsageOverview,
   type UsageAttribution,
+  type UsageModelSource,
   type UsageRangeDays,
 } from "../lib/agent-usage-overview";
-import type { AgentUsageRun } from "../types";
+import { AGENT_EXECUTION_USD_TICKS_PER_DOLLAR } from "../lib/agent-execution-cost";
+import { LITELLM_MAIN_PRICING_SOURCE } from "../lib/agent-usage-pricing";
+import type { AgentUsagePricing, AgentUsageReport } from "../types";
 import { AgentProviderIcon } from "./AgentIcons";
 
 const quotaProviderOrder = ["claude", "codex", "grok"] as const;
@@ -49,7 +52,7 @@ const providerColors: Record<UsageAttribution, string> = {
   unknown: "var(--usage-unknown-color)",
 };
 
-type ChartMetric = "tokens" | "runs";
+type ChartMetric = "tokens" | "cost" | "runs";
 type BreakdownMode = "model" | "day";
 
 function providerName(provider: UsageAttribution) {
@@ -72,6 +75,66 @@ function formatPercent(value: number, locale: string) {
     maximumFractionDigits: 1,
     style: "percent",
   }).format(Math.max(0, Math.min(1, value)));
+}
+
+function formatUsdTicks(value: number, locale: string, compact = false) {
+  const dollars = value / AGENT_EXECUTION_USD_TICKS_PER_DOLLAR;
+  const magnitude = Math.abs(dollars);
+  const minimumFractionDigits =
+    magnitude === 0 || magnitude >= 1
+      ? 2
+      : magnitude >= 0.01
+        ? 4
+        : magnitude >= 0.0001
+          ? 6
+          : 8;
+  return new Intl.NumberFormat(locale, {
+    style: "currency",
+    currency: "USD",
+    notation: compact && magnitude >= 10_000 ? "compact" : "standard",
+    minimumFractionDigits,
+    maximumFractionDigits: magnitude >= 1 ? 2 : 10,
+  }).format(dollars);
+}
+
+function chartValue(
+  point: ReturnType<typeof aggregateAgentUsageOverview>["daily"][number]["byProvider"][UsageAttribution],
+  metric: ChartMetric,
+) {
+  return metric === "cost" ? point.costUsdTicks : point[metric];
+}
+
+function modelSourceLabel(
+  source: UsageModelSource,
+  t: ReturnType<typeof useI18n>["t"],
+) {
+  if (source === "providerReported") return t("usage.modelSourceReported");
+  if (source === "providerConfig") return t("usage.modelSourceProviderConfig");
+  if (source === "configuredFallback" || source === "legacyConfigured") {
+    return t("usage.modelSourceConfigured");
+  }
+  return t("usage.modelSourceUnknown");
+}
+
+function pricingStatusLabel(
+  pricing: AgentUsagePricing,
+  locale: string,
+  t: ReturnType<typeof useI18n>["t"],
+) {
+  if (pricing.status === "unavailable") return t("usage.pricingUnavailable");
+  const fetchedAtTimestamp = pricing.fetchedAt
+    ? Date.parse(pricing.fetchedAt)
+    : Number.NaN;
+  const fetchedAt = Number.isFinite(fetchedAtTimestamp)
+    ? new Intl.DateTimeFormat(locale, {
+        dateStyle: "medium",
+        timeStyle: "short",
+      }).format(fetchedAtTimestamp)
+    : t("usage.pricingTimeUnknown");
+  return t(
+    pricing.status === "live" ? "usage.pricingLive" : "usage.pricingCached",
+    { time: fetchedAt },
+  );
 }
 
 function formatDateRange(startAt: number, endAt: number, locale: string) {
@@ -141,7 +204,7 @@ function DailyUsageChart({
   const dataTableId = useId();
   const width = 720;
   const height = 268;
-  const left = 62;
+  const left = metric === "cost" ? 86 : 62;
   const right = 12;
   const top = 15;
   const bottom = 34;
@@ -149,13 +212,17 @@ function DailyUsageChart({
   const plotHeight = height - top - bottom;
   const providers = overview.providers
     .filter((provider) =>
-      metric === "tokens" ? provider.totalTokens > 0 : provider.runs > 0,
+      metric === "tokens"
+        ? provider.totalTokens > 0
+        : metric === "cost"
+          ? provider.totalCostUsdTicks > 0
+          : provider.runs > 0,
     )
     .map((provider) => provider.provider);
   let maximum = 0;
   for (const day of overview.daily) {
     for (const provider of providers) {
-      const value = day.byProvider[provider]?.[metric] ?? 0;
+      const value = chartValue(day.byProvider[provider], metric);
       if (value > maximum) maximum = value;
     }
   }
@@ -204,7 +271,9 @@ function DailyUsageChart({
         aria-label={
           metric === "tokens"
             ? t("usage.chartLabelTokens")
-            : t("usage.chartLabelRuns")
+            : metric === "cost"
+              ? t("usage.chartLabelCost")
+              : t("usage.chartLabelRuns")
         }
         className="usage-overview-chart-svg"
         role="img"
@@ -213,7 +282,9 @@ function DailyUsageChart({
         <desc>
           {metric === "tokens"
             ? t("usage.chartLabelTokens")
-            : t("usage.chartLabelRuns")}
+            : metric === "cost"
+              ? t("usage.chartLabelCost")
+              : t("usage.chartLabelRuns")}
         </desc>
         {tickValues.map((value) => {
           const y = baseline - (value / yMaximum) * plotHeight;
@@ -232,7 +303,9 @@ function DailyUsageChart({
                 x={left - 12}
                 y={y + 4}
               >
-                {formatCompact(value, localeTag)}
+                {metric === "cost"
+                  ? formatUsdTicks(value, localeTag, true)
+                  : formatCompact(value, localeTag)}
               </text>
             </g>
           );
@@ -241,7 +314,7 @@ function DailyUsageChart({
         {providers.map((provider) => {
           const points = overview.daily.map((day, index) => ({
             x: xAt(index),
-            y: yAt(day.byProvider[provider]?.[metric] ?? 0),
+            y: yAt(chartValue(day.byProvider[provider], metric)),
           }));
           const line = smoothPath(points);
           const area = points.length
@@ -291,26 +364,40 @@ function DailyUsageChart({
         <caption>
           {metric === "tokens"
             ? t("usage.chartLabelTokens")
-            : t("usage.chartLabelRuns")}
+            : metric === "cost"
+              ? t("usage.chartLabelCost")
+              : t("usage.chartLabelRuns")}
         </caption>
         <thead>
           <tr>
             <th>{t("usage.day")}</th>
             <th>{t("usage.provider")}</th>
-            <th>{t(metric === "tokens" ? "usage.tokens" : "usage.runs")}</th>
+            <th>
+              {t(
+                metric === "tokens"
+                  ? "usage.tokens"
+                  : metric === "cost"
+                    ? "usage.cost"
+                    : "usage.runs",
+              )}
+            </th>
           </tr>
         </thead>
         <tbody>
           {overview.daily.flatMap((day) =>
             providers.flatMap((provider) => {
-              const value = day.byProvider[provider]?.[metric] ?? 0;
+              const value = chartValue(day.byProvider[provider], metric);
               return value > 0 ? (
                 <tr key={`${day.dateKey}:${provider}`}>
                   <td>{accessibleDateFormatter.format(day.timestamp)}</td>
                   <td>
                     {providerName(provider) ?? t("usage.unknownProvider")}
                   </td>
-                  <td>{new Intl.NumberFormat(localeTag).format(value)}</td>
+                  <td>
+                    {metric === "cost"
+                      ? formatUsdTicks(value, localeTag)
+                      : new Intl.NumberFormat(localeTag).format(value)}
+                  </td>
                 </tr>
               ) : [];
             }),
@@ -324,7 +411,11 @@ function DailyUsageChart({
             : t(
                 metric === "tokens"
                   ? "usage.noRecordedTokens"
-                  : "usage.noRecordedRuns",
+                  : metric === "cost"
+                    ? overview.costs.costedRuns > 0
+                      ? "usage.zeroRecordedCost"
+                      : "usage.noRecordedCost"
+                    : "usage.noRecordedRuns",
               )}
         </p>
       ) : null}
@@ -371,11 +462,13 @@ function ProviderLimitRow({ provider }: { provider: AgentUsageProvider }) {
 }
 
 export function AgentUsageSettings({
-  onLoadUsageRuns,
+  onLoadProviderUsage,
+  onLoadUsageReport,
   onManageAccounts,
   usageScopeKey = "default",
 }: {
-  onLoadUsageRuns?: () => Promise<readonly AgentUsageRun[]>;
+  onLoadProviderUsage?: () => Promise<AgentUsageSnapshot>;
+  onLoadUsageReport?: () => Promise<AgentUsageReport>;
   onManageAccounts: () => void;
   usageScopeKey?: string;
 }) {
@@ -392,10 +485,11 @@ export function AgentUsageSettings({
   const [providerError, setProviderError] = useState<string | null>(null);
   const [usageRunsError, setUsageRunsError] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now);
-  const [usageRuns, setUsageRuns] = useState<readonly AgentUsageRun[]>([]);
-  const [usageRunsLoaded, setUsageRunsLoaded] = useState(false);
-  const loadUsageRunsRef = useRef(onLoadUsageRuns);
-  loadUsageRunsRef.current = onLoadUsageRuns;
+  const [usageReport, setUsageReport] = useState<AgentUsageReport | null>(null);
+  const loadProviderUsageRef = useRef(onLoadProviderUsage ?? loadAgentUsage);
+  loadProviderUsageRef.current = onLoadProviderUsage ?? loadAgentUsage;
+  const loadUsageReportRef = useRef(onLoadUsageReport);
+  loadUsageReportRef.current = onLoadUsageReport;
   const refreshGenerationRef = useRef(0);
   const latest = history[0] ?? null;
 
@@ -405,11 +499,20 @@ export function AgentUsageSettings({
     setRefreshing(true);
     setProviderError(null);
     setUsageRunsError(null);
-    const [providerResult, runResult] = await Promise.allSettled([
-      loadAgentUsage(),
-      loadUsageRunsRef.current
-        ? loadUsageRunsRef.current()
-        : Promise.resolve([]),
+    const [providerResult, reportResult] = await Promise.allSettled([
+      loadProviderUsageRef.current(),
+      loadUsageReportRef.current
+        ? loadUsageReportRef.current()
+        : Promise.resolve({
+            runs: [],
+            generatedAt: new Date().toISOString(),
+            pricing: {
+              status: "unavailable" as const,
+              source: LITELLM_MAIN_PRICING_SOURCE,
+              fetchedAt: null,
+              knownModels: 0,
+            },
+          }),
     ]);
     if (generation !== refreshGenerationRef.current) return;
     if (providerResult.status === "fulfilled") {
@@ -421,14 +524,13 @@ export function AgentUsageSettings({
           : String(providerResult.reason),
       );
     }
-    if (runResult.status === "fulfilled") {
-      setUsageRuns(runResult.value);
-      setUsageRunsLoaded(true);
+    if (reportResult.status === "fulfilled") {
+      setUsageReport(reportResult.value);
     } else {
       setUsageRunsError(
-        runResult.reason instanceof Error
-          ? runResult.reason.message
-          : String(runResult.reason),
+        reportResult.reason instanceof Error
+          ? reportResult.reason.message
+          : String(reportResult.reason),
       );
     }
     setNow(Date.now());
@@ -438,8 +540,7 @@ export function AgentUsageSettings({
   useEffect(() => {
     const generation = refreshGenerationRef.current + 1;
     refreshGenerationRef.current = generation;
-    setUsageRuns([]);
-    setUsageRunsLoaded(false);
+    setUsageReport(null);
     setUsageRunsError(null);
     void refresh(generation);
     return () => {
@@ -450,9 +551,10 @@ export function AgentUsageSettings({
   }, [refresh, usageScopeKey]);
 
   const overview = useMemo(
-    () => aggregateAgentUsageOverview(usageRuns, rangeDays, now),
-    [now, rangeDays, usageRuns],
+    () => aggregateAgentUsageOverview(usageReport?.runs ?? [], rangeDays, now),
+    [now, rangeDays, usageReport],
   );
+  const usageRunsLoaded = usageReport !== null;
   const totalTokens = overview.totals.totalTokens;
   const cachedDenominator =
     overview.totals.cacheReadTokens + overview.totals.uncachedInputTokens;
@@ -466,12 +568,15 @@ export function AgentUsageSettings({
   const breakdownRows =
     breakdownMode === "model"
       ? overview.models.map((row) => ({
-          key: `${row.provider}:${row.model ?? ""}`,
-          label: row.model ?? t("usage.defaultModel"),
+          key: `${row.provider}:${row.modelProvider ?? ""}:${row.model ?? ""}`,
+          label: row.model ?? t("usage.modelNotReported"),
           provider: row.provider,
+          modelProvider: row.modelProvider,
+          modelSource: row.modelSource,
           runs: row.runs,
           timestamp: null,
           tokens: row.totalTokens,
+          costUsdTicks: row.totalCostUsdTicks,
         }))
       : [...overview.daily]
           .reverse()
@@ -484,9 +589,12 @@ export function AgentUsageSettings({
               year: "numeric",
             }).format(day.timestamp),
             provider: null,
+            modelProvider: null,
+            modelSource: null,
             runs: day.runs,
             timestamp: day.timestamp,
             tokens: day.totalTokens,
+            costUsdTicks: day.totalCostUsdTicks,
           }));
   const coverage =
     overview.observedRuns > 0
@@ -494,13 +602,25 @@ export function AgentUsageSettings({
       : 0;
   const missingCoverage =
     overview.observedRuns > 0 ? 1 - coverage : 0;
+  const actualModelCoverage =
+    overview.reportedRuns > 0
+      ? overview.actualModelRuns / overview.reportedRuns
+      : 0;
+  const costCoverage =
+    overview.reportedRuns > 0
+      ? overview.costs.costedRuns / overview.reportedRuns
+      : 0;
   const dateRange = formatDateRange(
     overview.startAt,
     overview.endAt,
     localeTag,
   );
   const chartProviders = providerRows.filter((provider) =>
-    chartMetric === "tokens" ? provider.totalTokens > 0 : provider.runs > 0,
+    chartMetric === "tokens"
+      ? provider.totalTokens > 0
+      : chartMetric === "cost"
+        ? provider.totalCostUsdTicks > 0
+        : provider.runs > 0,
   );
   const unavailableMessage = usageRunsError
     ? t("usage.loadRunsFailed")
@@ -616,7 +736,7 @@ export function AgentUsageSettings({
                 className="usage-overview-segmented metric"
                 role="group"
               >
-                {(["tokens", "runs"] as const).map((metric) => (
+                {(["tokens", "cost", "runs"] as const).map((metric) => (
                   <button
                     aria-pressed={chartMetric === metric}
                     key={metric}
@@ -669,6 +789,28 @@ export function AgentUsageSettings({
                   ),
                 })
               : unavailableMessage}
+          </small>
+        </div>
+        <div>
+          <span>{t("usage.totalCost")}</span>
+          <strong>
+            {usageRunsLoaded
+              ? formatUsdTicks(overview.costs.totalUsdTicks, localeTag)
+              : "—"}
+          </strong>
+          <small>
+            {usageRunsLoaded
+              ? t("usage.costMix", {
+                  estimated: formatUsdTicks(
+                    overview.costs.estimatedUsdTicks,
+                    localeTag,
+                  ),
+                  reported: formatUsdTicks(
+                    overview.costs.providerReportedUsdTicks,
+                    localeTag,
+                  ),
+                })
+              : "—"}
           </small>
         </div>
         <div>
@@ -773,6 +915,7 @@ export function AgentUsageSettings({
                 <tr>
                   <th>{t(breakdownMode === "model" ? "usage.model" : "usage.day")}</th>
                   <th>{t("usage.tokens")}</th>
+                  <th>{t("usage.cost")}</th>
                   <th>{t("usage.share")}</th>
                   <th>{t("usage.runs")}</th>
                 </tr>
@@ -800,12 +943,19 @@ export function AgentUsageSettings({
                                 <small>
                                   {providerName(row.provider) ??
                                     t("usage.unknownProvider")}
+                                  {row.modelSource
+                                    ? ` · ${modelSourceLabel(row.modelSource, t)}`
+                                    : ""}
+                                  {row.modelProvider
+                                    ? ` · ${row.modelProvider}`
+                                    : ""}
                                 </small>
                               ) : null}
                             </span>
                           </div>
                         </td>
                         <td>{formatCompact(row.tokens, localeTag)}</td>
+                        <td>{formatUsdTicks(row.costUsdTicks, localeTag)}</td>
                         <td>{formatPercent(share, localeTag)}</td>
                         <td>{row.runs}</td>
                       </tr>
@@ -813,7 +963,7 @@ export function AgentUsageSettings({
                   })
                 ) : (
                   <tr>
-                    <td className="usage-overview-table-empty" colSpan={4}>
+                    <td className="usage-overview-table-empty" colSpan={5}>
                       {usageRunsLoaded
                         ? t("usage.noRecordedTokens")
                         : unavailableMessage}
@@ -834,6 +984,22 @@ export function AgentUsageSettings({
                 <dd>{usageRunsLoaded ? formatPercent(coverage, localeTag) : "—"}</dd>
               </div>
               <div>
+                <dt>{t("usage.actualModelReported")}</dt>
+                <dd>
+                  {usageRunsLoaded
+                    ? formatPercent(actualModelCoverage, localeTag)
+                    : "—"}
+                </dd>
+              </div>
+              <div>
+                <dt>{t("usage.costCovered")}</dt>
+                <dd>
+                  {usageRunsLoaded
+                    ? formatPercent(costCoverage, localeTag)
+                    : "—"}
+                </dd>
+              </div>
+              <div>
                 <dt>{t("usage.tokenMissing")}</dt>
                 <dd>
                   {usageRunsLoaded
@@ -845,12 +1011,76 @@ export function AgentUsageSettings({
                 <dt>{t("usage.cacheShare")}</dt>
                 <dd>{usageRunsLoaded ? formatPercent(cacheShare, localeTag) : "—"}</dd>
               </div>
+            </dl>
+            <p>
+              {usageRunsLoaded
+                ? t("usage.ledgerCoverage", {
+                    ledger: overview.ledgerRuns,
+                    legacy: overview.legacyRuns,
+                    records: overview.usageRecords,
+                  })
+                : unavailableMessage}
+            </p>
+          </section>
+
+          <section className="usage-overview-pricing">
+            <h2>{t("usage.costCalculation")}</h2>
+            <strong>
+              {usageReport
+                ? pricingStatusLabel(usageReport.pricing, localeTag, t)
+                : "—"}
+            </strong>
+            <dl className="usage-overview-coverage">
               <div>
-                <dt>{t("usage.rawCost")}</dt>
-                <dd>{t("usage.costUnavailable")}</dd>
+                <dt>{t("usage.providerReportedCost")}</dt>
+                <dd>
+                  {usageRunsLoaded
+                    ? formatUsdTicks(
+                        overview.costs.providerReportedUsdTicks,
+                        localeTag,
+                      )
+                    : "—"}
+                </dd>
+              </div>
+              <div>
+                <dt>{t("usage.currentPriceEstimate")}</dt>
+                <dd>
+                  {usageRunsLoaded
+                    ? formatUsdTicks(
+                        overview.costs.estimatedUsdTicks,
+                        localeTag,
+                      )
+                    : "—"}
+                </dd>
+              </div>
+              <div>
+                <dt>{t("usage.unattributedCost")}</dt>
+                <dd>
+                  {usageRunsLoaded
+                    ? formatUsdTicks(
+                        overview.costs.unattributedUsdTicks,
+                        localeTag,
+                      )
+                    : "—"}
+                </dd>
+              </div>
+              <div>
+                <dt>{t("usage.unpricedRuns")}</dt>
+                <dd>{usageRunsLoaded ? overview.costs.unpricedRuns : "—"}</dd>
               </div>
             </dl>
-            <p>{t("usage.costUnavailableNote")}</p>
+            <p>{t("usage.currentPricingNote")}</p>
+            {usageReport ? (
+              <a
+                href={LITELLM_MAIN_PRICING_SOURCE}
+                rel="noreferrer"
+                target="_blank"
+              >
+                {t("usage.pricingSource", {
+                  count: usageReport.pricing.knownModels,
+                })}
+              </a>
+            ) : null}
           </section>
 
           <section>

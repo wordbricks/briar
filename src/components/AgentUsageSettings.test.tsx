@@ -8,7 +8,7 @@ import {
   loadAgentUsage,
   type AgentUsageSnapshot,
 } from "../lib/agent-usage";
-import type { AgentUsageRun } from "../types";
+import type { AgentUsageReport, AgentUsageRun } from "../types";
 import { AgentUsageSettings } from "./AgentUsageSettings";
 
 vi.mock("../lib/agent-usage", async (importOriginal) => {
@@ -45,21 +45,119 @@ const run = (
     updatedAt: recentDate,
     completedAt: recentDate,
     preferredProvider: provider,
-    preferredModel: model,
+    preferredModel: "configured-default",
     requestedProvider: null,
     requestedModel: null,
     executionProvider: provider,
     executionModel: model,
     executionMetrics: {
-      totalTokens,
-      inputTokens: Math.round(totalTokens * 0.8),
-      outputTokens: Math.round(totalTokens * 0.2),
-      cacheReadTokens: Math.round(totalTokens * 0.5),
+      totalTokens: 99_999,
+      inputTokens: 99_999,
+      outputTokens: 0,
+      cacheReadTokens: 0,
       cacheWriteTokens: provider === "claude" ? 50 : null,
-      reasoningOutputTokens: 25,
+      reasoningOutputTokens: 0,
       durationMs: 60_000,
     },
+    usageRecords: [
+      {
+        executionId: `${id}-execution`,
+        projectId: "project-1",
+        runAttempt: 1,
+        claimAttempt: 1,
+        workerId: "worker-1",
+        claimedAt: recentDate,
+        recordedAt: recentDate,
+        usageKey: `${id}-usage`,
+        sessionId: `${id}-session`,
+        scopeId: `${id}-turn`,
+        turnId: `${id}-turn`,
+        agentProvider: provider,
+        modelProvider: provider === "codex" ? "openai" : "anthropic",
+        model,
+        canonicalModel: null,
+        modelSource: "providerReported",
+        source:
+          provider === "codex"
+            ? "codex.turnUsage"
+            : "claude.assistant.usage",
+        uncachedInputTokens: Math.round(totalTokens * 0.3),
+        cacheReadTokens: Math.round(totalTokens * 0.5),
+        cacheWriteTokens: 0,
+        outputTokens: Math.round(totalTokens * 0.2),
+        reasoningOutputTokens: Math.round(totalTokens * 0.05),
+        totalTokens,
+        observedAt: recentDate,
+      },
+    ],
+    costRecords:
+      provider === "claude"
+        ? [
+            {
+              executionId: `${id}-execution`,
+              projectId: "project-1",
+              runAttempt: 1,
+              claimAttempt: 1,
+              workerId: "worker-1",
+              claimedAt: recentDate,
+              recordedAt: recentDate,
+              costKey: `${id}-cost`,
+              usageKey: `${id}-usage`,
+              sessionId: `${id}-session`,
+              scopeId: `${id}-turn`,
+              turnId: `${id}-turn`,
+              agentProvider: provider,
+              modelProvider: "anthropic",
+              model,
+              canonicalModel: null,
+              modelSource: "providerReported",
+              source: "claude.result.modelUsage.costUSD",
+              amountUsdTicks: 200_000_000,
+              observedAt: recentDate,
+              costSource: "providerReported",
+            },
+          ]
+        : [],
+    estimatedCostRecords:
+      provider === "codex"
+        ? [
+            {
+              executionId: `${id}-execution`,
+              projectId: "project-1",
+              runAttempt: 1,
+              claimAttempt: 1,
+              workerId: "worker-1",
+              claimedAt: recentDate,
+              usageKey: `${id}-usage`,
+              sessionId: `${id}-session`,
+              scopeId: `${id}-turn`,
+              turnId: `${id}-turn`,
+              agentProvider: provider,
+              modelProvider: "openai",
+              model,
+              canonicalModel: null,
+              modelSource: "providerReported",
+              usageSource: "codex.turnUsage",
+              pricingKey: model,
+              amountUsdTicks: 300_000_000,
+              observedAt: recentDate,
+              costSource: "modelPriced",
+            },
+          ]
+        : [],
   }) as AgentUsageRun;
+
+const report = (runs: AgentUsageRun[]): AgentUsageReport => ({
+  runs,
+  generatedAt: recentDate,
+  pricing: {
+    status: "live",
+    source:
+      "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json",
+    fetchedAt: recentDate,
+    knownModels: 2_500,
+  },
+});
 
 const provider = (
   id: "claude" | "codex" | "grok",
@@ -105,17 +203,19 @@ describe("AgentUsageSettings", () => {
     const container = document.createElement("div");
     document.body.append(container);
     const root = createRoot(container);
-    const onLoadUsageRuns = vi.fn().mockResolvedValue([
-      run("codex-run", "codex", "gpt-5.6-sol", 1_000),
-      run("claude-run", "claude", "opus", 500),
-    ]);
+    const onLoadUsageReport = vi.fn().mockResolvedValue(
+      report([
+        run("codex-run", "codex", "gpt-5.6-sol", 1_000),
+        run("claude-run", "claude", "claude-sonnet-4-6", 500),
+      ]),
+    );
 
     await act(async () => {
       root.render(
         <I18nProvider>
           <AgentUsageSettings
             onManageAccounts={() => undefined}
-            onLoadUsageRuns={onLoadUsageRuns}
+            onLoadUsageReport={onLoadUsageReport}
             usageScopeKey="organization-1"
           />
         </I18nProvider>,
@@ -123,13 +223,28 @@ describe("AgentUsageSettings", () => {
     });
 
     expect(loadAgentUsage).toHaveBeenCalledOnce();
-    expect(onLoadUsageRuns).toHaveBeenCalledOnce();
+    expect(onLoadUsageReport).toHaveBeenCalledOnce();
     expect(container.textContent).toContain("Observed tokens");
     expect(container.textContent).toContain("1,500");
     expect(container.textContent).toContain("gpt-5.6-sol");
-    expect(container.textContent).toContain("opus");
+    expect(container.textContent).toContain("claude-sonnet-4-6");
     expect(container.textContent).toContain("Provider limits");
-    expect(container.textContent).toContain("Not priced");
+    expect(container.textContent).toContain("Total cost");
+    expect(container.textContent).toContain("$0.05");
+    expect(container.textContent).toContain("Provider reported");
+    expect(container.textContent).toContain("Current prices loaded");
+    expect(container.textContent).not.toContain("Provider default");
+
+    const costButton = Array.from(
+      container.querySelectorAll<HTMLButtonElement>("button"),
+    ).find((button) => button.textContent === "Cost");
+    await act(async () => costButton?.click());
+    expect(costButton?.getAttribute("aria-pressed")).toBe("true");
+    expect(
+      container
+        .querySelector<SVGElement>(".usage-overview-chart-svg")
+        ?.getAttribute("aria-label"),
+    ).toBe("Daily cost by provider");
 
     const runsButton = Array.from(
       container.querySelectorAll<HTMLButtonElement>("button"),
@@ -163,15 +278,15 @@ describe("AgentUsageSettings", () => {
     const container = document.createElement("div");
     document.body.append(container);
     const root = createRoot(container);
-    const initialLoader = vi.fn().mockResolvedValue([]);
-    const replacementLoader = vi.fn().mockResolvedValue([]);
+    const initialLoader = vi.fn().mockResolvedValue(report([]));
+    const replacementLoader = vi.fn().mockResolvedValue(report([]));
 
     await act(async () => {
       root.render(
         <I18nProvider>
           <AgentUsageSettings
             onManageAccounts={() => undefined}
-            onLoadUsageRuns={initialLoader}
+            onLoadUsageReport={initialLoader}
             usageScopeKey="organization-1"
           />
         </I18nProvider>,
@@ -183,7 +298,7 @@ describe("AgentUsageSettings", () => {
         <I18nProvider>
           <AgentUsageSettings
             onManageAccounts={() => undefined}
-            onLoadUsageRuns={replacementLoader}
+            onLoadUsageReport={replacementLoader}
             usageScopeKey="organization-1"
           />
         </I18nProvider>,
@@ -198,7 +313,7 @@ describe("AgentUsageSettings", () => {
         <I18nProvider>
           <AgentUsageSettings
             onManageAccounts={() => undefined}
-            onLoadUsageRuns={replacementLoader}
+            onLoadUsageReport={replacementLoader}
             usageScopeKey="organization-2"
           />
         </I18nProvider>,
@@ -221,7 +336,7 @@ describe("AgentUsageSettings", () => {
         <I18nProvider>
           <AgentUsageSettings
             onManageAccounts={() => undefined}
-            onLoadUsageRuns={() => Promise.reject(new Error("usage unavailable"))}
+            onLoadUsageReport={() => Promise.reject(new Error("usage unavailable"))}
             usageScopeKey="organization-1"
           />
         </I18nProvider>,
@@ -246,6 +361,40 @@ describe("AgentUsageSettings", () => {
         (tick) => tick.textContent,
       ),
     ).toEqual(["0"]);
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("keeps provider-limit errors separate from organization usage", async () => {
+    vi.mocked(loadAgentUsage).mockRejectedValueOnce(
+      new Error("provider quota unavailable"),
+    );
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <I18nProvider>
+          <AgentUsageSettings
+            onManageAccounts={() => undefined}
+            onLoadUsageReport={() =>
+              Promise.resolve(
+                report([run("codex-run", "codex", "gpt-5.6-sol", 1_000)]),
+              )
+            }
+            usageScopeKey="organization-1"
+          />
+        </I18nProvider>,
+      );
+    });
+
+    expect(container.textContent).toContain("1,000");
+    expect(container.textContent).toContain("provider quota unavailable");
+    expect(container.textContent).not.toContain(
+      "Organization usage could not be loaded.",
+    );
 
     await act(async () => root.unmount());
     container.remove();
