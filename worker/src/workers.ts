@@ -15,17 +15,19 @@ import {
   compareSemanticVersions,
   isSemanticVersion,
 } from "../../src/lib/semantic-version";
+import {
+  agentProviders,
+  type AgentProvider,
+  type ModelEffort,
+} from "../../src/lib/agent-provider-contract";
+
+export type {
+  AgentProvider,
+  ModelEffort,
+} from "../../src/lib/agent-provider-contract";
 
 export type ExecutionWorkerState = "online" | "stale" | "disabled";
 export type ExecutionWorkerReadiness = "ready" | "busy" | "needs_attention";
-export type AgentProvider = "codex" | "claude" | "grok" | "opencode";
-export type ModelEffort =
-  | "low"
-  | "medium"
-  | "high"
-  | "xhigh"
-  | "max"
-  | "ultra";
 export type ProviderHealth = {
   installed: boolean;
   authenticated: boolean;
@@ -34,8 +36,6 @@ export type ProviderHealth = {
 };
 export type ProviderHealthMap = Partial<Record<AgentProvider, ProviderHealth>>;
 export type TranscriptDirection = "client" | "server";
-
-const agentProviders: readonly AgentProvider[] = ["codex", "claude", "grok", "opencode"];
 
 export type ExecutionWorkerRow = {
   id: string;

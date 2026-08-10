@@ -1,5 +1,9 @@
 import { Buffer } from "node:buffer";
 import type { AgentAttachment } from "../src-agent/runner-attachments";
+import type {
+  AgentProvider,
+  ModelEffort,
+} from "../src/lib/agent-provider-contract";
 
 // A detached run keeps one durable transcript session across retries and
 // checkpoint resumes. Each claim gets its own sequence range so a new worker
@@ -24,15 +28,9 @@ export function detachedTranscriptSequence(
   return (claimAttempt - 1) * detachedTranscriptClaimStride + localSequence;
 }
 
-export type DetachedAgentProvider = "codex" | "claude" | "grok" | "opencode";
+export type DetachedAgentProvider = AgentProvider;
 
-export type DetachedAgentEffort =
-  | "low"
-  | "medium"
-  | "high"
-  | "xhigh"
-  | "max"
-  | "ultra";
+export type DetachedAgentEffort = ModelEffort;
 
 export type DetachedAgentSkill = {
   id: string;

@@ -1,4 +1,6 @@
-export type PrerequisiteId = "git" | "codex" | "claude" | "grok" | "opencode";
+import type { AgentProvider } from "./agent-provider-contract";
+
+export type PrerequisiteId = "git" | AgentProvider;
 
 export type PrerequisiteStatus = {
   installed: boolean;

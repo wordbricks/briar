@@ -53,6 +53,7 @@ import { useI18n } from "../i18n";
 import {
   agentEfforts,
   agentModels,
+  agentProviderLabels,
   agentProviders,
   defaultAppProviderSettings,
   defaultProjectLlmSettings,
@@ -86,13 +87,6 @@ import {
 import { LinearIssueImport } from "./LinearIssueImport";
 import { ProjectExecutionSettings } from "./ProjectExecutionSettings";
 import { SelectMenu } from "./SelectMenu";
-
-const providerLabels: Record<AgentProvider, string> = {
-  codex: "Codex",
-  claude: "Claude",
-  grok: "Grok",
-  opencode: "OpenCode",
-};
 
 export type ProjectSettingsSection =
   | "general"
@@ -947,7 +941,7 @@ export function ProjectSettings({
                       ? t("settings.providerDisabled")
                       : undefined,
                     disabled: !providerAvailability[candidate],
-                    label: providerLabels[candidate],
+                    label: agentProviderLabels[candidate],
                     value: candidate,
                   }))}
                   size="small"
@@ -1040,7 +1034,7 @@ export function ProjectSettings({
                     : approvalPolicy === "on-request"
                       ? "settings.approvalOnRequestDescription"
                       : "settings.approvalNeverDescription",
-                ).replace("Codex", providerLabels[runtimeProvider])}
+                ).replace("Codex", agentProviderLabels[runtimeProvider])}
               </p>
               {runtimeError ? (
                 <p className="project-settings-runtime-error" role="alert">

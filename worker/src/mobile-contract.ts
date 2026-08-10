@@ -1,11 +1,17 @@
 import { z } from "zod";
 import {
+  agentProviders,
+  modelEfforts,
+} from "../../src/lib/agent-provider-contract";
+import {
   issueTitleAbsoluteMaxLength,
   issueTitleOverLimitMessage,
 } from "../../src/lib/issue-title";
 
 export const mobileClientIds = ["briar-mobile", "briar-android"] as const;
 export const mobileClientIdSchema = z.enum(mobileClientIds);
+const mobileProviderSchema = z.enum(agentProviders);
+const mobileEffortSchema = z.enum(modelEfforts);
 
 export const mobileHealthResponseSchema = z.object({
   ok: z.literal(true),
@@ -177,12 +183,12 @@ export const mobileDashboardRunSchema = z.object({
   pullRequestUrls: z.array(z.url()).optional(),
   branch: z.string().nullable().optional(),
   commitSha: z.string().nullable().optional(),
-  preferredProvider: z.enum(["codex", "claude", "grok", "opencode"]).nullable().optional(),
+  preferredProvider: mobileProviderSchema.nullable().optional(),
   preferredModel: z.string().nullable().optional(),
-  preferredEffort: z.enum(["low", "medium", "high", "xhigh", "max", "ultra"]).nullable().optional(),
-  requestedProvider: z.enum(["codex", "claude", "grok", "opencode"]).nullable().optional(),
+  preferredEffort: mobileEffortSchema.nullable().optional(),
+  requestedProvider: mobileProviderSchema.nullable().optional(),
   requestedModel: z.string().nullable().optional(),
-  requestedEffort: z.enum(["low", "medium", "high", "xhigh", "max", "ultra"]).nullable().optional(),
+  requestedEffort: mobileEffortSchema.nullable().optional(),
   requestedWorkerId: z.string().nullable().optional(),
   workerId: z.string().nullable().optional(),
   updatedAt: z.iso.datetime(),
@@ -202,8 +208,8 @@ export const mobileDashboardWorkerSchema = z.object({
     z.object({ type: z.literal("emoji"), value: z.string() }),
     z.object({ type: z.literal("image"), value: z.string() }),
   ]).nullable().optional(),
-  agentProvider: z.enum(["codex", "claude", "grok", "opencode"]).optional(),
-  providers: z.array(z.enum(["codex", "claude", "grok", "opencode"])).optional(),
+  agentProvider: mobileProviderSchema.optional(),
+  providers: z.array(mobileProviderSchema).optional(),
   readiness: z.string(),
   acceptingWork: z.boolean(),
   readinessDetail: z.string().nullable(),
@@ -239,7 +245,7 @@ export const mobileDashboardSnapshotSchema = z.object({
   project: mobileDashboardProjectSchema,
   runs: z.array(mobileDashboardRunSchema),
   workers: z.array(mobileDashboardWorkerSchema).optional(),
-  organizationProviders: z.array(z.enum(["codex", "claude", "grok", "opencode"])).optional(),
+  organizationProviders: z.array(mobileProviderSchema).optional(),
   members: z.array(mobileOrganizationMemberSchema).optional(),
   conversationNotifications: z.array(mobileConversationNotificationSchema).optional(),
   channelNotifications: z.array(mobileChannelNotificationSchema).optional(),
@@ -254,7 +260,7 @@ export const mobileDashboardDeltaSchema = z.object({
   deletedRunIds: z.array(z.uuid()),
   project: mobileDashboardProjectSchema.optional(),
   workers: z.array(mobileDashboardWorkerSchema).optional(),
-  organizationProviders: z.array(z.enum(["codex", "claude", "grok", "opencode"])).optional(),
+  organizationProviders: z.array(mobileProviderSchema).optional(),
   members: z.array(mobileOrganizationMemberSchema).optional(),
   conversationNotifications: z.array(mobileConversationNotificationSchema).optional(),
   channelNotifications: z.array(mobileChannelNotificationSchema).optional(),
@@ -414,7 +420,7 @@ export const mobileChannelDetailResponseSchema = z.object({
     agentId: z.uuid(),
     handle: z.string().nullable(),
     name: z.string(),
-    provider: z.enum(["codex", "claude", "grok", "opencode"]),
+    provider: mobileProviderSchema,
     model: z.string().nullable(),
     projectId: z.uuid().nullable(),
     responsibility: z.string(),
@@ -499,8 +505,6 @@ const mobilePlacementStatusSchema = z.enum([
   "completed",
   "cancelled",
 ]);
-const mobileProviderSchema = z.enum(["codex", "claude", "grok", "opencode"]);
-const mobileEffortSchema = z.enum(["low", "medium", "high", "xhigh", "max", "ultra"]);
 const requestIdSchema = z.object({ requestId: z.uuid() });
 
 const mobileIssueTitleSchema = z

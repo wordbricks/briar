@@ -1,12 +1,25 @@
 import type { StructuredAgentResult } from "./agent-result";
+import {
+  agentProviderPolicies,
+  agentProviders,
+  modelEfforts,
+  type AgentProvider,
+  type ModelEffort,
+} from "./agent-provider-contract";
+
+export {
+  agentProviderLabels,
+  agentProviderPolicies,
+  agentProviders,
+  modelEfforts,
+  type AgentProvider,
+  type ModelEffort,
+} from "./agent-provider-contract";
 
 export type JsonSchema = Record<string, unknown> | boolean;
 
 export const approvalPolicies = ["untrusted", "on-request", "never"] as const;
 export type ApprovalPolicy = (typeof approvalPolicies)[number];
-
-export const agentProviders = ["codex", "claude", "grok", "opencode"] as const;
-export type AgentProvider = (typeof agentProviders)[number];
 
 export type AppProviderSettings = Record<AgentProvider, boolean>;
 
@@ -38,48 +51,25 @@ export type AgentProviderModelCatalog = Record<
   AgentProviderModelCatalogEntry
 >;
 
-export const modelEfforts = [
-  "low",
-  "medium",
-  "high",
-  "xhigh",
-  "max",
-  "ultra",
-] as const;
-export type ModelEffort = (typeof modelEfforts)[number];
-
 export const agentEfforts: Record<AgentProvider, readonly ModelEffort[]> = {
-  codex: modelEfforts,
-  claude: modelEfforts.filter((effort) => effort !== "ultra"),
-  grok: modelEfforts.filter(
-    (effort) => effort !== "ultra" && effort !== "xhigh" && effort !== "max",
-  ),
-  opencode: modelEfforts.filter(
-    (effort) => effort !== "ultra" && effort !== "xhigh" && effort !== "max",
-  ),
+  codex: agentProviderPolicies.codex.efforts,
+  claude: agentProviderPolicies.claude.efforts,
+  grok: agentProviderPolicies.grok.efforts,
+  opencode: agentProviderPolicies.opencode.efforts,
 };
 
-export const agentModels: Record<AgentProvider, AgentModelOption[]> = {
-  codex: [
-    { value: "", label: "Provider default" },
-    { value: "gpt-5.6-sol", label: "GPT-5.6 Sol" },
-    { value: "gpt-5.6-terra", label: "GPT-5.6 Terra" },
-    { value: "gpt-5.6-luna", label: "GPT-5.6 Luna" },
-  ],
-  claude: [
-    { value: "", label: "Provider default" },
-    { value: "sonnet", label: "Claude Sonnet" },
-    { value: "opus", label: "Claude Opus" },
-    { value: "haiku", label: "Claude Haiku" },
-    { value: "fable", label: "Claude Fable" },
-  ],
-  grok: [
-    { value: "", label: "Provider default" },
-    { value: "grok-4.5", label: "Grok 4.5" },
-    { value: "grok-build", label: "Grok Build" },
-  ],
-  opencode: [{ value: "", label: "Provider default" }],
-};
+export const agentModels = Object.fromEntries(
+  agentProviders.map((provider) => [
+    provider,
+    [
+      { value: "", label: "Provider default" },
+      ...agentProviderPolicies[provider].models.map((model) => ({
+        value: model.id,
+        label: model.label,
+      })),
+    ],
+  ]),
+) as Record<AgentProvider, AgentModelOption[]>;
 
 export const defaultAgentProviderModelCatalog: AgentProviderModelCatalog =
   Object.fromEntries(

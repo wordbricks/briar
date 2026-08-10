@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { agentProviders } from "../../src/lib/agent-provider-contract";
 import type {
   HuntEventRow,
   IssueMessageRow,
@@ -280,7 +281,7 @@ const issueMessageSchema: z.ZodType<IssueMessageRow> = z.object({
   run_id: z.string(),
   parent_message_id: nullableString,
   author_user_id: nullableString,
-  author_agent_provider: z.enum(["codex", "claude", "grok", "opencode"]).nullable(),
+  author_agent_provider: z.enum(agentProviders).nullable(),
   author_name: nullableString,
   author_image: nullableString,
   body: z.string(),
@@ -306,7 +307,7 @@ const transcriptSessionSchema: z.ZodType<TranscriptSessionRow> = z.object({
   project_id: z.string(),
   run_id: nullableString,
   worker_id: nullableString,
-  agent_provider: z.enum(["codex", "claude", "grok", "opencode"]),
+  agent_provider: z.enum(agentProviders),
   started_at: z.string(),
   last_event_at: z.string(),
   event_count: z.number(),

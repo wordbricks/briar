@@ -29,6 +29,8 @@ import {
 import {
   agentEfforts,
   agentModels,
+  agentProviderLabels,
+  agentProviders,
   type AgentProvider,
   type ModelEffort,
 } from "../lib/project-llm";
@@ -64,13 +66,6 @@ import {
   ProjectAgentTaskDialog,
   type ProjectAgentTaskDialogSubmit,
 } from "./ProjectAgentTaskDialog";
-
-const providerLabels: Record<AgentProvider, string> = {
-  codex: "Codex",
-  claude: "Claude",
-  grok: "Grok",
-  opencode: "OpenCode",
-};
 
 export function ProjectAgents({
   companionMode = false,
@@ -250,7 +245,7 @@ export function ProjectAgents({
       ? await updateProjectAgent(token, project.id, agent.id, input)
       : {
           ...agent,
-          name: input.name ?? `${providerLabels[input.provider]} Agent`,
+          name: input.name ?? `${agentProviderLabels[input.provider]} Agent`,
           avatar:
             input.avatar === undefined ? agent.avatar : input.avatar,
           codexPet:
@@ -267,7 +262,7 @@ export function ProjectAgents({
             agent.skills,
           ),
           skill: projectAgentSkill({
-            name: input.name ?? `${providerLabels[input.provider]} Agent`,
+            name: input.name ?? `${agentProviderLabels[input.provider]} Agent`,
             responsibility: input.responsibility,
           }),
           updatedAt,
@@ -513,10 +508,10 @@ export function ProjectAgents({
                         </header>
                         <div className="project-agent-runtime">
                           <span
-                            aria-label={providerLabels[agent.provider]}
+                            aria-label={agentProviderLabels[agent.provider]}
                             className={`project-agent-provider-icon ${agent.provider}`}
                             role="img"
-                            title={providerLabels[agent.provider]}
+                            title={agentProviderLabels[agent.provider]}
                           >
                             <AgentProviderIcon
                               provider={agent.provider}
@@ -784,10 +779,8 @@ export function ProjectAgentDialog({
                   setModel("");
                   setEffort(null);
                 }}
-                options={(
-                  ["codex", "claude", "grok", "opencode"] as AgentProvider[]
-                ).map((candidate) => ({
-                  label: providerLabels[candidate],
+                options={agentProviders.map((candidate) => ({
+                  label: agentProviderLabels[candidate],
                   value: candidate,
                 }))}
                 value={provider}
@@ -905,7 +898,7 @@ function localProjectAgent(
   createdAt: string,
 ): ProjectAgent {
   const id = crypto.randomUUID();
-  const name = input.name ?? `${providerLabels[input.provider]} Agent`;
+  const name = input.name ?? `${agentProviderLabels[input.provider]} Agent`;
   const initialSkills: ProjectAgentSkillInput[] = [
     {
       name,

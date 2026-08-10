@@ -1,11 +1,10 @@
-export type AgentSkillProvider = "codex" | "claude" | "grok" | "opencode";
-export type AgentSkillEffort =
-  | "low"
-  | "medium"
-  | "high"
-  | "xhigh"
-  | "max"
-  | "ultra";
+import type {
+  AgentProvider,
+  ModelEffort,
+} from "../../src/lib/agent-provider-contract";
+
+export type AgentSkillProvider = AgentProvider;
+export type AgentSkillEffort = ModelEffort;
 export type AgentSkillKind = "issue_processing" | "custom";
 
 export type AgentSkillInput = {

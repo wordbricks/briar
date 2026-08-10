@@ -1,12 +1,8 @@
 import { AgentProviderIcon } from "./AgentIcons";
-import type { AgentProvider } from "../lib/project-llm";
-
-const providerLabels: Record<AgentProvider, string> = {
-  codex: "Codex",
-  claude: "Claude",
-  grok: "Grok",
-  opencode: "OpenCode",
-};
+import {
+  agentProviderLabels,
+  type AgentProvider,
+} from "../lib/project-llm";
 
 export function WorkerProviderIcons({
   providers,
@@ -19,11 +15,11 @@ export function WorkerProviderIcons({
     <span className="inline-flex items-center gap-1.5">
       {providers.map((provider) => (
         <span
-          aria-label={providerLabels[provider]}
+          aria-label={agentProviderLabels[provider]}
           className="inline-flex items-center justify-center"
           key={provider}
           role="img"
-          title={providerLabels[provider]}
+          title={agentProviderLabels[provider]}
         >
           <AgentProviderIcon provider={provider} size={size} />
         </span>

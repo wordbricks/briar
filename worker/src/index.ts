@@ -23,6 +23,14 @@ import {
 } from "../../src/lib/agent-result";
 import { agentExecutionMetricsSchema } from "../../src/lib/agent-execution-metrics";
 import {
+  agentProviderAllowsEffort,
+  agentProviderAllowsModel,
+  agentProviderLabels,
+  agentProviders,
+  modelEfforts,
+  type AgentProvider,
+} from "../../src/lib/agent-provider-contract";
+import {
   defaultProjectAgentCalendarColor,
   normalizeProjectAgentLocale,
 } from "../../src/lib/project-agent";
@@ -940,12 +948,9 @@ export const projectAgentInputSchema = z
       .strict()
       .nullable()
       .optional(),
-    provider: z.enum(["codex", "claude", "grok", "opencode"]),
+    provider: z.enum(agentProviders),
     model: z.string().trim().min(1).max(100).nullable().optional(),
-    effort: z
-      .enum(["low", "medium", "high", "xhigh", "max", "ultra"])
-      .nullable()
-      .optional(),
+    effort: z.enum(modelEfforts).nullable().optional(),
     responsibility: z.string().trim().min(1).max(2_000),
     skills: z.array(channelAgentSkillInputSchema).min(1).max(50).optional(),
     calendarColor: z
@@ -1259,13 +1264,6 @@ const slackOAuthInputSchema = z
   .strict();
 const slackInstallationUpdateSchema = slackOAuthInputSchema;
 
-const providerModels = {
-  codex: new Set(["gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"]),
-  claude: new Set(["sonnet", "opus", "haiku", "fable"]),
-  grok: new Set(["grok-4.5", "grok-build"]),
-  opencode: new Set<string>(),
-} as const;
-
 const issueTitleSchema = z
   .string()
   .trim()
@@ -1285,15 +1283,9 @@ const issueInputBaseSchema = z
     priority: z.number().int().min(1).max(4).nullable().optional(),
     assigneeUserId: z.string().trim().min(1).max(200).nullable().optional(),
     status: z.enum(["backlog", "queued"]).default("queued"),
-    preferredProvider: z
-      .enum(["codex", "claude", "grok", "opencode"])
-      .nullable()
-      .optional(),
+    preferredProvider: z.enum(agentProviders).nullable().optional(),
     preferredModel: z.string().trim().min(1).max(100).nullable().optional(),
-    preferredEffort: z
-      .enum(["low", "medium", "high", "xhigh", "max", "ultra"])
-      .nullable()
-      .optional(),
+    preferredEffort: z.enum(modelEfforts).nullable().optional(),
     checkpoints: z.array(workflowCheckpointSchema).max(100).default([]),
   })
   .strict();
@@ -1319,29 +1311,28 @@ const issueInputSchema = issueInputBaseSchema.superRefine((input, context) => {
   }
   if (
     input.preferredProvider &&
-    input.preferredProvider !== "opencode" &&
     input.preferredModel &&
-    !providerModels[input.preferredProvider].has(input.preferredModel)
+    !agentProviderAllowsModel(input.preferredProvider, input.preferredModel)
   ) {
     context.addIssue({
       code: "custom",
       message: `${input.preferredModel} is not available from ${input.preferredProvider}`,
     });
   }
-  if (input.preferredProvider === "claude" && input.preferredEffort === "ultra") {
-    context.addIssue({
-      code: "custom",
-      message: "Claude does not support ultra effort",
-    });
-  }
   if (
-    (input.preferredProvider === "grok" || input.preferredProvider === "opencode") &&
+    input.preferredProvider &&
     input.preferredEffort &&
-    !["low", "medium", "high"].includes(input.preferredEffort)
+    !agentProviderAllowsEffort(
+      input.preferredProvider,
+      input.preferredEffort,
+    )
   ) {
     context.addIssue({
       code: "custom",
-      message: `${input.preferredProvider} supports low, medium, or high effort`,
+      message:
+        input.preferredProvider === "claude"
+          ? "Claude does not support ultra effort"
+          : `${input.preferredProvider} supports low, medium, or high effort`,
     });
   }
 });
@@ -1360,18 +1351,11 @@ export const issueUpdateInputSchema = issueInputBaseSchema
   })
   .strict();
 
-const modelEffortSchema = z.enum([
-  "low",
-  "medium",
-  "high",
-  "xhigh",
-  "max",
-  "ultra",
-]);
+const modelEffortSchema = z.enum(modelEfforts);
 
 export const issueExecutionPreferencesSchema = z
   .object({
-    provider: z.enum(["codex", "claude", "grok", "opencode"]).nullable(),
+    provider: z.enum(agentProviders).nullable(),
     model: z.string().trim().min(1).max(100).nullable(),
     effort: modelEffortSchema.nullable(),
   })
@@ -1391,29 +1375,25 @@ export const issueExecutionPreferencesSchema = z
     }
     if (
       input.provider &&
-      input.provider !== "opencode" &&
       input.model &&
-      !providerModels[input.provider].has(input.model)
+      !agentProviderAllowsModel(input.provider, input.model)
     ) {
       context.addIssue({
         code: "custom",
         message: `${input.model} is not available from ${input.provider}`,
       });
     }
-    if (input.provider === "claude" && input.effort === "ultra") {
-      context.addIssue({
-        code: "custom",
-        message: "Claude does not support ultra effort",
-      });
-    }
     if (
-      (input.provider === "grok" || input.provider === "opencode") &&
+      input.provider &&
       input.effort &&
-      !["low", "medium", "high"].includes(input.effort)
+      !agentProviderAllowsEffort(input.provider, input.effort)
     ) {
       context.addIssue({
         code: "custom",
-        message: `${input.provider} supports low, medium, or high effort`,
+        message:
+          input.provider === "claude"
+            ? "Claude does not support ultra effort"
+            : `${input.provider} supports low, medium, or high effort`,
       });
     }
   });
@@ -1832,7 +1812,7 @@ const claimInputSchema = z
   .strict();
 
 const providerHealthSchema = z.record(
-  z.enum(["codex", "claude", "grok", "opencode"]),
+  z.enum(agentProviders),
   z
     .object({
       installed: z.boolean(),
@@ -1847,9 +1827,9 @@ const workerRegisterSchema = z
   .object({
     label: z.string().trim().min(1).max(100),
     deviceIdentity: z.string().regex(/^briar_device_[0-9a-f]{64}$/u),
-    agentProvider: z.enum(["codex", "claude", "grok", "opencode"]),
+    agentProvider: z.enum(agentProviders),
     providers: z
-      .array(z.enum(["codex", "claude", "grok", "opencode"]))
+      .array(z.enum(agentProviders))
       .max(4)
       .optional(),
     providerHealth: providerHealthSchema.optional(),
@@ -1947,7 +1927,7 @@ const workerLabelSchema = z
 const dispatchRunSchema = z
   .object({
     agentId: z.string().uuid().nullable().optional(),
-    provider: z.enum(["codex", "claude", "grok", "opencode"]).optional(),
+    provider: z.enum(agentProviders).optional(),
     model: z.string().trim().min(1).max(100).nullable().optional(),
     effort: modelEffortSchema.nullable().optional(),
     persistPreferences: z.boolean().optional(),
@@ -2051,7 +2031,7 @@ export const transcriptSchema = z
     runAttempt: z.number().int().positive().optional(),
     projectId: z.string().uuid().optional(),
     workerId: z.string().trim().min(1).max(128).nullable().optional(),
-    agentProvider: z.enum(["codex", "claude", "grok", "opencode"]),
+    agentProvider: z.enum(agentProviders),
     executionMetrics: agentExecutionMetricsSchema.optional(),
     events: z
       .array(
@@ -2657,7 +2637,7 @@ const workerJson = (
     device_id?: string;
     owner_user_id?: string;
     label: string;
-    agent_provider: "codex" | "claude" | "grok" | "opencode";
+    agent_provider: AgentProvider;
     versions_json: string;
     state: string;
     accepting_work?: number;
@@ -6765,7 +6745,7 @@ async function route(
       .bind(input.workerId, project.id, project.organization_id)
       .first<{
         id: string;
-        agent_provider: "codex" | "claude" | "grok" | "opencode";
+        agent_provider: AgentProvider;
         capabilities_json: string;
         state: "online" | "stale" | "disabled";
         accepting_work: number;
@@ -6951,12 +6931,7 @@ async function route(
         "Create the agent before selecting a Codex Pet avatar",
       );
     }
-    const providerName =
-      input.provider === "codex"
-        ? "Codex"
-        : input.provider === "claude"
-          ? "Claude"
-          : "Grok";
+    const providerName = agentProviderLabels[input.provider];
     const agent = await createProjectAgent(db, project.id, {
       name: input.name ?? `${providerName} Agent`,
       avatar: input.avatar ?? null,
@@ -7205,12 +7180,7 @@ async function route(
         objectKey,
       };
     }
-    const providerName =
-      input.provider === "codex"
-        ? "Codex"
-        : input.provider === "claude"
-          ? "Claude"
-          : "Grok";
+    const providerName = agentProviderLabels[input.provider];
     let agent: ProjectAgentRow | null;
     try {
       agent = await updateProjectAgent(

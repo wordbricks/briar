@@ -33,6 +33,10 @@ import {
   agentModels,
   type ModelEffort,
 } from "../lib/project-llm";
+import {
+  agentProviderLabels,
+  agentProviders,
+} from "../lib/agent-provider-contract";
 import { AgentProviderIcon } from "./AgentIcons";
 import { NativeSelect } from "./NativeSelect";
 import {
@@ -42,19 +46,7 @@ import {
 } from "./ProjectAgentSkillsEditor";
 import type { ProjectAgentSkillInput } from "../types";
 
-const providers: ChannelAgentProvider[] = [
-  "codex",
-  "claude",
-  "grok",
-  "opencode",
-];
-
-const providerLabels: Record<ChannelAgentProvider, string> = {
-  codex: "Codex",
-  claude: "Claude",
-  grok: "Grok",
-  opencode: "OpenCode",
-};
+const providers: readonly ChannelAgentProvider[] = agentProviders;
 
 export function OrganizationAgentsSettings({
   organizationId,
@@ -293,7 +285,7 @@ export function OrganizationAgentsSettings({
                 ) : null}
                 <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-muted-foreground">
                   <Typography as="span" variant="caption">
-                    {providerLabels[agent.provider]}
+                    {agentProviderLabels[agent.provider]}
                     {agent.model ? ` · ${agent.model}` : ""}
                   </Typography>
                   <time dateTime={agent.createdAt}>
@@ -600,7 +592,7 @@ function OrganizationAgentCreateDialog({
                   setEffort(null);
                 }}
                 options={providers.map((candidate) => ({
-                  label: providerLabels[candidate],
+                  label: agentProviderLabels[candidate],
                   value: candidate,
                 }))}
                 value={provider}
