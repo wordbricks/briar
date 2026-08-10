@@ -388,6 +388,7 @@ import {
   channelMessageJson,
   channelReplyJson,
   claimNextChannelAgentReply,
+  channelReplyProjectTargets,
   completeChannelReply,
   createChannel,
   createChannelMessage,
@@ -549,6 +550,69 @@ class HttpError extends Error {
   ) {
     super(message);
   }
+}
+
+export function resolveChannelProposalTargetProjectId(input: {
+  requestedProjectId: string | null | undefined;
+  proposedProjectId: string | null | undefined;
+  defaultProjectId: string | null | undefined;
+}) {
+  if (
+    input.proposedProjectId &&
+    input.requestedProjectId &&
+    input.proposedProjectId !== input.requestedProjectId
+  ) {
+    throw new HttpError(
+      400,
+      "The approved project must match the Agent proposal",
+    );
+  }
+  return input.proposedProjectId ??
+    input.requestedProjectId ??
+    input.defaultProjectId ??
+    null;
+}
+
+export function assertChannelProposalAuthorScope(input: {
+  channelOrganizationId: string;
+  proposedProjectId: string | null;
+  replyAuthorAgentId: string | null;
+  replyAuthorAgentOrganizationId: string | null;
+  replyAuthorAgentProjectId: string | null;
+}) {
+  if (
+    !input.replyAuthorAgentId ||
+    !input.replyAuthorAgentOrganizationId ||
+    input.replyAuthorAgentOrganizationId !== input.channelOrganizationId
+  ) {
+    throw new HttpError(
+      409,
+      "The Agent proposal scope can no longer be verified; request a new proposal",
+    );
+  }
+  if (
+    input.replyAuthorAgentProjectId !== null &&
+    input.replyAuthorAgentProjectId !== input.proposedProjectId
+  ) {
+    // Older workers could persist a null or cross-project target for a
+    // Project Agent. Never reinterpret what the member saw and approved.
+    throw new HttpError(
+      409,
+      "The Project Agent proposal scope is invalid; request a new proposal",
+    );
+  }
+}
+
+export function approvedIssueCreation<T extends Record<string, unknown>>(
+  issue: T,
+) {
+  return {
+    ...issue,
+    // Creating and executing are separate approvals. A creation proposal can
+    // never enter the worker queue, including proposals stored by older builds.
+    status: "backlog" as const,
+    checkpoints: [] as never[],
+  };
 }
 
 async function readBoundedMultipartForm(
@@ -2852,9 +2916,9 @@ async function requireWorkerCredential(db: D1Database, request: Request) {
 }
 
 /**
- * Channel work is organization work, so a device only has to prove it belongs
- * to the organization. Whether it may run a particular job is decided per job:
- * organization Agents need nothing more, project Agents still need a binding.
+ * Channel work is organization work, so the credential first proves device
+ * membership. The claim then pins the ready host binding, and Project Agent
+ * jobs additionally require that exact binding to match the target project.
  */
 async function requireWorkerOrganization(
   db: D1Database,
@@ -6224,16 +6288,34 @@ async function route(
         resultRunId: proposal.result_run_id,
       });
     }
+    assertChannelProposalAuthorScope({
+      channelOrganizationId: channel.organization_id,
+      proposedProjectId: proposal.project_id,
+      replyAuthorAgentId: proposal.reply_author_agent_id,
+      replyAuthorAgentOrganizationId:
+        proposal.reply_author_agent_organization_id,
+      replyAuthorAgentProjectId: proposal.reply_author_agent_project_id,
+    });
     const input = channelProposalAcceptInputSchema.parse(
       await readJson(request),
     );
-    // The conversation never fixes a project, so the accepting member does:
-    // their choice wins, then the proposal's, then the channel default.
-    const targetProjectId =
-      input.projectId ?? proposal.project_id ?? channel.default_project_id;
+    // A Project Agent's proposal is already bound to its authoritative
+    // project. Only an organization-scoped proposal may be assigned at
+    // approval time, and every target must stay inside this channel's org.
+    const targetProjectId = resolveChannelProposalTargetProjectId({
+      requestedProjectId: input.projectId,
+      proposedProjectId: proposal.project_id,
+      defaultProjectId: channel.default_project_id,
+    });
     if (!targetProjectId) {
       throw new HttpError(400, "A target project is required");
     }
+    const organizationProject = await getOrganizationProject(
+      db,
+      channel.organization_id,
+      targetProjectId,
+    );
+    if (!organizationProject) throw new HttpError(404, "Project not found");
     const project = await getProject(db, targetProjectId, session.user.id);
     if (!project) throw new HttpError(404, "Project not found");
     const payload = channelIssueProposalPayloadSchema.parse(
@@ -6243,7 +6325,7 @@ async function route(
       db,
       attachmentsBucket,
       project,
-      issue: { ...payload.issue, checkpoints: [] },
+      issue: approvedIssueCreation(payload.issue),
       attachments: [],
       sourceKey: `briar-channel-proposal:${proposal.id}`,
       actor: "briar-channel",
@@ -8532,10 +8614,7 @@ async function route(
       db,
       attachmentsBucket,
       project,
-      issue: {
-        ...action.issue,
-        checkpoints: [],
-      },
+      issue: approvedIssueCreation(action.issue),
       attachments: [],
       sourceKey: `briar-conversation-proposal:${proposal.id}`,
       // Keep the event payload stable across retries. The accepting user is
@@ -9965,105 +10044,142 @@ async function route(
       throw new HttpError(409, "Worker has no available reply provider");
     }
     const claimToken = `briar_channel_claim_${crypto.randomUUID().replaceAll("-", "")}${crypto.randomUUID().replaceAll("-", "")}`;
+    const claimTokenHash = await sha256(claimToken);
     const job = await claimNextChannelAgentReply(db, input.organizationId, {
       deviceId: principal.deviceId,
+      workerId: binding.id,
       providers,
-      claimTokenHash: await sha256(claimToken),
+      claimTokenHash,
       claimedAt: observedAt,
       leaseExpiresAt: leaseExpiryFrom(observedAt),
     });
     if (!job) return json({ work: null });
-    const [channel, agent, messages] = await Promise.all([
-      getChannelById(db, job.organization_id, job.channel_id),
-      getOrganizationAgent(db, job.organization_id, job.agent_id),
-      listChannelThreadMessages(db, job.channel_id, job.parent_message_id),
-    ]);
-    if (!channel || !agent || !job.agent_provider) {
-      throw new HttpError(409, "Reply job lost its channel context");
-    }
-    const activeSkill = job.skill_id
-      ? agent.skills.find((skill) => skill.id === job.skill_id) ?? null
-      : null;
-    if (job.skill_id && !activeSkill) {
-      throw new HttpError(409, "Reply job lost its selected Agent Skill");
-    }
-    const replyRuntime = activeSkill ?? agent;
-    const replyModel = replyRuntime.provider === job.agent_provider
-      ? replyRuntime.model
-      : null;
-    const replyEffort = replyRuntime.provider === job.agent_provider
-      ? replyRuntime.effort
-      : null;
-    const project = job.project_id
-      ? await getOrganizationProject(db, job.organization_id, job.project_id)
-      : null;
-    return json({
-      work: {
-        workType: "channelReply",
-        workId: job.id,
-        organizationId: job.organization_id,
-        channelId: job.channel_id,
-        // Null means there is no repository: the runner skips worktree setup.
-        projectId: job.project_id,
-        // The worker loop keys in-flight work by runId; a channel reply has no
-        // run, so the channel stands in for it.
-        runId: job.channel_id,
-        sourceKey: `briar-channel:${job.channel_id}:reply:${job.trigger_message_id}`,
-        title: channel.name,
-        triggerMessageId: job.trigger_message_id,
-        parentMessageId: job.parent_message_id,
-        provider: job.agent_provider,
-        model: replyModel,
-        effort: replyEffort,
-        activeSkill: activeSkill ? agentSkillJson(activeSkill) : null,
-        agent: {
-          id: agent.id,
-          name: agent.name,
+    try {
+      if (job.claimed_worker_id !== binding.id) {
+        throw new HttpError(409, "Reply claim is bound to another Worker");
+      }
+      const [channel, agent, messages] = await Promise.all([
+        getChannelById(db, job.organization_id, job.channel_id),
+        getOrganizationAgent(db, job.organization_id, job.agent_id),
+        listChannelThreadMessages(db, job.channel_id, job.parent_message_id),
+      ]);
+      if (!channel || !agent || !job.agent_provider) {
+        throw new HttpError(409, "Reply job lost its channel context");
+      }
+      if (job.project_id !== agent.project_id) {
+        throw new HttpError(409, "Reply job no longer matches its Agent scope");
+      }
+      const activeSkill = job.skill_id
+        ? agent.skills.find((skill) => skill.id === job.skill_id) ?? null
+        : null;
+      if (job.skill_id && !activeSkill) {
+        throw new HttpError(409, "Reply job lost its selected Agent Skill");
+      }
+      const replyRuntime = activeSkill ?? agent;
+      const replyModel = replyRuntime.provider === job.agent_provider
+        ? replyRuntime.model
+        : null;
+      const replyEffort = replyRuntime.provider === job.agent_provider
+        ? replyRuntime.effort
+        : null;
+      const project = job.project_id
+        ? await getOrganizationProject(db, job.organization_id, job.project_id)
+        : null;
+      if (job.project_id !== null && !project) {
+        throw new HttpError(409, "Reply job lost its project context");
+      }
+      const organizationProjects = await listOrganizationProjectTargets(
+        db,
+        job.organization_id,
+      );
+      return json({
+        work: {
+          workType: "channelReply",
+          workId: job.id,
+          organizationId: job.organization_id,
+          channelId: job.channel_id,
+          // Null means there is no repository: the runner skips worktree setup.
+          projectId: job.project_id,
+          scope: agent.project_id === null
+            ? {
+                kind: "organization",
+                organizationId: job.organization_id,
+              }
+            : {
+                kind: "project",
+                organizationId: job.organization_id,
+                projectId: agent.project_id,
+              },
+          // The worker loop keys in-flight work by runId; a channel reply has no
+          // run, so the channel stands in for it.
+          runId: job.channel_id,
+          sourceKey: `briar-channel:${job.channel_id}:reply:${job.trigger_message_id}`,
+          title: channel.name,
+          triggerMessageId: job.trigger_message_id,
+          parentMessageId: job.parent_message_id,
           provider: job.agent_provider,
           model: replyModel,
           effort: replyEffort,
-          responsibility: agent.responsibility,
-          skill: legacyAgentSkillInstructions(
-            activeSkill,
-            agent.skill_markdown ?? agent.responsibility,
-          ),
-          skills: agent.skills.map(agentSkillJson),
-        },
-        claimToken,
-        claimedAt: job.claimed_at,
-        leaseExpiresAt: job.lease_expires_at,
-        snapshot: {
-          channel: {
-            id: channel.id,
-            name: channel.name,
-            slug: channel.slug,
-            topic: channel.topic,
-            defaultProjectId: channel.default_project_id,
-          },
+          activeSkill: activeSkill ? agentSkillJson(activeSkill) : null,
           agent: {
             id: agent.id,
             name: agent.name,
-            handle: agent.handle,
+            provider: job.agent_provider,
+            model: replyModel,
+            effort: replyEffort,
             responsibility: agent.responsibility,
             skill: legacyAgentSkillInstructions(
               activeSkill,
               agent.skill_markdown ?? agent.responsibility,
             ),
-            provider: job.agent_provider,
-            model: replyModel,
-            effort: replyEffort,
             skills: agent.skills.map(agentSkillJson),
-            projectId: agent.project_id,
           },
-          project: project ? { id: project.id, name: project.name } : null,
-          projectTargets: await listOrganizationProjectTargets(
-            db,
-            job.organization_id,
-          ),
-          messages,
+          claimToken,
+          claimedAt: job.claimed_at,
+          leaseExpiresAt: job.lease_expires_at,
+          snapshot: {
+            channel: {
+              id: channel.id,
+              name: channel.name,
+              slug: channel.slug,
+              topic: channel.topic,
+              defaultProjectId: channel.default_project_id,
+            },
+            agent: {
+              id: agent.id,
+              name: agent.name,
+              handle: agent.handle,
+              responsibility: agent.responsibility,
+              skill: legacyAgentSkillInstructions(
+                activeSkill,
+                agent.skill_markdown ?? agent.responsibility,
+              ),
+              provider: job.agent_provider,
+              model: replyModel,
+              effort: replyEffort,
+              skills: agent.skills.map(agentSkillJson),
+              projectId: agent.project_id,
+            },
+            project: project ? { id: project.id, name: project.name } : null,
+            projectTargets: channelReplyProjectTargets(
+              agent.project_id,
+              organizationProjects,
+            ),
+            messages,
+          },
         },
-      },
-    });
+      });
+    } catch (error) {
+      await failChannelReply(db, {
+        jobId: job.id,
+        deviceId: principal.deviceId,
+        workerId: binding.id,
+        claimTokenHash,
+        error: error instanceof Error ? error.message : String(error),
+        updatedAt: new Date().toISOString(),
+      });
+      throw error;
+    }
   }
 
   const channelReplyAttachmentMatch = pathname.match(
@@ -10110,10 +10226,16 @@ async function route(
   if (channelReplyClaimMatch && request.method === "POST") {
     if (channelReplyClaimMatch[2] === "lease") {
       const input = channelReplyLeaseInputSchema.parse(await readJson(request));
-      await requireWorkerOrganization(db, request, input.organizationId);
+      const principal = await requireWorkerOrganization(
+        db,
+        request,
+        input.organizationId,
+      );
       const observedAt = new Date().toISOString();
       const renewed = await renewChannelReplyLease(db, {
         jobId: channelReplyClaimMatch[1],
+        deviceId: principal.deviceId,
+        workerId: input.workerId,
         claimTokenHash: await sha256(input.claimToken),
         leaseExpiresAt: leaseExpiryFrom(observedAt),
       });
@@ -10122,13 +10244,18 @@ async function route(
     }
 
     const input = channelReplyCompleteInputSchema.parse(await readJson(request));
-    await requireWorkerOrganization(db, request, input.organizationId);
-    const claimTokenHash = await sha256(input.claimToken);
-    const job = await getClaimedChannelReply(
+    const principal = await requireWorkerOrganization(
       db,
-      channelReplyClaimMatch[1],
-      claimTokenHash,
+      request,
+      input.organizationId,
     );
+    const claimTokenHash = await sha256(input.claimToken);
+    const job = await getClaimedChannelReply(db, {
+      jobId: channelReplyClaimMatch[1],
+      deviceId: principal.deviceId,
+      workerId: input.workerId,
+      claimTokenHash,
+    });
     if (!job || job.organization_id !== input.organizationId) {
       throw new HttpError(409, "Reply claim is no longer active");
     }
@@ -10136,6 +10263,8 @@ async function route(
     if (input.error) {
       const failed = await failChannelReply(db, {
         jobId: job.id,
+        deviceId: principal.deviceId,
+        workerId: input.workerId,
         claimTokenHash,
         error: input.error,
         updatedAt: observedAt,
@@ -10150,10 +10279,33 @@ async function route(
     );
     if (!agent) throw new HttpError(409, "Reply job lost its Agent");
     const result = input.result!;
-    // A document or issue may only target a project inside this organization.
     for (const projectId of [
       result.document?.projectId,
       result.issueProposal?.projectId,
+    ]) {
+      if (
+        projectId !== null && projectId !== undefined &&
+        agent.project_id !== null && projectId !== agent.project_id
+      ) {
+        throw new HttpError(400, "Project Agent output is outside its project");
+      }
+    }
+    const document = result.document
+      ? {
+          ...result.document,
+          projectId: result.document.projectId ?? agent.project_id,
+        }
+      : null;
+    const issueProposal = result.issueProposal
+      ? {
+          ...result.issueProposal,
+          projectId: result.issueProposal.projectId ?? agent.project_id,
+        }
+      : null;
+    // A document or issue may only target a project inside this organization.
+    for (const projectId of [
+      document?.projectId,
+      issueProposal?.projectId,
     ]) {
       if (!projectId) continue;
       const project = await getOrganizationProject(
@@ -10167,10 +10319,12 @@ async function route(
     }
     const completed = await completeChannelReply(db, job, {
       jobId: job.id,
+      deviceId: principal.deviceId,
+      workerId: input.workerId,
       claimTokenHash,
       body: result.body,
-      document: result.document,
-      issueProposal: result.issueProposal,
+      document,
+      issueProposal,
       agentName: agent.name,
       agentProvider: job.agent_provider ?? agent.provider,
       completedAt: observedAt,

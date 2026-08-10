@@ -25,6 +25,7 @@ export type CodexRunnerRequest = {
   approvalPolicy: "untrusted" | "on-request" | "never";
   sandboxMode: "readOnly" | "workspaceWrite" | "dangerFullAccess";
   networkAccess: boolean;
+  externalTools?: boolean;
   attachments?: AgentAttachment[];
   codexBinary: string;
 };
@@ -175,9 +176,32 @@ export function createCodexAppServerState(
 }
 
 export function codexAppServerArgs(
-  request: Pick<CodexRunnerRequest, "networkAccess">,
+  request: Pick<CodexRunnerRequest, "networkAccess" | "externalTools">,
 ): string[] {
   const argumentsList = ["app-server", "--listen", "stdio://"];
+  if (request.externalTools === false) {
+    argumentsList.push(
+      "--strict-config",
+      "--disable",
+      "apps",
+      "--disable",
+      "plugins",
+      "--config",
+      "mcp_servers={}",
+      "--config",
+      "shell_environment_policy.inherit=core",
+      "--config",
+      'web_search="disabled"',
+      "--config",
+      "project_doc_max_bytes=0",
+      "--config",
+      "skills.include_instructions=false",
+      "--config",
+      'default_permissions="briar_read_only"',
+      "--config",
+      'permissions.briar_read_only={filesystem={":minimal"="read",":workspace_roots"={"."="read"}},network={enabled=false}}',
+    );
+  }
   if (request.networkAccess) {
     argumentsList.push(
       "--config",
@@ -276,9 +300,14 @@ export function codexThreadRequest(
 ): CodexRpcMessage {
   const params: Record<string, unknown> = {
     cwd: request.workspaceRoot,
-    sandbox: sandboxModeValue(request.sandboxMode),
     approvalPolicy: request.approvalPolicy,
   };
+  // Isolated conversational turns use the narrower permission profile passed
+  // at App Server startup. Supplying the legacy sandbox field would make Codex
+  // ignore that filesystem read allowlist.
+  if (request.externalTools !== false) {
+    params.sandbox = sandboxModeValue(request.sandboxMode);
+  }
   const config = codexMcpSessionConfig(isolation);
   if (config) params.config = config;
   const instructions = request.instructions?.trim();
@@ -623,6 +652,17 @@ export function consumeCodexAppServerMessage(
         asRecord(config?.mcp_servers) ?? {},
       );
       state.configuredPlugins = Object.keys(asRecord(config?.plugins) ?? {});
+      if (request.externalTools === false) {
+        state.isolation = mergeMcpIsolation([
+          state.isolation,
+          {
+            mcpServers: state.configuredMcpServers,
+            apps: [],
+            disableApps: true,
+            disablePlugins: true,
+          },
+        ]);
+      }
       const effectiveModel =
         typeof config?.model === "string" ? config.model.trim() : "";
       if (!request.model?.trim() && !effectiveModel) {
@@ -654,6 +694,17 @@ export function consumeCodexAppServerMessage(
         const name = firstText(app?.runtimeName)?.trim();
         return id && name ? [{ id, name }] : [];
       });
+      if (request.externalTools === false) {
+        state.isolation = mergeMcpIsolation([
+          state.isolation,
+          {
+            mcpServers: [],
+            apps: state.installedApps.map((app) => app.id),
+            disableApps: true,
+            disablePlugins: true,
+          },
+        ]);
+      }
       state.phase = "startingThread";
       return {
         outgoing: [codexThreadRequest(request, state.isolation)],
