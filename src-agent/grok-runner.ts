@@ -7,6 +7,7 @@ import {
   finalizeGrokMessage,
   GROK_OAUTH2_REFERRER_ENV,
   grokSessionMeta,
+  grokStopReasonSucceeded,
   mapEffortToGrok,
   normalizeGrokSessionUpdate,
   permissionDecisionResult,
@@ -17,12 +18,16 @@ import {
   resolveGrokFinalMessage,
   resolveGrokModelId,
   shouldAutoApprovePermission,
-  shouldDenyWritePermission,
+  shouldDenyGrokPermission,
   type GrokRunnerOutput,
   type GrokRunnerRequest,
   type JsonRpcMessage,
 } from "./grok-runner-lib";
 import { createRunnerIo } from "./runner-io";
+import {
+  providerInstructionSeatbeltPattern,
+  readOnlySeatbeltSpawnSpec,
+} from "./read-only-seatbelt";
 
 class GrokAcpConnection {
   private nextId = 0;
@@ -47,13 +52,18 @@ class GrokAcpConnection {
     grokBinary: string,
     workspaceRoot: string,
     environment: NodeJS.ProcessEnv,
+    readOnly: boolean,
   ) {
-    this.child = spawn(grokBinary, ["agent", "stdio"], {
+    const spawnSpec = grokAgentSpawnSpec({
+      binary: grokBinary,
+      arguments: grokAgentArgs(readOnly),
+      workspaceRoot,
+      environment,
+      readOnly,
+    });
+    this.child = spawn(spawnSpec.command, spawnSpec.arguments, {
       cwd: workspaceRoot,
-      env: {
-        ...environment,
-        [GROK_OAUTH2_REFERRER_ENV]: BRIAR_OAUTH_REFERRER,
-      },
+      env: grokAgentEnvironment(environment, readOnly),
       stdio: ["pipe", "pipe", "pipe"],
     });
     this.child.stdout.setEncoding("utf8");
@@ -172,6 +182,60 @@ class GrokAcpConnection {
   }
 }
 
+export function grokAgentArgs(readOnly: boolean) {
+  return readOnly
+    ? [
+        "--disable-web-search",
+        "--no-memory",
+        "--no-subagents",
+        "agent",
+        "--no-leader",
+        "stdio",
+      ]
+    : ["agent", "stdio"];
+}
+
+export function grokAgentEnvironment(
+  environment: NodeJS.ProcessEnv,
+  readOnly: boolean,
+) {
+  return {
+    ...environment,
+    // macOS Seatbelt cannot be nested. The outer Briar profile is stricter
+    // than Grok's broad built-in strict profile and covers every child tool.
+    ...(readOnly ? { GROK_SANDBOX: "off" } : {}),
+    [GROK_OAUTH2_REFERRER_ENV]: BRIAR_OAUTH_REFERRER,
+  };
+}
+
+export function grokAgentSpawnSpec(input: {
+  binary: string;
+  arguments: string[];
+  workspaceRoot: string;
+  environment: NodeJS.ProcessEnv;
+  readOnly: boolean;
+  platform?: NodeJS.Platform;
+}) {
+  if (!input.readOnly) {
+    return { command: input.binary, arguments: input.arguments };
+  }
+  const stateRoot = input.environment.GROK_HOME;
+  if (!stateRoot) throw new Error("Grok read-only state is not isolated");
+  return readOnlySeatbeltSpawnSpec({
+    providerName: "Grok",
+    binary: input.binary,
+    arguments: input.arguments,
+    workspaceRoot: input.workspaceRoot,
+    stateRoot,
+    readOnly: true,
+    deniedPathPatterns: [
+      providerInstructionSeatbeltPattern,
+      "/[.]grok(?:/.*)?$",
+    ],
+    platform: input.platform,
+  });
+}
+
 export function grokRpcResultEnvelope(
   method: string,
   params: unknown,
@@ -267,6 +331,7 @@ async function main(runnerIo: GrokRunnerIo) {
     request.grokBinary,
     request.workspaceRoot,
     process.env,
+    request.sandboxMode === "readOnly",
   );
   const state = createGrokEventState();
   let approvalSequence = 0;
@@ -299,7 +364,7 @@ async function main(runnerIo: GrokRunnerIo) {
           const input = permissionInput(rpc.params);
           const options = permissionOptions(rpc.params);
 
-          if (shouldDenyWritePermission(request, toolName)) {
+          if (await shouldDenyGrokPermission(request, toolName, input)) {
             connection.respond(
               rpc.id,
               permissionDecisionResult(options, false),
@@ -460,6 +525,13 @@ async function main(runnerIo: GrokRunnerIo) {
         raw: { type: "turn", event },
         event,
       });
+    }
+    if (!grokStopReasonSucceeded(promptResult?.stopReason)) {
+      throw new Error(
+        `Grok turn did not complete successfully (stop reason: ${
+          promptResult?.stopReason?.trim() || "missing"
+        }).`,
+      );
     }
 
     const finalMessage = resolveGrokFinalMessage(

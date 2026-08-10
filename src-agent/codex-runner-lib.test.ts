@@ -44,6 +44,32 @@ describe("Codex App Server runner", () => {
       "--listen",
       "stdio://",
     ]);
+    expect(
+      codexAppServerArgs({ networkAccess: false, externalTools: false }),
+    ).toEqual([
+      "app-server",
+      "--listen",
+      "stdio://",
+      "--strict-config",
+      "--disable",
+      "apps",
+      "--disable",
+      "plugins",
+      "--config",
+      "mcp_servers={}",
+      "--config",
+      "shell_environment_policy.inherit=core",
+      "--config",
+      'web_search="disabled"',
+      "--config",
+      "project_doc_max_bytes=0",
+      "--config",
+      "skills.include_instructions=false",
+      "--config",
+      'default_permissions="briar_read_only"',
+      "--config",
+      'permissions.briar_read_only={filesystem={":minimal"="read",":workspace_roots"={"."="read"}},network={enabled=false}}',
+    ]);
     expect(codexInitializeRequest()).toMatchObject({
       method: "initialize",
       id: 1,
@@ -386,6 +412,44 @@ describe("Codex App Server runner", () => {
     expect(state.installedApps).toEqual([
       { id: "connector_figma", name: "Figma" },
     ]);
+
+    const isolatedState = createCodexAppServerState();
+    const isolatedRequest = { ...request, externalTools: false };
+    consumeCodexAppServerMessage(isolatedState, isolatedRequest, {
+      id: 1,
+      result: {},
+    });
+    consumeCodexAppServerMessage(isolatedState, isolatedRequest, {
+      id: 2,
+      result: {
+        config: {
+          model: "gpt-5",
+          mcp_servers: { playwright: { enabled: true } },
+          plugins: { "figma@openai-curated": { enabled: true } },
+        },
+      },
+    });
+    const isolatedApps = consumeCodexAppServerMessage(
+      isolatedState,
+      isolatedRequest,
+      {
+        id: 6,
+        result: {
+          apps: [{ id: "connector_figma", runtimeName: "Figma" }],
+        },
+      },
+    );
+    expect(isolatedApps.outgoing[0]).toMatchObject({
+      method: "thread/start",
+      params: {
+        config: {
+          features: { apps: false, plugins: false },
+          apps: { connector_figma: { enabled: false } },
+          mcp_servers: { playwright: { enabled: false } },
+        },
+      },
+    });
+    expect(isolatedApps.outgoing[0]?.params).not.toHaveProperty("sandbox");
   });
 
   it("falls back to the provider model catalog when config has no model", () => {

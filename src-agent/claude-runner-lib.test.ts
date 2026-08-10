@@ -1,7 +1,7 @@
 import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, parse, resolve } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import {
   approvalResult,
@@ -67,12 +67,18 @@ describe("Claude runner", () => {
     expect(options.effort).toBe("high");
     expect(options.permissionMode).toBe("dontAsk");
     expect(options.tools).toEqual(["Read", "Glob", "Grep"]);
+    expect(options.settingSources).toEqual([]);
+    expect(options.skills).toEqual([]);
     expect(options.disallowedTools).toEqual(["WebFetch", "WebSearch"]);
     expect(options.sandbox).toMatchObject({
       enabled: true,
       failIfUnavailable: true,
       allowUnsandboxedCommands: false,
       network: { deniedDomains: ["*"] },
+      filesystem: {
+        denyRead: [parse(resolve("/repo")).root],
+        allowRead: [resolve("/repo")],
+      },
     });
   });
 
@@ -87,6 +93,8 @@ describe("Claude runner", () => {
     );
 
     expect(options.permissionMode).toBe("acceptEdits");
+    expect(options.settingSources).toEqual(["user", "project", "local"]);
+    expect(options.skills).toBe("all");
     expect(options.sandbox).toMatchObject({
       autoAllowBashIfSandboxed: true,
       allowUnsandboxedCommands: false,

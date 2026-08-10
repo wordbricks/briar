@@ -97,6 +97,7 @@ export type ChannelReplyJobRow = {
   status: ChannelReplyStatus;
   agent_provider: AgentProvider | null;
   claimed_device_id: string | null;
+  claimed_worker_id: string | null;
   claim_token_hash: string | null;
   claimed_at: string | null;
   lease_expires_at: string | null;
@@ -108,6 +109,15 @@ export type ChannelReplyJobRow = {
 };
 
 const MAX_REPLY_ATTEMPTS = 3;
+
+export function channelReplyProjectTargets<T extends { id: string }>(
+  agentProjectId: string | null,
+  projects: T[],
+) {
+  return agentProjectId === null
+    ? projects
+    : projects.filter((project) => project.id === agentProjectId);
+}
 
 const channelSelect = `
   select channel.id, channel.organization_id, channel.slug, channel.name,
@@ -1016,6 +1026,13 @@ export async function getClaimedChannelReplyAttachment(
        where job.id = ? and job.organization_id = ?
          and job.claimed_device_id = ? and job.claim_token_hash = ?
          and job.status = 'running' and job.lease_expires_at > ?
+         and exists (
+           select 1 from briar_execution_workers binding
+           where binding.id = job.claimed_worker_id
+             and binding.device_id = job.claimed_device_id
+             and binding.state <> 'disabled'
+             and (job.project_id is null or binding.project_id = job.project_id)
+         )
          and attachment.id = ?`,
     )
     .bind(
@@ -1120,15 +1137,16 @@ export async function getChannelAgentReplyJob(
 }
 
 /**
- * A device may take an organization job on behalf of any agent without a
- * project. A project agent's job additionally requires that this device holds
- * an enabled binding to that project.
+ * Any enabled binding may host an organization job. A Project Agent job may
+ * only be claimed by the exact binding for that project; device identity alone
+ * is insufficient because one device can run several project loops.
  */
 export async function claimNextChannelAgentReply(
   db: D1Database,
   organizationId: string,
   input: {
     deviceId: string;
+    workerId: string;
     providers: AgentProvider[];
     claimTokenHash: string;
     claimedAt: string;
@@ -1140,6 +1158,7 @@ export async function claimNextChannelAgentReply(
       `update briar_channel_agent_reply_jobs
        set status = 'failed',
            error = coalesce(error, 'Channel reply lease expired repeatedly.'),
+           claimed_device_id = null, claimed_worker_id = null,
            claim_token_hash = null, lease_expires_at = null, updated_at = ?
        where organization_id = ? and status = 'running' and attempts >= ?
          and lease_expires_at <= ?`,
@@ -1149,7 +1168,8 @@ export async function claimNextChannelAgentReply(
   return db
     .prepare(
       `update briar_channel_agent_reply_jobs
-       set status = 'running', claimed_device_id = ?, claim_token_hash = ?,
+       set status = 'running', claimed_device_id = ?, claimed_worker_id = ?,
+           claim_token_hash = ?,
            claimed_at = ?, lease_expires_at = ?, attempts = attempts + 1,
            error = null, updated_at = ?
        where id = (
@@ -1161,20 +1181,21 @@ export async function claimNextChannelAgentReply(
              or (job.agent_provider = 'claude' and ? = 1)
              or (job.agent_provider = 'grok' and ? = 1)
              or (job.agent_provider = 'opencode' and ? = 1))
-           and (
-             job.project_id is null
-             or exists (
-               select 1 from briar_execution_workers binding
-               where binding.device_id = ?
-                 and binding.project_id = job.project_id
-                 and binding.state <> 'disabled'
-             )
+           and exists (
+             select 1 from briar_execution_workers binding
+             where binding.id = ? and binding.device_id = ?
+               and binding.state <> 'disabled'
+               and (
+                 job.project_id is null
+                 or binding.project_id = job.project_id
+               )
            )
          order by job.created_at, job.id limit 1
        ) returning *`,
     )
     .bind(
       input.deviceId,
+      input.workerId,
       input.claimTokenHash,
       input.claimedAt,
       input.leaseExpiresAt,
@@ -1186,6 +1207,7 @@ export async function claimNextChannelAgentReply(
       input.providers.includes("claude") ? 1 : 0,
       input.providers.includes("grok") ? 1 : 0,
       input.providers.includes("opencode") ? 1 : 0,
+      input.workerId,
       input.deviceId,
     )
     .first<ChannelReplyJobRow>();
@@ -1193,33 +1215,76 @@ export async function claimNextChannelAgentReply(
 
 export async function getClaimedChannelReply(
   db: D1Database,
-  jobId: string,
-  claimTokenHash: string,
+  input: {
+    jobId: string;
+    deviceId: string;
+    workerId: string;
+    claimTokenHash: string;
+  },
 ) {
-  return db
+  const claimed = await db
     .prepare(
-      `select * from briar_channel_agent_reply_jobs
-       where id = ? and claim_token_hash = ? and status = 'running'`,
+      `select job.* from briar_channel_agent_reply_jobs job
+       where job.id = ? and job.claimed_device_id = ?
+         and job.claimed_worker_id = ?
+         and job.claim_token_hash = ? and job.status = 'running'
+         and exists (
+           select 1 from briar_execution_workers binding
+           where binding.id = job.claimed_worker_id
+             and binding.device_id = job.claimed_device_id
+             and binding.state <> 'disabled'
+             and (job.project_id is null or binding.project_id = job.project_id)
+         )`,
     )
-    .bind(jobId, claimTokenHash)
+    .bind(
+      input.jobId,
+      input.deviceId,
+      input.workerId,
+      input.claimTokenHash,
+    )
     .first<ChannelReplyJobRow>();
+  // A null worker binding is never adoptable. It can mean either a pre-scope
+  // deployment claim or a binding removed through ON DELETE SET NULL; both
+  // must expire and requeue instead of transferring a live claim token.
+  return claimed;
 }
 
 export async function renewChannelReplyLease(
   db: D1Database,
-  input: { jobId: string; claimTokenHash: string; leaseExpiresAt: string },
+  input: {
+    jobId: string;
+    deviceId: string;
+    workerId: string;
+    claimTokenHash: string;
+    leaseExpiresAt: string;
+  },
 ) {
+  const claimed = await getClaimedChannelReply(db, input);
+  if (!claimed) return null;
   return db
     .prepare(
       `update briar_channel_agent_reply_jobs
        set lease_expires_at = ?, updated_at = ?
-       where id = ? and claim_token_hash = ? and status = 'running'
+       where id = ? and claimed_device_id = ? and claimed_worker_id = ?
+         and claim_token_hash = ? and status = 'running'
+         and exists (
+           select 1 from briar_execution_workers binding
+           where binding.id = briar_channel_agent_reply_jobs.claimed_worker_id
+             and binding.device_id = briar_channel_agent_reply_jobs.claimed_device_id
+             and binding.state <> 'disabled'
+             and (
+               briar_channel_agent_reply_jobs.project_id is null
+               or binding.project_id = briar_channel_agent_reply_jobs.project_id
+             )
+         )
        returning *`,
     )
     .bind(
       input.leaseExpiresAt,
       input.leaseExpiresAt,
       input.jobId,
+      input.deviceId,
+      input.workerId,
       input.claimTokenHash,
     )
     .first<ChannelReplyJobRow>();
@@ -1229,18 +1294,24 @@ export async function failChannelReply(
   db: D1Database,
   input: {
     jobId: string;
+    deviceId: string;
+    workerId: string;
     claimTokenHash: string;
     error: string;
     updatedAt: string;
   },
 ) {
+  const claimed = await getClaimedChannelReply(db, input);
+  if (!claimed) return null;
   return db
     .prepare(
       `update briar_channel_agent_reply_jobs
        set status = case when attempts >= ? then 'failed' else 'queued' end,
-           error = ?, claim_token_hash = null, lease_expires_at = null,
+           error = ?, claimed_device_id = null, claimed_worker_id = null,
+           claim_token_hash = null, lease_expires_at = null,
            updated_at = ?
-       where id = ? and claim_token_hash = ? and status = 'running'
+       where id = ? and claimed_device_id = ? and claimed_worker_id = ?
+         and claim_token_hash = ? and status = 'running'
        returning *`,
     )
     .bind(
@@ -1248,6 +1319,8 @@ export async function failChannelReply(
       input.error.slice(0, 4000),
       input.updatedAt,
       input.jobId,
+      input.deviceId,
+      input.workerId,
       input.claimTokenHash,
     )
     .first<ChannelReplyJobRow>();
@@ -1255,6 +1328,8 @@ export async function failChannelReply(
 
 export type ChannelReplyCompletionInput = {
   jobId: string;
+  deviceId: string;
+  workerId: string;
   claimTokenHash: string;
   body: string;
   document: { title: string; markdown: string; projectId: string | null } | null;
@@ -1276,13 +1351,52 @@ export async function completeChannelReply(
   job: ChannelReplyJobRow,
   input: ChannelReplyCompletionInput,
 ) {
+  if (
+    job.project_id !== null &&
+    [input.document?.projectId, input.issueProposal?.projectId].some(
+      (projectId) => projectId !== undefined && projectId !== job.project_id,
+    )
+  ) {
+    throw new Error("Project Agent output must target its claimed project");
+  }
   const statements = [
+    db
+      .prepare(
+        `update briar_channel_agent_reply_jobs
+         set status = 'completed', completed_at = ?, updated_at = ?
+         where id = ? and claimed_device_id = ? and claimed_worker_id = ?
+           and claim_token_hash = ? and status = 'running'
+           and exists (
+             select 1 from briar_execution_workers binding
+             where binding.id = briar_channel_agent_reply_jobs.claimed_worker_id
+               and binding.device_id = briar_channel_agent_reply_jobs.claimed_device_id
+               and binding.state <> 'disabled'
+               and (
+                 briar_channel_agent_reply_jobs.project_id is null
+                 or binding.project_id = briar_channel_agent_reply_jobs.project_id
+               )
+           )
+         returning *`,
+      )
+      .bind(
+        input.completedAt,
+        input.completedAt,
+        input.jobId,
+        input.deviceId,
+        input.workerId,
+        input.claimTokenHash,
+      ),
     db
       .prepare(
         `insert into briar_channel_messages (
            id, channel_id, parent_message_id, author_user_id, author_agent_id,
            author_agent_name, author_agent_provider, body, created_at, updated_at
-         ) values (?, ?, ?, null, ?, ?, ?, ?, ?, ?)`,
+         )
+         select ?, ?, ?, null, ?, ?, ?, ?, ?, ?
+         from briar_channel_agent_reply_jobs claim
+         where claim.id = ? and claim.claimed_device_id = ?
+           and claim.claimed_worker_id = ? and claim.claim_token_hash = ?
+           and claim.status = 'completed' and claim.completed_at = ?`,
       )
       .bind(
         job.reply_message_id,
@@ -1294,6 +1408,11 @@ export async function completeChannelReply(
         input.body,
         input.completedAt,
         input.completedAt,
+        input.jobId,
+        input.deviceId,
+        input.workerId,
+        input.claimTokenHash,
+        input.completedAt,
       ),
   ];
   if (input.document) {
@@ -1303,7 +1422,12 @@ export async function completeChannelReply(
           `insert into briar_channel_message_documents (
              message_id, channel_id, project_id, title, markdown,
              created_at, updated_at
-           ) values (?, ?, ?, ?, ?, ?, ?)`,
+           )
+           select ?, ?, ?, ?, ?, ?, ?
+           from briar_channel_agent_reply_jobs claim
+           where claim.id = ? and claim.claimed_device_id = ?
+             and claim.claimed_worker_id = ? and claim.claim_token_hash = ?
+             and claim.status = 'completed' and claim.completed_at = ?`,
         )
         .bind(
           job.reply_message_id,
@@ -1312,6 +1436,11 @@ export async function completeChannelReply(
           input.document.title,
           input.document.markdown,
           input.completedAt,
+          input.completedAt,
+          input.jobId,
+          input.deviceId,
+          input.workerId,
+          input.claimTokenHash,
           input.completedAt,
         ),
     );
@@ -1323,7 +1452,12 @@ export async function completeChannelReply(
           `insert into briar_channel_action_proposals (
              id, channel_id, project_id, trigger_message_id, reply_message_id,
              action_type, payload_json, created_at, updated_at
-           ) values (?, ?, ?, ?, ?, 'request_issue_create', ?, ?, ?)
+           )
+           select ?, ?, ?, ?, ?, 'request_issue_create', ?, ?, ?
+           from briar_channel_agent_reply_jobs claim
+           where claim.id = ? and claim.claimed_device_id = ?
+             and claim.claimed_worker_id = ? and claim.claim_token_hash = ?
+             and claim.status = 'completed' and claim.completed_at = ?
            on conflict (channel_id, trigger_message_id) do nothing`,
         )
         .bind(
@@ -1335,6 +1469,11 @@ export async function completeChannelReply(
           JSON.stringify({ issue: input.issueProposal.issue }),
           input.completedAt,
           input.completedAt,
+          input.jobId,
+          input.deviceId,
+          input.workerId,
+          input.claimTokenHash,
+          input.completedAt,
         ),
     );
   }
@@ -1342,19 +1481,32 @@ export async function completeChannelReply(
     db
       .prepare(
         `update briar_channel_agent_reply_jobs
-         set status = 'completed', claim_token_hash = null,
-             lease_expires_at = null, completed_at = ?, updated_at = ?
-         where id = ? and claim_token_hash = ? and status = 'running'`,
+         set claim_token_hash = null, lease_expires_at = null
+         where id = ? and claimed_device_id = ? and claimed_worker_id = ?
+           and claim_token_hash = ? and status = 'completed'
+           and completed_at = ?`,
       )
       .bind(
-        input.completedAt,
-        input.completedAt,
         input.jobId,
+        input.deviceId,
+        input.workerId,
         input.claimTokenHash,
+        input.completedAt,
       ),
   );
-  await db.batch(statements);
-  return getChannelAgentReplyJob(db, job.organization_id, job.id);
+  const results = await db.batch(statements);
+  // AFTER UPDATE channel-sync triggers inflate meta.changes, so ownership is
+  // proven by the guarded UPDATE's RETURNING row. Avoid a second immediate D1
+  // read as well: Miniflare can expose that read across a visibility boundary
+  // even though the batch has committed successfully.
+  const transitioned = results[0]?.results[0] as ChannelReplyJobRow | undefined;
+  return transitioned
+    ? {
+        ...transitioned,
+        claim_token_hash: null,
+        lease_expires_at: null,
+      }
+    : null;
 }
 
 export async function getChannelActionProposal(
@@ -1364,8 +1516,17 @@ export async function getChannelActionProposal(
 ) {
   return db
     .prepare(
-      `select * from briar_channel_action_proposals
-       where id = ? and channel_id = ?`,
+      `select proposal.*,
+              reply.author_agent_id as reply_author_agent_id,
+              agent.organization_id as reply_author_agent_organization_id,
+              agent.project_id as reply_author_agent_project_id
+       from briar_channel_action_proposals proposal
+       join briar_channel_messages reply
+         on reply.id = proposal.reply_message_id
+        and reply.channel_id = proposal.channel_id
+       left join briar_project_agents agent
+         on agent.id = reply.author_agent_id
+       where proposal.id = ? and proposal.channel_id = ?`,
     )
     .bind(proposalId, channelId)
     .first<{
@@ -1378,6 +1539,9 @@ export async function getChannelActionProposal(
       payload_json: string;
       status: "pending" | "accepted";
       result_run_id: string | null;
+      reply_author_agent_id: string | null;
+      reply_author_agent_organization_id: string | null;
+      reply_author_agent_project_id: string | null;
       created_at: string;
       updated_at: string;
     }>();

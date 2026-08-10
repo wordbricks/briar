@@ -4,13 +4,16 @@ import {
   addChannelAgent,
   addChannelMember,
   claimNextChannelAgentReply,
+  channelReplyProjectTargets,
   completeChannelReply,
   createChannel,
   createChannelMessage,
   enqueueChannelAgentReplies,
   failChannelReply,
   getChannelById,
+  getClaimedChannelReply,
   getClaimedChannelReplyAttachment,
+  getChannelActionProposal,
   getChannelMessage,
   getChannelMessageAttachment,
   getChannelSyncCursor,
@@ -19,6 +22,7 @@ import {
   listChannelThreadMessages,
   listChannels,
   loadChannelDelta,
+  renewChannelReplyLease,
   toggleChannelMessageReaction,
 } from "./channels";
 import {
@@ -32,6 +36,8 @@ const otherOrganizationId = "a0000000-0000-4000-8000-000000000002";
 const projectId = "b0000000-0000-4000-8000-000000000001";
 const deviceId = "c0000000-0000-4000-8000-000000000001";
 const boundWorkerId = "d0000000-0000-4000-8000-000000000001";
+const otherProjectId = "b0000000-0000-4000-8000-000000000002";
+const otherWorkerId = "d0000000-0000-4000-8000-000000000002";
 const ownerId = "owner";
 const outsiderId = "outsider";
 const at = (minute: number) =>
@@ -106,6 +112,35 @@ describe("organization channels", () => {
       )
       .bind(deviceId, organizationId, ownerId, "a".repeat(64), at(0), at(0), at(0))
       .run();
+    await db.batch([
+      db.prepare(
+        `insert into briar_projects (
+           id, owner_user_id, name, agent_token_hash, organization_id,
+           created_at, updated_at
+         ) values (?, ?, 'Other Project', ?, ?, ?, ?)`,
+      ).bind(
+        otherProjectId,
+        ownerId,
+        "e".repeat(64),
+        organizationId,
+        at(0),
+        at(0),
+      ),
+      db.prepare(
+        `insert into briar_execution_workers (
+           id, project_id, label, host_fingerprint, agent_provider, state,
+           last_heartbeat_at, created_at, updated_at, device_id
+         ) values (?, ?, 'Other Worker', ?, 'claude', 'online', ?, ?, ?, ?)`,
+      ).bind(
+        otherWorkerId,
+        otherProjectId,
+        "c".repeat(64),
+        at(0),
+        at(0),
+        at(0),
+        deviceId,
+      ),
+    ]);
   }, 60_000);
 
   afterAll(async () => {
@@ -124,6 +159,17 @@ describe("organization channels", () => {
       .bind(boundWorkerId, projectId, "b".repeat(64), at(0), at(0), at(0), deviceId)
       .run();
   };
+
+  it("exposes only the authoritative project to a Project Agent", () => {
+    const projects = [
+      { id: projectId, name: "Project" },
+      { id: otherProjectId, name: "Other Project" },
+    ];
+    expect(channelReplyProjectTargets(projectId, projects)).toEqual([
+      projects[0],
+    ]);
+    expect(channelReplyProjectTargets(null, projects)).toEqual(projects);
+  });
 
   it("hides a private channel from members who were not added", async () => {
     const channelId = "e0000000-0000-4000-8000-000000000001";
@@ -395,6 +441,7 @@ describe("organization channels", () => {
     });
     const claimed = await claimNextChannelAgentReply(db, organizationId, {
       deviceId,
+      workerId: otherWorkerId,
       providers: ["grok"],
       claimTokenHash,
       claimedAt: at(9),
@@ -421,8 +468,17 @@ describe("organization channels", () => {
     await expect(lookup({ claimTokenHash: "9".repeat(64) })).resolves.toBeNull();
     await expect(lookup({ attachmentId: otherAttachmentId })).resolves.toBeNull();
     await expect(lookup({ observedAt: at(20) })).resolves.toBeNull();
+    await db.prepare(
+      `update briar_execution_workers set state = 'disabled' where id = ?`,
+    ).bind(otherWorkerId).run();
+    await expect(lookup()).resolves.toBeNull();
+    await db.prepare(
+      `update briar_execution_workers set state = 'online' where id = ?`,
+    ).bind(otherWorkerId).run();
     await completeChannelReply(db, claimed!, {
       jobId: claimed!.id,
+      deviceId,
+      workerId: otherWorkerId,
       claimTokenHash,
       body: "I inspected the image.",
       document: null,
@@ -516,9 +572,28 @@ describe("organization channels", () => {
     });
     expect(jobs).toHaveLength(1);
 
-    // No project binding exists yet: an organization Agent still runs.
+    // Organization work still requires the exact host binding to be enabled at
+    // the atomic claim boundary.
+    await db.prepare(
+      `update briar_execution_workers set state = 'disabled' where id = ?`,
+    ).bind(otherWorkerId).run();
+    await expect(
+      claimNextChannelAgentReply(db, organizationId, {
+        deviceId,
+        workerId: otherWorkerId,
+        providers: ["claude"],
+        claimTokenHash: "0".repeat(64),
+        claimedAt: at(9),
+        leaseExpiresAt: at(19),
+      }),
+    ).resolves.toBeNull();
+    await db.prepare(
+      `update briar_execution_workers set state = 'online' where id = ?`,
+    ).bind(otherWorkerId).run();
+
     const claimed = await claimNextChannelAgentReply(db, organizationId, {
       deviceId,
+      workerId: otherWorkerId,
       providers: ["claude"],
       claimTokenHash: "1".repeat(64),
       claimedAt: at(10),
@@ -533,6 +608,8 @@ describe("organization channels", () => {
 
     const completed = await completeChannelReply(db, claimed!, {
       jobId: claimed!.id,
+      deviceId,
+      workerId: otherWorkerId,
       claimTokenHash: "1".repeat(64),
       body: "Here is the plan.",
       document: {
@@ -568,6 +645,13 @@ describe("organization channels", () => {
       actionType: "request_issue_create",
       status: "pending",
       projectId,
+    });
+    await expect(
+      getChannelActionProposal(db, channelId, reply!.proposal!.id),
+    ).resolves.toMatchObject({
+      reply_author_agent_id: agent!.id,
+      reply_author_agent_organization_id: organizationId,
+      reply_author_agent_project_id: null,
     });
 
     const stored = await db
@@ -650,6 +734,7 @@ describe("organization channels", () => {
     expect(
       await claimNextChannelAgentReply(db, organizationId, {
         deviceId,
+        workerId: otherWorkerId,
         providers: ["claude"],
         claimTokenHash: "2".repeat(64),
         claimedAt: at(14),
@@ -660,21 +745,151 @@ describe("organization channels", () => {
     await bindWorkerToProject();
     const claimed = await claimNextChannelAgentReply(db, organizationId, {
       deviceId,
+      workerId: boundWorkerId,
       providers: ["claude"],
       claimTokenHash: "2".repeat(64),
       claimedAt: at(15),
       leaseExpiresAt: at(25),
     });
-    expect(claimed).toMatchObject({ agent_id: agentId, project_id: projectId });
+    expect(claimed).toMatchObject({
+      agent_id: agentId,
+      project_id: projectId,
+      claimed_worker_id: boundWorkerId,
+    });
+    // A pre-scope claim or a deleted binding leaves claimed_worker_id null.
+    // It must expire and requeue; another binding can never adopt its token.
+    await db.prepare(
+      `update briar_channel_agent_reply_jobs
+       set claimed_worker_id = null where id = ?`,
+    ).bind(claimed!.id).run();
+
+    await expect(
+      failChannelReply(db, {
+        jobId: claimed!.id,
+        deviceId,
+        workerId: otherWorkerId,
+        claimTokenHash: "2".repeat(64),
+        error: "wrong project loop",
+        updatedAt: at(16),
+      }),
+    ).resolves.toBeNull();
+
+    await expect(
+      renewChannelReplyLease(db, {
+        jobId: claimed!.id,
+        deviceId,
+        workerId: boundWorkerId,
+        claimTokenHash: "2".repeat(64),
+        leaseExpiresAt: at(26),
+      }),
+    ).resolves.toBeNull();
+    await db.prepare(
+      `update briar_channel_agent_reply_jobs
+       set claimed_worker_id = ? where id = ?`,
+    ).bind(boundWorkerId, claimed!.id).run();
+
+    await db.prepare(
+      `update briar_execution_workers set state = 'disabled' where id = ?`,
+    ).bind(boundWorkerId).run();
+    await expect(
+      getClaimedChannelReply(db, {
+        jobId: claimed!.id,
+        deviceId,
+        workerId: boundWorkerId,
+        claimTokenHash: "2".repeat(64),
+      }),
+    ).resolves.toBeNull();
+    await expect(
+      renewChannelReplyLease(db, {
+        jobId: claimed!.id,
+        deviceId,
+        workerId: boundWorkerId,
+        claimTokenHash: "2".repeat(64),
+        leaseExpiresAt: at(27),
+      }),
+    ).resolves.toBeNull();
+    await expect(
+      completeChannelReply(db, claimed!, {
+        jobId: claimed!.id,
+        deviceId,
+        workerId: boundWorkerId,
+        claimTokenHash: "2".repeat(64),
+        body: "Disabled Worker output",
+        document: null,
+        issueProposal: null,
+        agentName: "Bumble",
+        agentProvider: "claude",
+        completedAt: at(16),
+      }),
+    ).resolves.toBeNull();
+    await db.prepare(
+      `update briar_execution_workers set state = 'online' where id = ?`,
+    ).bind(boundWorkerId).run();
+
+    await expect(
+      completeChannelReply(db, claimed!, {
+        jobId: claimed!.id,
+        deviceId,
+        workerId: boundWorkerId,
+        claimTokenHash: "2".repeat(64),
+        body: "I cannot target another project.",
+        document: null,
+        issueProposal: {
+          projectId: otherProjectId,
+          issue: {
+            title: "Wrong project",
+            description: null,
+            priority: null,
+            status: "backlog",
+          },
+        },
+        agentName: "Bumble",
+        agentProvider: "claude",
+        completedAt: at(16),
+      }),
+    ).rejects.toThrow("must target its claimed project");
+
+    await db.prepare(
+      `update briar_channel_agent_reply_jobs
+       set claim_token_hash = ? where id = ?`,
+    ).bind("9".repeat(64), claimed!.id).run();
+    await expect(
+      completeChannelReply(db, claimed!, {
+        jobId: claimed!.id,
+        deviceId,
+        workerId: boundWorkerId,
+        claimTokenHash: "2".repeat(64),
+        body: "Stale claimant output",
+        document: null,
+        issueProposal: null,
+        agentName: "Bumble",
+        agentProvider: "claude",
+        completedAt: at(16),
+      }),
+    ).resolves.toBeNull();
+    await expect(
+      getChannelMessage(db, channelId, claimed!.reply_message_id),
+    ).resolves.toBeNull();
+    await db.prepare(
+      `update briar_channel_agent_reply_jobs
+       set claim_token_hash = ? where id = ?`,
+    ).bind("2".repeat(64), claimed!.id).run();
 
     const failed = await failChannelReply(db, {
       jobId: claimed!.id,
+      deviceId,
+      workerId: boundWorkerId,
       claimTokenHash: "2".repeat(64),
       error: "provider unavailable",
       updatedAt: at(16),
     });
     // The first failure returns the job to the queue rather than burning it.
-    expect(failed).toMatchObject({ status: "queued", attempts: 1 });
+    expect(failed).toMatchObject({
+      status: "queued",
+      attempts: 1,
+      claimed_device_id: null,
+      claimed_worker_id: null,
+    });
   });
 
   it("skips a provider the claiming device cannot run", async () => {
@@ -726,6 +941,7 @@ describe("organization channels", () => {
     expect(
       await claimNextChannelAgentReply(db, organizationId, {
         deviceId,
+        workerId: otherWorkerId,
         providers: ["grok"],
         claimTokenHash: "3".repeat(64),
         claimedAt: at(19),

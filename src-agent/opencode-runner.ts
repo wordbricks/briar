@@ -30,6 +30,11 @@ import {
   type OpenCodeRunnerRequest,
 } from "./opencode-runner-lib";
 import { createRunnerIo } from "./runner-io";
+import {
+  providerInstructionSeatbeltPattern,
+  readOnlySeatbeltProfile,
+  readOnlySeatbeltSpawnSpec,
+} from "./read-only-seatbelt";
 
 class OpenCodeBlockedError extends Error {
   constructor(readonly blocker: OpenCodeBlockedRetry) {
@@ -67,6 +72,59 @@ function stopOpenCodeProcess(child: ChildProcessWithoutNullStreams) {
   child.kill();
 }
 
+export function openCodeServerArgs(port: number, pure: boolean) {
+  return [
+    "serve",
+    ...(pure ? ["--pure"] : []),
+    "--hostname=127.0.0.1",
+    `--port=${port}`,
+  ];
+}
+
+export function openCodeReadOnlySeatbeltProfile(input: {
+  workspaceRoot: string;
+  stateRoot: string;
+  executablePaths: string[];
+}) {
+  return readOnlySeatbeltProfile({
+    ...input,
+    deniedPathPatterns: [
+      providerInstructionSeatbeltPattern,
+      "/(?:opencode[.]jsonc?|[.]opencode)(?:/.*)?$",
+    ],
+  });
+}
+
+export function openCodeServerSpawnSpec(input: {
+  binary: string;
+  arguments: string[];
+  workspaceRoot: string;
+  environment: NodeJS.ProcessEnv;
+  readOnly: boolean;
+  platform?: NodeJS.Platform;
+}) {
+  if (!input.readOnly) {
+    return { command: input.binary, arguments: input.arguments };
+  }
+  const stateRoot = input.environment.HOME;
+  if (!stateRoot) {
+    throw new Error("OpenCode read-only state is not isolated");
+  }
+  return readOnlySeatbeltSpawnSpec({
+    providerName: "OpenCode",
+    binary: input.binary,
+    arguments: input.arguments,
+    workspaceRoot: input.workspaceRoot,
+    stateRoot,
+    readOnly: true,
+    deniedPathPatterns: [
+      providerInstructionSeatbeltPattern,
+      "/(?:opencode[.]jsonc?|[.]opencode)(?:/.*)?$",
+    ],
+    platform: input.platform,
+  });
+}
+
 class OpenCodeServer {
   private constructor(
     readonly child: ChildProcessWithoutNullStreams,
@@ -77,11 +135,20 @@ class OpenCodeServer {
     binary: string,
     workspaceRoot: string,
     environment: NodeJS.ProcessEnv,
+    pure: boolean,
   ): Promise<OpenCodeServer> {
     const port = await availablePort();
-    const child = spawn(
+    const serverArgs = openCodeServerArgs(port, pure);
+    const spawnSpec = openCodeServerSpawnSpec({
       binary,
-      ["serve", "--hostname=127.0.0.1", `--port=${port}`],
+      arguments: serverArgs,
+      workspaceRoot,
+      environment,
+      readOnly: pure,
+    });
+    const child = spawn(
+      spawnSpec.command,
+      spawnSpec.arguments,
       {
         cwd: workspaceRoot,
         env: { ...environment, OPENCODE_CONFIG_CONTENT: "{}" },
@@ -218,6 +285,7 @@ async function main(runnerIo: OpenCodeRunnerIo) {
     request.opencodeBinary,
     request.workspaceRoot,
     process.env,
+    request.sandboxMode === "readOnly",
   );
   try {
     const client = createOpencodeClient({
