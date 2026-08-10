@@ -29,21 +29,6 @@ export function MainContent({
   );
 }
 
-export function PageScroll({
-  children,
-  className,
-  ...props
-}: HTMLAttributes<HTMLDivElement>) {
-  return (
-    <div
-      className={cn("min-h-0 flex-1 overflow-auto", className)}
-      {...props}
-    >
-      {children}
-    </div>
-  );
-}
-
 export function PageHeader({
   action,
   className,
@@ -202,42 +187,6 @@ export function ErrorBanner({
     >
       {icon}
       <span className="min-w-0">{children}</span>
-    </div>
-  );
-}
-
-export function SectionCard({
-  children,
-  className,
-  ...props
-}: HTMLAttributes<HTMLElement>) {
-  return (
-    <section
-      className={cn(
-        "rounded-xl border border-border bg-card text-card-foreground shadow-xs",
-        className,
-      )}
-      {...props}
-    >
-      {children}
-    </section>
-  );
-}
-
-export function Toolbar({
-  children,
-  className,
-  ...props
-}: HTMLAttributes<HTMLDivElement>) {
-  return (
-    <div
-      className={cn(
-        "flex flex-wrap items-center gap-2",
-        className,
-      )}
-      {...props}
-    >
-      {children}
     </div>
   );
 }

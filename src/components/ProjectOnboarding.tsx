@@ -14,7 +14,7 @@ import {
   Sparkles,
   Wrench,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 import type { ProjectConnection } from "../hooks/useBriar";
 import { ApiError, apiErrorIssueMessages } from "../lib/api";
 import type {
@@ -121,6 +121,35 @@ function WorkflowPreview({ workflow }: { workflow: AutoHuntWorkflow }) {
         </li>
       ))}
     </ol>
+  );
+}
+
+function OnboardingProviderProgress({
+  progress,
+  progressMessageRef,
+}: {
+  progress: ProjectLlmProgress | null;
+  progressMessageRef: RefObject<HTMLParagraphElement | null>;
+}) {
+  const { t } = useI18n();
+
+  return (
+    <div
+      aria-atomic="true"
+      aria-live="polite"
+      className="onboarding-provider-progress"
+      role="status"
+    >
+      <span>
+        <i aria-hidden="true" />
+        {progress
+          ? agentProviderLabels[progress.provider]
+          : t("onboarding.workflowProviderProgress")}
+      </span>
+      <p ref={progressMessageRef}>
+        {progress?.message ?? t("onboarding.workflowProviderWaiting")}
+      </p>
+    </div>
   );
 }
 
@@ -573,23 +602,10 @@ export function ProjectOnboarding({
                     <span className="onboarding-process-icon"><LoaderCircle className="spin" size={27} /></span>
                     <h1>{t("onboarding.generatingWorkflowTitle")}</h1>
                     <p>{t("onboarding.generatingWorkflowDescription")}</p>
-                    <div
-                      aria-atomic="true"
-                      aria-live="polite"
-                      className="onboarding-provider-progress"
-                      role="status"
-                    >
-                      <span>
-                        <i aria-hidden="true" />
-                        {workflowProgress
-                          ? agentProviderLabels[workflowProgress.provider]
-                          : t("onboarding.workflowProviderProgress")}
-                      </span>
-                      <p ref={workflowProgressMessage}>
-                        {workflowProgress?.message ??
-                          t("onboarding.workflowProviderWaiting")}
-                      </p>
-                    </div>
+                    <OnboardingProviderProgress
+                      progress={workflowProgress}
+                      progressMessageRef={workflowProgressMessage}
+                    />
                   </>
                 )}
               </section>
@@ -642,23 +658,10 @@ export function ProjectOnboarding({
                     <span className="onboarding-process-icon"><Cpu className="pulse" size={27} /></span>
                     <h1>{t("onboarding.analyzingToolsTitle")}</h1>
                     <p>{t("onboarding.analyzingToolsDescription")}</p>
-                    <div
-                      aria-atomic="true"
-                      aria-live="polite"
-                      className="onboarding-provider-progress"
-                      role="status"
-                    >
-                      <span>
-                        <i aria-hidden="true" />
-                        {workflowProgress
-                          ? agentProviderLabels[workflowProgress.provider]
-                          : t("onboarding.workflowProviderProgress")}
-                      </span>
-                      <p ref={workflowProgressMessage}>
-                        {workflowProgress?.message ??
-                          t("onboarding.workflowProviderWaiting")}
-                      </p>
-                    </div>
+                    <OnboardingProviderProgress
+                      progress={workflowProgress}
+                      progressMessageRef={workflowProgressMessage}
+                    />
                   </>
                 )}
               </section>

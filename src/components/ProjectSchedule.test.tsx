@@ -217,6 +217,75 @@ describe("ProjectSchedule", () => {
     ).toBe("scheduled");
   });
 
+  it("assigns occurrence lanes with the same ordering and cluster boundaries as runs", () => {
+    const agent: ProjectAgent = {
+      id: "77777777-7777-4777-8777-777777777777",
+      projectId: demoDashboard.project.id,
+      name: "Overlap agent",
+      avatar: null,
+      codexPet: null,
+      provider: "codex",
+      model: null,
+      effort: null,
+      responsibility: "Run overlapping calendar work.",
+      skill: "# Overlap agent\n\nRun overlapping calendar work.",
+      skills: [],
+      calendarColor: "#8b5cf6",
+      createdAt: "2026-07-26T00:00:00.000Z",
+      updatedAt: "2026-07-26T00:00:00.000Z",
+    };
+    const schedule = (
+      id: string,
+      timeOfDay: string,
+    ): ProjectAgentSchedule => ({
+      id,
+      projectId: demoDashboard.project.id,
+      agentId: agent.id,
+      agentName: agent.name,
+      agentProvider: agent.provider,
+      name: `Schedule ${id}`,
+      recurrence: "daily",
+      timeOfDay,
+      dayOfWeek: null,
+      timeZone: "Asia/Seoul",
+      enabled: true,
+      createdAt: agent.createdAt,
+      updatedAt: agent.updatedAt,
+    });
+    const schedules = [
+      schedule("schedule-a", "09:00"),
+      schedule("schedule-b", "09:00"),
+      schedule("schedule-c", "09:30"),
+    ];
+
+    const segments = scheduleOccurrenceSegmentsForWeek(
+      schedules,
+      [],
+      [agent],
+      weekStart,
+      now,
+    )
+      .flat()
+      .filter((segment) =>
+        [
+          "2026-07-27T00:00:00.000Z",
+          "2026-07-27T00:30:00.000Z",
+        ].includes(segment.start.toISOString()),
+      );
+
+    expect(
+      segments.map((segment) => ({
+        scheduleId: segment.schedule.id,
+        lane: segment.lane,
+        laneCount: segment.laneCount,
+      })),
+    ).toEqual([
+      { scheduleId: "schedule-a", lane: 0, laneCount: 2 },
+      { scheduleId: "schedule-b", lane: 1, laneCount: 2 },
+      { scheduleId: "schedule-c", lane: 0, laneCount: 1 },
+    ]);
+  });
+
   it("renders the calendar shell, live time, and week controls", () => {
     const markup = renderToStaticMarkup(
       <I18nProvider>

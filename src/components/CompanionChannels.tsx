@@ -42,6 +42,7 @@ import {
   ChannelDraftImages,
   ChannelMessageImages,
 } from "./ChannelImages";
+import { ChannelMentionMenu } from "./ChannelMentionMenu";
 import { ChannelMessageText } from "./ChannelMessageText";
 
 type CompanionChannelsProps = {
@@ -722,43 +723,15 @@ export function CompanionChannelComposer({
       onSubmit={handleSubmit}
     >
       {showsSuggestions ? (
-        <ul
-          aria-label={t("run.mention")}
-          className="companion-channel-mention-menu"
+        <ChannelMentionMenu
+          activeSuggestionIndex={activeSuggestionIndex}
+          ariaLabel={t("run.mention")}
           id={mentionListId}
-          role="listbox"
-        >
-          {suggestions.map((target, index) => (
-            <li key={`${target.type}:${target.id}`}>
-              <button
-                aria-selected={index === activeSuggestionIndex}
-                className={index === activeSuggestionIndex ? "active" : undefined}
-                id={`${mentionListId}-option-${index}`}
-                onClick={() => pickSuggestion(target)}
-                onMouseEnter={() => setActiveSuggestionIndex(index)}
-                role="option"
-                type="button"
-              >
-                {target.image ? (
-                  <img alt="" src={target.image} />
-                ) : (
-                  <span className={`companion-channel-mention-avatar ${target.type}`}>
-                    {target.type === "agent" ? (
-                      <Bot size={16} />
-                    ) : (
-                      target.label.trim().charAt(0).toUpperCase() || "?"
-                    )}
-                  </span>
-                )}
-                <span className="companion-channel-mention-copy">
-                  <strong>{target.label}</strong>
-                  <small>@{target.handle}</small>
-                </span>
-                <em>{target.detail}</em>
-              </button>
-            </li>
-          ))}
-        </ul>
+          onActiveSuggestionIndexChange={setActiveSuggestionIndex}
+          onPickSuggestion={pickSuggestion}
+          suggestions={suggestions}
+          variant="companion"
+        />
       ) : null}
       <ChannelDraftImages images={images} onRemove={removeImage} />
       <button

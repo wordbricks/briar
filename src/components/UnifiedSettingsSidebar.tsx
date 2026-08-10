@@ -10,7 +10,14 @@ import {
   SlidersHorizontal,
   Users,
 } from "lucide-react";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type Dispatch,
+  type ReactNode,
+  type SetStateAction,
+} from "react";
 
 import {
   SettingsBackButton,
@@ -49,6 +56,114 @@ type NavigationItem<Section extends string> = {
   icon: ReactNode;
   label: string;
 };
+
+function SettingsTreeGroup<
+  Entity extends { id: string; name: string },
+  Section extends string,
+>({
+  activeEntityId,
+  activeSection,
+  defaultSection,
+  entities,
+  expandedId,
+  groupLabel,
+  items,
+  normalizedQuery,
+  onExpandedIdChange,
+  onNavigate,
+  renderEntityIcon,
+  scope,
+  targetFor,
+}: {
+  activeEntityId: string | null;
+  activeSection: Section | null;
+  defaultSection: Section;
+  entities: Entity[];
+  expandedId: string | null;
+  groupLabel: string;
+  items: NavigationItem<Section>[];
+  normalizedQuery: string;
+  onExpandedIdChange: Dispatch<SetStateAction<string | null>>;
+  onNavigate: (target: UnifiedSettingsTarget) => void;
+  renderEntityIcon: (entity: Entity) => ReactNode;
+  scope: "organization" | "project";
+  targetFor: (entity: Entity, section: Section) => UnifiedSettingsTarget;
+}) {
+  const matches = (value: string) =>
+    !normalizedQuery || value.toLocaleLowerCase().includes(normalizedQuery);
+  const sectionMatches = items.some((item) => matches(item.label));
+  const visibleEntities = entities.filter(
+    (entity) =>
+      matches(entity.name) || matches(groupLabel) || sectionMatches,
+  );
+
+  if (visibleEntities.length === 0) return null;
+
+  return (
+    <SettingsNavGroup label={groupLabel}>
+      {visibleEntities.map((entity) => {
+        const expanded = expandedId === entity.id || Boolean(normalizedQuery);
+        const active = activeEntityId === entity.id;
+        const parentDataAttributes = {
+          [`data-${scope}-settings`]: entity.id,
+        };
+        return (
+          <div className="settings-nav-tree" key={entity.id}>
+            <SettingsNavItem
+              active={active && !expanded}
+              aria-expanded={expanded}
+              className="settings-nav-parent [&>span:last-child]:flex [&>span:last-child]:flex-1"
+              icon={renderEntityIcon(entity)}
+              onClick={() => {
+                onExpandedIdChange((current) =>
+                  current === entity.id ? null : entity.id,
+                );
+                if (!active) onNavigate(targetFor(entity, defaultSection));
+              }}
+              {...parentDataAttributes}
+            >
+              <span className="flex min-w-0 flex-1 items-center">
+                <span className="truncate">{entity.name}</span>
+                <ChevronDown
+                  aria-hidden="true"
+                  className={cn(
+                    "ml-auto size-3.5 shrink-0 transition-transform",
+                    expanded && "rotate-180",
+                  )}
+                />
+              </span>
+            </SettingsNavItem>
+            {expanded ? (
+              <div className="settings-nav-children">
+                {items
+                  .filter(
+                    (item) => matches(entity.name) || matches(item.label),
+                  )
+                  .map((item) => {
+                    const sectionDataAttributes = {
+                      [`data-${scope}-settings-section`]: item.id,
+                    };
+                    return (
+                      <SettingsNavItem
+                        active={active && activeSection === item.id}
+                        className="pl-8"
+                        icon={item.icon}
+                        key={item.id}
+                        onClick={() => onNavigate(targetFor(entity, item.id))}
+                        {...sectionDataAttributes}
+                      >
+                        {item.label}
+                      </SettingsNavItem>
+                    );
+                  })}
+              </div>
+            ) : null}
+          </div>
+        );
+      })}
+    </SettingsNavGroup>
+  );
+}
 
 export function UnifiedSettingsSidebar({
   activeTarget,
@@ -168,24 +283,6 @@ export function UnifiedSettingsSidebar({
   const filteredApplicationItems = applicationItems.filter((item) =>
     matches(item.label),
   );
-  const organizationSectionMatches = organizationItems.some((item) =>
-    matches(item.label),
-  );
-  const visibleOrganizations = organizations.filter(
-    (organization) =>
-      matches(organization.name) ||
-      matches(t("organization.settingsLabel")) ||
-      organizationSectionMatches,
-  );
-  const projectSectionMatches = projectItems.some((item) =>
-    matches(item.label),
-  );
-  const visibleProjects = projects.filter(
-    (project) =>
-      matches(project.name) ||
-      matches(t("settings.title")) ||
-      projectSectionMatches,
-  );
 
   return (
     <SettingsSidebar isOpen={isOpen} label={t("appSettings.navigation")}>
@@ -222,152 +319,59 @@ export function UnifiedSettingsSidebar({
           </SettingsNavGroup>
         ) : null}
 
-        {visibleOrganizations.length > 0 ? (
-          <SettingsNavGroup label={t("organization.settingsLabel")}>
-            {visibleOrganizations.map((organization) => {
-              const expanded =
-                expandedOrganizationId === organization.id ||
-                Boolean(normalizedQuery);
-              const active =
-                activeTarget.scope === "organization" &&
-                activeTarget.organizationId === organization.id;
-              return (
-                <div className="settings-nav-tree" key={organization.id}>
-                  <SettingsNavItem
-                    active={active && !expanded}
-                    aria-expanded={expanded}
-                    className="settings-nav-parent [&>span:last-child]:flex [&>span:last-child]:flex-1"
-                    data-organization-settings={organization.id}
-                    icon={<Building2 size={16} strokeWidth={1.75} />}
-                    onClick={() => {
-                      setExpandedOrganizationId((current) =>
-                        current === organization.id ? null : organization.id,
-                      );
-                      if (!active) {
-                        onNavigate({
-                          scope: "organization",
-                          organizationId: organization.id,
-                          section: "general",
-                        });
-                      }
-                    }}
-                  >
-                    <span className="flex min-w-0 flex-1 items-center">
-                      <span className="truncate">{organization.name}</span>
-                      <ChevronDown
-                        aria-hidden="true"
-                        className={cn(
-                          "ml-auto size-3.5 shrink-0 transition-transform",
-                          expanded && "rotate-180",
-                        )}
-                      />
-                    </span>
-                  </SettingsNavItem>
-                  {expanded ? (
-                    <div className="settings-nav-children">
-                      {organizationItems
-                        .filter(
-                          (item) =>
-                            matches(organization.name) || matches(item.label),
-                        )
-                        .map((item) => (
-                          <SettingsNavItem
-                            active={active && activeTarget.section === item.id}
-                            className="pl-8"
-                            data-organization-settings-section={item.id}
-                            icon={item.icon}
-                            key={item.id}
-                            onClick={() =>
-                              onNavigate({
-                                scope: "organization",
-                                organizationId: organization.id,
-                                section: item.id,
-                              })
-                            }
-                          >
-                            {item.label}
-                          </SettingsNavItem>
-                        ))}
-                    </div>
-                  ) : null}
-                </div>
-              );
-            })}
-          </SettingsNavGroup>
-        ) : null}
+        <SettingsTreeGroup
+          activeEntityId={
+            activeTarget.scope === "organization"
+              ? activeTarget.organizationId
+              : null
+          }
+          activeSection={
+            activeTarget.scope === "organization" ? activeTarget.section : null
+          }
+          defaultSection="general"
+          entities={organizations}
+          expandedId={expandedOrganizationId}
+          groupLabel={t("organization.settingsLabel")}
+          items={organizationItems}
+          normalizedQuery={normalizedQuery}
+          onExpandedIdChange={setExpandedOrganizationId}
+          onNavigate={onNavigate}
+          renderEntityIcon={() => (
+            <Building2 size={16} strokeWidth={1.75} />
+          )}
+          scope="organization"
+          targetFor={(organization, section) => ({
+            scope: "organization",
+            organizationId: organization.id,
+            section,
+          })}
+        />
 
-        {visibleProjects.length > 0 ? (
-          <SettingsNavGroup label={t("settings.title")}>
-            {visibleProjects.map((project) => {
-              const expanded =
-                expandedProjectId === project.id || Boolean(normalizedQuery);
-              const active =
-                activeTarget.scope === "project" &&
-                activeTarget.projectId === project.id;
-              return (
-                <div className="settings-nav-tree" key={project.id}>
-                  <SettingsNavItem
-                    active={active && !expanded}
-                    aria-expanded={expanded}
-                    className="settings-nav-parent [&>span:last-child]:flex [&>span:last-child]:flex-1"
-                    data-project-settings={project.id}
-                    icon={<ProjectIcon className="size-4" project={project} />}
-                    onClick={() => {
-                      setExpandedProjectId((current) =>
-                        current === project.id ? null : project.id,
-                      );
-                      if (!active) {
-                        onNavigate({
-                          scope: "project",
-                          projectId: project.id,
-                          section: "general",
-                        });
-                      }
-                    }}
-                  >
-                    <span className="flex min-w-0 flex-1 items-center">
-                      <span className="truncate">{project.name}</span>
-                      <ChevronDown
-                        aria-hidden="true"
-                        className={cn(
-                          "ml-auto size-3.5 shrink-0 transition-transform",
-                          expanded && "rotate-180",
-                        )}
-                      />
-                    </span>
-                  </SettingsNavItem>
-                  {expanded ? (
-                    <div className="settings-nav-children">
-                      {projectItems
-                        .filter(
-                          (item) =>
-                            matches(project.name) || matches(item.label),
-                        )
-                        .map((item) => (
-                          <SettingsNavItem
-                            active={active && activeTarget.section === item.id}
-                            className="pl-8"
-                            data-project-settings-section={item.id}
-                            icon={item.icon}
-                            key={item.id}
-                            onClick={() =>
-                              onNavigate({
-                                scope: "project",
-                                projectId: project.id,
-                                section: item.id,
-                              })
-                            }
-                          >
-                            {item.label}
-                          </SettingsNavItem>
-                        ))}
-                    </div>
-                  ) : null}
-                </div>
-              );
-            })}
-          </SettingsNavGroup>
-        ) : null}
+        <SettingsTreeGroup
+          activeEntityId={
+            activeTarget.scope === "project" ? activeTarget.projectId : null
+          }
+          activeSection={
+            activeTarget.scope === "project" ? activeTarget.section : null
+          }
+          defaultSection="general"
+          entities={projects}
+          expandedId={expandedProjectId}
+          groupLabel={t("settings.title")}
+          items={projectItems}
+          normalizedQuery={normalizedQuery}
+          onExpandedIdChange={setExpandedProjectId}
+          onNavigate={onNavigate}
+          renderEntityIcon={(project) => (
+            <ProjectIcon className="size-4" project={project} />
+          )}
+          scope="project"
+          targetFor={(project, section) => ({
+            scope: "project",
+            projectId: project.id,
+            section,
+          })}
+        />
       </SettingsNav>
     </SettingsSidebar>
   );

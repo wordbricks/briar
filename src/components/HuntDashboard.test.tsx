@@ -2075,6 +2075,11 @@ describe("HuntDashboard", () => {
       ".run-page-conversation-resizer",
     );
     expect(resizer).not.toBeNull();
+    expect(resizer?.getAttribute("role")).toBe("separator");
+    expect(resizer?.getAttribute("aria-orientation")).toBe("vertical");
+    expect(resizer?.getAttribute("aria-valuemin")).toBe("30");
+    expect(resizer?.getAttribute("aria-valuemax")).toBe("65");
+    expect(resizer?.getAttribute("aria-valuenow")).toBe("38");
     const layout = container.querySelector<HTMLElement>(".run-page-layout");
     expect(layout?.style.getPropertyValue("--run-conversation-pane-width")).toBe(
       "",

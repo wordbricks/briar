@@ -51,6 +51,13 @@ type ExecutionWindow = {
   end: Date;
 };
 
+type LaneSegment = {
+  startMinute: number;
+  endMinute: number;
+  lane: number;
+  laneCount: number;
+};
+
 export function startOfCalendarWeek(value: Date) {
   const start = new Date(value);
   start.setHours(0, 0, 0, 0);
@@ -98,13 +105,13 @@ export function minutesIntoCalendarDay(value: Date) {
   );
 }
 
-function assignLanes(segments: ScheduleSegment[]) {
+function assignSegmentLanes<Segment extends LaneSegment>(segments: Segment[]) {
   const sorted = [...segments].sort(
     (left, right) =>
       left.startMinute - right.startMinute ||
       left.endMinute - right.endMinute,
   );
-  let cluster: ScheduleSegment[] = [];
+  let cluster: Segment[] = [];
   let clusterEnd = -1;
   let laneEnds: number[] = [];
 
@@ -190,7 +197,7 @@ export function scheduleSegmentsForWeek(
     }
   }
 
-  return byDay.map(assignLanes);
+  return byDay.map(assignSegmentLanes);
 }
 
 function occurrenceKey(scheduleId: string, scheduledFor: string | Date) {
@@ -208,41 +215,6 @@ function occurrenceStatus(
   if (run?.status === "failed") return "failed";
   if (run?.status === "running") return "running";
   return scheduledFor.getTime() < now.getTime() ? "missed" : "scheduled";
-}
-
-function assignOccurrenceLanes(segments: ScheduleOccurrenceSegment[]) {
-  const sorted = [...segments].sort(
-    (left, right) =>
-      left.startMinute - right.startMinute ||
-      left.endMinute - right.endMinute,
-  );
-  let cluster: ScheduleOccurrenceSegment[] = [];
-  let clusterEnd = -1;
-  let laneEnds: number[] = [];
-
-  const finishCluster = () => {
-    const laneCount = Math.max(1, laneEnds.length);
-    for (const segment of cluster) segment.laneCount = laneCount;
-    cluster = [];
-    clusterEnd = -1;
-    laneEnds = [];
-  };
-
-  for (const segment of sorted) {
-    if (cluster.length > 0 && segment.startMinute >= clusterEnd) {
-      finishCluster();
-    }
-    const availableLane = laneEnds.findIndex(
-      (laneEnd) => laneEnd <= segment.startMinute,
-    );
-    const lane = availableLane === -1 ? laneEnds.length : availableLane;
-    laneEnds[lane] = segment.endMinute;
-    segment.lane = lane;
-    cluster.push(segment);
-    clusterEnd = Math.max(clusterEnd, segment.endMinute);
-  }
-  finishCluster();
-  return sorted;
 }
 
 export function scheduleOccurrenceSegmentsForWeek(
@@ -332,5 +304,5 @@ export function scheduleOccurrenceSegmentsForWeek(
     }
   }
 
-  return byDay.map(assignOccurrenceLanes);
+  return byDay.map(assignSegmentLanes);
 }
