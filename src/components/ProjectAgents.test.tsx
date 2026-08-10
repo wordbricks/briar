@@ -220,9 +220,26 @@ describe("ProjectAgents", () => {
         'button[aria-label="Sentry 오류 탐지 에이전트 세부 정보 열기"]',
       )?.textContent,
     ).toContain("준비됨");
+
+    const runButton = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="개발자 에이전트 스킬 실행"]',
+    );
+    expect(runButton?.disabled).toBe(false);
+
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>(
+          'button[aria-label="개발자 에이전트 세부 정보 열기"]',
+        )
+        ?.click();
+    });
+    expect(
+      container.querySelector<HTMLButtonElement>(".project-agent-run-task")
+        ?.disabled,
+    ).toBe(false);
   });
 
-  it("opens a Skill picker and runs the selected Skill from the play button", async () => {
+  it("starts another Skill run before the first one finishes", async () => {
     let finishRun:
       | ((value: Awaited<ReturnType<typeof runProjectAgent>>) => void)
       | undefined;
@@ -301,7 +318,39 @@ describe("ProjectAgents", () => {
       }),
     );
     expect(document.querySelector('[role="dialog"]')).toBeNull();
-    expect(runButton?.disabled).toBe(true);
+    expect(runButton?.disabled).toBe(false);
+
+    await act(async () => {
+      runButton?.click();
+      await Promise.resolve();
+    });
+    await act(async () => {
+      document
+        .querySelector<HTMLButtonElement>('.native-select button[aria-label="스킬"]')
+        ?.click();
+    });
+    await act(async () => {
+      document
+        .querySelector<HTMLButtonElement>(
+          '.select-menu-option[data-value="demo-skill-issue-processing"]',
+        )
+        ?.click();
+    });
+    await act(async () => {
+      document
+        .querySelector<HTMLFormElement>("#project-agent-task-form")
+        ?.dispatchEvent(
+          new Event("submit", { bubbles: true, cancelable: true }),
+        );
+      await Promise.resolve();
+    });
+
+    const secondSession = onStartTaskSession.mock.calls[1]?.[1];
+    expect(runProjectAgent).toHaveBeenCalledTimes(2);
+    expect(secondSession?.sessionId).not.toBe(startedSession.sessionId);
+    expect(runProjectAgent).toHaveBeenLastCalledWith(
+      expect.objectContaining({ sessionId: secondSession?.sessionId }),
+    );
 
     await act(async () => {
       finishRun?.({
@@ -326,6 +375,7 @@ describe("ProjectAgents", () => {
     });
 
     expect(onStart).not.toHaveBeenCalled();
+    expect(onSettleTaskSession).toHaveBeenCalledTimes(2);
     expect(onSettleTaskSession).toHaveBeenCalledWith(
       startedSession.sessionId,
       {

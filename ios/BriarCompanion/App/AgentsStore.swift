@@ -3,7 +3,6 @@ import Foundation
 enum AgentsStoreError: LocalizedError, Equatable {
     case notConfigured
     case noQueuedIssues
-    case duplicateExecution
 
     var errorDescription: String? {
         switch self {
@@ -11,8 +10,6 @@ enum AgentsStoreError: LocalizedError, Equatable {
             "프로젝트와 로그인 정보가 준비되지 않았습니다."
         case .noQueuedIssues:
             "실행할 준비가 된 queued 이슈가 없습니다."
-        case .duplicateExecution:
-            "이 Agent는 이미 실행 중입니다."
         }
     }
 }
@@ -24,7 +21,11 @@ final class AgentsStore: ObservableObject {
     @Published private(set) var isRefreshing = false
     @Published private(set) var errorMessage: String?
     @Published private(set) var executionError: String?
-    @Published private(set) var executingAgentIDs: Set<UUID> = []
+    @Published private var executingAgentCounts: [UUID: Int] = [:]
+
+    var executingAgentIDs: Set<UUID> {
+        Set(executingAgentCounts.keys)
+    }
 
     private let api: any MobileAPIClientProtocol
     private let pollInterval: Duration
@@ -51,7 +52,7 @@ final class AgentsStore: ObservableObject {
         sessions = []
         errorMessage = nil
         executionError = nil
-        executingAgentIDs = []
+        executingAgentCounts = [:]
         guard projectID != nil, token != nil else { return }
         Task { await refresh() }
         startPolling()
@@ -112,11 +113,8 @@ final class AgentsStore: ObservableObject {
         else {
             throw MobileAPIError.invalidRequest
         }
-        guard executingAgentIDs.insert(agent.id).inserted else {
-            executionError = AgentsStoreError.duplicateExecution.localizedDescription
-            throw AgentsStoreError.duplicateExecution
-        }
-        defer { executingAgentIDs.remove(agent.id) }
+        beginExecution(agent.id)
+        defer { endExecution(agent.id) }
 
         executionError = nil
         do {
@@ -159,11 +157,8 @@ final class AgentsStore: ObservableObject {
             executionError = AgentsStoreError.notConfigured.localizedDescription
             throw AgentsStoreError.notConfigured
         }
-        guard executingAgentIDs.insert(agent.id).inserted else {
-            executionError = AgentsStoreError.duplicateExecution.localizedDescription
-            throw AgentsStoreError.duplicateExecution
-        }
-        defer { executingAgentIDs.remove(agent.id) }
+        beginExecution(agent.id)
+        defer { endExecution(agent.id) }
 
         executionError = nil
         let candidates = Self.selectQueuedRuns(runs, maxIssues: maxIssues)
@@ -344,7 +339,20 @@ final class AgentsStore: ObservableObject {
     }
 
     func isExecuting(_ agentID: UUID) -> Bool {
-        executingAgentIDs.contains(agentID)
+        executingAgentCounts[agentID, default: 0] > 0
+    }
+
+    private func beginExecution(_ agentID: UUID) {
+        executingAgentCounts[agentID, default: 0] += 1
+    }
+
+    private func endExecution(_ agentID: UUID) {
+        let remaining = executingAgentCounts[agentID, default: 0] - 1
+        if remaining > 0 {
+            executingAgentCounts[agentID] = remaining
+        } else {
+            executingAgentCounts.removeValue(forKey: agentID)
+        }
     }
 
     func clearExecutionError() {

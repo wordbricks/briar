@@ -129,7 +129,7 @@ export function ProjectAgents({
   const [selectedAgent, setSelectedAgent] = useState<ProjectAgent | null>(null);
   const [taskDialogAgent, setTaskDialogAgent] =
     useState<ProjectAgent | null>(null);
-  const [executingAgentIds, setExecutingAgentIds] = useState<Set<string>>(
+  const [startingAgentIds, setStartingAgentIds] = useState<Set<string>>(
     () => new Set(),
   );
   const [error, setError] = useState<string | null>(null);
@@ -310,12 +310,11 @@ export function ProjectAgents({
   ) => {
     if (
       !dashboard ||
-      runningAgentIds.has(agent.id) ||
-      executingAgentIds.has(agent.id)
+      startingAgentIds.has(agent.id)
     ) {
       return;
     }
-    setExecutingAgentIds((current) => new Set(current).add(agent.id));
+    setStartingAgentIds((current) => new Set(current).add(agent.id));
     try {
       if (companionMode) {
         if (!onStartRemoteTask || !input.workerId) {
@@ -332,7 +331,14 @@ export function ProjectAgents({
       await executeProjectAgentTask(
         {
           runAgent: runProjectAgent,
-          startSession: (session) => onStartTaskSession(runtimeAgent, session),
+          startSession: (session) => {
+            onStartTaskSession(runtimeAgent, session);
+            setStartingAgentIds((current) => {
+              const next = new Set(current);
+              next.delete(agent.id);
+              return next;
+            });
+          },
           settleSession: onSettleTaskSession,
           startAutoHunt: (runs, options) =>
             onStart(runtimeAgent, runs, options),
@@ -350,7 +356,7 @@ export function ProjectAgents({
         { tone: "error" },
       );
     } finally {
-      setExecutingAgentIds((current) => {
+      setStartingAgentIds((current) => {
         const next = new Set(current);
         next.delete(agent.id);
         return next;
@@ -394,10 +400,7 @@ export function ProjectAgents({
         onStartTaskSession={(session) =>
           onStartTaskSession(selectedAgent, session)}
         requestedSessionId={requestedSessionId}
-        isRunning={
-          runningAgentIds.has(selectedAgent.id) ||
-          executingAgentIds.has(selectedAgent.id)
-        }
+        isStarting={startingAgentIds.has(selectedAgent.id)}
         sessions={sessions}
         token={token}
       />
@@ -475,9 +478,10 @@ export function ProjectAgents({
                 className="project-agent-grid"
               >
                 {agents.map((agent) => {
+                  const isStarting = startingAgentIds.has(agent.id);
                   const isRunning =
                     runningAgentIds.has(agent.id) ||
-                    executingAgentIds.has(agent.id);
+                    isStarting;
                   return (
                     <article className="project-agent-card" key={agent.id}>
                       <button
@@ -565,7 +569,7 @@ export function ProjectAgents({
                           })}
                           className="project-agent-run-button"
                           disabled={
-                            isRunning ||
+                            isStarting ||
                             !dashboard ||
                             agent.skills.length === 0
                           }
@@ -575,7 +579,7 @@ export function ProjectAgents({
                           title={t("agents.runAgent", { name: agent.name })}
                           type="button"
                         >
-                          {isRunning ? (
+                          {isStarting ? (
                             <LoaderCircle
                               aria-hidden="true"
                               className="spin"
@@ -637,7 +641,7 @@ export function ProjectAgents({
         isOpen={taskDialogAgent !== null}
         isSubmitting={
           taskDialogAgent
-            ? executingAgentIds.has(taskDialogAgent.id)
+            ? startingAgentIds.has(taskDialogAgent.id)
             : false
         }
         onOpenChange={(open) => {
