@@ -13,6 +13,7 @@ describe("D1 migrations", () => {
     "0055_agent_provider_opencode.sql",
     "0074_channel_delta_sync.sql",
     "0081_optimize_dashboard_worker_device_sync.sql",
+    "0083_suppress_heartbeat_dashboard_changes.sql",
   ])("keeps each trigger in a separate Wrangler statement: %s", async (name) => {
     const sql = await readFile(resolve("migrations", name), "utf8");
     const statements = unstable_splitSqlQuery(sql);
@@ -179,6 +180,331 @@ describe("D1 migrations", () => {
       expect(details).toContain("briar_execution_workers_device_idx");
       expect(details).toContain("briar_dashboard_changes_project_version_idx");
       expect(details).not.toMatch(/scan briar_dashboard_changes/iu);
+    } finally {
+      await miniflare.dispose();
+    }
+  });
+
+  it("suppresses heartbeat-only dashboard changes without hiding semantic updates", async () => {
+    const miniflare = new Miniflare({
+      modules: true,
+      script: "export default { fetch() { return new Response('ok') } }",
+      d1Databases: { DB: "briar-dashboard-heartbeat-suppression-test" },
+    });
+    try {
+      const db = (await miniflare.getD1Database("DB")) as unknown as D1Database;
+      await executeD1Sql(
+        db,
+        `create table briar_execution_worker_devices (
+           id text primary key not null,
+           organization_id text not null,
+           owner_user_id text not null,
+           label text not null,
+           device_identity_hash text not null,
+           state text not null,
+           max_concurrent_sessions integer not null,
+           icon_type text,
+           icon_value text,
+           last_heartbeat_at text not null,
+           created_at text not null,
+           updated_at text not null
+         );
+         create table briar_execution_workers (
+           id text primary key not null,
+           project_id text not null,
+           device_id text not null,
+           label text not null,
+           host_fingerprint text not null,
+           agent_provider text not null,
+           versions_json text not null,
+           capabilities_json text not null,
+           state text not null,
+           accepting_work integer not null,
+           readiness_state text not null,
+           readiness_detail text,
+           last_heartbeat_at text not null,
+           created_at text not null,
+           updated_at text not null
+         );
+         create unique index briar_execution_workers_project_device_idx
+           on briar_execution_workers (project_id, device_id);
+         create index briar_execution_workers_device_idx
+           on briar_execution_workers (device_id, project_id);
+         create table briar_dashboard_changes (
+           version integer primary key autoincrement,
+           project_id text not null,
+           entity_type text not null,
+           entity_id text,
+           operation text not null,
+           created_at text not null
+         );
+         create index briar_dashboard_changes_project_version_idx
+           on briar_dashboard_changes (project_id, version);
+         create table briar_dashboard_sync_state (
+           project_id text primary key not null,
+           current_version integer not null
+         );
+         create trigger briar_dashboard_workers_update_sync
+         after update on briar_execution_workers BEGIN
+           insert into briar_dashboard_changes (
+             project_id, entity_type, entity_id, operation, created_at
+           ) values (new.project_id, 'worker', new.id, 'upsert', datetime('now'));
+           insert into briar_dashboard_sync_state (project_id, current_version)
+           values (new.project_id, last_insert_rowid())
+           on conflict (project_id) do update set
+             current_version = excluded.current_version;
+         END;
+         create trigger briar_dashboard_worker_devices_update_sync
+         after update on briar_execution_worker_devices BEGIN
+           select new.id;
+         END;`,
+      );
+      await db.prepare(
+        `insert into briar_execution_worker_devices (
+           id, organization_id, owner_user_id, label, device_identity_hash,
+           state, max_concurrent_sessions, icon_type, icon_value,
+           last_heartbeat_at, created_at, updated_at
+         ) values (
+           'device-1', 'organization-1', 'owner-1', 'Worker one',
+           'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+           'online', 2, 'emoji', '🌿',
+           '2026-08-10T00:00:00.000Z', '2026-08-10T00:00:00.000Z',
+           '2026-08-10T00:00:00.000Z'
+         )`,
+      ).run();
+      await db.prepare(
+        `insert into briar_execution_workers (
+           id, project_id, device_id, label, host_fingerprint,
+           agent_provider, versions_json, capabilities_json, state,
+           accepting_work, readiness_state, readiness_detail,
+           last_heartbeat_at, created_at, updated_at
+         ) values
+           (
+             'worker-1', 'project-1', 'device-1', 'Worker one',
+             'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+             'codex', '{"briar":"1.2.94"}',
+             '{"providerHealth":{"codex":{"healthy":true}}}',
+             'online', 1, 'ready', null,
+             '2026-08-10T00:00:00.000Z', '2026-08-10T00:00:00.000Z',
+             '2026-08-10T00:00:00.000Z'
+           ),
+           (
+             'worker-2', 'project-2', 'device-1', 'Worker one',
+             'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+             'codex', '{"briar":"1.2.94"}',
+             '{"providerHealth":{"codex":{"healthy":true}}}',
+             'online', 1, 'ready', null,
+             '2026-08-10T00:00:00.000Z', '2026-08-10T00:00:00.000Z',
+             '2026-08-10T00:00:00.000Z'
+           )`,
+      ).run();
+      await db.prepare(
+        `insert into briar_dashboard_changes (
+           project_id, entity_type, entity_id, operation, created_at
+         ) values
+           ('project-1', 'run', 'run-1', 'upsert', '2026-08-10 00:00:00'),
+           ('project-2', 'run', 'run-2', 'upsert', '2026-08-10 00:00:00')`,
+      ).run();
+      await db.prepare(
+        `insert into briar_dashboard_sync_state (project_id, current_version)
+         values ('project-1', 1), ('project-2', 2)`,
+      ).run();
+      await db.prepare(
+        `with recursive sequence(value) as (
+           select 1
+           union all
+           select value + 1 from sequence where value < 1000
+         )
+         insert into briar_dashboard_changes (
+           project_id, entity_type, entity_id, operation, created_at
+         )
+         select 'project-history', 'run', 'history-' || value, 'upsert',
+                '2026-08-10 00:00:00'
+         from sequence`,
+      ).run();
+
+      for (const name of [
+        "0081_optimize_dashboard_worker_device_sync.sql",
+        "0083_suppress_heartbeat_dashboard_changes.sql",
+      ]) {
+        await executeD1Sql(
+          db,
+          await readFile(resolve("migrations", name), "utf8"),
+        );
+      }
+
+      const triggerDefinitions = await db.prepare(
+        `select name, sql from sqlite_master
+         where type = 'trigger' and name in (
+           'briar_dashboard_workers_update_sync',
+           'briar_dashboard_worker_devices_update_sync'
+         )`,
+      ).all<{ name: string; sql: string }>();
+      const definitions = new Map(
+        triggerDefinitions.results.map((trigger) => [trigger.name, trigger.sql]),
+      );
+      const workerTrigger = definitions.get("briar_dashboard_workers_update_sync") ?? "";
+      for (const field of [
+        "project_id",
+        "device_id",
+        "label",
+        "host_fingerprint",
+        "agent_provider",
+        "versions_json",
+        "capabilities_json",
+        "state",
+        "accepting_work",
+        "readiness_state",
+        "readiness_detail",
+      ]) {
+        expect(workerTrigger).toMatch(
+          new RegExp(`old\\.${field}\\s+is\\s+not\\s+new\\.${field}`, "iu"),
+        );
+      }
+      const deviceTrigger =
+        definitions.get("briar_dashboard_worker_devices_update_sync") ?? "";
+      for (const field of [
+        "organization_id",
+        "owner_user_id",
+        "label",
+        "device_identity_hash",
+        "state",
+        "max_concurrent_sessions",
+        "icon_type",
+        "icon_value",
+      ]) {
+        expect(deviceTrigger).toMatch(
+          new RegExp(`old\\.${field}\\s+is\\s+not\\s+new\\.${field}`, "iu"),
+        );
+      }
+      expect(`${workerTrigger}\n${deviceTrigger}`).not.toMatch(
+        /old\.(last_heartbeat_at|updated_at)\s+is\s+not/iu,
+      );
+      expect(deviceTrigger).toMatch(
+        /order\s+by\s+change\.version\s+desc\s+limit\s+1/iu,
+      );
+      expect(deviceTrigger).toMatch(
+        /max\(briar_dashboard_sync_state\.current_version,\s*excluded\.current_version\)/iu,
+      );
+
+      const readState = async () => {
+        const changes = await db.prepare(
+          `select count(*) as count from briar_dashboard_changes
+           where entity_type = 'worker'`,
+        ).first<{ count: number }>();
+        const cursors = await db.prepare(
+          `select project_id, current_version from briar_dashboard_sync_state
+           order by project_id`,
+        ).all<{ project_id: string; current_version: number }>();
+        return {
+          changes: changes?.count ?? 0,
+          cursors: cursors.results,
+        };
+      };
+      const beforeHeartbeat = await readState();
+      await db.prepare(
+        `update briar_execution_worker_devices
+         set last_heartbeat_at = '2026-08-10T00:01:00.000Z',
+             updated_at = '2026-08-10T00:01:00.000Z',
+             state = case when state = 'disabled' then 'disabled' else 'online' end
+         where id = 'device-1'`,
+      ).run();
+      await db.prepare(
+        `update briar_execution_workers
+         set last_heartbeat_at = '2026-08-10T00:01:00.000Z',
+             updated_at = '2026-08-10T00:01:00.000Z',
+             versions_json = coalesce('{"briar":"1.2.94"}', versions_json),
+             accepting_work = coalesce(1, accepting_work),
+             readiness_state = coalesce('ready', readiness_state),
+             readiness_detail = case when 1 is null
+               then readiness_detail else null end,
+             capabilities_json = coalesce(
+               '{"providerHealth":{"codex":{"healthy":true}}}',
+               capabilities_json
+             ),
+             state = case when state = 'disabled' then 'disabled' else 'online' end
+         where id = 'worker-1' and project_id = 'project-1'`,
+      ).run();
+      expect(await readState()).toEqual(beforeHeartbeat);
+
+      const liveness = await db.prepare(
+        `select device.last_heartbeat_at as device_heartbeat_at,
+                device.updated_at as device_updated_at,
+                device.state as device_state,
+                worker.last_heartbeat_at as worker_heartbeat_at,
+                worker.updated_at as worker_updated_at,
+                worker.state as worker_state
+         from briar_execution_worker_devices device
+         join briar_execution_workers worker on worker.device_id = device.id
+         where device.id = 'device-1' and worker.id = 'worker-1'`,
+      ).first<{
+        device_heartbeat_at: string;
+        device_updated_at: string;
+        device_state: string;
+        worker_heartbeat_at: string;
+        worker_updated_at: string;
+        worker_state: string;
+      }>();
+      expect(liveness).toEqual({
+        device_heartbeat_at: "2026-08-10T00:01:00.000Z",
+        device_updated_at: "2026-08-10T00:01:00.000Z",
+        device_state: "online",
+        worker_heartbeat_at: "2026-08-10T00:01:00.000Z",
+        worker_updated_at: "2026-08-10T00:01:00.000Z",
+        worker_state: "online",
+      });
+
+      await db.prepare(
+        `update briar_execution_workers
+         set capabilities_json =
+               '{"providerHealth":{"codex":{"healthy":true},"claude":{"healthy":true}}}',
+             updated_at = '2026-08-10T00:02:00.000Z'
+         where id = 'worker-1'`,
+      ).run();
+      const afterCapabilities = await readState();
+      expect(afterCapabilities.changes).toBe(beforeHeartbeat.changes + 1);
+      expect(afterCapabilities.cursors[0].current_version).toBeGreaterThan(
+        beforeHeartbeat.cursors[0].current_version,
+      );
+      expect(afterCapabilities.cursors[1]).toEqual(beforeHeartbeat.cursors[1]);
+
+      await db.prepare(
+        `update briar_execution_workers
+         set accepting_work = 0, readiness_state = 'busy',
+             updated_at = '2026-08-10T00:03:00.000Z'
+         where id = 'worker-1'`,
+      ).run();
+      const afterReadiness = await readState();
+      expect(afterReadiness.changes).toBe(afterCapabilities.changes + 1);
+      expect(afterReadiness.cursors[0].current_version).toBeGreaterThan(
+        afterCapabilities.cursors[0].current_version,
+      );
+      expect(afterReadiness.cursors[1]).toEqual(afterCapabilities.cursors[1]);
+
+      const labelUpdate = await db.prepare(
+        `update briar_execution_worker_devices
+         set label = 'Renamed worker',
+             updated_at = '2026-08-10T00:04:00.000Z'
+         where id = 'device-1'`,
+      ).run();
+      expect(labelUpdate.meta.rows_read).toBeLessThan(50);
+      const afterLabel = await readState();
+      expect(afterLabel.changes).toBe(afterReadiness.changes + 2);
+      expect(
+        afterLabel.cursors.every((cursor, index) =>
+          cursor.current_version > afterReadiness.cursors[index].current_version
+        ),
+      ).toBe(true);
+      const published = await db.prepare(
+        `select project_id, entity_id from briar_dashboard_changes
+         where entity_type = 'worker' order by version`,
+      ).all<{ project_id: string; entity_id: string }>();
+      expect(published.results).toEqual([
+        { project_id: "project-1", entity_id: "worker-1" },
+        { project_id: "project-1", entity_id: "worker-1" },
+        { project_id: "project-1", entity_id: "worker-1" },
+        { project_id: "project-2", entity_id: "worker-2" },
+      ]);
     } finally {
       await miniflare.dispose();
     }
