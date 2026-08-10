@@ -8,8 +8,12 @@ final class InboxStore: ObservableObject {
     private var readVersions: [String: String] = [:]
     private var remoteReadVersions: [String: String] = [:]
     private var pendingPush: [String: String] = [:]
+    private var inFlightPush: [String: String] = [:]
     private var pushTask: Task<Void, Never>?
     private var syncTask: Task<Void, Never>?
+    private var accountGeneration: UInt64 = 0
+    private var syncRequestGeneration: UInt64 = 0
+    private var remoteMutationGeneration: UInt64 = 0
     private var token: String?
     private var userID: String?
     private let defaults: UserDefaults
@@ -26,24 +30,34 @@ final class InboxStore: ObservableObject {
 
     func configure(token: String?, userID: String?) {
         let normalizedUserID = userID?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let nextUserID = (normalizedUserID?.isEmpty == false) ? normalizedUserID : nil
         let changed =
             self.token != token ||
-            self.userID != normalizedUserID
-        self.token = token
-        self.userID = (normalizedUserID?.isEmpty == false) ? normalizedUserID : nil
+            self.userID != nextUserID
         guard changed else { return }
 
+        accountGeneration &+= 1
+        syncRequestGeneration = 0
+        remoteMutationGeneration = 0
         syncTask?.cancel()
         pushTask?.cancel()
+        syncTask = nil
+        pushTask = nil
+        self.token = token
+        self.userID = nextUserID
         pendingPush = [:]
+        inFlightPush = [:]
         remoteReadVersions = [:]
+        // Never let a previous account's in-memory cache seed the new account.
+        readVersions = [:]
+        messages = []
+        unreadCount = 0
 
         if let userID = self.userID {
             loadReadVersions(storageKey: storageKey(for: userID))
             recompute(persist: false)
-            syncTask = Task { await syncFromServer() }
+            startReadStateSync()
         } else {
-            readVersions = [:]
             messages = []
             unreadCount = 0
         }
@@ -66,10 +80,10 @@ final class InboxStore: ObservableObject {
 
         messages = built.map { message in
             var copy = message
-            copy.isUnread = readVersions[message.id] != message.version
+            copy.isUnread = isUnread(message)
             return copy
         }
-        unreadCount = messages.filter(\.isUnread).count
+        unreadCount = messages.filter(countsTowardUnread).count
         persistIfPossible()
         Task { await AppBadgeService.sync(count: unreadCount) }
     }
@@ -100,6 +114,15 @@ final class InboxStore: ObservableObject {
         }
     }
 
+    func applicationDidBecomeActive() {
+        startReadStateSync()
+    }
+
+    func refreshReadStates() async {
+        guard let task = startReadStateSync() else { return }
+        await task.value
+    }
+
     func messages(in category: InboxCategory) -> [InboxMessage] {
         messages.filter { InboxMessageBuilder.classify($0) == category }
     }
@@ -107,14 +130,22 @@ final class InboxStore: ObservableObject {
     private func recompute(persist: Bool = true) {
         messages = messages.map { message in
             var copy = message
-            copy.isUnread = readVersions[message.id] != message.version
+            copy.isUnread = isUnread(message)
             return copy
         }
-        unreadCount = messages.filter(\.isUnread).count
+        unreadCount = messages.filter(countsTowardUnread).count
         if persist {
             persistIfPossible()
         }
         Task { await AppBadgeService.sync(count: unreadCount) }
+    }
+
+    private func isUnread(_ message: InboxMessage) -> Bool {
+        readVersions[message.id] != message.version
+    }
+
+    private func countsTowardUnread(_ message: InboxMessage) -> Bool {
+        message.isUnread && InboxMessageBuilder.classify(message) != .activity
     }
 
     private func storageKey(for userID: String) -> String {
@@ -165,74 +196,190 @@ final class InboxStore: ObservableObject {
 
     private func queuePush(_ versions: [String: String]) {
         guard api != nil, token != nil, userID != nil else { return }
+        var changed = false
         for (messageID, version) in versions {
-            if remoteReadVersions[messageID] != version {
+            if remoteReadVersions[messageID] != version,
+               inFlightPush[messageID] != version,
+               pendingPush[messageID] != version {
                 pendingPush[messageID] = version
+                changed = true
             }
         }
-        guard !pendingPush.isEmpty else { return }
-        // Do not cancel an in-flight push: the previous task already took
-        // ownership of its payload and will drain any newer pending entries.
-        guard pushTask == nil else { return }
-        pushTask = Task { await flushPush() }
+        guard changed else { return }
+        // Any GET that was already waiting is older than this explicit read.
+        remoteMutationGeneration &+= 1
+        startPushIfNeeded()
     }
 
-    private func syncFromServer() async {
-        guard let api, let token, userID != nil else { return }
+    @discardableResult
+    private func startReadStateSync() -> Task<Void, Never>? {
+        guard api != nil, let token, let userID else { return nil }
+        // Foregrounding and pull-to-refresh also retry a previously failed PUT.
+        startPushIfNeeded()
+        syncRequestGeneration &+= 1
+        let requestGeneration = syncRequestGeneration
+        let accountGeneration = accountGeneration
+        let responseGeneration = remoteMutationGeneration
+        let localAtRequestStart = readVersions
+        syncTask?.cancel()
+        let task = Task { [weak self] in
+            guard let self else { return }
+            await self.syncFromServer(
+                accountGeneration: accountGeneration,
+                requestGeneration: requestGeneration,
+                responseGeneration: responseGeneration,
+                token: token,
+                userID: userID,
+                localAtRequestStart: localAtRequestStart
+            )
+        }
+        syncTask = task
+        return task
+    }
+
+    private func syncFromServer(
+        accountGeneration: UInt64,
+        requestGeneration: UInt64,
+        responseGeneration: UInt64,
+        token: String,
+        userID: String,
+        localAtRequestStart: [String: String]
+    ) async {
+        defer {
+            if isCurrentAccount(
+                generation: accountGeneration,
+                token: token,
+                userID: userID
+            ), syncRequestGeneration == requestGeneration {
+                syncTask = nil
+            }
+        }
+        guard let api else { return }
         do {
             let response = try await api.get(
                 MobileAPIContract.Endpoint.inboxReadStates,
                 token: token,
                 as: InboxReadStatesResponse.self
             )
-            remoteReadVersions = response.readVersions
-            readVersions.merge(response.readVersions) { _, remote in remote }
-            recompute()
+            guard isCurrentAccount(
+                generation: accountGeneration,
+                token: token,
+                userID: userID
+            ), syncRequestGeneration == requestGeneration,
+               remoteMutationGeneration == responseGeneration
+            else { return }
 
-            var pending: [String: String] = [:]
-            for (messageID, version) in readVersions where remoteReadVersions[messageID] != version {
-                pending[messageID] = version
+            let localOnly = localAtRequestStart.filter {
+                response.readVersions[$0.key] == nil
             }
-            if !pending.isEmpty {
-                pendingPush.merge(pending) { _, latest in latest }
-                await flushPush()
+            var protectedLocal = localOnly
+            protectedLocal.merge(inFlightPush) { _, latest in latest }
+            protectedLocal.merge(pendingPush) { _, latest in latest }
+            applyRemoteReadVersions(
+                response.readVersions,
+                preserving: protectedLocal
+            )
+            if !localOnly.isEmpty {
+                queuePush(localOnly)
             }
         } catch {
             // Keep local cache when offline or during auth races.
         }
     }
 
-    private func flushPush() async {
-        guard let api, let token, userID != nil else {
-            pushTask = nil
-            return
-        }
-        let payload = pendingPush
-        guard !payload.isEmpty else {
-            pushTask = nil
-            return
-        }
-        pendingPush = [:]
-        do {
-            let response = try await api.send(
-                MobileAPIContract.Endpoint.inboxReadStates,
-                method: "PUT",
+    private func startPushIfNeeded() {
+        guard pushTask == nil,
+              !pendingPush.isEmpty,
+              api != nil,
+              let token,
+              let userID
+        else { return }
+        let accountGeneration = accountGeneration
+        pushTask = Task { [weak self] in
+            guard let self else { return }
+            await self.drainPush(
+                accountGeneration: accountGeneration,
                 token: token,
-                body: InboxReadStatesRequest(readVersions: payload),
-                as: InboxReadStatesResponse.self
+                userID: userID
             )
-            remoteReadVersions.merge(response.readVersions) { _, remote in remote }
-            readVersions.merge(response.readVersions) { _, remote in remote }
-            recompute()
-            if !pendingPush.isEmpty {
-                await flushPush()
-            } else {
-                pushTask = nil
-            }
-        } catch {
-            pendingPush.merge(payload) { _, latest in latest }
-            pushTask = nil
         }
+    }
+
+    private func drainPush(
+        accountGeneration: UInt64,
+        token: String,
+        userID: String
+    ) async {
+        guard let api else { return }
+        while isCurrentAccount(
+            generation: accountGeneration,
+            token: token,
+            userID: userID
+        ) {
+            let payload = pendingPush
+            guard !payload.isEmpty else {
+                pushTask = nil
+                return
+            }
+            pendingPush = [:]
+            inFlightPush = payload
+
+            do {
+                let response = try await api.send(
+                    MobileAPIContract.Endpoint.inboxReadStates,
+                    method: "PUT",
+                    token: token,
+                    body: InboxReadStatesRequest(readVersions: payload),
+                    as: InboxReadStatesResponse.self
+                )
+                guard isCurrentAccount(
+                    generation: accountGeneration,
+                    token: token,
+                    userID: userID
+                ) else { return }
+
+                remoteMutationGeneration &+= 1
+                inFlightPush = [:]
+                applyRemoteReadVersions(
+                    response.readVersions,
+                    preserving: pendingPush
+                )
+            } catch {
+                guard isCurrentAccount(
+                    generation: accountGeneration,
+                    token: token,
+                    userID: userID
+                ) else { return }
+
+                var retry = payload
+                retry.merge(pendingPush) { _, latest in latest }
+                pendingPush = retry
+                inFlightPush = [:]
+                // Retry only after the next mark, foreground, or explicit sync.
+                pushTask = nil
+                return
+            }
+        }
+    }
+
+    private func applyRemoteReadVersions(
+        _ remote: [String: String],
+        preserving protectedLocal: [String: String]
+    ) {
+        remoteReadVersions = remote
+        readVersions.merge(remote) { _, remote in remote }
+        readVersions.merge(protectedLocal) { _, local in local }
+        recompute()
+    }
+
+    private func isCurrentAccount(
+        generation: UInt64,
+        token: String,
+        userID: String
+    ) -> Bool {
+        accountGeneration == generation &&
+            self.token == token &&
+            self.userID == userID
     }
 
     private struct Storage: Codable {

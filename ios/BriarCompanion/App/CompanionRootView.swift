@@ -148,6 +148,7 @@ struct CompanionRootView: View {
             case .active:
                 dashboard.applicationDidBecomeActive()
                 agents.applicationDidBecomeActive()
+                inbox.applicationDidBecomeActive()
             case .background:
                 dashboard.applicationDidEnterBackground()
                 agents.applicationDidEnterBackground()

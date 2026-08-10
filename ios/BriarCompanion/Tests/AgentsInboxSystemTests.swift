@@ -715,13 +715,13 @@ final class AgentsInboxSystemTests: XCTestCase {
             let store = InboxStore(defaults: defaults)
             store.configure(token: nil, userID: "fixture-user")
             store.update(snapshot: snapshot, sessions: [session], project: project)
-            XCTAssertEqual(store.unreadCount, 5)
+            XCTAssertEqual(store.unreadCount, 4)
             // Store keeps a single chronological list for the mobile feed.
             XCTAssertEqual(store.messages.map(\.id), messages.map(\.id))
             XCTAssertEqual(store.messages(in: .urgent).count, 1)
             XCTAssertEqual(store.messages(in: .actionRequired).count, 3)
             store.markIssueRead(runID: blocked.id)
-            XCTAssertEqual(store.unreadCount, 4)
+            XCTAssertEqual(store.unreadCount, 3)
             store.markAllRead()
             XCTAssertEqual(store.unreadCount, 0)
 

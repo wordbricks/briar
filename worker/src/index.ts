@@ -1227,7 +1227,7 @@ const inboxReadStateMessageIdSchema = z
   .trim()
   .min(1)
   .max(200)
-  .regex(/^(?:issue|session|conversation):.+$/u);
+  .regex(/^(?:issue|session|conversation|channel):.+$/u);
 const inboxReadStateVersionSchema = z.string().trim().min(1).max(500);
 export const inboxReadStatesInputSchema = z
   .object({

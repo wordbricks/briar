@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import worker from "./index";
+import worker, { inboxReadStatesInputSchema } from "./index";
 import {
   mobileClientIds,
   mobileDashboardDeltaSchema,
@@ -81,6 +81,18 @@ describe("Companion mobile API contract", () => {
 
     expect(listResponse.sessions[0]?.agentName).toBe("Issue processing agent");
     expect(taskResponse.session.agentName).toBe("Issue processing agent");
+  });
+
+  it("accepts channel inbox ids in an all-read state update", () => {
+    const request = fixture.operations.putInboxReadStates.request as {
+      readVersions: Record<string, string>;
+    };
+
+    expect(
+      inboxReadStatesInputSchema.parse(request).readVersions[
+        "channel:55555555-5555-4555-8555-555555555555"
+      ],
+    ).toBe("55555555-5555-4555-8555-555555555555");
   });
 
   it("preserves organization providers in full and delta dashboard payloads", () => {
