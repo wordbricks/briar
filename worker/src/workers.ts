@@ -59,6 +59,22 @@ export type ExecutionWorkerRow = {
   icon_value?: string | null;
 };
 
+export type ExecutionWorkerReadinessSnapshot = Pick<
+  ExecutionWorkerRow,
+  "accepting_work" | "readiness_state" | "readiness_detail"
+>;
+
+export function hasExecutionWorkerReadinessChanged(
+  before: ExecutionWorkerReadinessSnapshot,
+  after: ExecutionWorkerReadinessSnapshot,
+) {
+  return (
+    before.accepting_work !== after.accepting_work ||
+    before.readiness_state !== after.readiness_state ||
+    before.readiness_detail !== after.readiness_detail
+  );
+}
+
 export type ExecutionWorkerDeviceRow = {
   id: string;
   organization_id: string;
