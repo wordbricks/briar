@@ -48,6 +48,9 @@ vi.mock("@emoji-mart/react", () => ({
 
 const { Channels } = await import("./Channels");
 
+(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean })
+  .IS_REACT_ACT_ENVIRONMENT = true;
+
 const channel: ChannelSummary = {
   id: "channel-1",
   organizationId: "org-1",
@@ -259,6 +262,27 @@ describe("Channels", () => {
       reacted.id,
       "👍",
     );
+  });
+
+  it("renders the emoji picker in a viewport portal outside the message scroller", async () => {
+    await render([message()]);
+
+    const openPicker = container.querySelector<HTMLButtonElement>(
+      ".channel-quick-reaction.open-picker",
+    );
+    await act(async () => openPicker?.click());
+
+    const picker = document.body.querySelector<HTMLElement>(
+      ".channel-emoji-picker",
+    );
+    expect(picker).not.toBeNull();
+    expect(container.contains(picker)).toBe(false);
+    expect(openPicker?.getAttribute("aria-expanded")).toBe("true");
+
+    await act(async () => {
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    });
+    expect(document.body.querySelector(".channel-emoji-picker")).toBeNull();
   });
 
   it("requests organization agent creation from the channel welcome action", async () => {

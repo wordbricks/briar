@@ -4,11 +4,17 @@ import { SmilePlus } from "lucide-react";
 import {
   useEffect,
   useId,
+  useLayoutEffect,
   useRef,
   useState,
   type MouseEvent as ReactMouseEvent,
 } from "react";
+import { createPortal } from "react-dom";
 import { useI18n } from "../i18n";
+import {
+  getChannelEmojiPickerPosition,
+  type ChannelEmojiPickerPosition,
+} from "../lib/channel-emoji-picker-position";
 import {
   channelQuickReactionEmojis,
   type ChannelMessage,
@@ -46,6 +52,9 @@ export function ChannelMessageReactions({
   const { t } = useI18n();
   const pickerId = useId();
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerPosition, setPickerPosition] =
+    useState<ChannelEmojiPickerPosition | null>(null);
+  const pickerAnchorRef = useRef<HTMLButtonElement | null>(null);
   const pickerRef = useRef<HTMLDivElement | null>(null);
   const hasReactions = message.reactions.length > 0;
 
@@ -56,7 +65,11 @@ export function ChannelMessageReactions({
   useEffect(() => {
     if (!pickerOpen) return;
     const onPointerDown = (event: PointerEvent) => {
-      if (!pickerRef.current?.contains(event.target as Node)) {
+      const target = event.target as Node;
+      if (
+        !pickerRef.current?.contains(target) &&
+        !pickerAnchorRef.current?.contains(target)
+      ) {
         setPickerOpen(false);
       }
     };
@@ -68,6 +81,56 @@ export function ChannelMessageReactions({
     return () => {
       document.removeEventListener("pointerdown", onPointerDown);
       document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [pickerOpen]);
+
+  useLayoutEffect(() => {
+    if (!pickerOpen) return;
+
+    const updatePosition = () => {
+      const anchor = pickerAnchorRef.current;
+      const picker = pickerRef.current;
+      if (!anchor?.isConnected || !picker) {
+        setPickerOpen(false);
+        return;
+      }
+      const visualViewport = window.visualViewport;
+      const nextPosition = getChannelEmojiPickerPosition(
+        anchor.getBoundingClientRect(),
+        picker.getBoundingClientRect(),
+        {
+          height: visualViewport?.height ?? window.innerHeight,
+          left: visualViewport?.offsetLeft ?? 0,
+          top: visualViewport?.offsetTop ?? 0,
+          width: visualViewport?.width ?? window.innerWidth,
+        },
+      );
+      setPickerPosition((current) =>
+        current &&
+        current.left === nextPosition.left &&
+        current.top === nextPosition.top &&
+        current.placement === nextPosition.placement
+          ? current
+          : nextPosition,
+      );
+    };
+
+    updatePosition();
+    const resizeObserver =
+      typeof ResizeObserver === "undefined"
+        ? null
+        : new ResizeObserver(updatePosition);
+    if (pickerRef.current) resizeObserver?.observe(pickerRef.current);
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    window.visualViewport?.addEventListener("resize", updatePosition);
+    window.visualViewport?.addEventListener("scroll", updatePosition);
+    return () => {
+      resizeObserver?.disconnect();
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+      window.visualViewport?.removeEventListener("resize", updatePosition);
+      window.visualViewport?.removeEventListener("scroll", updatePosition);
     };
   }, [pickerOpen]);
 
@@ -83,19 +146,55 @@ export function ChannelMessageReactions({
     handleToggle(emoji);
   };
 
-  const openPicker = (event?: ReactMouseEvent) => {
-    event?.stopPropagation();
+  const openPicker = (event: ReactMouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    pickerAnchorRef.current = event.currentTarget;
+    setPickerPosition(null);
     setPickerOpen((open) => !open);
   };
+
+  const picker =
+    pickerOpen && typeof document !== "undefined"
+      ? createPortal(
+          <div
+            className="channel-emoji-picker"
+            data-placement={pickerPosition?.placement}
+            id={pickerId}
+            onClick={(event) => event.stopPropagation()}
+            ref={pickerRef}
+            style={{
+              left: pickerPosition?.left ?? 0,
+              top: pickerPosition?.top ?? 0,
+              visibility: pickerPosition ? "visible" : "hidden",
+            }}
+          >
+            <Picker
+              data={data}
+              dynamicWidth
+              emojiSize={20}
+              emojiButtonSize={32}
+              maxFrequentRows={2}
+              navPosition="bottom"
+              onEmojiSelect={handlePickerSelect}
+              previewPosition="none"
+              skinTonePosition="search"
+              theme="auto"
+            />
+          </div>,
+          document.body,
+        )
+      : null;
 
   return (
     <>
       {showHoverActions ? (
         <ChannelMessageHoverActions
           busy={busy}
-          onOpenPicker={() => setPickerOpen(true)}
+          onOpenPicker={openPicker}
           onOpenThread={onOpenThread}
           onToggle={handleToggle}
+          pickerId={pickerId}
+          pickerOpen={pickerOpen}
         />
       ) : null}
       <div
@@ -140,29 +239,8 @@ export function ChannelMessageReactions({
             <SmilePlus aria-hidden="true" size={14} />
           </button>
         ) : null}
-
-        {pickerOpen ? (
-          <div
-            className="channel-emoji-picker"
-            id={pickerId}
-            onClick={(event) => event.stopPropagation()}
-            ref={pickerRef}
-          >
-            <Picker
-              data={data}
-              dynamicWidth
-              emojiSize={20}
-              emojiButtonSize={32}
-              maxFrequentRows={2}
-              navPosition="bottom"
-              onEmojiSelect={handlePickerSelect}
-              previewPosition="none"
-              skinTonePosition="search"
-              theme="auto"
-            />
-          </div>
-        ) : null}
       </div>
+      {picker}
     </>
   );
 }
@@ -172,11 +250,15 @@ function ChannelMessageHoverActions({
   onOpenPicker,
   onOpenThread,
   onToggle,
+  pickerId,
+  pickerOpen,
 }: {
   busy?: boolean;
-  onOpenPicker: () => void;
+  onOpenPicker: (event: ReactMouseEvent<HTMLButtonElement>) => void;
   onOpenThread?: () => void;
   onToggle: (emoji: string) => void;
+  pickerId: string;
+  pickerOpen: boolean;
 }) {
   const { t } = useI18n();
 
@@ -206,6 +288,8 @@ function ChannelMessageHoverActions({
       ))}
       <span aria-hidden="true" className="channel-message-actions-divider" />
       <button
+        aria-controls={pickerId}
+        aria-expanded={pickerOpen}
         aria-label={t("channel.react")}
         className="channel-quick-reaction open-picker"
         disabled={busy}
