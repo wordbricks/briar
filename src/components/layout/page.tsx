@@ -82,54 +82,6 @@ export function PageHeader({
   );
 }
 
-export function PageHero({
-  action,
-  className,
-  description,
-  eyebrow,
-  meta,
-  title,
-}: {
-  action?: ReactNode;
-  className?: string;
-  description?: ReactNode;
-  eyebrow?: ReactNode;
-  meta?: ReactNode;
-  title: ReactNode;
-}) {
-  return (
-    <section
-      className={cn(
-        "page-hero flex flex-wrap items-center justify-between gap-8 border-b border-border bg-[radial-gradient(circle_at_80%_20%,rgba(110,82,199,.11),transparent_32%),linear-gradient(135deg,#fff_0%,#faf9fd_100%)] px-8 py-7",
-        className,
-      )}
-    >
-      <div className="min-w-0 max-w-[620px]">
-        {eyebrow ? (
-          <Typography
-            as="p"
-            className="eyebrow mb-3 flex items-center gap-1.5 tracking-wide uppercase"
-            tone="primary"
-            variant="micro"
-          >
-            {eyebrow}
-          </Typography>
-        ) : null}
-        <Typography as="h1" variant="title">
-          {title}
-        </Typography>
-        {description ? (
-          <Typography className="mt-2.5" tone="muted" variant="bodySm">
-            {description}
-          </Typography>
-        ) : null}
-        {meta ? <div className="mt-4 flex flex-wrap items-center gap-2">{meta}</div> : null}
-      </div>
-      {action ? <div className="flex shrink-0 items-center gap-2">{action}</div> : null}
-    </section>
-  );
-}
-
 export function EmptyState({
   action,
   className,
@@ -188,31 +140,5 @@ export function ErrorBanner({
       {icon}
       <span className="min-w-0">{children}</span>
     </div>
-  );
-}
-
-export function StatusPill({
-  children,
-  className,
-  tone = "neutral",
-}: {
-  children: ReactNode;
-  className?: string;
-  tone?: "neutral" | "primary" | "success" | "warning" | "destructive";
-}) {
-  return (
-    <span
-      className={cn(
-        "inline-flex h-6 items-center justify-center rounded-full px-2.5 text-2xs font-semibold whitespace-nowrap",
-        tone === "neutral" && "bg-secondary text-muted-foreground",
-        tone === "primary" && "bg-accent text-accent-foreground",
-        tone === "success" && "bg-success/15 text-success",
-        tone === "warning" && "bg-warning/15 text-warning",
-        tone === "destructive" && "bg-destructive/12 text-destructive",
-        className,
-      )}
-    >
-      {children}
-    </span>
   );
 }

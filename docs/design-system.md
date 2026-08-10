@@ -95,9 +95,8 @@ Shared page layout primitives live in `src/components/layout/`:
 | Export | Role |
 |--------|------|
 | `MainContent` | App main pane (`main-content` compatible) |
-| `PageHeader` / `PageHero` | Page titles with optional eyebrow/actions |
+| `PageHeader` | Page titles with optional eyebrow/actions |
 | `EmptyState` / `ErrorBanner` | Empty and error affordances |
-| `SectionCard` / `Toolbar` / `StatusPill` | Content chrome |
 
 Migrated product surfaces include Login, Inbox, Auto Hunt, Agents, Schedule,
 Issue queue/dashboard, Organization create, Companion chrome, and settings.
