@@ -38,7 +38,6 @@ describe("ProjectAgentSettings", () => {
           model: null,
           effort: null,
           kind: "issue_processing" as const,
-          isDefault: true,
           position: 0,
           createdAt: "2026-07-26T00:00:00.000Z",
           updatedAt: "2026-07-26T00:00:00.000Z",

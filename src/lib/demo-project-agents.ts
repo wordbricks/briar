@@ -24,7 +24,6 @@ export function demoProjectAgents(
     ...input,
     effort: null,
     kind: "custom",
-    isDefault: true,
     position: 0,
     createdAt,
     updatedAt: createdAt,

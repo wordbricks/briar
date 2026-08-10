@@ -444,7 +444,6 @@ describe("organization channels", () => {
           model: null,
           effort: null,
           kind: "custom",
-          isDefault: true,
           position: 0,
         },
         {
@@ -455,7 +454,6 @@ describe("organization channels", () => {
           model: null,
           effort: "high",
           kind: "custom",
-          isDefault: false,
           position: 1,
         },
       ],

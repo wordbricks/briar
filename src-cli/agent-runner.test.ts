@@ -38,7 +38,6 @@ const agent = {
       model: "gpt-5",
       effort: "high" as const,
       kind: "issue_processing" as const,
-      isDefault: true,
       position: 0,
     },
     {
@@ -49,7 +48,6 @@ const agent = {
       model: "claude-sonnet",
       effort: "medium" as const,
       kind: "custom" as const,
-      isDefault: false,
       position: 1,
     },
   ],
@@ -269,7 +267,7 @@ describe("detached Agent runner", () => {
       expect(launch.request.instructions).toContain("## Responsibility");
       expect(launch.request.instructions).toContain("Ship the assigned issue.");
       expect(launch.request.instructions).toContain(
-        "Issue handling (active, default)",
+        "Issue handling (active)",
       );
       expect(launch.request.instructions).toContain(
         "Investigate, implement, and verify an assigned issue.",
@@ -301,8 +299,9 @@ describe("detached Agent runner", () => {
       skills: [],
       skill: "Follow the legacy release checklist.",
     });
-    expect(legacyContext).toContain("Legacy skill (default)");
+    expect(legacyContext).toContain("Legacy skill");
     expect(legacyContext).toContain("Follow the legacy release checklist.");
+    expect(legacyContext).toContain("No Skill was preselected");
   });
 
   it("continues the same provider conversation on a follow-up turn", () => {

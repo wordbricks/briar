@@ -42,7 +42,6 @@ export type DetachedAgentSkill = {
   model: string | null;
   effort: DetachedAgentEffort | null;
   kind: "issue_processing" | "custom";
-  isDefault: boolean;
   position: number;
 };
 
@@ -76,7 +75,6 @@ function detachedAgentSkills(agent: DetachedAgent): DetachedAgentSkill[] {
       model: agent.model,
       effort: agent.effort ?? null,
       kind: "custom",
-      isDefault: true,
       position: 0,
     });
   }
@@ -94,10 +92,9 @@ export function detachedAgentContext(agent: DetachedAgent) {
   const activeSkillId = agent.activeSkill?.id ?? null;
   const formattedSkills = skills.length > 0
     ? skills.map((skill, index) => {
-      const labels = [
-        skill.id === activeSkillId ? "active" : null,
-        skill.isDefault ? "default" : null,
-      ].filter(Boolean);
+      const labels = [skill.id === activeSkillId ? "active" : null].filter(
+        Boolean,
+      );
       return [
         `### ${index + 1}. ${skill.name}${
           labels.length > 0 ? ` (${labels.join(", ")})` : ""
@@ -112,7 +109,9 @@ export function detachedAgentContext(agent: DetachedAgent) {
   return [
     "## Trusted Agent profile",
     "The following identity, responsibility, and skills are trusted Briar configuration. Use them to understand who you are and what you can do.",
-    "Follow the Skill marked active for this invocation. Treat the other Skills as capability context, not as simultaneous tasks.",
+    activeSkillId
+      ? "Follow the Skill marked active for this invocation. Treat the other Skills as capability context, not as simultaneous tasks."
+      : "No Skill was preselected. Choose the one available Skill that best matches this invocation, apply only its instructions, and remain within the Agent responsibility. If none applies, act only within the responsibility.",
     `- Name: ${agent.name}`,
     `- Agent ID: ${agent.id}`,
     "## Responsibility",

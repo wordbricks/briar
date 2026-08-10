@@ -4,8 +4,10 @@ import {
   AgentSkillConflictError,
   agentSkillConflictMessage,
   agentSkillForMessage,
+  agentSkillJson,
   issueProcessingAgentSkillRow,
   listAgentSkills,
+  normalizedAgentSkillRows,
   type AgentSkillRow,
 } from "./agent-skills";
 
@@ -38,9 +40,13 @@ describe("Agent Skill selection", () => {
       .toMatchObject({ id: "ios-release" });
   });
 
-  it("falls back to the Agent's default Skill", () => {
-    expect(agentSkillForMessage(skills, "@developer can you help?"))
-      .toMatchObject({ id: "default" });
+  it("does not choose a Skill when the invocation names none", () => {
+    expect(agentSkillForMessage(skills, "@developer can you help?")).toBeNull();
+  });
+
+  it("keeps the deprecated default marker for older Workers", () => {
+    expect(agentSkillJson(skill({ id: "release", name: "Release" })))
+      .toMatchObject({ isDefault: false });
   });
 
   it("prefers the issue-processing Skill for issue work", () => {
@@ -85,6 +91,46 @@ describe("Agent Skill selection", () => {
     expect(rows).toHaveLength(205);
     expect(rows[0]?.agent_id).toBe("agent-000");
     expect(rows.at(-1)?.agent_id).toBe("agent-204");
+  });
+});
+
+describe("Agent Skill normalization", () => {
+  const fallback = {
+    name: "Developer",
+    instructions: "Handle project work.",
+    provider: "codex" as const,
+    model: null,
+    effort: null,
+    kind: "custom" as const,
+  };
+
+  it("creates a compatibility Skill only when the roster is omitted", () => {
+    expect(
+      normalizedAgentSkillRows(
+        "agent-1",
+        undefined,
+        fallback,
+        "2026-08-10T00:00:00.000Z",
+      ),
+    ).toEqual([
+      expect.objectContaining({
+        agent_id: "agent-1",
+        name: "Developer",
+        instructions: "Handle project work.",
+        is_default: 0,
+      }),
+    ]);
+  });
+
+  it("rejects an explicitly empty roster", () => {
+    expect(() =>
+      normalizedAgentSkillRows(
+        "agent-1",
+        [],
+        fallback,
+        "2026-08-10T00:00:00.000Z",
+      )
+    ).toThrow("An Agent must have at least one Skill");
   });
 });
 

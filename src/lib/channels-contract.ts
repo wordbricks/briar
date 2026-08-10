@@ -69,12 +69,15 @@ export const channelAgentSkillInputSchema = z
     model: z.string().trim().min(1).max(100).nullable().default(null),
     effort: z.enum(channelAgentEfforts).nullable().default(null),
     kind: z.enum(channelAgentSkillKinds).default("custom"),
-    isDefault: z.boolean().default(false),
+    // Accepted only so clients from before Skill selection was explicit can
+    // roll forward without a hard API failure. It has no runtime meaning.
+    isDefault: z.boolean().optional(),
     position: z.number().int().min(0).max(999).default(0),
   })
-  .strict();
+  .strict()
+  .transform(({ isDefault: _legacyDefault, ...skill }) => skill);
 
-export type ChannelAgentSkillInput = z.input<
+export type ChannelAgentSkillInput = z.output<
   typeof channelAgentSkillInputSchema
 >;
 
@@ -183,7 +186,6 @@ export type ChannelAgentSkill = {
   model: string | null;
   effort: ChannelAgentEffort | null;
   kind: ChannelAgentSkillKind;
-  isDefault: boolean;
   position: number;
   createdAt: string;
   updatedAt: string;

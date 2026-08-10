@@ -88,9 +88,10 @@ struct AgentsHomeView: View {
                             agent: agent,
                             sessions: agents.sessions(for: id),
                             workers: snapshot?.workers ?? [],
-                            onRun: { request, workerID in
+                            onRun: { skill, request, workerID in
                                 _ = try await agents.run(
                                     agent: agent,
+                                    skill: skill,
                                     request: request,
                                     workerID: workerID
                                 )
@@ -259,17 +260,31 @@ struct AgentDetailView: View {
     let agent: ProjectAgent
     let sessions: [ProjectAgentSession]
     let workers: [DashboardWorker]
-    let onRun: (String, String) async throws -> Void
+    let onRun: (ProjectAgent.Skill, String, String) async throws -> Void
     let onOpenSession: (String) -> Void
 
     @State private var showingRun = false
 
-    private var availableWorkers: [DashboardWorker] {
-        workers.filter { worker in
-            guard worker.readiness == "available" else { return false }
-            return worker.providers?.contains(agent.provider) == true ||
-                worker.agentProvider == agent.provider
+    private var readyWorkers: [DashboardWorker] {
+        workers.filter { $0.readiness == "available" && $0.acceptingWork }
+    }
+
+    private var sortedSkills: [ProjectAgent.Skill] {
+        agent.skills.sorted { left, right in
+            if left.position != right.position { return left.position < right.position }
+            return left.name.localizedCaseInsensitiveCompare(right.name) == .orderedAscending
         }
+    }
+
+    private func runtimeLabel(for skill: ProjectAgent.Skill) -> String {
+        var components = [skill.provider.displayName]
+        if let model = skill.model { components.append(model) }
+        if let effort = skill.effort { components.append(effort.rawValue) }
+        return components.joined(separator: " · ")
+    }
+
+    private func workerSupports(_ skill: ProjectAgent.Skill) -> Bool {
+        readyWorkers.contains { workerCanRunAgentSkill($0, provider: skill.provider) }
     }
 
     var body: some View {
@@ -306,8 +321,32 @@ struct AgentDetailView: View {
                 LabeledContent("색상", value: agent.calendarColor)
                 Text(agent.responsibility)
             }
-            Section("책임 / Skill") {
-                MarkdownText(markdown: agent.skill)
+            Section("Skills") {
+                if sortedSkills.isEmpty {
+                    Text("등록된 Skill이 없습니다.")
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(sortedSkills) { skill in
+                        VStack(alignment: .leading, spacing: 7) {
+                            HStack(alignment: .firstTextBaseline) {
+                                Text(skill.name)
+                                    .font(.headline)
+                                Spacer()
+                                Text(runtimeLabel(for: skill))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            MarkdownText(markdown: skill.instructions)
+                            if !workerSupports(skill) {
+                                Label("현재 실행 가능한 Worker 없음", systemImage: "exclamationmark.triangle")
+                                    .font(.caption)
+                                    .foregroundStyle(.orange)
+                            }
+                        }
+                        .padding(.vertical, 3)
+                        .accessibilityIdentifier("agent-skill-\(skill.id.uuidString.lowercased())")
+                    }
+                }
             }
             Section("세션") {
                 if sessions.isEmpty {
@@ -333,14 +372,14 @@ struct AgentDetailView: View {
                 } label: {
                     Label("Agent 실행", systemImage: "play.fill")
                 }
-                .disabled(availableWorkers.isEmpty)
+                .disabled(agent.skills.isEmpty)
                 .accessibilityIdentifier("agent-run-button")
             }
         }
         .sheet(isPresented: $showingRun) {
             AgentRunSheet(
                 agent: agent,
-                workers: availableWorkers,
+                workers: readyWorkers,
                 onRun: onRun
             )
         }
@@ -351,8 +390,9 @@ private struct AgentRunSheet: View {
     @Environment(\.dismiss) private var dismiss
     let agent: ProjectAgent
     let workers: [DashboardWorker]
-    let onRun: (String, String) async throws -> Void
+    let onRun: (ProjectAgent.Skill, String, String) async throws -> Void
 
+    @State private var selectedSkillID: UUID?
     @State private var request: String
     @State private var selectedWorkerID: String
     @State private var isRunning = false
@@ -361,39 +401,105 @@ private struct AgentRunSheet: View {
     init(
         agent: ProjectAgent,
         workers: [DashboardWorker],
-        onRun: @escaping (String, String) async throws -> Void
+        onRun: @escaping (ProjectAgent.Skill, String, String) async throws -> Void
     ) {
         self.agent = agent
         self.workers = workers
         self.onRun = onRun
-        _request = State(initialValue: agent.responsibility)
-        _selectedWorkerID = State(initialValue: workers.first?.id ?? "")
+        _selectedSkillID = State(initialValue: nil)
+        _request = State(initialValue: "")
+        _selectedWorkerID = State(initialValue: "")
+    }
+
+    private var sortedSkills: [ProjectAgent.Skill] {
+        agent.skills.sorted { left, right in
+            if left.position != right.position { return left.position < right.position }
+            return left.name.localizedCaseInsensitiveCompare(right.name) == .orderedAscending
+        }
+    }
+
+    private var selectedSkill: ProjectAgent.Skill? {
+        guard let selectedSkillID else { return nil }
+        return agent.skills.first { $0.id == selectedSkillID }
+    }
+
+    private var availableWorkers: [DashboardWorker] {
+        guard let selectedSkill else { return [] }
+        return workers.filter { workerCanRunAgentSkill($0, provider: selectedSkill.provider) }
+    }
+
+    private var selectedWorker: DashboardWorker? {
+        availableWorkers.first { $0.id == selectedWorkerID }
+    }
+
+    private var selectedRuntimeDescription: String? {
+        guard let selectedSkill else { return nil }
+        var components = [selectedSkill.provider.displayName]
+        if let model = selectedSkill.model { components.append(model) }
+        if let effort = selectedSkill.effort { components.append(effort.rawValue) }
+        return components.joined(separator: " · ")
     }
 
     var body: some View {
         NavigationStack {
             Form {
+                Section("Skill") {
+                    Picker("Skill", selection: $selectedSkillID) {
+                        Text("Skill을 선택해 주세요")
+                            .tag(nil as UUID?)
+                        ForEach(sortedSkills) { skill in
+                            Text(skill.name)
+                                .tag(Optional(skill.id))
+                                .accessibilityIdentifier(
+                                    "agent-run-skill-\(skill.id.uuidString.lowercased())"
+                                )
+                        }
+                    }
+                    .disabled(isRunning)
+                    .accessibilityIdentifier("agent-run-skill-picker")
+
+                    if let selectedRuntimeDescription {
+                        LabeledContent("실행 설정", value: selectedRuntimeDescription)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
                 Section("작업 요청") {
                     TextEditor(text: $request)
                         .frame(minHeight: 130)
+                        .disabled(selectedSkill == nil || isRunning)
                         .accessibilityLabel("에이전트 작업 요청")
                         .accessibilityIdentifier("agent-run-request")
                 }
 
                 Section("실행 호스트") {
-                    Picker("Worker", selection: $selectedWorkerID) {
-                        ForEach(workers) { worker in
-                            Text(worker.label).tag(worker.id)
-                        }
-                    }
-                    .accessibilityIdentifier("agent-run-worker-picker")
-                    if let worker = workers.first(where: { $0.id == selectedWorkerID }) {
+                    if selectedSkill == nil {
+                        Text("먼저 실행할 Skill을 선택해 주세요.")
+                            .foregroundStyle(.secondary)
+                    } else if availableWorkers.isEmpty {
                         Label(
-                            worker.readinessDetail ?? "실행 가능",
-                            systemImage: "checkmark.circle.fill"
+                            "선택한 Skill을 실행할 수 있는 Worker가 없습니다.",
+                            systemImage: "exclamationmark.triangle"
                         )
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.orange)
+                    } else {
+                        Picker("Worker", selection: $selectedWorkerID) {
+                            ForEach(availableWorkers) { worker in
+                                Text(worker.label).tag(worker.id)
+                            }
+                        }
+                        .disabled(isRunning)
+                        .accessibilityIdentifier("agent-run-worker-picker")
+                        .accessibilityValue(selectedWorker?.label ?? "")
+                        if let worker = selectedWorker {
+                            Label(
+                                worker.readinessDetail ?? "실행 가능",
+                                systemImage: "checkmark.circle.fill"
+                            )
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        }
                     }
                 }
 
@@ -421,27 +527,66 @@ private struct AgentRunSheet: View {
                             Text("실행")
                         }
                     }
-                    .disabled(isRunning || request.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || selectedWorkerID.isEmpty)
+                    .disabled(
+                        isRunning ||
+                            selectedSkill == nil ||
+                            request.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+                            !availableWorkers.contains(where: { $0.id == selectedWorkerID })
+                    )
                     .accessibilityIdentifier("agent-run-submit")
                 }
             }
         }
+        .onAppear(perform: resetSelection)
+        .onChange(of: selectedSkillID) { _, _ in
+            applySelectedSkill()
+        }
         .presentationDetents([.medium, .large])
+        .interactiveDismissDisabled(isRunning)
     }
 
     private func submit() async {
         let trimmed = request.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, !selectedWorkerID.isEmpty, !isRunning else { return }
+        guard
+            let selectedSkill,
+            !trimmed.isEmpty,
+            availableWorkers.contains(where: { $0.id == selectedWorkerID }),
+            !isRunning
+        else { return }
         isRunning = true
         errorMessage = nil
         do {
-            try await onRun(trimmed, selectedWorkerID)
+            try await onRun(selectedSkill, trimmed, selectedWorkerID)
             dismiss()
         } catch {
             errorMessage = CompanionStore.message(for: error)
         }
         isRunning = false
     }
+
+    private func resetSelection() {
+        selectedSkillID = nil
+        request = ""
+        selectedWorkerID = ""
+        errorMessage = nil
+    }
+
+    private func applySelectedSkill() {
+        guard let selectedSkill else {
+            request = ""
+            selectedWorkerID = ""
+            return
+        }
+        request = selectedSkill.instructions
+        selectedWorkerID = availableWorkers.first?.id ?? ""
+        errorMessage = nil
+    }
+}
+
+func workerCanRunAgentSkill(_ worker: DashboardWorker, provider: AgentProvider) -> Bool {
+    guard worker.readiness == "available", worker.acceptingWork else { return false }
+    let providers = worker.providers ?? worker.agentProvider.map { [$0] } ?? []
+    return providers.contains(provider)
 }
 
 struct SessionDetailView: View {

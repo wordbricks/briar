@@ -42,6 +42,19 @@ final class ProfileImageTests: XCTestCase {
           "model":"gpt-5.4",
           "responsibility":"Hunt",
           "skill":"# skill",
+          "skills":[{
+            "id":"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            "agentId":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            "name":"Issue processing",
+            "instructions":"Process every queued issue.",
+            "provider":"codex",
+            "model":"gpt-5.4",
+            "effort":null,
+            "kind":"issue_processing",
+            "position":0,
+            "createdAt":"2026-08-02T01:00:00Z",
+            "updatedAt":"2026-08-02T01:00:00Z"
+          }],
           "calendarColor":"#3275d5",
           "createdAt":"2026-08-02T01:00:00Z",
           "updatedAt":"2026-08-02T01:00:00Z"
@@ -52,6 +65,7 @@ final class ProfileImageTests: XCTestCase {
             from: Data(agentJSON.utf8)
         )
         XCTAssertEqual(agent.avatar, samplePNGDataURL)
+        XCTAssertEqual(agent.skills.first?.name, "Issue processing")
         XCTAssertNotNil(ProfileImageSource.uiImage(from: agent.avatar))
     }
 

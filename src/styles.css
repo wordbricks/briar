@@ -3342,7 +3342,6 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .project-agent-card-skills { margin-top:17px; display:grid; gap:8px; }
 .project-agent-card-skills ul { margin:0; padding:0; display:flex; flex-wrap:wrap; gap:6px; list-style:none; }
 .project-agent-card-skills li { min-height:24px; max-width:100%; padding:3px 8px; overflow:hidden; border:1px solid var(--border); border-radius:999px; color:var(--muted-foreground); background:var(--muted); font-size:var(--text-2xs); font-weight:600; text-overflow:ellipsis; white-space:nowrap; }
-.project-agent-card-skills li.default { border-color:color-mix(in srgb,var(--primary) 28%,var(--border)); color:var(--primary); background:color-mix(in srgb,var(--primary) 8%,var(--card)); }
 .project-agent-card > footer { min-height:52px; padding:0 13px 0 20px; display:flex; align-items:center; justify-content:space-between; gap:9px; border-top:1px solid var(--border); color:var(--muted-foreground); background:var(--card); font:500 var(--text-xs) "DM Mono",monospace; }
 .project-agent-card > footer time { margin-right:auto; }
 .project-agent-card > footer > svg { color:var(--muted-foreground); }
@@ -3409,6 +3408,8 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .project-agent-run-panel { width:min(880px,calc(100% - 48px)); margin:28px auto 56px; display:grid; gap:18px; }
 .project-agent-session-panel { width:100%; min-height:0; flex:1; margin:0; border:0; border-radius:0; box-shadow:none; }
 .project-agent-task-dialog { max-height:min(760px,calc(100vh - 48px)); overflow-y:auto; }
+.project-agent-run-worker-select { display:grid; gap:7px; color:var(--foreground); font-size:var(--text-xs); font-weight:650; }
+.project-agent-run-worker-select .native-select,.project-agent-run-worker-select .select-menu-trigger { width:100%; }
 .project-agent-session-request { margin:0; padding:14px 15px; border:1px solid var(--border); border-radius:11px; color:var(--foreground); background:var(--muted); font-size:var(--text-2xs); line-height:1.65; white-space:pre-wrap; }
 .project-agent-run-panel > header { display:flex; align-items:center; justify-content:space-between; gap:16px; }
 .project-agent-run-composer { padding:16px; display:grid; gap:12px; border:1px solid var(--border); border-radius:18px; background:var(--card); box-shadow:var(--shadow-sm); }
@@ -3500,7 +3501,6 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .project-agent-skill-card > header > span:first-child { overflow:hidden; }
 .project-agent-skill-card > header strong { min-width:0; overflow:hidden; font-size:var(--text-xs); text-overflow:ellipsis; white-space:nowrap; }
 .project-agent-skill-card > header small { min-height:21px; padding:2px 7px; border:1px solid var(--border); border-radius:999px; color:var(--muted-foreground); background:var(--card); font-size:var(--text-2xs); white-space:nowrap; }
-.project-agent-skill-card > header small.default { border-color:color-mix(in srgb,var(--primary) 28%,var(--border)); color:var(--primary); background:color-mix(in srgb,var(--primary) 8%,var(--card)); }
 .project-agent-skill-card > header .button { flex:0 0 auto; }
 .project-agent-skill-fields { padding:15px; display:grid; gap:14px; }
 .project-agent-skill-runtime-grid { display:grid; grid-template-columns:1fr 1.35fr 1fr; gap:10px; }

@@ -11,6 +11,7 @@ struct ProjectAgent: Codable, Equatable, Identifiable, Sendable {
     let effort: ModelEffort?
     let responsibility: String
     let skill: String
+    let skills: [Skill]
     let calendarColor: String
     let createdAt: Date
     let updatedAt: Date
@@ -23,6 +24,25 @@ struct ProjectAgent: Codable, Equatable, Identifiable, Sendable {
         let spriteVersion: Int?
         let spriteSheetUrl: String?
     }
+
+    struct Skill: Codable, Equatable, Identifiable, Sendable {
+        let id: UUID
+        let agentId: UUID
+        let name: String
+        let instructions: String
+        let provider: AgentProvider
+        let model: String?
+        let effort: ModelEffort?
+        let kind: Kind
+        let position: Int
+        let createdAt: Date
+        let updatedAt: Date
+
+        enum Kind: String, Codable, Sendable {
+            case issueProcessing = "issue_processing"
+            case custom
+        }
+    }
 }
 
 struct ProjectAgentsResponse: Codable, Equatable, Sendable {
@@ -34,6 +54,7 @@ struct ProjectAgentSession: Codable, Equatable, Identifiable, Sendable {
     let projectId: UUID
     let dispatchGroupId: String?
     let agentId: UUID?
+    let skillId: UUID?
     let sessionType: SessionType?
     let trigger: Trigger?
     let scheduleId: String?
@@ -58,6 +79,7 @@ struct ProjectAgentSession: Codable, Equatable, Identifiable, Sendable {
         projectId: UUID,
         dispatchGroupId: String?,
         agentId: UUID?,
+        skillId: UUID? = nil,
         sessionType: SessionType?,
         trigger: Trigger?,
         scheduleId: String?,
@@ -81,6 +103,7 @@ struct ProjectAgentSession: Codable, Equatable, Identifiable, Sendable {
         self.projectId = projectId
         self.dispatchGroupId = dispatchGroupId
         self.agentId = agentId
+        self.skillId = skillId
         self.sessionType = sessionType
         self.trigger = trigger
         self.scheduleId = scheduleId
@@ -196,23 +219,26 @@ struct ProjectAgentSession: Codable, Equatable, Identifiable, Sendable {
 
 struct ProjectAgentTaskRequest: Codable, Equatable, Sendable {
     let agentId: UUID
+    let skillId: UUID
     let request: String
     let workerId: String
     let requestId: UUID
 
     private enum CodingKeys: String, CodingKey {
         case agentId
+        case skillId
         case request
         case workerId
         case requestId
     }
 
-    /// Agent IDs are stored as lowercase strings and compared case-sensitively.
-    /// Foundation's synthesized UUID encoding uses uppercase characters, so keep
-    /// both UUID request fields in the API's canonical form.
+    /// Agent and Skill IDs are stored as lowercase strings and compared
+    /// case-sensitively. Foundation's synthesized UUID encoding uses uppercase
+    /// characters, so keep every UUID request field in the API's canonical form.
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(agentId.uuidString.lowercased(), forKey: .agentId)
+        try container.encode(skillId.uuidString.lowercased(), forKey: .skillId)
         try container.encode(request, forKey: .request)
         try container.encode(workerId, forKey: .workerId)
         try container.encode(requestId.uuidString.lowercased(), forKey: .requestId)
@@ -234,6 +260,7 @@ struct ProjectAgentSessionResponse: Codable, Equatable, Sendable {
 struct ProjectAgentSessionSyncRequest: Codable, Sendable {
     let dispatchGroupId: String
     let agentId: UUID?
+    let skillId: UUID?
     let sessionType: ProjectAgentSession.SessionType
     let trigger: ProjectAgentSession.Trigger?
     let scheduleId: String?
@@ -253,6 +280,7 @@ struct ProjectAgentSessionSyncRequest: Codable, Sendable {
     init(session: ProjectAgentSession) {
         dispatchGroupId = session.dispatchGroupId ?? session.id
         agentId = session.agentId
+        skillId = session.skillId
         sessionType = session.sessionType ?? .dispatch
         trigger = session.trigger
         scheduleId = session.scheduleId
@@ -273,6 +301,7 @@ struct ProjectAgentSessionSyncRequest: Codable, Sendable {
     private enum CodingKeys: String, CodingKey {
         case dispatchGroupId
         case agentId
+        case skillId
         case sessionType
         case trigger
         case scheduleId
@@ -294,6 +323,7 @@ struct ProjectAgentSessionSyncRequest: Codable, Sendable {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(dispatchGroupId, forKey: .dispatchGroupId)
         try encode(agentId, forKey: .agentId, into: &container)
+        try encode(skillId, forKey: .skillId, into: &container)
         try container.encode(sessionType, forKey: .sessionType)
         try encode(trigger, forKey: .trigger, into: &container)
         try encode(scheduleId, forKey: .scheduleId, into: &container)

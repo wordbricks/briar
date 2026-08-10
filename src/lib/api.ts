@@ -144,7 +144,6 @@ const projectAgentSchema = z.object({
           .nullable()
           .default(null),
         kind: z.enum(["issue_processing", "custom"]),
-        isDefault: z.boolean(),
         position: z.number().int().nonnegative(),
         createdAt: z.string(),
         updatedAt: z.string(),
@@ -163,6 +162,7 @@ const projectAgentSessionSchema = z.object({
   projectId: z.string().uuid(),
   dispatchGroupId: z.string(),
   agentId: z.string().uuid().nullable(),
+  skillId: z.string().uuid().nullable().optional(),
   sessionType: z.enum(["task", "dispatch"]),
   trigger: z.enum(["manual", "scheduled"]).nullable(),
   scheduleId: z.string().nullable(),
@@ -1120,7 +1120,7 @@ export async function runProjectAgentTaskOnWorker(
     agentId: string;
     request: string;
     workerId: string;
-    skillId?: string;
+    skillId: string;
   },
 ): Promise<AutoHuntSession> {
   const result = await request<{ session: unknown }>(
@@ -1155,6 +1155,7 @@ export async function upsertProjectAgentSession(
       body: JSON.stringify({
         dispatchGroupId: session.dispatchGroupId,
         agentId: session.agentId ?? null,
+        skillId: session.skillId ?? null,
         sessionType: session.sessionType ?? "dispatch",
         trigger: session.trigger ?? null,
         scheduleId: session.scheduleId ?? null,

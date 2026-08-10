@@ -20,6 +20,7 @@ import worker, {
   projectIconInputSchema,
   projectIssueKeyPrefixInputSchema,
   projectAgentSessionInputSchema,
+  projectAgentInputSchema,
   projectAgentScheduleInputSchema,
   projectAgentScheduleRunCompletionSchema,
   readIssueRequest,
@@ -34,6 +35,18 @@ import worker, {
 import { slackCreateIssueShortcutCallbackId } from "./slack";
 
 describe("Worker HTTP contract", () => {
+  it("allows legacy Agent writes to omit Skills but rejects an empty roster", () => {
+    const input = {
+      provider: "codex" as const,
+      responsibility: "Handle project work.",
+    };
+
+    expect(projectAgentInputSchema.parse(input).skills).toBeUndefined();
+    expect(
+      projectAgentInputSchema.safeParse({ ...input, skills: [] }).success,
+    ).toBe(false);
+  });
+
   it("uses execution settings only from sources matching the claimed reply provider", () => {
     expect(
       issueReplyExecutionConfig({

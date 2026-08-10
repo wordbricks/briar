@@ -128,7 +128,6 @@ describe("ChannelMessageText", () => {
                   model: "gpt-5.6-sol",
                   effort: "high",
                   kind: "issue_processing",
-                  isDefault: true,
                   position: 0,
                   createdAt: agent.createdAt,
                   updatedAt: agent.createdAt,
@@ -147,7 +146,7 @@ describe("ChannelMessageText", () => {
     );
     expect(profile?.textContent).toContain("Honey");
     expect(profile?.textContent).toContain("Writing partner");
-    expect(profile?.textContent).toContain("codex · gpt-5.6-sol");
-    expect(profile?.textContent).not.toContain("claude · sonnet");
+    expect(profile?.textContent).toContain("claude · sonnet");
+    expect(profile?.textContent).not.toContain("codex · gpt-5.6-sol");
   });
 });

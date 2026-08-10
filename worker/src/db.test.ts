@@ -819,6 +819,13 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         "utf8",
       ),
     );
+    await executeSql(
+      db,
+      await readFile(
+        resolve("migrations/0082_explicit_agent_skill_selection.sql"),
+        "utf8",
+      ),
+    );
   }, 30_000);
 
   afterAll(async () => {
@@ -1438,7 +1445,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
             name: "Issue processing",
             provider: "codex",
             kind: "issue_processing",
-            is_default: 1,
+            is_default: 0,
           }),
         ],
         calendar_color: "#3275d5",
@@ -1464,7 +1471,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
             name: "이슈 처리",
             instructions: "대기 중인 모든 이슈를 처리합니다.",
             kind: "issue_processing",
-            is_default: 1,
+            is_default: 0,
           }),
         ],
       }),
@@ -1520,7 +1527,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
           id: taskId,
           projectId,
           agentId: agent.id,
-          skillId: skill.id,
+          skill,
           request: "Summarize the repository without processing queued issues.",
           requestId,
           workerId: selected.worker.id,
@@ -1839,12 +1846,14 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       schedule_name: "Daily project audit",
       agent_provider: "codex",
       agent_responsibility: "Perform Auto Hunt for every queued issue.",
-      agent_skill_markdown: "Perform Auto Hunt for every queued issue.",
+      agent_skill_markdown: expect.stringContaining(
+        "Perform Auto Hunt for every queued issue.",
+      ),
       agent_skills: [
         expect.objectContaining({
           name: "Issue processing",
           kind: "issue_processing",
-          is_default: 1,
+          is_default: 0,
         }),
       ],
       workflow_json: expect.any(String),
@@ -2040,7 +2049,6 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
           model: null,
           effort: "medium",
           kind: "issue_processing",
-          isDefault: false,
           position: 0,
         },
         {
@@ -2050,7 +2058,6 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
           model: "sonnet",
           effort: "high",
           kind: "custom",
-          isDefault: true,
           position: 1,
         },
       ],
@@ -2080,7 +2087,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
           provider: "claude",
           model: "sonnet",
           effort: "high",
-          is_default: 1,
+          is_default: 0,
         }),
       ],
       skill_markdown: expect.stringContaining(
@@ -2105,7 +2112,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     ).resolves.toBeNull();
   });
 
-  it("preserves retained Skill job references across name and default swaps", async () => {
+  it("preserves retained Skill job references across name swaps", async () => {
     const agent = await createProjectAgent(db, projectId, {
       name: "Durable skill agent",
       provider: "codex",
@@ -2120,7 +2127,6 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
           model: null,
           effort: "medium",
           kind: "issue_processing",
-          isDefault: true,
           position: 0,
         },
         {
@@ -2130,7 +2136,6 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
           model: "sonnet",
           effort: "high",
           kind: "custom",
-          isDefault: false,
           position: 1,
         },
       ],
@@ -2149,7 +2154,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         id: taskId,
         projectId,
         agentId: agent.id,
-        skillId: releaseSkill.id,
+        skill: releaseSkill,
         request: "Run the retained release Skill.",
         requestId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
         workerId: "legacy-worker",
@@ -2172,7 +2177,6 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
               model: issueSkill.model,
               effort: issueSkill.effort,
               kind: issueSkill.kind,
-              isDefault: true,
               position: 0,
             },
           ],
@@ -2208,7 +2212,6 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
             model: issueSkill.model,
             effort: issueSkill.effort,
             kind: issueSkill.kind,
-            isDefault: false,
             position: 0,
           },
           {
@@ -2219,7 +2222,6 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
             model: releaseSkill.model,
             effort: releaseSkill.effort,
             kind: releaseSkill.kind,
-            isDefault: true,
             position: 1,
           },
         ],
@@ -2235,7 +2237,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         expect.objectContaining({
           id: releaseSkill.id,
           name: "Issue processing",
-          is_default: 1,
+          is_default: 0,
         }),
       ]);
       await expect(
@@ -2255,13 +2257,152 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     }
   });
 
-  it("applies legacy Agent execution updates to the default Skill", async () => {
+  it("protects active direct-task Skill runtimes while allowing terminal edits", async () => {
+    const agent = await createProjectAgent(db, projectId, {
+      name: "Pinned runtime agent",
+      provider: "codex",
+      model: null,
+      effort: null,
+      responsibility: "Keep direct task execution settings stable.",
+      skills: [{
+        name: "Desktop release",
+        instructions: "Publish the desktop release.",
+        provider: "codex",
+        model: null,
+        effort: "medium",
+        kind: "custom",
+        position: 0,
+      }],
+      calendarColor: "#3275d5",
+    });
+    const selectedSkill = agent.skills[0]!;
+    const taskId = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+    type RuntimeOverride = Partial<
+      Pick<
+        typeof selectedSkill,
+        "instructions" | "provider" | "model" | "effort"
+      >
+    >;
+    const updateSkill = (overrides: RuntimeOverride) =>
+      updateProjectAgent(db, projectId, agent.id, {
+        name: agent.name,
+        provider: agent.provider,
+        model: agent.model,
+        effort: agent.effort,
+        responsibility: agent.responsibility,
+        skills: [{
+          id: selectedSkill.id,
+          name: selectedSkill.name,
+          instructions: selectedSkill.instructions,
+          provider: selectedSkill.provider,
+          model: selectedSkill.model,
+          effort: selectedSkill.effort,
+          kind: selectedSkill.kind,
+          position: selectedSkill.position,
+          ...overrides,
+        }],
+        calendarColor: agent.calendar_color,
+      });
+
+    try {
+      await createProjectAgentTaskJob(db, {
+        id: taskId,
+        projectId,
+        agentId: agent.id,
+        skill: selectedSkill,
+        request: "Run the selected release Skill.",
+        requestId: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+        workerId: "legacy-worker",
+        createdAt: atMinute(20),
+      });
+
+      for (const change of [
+        { instructions: "Changed while queued." },
+        { provider: "claude" as const },
+      ]) {
+        await expect(updateSkill(change)).rejects.toThrow(
+          "cannot change instructions or execution settings while queued or running direct Agent work",
+        );
+      }
+
+      await db
+        .prepare(
+          `update briar_project_agent_task_jobs set status = 'running' where id = ?`,
+        )
+        .bind(taskId)
+        .run();
+      for (const change of [
+        { model: "gpt-5.6-sol" },
+        { effort: "high" as const },
+      ]) {
+        await expect(updateSkill(change)).rejects.toThrow(
+          "cannot change instructions or execution settings while queued or running direct Agent work",
+        );
+      }
+
+      expect(
+        (await listProjectAgents(db, projectId)).find(
+          (candidate) => candidate.id === agent.id,
+        )?.skills[0],
+      ).toMatchObject({
+        instructions: selectedSkill.instructions,
+        provider: selectedSkill.provider,
+        model: selectedSkill.model,
+        effort: selectedSkill.effort,
+      });
+
+      await db
+        .prepare(
+          `update briar_project_agent_task_jobs set status = 'completed' where id = ?`,
+        )
+        .bind(taskId)
+        .run();
+      await expect(
+        updateSkill({
+          instructions: "Publish and verify the desktop release.",
+          provider: "claude",
+          model: "sonnet",
+          effort: "high",
+        }),
+      ).resolves.toMatchObject({
+        skills: [
+          expect.objectContaining({
+            instructions: "Publish and verify the desktop release.",
+            provider: "claude",
+            model: "sonnet",
+            effort: "high",
+          }),
+        ],
+      });
+
+      await expect(
+        createProjectAgentTaskJob(db, {
+          id: "ffffffff-ffff-4fff-8fff-ffffffffffff",
+          projectId,
+          agentId: agent.id,
+          skill: selectedSkill,
+          request: "Do not enqueue with a stale Skill runtime.",
+          requestId: "12121212-1212-4121-8121-121212121212",
+          workerId: "legacy-worker",
+          createdAt: atMinute(21),
+        }),
+      ).resolves.toBeNull();
+    } finally {
+      await db
+        .prepare(`delete from briar_project_agent_task_jobs where id = ?`)
+        .bind(taskId)
+        .run();
+      await deleteProjectAgent(db, projectId, agent.id);
+    }
+  });
+
+  it("applies legacy Agent execution updates to a sole Skill", async () => {
     const agent = await createProjectAgent(db, projectId, {
       name: "Legacy settings agent",
       provider: "codex",
       model: null,
       effort: null,
-      responsibility: "Run with the original default Skill settings.",
+      responsibility: "Run with the original Skill settings.",
       calendarColor: "#3275d5",
     });
 
@@ -2287,7 +2428,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
             provider: "claude",
             model: "sonnet",
             effort: "high",
-            is_default: 1,
+            is_default: 0,
           }),
         ],
       });
@@ -2324,7 +2465,6 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
               model: "sonnet",
               effort: "high",
               kind: "custom",
-              isDefault: true,
               position: 0,
             },
           ],

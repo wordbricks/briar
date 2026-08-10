@@ -1957,7 +1957,6 @@ const detachedAgentSkillSchema = z.object({
   model: z.string().nullable(),
   effort: detachedAgentEffortSchema.nullable(),
   kind: z.enum(["issue_processing", "custom"]),
-  isDefault: z.boolean(),
   position: z.number().int().nonnegative(),
 });
 

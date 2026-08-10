@@ -98,6 +98,7 @@ final class CompanionReadTests: XCTestCase {
             label: "Mac Studio",
             icon: .init(type: .emoji, value: "🍋"),
             readiness: "available",
+            acceptingWork: true,
             readinessDetail: nil,
             activeSessions: 0,
             availableSessions: 1
@@ -112,5 +113,46 @@ final class CompanionReadTests: XCTestCase {
         )
 
         XCTAssertEqual(RunRow.worker(for: run, workers: [worker]), worker)
+    }
+
+    func testAgentSkillWorkerEligibilityUsesAvailabilityAndHealthyProviders() {
+        let pausedWorker = DashboardWorker(
+            id: "worker-paused",
+            label: "Paused Mac",
+            agentProvider: .codex,
+            providers: [.codex],
+            readiness: "available",
+            acceptingWork: false,
+            readinessDetail: nil,
+            activeSessions: 0,
+            availableSessions: 1
+        )
+        XCTAssertFalse(workerCanRunAgentSkill(pausedWorker, provider: .codex))
+
+        let providerOverride = DashboardWorker(
+            id: "worker-provider-override",
+            label: "Claude Mac",
+            agentProvider: .codex,
+            providers: [.claude],
+            readiness: "available",
+            acceptingWork: true,
+            readinessDetail: nil,
+            activeSessions: 0,
+            availableSessions: 1
+        )
+        XCTAssertFalse(workerCanRunAgentSkill(providerOverride, provider: .codex))
+        XCTAssertTrue(workerCanRunAgentSkill(providerOverride, provider: .claude))
+
+        let legacyProvider = DashboardWorker(
+            id: "worker-legacy-provider",
+            label: "Legacy Mac",
+            agentProvider: .codex,
+            readiness: "available",
+            acceptingWork: true,
+            readinessDetail: nil,
+            activeSessions: 0,
+            availableSessions: 1
+        )
+        XCTAssertTrue(workerCanRunAgentSkill(legacyProvider, provider: .codex))
     }
 }

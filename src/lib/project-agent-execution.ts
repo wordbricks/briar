@@ -41,6 +41,7 @@ export async function executeProjectAgentTurn<DispatchResult>(
 export type ProjectAgentTaskSessionStart = {
   sessionId: string;
   request: string;
+  skillId?: string | null;
   startedAt: string;
   isFollowUp?: boolean;
 };
@@ -92,6 +93,7 @@ export async function executeProjectAgentTask(
     agent: ProjectAgentRunInput["agent"];
     dashboard: DashboardPayload;
     message: string;
+    skillId?: string | null;
     sessionId?: string;
     startedAt?: string;
     conversationId?: string | null;
@@ -108,6 +110,7 @@ export async function executeProjectAgentTask(
     dependencies.startSession({
       sessionId,
       request: input.message,
+      skillId: input.skillId,
       startedAt,
       isFollowUp: input.isFollowUp,
     });

@@ -43,7 +43,6 @@ const organizationAgent = {
       model: null,
       effort: null,
       kind: "custom" as const,
-      isDefault: true,
       position: 0,
       createdAt: "2026-08-07T00:00:00.000Z",
       updatedAt: "2026-08-07T00:00:00.000Z",
@@ -122,7 +121,7 @@ describe("OrganizationAgentsSettings", () => {
     expect(container.textContent).not.toContain("스케줄");
   });
 
-  it("shows the default Skill runtime on an organization Agent card", async () => {
+  it("shows the Agent-level runtime on an organization Agent card", async () => {
     listOrganizationAgents.mockResolvedValue({
       agents: [
         {
@@ -140,7 +139,8 @@ describe("OrganizationAgentsSettings", () => {
     });
     await render();
 
-    expect(container.textContent).toContain("Claude · sonnet");
+    expect(container.textContent).toContain("Codex");
+    expect(container.textContent).not.toContain("Claude · sonnet");
   });
 
   it("saves per-Skill runtime settings for an organization Agent", async () => {
@@ -168,7 +168,6 @@ describe("OrganizationAgentsSettings", () => {
             id: "00000000-0000-4000-8000-000000000011",
             name: "Product planning",
             provider: "codex",
-            isDefault: true,
           }),
         ],
       }),

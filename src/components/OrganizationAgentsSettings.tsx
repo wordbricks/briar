@@ -151,7 +151,6 @@ export function OrganizationAgentsSettings({
           model: skill.model,
           effort: skill.effort,
           kind: skill.kind,
-          isDefault: skill.isDefault,
           position: skill.position,
         })),
       ),
@@ -263,10 +262,6 @@ export function OrganizationAgentsSettings({
           className="grid gap-3"
         >
           {agents.map((agent) => {
-            const defaultSkill =
-              agent.skills.find((skill) => skill.isDefault) ??
-              agent.skills[0];
-            const runtime = defaultSkill ?? agent;
             return (
               <article
               className="grid gap-4 rounded-xl border border-border bg-card p-5 shadow-xs md:grid-cols-[minmax(0,1fr)_auto]"
@@ -275,7 +270,7 @@ export function OrganizationAgentsSettings({
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="grid size-8 place-items-center rounded-lg bg-secondary text-foreground">
-                    <AgentProviderIcon provider={runtime.provider} size={16} />
+                    <AgentProviderIcon provider={agent.provider} size={16} />
                   </span>
                   <Typography as="h2" variant="bodyLg">
                     {agent.name}
@@ -298,8 +293,8 @@ export function OrganizationAgentsSettings({
                 ) : null}
                 <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-muted-foreground">
                   <Typography as="span" variant="caption">
-                    {providerLabels[runtime.provider]}
-                    {runtime.model ? ` · ${runtime.model}` : ""}
+                    {providerLabels[agent.provider]}
+                    {agent.model ? ` · ${agent.model}` : ""}
                   </Typography>
                   <time dateTime={agent.createdAt}>
                     <Typography as="span" variant="caption">

@@ -1,7 +1,11 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import worker from "./index";
-import { mobileClientIds, mobileOperationSchemas } from "./mobile-contract";
+import {
+  mobileClientIds,
+  mobileOperationSchemas,
+  mobileProjectAgentTaskRequestSchema,
+} from "./mobile-contract";
 
 type FixtureOperation = {
   method: string;
@@ -65,6 +69,22 @@ describe("Companion mobile API contract", () => {
           .not.toThrow();
       }
     }
+  });
+
+  it("requires callers to choose an Agent Skill before running a task", () => {
+    const request = fixture.operations.runProjectAgentTask.request as Record<
+      string,
+      unknown
+    >;
+
+    expect(mobileProjectAgentTaskRequestSchema.parse(request).skillId).toBe(
+      "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    );
+    const requestWithoutSkill = { ...request };
+    delete requestWithoutSkill.skillId;
+    expect(
+      mobileProjectAgentTaskRequestSchema.safeParse(requestWithoutSkill).success,
+    ).toBe(false);
   });
 
   it("serves the documented health fixture from the Worker", async () => {

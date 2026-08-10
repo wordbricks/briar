@@ -217,10 +217,35 @@ final class BriarCompanionUITests: XCTestCase {
         XCTAssertTrue(agentRow.waitForExistence(timeout: 5))
         agentRow.tap()
         XCTAssertTrue(app.navigationBars["Issue processing agent"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.buttons[
-            "agent-run-button"
-        ].waitForExistence(timeout: 5))
+        let runButton = app.buttons["agent-run-button"]
+        XCTAssertTrue(runButton.waitForExistence(timeout: 5))
         captureScreenshot(named: "companion-agent-run")
+        runButton.tap()
+
+        let skillPicker = app.descendants(matching: .any)["agent-run-skill-picker"]
+        let submitRun = app.buttons["agent-run-submit"]
+        XCTAssertTrue(skillPicker.waitForExistence(timeout: 5))
+        XCTAssertTrue(submitRun.waitForExistence(timeout: 5))
+        XCTAssertFalse(submitRun.isEnabled)
+
+        skillPicker.tap()
+        let releaseSkill = app.descendants(matching: .any)[
+            "agent-run-skill-cccccccc-cccc-4ccc-8ccc-cccccccccccc"
+        ]
+        XCTAssertTrue(releaseSkill.waitForExistence(timeout: 5))
+        releaseSkill.tap()
+
+        let requestEditor = app.textViews["agent-run-request"]
+        XCTAssertTrue(requestEditor.waitForExistence(timeout: 5))
+        XCTAssertEqual(requestEditor.value as? String, "Release the iOS app.")
+        requestEditor.swipeUp()
+        let workerPicker = app.descendants(matching: .any)["agent-run-worker-picker"]
+        XCTAssertTrue(workerPicker.waitForExistence(timeout: 5))
+        XCTAssertEqual(workerPicker.value as? String, "Release Mac")
+        XCTAssertTrue(submitRun.isEnabled)
+        app.buttons["취소"].tap()
+        XCTAssertTrue(skillPicker.waitForNonExistence(timeout: 5))
+
         app.navigationBars["Issue processing agent"].buttons.element(boundBy: 0).tap()
         XCTAssertTrue(app.navigationBars["Agents"].waitForExistence(timeout: 5))
 

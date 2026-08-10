@@ -207,18 +207,33 @@ private struct UITestCompanionFlow: View {
         return DashboardSnapshot(
             project: selectedProject,
             runs: runs,
-            workers: [DashboardWorker(
-                id: "worker-1",
-                label: "Mac Studio",
-                icon: .init(type: .emoji, value: "🍋"),
-                agentProvider: .codex,
-                providers: [.codex],
-                readiness: "available",
-                readinessDetail: "작업 수신 가능",
-                activeSessions: 1,
-                availableSessions: 2
-            )],
-            organizationProviders: [.codex],
+            workers: [
+                DashboardWorker(
+                    id: "worker-1",
+                    label: "Mac Studio",
+                    icon: .init(type: .emoji, value: "🍋"),
+                    agentProvider: .codex,
+                    providers: [.codex],
+                    readiness: "available",
+                    acceptingWork: true,
+                    readinessDetail: "작업 수신 가능",
+                    activeSessions: 1,
+                    availableSessions: 2
+                ),
+                DashboardWorker(
+                    id: "worker-claude",
+                    label: "Release Mac",
+                    icon: .init(type: .emoji, value: "🚀"),
+                    agentProvider: .claude,
+                    providers: [.claude],
+                    readiness: "available",
+                    acceptingWork: true,
+                    readinessDetail: "릴리즈 작업 수신 가능",
+                    activeSessions: 0,
+                    availableSessions: 1
+                ),
+            ],
+            organizationProviders: [.codex, .claude],
             conversationNotifications: [],
             cursor: 41,
             generatedAt: Date(timeIntervalSince1970: 1_775_264_400)
@@ -287,7 +302,7 @@ private actor UITestAPIClient: MobileAPIClientProtocol {
             """##
         } else if path.contains("/agents") {
             payload = ##"""
-            {"agents":[{"id":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","projectId":"11111111-1111-4111-8111-111111111111","name":"Issue processing agent","avatar":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==","codexPet":null,"provider":"codex","model":"gpt-5.4","responsibility":"Process every queued issue.","skill":"# Issue processing agent","calendarColor":"#3275d5","createdAt":"2026-08-02T01:00:00Z","updatedAt":"2026-08-02T01:00:00Z"}]}
+            {"agents":[{"id":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","projectId":"11111111-1111-4111-8111-111111111111","name":"Issue processing agent","avatar":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==","codexPet":null,"provider":"codex","model":"gpt-5.4","responsibility":"Process every queued issue.","skill":"# Issue processing agent","skills":[{"id":"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","agentId":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","name":"Issue processing","instructions":"Process every queued issue.","provider":"codex","model":"gpt-5.4","effort":"high","kind":"issue_processing","position":0,"createdAt":"2026-08-02T01:00:00Z","updatedAt":"2026-08-02T01:00:00Z"},{"id":"cccccccc-cccc-4ccc-8ccc-cccccccccccc","agentId":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","name":"iOS release","instructions":"Release the iOS app.","provider":"claude","model":"sonnet","effort":"high","kind":"custom","position":1,"createdAt":"2026-08-02T01:00:00Z","updatedAt":"2026-08-02T01:00:00Z"}],"calendarColor":"#3275d5","createdAt":"2026-08-02T01:00:00Z","updatedAt":"2026-08-02T01:00:00Z"}]}
             """##
         } else if path.contains("/agent-sessions") {
             payload = ##"""

@@ -4,6 +4,7 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
+import { requestMobileNavigationBack } from "../lib/mobile-navigation";
 import { runProjectAgent } from "../lib/project-llm";
 import type { DashboardPayload, ProjectAgent } from "../types";
 import {
@@ -133,7 +134,7 @@ describe("ProjectAgents", () => {
     }
   });
 
-  it("shows the default Skill runtime on an Agent card", async () => {
+  it("shows the Agent-level runtime on an Agent card", async () => {
     const runtimeAgent: ProjectAgent = {
       id: "agent-runtime",
       projectId: project.id,
@@ -155,7 +156,6 @@ describe("ProjectAgents", () => {
           model: "runtime-model",
           effort: "high",
           kind: "custom",
-          isDefault: true,
           position: 0,
           createdAt: "2026-08-01T00:00:00.000Z",
           updatedAt: "2026-08-01T00:00:00.000Z",
@@ -176,13 +176,13 @@ describe("ProjectAgents", () => {
       'button[aria-label="Release developer 세부 정보 열기"]',
     );
     expect(
-      card?.querySelector(".project-agent-provider-icon.claude"),
+      card?.querySelector(".project-agent-provider-icon.codex"),
     ).not.toBeNull();
     expect(card?.querySelector(".project-agent-runtime")?.textContent).toContain(
-      "runtime-model",
+      "legacy-model",
     );
     expect(card?.querySelector(".project-agent-runtime")?.textContent).not.toContain(
-      "legacy-model",
+      "runtime-model",
     );
   });
 
@@ -221,7 +221,7 @@ describe("ProjectAgents", () => {
     ).toContain("준비됨");
   });
 
-  it("runs an agent's saved responsibility immediately from the play button", async () => {
+  it("opens a Skill picker and runs the selected Skill from the play button", async () => {
     let finishRun:
       | ((value: Awaited<ReturnType<typeof runProjectAgent>>) => void)
       | undefined;
@@ -244,12 +244,43 @@ describe("ProjectAgents", () => {
     await act(async () => Promise.resolve());
 
     const runButton = container.querySelector<HTMLButtonElement>(
-      'button[aria-label="개발자 에이전트 책임 실행"]',
+      'button[aria-label="개발자 에이전트 스킬 실행"]',
     );
     expect(runButton).not.toBeNull();
 
     await act(async () => {
       runButton?.click();
+      await Promise.resolve();
+    });
+
+    expect(document.querySelector('[role="dialog"]')).not.toBeNull();
+    expect(runProjectAgent).not.toHaveBeenCalled();
+    const submitButton = document.querySelector<HTMLButtonElement>(
+      '#project-agent-task-form + div button[type="submit"], button[form="project-agent-task-form"]',
+    );
+    expect(submitButton?.disabled).toBe(true);
+
+    await act(async () => {
+      document
+        .querySelector<HTMLButtonElement>('.native-select button[aria-label="스킬"]')
+        ?.click();
+    });
+    await act(async () => {
+      document
+        .querySelector<HTMLButtonElement>(
+          '.select-menu-option[data-value="demo-skill-issue-processing"]',
+        )
+        ?.click();
+    });
+    expect(document.querySelector<HTMLTextAreaElement>("textarea")?.value).toBe(
+      "대기 중인 모든 이슈를 처리합니다.",
+    );
+    await act(async () => {
+      document
+        .querySelector<HTMLFormElement>("#project-agent-task-form")
+        ?.dispatchEvent(
+          new Event("submit", { bubbles: true, cancelable: true }),
+        );
       await Promise.resolve();
     });
 
@@ -323,19 +354,32 @@ describe("ProjectAgents", () => {
     await act(async () => {
       container
         .querySelector<HTMLButtonElement>(
-          'button[aria-label="개발자 에이전트 책임 실행"]',
+          'button[aria-label="개발자 에이전트 스킬 실행"]',
         )
         ?.click();
       await Promise.resolve();
     });
 
-    await act(async () => {
-      document.querySelector<HTMLButtonElement>(".project-agent-run-task")?.click();
-      await Promise.resolve();
-    });
     expect(document.querySelector('[role="dialog"]')).not.toBeNull();
     await act(async () => {
-      document.querySelector<HTMLButtonElement>('button[type="submit"]')?.click();
+      document
+        .querySelector<HTMLButtonElement>('.native-select button[aria-label="스킬"]')
+        ?.click();
+    });
+    await act(async () => {
+      document
+        .querySelector<HTMLButtonElement>(
+          '.select-menu-option[data-value="demo-skill-issue-processing"]',
+        )
+        ?.click();
+      await Promise.resolve();
+    });
+    await act(async () => {
+      document
+        .querySelector<HTMLFormElement>("#project-agent-task-form")
+        ?.dispatchEvent(
+          new Event("submit", { bubbles: true, cancelable: true }),
+        );
       await Promise.resolve();
     });
 
@@ -349,6 +393,33 @@ describe("ProjectAgents", () => {
     );
     expect(runProjectAgent).not.toHaveBeenCalled();
     expect(onStartTaskSession).not.toHaveBeenCalled();
+  });
+
+  it("closes the Skill picker before leaving the mobile Agent list", async () => {
+    const container = await mount(
+      <ProjectAgents
+        {...projectAgentsProps}
+        companionMode
+        dashboard={dashboardWithWorker}
+        onStartRemoteTask={vi.fn(async () => "remote-session")}
+      />,
+    );
+    await act(async () => Promise.resolve());
+
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>(
+          'button[aria-label="개발자 에이전트 스킬 실행"]',
+        )
+        ?.click();
+    });
+    expect(document.querySelector('[role="dialog"]')).not.toBeNull();
+
+    await act(async () => {
+      expect(requestMobileNavigationBack()).toBe(true);
+    });
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+    expect(container.querySelector("#project-agents")).not.toBeNull();
   });
 
   it("submits provider, default model, and a concrete responsibility", async () => {
@@ -615,9 +686,25 @@ describe("ProjectAgents", () => {
     });
 
     expect(document.body.textContent).toContain("에이전트에게 작업 요청");
-    expect(document.querySelector<HTMLTextAreaElement>("textarea")?.value).toBe(
-      "대기 중인 모든 이슈를 처리합니다.",
+    const taskInput = document.querySelector<HTMLTextAreaElement>(
+      'textarea[aria-label="에이전트 작업 요청"]',
     );
+    expect(taskInput?.value).toBe("");
+    expect(taskInput?.disabled).toBe(true);
+    await act(async () => {
+      document
+        .querySelector<HTMLButtonElement>('.native-select button[aria-label="스킬"]')
+        ?.click();
+    });
+    await act(async () => {
+      document
+        .querySelector<HTMLButtonElement>(
+          '.select-menu-option[data-value="demo-skill-issue-processing"]',
+        )
+        ?.click();
+    });
+    expect(taskInput?.value).toBe("대기 중인 모든 이슈를 처리합니다.");
+    expect(taskInput?.disabled).toBe(false);
     await act(async () => {
       container
         .querySelector<HTMLButtonElement>(".project-agent-detail-back")

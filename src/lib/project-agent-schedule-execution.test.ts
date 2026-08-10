@@ -93,7 +93,7 @@ const dependencies = (): ProjectAgentScheduleExecutionDependencies => ({
 });
 
 describe("scheduled project agent execution", () => {
-  it("runs the Agent's default Skill with its own provider, model, and effort", async () => {
+  it("lets the Agent choose from its Skill roster with Agent-level runtime", async () => {
     const current = dependencies();
     const run = scheduledRun();
     run.agent.skills = [{
@@ -105,7 +105,6 @@ describe("scheduled project agent execution", () => {
       model: "claude-sonnet-4-5",
       effort: "high",
       kind: "custom",
-      isDefault: true,
       position: 0,
       createdAt: "2026-07-27T00:00:00.000Z",
       updatedAt: "2026-07-27T00:00:00.000Z",
@@ -116,12 +115,12 @@ describe("scheduled project agent execution", () => {
     expect(current.runAgent).toHaveBeenCalledWith(
       expect.objectContaining({
         agent: expect.objectContaining({
-          provider: "claude",
-          model: "claude-sonnet-4-5",
-          effort: "high",
-          skill: expect.stringContaining("Desktop release (active)"),
+          provider: "codex",
+          model: null,
+          effort: null,
+          skill: expect.stringContaining("No Skill was preselected"),
         }),
-        message: expect.stringContaining("Publish the signed desktop release."),
+        message: expect.stringContaining("Fulfill the saved responsibility."),
       }),
     );
   });
@@ -140,7 +139,11 @@ describe("scheduled project agent execution", () => {
     expect(current.runAgent).toHaveBeenCalledWith({
       projectId: scheduledRun().projectId,
       sessionId: expect.any(String),
-      agent: scheduledRun().agent,
+      agent: expect.objectContaining({
+        id: scheduledRun().agent.id,
+        provider: "codex",
+        skill: expect.stringContaining("No Skill was preselected"),
+      }),
       message: [
         'Run the scheduled automation "Weekly Auto Hunt".',
         "It was scheduled for 2026-07-28T00:00:00.000Z.",

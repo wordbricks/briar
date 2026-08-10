@@ -1,4 +1,4 @@
-import { Plus, Star, Trash2, Wrench } from "lucide-react";
+import { Plus, Trash2, Wrench } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,15 +38,9 @@ export function projectAgentSkillInputs(
     model: skill.model,
     effort: skill.effort,
     kind: skill.kind,
-    isDefault: skill.isDefault,
     position,
   }));
-  if (next.length === 0) return next;
-  const defaultIndex = next.findIndex((skill) => skill.isDefault);
-  return next.map((skill, index) => ({
-    ...skill,
-    isDefault: index === (defaultIndex === -1 ? 0 : defaultIndex),
-  }));
+  return next;
 }
 
 export function projectAgentSkillsValid(
@@ -57,7 +51,6 @@ export function projectAgentSkillsValid(
   );
   return (
     skills.length > 0 &&
-    skills.filter((skill) => skill.isDefault).length === 1 &&
     new Set(names).size === names.length &&
     skills.every(
       (skill) => skill.name.trim() && skill.instructions.trim(),
@@ -106,7 +99,6 @@ export function ProjectAgentSkillsEditor({
         model: defaultModel,
         effort: defaultEffort,
         kind: "custom",
-        isDefault: skills.length === 0,
         position: skills.length,
       },
     ]);
@@ -114,21 +106,8 @@ export function ProjectAgentSkillsEditor({
 
   const removeSkill = (index: number) => {
     if (skills.length <= 1) return;
-    const removedDefault = skills[index]?.isDefault ?? false;
     const next = skills.filter((_, candidateIndex) => candidateIndex !== index);
-    if (removedDefault && next[0]) next[0] = { ...next[0], isDefault: true };
     onChange(positioned(next));
-  };
-
-  const makeDefault = (index: number) => {
-    onChange(
-      positioned(
-        skills.map((skill, candidateIndex) => ({
-          ...skill,
-          isDefault: candidateIndex === index,
-        })),
-      ),
-    );
   };
 
   return (
@@ -192,29 +171,8 @@ export function ProjectAgentSkillsEditor({
                     {skill.kind === "issue_processing" ? (
                       <small>{t("agents.issueProcessingSkill")}</small>
                     ) : null}
-                    {skill.isDefault ? (
-                      <small className="default">
-                        {t("agents.defaultSkill")}
-                      </small>
-                    ) : null}
                   </span>
                   <span>
-                    {!skill.isDefault ? (
-                      <Button
-                        aria-label={t("agents.makeDefaultSkill", {
-                          name:
-                            skill.name.trim() || t("agents.untitledSkill"),
-                        })}
-                        disabled={disabled}
-                        onClick={() => makeDefault(index)}
-                        size="sm"
-                        type="button"
-                        variant="ghost"
-                      >
-                        <Star aria-hidden="true" size={14} />
-                        {t("agents.makeDefault")}
-                      </Button>
-                    ) : null}
                     <Button
                       aria-label={t("agents.deleteSkill", {
                         name: skill.name.trim() || t("agents.untitledSkill"),

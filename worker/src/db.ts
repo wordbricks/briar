@@ -45,7 +45,7 @@ import {
   listAgentSkills,
   normalizedAgentSkillRows,
   replaceAgentSkillStatements,
-  updateDefaultAgentSkillFromLegacyStatement,
+  soleAgentSkillRowFromLegacy,
   type AgentSkillEffort,
   type AgentSkillInput,
   type AgentSkillProvider,
@@ -3611,7 +3611,6 @@ export async function createProject(
       model: defaultAgent.model,
       effort: defaultAgent.effort,
       kind: "issue_processing",
-      isDefault: true,
       position: 0,
     }],
     {
@@ -3875,7 +3874,10 @@ export async function createProjectAgentTaskJob(
     id: string;
     projectId: string;
     agentId: string;
-    skillId?: string | null;
+    skill: Pick<
+      AgentSkillRow,
+      "id" | "instructions" | "provider" | "model" | "effort"
+    >;
     request: string;
     requestId: string;
     workerId: string;
@@ -3887,18 +3889,30 @@ export async function createProjectAgentTaskJob(
       `insert into briar_project_agent_task_jobs (
          id, project_id, agent_id, skill_id, request, request_id, status,
          preferred_worker_id, created_at, updated_at
-       ) values (?, ?, ?, ?, ?, ?, 'queued', ?, ?, ?)`,
+       )
+       select ?, ?, ?, skill.id, ?, ?, 'queued', ?, ?, ?
+       from briar_agent_skills skill
+       where skill.id = ? and skill.agent_id = ?
+         and skill.instructions is ?
+         and skill.provider is ?
+         and skill.model is ?
+         and skill.effort is ?`,
     )
     .bind(
       input.id,
       input.projectId,
       input.agentId,
-      input.skillId ?? null,
       input.request,
       input.requestId,
       input.workerId,
       input.createdAt,
       input.createdAt,
+      input.skill.id,
+      input.agentId,
+      input.skill.instructions,
+      input.skill.provider,
+      input.skill.model,
+      input.skill.effort,
     )
     .run();
   if ((inserted.meta.changes ?? 0) < 1) return null;
@@ -3984,12 +3998,7 @@ export async function claimNextProjectAgentTask(
          join briar_project_agents agent on agent.id = job.agent_id
          join briar_agent_skills skill
            on skill.agent_id = agent.id
-          and skill.id = coalesce(
-            job.skill_id,
-            (select default_skill.id from briar_agent_skills default_skill
-             where default_skill.agent_id = agent.id
-               and default_skill.is_default = 1)
-          )
+          and skill.id = job.skill_id
          where job.project_id = ?
            and job.preferred_worker_id = ?
            and skill.provider in (${providerPlaceholders})
@@ -4029,12 +4038,7 @@ export async function claimNextProjectAgentTask(
        join briar_project_agents agent on agent.id = job.agent_id
        join briar_agent_skills skill
          on skill.agent_id = agent.id
-        and skill.id = coalesce(
-          job.skill_id,
-          (select default_skill.id from briar_agent_skills default_skill
-           where default_skill.agent_id = agent.id
-             and default_skill.is_default = 1)
-        )
+        and skill.id = job.skill_id
        where job.id = ? and job.project_id = ?`,
     )
     .bind(claimed.id, projectId)
@@ -4498,15 +4502,11 @@ const scheduleRunSelect = `
   select run.id, run.project_id, run.schedule_id,
          schedule.name as schedule_name,
          run.agent_id, agent.name as agent_name,
-         coalesce(default_skill.provider, agent.provider) as agent_provider,
-         case when default_skill.id is not null
-           then default_skill.model else agent.model end as agent_model,
-         case when default_skill.id is not null
-           then default_skill.effort else agent.effort end as agent_effort,
+         agent.provider as agent_provider,
+         agent.model as agent_model,
+         agent.effort as agent_effort,
          agent.responsibility as agent_responsibility,
-         case when default_skill.id is not null
-           then default_skill.instructions else agent.skill_markdown
-         end as agent_skill_markdown,
+         agent.skill_markdown as agent_skill_markdown,
          settings.workflow_json,
          run.status, run.scheduled_for, run.lease_expires_at,
          run.started_at, run.completed_at, run.result_summary,
@@ -4515,8 +4515,6 @@ const scheduleRunSelect = `
   from briar_project_agent_schedule_runs run
   join briar_project_agent_schedules schedule on schedule.id = run.schedule_id
   join briar_project_agents agent on agent.id = run.agent_id
-  left join briar_agent_skills default_skill
-    on default_skill.agent_id = agent.id and default_skill.is_default = 1
   join briar_project_settings settings on settings.project_id = run.project_id`;
 
 type UnhydratedProjectAgentScheduleRunRow = Omit<
@@ -4938,20 +4936,23 @@ export async function updateProjectAgent(
     await assertAgentSkillReplacementAllowed(
       db,
       agentId,
-      skillRows.map((row) => row.id),
+      skillRows,
     );
     statements.push(...replaceAgentSkillStatements(db, agentId, skillRows));
   } else {
-    statements.push(
-      updateDefaultAgentSkillFromLegacyStatement(db, {
-        agentId,
+    const legacySkill = soleAgentSkillRowFromLegacy(existing.skills, {
         instructions: input.responsibility,
         provider: input.provider,
         model: input.model,
         effort: input.effort,
         updatedAt,
-      }),
-    );
+      });
+    if (legacySkill) {
+      await assertAgentSkillReplacementAllowed(db, agentId, [legacySkill]);
+      statements.push(
+        ...replaceAgentSkillStatements(db, agentId, [legacySkill]),
+      );
+    }
   }
   const results = await db.batch(statements);
   if ((results[0]?.meta.changes ?? 0) === 0) return null;
@@ -5662,10 +5663,8 @@ export async function enqueueIssueAgentReply(
                   select skill.provider
                   from briar_agent_skills skill
                   where skill.agent_id = agent.id
-                  order by
-                    case when skill.kind = 'issue_processing' then 0 else 1 end,
-                    case when skill.is_default = 1 then 0 else 1 end,
-                    skill.position, skill.created_at, skill.id
+                    and skill.kind = 'issue_processing'
+                  order by skill.position, skill.created_at, skill.id
                   limit 1
                 ),
                 agent.provider
@@ -6545,10 +6544,8 @@ export async function claimNextQueuedHuntRun(
                    select skill.provider
                    from briar_agent_skills skill
                    where skill.agent_id = briar_hunt_runs.agent_id
-                   order by
-                     case when skill.kind = 'issue_processing' then 0 else 1 end,
-                     case when skill.is_default = 1 then 0 else 1 end,
-                     skill.position, skill.created_at, skill.id
+                     and skill.kind = 'issue_processing'
+                   order by skill.position, skill.created_at, skill.id
                    limit 1
                  ),
                  (
@@ -6567,10 +6564,8 @@ export async function claimNextQueuedHuntRun(
                    select skill.provider
                    from briar_agent_skills skill
                    where skill.agent_id = briar_hunt_runs.agent_id
-                   order by
-                     case when skill.kind = 'issue_processing' then 0 else 1 end,
-                     case when skill.is_default = 1 then 0 else 1 end,
-                     skill.position, skill.created_at, skill.id
+                     and skill.kind = 'issue_processing'
+                   order by skill.position, skill.created_at, skill.id
                    limit 1
                  ),
                  (
@@ -6589,10 +6584,8 @@ export async function claimNextQueuedHuntRun(
                    select skill.provider
                    from briar_agent_skills skill
                    where skill.agent_id = briar_hunt_runs.agent_id
-                   order by
-                     case when skill.kind = 'issue_processing' then 0 else 1 end,
-                     case when skill.is_default = 1 then 0 else 1 end,
-                     skill.position, skill.created_at, skill.id
+                     and skill.kind = 'issue_processing'
+                   order by skill.position, skill.created_at, skill.id
                    limit 1
                  ),
                  (
@@ -6611,10 +6604,8 @@ export async function claimNextQueuedHuntRun(
                    select skill.provider
                    from briar_agent_skills skill
                    where skill.agent_id = briar_hunt_runs.agent_id
-                   order by
-                     case when skill.kind = 'issue_processing' then 0 else 1 end,
-                     case when skill.is_default = 1 then 0 else 1 end,
-                     skill.position, skill.created_at, skill.id
+                     and skill.kind = 'issue_processing'
+                   order by skill.position, skill.created_at, skill.id
                    limit 1
                  ),
                  (
