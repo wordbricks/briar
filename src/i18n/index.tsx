@@ -1,17 +1,13 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { en, ko, zh, type MessageKey, type Messages } from "./messages";
+import { localeTags, type Locale } from "./locale";
 
-export type Locale = "ko" | "en" | "zh";
+export { localeTags, type Locale } from "./locale";
 type Variables = Record<string, string | number>;
 type Translate = (key: MessageKey, variables?: Variables) => string;
 
 const storageKey = "briar.locale.v1";
 const resources: Record<Locale, Messages> = { ko, en, zh };
-export const localeTags: Record<Locale, string> = {
-  ko: "ko-KR",
-  en: "en-US",
-  zh: "zh-CN",
-};
 
 const interpolate = (message: string, variables?: Variables) =>
   message.replace(/\{([a-zA-Z0-9_]+)\}/gu, (_, key: string) =>

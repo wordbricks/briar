@@ -1,4 +1,4 @@
-import type { Locale } from "../i18n";
+import type { Locale } from "../i18n/locale";
 import type { AutoHuntWorkflow } from "./auto-hunt-contract";
 import type {
   ChannelAgentEffort as ModelEffort,
