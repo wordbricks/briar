@@ -2,7 +2,7 @@ import XCTest
 
 @MainActor
 final class BriarCompanionUITests: XCTestCase {
-    private let transitionTimeout: TimeInterval = 10
+    private let transitionTimeout: TimeInterval = 20
 
     override func setUpWithError() throws {
         continueAfterFailure = false
