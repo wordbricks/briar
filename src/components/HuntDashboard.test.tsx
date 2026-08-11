@@ -3934,6 +3934,91 @@ describe("HuntDashboard", () => {
     container.remove();
   });
 
+  it("keeps conversation images loaded when the run snapshot refreshes", async () => {
+    const createObjectUrl = vi.fn(() => "blob:conversation-attachment");
+    const revokeObjectUrl = vi.fn();
+    Object.defineProperty(URL, "createObjectURL", {
+      configurable: true,
+      value: createObjectUrl,
+    });
+    Object.defineProperty(URL, "revokeObjectURL", {
+      configurable: true,
+      value: revokeObjectUrl,
+    });
+    const attachment = {
+      id: "conversation-attachment",
+      filename: "conversation.png",
+      contentType: "image/png",
+      byteSize: 12,
+      url: "/attachments/conversation-attachment",
+    };
+    const createdAt = "2026-08-11T00:00:00.000Z";
+    const message: IssueMessage = {
+      id: "message-with-image",
+      runId: demoDashboard.runs[0].id,
+      parentMessageId: null,
+      body: "![conversation](briar-attachment://conversation-attachment)",
+      attachments: [attachment],
+      author: { id: "jay", name: "Jay", image: null, provider: null },
+      replyCount: 0,
+      createdAt,
+      updatedAt: createdAt,
+    };
+    const onLoadAttachment = vi.fn(async () =>
+      new Blob([attachment.filename], { type: attachment.contentType })
+    );
+    const onLoadIssueMessages = vi.fn(async () => [message]);
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    const renderPage = (run: HuntRun) => (
+      <RunPage
+        isSidebarOpen
+        error={null}
+        isRecovering={false}
+        onBack={() => undefined}
+        onCancel={async () => undefined}
+        onLoadAttachment={onLoadAttachment}
+        onLoadIssueMessages={onLoadIssueMessages}
+        onLoadRunEvidence={async () => []}
+        onMove={async () => undefined}
+        onRetry={async () => undefined}
+        onSendIssueMessage={async () => {
+          throw new Error("not implemented in this test");
+        }}
+        run={run}
+      />
+    );
+
+    await act(async () => root.render(renderPage(demoDashboard.runs[0])));
+    expect(onLoadIssueMessages).toHaveBeenCalledOnce();
+    expect(onLoadAttachment).toHaveBeenCalledOnce();
+    expect(createObjectUrl).toHaveBeenCalledOnce();
+    expect(
+      container.querySelector<HTMLImageElement>(".issue-message-body img")?.src,
+    ).toContain("blob:conversation-attachment");
+
+    await act(async () => {
+      root.render(renderPage({
+        ...demoDashboard.runs[0],
+        updatedAt: "2026-08-11T00:00:15.000Z",
+      }));
+      await Promise.resolve();
+    });
+
+    expect(onLoadIssueMessages).toHaveBeenCalledOnce();
+    expect(onLoadAttachment).toHaveBeenCalledOnce();
+    expect(createObjectUrl).toHaveBeenCalledOnce();
+    expect(revokeObjectUrl).not.toHaveBeenCalled();
+    expect(
+      container.querySelector<HTMLImageElement>(".issue-message-body img")?.src,
+    ).toContain("blob:conversation-attachment");
+
+    await act(async () => root.unmount());
+    expect(revokeObjectUrl).toHaveBeenCalledOnce();
+    container.remove();
+  });
+
   it("scrolls the conversation to the bottom after loading and sending", async () => {
     const createdAt = new Date().toISOString();
     const loadedMessage: IssueMessage = {
