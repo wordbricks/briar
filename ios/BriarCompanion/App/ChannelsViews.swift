@@ -131,8 +131,6 @@ private struct ChannelRow: View {
 
 /// A channel's root messages. Tapping one opens its thread.
 struct ChannelMessagesView: View {
-    @Environment(\.dismiss) private var dismiss
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @ObservedObject var channels: ChannelsStore
     @AppStorage("companion-locale") private var localeRaw = CompanionLocale.ko.rawValue
     @State private var draft = ""
@@ -173,18 +171,14 @@ struct ChannelMessagesView: View {
             onSkillSessionOpen: onSkillSessionOpen,
             showsThreadSummary: true
         )
-        .safeAreaInset(edge: .top, spacing: 0) {
-            ChannelHeader(
-                channel: currentChannel,
-                locale: locale,
-                showsStatusIcons: !dynamicTypeSize.isAccessibilitySize,
-                onBack: {
-                    channels.closeChannelFocus(channelID: channel.id)
-                    dismiss()
-                }
-            )
+        .navigationTitle(currentChannel.name)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                ChannelNavigationTitle(channel: currentChannel, locale: locale)
+            }
         }
-        .toolbar(.hidden, for: .navigationBar)
+        .toolbarBackground(.hidden, for: .navigationBar)
         .task(id: channel.id) { await channels.openChannel(channel.id) }
         .sheet(item: $previewFile) { file in
             QuickLookPreview(fileURL: file.url)
@@ -219,11 +213,9 @@ struct ChannelMessagesView: View {
     }
 }
 
-private struct ChannelHeader: View {
+private struct ChannelNavigationTitle: View {
     let channel: ChannelSummary
     let locale: CompanionLocale
-    let showsStatusIcons: Bool
-    let onBack: () -> Void
 
     private var memberLabel: String {
         String(
@@ -240,71 +232,23 @@ private struct ChannelHeader: View {
     }
 
     var body: some View {
-        HStack(spacing: 10) {
-            Button(action: onBack) {
-                Image(systemName: "chevron.left")
-                    .font(.title3.weight(.semibold))
-                    .frame(width: 46, height: 46)
-                    .background(.thinMaterial, in: Circle())
-                    .overlay {
-                        Circle()
-                            .stroke(Color.secondary.opacity(0.22), lineWidth: 1)
-                    }
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(L10n.text(.channelBack, locale: locale))
-            .accessibilityIdentifier("channel-header-back")
+        HStack(spacing: 7) {
+            Image(systemName: channel.visibility == .restricted ? "lock.fill" : "number")
+                .foregroundStyle(.secondary)
 
-            HStack(spacing: 10) {
-                Image(systemName: channel.visibility == .restricted ? "lock.fill" : "number")
-                    .font(.title2.weight(.semibold))
-                    .foregroundStyle(.primary)
-                    .frame(width: 30)
-
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(channel.name)
-                        .font(.headline.weight(.bold))
-                        .lineLimit(1)
-                    Text("\(memberLabel) • \(agentLabel)")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.78)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .padding(.horizontal, 14)
-            .frame(maxWidth: .infinity, minHeight: 54)
-            .background(.thinMaterial, in: Capsule())
-            .overlay {
-                Capsule()
-                    .stroke(Color.secondary.opacity(0.22), lineWidth: 1)
-            }
-            .accessibilityElement(children: .combine)
-            .accessibilityIdentifier("channel-header-identity")
-
-            if showsStatusIcons {
-                HStack(spacing: 16) {
-                    Image(systemName: "sparkles")
-                    Image(systemName: "headphones")
-                }
-                .font(.title3.weight(.medium))
-                .foregroundStyle(.primary)
-                .padding(.horizontal, 15)
-                .frame(height: 46)
-                .background(.thinMaterial, in: Capsule())
-                .overlay {
-                    Capsule()
-                        .stroke(Color.secondary.opacity(0.22), lineWidth: 1)
-                }
-                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 0) {
+                Text(channel.name)
+                    .font(.headline)
+                    .lineLimit(1)
+                Text("\(memberLabel) • \(agentLabel)")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(.bar)
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("channel-header")
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("channel-header-identity")
     }
 }
 
@@ -352,6 +296,7 @@ struct ChannelThreadView: View {
         )
         .navigationTitle(L10n.text(.channelThread, locale: locale))
         .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(.hidden, for: .navigationBar)
         .sheet(item: $previewFile) { file in
             QuickLookPreview(fileURL: file.url)
         }
@@ -1518,11 +1463,10 @@ private struct ChannelComposer: View {
                 ) {
                     Image(systemName: "plus")
                         .font(.body.weight(.medium))
-                        .foregroundStyle(.secondary)
-                        .frame(width: 40, height: 40)
-                        .background(.background, in: Circle())
-                        .overlay { Circle().stroke(Color.secondary.opacity(0.18), lineWidth: 1) }
                 }
+                .buttonStyle(.bordered)
+                .buttonBorderShape(.circle)
+                .controlSize(.regular)
                 .disabled(
                     isLoadingPhotos || sending ||
                         attachments.count >= PendingIssueAttachment.maximumCount
@@ -1530,7 +1474,7 @@ private struct ChannelComposer: View {
                 .accessibilityLabel(L10n.text("이미지 첨부"))
                 .accessibilityIdentifier("channel-composer-attach")
                 TextField(placeholder, text: $draft, axis: .vertical)
-                    .textFieldStyle(.plain)
+                    .textFieldStyle(.roundedBorder)
                     .lineLimit(1...4)
                     .disabled(sending)
                     .accessibilityIdentifier("channel-composer-field")
@@ -1549,26 +1493,22 @@ private struct ChannelComposer: View {
                         Task { await send(body, selected, selectedAttachments) }
                     } label: {
                         if sending {
-                            ProgressView().controlSize(.small).frame(width: 40, height: 40)
+                            ProgressView().controlSize(.small)
                         } else {
                             Image(systemName: "arrow.up")
                                 .font(.body.weight(.bold))
-                                .foregroundStyle(.white)
-                                .frame(width: 40, height: 40)
-                                .background(.tint, in: Circle())
                         }
                     }
+                    .buttonStyle(.borderedProminent)
+                    .buttonBorderShape(.circle)
+                    .controlSize(.regular)
                     .disabled(sending)
                     .accessibilityIdentifier("channel-composer-send")
                 }
             }
-            .padding(7)
-            .background(.secondary.opacity(0.1), in: Capsule())
-            .overlay { Capsule().stroke(Color.secondary.opacity(0.18), lineWidth: 1) }
             .padding(.horizontal, 12)
-            .padding(.vertical, 10)
+            .padding(.vertical, 8)
         }
-        .background(.bar)
         .onChange(of: selectedPhotos) { _, items in
             guard !items.isEmpty else { return }
             Task { await importPhotos(items) }

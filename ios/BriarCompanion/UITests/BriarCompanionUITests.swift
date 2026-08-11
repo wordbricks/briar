@@ -104,7 +104,7 @@ final class BriarCompanionUITests: XCTestCase {
         captureScreenshot(named: "companion-attention-filter")
     }
 
-    func testChannelHeaderShowsIdentityAndParticipationCounts() {
+    func testChannelUsesNativeNavigationAndShowsParticipationCounts() {
         let app = launchInsideCompanion()
 
         app.tabBars.buttons["홈"].tap()
@@ -114,22 +114,19 @@ final class BriarCompanionUITests: XCTestCase {
         XCTAssertTrue(channel.waitForExistence(timeout: 5))
         channel.tap()
 
-        let header = app.descendants(matching: .any)["channel-header"]
-        XCTAssertTrue(header.waitForExistence(timeout: 5))
-        let identity = app.descendants(matching: .any)
-            .matching(
-                NSPredicate(
-                    format: "label CONTAINS %@ AND label CONTAINS %@",
-                    "design",
-                    "멤버 4명 • Agent 3개"
-                )
-            )
-            .firstMatch
+        let navigationBar = app.navigationBars["design"]
+        XCTAssertTrue(navigationBar.waitForExistence(timeout: 5))
+        let identity = app.descendants(matching: .any)["channel-header-identity"]
         XCTAssertTrue(identity.waitForExistence(timeout: 5))
         XCTAssertTrue(identity.label.contains("design"))
         XCTAssertTrue(identity.label.contains("멤버 4명 • Agent 3개"))
-        XCTAssertTrue(app.buttons["channel-header-back"].exists)
+        XCTAssertTrue(navigationBar.buttons.firstMatch.isHittable)
         captureScreenshot(named: "companion-channel-header")
+
+        let edge = app.coordinate(withNormalizedOffset: CGVector(dx: 0.01, dy: 0.5))
+        let destination = app.coordinate(withNormalizedOffset: CGVector(dx: 0.75, dy: 0.5))
+        edge.press(forDuration: 0.05, thenDragTo: destination)
+        XCTAssertTrue(channel.waitForExistence(timeout: 5))
     }
 
     func testChannelComposerShowsAttachmentButton() {
@@ -144,7 +141,11 @@ final class BriarCompanionUITests: XCTestCase {
 
         let attach = app.buttons["channel-composer-attach"]
         XCTAssertTrue(attach.waitForExistence(timeout: 5))
-        XCTAssertTrue(app.textFields["channel-composer-field"].exists)
+        let field = app.textFields["channel-composer-field"]
+        XCTAssertTrue(field.exists)
+        field.tap()
+        field.typeText("Native input")
+        XCTAssertTrue(app.buttons["channel-composer-send"].waitForExistence(timeout: 5))
         captureScreenshot(named: "companion-channel-composer")
     }
 
