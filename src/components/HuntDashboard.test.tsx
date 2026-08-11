@@ -979,7 +979,7 @@ describe("HuntDashboard", () => {
         ".run-page-inline-title",
       );
       const description = container.querySelector<HTMLTextAreaElement>(
-        ".issue-description-inline-editor",
+        ".issue-description-inline-editor .issue-description-input",
       );
       expect(title?.value).toBe(run.title);
       expect(description?.value).toBe(run.issueDescription ?? "");
@@ -1016,6 +1016,118 @@ describe("HuntDashboard", () => {
       });
       expect(container.querySelector(".run-page-save-status")?.textContent)
         .toContain("저장됨");
+    } finally {
+      await act(async () => root.unmount());
+      container.remove();
+      vi.useRealTimers();
+    }
+  });
+
+  it("keeps referenced images inline while the issue body remains editable", async () => {
+    vi.useFakeTimers();
+    const createObjectUrl = vi.fn((blob: Blob) =>
+      `blob:issue-inline-editor-${blob.size}`
+    );
+    const revokeObjectUrl = vi.fn();
+    Object.defineProperty(URL, "createObjectURL", {
+      configurable: true,
+      value: createObjectUrl,
+      writable: true,
+    });
+    Object.defineProperty(URL, "revokeObjectURL", {
+      configurable: true,
+      value: revokeObjectUrl,
+      writable: true,
+    });
+    const inlineAttachment = {
+      id: "attachment-inline",
+      filename: "inline.png",
+      contentType: "image/png",
+      byteSize: 6,
+      url: "/attachments/attachment-inline",
+    };
+    const galleryAttachment = {
+      id: "attachment-gallery",
+      filename: "gallery.png",
+      contentType: "image/png",
+      byteSize: 7,
+      url: "/attachments/attachment-gallery",
+    };
+    const run = {
+      ...demoDashboard.runs[0],
+      issueDescription:
+        "before\n\n![inline](briar-attachment://attachment-inline)\n\nafter",
+      attachments: [inlineAttachment, galleryAttachment],
+      workerId: null,
+    };
+    const onUpdateIssue = vi.fn(async () => undefined);
+    const onLoadAttachment = vi.fn(
+      async (attachment: typeof inlineAttachment) =>
+        new Blob([attachment.filename], { type: attachment.contentType }),
+    );
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    try {
+      await act(async () => root.render(
+        <RunPage
+          isSidebarOpen
+          error={null}
+          isRecovering={false}
+          onBack={() => undefined}
+          onCancel={async () => undefined}
+          onLoadAttachment={onLoadAttachment}
+          onLoadIssueMessages={async () => []}
+          onLoadRunEvidence={async () => []}
+          onMove={async () => undefined}
+          onRetry={async () => undefined}
+          onSendIssueMessage={async () => {
+            throw new Error("not implemented in this test");
+          }}
+          onUpdateIssue={onUpdateIssue}
+          run={run}
+        />,
+      ));
+
+      const editor = container.querySelector(".issue-description-inline-editor");
+      expect(editor?.tagName).toBe("DIV");
+      expect(
+        Array.from(
+          editor?.querySelectorAll<HTMLTextAreaElement>(
+            ".issue-description-input",
+          ) ?? [],
+        ).map((textarea) => textarea.value),
+      ).toEqual(["before\n\n", "\n\nafter"]);
+      expect(
+        editor?.querySelector<HTMLImageElement>(
+          '.issue-inline-attachment img[alt="inline.png"]',
+        ),
+      ).not.toBeNull();
+      expect(container.querySelector(".run-attachments")?.textContent)
+        .toContain("gallery.png");
+      expect(container.querySelector(".run-attachments")?.textContent)
+        .not.toContain("inline.png");
+
+      await act(async () => {
+        editor
+          ?.querySelector<HTMLButtonElement>(".issue-inline-attachment button")
+          ?.click();
+      });
+      expect(container.querySelector(".issue-inline-attachment")).toBeNull();
+      expect(container.querySelector(".run-attachments")?.textContent)
+        .not.toContain("inline.png");
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(600);
+      });
+      expect(onUpdateIssue).toHaveBeenCalledWith({
+        title: run.title,
+        description: "before\n\nafter",
+        priority: run.priority,
+        attachments: [],
+        keptAttachmentIds: ["attachment-gallery"],
+      });
     } finally {
       await act(async () => root.unmount());
       container.remove();

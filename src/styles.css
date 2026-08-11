@@ -1589,10 +1589,14 @@ button.paused-review-state { width:100%; border:0; border-radius:8px; cursor:poi
 .issue-content-divider:hover::before,.issue-content-divider:focus-visible::before,.run-page-content.is-resizing .issue-content-divider::before { background:#a997df; box-shadow:0 0 0 1px rgba(128,104,206,.08); }
 .issue-content-divider:hover::after,.issue-content-divider:focus-visible::after,.run-page-content.is-resizing .issue-content-divider::after { border-color:#a997df; background:#f1edfc; opacity:1; }
 .issue-description-empty { margin:0; color:var(--muted-foreground); font-size:var(--text-2xs); }
-.issue-description-inline-editor { width:100%; min-height:220px; padding:8px 9px; resize:vertical; border:1px solid transparent; border-radius:9px; outline:0; color:var(--foreground); background:transparent; font:inherit; font-size:var(--text-xs); line-height:1.7; transition:border-color .15s ease,background-color .15s ease,box-shadow .15s ease; }
-.issue-description-inline-editor:hover { border-color:var(--border); background:var(--card); }
-.issue-description-inline-editor:focus { border-color:#a997df; background:var(--card); box-shadow:0 0 0 2px rgba(128,104,206,.12); }
-.issue-description-inline-editor::placeholder { color:var(--muted-foreground); }
+.issue-description-scroll .issue-description-inline-editor { width:100%; min-height:220px; flex:1 0 220px; display:flex; flex-direction:column; }
+.issue-description-scroll .issue-description-inline-editor .issue-description-input { width:100%; min-height:220px; flex:1 0 220px; padding:0; resize:none; overflow:hidden; border:0; border-radius:0; outline:0; color:var(--foreground); background:transparent; font:inherit; font-size:var(--text-xs); line-height:1.7; }
+.issue-description-scroll .issue-description-inline-editor.has-inline-attachments { min-height:220px; flex-basis:auto; }
+.issue-description-scroll .issue-description-inline-editor.has-inline-attachments .issue-description-input { min-height:1.7em; flex:0 0 auto; }
+.issue-description-scroll .issue-description-inline-editor.has-inline-attachments .issue-description-input:last-child { min-height:80px; flex-grow:1; }
+.issue-description-scroll .issue-description-inline-editor .issue-description-input::placeholder { color:var(--muted-foreground); }
+.issue-description-scroll .issue-description-inline-editor .issue-inline-attachment { margin:8px 0; }
+.issue-description-scroll .issue-description-inline-editor .issue-inline-attachment img { max-height:min(520px,62vh); }
 .issue-description-markdown { min-width:0; color:var(--foreground); font-size:var(--text-xs); line-height:1.7; overflow-wrap:anywhere; }
 .issue-description-markdown > :first-child { margin-top:0; }
 .issue-description-markdown > :last-child { margin-bottom:0; }
