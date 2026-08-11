@@ -26,6 +26,7 @@ import {
   deleteProjectAgentSchedule,
   loadDashboard,
   loadDashboardDelta,
+  loadStatusTrayRuns,
   loadAgentUsageReport,
   loadAgentUsageRuns,
   loadProjectAgentSessions,
@@ -1490,6 +1491,42 @@ describe("API errors", () => {
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining(
         `/projects/${demoDashboard.project.id}/dashboard/delta?cursor=17`,
+      ),
+      expect.objectContaining({ headers: expect.any(Headers) }),
+    );
+  });
+
+  it("loads the organization status tray projection", async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response(JSON.stringify({
+        runs: [{
+          projectId: "project-1",
+          projectName: "Briar",
+          id: "run-1",
+          title: "Optimize tray polling",
+          status: "running",
+          workflowStage: "implementing",
+          workflowStageLabel: "Implement",
+          startedAt: "2026-08-11T00:00:00.000Z",
+          updatedAt: "2026-08-11T00:01:00.000Z",
+          lastEventAt: "2026-08-11T00:01:00.000Z",
+        }],
+        generatedAt: "2026-08-11T00:01:00.000Z",
+      }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      loadStatusTrayRuns("token", "organization-1"),
+    ).resolves.toMatchObject({
+      runs: [expect.objectContaining({ id: "run-1", projectId: "project-1" })],
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "/organizations/organization-1/status-tray/runs",
       ),
       expect.objectContaining({ headers: expect.any(Headers) }),
     );
