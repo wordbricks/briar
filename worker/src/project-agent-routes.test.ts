@@ -64,14 +64,20 @@ describe("project Agent routes", () => {
     GOOGLE_CLIENT_SECRET: "google-secret",
   }) as never;
 
-  const request = (pathname: string, method: "POST" | "PUT", body: unknown) =>
+  const request = (
+    pathname: string,
+    method: "GET" | "POST" | "PUT",
+    body?: unknown,
+    headers?: Record<string, string>,
+  ) =>
     new Request(`https://briar.example${pathname}`, {
       method,
       headers: {
         authorization: `Bearer ${sessionToken}`,
         "content-type": "application/json",
+        ...headers,
       },
-      body: JSON.stringify(body),
+      body: body === undefined ? undefined : JSON.stringify(body),
     });
 
   it("uses the OpenCode label for default names on create and update", async () => {
@@ -112,6 +118,135 @@ describe("project Agent routes", () => {
         name: "OpenCode Agent",
         provider: "opencode",
         model: "vendor/custom-model",
+      },
+    });
+  });
+
+  it("syncs lightweight summaries with cursors and loads detail on demand", async () => {
+    const sessionId = "session-sync-1";
+    const startedAt = "2026-08-10T01:00:00.000Z";
+    const input = {
+      dispatchGroupId: sessionId,
+      agentId: null,
+      agentName: "Repository Agent",
+      skillId: null,
+      sessionType: "task",
+      trigger: "manual",
+      scheduleId: null,
+      scheduleRunId: null,
+      parentSessionId: null,
+      request: "Review the repository",
+      followUps: [],
+      status: "running",
+      issues: [],
+      startedAt,
+      completedAt: null,
+      conversationId: null,
+      summary: null,
+      error: null,
+      requestedWorkerId: null,
+      workerId: null,
+      events: [{ id: "event-1", type: "started", occurredAt: startedAt }],
+      updatedAt: startedAt,
+    } as const;
+    const created = await worker.fetch(
+      request(
+        `/projects/${projectId}/agent-sessions/${sessionId}`,
+        "PUT",
+        input,
+      ),
+      env(),
+    );
+    expect(created.status).toBe(200);
+
+    const snapshot = await worker.fetch(
+      request(`/projects/${projectId}/agent-sessions/changes`, "GET"),
+      env(),
+    );
+    expect(snapshot.status).toBe(200);
+    const etag = snapshot.headers.get("ETag");
+    const snapshotBody = await snapshot.json<{
+      cursor: number;
+      reset: boolean;
+      sessions: Array<Record<string, unknown>>;
+    }>();
+    expect(snapshotBody).toMatchObject({
+      reset: true,
+      sessions: [{
+        id: sessionId,
+        request: "Review the repository",
+        events: [],
+        summary: null,
+        detailLoaded: false,
+      }],
+    });
+    expect(etag).toBeTruthy();
+
+    const unchanged = await worker.fetch(
+      request(
+        `/projects/${projectId}/agent-sessions/changes?cursor=${snapshotBody.cursor}`,
+        "GET",
+        undefined,
+        { "if-none-match": etag! },
+      ),
+      env(),
+    );
+    expect(unchanged.status).toBe(304);
+
+    const completedAt = "2026-08-10T01:05:00.000Z";
+    const updated = await worker.fetch(
+      request(
+        `/projects/${projectId}/agent-sessions/${sessionId}`,
+        "PUT",
+        {
+          ...input,
+          status: "completed",
+          completedAt,
+          summary: "Repository review complete.",
+          events: [
+            ...input.events,
+            { id: "event-2", type: "completed", occurredAt: completedAt },
+          ],
+          updatedAt: completedAt,
+        },
+      ),
+      env(),
+    );
+    expect(updated.status).toBe(200);
+
+    const delta = await worker.fetch(
+      request(
+        `/projects/${projectId}/agent-sessions/changes?cursor=${snapshotBody.cursor}`,
+        "GET",
+        undefined,
+        { "if-none-match": etag! },
+      ),
+      env(),
+    );
+    expect(delta.status).toBe(200);
+    await expect(delta.json()).resolves.toMatchObject({
+      reset: false,
+      sessions: [{
+        id: sessionId,
+        status: "completed",
+        summary: null,
+        events: [],
+        detailLoaded: false,
+      }],
+      deletedSessionIds: [],
+    });
+
+    const detail = await worker.fetch(
+      request(`/projects/${projectId}/agent-sessions/${sessionId}`, "GET"),
+      env(),
+    );
+    expect(detail.status).toBe(200);
+    await expect(detail.json()).resolves.toMatchObject({
+      session: {
+        id: sessionId,
+        summary: "Repository review complete.",
+        events: [{ id: "event-1" }, { id: "event-2" }],
+        detailLoaded: true,
       },
     });
   });

@@ -29,6 +29,7 @@ import {
   loadAgentUsageReport,
   loadAgentUsageRuns,
   loadProjectAgentSessions,
+  loadProjectAgentSessionChanges,
   loadProjectAgentScheduleRuns,
   loadProjectAgents,
   loadRunEvidence,
@@ -1156,6 +1157,33 @@ describe("API errors", () => {
         localOwner: false,
       }),
     ]);
+  });
+
+  it("uses the Agent session cursor and ETag for unchanged polls", async () => {
+    const projectId = "22222222-2222-4222-8222-222222222222";
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      expect(new Headers(init?.headers).get("If-None-Match")).toBe(
+        '"project-agent-sessions:project:7"',
+      );
+      return new Response(null, {
+        status: 304,
+        headers: { ETag: '"project-agent-sessions:project:7"' },
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(loadProjectAgentSessionChanges("token", projectId, {
+      cursor: 7,
+      etag: '"project-agent-sessions:project:7"',
+    })).resolves.toMatchObject({
+      state: { cursor: 7 },
+      notModified: true,
+      sessions: [],
+      deletedSessionIds: [],
+    });
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain(
+      `/projects/${projectId}/agent-sessions/changes?cursor=7`,
+    );
   });
 
   it("canonicalizes the Agent ID before running a task on a Worker", async () => {

@@ -5,6 +5,7 @@ import { createRoot } from "react-dom/client";
 import { beforeEach, describe, expect, it } from "vitest";
 import type { HuntRun } from "../types";
 import {
+  applyProjectAgentSessionSync,
   mergeSynchronizedSessions,
   reconcileWorkerDispatchSession,
   useAutoHuntSessions,
@@ -162,6 +163,56 @@ describe("useAutoHuntSessions", () => {
         workspaceRoot: "/repo",
         localOwner: true,
       });
+  });
+
+  it("replaces remote project summaries without deleting local-owned sessions", () => {
+    const base = {
+      id: "session-1",
+      dispatchGroupId: "session-1",
+      projectId: "project-1",
+      agentId: "agent-1",
+      sessionType: "task",
+      status: "completed",
+      issues: [],
+      startedAt: "2026-07-28T01:00:00.000Z",
+      completedAt: "2026-07-28T01:10:00.000Z",
+      conversationId: null,
+      workspaceRoot: null,
+      summary: null,
+      error: null,
+      events: [],
+      dispatchEvents: [],
+      workers: [],
+      updatedAt: "2026-07-28T01:10:00.000Z",
+    } as AutoHuntSession;
+    const local = {
+      ...base,
+      id: "local-session",
+      localOwner: true,
+    };
+    const staleRemote = {
+      ...base,
+      id: "stale-session",
+      localOwner: false,
+    };
+    const nextRemote = {
+      ...base,
+      id: "next-session",
+      localOwner: false,
+      detailLoaded: false,
+    };
+
+    const result = applyProjectAgentSessionSync(
+      [local, staleRemote],
+      "project-1",
+      [nextRemote],
+      [],
+      true,
+    );
+    expect(result.map((session) => session.id).sort()).toEqual([
+      "local-session",
+      "next-session",
+    ]);
   });
 
   it("starts and settles a scheduled task session with schedule identity", async () => {

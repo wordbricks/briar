@@ -213,6 +213,8 @@ const projectAgentSessionSchema = z.object({
   dispatchEvents: z.array(z.never()),
   workers: z.array(z.never()),
   updatedAt: z.string(),
+  archived: z.boolean().default(false),
+  detailLoaded: z.boolean().default(true),
 });
 const projectAgentScheduleSchema = z.object({
   id: z.string().uuid(),
@@ -1054,6 +1056,101 @@ export async function loadProjectAgentSessions(
       localOwner: false,
     } as AutoHuntSession),
   );
+}
+
+export type ProjectAgentSessionSyncState = {
+  cursor: number;
+  etag: string | null;
+};
+
+export type ProjectAgentSessionSyncResult = {
+  state: ProjectAgentSessionSyncState;
+  hasMore: boolean;
+  reset: boolean;
+  notModified: boolean;
+  sessions: AutoHuntSession[];
+  deletedSessionIds: string[];
+};
+
+const projectAgentSessionSyncSchema = z.object({
+  cursor: z.number().int().nonnegative(),
+  hasMore: z.boolean(),
+  reset: z.boolean(),
+  sessions: z.array(projectAgentSessionSchema),
+  deletedSessionIds: z.array(z.string()),
+});
+
+export async function loadProjectAgentSessionChanges(
+  token: string,
+  projectId: string,
+  state: ProjectAgentSessionSyncState | null,
+): Promise<ProjectAgentSessionSyncResult> {
+  if (!apiUrl) throw new Error("Briar API URL이 설정되지 않았습니다.");
+  const query = state ? `?cursor=${state.cursor}` : "";
+  const headers = new Headers({
+    Accept: "application/json",
+    Authorization: `Bearer ${token}`,
+  });
+  if (state?.etag) headers.set("If-None-Match", state.etag);
+  const response = await fetch(
+    `${apiUrl}/projects/${projectId}/agent-sessions/changes${query}`,
+    { headers },
+  );
+  if (response.status === 304 && state) {
+    return {
+      state: {
+        cursor: state.cursor,
+        etag: response.headers.get("ETag") ?? state.etag,
+      },
+      hasMore: false,
+      reset: false,
+      notModified: true,
+      sessions: [],
+      deletedSessionIds: [],
+    };
+  }
+  if (response.status === 410 && state) {
+    return loadProjectAgentSessionChanges(token, projectId, null);
+  }
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new ApiError(
+      response.status,
+      body?.message ?? `Briar API 요청 실패 (${response.status})`,
+      body?.code,
+      Array.isArray(body?.issues) ? body.issues : undefined,
+    );
+  }
+  const result = projectAgentSessionSyncSchema.parse(await response.json());
+  return {
+    state: {
+      cursor: result.cursor,
+      etag: response.headers.get("ETag"),
+    },
+    hasMore: result.hasMore,
+    reset: result.reset,
+    notModified: false,
+    sessions: result.sessions.map((session) => ({
+      ...session,
+      localOwner: false,
+    } as AutoHuntSession)),
+    deletedSessionIds: result.deletedSessionIds,
+  };
+}
+
+export async function loadProjectAgentSession(
+  token: string,
+  projectId: string,
+  sessionId: string,
+): Promise<AutoHuntSession> {
+  const result = await request<{ session: unknown }>(
+    `/projects/${projectId}/agent-sessions/${encodeURIComponent(sessionId)}`,
+    token,
+  );
+  return {
+    ...projectAgentSessionSchema.parse(result.session),
+    localOwner: false,
+  } as AutoHuntSession;
 }
 
 export async function runProjectAgentTaskOnWorker(

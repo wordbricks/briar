@@ -906,6 +906,13 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
          dead_letter_reason text
        );`,
     );
+    await executeSql(
+      db,
+      await readFile(
+        resolve("migrations/0093_project_agent_session_sync.sql"),
+        "utf8",
+      ),
+    );
   }, 30_000);
 
   afterAll(async () => {

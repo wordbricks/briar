@@ -390,6 +390,12 @@ describe("D1 to R2 log archives", () => {
         ?.session.session_id,
     ).toBe("session-archive");
     expect(await listArchivedProjectAgentSessions(db, bucket, projectId)).toHaveLength(1);
+    await expect(
+      db.prepare(
+        `select archived from briar_project_agent_session_summaries
+         where project_id = ? and session_id = 'project-session-1'`,
+      ).bind(projectId).first<number>("archived"),
+    ).resolves.toBe(1);
 
     const secondPass = await archiveCompletedLogs(db, bucket, observedAt, {
       maxObjects: 24,

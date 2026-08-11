@@ -33,6 +33,7 @@ import {
 } from "../lib/auto-hunt-agent";
 import { copySessionShareLink } from "../lib/issue-links";
 import { formatIssueKey } from "../lib/issue-key";
+import { loadProjectAgentSession } from "../lib/api";
 
 export function ProjectAgentSessionDetail({
   isSidebarOpen,
@@ -41,7 +42,7 @@ export function ProjectAgentSessionDetail({
   onIssueOpen,
   onFollowUp,
   onStop,
-  session,
+  session: sessionSummary,
   token = null,
 }: {
   isSidebarOpen: boolean;
@@ -54,6 +55,43 @@ export function ProjectAgentSessionDetail({
   token?: string | null;
 }) {
   const { localeTag, t } = useI18n();
+  const [loadedSession, setLoadedSession] = useState<AutoHuntSession | null>(null);
+  useEffect(() => {
+    if (
+      !token ||
+      sessionSummary.localOwner !== false ||
+      sessionSummary.detailLoaded !== false
+    ) {
+      setLoadedSession(null);
+      return;
+    }
+    let active = true;
+    void loadProjectAgentSession(
+      token,
+      sessionSummary.projectId,
+      sessionSummary.id,
+    ).then((detail) => {
+      if (active) setLoadedSession(detail);
+    }).catch(() => {
+      // The lightweight summary remains usable for navigation when a detail
+      // request is temporarily unavailable.
+    });
+    return () => {
+      active = false;
+    };
+  }, [
+    sessionSummary.detailLoaded,
+    sessionSummary.id,
+    sessionSummary.localOwner,
+    sessionSummary.projectId,
+    sessionSummary.updatedAt,
+    token,
+  ]);
+  const session =
+    loadedSession?.id === sessionSummary.id &&
+      loadedSession.updatedAt === sessionSummary.updatedAt
+      ? loadedSession
+      : sessionSummary;
   const isRemoteSession = session.localOwner === false;
   const appServerEvents = useAutoHuntAppServerEvents(
     !isRemoteSession && session.sessionType === "task" ? session.id : null,

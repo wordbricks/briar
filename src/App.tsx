@@ -1794,6 +1794,7 @@ export function App() {
             }}
             onStop={() => autoHunt.stopSession(requestedCompanionSession.id)}
             session={requestedCompanionSession}
+            token={briar.token}
           />
         ) : companionPage === "settings" ? (
           <CompanionSettings
