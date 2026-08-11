@@ -6,7 +6,7 @@ import {
   Waypoints,
   BrainCircuit,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -25,6 +25,7 @@ import {
   type AgentProvider,
   type ModelEffort,
 } from "../lib/project-llm";
+import { agentProviderPolicies } from "../lib/agent-provider-contract";
 import type {
   ExecutionWorker,
   HuntRun,
@@ -32,20 +33,24 @@ import type {
 } from "../types";
 import { NativeSelect } from "./NativeSelect";
 import { WorkerIcon } from "./WorkerIcon";
+import { Input } from "./ui/input";
 
 export function WorkerDispatchDialog({
   didDispatchSuccessfully = false,
   error,
+  intent = "dispatch",
   isDispatching,
   onOpenChange,
   onSubmit,
   open,
   policy,
   run,
+  submissionDisabled = false,
   workers,
 }: {
   didDispatchSuccessfully?: boolean;
   error: string | null;
+  intent?: "dispatch" | "approve_execution";
   isDispatching: boolean;
   onOpenChange: (open: boolean) => void;
   onSubmit: (input: {
@@ -57,6 +62,7 @@ export function WorkerDispatchDialog({
   open: boolean;
   policy?: ProjectExecutionWorkerPolicy;
   run: HuntRun | null;
+  submissionDisabled?: boolean;
   workers: ExecutionWorker[];
 }) {
   const { t } = useI18n();
@@ -64,6 +70,9 @@ export function WorkerDispatchDialog({
   const [model, setModel] = useState("");
   const [effort, setEffort] = useState("");
   const [workerId, setWorkerId] = useState("");
+  const selectionSessionRef = useRef<string | null>(null);
+  const selectionDirtyRef = useRef(false);
+  const initializingProviderRef = useRef<AgentProvider | null>(null);
   const policyWorkers = useMemo(
     () =>
       workers.filter(
@@ -96,9 +105,23 @@ export function WorkerDispatchDialog({
       ),
     [policyWorkers, provider],
   );
+  const selectedModelKnown = agentModels[provider].some(
+    (option) => option.value === model,
+  );
+  const normalizedModel = model.trim();
+  const selectionSessionKey = run?.id ?? "__without-run__";
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      selectionSessionRef.current = null;
+      selectionDirtyRef.current = false;
+      initializingProviderRef.current = null;
+      return;
+    }
+    const startsNewSelectionSession =
+      selectionSessionRef.current !== selectionSessionKey;
+    if (!startsNewSelectionSession && selectionDirtyRef.current) return;
+    selectionSessionRef.current = selectionSessionKey;
     const preferredWorker = policyWorkers.find(
       (worker) =>
         worker.id === (run?.requestedWorkerId ?? policy?.defaultWorkerId),
@@ -109,6 +132,7 @@ export function WorkerDispatchDialog({
       preferredWorker?.agentProvider ??
       healthyProviders[0] ??
       "codex";
+    initializingProviderRef.current = initialProvider;
     setProvider(initialProvider);
     setModel(
       run?.preferredProvider
@@ -135,16 +159,24 @@ export function WorkerDispatchDialog({
     run?.requestedModel,
     run?.requestedProvider,
     run?.requestedWorkerId,
+    selectionSessionKey,
   ]);
 
   useEffect(() => {
-    if (!model && effort) setEffort("");
-  }, [effort, model]);
+    if (!normalizedModel && effort) setEffort("");
+  }, [effort, normalizedModel]);
 
   useEffect(() => {
     if (!open || healthyProviders.length === 0) return;
+    if (
+      initializingProviderRef.current &&
+      provider !== initializingProviderRef.current
+    ) return;
+    initializingProviderRef.current = null;
     if (healthyProviders.includes(provider)) return;
     setProvider(healthyProviders[0]);
+    setModel("");
+    setEffort("");
   }, [healthyProviders, open, provider]);
 
   useEffect(() => {
@@ -156,20 +188,34 @@ export function WorkerDispatchDialog({
     setWorkerId("");
   }, [eligibleWorkers, workerId]);
 
-  const canDispatch = workerId === ""
-    ? eligibleWorkers.length > 0
+  const providerIsHealthy = healthyProviders.includes(provider);
+  const canDispatch = providerIsHealthy && (workerId === ""
+    ? eligibleWorkers.some(
+        (worker) => worker.readiness === "available" ||
+          worker.readiness === "busy",
+      )
     : eligibleWorkers.some(
         (worker) => worker.id === workerId && worker.readiness === "available",
-      );
+      ));
   const isReassign = Boolean(run?.dispatchedAt || run?.workerId);
+  const isApproval = intent === "approve_execution";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{t("worker.dispatchTitle")}</DialogTitle>
+          <DialogTitle>
+            {t(isApproval
+              ? "worker.executionApprovalTitle"
+              : "worker.dispatchTitle")}
+          </DialogTitle>
           <DialogDescription>
-            {t("worker.dispatchDescription", { title: run?.title ?? "" })}
+            {t(
+              isApproval
+                ? "worker.executionApprovalDescription"
+                : "worker.dispatchDescription",
+              { title: run?.title ?? "" },
+            )}
           </DialogDescription>
         </DialogHeader>
 
@@ -179,6 +225,7 @@ export function WorkerDispatchDialog({
             <NativeSelect
               label={t("worker.provider")}
               onValueChange={(value) => {
+                selectionDirtyRef.current = true;
                 setProvider(value as AgentProvider);
                 setModel("");
                 setEffort("");
@@ -199,27 +246,49 @@ export function WorkerDispatchDialog({
           </label>
           <label>
             <span><BrainCircuit size={15} />{t("issue.preferredModel")}</span>
-            <NativeSelect
-              label={t("issue.preferredModel")}
-              onValueChange={(value) => {
-                setModel(value);
-                if (!value) setEffort("");
-              }}
-              options={agentModels[provider].map((option) => ({
-                ...option,
-                label: option.value
-                  ? option.label
-                  : t("settings.providerDefaultModel"),
-              }))}
-              value={model}
-            />
+            {agentProviderPolicies[provider].allowUnlistedModels ? (
+              <Input
+                aria-label={t("issue.preferredModel")}
+                maxLength={100}
+                onChange={(event) => {
+                  selectionDirtyRef.current = true;
+                  setModel(event.currentTarget.value);
+                }}
+                placeholder={t("settings.providerDefaultModel")}
+                value={model}
+              />
+            ) : (
+              <NativeSelect
+                label={t("issue.preferredModel")}
+                onValueChange={(value) => {
+                  selectionDirtyRef.current = true;
+                  setModel(value);
+                  if (!value) setEffort("");
+                }}
+                options={[
+                  ...(!selectedModelKnown && model
+                    ? [{ label: model, value: model }]
+                    : []),
+                  ...agentModels[provider].map((option) => ({
+                    ...option,
+                    label: option.value
+                      ? option.label
+                      : t("settings.providerDefaultModel"),
+                  })),
+                ]}
+                value={model}
+              />
+            )}
           </label>
           <label>
             <span><BrainCircuit size={15} />{t("settings.effort")}</span>
             <NativeSelect
-              disabled={!model}
+              disabled={!normalizedModel}
               label={t("settings.effort")}
-              onValueChange={setEffort}
+              onValueChange={(value) => {
+                selectionDirtyRef.current = true;
+                setEffort(value);
+              }}
               options={[
                 {
                   label: t("settings.providerDefaultEffort"),
@@ -237,7 +306,10 @@ export function WorkerDispatchDialog({
             <span><Cpu size={15} />{t("worker.executionEnvironment")}</span>
             <NativeSelect
               label={t("worker.executionEnvironment")}
-              onValueChange={setWorkerId}
+              onValueChange={(value) => {
+                selectionDirtyRef.current = true;
+                setWorkerId(value);
+              }}
               options={[
                 {
                   label: t("worker.anyAvailable"),
@@ -261,7 +333,10 @@ export function WorkerDispatchDialog({
                 <button
                   aria-pressed={workerId === ""}
                   className="worker-readiness-row"
-                  onClick={() => setWorkerId("")}
+                  onClick={() => {
+                    selectionDirtyRef.current = true;
+                    setWorkerId("");
+                  }}
                   type="button"
                 >
                   <span className="worker-readiness-dot any" />
@@ -284,7 +359,10 @@ export function WorkerDispatchDialog({
                     className="worker-readiness-row"
                     disabled={worker.readiness !== "available"}
                     key={worker.id}
-                    onClick={() => setWorkerId(worker.id)}
+                    onClick={() => {
+                      selectionDirtyRef.current = true;
+                      setWorkerId(worker.id);
+                    }}
                     type="button"
                   >
                     <span className={`worker-readiness-dot ${worker.readiness}`} />
@@ -308,7 +386,12 @@ export function WorkerDispatchDialog({
               </>
             )}
           </div>
-          {error && <p className="run-status-error"><CircleAlert size={13} />{error}</p>}
+          {error && (
+            <p className="run-status-error" role="alert">
+              <CircleAlert aria-hidden="true" size={13} />
+              {error}
+            </p>
+          )}
         </div>
 
         <DialogFooter>
@@ -321,13 +404,20 @@ export function WorkerDispatchDialog({
           </Button>
           <Button
             aria-label={
-              didDispatchSuccessfully ? t("worker.dispatchComplete") : undefined
+              didDispatchSuccessfully
+                ? t(isApproval
+                  ? "worker.executionApprovalComplete"
+                  : "worker.dispatchComplete")
+                : undefined
             }
-            disabled={!canDispatch || isDispatching || didDispatchSuccessfully}
+            disabled={
+              submissionDisabled || !canDispatch || isDispatching ||
+              didDispatchSuccessfully
+            }
             onClick={() =>
               onSubmit({
                 provider,
-                model: model || null,
+                model: normalizedModel || null,
                 effort: (effort || null) as ModelEffort | null,
                 workerId: workerId || null,
               })
@@ -339,8 +429,14 @@ export function WorkerDispatchDialog({
               <LoaderCircle className="spin" size={15} />
             ) : null}
             {didDispatchSuccessfully
-              ? t("worker.dispatchComplete")
-              : t(isReassign ? "worker.reassign" : "worker.dispatch")}
+              ? t(isApproval
+                ? "worker.executionApprovalComplete"
+                : "worker.dispatchComplete")
+              : t(isApproval
+                ? "worker.approveExecution"
+                : isReassign
+                  ? "worker.reassign"
+                  : "worker.dispatch")}
           </Button>
         </DialogFooter>
       </DialogContent>

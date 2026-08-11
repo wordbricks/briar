@@ -47,6 +47,8 @@ struct CompanionShellView: View {
                     activeProjectID: project.id,
                     currentUserID: user?.id,
                     projects: projects,
+                    providers: snapshot?.organizationProviders ?? [],
+                    workers: snapshot?.workers ?? [],
                     onIssueOpen: { projectID, runID, sourceIsCurrent in
                         await navigation.openIssueWhenAvailable(
                             projectID: projectID,
@@ -682,6 +684,13 @@ private enum RunDetailTab: String, CaseIterable, Identifiable {
     }
 }
 
+private struct IssueExecutionApprovalPresentation: Identifiable {
+    let proposal: IssueExecutionProposal
+    let snapshot: DashboardSnapshot
+
+    var id: UUID { proposal.id }
+}
+
 struct RunDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var inbox: InboxStore
@@ -698,6 +707,8 @@ struct RunDetailView: View {
     @State private var confirmingDelete = false
     @State private var showingTransfer = false
     @State private var showingDependencyPicker = false
+    @State private var executionApprovalPresentation: IssueExecutionApprovalPresentation?
+    @State private var preparingExecutionProposalID: UUID?
     @State private var transferTargetProjectID: UUID?
     @State private var localStatus: DashboardRun.Status
     @State private var localWorkflowStage: String?
@@ -726,6 +737,8 @@ struct RunDetailView: View {
     private let members: [OrganizationMember]
     private let currentUserID: String?
     private let refresh: () async -> Void
+    private let token: String
+    private let api: any MobileAPIClientProtocol
 
     private var issueMentionCandidates: [ChannelMentionTarget] {
         MessageMentions.issueCandidates(members: members, currentUserId: currentUserID)
@@ -774,6 +787,8 @@ struct RunDetailView: View {
         self.members = members
         self.currentUserID = currentUserID
         self.refresh = refresh
+        self.token = token
+        self.api = api
         _detail = StateObject(wrappedValue: RunDetailStore(
             api: api,
             projectID: projectID,
@@ -862,6 +877,27 @@ struct RunDetailView: View {
             )
             .presentationDetents([.medium, .large])
         }
+        .sheet(item: $executionApprovalPresentation) { presentation in
+            ExecutionProposalApprovalSheet(
+                targetTitle: presentation.snapshot.runs.first(where: {
+                    $0.id == presentation.proposal.runId
+                })?.title ?? presentation.proposal.title,
+                providers: presentation.snapshot.organizationProviders ?? [],
+                workers: presentation.snapshot.workers ?? [],
+                policy: presentation.snapshot.executionPolicy,
+                locale: locale,
+                delegationNotice: issueExecutionDelegationNotice(
+                    agentName: presentation.proposal.delegatedByAgentName,
+                    locale: locale
+                ),
+                approve: { request in
+                    try await approveExecutionProposal(
+                        presentation.proposal,
+                        request: request
+                    )
+                }
+            )
+        }
         .accessibilityIdentifier("run-detail")
     }
 
@@ -921,6 +957,30 @@ struct RunDetailView: View {
             .onChange(of: run.workflowStage) { _, stage in localWorkflowStage = stage }
             .onChange(of: run.prerequisites) { _, prerequisites in
                 dependencyIDs = Set((prerequisites ?? []).map(\.id))
+            }
+            .onDisappear {
+                executionApprovalPresentation = nil
+                preparingExecutionProposalID = nil
+                detail.close()
+            }
+            .onChange(of: detail.messages) { _, messages in
+                guard let proposalID = executionApprovalPresentation?.proposal.id else {
+                    return
+                }
+                if !messages.contains(where: {
+                    $0.executionProposal?.id == proposalID &&
+                        $0.executionProposal?.status == .pending
+                }) {
+                    executionApprovalPresentation = nil
+                }
+            }
+            .onChange(of: pendingExecutionTargetSignatures) { previous, current in
+                guard pendingIssueExecutionTargetChanged(
+                    from: previous,
+                    to: current
+                ) else { return }
+                executionApprovalPresentation = nil
+                Task { await detail.load(queueIfLoading: true) }
             }
     }
 
@@ -1534,6 +1594,17 @@ struct RunDetailView: View {
                             )
                             .font(.caption)
                             .foregroundStyle(.secondary)
+                            if proposal.executeAfterCreate == true {
+                                Label(
+                                    L10n.text(
+                                        "생성 승인 후에도 자동 실행되지 않습니다. 별도의 실행 승인 카드가 이어서 표시됩니다.",
+                                        locale: locale
+                                    ),
+                                    systemImage: "checkmark.shield"
+                                )
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            }
                         }
                         if proposal.status == .accepted {
                             Label(
@@ -1582,8 +1653,251 @@ struct RunDetailView: View {
                             .stroke(Color.accentColor.opacity(0.25))
                     }
                 }
+                if let proposal = message.executionProposal {
+                    issueExecutionProposalCard(proposal)
+                }
                 Button(L10n.text("답글", locale: locale)) { replyTo = message }.font(.caption)
             }
+        }
+    }
+
+    @ViewBuilder
+    private func issueExecutionProposalCard(_ proposal: IssueExecutionProposal) -> some View {
+        let target = executionTarget(proposal)
+        let isFreshBacklog = issueExecutionApprovalUnavailable(
+            run: target,
+            targetRunID: proposal.runId
+        ) == nil
+        VStack(alignment: .leading, spacing: 8) {
+            Text(L10n.text("이슈 실행 제안", locale: locale))
+                .font(.subheadline.weight(.semibold))
+            Text(target?.title ?? proposal.title)
+                .font(.subheadline.weight(.semibold))
+            if let notice = issueExecutionDelegationNotice(
+                agentName: proposal.delegatedByAgentName,
+                locale: locale
+            ) {
+                Label(notice, systemImage: "arrow.triangle.branch")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            if proposal.status == .accepted {
+                Label(
+                    L10n.text("승인되어 실행을 요청했습니다.", locale: locale),
+                    systemImage: "checkmark.seal.fill"
+                )
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.tint)
+                executionProposalSummary(proposal)
+                if proposal.runId != run.id {
+                    if proposal.projectId == projectID, target != nil {
+                        NavigationLink(value: proposal.runId) {
+                            Label(
+                                L10n.text(.channelViewIssue, locale: locale),
+                                systemImage: "arrow.right.circle"
+                            )
+                        }
+                        .buttonStyle(.bordered)
+                    } else {
+                        Link(
+                            destination: BriarShareLinks.issueShareURL(
+                                projectID: proposal.projectId,
+                                runID: proposal.runId,
+                                origin: BriarShareLinks.defaultOrigin
+                            )
+                        ) {
+                            Label(
+                                L10n.text(.channelViewIssue, locale: locale),
+                                systemImage: "arrow.up.right.circle"
+                            )
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                }
+            } else {
+                Label(
+                    isFreshBacklog
+                        ? L10n.text(
+                            "승인 시점에도 fresh backlog 상태인지 다시 확인합니다.",
+                            locale: locale
+                        )
+                        : L10n.text(
+                            "최신 스냅샷에서 fresh backlog 상태를 확인한 뒤 승인할 수 있습니다.",
+                            locale: locale
+                        ),
+                    systemImage: isFreshBacklog ? "checkmark.shield" : "arrow.clockwise"
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+                Button {
+                    Task { await prepareIssueExecutionApproval(proposal) }
+                } label: {
+                    if preparingExecutionProposalID == proposal.id {
+                        ProgressView()
+                    } else {
+                        Label(
+                            L10n.text(
+                                isFreshBacklog ? "실행 설정 선택" : "최신 상태 확인",
+                                locale: locale
+                            ),
+                            systemImage: isFreshBacklog
+                                ? "slider.horizontal.3"
+                                : "arrow.clockwise"
+                        )
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(
+                    mutations.isActive("issue-execution-proposal-\(proposal.id)") ||
+                        preparingExecutionProposalID != nil ||
+                        executionApprovalPresentation != nil
+                )
+                .accessibilityIdentifier(
+                    "configure-issue-execution-proposal-\(proposal.id.uuidString.lowercased())"
+                )
+            }
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+        .overlay {
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(Color.orange.opacity(0.35))
+        }
+        .accessibilityIdentifier(
+            "issue-execution-proposal-\(proposal.id.uuidString.lowercased())"
+        )
+    }
+
+    @ViewBuilder
+    private func executionProposalSummary(_ proposal: IssueExecutionProposal) -> some View {
+        if let provider = proposal.requestedProvider {
+            let values = [
+                provider.displayName,
+                proposal.requestedModel,
+                proposal.requestedEffort?.rawValue,
+            ].compactMap { $0 }
+            Label(values.joined(separator: " · "), systemImage: "cpu")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        if let workerID = proposal.requestedWorkerId {
+            let label = workers.first(where: { $0.id == workerID })?.label ?? workerID
+            Label(label, systemImage: "desktopcomputer")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private func executionTarget(_ proposal: IssueExecutionProposal) -> DashboardRun? {
+        if proposal.runId == run.id { return run }
+        return allRuns.first(where: { $0.id == proposal.runId })
+    }
+
+    private var pendingExecutionTargetSignatures: [PendingIssueExecutionTargetSignature] {
+        detail.messages.compactMap { message in
+            guard let proposal = message.executionProposal,
+                  proposal.status == .pending
+            else { return nil }
+            return PendingIssueExecutionTargetSignature(
+                proposalID: proposal.id,
+                targetSignature: issueExecutionSignature(executionTarget(proposal))
+            )
+        }
+        .sorted { $0.proposalID.uuidString < $1.proposalID.uuidString }
+    }
+
+    @MainActor
+    private func prepareIssueExecutionApproval(_ proposal: IssueExecutionProposal) async {
+        guard preparingExecutionProposalID == nil,
+              executionApprovalPresentation == nil,
+              let context = detail.captureExecutionProposal(proposalID: proposal.id)
+        else { return }
+        preparingExecutionProposalID = proposal.id
+        defer {
+            if preparingExecutionProposalID == proposal.id {
+                preparingExecutionProposalID = nil
+            }
+        }
+        do {
+            let snapshot: DashboardSnapshot = try await api.get(
+                MobileAPIContract.Endpoint.dashboard(projectID: proposal.projectId),
+                token: token,
+                as: DashboardSnapshot.self
+            )
+            guard detail.executionProposalIsCurrent(context) else { return }
+            _ = try validateIssueExecutionApproval(
+                snapshot: snapshot,
+                proposal: proposal
+            )
+            actionError = nil
+            executionApprovalPresentation = IssueExecutionApprovalPresentation(
+                proposal: proposal,
+                snapshot: snapshot
+            )
+        } catch {
+            guard detail.executionProposalIsCurrent(context) else { return }
+            actionError = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    private func approveExecutionProposal(
+        _ proposal: IssueExecutionProposal,
+        request: AcceptIssueExecutionProposalRequest
+    ) async throws -> Bool {
+        guard let context = detail.captureExecutionProposal(proposalID: proposal.id) else {
+            return false
+        }
+        do {
+            let preflight: DashboardSnapshot = try await api.get(
+                MobileAPIContract.Endpoint.dashboard(projectID: proposal.projectId),
+                token: token,
+                as: DashboardSnapshot.self
+            )
+            guard detail.executionProposalIsCurrent(context) else { return false }
+            _ = try validateIssueExecutionApproval(
+                snapshot: preflight,
+                proposal: proposal,
+                request: request
+            )
+            let response = try await mutations.acceptIssueExecutionProposal(
+                conversationRunID: run.id,
+                proposalID: proposal.id,
+                request: request
+            )
+            guard detail.executionProposalIsCurrent(context) else { return false }
+            guard response.projectId == proposal.projectId,
+                  response.runId == proposal.runId,
+                  issueExecutionApprovalResponseMatches(
+                      proposal: response.proposal,
+                      projectID: response.projectId,
+                      runID: response.runId,
+                      dispatch: response.dispatch,
+                      expectedProposalID: proposal.id,
+                      request: request
+                  )
+            else { throw MobileAPIError.invalidResponse }
+            let acceptedSnapshot: DashboardSnapshot = try await api.get(
+                MobileAPIContract.Endpoint.dashboard(projectID: proposal.projectId),
+                token: token,
+                as: DashboardSnapshot.self
+            )
+            guard detail.executionProposalIsCurrent(context) else { return false }
+            guard issueExecutionApprovalAcceptedStateMatches(
+                run: acceptedSnapshot.runs.first(where: { $0.id == proposal.runId }),
+                request: request
+            ) else { throw IssueExecutionApprovalError.stateChanged }
+            detail.updateExecutionProposal(response.proposal)
+            actionError = nil
+            await refresh()
+            return true
+        } catch {
+            await detail.load()
+            guard detail.executionProposalIsCurrent(context) else { return false }
+            throw error
         }
     }
 
@@ -1939,9 +2253,18 @@ struct RunDetailView: View {
                 runID: run.id,
                 proposal: proposal
             )
-            detail.updateIssueProposal(accepted)
+            if let acceptedProposal = accepted.proposal {
+                detail.updateIssueProposal(
+                    acceptedProposal,
+                    executionProposal: accepted.executionProposal
+                )
+            }
             actionError = nil
             await refresh()
+            if accepted.requiresAuthoritativeReload ||
+                (proposal.type == .create && proposal.executeAfterCreate == true) {
+                await detail.load()
+            }
         } catch {
             actionError = error.localizedDescription
         }

@@ -479,19 +479,80 @@
       "response": {
         "proposal": {
           "id": "abababab-abab-4bab-8bab-abababababab",
-          "type": "request_issue_update",
-          "changes": {
-            "description": "Use the revised acceptance criteria."
+          "type": "request_issue_create",
+          "issue": {
+            "title": "Native dashboard sync",
+            "description": "Create the follow-up and request execution approval.",
+            "priority": 2,
+            "status": "backlog"
           },
-          "changedFields": [
-            "description"
-          ],
+          "executeAfterCreate": true,
           "status": "accepted",
           "acceptedAt": "2026-08-02T01:03:00.000Z",
           "resultRunId": "33333333-3333-4333-8333-333333333333"
         },
         "outcome": "accepted",
-        "resultRunId": "33333333-3333-4333-8333-333333333333"
+        "resultRunId": "33333333-3333-4333-8333-333333333333",
+        "executionProposal": {
+          "id": "cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd",
+          "type": "request_issue_execute",
+          "status": "pending",
+          "projectId": "11111111-1111-4111-8111-111111111111",
+          "runId": "33333333-3333-4333-8333-333333333333",
+          "title": "Native dashboard sync",
+          "createdAt": "2026-08-11T00:59:00.000Z",
+          "acceptedAt": null,
+          "requestedProvider": null,
+          "requestedModel": null,
+          "requestedEffort": null,
+          "requestedWorkerId": null,
+          "delegatedByAgentId": null,
+          "delegatedByAgentName": null
+        }
+      }
+    },
+    "acceptIssueExecutionProposal": {
+      "method": "POST",
+      "path": "/projects/{projectId}/runs/{runId}/issue-execution-proposals/{proposalId}/accept",
+      "status": 200,
+      "request": {
+        "provider": "codex",
+        "model": "gpt-5.6-sol",
+        "effort": "high",
+        "workerId": null
+      },
+      "response": {
+        "proposal": {
+          "id": "cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd",
+          "type": "request_issue_execute",
+          "status": "accepted",
+          "projectId": "11111111-1111-4111-8111-111111111111",
+          "runId": "33333333-3333-4333-8333-333333333333",
+          "title": "Native dashboard sync",
+          "createdAt": "2026-08-11T00:59:00.000Z",
+          "acceptedAt": "2026-08-11T01:00:00.000Z",
+          "requestedProvider": "codex",
+          "requestedModel": "gpt-5.6-sol",
+          "requestedEffort": "high",
+          "requestedWorkerId": null,
+          "delegatedByAgentId": null,
+          "delegatedByAgentName": null
+        },
+        "outcome": "accepted",
+        "projectId": "11111111-1111-4111-8111-111111111111",
+        "runId": "33333333-3333-4333-8333-333333333333",
+        "dispatch": {
+          "runId": "33333333-3333-4333-8333-333333333333",
+          "agentId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          "provider": "codex",
+          "model": "gpt-5.6-sol",
+          "effort": "high",
+          "requestedWorkerId": null,
+          "requestedByUserId": "fixture-user",
+          "dispatchMode": "any",
+          "dispatchedAt": "2026-08-11T01:00:00.000Z",
+          "outcome": "dispatched"
+        }
       }
     },
     "cancelRun": {
@@ -1055,7 +1116,8 @@
                   "description": "온보딩 흐름을 개선합니다.",
                   "priority": 3,
                   "status": "backlog"
-                }
+                },
+                "executeAfterCreate": true
               },
               "resultRunId": null
             },
@@ -1137,7 +1199,67 @@
       "response": {
         "outcome": "accepted",
         "projectId": "11111111-1111-4111-8111-111111111111",
-        "resultRunId": "33333333-3333-4333-8333-333333333333"
+        "resultRunId": "33333333-3333-4333-8333-333333333333",
+        "executionProposal": {
+          "id": "dededede-dede-4ede-8ede-dededededede",
+          "type": "request_issue_execute",
+          "status": "pending",
+          "projectId": "11111111-1111-4111-8111-111111111111",
+          "runId": "33333333-3333-4333-8333-333333333333",
+          "title": "Native dashboard sync",
+          "createdAt": "2026-08-11T00:59:00.000Z",
+          "acceptedAt": null,
+          "requestedProvider": null,
+          "requestedModel": null,
+          "requestedEffort": null,
+          "requestedWorkerId": null,
+          "delegatedByAgentId": "66666666-6666-4666-8666-666666666666",
+          "delegatedByAgentName": "Bumble"
+        }
+      }
+    },
+    "acceptChannelExecutionProposal": {
+      "method": "POST",
+      "path": "/organizations/{organizationId}/channels/{channelId}/proposals/{proposalId}/accept-execution",
+      "status": 200,
+      "request": {
+        "provider": "codex",
+        "model": null,
+        "effort": null,
+        "workerId": "worker-1"
+      },
+      "response": {
+        "proposal": {
+          "id": "dededede-dede-4ede-8ede-dededededede",
+          "type": "request_issue_execute",
+          "status": "accepted",
+          "projectId": "11111111-1111-4111-8111-111111111111",
+          "runId": "33333333-3333-4333-8333-333333333333",
+          "title": "Native dashboard sync",
+          "createdAt": "2026-08-11T00:59:00.000Z",
+          "acceptedAt": "2026-08-11T01:00:00.000Z",
+          "requestedProvider": "codex",
+          "requestedModel": null,
+          "requestedEffort": null,
+          "requestedWorkerId": "worker-1",
+          "delegatedByAgentId": "66666666-6666-4666-8666-666666666666",
+          "delegatedByAgentName": "Bumble"
+        },
+        "outcome": "accepted",
+        "projectId": "11111111-1111-4111-8111-111111111111",
+        "runId": "33333333-3333-4333-8333-333333333333",
+        "dispatch": {
+          "runId": "33333333-3333-4333-8333-333333333333",
+          "agentId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          "provider": "codex",
+          "model": null,
+          "effort": null,
+          "requestedWorkerId": "worker-1",
+          "requestedByUserId": "fixture-user",
+          "dispatchMode": "specific",
+          "dispatchedAt": "2026-08-11T01:00:00.000Z",
+          "outcome": "dispatched"
+        }
       }
     },
     "toggleChannelMessageReaction": {

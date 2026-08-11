@@ -14,6 +14,7 @@ describe("channel reply completion contract", () => {
       body: "Answer",
       document: null,
       issueProposal: null,
+      executionProposal: null,
       delegation: null,
     });
   });

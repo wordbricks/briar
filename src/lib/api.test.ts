@@ -4,6 +4,8 @@ import {
   ApiError,
   addIssueDependency,
   acceptChannelProposal,
+  acceptChannelExecutionProposal,
+  acceptIssueExecutionProposal,
   beginDeviceAuthorization,
   claimProjectAgentScheduleRun,
   completeProjectAgentScheduleRun,
@@ -117,6 +119,85 @@ describe("API errors", () => {
       expect.objectContaining({
         method: "POST",
         body: JSON.stringify({ projectId: "project-2" }),
+      }),
+    );
+  });
+
+  it("sends only user-selected settings for channel execution approval", async () => {
+    const response = {
+      proposal: { id: "execution-1", status: "accepted" },
+      outcome: "accepted",
+      projectId: "project-1",
+      runId: "run-1",
+      dispatch: { outcome: "dispatched" },
+    };
+    const fetchMock = vi.fn(async (
+      _input: RequestInfo | URL,
+      _init?: RequestInit,
+    ) => new Response(JSON.stringify(response), {
+      headers: { "Content-Type": "application/json" },
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    const input = {
+      provider: "codex" as const,
+      model: "gpt-5.6-sol",
+      effort: "xhigh" as const,
+      workerId: "worker-1",
+    };
+
+    await expect(acceptChannelExecutionProposal(
+      "token",
+      "organization-1",
+      "channel-1",
+      "execution-1",
+      input,
+    )).resolves.toEqual(response);
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "/organizations/organization-1/channels/channel-1/proposals/execution-1/accept-execution",
+      ),
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    );
+    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body)))
+      .not.toHaveProperty("requestId");
+  });
+
+  it("keeps the conversation run and execution proposal IDs distinct", async () => {
+    const fetchMock = vi.fn(async (
+      _input: RequestInfo | URL,
+      _init?: RequestInit,
+    ) => new Response(JSON.stringify({
+      proposal: { id: "execution-1", status: "accepted" },
+      outcome: "accepted",
+      projectId: "project-1",
+      runId: "target-run",
+      dispatch: { outcome: "dispatched" },
+    }), { headers: { "Content-Type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await acceptIssueExecutionProposal(
+      "token",
+      "project-1",
+      "conversation-run",
+      "execution-1",
+      { provider: "claude", model: "opus", effort: "high", workerId: null },
+    );
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "/projects/project-1/runs/conversation-run/issue-execution-proposals/execution-1/accept",
+      ),
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          provider: "claude",
+          model: "opus",
+          effort: "high",
+          workerId: null,
+        }),
       }),
     );
   });

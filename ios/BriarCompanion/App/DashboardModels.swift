@@ -38,6 +38,10 @@ struct DashboardRun: Codable, Equatable, Identifiable, Sendable {
     let requestedModel: String?
     let requestedEffort: ModelEffort?
     let requestedWorkerId: String?
+    let requestedByUserId: String?
+    let dispatchMode: String?
+    let claimedBy: String?
+    let claimedAt: Date?
     let workerId: String?
     let startedAt: Date?
     let updatedAt: Date
@@ -83,6 +87,10 @@ struct DashboardRun: Codable, Equatable, Identifiable, Sendable {
         requestedModel: String? = nil,
         requestedEffort: ModelEffort? = nil,
         requestedWorkerId: String? = nil,
+        requestedByUserId: String? = nil,
+        dispatchMode: String? = nil,
+        claimedBy: String? = nil,
+        claimedAt: Date? = nil,
         workerId: String? = nil,
         startedAt: Date? = nil,
         updatedAt: Date,
@@ -127,6 +135,10 @@ struct DashboardRun: Codable, Equatable, Identifiable, Sendable {
         self.requestedModel = requestedModel
         self.requestedEffort = requestedEffort
         self.requestedWorkerId = requestedWorkerId
+        self.requestedByUserId = requestedByUserId
+        self.dispatchMode = dispatchMode
+        self.claimedBy = claimedBy
+        self.claimedAt = claimedAt
         self.workerId = workerId
         self.startedAt = startedAt
         self.updatedAt = updatedAt
@@ -273,6 +285,22 @@ struct DashboardWorker: Codable, Equatable, Identifiable, Sendable {
     }
 }
 
+struct ProjectExecutionWorkerPolicy: Codable, Equatable, Sendable {
+    enum SelectionMode: String, Codable, Sendable {
+        case any
+        case allowlist
+    }
+
+    let selectionMode: SelectionMode
+    let defaultWorkerId: String?
+    let allowedWorkerIds: [String]
+    let updatedAt: Date?
+
+    func allows(workerID: String) -> Bool {
+        selectionMode == .any || allowedWorkerIds.contains(workerID)
+    }
+}
+
 struct ConversationNotification: Codable, Equatable, Identifiable, Sendable {
     let id: UUID
     let runId: UUID
@@ -311,6 +339,7 @@ struct DashboardSnapshot: Codable, Equatable, Sendable {
     var runs: [DashboardRun]
     var workers: [DashboardWorker]?
     var organizationProviders: [AgentProvider]?
+    var executionPolicy: ProjectExecutionWorkerPolicy?
     var members: [OrganizationMember]?
     var conversationNotifications: [ConversationNotification]?
     var channelNotifications: [ChannelNotification]?
@@ -322,6 +351,7 @@ struct DashboardSnapshot: Codable, Equatable, Sendable {
         runs: [DashboardRun],
         workers: [DashboardWorker]? = nil,
         organizationProviders: [AgentProvider]? = nil,
+        executionPolicy: ProjectExecutionWorkerPolicy? = nil,
         members: [OrganizationMember]? = nil,
         conversationNotifications: [ConversationNotification]? = nil,
         channelNotifications: [ChannelNotification]? = nil,
@@ -332,6 +362,7 @@ struct DashboardSnapshot: Codable, Equatable, Sendable {
         self.runs = runs
         self.workers = workers
         self.organizationProviders = organizationProviders
+        self.executionPolicy = executionPolicy
         self.members = members
         self.conversationNotifications = conversationNotifications
         self.channelNotifications = channelNotifications
@@ -348,6 +379,7 @@ struct DashboardDelta: Codable, Equatable, Sendable {
     let project: ProjectsResponse.Project?
     let workers: [DashboardWorker]?
     let organizationProviders: [AgentProvider]?
+    let executionPolicy: ProjectExecutionWorkerPolicy?
     let members: [OrganizationMember]?
     let conversationNotifications: [ConversationNotification]?
     let channelNotifications: [ChannelNotification]?
@@ -361,6 +393,7 @@ struct DashboardDelta: Codable, Equatable, Sendable {
         project: ProjectsResponse.Project?,
         workers: [DashboardWorker]? = nil,
         organizationProviders: [AgentProvider]? = nil,
+        executionPolicy: ProjectExecutionWorkerPolicy? = nil,
         members: [OrganizationMember]? = nil,
         conversationNotifications: [ConversationNotification]? = nil,
         channelNotifications: [ChannelNotification]? = nil,
@@ -373,6 +406,7 @@ struct DashboardDelta: Codable, Equatable, Sendable {
         self.project = project
         self.workers = workers
         self.organizationProviders = organizationProviders
+        self.executionPolicy = executionPolicy
         self.members = members
         self.conversationNotifications = conversationNotifications
         self.channelNotifications = channelNotifications
@@ -406,6 +440,9 @@ struct IssueMessage: Codable, Equatable, Identifiable, Sendable {
     let author: Author
     let replyCount: Int
     var proposedAction: IssueProposedAction? = nil
+    /// Kept separate so an accepted create proposal and its pending execution
+    /// follow-up can be rendered together without collapsing either approval.
+    var executionProposal: IssueExecutionProposal? = nil
     let createdAt: Date
     let updatedAt: Date
 
@@ -429,6 +466,38 @@ struct IssueProposedAction: Codable, Equatable, Identifiable, Sendable {
     let acceptedAt: Date?
     let appliedRevision: Int?
     let resultRunId: UUID?
+    /// An Agent may request a follow-up execution after creation, but accepting
+    /// this proposal still creates a backlog issue only. The server then
+    /// materializes a separate `executionProposal` for a second approval.
+    let executeAfterCreate: Bool?
+
+    init(
+        id: UUID,
+        type: ActionType,
+        workflowStage: String? = nil,
+        reason: String? = nil,
+        changes: Changes? = nil,
+        changedFields: [String]? = nil,
+        issue: NewIssue? = nil,
+        status: Status,
+        acceptedAt: Date? = nil,
+        appliedRevision: Int? = nil,
+        resultRunId: UUID? = nil,
+        executeAfterCreate: Bool? = nil
+    ) {
+        self.id = id
+        self.type = type
+        self.workflowStage = workflowStage
+        self.reason = reason
+        self.changes = changes
+        self.changedFields = changedFields
+        self.issue = issue
+        self.status = status
+        self.acceptedAt = acceptedAt
+        self.appliedRevision = appliedRevision
+        self.resultRunId = resultRunId
+        self.executeAfterCreate = executeAfterCreate
+    }
 
     enum ActionType: String, Codable, Sendable {
         case rework = "request_issue_rework"
@@ -455,6 +524,127 @@ struct IssueProposedAction: Codable, Equatable, Identifiable, Sendable {
     }
 }
 
+/// Separate from issue create/update/rework proposals so creation evidence and
+/// execution approval may coexist on one message.
+struct IssueExecutionProposal: Codable, Equatable, Hashable, Identifiable, Sendable {
+    let id: UUID
+    let type: Kind
+    let status: Status
+    let projectId: UUID
+    let runId: UUID
+    let title: String
+    let createdAt: Date
+    let acceptedAt: Date?
+    let requestedProvider: AgentProvider?
+    let requestedModel: String?
+    let requestedEffort: ModelEffort?
+    let requestedWorkerId: String?
+    let delegatedByAgentId: UUID?
+    let delegatedByAgentName: String?
+
+    enum Kind: String, Codable, Hashable, Sendable {
+        case executeIssue = "request_issue_execute"
+    }
+
+    enum Status: String, Codable, Sendable {
+        case pending
+        case accepted
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, type, status, projectId, runId, title, createdAt, acceptedAt
+        case requestedProvider, requestedModel, requestedEffort, requestedWorkerId
+        case delegatedByAgentId, delegatedByAgentName
+    }
+
+    init(
+        id: UUID,
+        type: Kind = .executeIssue,
+        status: Status,
+        projectId: UUID,
+        runId: UUID,
+        title: String,
+        createdAt: Date,
+        acceptedAt: Date? = nil,
+        requestedProvider: AgentProvider? = nil,
+        requestedModel: String? = nil,
+        requestedEffort: ModelEffort? = nil,
+        requestedWorkerId: String? = nil,
+        delegatedByAgentId: UUID? = nil,
+        delegatedByAgentName: String? = nil
+    ) {
+        self.id = id
+        self.type = type
+        self.status = status
+        self.projectId = projectId
+        self.runId = runId
+        self.title = title
+        self.createdAt = createdAt
+        self.acceptedAt = acceptedAt
+        self.requestedProvider = requestedProvider
+        self.requestedModel = requestedModel
+        self.requestedEffort = requestedEffort
+        self.requestedWorkerId = requestedWorkerId
+        self.delegatedByAgentId = delegatedByAgentId
+        self.delegatedByAgentName = delegatedByAgentName
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        type = try container.decode(Kind.self, forKey: .type)
+        status = try container.decode(Status.self, forKey: .status)
+        projectId = try container.decode(UUID.self, forKey: .projectId)
+        runId = try container.decode(UUID.self, forKey: .runId)
+        title = try container.decode(String.self, forKey: .title)
+        createdAt = try container.decode(Date.self, forKey: .createdAt)
+        // These nullable fields are nevertheless required by the canonical
+        // server snapshot. `decode(Optional.self)` accepts JSON null but rejects
+        // a missing key, matching the strict mobile Zod/OpenAPI contract.
+        acceptedAt = try container.decode(Date?.self, forKey: .acceptedAt)
+        requestedProvider = try container.decode(
+            AgentProvider?.self,
+            forKey: .requestedProvider
+        )
+        requestedModel = try container.decode(String?.self, forKey: .requestedModel)
+        requestedEffort = try container.decode(ModelEffort?.self, forKey: .requestedEffort)
+        requestedWorkerId = try container.decode(String?.self, forKey: .requestedWorkerId)
+        delegatedByAgentId = try container.decode(UUID?.self, forKey: .delegatedByAgentId)
+        delegatedByAgentName = try container.decode(String?.self, forKey: .delegatedByAgentName)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(type, forKey: .type)
+        try container.encode(status, forKey: .status)
+        try container.encode(projectId, forKey: .projectId)
+        try container.encode(runId, forKey: .runId)
+        try container.encode(title, forKey: .title)
+        try container.encode(createdAt, forKey: .createdAt)
+        try container.encode(acceptedAt, forKey: .acceptedAt)
+        try container.encode(requestedProvider, forKey: .requestedProvider)
+        try container.encode(requestedModel, forKey: .requestedModel)
+        try container.encode(requestedEffort, forKey: .requestedEffort)
+        try container.encode(requestedWorkerId, forKey: .requestedWorkerId)
+        try container.encode(delegatedByAgentId, forKey: .delegatedByAgentId)
+        try container.encode(delegatedByAgentName, forKey: .delegatedByAgentName)
+    }
+}
+
+struct AcceptIssueExecutionProposalResponse: Codable, Sendable {
+    let proposal: IssueExecutionProposal
+    let outcome: Outcome
+    let projectId: UUID
+    let runId: UUID
+    let dispatch: DispatchRunResponse
+
+    enum Outcome: String, Codable, Sendable {
+        case accepted
+        case alreadyAccepted = "already_accepted"
+    }
+}
+
 struct AcceptIssueReworkProposalResponse: Codable, Equatable, Sendable {
     let proposal: IssueProposedAction
     let outcome: String
@@ -467,6 +657,9 @@ struct AcceptIssueActionProposalResponse: Codable, Equatable, Sendable {
     let proposal: IssueProposedAction
     let outcome: String
     let resultRunId: UUID?
+    /// Present when an accepted create proposal requested a separate execution
+    /// approval. Optional keeps decoding compatible with older responses.
+    let executionProposal: IssueExecutionProposal?
 }
 
 struct RunEvidenceResponse: Codable, Equatable, Sendable {
@@ -583,6 +776,7 @@ enum DashboardMerge {
             runs: Array(runs.prefix(200)),
             workers: delta.workers ?? snapshot.workers,
             organizationProviders: delta.organizationProviders ?? snapshot.organizationProviders,
+            executionPolicy: delta.executionPolicy ?? snapshot.executionPolicy,
             members: delta.members ?? snapshot.members,
             conversationNotifications: delta.conversationNotifications ?? snapshot.conversationNotifications,
             channelNotifications: delta.channelNotifications ?? snapshot.channelNotifications,

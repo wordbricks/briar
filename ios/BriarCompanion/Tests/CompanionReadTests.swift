@@ -52,6 +52,19 @@ final class CompanionReadTests: XCTestCase {
         )
     }
 
+    func testDelegationNoticeNamesTheOrganizationAgentAndHidesDirectProposals() {
+        XCTAssertEqual(
+            issueExecutionDelegationNotice(agentName: "Bumble", locale: .ko),
+            "Organization Agent Bumble의 위임"
+        )
+        XCTAssertEqual(
+            issueExecutionDelegationNotice(agentName: "Bumble", locale: .en),
+            "Delegated by Organization Agent Bumble"
+        )
+        XCTAssertNil(issueExecutionDelegationNotice(agentName: nil, locale: .ko))
+        XCTAssertNil(issueExecutionDelegationNotice(agentName: "   ", locale: .ko))
+    }
+
     private var runs: [DashboardRun] {
         [
             DashboardRun(
@@ -229,5 +242,234 @@ final class CompanionReadTests: XCTestCase {
             availableSessions: 1
         )
         XCTAssertTrue(workerCanRunAgentSkill(legacyProvider, provider: .codex))
+    }
+
+    @MainActor
+    func testRunDetailAuthoritativeNullInvalidatesPendingExecutionContext() async throws {
+        let proposal = executionProposal()
+        let api = RunDetailSnapshotAPI(messageSnapshots: [
+            IssueMessagesResponse(messages: [issueMessage(executionProposal: proposal)]),
+            IssueMessagesResponse(messages: [issueMessage(executionProposal: nil)]),
+        ])
+        let store = RunDetailStore(
+            api: api,
+            projectID: proposal.projectId,
+            runID: proposal.runId,
+            token: "token"
+        )
+        await store.load()
+        let context = try XCTUnwrap(store.captureExecutionProposal(proposalID: proposal.id))
+
+        await store.load()
+
+        XCTAssertFalse(store.executionProposalIsCurrent(context))
+        XCTAssertNil(store.captureExecutionProposal(proposalID: proposal.id))
+        XCTAssertNil(store.messages.first?.executionProposal)
+    }
+
+    @MainActor
+    func testRunDetailAuthoritativeRemovalInvalidatesPendingExecutionContext() async throws {
+        let proposal = executionProposal()
+        let api = RunDetailSnapshotAPI(messageSnapshots: [
+            IssueMessagesResponse(messages: [issueMessage(executionProposal: proposal)]),
+            IssueMessagesResponse(messages: []),
+        ])
+        let store = RunDetailStore(
+            api: api,
+            projectID: proposal.projectId,
+            runID: proposal.runId,
+            token: "token"
+        )
+        await store.load()
+        let context = try XCTUnwrap(store.captureExecutionProposal(proposalID: proposal.id))
+
+        await store.load()
+
+        XCTAssertFalse(store.executionProposalIsCurrent(context))
+        XCTAssertNil(store.captureExecutionProposal(proposalID: proposal.id))
+        XCTAssertTrue(store.messages.isEmpty)
+    }
+
+    @MainActor
+    func testRunDetailOtherClientApprovalTombstonesPendingExecutionContext() async throws {
+        let pending = executionProposal()
+        let accepted = executionProposal(status: .accepted)
+        let api = RunDetailSnapshotAPI(messageSnapshots: [
+            IssueMessagesResponse(messages: [issueMessage(executionProposal: pending)]),
+            IssueMessagesResponse(messages: [issueMessage(executionProposal: accepted)]),
+        ])
+        let store = RunDetailStore(
+            api: api,
+            projectID: pending.projectId,
+            runID: pending.runId,
+            token: "token"
+        )
+        await store.load()
+        let context = try XCTUnwrap(store.captureExecutionProposal(proposalID: pending.id))
+
+        await store.load()
+
+        XCTAssertFalse(store.executionProposalIsCurrent(context))
+        XCTAssertNil(store.captureExecutionProposal(proposalID: pending.id))
+        XCTAssertEqual(store.messages.first?.executionProposal?.status, .accepted)
+    }
+
+    @MainActor
+    func testRunDetailQueuesForcedReloadBehindAnOlderInFlightSnapshot() async throws {
+        let proposal = executionProposal()
+        let api = RunDetailSnapshotAPI(
+            messageSnapshots: [
+                IssueMessagesResponse(messages: [issueMessage(
+                    executionProposal: proposal
+                )]),
+                IssueMessagesResponse(messages: [issueMessage(
+                    executionProposal: nil
+                )]),
+            ],
+            messageDelay: .milliseconds(80)
+        )
+        let store = RunDetailStore(
+            api: api,
+            projectID: proposal.projectId,
+            runID: proposal.runId,
+            token: "token"
+        )
+
+        let initialLoad = Task { await store.load() }
+        while await api.messageRequestCount() == 0 {
+            await Task.yield()
+        }
+        await store.load(queueIfLoading: true)
+        await initialLoad.value
+
+        let requestCount = await api.messageRequestCount()
+        XCTAssertEqual(requestCount, 2)
+        XCTAssertNil(store.messages.first?.executionProposal)
+        XCTAssertNil(store.captureExecutionProposal(proposalID: proposal.id))
+    }
+
+    @MainActor
+    func testCreateAcceptanceResponseImmediatelyAddsSeparateExecutionProposal() throws {
+        let proposalID = UUID(uuidString: "abababab-abab-4bab-8bab-abababababab")!
+        let pendingCreate = IssueProposedAction(
+            id: proposalID,
+            type: .create,
+            issue: .init(
+                title: "Follow-up",
+                description: nil,
+                priority: 2,
+                status: "backlog"
+            ),
+            status: .pending,
+            executeAfterCreate: true
+        )
+        let acceptedCreate = IssueProposedAction(
+            id: proposalID,
+            type: .create,
+            issue: pendingCreate.issue,
+            status: .accepted,
+            acceptedAt: newer,
+            resultRunId: executionProposal().runId,
+            executeAfterCreate: true
+        )
+        let execution = executionProposal()
+        let store = RunDetailStore(
+            api: RunDetailSnapshotAPI(messageSnapshots: []),
+            projectID: execution.projectId,
+            runID: execution.runId,
+            token: "token"
+        )
+        store.appendMessages([issueMessage(
+            proposedAction: pendingCreate,
+            executionProposal: nil
+        )])
+
+        store.updateIssueProposal(
+            acceptedCreate,
+            executionProposal: execution
+        )
+
+        XCTAssertEqual(store.messages.first?.proposedAction?.status, .accepted)
+        XCTAssertEqual(store.messages.first?.executionProposal?.id, execution.id)
+        XCTAssertNotNil(store.captureExecutionProposal(proposalID: execution.id))
+    }
+
+    private func executionProposal(
+        status: IssueExecutionProposal.Status = .pending
+    ) -> IssueExecutionProposal {
+        IssueExecutionProposal(
+            id: UUID(uuidString: "77777777-7777-4777-8777-777777777777")!,
+            status: status,
+            projectId: UUID(uuidString: "11111111-1111-4111-8111-111111111111")!,
+            runId: UUID(uuidString: "33333333-3333-4333-8333-333333333333")!,
+            title: "Fresh backlog",
+            createdAt: Date(timeIntervalSince1970: 1_700_000_000),
+            acceptedAt: status == .accepted ? Date(timeIntervalSince1970: 1_700_000_100) : nil,
+            requestedProvider: status == .accepted ? .codex : nil,
+            requestedModel: status == .accepted ? "gpt-5.6-sol" : nil,
+            requestedEffort: status == .accepted ? .high : nil,
+            requestedWorkerId: status == .accepted ? "worker-1" : nil
+        )
+    }
+
+    private func issueMessage(
+        proposedAction: IssueProposedAction? = nil,
+        executionProposal: IssueExecutionProposal?
+    ) -> IssueMessage {
+        IssueMessage(
+            id: UUID(uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!,
+            runId: UUID(uuidString: "33333333-3333-4333-8333-333333333333")!,
+            parentMessageId: nil,
+            body: "Execution proposal",
+            attachments: [],
+            author: .init(id: nil, name: "Bumble", image: nil, provider: "codex"),
+            replyCount: 0,
+            proposedAction: proposedAction,
+            executionProposal: executionProposal,
+            createdAt: Date(timeIntervalSince1970: 1_700_000_000),
+            updatedAt: Date(timeIntervalSince1970: 1_700_000_000)
+        )
+    }
+}
+
+private actor RunDetailSnapshotAPI: MobileAPIClientProtocol {
+    private var messageSnapshots: [IssueMessagesResponse]
+    private let messageDelay: Duration?
+    private var messageRequests = 0
+
+    init(
+        messageSnapshots: [IssueMessagesResponse],
+        messageDelay: Duration? = nil
+    ) {
+        self.messageSnapshots = messageSnapshots
+        self.messageDelay = messageDelay
+    }
+
+    func messageRequestCount() -> Int {
+        messageRequests
+    }
+
+    func send<Response: Decodable & Sendable>(
+        _ path: String,
+        method: String,
+        token: String?,
+        body: (any Encodable & Sendable)?,
+        as responseType: Response.Type
+    ) async throws -> Response {
+        let data: Data
+        if path.hasSuffix("/events") {
+            data = try JSONEncoder.mobileContract.encode(RunEventsResponse(events: []))
+        } else if path.hasSuffix("/messages") {
+            guard !messageSnapshots.isEmpty else { throw MobileAPIError.invalidRequest }
+            messageRequests += 1
+            let response = messageSnapshots.removeFirst()
+            if let messageDelay { try await Task.sleep(for: messageDelay) }
+            data = try JSONEncoder.mobileContract.encode(response)
+        } else if path.hasSuffix("/evidence") {
+            data = try JSONEncoder.mobileContract.encode(RunEvidenceResponse(evidence: []))
+        } else {
+            throw MobileAPIError.invalidRequest
+        }
+        return try JSONDecoder.mobileContract.decode(responseType, from: data)
     }
 }

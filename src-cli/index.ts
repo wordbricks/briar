@@ -2855,6 +2855,7 @@ async function runClaimedIssueReply(
           claimToken: issue.claimToken,
           body: result.reply,
           proposedAction: result.proposedAction,
+          executionProposal: result.executionProposal,
         }),
       },
     );

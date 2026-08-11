@@ -51,6 +51,9 @@ struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
     let lastReplyAt: Date?
     let document: Document?
     var proposal: Proposal?
+    /// A generated follow-up may coexist with the accepted create proposal so
+    /// the UI can show creation evidence and a distinct second approval.
+    var executionProposal: IssueExecutionProposal?
     let createdAt: Date
 
     enum CodingKeys: String, CodingKey {
@@ -67,6 +70,7 @@ struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
         case lastReplyAt
         case document
         case proposal
+        case executionProposal
         case createdAt
     }
 
@@ -84,6 +88,7 @@ struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
         lastReplyAt: Date?,
         document: Document?,
         proposal: Proposal?,
+        executionProposal: IssueExecutionProposal? = nil,
         createdAt: Date
     ) {
         self.id = id
@@ -99,6 +104,7 @@ struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
         self.lastReplyAt = lastReplyAt
         self.document = document
         self.proposal = proposal
+        self.executionProposal = executionProposal
         self.createdAt = createdAt
     }
 
@@ -117,6 +123,10 @@ struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
         lastReplyAt = try container.decodeIfPresent(Date.self, forKey: .lastReplyAt)
         document = try container.decodeIfPresent(Document.self, forKey: .document)
         proposal = try container.decodeIfPresent(Proposal.self, forKey: .proposal)
+        executionProposal = try container.decodeIfPresent(
+            IssueExecutionProposal.self,
+            forKey: .executionProposal
+        )
         createdAt = try container.decode(Date.self, forKey: .createdAt)
     }
 
@@ -184,7 +194,19 @@ struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
         }
 
         struct Payload: Codable, Hashable, Sendable {
-            let issue: Issue
+            /// Present only for `request_issue_create` proposals.
+            let issue: Issue?
+            /// Compatibility for Agent payloads that place the follow-up intent
+            /// next to the issue. It never contains execution preferences.
+            let executeAfterCreate: Bool?
+
+            init(
+                issue: Issue? = nil,
+                executeAfterCreate: Bool? = nil
+            ) {
+                self.issue = issue
+                self.executeAfterCreate = executeAfterCreate
+            }
 
             struct Issue: Codable, Hashable, Sendable {
                 let title: String
@@ -349,8 +371,59 @@ struct AcceptChannelProposalResponse: Codable, Equatable, Sendable {
     let outcome: Outcome
     let projectId: UUID
     let resultRunId: UUID
+    /// A create-and-execute proposal materializes a second, pending approval
+    /// boundary in the same response. Older servers may omit this field.
+    let executionProposal: IssueExecutionProposal?
+
+    init(
+        outcome: Outcome,
+        projectId: UUID,
+        resultRunId: UUID,
+        executionProposal: IssueExecutionProposal? = nil
+    ) {
+        self.outcome = outcome
+        self.projectId = projectId
+        self.resultRunId = resultRunId
+        self.executionProposal = executionProposal
+    }
 
     enum Outcome: String, Codable, Equatable, Sendable {
+        case accepted
+        case alreadyAccepted = "already_accepted"
+    }
+}
+
+/// Values selected by the user at the moment an Agent-authored execution
+/// proposal is approved. Every nullable key is encoded explicitly because the
+/// API is strict and distinguishes a deliberate automatic/default selection
+/// from an omitted field.
+struct AcceptIssueExecutionProposalRequest: Codable, Equatable, Sendable {
+    let provider: AgentProvider
+    let model: String?
+    let effort: ModelEffort?
+    let workerId: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case provider, model, effort, workerId
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(provider, forKey: .provider)
+        try container.encode(model, forKey: .model)
+        try container.encode(effort, forKey: .effort)
+        try container.encode(workerId, forKey: .workerId)
+    }
+}
+
+struct AcceptChannelExecutionProposalResponse: Codable, Sendable {
+    let proposal: IssueExecutionProposal
+    let outcome: Outcome
+    let projectId: UUID
+    let runId: UUID
+    let dispatch: DispatchRunResponse
+
+    enum Outcome: String, Codable, Sendable {
         case accepted
         case alreadyAccepted = "already_accepted"
     }

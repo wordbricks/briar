@@ -122,7 +122,7 @@ import {
   claimNextProjectAgentTask,
   claimDueProjectAgentScheduleRun,
   claimNextQueuedHuntRun,
-  completeIssueAgentReply,
+  completeIssueAgentReplyOutput,
   completeIssueResultReview,
   completeProjectAgentScheduleRun,
   completeGithubDelivery,
@@ -133,12 +133,11 @@ import {
   consumeGithubOAuthState,
   consumeSlackOAuthState,
   createGithubOAuthState,
-  createIssueActionProposal,
   createIssueMessage,
-  createIssueReworkProposal,
   createIssueDependency,
   createIssueAttachments,
   issueAttachmentObjectKeysInUse,
+  issueExecutionApprovalTablesAvailable,
   createRunEvidenceImages,
   createOrganization,
   createOrganizationInvitation,
@@ -168,6 +167,7 @@ import {
   getProjectAgent,
   getClaimedIssueAgentReply,
   getIssueActionProposal,
+  getIssueExecutionProposal,
   getIssueAgentReplyJob,
   getIssueReworkProposal,
   getIssueAttachment,
@@ -198,6 +198,7 @@ import {
   listIssueDependencies,
   listIssueConversationNotifications,
   listIssueActionProposals,
+  listIssueExecutionProposals,
   listIssueMessages,
   listIssueReworkProposals,
   listIssueThreadMessages,
@@ -250,6 +251,7 @@ import {
   acceptIssueUpdateProposal,
   acceptIssueReworkProposal,
   reserveIssueCreateProposalApproval,
+  reserveIssueExecutionProposalApproval,
   rollbackNewAppIssue,
   startWorkflowStageLifecycle,
   releaseGithubDelivery,
@@ -282,6 +284,7 @@ import {
   type HuntRunRow,
   type IssueAttachmentRow,
   type IssueActionProposalRow,
+  type IssueExecutionProposalRow,
   type IssueAgentReplyJobRow,
   type ChannelConversationNotificationRow,
   type IssueConversationNotificationRow,
@@ -400,6 +403,7 @@ import {
   addChannelAgent,
   addChannelMember,
   channelJson,
+  channelExecutionProposalTablesAvailable,
   channelMessageJson,
   channelReplyJson,
   claimNextChannelAgentReply,
@@ -411,6 +415,7 @@ import {
   failChannelReply,
   getChannel,
   getChannelActionProposal,
+  getChannelExecutionProposal,
   getChannelAgentReplyJob,
   getChannelById,
   getClaimedChannelReplyAttachment,
@@ -431,7 +436,9 @@ import {
   removeChannelAgent,
   removeChannelMember,
   reserveChannelActionProposalApproval,
+  reserveChannelExecutionProposalApproval,
   renewChannelReplyLease,
+  snapshotChannelReplyExecutionTargets,
   toggleChannelMessageReaction,
   updateChannel,
 } from "./channels";
@@ -455,6 +462,7 @@ import {
 import {
   channelInputSchema,
   channelIssueProposalPayloadSchema,
+  channelExecutionProposalAcceptInputSchema,
   channelMemberInputSchema,
   channelMessageInputSchema,
   channelMessageReactionInputSchema,
@@ -1944,6 +1952,7 @@ const issueUpdateProposalActionSchema = z
 const issueCreateProposalActionSchema = z
   .object({
     type: z.literal("request_issue_create"),
+    executeAfterCreate: z.boolean().default(false),
     issue: z
       .object({
         title: issueTitleSchema,
@@ -1974,11 +1983,25 @@ const issueAgentReplyCompletionSchema = z
     claimToken: z.string().startsWith("briar_reply_claim_"),
     body: z.string().trim().min(1).max(10_000).optional(),
     proposedAction: issueAgentProposedActionSchema.nullable().optional(),
+    executionProposal: z
+      .object({ type: z.literal("request_issue_execute") })
+      .strict()
+      .nullable()
+      .optional(),
     error: z.string().trim().min(1).max(4_000).optional(),
   })
   .strict()
   .refine((input) => Boolean(input.body) !== Boolean(input.error), {
     message: "Provide exactly one of body or error",
+  })
+  .superRefine((input, context) => {
+    if (input.executionProposal && input.proposedAction) {
+      context.addIssue({
+        code: "custom",
+        message: "Use executeAfterCreate for a create-and-execute request",
+        path: ["executionProposal"],
+      });
+    }
   });
 
 const issueAgentReplyLeaseSchema = z
@@ -5045,10 +5068,41 @@ const issueActionProposalJson = (proposal: IssueActionProposalRow) => {
       ? { changedFields: Object.keys(payload.changes) }
       : {}),
     status: proposal.status,
+    ...(proposal.action_type === "request_issue_create"
+      ? { executeAfterCreate: proposal.execute_after_create === 1 }
+      : {}),
     acceptedAt: proposal.accepted_at,
     resultRunId: proposal.result_run_id,
   };
 };
+
+const issueExecutionProposalJson = (proposal: IssueExecutionProposalRow) => {
+  if (proposal.status !== "pending" && proposal.status !== "accepted") {
+    throw new Error("Invalidated execution proposals cannot be serialized");
+  }
+  return {
+    id: proposal.id,
+    type: "request_issue_execute" as const,
+    status: proposal.status,
+    projectId: proposal.project_id,
+    runId: proposal.target_run_id,
+    title: proposal.target_title,
+    createdAt: proposal.created_at,
+    acceptedAt: proposal.accepted_at,
+    requestedProvider: proposal.requested_provider,
+    requestedModel: proposal.requested_model,
+    requestedEffort: proposal.requested_effort,
+    requestedWorkerId: proposal.requested_worker_id,
+    delegatedByAgentId: proposal.delegated_by_agent_id,
+    delegatedByAgentName: proposal.delegated_by_agent_name,
+  };
+};
+
+const liveIssueExecutionProposalJson = (
+  proposal: IssueExecutionProposalRow | null,
+) => proposal && (proposal.status === "pending" || proposal.status === "accepted")
+  ? issueExecutionProposalJson(proposal)
+  : null;
 
 type IssueProposalRow = IssueReworkProposalRow | IssueActionProposalRow;
 
@@ -5061,6 +5115,7 @@ const issueMessageJson = (
   message: IssueMessageRow,
   attachments: IssueAttachmentRow[] = [],
   proposal: IssueProposalRow | null = null,
+  executionProposal: IssueExecutionProposalRow | null = null,
 ) => ({
   id: message.id,
   runId: message.run_id,
@@ -5087,6 +5142,9 @@ const issueMessageJson = (
   },
   replyCount: message.reply_count,
   proposedAction: proposal ? issueProposalJson(proposal) : null,
+  executionProposal: executionProposal
+    ? issueExecutionProposalJson(executionProposal)
+    : null,
   createdAt: message.created_at,
   updatedAt: message.updated_at,
 });
@@ -6658,10 +6716,19 @@ async function route(
       if (!proposal.project_id || !proposal.result_run_id) {
         throw new HttpError(409, "Accepted proposal is missing its result");
       }
+      const executionProposal = proposal.execution_proposal_id
+        ? await getChannelExecutionProposal(db, {
+            organizationId: channel.organization_id,
+            channelId: channel.id,
+            proposalId: proposal.execution_proposal_id,
+            userId: session.user.id,
+          })
+        : null;
       return json({
         outcome: "already_accepted",
         projectId: proposal.project_id,
         resultRunId: proposal.result_run_id,
+        executionProposal: liveIssueExecutionProposalJson(executionProposal),
       });
     }
     if (channel.archived_at) {
@@ -6720,10 +6787,19 @@ async function route(
         current.project_id &&
         current.result_run_id
       ) {
+        const executionProposal = current.execution_proposal_id
+          ? await getChannelExecutionProposal(db, {
+              organizationId: channel.organization_id,
+              channelId: channel.id,
+              proposalId: current.execution_proposal_id,
+              userId: session.user.id,
+            })
+          : null;
         return json({
           outcome: "already_accepted",
           projectId: current.project_id,
           resultRunId: current.result_run_id,
+          executionProposal: liveIssueExecutionProposalJson(executionProposal),
         });
       }
       if (
@@ -6760,11 +6836,188 @@ async function route(
     ) {
       throw new HttpError(409, "Proposal approval was not finalized");
     }
+    const executionProposal = finalized.execution_proposal_id
+      ? await getChannelExecutionProposal(db, {
+          organizationId: channel.organization_id,
+          channelId: channel.id,
+          proposalId: finalized.execution_proposal_id,
+          userId: session.user.id,
+        })
+      : null;
     return json({
       outcome: "accepted",
       projectId: project.id,
       resultRunId,
+      executionProposal: liveIssueExecutionProposalJson(executionProposal),
     });
+  }
+
+  const channelExecutionProposalAcceptMatch = pathname.match(
+    /^\/organizations\/([0-9a-f-]+)\/channels\/([0-9a-f-]+)\/proposals\/([0-9a-f-]+)\/accept-execution$/u,
+  );
+  if (channelExecutionProposalAcceptMatch && request.method === "POST") {
+    const session = await requireSession(auth, request);
+    const channel = await requireChannelAccess(
+      db,
+      channelExecutionProposalAcceptMatch[1],
+      channelExecutionProposalAcceptMatch[2],
+      session.user.id,
+    );
+    if (!(await channelExecutionProposalTablesAvailable(db))) {
+      throw new HttpError(
+        503,
+        "Issue execution approval is not available during this upgrade",
+        "ISSUE_EXECUTION_APPROVAL_UNAVAILABLE",
+      );
+    }
+    const proposal = await getChannelExecutionProposal(db, {
+      organizationId: channel.organization_id,
+      channelId: channel.id,
+      proposalId: channelExecutionProposalAcceptMatch[3],
+      userId: session.user.id,
+    });
+    if (!proposal) throw new HttpError(404, "Execution proposal not found");
+    const input = channelExecutionProposalAcceptInputSchema.parse(
+      await readJson(request),
+    );
+    issueExecutionPreferencesSchema.parse({
+      provider: input.provider,
+      model: input.model,
+      effort: input.effort,
+    });
+    const project = await getProject(db, proposal.project_id, session.user.id);
+    if (!project || project.organization_id !== channel.organization_id) {
+      throw new HttpError(404, "Project not found");
+    }
+    const run = await getHuntRunForProject(db, project.id, proposal.target_run_id);
+    if (proposal.status === "accepted") {
+      if (
+        proposal.accepted_by_user_id !== session.user.id ||
+        proposal.requested_provider !== input.provider ||
+        proposal.requested_model !== input.model ||
+        proposal.requested_effort !== input.effort ||
+        proposal.requested_worker_id !== input.workerId
+      ) {
+        throw new HttpError(
+          409,
+          "Execution was approved with different settings or by another member",
+          "CHANNEL_EXECUTION_PROPOSAL_CONFLICT",
+        );
+      }
+      if (
+        !run || !proposal.dispatch_request_id ||
+        run.dispatch_request_id !== proposal.dispatch_request_id
+      ) {
+        throw new HttpError(
+          409,
+          "This execution approval is stale; request a new approval",
+          "CHANNEL_EXECUTION_PROPOSAL_STALE",
+        );
+      }
+      return json({
+        proposal: issueExecutionProposalJson(proposal),
+        outcome: "already_accepted",
+        projectId: proposal.project_id,
+        runId: proposal.target_run_id,
+        dispatch: {
+          runId: proposal.target_run_id,
+          agentId: proposal.proposed_by_agent_id,
+          provider: proposal.requested_provider,
+          model: proposal.requested_model,
+          effort: proposal.requested_effort,
+          requestedWorkerId: proposal.requested_worker_id,
+          requestedByUserId: proposal.accepted_by_user_id,
+          dispatchMode: proposal.requested_worker_id ? "specific" : "any",
+          dispatchedAt: proposal.accepted_at,
+          outcome: "already_dispatched",
+        },
+      });
+    }
+    if (proposal.status !== "pending" || channel.archived_at) {
+      throw new HttpError(
+        409,
+        channel.archived_at
+          ? "Channel is archived"
+          : "This execution proposal is no longer valid",
+        "CHANNEL_EXECUTION_PROPOSAL_STALE",
+      );
+    }
+    const acceptedAt = new Date().toISOString();
+    const reservation = await reserveChannelExecutionProposalApproval(db, {
+      organizationId: channel.organization_id,
+      channelId: channel.id,
+      proposalId: proposal.id,
+      userId: session.user.id,
+      provider: input.provider,
+      model: input.model,
+      effort: input.effort,
+      workerId: input.workerId,
+      dispatchRequestId: crypto.randomUUID(),
+      reservedAt: acceptedAt,
+    });
+    if (!reservation?.dispatch_request_id ||
+        !reservation.approval_reserved_by_user_id ||
+        !reservation.approval_reserved_at) {
+      throw new HttpError(
+        409,
+        "The issue or execution approval changed before dispatch",
+        "CHANNEL_EXECUTION_PROPOSAL_CONFLICT",
+      );
+    }
+    try {
+      const dispatched = await dispatchHuntRun(
+        db,
+        project.organization_id,
+        project.id,
+        {
+          runId: reservation.target_run_id,
+          agentId: reservation.proposed_by_agent_id,
+          provider: reservation.requested_provider!,
+          model: reservation.requested_model,
+          effort: reservation.requested_effort,
+          persistPreferences: false,
+          workerId: reservation.requested_worker_id,
+          requestedByUserId: reservation.approval_reserved_by_user_id,
+          requestId: reservation.dispatch_request_id,
+          occurredAt: reservation.approval_reserved_at,
+        },
+      );
+      if (!dispatched) throw new HttpError(404, "Run not found");
+      const accepted = await getChannelExecutionProposal(db, {
+        organizationId: reservation.organization_id,
+        channelId: reservation.channel_id!,
+        proposalId: reservation.id,
+        userId: reservation.approval_reserved_by_user_id,
+      });
+      if (
+        !accepted || accepted.status !== "accepted" ||
+        accepted.dispatch_request_id !== reservation.dispatch_request_id
+      ) {
+        throw new HttpError(
+          409,
+          "Execution approval was not finalized",
+          "CHANNEL_EXECUTION_PROPOSAL_CONFLICT",
+        );
+      }
+      return json({
+        proposal: issueExecutionProposalJson(accepted),
+        outcome: "accepted",
+        projectId: accepted.project_id,
+        runId: accepted.target_run_id,
+        dispatch: dispatched,
+      });
+    } catch (error) {
+      if (error instanceof WorkerConflictError || (
+        error instanceof Error && error.message.includes("execution proposal")
+      )) {
+        throw new HttpError(
+          409,
+          error.message,
+          "CHANNEL_EXECUTION_PROPOSAL_CONFLICT",
+        );
+      }
+      throw error;
+    }
   }
 
   const organizationWorkersMatch = pathname.match(
@@ -8585,11 +8838,18 @@ async function route(
       issueMessagesMatch[2],
     );
     if (!run) throw new HttpError(404, "Run not found");
-    const [messages, attachments, reworkProposals, actionProposals] = await Promise.all([
+    const [
+      messages,
+      attachments,
+      reworkProposals,
+      actionProposals,
+      executionProposals,
+    ] = await Promise.all([
       listIssueMessagesWithArchive(db, env.ARCHIVES, project.id, run.id),
       listIssueAttachments(db, project.id, run.id),
       listIssueReworkProposals(db, project.id, run.id),
       listIssueActionProposals(db, project.id, run.id),
+      listIssueExecutionProposals(db, project.id, run.id),
     ]);
     const proposalsByReply = new Map(
       [...reworkProposals, ...actionProposals].map((proposal) => [
@@ -8603,6 +8863,9 @@ async function route(
           message,
           attachments,
           proposalsByReply.get(message.id) ?? null,
+          executionProposals.find(
+            (proposal) => proposal.reply_message_id === message.id,
+          ) ?? null,
         )
       ),
     });
@@ -8793,15 +9056,31 @@ async function route(
       project.id,
       issueMessageEditMatch[2],
     );
-    const [attachments, reworkProposals, actionProposals] = await Promise.all([
+    const [
+      attachments,
+      reworkProposals,
+      actionProposals,
+      executionProposals,
+    ] = await Promise.all([
       listIssueAttachments(db, project.id, issueMessageEditMatch[2]),
       listIssueReworkProposals(db, project.id, issueMessageEditMatch[2]),
       listIssueActionProposals(db, project.id, issueMessageEditMatch[2]),
+      listIssueExecutionProposals(db, project.id, issueMessageEditMatch[2]),
     ]);
     const proposal = [...reworkProposals, ...actionProposals].find(
       (candidate) => candidate.reply_message_id === updated.id,
     ) ?? null;
-    return json({ message: issueMessageJson(updated, attachments, proposal) });
+    const executionProposal = executionProposals.find(
+      (candidate) => candidate.reply_message_id === updated.id,
+    ) ?? null;
+    return json({
+      message: issueMessageJson(
+        updated,
+        attachments,
+        proposal,
+        executionProposal,
+      ),
+    });
   }
   if (issueMessageEditMatch && request.method === "DELETE") {
     const session = await requireSession(auth, request);
@@ -8857,7 +9136,7 @@ async function route(
     if (!job || job.run_id !== issueAgentReplyStatusMatch[2]) {
       throw new HttpError(404, "Agent reply not found");
     }
-    const [messages, reworkProposals, actionProposals] =
+    const [messages, reworkProposals, actionProposals, executionProposals] =
       job.status === "completed"
         ? await Promise.all([
             listIssueMessagesWithArchive(
@@ -8868,8 +9147,9 @@ async function route(
             ),
             listIssueReworkProposals(db, project.id, job.run_id),
             listIssueActionProposals(db, project.id, job.run_id),
+            listIssueExecutionProposals(db, project.id, job.run_id),
           ])
-        : [[], [], []];
+        : [[], [], [], []];
     const reply = messages.find(
       (message) => message.id === job.reply_message_id,
     );
@@ -8878,7 +9158,16 @@ async function route(
     ) ?? null;
     return json({
       agentReply: issueAgentReplyJson(job),
-      message: reply ? issueMessageJson(reply, [], proposal) : null,
+      message: reply
+        ? issueMessageJson(
+            reply,
+            [],
+            proposal,
+            executionProposals.find(
+              (candidate) => candidate.reply_message_id === job.reply_message_id,
+            ) ?? null,
+          )
+        : null,
     });
   }
 
@@ -8977,8 +9266,18 @@ async function route(
     );
     if (!proposal) throw new HttpError(404, "Issue action proposal not found");
     if (proposal.status === "accepted") {
+      const executionProposal = (await listIssueExecutionProposals(
+        db,
+        project.id,
+        proposal.conversation_run_id,
+      )).find(
+        (candidate) => candidate.origin_create_proposal_id === proposal.id,
+      ) ?? null;
       return json({
         proposal: issueActionProposalJson(proposal),
+        executionProposal: executionProposal
+          ? issueExecutionProposalJson(executionProposal)
+          : null,
         outcome: "already_accepted",
         resultRunId: proposal.result_run_id,
       });
@@ -9053,8 +9352,18 @@ async function route(
         proposal.id,
       );
       if (latest?.status === "accepted") {
+        const executionProposal = (await listIssueExecutionProposals(
+          db,
+          project.id,
+          latest.conversation_run_id,
+        )).find(
+          (candidate) => candidate.origin_create_proposal_id === latest.id,
+        ) ?? null;
         return json({
           proposal: issueActionProposalJson(latest),
+          executionProposal: executionProposal
+            ? issueExecutionProposalJson(executionProposal)
+            : null,
           outcome: "already_accepted",
           resultRunId: latest.result_run_id,
         });
@@ -9133,14 +9442,186 @@ async function route(
         "ISSUE_ACTION_PROPOSAL_CONFLICT",
       );
     }
+    const executionProposal = (await listIssueExecutionProposals(
+      db,
+      project.id,
+      accepted.conversation_run_id,
+    )).find(
+      (candidate) => candidate.origin_create_proposal_id === accepted.id,
+    ) ?? null;
     return json({
       proposal: issueActionProposalJson(accepted),
+      executionProposal: executionProposal
+        ? issueExecutionProposalJson(executionProposal)
+        : null,
       outcome:
         accepted.status === "accepted" && accepted.accepted_at !== acceptedAt
           ? "already_accepted"
           : "accepted",
       resultRunId: accepted.result_run_id,
     });
+  }
+
+  const issueExecutionProposalAcceptMatch = pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/issue-execution-proposals\/([0-9a-f-]+)\/accept$/u,
+  );
+  if (issueExecutionProposalAcceptMatch && request.method === "POST") {
+    const session = await requireSession(auth, request);
+    const project = await getProject(
+      db,
+      issueExecutionProposalAcceptMatch[1],
+      session.user.id,
+    );
+    if (!project) throw new HttpError(404, "Project not found");
+    if (!(await issueExecutionApprovalTablesAvailable(db))) {
+      throw new HttpError(
+        503,
+        "Issue execution approval is not available during this upgrade",
+        "ISSUE_EXECUTION_APPROVAL_UNAVAILABLE",
+      );
+    }
+    const proposal = await getIssueExecutionProposal(
+      db,
+      project.id,
+      issueExecutionProposalAcceptMatch[2],
+      issueExecutionProposalAcceptMatch[3],
+    );
+    if (!proposal) throw new HttpError(404, "Execution proposal not found");
+    const input = channelExecutionProposalAcceptInputSchema.parse(
+      await readJson(request),
+    );
+    issueExecutionPreferencesSchema.parse({
+      provider: input.provider,
+      model: input.model,
+      effort: input.effort,
+    });
+    const run = await getHuntRunForProject(db, project.id, proposal.target_run_id);
+    if (proposal.status === "accepted") {
+      if (
+        proposal.accepted_by_user_id !== session.user.id ||
+        proposal.requested_provider !== input.provider ||
+        proposal.requested_model !== input.model ||
+        proposal.requested_effort !== input.effort ||
+        proposal.requested_worker_id !== input.workerId
+      ) {
+        throw new HttpError(
+          409,
+          "Execution was approved with different settings or by another member",
+          "ISSUE_EXECUTION_PROPOSAL_CONFLICT",
+        );
+      }
+      if (
+        !run || !proposal.dispatch_request_id ||
+        run.dispatch_request_id !== proposal.dispatch_request_id
+      ) {
+        throw new HttpError(
+          409,
+          "This execution approval is stale; request a new approval",
+          "ISSUE_EXECUTION_PROPOSAL_STALE",
+        );
+      }
+      return json({
+        proposal: issueExecutionProposalJson(proposal),
+        outcome: "already_accepted",
+        projectId: proposal.project_id,
+        runId: proposal.target_run_id,
+        dispatch: {
+          runId: proposal.target_run_id,
+          agentId: proposal.proposed_by_agent_id,
+          provider: proposal.requested_provider,
+          model: proposal.requested_model,
+          effort: proposal.requested_effort,
+          requestedWorkerId: proposal.requested_worker_id,
+          requestedByUserId: proposal.accepted_by_user_id,
+          dispatchMode: proposal.requested_worker_id ? "specific" : "any",
+          dispatchedAt: proposal.accepted_at,
+          outcome: "already_dispatched",
+        },
+      });
+    }
+    if (proposal.status !== "pending") {
+      throw new HttpError(
+        409,
+        "This execution proposal is no longer valid",
+        "ISSUE_EXECUTION_PROPOSAL_STALE",
+      );
+    }
+    const acceptedAt = new Date().toISOString();
+    const reservation = await reserveIssueExecutionProposalApproval(db, {
+      projectId: project.id,
+      conversationRunId: proposal.conversation_run_id!,
+      proposalId: proposal.id,
+      userId: session.user.id,
+      provider: input.provider,
+      model: input.model,
+      effort: input.effort,
+      workerId: input.workerId,
+      dispatchRequestId: crypto.randomUUID(),
+      reservedAt: acceptedAt,
+    });
+    if (!reservation?.dispatch_request_id ||
+        !reservation.approval_reserved_by_user_id ||
+        !reservation.approval_reserved_at) {
+      throw new HttpError(
+        409,
+        "The issue or execution approval changed before dispatch",
+        "ISSUE_EXECUTION_PROPOSAL_CONFLICT",
+      );
+    }
+    try {
+      const dispatched = await dispatchHuntRun(
+        db,
+        project.organization_id,
+        project.id,
+        {
+          runId: reservation.target_run_id,
+          agentId: reservation.proposed_by_agent_id,
+          provider: reservation.requested_provider!,
+          model: reservation.requested_model,
+          effort: reservation.requested_effort,
+          persistPreferences: false,
+          workerId: reservation.requested_worker_id,
+          requestedByUserId: reservation.approval_reserved_by_user_id,
+          requestId: reservation.dispatch_request_id,
+          occurredAt: reservation.approval_reserved_at,
+        },
+      );
+      if (!dispatched) throw new HttpError(404, "Run not found");
+      const accepted = await getIssueExecutionProposal(
+        db,
+        reservation.project_id,
+        reservation.conversation_run_id!,
+        reservation.id,
+      );
+      if (
+        !accepted || accepted.status !== "accepted" ||
+        accepted.dispatch_request_id !== reservation.dispatch_request_id
+      ) {
+        throw new HttpError(
+          409,
+          "Execution approval was not finalized",
+          "ISSUE_EXECUTION_PROPOSAL_CONFLICT",
+        );
+      }
+      return json({
+        proposal: issueExecutionProposalJson(accepted),
+        outcome: "accepted",
+        projectId: accepted.project_id,
+        runId: accepted.target_run_id,
+        dispatch: dispatched,
+      });
+    } catch (error) {
+      if (error instanceof WorkerConflictError || (
+        error instanceof Error && error.message.includes("execution proposal")
+      )) {
+        throw new HttpError(
+          409,
+          error.message,
+          "ISSUE_EXECUTION_PROPOSAL_CONFLICT",
+        );
+      }
+      throw error;
+    }
   }
 
   const projectRunEvidenceMatch = pathname.match(
@@ -10579,6 +11060,19 @@ async function route(
       if (job.project_id !== null && !project) {
         throw new HttpError(409, "Reply job lost its project context");
       }
+      const executionTargets = job.project_id &&
+          await channelExecutionProposalTablesAvailable(db)
+        ? await snapshotChannelReplyExecutionTargets(db, {
+            jobId: job.id,
+            deviceId: principal.deviceId,
+            workerId: binding.id,
+            claimTokenHash,
+            claimedAt: job.claimed_at ?? observedAt,
+          })
+        : [];
+      if (executionTargets === null) {
+        throw new HttpError(409, "Reply claim target snapshot was not stored");
+      }
       const channelAgents = agent.project_id === null
         ? await hydrateAgentSkills(db, await listChannelAgents(db, job.channel_id))
         : [];
@@ -10715,6 +11209,15 @@ async function route(
             projectTargets: project
               ? [{ id: project.id, name: project.name }]
               : [],
+            executionTargets: executionTargets.map((target) => ({
+              id: target.id,
+              projectId: job.project_id,
+              runId: target.id,
+              runNumber: target.run_number,
+              sourceKey: target.source_key,
+              title: target.title,
+              status: target.status,
+            })),
             messages,
           },
         },
@@ -10941,6 +11444,16 @@ async function route(
     if (!agent) throw new HttpError(409, "Reply job lost its Agent");
     const result = input.result!;
     if (
+      (result.executionProposal || result.issueProposal?.executeAfterCreate) &&
+      !(await channelExecutionProposalTablesAvailable(db))
+    ) {
+      throw new HttpError(
+        503,
+        "Issue execution approval is not available during this upgrade",
+        "ISSUE_EXECUTION_APPROVAL_UNAVAILABLE",
+      );
+    }
+    if (
       result.delegation &&
       (agent.project_id !== null || job.delegated_by_reply_job_id !== null)
     ) {
@@ -10949,6 +11462,7 @@ async function route(
     for (const projectId of [
       result.document?.projectId,
       result.issueProposal?.projectId,
+      result.executionProposal?.projectId,
     ]) {
       if (
         projectId !== null && projectId !== undefined &&
@@ -10969,6 +11483,16 @@ async function route(
           projectId: result.issueProposal.projectId ?? agent.project_id,
         }
       : null;
+    const executionProposal = result.executionProposal;
+    if (
+      agent.project_id === null &&
+      (executionProposal || issueProposal?.executeAfterCreate)
+    ) {
+      throw new HttpError(
+        400,
+        "Organization Agents must delegate execution requests to a Project Agent",
+      );
+    }
     let delegation: {
       projectId: string;
       agentId: string;
@@ -11010,6 +11534,7 @@ async function route(
     for (const projectId of [
       document?.projectId,
       issueProposal?.projectId,
+      executionProposal?.projectId,
     ]) {
       if (!projectId) continue;
       const project = await getOrganizationProject(
@@ -11029,6 +11554,7 @@ async function route(
       body: result.body,
       document,
       issueProposal,
+      executionProposal,
       delegation,
       agentName: agent.name,
       agentProvider: job.agent_provider ?? agent.provider,
@@ -11076,6 +11602,18 @@ async function route(
     const input = issueAgentReplyCompletionSchema.parse(
       await readJson(request),
     );
+    if (
+      (input.executionProposal ||
+        (input.proposedAction?.type === "request_issue_create" &&
+          input.proposedAction.executeAfterCreate)) &&
+      !(await issueExecutionApprovalTablesAvailable(db))
+    ) {
+      throw new HttpError(
+        503,
+        "Issue execution approval is not available during this upgrade",
+        "ISSUE_EXECUTION_APPROVAL_UNAVAILABLE",
+      );
+    }
     const worker = await requireWorkerProjectBinding(
       db,
       request,
@@ -11083,14 +11621,14 @@ async function route(
       input.workerId,
     );
     const claimTokenHash = await sha256(input.claimToken);
+    const observedAt = new Date().toISOString();
     const job = await getClaimedIssueAgentReply(
       db,
       input.projectId,
       issueReplyClaimMatch[1],
-      { workerId: worker.binding.id, claimTokenHash },
+      { workerId: worker.binding.id, claimTokenHash, observedAt },
     );
     if (!job) throw new HttpError(409, "Reply claim is no longer active");
-    const observedAt = new Date().toISOString();
     if (input.error) {
       const failed = await failIssueAgentReply(
         db,
@@ -11107,86 +11645,52 @@ async function route(
       return json({ agentReply: issueAgentReplyJson(failed) });
     }
 
-    let reply = await createIssueMessage(db, {
-      id: job.reply_message_id,
-      projectId: input.projectId,
-      runId: job.run_id,
-      parentMessageId: job.parent_message_id,
-      authorUserId: null,
-      authorAgentProvider: job.agent_provider,
-      body: input.body!,
-      createdAt: observedAt,
-    });
-    if (!reply) {
-      reply = (await listIssueMessagesWithArchive(
-        db,
-        env.ARCHIVES,
-        input.projectId,
-        job.run_id,
-      )).find(
-        (message) => message.id === job.reply_message_id,
-      ) ?? null;
-    }
-    if (!reply) throw new HttpError(409, "Agent reply could not be persisted");
-    let proposal: IssueProposalRow | null = null;
-    if (input.proposedAction?.type === "request_issue_rework") {
-      proposal = await createIssueReworkProposal(db, {
-        id: crypto.randomUUID(),
-        projectId: input.projectId,
-        runId: job.run_id,
-        triggerMessageId: job.trigger_message_id,
-        replyMessageId: job.reply_message_id,
-        workflowStage: input.proposedAction.workflowStage,
-        reason: input.proposedAction.reason,
-        createdAt: observedAt,
-      });
-      if (!proposal) {
-        proposal = (await listIssueReworkProposals(
-          db,
-          input.projectId,
-          job.run_id,
-        )).find(
-          (candidate) => candidate.trigger_message_id === job.trigger_message_id,
-        ) ?? null;
-      }
-    } else if (input.proposedAction) {
-      const payload = input.proposedAction.type === "request_issue_update"
-        ? { changes: input.proposedAction.changes }
-        : { issue: input.proposedAction.issue };
-      proposal = await createIssueActionProposal(db, {
-        id: crypto.randomUUID(),
-        projectId: input.projectId,
-        conversationRunId: job.run_id,
-        triggerMessageId: job.trigger_message_id,
-        replyMessageId: job.reply_message_id,
-        actionType: input.proposedAction.type,
-        payloadJson: JSON.stringify(payload),
-        createdAt: observedAt,
-      });
-      if (!proposal) {
-        proposal = (await listIssueActionProposals(
-          db,
-          input.projectId,
-          job.run_id,
-        )).find(
-          (candidate) => candidate.trigger_message_id === job.trigger_message_id,
-        ) ?? null;
-      }
-    }
-    const completed = await completeIssueAgentReply(
+    const completedAt = new Date().toISOString();
+    const completed = await completeIssueAgentReplyOutput(
       db,
       input.projectId,
       job.id,
       {
         workerId: worker.binding.id,
         claimTokenHash,
-        completedAt: observedAt,
+        completedAt,
+        output: {
+          body: input.body!,
+          proposedAction: input.proposedAction ?? null,
+          executionProposal: Boolean(input.executionProposal),
+        },
       },
     );
     if (!completed) throw new HttpError(409, "Reply claim is no longer active");
+    const [messages, reworkProposals, actionProposals, executionProposals] =
+      await Promise.all([
+        listIssueMessagesWithArchive(
+          db,
+          env.ARCHIVES,
+          input.projectId,
+          job.run_id,
+        ),
+        listIssueReworkProposals(db, input.projectId, job.run_id),
+        listIssueActionProposals(db, input.projectId, job.run_id),
+        listIssueExecutionProposals(db, input.projectId, job.run_id),
+      ]);
+    const reply = messages.find(
+      (message) => message.id === job.reply_message_id,
+    ) ?? null;
+    if (!reply) throw new HttpError(409, "Agent reply could not be persisted");
+    const proposal: IssueProposalRow | null =
+      reworkProposals.find(
+        (candidate) => candidate.trigger_message_id === job.trigger_message_id,
+      ) ?? actionProposals.find(
+        (candidate) => candidate.trigger_message_id === job.trigger_message_id,
+      ) ?? null;
+    const executionProposal: IssueExecutionProposalRow | null =
+      executionProposals.find(
+        (candidate) => candidate.trigger_message_id === job.trigger_message_id,
+      ) ?? null;
     return json({
       agentReply: issueAgentReplyJson(completed),
-      message: issueMessageJson(reply, [], proposal),
+      message: issueMessageJson(reply, [], proposal, executionProposal),
     });
   }
 

@@ -651,6 +651,7 @@ describe("organization channels", () => {
       body: "I inspected the image.",
       document: null,
       issueProposal: null,
+      executionProposal: null,
       agentName: "Vision",
       agentProvider: "grok",
       completedAt: at(10),
@@ -948,6 +949,7 @@ describe("organization channels", () => {
       },
       issueProposal: {
         projectId,
+        executeAfterCreate: false,
         issue: {
           title: "Build onboarding",
           description: null,
@@ -955,6 +957,7 @@ describe("organization channels", () => {
           status: "backlog",
         },
       },
+      executionProposal: null,
       agentName: "Honey",
       agentProvider: "claude",
       completedAt: new Date(
@@ -1166,6 +1169,7 @@ describe("organization channels", () => {
         body: "Expired Worker output",
         document: null,
         issueProposal: null,
+        executionProposal: null,
         agentName: "Bumble",
         agentProvider: "claude",
         completedAt: at(26),
@@ -1203,6 +1207,7 @@ describe("organization channels", () => {
         body: "Disabled Worker output",
         document: null,
         issueProposal: null,
+        executionProposal: null,
         agentName: "Bumble",
         agentProvider: "claude",
         completedAt: at(16),
@@ -1222,6 +1227,7 @@ describe("organization channels", () => {
         document: null,
         issueProposal: {
           projectId: otherProjectId,
+          executeAfterCreate: false,
           issue: {
             title: "Wrong project",
             description: null,
@@ -1229,6 +1235,7 @@ describe("organization channels", () => {
             status: "backlog",
           },
         },
+        executionProposal: null,
         agentName: "Bumble",
         agentProvider: "claude",
         completedAt: at(16),
@@ -1248,6 +1255,7 @@ describe("organization channels", () => {
         body: "Stale claimant output",
         document: null,
         issueProposal: null,
+        executionProposal: null,
         agentName: "Bumble",
         agentProvider: "claude",
         completedAt: at(16),

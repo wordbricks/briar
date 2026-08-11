@@ -10,6 +10,9 @@ final class ChannelsStoreTests: XCTestCase {
     private let rootID = UUID(uuidString: "44444444-4444-4444-8444-444444444444")!
     private let replyID = UUID(uuidString: "55555555-5555-4555-8555-555555555555")!
     private let proposalID = UUID(uuidString: "77777777-7777-4777-8777-777777777777")!
+    private let executionProposalID = UUID(
+        uuidString: "cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd"
+    )!
     private let projectID = UUID(uuidString: "11111111-1111-4111-8111-111111111111")!
     private let resultRunID = UUID(uuidString: "88888888-8888-4888-8888-888888888888")!
 
@@ -553,6 +556,50 @@ final class ChannelsStoreTests: XCTestCase {
     }
 
     @MainActor
+    func testCreateApprovalOnlyMaterializesASeparatePendingExecutionProposal() async throws {
+        let configured = try await proposalStore(
+            response: AcceptChannelProposalResponse(
+                outcome: .accepted,
+                projectId: projectID,
+                resultRunId: resultRunID,
+                executionProposal: executionProposal()
+            ),
+            requestsExecutionFollowUp: true
+        )
+
+        let result = await configured.store.acceptProposal(
+            channelID: channelID,
+            proposalID: proposalID,
+            projectID: projectID
+        )
+
+        XCTAssertEqual(result?.outcome, .accepted)
+        XCTAssertEqual(configured.store.messages.first?.proposal?.status, .accepted)
+        XCTAssertEqual(
+            configured.store.messages.first?.executionProposal?.status,
+            .pending
+        )
+        let executionAcceptPath = MobileAPIContract.Endpoint.acceptChannelExecutionProposal(
+            organizationID: organizationID,
+            channelID: channelID,
+            proposalID: executionProposalID
+        )
+        let executionRequests = await configured.api.requestCount(for: executionAcceptPath)
+        XCTAssertEqual(executionRequests, 0, "create acceptance must never auto-dispatch")
+        let detailPath = MobileAPIContract.Endpoint.channel(
+            organizationID: organizationID,
+            channelID: channelID
+        )
+        let detailRequests = await configured.api.requestCount(for: detailPath)
+        XCTAssertEqual(
+            detailRequests,
+            1,
+            "the accept response should materialize the follow-up without a race-prone reload"
+        )
+        configured.store.applicationDidEnterBackground()
+    }
+
+    @MainActor
     func testAcceptProposalFailureKeepsProposalPendingAndSurfacesError() async throws {
         let configured = try await proposalStore(response: nil)
 
@@ -645,7 +692,11 @@ final class ChannelsStoreTests: XCTestCase {
                     channelID: channelID,
                     body: "Issue proposal",
                     authorKind: .agent,
-                    proposal: transferredProposal
+                    proposal: transferredProposal,
+                    executionProposal: executionProposal(
+                        projectID: transferredProjectID,
+                        runID: transferredRunID
+                    )
                 )],
                 removedMessageIds: []
             )
@@ -663,6 +714,8 @@ final class ChannelsStoreTests: XCTestCase {
         let navigableResult = await acceptance.value
         XCTAssertEqual(navigableResult?.projectId, transferredProjectID)
         XCTAssertEqual(navigableResult?.resultRunId, transferredRunID)
+        XCTAssertEqual(navigableResult?.executionProposal?.projectId, transferredProjectID)
+        XCTAssertEqual(navigableResult?.executionProposal?.runId, transferredRunID)
         XCTAssertEqual(
             configured.store.messages.first?.proposal?.projectId,
             transferredProjectID
@@ -985,6 +1038,314 @@ final class ChannelsStoreTests: XCTestCase {
         configured.store.applicationDidEnterBackground()
     }
 
+    @MainActor
+    func testPreparingExecutionApprovalUsesTheTargetProjectCapabilitySnapshot() async throws {
+        let configured = try await executionProposalStore(
+            dashboardSnapshots: [executionDashboard(dispatched: false)]
+        )
+
+        let context = await configured.store.prepareExecutionProposal(
+            channelID: channelID,
+            proposalID: executionProposalID
+        )
+
+        XCTAssertEqual(context?.proposalID, executionProposalID)
+        XCTAssertEqual(context?.snapshot.project.id, projectID)
+        XCTAssertEqual(context?.snapshot.organizationProviders, [.codex])
+        XCTAssertEqual(context?.snapshot.workers?.map(\.id), ["worker-1"])
+        XCTAssertEqual(context?.snapshot.executionPolicy?.selectionMode, .allowlist)
+        let dashboardRequests = await configured.api.requestCount(
+            for: configured.dashboardPath
+        )
+        let approvalRequests = await configured.api.requestCount(for: configured.acceptPath)
+        XCTAssertEqual(dashboardRequests, 1)
+        XCTAssertEqual(approvalRequests, 0)
+        configured.store.applicationDidEnterBackground()
+    }
+
+    @MainActor
+    func testExecutionApprovalRechecksImmediatelyBeforeAndAfterTheMutation() async throws {
+        let pendingSnapshot = executionDashboard(dispatched: false)
+        let configured = try await executionProposalStore(
+            dashboardSnapshots: [
+                pendingSnapshot,
+                pendingSnapshot,
+                executionDashboard(dispatched: true),
+            ],
+            approvalResponse: executionApprovalResponse()
+        )
+        let context = await configured.store.prepareExecutionProposal(
+            channelID: channelID,
+            proposalID: executionProposalID
+        )
+        XCTAssertNotNil(context)
+
+        let result = await configured.store.acceptExecutionProposal(
+            channelID: channelID,
+            proposalID: executionProposalID,
+            request: executionApprovalRequest()
+        )
+
+        XCTAssertEqual(result?.outcome, .accepted)
+        XCTAssertEqual(configured.store.messages.first?.executionProposal?.status, .accepted)
+        let dashboardRequests = await configured.api.requestCount(
+            for: configured.dashboardPath
+        )
+        let approvalRequests = await configured.api.requestCount(for: configured.acceptPath)
+        XCTAssertEqual(
+            dashboardRequests,
+            3,
+            "open, pre-submit, and post-response must each read the exact target dashboard"
+        )
+        XCTAssertEqual(approvalRequests, 1)
+        configured.store.applicationDidEnterBackground()
+    }
+
+    @MainActor
+    func testDelayedPendingDeltaCannotRegressLocallyAcceptedExecutionProposal() async throws {
+        let pendingDelta = ChannelDeltaResponse(
+            cursor: 11,
+            hasMore: false,
+            channels: [],
+            removedChannelIds: [],
+            messages: [message(
+                id: rootID,
+                channelID: channelID,
+                body: "Delayed pending execution proposal",
+                authorKind: .agent,
+                executionProposal: executionProposal()
+            )],
+            removedMessageIds: []
+        )
+        let configured = try await executionProposalStore(
+            dashboardSnapshots: [
+                executionDashboard(dispatched: false),
+                executionDashboard(dispatched: true),
+            ],
+            approvalResponse: executionApprovalResponse(),
+            delta: pendingDelta
+        )
+
+        let accepted = await configured.store.acceptExecutionProposal(
+            channelID: channelID,
+            proposalID: executionProposalID,
+            request: executionApprovalRequest()
+        )
+        XCTAssertEqual(accepted?.proposal.status, .accepted)
+
+        await configured.store.refreshChanges()
+
+        XCTAssertEqual(
+            configured.store.messages.first?.executionProposal?.status,
+            .accepted
+        )
+        configured.store.applicationDidEnterBackground()
+    }
+
+    @MainActor
+    func testNewExecutionProposalIDStillTombstonesLocallyAcceptedProposal() async throws {
+        let replacementID = UUID(uuidString: "edededed-eded-4ded-8ded-edededededed")!
+        let replacementDelta = ChannelDeltaResponse(
+            cursor: 11,
+            hasMore: false,
+            channels: [],
+            removedChannelIds: [],
+            messages: [message(
+                id: rootID,
+                channelID: channelID,
+                body: "Replacement execution proposal",
+                authorKind: .agent,
+                executionProposal: executionProposal(id: replacementID)
+            )],
+            removedMessageIds: []
+        )
+        let configured = try await executionProposalStore(
+            dashboardSnapshots: [
+                executionDashboard(dispatched: false),
+                executionDashboard(dispatched: true),
+            ],
+            approvalResponse: executionApprovalResponse(),
+            delta: replacementDelta
+        )
+        let accepted = await configured.store.acceptExecutionProposal(
+            channelID: channelID,
+            proposalID: executionProposalID,
+            request: executionApprovalRequest()
+        )
+        XCTAssertNotNil(accepted)
+
+        await configured.store.refreshChanges()
+
+        XCTAssertEqual(configured.store.messages.first?.executionProposal?.id, replacementID)
+        XCTAssertEqual(configured.store.messages.first?.executionProposal?.status, .pending)
+        let replacedContext = await configured.store.prepareExecutionProposal(
+            channelID: channelID,
+            proposalID: executionProposalID
+        )
+        XCTAssertNil(replacedContext)
+        configured.store.applicationDidEnterBackground()
+    }
+
+    @MainActor
+    func testNullExecutionProposalStillTombstonesLocallyAcceptedProposal() async throws {
+        let tombstoneDelta = ChannelDeltaResponse(
+            cursor: 11,
+            hasMore: false,
+            channels: [],
+            removedChannelIds: [],
+            messages: [message(
+                id: rootID,
+                channelID: channelID,
+                body: "Execution proposal removed",
+                authorKind: .agent,
+                executionProposal: nil
+            )],
+            removedMessageIds: []
+        )
+        let configured = try await executionProposalStore(
+            dashboardSnapshots: [
+                executionDashboard(dispatched: false),
+                executionDashboard(dispatched: true),
+            ],
+            approvalResponse: executionApprovalResponse(),
+            delta: tombstoneDelta
+        )
+        let accepted = await configured.store.acceptExecutionProposal(
+            channelID: channelID,
+            proposalID: executionProposalID,
+            request: executionApprovalRequest()
+        )
+        XCTAssertNotNil(accepted)
+
+        await configured.store.refreshChanges()
+
+        XCTAssertNil(configured.store.messages.first?.executionProposal)
+        let removedContext = await configured.store.prepareExecutionProposal(
+            channelID: channelID,
+            proposalID: executionProposalID
+        )
+        XCTAssertNil(removedContext)
+        configured.store.applicationDidEnterBackground()
+    }
+
+    @MainActor
+    func testExecutionProposalTombstoneInvalidatesDelayedApprovalResponse() async throws {
+        let tombstone = message(
+            id: rootID,
+            channelID: channelID,
+            body: "Execution proposal removed after transfer",
+            authorKind: .agent,
+            executionProposal: nil
+        )
+        let configured = try await executionProposalStore(
+            dashboardSnapshots: [executionDashboard(dispatched: false)],
+            approvalResponse: executionApprovalResponse(),
+            approvalDelay: .milliseconds(120),
+            delta: ChannelDeltaResponse(
+                cursor: 11,
+                hasMore: false,
+                channels: [],
+                removedChannelIds: [],
+                messages: [tombstone],
+                removedMessageIds: []
+            )
+        )
+        let approval = Task {
+            await configured.store.acceptExecutionProposal(
+                channelID: channelID,
+                proposalID: executionProposalID,
+                request: executionApprovalRequest()
+            )
+        }
+        await waitForRequests(configured.api, path: configured.acceptPath, count: 1)
+
+        await configured.store.refreshChanges()
+        let result = await approval.value
+
+        XCTAssertNil(result)
+        XCTAssertNil(configured.store.messages.first?.executionProposal)
+        XCTAssertNil(configured.store.approvingExecutionProposalID)
+        XCTAssertNil(configured.store.errorMessage)
+        let dashboardRequests = await configured.api.requestCount(
+            for: configured.dashboardPath
+        )
+        XCTAssertEqual(
+            dashboardRequests,
+            1,
+            "a tombstone must prevent the delayed response from triggering postflight or UI state"
+        )
+        configured.store.applicationDidEnterBackground()
+    }
+
+    @MainActor
+    func testArchivingChannelInvalidatesDelayedExecutionApprovalResponse() async throws {
+        let archived = summary(
+            id: channelID,
+            name: "Briar",
+            archivedAt: Date(timeIntervalSince1970: 1_700_000_100)
+        )
+        let configured = try await executionProposalStore(
+            dashboardSnapshots: [executionDashboard(dispatched: false)],
+            approvalResponse: executionApprovalResponse(),
+            approvalDelay: .milliseconds(120),
+            delta: ChannelDeltaResponse(
+                cursor: 11,
+                hasMore: false,
+                channels: [archived],
+                removedChannelIds: [],
+                messages: [],
+                removedMessageIds: []
+            )
+        )
+        let approval = Task {
+            await configured.store.acceptExecutionProposal(
+                channelID: channelID,
+                proposalID: executionProposalID,
+                request: executionApprovalRequest()
+            )
+        }
+        await waitForRequests(configured.api, path: configured.acceptPath, count: 1)
+
+        await configured.store.refreshChanges()
+        let result = await approval.value
+
+        XCTAssertNil(result)
+        XCTAssertNotNil(configured.store.channels.first?.archivedAt)
+        XCTAssertEqual(configured.store.messages.first?.executionProposal?.status, .pending)
+        XCTAssertNil(configured.store.approvingExecutionProposalID)
+        let dashboardRequests = await configured.api.requestCount(
+            for: configured.dashboardPath
+        )
+        XCTAssertEqual(dashboardRequests, 1)
+        configured.store.applicationDidEnterBackground()
+    }
+
+    @MainActor
+    func testAuthoritativeReloadInvalidatesAnExecutionProposalWhoseMessageWasRemoved() async throws {
+        let configured = try await executionProposalStore(
+            dashboardSnapshots: [executionDashboard(dispatched: false)],
+            additionalDetailMessages: [[]]
+        )
+        let prepared = await configured.store.prepareExecutionProposal(
+            channelID: channelID,
+            proposalID: executionProposalID
+        )
+        XCTAssertNotNil(prepared)
+
+        await configured.store.openChannel(channelID)
+        let result = await configured.store.acceptExecutionProposal(
+            channelID: channelID,
+            proposalID: executionProposalID,
+            request: executionApprovalRequest()
+        )
+
+        XCTAssertTrue(configured.store.messages.isEmpty)
+        XCTAssertNil(result)
+        let approvalRequests = await configured.api.requestCount(for: configured.acceptPath)
+        XCTAssertEqual(approvalRequests, 0)
+        configured.store.applicationDidEnterBackground()
+    }
+
     private func summary(
         id: UUID,
         name: String,
@@ -1016,7 +1377,8 @@ final class ChannelsStoreTests: XCTestCase {
         lastReplyAt: Date? = nil,
         createdAt: Date = Date(timeIntervalSince1970: 1_700_000_010),
         authorKind: ChannelMessage.Author.Kind = .user,
-        proposal: ChannelMessage.Proposal? = nil
+        proposal: ChannelMessage.Proposal? = nil,
+        executionProposal: IssueExecutionProposal? = nil
     ) -> ChannelMessage {
         ChannelMessage(
             id: id,
@@ -1033,8 +1395,177 @@ final class ChannelsStoreTests: XCTestCase {
             lastReplyAt: lastReplyAt,
             document: nil,
             proposal: proposal,
+            executionProposal: executionProposal,
             createdAt: createdAt
         )
+    }
+
+    private func executionProposal(
+        id: UUID? = nil,
+        status: IssueExecutionProposal.Status = .pending,
+        projectID: UUID? = nil,
+        runID: UUID? = nil
+    ) -> IssueExecutionProposal {
+        IssueExecutionProposal(
+            id: id ?? executionProposalID,
+            status: status,
+            projectId: projectID ?? self.projectID,
+            runId: runID ?? resultRunID,
+            title: "Build onboarding",
+            createdAt: Date(timeIntervalSince1970: 1_700_000_010),
+            acceptedAt: status == .accepted ? Date(timeIntervalSince1970: 1_700_000_100) : nil,
+            requestedProvider: status == .accepted ? .codex : nil,
+            requestedModel: status == .accepted ? "gpt-5.6-sol" : nil,
+            requestedEffort: status == .accepted ? .high : nil,
+            requestedWorkerId: status == .accepted ? "worker-1" : nil,
+            delegatedByAgentId: UUID(uuidString: "66666666-6666-4666-8666-666666666666"),
+            delegatedByAgentName: "Bumble"
+        )
+    }
+
+    private func executionApprovalRequest() -> AcceptIssueExecutionProposalRequest {
+        AcceptIssueExecutionProposalRequest(
+            provider: .codex,
+            model: "gpt-5.6-sol",
+            effort: .high,
+            workerId: "worker-1"
+        )
+    }
+
+    private func executionApprovalResponse() -> AcceptChannelExecutionProposalResponse {
+        AcceptChannelExecutionProposalResponse(
+            proposal: executionProposal(status: .accepted),
+            outcome: .accepted,
+            projectId: projectID,
+            runId: resultRunID,
+            dispatch: DispatchRunResponse(
+                runId: resultRunID,
+                agentId: nil,
+                provider: .codex,
+                model: "gpt-5.6-sol",
+                effort: .high,
+                requestedWorkerId: "worker-1",
+                requestedByUserId: "fixture-user",
+                dispatchMode: "specific",
+                dispatchedAt: Date(timeIntervalSince1970: 1_700_000_100),
+                outcome: "dispatched"
+            )
+        )
+    }
+
+    private func executionDashboard(dispatched: Bool) -> DashboardSnapshot {
+        let project = ProjectsResponse.Project(
+            id: projectID,
+            name: "Target",
+            icon: nil,
+            organizationId: organizationID,
+            organizationName: "Wordbricks",
+            role: .owner,
+            createdAt: Date(timeIntervalSince1970: 1_700_000_000)
+        )
+        let run = DashboardRun(
+            id: resultRunID,
+            title: "Build onboarding",
+            status: dispatched ? .queued : .backlog,
+            executionReadiness: "ready",
+            dispatchedAt: dispatched ? Date(timeIntervalSince1970: 1_700_000_100) : nil,
+            requestedProvider: dispatched ? .codex : nil,
+            requestedModel: dispatched ? "gpt-5.6-sol" : nil,
+            requestedEffort: dispatched ? .high : nil,
+            requestedWorkerId: dispatched ? "worker-1" : nil,
+            requestedByUserId: dispatched ? "fixture-user" : nil,
+            dispatchMode: dispatched ? "specific" : nil,
+            updatedAt: Date(timeIntervalSince1970: 1_700_000_100)
+        )
+        return DashboardSnapshot(
+            project: project,
+            runs: [run],
+            workers: [DashboardWorker(
+                id: "worker-1",
+                label: "Build Mac",
+                agentProvider: .codex,
+                providers: [.codex],
+                readiness: "available",
+                acceptingWork: true,
+                readinessDetail: nil,
+                activeSessions: 0,
+                availableSessions: 1
+            )],
+            organizationProviders: [.codex],
+            executionPolicy: ProjectExecutionWorkerPolicy(
+                selectionMode: .allowlist,
+                defaultWorkerId: "worker-1",
+                allowedWorkerIds: ["worker-1"],
+                updatedAt: Date(timeIntervalSince1970: 1_700_000_000)
+            ),
+            cursor: 1,
+            generatedAt: Date(timeIntervalSince1970: 1_700_000_100)
+        )
+    }
+
+    @MainActor
+    private func executionProposalStore(
+        dashboardSnapshots: [DashboardSnapshot],
+        approvalResponse: AcceptChannelExecutionProposalResponse? = nil,
+        approvalDelay: Duration? = nil,
+        delta: ChannelDeltaResponse? = nil,
+        additionalDetailMessages: [[ChannelMessage]] = []
+    ) async throws -> (
+        store: ChannelsStore,
+        api: ChannelPollingAPI,
+        dashboardPath: String,
+        acceptPath: String
+    ) {
+        let channel = summary(id: channelID, name: "Briar")
+        let initialMessage = message(
+            id: rootID,
+            channelID: channelID,
+            body: "Execution proposal",
+            authorKind: .agent,
+            executionProposal: executionProposal()
+        )
+        let listPath = MobileAPIContract.Endpoint.channels(organizationID: organizationID)
+        let detailPath = MobileAPIContract.Endpoint.channel(
+            organizationID: organizationID,
+            channelID: channelID
+        )
+        let dashboardPath = MobileAPIContract.Endpoint.dashboard(projectID: projectID)
+        let acceptPath = MobileAPIContract.Endpoint.acceptChannelExecutionProposal(
+            organizationID: organizationID,
+            channelID: channelID,
+            proposalID: executionProposalID
+        )
+        var routes: [String: [Data]] = [
+            listPath: [try encoded(ChannelsResponse(channels: [channel], cursor: 10))],
+            detailPath: try ([[initialMessage]] + additionalDetailMessages).map { messages in
+                try encoded(ChannelDetailResponse(
+                    channel: channel,
+                    members: [],
+                    agents: [],
+                    messages: messages
+                ))
+            },
+            dashboardPath: try dashboardSnapshots.map { try encoded($0) },
+        ]
+        if let approvalResponse {
+            routes[acceptPath] = [try encoded(approvalResponse)]
+        }
+        if let delta {
+            routes[MobileAPIContract.Endpoint.channelChanges(
+                organizationID: organizationID,
+                cursor: 10
+            )] = [try encoded(delta)]
+        }
+        let api = ChannelPollingAPI(
+            routes: routes,
+            delays: approvalDelay.map { [acceptPath: $0] } ?? [:]
+        )
+        let store = ChannelsStore(api: api, pollInterval: .seconds(3_600))
+        store.select(organizationID: organizationID, token: "token")
+        await waitForRequests(api, path: listPath, count: 1)
+        await waitForChannels(store, count: 1)
+        await store.openChannel(channelID)
+        return (store, api, dashboardPath, acceptPath)
     }
 
     @MainActor
@@ -1043,6 +1574,8 @@ final class ChannelsStoreTests: XCTestCase {
         delay: Duration? = nil,
         delta: ChannelDeltaResponse? = nil,
         refreshedProposal: ChannelMessage.Proposal? = nil,
+        refreshedExecutionProposal: IssueExecutionProposal? = nil,
+        requestsExecutionFollowUp: Bool = false,
         focusChangeResponse: ChannelDetailResponse? = nil,
         focusThread: Bool = false,
         malformedAcceptance: Bool = false,
@@ -1065,7 +1598,8 @@ final class ChannelsStoreTests: XCTestCase {
                     description: "Ship the guided setup.",
                     priority: 2,
                     status: .backlog
-                )
+                ),
+                executeAfterCreate: requestsExecutionFollowUp
             ),
             resultRunId: nil
         )
@@ -1101,7 +1635,8 @@ final class ChannelsStoreTests: XCTestCase {
                     channelID: channelID,
                     body: "Issue proposal",
                     authorKind: .agent,
-                    proposal: refreshedProposal
+                    proposal: refreshedProposal,
+                    executionProposal: refreshedExecutionProposal
                 )]
             )))
         }

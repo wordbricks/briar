@@ -1,5 +1,11 @@
 import Foundation
 
+struct AcceptIssueProposalResult: Sendable {
+    let proposal: IssueProposedAction?
+    let executionProposal: IssueExecutionProposal?
+    let requiresAuthoritativeReload: Bool
+}
+
 @MainActor
 final class IssueMutationStore: ObservableObject {
     @Published private(set) var activeActions: Set<String> = []
@@ -283,7 +289,7 @@ final class IssueMutationStore: ObservableObject {
     func acceptIssueProposal(
         runID: UUID,
         proposal: IssueProposedAction
-    ) async throws -> IssueProposedAction {
+    ) async throws -> AcceptIssueProposalResult {
         try await perform("issue-proposal-\(proposal.id)") {
             if proposal.type == .rework {
                 let response: AcceptIssueReworkProposalResponse = try await api.send(
@@ -297,7 +303,11 @@ final class IssueMutationStore: ObservableObject {
                     body: nil,
                     as: AcceptIssueReworkProposalResponse.self
                 )
-                return response.proposal
+                return AcceptIssueProposalResult(
+                    proposal: response.proposal,
+                    executionProposal: nil,
+                    requiresAuthoritativeReload: false
+                )
             }
             let response: AcceptIssueActionProposalResponse = try await api.send(
                 MobileAPIContract.Endpoint.acceptIssueActionProposal(
@@ -310,7 +320,44 @@ final class IssueMutationStore: ObservableObject {
                 body: nil,
                 as: AcceptIssueActionProposalResponse.self
             )
-            return response.proposal
+            let proposalMatches = response.proposal.id == proposal.id
+            let executionProposal = response.executionProposal.flatMap { candidate in
+                guard response.proposal.type == .create,
+                      let resultRunID = response.resultRunId,
+                      issueExecutionProposalMatchesCreatedRun(
+                          candidate,
+                          projectID: projectID,
+                          runID: resultRunID
+                      )
+                else { return nil }
+                return candidate
+            }
+            return AcceptIssueProposalResult(
+                proposal: proposalMatches ? response.proposal : nil,
+                executionProposal: executionProposal,
+                requiresAuthoritativeReload: !proposalMatches ||
+                    (response.executionProposal != nil && executionProposal == nil)
+            )
+        }
+    }
+
+    func acceptIssueExecutionProposal(
+        conversationRunID: UUID,
+        proposalID: UUID,
+        request: AcceptIssueExecutionProposalRequest
+    ) async throws -> AcceptIssueExecutionProposalResponse {
+        try await perform("issue-execution-proposal-\(proposalID)") {
+            try await api.send(
+                MobileAPIContract.Endpoint.acceptIssueExecutionProposal(
+                    projectID: projectID,
+                    conversationRunID: conversationRunID,
+                    proposalID: proposalID
+                ),
+                method: "POST",
+                token: token,
+                body: request,
+                as: AcceptIssueExecutionProposalResponse.self
+            )
         }
     }
 

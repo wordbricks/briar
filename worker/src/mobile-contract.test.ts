@@ -5,7 +5,13 @@ import {
   mobileClientIds,
   mobileDashboardDeltaSchema,
   mobileDashboardSnapshotSchema,
+  mobileAcceptChannelProposalResponseSchema,
+  mobileAcceptIssueActionProposalResponseSchema,
   mobileChannelIssueProposalPayloadSchema,
+  mobileChannelMessageSchema,
+  mobileIssueExecutionApprovalRequestSchema,
+  mobileIssueExecutionProposalSchema,
+  mobileIssueMessagesResponseSchema,
   mobileOperationSchemas,
   mobileProjectAgentTaskRequestSchema,
 } from "./mobile-contract";
@@ -43,6 +49,9 @@ const openapi = JSON.parse(readFileSync(
             };
           };
         };
+      };
+      IssueExecutionApprovalRequest: {
+        required: string[];
       };
     };
   };
@@ -171,6 +180,130 @@ describe("Companion mobile API contract", () => {
       openapi.components.schemas.ChannelIssueProposalPayload.properties.issue
         .properties.status.enum,
     ).toEqual(["backlog", "queued"]);
+  });
+
+  it("keeps create and execution proposals as two explicit approval boundaries", () => {
+    const executionProposal = {
+      id: "cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd",
+      type: "request_issue_execute",
+      status: "pending",
+      projectId: "11111111-1111-4111-8111-111111111111",
+      runId: "33333333-3333-4333-8333-333333333333",
+      title: "온보딩 개편",
+      createdAt: "2026-08-11T01:00:00.000Z",
+      acceptedAt: null,
+      requestedProvider: null,
+      requestedModel: null,
+      requestedEffort: null,
+      requestedWorkerId: null,
+      delegatedByAgentId: "66666666-6666-4666-8666-666666666666",
+      delegatedByAgentName: "Bumble",
+    } as const;
+    expect(mobileIssueExecutionProposalSchema.parse(executionProposal).status)
+      .toBe("pending");
+
+    const channelResponse = fixture.operations.listChannelMessages.response as {
+      messages: Array<Record<string, unknown>>;
+    };
+    const createMessage = channelResponse.messages.find((message) => message.proposal);
+    expect(createMessage).toBeDefined();
+    const channelMessage = mobileChannelMessageSchema.parse({
+      ...createMessage,
+      executionProposal,
+    });
+    expect(channelMessage.proposal?.actionType).toBe("request_issue_create");
+    expect(channelMessage.executionProposal?.type).toBe("request_issue_execute");
+
+    const issueMessages = fixture.operations.listIssueMessages.response as {
+      messages: Array<Record<string, unknown>>;
+    };
+    const issueMessage = issueMessages.messages[0];
+    const parsedIssueMessages = mobileIssueMessagesResponseSchema.parse({
+      messages: [{
+        ...issueMessage,
+        proposedAction: {
+          id: "abababab-abab-4bab-8bab-abababababab",
+          type: "request_issue_create",
+          issue: {
+            title: "온보딩 개편",
+            description: null,
+            priority: 2,
+            status: "backlog",
+          },
+          executeAfterCreate: true,
+          status: "accepted",
+          acceptedAt: "2026-08-11T01:00:00.000Z",
+          resultRunId: "33333333-3333-4333-8333-333333333333",
+        },
+        executionProposal,
+      }],
+    });
+    expect(parsedIssueMessages.messages[0]?.proposedAction?.type)
+      .toBe("request_issue_create");
+    expect(parsedIssueMessages.messages[0]?.executionProposal?.status)
+      .toBe("pending");
+
+    const acceptedChannel = mobileAcceptChannelProposalResponseSchema.parse(
+      fixture.operations.acceptChannelProposal.response,
+    );
+    expect(acceptedChannel.executionProposal).toMatchObject({
+      status: "pending",
+      runId: executionProposal.runId,
+    });
+    const acceptedIssue = mobileAcceptIssueActionProposalResponseSchema.parse(
+      fixture.operations.acceptIssueActionProposal.response,
+    );
+    expect(acceptedIssue.proposal).toMatchObject({
+      type: "request_issue_create",
+      executeAfterCreate: true,
+    });
+    expect(acceptedIssue.executionProposal).toMatchObject({
+      id: executionProposal.id,
+      status: "pending",
+    });
+
+    const acceptedUpdate = mobileAcceptIssueActionProposalResponseSchema.parse({
+      proposal: {
+        id: "abababab-abab-4bab-8bab-abababababab",
+        type: "request_issue_update",
+        changes: { description: "Updated acceptance criteria." },
+        changedFields: ["description"],
+        status: "accepted",
+        acceptedAt: "2026-08-11T01:00:00.000Z",
+        resultRunId: executionProposal.runId,
+      },
+      outcome: "accepted",
+      resultRunId: executionProposal.runId,
+      executionProposal: null,
+    });
+    expect(acceptedUpdate.proposal.type).toBe("request_issue_update");
+    expect(acceptedUpdate.proposal).not.toHaveProperty("executeAfterCreate");
+  });
+
+  it("requires explicit nullable execution choices and rejects hidden fields", () => {
+    const request = {
+      provider: "codex",
+      model: null,
+      effort: null,
+      workerId: null,
+    };
+    expect(mobileIssueExecutionApprovalRequestSchema.parse(request)).toEqual(request);
+    expect(
+      mobileIssueExecutionApprovalRequestSchema.safeParse({
+        provider: "codex",
+        model: null,
+        workerId: null,
+      }).success,
+    ).toBe(false);
+    expect(
+      mobileIssueExecutionApprovalRequestSchema.safeParse({
+        ...request,
+        requestId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      }).success,
+    ).toBe(false);
+    expect(
+      openapi.components.schemas.IssueExecutionApprovalRequest.required,
+    ).toEqual(["provider", "model", "effort", "workerId"]);
   });
 
   it("serves the documented health fixture from the Worker", async () => {

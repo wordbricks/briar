@@ -1728,6 +1728,24 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .issue-rework-proposal-accept:disabled { opacity:.6; cursor:wait; }
 .issue-rework-proposal-accepted { display:flex; align-items:center; gap:6px; color:var(--primary); font-size:var(--text-xs); font-weight:650; overflow-wrap:anywhere; }
 .issue-rework-proposal-error { min-width:0; display:flex; align-items:center; gap:6px; color:var(--destructive); overflow-wrap:anywhere; }
+.execution-proposal-card { min-width:0; max-width:100%; margin-top:10px; padding:11px; display:grid; gap:8px; border:1px solid color-mix(in srgb,var(--primary) 32%,var(--border)); border-radius:10px; background:color-mix(in srgb,var(--primary) 7%,var(--card)); }
+.execution-proposal-card>header { min-width:0; display:flex; align-items:center; gap:8px; }
+.execution-proposal-card>header>span:last-child { min-width:0; display:grid; gap:1px; }
+.execution-proposal-card>header strong { font-size:var(--text-xs); overflow-wrap:anywhere; }
+.execution-proposal-card>header small,
+.execution-proposal-project,
+.execution-proposal-delegation { color:var(--muted-foreground); font-size:var(--text-2xs); line-height:1.4; overflow-wrap:anywhere; }
+.execution-proposal-icon { width:28px; height:28px; display:grid; flex:0 0 auto; place-items:center; border-radius:8px; color:var(--primary); background:color-mix(in srgb,var(--primary) 13%,transparent); }
+.execution-proposal-target { font-size:var(--text-sm); overflow-wrap:anywhere; }
+.execution-proposal-delegation { color:var(--primary); font-weight:650; }
+.execution-proposal-card>p { margin:0; font-size:var(--text-xs); line-height:1.45; overflow-wrap:anywhere; }
+.execution-proposal-accepted { min-width:0; display:flex; align-items:flex-start; gap:6px; color:var(--primary); font-size:var(--text-xs); font-weight:650; overflow-wrap:anywhere; }
+.execution-proposal-accepted svg { margin-top:1px; flex:0 0 auto; }
+.execution-proposal-error { min-width:0; display:flex; align-items:flex-start; gap:6px; color:var(--destructive); }
+.execution-proposal-error svg { margin-top:1px; flex:0 0 auto; }
+.execution-proposal-card>footer { display:flex; flex-wrap:wrap; gap:8px; }
+.execution-proposal-card>footer button { width:max-content; max-width:100%; min-height:32px; padding:6px 10px; display:inline-flex; align-items:center; gap:6px; border:0; border-radius:8px; color:var(--primary-foreground); background:var(--primary); font-size:var(--text-xs); font-weight:650; }
+.execution-proposal-card>footer button:disabled { opacity:.55; cursor:not-allowed; }
 .issue-message-action-error { grid-column:1 / -1; min-width:0; margin:2px 0 0; display:flex; align-items:center; gap:6px; color:var(--destructive); font-size:var(--text-2xs); overflow-wrap:anywhere; }
 .issue-message-composer { position:relative; z-index:1; min-width:0; flex:0 0 auto; overflow:visible; display:grid; grid-template-rows:minmax(0,1fr) auto; border:1px solid var(--border); border-radius:16px; background:var(--card); box-shadow:0 5px 18px rgba(0,0,0,.08); transition:border-color .14s ease-out,box-shadow .14s ease-out; }
 .issue-conversation > .issue-message-composer { min-width:0; margin:0 14px 14px; }
@@ -6120,6 +6138,7 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .channel-proposal-card .channel-proposal-description-toggle,
 .companion-channel-proposal .channel-proposal-description-toggle { align-self:flex-start; border:0; background:transparent; padding:1px 0; color:var(--muted-foreground,#777168); font:inherit; font-size:11px; text-decoration:underline; }
 .channel-proposal-metadata { display:flex; flex-wrap:wrap; gap:3px 8px; }
+.channel-proposal-execution-intent { margin:4px 0 0; color:var(--foreground,#25221f); font-size:11px; line-height:1.4; overflow-wrap:anywhere; }
 .channel-proposal-card select {
   min-width:160px;
   max-width:240px;

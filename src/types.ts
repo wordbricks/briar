@@ -80,6 +80,14 @@ export type IssueExecutionPreferences = {
   effort: ModelEffort | null;
 };
 
+/** Values a member explicitly chooses before approving issue execution. */
+export type IssueExecutionApprovalInput = {
+  provider: AgentProvider;
+  model: string | null;
+  effort: ModelEffort | null;
+  workerId: string | null;
+};
+
 export type IssueDependencyReference = {
   id: string;
   runNumber: number;
@@ -119,6 +127,8 @@ export type IssueMessage = {
   author: IssueMessageAuthor;
   replyCount: number;
   proposedAction?: IssueProposedAction | null;
+  /** A separate approval boundary for execution, including create-then-execute. */
+  executionProposal?: IssueExecutionProposal | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -156,9 +166,27 @@ export type IssueCreateProposal = {
     priority: number | null;
     status: "backlog" | "queued";
   };
+  executeAfterCreate?: boolean;
   status: "pending" | "accepted";
   acceptedAt: string | null;
   resultRunId: string | null;
+};
+
+export type IssueExecutionProposal = {
+  id: string;
+  type: "request_issue_execute";
+  status: "pending" | "accepted";
+  projectId: string;
+  runId: string;
+  title: string;
+  createdAt: string;
+  acceptedAt: string | null;
+  requestedProvider: AgentProvider | null;
+  requestedModel: string | null;
+  requestedEffort: ModelEffort | null;
+  requestedWorkerId: string | null;
+  delegatedByAgentId: string | null;
+  delegatedByAgentName: string | null;
 };
 
 export type IssueProposedAction =

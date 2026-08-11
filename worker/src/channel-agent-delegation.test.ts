@@ -13,8 +13,13 @@ import {
   getChannelMessage,
   listChannelAgentReplies,
   removeChannelAgent,
+  snapshotChannelReplyExecutionTargets,
 } from "./channels";
-import { createProjectAgent } from "./db";
+import {
+  createProjectAgent,
+  recordHuntEvent,
+  type HuntEventInput,
+} from "./db";
 import apiWorker from "./index";
 import { createOrganizationAgent } from "./organization-agents";
 import { applyD1Migrations } from "./test-helpers/d1";
@@ -31,6 +36,33 @@ const ownerId = "delegation-owner";
 const workerToken = "briar_worker_channel-delegation-test";
 const sha256 = (value: string) =>
   createHash("sha256").update(value).digest("hex");
+const backlogEvent = (sourceKey: string): HuntEventInput => ({
+  source: "issue",
+  sourceKey,
+  title: `Execute ${sourceKey}`,
+  stage: "queued",
+  status: "backlog",
+  workflowStage: null,
+  eventKey: `${sourceKey}:backlog`,
+  occurredAt: new Date().toISOString(),
+  actor: "channel-delegation-test",
+  repository: "Briar",
+  detail: null,
+  priority: null,
+  branch: null,
+  commitSha: null,
+  tracker: null,
+  issueDescription: null,
+  resultSummary: null,
+  structuredResult: null,
+  pullRequestUrls: [],
+  targetSha: null,
+  sourceCreatedAt: new Date().toISOString(),
+  qaStatus: null,
+  stagingQaDetail: null,
+  productionQaDetail: null,
+  context: null,
+});
 
 describe("Organization Agent channel delegation", () => {
   const miniflare = new Miniflare({
@@ -394,6 +426,325 @@ describe("Organization Agent channel delegation", () => {
     });
   });
 
+  it("requires Organization delegation and preserves it on a Project Agent execution card", async () => {
+    const workflow = JSON.stringify({
+      version: 2,
+      requirements: [],
+      stages: [{ id: "implementing", label: "Implement", required: true }],
+      execution: { checkpoints: [] },
+      completion: { requiredStages: ["implementing"] },
+    });
+    await db.prepare(
+      `insert into briar_project_settings (
+         project_id, workflow_json, mandatory_checkpoints_json,
+         created_at, updated_at
+       ) values (?, ?, '[]', ?, ?)
+       on conflict (project_id) do update set workflow_json = excluded.workflow_json`,
+    ).bind(projectId, workflow, new Date().toISOString(), new Date().toISOString())
+      .run();
+    const targetRunId = await recordHuntEvent(
+      db,
+      projectId,
+      backlogEvent(`delegated-execution-${crypto.randomUUID()}`),
+    );
+
+    const direct = await queueOrganizationReply("Execute the Briar issue.");
+    const directClaim = await claim(otherWorkerId);
+    expect(directClaim.work).toMatchObject({ workId: direct.id, projectId: null });
+    const rejected = await apiWorker.fetch(
+      workerRequest(`/channel-reply-claims/${direct.id}/complete`, {
+        organizationId,
+        workerId: otherWorkerId,
+        claimToken: String(directClaim.work?.claimToken),
+        result: {
+          body: "Trying to execute directly.",
+          document: null,
+          issueProposal: null,
+          executionProposal: { projectId, runId: targetRunId },
+          delegation: null,
+        },
+      }),
+      env(),
+    );
+    expect(rejected.status).toBe(400);
+    const directFinished = await apiWorker.fetch(
+      workerRequest(`/channel-reply-claims/${direct.id}/complete`, {
+        organizationId,
+        workerId: otherWorkerId,
+        claimToken: String(directClaim.work?.claimToken),
+        result: {
+          body: "Delegation is required.",
+          document: null,
+          issueProposal: null,
+          executionProposal: null,
+          delegation: null,
+        },
+      }),
+      env(),
+    );
+    expect(directFinished.status).toBe(200);
+
+    const child = await queueDelegatedChild(
+      "Repository questions: execute the listed Briar issue.",
+    );
+    const childClaim = await claim(projectWorkerId);
+    expect(childClaim.work).toMatchObject({
+      workId: child.id,
+      projectId,
+      snapshot: {
+        executionTargets: [expect.objectContaining({
+          projectId,
+          runId: targetRunId,
+        })],
+      },
+    });
+    const afterClaimAt = new Date(Date.now() + 5_000).toISOString();
+    const lateTarget = backlogEvent(
+      `late-delegated-execution-${crypto.randomUUID()}`,
+    );
+    const lateTargetRunId = await recordHuntEvent(db, projectId, {
+      ...lateTarget,
+      occurredAt: afterClaimAt,
+      sourceCreatedAt: afterClaimAt,
+    });
+    const lateCompletion = await apiWorker.fetch(
+      workerRequest(`/channel-reply-claims/${child.id}/complete`, {
+        organizationId,
+        workerId: projectWorkerId,
+        claimToken: String(childClaim.work?.claimToken),
+        result: {
+          body: "This target was not in the claim snapshot.",
+          document: null,
+          issueProposal: null,
+          executionProposal: { projectId, runId: lateTargetRunId },
+          delegation: null,
+        },
+      }),
+      env(),
+    );
+    expect(lateCompletion.status).toBe(409);
+    await expect(
+      getChannelMessage(db, channelId, child.reply_message_id),
+    ).resolves.toBeNull();
+    const completed = await apiWorker.fetch(
+      workerRequest(`/channel-reply-claims/${child.id}/complete`, {
+        organizationId,
+        workerId: projectWorkerId,
+        claimToken: String(childClaim.work?.claimToken),
+        result: {
+          body: "실행 전에 설정 승인이 필요합니다.",
+          document: null,
+          issueProposal: null,
+          executionProposal: { projectId, runId: targetRunId },
+          delegation: null,
+        },
+      }),
+      env(),
+    );
+    expect(completed.status).toBe(200);
+    await expect(completed.json()).resolves.toMatchObject({
+      message: {
+        executionProposal: {
+          type: "request_issue_execute",
+          status: "pending",
+          projectId,
+          runId: targetRunId,
+          delegatedByAgentId: organizationAgent.id,
+          delegatedByAgentName: organizationAgent.name,
+        },
+      },
+    });
+    await expect(db.prepare(
+      `select proposed_by_agent_id, delegated_by_agent_id,
+              delegated_by_agent_name, status, dispatch_request_id
+       from briar_issue_execution_proposals where reply_message_id = ?`,
+    ).bind(child.reply_message_id).first()).resolves.toEqual({
+      proposed_by_agent_id: projectAgent.id,
+      delegated_by_agent_id: organizationAgent.id,
+      delegated_by_agent_name: organizationAgent.name,
+      status: "pending",
+      dispatch_request_id: null,
+    });
+  });
+
+  it("does not expand a Project Agent execution allowlist when rank 101 later enters the top 100", async () => {
+    const outsideTargetRunId = await recordHuntEvent(
+      db,
+      projectId,
+      backlogEvent(`outside-snapshot-${crypto.randomUUID()}`),
+    );
+    const newerRunIds: string[] = [];
+    for (let index = 0; index < 100; index += 1) {
+      newerRunIds.push(await recordHuntEvent(
+        db,
+        projectId,
+        backlogEvent(`snapshot-decoy-${index}-${crypto.randomUUID()}`),
+      ));
+    }
+
+    const child = await queueDelegatedChild(
+      "Repository questions: execute the issue just outside the snapshot.",
+    );
+    const childClaim = await claim(projectWorkerId);
+    expect(childClaim.work).toMatchObject({ workId: child.id, projectId });
+    const executionTargets = (
+      childClaim.work?.snapshot as {
+        executionTargets: Array<{ runId: string }>;
+      }
+    ).executionTargets;
+    expect(executionTargets).toHaveLength(100);
+    expect(executionTargets.map((target) => target.runId))
+      .not.toContain(outsideTargetRunId);
+
+    // Removing one snapshotted run makes the old rank-101 run currently rank
+    // 100, but it must remain unauthorized because it was never disclosed.
+    await db.prepare(`delete from briar_hunt_runs where id = ?`)
+      .bind(newerRunIds[0]).run();
+    const currentRank = await db.prepare(
+      `select 1 as present
+       from briar_hunt_runs candidate
+       where candidate.id = ? and candidate.project_id = ?
+         and candidate.status = 'backlog' and candidate.stage = 'queued'
+         and (
+           select count(*) from briar_hunt_runs newer
+           where newer.project_id = candidate.project_id
+             and newer.run_number > candidate.run_number
+             and newer.status = 'backlog' and newer.stage = 'queued'
+             and newer.workflow_stage is null
+             and newer.worker_id is null and newer.requested_worker_id is null
+             and newer.claim_token_hash is null and newer.claimed_by is null
+             and newer.claimed_at is null and newer.lease_expires_at is null
+             and newer.last_execution_id is null
+             and newer.dispatch_mode is null
+             and newer.dispatch_request_id is null
+             and newer.dispatched_at is null
+             and newer.requested_by_user_id is null
+             and newer.completed_at is null and newer.paused_at is null
+             and newer.resume_requested_at is null
+         ) < 100`,
+    ).bind(outsideTargetRunId, projectId).first();
+    expect(currentRank).toEqual({ present: 1 });
+
+    const rejected = await apiWorker.fetch(
+      workerRequest(`/channel-reply-claims/${child.id}/complete`, {
+        organizationId,
+        workerId: projectWorkerId,
+        claimToken: String(childClaim.work?.claimToken),
+        result: {
+          body: "The target is currently in the top 100.",
+          document: null,
+          issueProposal: null,
+          executionProposal: { projectId, runId: outsideTargetRunId },
+          delegation: null,
+        },
+      }),
+      env(),
+    );
+    expect(rejected.status).toBe(409);
+    await expect(db.prepare(
+      `select count(*) as count from briar_issue_execution_proposals
+       where reply_message_id = ?`,
+    ).bind(child.reply_message_id).first()).resolves.toEqual({ count: 0 });
+
+    const completed = await apiWorker.fetch(
+      workerRequest(`/channel-reply-claims/${child.id}/complete`, {
+        organizationId,
+        workerId: projectWorkerId,
+        claimToken: String(childClaim.work?.claimToken),
+        result: {
+          body: "The requested issue was outside my execution snapshot.",
+          document: null,
+          issueProposal: null,
+          executionProposal: null,
+          delegation: null,
+        },
+      }),
+      env(),
+    );
+    expect(completed.status).toBe(200);
+  });
+
+  it("snapshots and projects the exact execution allowlist in one D1 batch", async () => {
+    await recordHuntEvent(
+      db,
+      projectId,
+      backlogEvent(`atomic-snapshot-${crypto.randomUUID()}`),
+    );
+    const child = await queueDelegatedChild(
+      "Repository questions: inspect the atomic execution snapshot.",
+    );
+    const childClaim = await claim(projectWorkerId);
+    expect(childClaim.work).toMatchObject({ workId: child.id, projectId });
+
+    const actualStatements = new WeakMap<object, D1PreparedStatement>();
+    let batchCalls = 0;
+    let standaloneExecutions = 0;
+    const atomicOnlyDb = {
+      prepare(query: string) {
+        let actual = db.prepare(query);
+        const rejectStandalone = () => {
+          standaloneExecutions += 1;
+          throw new Error("snapshot projection escaped its atomic D1 batch");
+        };
+        const wrapped = {
+          bind(...values: Parameters<D1PreparedStatement["bind"]>) {
+            actual = actual.bind(...values);
+            actualStatements.set(wrapped, actual);
+            return wrapped;
+          },
+          first: rejectStandalone,
+          all: rejectStandalone,
+          run: rejectStandalone,
+          raw: rejectStandalone,
+        };
+        actualStatements.set(wrapped, actual);
+        return wrapped;
+      },
+      batch(statements: object[]) {
+        batchCalls += 1;
+        return db.batch(statements.map((statement) => {
+          const actual = actualStatements.get(statement);
+          if (!actual) throw new Error("unknown wrapped D1 statement");
+          return actual;
+        }));
+      },
+    } as unknown as D1Database;
+
+    const targets = await snapshotChannelReplyExecutionTargets(atomicOnlyDb, {
+      jobId: child.id,
+      deviceId,
+      workerId: projectWorkerId,
+      claimTokenHash: sha256(String(childClaim.work?.claimToken)),
+      claimedAt: String(childClaim.work?.claimedAt),
+    });
+    expect(batchCalls).toBe(1);
+    expect(standaloneExecutions).toBe(0);
+    expect(targets?.length).toBeGreaterThan(0);
+    const stored = await db.prepare(
+      `select execution_target_ids_json
+       from briar_channel_agent_reply_jobs where id = ?`,
+    ).bind(child.id).first<{ execution_target_ids_json: string }>();
+    expect(JSON.parse(stored!.execution_target_ids_json))
+      .toEqual(targets!.map((target) => target.id));
+
+    const completed = await apiWorker.fetch(
+      workerRequest(`/channel-reply-claims/${child.id}/complete`, {
+        organizationId,
+        workerId: projectWorkerId,
+        claimToken: String(childClaim.work?.claimToken),
+        result: {
+          body: "The execution snapshot was captured atomically.",
+          document: null,
+          issueProposal: null,
+          executionProposal: null,
+          delegation: null,
+        },
+      }),
+      env(),
+    );
+    expect(completed.status).toBe(200);
+  });
+
   it("revalidates the roster atomically and never creates a child after revocation", async () => {
     const parent = await queueOrganizationReply("Inspect the Briar repository.");
     const parentClaim = await claim(otherWorkerId);
@@ -410,6 +761,7 @@ describe("Organization Agent channel delegation", () => {
       body: "Delegating.",
       document: null,
       issueProposal: null,
+      executionProposal: null,
       delegation: {
         projectId,
         agentId: projectAgent.id,
@@ -445,6 +797,7 @@ describe("Organization Agent channel delegation", () => {
         body: "The target was removed, so I did not delegate.",
         document: null,
         issueProposal: null,
+        executionProposal: null,
         delegation: null,
         agentName: organizationAgent.name,
         agentProvider: "claude",

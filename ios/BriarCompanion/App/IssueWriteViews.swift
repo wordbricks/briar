@@ -405,6 +405,283 @@ struct EditIssueSheet: View {
     }
 }
 
+/// Provider/model/effort/Worker selectors shared by ordinary manual dispatch
+/// and Agent-authored execution approvals. Approval callers pass the bounded
+/// conversational effort list; manual dispatch retains every provider option.
+struct ExecutionConfigurationFields: View {
+    @Binding var preferences: IssueExecutionPreferences
+    @Binding var workerID: String?
+
+    let providers: [AgentProvider]
+    let workers: [DashboardWorker]
+    let policy: ProjectExecutionWorkerPolicy?
+    let effortOptions: [ModelEffort]?
+    let locale: CompanionLocale
+
+    private var availableProviders: [AgentProvider] {
+        providers
+    }
+
+    private var visibleEfforts: [ModelEffort] {
+        let supported = preferences.provider?.efforts ?? []
+        guard let effortOptions else { return supported }
+        return effortOptions.filter(supported.contains)
+    }
+
+    var body: some View {
+        Section(L10n.text("실행 설정", locale: locale)) {
+            Picker(L10n.text("프로바이더", locale: locale), selection: $preferences.provider) {
+                ForEach(availableProviders) {
+                    Text($0.displayName).tag(AgentProvider?.some($0))
+                }
+            }
+            .accessibilityIdentifier("execution-approval-provider")
+
+            Picker(L10n.text("모델", locale: locale), selection: $preferences.model) {
+                Text(L10n.text("기본값", locale: locale)).tag(String?.none)
+                ForEach(preferences.provider?.models ?? [], id: \.self) {
+                    Text($0).tag(String?.some($0))
+                }
+            }
+            .accessibilityIdentifier("execution-approval-model")
+
+            Picker(L10n.text("Effort", locale: locale), selection: $preferences.effort) {
+                Text(L10n.text("기본값", locale: locale)).tag(ModelEffort?.none)
+                ForEach(visibleEfforts) {
+                    Text($0.rawValue).tag(ModelEffort?.some($0))
+                }
+            }
+            .disabled(preferences.model == nil)
+            .accessibilityIdentifier("execution-approval-effort")
+        }
+
+        Section("Worker") {
+            Picker(L10n.text("실행 환경", locale: locale), selection: $workerID) {
+                Text(L10n.text("사용 가능한 Worker 자동 선택", locale: locale))
+                    .tag(String?.none)
+                ForEach(compatibleWorkers) { worker in
+                    Text("\(worker.label) · \(worker.readiness)")
+                        .tag(String?.some(worker.id))
+                        .disabled(worker.readiness != "available")
+                }
+            }
+            .accessibilityIdentifier("execution-approval-worker")
+        }
+        .onChange(of: preferences.provider) { oldProvider, provider in
+            guard oldProvider != provider else { return }
+            preferences.model = nil
+            preferences.effort = nil
+            clearIncompatibleWorker()
+        }
+        .onChange(of: preferences.model) { _, model in
+            if model == nil { preferences.effort = nil }
+        }
+        .onChange(of: preferences.effort) { _, effort in
+            if let effort, !visibleEfforts.contains(effort) {
+                preferences.effort = nil
+            }
+        }
+    }
+
+    private var compatibleWorkers: [DashboardWorker] {
+        eligibleExecutionWorkers(
+            workers: workers,
+            provider: preferences.provider,
+            policy: policy
+        )
+    }
+
+    private func clearIncompatibleWorker() {
+        guard let workerID,
+              !compatibleWorkers.contains(where: {
+                  $0.id == workerID && $0.readiness == "available"
+              })
+        else { return }
+        self.workerID = nil
+    }
+}
+
+/// Explicit second-step confirmation used by channel and issue conversations.
+/// Opening this sheet never dispatches; only its confirmation action sends the
+/// user-selected settings to the proposal-specific approval endpoint.
+struct ExecutionProposalApprovalSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @State private var preferences: IssueExecutionPreferences
+    @State private var workerID: String?
+    @State private var submitting = false
+    @State private var completed = false
+    @State private var errorMessage: String?
+    @State private var presentationRevision = 0
+
+    let targetTitle: String
+    let providers: [AgentProvider]
+    let workers: [DashboardWorker]
+    let policy: ProjectExecutionWorkerPolicy?
+    let locale: CompanionLocale
+    let delegationNotice: String?
+    let approve: @MainActor (AcceptIssueExecutionProposalRequest) async throws -> Bool
+
+    init(
+        targetTitle: String,
+        providers: [AgentProvider],
+        workers: [DashboardWorker],
+        policy: ProjectExecutionWorkerPolicy? = nil,
+        locale: CompanionLocale,
+        delegationNotice: String? = nil,
+        approve: @escaping @MainActor (AcceptIssueExecutionProposalRequest) async throws -> Bool
+    ) {
+        self.targetTitle = targetTitle
+        let availableProviders = providers
+        let executableProviders = availableProviders.filter { provider in
+            !eligibleExecutionWorkers(
+                workers: workers,
+                provider: provider,
+                policy: policy
+            ).isEmpty
+        }
+        let presentedProviders = executableProviders.isEmpty
+            ? availableProviders
+            : executableProviders
+        self.providers = presentedProviders
+        self.workers = workers
+        self.policy = policy
+        self.locale = locale
+        self.delegationNotice = delegationNotice
+        self.approve = approve
+        _preferences = State(initialValue: IssueExecutionPreferences(
+            provider: presentedProviders.first,
+            model: nil,
+            effort: nil
+        ))
+        let preferredWorkerID = policy?.defaultWorkerId
+        _workerID = State(initialValue: preferredWorkerID.flatMap { workerID in
+            eligibleExecutionWorkers(
+                workers: workers,
+                provider: presentedProviders.first,
+                policy: policy
+            ).contains(where: {
+                $0.id == workerID && $0.readiness == "available"
+            }) ? workerID : nil
+        })
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section(L10n.text("실행 승인", locale: locale)) {
+                    Text(targetTitle)
+                        .font(.headline)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text(
+                        L10n.text(
+                            "승인 시 선택한 설정으로 이슈 실행이 시작됩니다. 이슈 생성 승인과는 별개의 작업입니다.",
+                            locale: locale
+                        )
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    if let delegationNotice {
+                        Label(delegationNotice, systemImage: "arrow.triangle.branch")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .accessibilityIdentifier("execution-approval-delegation")
+                    }
+                }
+
+                ExecutionConfigurationFields(
+                    preferences: $preferences,
+                    workerID: $workerID,
+                    providers: providers,
+                    workers: workers,
+                    policy: policy,
+                    effortOptions: ModelEffort.conversationalApprovalCases,
+                    locale: locale
+                )
+
+                if let errorMessage {
+                    Text(errorMessage).foregroundStyle(.red)
+                }
+            }
+            .navigationTitle(L10n.text("실행 승인", locale: locale))
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(L10n.text("취소", locale: locale)) { dismiss() }
+                        .disabled(submitting)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button { Task { await submit() } } label: {
+                        if completed {
+                            Image(systemName: "checkmark")
+                                .bold()
+                        } else if submitting {
+                            ProgressView()
+                        } else {
+                            Text(L10n.text("승인하고 실행", locale: locale))
+                        }
+                    }
+                    .disabled(
+                        submitting || completed ||
+                            !canSubmit
+                    )
+                    .accessibilityIdentifier("execution-proposal-approve")
+                }
+            }
+        }
+        .interactiveDismissDisabled(submitting)
+        .onDisappear { presentationRevision &+= 1 }
+    }
+
+    @MainActor
+    private func submit() async {
+        guard !submitting, !completed else { return }
+        let request: AcceptIssueExecutionProposalRequest
+        do {
+            request = try AcceptIssueExecutionProposalRequest(
+                preferences: preferences,
+                workerID: workerID
+            )
+        } catch {
+            errorMessage = error.localizedDescription
+            return
+        }
+        let expectedRevision = presentationRevision
+        submitting = true
+        errorMessage = nil
+        do {
+            let accepted = try await approve(request)
+            guard expectedRevision == presentationRevision else { return }
+            guard accepted else {
+                submitting = false
+                return
+            }
+            completed = true
+            submitting = false
+            try? await Task.sleep(for: .milliseconds(350))
+            guard expectedRevision == presentationRevision else { return }
+            dismiss()
+        } catch {
+            guard expectedRevision == presentationRevision else { return }
+            submitting = false
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private var canSubmit: Bool {
+        guard preferences.isValidForConversationApproval else { return false }
+        let eligible = eligibleExecutionWorkers(
+            workers: workers,
+            provider: preferences.provider,
+            policy: policy
+        )
+        guard !eligible.isEmpty else { return false }
+        return workerID.map { selected in
+            eligible.contains(where: {
+                $0.id == selected && $0.readiness == "available"
+            })
+        } ?? true
+    }
+}
+
 struct DispatchIssueSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var preferences: IssueExecutionPreferences
@@ -446,32 +723,15 @@ struct DispatchIssueSheet: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section(L10n.text("실행 설정")) {
-                    Picker(L10n.text("프로바이더"), selection: $preferences.provider) {
-                        ForEach(providers) { Text($0.displayName).tag(AgentProvider?.some($0)) }
-                    }
-                    Picker(L10n.text("모델"), selection: $preferences.model) {
-                        Text(L10n.text("기본값")).tag(String?.none)
-                        ForEach(preferences.provider?.models ?? [], id: \.self) {
-                            Text($0).tag(String?.some($0))
-                        }
-                    }
-                    Picker(L10n.text("Effort"), selection: $preferences.effort) {
-                        Text(L10n.text("기본값")).tag(ModelEffort?.none)
-                        ForEach(preferences.provider?.efforts ?? []) {
-                            Text($0.rawValue).tag(ModelEffort?.some($0))
-                        }
-                    }
-                    .disabled(preferences.model == nil)
-                }
-                Section("Worker") {
-                    Picker(L10n.text("실행 환경"), selection: $workerID) {
-                        Text(L10n.text("사용 가능한 Worker 자동 선택")).tag(String?.none)
-                        ForEach(compatibleWorkers) { worker in
-                            Text("\(worker.label) · \(worker.readiness)").tag(String?.some(worker.id))
-                        }
-                    }
-                }
+                ExecutionConfigurationFields(
+                    preferences: $preferences,
+                    workerID: $workerID,
+                    providers: providers,
+                    workers: workers,
+                    policy: nil,
+                    effortOptions: nil,
+                    locale: .current
+                )
                 if let errorMessage { Text(errorMessage).foregroundStyle(.red) }
             }
             .navigationTitle(L10n.text(reassign ? "다시 배정" : "바로 처리"))
@@ -503,26 +763,6 @@ struct DispatchIssueSheet: View {
                         .accessibilityIdentifier("dispatch-issue-submit")
                 }
             }
-            .onChange(of: preferences.provider) { oldProvider, provider in
-                guard oldProvider != provider else { return }
-                preferences.model = nil
-                preferences.effort = nil
-                if let workerID,
-                   !compatibleWorkers.contains(where: { $0.id == workerID }) {
-                    self.workerID = nil
-                }
-            }
-            .onChange(of: preferences.model) { _, model in
-                if model == nil { preferences.effort = nil }
-            }
-        }
-    }
-
-    private var compatibleWorkers: [DashboardWorker] {
-        guard let provider = preferences.provider else { return workers }
-        return workers.filter { worker in
-            worker.readiness == "available" &&
-                (worker.providers ?? worker.agentProvider.map { [$0] } ?? []).contains(provider)
         }
     }
 
