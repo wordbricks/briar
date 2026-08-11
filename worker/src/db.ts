@@ -4599,6 +4599,25 @@ const projectAgentSessionChangePageSize = 500;
 
 const projectAgentSessionSummaryJson = (row: ProjectAgentSessionRow) => {
   const payload = JSON.parse(row.payload_json) as Record<string, unknown>;
+  const status = typeof payload.status === "string"
+    ? payload.status
+    : row.status;
+  const startedAt = typeof payload.startedAt === "string"
+    ? payload.startedAt
+    : row.started_at;
+  const completedAt = typeof payload.completedAt === "string"
+    ? payload.completedAt
+    : row.completed_at;
+  const terminalEvent = Array.isArray(payload.events)
+    ? [...payload.events].reverse().find((value) => {
+        if (!value || typeof value !== "object" || Array.isArray(value)) {
+          return false;
+        }
+        const event = value as Record<string, unknown>;
+        return event.type === status && typeof event.id === "string";
+      }) as Record<string, unknown> | undefined
+    : undefined;
+  const terminalEventId = terminalEvent?.id;
   const issues = Array.isArray(payload.issues)
     ? payload.issues.map((value) => {
         const issue = value as Record<string, unknown>;
@@ -4625,10 +4644,13 @@ const projectAgentSessionSummaryJson = (row: ProjectAgentSessionRow) => {
     request: typeof payload.request === "string"
       ? payload.request.slice(0, 500)
       : null,
-    status: payload.status ?? row.status,
+    status,
     issues,
-    startedAt: payload.startedAt ?? row.started_at,
-    completedAt: payload.completedAt ?? row.completed_at,
+    startedAt,
+    completedAt,
+    inboxVersion: typeof terminalEventId === "string"
+      ? terminalEventId
+      : `${status}:${completedAt ?? startedAt}`,
     requestedWorkerId: payload.requestedWorkerId ?? null,
     workerId: payload.workerId ?? null,
     updatedAt: payload.updatedAt ?? row.updated_at,

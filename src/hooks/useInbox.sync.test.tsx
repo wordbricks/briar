@@ -3,19 +3,22 @@
 import { act, useMemo } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { DashboardPayload } from "../types";
+import type { DashboardPayload, Project } from "../types";
 import { demoDashboard } from "../lib/demo-data";
 import {
+  loadInboxFeed,
   loadInboxReadStates,
   saveInboxReadStates,
 } from "../lib/api";
 import { useInbox } from "./useInbox";
 
 vi.mock("../lib/api", () => ({
+  loadInboxFeed: vi.fn(),
   loadInboxReadStates: vi.fn(),
   saveInboxReadStates: vi.fn(),
 }));
 
+const mockedLoadInboxFeed = vi.mocked(loadInboxFeed);
 const mockedLoadInboxReadStates = vi.mocked(loadInboxReadStates);
 const mockedSaveInboxReadStates = vi.mocked(saveInboxReadStates);
 
@@ -59,6 +62,7 @@ function dashboardAt(revision: number): DashboardPayload {
 
 type HarnessProps = {
   dashboard: DashboardPayload;
+  projects?: Project[];
   token: string;
   userId: string;
 };
@@ -67,9 +71,12 @@ let inbox: ReturnType<typeof useInbox>;
 let root: Root;
 let container: HTMLDivElement;
 
-function Harness({ dashboard, token, userId }: HarnessProps) {
+function Harness({ dashboard, projects: providedProjects, token, userId }: HarnessProps) {
   const sessions = useMemo(() => [], []);
-  const projects = useMemo(() => [dashboard.project], [dashboard.project]);
+  const projects = useMemo(
+    () => providedProjects ?? [dashboard.project],
+    [dashboard.project, providedProjects],
+  );
   inbox = useInbox(
     userId,
     dashboard.project.organizationId ?? null,
@@ -95,6 +102,7 @@ async function flushPromises() {
 describe("useInbox read-state synchronization", () => {
   beforeEach(() => {
     window.localStorage.clear();
+    mockedLoadInboxFeed.mockReset().mockResolvedValue([]);
     mockedLoadInboxReadStates.mockReset().mockResolvedValue({});
     mockedSaveInboxReadStates.mockReset().mockResolvedValue({});
     container = document.createElement("div");
@@ -103,6 +111,90 @@ describe("useInbox read-state synchronization", () => {
 
   afterEach(async () => {
     await act(async () => root.unmount());
+  });
+
+  it("loads another project's messages without selecting that project", async () => {
+    const dashboard = dashboardAt(1);
+    const secondProject: Project = {
+      ...dashboard.project,
+      id: "22222222-2222-4222-8222-222222222222",
+      name: "Second project",
+    };
+    mockedLoadInboxFeed.mockResolvedValue([{
+      id: "issue:bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      kind: "issue",
+      projectId: secondProject.id,
+      projectName: secondProject.name,
+      targetId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      title: "Needs attention in the second project",
+      occurredAt: "2026-08-11T00:00:02.000Z",
+      version: "1:1:blocked:implementing:2026-08-11T00:00:02.000Z:2",
+      runNumber: 2,
+      status: "blocked",
+      workflowStage: "implementing",
+      priority: 1,
+      structuredResult: null,
+    }]);
+
+    await renderHarness({
+      dashboard,
+      projects: [dashboard.project, secondProject],
+      token: "token-a",
+      userId: "user-a",
+    });
+    await flushPromises();
+
+    expect(mockedLoadInboxFeed).toHaveBeenCalledWith(
+      "token-a",
+      dashboard.project.organizationId,
+      expect.any(AbortSignal),
+    );
+    expect(inbox.messages).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        projectId: secondProject.id,
+        title: "Needs attention in the second project",
+      }),
+    ]));
+    expect(inbox.notificationBaselineId).toBe(
+      `user-a:${dashboard.project.organizationId}`,
+    );
+  });
+
+  it("keeps the selected-project fallback when the organization feed is offline", async () => {
+    mockedLoadInboxFeed.mockRejectedValueOnce(new Error("offline"));
+
+    await renderHarness({
+      dashboard: dashboardAt(1),
+      token: "token-a",
+      userId: "user-a",
+    });
+    await flushPromises();
+
+    expect(inbox.messages).toEqual([
+      expect.objectContaining({
+        id: "issue:inbox-sync-run",
+        projectId: demoDashboard.project.id,
+      }),
+    ]);
+    expect(inbox.notificationBaselineId).toBe("user-a:local");
+  });
+
+  it("preserves richer local details for the same canonical feed version", async () => {
+    const feed = deferred<Awaited<ReturnType<typeof loadInboxFeed>>>();
+    mockedLoadInboxFeed.mockReturnValueOnce(feed.promise);
+    const dashboard = dashboardAt(1);
+
+    await renderHarness({
+      dashboard,
+      token: "token-a",
+      userId: "user-a",
+    });
+    const selectedMessage = inbox.messages[0]!;
+
+    feed.resolve([{ ...selectedMessage, title: "Compact feed title" }]);
+    await flushPromises();
+
+    expect(inbox.messages[0]?.title).toBe(selectedMessage.title);
   });
 
   it("refreshes account read state when the app regains focus", async () => {

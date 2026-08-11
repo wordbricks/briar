@@ -4,6 +4,9 @@ import Foundation
 final class InboxStore: ObservableObject {
     @Published private(set) var messages: [InboxMessage] = []
     @Published private(set) var unreadCount = 0
+    @Published private(set) var feedReady = false
+    @Published private(set) var notificationBaselineID =
+        "signed-out:no-organization:local"
 
     private var readVersions: [String: String] = [:]
     private var remoteReadVersions: [String: String] = [:]
@@ -11,53 +14,78 @@ final class InboxStore: ObservableObject {
     private var inFlightPush: [String: String] = [:]
     private var pushTask: Task<Void, Never>?
     private var syncTask: Task<Void, Never>?
+    private var feedRefreshTask: Task<Void, Never>?
+    private var feedPollingTask: Task<Void, Never>?
     private var accountGeneration: UInt64 = 0
+    private var feedGeneration: UInt64 = 0
     private var syncRequestGeneration: UInt64 = 0
     private var remoteMutationGeneration: UInt64 = 0
     private var token: String?
     private var userID: String?
+    private var organizationID: UUID?
     private let defaults: UserDefaults
     private let api: (any MobileAPIClientProtocol)?
+    private let pollInterval: Duration
     private let storageKeyPrefix = "briar.inbox.v1"
 
     init(
         defaults: UserDefaults = .standard,
-        api: (any MobileAPIClientProtocol)? = nil
+        api: (any MobileAPIClientProtocol)? = nil,
+        pollInterval: Duration = .seconds(15)
     ) {
         self.defaults = defaults
         self.api = api
+        self.pollInterval = pollInterval
     }
 
-    func configure(token: String?, userID: String?) {
+    func configure(token: String?, userID: String?, organizationID: UUID? = nil) {
         let normalizedUserID = userID?.trimmingCharacters(in: .whitespacesAndNewlines)
         let nextUserID = (normalizedUserID?.isEmpty == false) ? normalizedUserID : nil
-        let changed =
+        let accountChanged =
             self.token != token ||
             self.userID != nextUserID
-        guard changed else { return }
+        let organizationChanged = self.organizationID != organizationID
+        guard accountChanged || organizationChanged else { return }
 
-        accountGeneration &+= 1
-        syncRequestGeneration = 0
-        remoteMutationGeneration = 0
-        syncTask?.cancel()
-        pushTask?.cancel()
-        syncTask = nil
-        pushTask = nil
-        self.token = token
-        self.userID = nextUserID
-        pendingPush = [:]
-        inFlightPush = [:]
-        remoteReadVersions = [:]
-        // Never let a previous account's in-memory cache seed the new account.
-        readVersions = [:]
+        if accountChanged {
+            accountGeneration &+= 1
+            syncRequestGeneration = 0
+            remoteMutationGeneration = 0
+            syncTask?.cancel()
+            pushTask?.cancel()
+            syncTask = nil
+            pushTask = nil
+            self.token = token
+            self.userID = nextUserID
+            pendingPush = [:]
+            inFlightPush = [:]
+            remoteReadVersions = [:]
+            // Never let a previous account's in-memory cache seed the new account.
+            readVersions = [:]
+            if let userID = self.userID {
+                loadReadVersions(storageKey: storageKey(for: userID))
+                startReadStateSync()
+            }
+        }
+
+        feedGeneration &+= 1
+        feedRefreshTask?.cancel()
+        feedPollingTask?.cancel()
+        feedRefreshTask = nil
+        feedPollingTask = nil
+        self.organizationID = organizationID
+        feedReady = false
+        let accountScope = self.userID ?? "signed-out"
+        let organizationScope =
+            organizationID?.uuidString.lowercased() ?? "no-organization"
+        notificationBaselineID = "\(accountScope):\(organizationScope):local"
         messages = []
         unreadCount = 0
+        recompute(persist: false)
 
-        if let userID = self.userID {
-            loadReadVersions(storageKey: storageKey(for: userID))
-            recompute(persist: false)
-            startReadStateSync()
-        } else {
+        if self.token != nil, self.userID != nil, organizationID != nil {
+            startFeedPolling()
+        } else if self.userID == nil {
             messages = []
             unreadCount = 0
         }
@@ -78,14 +106,7 @@ final class InboxStore: ObservableObject {
             project: project
         )
 
-        messages = built.map { message in
-            var copy = message
-            copy.isUnread = isUnread(message)
-            return copy
-        }
-        unreadCount = messages.filter(countsTowardUnread).count
-        persistIfPossible()
-        Task { await AppBadgeService.sync(count: unreadCount) }
+        mergeMessages(built)
     }
 
     func markRead(id: String) {
@@ -127,6 +148,14 @@ final class InboxStore: ObservableObject {
 
     func applicationDidBecomeActive() {
         startReadStateSync()
+        if organizationID != nil {
+            startFeedPolling()
+        }
+    }
+
+    func applicationDidEnterBackground() {
+        feedPollingTask?.cancel()
+        feedPollingTask = nil
     }
 
     func refreshReadStates() async {
@@ -134,8 +163,100 @@ final class InboxStore: ObservableObject {
         await task.value
     }
 
+    func refreshFeed() async {
+        if let feedRefreshTask {
+            await feedRefreshTask.value
+            return
+        }
+        guard let api, let token, let userID, let organizationID else { return }
+        let expectedGeneration = feedGeneration
+        let task = Task { [weak self] in
+            guard let self else { return }
+            do {
+                let response: InboxFeedResponse = try await api.get(
+                    MobileAPIContract.Endpoint.inbox(organizationID: organizationID),
+                    token: token,
+                    as: InboxFeedResponse.self
+                )
+                guard
+                    !Task.isCancelled,
+                    expectedGeneration == self.feedGeneration,
+                    self.token == token,
+                    self.organizationID == organizationID
+                else { return }
+                self.notificationBaselineID =
+                    "\(userID):\(organizationID.uuidString.lowercased()):feed"
+                let storedByID = Dictionary(
+                    uniqueKeysWithValues: self.messages.map { ($0.id, $0) }
+                )
+                let feedMessages = response.messages.map { feedMessage in
+                    let message = feedMessage.inboxMessage()
+                    // Feed rows are compact. Keep richer selected-project
+                    // details when the canonical cross-client version agrees.
+                    if let stored = storedByID[message.id],
+                       stored.version == message.version {
+                        return stored
+                    }
+                    return message
+                }
+                self.mergeMessages(feedMessages)
+                self.feedReady = true
+            } catch is CancellationError {
+                return
+            } catch {
+                // Keep the latest local feed while offline. Foregrounding,
+                // reconnecting, or the next poll retries the server snapshot.
+            }
+        }
+        feedRefreshTask = task
+        await task.value
+        if expectedGeneration == feedGeneration {
+            feedRefreshTask = nil
+        }
+    }
+
     func messages(in category: InboxCategory) -> [InboxMessage] {
         messages.filter { InboxMessageBuilder.classify($0) == category }
+    }
+
+    private func startFeedPolling() {
+        guard api != nil, token != nil, organizationID != nil else { return }
+        feedPollingTask?.cancel()
+        feedPollingTask = Task { [weak self, pollInterval] in
+            guard let self else { return }
+            await self.refreshFeed()
+            while !Task.isCancelled {
+                try? await Task.sleep(for: pollInterval)
+                guard !Task.isCancelled else { return }
+                await self.refreshFeed()
+            }
+        }
+    }
+
+    private func mergeMessages(_ incoming: [InboxMessage]) {
+        var merged = Dictionary(uniqueKeysWithValues: messages.map { ($0.id, $0) })
+        for message in incoming {
+            merged[message.id] = message
+        }
+        let nextMessages = merged.values
+            .sorted {
+                $0.occurredAt == $1.occurredAt
+                    ? $0.id < $1.id
+                    : $0.occurredAt > $1.occurredAt
+            }
+            .map { message in
+                var copy = message
+                copy.isUnread = isUnread(message)
+                return copy
+            }
+        let nextUnreadCount = nextMessages.filter(countsTowardUnread).count
+        guard nextMessages != messages || nextUnreadCount != unreadCount else {
+            return
+        }
+        messages = nextMessages
+        unreadCount = nextUnreadCount
+        persistIfPossible()
+        Task { await AppBadgeService.sync(count: unreadCount) }
     }
 
     private func recompute(persist: Bool = true) {

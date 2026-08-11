@@ -169,6 +169,7 @@ final class LocalNotificationService: ObservableObject {
     @Published private(set) var authorizationStatus: UNAuthorizationStatus = .notDetermined
 
     private var knownIDs = Set<String>()
+    private var baselineID: String?
     private let center = UNUserNotificationCenter.current()
 
     init() {
@@ -199,21 +200,21 @@ final class LocalNotificationService: ObservableObject {
         preferences.save()
     }
 
-    func process(messages: [InboxMessage]) async {
+    func process(messages: [InboxMessage], baselineID: String = "local") async {
+        let currentIDs = Set(messages.map(\.id))
+        guard self.baselineID == baselineID else {
+            self.baselineID = baselineID
+            knownIDs = currentIDs
+            return
+        }
         let enabled = InboxCategory.allCases.filter { preferences[$0] }
         guard !enabled.isEmpty else {
-            knownIDs = Set(messages.map(\.id))
+            knownIDs = currentIDs
             return
         }
 
         let authorized = await requestAuthorizationIfNeeded()
         guard authorized else {
-            knownIDs = Set(messages.map(\.id))
-            return
-        }
-
-        let currentIDs = Set(messages.map(\.id))
-        if knownIDs.isEmpty {
             knownIDs = currentIDs
             return
         }

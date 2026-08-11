@@ -120,6 +120,39 @@
         }
       }
     },
+    "/organizations/{organizationId}/inbox": {
+      "get": {
+        "operationId": "getInboxFeed",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OrganizationId"
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Selection-independent inbox feed for every project in the organization",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InboxFeedResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
     "/inbox/read-states": {
       "get": {
         "operationId": "getInboxReadStates",
@@ -1604,6 +1637,81 @@
       }
     },
     "schemas": {
+      "InboxFeedResponse": {
+        "type": "object",
+        "required": [
+          "messages",
+          "generatedAt"
+        ],
+        "properties": {
+          "messages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InboxFeedMessage"
+            }
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "InboxFeedMessage": {
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "projectId",
+          "projectName",
+          "targetId",
+          "title",
+          "occurredAt",
+          "version"
+        ],
+        "properties": {
+          "id": { "type": "string" },
+          "kind": {
+            "type": "string",
+            "enum": ["issue", "conversation", "channel", "session"]
+          },
+          "projectId": { "type": "string", "format": "uuid" },
+          "projectName": { "type": "string" },
+          "targetId": { "type": "string" },
+          "title": { "type": "string" },
+          "occurredAt": { "type": "string", "format": "date-time" },
+          "version": { "type": "string" },
+          "runNumber": { "type": "integer", "minimum": 1 },
+          "status": {
+            "type": "string",
+            "enum": ["paused", "completed", "failed", "blocked"]
+          },
+          "workflowStage": { "type": ["string", "null"] },
+          "workflowStageLabel": { "type": ["string", "null"] },
+          "priority": { "type": ["integer", "null"], "minimum": 1, "maximum": 4 },
+          "structuredResult": {
+            "type": ["object", "null"],
+            "additionalProperties": true
+          },
+          "messageId": { "type": "string", "format": "uuid" },
+          "rootMessageId": { "type": "string", "format": "uuid" },
+          "body": { "type": "string" },
+          "authorName": { "type": "string" },
+          "issueKey": { "type": "string" },
+          "reason": {
+            "type": "string",
+            "enum": ["mention", "thread_reply"]
+          },
+          "channelId": { "type": "string", "format": "uuid" },
+          "channelName": { "type": "string" },
+          "agentName": { "type": ["string", "null"] },
+          "issueCount": { "type": "integer", "minimum": 0 },
+          "error": { "type": ["string", "null"] },
+          "summary": { "type": ["string", "null"] },
+          "requiresAttention": { "type": "boolean" }
+        },
+        "additionalProperties": false
+      },
       "InboxReadStates": {
         "type": "object",
         "required": [
