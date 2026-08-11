@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { briarApiUrl, briarWebAppOrigin } from "./api-config";
+export { briarApiUrl } from "./api-config";
 import { structuredAgentResultSchema } from "./agent-result";
 import { validateIssueAttachments } from "./issue-attachments";
 import {
@@ -79,16 +81,8 @@ import type {
   WorkerIcon,
 } from "../types";
 
-const configuredApiUrl = import.meta.env.VITE_BRIAR_API_URL?.trim();
-const webAppOrigin =
-  import.meta.env.VITE_BRIAR_WEB === "true" &&
-  typeof window !== "undefined" &&
-  /^https?:$/u.test(window.location.protocol)
-    ? window.location.origin
-    : "";
-const apiUrl = (configuredApiUrl || webAppOrigin).replace(/\/$/u, "");
+const apiUrl = briarApiUrl;
 
-export const briarApiUrl = apiUrl;
 
 const sessionUserSchema = z.object({
   id: z.string(),
@@ -641,7 +635,7 @@ export async function createOrganizationInvitation(
     method: "POST",
     body: JSON.stringify(input),
   });
-  const appOrigin = webAppOrigin || "https://briar.wordbricks.ai";
+  const appOrigin = briarWebAppOrigin || "https://briar.wordbricks.ai";
   return {
     invitation: result.invitation,
     inviteUrl: new URL(result.invitePath, appOrigin).toString(),

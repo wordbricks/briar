@@ -80,10 +80,11 @@ import {
 } from "./ChannelIssueProposalDetails";
 import { IssueExecutionApproval } from "./IssueExecutionApproval";
 import { AgentSkillExecutionApproval } from "./AgentSkillExecutionApproval";
-
-/** Match the foreground chat cadence used by the desktop channel view. */
-const COMPANION_CHANNEL_POLL_INTERVAL_MS = 3_000;
-const MAX_DELTA_PAGES_PER_POLL = 20;
+import {
+  CHANNEL_REALTIME_FALLBACK_MS,
+  createChannelRealtimeTransport,
+  MAX_CHANNEL_DELTA_PAGES_PER_SYNC,
+} from "../lib/channel-realtime";
 
 const mergeChannels = (
   current: ChannelSummary[],
@@ -327,111 +328,141 @@ export function CompanionChannels({
     const pollingSelectionVersion = channelSelectionVersion.current;
     let stopped = false;
     let inFlight = false;
+    let pending = false;
     const abortController = new AbortController();
+    const transport = createChannelRealtimeTransport(token, organizationId);
 
-    const tick = async () => {
+    const sync = async () => {
+      pending = true;
       if (stopped || inFlight || document.hidden) return;
       inFlight = true;
       try {
-        for (let page = 0; page < MAX_DELTA_PAGES_PER_POLL; page += 1) {
-          const delta = await loadChannelDelta(
-            token,
-            organizationId,
-            cursor.current,
-            abortController.signal,
-          );
-          if (
-            stopped ||
-            pollingSelectionVersion !== channelSelectionVersion.current
-          ) return;
-          cursor.current = delta.cursor;
-
-          setChannels((current) =>
-            mergeChannels(
-              current,
-              delta.channels,
-              delta.removedChannelIds,
-            ),
-          );
-          if (delta.removedChannelIds.includes(selectedChannelId)) {
-            channelSelectionVersion.current += 1;
-            invalidateChannelSurface(null, null);
-            setChannel(null);
-            setMessages([]);
-            setMembers([]);
-            setAgents([]);
-            setReplies([]);
-            setThread(null);
-            setThreadParentId(null);
-            return;
-          }
-
-          const selectedSummary = delta.channels.find(
-            (item) => item.id === selectedChannelId,
-          );
-          if (selectedSummary) setChannel(selectedSummary);
-
-          const selectedMessages = delta.messages.filter(
-            (item) => item.channelId === selectedChannelId,
-          );
-          recordProposalMessages(selectedMessages);
-          setMessages((current) =>
-            mergeChannelMessages(
-              current,
-              selectedMessages.filter((item) => item.parentMessageId === null),
-              delta.removedMessageIds,
-            ),
-          );
-          if (threadParentId) {
-            setThread((current) =>
-              current
-                ? mergeChannelMessages(
-                    current,
-                    selectedMessages.filter(
-                      (item) =>
-                        item.id === threadParentId ||
-                        item.parentMessageId === threadParentId,
-                    ),
-                    delta.removedMessageIds,
-                  )
-                : current,
+        while (pending && !stopped) {
+          pending = false;
+          for (
+            let page = 0;
+            page < MAX_CHANNEL_DELTA_PAGES_PER_SYNC;
+            page += 1
+          ) {
+            const requestedCursor = cursor.current;
+            const delta = await loadChannelDelta(
+              token,
+              organizationId,
+              requestedCursor,
+              abortController.signal,
             );
-          }
+            if (
+              stopped ||
+              pollingSelectionVersion !== channelSelectionVersion.current
+            ) return;
+            cursor.current = delta.cursor;
 
-          const selectedReplies = delta.agentReplies.filter(
-            (item) => item.channelId === selectedChannelId,
-          );
-          if (selectedReplies.length > 0) {
-            setReplies((current) => mergeReplies(current, selectedReplies));
-            const failed = selectedReplies.find(
-              (item) => item.status === "failed",
+            setChannels((current) =>
+              mergeChannels(
+                current,
+                delta.channels,
+                delta.removedChannelIds,
+              ),
             );
-            if (failed) {
-              setError(
-                t("run.briarReplyFailed", {
-                  error: failed.error ?? t("run.failed"),
-                }),
+            if (delta.removedChannelIds.includes(selectedChannelId)) {
+              channelSelectionVersion.current += 1;
+              invalidateChannelSurface(null, null);
+              setChannel(null);
+              setMessages([]);
+              setMembers([]);
+              setAgents([]);
+              setReplies([]);
+              setThread(null);
+              setThreadParentId(null);
+              return;
+            }
+
+            const selectedSummary = delta.channels.find(
+              (item) => item.id === selectedChannelId,
+            );
+            if (selectedSummary) setChannel(selectedSummary);
+
+            const selectedMessages = delta.messages.filter(
+              (item) => item.channelId === selectedChannelId,
+            );
+            recordProposalMessages(selectedMessages);
+            setMessages((current) =>
+              mergeChannelMessages(
+                current,
+                selectedMessages.filter(
+                  (item) => item.parentMessageId === null,
+                ),
+                delta.removedMessageIds,
+              ),
+            );
+            if (threadParentId) {
+              setThread((current) =>
+                current
+                  ? mergeChannelMessages(
+                      current,
+                      selectedMessages.filter(
+                        (item) =>
+                          item.id === threadParentId ||
+                          item.parentMessageId === threadParentId,
+                      ),
+                      delta.removedMessageIds,
+                    )
+                  : current,
               );
             }
-          }
 
-          if (!delta.hasMore) break;
+            const selectedReplies = delta.agentReplies.filter(
+              (item) => item.channelId === selectedChannelId,
+            );
+            if (selectedReplies.length > 0) {
+              setReplies((current) => mergeReplies(current, selectedReplies));
+              const failed = selectedReplies.find(
+                (item) => item.status === "failed",
+              );
+              if (failed) {
+                setError(
+                  t("run.briarReplyFailed", {
+                    error: failed.error ?? t("run.failed"),
+                  }),
+                );
+              }
+            }
+
+            if (!delta.hasMore || delta.cursor <= requestedCursor) break;
+          }
         }
-      } catch {
-        // Transient refresh failures retry on the next foreground interval.
+      } catch (error) {
+        if (!abortController.signal.aborted) {
+          console.warn("Companion channel delta refresh failed", error);
+        }
       } finally {
         inFlight = false;
+        if (pending && !stopped) window.queueMicrotask(() => void sync());
       }
     };
 
-    const timer = window.setInterval(
-      () => void tick(),
-      COMPANION_CHANNEL_POLL_INTERVAL_MS,
+    const unsubscribe = transport.subscribe((notification) => {
+      if (notification.cursor > cursor.current) void sync();
+    });
+    const updateVisibility = () => {
+      if (document.hidden) transport.stop();
+      else {
+        transport.start();
+      }
+    };
+    document.addEventListener("visibilitychange", updateVisibility);
+    const fallback = window.setInterval(
+      () => void sync(),
+      CHANNEL_REALTIME_FALLBACK_MS,
     );
+    updateVisibility();
     return () => {
       stopped = true;
+      unsubscribe();
+      transport.stop();
       abortController.abort();
-      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", updateVisibility);
+      window.clearInterval(fallback);
     };
   }, [
     channel?.id,

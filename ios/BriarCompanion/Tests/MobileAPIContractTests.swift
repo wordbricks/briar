@@ -28,6 +28,28 @@ final class MobileAPIContractTests: XCTestCase {
         XCTAssertEqual(DeviceCodeRequest(), DeviceCodeRequest(clientID: "briar-mobile"))
     }
 
+    func testChannelRealtimeEndpointAndSSEDecoderUseCursorNotifications() throws {
+        let organizationID = UUID(
+            uuidString: "22222222-2222-4222-8222-222222222222"
+        )!
+        XCTAssertEqual(
+            MobileAPIContract.Endpoint.channelEvents(
+                organizationID: organizationID,
+                cursor: 41
+            ),
+            "/organizations/22222222-2222-4222-8222-222222222222/channel-events?cursor=41"
+        )
+
+        var decoder = MobileSSEDecoder()
+        XCTAssertNil(try decoder.append(line: ": connected"))
+        XCTAssertNil(try decoder.append(line: "event: change"))
+        XCTAssertNil(try decoder.append(line: "data: {\"topic\":\"channels\",\"cursor\":42}"))
+        XCTAssertEqual(
+            try decoder.append(line: ""),
+            ChannelRealtimeNotification(topic: "channels", cursor: 42)
+        )
+    }
+
     func testChannelIssueProposalPayloadIsDetailedAndBackwardCompatible() throws {
         let detailed = try JSONDecoder.mobileContract.decode(
             ChannelMessage.Proposal.self,

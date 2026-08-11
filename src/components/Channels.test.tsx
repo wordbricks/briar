@@ -27,6 +27,9 @@ const listOrganizationAgents = vi.fn();
 const setChannelMember = vi.fn();
 const setChannelAgent = vi.fn();
 const toggleChannelMessageReaction = vi.fn();
+const channelRealtime = vi.hoisted(() => ({
+  listeners: new Set<(notification: { topic: "channels"; cursor: number }) => void>(),
+}));
 
 vi.mock("../lib/api", () => ({
   listChannels: (...args: unknown[]) => listChannels(...args),
@@ -52,12 +55,33 @@ vi.mock("../lib/api", () => ({
     toggleChannelMessageReaction(...args),
 }));
 
+vi.mock("../lib/channel-realtime", () => ({
+  CHANNEL_REALTIME_FALLBACK_MS: 60_000,
+  MAX_CHANNEL_DELTA_PAGES_PER_SYNC: 20,
+  createChannelRealtimeTransport: () => ({
+    start: vi.fn(),
+    stop: vi.fn(),
+    subscribe: (
+      listener: (notification: { topic: "channels"; cursor: number }) => void,
+    ) => {
+      channelRealtime.listeners.add(listener);
+      return () => channelRealtime.listeners.delete(listener);
+    },
+  }),
+}));
+
 vi.mock("@emoji-mart/data", () => ({ default: {} }));
 vi.mock("@emoji-mart/react", () => ({
   default: () => null,
 }));
 
 const { Channels } = await import("./Channels");
+
+const emitChannelChange = (cursor: number) => {
+  for (const listener of channelRealtime.listeners) {
+    listener({ topic: "channels", cursor });
+  }
+};
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean })
   .IS_REACT_ACT_ENVIRONMENT = true;
@@ -224,6 +248,7 @@ describe("Channels", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    channelRealtime.listeners.clear();
     container = document.createElement("div");
     document.body.append(container);
     root = createRoot(container);
@@ -1332,7 +1357,8 @@ describe("Channels", () => {
       await Promise.resolve();
     });
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(3_000);
+      emitChannelChange(8);
+      await Promise.resolve();
     });
     await act(async () => {
       resolveAccept({
@@ -1424,7 +1450,8 @@ describe("Channels", () => {
       await Promise.resolve();
     });
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(3_000);
+      emitChannelChange(8);
+      await Promise.resolve();
     });
     await act(async () => {
       resolveAccept({
@@ -1537,7 +1564,8 @@ describe("Channels", () => {
       await Promise.resolve();
     });
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(3_000);
+      emitChannelChange(8);
+      await Promise.resolve();
     });
     await act(async () => {
       resolveAccept({
@@ -1654,7 +1682,8 @@ describe("Channels", () => {
       await Promise.resolve();
     });
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(3_000);
+      emitChannelChange(8);
+      await Promise.resolve();
     });
     await act(async () => {
       root.render(<Channels {...channelsProps} activeChannelId="channel-2" />);

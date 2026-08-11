@@ -3020,10 +3020,18 @@ export async function loadChannelDelta(
   since: number,
   limit = 200,
 ) {
-  const executionProposalsAvailable =
-    await channelExecutionProposalTablesAvailable(db);
-  const skillExecutionProposalsAvailable =
-    await channelSkillExecutionProposalTablesAvailable(db);
+  const currentCursor = await getChannelSyncCursor(db, organizationId);
+  if (currentCursor <= since) {
+    return {
+      cursor: since,
+      hasMore: false,
+      channels: [],
+      removedChannelIds: [],
+      messages: [],
+      removedMessageIds: [],
+      agentReplies: [],
+    };
+  }
   const changes = await db
     .prepare(
       `select version, channel_id, entity_type, entity_id, operation
@@ -3043,8 +3051,33 @@ export async function loadChannelDelta(
   const rows = hasMore ? changes.results.slice(0, limit) : changes.results;
   const cursor = rows.at(-1)?.version ?? since;
 
+  if (rows.length === 0) {
+    return {
+      cursor,
+      hasMore,
+      channels: [],
+      removedChannelIds: [],
+      messages: [],
+      removedMessageIds: [],
+      agentReplies: [],
+    };
+  }
+
+  const executionProposalsAvailable =
+    await channelExecutionProposalTablesAvailable(db);
+  const skillExecutionProposalsAvailable =
+    await channelSkillExecutionProposalTablesAvailable(db);
+
   const visible = new Set(
-    (await listChannels(db, organizationId, userId)).map((row) => row.id),
+    (
+      await db
+        .prepare(
+          `select channel.id from briar_channels channel
+           where channel.organization_id = ? and ${visibleToUser}`,
+        )
+        .bind(organizationId, userId)
+        .all<{ id: string }>()
+    ).results.map((row) => row.id),
   );
   const channelIds = new Set<string>();
   const messageIds = new Set<string>();

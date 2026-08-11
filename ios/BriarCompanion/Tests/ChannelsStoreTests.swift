@@ -197,6 +197,46 @@ final class ChannelsStoreTests: XCTestCase {
     }
 
     @MainActor
+    func testRealtimeCursorNotificationFetchesAuthoritativeDelta() async throws {
+        let channel = summary(id: channelID, name: "Briar")
+        let updated = summary(id: channelID, name: "Briar realtime")
+        let listPath = MobileAPIContract.Endpoint.channels(organizationID: organizationID)
+        let deltaPath = MobileAPIContract.Endpoint.channelChanges(
+            organizationID: organizationID,
+            cursor: 5
+        )
+        let api = ChannelPollingAPI(routes: [
+            listPath: [try encoded(ChannelsResponse(channels: [channel], cursor: 5))],
+            deltaPath: [try encoded(ChannelDeltaResponse(
+                cursor: 6,
+                hasMore: false,
+                channels: [updated],
+                removedChannelIds: [],
+                messages: [],
+                removedMessageIds: []
+            ))],
+        ])
+        let realtime = ChannelRealtimeStub()
+        let store = ChannelsStore(
+            api: api,
+            realtime: realtime,
+            pollInterval: .seconds(3_600)
+        )
+
+        store.select(organizationID: organizationID, token: "token")
+        await waitForChannels(store, count: 1)
+        realtime.send(ChannelRealtimeNotification(topic: "channels", cursor: 6))
+        await waitForRequests(api, path: deltaPath, count: 1)
+        for _ in 0..<100 {
+            if store.channels.first?.name == "Briar realtime" { break }
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+
+        XCTAssertEqual(store.channels.first?.name, "Briar realtime")
+        store.applicationDidEnterBackground()
+    }
+
+    @MainActor
     func testChangingOrganizationResetsCursorAndFocusedConversation() async throws {
         let firstChannel = summary(id: channelID, name: "First")
         let secondChannel = summary(
@@ -2317,6 +2357,28 @@ final class ChannelsStoreTests: XCTestCase {
             try? await Task.sleep(for: .milliseconds(10))
         }
         XCTFail("Timed out waiting for \(count) channel(s)", file: file, line: line)
+    }
+}
+
+private final class ChannelRealtimeStub: MobileRealtimeClientProtocol, @unchecked Sendable {
+    private let stream: AsyncThrowingStream<ChannelRealtimeNotification, Error>
+    private let continuation: AsyncThrowingStream<ChannelRealtimeNotification, Error>.Continuation
+
+    init() {
+        var captured: AsyncThrowingStream<ChannelRealtimeNotification, Error>.Continuation?
+        stream = AsyncThrowingStream { captured = $0 }
+        continuation = captured!
+    }
+
+    func realtimeEvents(
+        _ path: String,
+        token: String
+    ) -> AsyncThrowingStream<ChannelRealtimeNotification, Error> {
+        stream
+    }
+
+    func send(_ notification: ChannelRealtimeNotification) {
+        continuation.yield(notification)
     }
 }
 
