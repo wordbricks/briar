@@ -177,6 +177,7 @@ describe("D1 migrations", () => {
     "0074_channel_delta_sync.sql",
     "0081_optimize_dashboard_worker_device_sync.sql",
     "0083_suppress_heartbeat_dashboard_changes.sql",
+    "0089_channel_agent_delegation.sql",
     "0090_channel_issue_approval.sql",
     "0091_issue_execution_approvals.sql",
     "0092_agent_skill_execution_approvals.sql",

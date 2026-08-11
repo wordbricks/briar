@@ -38,21 +38,21 @@ where skill_id is not null and status in ('queued', 'running');
 create trigger briar_channel_reply_skill_snapshot_insert
 after insert on briar_channel_agent_reply_jobs
 when new.skill_id is not null and new.selected_skill_id_snapshot is null
-begin
+BEGIN
   update briar_channel_agent_reply_jobs
   set selected_skill_id_snapshot = new.skill_id
   where id = new.id;
-end;
+END;
 
 --> statement-breakpoint
 create trigger briar_channel_reply_skill_snapshot_update
 after update of skill_id on briar_channel_agent_reply_jobs
 when new.skill_id is not null and new.selected_skill_id_snapshot is null
-begin
+BEGIN
   update briar_channel_agent_reply_jobs
   set selected_skill_id_snapshot = new.skill_id
   where id = new.id;
-end;
+END;
 
 --> statement-breakpoint
 create unique index briar_channel_agent_reply_jobs_delegation_target_idx
