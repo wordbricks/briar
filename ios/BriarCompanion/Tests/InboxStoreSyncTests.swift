@@ -180,6 +180,68 @@ final class InboxStoreSyncTests: XCTestCase {
         XCTAssertEqual(store.unreadCount, 0)
     }
 
+    func testOrganizationFeedKeepsUnselectedProjectMessages() async throws {
+        let secondProject = ProjectsResponse.Project(
+            id: UUID(uuidString: "44444444-4444-4444-8444-444444444444")!,
+            name: "Second project",
+            icon: nil,
+            organizationId: project.organizationId,
+            organizationName: project.organizationName,
+            role: .member,
+            createdAt: project.createdAt
+        )
+        let secondRunID = UUID(uuidString: "55555555-5555-4555-8555-555555555555")!
+        let response = InboxFeedResponse(
+            messages: [
+                InboxFeedMessage(
+                    id: "issue:\(secondRunID.uuidString.lowercased())",
+                    kind: .issue,
+                    projectId: secondProject.id,
+                    projectName: secondProject.name,
+                    targetId: secondRunID.uuidString.lowercased(),
+                    title: "Second project needs attention",
+                    occurredAt: Date(timeIntervalSince1970: 1_775_260_950),
+                    version: "1:1:blocked:implementing:2026-04-03T00:02:30.000Z:2",
+                    status: "blocked",
+                    priority: 1,
+                    requiresAttention: true
+                )
+            ],
+            generatedAt: Date(timeIntervalSince1970: 1_775_260_951)
+        )
+        let api = SelectionIndependentInboxAPI(response: response)
+        let (defaults, suiteName) = isolatedDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let store = InboxStore(
+            defaults: defaults,
+            api: api,
+            pollInterval: .seconds(60)
+        )
+
+        store.configure(
+            token: "token-a",
+            userID: "user-a",
+            organizationID: project.organizationId
+        )
+        store.update(snapshot: snapshot(revision: 1), sessions: [], project: project)
+        await store.refreshFeed()
+        // A later selected-project refresh must merge into the organization
+        // feed instead of replacing the unselected project's message.
+        store.update(snapshot: snapshot(revision: 2), sessions: [], project: project)
+
+        let secondMessage = try XCTUnwrap(
+            store.messages.first(where: { $0.projectId == secondProject.id })
+        )
+        XCTAssertEqual(secondMessage.targetId, secondRunID.uuidString.lowercased())
+        XCTAssertEqual(secondMessage.statusLabel, DashboardRun.Status.blocked.displayName)
+        XCTAssertTrue(secondMessage.isUnread)
+        XCTAssertTrue(store.feedReady)
+        XCTAssertEqual(
+            store.notificationBaselineID,
+            "user-a:\(project.organizationId.uuidString.lowercased()):feed"
+        )
+    }
+
     private func snapshot(revision: Int) -> DashboardSnapshot {
         let occurredAt = Date(timeIntervalSince1970: 1_775_260_800 + Double(revision))
         let run = DashboardRun(
@@ -225,6 +287,34 @@ final class InboxStoreSyncTests: XCTestCase {
 
     private func settle() async throws {
         try await Task.sleep(for: .milliseconds(20))
+    }
+}
+
+private actor SelectionIndependentInboxAPI: MobileAPIClientProtocol {
+    let response: InboxFeedResponse
+
+    init(response: InboxFeedResponse) {
+        self.response = response
+    }
+
+    func send<Response: Decodable & Sendable>(
+        _ path: String,
+        method: String,
+        token: String?,
+        body: (any Encodable & Sendable)?,
+        as responseType: Response.Type
+    ) async throws -> Response {
+        let data: Data
+        if path == MobileAPIContract.Endpoint.inboxReadStates {
+            data = try JSONEncoder.mobileContract.encode(
+                InboxReadStatesResponse(readVersions: [:])
+            )
+        } else if path.hasSuffix("/inbox"), method == "GET" {
+            data = try JSONEncoder.mobileContract.encode(response)
+        } else {
+            throw MobileAPIError.invalidRequest
+        }
+        return try JSONDecoder.mobileContract.decode(responseType, from: data)
     }
 }
 

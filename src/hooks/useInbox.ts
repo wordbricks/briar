@@ -10,9 +10,11 @@ import {
 } from "../lib/auto-hunt-contract";
 import type { StructuredAgentResult } from "../lib/agent-result";
 import {
+  loadInboxFeed,
   loadInboxReadStates,
   saveInboxReadStates,
 } from "../lib/api";
+import { startDashboardPolling } from "../lib/dashboard-polling";
 
 const storagePrefix = "briar.inbox.v1";
 const builtInWorkflowStageIds = new Set<string>(
@@ -307,10 +309,73 @@ export function mergeInboxMessages(
   }
 
   return [...merged.values()].sort(
-    (left, right) =>
-      new Date(right.occurredAt).getTime() -
-      new Date(left.occurredAt).getTime(),
+    (left, right) => {
+      const occurredAtDifference =
+        new Date(right.occurredAt).getTime() -
+        new Date(left.occurredAt).getTime();
+      return occurredAtDifference || left.id.localeCompare(right.id);
+    },
   );
+}
+
+function inboxMessageSnapshotsEqual(
+  left: InboxMessage[],
+  right: InboxMessage[],
+) {
+  return left.length === right.length && left.every((message, index) => {
+    const candidate = right[index];
+    if (
+      candidate === undefined ||
+      message.kind !== candidate.kind ||
+      message.id !== candidate.id ||
+      message.version !== candidate.version ||
+      message.projectId !== candidate.projectId ||
+      message.projectName !== candidate.projectName ||
+      message.targetId !== candidate.targetId ||
+      message.title !== candidate.title ||
+      message.occurredAt !== candidate.occurredAt
+    ) {
+      return false;
+    }
+    if (message.kind === "issue" && candidate.kind === "issue") {
+      return message.runNumber === candidate.runNumber &&
+        message.status === candidate.status &&
+        message.workflowStage === candidate.workflowStage &&
+        message.workflowStageLabel === candidate.workflowStageLabel &&
+        message.priority === candidate.priority &&
+        JSON.stringify(message.structuredResult) ===
+          JSON.stringify(candidate.structuredResult);
+    }
+    if (message.kind === "session" && candidate.kind === "session") {
+      return message.status === candidate.status &&
+        message.agentName === candidate.agentName &&
+        message.issueCount === candidate.issueCount &&
+        message.error === candidate.error &&
+        message.summary === candidate.summary &&
+        message.requiresAttention === candidate.requiresAttention;
+    }
+    if (
+      message.kind === "conversation" &&
+      candidate.kind === "conversation"
+    ) {
+      return message.messageId === candidate.messageId &&
+        message.rootMessageId === candidate.rootMessageId &&
+        message.body === candidate.body &&
+        message.authorName === candidate.authorName &&
+        message.issueKey === candidate.issueKey &&
+        message.reason === candidate.reason;
+    }
+    if (message.kind === "channel" && candidate.kind === "channel") {
+      return message.channelId === candidate.channelId &&
+        message.channelName === candidate.channelName &&
+        message.messageId === candidate.messageId &&
+        message.rootMessageId === candidate.rootMessageId &&
+        message.body === candidate.body &&
+        message.authorName === candidate.authorName &&
+        message.reason === candidate.reason;
+    }
+    return false;
+  });
 }
 
 export function isInboxMessageUnread(
@@ -456,6 +521,9 @@ export function useInbox(
     storageKey,
     ...readInboxStorage(storageKey),
   }));
+  const [notificationFeedScope, setNotificationFeedScope] = useState<
+    string | null
+  >(null);
   const readSyncGenerationRef = useRef<InboxReadSyncGeneration | null>(null);
   const nextReadSyncGenerationIdRef = useRef(0);
 
@@ -750,6 +818,9 @@ export function useInbox(
         currentMessages,
         projects,
       );
+      if (inboxMessageSnapshotsEqual(current.messages, messages)) {
+        return current;
+      }
       // Keep account-synced read versions even when a message temporarily
       // leaves the local feed, so another device's read state is not lost.
       const next = { messages, readVersions: current.readVersions };
@@ -757,6 +828,82 @@ export function useInbox(
       return { storageKey, ...next };
     });
   }, [currentMessages, projects, storageKey, userId]);
+
+  useEffect(() => {
+    if (!token || !userId || !organizationId) {
+      setNotificationFeedScope(null);
+      return;
+    }
+
+    const feedScope = `${userId}:${organizationId}`;
+    setNotificationFeedScope((current) =>
+      current === feedScope ? current : null,
+    );
+    const abort = new AbortController();
+    let disposed = false;
+    let refreshInFlight = false;
+    let refreshRequested = false;
+
+    const refresh = async () => {
+      if (refreshInFlight) {
+        refreshRequested = true;
+        return;
+      }
+      refreshInFlight = true;
+      try {
+        const feedMessages = await loadInboxFeed(
+          token,
+          organizationId,
+          abort.signal,
+        );
+        if (disposed) return;
+        setState((current) => {
+          if (current.storageKey !== storageKey) return current;
+          const storedById = new Map(
+            current.messages.map((message) => [message.id, message]),
+          );
+          const feedSnapshot = feedMessages.map((message) => {
+            const stored = storedById.get(message.id);
+            // The organization feed intentionally uses compact summaries.
+            // Preserve richer selected-project/session details and the active
+            // channel association when the canonical read version is equal.
+            return stored?.version === message.version ? stored : message;
+          });
+          const messages = mergeInboxMessages(
+            current.messages,
+            feedSnapshot,
+            projects,
+          );
+          if (inboxMessageSnapshotsEqual(current.messages, messages)) {
+            return current;
+          }
+          const next = { messages, readVersions: current.readVersions };
+          writeInboxStorage(storageKey, next);
+          return { storageKey, ...next };
+        });
+        // Changing this key resets the OS-notification baseline on the first
+        // authoritative feed load, so existing messages from other projects do
+        // not arrive as a burst. Later feed refreshes keep the same baseline.
+        setNotificationFeedScope(feedScope);
+      } catch {
+        // Preserve the local Inbox cache while offline; reconnect and resume
+        // events from startDashboardPolling retry the authoritative feed.
+      } finally {
+        refreshInFlight = false;
+        if (!disposed && refreshRequested) {
+          refreshRequested = false;
+          void refresh();
+        }
+      }
+    };
+
+    const stopPolling = startDashboardPolling(() => void refresh());
+    return () => {
+      disposed = true;
+      abort.abort();
+      stopPolling();
+    };
+  }, [organizationId, projects, storageKey, token, userId]);
 
   const messages = useMemo<InboxMessageWithReadState[]>(
     () =>
@@ -857,6 +1004,8 @@ export function useInbox(
     markAllRead,
     markIssueRead,
     markRead,
+    notificationBaselineId:
+      notificationFeedScope ?? `${userId ?? "signed-out"}:local`,
     unreadCount: messages.filter(
       (message) =>
         message.isUnread && classifyInboxMessage(message) !== "activity",
