@@ -83,7 +83,7 @@ describe("organization Inbox feed", () => {
         id: "session:second-project-session",
         projectName: "Second project",
         requiresAttention: true,
-        version: "second-project-failed-event",
+        version: "session:v1:failed:2026-08-11T13:01:00.000Z",
       }),
     ]));
   });

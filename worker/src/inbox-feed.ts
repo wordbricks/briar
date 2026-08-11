@@ -3,6 +3,7 @@ import {
   normalizeAutoHuntWorkflow,
 } from "../../src/lib/auto-hunt-contract";
 import { structuredAgentResultSchema } from "../../src/lib/agent-result";
+import { inboxSessionMessageVersion } from "../../src/lib/inbox-session-version";
 import type {
   ChannelConversationNotificationRow,
   HuntRunRow,
@@ -172,9 +173,10 @@ function parseSession(
     summary: optionalString(payload.summary),
     error: optionalString(payload.error),
     updatedAt: optionalString(payload.updatedAt) ?? row.updated_at,
-    version:
-      optionalString(payload.inboxVersion) ??
-      `${status}:${completedAt ?? startedAt}`,
+    version: inboxSessionMessageVersion(
+      status,
+      completedAt ?? startedAt,
+    ),
   };
 }
 

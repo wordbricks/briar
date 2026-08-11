@@ -20,6 +20,7 @@ import {
   type AutoHuntWorkflowStageId,
 } from "../../src/lib/auto-hunt-contract";
 import type { StructuredAgentResult } from "../../src/lib/agent-result";
+import { inboxSessionMessageVersion } from "../../src/lib/inbox-session-version";
 import type { AgentExecutionCostRecord } from "../../src/lib/agent-execution-cost";
 import type {
   AgentExecutionMetrics,
@@ -4608,16 +4609,6 @@ const projectAgentSessionSummaryJson = (row: ProjectAgentSessionRow) => {
   const completedAt = typeof payload.completedAt === "string"
     ? payload.completedAt
     : row.completed_at;
-  const terminalEvent = Array.isArray(payload.events)
-    ? [...payload.events].reverse().find((value) => {
-        if (!value || typeof value !== "object" || Array.isArray(value)) {
-          return false;
-        }
-        const event = value as Record<string, unknown>;
-        return event.type === status && typeof event.id === "string";
-      }) as Record<string, unknown> | undefined
-    : undefined;
-  const terminalEventId = terminalEvent?.id;
   const issues = Array.isArray(payload.issues)
     ? payload.issues.map((value) => {
         const issue = value as Record<string, unknown>;
@@ -4648,9 +4639,10 @@ const projectAgentSessionSummaryJson = (row: ProjectAgentSessionRow) => {
     issues,
     startedAt,
     completedAt,
-    inboxVersion: typeof terminalEventId === "string"
-      ? terminalEventId
-      : `${status}:${completedAt ?? startedAt}`,
+    inboxVersion: inboxSessionMessageVersion(
+      status,
+      completedAt ?? startedAt,
+    ),
     requestedWorkerId: payload.requestedWorkerId ?? null,
     workerId: payload.workerId ?? null,
     updatedAt: payload.updatedAt ?? row.updated_at,

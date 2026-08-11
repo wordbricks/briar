@@ -1699,7 +1699,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     ).resolves.toEqual({ status: "skipped" });
   });
 
-  it("preserves the terminal event id as the Inbox read version", async () => {
+  it("uses the canonical terminal session Inbox version", async () => {
     const sessionId = "55555555-5555-4555-8555-555555555555";
     const completedAt = atMinute(4);
     await upsertProjectAgentSession(db, {
@@ -1731,7 +1731,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     );
     expect(JSON.parse(summaries[0]!.summary_json)).toMatchObject({
       status: "completed",
-      inboxVersion: "terminal-completed-event",
+      inboxVersion: `session:v1:completed:${completedAt}`,
     });
   });
 

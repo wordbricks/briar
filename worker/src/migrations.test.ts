@@ -3469,6 +3469,74 @@ describe("D1 migrations", () => {
     );
   }, 30_000);
 
+  it("normalizes terminal session summaries and their read state", async () => {
+    const miniflare = new Miniflare({
+      modules: true,
+      script: "export default { fetch() { return new Response('ok') } }",
+      d1Databases: { DB: "briar-inbox-session-version-migration-test" },
+    });
+    try {
+      const db = (await miniflare.getD1Database("DB")) as unknown as D1Database;
+      await db.prepare(
+        `create table briar_project_agent_session_summaries (
+           project_id text not null,
+           session_id text not null,
+           summary_json text not null,
+           updated_at text not null,
+           archived integer not null default 0,
+           primary key (project_id, session_id)
+         )`,
+      ).run();
+      await db.prepare(
+        `create table briar_inbox_read_states (
+           user_id text not null,
+           message_id text not null,
+           version text not null,
+           updated_at text not null,
+           primary key (user_id, message_id)
+         )`,
+      ).run();
+      const completedAt = "2026-08-01T12:22:38.913Z";
+      await db.prepare(
+        `insert into briar_project_agent_session_summaries (
+           project_id, session_id, summary_json, updated_at, archived
+         ) values ('project-1', 'session-1', ?, ?, 0)`,
+      ).bind(JSON.stringify({
+        status: "failed",
+        startedAt: "2026-08-01T12:00:00.000Z",
+        completedAt,
+        inboxVersion: "legacy-terminal-event-id",
+      }), completedAt).run();
+      await db.prepare(
+        `insert into briar_inbox_read_states (
+           user_id, message_id, version, updated_at
+         ) values ('user-1', 'session:session-1', 'legacy-terminal-event-id', ?)`,
+      ).bind(completedAt).run();
+
+      const sql = await readFile(
+        resolve("migrations/0094_canonical_inbox_session_versions.sql"),
+        "utf8",
+      );
+      await executeD1Sql(db, sql);
+      await executeD1Sql(db, sql);
+
+      const expectedVersion = `session:v1:failed:${completedAt}`;
+      const summary = await db.prepare(
+        `select summary_json
+         from briar_project_agent_session_summaries
+         where session_id = 'session-1'`,
+      ).first<{ summary_json: string }>();
+      expect(JSON.parse(summary!.summary_json).inboxVersion)
+        .toBe(expectedVersion);
+      expect(await db.prepare(
+        `select version from briar_inbox_read_states
+         where message_id = 'session:session-1'`,
+      ).first("version")).toBe(expectedVersion);
+    } finally {
+      await miniflare.dispose();
+    }
+  });
+
   it("migrates GitHub identity storage without backfilling URL-only evidence", async () => {
     await withPreWorkflowMigrationDatabase(
       "briar-github-storage-migration-test",

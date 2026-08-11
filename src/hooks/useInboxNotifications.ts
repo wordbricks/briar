@@ -8,6 +8,7 @@ import {
   sendInboxNotification,
   type InboxNotificationTarget,
 } from "../lib/inbox-notifications";
+import { inboxSessionMessageVersion } from "../lib/inbox-session-version";
 import {
   classifyInboxMessage,
   type InboxMessageWithReadState,
@@ -25,8 +26,15 @@ export function findChangedInboxMessages(
   messages: InboxMessageWithReadState[],
 ) {
   return messages.filter(
-    (message) => previousVersions[message.id] !== message.version,
+    (message) =>
+      previousVersions[message.id] !== inboxNotificationVersion(message),
   );
+}
+
+export function inboxNotificationVersion(message: InboxMessageWithReadState) {
+  return message.kind === "session"
+    ? inboxSessionMessageVersion(message.status, message.occurredAt)
+    : message.version;
 }
 
 export function useInboxNotifications(
@@ -45,7 +53,7 @@ export function useInboxNotifications(
     }
 
     const versions = Object.fromEntries(
-      messages.map((message) => [message.id, message.version]),
+      messages.map((message) => [message.id, inboxNotificationVersion(message)]),
     );
     const baseline = baselineRef.current;
     if (
