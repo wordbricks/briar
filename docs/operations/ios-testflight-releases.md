@@ -504,3 +504,70 @@ were verified before upload.
 The prior final handoff, `1.2.99 (2)`, remains `VALID`, but main advanced
 through the 1.2.103 release. Version `1.2.103 (1)` is therefore the final build
 handed off from the latest main commit.
+
+## 2026-08-12 — 1.2.106 (1)
+
+- App: Briar Companion (`app.briar.companion`)
+- Marketing version: `1.2.106`
+- App Store Connect build: `1`
+- App Store Connect build ID: `39631998-ba22-470e-98aa-7d6738674485`
+- Latest main commit: `ed911768`
+- Release source commit: `ed9117682e86c0d571a5df2e8a686b3c1a7d7366`
+- Implementation: native SwiftUI
+- Toolchain: Xcode 26.6, iOS 26.5 SDK
+- Minimum iOS version: 17.0
+- App Store Connect processing state: `VALID`
+- TestFlight state: `IN_BETA_TESTING`
+- Internal group: `wordbricks` (`hasAccessToAllBuilds=true`)
+- Automatic tester notification: enabled
+- IPA SHA-256: `a81d5108ab9767b65b99735ddcb85a2a4bdb204f7da90b0168b30c5921715cc1`
+
+The release includes the restored native channel UI, cross-project Inbox
+polling, Worker permissions for conversation agents, SSE and delta-based
+channel synchronization, optimized dashboard, tray, and project-agent
+synchronization, migration-first Worker claims, and Organization Agent
+context. Main advanced once during the release gate with README and landing
+copy changes only; the archive was nevertheless regenerated from the new exact
+main commit before upload.
+
+The release passed the shared mobile contract, Swift compile, unit and UI
+tests, iPhone and iPad accessibility and layout tests, Production analyze and
+build checks, and the Tauri iOS simulator and Android ARM64 regression builds.
+Archive identity, App Store provisioning, distribution signature, production
+entitlements, exported IPA signature, and all alternate app icons were
+verified before upload.
+
+The prior final handoff, `1.2.103 (1)`, remains `VALID`, but main advanced
+through the 1.2.106 release. Version `1.2.106 (1)` is therefore the final build
+handed off from the latest main commit.
+
+## 2026-08-12 — 1.2.107 (1)
+
+- App: Briar Companion (`app.briar.companion`)
+- Marketing version: `1.2.107`
+- App Store Connect build: `1`
+- App Store Connect build ID: `6b0b6de5-f61e-4d65-b477-0b8594303e5a`
+- Latest main commit: `9f91eb08`
+- Release source commit: `9f91eb08d84d889fc1985cdcd1bd9b26350b9cc4`
+- Implementation: native SwiftUI
+- Toolchain: Xcode 26.6, iOS 26.5 SDK
+- Minimum iOS version: 17.0
+- App Store Connect processing state: `VALID`
+- TestFlight state: `IN_BETA_TESTING`
+- Internal group: `wordbricks` (`hasAccessToAllBuilds=true`)
+- Automatic tester notification: enabled
+- IPA SHA-256: `2ba6e90e3aedba27c9f43b793e93f46fe970f0ff4330eff083bab3d4c5cfd239`
+
+Main advanced after the 1.2.106 upload with canonical Inbox session versions,
+the repeated Inbox session notification fix, and the 1.2.107 release metadata.
+The exact new main commit passed the shared mobile contract, Swift compile,
+unit and UI tests, iPhone and iPad accessibility and layout tests, Production
+analyze and build checks, and the Tauri iOS simulator and Android ARM64
+regression builds. Archive identity, App Store provisioning, distribution
+signature, production entitlements, exported IPA signature, and all alternate
+app icons were verified before upload.
+
+Build `1` of version `1.2.106`
+(`39631998-ba22-470e-98aa-7d6738674485`) remains `VALID`, but main advanced
+through the Inbox session fix and the 1.2.107 release. Version `1.2.107 (1)` is
+therefore the final build handed off from the latest main commit.
