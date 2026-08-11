@@ -39,6 +39,7 @@
       "/organizations*",
       "/projects*",
       "/workers*",
+      "/worker-claims",
       "/runs*",
       "/transcripts",
       "/issue-reply-claims*",

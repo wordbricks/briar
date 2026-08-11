@@ -3502,9 +3502,12 @@ async function workerCommand() {
   const result = await runWorkerLoop(
     {
       claim: async () => {
-        const replyClaim = await request<{ work: unknown }>(
+        const claim = await request<{
+          work: unknown;
+          retryAfterMs?: number;
+        }>(
           config.apiUrl,
-          "/issue-reply-claims",
+          "/worker-claims",
           workerToken,
           {
             method: "POST",
@@ -3515,57 +3518,20 @@ async function workerCommand() {
             }),
           },
         );
-        if (replyClaim.work !== null) {
-          return claimedIssueReplySchema.parse(replyClaim.work);
+        if (claim.work === null) {
+          return { work: null, retryAfterMs: claim.retryAfterMs };
         }
-        const taskClaim = await request<{ work: unknown }>(
-          config.apiUrl,
-          "/agent-task-claims",
-          workerToken,
-          {
-            method: "POST",
-            body: JSON.stringify({
-              workerId,
-              projectId: project.id,
-            }),
-          },
-        );
-        if (taskClaim.work !== null) {
-          return claimedProjectAgentTaskSchema.parse(taskClaim.work);
-        }
-        if (registered.organizationId) {
-          const channelClaim = await request<{ work: unknown }>(
-            config.apiUrl,
-            "/channel-reply-claims",
-            workerToken,
-            {
-              method: "POST",
-              body: JSON.stringify({
-                organizationId: registered.organizationId,
-                workerId,
-              }),
-            },
-          );
-          if (channelClaim.work !== null) {
-            return claimedChannelReplySchema.parse(channelClaim.work);
-          }
-        }
-        const claimed = await request<{ work: unknown }>(
-          config.apiUrl,
-          "/queue/claims",
-          workerToken,
-          {
-            method: "POST",
-            body: JSON.stringify({
-              claimedBy: label,
-              workerId,
-              projectId: project.id,
-            }),
-          },
-        );
-        return claimed.work === null
-          ? null
-          : claimedRunSchema.parse(claimed.work);
+        const workType = typeof claim.work === "object" && claim.work !== null
+          ? Reflect.get(claim.work, "workType")
+          : undefined;
+        const work = workType === "issueReply"
+          ? claimedIssueReplySchema.parse(claim.work)
+          : workType === "projectAgentTask"
+            ? claimedProjectAgentTaskSchema.parse(claim.work)
+            : workType === "channelReply"
+              ? claimedChannelReplySchema.parse(claim.work)
+              : claimedRunSchema.parse(claim.work);
+        return { work };
       },
       renewLease: async (issue) => {
         if (issue.workType === "projectAgentTask") {
