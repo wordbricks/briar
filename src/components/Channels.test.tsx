@@ -528,6 +528,14 @@ describe("Channels", () => {
     await act(async () => {
       suggestion!.click();
     });
+    const composerMention = container.querySelector<HTMLButtonElement>(
+      ".channel-composer-field .conversation-mention-button[data-mention-handle='honey']",
+    );
+    expect(composerMention?.textContent).toBe("@honey");
+    await act(async () => composerMention?.click());
+    expect(
+      document.body.querySelector<HTMLElement>(".profile-dialog")?.textContent,
+    ).toContain("Honey");
     await act(async () => {
       container
         .querySelector("form.channel-composer")!
@@ -578,6 +586,9 @@ describe("Channels", () => {
 
     const textarea = container.querySelector("textarea")!;
     await typeInto(textarea, "@honey are you there");
+    expect(
+      container.querySelector(".channel-composer-field .conversation-mention-button"),
+    ).toBeNull();
     await act(async () => {
       container
         .querySelector("form.channel-composer")!

@@ -88,16 +88,16 @@ describe("ChannelMessageText", () => {
       );
     });
 
-    const links = container.querySelectorAll<HTMLAnchorElement>(
-      "a.channel-mention-link",
+    const buttons = container.querySelectorAll<HTMLButtonElement>(
+      "button.channel-mention-button",
     );
-    expect([...links].map((link) => link.textContent)).toEqual([
+    expect([...buttons].map((button) => button.textContent)).toEqual([
       "@member",
       "@honey",
     ]);
     expect(container.textContent).toContain("@typed is plain text");
 
-    await act(async () => links[0].click());
+    await act(async () => buttons[0].click());
     const profile = document.body.querySelector<HTMLElement>(
       ".profile-dialog[role='dialog']",
     );
@@ -105,7 +105,7 @@ describe("ChannelMessageText", () => {
     expect(profile?.textContent).toContain("member@example.com");
     expect(profile?.textContent).toContain("Channel member");
 
-    expect(links[1].getAttribute("href")).toBe("briar-mention://honey");
+    expect(buttons[1].type).toBe("button");
   });
 
   it("shows the Agent's runtime and responsibility on its profile", async () => {

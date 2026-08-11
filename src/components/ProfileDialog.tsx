@@ -1,9 +1,12 @@
 import { AtSign, Bot, CalendarDays, Mail, ShieldCheck } from "lucide-react";
 import { useI18n } from "../i18n";
 import type {
+  ChannelAgentSummary,
   ChannelAgentProvider,
   ChannelAgentSkill,
+  ChannelMember,
 } from "../lib/channels-contract";
+import { mentionHandle } from "../lib/channel-mentions";
 import {
   Dialog,
   DialogContent,
@@ -35,6 +38,39 @@ export type ProfileTarget =
       projectId: string | null;
       createdAt: string | null;
     };
+
+export function profileTargetForChannelAgent(
+  agent: ChannelAgentSummary,
+  handle = mentionHandle(agent.handle?.trim() || agent.name),
+): ProfileTarget {
+  return {
+    type: "agent",
+    id: agent.agentId,
+    name: agent.name,
+    handle,
+    provider: agent.provider,
+    model: agent.model,
+    responsibility: agent.responsibility,
+    skills: agent.skills,
+    projectId: agent.projectId,
+    createdAt: agent.createdAt,
+  };
+}
+
+export function profileTargetForChannelMember(
+  member: ChannelMember,
+): ProfileTarget {
+  return {
+    type: "user",
+    id: member.userId,
+    name: member.name,
+    email: member.email,
+    image: member.image,
+    role: member.role,
+    roleContext: "channel",
+    createdAt: member.createdAt,
+  };
+}
 
 export function ProfileDialog({
   profile,

@@ -4652,13 +4652,15 @@ describe("HuntDashboard", () => {
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
 
-    const mentionLink = container.querySelector<HTMLAnchorElement>(
-      ".issue-message-body a.issue-mention-link",
+    const mentionButton = container.querySelector<HTMLButtonElement>(
+      ".issue-message-body button.issue-mention-button",
     );
-    expect(mentionLink?.textContent).toBe("@member");
-    expect(mentionLink?.getAttribute("href")).toBe("briar-mention://member");
+    expect(mentionButton?.textContent).toBe("@member");
+    expect(mentionButton?.type).toBe("button");
     expect(
-      container.querySelectorAll(".issue-message-body a.issue-mention-link"),
+      container.querySelectorAll(
+        ".issue-message-body button.issue-mention-button",
+      ),
     ).toHaveLength(1);
     expect(
       container.querySelector('.issue-message-body a[href="mailto:owner@example.com"]'),
@@ -4669,7 +4671,7 @@ describe("HuntDashboard", () => {
       cancelable: true,
     });
     await act(async () => {
-      expect(mentionLink?.dispatchEvent(click)).toBe(false);
+      expect(mentionButton?.dispatchEvent(click)).toBe(false);
     });
     const profile = document.body.querySelector<HTMLElement>(
       ".profile-dialog[role='dialog']",
@@ -4817,6 +4819,14 @@ describe("HuntDashboard", () => {
     expect(suggestion?.textContent).toContain("@member");
     await act(async () => suggestion?.click());
     expect(textarea?.value).toBe("@member ");
+    const composerMention = container.querySelector<HTMLButtonElement>(
+      ".issue-composer-field .conversation-mention-button[data-mention-handle='member']",
+    );
+    expect(composerMention?.textContent).toBe("@member");
+    await act(async () => composerMention?.click());
+    expect(
+      document.body.querySelector<HTMLElement>(".profile-dialog")?.textContent,
+    ).toContain("Member One");
 
     await act(async () => {
       if (!textarea) return;

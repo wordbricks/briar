@@ -1600,6 +1600,14 @@ describe("CompanionChannels", () => {
     expect(honey?.textContent).toContain("Organization agent");
     expect(honey?.textContent).not.toContain("조직 에이전트");
     await act(async () => honey!.click());
+    const composerMention = container.querySelector<HTMLButtonElement>(
+      ".companion-channel-composer-field .conversation-mention-button[data-mention-handle='honey']",
+    );
+    expect(composerMention?.textContent).toBe("@honey");
+    await act(async () => composerMention?.click());
+    expect(
+      document.body.querySelector<HTMLElement>(".profile-dialog")?.textContent,
+    ).toContain("Honey");
 
     setter.call(input, "@honey 확인해 줘");
     input.selectionStart = input.value.length;
