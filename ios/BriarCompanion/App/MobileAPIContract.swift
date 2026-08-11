@@ -15,6 +15,10 @@ enum MobileAPIContract {
         static let projects = "/projects"
         static let inboxReadStates = "/inbox/read-states"
 
+        static func inbox(organizationID: UUID) -> String {
+            "/organizations/\(organizationID.uuidString.lowercased())/inbox"
+        }
+
         static func issues(projectID: UUID) -> String {
             "/projects/\(projectID.uuidString.lowercased())/issues"
         }

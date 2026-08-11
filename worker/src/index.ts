@@ -100,6 +100,7 @@ import {
   mobileHealthResponseSchema,
   mobileProjectsResponseSchema,
 } from "./mobile-contract";
+import { buildInboxFeedMessages } from "./inbox-feed";
 import {
   archiveCompletedLogs,
   backfillArchivedProjectAgentSessionSummaries,
@@ -3495,21 +3496,27 @@ const projectAgentSessionSummaryJson = (row: {
   session_id: string;
   summary_json: string;
   archived: number;
-}) => ({
-  id: row.session_id,
-  projectId: row.project_id,
-  ...(JSON.parse(row.summary_json) as Record<string, unknown>),
-  followUps: [],
-  conversationId: null,
-  workspaceRoot: null,
-  summary: null,
-  error: null,
-  events: [],
-  dispatchEvents: [],
-  workers: [],
-  archived: row.archived === 1,
-  detailLoaded: false,
-});
+}) => {
+  const summary = JSON.parse(row.summary_json) as Record<string, unknown>;
+  // `inboxVersion` is an internal projection used by the organization feed;
+  // keep the existing public Agent-session contract unchanged.
+  delete summary.inboxVersion;
+  return {
+    id: row.session_id,
+    projectId: row.project_id,
+    ...summary,
+    followUps: [],
+    conversationId: null,
+    workspaceRoot: null,
+    summary: null,
+    error: null,
+    events: [],
+    dispatchEvents: [],
+    workers: [],
+    archived: row.archived === 1,
+    detailLoaded: false,
+  };
+};
 
 const projectAgentSessionSyncEtag = (projectId: string, cursor: number) =>
   `"project-agent-sessions:${projectId}:${cursor}"`;
@@ -5955,6 +5962,51 @@ async function route(
       readVersions: Object.fromEntries(
         rows.map((row) => [row.message_id, row.version]),
       ),
+    });
+  }
+
+  const organizationInboxMatch = pathname.match(
+    /^\/organizations\/([0-9a-f-]+)\/inbox$/u,
+  );
+  if (organizationInboxMatch && request.method === "GET") {
+    const session = await requireSession(auth, request);
+    const organizationId = organizationInboxMatch[1];
+    if (!(await getOrganizationRole(db, organizationId, session.user.id))) {
+      throw new HttpError(404, "Organization not found");
+    }
+    const projects = (await listProjects(db, session.user.id)).filter(
+      (project) => project.organization_id === organizationId,
+    );
+    const [projectData, channelNotifications] = await Promise.all([
+      Promise.all(
+        projects.map(async (project) => {
+          const [runs, conversationNotifications, sessionSummaries] =
+            await Promise.all([
+              listDashboardRuns(db, project.id),
+              listIssueConversationNotifications(
+                db,
+                project.id,
+                session.user.id,
+              ),
+              listProjectAgentSessionSummaries(db, project.id),
+            ]);
+          return {
+            project,
+            runs,
+            conversationNotifications,
+            sessionSummaries,
+          };
+        }),
+      ),
+      listChannelConversationNotifications(
+        db,
+        organizationId,
+        session.user.id,
+      ),
+    ]);
+    return privateNoStoreJson({
+      messages: buildInboxFeedMessages(projectData, channelNotifications),
+      generatedAt: new Date().toISOString(),
     });
   }
 

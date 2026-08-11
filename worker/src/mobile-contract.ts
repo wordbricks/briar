@@ -206,6 +206,67 @@ export const mobileInboxReadStatesSchema = z.object({
   readVersions: z.record(z.string().min(1), z.string().min(1)),
 });
 
+const mobileInboxMessageBaseSchema = z.object({
+  id: z.string().min(1),
+  projectId: z.uuid(),
+  projectName: z.string(),
+  targetId: z.string().min(1),
+  title: z.string(),
+  occurredAt: z.iso.datetime(),
+  version: z.string().min(1),
+});
+
+const mobileInboxIssueMessageSchema = mobileInboxMessageBaseSchema.extend({
+  kind: z.literal("issue"),
+  runNumber: z.number().int().positive(),
+  status: z.enum(["paused", "completed", "failed", "blocked"]),
+  workflowStage: z.string().nullable(),
+  workflowStageLabel: z.string().nullable().optional(),
+  priority: z.number().int().min(1).max(4).nullable(),
+  structuredResult: mobileDashboardRunSchema.shape.structuredResult,
+});
+
+const mobileInboxConversationMessageSchema = mobileInboxMessageBaseSchema.extend({
+  kind: z.literal("conversation"),
+  messageId: z.uuid(),
+  rootMessageId: z.uuid(),
+  body: z.string(),
+  authorName: z.string(),
+  issueKey: z.string().optional(),
+  reason: z.enum(["mention", "thread_reply"]),
+});
+
+const mobileInboxChannelMessageSchema = mobileInboxMessageBaseSchema.extend({
+  kind: z.literal("channel"),
+  channelId: z.uuid(),
+  channelName: z.string(),
+  messageId: z.uuid(),
+  rootMessageId: z.uuid(),
+  body: z.string(),
+  authorName: z.string(),
+  reason: z.enum(["mention", "thread_reply"]),
+});
+
+const mobileInboxSessionMessageSchema = mobileInboxMessageBaseSchema.extend({
+  kind: z.literal("session"),
+  status: z.enum(["completed", "failed"]),
+  agentName: z.string().nullable(),
+  issueCount: z.number().int().nonnegative(),
+  error: z.string().nullable(),
+  summary: z.string().nullable(),
+  requiresAttention: z.boolean(),
+});
+
+export const mobileInboxFeedResponseSchema = z.object({
+  messages: z.array(z.discriminatedUnion("kind", [
+    mobileInboxIssueMessageSchema,
+    mobileInboxConversationMessageSchema,
+    mobileInboxChannelMessageSchema,
+    mobileInboxSessionMessageSchema,
+  ])),
+  generatedAt: z.iso.datetime(),
+});
+
 export const mobileDashboardWorkerSchema = z.object({
   id: z.string(),
   label: z.string(),
@@ -978,6 +1039,7 @@ export const mobileOperationSchemas = {
   },
   getCurrentUser: { response: mobileCurrentUserResponseSchema },
   listProjects: { response: mobileProjectsResponseSchema },
+  getInboxFeed: { response: mobileInboxFeedResponseSchema },
   getInboxReadStates: { response: mobileInboxReadStatesSchema },
   putInboxReadStates: {
     request: mobileInboxReadStatesSchema,

@@ -266,6 +266,7 @@ export function App() {
     briar.user?.id ?? null,
     briar.activeOrganizationId,
     inbox.messages,
+    inbox.notificationBaselineId,
   );
   useEffect(() => {
     void syncAppBadgeCount(inbox.unreadCount).catch(() => {

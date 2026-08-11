@@ -84,6 +84,7 @@ struct InboxHomeView: View {
         .navigationBarTitleDisplayMode(.inline)
         .refreshable {
             await refresh()
+            await inbox.refreshFeed()
             await inbox.refreshReadStates()
         }
         .toolbar {

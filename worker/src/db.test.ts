@@ -77,6 +77,7 @@ import {
   issueProjectAgentToken,
   listProjects,
   listProjectAgents,
+  listProjectAgentSessionSummaries,
   listProjectAgentSessions,
   listProjectAgentScheduleRuns,
   listProjectAgentSchedules,
@@ -1571,6 +1572,42 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         "select status from briar_project_agent_sessions where project_id = ? and id = ?",
       ).bind(projectId, sessionId).first<{ status: string }>(),
     ).resolves.toEqual({ status: "skipped" });
+  });
+
+  it("preserves the terminal event id as the Inbox read version", async () => {
+    const sessionId = "55555555-5555-4555-8555-555555555555";
+    const completedAt = atMinute(4);
+    await upsertProjectAgentSession(db, {
+      project_id: projectId,
+      id: sessionId,
+      agent_id: null,
+      status: "completed",
+      session_type: "task",
+      payload_json: JSON.stringify({
+        status: "completed",
+        issues: [],
+        startedAt: atMinute(2),
+        completedAt,
+        events: [{
+          id: "terminal-completed-event",
+          type: "completed",
+          occurredAt: completedAt,
+        }],
+      }),
+      started_at: atMinute(2),
+      completed_at: completedAt,
+      updated_at: completedAt,
+    }, completedAt);
+
+    const summaries = await listProjectAgentSessionSummaries(
+      db,
+      projectId,
+      [sessionId],
+    );
+    expect(JSON.parse(summaries[0]!.summary_json)).toMatchObject({
+      status: "completed",
+      inboxVersion: "terminal-completed-event",
+    });
   });
 
   it("backfills legacy workers as organization devices without issuing credentials", async () => {

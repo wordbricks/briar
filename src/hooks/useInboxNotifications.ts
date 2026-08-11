@@ -16,6 +16,7 @@ import {
 type NotificationBaseline = {
   userId: string;
   organizationId: string;
+  baselineId: string;
   versions: Record<string, string>;
 };
 
@@ -32,6 +33,7 @@ export function useInboxNotifications(
   userId: string | null,
   organizationId: string | null,
   messages: InboxMessageWithReadState[],
+  baselineId = "local",
 ) {
   const { t } = useI18n();
   const baselineRef = useRef<NotificationBaseline | null>(null);
@@ -49,9 +51,10 @@ export function useInboxNotifications(
     if (
       !baseline ||
       baseline.userId !== userId ||
-      baseline.organizationId !== organizationId
+      baseline.organizationId !== organizationId ||
+      baseline.baselineId !== baselineId
     ) {
-      baselineRef.current = { userId, organizationId, versions };
+      baselineRef.current = { userId, organizationId, baselineId, versions };
       return;
     }
 
@@ -59,7 +62,7 @@ export function useInboxNotifications(
       baseline.versions,
       messages,
     );
-    baselineRef.current = { userId, organizationId, versions };
+    baselineRef.current = { userId, organizationId, baselineId, versions };
     if (changedMessages.length === 0) return;
 
     const preferences = readInboxNotificationPreferences();
@@ -73,7 +76,7 @@ export function useInboxNotifications(
         console.error("Failed to send inbox notification", error);
       });
     }
-  }, [messages, organizationId, t, userId]);
+  }, [baselineId, messages, organizationId, t, userId]);
 }
 
 export function useInboxNotificationClicks(

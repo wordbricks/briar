@@ -129,7 +129,11 @@ struct CompanionRootView: View {
             }
             do {
                 try await companion.load(token: token)
-                inbox.configure(token: token, userID: companion.user?.id)
+                inbox.configure(
+                    token: token,
+                    userID: companion.user?.id,
+                    organizationID: currentProject?.organizationId
+                )
                 applyPendingProjectIfNeeded()
                 // Auto-select a project after load: CompanionStore restores the
                 // last used project, or the first project of the first
@@ -143,7 +147,11 @@ struct CompanionRootView: View {
             }
         }
         .onChange(of: companion.user?.id) { _, userID in
-            inbox.configure(token: session.token, userID: userID)
+            inbox.configure(
+                token: session.token,
+                userID: userID,
+                organizationID: currentProject?.organizationId
+            )
         }
         .onChange(of: projectSelectionComplete, initial: true) { _, complete in
             updateProjectScopedStores(active: complete)
@@ -159,12 +167,34 @@ struct CompanionRootView: View {
         .onChange(of: dashboard.snapshot) { _, snapshot in
             guard let project = currentProject else { return }
             inbox.update(snapshot: snapshot, sessions: agents.sessions, project: project)
-            Task { await notifications.process(messages: inbox.messages) }
         }
         .onChange(of: agents.sessions) { _, sessions in
             guard let project = currentProject else { return }
             inbox.update(snapshot: dashboard.snapshot, sessions: sessions, project: project)
-            Task { await notifications.process(messages: inbox.messages) }
+        }
+        .onChange(of: inbox.messages) { _, messages in
+            // Empty lists are produced while account/organization scope is
+            // being reset. Let the first populated snapshot establish that
+            // scope's notification baseline instead of treating it as new.
+            guard !messages.isEmpty else { return }
+            let baselineID = inbox.notificationBaselineID
+            Task {
+                await notifications.process(
+                    messages: messages,
+                    baselineID: baselineID
+                )
+            }
+        }
+        .onChange(of: inbox.feedReady) { _, ready in
+            guard ready else { return }
+            let baselineID = inbox.notificationBaselineID
+            let messages = inbox.messages
+            Task {
+                await notifications.process(
+                    messages: messages,
+                    baselineID: baselineID
+                )
+            }
         }
         .onChange(of: scenePhase) { _, phase in
             switch phase {
@@ -177,11 +207,12 @@ struct CompanionRootView: View {
                 dashboard.applicationDidEnterBackground()
                 channels.applicationDidEnterBackground()
                 agents.applicationDidEnterBackground()
+                inbox.applicationDidEnterBackground()
             default: break
             }
         }
         .onChange(of: navigation.pendingProjectID) { _, projectID in
-            guard let projectID else { return }
+            guard projectID != nil else { return }
             Task {
                 await refreshAndApplyPendingProjectIfNeeded()
             }
@@ -214,6 +245,9 @@ struct CompanionRootView: View {
     private func updateProjectScopedStores(active: Bool) {
         let projectID = active ? companion.selectedProjectID : nil
         let token = active ? session.token : nil
+        let organizationID = projectID.flatMap { id in
+            companion.projects.first(where: { $0.id == id })?.organizationId
+        }
         dashboard.select(projectID: projectID, token: token)
         // Channels follow the selected project's organization, not the project.
         channels.select(
@@ -226,6 +260,11 @@ struct CompanionRootView: View {
             projectID: projectID,
             token: token,
             locale: locale.rawValue
+        )
+        inbox.configure(
+            token: token,
+            userID: companion.user?.id,
+            organizationID: organizationID
         )
     }
 
@@ -290,6 +329,7 @@ struct CompanionRootView: View {
         dashboard.select(projectID: nil, token: nil)
         channels.select(organizationID: nil, token: nil)
         agents.select(projectID: nil, token: nil, locale: locale.rawValue)
+        inbox.configure(token: nil, userID: nil, organizationID: nil)
         companion.clear()
         projectSelectionComplete = false
         Task { await AppBadgeService.sync(count: 0) }

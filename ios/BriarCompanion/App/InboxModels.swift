@@ -51,6 +51,136 @@ struct InboxMessage: Identifiable, Equatable, Sendable {
     var isUnread: Bool = true
 }
 
+struct InboxFeedResponse: Codable, Equatable, Sendable {
+    let messages: [InboxFeedMessage]
+    let generatedAt: Date
+}
+
+struct InboxFeedMessage: Codable, Equatable, Sendable {
+    let id: String
+    let kind: InboxMessageKind
+    let projectId: UUID
+    let projectName: String
+    let targetId: String
+    let title: String
+    let occurredAt: Date
+    let version: String
+    let status: String?
+    let priority: Int?
+    let structuredResult: StructuredRunResult?
+    let messageId: UUID?
+    let rootMessageId: UUID?
+    let body: String?
+    let authorName: String?
+    let issueKey: String?
+    let reason: String?
+    let channelId: UUID?
+    let channelName: String?
+    let agentName: String?
+    let issueCount: Int?
+    let error: String?
+    let summary: String?
+    let requiresAttention: Bool?
+
+    init(
+        id: String,
+        kind: InboxMessageKind,
+        projectId: UUID,
+        projectName: String,
+        targetId: String,
+        title: String,
+        occurredAt: Date,
+        version: String,
+        status: String? = nil,
+        priority: Int? = nil,
+        structuredResult: StructuredRunResult? = nil,
+        messageId: UUID? = nil,
+        rootMessageId: UUID? = nil,
+        body: String? = nil,
+        authorName: String? = nil,
+        issueKey: String? = nil,
+        reason: String? = nil,
+        channelId: UUID? = nil,
+        channelName: String? = nil,
+        agentName: String? = nil,
+        issueCount: Int? = nil,
+        error: String? = nil,
+        summary: String? = nil,
+        requiresAttention: Bool? = nil
+    ) {
+        self.id = id
+        self.kind = kind
+        self.projectId = projectId
+        self.projectName = projectName
+        self.targetId = targetId
+        self.title = title
+        self.occurredAt = occurredAt
+        self.version = version
+        self.status = status
+        self.priority = priority
+        self.structuredResult = structuredResult
+        self.messageId = messageId
+        self.rootMessageId = rootMessageId
+        self.body = body
+        self.authorName = authorName
+        self.issueKey = issueKey
+        self.reason = reason
+        self.channelId = channelId
+        self.channelName = channelName
+        self.agentName = agentName
+        self.issueCount = issueCount
+        self.error = error
+        self.summary = summary
+        self.requiresAttention = requiresAttention
+    }
+
+    func inboxMessage() -> InboxMessage {
+        let runStatus = status.flatMap { DashboardRun.Status(rawValue: $0) }
+        let statusLabel: String?
+        switch kind {
+        case .issue:
+            statusLabel = runStatus?.displayName
+        case .conversation, .channel:
+            statusLabel = reason == "mention" ? L10n.text("멘션") : L10n.text("답글")
+        case .session:
+            statusLabel = runStatus?.displayName
+        }
+        let displayTitle = kind == .channel
+            ? "#\(channelName ?? title)"
+            : title
+        let displayBody: String?
+        switch kind {
+        case .issue:
+            displayBody = structuredResult?.summary
+        case .session:
+            displayBody = summary ?? error
+        case .conversation, .channel:
+            displayBody = body
+        }
+        return InboxMessage(
+            id: id,
+            kind: kind,
+            projectId: projectId,
+            projectName: projectName,
+            targetId: targetId,
+            title: displayTitle,
+            occurredAt: occurredAt,
+            version: version,
+            body: displayBody,
+            authorName: kind == .session ? agentName : authorName,
+            statusLabel: statusLabel,
+            requiresAttention: requiresAttention ?? runStatus?.needsAttention ?? false,
+            priority: priority,
+            structuredResult: structuredResult,
+            rootMessageId: rootMessageId,
+            conversationMessageId: kind == .conversation ? messageId : nil,
+            channelMessageId: kind == .channel ? messageId : nil,
+            channelName: channelName,
+            issueKey: issueKey
+        )
+    }
+}
+
 enum InboxMessageBuilder {
     static func build(
         snapshot: DashboardSnapshot?,

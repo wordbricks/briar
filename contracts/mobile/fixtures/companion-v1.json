@@ -84,6 +84,46 @@
         ]
       }
     },
+    "getInboxFeed": {
+      "method": "GET",
+      "path": "/organizations/{organizationId}/inbox",
+      "status": 200,
+      "response": {
+        "messages": [
+          {
+            "id": "issue:33333333-3333-4333-8333-333333333333",
+            "kind": "issue",
+            "projectId": "11111111-1111-4111-8111-111111111111",
+            "projectName": "Briar",
+            "targetId": "33333333-3333-4333-8333-333333333333",
+            "title": "Native dashboard sync",
+            "occurredAt": "2026-08-11T13:00:00.000Z",
+            "version": "1:1:completed:none:2026-08-11T13:00:00.000Z:4",
+            "runNumber": 3832,
+            "status": "completed",
+            "workflowStage": null,
+            "priority": 2,
+            "structuredResult": null
+          },
+          {
+            "id": "issue:bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            "kind": "issue",
+            "projectId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            "projectName": "Second project",
+            "targetId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            "title": "Selection-independent notification",
+            "occurredAt": "2026-08-11T13:01:00.000Z",
+            "version": "1:1:blocked:implementing:2026-08-11T13:01:00.000Z:2",
+            "runNumber": 7,
+            "status": "blocked",
+            "workflowStage": "implementing",
+            "priority": 1,
+            "structuredResult": null
+          }
+        ],
+        "generatedAt": "2026-08-11T13:01:01.000Z"
+      }
+    },
     "getDashboardSnapshot": {
       "method": "GET",
       "path": "/projects/{projectId}/dashboard",

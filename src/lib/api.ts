@@ -22,6 +22,7 @@ import {
 import type { UsageRangeDays } from "./agent-usage-overview";
 import { LITELLM_MAIN_PRICING_SOURCE } from "./agent-usage-pricing";
 import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
+import type { InboxMessage } from "../hooks/useInbox";
 import type {
   ChannelAgentReply,
   ChannelAgentSkillInput,
@@ -480,6 +481,19 @@ export async function loadSession(token: string): Promise<SessionUser> {
 }
 
 const inboxReadVersionsSchema = z.record(z.string().min(1), z.string().min(1));
+
+export async function loadInboxFeed(
+  token: string,
+  organizationId: string,
+  signal?: AbortSignal,
+): Promise<InboxMessage[]> {
+  const result = await request<{ messages?: InboxMessage[] }>(
+    `/organizations/${encodeURIComponent(organizationId)}/inbox`,
+    token,
+    { signal },
+  );
+  return Array.isArray(result.messages) ? result.messages : [];
+}
 
 export async function loadInboxReadStates(
   token: string,
