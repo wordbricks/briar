@@ -7,6 +7,7 @@ import type {
   RunEvidenceImageRow,
   RunEvidenceRow,
 } from "./db";
+import { upsertProjectAgentSessionSummary } from "./db";
 import type { TranscriptDirection, TranscriptSessionRow } from "./workers";
 
 export const archiveFormatVersion = 1;
@@ -964,6 +965,7 @@ const purgeArchiveRecords = async (
     case "project_agent_sessions":
       for (const record of records) {
         const session = projectAgentSessionSchema.parse(record.data);
+        await upsertProjectAgentSessionSummary(db, session, true);
         await db
           .prepare(
             `delete from briar_project_agent_sessions
@@ -1437,6 +1439,46 @@ export async function getArchivedProjectAgentSession(
     : null;
 }
 
+/**
+ * Migration 0093 can project hot rows in SQL, but historical archive payloads
+ * only exist in R2. Read each missing legacy object once and persist its small
+ * D1 catalog entry so every later list/delta request remains R2-free.
+ */
+export async function backfillArchivedProjectAgentSessionSummaries(
+  db: D1Database,
+  bucket: ArchiveBucket,
+  projectId: string,
+) {
+  const result = await db
+    .prepare(
+      `select archive.*
+       from briar_log_archives archive
+       where archive.project_id = ?
+         and archive.archive_kind = 'project_agent_sessions'
+         and archive.status in ('verified', 'complete')
+         and not exists (
+           select 1 from briar_project_agent_session_summaries summary
+           where summary.project_id = archive.project_id
+             and summary.session_id = archive.scope_id
+         )
+       order by archive.period_end desc, archive.id
+       limit 200`,
+    )
+    .bind(projectId)
+    .all<ArchiveMetadataRow>();
+  for (let offset = 0; offset < result.results.length; offset += 8) {
+    const archived = await Promise.all(
+      result.results
+        .slice(offset, offset + 8)
+        .map((metadata) => readArchivedProjectAgentSession(bucket, metadata)),
+    );
+    for (const session of archived) {
+      await upsertProjectAgentSessionSummary(db, session, true);
+    }
+  }
+  return result.results.length;
+}
+
 export async function getArchivedEvidenceImage(
   db: D1Database,
   bucket: ArchiveBucket,
@@ -1828,6 +1870,27 @@ export async function expireArchives(
     if (archive.archive_kind === "project_agent_sessions") {
       await db.batch([
         db.prepare(`delete from briar_log_archives where id = ?`).bind(archive.id),
+        db.prepare(
+          `delete from briar_project_agent_session_summaries
+           where project_id = ? and session_id = ?
+             and not exists (
+               select 1 from briar_project_agent_sessions session
+               where session.project_id = ? and session.id = ?
+             )
+             and not exists (
+               select 1 from briar_log_archives retained
+               where retained.project_id = ? and retained.scope_id = ?
+                 and retained.archive_kind = 'project_agent_sessions'
+                 and retained.status in ('verified', 'complete')
+             )`,
+        ).bind(
+          archive.project_id,
+          archive.scope_id,
+          archive.project_id,
+          archive.scope_id,
+          archive.project_id,
+          archive.scope_id,
+        ),
         db.prepare(
           `delete from briar_project_agent_session_context_membership
            where project_id = ? and session_id = ?

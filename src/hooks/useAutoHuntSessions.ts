@@ -9,8 +9,9 @@ import {
 import { stopProjectAgentSession } from "../lib/project-llm";
 import {
   cancelHuntRun,
-  loadProjectAgentSessions,
+  loadProjectAgentSessionChanges,
   upsertProjectAgentSession,
+  type ProjectAgentSessionSyncState,
 } from "../lib/api";
 import { DASHBOARD_POLL_INTERVAL_MS } from "../lib/dashboard-polling";
 import type { HuntRun, ProjectAgent } from "../types";
@@ -87,6 +88,8 @@ export type AutoHuntSession = {
   workers: AutoHuntWorkerResult[];
   updatedAt?: string;
   localOwner?: boolean;
+  archived?: boolean;
+  detailLoaded?: boolean;
 };
 
 export function collapseLinkedAutoHuntSessions(
@@ -281,8 +284,21 @@ export function mergeSynchronizedSessions(
     const key = sessionSyncKey(remote);
     const local = merged.get(key);
     if (local && sessionVersion(local) >= sessionVersion(remote)) continue;
+    const preserveLoadedDetail =
+      remote.detailLoaded === false && local?.detailLoaded !== false;
     merged.set(key, {
       ...remote,
+      ...(preserveLoadedDetail
+        ? {
+            request: local?.request ?? remote.request,
+            followUps: local?.followUps ?? [],
+            conversationId: local?.conversationId ?? null,
+            summary: local?.summary ?? null,
+            error: local?.error ?? null,
+            events: local?.events ?? [],
+            detailLoaded: true,
+          }
+        : {}),
       localOwner: local?.localOwner ?? false,
       workspaceRoot: local?.workspaceRoot ?? null,
       dispatchEvents: local?.dispatchEvents ?? [],
@@ -294,6 +310,24 @@ export function mergeSynchronizedSessions(
         new Date(right.startedAt).getTime() -
         new Date(left.startedAt).getTime(),
   );
+}
+
+export function applyProjectAgentSessionSync(
+  current: readonly AutoHuntSession[],
+  projectId: string,
+  remote: readonly AutoHuntSession[],
+  deletedSessionIds: readonly string[],
+  reset: boolean,
+) {
+  const deleted = new Set(deletedSessionIds);
+  const retained = current.filter((session) => {
+    if (session.projectId !== projectId || session.localOwner !== false) {
+      return true;
+    }
+    if (reset) return false;
+    return !deleted.has(session.id);
+  });
+  return mergeSynchronizedSessions(retained, remote);
 }
 
 export function useAutoHuntSessions(
@@ -309,6 +343,9 @@ export function useAutoHuntSessions(
     () => new Set(),
   );
   const uploadedVersionsRef = useRef(new Map<string, string>());
+  const syncStatesRef = useRef(
+    new Map<string, ProjectAgentSessionSyncState>(),
+  );
 
   useEffect(() => {
     sessionsRef.current = sessions;
@@ -341,16 +378,42 @@ export function useAutoHuntSessions(
 
   useEffect(() => {
     uploadedVersionsRef.current.clear();
+    syncStatesRef.current.clear();
     setSynchronizedProjects(new Set());
     if (!syncContext || syncContext.projectIds.length === 0) return;
     let active = true;
 
+    let timer: number | null = null;
     const refreshRemoteSessions = async () => {
       const loaded = await Promise.allSettled(
-        syncContext.projectIds.map(async (projectId) => ({
-          projectId,
-          sessions: await loadProjectAgentSessions(syncContext.token, projectId),
-        })),
+        syncContext.projectIds.map(async (projectId) => {
+          let state = syncStatesRef.current.get(projectId) ?? null;
+          const sessions: AutoHuntSession[] = [];
+          const deletedSessionIds = new Set<string>();
+          let reset = false;
+          let notModified = false;
+          do {
+            const page = await loadProjectAgentSessionChanges(
+              syncContext.token,
+              projectId,
+              state,
+            );
+            state = page.state;
+            reset ||= page.reset;
+            notModified ||= page.notModified;
+            sessions.push(...page.sessions);
+            for (const id of page.deletedSessionIds) deletedSessionIds.add(id);
+            if (!page.hasMore) break;
+          } while (active);
+          if (state) syncStatesRef.current.set(projectId, state);
+          return {
+            projectId,
+            sessions,
+            deletedSessionIds: [...deletedSessionIds],
+            reset,
+            notModified,
+          };
+        }),
       );
       if (!active) return;
       const successfulProjectIds = new Set<string>();
@@ -365,24 +428,30 @@ export function useAutoHuntSessions(
               sessionVersion(session),
             );
           }
-          next = mergeSynchronizedSessions(
+          if (result.value.notModified) continue;
+          next = applyProjectAgentSessionSync(
             next,
+            result.value.projectId,
             result.value.sessions,
+            result.value.deletedSessionIds,
+            result.value.reset,
           );
         }
         return next;
       });
       setSynchronizedProjects(successfulProjectIds);
+      if (active) {
+        timer = window.setTimeout(
+          () => void refreshRemoteSessions(),
+          DASHBOARD_POLL_INTERVAL_MS,
+        );
+      }
     };
 
     void refreshRemoteSessions();
-    const timer = window.setInterval(
-      () => void refreshRemoteSessions(),
-      DASHBOARD_POLL_INTERVAL_MS,
-    );
     return () => {
       active = false;
-      window.clearInterval(timer);
+      if (timer !== null) window.clearTimeout(timer);
     };
   }, [syncContext]);
 

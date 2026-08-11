@@ -99,6 +99,7 @@ import {
 } from "./mobile-contract";
 import {
   archiveCompletedLogs,
+  backfillArchivedProjectAgentSessionSummaries,
   collectStorageMetrics,
   expireArchives,
   getArchivedEvidenceImage,
@@ -188,6 +189,7 @@ import {
   getProjectRunChildMismatch,
   getProjectSettings,
   getProjectAgentSession,
+  getProjectAgentSessionSyncCursor,
   projectAgentSessionIsApprovalOwned,
   getProjectAgentTaskJob,
   getProjectAgentTaskJobByRequest,
@@ -229,6 +231,8 @@ import {
   listProjects,
   listProjectAgents,
   listProjectAgentSessions,
+  listProjectAgentSessionChanges,
+  listProjectAgentSessionSummaries,
   listProjectAgentScheduleRuns,
   listProjectAgentSchedules,
   listSlackInstallations,
@@ -529,9 +533,10 @@ import {
 
 const corsHeaders = {
   "Access-Control-Allow-Headers":
-    "authorization, content-type, x-briar-claim-token, x-briar-channel-claim-token",
+    "authorization, content-type, if-none-match, x-briar-claim-token, x-briar-channel-claim-token",
   "Access-Control-Allow-Methods": "DELETE, GET, HEAD, PATCH, POST, PUT, OPTIONS",
   "Access-Control-Allow-Origin": "*",
+  "Access-Control-Expose-Headers": "ETag",
 };
 
 function scheduleChannelRealtimePublish(
@@ -3476,7 +3481,46 @@ const projectAgentSessionJson = (row: {
   workspaceRoot: null,
   dispatchEvents: [],
   workers: [],
+  detailLoaded: true,
 });
+
+const projectAgentSessionSummaryJson = (row: {
+  project_id: string;
+  session_id: string;
+  summary_json: string;
+  archived: number;
+}) => ({
+  id: row.session_id,
+  projectId: row.project_id,
+  ...(JSON.parse(row.summary_json) as Record<string, unknown>),
+  followUps: [],
+  conversationId: null,
+  workspaceRoot: null,
+  summary: null,
+  error: null,
+  events: [],
+  dispatchEvents: [],
+  workers: [],
+  archived: row.archived === 1,
+  detailLoaded: false,
+});
+
+const projectAgentSessionSyncEtag = (projectId: string, cursor: number) =>
+  `"project-agent-sessions:${projectId}:${cursor}"`;
+
+const projectAgentSessionSyncJson = (
+  body: unknown,
+  etag: string,
+  status = 200,
+) =>
+  Response.json(body, {
+    status,
+    headers: {
+      ...corsHeaders,
+      "Cache-Control": "private, no-cache",
+      ETag: etag,
+    },
+  });
 
 const projectAgentTaskSessionEvent = (
   type: "started" | "completed" | "failed",
@@ -8104,6 +8148,9 @@ async function route(
   const projectAgentSessionsMatch = pathname.match(
     /^\/projects\/([0-9a-f-]+)\/agent-sessions$/u,
   );
+  const projectAgentSessionChangesMatch = pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/agent-sessions\/changes$/u,
+  );
   const projectAgentTasksMatch = pathname.match(
     /^\/projects\/([0-9a-f-]+)\/agent-tasks$/u,
   );
@@ -8269,6 +8316,86 @@ async function route(
     }
     return json({ session: projectAgentSessionJson(createdSession) });
   }
+  if (projectAgentSessionChangesMatch && request.method === "GET") {
+    const session = await requireSession(auth, request);
+    const project = await getProject(
+      db,
+      projectAgentSessionChangesMatch[1],
+      session.user.id,
+    );
+    if (!project) throw new HttpError(404, "Project not found");
+    const rawCursor = new URL(request.url).searchParams.get("cursor");
+    let cursor: number | null = null;
+    if (rawCursor !== null) {
+      if (!/^\d+$/u.test(rawCursor)) {
+        throw new HttpError(400, "A non-negative Agent session cursor is required");
+      }
+      cursor = Number(rawCursor);
+      if (!Number.isSafeInteger(cursor)) {
+        throw new HttpError(400, "Agent session cursor is outside the safe range");
+      }
+    } else {
+      // Historical archives predate the D1 summary projection. This bounded
+      // one-time backfill is the only list path that may read those legacy R2
+      // objects; later snapshots and every delta are D1-only.
+      await backfillArchivedProjectAgentSessionSummaries(
+        db,
+        env.ARCHIVES,
+        project.id,
+      );
+    }
+
+    const currentCursor = await getProjectAgentSessionSyncCursor(db, project.id);
+    const etag = projectAgentSessionSyncEtag(project.id, currentCursor);
+    if (
+      cursor === currentCursor &&
+      request.headers.get("if-none-match") === etag
+    ) {
+      return new Response(null, {
+        status: 304,
+        headers: {
+          ...corsHeaders,
+          "Cache-Control": "private, no-cache",
+          ETag: etag,
+        },
+      });
+    }
+
+    if (cursor === null) {
+      const summaries = await listProjectAgentSessionSummaries(db, project.id);
+      return projectAgentSessionSyncJson({
+        cursor: currentCursor,
+        hasMore: false,
+        reset: true,
+        sessions: summaries.map(projectAgentSessionSummaryJson),
+        deletedSessionIds: [],
+      }, etag);
+    }
+
+    const page = await listProjectAgentSessionChanges(db, project.id, cursor);
+    if (page.expired) {
+      return projectAgentSessionSyncJson({
+        code: "project_agent_session_cursor_expired",
+        message: "Agent session cursor expired; reload the summary snapshot",
+      }, etag, 410);
+    }
+    const changedSessionIds = [...new Set(
+      page.changes.map((change) => change.session_id),
+    )];
+    const summaries = await listProjectAgentSessionSummaries(
+      db,
+      project.id,
+      changedSessionIds,
+    );
+    const existingIds = new Set(summaries.map((summary) => summary.session_id));
+    return projectAgentSessionSyncJson({
+      cursor: page.nextCursor,
+      hasMore: page.hasMore,
+      reset: false,
+      sessions: summaries.map(projectAgentSessionSummaryJson),
+      deletedSessionIds: changedSessionIds.filter((id) => !existingIds.has(id)),
+    }, etag);
+  }
   if (projectAgentSessionsMatch && request.method === "GET") {
     const session = await requireSession(auth, request);
     const project = await getProject(
@@ -8293,6 +8420,34 @@ async function route(
   const projectAgentSessionMatch = pathname.match(
     /^\/projects\/([0-9a-f-]+)\/agent-sessions\/([A-Za-z0-9_-]{1,128})$/u,
   );
+  if (projectAgentSessionMatch && request.method === "GET") {
+    const session = await requireSession(auth, request);
+    const project = await getProject(
+      db,
+      projectAgentSessionMatch[1],
+      session.user.id,
+    );
+    if (!project) throw new HttpError(404, "Project not found");
+    const hot = await getProjectAgentSession(
+      db,
+      project.id,
+      projectAgentSessionMatch[2],
+    );
+    if (hot) return privateNoStoreJson({ session: projectAgentSessionJson(hot) });
+    const archived = await getArchivedProjectAgentSession(
+      db,
+      env.ARCHIVES,
+      project.id,
+      projectAgentSessionMatch[2],
+    );
+    if (!archived) throw new HttpError(404, "Agent session not found");
+    return privateNoStoreJson({
+      session: {
+        ...projectAgentSessionJson(archived),
+        archived: true,
+      },
+    });
+  }
   if (projectAgentSessionMatch && request.method === "PUT") {
     const session = await requireSession(auth, request);
     const project = await getProject(

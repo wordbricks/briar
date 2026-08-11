@@ -286,6 +286,28 @@ export type ProjectAgentSessionRow = {
   updated_at: string;
 };
 
+export type ProjectAgentSessionSummaryRow = {
+  project_id: string;
+  session_id: string;
+  summary_json: string;
+  updated_at: string;
+  archived: number;
+};
+
+export type ProjectAgentSessionChangeRow = {
+  version: number;
+  session_id: string;
+  operation: "upsert" | "delete";
+};
+
+export type ProjectAgentSessionChangesPage = {
+  currentVersion: number;
+  changes: ProjectAgentSessionChangeRow[];
+  hasMore: boolean;
+  nextCursor: number;
+  expired: boolean;
+};
+
 export type ProjectAgentTaskJobRow = {
   id: string;
   project_id: string;
@@ -4558,6 +4580,170 @@ export async function getProjectAgent(
   return (await hydrateAgentSkills(db, [agent]))[0];
 }
 
+const projectAgentSessionChangePageSize = 500;
+
+const projectAgentSessionSummaryJson = (row: ProjectAgentSessionRow) => {
+  const payload = JSON.parse(row.payload_json) as Record<string, unknown>;
+  const issues = Array.isArray(payload.issues)
+    ? payload.issues.map((value) => {
+        const issue = value as Record<string, unknown>;
+        return {
+          runId: issue.runId,
+          runNumber: issue.runNumber,
+          sourceKey: issue.sourceKey,
+          title: issue.title,
+          outcome: issue.outcome,
+          summary: null,
+        };
+      })
+    : [];
+  return JSON.stringify({
+    dispatchGroupId: payload.dispatchGroupId ?? row.id,
+    agentId: payload.agentId ?? row.agent_id,
+    agentName: payload.agentName ?? null,
+    skillId: payload.skillId ?? null,
+    sessionType: payload.sessionType ?? row.session_type,
+    trigger: payload.trigger ?? null,
+    scheduleId: payload.scheduleId ?? null,
+    scheduleRunId: payload.scheduleRunId ?? null,
+    parentSessionId: payload.parentSessionId ?? null,
+    request: typeof payload.request === "string"
+      ? payload.request.slice(0, 500)
+      : null,
+    status: payload.status ?? row.status,
+    issues,
+    startedAt: payload.startedAt ?? row.started_at,
+    completedAt: payload.completedAt ?? row.completed_at,
+    requestedWorkerId: payload.requestedWorkerId ?? null,
+    workerId: payload.workerId ?? null,
+    updatedAt: payload.updatedAt ?? row.updated_at,
+  });
+};
+
+const upsertProjectAgentSessionSummaryStatement = (
+  db: D1Database,
+  row: ProjectAgentSessionRow,
+  archived: boolean,
+) =>
+  db.prepare(
+    `insert into briar_project_agent_session_summaries (
+       project_id, session_id, summary_json, updated_at, archived
+     ) values (?, ?, ?, ?, ?)
+     on conflict (project_id, session_id) do update set
+       summary_json = excluded.summary_json,
+       updated_at = excluded.updated_at,
+       archived = excluded.archived
+     where excluded.updated_at > briar_project_agent_session_summaries.updated_at
+        or excluded.archived <> briar_project_agent_session_summaries.archived`,
+  ).bind(
+    row.project_id,
+    row.id,
+    projectAgentSessionSummaryJson(row),
+    row.updated_at,
+    archived ? 1 : 0,
+  );
+
+export async function upsertProjectAgentSessionSummary(
+  db: D1Database,
+  row: ProjectAgentSessionRow,
+  archived: boolean,
+) {
+  return upsertProjectAgentSessionSummaryStatement(db, row, archived).run();
+}
+
+export async function listProjectAgentSessionSummaries(
+  db: D1Database,
+  projectId: string,
+  sessionIds?: readonly string[],
+) {
+  if (sessionIds?.length === 0) return [];
+  const idFilter = sessionIds
+    ? `and session_id in (${sessionIds.map(() => "?").join(",")})`
+    : "";
+  const rowLimit = sessionIds ? projectAgentSessionChangePageSize : 200;
+  const result = await db
+    .prepare(
+      `select project_id, session_id, summary_json, updated_at, archived
+       from briar_project_agent_session_summaries
+       where project_id = ? ${idFilter}
+       order by updated_at desc, session_id
+       limit ?`,
+    )
+    .bind(projectId, ...(sessionIds ?? []), rowLimit)
+    .all<ProjectAgentSessionSummaryRow>();
+  return result.results;
+}
+
+export async function getProjectAgentSessionSyncCursor(
+  db: D1Database,
+  projectId: string,
+) {
+  const state = await db
+    .prepare(
+      `select current_version from briar_project_agent_session_sync_state
+       where project_id = ?`,
+    )
+    .bind(projectId)
+    .first<{ current_version: number }>();
+  return state?.current_version ?? 0;
+}
+
+export async function listProjectAgentSessionChanges(
+  db: D1Database,
+  projectId: string,
+  cursor: number,
+): Promise<ProjectAgentSessionChangesPage> {
+  const currentVersion = await getProjectAgentSessionSyncCursor(db, projectId);
+  const oldest = await db
+    .prepare(
+      `select min(version) as oldest_version
+       from briar_project_agent_session_changes where project_id = ?`,
+    )
+    .bind(projectId)
+    .first<{ oldest_version: number | null }>();
+  const oldestVersion = oldest?.oldest_version ?? null;
+  const expired =
+    cursor < 0 ||
+    cursor > currentVersion ||
+    (cursor < currentVersion &&
+      (oldestVersion === null || cursor < oldestVersion - 1));
+  if (expired) {
+    return {
+      currentVersion,
+      changes: [],
+      hasMore: false,
+      nextCursor: currentVersion,
+      expired: true,
+    };
+  }
+  const result = await db
+    .prepare(
+      `select version, session_id, operation
+       from briar_project_agent_session_changes
+       where project_id = ? and version > ? and version <= ?
+       order by version
+       limit ?`,
+    )
+    .bind(
+      projectId,
+      cursor,
+      currentVersion,
+      projectAgentSessionChangePageSize + 1,
+    )
+    .all<ProjectAgentSessionChangeRow>();
+  const hasMore = result.results.length > projectAgentSessionChangePageSize;
+  const changes = result.results.slice(0, projectAgentSessionChangePageSize);
+  return {
+    currentVersion,
+    changes,
+    hasMore,
+    nextCursor: hasMore
+      ? (changes.at(-1)?.version ?? cursor)
+      : currentVersion,
+    expired: false,
+  };
+}
+
 export async function listProjectAgentSessions(
   db: D1Database,
   projectId: string,
@@ -4659,6 +4845,7 @@ export async function upsertProjectAgentSession(
       input.completed_at,
       input.updated_at,
     ),
+    upsertProjectAgentSessionSummaryStatement(db, input, false),
   ]);
   return db
     .prepare(
