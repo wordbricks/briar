@@ -357,6 +357,8 @@ test("server-renders the localized changelog from published releases", async () 
   assert.match(koreanHtml, /<html lang="ko"[\s>]/i);
   assert.match(koreanHtml, /Briar 변경 기록/);
   assert.match(koreanHtml, /현재 안정 버전/);
+  assert.match(koreanHtml, /모바일 채널을 자연스럽게 다듬고 반복 알림을 멈춥니다/);
+  assert.match(koreanHtml, /v1\.2\.107/);
   assert.match(koreanHtml, /프로젝트를 바꿔도 모든 Inbox 알림을 놓치지 않습니다/);
   assert.match(koreanHtml, /v1\.2\.106/);
   assert.match(koreanHtml, /프로젝트 대화 에이전트가 실제 작업 환경에서 검증합니다/);
@@ -398,6 +400,8 @@ test("server-renders the localized changelog from published releases", async () 
   const englishHtml = await englishResponse.text();
   assert.match(englishHtml, /<html lang="en"[\s>]/i);
   assert.match(englishHtml, /Briar changelog/);
+  assert.match(englishHtml, /Refine mobile channels and stop repeated session alerts/);
+  assert.match(englishHtml, /v1\.2\.107/);
   assert.match(englishHtml, /Keep every Inbox notification visible across projects/);
   assert.match(englishHtml, /v1\.2\.106/);
   assert.match(englishHtml, /Let project conversation agents verify work in a real runtime/);
