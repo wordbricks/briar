@@ -32,7 +32,9 @@ import {
 import { useI18n } from "../i18n";
 import { useChannelComposer } from "../hooks/useChannelComposer";
 import { useHorizontalPaneResize } from "../hooks/useHorizontalPaneResize";
+import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
 import {
+  acceptChannelSkillExecutionProposal,
   acceptChannelExecutionProposal,
   acceptChannelProposal,
   listChannelMessages,
@@ -48,6 +50,8 @@ import {
   toggleChannelMessageReaction,
 } from "../lib/api";
 import type {
+  AgentSkillExecutionApprovalInput,
+  AgentSkillExecutionProposal,
   ExecutionWorker,
   HuntRun,
   IssueExecutionApprovalInput,
@@ -64,7 +68,10 @@ import type {
   ChannelSummary,
 } from "../lib/channels-contract";
 import type { MentionTarget } from "../lib/channel-mentions";
-import { mergeChannelMessages } from "../lib/channel-message-merge";
+import {
+  mergeChannelMessages,
+  mergeChannelMessageSnapshot,
+} from "../lib/channel-message-merge";
 import { maxIssueAttachmentCount } from "../lib/issue-attachments";
 import {
   ChannelDraftImages,
@@ -98,6 +105,7 @@ import {
   channelIssueProposalRequestsExecution,
 } from "./ChannelIssueProposalDetails";
 import { IssueExecutionApproval } from "./IssueExecutionApproval";
+import { AgentSkillExecutionApproval } from "./AgentSkillExecutionApproval";
 
 /** Chat needs a tighter cadence than the 15s dashboard poll. */
 const CHANNEL_POLL_INTERVAL_MS = 3_000;
@@ -112,6 +120,7 @@ type ChannelsProps = {
   onChannelSelect: (channelId: string | null) => void;
   onChannelsChange: Dispatch<SetStateAction<ChannelSummary[]>>;
   onIssueCreated?: (projectId: string, runId: string) => void | Promise<void>;
+  onSkillSessionAccepted?: (session: AutoHuntSession) => void;
   onCreateAgent?: () => void;
   requestedMessage?: {
     channelId: string;
@@ -239,6 +248,7 @@ export function Channels({
   onChannelSelect,
   onChannelsChange,
   onIssueCreated,
+  onSkillSessionAccepted,
   requestedMessage,
   onRequestedMessageOpen,
   onCreateAgent,
@@ -512,7 +522,8 @@ export function Channels({
         setMembers(result.members);
         setAgents(result.agents);
         recordProposalMessages(result.messages);
-        setMessages(result.messages);
+        setMessages((current) =>
+          mergeChannelMessageSnapshot(current, result.messages));
         const target = requestedMessage?.channelId === activeChannelId
           ? requestedMessage
           : null;
@@ -526,7 +537,8 @@ export function Channels({
           if (cancelled || loadVersion !== channelDataVersion.current) return;
           recordProposalMessages(threadResult.messages);
           setThreadParentId(target.rootMessageId);
-          setThreadMessages(threadResult.messages);
+          setThreadMessages((current) =>
+            mergeChannelMessageSnapshot(current, threadResult.messages));
         } else {
           setThreadParentId(null);
           setThreadMessages([]);
@@ -693,7 +705,8 @@ export function Channels({
         );
         if (loadVersion !== channelDataVersion.current) return;
         recordProposalMessages(result.messages);
-        setThreadMessages(result.messages);
+        setThreadMessages((current) =>
+          mergeChannelMessageSnapshot(current, result.messages));
       } catch (cause) {
         if (loadVersion === channelDataVersion.current) {
           setError(errorMessage(cause));
@@ -824,6 +837,17 @@ export function Channels({
     [token],
   );
 
+  const loadSkillExecutionProposalContext = useCallback(
+    async (proposal: AgentSkillExecutionProposal) => {
+      const dashboard = await loadDashboard(token, proposal.projectId);
+      return {
+        workers: dashboard.workers ?? [],
+        policy: dashboard.executionPolicy,
+      };
+    },
+    [token],
+  );
+
   const acceptExecutionProposal = useCallback(
     async (
       message: ChannelMessage,
@@ -863,6 +887,46 @@ export function Channels({
     [],
   );
 
+  const acceptSkillExecutionProposal = useCallback(
+    async (
+      message: ChannelMessage,
+      input: AgentSkillExecutionApprovalInput,
+    ) => {
+      const proposal = message.skillExecutionProposal;
+      if (
+        !proposal ||
+        proposal.status !== "pending" ||
+        !activeChannelId ||
+        activeChannelId !== message.channelId
+      ) {
+        throw new Error(t("skillExecution.approvalUnavailable"));
+      }
+      const result = await acceptChannelSkillExecutionProposal(
+        token,
+        organizationId,
+        message.channelId,
+        proposal,
+        input,
+      );
+      onSkillSessionAccepted?.(result.session);
+      return result.proposal;
+    },
+    [activeChannelId, onSkillSessionAccepted, organizationId, t, token],
+  );
+
+  const applyAcceptedSkillExecutionProposal = useCallback(
+    (messageId: string, proposal: AgentSkillExecutionProposal) => {
+      const apply = (message: ChannelMessage): ChannelMessage =>
+        message.id === messageId &&
+        message.skillExecutionProposal?.id === proposal.id
+          ? { ...message, skillExecutionProposal: proposal }
+          : message;
+      setMessages((current) => current.map(apply));
+      setThreadMessages((current) => current.map(apply));
+    },
+    [],
+  );
+
   const refreshProposalState = useCallback(
     async (message: ChannelMessage, proposalId: string) => {
       if (!activeChannelId) return null;
@@ -880,7 +944,8 @@ export function Channels({
             return latestProposals.current.get(proposalId) ?? null;
           }
           recordProposalMessages(result.messages);
-          setThreadMessages(result.messages);
+          setThreadMessages((current) =>
+            mergeChannelMessageSnapshot(current, result.messages));
         } else {
           const result = await loadChannel(token, organizationId, activeChannelId);
           if (loadVersion !== channelDataVersion.current) {
@@ -889,7 +954,8 @@ export function Channels({
           recordProposalMessages(result.messages);
           setMembers(result.members);
           setAgents(result.agents);
-          setMessages(result.messages);
+          setMessages((current) =>
+            mergeChannelMessageSnapshot(current, result.messages));
           onChannelsChange((current) =>
             current.map((item) =>
               item.id === result.channel.id ? result.channel : item,
@@ -1167,10 +1233,18 @@ export function Channels({
                       onAcceptProposal={() => void acceptProposal(message)}
                       loadExecutionProposalContext={() =>
                         loadExecutionProposalContext(message.executionProposal!)}
+                      loadSkillExecutionProposalContext={() =>
+                        loadSkillExecutionProposalContext(
+                          message.skillExecutionProposal!,
+                        )}
                       onAcceptExecutionProposal={(input) =>
                         acceptExecutionProposal(message, input)}
                       onExecutionProposalAccepted={(proposal) =>
                         applyAcceptedExecutionProposal(message.id, proposal)}
+                      onAcceptSkillExecutionProposal={(input) =>
+                        acceptSkillExecutionProposal(message, input)}
+                      onSkillExecutionProposalAccepted={(proposal) =>
+                        applyAcceptedSkillExecutionProposal(message.id, proposal)}
                       onIssueOpen={openIssue}
                       onOpenThread={() => void openThread(message.id)}
                       onProjectChange={(projectId) => {
@@ -1268,10 +1342,18 @@ export function Channels({
                 onAcceptProposal={() => void acceptProposal(message)}
                 loadExecutionProposalContext={() =>
                   loadExecutionProposalContext(message.executionProposal!)}
+                loadSkillExecutionProposalContext={() =>
+                  loadSkillExecutionProposalContext(
+                    message.skillExecutionProposal!,
+                  )}
                 onAcceptExecutionProposal={(input) =>
                   acceptExecutionProposal(message, input)}
                 onExecutionProposalAccepted={(proposal) =>
                   applyAcceptedExecutionProposal(message.id, proposal)}
+                onAcceptSkillExecutionProposal={(input) =>
+                  acceptSkillExecutionProposal(message, input)}
+                onSkillExecutionProposalAccepted={(proposal) =>
+                  applyAcceptedSkillExecutionProposal(message.id, proposal)}
                 onIssueOpen={openIssue}
                 onProjectChange={(projectId) => {
                   const proposalId = message.proposal?.id;
@@ -1616,6 +1698,7 @@ function MessageRow({
   agents,
   channel,
   loadExecutionProposalContext,
+  loadSkillExecutionProposalContext,
   message,
   members,
   localeTag,
@@ -1623,7 +1706,9 @@ function MessageRow({
   onOpenThread,
   onAcceptProposal,
   onAcceptExecutionProposal,
+  onAcceptSkillExecutionProposal,
   onExecutionProposalAccepted,
+  onSkillExecutionProposalAccepted,
   onIssueOpen,
   onProjectChange,
   onToggleReaction,
@@ -1639,6 +1724,10 @@ function MessageRow({
     workers: ExecutionWorker[];
     policy?: ProjectExecutionWorkerPolicy;
   }>;
+  loadSkillExecutionProposalContext: () => Promise<{
+    workers: ExecutionWorker[];
+    policy?: ProjectExecutionWorkerPolicy;
+  }>;
   message: ChannelMessage;
   members: ChannelMember[];
   localeTag: string;
@@ -1649,6 +1738,12 @@ function MessageRow({
     input: IssueExecutionApprovalInput,
   ) => Promise<ChannelExecutionProposal>;
   onExecutionProposalAccepted: (proposal: ChannelExecutionProposal) => void;
+  onAcceptSkillExecutionProposal: (
+    input: AgentSkillExecutionApprovalInput,
+  ) => Promise<AgentSkillExecutionProposal>;
+  onSkillExecutionProposalAccepted: (
+    proposal: AgentSkillExecutionProposal,
+  ) => void;
   onIssueOpen?: (projectId: string, runId: string) => void | Promise<void>;
   onProjectChange: (projectId: string) => void;
   onToggleReaction: (emoji: string) => void;
@@ -1812,6 +1907,19 @@ function MessageRow({
               : undefined}
             projectName={executionProjectName}
             proposal={message.executionProposal}
+            surfaceKey={`${channel.id}:${message.parentMessageId ?? "root"}:${message.id}`}
+          />
+        ) : null}
+
+        {message.skillExecutionProposal ? (
+          <AgentSkillExecutionApproval
+            disabledReason={channel.archivedAt
+              ? t("skillExecution.archived")
+              : null}
+            loadExecutionContext={loadSkillExecutionProposalContext}
+            onAccept={onAcceptSkillExecutionProposal}
+            onAccepted={onSkillExecutionProposalAccepted}
+            proposal={message.skillExecutionProposal}
             surfaceKey={`${channel.id}:${message.parentMessageId ?? "root"}:${message.id}`}
           />
         ) : null}

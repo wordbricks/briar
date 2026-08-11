@@ -33,6 +33,10 @@ final class AgentsStore: ObservableObject {
     private var token: String?
     private var locale: String = CompanionLocale.ko.rawValue
     private var generation = 0
+    /// Local session writes can race a list request that started before the
+    /// write. A matching revision may replace authoritatively; otherwise the
+    /// delayed response is merged monotonically with the newer local state.
+    private var sessionMutationRevision = 0
     private var pollingTask: Task<Void, Never>?
 
     init(api: any MobileAPIClientProtocol, pollInterval: Duration = .seconds(15)) {
@@ -47,6 +51,7 @@ final class AgentsStore: ObservableObject {
         self.token = token
         self.locale = locale
         generation += 1
+        sessionMutationRevision &+= 1
         pollingTask?.cancel()
         agents = []
         sessions = []
@@ -61,6 +66,7 @@ final class AgentsStore: ObservableObject {
     func refresh() async {
         guard let projectID, let token else { return }
         let generation = self.generation
+        let expectedSessionMutationRevision = sessionMutationRevision
         isRefreshing = true
         defer {
             if generation == self.generation {
@@ -87,8 +93,14 @@ final class AgentsStore: ObservableObject {
             agents = loadedAgents.agents.sorted {
                 $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
             }
-            sessions = Self.collapseLinked(loadedSessions.sessions).sorted {
-                $0.displayTimestamp > $1.displayTimestamp
+            let authoritativeSessions = Self.collapseLinked(loadedSessions.sessions)
+            sessions = if expectedSessionMutationRevision == sessionMutationRevision {
+                Self.sortedSessions(authoritativeSessions)
+            } else {
+                Self.mergeSessions(
+                    current: sessions,
+                    incoming: authoritativeSessions
+                )
             }
             errorMessage = nil
         } catch {
@@ -131,9 +143,7 @@ final class AgentsStore: ObservableObject {
                 ),
                 as: ProjectAgentTaskResponse.self
             )
-            sessions = Self.collapseLinked(
-                [response.session] + sessions.filter { $0.id != response.session.id }
-            ).sorted { $0.displayTimestamp > $1.displayTimestamp }
+            insertOrReplace(response.session)
             errorMessage = nil
             return response.session
         } catch {
@@ -335,6 +345,14 @@ final class AgentsStore: ObservableObject {
         sessions.first { $0.id == id }
     }
 
+    /// Approval responses already contain the canonical persisted session.
+    /// Insert it immediately when this store owns the same project so Agent
+    /// history does not wait for the next polling interval.
+    func materialize(_ session: ProjectAgentSession) {
+        guard session.projectId == projectID else { return }
+        insertOrReplace(session)
+    }
+
     func agent(id: UUID) -> ProjectAgent? {
         agents.first { $0.id == id }
     }
@@ -385,6 +403,60 @@ final class AgentsStore: ObservableObject {
     static func collapseLinked(_ sessions: [ProjectAgentSession]) -> [ProjectAgentSession] {
         let parentIDs = Set(sessions.compactMap(\.parentSessionId))
         return sessions.filter { !parentIDs.contains($0.id) }
+    }
+
+    /// Keeps the newest observation for each session while preserving a local
+    /// materialization that an older in-flight list response has not seen yet.
+    /// Terminal state wins a timestamp tie so a completed/failed session never
+    /// regresses to running merely because two writes share one clock value.
+    static func mergeSessions(
+        current: [ProjectAgentSession],
+        incoming: [ProjectAgentSession]
+    ) -> [ProjectAgentSession] {
+        var byID: [String: ProjectAgentSession] = [:]
+        for candidate in current + incoming {
+            if let existing = byID[candidate.id] {
+                byID[candidate.id] = newerSession(existing, candidate)
+            } else {
+                byID[candidate.id] = candidate
+            }
+        }
+        return sortedSessions(collapseLinked(Array(byID.values)))
+    }
+
+    private static func newerSession(
+        _ current: ProjectAgentSession,
+        _ candidate: ProjectAgentSession
+    ) -> ProjectAgentSession {
+        let currentTimestamp = current.displayTimestamp
+        let candidateTimestamp = candidate.displayTimestamp
+        if candidateTimestamp != currentTimestamp {
+            return candidateTimestamp > currentTimestamp ? candidate : current
+        }
+
+        let currentIsTerminal = current.status != .running
+        let candidateIsTerminal = candidate.status != .running
+        if currentIsTerminal != candidateIsTerminal {
+            return candidateIsTerminal ? candidate : current
+        }
+
+        let currentEvidenceCount = current.events?.count ?? 0
+        let candidateEvidenceCount = candidate.events?.count ?? 0
+        if candidateEvidenceCount != currentEvidenceCount {
+            return candidateEvidenceCount > currentEvidenceCount ? candidate : current
+        }
+        return candidate
+    }
+
+    private static func sortedSessions(
+        _ sessions: [ProjectAgentSession]
+    ) -> [ProjectAgentSession] {
+        sessions.sorted {
+            if $0.displayTimestamp != $1.displayTimestamp {
+                return $0.displayTimestamp > $1.displayTimestamp
+            }
+            return $0.id < $1.id
+        }
     }
 
     private static func isExecutionReady(_ run: DashboardRun) -> Bool {
@@ -472,12 +544,8 @@ final class AgentsStore: ObservableObject {
     }
 
     private func insertOrReplace(_ session: ProjectAgentSession) {
-        if let index = sessions.firstIndex(where: { $0.id == session.id }) {
-            sessions[index] = session
-        } else {
-            sessions.insert(session, at: 0)
-        }
-        sessions.sort { $0.displayTimestamp > $1.displayTimestamp }
+        sessionMutationRevision &+= 1
+        sessions = Self.mergeSessions(current: sessions, incoming: [session])
     }
 
     private func syncSession(

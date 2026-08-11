@@ -3674,6 +3674,109 @@ describe("HuntDashboard", () => {
     container.remove();
   });
 
+  it("uses the shared exact-Worker Skill approval in issue conversations", async () => {
+    const run = demoDashboard.runs[0];
+    const pending = {
+      id: "skill-issue-approval",
+      type: "request_agent_skill_execute" as const,
+      status: "pending" as const,
+      projectId: demoDashboard.project.id,
+      agentId: dashboardAgent.id,
+      agentName: dashboardAgent.name,
+      skillId: "skill-release",
+      skillName: "Release",
+      request: "Release this project",
+      provider: "codex" as const,
+      model: null,
+      effort: null,
+      createdAt: "2026-08-11T00:00:00.000Z",
+      acceptedAt: null,
+      requestedWorkerId: null,
+      requestedWorkerLabel: null,
+      resultSessionId: null,
+      delegatedByAgentId: null,
+      delegatedByAgentName: null,
+    };
+    const message: IssueMessage = {
+      id: "message-skill-approval",
+      runId: run.id,
+      parentMessageId: null,
+      body: "I matched the Release Skill.",
+      author: { id: null, name: "Briar · Codex", image: null, provider: "codex" },
+      replyCount: 0,
+      skillExecutionProposal: pending,
+      createdAt: pending.createdAt,
+      updatedAt: pending.createdAt,
+    };
+    const onAccept = vi.fn(async (_proposal, input) => ({
+      ...pending,
+      status: "accepted" as const,
+      acceptedAt: "2026-08-11T00:01:00.000Z",
+      requestedWorkerId: input.workerId,
+      requestedWorkerLabel: dashboardWorker.label,
+      resultSessionId: "session-skill-issue",
+    }));
+    const skillWorker: ExecutionWorker = {
+      ...dashboardWorker,
+      readiness: "available",
+      activeSessions: 0,
+      availableSessions: 1,
+    };
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(
+        <RunPage
+          availableRuns={[run]}
+          error={null}
+          executionWorkers={[skillWorker]}
+          isRecovering={false}
+          isSidebarOpen
+          onAcceptSkillExecution={onAccept}
+          onBack={() => undefined}
+          onCancel={async () => undefined}
+          onLoadAttachment={async () => new Blob()}
+          onLoadIssueMessages={async () => [message]}
+          onLoadRunEvidence={async () => []}
+          onMove={async () => undefined}
+          onRetry={async () => undefined}
+          onSendIssueMessage={async () => {
+            throw new Error("not implemented in this test");
+          }}
+          projectId={demoDashboard.project.id}
+          run={run}
+        />,
+      );
+      await Promise.resolve();
+    });
+    expect(container.querySelector(".skill-execution-proposal-card")).not.toBeNull();
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(
+        ".skill-execution-proposal-card footer button",
+      )?.click();
+    });
+    await act(async () => {
+      document.body.querySelector<HTMLButtonElement>(
+        'button[aria-label="실행할 정확한 Worker"]',
+      )?.click();
+    });
+    await act(async () => {
+      document.body.querySelector<HTMLButtonElement>(
+        '[role="option"][data-value="worker-1"]',
+      )?.click();
+    });
+    const approve = Array.from(
+      document.body.querySelectorAll<HTMLButtonElement>("button"),
+    ).find((button) => button.textContent?.includes("승인하고 Skill 실행"));
+    await act(async () => approve?.click());
+
+    expect(onAccept).toHaveBeenCalledWith(pending, { workerId: "worker-1" });
+    expect(container.textContent).toContain("session-skill-issue");
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
   it("revalidates a newly loaded pending proposal when its target changed during the load", async () => {
     const conversationRun = demoDashboard.runs[1];
     const targetRun = {

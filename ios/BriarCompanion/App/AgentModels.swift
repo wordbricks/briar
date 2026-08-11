@@ -49,6 +49,143 @@ struct ProjectAgentsResponse: Codable, Equatable, Sendable {
     let agents: [ProjectAgent]
 }
 
+/// An Agent-authored request to run one immutable saved Skill. The Agent,
+/// Skill, natural-language request, and runtime are server snapshots; native
+/// clients only choose the exact Worker at the separate approval boundary.
+struct AgentSkillExecutionProposal: Codable, Equatable, Hashable, Identifiable, Sendable {
+    let id: UUID
+    let type: Kind
+    let status: Status
+    let projectId: UUID
+    let agentId: UUID
+    let agentName: String
+    let skillId: UUID
+    let skillName: String
+    let request: String
+    let provider: AgentProvider
+    let model: String?
+    let effort: ModelEffort?
+    let createdAt: Date
+    let acceptedAt: Date?
+    let requestedWorkerId: String?
+    let requestedWorkerLabel: String?
+    let resultSessionId: String?
+    let delegatedByAgentId: UUID?
+    let delegatedByAgentName: String?
+
+    enum Kind: String, Codable, Hashable, Sendable {
+        case executeAgentSkill = "request_agent_skill_execute"
+    }
+
+    enum Status: String, Codable, Hashable, Sendable {
+        case pending
+        case accepted
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, type, status, projectId, agentId, agentName, skillId, skillName
+        case request, provider, model, effort, createdAt, acceptedAt
+        case requestedWorkerId, requestedWorkerLabel, resultSessionId
+        case delegatedByAgentId, delegatedByAgentName
+    }
+
+    init(
+        id: UUID,
+        type: Kind = .executeAgentSkill,
+        status: Status,
+        projectId: UUID,
+        agentId: UUID,
+        agentName: String,
+        skillId: UUID,
+        skillName: String,
+        request: String,
+        provider: AgentProvider,
+        model: String? = nil,
+        effort: ModelEffort? = nil,
+        createdAt: Date,
+        acceptedAt: Date? = nil,
+        requestedWorkerId: String? = nil,
+        requestedWorkerLabel: String? = nil,
+        resultSessionId: String? = nil,
+        delegatedByAgentId: UUID? = nil,
+        delegatedByAgentName: String? = nil
+    ) {
+        self.id = id
+        self.type = type
+        self.status = status
+        self.projectId = projectId
+        self.agentId = agentId
+        self.agentName = agentName
+        self.skillId = skillId
+        self.skillName = skillName
+        self.request = request
+        self.provider = provider
+        self.model = model
+        self.effort = effort
+        self.createdAt = createdAt
+        self.acceptedAt = acceptedAt
+        self.requestedWorkerId = requestedWorkerId
+        self.requestedWorkerLabel = requestedWorkerLabel
+        self.resultSessionId = resultSessionId
+        self.delegatedByAgentId = delegatedByAgentId
+        self.delegatedByAgentName = delegatedByAgentName
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        type = try container.decode(Kind.self, forKey: .type)
+        status = try container.decode(Status.self, forKey: .status)
+        projectId = try container.decode(UUID.self, forKey: .projectId)
+        agentId = try container.decode(UUID.self, forKey: .agentId)
+        agentName = try container.decode(String.self, forKey: .agentName)
+        skillId = try container.decode(UUID.self, forKey: .skillId)
+        skillName = try container.decode(String.self, forKey: .skillName)
+        request = try container.decode(String.self, forKey: .request)
+        provider = try container.decode(AgentProvider.self, forKey: .provider)
+        // Canonical nullable fields must be present. This rejects a partial
+        // proposal instead of silently inventing mutable runtime metadata.
+        model = try container.decode(String?.self, forKey: .model)
+        effort = try container.decode(ModelEffort?.self, forKey: .effort)
+        createdAt = try container.decode(Date.self, forKey: .createdAt)
+        acceptedAt = try container.decode(Date?.self, forKey: .acceptedAt)
+        requestedWorkerId = try container.decode(String?.self, forKey: .requestedWorkerId)
+        requestedWorkerLabel = try container.decode(
+            String?.self,
+            forKey: .requestedWorkerLabel
+        )
+        resultSessionId = try container.decode(String?.self, forKey: .resultSessionId)
+        delegatedByAgentId = try container.decode(UUID?.self, forKey: .delegatedByAgentId)
+        delegatedByAgentName = try container.decode(
+            String?.self,
+            forKey: .delegatedByAgentName
+        )
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(type, forKey: .type)
+        try container.encode(status, forKey: .status)
+        try container.encode(projectId, forKey: .projectId)
+        try container.encode(agentId, forKey: .agentId)
+        try container.encode(agentName, forKey: .agentName)
+        try container.encode(skillId, forKey: .skillId)
+        try container.encode(skillName, forKey: .skillName)
+        try container.encode(request, forKey: .request)
+        try container.encode(provider, forKey: .provider)
+        try container.encode(model, forKey: .model)
+        try container.encode(effort, forKey: .effort)
+        try container.encode(createdAt, forKey: .createdAt)
+        try container.encode(acceptedAt, forKey: .acceptedAt)
+        try container.encode(requestedWorkerId, forKey: .requestedWorkerId)
+        try container.encode(requestedWorkerLabel, forKey: .requestedWorkerLabel)
+        try container.encode(resultSessionId, forKey: .resultSessionId)
+        try container.encode(delegatedByAgentId, forKey: .delegatedByAgentId)
+        try container.encode(delegatedByAgentName, forKey: .delegatedByAgentName)
+    }
+}
+
 struct ProjectAgentSession: Codable, Equatable, Identifiable, Sendable {
     let id: String
     let projectId: UUID
@@ -254,6 +391,22 @@ struct ProjectAgentTaskRequest: Codable, Equatable, Sendable {
 
 struct ProjectAgentTaskResponse: Codable, Equatable, Sendable {
     let session: ProjectAgentSession
+}
+
+struct AcceptAgentSkillExecutionProposalRequest: Codable, Equatable, Sendable {
+    let workerId: String
+}
+
+struct AcceptAgentSkillExecutionProposalResponse: Codable, Equatable, Sendable {
+    let outcome: Outcome
+    let proposal: AgentSkillExecutionProposal
+    let projectId: UUID
+    let session: ProjectAgentSession
+
+    enum Outcome: String, Codable, Equatable, Sendable {
+        case accepted
+        case alreadyAccepted = "already_accepted"
+    }
 }
 
 struct ProjectAgentSessionsResponse: Codable, Equatable, Sendable {

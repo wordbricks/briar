@@ -15,8 +15,30 @@ describe("channel reply completion contract", () => {
       document: null,
       issueProposal: null,
       executionProposal: null,
+      skillExecutionProposal: null,
       delegation: null,
     });
+  });
+
+  it("accepts only an isolated saved Skill execution marker", () => {
+    expect(channelReplyCompletionSchema.parse({
+      body: "I matched the release Skill and prepared an approval.",
+      document: null,
+      issueProposal: null,
+      skillExecutionProposal: { type: "request_agent_skill_execute" },
+    })).toMatchObject({
+      skillExecutionProposal: { type: "request_agent_skill_execute" },
+      executionProposal: null,
+      delegation: null,
+    });
+
+    expect(channelReplyCompletionSchema.safeParse({
+      body: "Unsafe combined proposal",
+      document: null,
+      issueProposal: null,
+      executionProposal: { projectId, runId: projectId },
+      skillExecutionProposal: { type: "request_agent_skill_execute" },
+    }).success).toBe(false);
   });
 
   it("accepts one bounded structured Project Agent delegation", () => {

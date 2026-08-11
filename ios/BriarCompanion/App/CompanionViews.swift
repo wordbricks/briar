@@ -61,6 +61,10 @@ struct CompanionShellView: View {
                             },
                             sourceIsCurrent: sourceIsCurrent
                         )
+                    },
+                    onSkillSessionMaterialized: { agents.materialize($0) },
+                    onSkillSessionOpen: { projectID, sessionID in
+                        navigation.open(.session(projectID: projectID, sessionID: sessionID))
                     }
                 )
                 .navigationTitle(L10n.text(.channelHome, locale: companionLocale))
@@ -79,7 +83,11 @@ struct CompanionShellView: View {
                     token: token,
                     api: api,
                     currentUserID: user?.id,
-                    refresh: refresh
+                    refresh: refresh,
+                    onSkillSessionMaterialized: { agents.materialize($0) },
+                    onSkillSessionOpen: { projectID, sessionID in
+                        navigation.open(.session(projectID: projectID, sessionID: sessionID))
+                    }
                 )
                 .id(project.id)
                 .navigationTitle(L10n.text("Tasks", locale: companionLocale))
@@ -99,7 +107,13 @@ struct CompanionShellView: View {
                             providers: snapshot?.organizationProviders ?? [],
                             members: snapshot?.members ?? [],
                             currentUserID: user?.id,
-                            refresh: refresh
+                            refresh: refresh,
+                            onSkillSessionMaterialized: { agents.materialize($0) },
+                            onSkillSessionOpen: { projectID, sessionID in
+                                navigation.open(
+                                    .session(projectID: projectID, sessionID: sessionID)
+                                )
+                            }
                         )
                     } else {
                         ContentUnavailableView(L10n.text("이슈를 찾을 수 없음"), systemImage: "checklist")
@@ -319,6 +333,8 @@ struct TaskListView: View {
     let api: any MobileAPIClientProtocol
     let currentUserID: String?
     let refresh: () async -> Void
+    let onSkillSessionMaterialized: SkillSessionMaterializedHandler
+    let onSkillSessionOpen: SkillSessionOpenHandler
 
     @MainActor
     init(
@@ -329,7 +345,9 @@ struct TaskListView: View {
         token: String,
         api: any MobileAPIClientProtocol,
         currentUserID: String? = nil,
-        refresh: @escaping () async -> Void
+        refresh: @escaping () async -> Void,
+        onSkillSessionMaterialized: @escaping SkillSessionMaterializedHandler = { _ in },
+        onSkillSessionOpen: @escaping SkillSessionOpenHandler = { _, _ in }
     ) {
         self.project = project
         self.projects = projects
@@ -339,6 +357,8 @@ struct TaskListView: View {
         self.api = api
         self.currentUserID = currentUserID
         self.refresh = refresh
+        self.onSkillSessionMaterialized = onSkillSessionMaterialized
+        self.onSkillSessionOpen = onSkillSessionOpen
         _mutations = StateObject(wrappedValue: IssueMutationStore(
             api: api,
             projectID: project.id,
@@ -400,7 +420,9 @@ struct TaskListView: View {
                                     providers: snapshot?.organizationProviders ?? [],
                                     members: snapshot?.members ?? [],
                                     currentUserID: currentUserID,
-                                    refresh: refresh
+                                    refresh: refresh,
+                                    onSkillSessionMaterialized: onSkillSessionMaterialized,
+                                    onSkillSessionOpen: onSkillSessionOpen
                                 )
                             } label: {
                                 RunRow(
@@ -691,6 +713,13 @@ private struct IssueExecutionApprovalPresentation: Identifiable {
     var id: UUID { proposal.id }
 }
 
+private struct SkillExecutionApprovalPresentation: Identifiable {
+    let proposal: AgentSkillExecutionProposal
+    let snapshot: DashboardSnapshot
+
+    var id: UUID { proposal.id }
+}
+
 struct RunDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var inbox: InboxStore
@@ -709,6 +738,9 @@ struct RunDetailView: View {
     @State private var showingDependencyPicker = false
     @State private var executionApprovalPresentation: IssueExecutionApprovalPresentation?
     @State private var preparingExecutionProposalID: UUID?
+    @State private var skillExecutionApprovalPresentation:
+        SkillExecutionApprovalPresentation?
+    @State private var preparingSkillExecutionProposalID: UUID?
     @State private var transferTargetProjectID: UUID?
     @State private var localStatus: DashboardRun.Status
     @State private var localWorkflowStage: String?
@@ -737,6 +769,8 @@ struct RunDetailView: View {
     private let members: [OrganizationMember]
     private let currentUserID: String?
     private let refresh: () async -> Void
+    private let onSkillSessionMaterialized: SkillSessionMaterializedHandler
+    private let onSkillSessionOpen: SkillSessionOpenHandler
     private let token: String
     private let api: any MobileAPIClientProtocol
 
@@ -762,6 +796,22 @@ struct RunDetailView: View {
         }
     }
 
+    private var proposalMutationInFlight: Bool {
+        mutations.activeActions.contains { action in
+            action.hasPrefix("issue-proposal-") ||
+                action.hasPrefix("issue-execution-proposal-") ||
+                action.hasPrefix("agent-skill-execution-proposal-")
+        }
+    }
+
+    private var proposalApprovalPresentationInFlight: Bool {
+        proposalMutationInFlight ||
+            preparingExecutionProposalID != nil ||
+            executionApprovalPresentation != nil ||
+            preparingSkillExecutionProposalID != nil ||
+            skillExecutionApprovalPresentation != nil
+    }
+
     @MainActor
     init(
         run: DashboardRun,
@@ -775,7 +825,9 @@ struct RunDetailView: View {
         providers: [AgentProvider] = [],
         members: [OrganizationMember] = [],
         currentUserID: String? = nil,
-        refresh: @escaping () async -> Void = {}
+        refresh: @escaping () async -> Void = {},
+        onSkillSessionMaterialized: @escaping SkillSessionMaterializedHandler = { _ in },
+        onSkillSessionOpen: @escaping SkillSessionOpenHandler = { _, _ in }
     ) {
         self.run = run
         self.projectID = projectID
@@ -787,6 +839,8 @@ struct RunDetailView: View {
         self.members = members
         self.currentUserID = currentUserID
         self.refresh = refresh
+        self.onSkillSessionMaterialized = onSkillSessionMaterialized
+        self.onSkillSessionOpen = onSkillSessionOpen
         self.token = token
         self.api = api
         _detail = StateObject(wrappedValue: RunDetailStore(
@@ -898,6 +952,20 @@ struct RunDetailView: View {
                 }
             )
         }
+        .sheet(item: $skillExecutionApprovalPresentation) { presentation in
+            AgentSkillExecutionApprovalSheet(
+                proposal: presentation.proposal,
+                workers: presentation.snapshot.workers ?? [],
+                policy: presentation.snapshot.executionPolicy,
+                locale: locale,
+                approve: { request in
+                    try await approveSkillExecutionProposal(
+                        presentation.proposal,
+                        request: request
+                    )
+                }
+            )
+        }
         .accessibilityIdentifier("run-detail")
     }
 
@@ -961,17 +1029,25 @@ struct RunDetailView: View {
             .onDisappear {
                 executionApprovalPresentation = nil
                 preparingExecutionProposalID = nil
+                skillExecutionApprovalPresentation = nil
+                preparingSkillExecutionProposalID = nil
                 detail.close()
             }
             .onChange(of: detail.messages) { _, messages in
-                guard let proposalID = executionApprovalPresentation?.proposal.id else {
-                    return
-                }
-                if !messages.contains(where: {
-                    $0.executionProposal?.id == proposalID &&
-                        $0.executionProposal?.status == .pending
-                }) {
+                if let proposalID = executionApprovalPresentation?.proposal.id,
+                   !messages.contains(where: {
+                       $0.executionProposal?.id == proposalID &&
+                           $0.executionProposal?.status == .pending
+                   }) {
                     executionApprovalPresentation = nil
+                }
+                if let proposal = skillExecutionApprovalPresentation?.proposal,
+                   !messages.contains(where: {
+                       guard let current = $0.skillExecutionProposal else { return false }
+                       return current.status == .pending &&
+                           agentSkillExecutionImmutableFieldsMatch(current, proposal)
+                   }) {
+                    skillExecutionApprovalPresentation = nil
                 }
             }
             .onChange(of: pendingExecutionTargetSignatures) { previous, current in
@@ -1641,7 +1717,7 @@ struct RunDetailView: View {
                                 }
                             }
                             .buttonStyle(.borderedProminent)
-                            .disabled(mutations.isActive("issue-proposal-\(proposal.id)"))
+                            .disabled(proposalApprovalPresentationInFlight)
                             .accessibilityIdentifier("accept-issue-proposal-\(proposal.id.uuidString.lowercased())")
                         }
                     }
@@ -1655,6 +1731,9 @@ struct RunDetailView: View {
                 }
                 if let proposal = message.executionProposal {
                     issueExecutionProposalCard(proposal)
+                }
+                if let proposal = message.skillExecutionProposal {
+                    issueSkillExecutionProposalCard(proposal)
                 }
                 Button(L10n.text("답글", locale: locale)) { replyTo = message }.font(.caption)
             }
@@ -1750,9 +1829,11 @@ struct RunDetailView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(
-                    mutations.isActive("issue-execution-proposal-\(proposal.id)") ||
+                    proposalMutationInFlight ||
                         preparingExecutionProposalID != nil ||
-                        executionApprovalPresentation != nil
+                        executionApprovalPresentation != nil ||
+                        preparingSkillExecutionProposalID != nil ||
+                        skillExecutionApprovalPresentation != nil
                 )
                 .accessibilityIdentifier(
                     "configure-issue-execution-proposal-\(proposal.id.uuidString.lowercased())"
@@ -1768,6 +1849,131 @@ struct RunDetailView: View {
         }
         .accessibilityIdentifier(
             "issue-execution-proposal-\(proposal.id.uuidString.lowercased())"
+        )
+    }
+
+    @ViewBuilder
+    private func issueSkillExecutionProposalCard(
+        _ proposal: AgentSkillExecutionProposal
+    ) -> some View {
+        let runtime = [
+            proposal.provider.displayName,
+            proposal.model,
+            proposal.effort?.rawValue,
+        ].compactMap { $0 }.joined(separator: " · ")
+        let workerLabel = proposal.requestedWorkerLabel ?? proposal.requestedWorkerId.flatMap {
+            workerID in workers.first(where: { $0.id == workerID })?.label ?? workerID
+        }
+
+        VStack(alignment: .leading, spacing: 8) {
+            Text(L10n.text("Agent Skill 실행 제안", locale: locale))
+                .font(.subheadline.weight(.semibold))
+            Text(
+                proposal.status == .accepted
+                    ? L10n.text("승인되어 Agent 세션을 시작했습니다.", locale: locale)
+                    : L10n.text(
+                        "정확한 Worker를 선택하고 명시적으로 승인해야 실행됩니다.",
+                        locale: locale
+                    )
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
+
+            LabeledContent("Agent", value: proposal.agentName)
+                .font(.caption)
+            LabeledContent(L10n.text("Skill", locale: locale), value: proposal.skillName)
+                .font(.caption)
+            Label(runtime, systemImage: "cpu")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text(proposal.request)
+                .font(.subheadline)
+                .fixedSize(horizontal: false, vertical: true)
+
+            if let delegatedBy = proposal.delegatedByAgentName {
+                Label(
+                    L10n.format(
+                        "%@ Agent가 Project Agent에게 위임했습니다.",
+                        locale: locale,
+                        delegatedBy
+                    ),
+                    systemImage: "arrow.triangle.branch"
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+
+            if proposal.status == .accepted {
+                Label(
+                    L10n.text("Skill 실행을 승인했습니다.", locale: locale),
+                    systemImage: "checkmark.seal.fill"
+                )
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.tint)
+                if let workerLabel {
+                    Label(workerLabel, systemImage: "desktopcomputer")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                if let sessionID = proposal.resultSessionId {
+                    Button {
+                        onSkillSessionOpen(proposal.projectId, sessionID)
+                    } label: {
+                        Label(
+                            L10n.text("Agent 세션 보기", locale: locale),
+                            systemImage: "arrow.right.circle"
+                        )
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .accessibilityIdentifier(
+                        "open-issue-skill-session-\(proposal.id.uuidString.lowercased())"
+                    )
+                }
+            } else {
+                Label(
+                    L10n.text(
+                        "Agent, Skill, 요청과 런타임은 승인 화면에서 변경할 수 없습니다.",
+                        locale: locale
+                    ),
+                    systemImage: "lock.shield"
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+                Button {
+                    Task { await prepareSkillExecutionApproval(proposal) }
+                } label: {
+                    if preparingSkillExecutionProposalID == proposal.id {
+                        ProgressView()
+                    } else {
+                        Label(
+                            L10n.text("Worker 선택", locale: locale),
+                            systemImage: "desktopcomputer"
+                        )
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(
+                    proposalMutationInFlight ||
+                        preparingSkillExecutionProposalID != nil ||
+                        skillExecutionApprovalPresentation != nil ||
+                        preparingExecutionProposalID != nil ||
+                        executionApprovalPresentation != nil
+                )
+                .accessibilityIdentifier(
+                    "configure-issue-skill-execution-proposal-\(proposal.id.uuidString.lowercased())"
+                )
+            }
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.purple.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+        .overlay {
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(Color.purple.opacity(0.35))
+        }
+        .accessibilityIdentifier(
+            "issue-skill-execution-proposal-\(proposal.id.uuidString.lowercased())"
         )
     }
 
@@ -1813,6 +2019,9 @@ struct RunDetailView: View {
     private func prepareIssueExecutionApproval(_ proposal: IssueExecutionProposal) async {
         guard preparingExecutionProposalID == nil,
               executionApprovalPresentation == nil,
+              preparingSkillExecutionProposalID == nil,
+              skillExecutionApprovalPresentation == nil,
+              !proposalMutationInFlight,
               let context = detail.captureExecutionProposal(proposalID: proposal.id)
         else { return }
         preparingExecutionProposalID = proposal.id
@@ -1897,6 +2106,91 @@ struct RunDetailView: View {
         } catch {
             await detail.load()
             guard detail.executionProposalIsCurrent(context) else { return false }
+            throw error
+        }
+    }
+
+    @MainActor
+    private func prepareSkillExecutionApproval(
+        _ proposal: AgentSkillExecutionProposal
+    ) async {
+        guard preparingSkillExecutionProposalID == nil,
+              skillExecutionApprovalPresentation == nil,
+              preparingExecutionProposalID == nil,
+              executionApprovalPresentation == nil,
+              !proposalMutationInFlight,
+              let context = detail.captureSkillExecutionProposal(proposalID: proposal.id)
+        else { return }
+        preparingSkillExecutionProposalID = proposal.id
+        defer {
+            if preparingSkillExecutionProposalID == proposal.id {
+                preparingSkillExecutionProposalID = nil
+            }
+        }
+
+        do {
+            let snapshot: DashboardSnapshot = try await api.get(
+                MobileAPIContract.Endpoint.dashboard(projectID: proposal.projectId),
+                token: token,
+                as: DashboardSnapshot.self
+            )
+            guard detail.skillExecutionProposalIsCurrent(context) else { return }
+            _ = try validateAgentSkillExecutionApproval(
+                snapshot: snapshot,
+                proposal: proposal
+            )
+            actionError = nil
+            skillExecutionApprovalPresentation = SkillExecutionApprovalPresentation(
+                proposal: proposal,
+                snapshot: snapshot
+            )
+        } catch {
+            guard detail.skillExecutionProposalIsCurrent(context) else { return }
+            actionError = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    private func approveSkillExecutionProposal(
+        _ proposal: AgentSkillExecutionProposal,
+        request: AcceptAgentSkillExecutionProposalRequest
+    ) async throws -> Bool {
+        guard let context = detail.captureSkillExecutionProposal(
+            proposalID: proposal.id
+        ) else { return false }
+
+        do {
+            let preflight: DashboardSnapshot = try await api.get(
+                MobileAPIContract.Endpoint.dashboard(projectID: proposal.projectId),
+                token: token,
+                as: DashboardSnapshot.self
+            )
+            guard detail.skillExecutionProposalIsCurrent(context) else { return false }
+            _ = try validateAgentSkillExecutionApproval(
+                snapshot: preflight,
+                proposal: proposal,
+                request: request
+            )
+            let response = try await mutations.acceptAgentSkillExecutionProposal(
+                conversationRunID: run.id,
+                proposalID: proposal.id,
+                request: request
+            )
+            guard detail.skillExecutionProposalIsCurrent(context) else { return false }
+            guard agentSkillExecutionApprovalResponseMatches(
+                response: response,
+                expected: proposal,
+                request: request
+            ) else { throw MobileAPIError.invalidResponse }
+
+            detail.updateSkillExecutionProposal(response.proposal)
+            onSkillSessionMaterialized(response.session)
+            actionError = nil
+            await refresh()
+            return true
+        } catch {
+            await detail.load()
+            guard detail.skillExecutionProposalIsCurrent(context) else { return false }
             throw error
         }
     }
@@ -2248,6 +2542,7 @@ struct RunDetailView: View {
     }
 
     private func acceptIssueProposal(_ proposal: IssueProposedAction) async {
+        guard !proposalApprovalPresentationInFlight else { return }
         do {
             let accepted = try await mutations.acceptIssueProposal(
                 runID: run.id,

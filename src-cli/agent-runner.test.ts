@@ -19,6 +19,7 @@ import {
   detachedTranscriptPayload,
   issueReplyTextFromPayload,
   parseDetachedIssueReplyResult,
+  runProjectAgentTaskCompletionFlow,
   shouldPersistDetachedTranscriptPayload,
 } from "./agent-runner";
 
@@ -669,6 +670,7 @@ describe("detached Agent runner", () => {
         reason: "D를 D′로 변경하고 영향받는 QA를 다시 확인한다.",
       },
       executionProposal: null,
+      skillExecutionProposal: null,
     }))).toEqual({
       reply: "D를 D′로 바꾸는 개정을 제안했습니다. 수락이 필요합니다.",
       proposedAction: {
@@ -677,11 +679,13 @@ describe("detached Agent runner", () => {
         reason: "D를 D′로 변경하고 영향받는 QA를 다시 확인한다.",
       },
       executionProposal: null,
+      skillExecutionProposal: null,
     });
     expect(parseDetachedIssueReplyResult("plain fallback")).toEqual({
       reply: "plain fallback",
       proposedAction: null,
       executionProposal: null,
+      skillExecutionProposal: null,
     });
   });
 
@@ -693,6 +697,7 @@ describe("detached Agent runner", () => {
         changes: { description: "새 승인 기준", priority: 1 },
       },
       executionProposal: null,
+      skillExecutionProposal: null,
     }))).toEqual({
       reply: "설명 변경을 제안했습니다. 수락해 주세요.",
       proposedAction: {
@@ -700,6 +705,7 @@ describe("detached Agent runner", () => {
         changes: { description: "새 승인 기준", priority: 1 },
       },
       executionProposal: null,
+      skillExecutionProposal: null,
     });
     expect(parseDetachedIssueReplyResult(JSON.stringify({
       reply: "후속 이슈 생성을 제안했습니다. 수락해 주세요.",
@@ -725,10 +731,12 @@ describe("detached Agent runner", () => {
       reply: "실행 설정 승인이 필요합니다.",
       proposedAction: null,
       executionProposal: { type: "request_issue_execute" },
+      skillExecutionProposal: null,
     }))).toEqual({
       reply: "실행 설정 승인이 필요합니다.",
       proposedAction: null,
       executionProposal: { type: "request_issue_execute" },
+      skillExecutionProposal: null,
     });
     expect(parseDetachedIssueReplyResult(JSON.stringify({
       reply: "백로그 생성 후 별도 실행 승인을 요청합니다.",
@@ -775,8 +783,119 @@ describe("detached Agent runner", () => {
         reply: JSON.stringify(proposed),
         proposedAction: null,
         executionProposal: null,
+        skillExecutionProposal: null,
       });
     }
+  });
+
+  it("accepts only the exact server-authorized saved Skill marker", () => {
+    const marker = {
+      reply: "iOS 배포 Skill 실행에는 승인이 필요합니다.",
+      proposedAction: null,
+      executionProposal: null,
+      skillExecutionProposal: { type: "request_agent_skill_execute" },
+    };
+    expect(parseDetachedIssueReplyResult(
+      JSON.stringify(marker),
+      { allowSkillExecutionProposal: true },
+    )).toEqual(marker);
+    expect(parseDetachedIssueReplyResult(JSON.stringify(marker))).toEqual({
+      reply: JSON.stringify(marker),
+      proposedAction: null,
+      executionProposal: null,
+      skillExecutionProposal: null,
+    });
+
+    for (const invalid of [
+      {
+        ...marker,
+        skillExecutionProposal: {
+          type: "request_agent_skill_execute",
+          skillId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        },
+      },
+      {
+        ...marker,
+        executionProposal: { type: "request_issue_execute" },
+      },
+      {
+        ...marker,
+        proposedAction: {
+          type: "request_issue_update",
+          changes: { priority: 1 },
+        },
+      },
+    ]) {
+      expect(parseDetachedIssueReplyResult(
+        JSON.stringify(invalid),
+        { allowSkillExecutionProposal: true },
+      )).toEqual({
+        reply: JSON.stringify(invalid),
+        proposedAction: null,
+        executionProposal: null,
+        skillExecutionProposal: null,
+      });
+    }
+  });
+
+  it("exposes saved Skill authority only for the server-selected turn", () => {
+    const skillExecutionTarget = {
+      projectId: "22222222-2222-4222-8222-222222222222",
+      agentId: agent.id,
+      skillId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      skillName: "iOS deployment",
+      request: "iOS 앱을 배포해 줘",
+    };
+    const authorizedIssuePrompt = detachedIssueReplyPrompt({
+      agent,
+      snapshot: { messages: [] },
+      userMessage: skillExecutionTarget.request,
+      workspaceAvailable: true,
+      skillExecutionTarget,
+    });
+    expect(authorizedIssuePrompt).toContain("server matched");
+    expect(authorizedIssuePrompt).toContain("iOS deployment");
+    expect(authorizedIssuePrompt).toContain(
+      '"skillExecutionProposal":{"type":"request_agent_skill_execute"}',
+    );
+    expect(detachedIssueReplyPrompt({
+      agent,
+      snapshot: { messages: [] },
+      userMessage: skillExecutionTarget.request,
+      workspaceAvailable: true,
+    })).toContain("must be null");
+
+    const projectAgent = {
+      ...agent,
+      scope: {
+        kind: "project" as const,
+        organizationId: "11111111-1111-4111-8111-111111111111",
+        projectId: skillExecutionTarget.projectId,
+      },
+    };
+    expect(detachedChannelReplyPrompt({
+      agent: projectAgent,
+      snapshot: { messages: [] },
+      workspaceAvailable: true,
+      skillExecutionTarget,
+    })).toContain("server matched this Project Agent turn");
+
+    const organizationPrompt = detachedChannelReplyPrompt({
+      agent: {
+        ...agent,
+        scope: {
+          kind: "organization" as const,
+          organizationId: "11111111-1111-4111-8111-111111111111",
+        },
+      },
+      snapshot: { messages: [] },
+      workspaceAvailable: false,
+      skillExecutionTarget,
+    });
+    expect(organizationPrompt).toContain(
+      "skillExecutionProposal must always be null",
+    );
+    expect(organizationPrompt).toContain("delegate that bounded request");
   });
 
   it("constrains channel execution proposals to delegated Project targets", () => {
@@ -1008,5 +1127,65 @@ describe("detached Agent runner", () => {
       }),
     ).toBe(1);
     expect(sequencer.next()).toBe(2);
+  });
+
+  it("retries an ambiguous success completion without sending a failure", async () => {
+    const payload = {
+      summary: "Provider side effect completed.",
+      conversationId: "conversation-1",
+    };
+    let successAttempts = 0;
+    let failureAttempts = 0;
+    const sleeps: number[] = [];
+    const result = await runProjectAgentTaskCompletionFlow({
+      runProvider: async () => payload,
+      completeSuccess: async (candidate) => {
+        expect(candidate).toBe(payload);
+        successAttempts += 1;
+        if (successAttempts === 1) throw new TypeError("response was lost");
+        return "canonical-session";
+      },
+      completeFailure: async () => {
+        failureAttempts += 1;
+        return "wrong-path";
+      },
+      isRetryableCompletionError: (error) => error instanceof TypeError,
+      sleep: async (milliseconds) => {
+        sleeps.push(milliseconds);
+      },
+      signal: new AbortController().signal,
+    });
+
+    expect(result).toBe("canonical-session");
+    expect(successAttempts).toBe(2);
+    expect(failureAttempts).toBe(0);
+    expect(sleeps).toEqual([250]);
+  });
+
+  it("sends failure completion only when the provider turn itself fails", async () => {
+    const providerError = new Error("provider failed before completion");
+    let successAttempts = 0;
+    let failureAttempts = 0;
+    const result = await runProjectAgentTaskCompletionFlow({
+      runProvider: async () => {
+        throw providerError;
+      },
+      completeSuccess: async () => {
+        successAttempts += 1;
+        return "wrong-path";
+      },
+      completeFailure: async (error) => {
+        expect(error).toBe(providerError);
+        failureAttempts += 1;
+        return "failure-receipt";
+      },
+      isRetryableCompletionError: () => true,
+      sleep: async () => {},
+      signal: new AbortController().signal,
+    });
+
+    expect(result).toBe("failure-receipt");
+    expect(successAttempts).toBe(0);
+    expect(failureAttempts).toBe(1);
   });
 });

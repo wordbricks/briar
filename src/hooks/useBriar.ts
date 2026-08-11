@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { AutoHuntSession } from "./useAutoHuntSessions";
 import {
   acceptOrganizationInvitation as acceptRemoteOrganizationInvitation,
   acceptIssueActionProposal as acceptRemoteIssueActionProposal,
   acceptIssueExecutionProposal as acceptRemoteIssueExecutionProposal,
+  acceptIssueSkillExecutionProposal as acceptRemoteIssueSkillExecutionProposal,
   acceptIssueReworkProposal as acceptRemoteIssueReworkProposal,
   addIssueDependency,
   beginDeviceAuthorization,
@@ -129,6 +131,7 @@ import {
 } from "../lib/auto-hunt-contract";
 import { isMobileCompanion, isWebApp } from "../lib/platform";
 import { canonicalizeIssueAttachmentReferences } from "../lib/issue-markdown";
+import { mergeIssueMessages } from "../lib/issue-message-merge";
 import {
   runProjectAgent,
   type ProjectLlmProgress,
@@ -137,6 +140,8 @@ import { executeScheduledProjectAgent } from "../lib/project-agent-schedule-exec
 import { startProjectAgentSchedulePolling } from "../lib/project-agent-schedule-runner";
 import type {
   ClaimedProjectAgentScheduleRun,
+  AgentSkillExecutionApprovalInput,
+  AgentSkillExecutionProposal,
   CreateIssueInput,
   DashboardPayload,
   HuntEvent,
@@ -160,6 +165,7 @@ import type {
 } from "../types";
 
 export type UseBriarOptions = {
+  adoptRemoteAgentSession?: (session: AutoHuntSession) => void;
   deferDefaultOrganization?: boolean;
   startScheduledAgentSession?: (
     run: ClaimedProjectAgentScheduleRun,
@@ -310,6 +316,7 @@ async function readConnectedProjectIds() {
 
 export function useBriar(options: UseBriarOptions = {}) {
   const {
+    adoptRemoteAgentSession,
     deferDefaultOrganization = false,
     startScheduledAgentSession,
     startScheduledAgentWorkerDispatch,
@@ -2703,11 +2710,15 @@ export function useBriar(options: UseBriarOptions = {}) {
       if (demoMode) return issueMessagesByRun.current[runId] ?? [];
       if (!token) throw new Error("메시지를 불러오려면 로그인이 필요합니다.");
       const messages = await loadIssueMessages(token, activeProjectId, runId);
+      const merged = mergeIssueMessages(
+        issueMessagesByRun.current[runId] ?? [],
+        messages,
+      );
       issueMessagesByRun.current = {
         ...issueMessagesByRun.current,
-        [runId]: messages,
+        [runId]: merged,
       };
-      return messages;
+      return merged;
     },
     [activeProjectId, token],
   );
@@ -3022,6 +3033,48 @@ export function useBriar(options: UseBriarOptions = {}) {
       return result.proposal;
     },
     [activeProjectId, dashboard, demoMode, refresh, token],
+  );
+
+  const acceptConversationSkillExecution = useCallback(
+    async (
+      runId: string,
+      proposal: AgentSkillExecutionProposal,
+      input: AgentSkillExecutionApprovalInput,
+    ) => {
+      if (!activeProjectId || !dashboard) {
+        throw new Error("실행할 프로젝트 Agent Skill이 없습니다.");
+      }
+      if (demoMode) {
+        throw new Error("데모에서는 Agent Skill 실행을 승인할 수 없습니다.");
+      }
+      if (!token) throw new Error("로그인이 필요합니다.");
+      const result = await acceptRemoteIssueSkillExecutionProposal(
+        token,
+        activeProjectId,
+        runId,
+        proposal,
+        input,
+      );
+      adoptRemoteAgentSession?.(result.session);
+      issueMessagesByRun.current = {
+        ...issueMessagesByRun.current,
+        [runId]: (issueMessagesByRun.current[runId] ?? []).map((message) =>
+          message.skillExecutionProposal?.id === proposal.id
+            ? { ...message, skillExecutionProposal: result.proposal }
+            : message,
+        ),
+      };
+      await refresh("snapshot");
+      return result.proposal;
+    },
+    [
+      activeProjectId,
+      adoptRemoteAgentSession,
+      dashboard,
+      demoMode,
+      refresh,
+      token,
+    ],
   );
 
   const recoverRun = useCallback(
@@ -3568,6 +3621,7 @@ export function useBriar(options: UseBriarOptions = {}) {
     removeIssueMessage,
     acceptConversationIssueAction,
     acceptConversationIssueExecution,
+    acceptConversationSkillExecution,
     setActiveOrganizationId: selectOrganization,
     setActiveProjectId: selectProject,
     ensureProjectSelected,

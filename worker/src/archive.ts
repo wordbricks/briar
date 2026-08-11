@@ -1415,6 +1415,28 @@ export async function listArchivedProjectAgentSessions(
   return records.map((record) => projectAgentSessionSchema.parse(record.data));
 }
 
+export async function getArchivedProjectAgentSession(
+  db: D1Database,
+  bucket: ArchiveBucket,
+  projectId: string,
+  sessionId: string,
+) {
+  const metadata = await db
+    .prepare(
+      `select * from briar_log_archives
+       where project_id = ? and scope_id = ?
+         and archive_kind = 'project_agent_sessions'
+         and status in ('verified', 'complete')
+       order by completed_at desc, verified_at desc, created_at desc, id desc
+       limit 1`,
+    )
+    .bind(projectId, sessionId)
+    .first<ArchiveMetadataRow>();
+  return metadata
+    ? readArchivedProjectAgentSession(bucket, metadata)
+    : null;
+}
+
 export async function getArchivedEvidenceImage(
   db: D1Database,
   bucket: ArchiveBucket,

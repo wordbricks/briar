@@ -174,7 +174,10 @@ import {
 import {
   IssueExecutionApproval,
 } from "./IssueExecutionApproval";
+import { AgentSkillExecutionApproval } from "./AgentSkillExecutionApproval";
+import { loadDashboard } from "../lib/api";
 import { issueExecutionApprovalUnavailable } from "../lib/issue-execution-approval";
+import { mergeIssueMessages } from "../lib/issue-message-merge";
 import {
   copyIssueId,
   copyIssueShareLink,
@@ -182,6 +185,8 @@ import {
 } from "../lib/issue-links";
 import { formatIssueKey } from "../lib/issue-key";
 import type {
+  AgentSkillExecutionApprovalInput,
+  AgentSkillExecutionProposal,
   CreateIssueInput,
   DashboardPayload,
   ExecutionWorker,
@@ -438,6 +443,7 @@ export function HuntDashboard({
   onAddIssueDependency,
   onAcceptIssueAction,
   onAcceptIssueExecution,
+  onAcceptSkillExecution,
   onRemoveIssueDependency,
   onUpdateIssue,
   onUpdateIssueCheckpoints = async () => undefined,
@@ -513,6 +519,11 @@ export function HuntDashboard({
     proposal: IssueExecutionProposal,
     input: IssueExecutionApprovalInput,
   ) => Promise<IssueExecutionProposal>;
+  onAcceptSkillExecution?: (
+    runId: string,
+    proposal: AgentSkillExecutionProposal,
+    input: AgentSkillExecutionApprovalInput,
+  ) => Promise<AgentSkillExecutionProposal>;
   onRemoveIssueDependency?: (
     dependentRunId: string,
     prerequisiteRunId: string,
@@ -1134,6 +1145,10 @@ export function HuntDashboard({
           onAcceptIssueExecution={onAcceptIssueExecution
             ? (proposal, input) =>
                 onAcceptIssueExecution(selected.id, proposal, input)
+            : undefined}
+          onAcceptSkillExecution={onAcceptSkillExecution
+            ? (proposal, input) =>
+                onAcceptSkillExecution(selected.id, proposal, input)
             : undefined}
           onRemoveDependency={onRemoveIssueDependency
             ? (prerequisiteRunId) =>
@@ -4004,6 +4019,7 @@ export function RunPage({
   onAddDependency,
   onAcceptIssueAction,
   onAcceptIssueExecution,
+  onAcceptSkillExecution,
   onCancel,
   onUnassignRun,
   onDelete,
@@ -4062,6 +4078,10 @@ export function RunPage({
     proposal: IssueExecutionProposal,
     input: IssueExecutionApprovalInput,
   ) => Promise<IssueExecutionProposal>;
+  onAcceptSkillExecution?: (
+    proposal: AgentSkillExecutionProposal,
+    input: AgentSkillExecutionApprovalInput,
+  ) => Promise<AgentSkillExecutionProposal>;
   onCancel: () => Promise<unknown>;
   onUnassignRun?: (runId: string) => Promise<unknown>;
   onDelete?: () => Promise<unknown>;
@@ -5887,6 +5907,7 @@ export function RunPage({
                       mentionMembers={mentionMembers}
                       onAcceptIssueAction={onAcceptIssueAction}
                       onAcceptIssueExecution={onAcceptIssueExecution}
+                      onAcceptSkillExecution={onAcceptSkillExecution}
                       executionPolicy={executionPolicy}
                       executionWorkers={executionWorkers}
                       onDelete={onDeleteIssueMessage}
@@ -5895,6 +5916,8 @@ export function RunPage({
                       onLoad={onLoadIssueMessages}
                       onSend={onSendIssueMessage}
                       run={run}
+                      projectId={projectId}
+                      token={token}
                     />
                   </div>
                 ) : null}
@@ -5923,6 +5946,7 @@ export function RunPage({
                     mentionMembers={mentionMembers}
                     onAcceptIssueAction={onAcceptIssueAction}
                     onAcceptIssueExecution={onAcceptIssueExecution}
+                    onAcceptSkillExecution={onAcceptSkillExecution}
                     executionPolicy={executionPolicy}
                     executionWorkers={executionWorkers}
                     onDelete={onDeleteIssueMessage}
@@ -5931,6 +5955,8 @@ export function RunPage({
                     onLoad={onLoadIssueMessages}
                     onSend={onSendIssueMessage}
                     run={run}
+                    projectId={projectId}
+                    token={token}
                   />
                 </>
               ) : null}
@@ -7478,12 +7504,15 @@ function IssueConversation({
   mentionMembers,
   onAcceptIssueAction,
   onAcceptIssueExecution,
+  onAcceptSkillExecution,
   onDelete,
   onEdit,
   onLoadAttachment,
   onLoad,
   onSend,
+  projectId,
   run,
+  token,
 }: {
   currentUserId?: string | null;
   executionPolicy?: ProjectExecutionWorkerPolicy;
@@ -7497,6 +7526,10 @@ function IssueConversation({
     proposal: IssueExecutionProposal,
     input: IssueExecutionApprovalInput,
   ) => Promise<IssueExecutionProposal>;
+  onAcceptSkillExecution?: (
+    proposal: AgentSkillExecutionProposal,
+    input: AgentSkillExecutionApprovalInput,
+  ) => Promise<AgentSkillExecutionProposal>;
   onDelete: (messageId: string) => Promise<unknown>;
   onEdit: (messageId: string, input: {
     body: string;
@@ -7511,7 +7544,9 @@ function IssueConversation({
     attachments?: File[];
     attachmentReferences?: string[];
   }) => Promise<IssueMessageSendResult>;
+  projectId: string;
   run: HuntRun;
+  token: string | null;
 }) {
   const { localeTag, t } = useI18n();
   const [messages, setMessages] = useState<IssueMessage[]>([]);
@@ -7566,7 +7601,7 @@ function IssueConversation({
         activeRunIdRef.current === requestedRunId &&
         messageLoadVersion.current === requestedVersion
       ) {
-        setMessages(loaded);
+        setMessages((current) => mergeIssueMessages(current, loaded));
       }
     } catch {
       if (
@@ -7586,6 +7621,23 @@ function IssueConversation({
       }
     }
   }, [t]);
+
+  const loadSkillExecutionContext = useCallback(
+    async (proposal: AgentSkillExecutionProposal) => {
+      if (!token) {
+        return { workers: executionWorkers, policy: executionPolicy };
+      }
+      const dashboard = await loadDashboard(
+        token,
+        proposal.projectId || projectId,
+      );
+      return {
+        workers: dashboard.workers ?? [],
+        policy: dashboard.executionPolicy,
+      };
+    },
+    [executionPolicy, executionWorkers, projectId, token],
+  );
 
   useEffect(() => {
     void loadMessages();
@@ -8003,6 +8055,15 @@ function IssueConversation({
                           onAcceptIssueExecution(message.executionProposal!, input)
                       : undefined
                   }
+                  onAcceptSkillExecution={
+                    onAcceptSkillExecution && message.skillExecutionProposal
+                      ? (input) =>
+                          onAcceptSkillExecution(
+                            message.skillExecutionProposal!,
+                            input,
+                          )
+                      : undefined
+                  }
                   onExecutionProposalAccepted={(accepted) => {
                     setMessages((current) => current.map((candidate) =>
                       candidate.id === message.id
@@ -8010,6 +8071,15 @@ function IssueConversation({
                         : candidate,
                     ));
                   }}
+                  onSkillExecutionProposalAccepted={(accepted) => {
+                    setMessages((current) => current.map((candidate) =>
+                      candidate.id === message.id
+                        ? { ...candidate, skillExecutionProposal: accepted }
+                        : candidate,
+                    ));
+                  }}
+                  loadSkillExecutionContext={() =>
+                    loadSkillExecutionContext(message.skillExecutionProposal!)}
                   executionPolicy={executionPolicy}
                   executionRun={message.executionProposal
                     ? executionRuns.find(
@@ -8142,7 +8212,10 @@ function IssueMessageItem({
   onMentionOpen,
   onAcceptIssueAction,
   onAcceptIssueExecution,
+  onAcceptSkillExecution,
   onExecutionProposalAccepted,
+  onSkillExecutionProposalAccepted,
+  loadSkillExecutionContext,
   executionPolicy,
   executionRun,
   executionWorkers,
@@ -8170,7 +8243,17 @@ function IssueMessageItem({
   onAcceptIssueExecution?: (
     input: IssueExecutionApprovalInput,
   ) => Promise<IssueExecutionProposal>;
+  onAcceptSkillExecution?: (
+    input: AgentSkillExecutionApprovalInput,
+  ) => Promise<AgentSkillExecutionProposal>;
   onExecutionProposalAccepted: (proposal: IssueExecutionProposal) => void;
+  onSkillExecutionProposalAccepted: (
+    proposal: AgentSkillExecutionProposal,
+  ) => void;
+  loadSkillExecutionContext: () => Promise<{
+    workers: ExecutionWorker[];
+    policy?: ProjectExecutionWorkerPolicy;
+  }>;
   executionPolicy?: ProjectExecutionWorkerPolicy;
   executionRun: HuntRun | null;
   executionWorkers: ExecutionWorker[];
@@ -8378,6 +8461,23 @@ function IssueMessageItem({
             onAccepted={onExecutionProposalAccepted}
             proposal={message.executionProposal}
             surfaceKey={`${executionRun?.id ?? message.executionProposal.runId}:${message.id}`}
+          />
+        ) : null}
+        {message.skillExecutionProposal ? (
+          <AgentSkillExecutionApproval
+            disabledReason={!onAcceptSkillExecution
+              ? t("skillExecution.approvalUnavailable")
+              : null}
+            loadExecutionContext={loadSkillExecutionContext}
+            onAccept={async (input) => {
+              if (!onAcceptSkillExecution) {
+                throw new Error(t("skillExecution.approvalUnavailable"));
+              }
+              return onAcceptSkillExecution(input);
+            }}
+            onAccepted={onSkillExecutionProposalAccepted}
+            proposal={message.skillExecutionProposal}
+            surfaceKey={`${message.runId}:${message.id}`}
           />
         ) : null}
         {message.replyCount > 0 ? (

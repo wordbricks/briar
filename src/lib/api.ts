@@ -55,6 +55,8 @@ import type {
   IssueProposedAction,
   IssueExecutionPreferences,
   IssueExecutionApprovalInput,
+  AgentSkillExecutionApprovalInput,
+  AgentSkillExecutionProposal,
   IssueExecutionProposal,
   IssueResultReview,
   ClaimedProjectAgentScheduleRun,
@@ -1633,6 +1635,112 @@ export async function acceptChannelExecutionProposal(
   );
 }
 
+type AgentSkillExecutionAcceptResponse = {
+  proposal: AgentSkillExecutionProposal;
+  outcome: "accepted" | "already_accepted";
+  projectId: string;
+  session: unknown;
+};
+
+function assertPendingAgentSkillExecutionApproval(
+  proposal: AgentSkillExecutionProposal,
+  input: AgentSkillExecutionApprovalInput,
+) {
+  if (
+    proposal.status !== "pending" ||
+    proposal.acceptedAt !== null ||
+    proposal.requestedWorkerId !== null ||
+    proposal.requestedWorkerLabel !== null ||
+    proposal.resultSessionId !== null ||
+    !input.workerId ||
+    input.workerId !== input.workerId.trim()
+  ) {
+    throw new Error(
+      "Skill execution approval requires one exact Worker and a pending proposal.",
+    );
+  }
+}
+
+const skillExecutionSnapshotKeys = [
+  "id",
+  "type",
+  "projectId",
+  "agentId",
+  "agentName",
+  "skillId",
+  "skillName",
+  "request",
+  "provider",
+  "model",
+  "effort",
+  "createdAt",
+  "delegatedByAgentId",
+  "delegatedByAgentName",
+] as const satisfies readonly (keyof AgentSkillExecutionProposal)[];
+
+function validateAgentSkillExecutionAcceptance(
+  result: AgentSkillExecutionAcceptResponse,
+  expected: AgentSkillExecutionProposal,
+  input: AgentSkillExecutionApprovalInput,
+) {
+  const session = {
+    ...projectAgentSessionSchema.parse(result.session),
+    localOwner: false,
+  } as AutoHuntSession;
+  const snapshotChanged = skillExecutionSnapshotKeys.some(
+    (key) => result.proposal[key] !== expected[key],
+  );
+  if (
+    snapshotChanged ||
+    (result.outcome !== "accepted" && result.outcome !== "already_accepted") ||
+    result.projectId !== expected.projectId ||
+    result.proposal.status !== "accepted" ||
+    !result.proposal.acceptedAt ||
+    result.proposal.requestedWorkerId !== input.workerId ||
+    !result.proposal.requestedWorkerLabel?.trim() ||
+    result.proposal.resultSessionId !== session.id ||
+    session.projectId !== expected.projectId ||
+    session.agentId !== expected.agentId ||
+    session.agentName !== expected.agentName ||
+    session.skillId !== expected.skillId ||
+    session.sessionType !== "task" ||
+    session.trigger !== "manual" ||
+    session.request !== expected.request ||
+    session.requestedWorkerId !== input.workerId ||
+    session.workerId !== input.workerId
+  ) {
+    throw new Error(
+      "Skill execution approval returned inconsistent immutable evidence.",
+    );
+  }
+  return { ...result, session };
+}
+
+export async function acceptChannelSkillExecutionProposal(
+  token: string,
+  organizationId: string,
+  channelId: string,
+  expectedProposal: AgentSkillExecutionProposal,
+  input: AgentSkillExecutionApprovalInput,
+) {
+  assertPendingAgentSkillExecutionApproval(expectedProposal, input);
+  const result = await request<{
+    proposal: AgentSkillExecutionProposal;
+    outcome: "accepted" | "already_accepted";
+    projectId: string;
+    session: unknown;
+  }>(
+    `/organizations/${organizationId}/channels/${channelId}/skill-execution-proposals/${expectedProposal.id}/accept`,
+    token,
+    { method: "POST", body: JSON.stringify(input) },
+  );
+  return validateAgentSkillExecutionAcceptance(
+    result,
+    expectedProposal,
+    input,
+  );
+}
+
 export async function loadChannelDelta(
   token: string,
   organizationId: string,
@@ -2106,6 +2214,31 @@ export async function acceptIssueExecutionProposal(
     `/projects/${projectId}/runs/${conversationRunId}/issue-execution-proposals/${proposalId}/accept`,
     token,
     { method: "POST", body: JSON.stringify(input) },
+  );
+}
+
+export async function acceptIssueSkillExecutionProposal(
+  token: string,
+  projectId: string,
+  conversationRunId: string,
+  expectedProposal: AgentSkillExecutionProposal,
+  input: AgentSkillExecutionApprovalInput,
+) {
+  assertPendingAgentSkillExecutionApproval(expectedProposal, input);
+  const result = await request<{
+    proposal: AgentSkillExecutionProposal;
+    outcome: "accepted" | "already_accepted";
+    projectId: string;
+    session: unknown;
+  }>(
+    `/projects/${projectId}/runs/${conversationRunId}/skill-execution-proposals/${expectedProposal.id}/accept`,
+    token,
+    { method: "POST", body: JSON.stringify(input) },
+  );
+  return validateAgentSkillExecutionAcceptance(
+    result,
+    expectedProposal,
+    input,
   );
 }
 

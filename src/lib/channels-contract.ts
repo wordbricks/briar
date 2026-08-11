@@ -257,6 +257,35 @@ export type ChannelExecutionProposal = {
   delegatedByAgentName: string | null;
 };
 
+/**
+ * Immutable wire snapshot for a natural-language request matched to a saved
+ * Project Agent Skill. Keeping this in the shared channel contract avoids
+ * pulling browser-only application types into the Worker build.
+ */
+export type AgentSkillExecutionProposal = {
+  id: string;
+  type: "request_agent_skill_execute";
+  status: "pending" | "accepted";
+  projectId: string;
+  agentId: string;
+  agentName: string;
+  skillId: string;
+  skillName: string;
+  provider: AgentProvider;
+  model: string | null;
+  effort: ModelEffort | null;
+  request: string;
+  delegatedByAgentId: string | null;
+  delegatedByAgentName: string | null;
+  requestedWorkerId: string | null;
+  requestedWorkerLabel: string | null;
+  resultSessionId: string | null;
+  createdAt: string;
+  acceptedAt: string | null;
+};
+
+export type ChannelSkillExecutionProposal = AgentSkillExecutionProposal;
+
 export type ChannelMessageAttachment = {
   id: string;
   filename: string;
@@ -289,6 +318,7 @@ export type ChannelMessage = {
   document: ChannelMessageDocument | null;
   proposal: ChannelMessageProposal | null;
   executionProposal: ChannelExecutionProposal | null;
+  skillExecutionProposal?: ChannelSkillExecutionProposal | null;
   createdAt: string;
 };
 
@@ -371,6 +401,13 @@ export const channelReplyCompletionSchema = z
       .strict()
       .nullable()
       .default(null),
+    skillExecutionProposal: z
+      .object({
+        type: z.literal("request_agent_skill_execute"),
+      })
+      .strict()
+      .nullable()
+      .default(null),
     /**
      * Organization Agents can hand one repository-specific question to an
      * eligible Project Agent. The server remains authoritative for the target
@@ -390,7 +427,8 @@ export const channelReplyCompletionSchema = z
   .superRefine((reply, context) => {
     if (
       reply.delegation &&
-      (reply.document || reply.issueProposal || reply.executionProposal)
+      (reply.document || reply.issueProposal || reply.executionProposal ||
+        reply.skillExecutionProposal)
     ) {
       context.addIssue({
         code: "custom",
@@ -403,6 +441,16 @@ export const channelReplyCompletionSchema = z
         code: "custom",
         message: "Use executeAfterCreate for a create-and-execute request",
         path: ["executionProposal"],
+      });
+    }
+    if (
+      reply.skillExecutionProposal &&
+      (reply.document || reply.issueProposal || reply.executionProposal)
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "A Skill execution cannot be combined with another artifact proposal",
+        path: ["skillExecutionProposal"],
       });
     }
   });

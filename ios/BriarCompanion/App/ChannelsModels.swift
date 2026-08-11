@@ -54,6 +54,9 @@ struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
     /// A generated follow-up may coexist with the accepted create proposal so
     /// the UI can show creation evidence and a distinct second approval.
     var executionProposal: IssueExecutionProposal?
+    /// Mutually exclusive with issue creation/execution on the same reply. Its
+    /// immutable snapshot and monotonic merge lifecycle are tracked separately.
+    var skillExecutionProposal: AgentSkillExecutionProposal?
     let createdAt: Date
 
     enum CodingKeys: String, CodingKey {
@@ -71,6 +74,7 @@ struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
         case document
         case proposal
         case executionProposal
+        case skillExecutionProposal
         case createdAt
     }
 
@@ -89,6 +93,7 @@ struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
         document: Document?,
         proposal: Proposal?,
         executionProposal: IssueExecutionProposal? = nil,
+        skillExecutionProposal: AgentSkillExecutionProposal? = nil,
         createdAt: Date
     ) {
         self.id = id
@@ -105,6 +110,7 @@ struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
         self.document = document
         self.proposal = proposal
         self.executionProposal = executionProposal
+        self.skillExecutionProposal = skillExecutionProposal
         self.createdAt = createdAt
     }
 
@@ -126,6 +132,10 @@ struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
         executionProposal = try container.decodeIfPresent(
             IssueExecutionProposal.self,
             forKey: .executionProposal
+        )
+        skillExecutionProposal = try container.decodeIfPresent(
+            AgentSkillExecutionProposal.self,
+            forKey: .skillExecutionProposal
         )
         createdAt = try container.decode(Date.self, forKey: .createdAt)
     }

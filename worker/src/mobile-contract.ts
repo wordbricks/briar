@@ -348,6 +348,45 @@ export const mobileIssueExecutionProposalSchema = z.object({
   delegatedByAgentName: z.string().nullable(),
 }).strict();
 
+export const mobileAgentSkillExecutionProposalSchema = z.object({
+  id: z.uuid(),
+  type: z.literal("request_agent_skill_execute"),
+  status: z.enum(["pending", "accepted"]),
+  projectId: z.uuid(),
+  agentId: z.uuid(),
+  agentName: z.string().trim().min(1).max(100),
+  skillId: z.uuid(),
+  skillName: z.string().trim().min(1).max(100),
+  provider: mobileProviderSchema,
+  model: z.string().nullable(),
+  effort: mobileEffortSchema.nullable(),
+  request: z.string().trim().min(1).max(10_000),
+  delegatedByAgentId: z.uuid().nullable(),
+  delegatedByAgentName: z.string().nullable(),
+  requestedWorkerId: z.string().nullable(),
+  requestedWorkerLabel: z.string().nullable(),
+  resultSessionId: z.string().nullable(),
+  createdAt: z.iso.datetime(),
+  acceptedAt: z.iso.datetime().nullable(),
+}).strict().superRefine((proposal, context) => {
+  const hasAcceptedFields = proposal.requestedWorkerId !== null &&
+    proposal.requestedWorkerLabel !== null &&
+    proposal.resultSessionId !== null && proposal.acceptedAt !== null;
+  if (
+    (proposal.status === "accepted") !== hasAcceptedFields ||
+    (proposal.status === "pending" && (
+      proposal.requestedWorkerId !== null ||
+      proposal.requestedWorkerLabel !== null ||
+      proposal.resultSessionId !== null || proposal.acceptedAt !== null
+    ))
+  ) {
+    context.addIssue({
+      code: "custom",
+      message: "Agent Skill execution approval fields do not match status",
+    });
+  }
+});
+
 export const mobileIssueProposedActionSchema = z.discriminatedUnion("type", [
   mobileIssueReworkProposalSchema,
   mobileIssueUpdateProposalSchema,
@@ -365,6 +404,8 @@ export const mobileIssueMessagesResponseSchema = z.object({
     replyCount: z.number().int().nonnegative(),
     proposedAction: mobileIssueProposedActionSchema.nullable().optional(),
     executionProposal: mobileIssueExecutionProposalSchema.nullable().optional(),
+    skillExecutionProposal:
+      mobileAgentSkillExecutionProposalSchema.nullable().optional(),
     createdAt: z.iso.datetime(),
     updatedAt: z.iso.datetime(),
   })),
@@ -463,6 +504,8 @@ export const mobileChannelMessageSchema = z.object({
     ])
     .nullable(),
   executionProposal: mobileIssueExecutionProposalSchema.nullable().optional(),
+  skillExecutionProposal:
+    mobileAgentSkillExecutionProposalSchema.nullable().optional(),
   createdAt: z.iso.datetime(),
 });
 
@@ -558,6 +601,13 @@ export const mobileIssueExecutionApprovalRequestSchema = z.object({
   model: z.string().nullable(),
   effort: mobileEffortSchema.nullable(),
   workerId: z.string().nullable(),
+}).strict();
+
+export const mobileAgentSkillExecutionApprovalRequestSchema = z.object({
+  workerId: z.string().min(1).max(128).refine(
+    (workerId) => workerId === workerId.trim(),
+    { message: "workerId cannot contain leading or trailing whitespace" },
+  ),
 }).strict();
 
 export const mobileRunEvidenceResponseSchema = z.object({
@@ -882,6 +932,39 @@ export const mobileProjectAgentTaskResponseSchema = z.object({
   session: mobileProjectAgentSessionSchema,
 });
 
+export const mobileAgentSkillExecutionApprovalResponseSchema = z.object({
+  outcome: z.enum(["accepted", "already_accepted"]),
+  proposal: mobileAgentSkillExecutionProposalSchema,
+  projectId: z.uuid(),
+  session: mobileProjectAgentSessionSchema,
+}).strict().superRefine((response, context) => {
+  const proposal = response.proposal;
+  const session = response.session;
+  if (
+    proposal.status !== "accepted" ||
+    proposal.resultSessionId === null ||
+    proposal.requestedWorkerId === null ||
+    proposal.requestedWorkerLabel === null ||
+    proposal.acceptedAt === null ||
+    response.projectId !== proposal.projectId ||
+    session.id !== proposal.resultSessionId ||
+    session.projectId !== proposal.projectId ||
+    session.agentId !== proposal.agentId ||
+    session.agentName !== proposal.agentName ||
+    session.skillId !== proposal.skillId ||
+    session.sessionType !== "task" ||
+    session.trigger !== "manual" ||
+    session.request !== proposal.request ||
+    session.requestedWorkerId !== proposal.requestedWorkerId ||
+    session.workerId !== proposal.requestedWorkerId
+  ) {
+    context.addIssue({
+      code: "custom",
+      message: "Approved Agent Skill execution response is not canonical",
+    });
+  }
+});
+
 export const mobileOperationSchemas = {
   getHealth: { response: mobileHealthResponseSchema },
   beginDeviceAuthorization: {
@@ -933,6 +1016,10 @@ export const mobileOperationSchemas = {
     request: mobileIssueExecutionApprovalRequestSchema,
     response: mobileIssueExecutionApprovalResponseSchema,
   },
+  acceptIssueSkillExecutionProposal: {
+    request: mobileAgentSkillExecutionApprovalRequestSchema,
+    response: mobileAgentSkillExecutionApprovalResponseSchema,
+  },
   listProjectAgents: { response: mobileProjectAgentsResponseSchema },
   listProjectAgentSessions: { response: mobileProjectAgentSessionsResponseSchema },
   runProjectAgentTask: {
@@ -958,6 +1045,10 @@ export const mobileOperationSchemas = {
   acceptChannelExecutionProposal: {
     request: mobileIssueExecutionApprovalRequestSchema,
     response: mobileIssueExecutionApprovalResponseSchema,
+  },
+  acceptChannelSkillExecutionProposal: {
+    request: mobileAgentSkillExecutionApprovalRequestSchema,
+    response: mobileAgentSkillExecutionApprovalResponseSchema,
   },
 } as const;
 

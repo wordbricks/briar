@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { Miniflare } from "miniflare";
@@ -106,7 +107,7 @@ import {
   upsertProjectAgentSession,
 } from "./db";
 import { registerExecutionWorker } from "./workers";
-import { processSlackRevocationQueue } from "./index";
+import apiWorker, { processSlackRevocationQueue } from "./index";
 import { encryptSlackToken } from "./slack";
 import { executeD1Sql } from "./test-helpers/d1";
 
@@ -1665,7 +1666,9 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       ownerUserId: "owner",
       label: "Selected direct task Worker",
       deviceIdentityHash: "d".repeat(64),
-      credentialTokenHash: "e".repeat(64),
+      credentialTokenHash: createHash("sha256")
+        .update("briar_worker_direct_task_selected")
+        .digest("hex"),
       agentProvider: "codex",
       providers: ["codex"],
       providerHealth: {
@@ -1693,6 +1696,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     const taskId = "55555555-5555-4555-8555-555555555555";
     const requestId = "44444444-4444-4444-8444-444444444444";
     const claimTokenHash = "1".repeat(64);
+    const workerCredential = "briar_worker_direct_task_selected";
 
     try {
       await expect(
@@ -1753,6 +1757,32 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         id: taskId,
         lease_expires_at: atMinute(15),
       });
+
+      const wrongTokenResponse = await apiWorker.fetch(new Request(
+        `https://briar.example/agent-task-claims/${taskId}/complete`,
+        {
+          method: "POST",
+          headers: {
+            authorization: `Bearer ${workerCredential}`,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            projectId,
+            workerId: selected.worker.id,
+            claimToken: "briar_agent_task_claim_wrong_token",
+            summary: "This completion must not be acknowledged.",
+          }),
+        },
+      ), { DB: db } as Env);
+      expect(wrongTokenResponse.status).toBe(409);
+
+      await expect(
+        completeProjectAgentTask(db, projectId, taskId, {
+          workerId: selected.worker.id,
+          claimTokenHash: "2".repeat(64),
+          updatedAt: atMinute(14),
+        }),
+      ).resolves.toBeNull();
 
       await expect(
         completeProjectAgentTask(db, projectId, taskId, {

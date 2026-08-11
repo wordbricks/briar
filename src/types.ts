@@ -14,6 +14,7 @@ import type {
   AgentExecutionUsageRecord,
 } from "./lib/agent-execution-metrics";
 import type { ProjectAgentCodexPet } from "./lib/codex-pets";
+import type { AgentSkillExecutionProposal } from "./lib/channels-contract";
 import type { AgentProvider, ModelEffort } from "./lib/project-llm";
 import type {
   ProjectAgentScheduleIntervalUnit,
@@ -23,6 +24,7 @@ import type {
 
 export type HuntStatus = AutoHuntRunStatus;
 export type HuntSource = AutoHuntSource;
+export type { AgentSkillExecutionProposal };
 
 export type TrackerReference = {
   provider: string;
@@ -88,6 +90,11 @@ export type IssueExecutionApprovalInput = {
   workerId: string | null;
 };
 
+/** The only mutable choice a member makes when approving a saved Skill run. */
+export type AgentSkillExecutionApprovalInput = {
+  workerId: string;
+};
+
 export type IssueDependencyReference = {
   id: string;
   runNumber: number;
@@ -129,6 +136,8 @@ export type IssueMessage = {
   proposedAction?: IssueProposedAction | null;
   /** A separate approval boundary for execution, including create-then-execute. */
   executionProposal?: IssueExecutionProposal | null;
+  /** A separate approval boundary for a matched saved Project Agent Skill. */
+  skillExecutionProposal?: AgentSkillExecutionProposal | null;
   createdAt: string;
   updatedAt: string;
 };

@@ -398,6 +398,12 @@ final class RunDetailStore: ObservableObject {
         let proposalID: UUID
     }
 
+    struct SkillExecutionProposalContext: Equatable, Sendable {
+        let lifecycleRevision: Int
+        let proposalRevision: Int
+        let proposalID: UUID
+    }
+
     @Published private(set) var events: [RunEvent] = []
     @Published private(set) var messages: [IssueMessage] = []
     @Published private(set) var evidence: [RunEvidence] = []
@@ -411,6 +417,8 @@ final class RunDetailStore: ObservableObject {
     private var lifecycleRevision = 0
     private var executionProposalRevisions: [UUID: Int] = [:]
     private var executionProposalIDsByMessage: [UUID: UUID] = [:]
+    private var skillExecutionProposalRevisions: [UUID: Int] = [:]
+    private var skillExecutionProposalIDsByMessage: [UUID: UUID] = [:]
     private var authoritativeReloadPending = false
 
     init(
@@ -464,8 +472,11 @@ final class RunDetailStore: ObservableObject {
                 let loaded = try await (eventResponse, messageResponse, evidenceResponse)
                 guard expectedLifecycleRevision == lifecycleRevision else { return }
                 events = loaded.0.events
-                reconcileExecutionProposals(loaded.1.messages, authoritative: true)
-                messages = loaded.1.messages
+                let stabilizedMessages = preservingLocallyAcceptedSkillExecutionProposals(
+                    in: loaded.1.messages
+                )
+                reconcileExecutionProposals(stabilizedMessages, authoritative: true)
+                messages = stabilizedMessages
                 evidence = loaded.2.evidence
                 errorMessage = nil
             } catch {
@@ -477,11 +488,16 @@ final class RunDetailStore: ObservableObject {
     }
 
     func appendMessages(_ newMessages: [IssueMessage]) {
-        reconcileExecutionProposals(newMessages, authoritative: false)
-        let replacements = Dictionary(uniqueKeysWithValues: newMessages.map { ($0.id, $0) })
+        let stabilizedMessages = preservingLocallyAcceptedSkillExecutionProposals(
+            in: newMessages
+        )
+        reconcileExecutionProposals(stabilizedMessages, authoritative: false)
+        let replacements = Dictionary(
+            uniqueKeysWithValues: stabilizedMessages.map { ($0.id, $0) }
+        )
         let existing = Set(messages.map(\.id))
         messages = messages.map { replacements[$0.id] ?? $0 }
-        messages.append(contentsOf: newMessages.filter { !existing.contains($0.id) })
+        messages.append(contentsOf: stabilizedMessages.filter { !existing.contains($0.id) })
         messages.sort { $0.createdAt < $1.createdAt }
     }
 
@@ -515,6 +531,16 @@ final class RunDetailStore: ObservableObject {
         executionProposalRevisions[proposal.id, default: 0] &+= 1
     }
 
+    func updateSkillExecutionProposal(_ proposal: AgentSkillExecutionProposal) {
+        messages = messages.map { message in
+            guard message.skillExecutionProposal?.id == proposal.id else { return message }
+            var updated = message
+            updated.skillExecutionProposal = proposal
+            return updated
+        }
+        skillExecutionProposalRevisions[proposal.id, default: 0] &+= 1
+    }
+
     func captureExecutionProposal(
         proposalID: UUID
     ) -> ExecutionProposalContext? {
@@ -543,6 +569,34 @@ final class RunDetailStore: ObservableObject {
             })
     }
 
+    func captureSkillExecutionProposal(
+        proposalID: UUID
+    ) -> SkillExecutionProposalContext? {
+        guard messages.contains(where: {
+            $0.skillExecutionProposal?.id == proposalID &&
+                $0.skillExecutionProposal?.status == .pending
+        }) else { return nil }
+        return SkillExecutionProposalContext(
+            lifecycleRevision: lifecycleRevision,
+            proposalRevision: skillExecutionProposalRevisions[proposalID, default: 0],
+            proposalID: proposalID
+        )
+    }
+
+    func skillExecutionProposalIsCurrent(
+        _ context: SkillExecutionProposalContext
+    ) -> Bool {
+        context.lifecycleRevision == lifecycleRevision &&
+            context.proposalRevision == skillExecutionProposalRevisions[
+                context.proposalID,
+                default: 0
+            ] &&
+            messages.contains(where: {
+                $0.skillExecutionProposal?.id == context.proposalID &&
+                    $0.skillExecutionProposal?.status == .pending
+            })
+    }
+
     /// Invalidates delayed loads and mutation presentation when navigation
     /// leaves this exact run detail.
     func close() {
@@ -561,8 +615,15 @@ final class RunDetailStore: ObservableObject {
             },
             uniquingKeysWith: { current, _ in current }
         )
+        let previousSkillProposals = Dictionary(
+            messages.compactMap { message in
+                message.skillExecutionProposal.map { ($0.id, $0) }
+            },
+            uniquingKeysWith: { current, _ in current }
+        )
         let incomingMessageIDs = Set(incoming.map(\.id))
         var invalidatedProposalIDs: Set<UUID> = []
+        var invalidatedSkillProposalIDs: Set<UUID> = []
 
         for message in incoming {
             let previousID = executionProposalIDsByMessage[message.id]
@@ -574,6 +635,20 @@ final class RunDetailStore: ObservableObject {
                       previousProposals[proposal.id] != proposal {
                 invalidatedProposalIDs.insert(proposal.id)
             }
+
+            let previousSkillID = skillExecutionProposalIDsByMessage[message.id]
+            let incomingSkillID = message.skillExecutionProposal?.id
+            if previousSkillID != incomingSkillID {
+                if let previousSkillID {
+                    invalidatedSkillProposalIDs.insert(previousSkillID)
+                }
+                if let incomingSkillID {
+                    invalidatedSkillProposalIDs.insert(incomingSkillID)
+                }
+            } else if let proposal = message.skillExecutionProposal,
+                      previousSkillProposals[proposal.id] != proposal {
+                invalidatedSkillProposalIDs.insert(proposal.id)
+            }
         }
 
         if authoritative {
@@ -581,16 +656,28 @@ final class RunDetailStore: ObservableObject {
                 where !incomingMessageIDs.contains(messageID) {
                 invalidatedProposalIDs.insert(proposalID)
             }
+            for (messageID, proposalID) in skillExecutionProposalIDsByMessage
+                where !incomingMessageIDs.contains(messageID) {
+                invalidatedSkillProposalIDs.insert(proposalID)
+            }
         }
 
         for proposalID in invalidatedProposalIDs {
             executionProposalRevisions[proposalID, default: 0] &+= 1
+        }
+        for proposalID in invalidatedSkillProposalIDs {
+            skillExecutionProposalRevisions[proposalID, default: 0] &+= 1
         }
 
         if authoritative {
             executionProposalIDsByMessage = Dictionary(
                 uniqueKeysWithValues: incoming.compactMap { message in
                     message.executionProposal.map { (message.id, $0.id) }
+                }
+            )
+            skillExecutionProposalIDsByMessage = Dictionary(
+                uniqueKeysWithValues: incoming.compactMap { message in
+                    message.skillExecutionProposal.map { (message.id, $0.id) }
                 }
             )
         } else {
@@ -600,7 +687,38 @@ final class RunDetailStore: ObservableObject {
                 } else {
                     executionProposalIDsByMessage.removeValue(forKey: message.id)
                 }
+                if let proposalID = message.skillExecutionProposal?.id {
+                    skillExecutionProposalIDsByMessage[message.id] = proposalID
+                } else {
+                    skillExecutionProposalIDsByMessage.removeValue(forKey: message.id)
+                }
             }
+        }
+    }
+
+    /// A just-accepted response can beat a replicated pending message snapshot.
+    /// Preserve only the same Skill proposal ID; nulls and replacements remain
+    /// authoritative so source moves and tombstones still invalidate the sheet.
+    private func preservingLocallyAcceptedSkillExecutionProposals(
+        in incoming: [IssueMessage]
+    ) -> [IssueMessage] {
+        let acceptedByID = Dictionary(
+            messages.compactMap { message in
+                guard let proposal = message.skillExecutionProposal,
+                      proposal.status == .accepted
+                else { return nil }
+                return (proposal.id, proposal)
+            },
+            uniquingKeysWith: { current, _ in current }
+        )
+        return incoming.map { message in
+            guard let pending = message.skillExecutionProposal,
+                  pending.status == .pending,
+                  let accepted = acceptedByID[pending.id]
+            else { return message }
+            var stabilized = message
+            stabilized.skillExecutionProposal = accepted
+            return stabilized
         }
     }
 

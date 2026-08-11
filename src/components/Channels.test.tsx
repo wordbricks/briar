@@ -17,6 +17,7 @@ const loadChannelDelta = vi.fn();
 const sendChannelMessage = vi.fn();
 const acceptChannelProposal = vi.fn();
 const acceptChannelExecutionProposal = vi.fn();
+const acceptChannelSkillExecutionProposal = vi.fn();
 const loadDashboard = vi.fn();
 const listChannelMessages = vi.fn();
 const createChannel = vi.fn();
@@ -35,6 +36,8 @@ vi.mock("../lib/api", () => ({
   acceptChannelProposal: (...args: unknown[]) => acceptChannelProposal(...args),
   acceptChannelExecutionProposal: (...args: unknown[]) =>
     acceptChannelExecutionProposal(...args),
+  acceptChannelSkillExecutionProposal: (...args: unknown[]) =>
+    acceptChannelSkillExecutionProposal(...args),
   loadDashboard: (...args: unknown[]) => loadDashboard(...args),
   listChannelMessages: (...args: unknown[]) => listChannelMessages(...args),
   createChannel: (...args: unknown[]) => createChannel(...args),
@@ -268,6 +271,105 @@ describe("Channels", () => {
     );
   });
 
+  it("runs a matched saved Skill only after exact Worker approval", async () => {
+    const pending = {
+      id: "skill-proposal-1",
+      type: "request_agent_skill_execute" as const,
+      status: "pending" as const,
+      projectId: "project-1",
+      agentId: "project-agent-1",
+      agentName: "Release Agent",
+      skillId: "skill-1",
+      skillName: "iOS 배포",
+      request: "TestFlight에 배포해 주세요.",
+      provider: "codex" as const,
+      model: "gpt-5.6-sol",
+      effort: "high" as const,
+      createdAt: "2026-08-11T00:00:00.000Z",
+      acceptedAt: null,
+      requestedWorkerId: null,
+      requestedWorkerLabel: null,
+      resultSessionId: null,
+      delegatedByAgentId: null,
+      delegatedByAgentName: null,
+    };
+    const accepted = {
+      ...pending,
+      status: "accepted" as const,
+      acceptedAt: "2026-08-11T00:01:00.000Z",
+      requestedWorkerId: "worker-skill",
+      requestedWorkerLabel: "Build Mac",
+      resultSessionId: "session-skill",
+    };
+    const item = message({
+      author: { type: "agent", id: "agent-1", name: "Honey", provider: "claude" },
+      skillExecutionProposal: pending,
+    });
+    loadDashboard.mockResolvedValue({
+      runs: [],
+      workers: [{
+        id: "worker-skill",
+        deviceId: "device-skill",
+        ownerUserId: "owner",
+        label: "Build Mac",
+        agentProvider: "codex",
+        providers: ["codex"],
+        versions: {},
+        state: "online",
+        readiness: "available",
+        acceptingWork: true,
+        readinessDetail: null,
+        capabilities: {},
+        maxConcurrentSessions: 1,
+        activeSessions: 0,
+        availableSessions: 1,
+        lastHeartbeatAt: "2026-08-11T00:00:00.000Z",
+        createdAt: "2026-08-11T00:00:00.000Z",
+      }],
+      executionPolicy: { selectionMode: "any", defaultWorkerId: null, allowedWorkerIds: [], updatedAt: null },
+    });
+    acceptChannelSkillExecutionProposal.mockResolvedValue({
+      outcome: "accepted",
+      proposal: accepted,
+      projectId: "project-1",
+      session: { id: "session-skill" },
+    });
+    await render([item]);
+
+    expect(container.textContent).toContain("프로젝트 Agent Skill 실행 제안");
+    expect(acceptChannelSkillExecutionProposal).not.toHaveBeenCalled();
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(
+        ".skill-execution-proposal-card footer button",
+      )?.click();
+    });
+    expect(acceptChannelSkillExecutionProposal).not.toHaveBeenCalled();
+    await act(async () => {
+      document.body.querySelector<HTMLButtonElement>(
+        'button[aria-label="실행할 정확한 Worker"]',
+      )?.click();
+    });
+    await act(async () => {
+      document.body.querySelector<HTMLButtonElement>(
+        '[role="option"][data-value="worker-skill"]',
+      )?.click();
+    });
+    const finalApprove = Array.from(
+      document.body.querySelectorAll<HTMLButtonElement>("button"),
+    ).find((button) => button.textContent?.includes("승인하고 Skill 실행"));
+    await act(async () => finalApprove?.click());
+
+    expect(loadDashboard).toHaveBeenCalledTimes(2);
+    expect(acceptChannelSkillExecutionProposal).toHaveBeenCalledWith(
+      "token",
+      "org-1",
+      "channel-1",
+      pending,
+      { workerId: "worker-skill" },
+    );
+    expect(container.textContent).toContain("session-skill");
+  });
+
   it("establishes the initial change cursor before loading channel detail", async () => {
     let resolveList!: (value: { channels: ChannelSummary[]; cursor: number }) => void;
     const pendingList = new Promise<{ channels: ChannelSummary[]; cursor: number }>(
@@ -428,6 +530,46 @@ describe("Channels", () => {
     );
     expect(container.querySelector(".channel-proposal-card")).not.toBeNull();
     expect(container.querySelector(".execution-proposal-card")).not.toBeNull();
+  });
+
+  it("preserves accepted Skill history when a reaction response is stale", async () => {
+    const reacted = message({
+      id: "message-skill-reacted",
+      reactions: [{ emoji: "👍", count: 1, userIds: ["user-1"] }],
+      skillExecutionProposal: {
+        id: "skill-reacted",
+        type: "request_agent_skill_execute",
+        status: "accepted",
+        projectId: "project-1",
+        agentId: "project-agent-1",
+        agentName: "Release Agent",
+        skillId: "skill-release",
+        skillName: "Deploy",
+        request: "Deploy the app",
+        provider: "codex",
+        model: null,
+        effort: null,
+        createdAt: "2026-08-11T00:00:00.000Z",
+        acceptedAt: "2026-08-11T00:01:00.000Z",
+        requestedWorkerId: "worker-1",
+        requestedWorkerLabel: "Build Mac",
+        resultSessionId: "session-1",
+        delegatedByAgentId: null,
+        delegatedByAgentName: null,
+      },
+    });
+    toggleChannelMessageReaction.mockResolvedValue({
+      message: message({ id: reacted.id, reactions: [] }),
+    });
+    await render([reacted]);
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(".channel-reaction-chip")
+        ?.click();
+      await Promise.resolve();
+    });
+    expect(container.querySelector(".skill-execution-proposal-card"))
+      .not.toBeNull();
+    expect(container.textContent).toContain("session-1");
   });
 
   it("shares one dashboard lookup across accepted execution history cards", async () => {
