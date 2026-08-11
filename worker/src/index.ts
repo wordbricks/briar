@@ -121,7 +121,6 @@ import {
   addOrganizationMember,
   assertQueuedHuntClaim,
   attemptGithubMergeAutoResume,
-  channelApprovalTablesAvailable,
   agentSkillExecutionApprovalTablesAvailable,
   acceptAgentSkillExecutionProposal,
   claimGithubDelivery,
@@ -12817,17 +12816,8 @@ async function route(
   }
 
   if (pathname === "/queue/claims" && request.method === "POST") {
+    // Migration 0090 is applied by worker:deploy before this code can run.
     const input = claimInputSchema.parse(await readJson(request));
-    if (!(await channelApprovalTablesAvailable(db))) {
-      // Migration-first is a security boundary, not just an operational
-      // preference. Refuse all claims when a new Worker is accidentally
-      // deployed before 0090 so a legacy cross-project transfer cannot run in
-      // the target project during that window.
-      throw new HttpError(
-        503,
-        "Channel issue approval migration 0090 must be applied before claiming work",
-      );
-    }
     let authenticatedWorkerId: string | undefined;
     let authenticatedWorker:
       | Awaited<ReturnType<typeof requireWorkerProjectBinding>>

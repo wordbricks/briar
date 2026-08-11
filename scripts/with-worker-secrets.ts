@@ -69,6 +69,21 @@ async function runWrangler(args: string[]): Promise<number> {
   return processHandle.exited;
 }
 
+export async function runWorkerDeploy(
+  secretsPath: string,
+  runner: (args: string[]) => Promise<number> = runWrangler,
+): Promise<number> {
+  const migrationExitCode = await runner([
+    "d1",
+    "migrations",
+    "apply",
+    "briar-db",
+    "--remote",
+  ]);
+  if (migrationExitCode !== 0) return migrationExitCode;
+  return runner(["deploy", "--secrets-file", secretsPath]);
+}
+
 async function main(): Promise<void> {
   const mode = process.argv[2] as Mode | undefined;
   if (!mode || !["check", "deploy", "dev"].includes(mode)) {
@@ -110,16 +125,14 @@ async function main(): Promise<void> {
     ) {
       throw new Error("BRIAR_WORKER_DEV_PORT must be a valid TCP port.");
     }
-    const exitCode = await runWrangler(
-      mode === "deploy"
-        ? ["deploy", "--secrets-file", secretsPath]
-        : [
-            "dev",
-            "--env-file",
-            secretsPath,
-            ...(workerDevPort ? ["--port", workerDevPort] : []),
-          ],
-    );
+    const exitCode = mode === "deploy"
+      ? await runWorkerDeploy(secretsPath)
+      : await runWrangler([
+          "dev",
+          "--env-file",
+          secretsPath,
+          ...(workerDevPort ? ["--port", workerDevPort] : []),
+        ]);
 
     if (exitCode !== 0) {
       process.exitCode = exitCode;
@@ -129,4 +142,4 @@ async function main(): Promise<void> {
   }
 }
 
-await main();
+if (import.meta.main) await main();
