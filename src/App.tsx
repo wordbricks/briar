@@ -1447,6 +1447,7 @@ export function App() {
           <Channels
             activeChannelId={activeChannelId}
             channels={organizationChannels}
+            projects={activeOrganizationProjects}
             currentUserId={briar.user?.id ?? null}
             onChannelSelect={setActiveChannelId}
             onChannelsChange={setOrganizationChannels}
@@ -1463,7 +1464,8 @@ export function App() {
               setIsSidebarOpen(true);
               navigateToPage("settings");
             }}
-            onIssueCreated={(runId) => {
+            onIssueCreated={async (projectId, runId) => {
+              await briar.ensureProjectSelected(projectId);
               setRequestedRunId(runId);
               setIssueListRequestKey((key) => key + 1);
               navigateToPage("issues");
@@ -1791,8 +1793,8 @@ export function App() {
               token={briar.token}
               requestedMessage={requestedChannelMessage}
               onRequestedMessageOpen={clearRequestedChannelMessage}
-              onIssueOpen={(projectId, runId) => {
-                briar.setActiveProjectId(projectId);
+              onIssueOpen={async (projectId, runId) => {
+                await briar.ensureProjectSelected(projectId);
                 setRequestedRunId(runId);
                 setIssueListRequestKey((key) => key + 1);
                 setCompanionStatus("all");

@@ -1,6 +1,21 @@
 import PhotosUI
 import SwiftUI
 
+typealias ChannelIssueOpenHandler = (
+    UUID,
+    UUID,
+    @escaping @MainActor () -> Bool
+) async -> Void
+
+func channelProposalApprovalIsEnabled(
+    acceptanceInFlight: Bool,
+    channelArchived: Bool,
+    targetProjectID: UUID?,
+    issue: ChannelMessage.Proposal.Payload.Issue?
+) -> Bool {
+    !acceptanceInFlight && !channelArchived && targetProjectID != nil && issue != nil
+}
+
 /// Home: the organization's channels, grouped by project with section dividers.
 struct ChannelsHomeView: View {
     @ObservedObject var channels: ChannelsStore
@@ -9,7 +24,7 @@ struct ChannelsHomeView: View {
     let activeProjectID: UUID?
     let currentUserID: String?
     let projects: [ProjectsResponse.Project]
-    let onIssueOpen: (UUID, UUID) -> Void
+    let onIssueOpen: ChannelIssueOpenHandler
 
     private var locale: CompanionLocale {
         CompanionLocale(rawValue: localeRaw) ?? .ko
@@ -94,10 +109,14 @@ struct ChannelMessagesView: View {
     let channel: ChannelSummary
     let currentUserID: String?
     let projects: [ProjectsResponse.Project]
-    let onIssueOpen: (UUID, UUID) -> Void
+    let onIssueOpen: ChannelIssueOpenHandler
 
     private var locale: CompanionLocale {
         CompanionLocale(rawValue: localeRaw) ?? .ko
+    }
+
+    private var currentChannel: ChannelSummary {
+        channels.channels.first(where: { $0.id == channel.id }) ?? channel
     }
 
     var body: some View {
@@ -105,7 +124,7 @@ struct ChannelMessagesView: View {
             channels: channels,
             draft: $draft,
             previewFile: $previewFile,
-            channel: channel,
+            channel: currentChannel,
             currentUserID: currentUserID,
             locale: locale,
             messages: channels.messages,
@@ -116,10 +135,13 @@ struct ChannelMessagesView: View {
         )
         .safeAreaInset(edge: .top, spacing: 0) {
             ChannelHeader(
-                channel: channel,
+                channel: currentChannel,
                 locale: locale,
                 showsStatusIcons: !dynamicTypeSize.isAccessibilitySize,
-                onBack: { dismiss() }
+                onBack: {
+                    channels.closeChannelFocus(channelID: channel.id)
+                    dismiss()
+                }
             )
         }
         .toolbar(.hidden, for: .navigationBar)
@@ -130,12 +152,17 @@ struct ChannelMessagesView: View {
         .navigationDestination(for: ChannelMessage.self) { message in
             ChannelThreadView(
                 channels: channels,
-                channel: channel,
+                channel: currentChannel,
                 parent: message,
                 currentUserID: currentUserID,
                 projects: projects,
                 onIssueOpen: onIssueOpen
             )
+        }
+        .onDisappear {
+            // Covers interactive navigation pops. This is intentionally a
+            // no-op while a child thread owns the focus.
+            channels.closeChannelFocus(channelID: channel.id)
         }
         .overlay {
             if channels.messages.isEmpty, !channels.loading {
@@ -247,10 +274,14 @@ struct ChannelThreadView: View {
     let parent: ChannelMessage
     let currentUserID: String?
     let projects: [ProjectsResponse.Project]
-    let onIssueOpen: (UUID, UUID) -> Void
+    let onIssueOpen: ChannelIssueOpenHandler
 
     private var locale: CompanionLocale {
         CompanionLocale(rawValue: localeRaw) ?? .ko
+    }
+
+    private var currentChannel: ChannelSummary {
+        channels.channels.first(where: { $0.id == channel.id }) ?? channel
     }
 
     var body: some View {
@@ -258,7 +289,7 @@ struct ChannelThreadView: View {
             channels: channels,
             draft: $draft,
             previewFile: $previewFile,
-            channel: channel,
+            channel: currentChannel,
             currentUserID: currentUserID,
             locale: locale,
             messages: channels.thread,
@@ -275,6 +306,12 @@ struct ChannelThreadView: View {
         .task(id: parent.id) {
             await channels.openThread(channelID: channel.id, parentMessageID: parent.id)
         }
+        .onDisappear {
+            channels.closeThreadFocus(
+                channelID: channel.id,
+                parentMessageID: parent.id
+            )
+        }
     }
 }
 
@@ -290,7 +327,7 @@ private struct ChannelConversationView: View {
     let currentUserID: String?
     let locale: CompanionLocale
     let messages: [ChannelMessage]
-    let onIssueOpen: (UUID, UUID) -> Void
+    let onIssueOpen: ChannelIssueOpenHandler
     let parentMessageID: UUID?
     let projects: [ProjectsResponse.Project]
     let showsThreadSummary: Bool
@@ -305,6 +342,27 @@ private struct ChannelConversationView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            if let errorMessage = channels.errorMessage {
+                HStack(alignment: .top, spacing: 9) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.red)
+                    Text(errorMessage)
+                        .font(.caption)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Button {
+                        channels.dismissError()
+                    } label: {
+                        Image(systemName: "xmark")
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(L10n.text("닫기", locale: locale))
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 9)
+                .background(Color.red.opacity(0.08))
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("channel-error-banner")
+            }
             ScrollView {
                 LazyVStack(spacing: 0) {
                     ForEach(messages) { message in
@@ -323,7 +381,15 @@ private struct ChannelConversationView: View {
                                     projectID: projectID
                                 )
                             },
-                            onIssueOpen: onIssueOpen,
+                            onIssueOpen: { projectID, runID in
+                                guard let context = channels.captureFocus(
+                                    channelID: channel.id,
+                                    threadParentID: parentMessageID
+                                ) else { return }
+                                await onIssueOpen(projectID, runID) {
+                                    channels.focusIsCurrent(context)
+                                }
+                            },
                             onLoadAttachment: { attachment in
                                 try await channels.download(
                                     path: attachment.url,
@@ -377,7 +443,7 @@ private struct ChannelMessageRow: View {
     let message: ChannelMessage
     let locale: CompanionLocale
     let onAcceptProposal: (UUID, UUID) async -> AcceptChannelProposalResponse?
-    let onIssueOpen: (UUID, UUID) -> Void
+    let onIssueOpen: (UUID, UUID) async -> Void
     let onLoadAttachment: @MainActor (ChannelMessageAttachment) async throws -> URL
     let onOpenAttachment: @MainActor (URL) -> Void
     let onToggleReaction: (String) async -> Void
@@ -462,6 +528,7 @@ private struct ChannelMessageRow: View {
                    proposal.actionType == .createIssue {
                     ChannelProposalCard(
                         accepting: acceptingProposalID == proposal.id,
+                        acceptanceInFlight: acceptingProposalID != nil,
                         channel: channel,
                         locale: locale,
                         onAccept: { projectID in
@@ -611,12 +678,14 @@ private struct FlowReactionRow<Content: View>: View {
 
 private struct ChannelProposalCard: View {
     @State private var selectedProjectID: UUID?
+    @State private var descriptionExpanded = false
 
     let accepting: Bool
+    let acceptanceInFlight: Bool
     let channel: ChannelSummary
     let locale: CompanionLocale
     let onAccept: (UUID) async -> AcceptChannelProposalResponse?
-    let onIssueOpen: (UUID, UUID) -> Void
+    let onIssueOpen: (UUID, UUID) async -> Void
     let projects: [ProjectsResponse.Project]
     let proposal: ChannelMessage.Proposal
 
@@ -637,6 +706,24 @@ private struct ChannelProposalCard: View {
         return availableProjects.first(where: { $0.id == selectedProjectID })?.name
     }
 
+    private var targetProjectName: String? {
+        guard let targetProjectID else { return nil }
+        return availableProjects.first(where: { $0.id == targetProjectID })?.name
+            ?? targetProjectID.uuidString.lowercased()
+    }
+
+    private var issueDescription: String? {
+        guard let rawDescription = proposal.payload?.issue?.description else { return nil }
+        let description = rawDescription.trimmingCharacters(in: .whitespacesAndNewlines)
+        return description.isEmpty ? nil : description
+    }
+
+    private var descriptionNeedsExpansion: Bool {
+        guard let issueDescription else { return false }
+        return issueDescription.count > 240 ||
+            issueDescription.components(separatedBy: .newlines).count > 3
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 9) {
             VStack(alignment: .leading, spacing: 2) {
@@ -654,7 +741,75 @@ private struct ChannelProposalCard: View {
                 .foregroundStyle(.secondary)
             }
 
+            if let issue = proposal.payload?.issue {
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(issue.title)
+                        .font(.subheadline.weight(.semibold))
+                        .fixedSize(horizontal: false, vertical: true)
+                    if let issueDescription {
+                        Text(issueDescription)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(
+                                descriptionNeedsExpansion && !descriptionExpanded ? 3 : nil
+                            )
+                            .fixedSize(horizontal: false, vertical: true)
+                        if descriptionNeedsExpansion {
+                            Button(
+                                L10n.text(
+                                    descriptionExpanded
+                                        ? .channelIssueHideDescription
+                                        : .channelIssueShowDescription,
+                                    locale: locale
+                                )
+                            ) {
+                                descriptionExpanded.toggle()
+                            }
+                            .buttonStyle(.plain)
+                            .font(.caption2.weight(.medium))
+                            .foregroundStyle(.secondary)
+                            .accessibilityIdentifier(
+                                "channel-proposal-description-\(proposal.id.uuidString.lowercased())"
+                            )
+                        }
+                    }
+                    if let priority = issue.priority {
+                        Label(
+                            String(
+                                format: L10n.text(.channelIssuePriority, locale: locale),
+                                priority
+                            ),
+                            systemImage: "flag"
+                        )
+                        .font(.caption2.weight(.medium))
+                        .foregroundStyle(.secondary)
+                    }
+                }
+                .accessibilityIdentifier(
+                    "channel-proposal-details-\(proposal.id.uuidString.lowercased())"
+                )
+            }
+
             if proposal.status == .pending {
+                if let targetProjectName {
+                    Label(
+                        String(
+                            format: L10n.text(.channelIssueProject, locale: locale),
+                            targetProjectName
+                        ),
+                        systemImage: "folder"
+                    )
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                }
+                Label(
+                    L10n.text(.channelIssueCreationSafety, locale: locale),
+                    systemImage: "tray"
+                )
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
                 if proposal.projectId == nil, channel.defaultProjectId == nil {
                     Menu {
                         ForEach(availableProjects, id: \.id) { project in
@@ -671,6 +826,7 @@ private struct ChannelProposalCard: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     .buttonStyle(.borderless)
+                    .disabled(acceptanceInFlight || channel.archivedAt != nil)
                     .accessibilityIdentifier(
                         "channel-proposal-project-\(proposal.id.uuidString.lowercased())"
                     )
@@ -680,7 +836,7 @@ private struct ChannelProposalCard: View {
                     guard let targetProjectID else { return }
                     Task {
                         if let result = await onAccept(targetProjectID) {
-                            onIssueOpen(result.projectId, result.resultRunId)
+                            await onIssueOpen(result.projectId, result.resultRunId)
                         }
                     }
                 } label: {
@@ -692,14 +848,21 @@ private struct ChannelProposalCard: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.small)
-                .disabled(accepting || targetProjectID == nil)
+                .disabled(
+                    !channelProposalApprovalIsEnabled(
+                        acceptanceInFlight: acceptanceInFlight,
+                        channelArchived: channel.archivedAt != nil,
+                        targetProjectID: targetProjectID,
+                        issue: proposal.payload?.issue
+                    )
+                )
                 .accessibilityIdentifier(
                     "accept-channel-proposal-\(proposal.id.uuidString.lowercased())"
                 )
             } else if let projectID = proposal.projectId,
                       let runID = proposal.resultRunId {
                 Button(L10n.text(.channelViewIssue, locale: locale)) {
-                    onIssueOpen(projectID, runID)
+                    Task { await onIssueOpen(projectID, runID) }
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.small)

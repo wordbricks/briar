@@ -21,6 +21,10 @@ final class CompanionStore: ObservableObject {
 
     private let api: any MobileAPIClientProtocol
     private let defaults: UserDefaults
+    private var activeToken: String?
+    private var sessionGeneration = 0
+    private var loadRevision = 0
+    private var projectCatalogRevision = 0
 
     private static func selectedProjectKey(for userID: String) -> String {
         "companion.selectedProjectID.\(userID)"
@@ -32,8 +36,21 @@ final class CompanionStore: ObservableObject {
     }
 
     func load(token: String) async throws {
+        sessionGeneration &+= 1
+        loadRevision &+= 1
+        projectCatalogRevision &+= 1
+        activeToken = token
+        let expectedGeneration = sessionGeneration
+        let expectedLoadRevision = loadRevision
+        let expectedCatalogRevision = projectCatalogRevision
         loading = true
-        defer { loading = false }
+        defer {
+            if activeToken == token,
+               expectedGeneration == sessionGeneration,
+               expectedLoadRevision == loadRevision {
+                loading = false
+            }
+        }
         do {
             async let userResponse: CurrentUserResponse = api.send(
                 MobileAPIContract.Endpoint.currentUser,
@@ -50,33 +67,99 @@ final class CompanionStore: ObservableObject {
                 as: ProjectsResponse.self
             )
             let (loadedUser, loadedProjects) = try await (userResponse, projectResponse)
+            guard
+                activeToken == token,
+                expectedGeneration == sessionGeneration,
+                expectedLoadRevision == loadRevision
+            else { throw CancellationError() }
             user = loadedUser.user
-            projects = loadedProjects.projects
-            organizations = Dictionary(
-                grouping: projects,
-                by: \.organizationId
-            ).compactMap { id, projects in
-                projects.first.map { OrganizationSummary(id: id, name: $0.organizationName) }
-            }.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+            if expectedCatalogRevision == projectCatalogRevision {
+                applyProjectCatalog(loadedProjects.projects)
+            }
+            let currentProjects = expectedCatalogRevision == projectCatalogRevision
+                ? loadedProjects.projects
+                : projects
             let storedProjectID = Self.storedProjectID(
                 for: loadedUser.user.id,
-                in: loadedProjects.projects,
+                in: currentProjects,
                 defaults: defaults
             )
-            selectedProjectID = storedProjectID ?? Self.defaultProjectID(for: loadedProjects.projects)
+            selectedProjectID = storedProjectID ?? Self.defaultProjectID(for: currentProjects)
             errorMessage = nil
         } catch {
-            errorMessage = Self.message(for: error)
+            if activeToken == token,
+               expectedGeneration == sessionGeneration,
+               expectedLoadRevision == loadRevision {
+                errorMessage = Self.message(for: error)
+            }
+            throw error
+        }
+    }
+
+    /// Refreshes the project catalog without discarding a still-valid active
+    /// selection. Channel approvals can target a project created by another
+    /// member after this device's initial account snapshot.
+    func refreshProjects(token: String) async throws {
+        if activeToken == nil {
+            sessionGeneration &+= 1
+            activeToken = token
+        }
+        guard activeToken == token else { throw CancellationError() }
+        let expectedGeneration = sessionGeneration
+        projectCatalogRevision &+= 1
+        let expectedCatalogRevision = projectCatalogRevision
+        do {
+            let response: ProjectsResponse = try await api.send(
+                MobileAPIContract.Endpoint.projects,
+                method: "GET",
+                token: token,
+                body: nil,
+                as: ProjectsResponse.self
+            )
+            guard
+                activeToken == token,
+                expectedGeneration == sessionGeneration,
+                expectedCatalogRevision == projectCatalogRevision
+            else { throw CancellationError() }
+            applyProjectCatalog(response.projects)
+            if let selectedProjectID,
+               !projects.contains(where: { $0.id == selectedProjectID }) {
+                self.selectedProjectID = Self.defaultProjectID(for: projects)
+            } else if selectedProjectID == nil {
+                selectedProjectID = Self.defaultProjectID(for: projects)
+            }
+            errorMessage = nil
+        } catch {
+            if activeToken == token,
+               expectedGeneration == sessionGeneration,
+               expectedCatalogRevision == projectCatalogRevision {
+                errorMessage = Self.message(for: error)
+            }
             throw error
         }
     }
 
     func clear() {
+        sessionGeneration &+= 1
+        loadRevision &+= 1
+        projectCatalogRevision &+= 1
+        activeToken = nil
         user = nil
         organizations = []
         projects = []
         selectedProjectID = nil
+        loading = false
         errorMessage = nil
+    }
+
+    private func applyProjectCatalog(_ nextProjects: [ProjectsResponse.Project]) {
+        projects = nextProjects
+        organizations = Dictionary(
+            grouping: nextProjects,
+            by: \.organizationId
+        ).compactMap { id, projects in
+            projects.first.map { OrganizationSummary(id: id, name: $0.organizationName) }
+        }.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
 
     private static func storedProjectID(
@@ -131,7 +214,9 @@ final class DashboardStore: ObservableObject {
     private var projectID: UUID?
     private var token: String?
     private var generation = 0
+    private var refreshRevision = 0
     private var refreshTask: Task<Void, Never>?
+    private var refreshTaskForcesSnapshot = false
     private var pollingTask: Task<Void, Never>?
 
     init(api: any MobileAPIClientProtocol, pollInterval: Duration = .seconds(15)) {
@@ -142,25 +227,40 @@ final class DashboardStore: ObservableObject {
     func select(projectID: UUID?, token: String?) {
         guard self.projectID != projectID || self.token != token else { return }
         generation += 1
+        refreshRevision &+= 1
         refreshTask?.cancel()
         refreshTask = nil
+        refreshTaskForcesSnapshot = false
         pollingTask?.cancel()
         pollingTask = nil
         self.projectID = projectID
         self.token = token
         snapshot = nil
+        isRefreshing = false
         errorMessage = nil
         guard projectID != nil, token != nil else { return }
         startPolling()
     }
 
-    func refresh(forceSnapshot: Bool = false) async {
+    func refresh(
+        forceSnapshot: Bool = false,
+        supersedeInFlight: Bool = false
+    ) async {
         guard let projectID, let token else { return }
         if let refreshTask {
-            await refreshTask.value
-            return
+            if !supersedeInFlight,
+               !forceSnapshot || refreshTaskForcesSnapshot {
+                await refreshTask.value
+                return
+            }
+            // A navigation gate needs a canonical snapshot. Supersede an
+            // incremental refresh so its older result cannot win afterward.
+            refreshRevision &+= 1
+            refreshTask.cancel()
         }
         let expectedGeneration = generation
+        refreshRevision &+= 1
+        let expectedRefreshRevision = refreshRevision
         let current = snapshot
         let task = Task { [api] in
             do {
@@ -171,23 +271,52 @@ final class DashboardStore: ObservableObject {
                     current: current,
                     forceSnapshot: forceSnapshot
                 )
-                guard !Task.isCancelled, expectedGeneration == self.generation else { return }
+                guard
+                    !Task.isCancelled,
+                    expectedGeneration == self.generation,
+                    expectedRefreshRevision == self.refreshRevision
+                else { return }
                 self.snapshot = loaded
                 self.errorMessage = nil
             } catch is CancellationError {
                 return
             } catch {
-                guard expectedGeneration == self.generation else { return }
+                guard
+                    expectedGeneration == self.generation,
+                    expectedRefreshRevision == self.refreshRevision
+                else { return }
                 self.errorMessage = CompanionStore.message(for: error)
             }
         }
         refreshTask = task
+        // A first load is canonical even when the caller did not explicitly
+        // request `forceSnapshot`, so a concurrent gate can safely join it.
+        refreshTaskForcesSnapshot = forceSnapshot || current == nil
         isRefreshing = true
         await task.value
-        if expectedGeneration == generation {
+        if expectedGeneration == generation,
+           expectedRefreshRevision == refreshRevision {
             refreshTask = nil
+            refreshTaskForcesSnapshot = false
             isRefreshing = false
         }
+    }
+
+    /// Loads a canonical dashboard for `projectID` and only returns true once
+    /// the requested run is present in the store's current authoritative state.
+    func ensureRunAvailable(projectID: UUID, runID: UUID, token: String) async -> Bool {
+        if self.projectID != projectID || self.token != token {
+            select(projectID: projectID, token: token)
+        }
+        let expectedGeneration = generation
+        await refresh(forceSnapshot: true, supersedeInFlight: true)
+        guard
+            expectedGeneration == generation,
+            self.projectID == projectID,
+            self.token == token
+        else { return false }
+        return snapshot?.project.id == projectID &&
+            snapshot?.runs.contains(where: { $0.id == runID }) == true
     }
 
     func applicationDidBecomeActive() {

@@ -125,6 +125,20 @@ export type SlackInstallationRow = {
   updated_at: string;
 };
 
+export type SlackRevocationQueueRow = {
+  id: string;
+  team_id: string;
+  encrypted_bot_token: string;
+  token_iv: string;
+  queued_at: string;
+  next_attempt_at: string;
+  attempts: number;
+  last_attempt_at: string | null;
+  last_error: string | null;
+  dead_lettered_at: string | null;
+  dead_letter_reason: string | null;
+};
+
 export type SlackOAuthStateRow = {
   state_hash: string;
   organization_id: string;
@@ -708,6 +722,9 @@ export type IssueActionProposalRow = {
   status: "pending" | "accepted";
   accepted_by_user_id: string | null;
   accepted_at: string | null;
+  approval_reserved_by_user_id: string | null;
+  approval_reserved_at: string | null;
+  issue_source_key: string | null;
   result_run_id: string | null;
   created_at: string;
   updated_at: string;
@@ -2271,32 +2288,391 @@ export async function deleteAccountData(
   input: {
     userId: string;
     email: string;
-    organizationIds: readonly string[];
+    observedAt: string;
   },
 ) {
-  const statements = [
-    ...input.organizationIds.map((organizationId) =>
-      db
-        .prepare(`delete from briar_organizations where id = ?`)
-        .bind(organizationId),
-    ),
-    db
-      .prepare(`delete from verification where lower(identifier) = lower(?)`)
-      .bind(input.email),
-    db.prepare(`delete from deviceCode where userId = ?`).bind(input.userId),
+  const jobId = crypto.randomUUID();
+  const cleanupUpsert = `
+    on conflict (bucket, object_key) do update set
+      project_id = excluded.project_id,
+      run_id = excluded.run_id,
+      queued_at = excluded.queued_at,
+      attempts = 0,
+      last_attempt_at = null,
+      last_error = null,
+      generation = briar_archive_cleanup_queue.generation + 1,
+      next_attempt_at = null,
+      dead_lettered_at = null,
+      alert_state = 'none',
+      alert_detail_json = null`;
+  const statements: D1PreparedStatement[] = [
+    // This authoritative guard deliberately recomputes the current state. A
+    // preview plan is useful UI, but it is never permission to erase an
+    // organization that gained another member or user-owned resource later.
     db
       .prepare(
-        `delete from briar_project_agent_tokens where issued_to_user_id = ?`,
+        `insert into briar_account_deletion_jobs (
+           id, user_id, email, created_at
+         )
+         select ?, account.id, ?, ?
+         from "user" account
+         where account.id = ?
+           and not exists (
+             select 1
+             from briar_organization_members membership
+             where membership.user_id = account.id
+               and membership.role = 'owner'
+               and 1 < (
+                 select count(*)
+                 from briar_organization_members peer
+                 where peer.organization_id = membership.organization_id
+               )
+           )
+           and not exists (
+             select 1 from briar_projects project
+             where project.owner_user_id = account.id
+               and not exists (
+                 select 1
+                 from briar_organization_members membership
+                 where membership.organization_id = project.organization_id
+                   and membership.user_id = account.id
+                   and 1 = (
+                     select count(*)
+                     from briar_organization_members peer
+                     where peer.organization_id = project.organization_id
+                   )
+               )
+           )
+           and not exists (
+             select 1 from briar_execution_worker_devices device
+             where device.owner_user_id = account.id
+               and not exists (
+                 select 1
+                 from briar_organization_members membership
+                 where membership.organization_id = device.organization_id
+                   and membership.user_id = account.id
+                   and 1 = (
+                     select count(*)
+                     from briar_organization_members peer
+                     where peer.organization_id = device.organization_id
+                   )
+               )
+           )
+           and not exists (
+             select 1 from briar_slack_installations installation
+             where installation.installed_by_user_id = account.id
+               and not exists (
+                 select 1
+                 from briar_organization_members membership
+                 where membership.organization_id = installation.organization_id
+                   and membership.user_id = account.id
+                   and 1 = (
+                     select count(*)
+                     from briar_organization_members peer
+                     where peer.organization_id = installation.organization_id
+                   )
+               )
+           )
+         returning id`,
       )
-      .bind(input.userId),
-    db.prepare(`delete from "user" where id = ?`).bind(input.userId),
+      .bind(jobId, input.email, input.observedAt, input.userId),
+    db
+      .prepare(
+        `insert into briar_account_deletion_job_organizations (
+           job_id, organization_id
+         )
+         select job.id, membership.organization_id
+         from briar_account_deletion_jobs job
+         join briar_organization_members membership
+           on membership.user_id = job.user_id
+         where job.id = ?
+           and 1 = (
+             select count(*) from briar_organization_members peer
+             where peer.organization_id = membership.organization_id
+           )`,
+      )
+      .bind(jobId),
+    db
+      .prepare(
+        `insert into briar_archive_cleanup_queue (
+           bucket, object_key, project_id, run_id, queued_at
+         )
+         select 'archives', archive.object_key,
+                case when current_scope.organization_id is not null
+                     then current_project.id else stored_project.id end,
+                null, ?
+         from briar_log_archives archive
+         left join briar_projects stored_project
+           on stored_project.id = archive.project_id
+         left join briar_account_deletion_job_organizations stored_scope
+           on stored_scope.job_id = ?
+          and stored_scope.organization_id = stored_project.organization_id
+         left join briar_hunt_runs run on run.id = archive.run_id
+         left join briar_projects current_project
+           on current_project.id = run.project_id
+         left join briar_account_deletion_job_organizations current_scope
+           on current_scope.job_id = ?
+          and current_scope.organization_id = current_project.organization_id
+         where stored_scope.organization_id is not null
+            or current_scope.organization_id is not null
+         ${cleanupUpsert}`,
+      )
+      .bind(input.observedAt, jobId, jobId),
+    db
+      .prepare(
+        `insert into briar_archive_cleanup_queue (
+           bucket, object_key, project_id, run_id, queued_at
+         )
+         select 'attachments', related.value,
+                case when current_scope.organization_id is not null
+                     then current_project.id else stored_project.id end,
+                null, ?
+         from briar_log_archives archive
+         join json_each(archive.related_object_keys_json) related
+           on related.type = 'text'
+         left join briar_projects stored_project
+           on stored_project.id = archive.project_id
+         left join briar_account_deletion_job_organizations stored_scope
+           on stored_scope.job_id = ?
+          and stored_scope.organization_id = stored_project.organization_id
+         left join briar_hunt_runs run on run.id = archive.run_id
+         left join briar_projects current_project
+           on current_project.id = run.project_id
+         left join briar_account_deletion_job_organizations current_scope
+           on current_scope.job_id = ?
+          and current_scope.organization_id = current_project.organization_id
+         where stored_scope.organization_id is not null
+            or current_scope.organization_id is not null
+         ${cleanupUpsert}`,
+      )
+      .bind(input.observedAt, jobId, jobId),
+    db
+      .prepare(
+        `insert into briar_archive_cleanup_queue (
+           bucket, object_key, project_id, run_id, queued_at
+         )
+         select 'attachments', attachment.object_key,
+                case when current_scope.organization_id is not null
+                     then current_project.id else stored_project.id end,
+                null, ?
+         from briar_issue_attachments attachment
+         left join briar_projects stored_project
+           on stored_project.id = attachment.project_id
+         left join briar_account_deletion_job_organizations stored_scope
+           on stored_scope.job_id = ?
+          and stored_scope.organization_id = stored_project.organization_id
+         left join briar_hunt_runs run on run.id = attachment.run_id
+         left join briar_projects current_project
+           on current_project.id = run.project_id
+         left join briar_account_deletion_job_organizations current_scope
+           on current_scope.job_id = ?
+          and current_scope.organization_id = current_project.organization_id
+         where stored_scope.organization_id is not null
+            or current_scope.organization_id is not null
+         ${cleanupUpsert}`,
+      )
+      .bind(input.observedAt, jobId, jobId),
+    db
+      .prepare(
+        `insert into briar_archive_cleanup_queue (
+           bucket, object_key, project_id, run_id, queued_at
+         )
+         select 'attachments', image.object_key,
+                case when current_scope.organization_id is not null
+                     then current_project.id else stored_project.id end,
+                null, ?
+         from briar_run_evidence_images image
+         left join briar_projects stored_project
+           on stored_project.id = image.project_id
+         left join briar_account_deletion_job_organizations stored_scope
+           on stored_scope.job_id = ?
+          and stored_scope.organization_id = stored_project.organization_id
+         left join briar_hunt_runs run on run.id = image.run_id
+         left join briar_projects current_project
+           on current_project.id = run.project_id
+         left join briar_account_deletion_job_organizations current_scope
+           on current_scope.job_id = ?
+          and current_scope.organization_id = current_project.organization_id
+         where stored_scope.organization_id is not null
+            or current_scope.organization_id is not null
+         ${cleanupUpsert}`,
+      )
+      .bind(input.observedAt, jobId, jobId),
+    db
+      .prepare(
+        `insert into briar_archive_cleanup_queue (
+           bucket, object_key, project_id, run_id, queued_at
+         )
+         select 'attachments', agent.avatar_spritesheet_object_key,
+                'organization:' || agent.organization_id, null, ?
+         from briar_project_agents agent
+         join briar_account_deletion_job_organizations scope
+           on scope.job_id = ?
+          and scope.organization_id = agent.organization_id
+         where agent.avatar_spritesheet_object_key is not null
+         ${cleanupUpsert}`,
+      )
+      .bind(input.observedAt, jobId),
+    db
+      .prepare(
+        `insert into briar_archive_cleanup_queue (
+           bucket, object_key, project_id, run_id, queued_at
+         )
+         select 'attachments', attachment.object_key,
+                'organization:' || attachment.organization_id, null, ?
+         from briar_channel_message_attachments attachment
+         join briar_account_deletion_job_organizations scope
+           on scope.job_id = ?
+          and scope.organization_id = attachment.organization_id
+         ${cleanupUpsert}`,
+      )
+      .bind(input.observedAt, jobId),
+    db
+      .prepare(
+        `insert into briar_slack_revocation_queue (
+           id, team_id, encrypted_bot_token, token_iv, queued_at,
+           next_attempt_at
+         )
+         select lower(hex(randomblob(32))), installation.team_id,
+                installation.encrypted_bot_token, installation.token_iv, ?, ?
+         from briar_slack_installations installation
+         join briar_account_deletion_job_organizations scope
+           on scope.job_id = ?
+          and scope.organization_id = installation.organization_id`,
+      )
+      .bind(input.observedAt, input.observedAt, jobId),
   ];
-  await db.batch(statements);
-  const remaining = await db
-    .prepare(`select 1 as present from "user" where id = ?`)
-    .bind(input.userId)
-    .first<{ present: number }>();
-  return remaining === null;
+  statements.push(
+    db
+      .prepare(
+        `delete from verification
+         where lower(identifier) = lower(?)
+           and exists (
+             select 1 from briar_account_deletion_jobs where id = ?
+           )`,
+      )
+      .bind(input.email, jobId),
+    db
+      .prepare(
+        `delete from deviceCode
+         where userId = ?
+           and exists (
+             select 1 from briar_account_deletion_jobs where id = ?
+           )`,
+      )
+      .bind(input.userId, jobId),
+    // issued_to_user_id is ON DELETE SET NULL, so revoke these credentials
+    // before deleting the user while the authoritative job guard still exists.
+    db
+      .prepare(
+        `delete from briar_project_agent_tokens
+         where issued_to_user_id = ?
+           and exists (
+             select 1 from briar_account_deletion_jobs where id = ?
+           )`,
+      )
+      .bind(input.userId, jobId),
+  );
+  const userDeleteIndex = statements.length;
+  statements.push(
+    db
+      .prepare(
+        `delete from "user"
+         where id = ? and exists (
+           select 1 from briar_account_deletion_jobs where id = ?
+         )
+         returning id`,
+      )
+      .bind(input.userId, jobId),
+    db
+      .prepare(
+        `delete from briar_organizations
+         where id in (
+           select organization_id
+           from briar_account_deletion_job_organizations
+           where job_id = ?
+         )
+         and not exists (select 1 from "user" where id = ?)`,
+      )
+      .bind(jobId, input.userId),
+    db.prepare(`delete from briar_account_deletion_jobs where id = ?`).bind(jobId),
+    db.prepare(`select 1 as present from "user" where id = ?`).bind(input.userId),
+  );
+  const results = await db.batch(statements);
+  if ((results[userDeleteIndex]?.results?.length ?? 0) > 0) {
+    return "deleted" as const;
+  }
+  return (results.at(-1)?.results?.length ?? 0) > 0
+    ? ("blocked" as const)
+    : ("not_found" as const);
+}
+
+export async function listSlackRevocationQueue(
+  db: D1Database,
+  observedAt: string,
+  limit = 100,
+) {
+  const result = await db
+    .prepare(
+      `select id, team_id, encrypted_bot_token, token_iv, queued_at,
+              next_attempt_at, attempts, last_attempt_at, last_error,
+              dead_lettered_at, dead_letter_reason
+       from briar_slack_revocation_queue
+       where dead_lettered_at is null and next_attempt_at <= ?
+       order by next_attempt_at, queued_at, id
+       limit ?`,
+    )
+    .bind(observedAt, Math.max(1, Math.min(limit, 1_000)))
+    .all<SlackRevocationQueueRow>();
+  return result.results ?? [];
+}
+
+export async function completeSlackRevocation(
+  db: D1Database,
+  id: string,
+) {
+  await db
+    .prepare(`delete from briar_slack_revocation_queue where id = ?`)
+    .bind(id)
+    .run();
+}
+
+export async function failSlackRevocation(
+  db: D1Database,
+  id: string,
+  observedAt: string,
+  nextAttemptAt: string,
+  error: string,
+) {
+  const result = await db
+    .prepare(
+      `update briar_slack_revocation_queue
+       set attempts = attempts + 1, last_attempt_at = ?,
+           next_attempt_at = ?, last_error = ?
+       where id = ? and dead_lettered_at is null`,
+    )
+    .bind(observedAt, nextAttemptAt, error.slice(0, 1_000), id)
+    .run();
+  return result.meta.changes > 0;
+}
+
+export async function deadLetterSlackRevocation(
+  db: D1Database,
+  id: string,
+  observedAt: string,
+  error: string,
+) {
+  const reason = error.slice(0, 1_000);
+  const result = await db
+    .prepare(
+      `update briar_slack_revocation_queue
+       set attempts = attempts + 1, last_attempt_at = ?, last_error = ?,
+           dead_lettered_at = ?, dead_letter_reason = ?
+       where id = ? and dead_lettered_at is null`,
+    )
+    .bind(observedAt, reason, observedAt, reason, id)
+    .run();
+  return result.meta.changes > 0;
 }
 
 export async function createOrganization(
@@ -3390,17 +3766,65 @@ export async function updateSlackInstallationProject(
 
 export async function deleteSlackInstallation(
   db: D1Database,
-  organizationId: string,
-  teamId: string,
+  input: {
+    organizationId: string;
+    teamId: string;
+    actorUserId: string;
+    observedAt: string;
+  },
 ) {
-  const result = await db
-    .prepare(
-      `delete from briar_slack_installations
-       where organization_id = ? and team_id = ?`,
-    )
-    .bind(organizationId, teamId)
-    .run();
-  return result.meta.changes > 0;
+  const queueId = Array.from(
+    crypto.getRandomValues(new Uint8Array(32)),
+    (byte) => byte.toString(16).padStart(2, "0"),
+  ).join("");
+  const results = await db.batch([
+    db
+      .prepare(
+        `insert into briar_slack_revocation_queue (
+           id, team_id, encrypted_bot_token, token_iv, queued_at,
+           next_attempt_at
+         )
+         select ?, installation.team_id, installation.encrypted_bot_token,
+                installation.token_iv, ?, ?
+         from briar_slack_installations installation
+         where installation.organization_id = ?
+           and installation.team_id = ?
+           and exists (
+             select 1 from briar_organization_members membership
+             where membership.organization_id = installation.organization_id
+               and membership.user_id = ?
+               and membership.role in ('owner', 'admin')
+           )`,
+      )
+      .bind(
+        queueId,
+        input.observedAt,
+        input.observedAt,
+        input.organizationId,
+        input.teamId,
+        input.actorUserId,
+      ),
+    db
+      .prepare(
+        `delete from briar_slack_installations
+         where organization_id = ? and team_id = ?
+           and exists (
+             select 1 from briar_slack_revocation_queue queue
+             where queue.id = ? and queue.team_id = briar_slack_installations.team_id
+           )`,
+      )
+      .bind(input.organizationId, input.teamId, queueId),
+    db
+      .prepare(
+        `select 1 as present from briar_slack_installations
+         where organization_id = ? and team_id = ?`,
+      )
+      .bind(input.organizationId, input.teamId),
+  ]);
+  if ((results[1]?.meta.changes ?? 0) > 0) return "deleted" as const;
+  return (results[2]?.results?.length ?? 0) > 0
+    ? ("forbidden" as const)
+    : ("not_found" as const);
 }
 
 export async function claimSlackEvent(
@@ -3767,22 +4191,191 @@ export async function updateProjectIssueKeyPrefix(
   return result.meta.changes > 0;
 }
 
+const archiveCleanupQueueUpsertSql = `
+  on conflict (bucket, object_key) do update set
+    project_id = excluded.project_id,
+    run_id = excluded.run_id,
+    queued_at = excluded.queued_at,
+    attempts = 0,
+    last_attempt_at = null,
+    last_error = null,
+    generation = briar_archive_cleanup_queue.generation + 1,
+    next_attempt_at = null,
+    dead_lettered_at = null,
+    alert_state = 'none',
+    alert_detail_json = null`;
+
 export async function deleteProject(
   db: D1Database,
   projectId: string,
   userId: string,
+  observedAt = new Date().toISOString(),
 ) {
-  const result = await db
-    .prepare(
-      `delete from briar_projects
-       where id = ? and organization_id in (
-         select organization_id from briar_organization_members
-         where user_id = ? and role = 'owner'
-       )`,
-    )
-    .bind(projectId, userId)
-    .run();
-  return result.meta.changes > 0;
+  const authorizedProject = `exists (
+    select 1
+    from briar_projects target
+    join briar_organization_members membership
+      on membership.organization_id = target.organization_id
+    where target.id = ? and membership.user_id = ?
+      and membership.role = 'owner'
+  )`;
+  const results = await db.batch([
+    db
+      .prepare(
+        `insert into briar_archive_cleanup_queue (
+           bucket, object_key, project_id, run_id, queued_at
+         )
+         select 'archives', archive.object_key, ?, null, ?
+         from briar_log_archives archive
+         where (
+           archive.project_id = ?
+           or exists (
+             select 1 from briar_hunt_runs run
+             where run.id = archive.run_id and run.project_id = ?
+           )
+         ) and ${authorizedProject}
+         ${archiveCleanupQueueUpsertSql}`,
+      )
+      .bind(
+        projectId,
+        observedAt,
+        projectId,
+        projectId,
+        projectId,
+        userId,
+      ),
+    db
+      .prepare(
+        `insert into briar_archive_cleanup_queue (
+           bucket, object_key, project_id, run_id, queued_at
+         )
+         select 'attachments', related.value, ?, null, ?
+         from briar_log_archives archive,
+              json_each(archive.related_object_keys_json) related
+         where related.type = 'text'
+           and (
+             archive.project_id = ?
+             or exists (
+               select 1 from briar_hunt_runs run
+               where run.id = archive.run_id and run.project_id = ?
+             )
+           ) and ${authorizedProject}
+         ${archiveCleanupQueueUpsertSql}`,
+      )
+      .bind(
+        projectId,
+        observedAt,
+        projectId,
+        projectId,
+        projectId,
+        userId,
+      ),
+    db
+      .prepare(
+        `insert into briar_archive_cleanup_queue (
+           bucket, object_key, project_id, run_id, queued_at
+         )
+         select 'attachments', attachment.object_key, ?, null, ?
+         from briar_issue_attachments attachment
+         where (
+           attachment.project_id = ?
+           or exists (
+             select 1 from briar_hunt_runs run
+             where run.id = attachment.run_id and run.project_id = ?
+           )
+         ) and ${authorizedProject}
+         ${archiveCleanupQueueUpsertSql}`,
+      )
+      .bind(
+        projectId,
+        observedAt,
+        projectId,
+        projectId,
+        projectId,
+        userId,
+      ),
+    db
+      .prepare(
+        `insert into briar_archive_cleanup_queue (
+           bucket, object_key, project_id, run_id, queued_at
+         )
+         select 'attachments', image.object_key, ?, null, ?
+         from briar_run_evidence_images image
+         where (
+           image.project_id = ?
+           or exists (
+             select 1 from briar_hunt_runs run
+             where run.id = image.run_id and run.project_id = ?
+           )
+         ) and ${authorizedProject}
+         ${archiveCleanupQueueUpsertSql}`,
+      )
+      .bind(
+        projectId,
+        observedAt,
+        projectId,
+        projectId,
+        projectId,
+        userId,
+      ),
+    db
+      .prepare(
+        `insert into briar_archive_cleanup_queue (
+           bucket, object_key, project_id, run_id, queued_at
+         )
+         select 'attachments', agent.avatar_spritesheet_object_key, ?, null, ?
+         from briar_project_agents agent
+         where agent.project_id = ?
+           and agent.avatar_spritesheet_object_key is not null
+           and ${authorizedProject}
+         ${archiveCleanupQueueUpsertSql}`,
+      )
+      .bind(projectId, observedAt, projectId, projectId, userId),
+    db
+      .prepare(
+        `delete from briar_projects
+         where id = ? and organization_id in (
+           select organization_id from briar_organization_members
+           where user_id = ? and role = 'owner'
+         )
+         returning id`,
+      )
+      .bind(projectId, userId),
+  ]);
+  return (results.at(-1)?.results?.length ?? 0) > 0;
+}
+
+export async function getProjectRunChildMismatch(
+  db: D1Database,
+  projectId: string,
+) {
+  type Mismatch = {
+      stale_project_id: string;
+      current_project_id: string;
+      run_id: string;
+      entity_kind: string;
+      entity_id: string;
+  };
+  for (const view of [
+    "briar_run_child_storage_a_project_mismatches",
+    "briar_run_child_storage_b_project_mismatches",
+    "briar_run_child_relation_a_project_mismatches",
+    "briar_run_child_relation_b_project_mismatches",
+  ]) {
+    const mismatch = await db
+      .prepare(
+        `select stale_project_id, current_project_id, run_id, entity_kind,
+                entity_id
+         from ${view}
+         where stale_project_id = ? or current_project_id = ?
+         order by entity_kind, entity_id
+         limit 1`,
+      )
+      .bind(projectId, projectId)
+      .first<Mismatch>();
+    if (mismatch) return mismatch;
+  }
+  return null;
 }
 
 export async function listProjectAgents(db: D1Database, projectId: string) {
@@ -5175,14 +5768,14 @@ export async function listOrganizationUsageRuns(
               run.preferred_agent_provider, run.preferred_agent_model,
               run.requested_agent_provider, run.requested_agent_model,
               coalesce(
-                run.preferred_agent_provider,
-                run.requested_agent_provider
+                run.requested_agent_provider,
+                run.preferred_agent_provider
               ) as execution_provider,
               case
-                when run.preferred_agent_provider is not null
-                  then run.preferred_agent_model
                 when run.requested_agent_provider is not null
                   then run.requested_agent_model
+                when run.preferred_agent_provider is not null
+                  then run.preferred_agent_model
                 else null
               end as execution_model,
               run.started_at, run.updated_at, run.completed_at
@@ -5670,6 +6263,8 @@ export async function listIssueMessages(
                where reply.parent_message_id = message.id) as reply_count,
               message.created_at, message.updated_at
        from briar_issue_messages message
+       join briar_hunt_runs run
+         on run.id = message.run_id and run.project_id = message.project_id
        left join "user" author on author.id = message.author_user_id
        where message.project_id = ? and message.run_id = ?
        order by message.created_at, message.id
@@ -5696,6 +6291,8 @@ export async function listIssueThreadMessages(
                where reply.parent_message_id = message.id) as reply_count,
               message.created_at, message.updated_at
        from briar_issue_messages message
+       join briar_hunt_runs run
+         on run.id = message.run_id and run.project_id = message.project_id
        left join "user" author on author.id = message.author_user_id
        where message.project_id = ? and message.run_id = ?
          and message.id in (
@@ -5815,7 +6412,12 @@ export async function getIssueMessage(
               message.created_at, message.updated_at
        from briar_issue_messages message
        left join "user" author on author.id = message.author_user_id
-       where message.project_id = ? and message.run_id = ? and message.id = ?`,
+       where message.project_id = ? and message.run_id = ? and message.id = ?
+         and exists (
+           select 1 from briar_hunt_runs run
+           where run.id = message.run_id
+             and run.project_id = message.project_id
+         )`,
     )
     .bind(projectId, runId, messageId)
     .first<IssueMessageRow>();
@@ -5836,7 +6438,12 @@ export async function updateIssueMessage(
     .prepare(
       `update briar_issue_messages
        set body = ?, updated_at = ?
-       where project_id = ? and run_id = ? and id = ?`,
+       where project_id = ? and run_id = ? and id = ?
+         and exists (
+           select 1 from briar_hunt_runs run
+           where run.id = briar_issue_messages.run_id
+             and run.project_id = briar_issue_messages.project_id
+         )`,
     )
     .bind(input.body, input.updatedAt, projectId, runId, messageId)
     .run();
@@ -5889,7 +6496,12 @@ export async function deleteIssueMessage(
          where reply.project_id = ? and reply.run_id = ?
        )
        delete from briar_issue_messages
-       where id in (select id from descendants)`,
+       where id in (select id from descendants)
+         and exists (
+           select 1 from briar_hunt_runs run
+           where run.id = briar_issue_messages.run_id
+             and run.project_id = briar_issue_messages.project_id
+         )`,
     )
     .bind(projectId, runId, messageId, projectId, runId)
     .run();
@@ -5963,8 +6575,11 @@ export async function getIssueAgentReplyJob(
 ) {
   return await db
     .prepare(
-      `select * from briar_issue_agent_reply_jobs
-       where project_id = ? and trigger_message_id = ?`,
+      `select job.*
+       from briar_issue_agent_reply_jobs job
+       join briar_hunt_runs run
+         on run.id = job.run_id and run.project_id = job.project_id
+       where job.project_id = ? and job.trigger_message_id = ?`,
     )
     .bind(projectId, triggerMessageId)
     .first<IssueAgentReplyJobRow>();
@@ -5990,7 +6605,12 @@ export async function claimNextIssueAgentReply(
            error = coalesce(error, 'Worker reply lease expired repeatedly.'),
            claim_token_hash = null, lease_expires_at = null, updated_at = ?
        where project_id = ? and status = 'running' and attempts >= 3
-         and lease_expires_at <= ?`,
+         and lease_expires_at <= ?
+         and exists (
+           select 1 from briar_hunt_runs run
+           where run.id = briar_issue_agent_reply_jobs.run_id
+             and run.project_id = briar_issue_agent_reply_jobs.project_id
+         )`,
     )
     .bind(input.claimedAt, projectId, input.claimedAt)
     .run();
@@ -6010,6 +6630,8 @@ export async function claimNextIssueAgentReply(
        where id = (
          select job.id
          from briar_issue_agent_reply_jobs job
+         join briar_hunt_runs run
+           on run.id = job.run_id and run.project_id = job.project_id
          where job.project_id = ?
            and job.attempts < 3
            and (
@@ -6102,6 +6724,11 @@ export async function renewIssueAgentReplyLease(
        set lease_expires_at = ?, updated_at = ?
        where id = ? and project_id = ? and status = 'running'
          and claimed_worker_id = ? and claim_token_hash = ?
+         and exists (
+           select 1 from briar_hunt_runs run
+           where run.id = briar_issue_agent_reply_jobs.run_id
+             and run.project_id = briar_issue_agent_reply_jobs.project_id
+         )
        returning *`,
     )
     .bind(
@@ -6123,9 +6750,12 @@ export async function getClaimedIssueAgentReply(
 ) {
   return await db
     .prepare(
-      `select * from briar_issue_agent_reply_jobs
-       where id = ? and project_id = ? and status = 'running'
-         and claimed_worker_id = ? and claim_token_hash = ?`,
+      `select job.*
+       from briar_issue_agent_reply_jobs job
+       join briar_hunt_runs run
+         on run.id = job.run_id and run.project_id = job.project_id
+       where job.id = ? and job.project_id = ? and job.status = 'running'
+         and job.claimed_worker_id = ? and job.claim_token_hash = ?`,
     )
     .bind(jobId, projectId, input.workerId, input.claimTokenHash)
     .first<IssueAgentReplyJobRow>();
@@ -6151,6 +6781,11 @@ export async function failIssueAgentReply(
            error = ?, updated_at = ?
        where id = ? and project_id = ? and status = 'running'
          and claimed_worker_id = ? and claim_token_hash = ?
+         and exists (
+           select 1 from briar_hunt_runs run
+           where run.id = briar_issue_agent_reply_jobs.run_id
+             and run.project_id = briar_issue_agent_reply_jobs.project_id
+         )
        returning *`,
     )
     .bind(
@@ -6181,6 +6816,11 @@ export async function completeIssueAgentReply(
            lease_expires_at = null, completed_at = ?, updated_at = ?
        where id = ? and project_id = ? and status = 'running'
          and claimed_worker_id = ? and claim_token_hash = ?
+         and exists (
+           select 1 from briar_hunt_runs run
+           where run.id = briar_issue_agent_reply_jobs.run_id
+             and run.project_id = briar_issue_agent_reply_jobs.project_id
+         )
        returning *`,
     )
     .bind(
@@ -6247,9 +6887,12 @@ export async function listIssueReworkProposals(
 ) {
   const result = await db
     .prepare(
-      `select * from briar_issue_rework_proposals
-       where project_id = ? and run_id = ?
-       order by created_at, id`,
+      `select proposal.*
+       from briar_issue_rework_proposals proposal
+       join briar_hunt_runs run
+         on run.id = proposal.run_id and run.project_id = proposal.project_id
+       where proposal.project_id = ? and proposal.run_id = ?
+       order by proposal.created_at, proposal.id`,
     )
     .bind(projectId, runId)
     .all<IssueReworkProposalRow>();
@@ -6264,8 +6907,12 @@ export async function getIssueReworkProposal(
 ) {
   return await db
     .prepare(
-      `select * from briar_issue_rework_proposals
-       where id = ? and project_id = ? and run_id = ?`,
+      `select proposal.*
+       from briar_issue_rework_proposals proposal
+       join briar_hunt_runs run
+         on run.id = proposal.run_id and run.project_id = proposal.project_id
+       where proposal.id = ? and proposal.project_id = ?
+         and proposal.run_id = ?`,
     )
     .bind(proposalId, projectId, runId)
     .first<IssueReworkProposalRow>();
@@ -6289,6 +6936,11 @@ export async function acceptIssueReworkProposal(
            applied_revision = ?, updated_at = ?
        where id = ? and project_id = ? and run_id = ?
          and status = 'pending'
+         and exists (
+           select 1 from briar_hunt_runs run
+           where run.id = briar_issue_rework_proposals.run_id
+             and run.project_id = briar_issue_rework_proposals.project_id
+         )
        returning *`,
     )
     .bind(
@@ -6353,9 +7005,13 @@ export async function listIssueActionProposals(
 ) {
   const result = await db
     .prepare(
-      `select * from briar_issue_action_proposals
-       where project_id = ? and conversation_run_id = ?
-       order by created_at, id`,
+      `select proposal.*
+       from briar_issue_action_proposals proposal
+       join briar_hunt_runs run
+         on run.id = proposal.conversation_run_id
+        and run.project_id = proposal.project_id
+       where proposal.project_id = ? and proposal.conversation_run_id = ?
+       order by proposal.created_at, proposal.id`,
     )
     .bind(projectId, conversationRunId)
     .all<IssueActionProposalRow>();
@@ -6370,8 +7026,13 @@ export async function getIssueActionProposal(
 ) {
   return await db
     .prepare(
-      `select * from briar_issue_action_proposals
-       where id = ? and project_id = ? and conversation_run_id = ?`,
+      `select proposal.*
+       from briar_issue_action_proposals proposal
+       join briar_hunt_runs run
+         on run.id = proposal.conversation_run_id
+        and run.project_id = proposal.project_id
+       where proposal.id = ? and proposal.project_id = ?
+         and proposal.conversation_run_id = ?`,
     )
     .bind(proposalId, projectId, conversationRunId)
     .first<IssueActionProposalRow>();
@@ -6473,17 +7134,112 @@ export async function acceptIssueCreateProposal(
   return await db
     .prepare(
       `update briar_issue_action_proposals
-       set status = 'accepted', accepted_by_user_id = ?, accepted_at = ?,
-           result_run_id = ?, updated_at = ?
+       set status = 'accepted',
+           accepted_by_user_id = approval_reserved_by_user_id,
+           accepted_at = approval_reserved_at,
+           result_run_id = ?, updated_at = approval_reserved_at
        where id = ? and project_id = ? and conversation_run_id = ?
          and status = 'pending' and action_type = 'request_issue_create'
+         and approval_reserved_by_user_id is not null
+         and approval_reserved_at is not null
+         and issue_source_key is not null
+         and exists (
+           select 1 from briar_hunt_runs conversation
+           where conversation.id =
+               briar_issue_action_proposals.conversation_run_id
+             and conversation.project_id =
+               briar_issue_action_proposals.project_id
+         )
+         and exists (
+           select 1 from briar_hunt_runs result
+           where result.id = ? and result.project_id = ?
+             and result.source = 'issue'
+             and result.source_key =
+               briar_issue_action_proposals.issue_source_key
+             and result.status = 'backlog' and result.stage = 'queued'
+             and result.workflow_stage is null
+             and result.worker_id is null
+             and result.agent_id is null
+             and result.requested_worker_id is null
+             and result.claim_token_hash is null
+             and result.claimed_by is null and result.claimed_at is null
+             and result.lease_expires_at is null
+             and result.last_execution_id is null
+             and result.dispatch_mode is null
+             and result.dispatch_request_id is null
+             and result.dispatched_at is null
+             and result.requested_by_user_id is null
+             and result.requested_agent_provider is null
+             and result.requested_agent_model is null
+             and result.requested_agent_effort is null
+             and result.completed_at is null
+             and result.paused_at is null
+             and result.resume_requested_at is null
+         )
+         and exists (
+           select 1
+           from briar_projects project
+           join briar_organization_members membership
+             on membership.organization_id = project.organization_id
+           where project.id = briar_issue_action_proposals.project_id
+             and membership.user_id = ?
+         )
+       returning *`,
+    )
+    .bind(
+      input.resultRunId,
+      input.proposalId,
+      input.projectId,
+      input.conversationRunId,
+      input.resultRunId,
+      input.projectId,
+      input.userId,
+    )
+    .first<IssueActionProposalRow>();
+}
+
+export async function reserveIssueCreateProposalApproval(
+  db: D1Database,
+  input: {
+    projectId: string;
+    conversationRunId: string;
+    proposalId: string;
+    userId: string;
+    reservedAt: string;
+    issueSourceKey: string;
+  },
+) {
+  return await db
+    .prepare(
+      `update briar_issue_action_proposals
+       set approval_reserved_by_user_id = case
+             when approval_reserved_by_user_id is null then ?
+             else approval_reserved_by_user_id
+           end,
+           approval_reserved_at = case
+             when approval_reserved_by_user_id is null then ?
+             else approval_reserved_at
+           end,
+           issue_source_key = coalesce(issue_source_key, ?),
+           updated_at = case
+             when approval_reserved_by_user_id is null then ? else updated_at
+           end
+       where id = ? and project_id = ? and conversation_run_id = ?
+         and status = 'pending' and action_type = 'request_issue_create'
+         and exists (
+           select 1 from briar_hunt_runs conversation
+           where conversation.id =
+               briar_issue_action_proposals.conversation_run_id
+             and conversation.project_id =
+               briar_issue_action_proposals.project_id
+         )
        returning *`,
     )
     .bind(
       input.userId,
-      input.acceptedAt,
-      input.resultRunId,
-      input.acceptedAt,
+      input.reservedAt,
+      input.issueSourceKey,
+      input.reservedAt,
       input.proposalId,
       input.projectId,
       input.conversationRunId,
@@ -6601,21 +7357,29 @@ export async function createIssueAttachments(
           `insert into briar_issue_attachments (
              id, run_id, project_id, object_key, filename, content_type,
              byte_size, created_at
-           ) values (?, ?, ?, ?, ?, ?, ?, ?)`,
+           )
+           select ?, run.id, run.project_id, ?, ?, ?, ?, ?
+           from briar_hunt_runs run
+           where run.id = ? and run.project_id = ?
+           returning id`,
         )
         .bind(
           attachment.id,
-          runId,
-          projectId,
           attachment.object_key,
           attachment.filename,
           attachment.content_type,
           attachment.byte_size,
           createdAt,
+          runId,
+          projectId,
         ),
     ),
   );
-  if (results.some((result) => !result.success)) {
+  if (
+    results.some(
+      (result) => !result.success || (result.results?.length ?? 0) !== 1,
+    )
+  ) {
     throw new Error("Issue attachment metadata could not be stored");
   }
 }
@@ -6626,13 +7390,19 @@ export async function deleteIssueAttachments(
   runId: string,
   attachmentIds: string[],
 ) {
-  if (attachmentIds.length === 0) return;
+  if (attachmentIds.length === 0) return [];
   const results = await db.batch(
     attachmentIds.map((attachmentId) =>
       db
         .prepare(
           `delete from briar_issue_attachments
-           where project_id = ? and run_id = ? and id = ?`,
+           where project_id = ? and run_id = ? and id = ?
+             and exists (
+               select 1 from briar_hunt_runs run
+               where run.id = briar_issue_attachments.run_id
+                 and run.project_id = briar_issue_attachments.project_id
+             )
+           returning object_key`,
         )
         .bind(projectId, runId, attachmentId),
     ),
@@ -6640,6 +7410,123 @@ export async function deleteIssueAttachments(
   if (results.some((result) => !result.success)) {
     throw new Error("Issue attachment metadata could not be removed");
   }
+  return results.flatMap((result) =>
+    (result.results ?? []).map((row) => (row as { object_key: string }).object_key)
+  );
+}
+
+export async function issueAttachmentObjectKeysInUse(
+  db: D1Database,
+  objectKeys: string[],
+) {
+  if (objectKeys.length === 0) return new Set<string>();
+  const placeholders = objectKeys.map(() => "?").join(",");
+  const result = await db
+    .prepare(
+      `select object_key from briar_issue_attachments
+       where object_key in (${placeholders})`,
+    )
+    .bind(...objectKeys)
+    .all<{ object_key: string }>();
+  return new Set((result.results ?? []).map((row) => row.object_key));
+}
+
+export async function updateIssueWithAttachmentMetadata(
+  db: D1Database,
+  projectId: string,
+  runId: string,
+  input: {
+    title: string;
+    description: string | null;
+    priority: number | null;
+    assigneeUserId?: string | null;
+    updatedAt: string;
+    attachments: IssueAttachmentInput[];
+    removedAttachmentIds: string[];
+  },
+) {
+  const createdAt = new Date().toISOString();
+  const statements = [
+    db
+      .prepare(
+        `update briar_hunt_runs
+         set title = ?, issue_description = ?, priority = ?,
+             assignee_user_id = case when ? = 1 then ? else assignee_user_id end,
+             updated_at = ?
+         where id = ? and project_id = ?
+         returning *`,
+      )
+      .bind(
+        input.title,
+        input.description,
+        input.priority,
+        input.assigneeUserId === undefined ? 0 : 1,
+        input.assigneeUserId ?? null,
+        input.updatedAt,
+        runId,
+        projectId,
+      ),
+    ...input.attachments.map((attachment) =>
+      db
+        .prepare(
+          `insert into briar_issue_attachments (
+             id, run_id, project_id, object_key, filename, content_type,
+             byte_size, created_at
+           )
+           select ?, run.id, run.project_id, ?, ?, ?, ?, ?
+           from briar_hunt_runs run
+           where run.id = ? and run.project_id = ?
+           returning id`,
+        )
+        .bind(
+          attachment.id,
+          attachment.object_key,
+          attachment.filename,
+          attachment.content_type,
+          attachment.byte_size,
+          createdAt,
+          runId,
+          projectId,
+        ),
+    ),
+    ...input.removedAttachmentIds.map((attachmentId) =>
+      db
+        .prepare(
+          `delete from briar_issue_attachments
+           where project_id = ? and run_id = ? and id = ?
+             and exists (
+               select 1 from briar_hunt_runs run
+               where run.id = briar_issue_attachments.run_id
+                 and run.project_id = briar_issue_attachments.project_id
+             )
+           returning object_key`,
+        )
+        .bind(projectId, runId, attachmentId),
+    ),
+  ];
+  const results = await db.batch(statements);
+  if (results.some((result) => !result.success)) {
+    throw new Error("Issue and attachment metadata could not be updated");
+  }
+  const run = (results[0]?.results?.[0] as HuntRunRow | undefined) ?? null;
+  if (!run) return null;
+  const insertOffset = 1;
+  const deleteOffset = insertOffset + input.attachments.length;
+  if (
+    results
+      .slice(insertOffset, deleteOffset)
+      .some((result) => (result.results?.length ?? 0) !== 1)
+  ) {
+    throw new Error("Issue attachment metadata could not be stored");
+  }
+  return {
+    run,
+    deletedObjectKeys: results.slice(deleteOffset).flatMap((result) =>
+      (result.results ?? []).map(
+        (row) => (row as { object_key: string }).object_key,
+      )
+    ),
+  };
 }
 
 export async function listIssueAttachments(
@@ -6650,8 +7537,13 @@ export async function listIssueAttachments(
   const query = runId
     ? `select id, run_id, project_id, object_key, filename, content_type,
               byte_size, created_at
-       from briar_issue_attachments
-       where project_id = ? and run_id = ?
+       from briar_issue_attachments attachment
+       where attachment.project_id = ? and attachment.run_id = ?
+         and exists (
+           select 1 from briar_hunt_runs run
+           where run.id = attachment.run_id
+             and run.project_id = attachment.project_id
+         )
        order by created_at, id`
     : `select id, run_id, project_id, object_key, filename, content_type,
               byte_size, created_at
@@ -6683,8 +7575,14 @@ export async function getIssueAttachment(
     .prepare(
       `select id, run_id, project_id, object_key, filename, content_type,
               byte_size, created_at
-       from briar_issue_attachments
-       where project_id = ? and run_id = ? and id = ?`,
+       from briar_issue_attachments attachment
+       where attachment.project_id = ? and attachment.run_id = ?
+         and attachment.id = ?
+         and exists (
+           select 1 from briar_hunt_runs run
+           where run.id = attachment.run_id
+             and run.project_id = attachment.project_id
+         )`,
     )
     .bind(projectId, runId, attachmentId)
     .first<IssueAttachmentRow>();
@@ -6800,8 +7698,8 @@ export async function claimNextQueuedHuntRun(
              or (
                ? = 1
                and coalesce(
-                 preferred_agent_provider,
                  requested_agent_provider,
+                 preferred_agent_provider,
                  (
                    select skill.provider
                    from briar_agent_skills skill
@@ -6820,8 +7718,8 @@ export async function claimNextQueuedHuntRun(
              or (
                ? = 1
                and coalesce(
-                 preferred_agent_provider,
                  requested_agent_provider,
+                 preferred_agent_provider,
                  (
                    select skill.provider
                    from briar_agent_skills skill
@@ -6840,8 +7738,8 @@ export async function claimNextQueuedHuntRun(
              or (
                ? = 1
                and coalesce(
-                 preferred_agent_provider,
                  requested_agent_provider,
+                 preferred_agent_provider,
                  (
                    select skill.provider
                    from briar_agent_skills skill
@@ -6860,8 +7758,8 @@ export async function claimNextQueuedHuntRun(
              or (
                ? = 1
                and coalesce(
-                 preferred_agent_provider,
                  requested_agent_provider,
+                 preferred_agent_provider,
                  (
                    select skill.provider
                    from briar_agent_skills skill
@@ -8833,9 +9731,12 @@ export async function listRunEvidenceImages(
   if (!runId) {
     const result = await db
       .prepare(
-        `select * from briar_run_evidence_images
-         where project_id = ?
-         order by run_id, evidence_id, position, id`,
+        `select image.*
+         from briar_run_evidence_images image
+         join briar_hunt_runs run
+           on run.id = image.run_id and run.project_id = image.project_id
+         where image.project_id = ?
+         order by image.run_id, image.evidence_id, image.position, image.id`,
       )
       .bind(projectId)
       .all<RunEvidenceImageRow>();
@@ -8884,9 +9785,12 @@ export async function listEvidenceImagesForEvidence(
 ) {
   const result = await db
     .prepare(
-      `select * from briar_run_evidence_images
-       where project_id = ? and run_id = ? and evidence_id = ?
-       order by position, id`,
+      `select image.*
+       from briar_run_evidence_images image
+       join briar_hunt_runs run
+         on run.id = image.run_id and run.project_id = image.project_id
+       where image.project_id = ? and image.run_id = ? and image.evidence_id = ?
+       order by image.position, image.id`,
     )
     .bind(projectId, runId, evidenceId)
     .all<RunEvidenceImageRow>();
@@ -8945,8 +9849,11 @@ export async function getRunEvidenceImage(
 ) {
   return db
     .prepare(
-      `select * from briar_run_evidence_images
-       where id = ? and project_id = ? and run_id = ?`,
+      `select image.*
+       from briar_run_evidence_images image
+       join briar_hunt_runs run
+         on run.id = image.run_id and run.project_id = image.project_id
+       where image.id = ? and image.project_id = ? and image.run_id = ?`,
     )
     .bind(imageId, projectId, runId)
     .first<RunEvidenceImageRow>();
@@ -9049,6 +9956,11 @@ export async function reworkHuntRun(
     ) {
       throw new HuntTransitionError(
         "The completed run changed before rework could be accepted",
+      );
+    }
+    if (await isChannelApprovedIssue(db, run)) {
+      throw new HuntTransitionError(
+        "Approved issue execution requires fresh approval before rework",
       );
     }
   } else if (run.status !== "running" || !run.workflow_stage) {
@@ -9490,6 +10402,15 @@ export async function moveHuntRun(
       status: run.status,
       workflowStage: run.workflow_stage,
     };
+  }
+  if (
+    ["completed", "cancelled"].includes(run.status) &&
+    !["completed", "cancelled"].includes(input.status) &&
+    await isChannelApprovedIssue(db, run)
+  ) {
+    throw new HuntTransitionError(
+      "Approved issue execution requires fresh approval before reactivation",
+    );
   }
 
   if (run.paused_at && input.status === "completed") {
@@ -10074,29 +10995,85 @@ export async function deleteIssue(
   runId: string,
   observedAt: string,
 ): Promise<"deleted" | "active" | "not_found"> {
-  const deleted = await db
-    .prepare(
-      `delete from briar_hunt_runs
-       where id = ? and project_id = ?
-         and status <> 'running'
-         and not (
-           status = 'queued'
-           and lease_expires_at is not null
-           and lease_expires_at > ?
+  const deletableRun = `run.id = ? and run.project_id = ?
+    and run.status <> 'running'
+    and not (
+      run.status = 'queued'
+      and run.lease_expires_at is not null
+      and run.lease_expires_at > ?
+    )`;
+  const results = await db.batch([
+    db
+      .prepare(
+        `insert into briar_archive_cleanup_queue (
+           bucket, object_key, project_id, run_id, queued_at
          )
-       returning id`,
-    )
-    .bind(runId, projectId, observedAt)
-    .first<{ id: string }>();
-  if (deleted) return "deleted";
-  const run = await db
-    .prepare(
-      `select id from briar_hunt_runs
-       where id = ? and project_id = ?`,
-    )
-    .bind(runId, projectId)
-    .first<{ id: string }>();
-  return run ? "active" : "not_found";
+         select 'archives', archive.object_key, ?, ?, ?
+         from briar_log_archives archive
+         join briar_hunt_runs run on run.id = archive.run_id
+         where ${deletableRun}
+         ${archiveCleanupQueueUpsertSql}`,
+      )
+      .bind(projectId, runId, observedAt, runId, projectId, observedAt),
+    db
+      .prepare(
+        `insert into briar_archive_cleanup_queue (
+           bucket, object_key, project_id, run_id, queued_at
+         )
+         select 'attachments', related.value, ?, ?, ?
+         from briar_log_archives archive
+         join briar_hunt_runs run on run.id = archive.run_id,
+              json_each(archive.related_object_keys_json) related
+         where related.type = 'text' and ${deletableRun}
+         ${archiveCleanupQueueUpsertSql}`,
+      )
+      .bind(projectId, runId, observedAt, runId, projectId, observedAt),
+    db
+      .prepare(
+        `insert into briar_archive_cleanup_queue (
+           bucket, object_key, project_id, run_id, queued_at
+         )
+         select 'attachments', attachment.object_key, ?, ?, ?
+         from briar_issue_attachments attachment
+         join briar_hunt_runs run on run.id = attachment.run_id
+         where ${deletableRun}
+         ${archiveCleanupQueueUpsertSql}`,
+      )
+      .bind(projectId, runId, observedAt, runId, projectId, observedAt),
+    db
+      .prepare(
+        `insert into briar_archive_cleanup_queue (
+           bucket, object_key, project_id, run_id, queued_at
+         )
+         select 'attachments', image.object_key, ?, ?, ?
+         from briar_run_evidence_images image
+         join briar_hunt_runs run on run.id = image.run_id
+         where ${deletableRun}
+         ${archiveCleanupQueueUpsertSql}`,
+      )
+      .bind(projectId, runId, observedAt, runId, projectId, observedAt),
+    db
+      .prepare(
+        `delete from briar_hunt_runs
+         where id = ? and project_id = ?
+           and status <> 'running'
+           and not (
+             status = 'queued'
+             and lease_expires_at is not null
+             and lease_expires_at > ?
+           )
+         returning id`,
+      )
+      .bind(runId, projectId, observedAt),
+    db
+      .prepare(
+        `select id from briar_hunt_runs
+         where id = ? and project_id = ?`,
+      )
+      .bind(runId, projectId),
+  ]);
+  if ((results[4]?.results?.length ?? 0) > 0) return "deleted";
+  return (results[5]?.results?.length ?? 0) > 0 ? "active" : "not_found";
 }
 
 export type TransferIssueOutcome =
@@ -10104,7 +11081,10 @@ export type TransferIssueOutcome =
   | "not_found"
   | "active"
   | "same_project"
-  | "source_key_conflict";
+  | "source_key_conflict"
+  | "archive_in_progress"
+  | "proposal_approval_in_progress"
+  | "execution_approval_boundary";
 
 const isActivelyClaimedRun = (run: HuntRunRow, observedAt: string) =>
   run.status === "running" ||
@@ -10113,6 +11093,485 @@ const isActivelyClaimedRun = (run: HuntRunRow, observedAt: string) =>
     run.lease_expires_at != null &&
     run.lease_expires_at > observedAt
   );
+
+const transferredIssueRelationStatements = async (
+  db: D1Database,
+  input: {
+    sourceProjectId: string;
+    targetProjectId: string;
+    runId: string;
+    observedAt: string;
+    resetExecutionApproval: boolean;
+  },
+) => {
+  const transcriptQuarantineAvailable = Boolean(await db
+    .prepare(
+      `select 1 as available from sqlite_master
+       where type = 'table'
+         and name = 'briar_channel_issue_transfer_quarantine'`,
+    )
+    .first<{ available: number }>());
+  const channelProposalsAvailable = Boolean(await db
+    .prepare(
+      `select 1 as available from sqlite_master
+       where type = 'table' and name = 'briar_channel_action_proposals'`,
+    )
+    .first<{ available: number }>());
+  const transcriptSessionQuarantineGuard = transcriptQuarantineAvailable
+    ? `and not exists (
+         select 1 from briar_channel_issue_transfer_quarantine quarantine
+         where quarantine.entity_kind = 'agent_transcript_session'
+           and quarantine.entity_id = briar_agent_transcript_sessions.session_id
+       )`
+    : "";
+  const transcriptArchiveQuarantineGuard = transcriptQuarantineAvailable
+    ? `and (
+         archive_kind <> 'agent_transcript'
+         or not exists (
+           select 1 from briar_channel_issue_transfer_quarantine quarantine
+           where quarantine.entity_kind = 'agent_transcript_archive'
+             and quarantine.entity_id = briar_log_archives.id
+         )
+       )`
+    : "";
+  const statements = [
+    // Older transfer attempts cleared dispatch identity but could leave a
+    // retryable run queued, blocked, or failed. Repair that partial state
+    // before any retry can be claimed in the target project without a fresh
+    // dispatch approval.
+    db
+      .prepare(
+        `update briar_hunt_runs
+         set status = 'backlog', stage = 'queued', workflow_stage = null,
+             paused_at = null, resume_requested_at = null,
+             completed_at = null,
+             updated_at = ?
+         where id = ? and project_id = ?
+           and status in ('queued', 'blocked', 'failed')
+           and ? = 1
+           and requested_by_user_id is null
+           and dispatch_request_id is null
+           and claim_token_hash is null and claimed_by is null
+           and claimed_at is null and lease_expires_at is null`,
+      )
+      .bind(
+        input.observedAt,
+        input.runId,
+        input.targetProjectId,
+        input.resetExecutionApproval ? 1 : 0,
+      ),
+    db
+      .prepare(
+        `insert into briar_dashboard_changes (
+           project_id, entity_type, entity_id, operation, created_at
+         )
+         select ?, 'run', ?, 'delete', datetime('now')
+         where exists (
+           select 1 from briar_hunt_runs run
+           where run.id = ? and run.project_id = ?
+         )`,
+      )
+      .bind(
+        input.sourceProjectId,
+        input.runId,
+        input.runId,
+        input.targetProjectId,
+      ),
+    db
+      .prepare(
+        `insert into briar_dashboard_sync_state (project_id, current_version)
+         select ?, max(version) from briar_dashboard_changes
+         where project_id = ?
+         having max(version) is not null
+         on conflict (project_id) do update set
+           current_version = excluded.current_version`,
+      )
+      .bind(input.sourceProjectId, input.sourceProjectId),
+    db
+      .prepare(
+        `delete from briar_issue_dependencies
+         where project_id = ?
+           and (prerequisite_run_id = ? or dependent_run_id = ?)
+           and exists (
+             select 1 from briar_hunt_runs run
+             where run.id = ? and run.project_id = ?
+           )`,
+      )
+      .bind(
+        input.sourceProjectId,
+        input.runId,
+        input.runId,
+        input.runId,
+        input.targetProjectId,
+      ),
+    db
+      .prepare(
+        `update briar_issue_attachments
+         set project_id = ?
+         where project_id = ? and run_id = ?
+           and exists (
+             select 1 from briar_hunt_runs run
+             where run.id = ? and run.project_id = ?
+           )`,
+      )
+      .bind(
+        input.targetProjectId,
+        input.sourceProjectId,
+        input.runId,
+        input.runId,
+        input.targetProjectId,
+      ),
+    db
+      .prepare(
+        `update briar_issue_messages
+         set project_id = ?
+         where project_id = ? and run_id = ?
+           and exists (
+             select 1 from briar_hunt_runs run
+             where run.id = ? and run.project_id = ?
+           )`,
+      )
+      .bind(
+        input.targetProjectId,
+        input.sourceProjectId,
+        input.runId,
+        input.runId,
+        input.targetProjectId,
+      ),
+    db
+      .prepare(
+        `update briar_run_evidence
+         set project_id = ?
+         where project_id = ? and run_id = ?
+           and exists (
+             select 1 from briar_hunt_runs run
+             where run.id = ? and run.project_id = ?
+           )`,
+      )
+      .bind(
+        input.targetProjectId,
+        input.sourceProjectId,
+        input.runId,
+        input.runId,
+        input.targetProjectId,
+      ),
+    db
+      .prepare(
+        `update briar_run_evidence_images
+         set project_id = ?
+         where project_id = ? and run_id = ?
+           and exists (
+             select 1 from briar_hunt_runs run
+             where run.id = ? and run.project_id = ?
+           )`,
+      )
+      .bind(
+        input.targetProjectId,
+        input.sourceProjectId,
+        input.runId,
+        input.runId,
+        input.targetProjectId,
+      ),
+    db
+      .prepare(
+        `update briar_issue_agent_reply_jobs
+         set project_id = ?, preferred_worker_id = null, claimed_worker_id = null
+         where project_id = ? and run_id = ?
+           and exists (
+             select 1 from briar_hunt_runs run
+             where run.id = ? and run.project_id = ?
+           )`,
+      )
+      .bind(
+        input.targetProjectId,
+        input.sourceProjectId,
+        input.runId,
+        input.runId,
+        input.targetProjectId,
+      ),
+    db
+      .prepare(
+        `update briar_log_archives
+         set project_id = ?
+         where project_id = ? and run_id = ?
+           and archive_kind <> 'execution_audit'
+           ${transcriptArchiveQuarantineGuard}
+           and exists (
+             select 1 from briar_hunt_runs run
+             where run.id = ? and run.project_id = ?
+           )`,
+      )
+      .bind(
+        input.targetProjectId,
+        input.sourceProjectId,
+        input.runId,
+        input.runId,
+        input.targetProjectId,
+      ),
+    db
+      .prepare(
+        `update briar_archive_cleanup_queue
+         set project_id = ?
+         where project_id = ? and run_id = ?
+           and exists (
+             select 1 from briar_hunt_runs run
+             where run.id = ? and run.project_id = ?
+           )`,
+      )
+      .bind(
+        input.targetProjectId,
+        input.sourceProjectId,
+        input.runId,
+        input.runId,
+        input.targetProjectId,
+      ),
+    db
+      .prepare(
+        `update briar_run_pull_requests
+         set project_id = ?
+         where project_id = ? and run_id = ?
+           and exists (
+             select 1 from briar_hunt_runs run
+             where run.id = ? and run.project_id = ?
+           )`,
+      )
+      .bind(
+        input.targetProjectId,
+        input.sourceProjectId,
+        input.runId,
+        input.runId,
+        input.targetProjectId,
+      ),
+    db
+      .prepare(
+        `update briar_agent_transcript_sessions
+         set project_id = ?
+         where project_id = ? and run_id = ?
+           ${transcriptSessionQuarantineGuard}
+           and exists (
+             select 1 from briar_hunt_runs run
+             where run.id = ? and run.project_id = ?
+           )`,
+      )
+      .bind(
+        input.targetProjectId,
+        input.sourceProjectId,
+        input.runId,
+        input.runId,
+        input.targetProjectId,
+      ),
+  ];
+  statements.push(
+    // Issue conversation proposals are run-scoped authorization records. Move
+    // them with the conversation so the source project cannot read or accept a
+    // stale proposal after transfer.
+    db
+      .prepare(
+        `update briar_issue_rework_proposals
+         set project_id = ?, updated_at = ?
+         where project_id = ? and run_id = ?
+           and exists (
+             select 1 from briar_hunt_runs run
+             where run.id = ? and run.project_id = ?
+           )`,
+      )
+      .bind(
+        input.targetProjectId,
+        input.observedAt,
+        input.sourceProjectId,
+        input.runId,
+        input.runId,
+        input.targetProjectId,
+      ),
+    db
+      .prepare(
+        `update briar_issue_action_proposals
+         set project_id = ?, updated_at = ?
+         where project_id = ? and conversation_run_id = ?
+           and exists (
+             select 1 from briar_hunt_runs run
+             where run.id = ? and run.project_id = ?
+           )`,
+      )
+      .bind(
+        input.targetProjectId,
+        input.observedAt,
+        input.sourceProjectId,
+        input.runId,
+        input.runId,
+        input.targetProjectId,
+      ),
+  );
+  if (channelProposalsAvailable) {
+    // Channel proposal cards point at the accepted issue. Keep their target
+    // project aligned so retries and "View issue" deep links survive transfer;
+    // the proposal UPDATE trigger also publishes a channel delta.
+    statements.push(
+      db
+        .prepare(
+          `update briar_channel_action_proposals
+           set project_id = ?, updated_at = ?
+           where result_run_id = ? and status = 'accepted'
+             and exists (
+               select 1 from briar_hunt_runs run
+               where run.id = ? and run.project_id = ?
+             )`,
+        )
+        .bind(
+          input.targetProjectId,
+          input.observedAt,
+          input.runId,
+          input.runId,
+          input.targetProjectId,
+        ),
+    );
+  }
+  return statements;
+};
+
+const repairTransferredIssueRelations = async (
+  db: D1Database,
+  input: Parameters<typeof transferredIssueRelationStatements>[1],
+) => db.batch(await transferredIssueRelationStatements(db, input));
+
+export const channelApprovalTablesAvailable = async (db: D1Database) => {
+  const result = await db
+    .prepare(
+      `select count(*) as table_count from sqlite_master
+       where type = 'table'
+         and name in (
+           'briar_channel_action_proposals',
+           'briar_channel_issue_approval_audit'
+         )`,
+    )
+    .first<{ table_count: number }>();
+  return result?.table_count === 2;
+};
+
+export const isChannelApprovedIssue = async (
+  db: D1Database,
+  run: Pick<HuntRunRow, "id" | "source_key">,
+) => {
+  if (await channelApprovalTablesAvailable(db)) {
+    return Boolean(await db
+      .prepare(
+        `select 1 as approved
+         from briar_channel_issue_approval_audit approval
+         where approval.run_id = ? and approval.issue_source_key = ?
+           and approval.result_verification in ('atomic', 'legacy_authorized')
+         limit 1`,
+      )
+      .bind(run.id, run.source_key)
+      .first<{ approved: number }>());
+  }
+  const proposalTables = await db.prepare(
+    `select name from sqlite_master
+     where type = 'table'
+       and name in (
+         'briar_channel_action_proposals', 'briar_issue_action_proposals'
+       )`,
+  ).all<{ name: string }>();
+  const available = new Set(proposalTables.results.map((row) => row.name));
+  // The new Worker may briefly run before migration 0090 if an operator uses
+  // the wrong rollout order. Recognize the exact pre-migration accepted shape
+  // so a queued transfer still drops back to backlog instead of carrying the
+  // source project's execution approval into the target project.
+  if (available.has("briar_channel_action_proposals")) {
+    const channel = await db
+      .prepare(
+        `select 1 as approved
+         from briar_channel_action_proposals proposal
+         where proposal.result_run_id = ? and proposal.status = 'accepted'
+           and proposal.action_type = 'request_issue_create'
+           and ? = 'briar-channel-proposal:' || proposal.id
+         limit 1`,
+      )
+      .bind(run.id, run.source_key)
+      .first<{ approved: number }>();
+    if (channel) return true;
+  }
+  if (available.has("briar_issue_action_proposals")) {
+    return Boolean(await db
+      .prepare(
+        `select 1 as approved
+         from briar_issue_action_proposals proposal
+         where proposal.result_run_id = ? and proposal.status = 'accepted'
+           and proposal.action_type = 'request_issue_create'
+           and ? = 'briar-conversation-proposal:' || proposal.id
+         limit 1`,
+      )
+      .bind(run.id, run.source_key)
+      .first<{ approved: number }>());
+  }
+  return false;
+};
+
+const channelIssueTransferRecovery = async (
+  db: D1Database,
+  input: {
+    sourceProjectId: string;
+    targetProjectId: string;
+    run: Pick<HuntRunRow, "id" | "source_key">;
+  },
+) => {
+  if (!(await channelApprovalTablesAvailable(db))) return null;
+  const approval = await db
+    .prepare(
+      `select approval.project_id
+       from briar_channel_issue_approval_audit approval
+       where approval.run_id = ? and approval.issue_source_key = ?
+         and approval.result_verification in ('atomic', 'legacy_authorized')
+       limit 1`,
+    )
+    .bind(
+      input.run.id,
+      input.run.source_key,
+    )
+    .first<{ project_id: string }>();
+  if (!approval) return null;
+  if (approval.project_id === input.sourceProjectId) return "repair" as const;
+  const sourceTombstone = await db
+    .prepare(
+      `select 1 as transferred
+       from briar_dashboard_changes
+       where project_id = ? and entity_type = 'run' and entity_id = ?
+         and operation = 'delete'
+       limit 1`,
+    )
+    .bind(input.sourceProjectId, input.run.id)
+    .first<{ transferred: number }>();
+  if (sourceTombstone) return "complete" as const;
+  const durableTransfer = await db
+    .prepare(
+      `select 1 as transferred
+       from briar_channel_issue_transfer_reconciliation transfer
+       where transfer.run_id = ? and transfer.source_project_id = ?
+         and transfer.target_project_id = ?
+       limit 1`,
+    )
+    .bind(
+      input.run.id,
+      input.sourceProjectId,
+      input.targetProjectId,
+    )
+    .first<{ transferred: number }>();
+  if (durableTransfer) return "repair" as const;
+  // If an older transfer crashed after moving the run but before its relation
+  // batch, a durable source-project dispatch still proves the A -> B provenance
+  // needed to finish the tombstone and child-row repair.
+  const sourceDispatch = await db
+    .prepare(
+      `select 1 as dispatched
+       from briar_execution_audit_events execution
+       where execution.run_id = ? and execution.project_id = ?
+         and execution.action in ('dispatched', 'reassigned')
+         and execution.request_id is not null
+       limit 1`,
+    )
+    .bind(input.run.id, input.sourceProjectId)
+    .first<{ dispatched: number }>();
+  return sourceDispatch ? "repair" as const : null;
+};
 
 /**
  * Move an issue (hunt run) and its project-scoped children to another project
@@ -10139,8 +11598,51 @@ export async function transferIssue(
     input.sourceProjectId,
     input.runId,
   );
-  if (!run) return "not_found";
+  if (!run) {
+    const alreadyMoved = await getHuntRunForProject(
+      db,
+      input.targetProjectId,
+      input.runId,
+    );
+    if (!alreadyMoved) return "not_found";
+    // A target row alone is not transfer provenance: it may have always
+    // belonged to that project. Only a channel approval whose immutable audit
+    // points back to the requested source may repair a partial transfer.
+    const recovery = await channelIssueTransferRecovery(db, {
+      sourceProjectId: input.sourceProjectId,
+      targetProjectId: input.targetProjectId,
+      run: alreadyMoved,
+    });
+    if (!recovery) return "not_found";
+    if (recovery === "repair") {
+      await repairTransferredIssueRelations(db, {
+        ...input,
+        resetExecutionApproval: true,
+      });
+    }
+    return "transferred";
+  }
   if (isActivelyClaimedRun(run, input.observedAt)) return "active";
+  const verifiedArchive = await db
+    .prepare(
+      `select 1 as archiving from briar_log_archives
+       where run_id = ? and status = 'verified'
+         and archive_kind <> 'execution_audit'
+       limit 1`,
+    )
+    .bind(input.runId)
+    .first<{ archiving: number }>();
+  if (verifiedArchive) return "archive_in_progress";
+  const channelApprovedIssue = await isChannelApprovedIssue(db, run);
+  // A terminal result is historical state, so do not silently turn it into a
+  // target-project execution candidate. Rework needs a separate approval-aware
+  // flow instead of carrying the source project's execution authority across.
+  if (
+    channelApprovedIssue &&
+    (["completed", "cancelled"] as AutoHuntRunStatus[]).includes(run.status)
+  ) {
+    return "execution_approval_boundary";
+  }
 
   const conflict = await db
     .prepare(
@@ -10152,9 +11654,14 @@ export async function transferIssue(
     .first<{ id: string }>();
   if (conflict) return "source_key_conflict";
 
+  const resetExecutionApproval =
+    (["queued", "blocked", "failed"] as AutoHuntRunStatus[]).includes(
+      run.status,
+    ) && channelApprovedIssue;
   const targetSettings = await getProjectSettings(db, input.targetProjectId);
   const adoptTargetWorkflow =
-    run.status === "backlog" || run.status === "queued";
+    run.status === "backlog" || run.status === "queued" ||
+    resetExecutionApproval;
   const fullAuto = runIsFullAuto(run);
   const targetBaseWorkflow = parseWorkflow(targetSettings?.workflow_json ?? null);
   const targetStageIds = new Set(targetBaseWorkflow.stages.map((stage) => stage.id));
@@ -10185,14 +11692,22 @@ export async function transferIssue(
     ? (targetSettings?.github_repository ?? input.targetProjectName)
     : run.repository;
   const refreshWorkflow = adoptTargetWorkflow ? 1 : 0;
-
-  // Reassign the run first so a concurrent claim cannot leave children
-  // stranded on the target project. The UPDATE trigger only upserts
-  // new.project_id, so also write an explicit delete tombstone for source.
-  const movedRun = await db
+  // Move the run, every project-scoped child, proposal, and the source
+  // dashboard tombstone in one D1 batch transaction. The target-project
+  // predicates on each relation also make a raced no-op update harmless.
+  const moveStatement = db
     .prepare(
       `update briar_hunt_runs
        set project_id = ?,
+           status = case
+             when ? = 1 and status in ('queued', 'blocked', 'failed')
+               then 'backlog' else status end,
+           stage = case
+             when ? = 1 and status in ('queued', 'blocked', 'failed')
+               then 'queued' else stage end,
+           workflow_stage = case
+             when ? = 1 and status in ('queued', 'blocked', 'failed')
+               then null else workflow_stage end,
            repository = case when ? = 1 then ? else repository end,
            workflow_snapshot_json = case when ? = 1 then ? else workflow_snapshot_json end,
            issue_checkpoints_json = case when ? = 1 then ? else issue_checkpoints_json end,
@@ -10212,6 +11727,10 @@ export async function transferIssue(
            requested_agent_provider = null,
            requested_agent_model = null,
            requested_agent_effort = null,
+           paused_at = case when ? = 1 then null else paused_at end,
+           resume_requested_at = case
+             when ? = 1 then null else resume_requested_at end,
+           completed_at = case when ? = 1 then null else completed_at end,
            updated_at = ?
        where id = ? and project_id = ?
          and status <> 'running'
@@ -10224,18 +11743,50 @@ export async function transferIssue(
     )
     .bind(
       input.targetProjectId,
+      resetExecutionApproval ? 1 : 0,
+      resetExecutionApproval ? 1 : 0,
+      resetExecutionApproval ? 1 : 0,
       refreshWorkflow,
       targetRepository,
       refreshWorkflow,
       targetWorkflowJson,
       refreshWorkflow,
       stableJson(compatibleIssueCheckpoints),
+      resetExecutionApproval ? 1 : 0,
+      resetExecutionApproval ? 1 : 0,
+      resetExecutionApproval ? 1 : 0,
       input.observedAt,
       input.runId,
       input.sourceProjectId,
       input.observedAt,
-    )
-    .first<{ id: string }>();
+    );
+  let transferResults: D1Result<unknown>[];
+  try {
+    transferResults = await db.batch([
+      moveStatement,
+      ...await transferredIssueRelationStatements(db, {
+        ...input,
+        resetExecutionApproval,
+      }),
+    ]);
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message.includes("verified run archive prevents transfer")
+    ) {
+      return "archive_in_progress";
+    }
+    if (
+      error instanceof Error &&
+      error.message.includes("conversation proposal acceptance in progress")
+    ) {
+      return "proposal_approval_in_progress";
+    }
+    throw error;
+  }
+  const movedRun = transferResults[0].results?.[0] as
+    | { id: string }
+    | undefined;
 
   if (!movedRun) {
     const stillThere = await getHuntRunForProject(
@@ -10249,102 +11800,15 @@ export async function transferIssue(
         input.targetProjectId,
         input.runId,
       );
-      return alreadyMoved ? "transferred" : "not_found";
+      if (!alreadyMoved) return "not_found";
+      // This invocation observed the run in the source before another caller
+      // atomically completed the same transfer.
+    } else {
+      return isActivelyClaimedRun(stillThere, input.observedAt)
+        ? "active"
+        : "not_found";
     }
-    return isActivelyClaimedRun(stillThere, input.observedAt)
-      ? "active"
-      : "not_found";
   }
-
-  await db.batch([
-    db
-      .prepare(
-        `insert into briar_dashboard_changes (
-           project_id, entity_type, entity_id, operation, created_at
-         ) values (?, 'run', ?, 'delete', datetime('now'))`,
-      )
-      .bind(input.sourceProjectId, input.runId),
-    db
-      .prepare(
-        `insert into briar_dashboard_sync_state (project_id, current_version)
-         values (?, last_insert_rowid())
-         on conflict (project_id) do update set
-           current_version = excluded.current_version`,
-      )
-      .bind(input.sourceProjectId),
-    db
-      .prepare(
-        `delete from briar_issue_dependencies
-         where project_id = ?
-           and (prerequisite_run_id = ? or dependent_run_id = ?)`,
-      )
-      .bind(input.sourceProjectId, input.runId, input.runId),
-    db
-      .prepare(
-        `update briar_issue_attachments
-         set project_id = ?
-         where project_id = ? and run_id = ?`,
-      )
-      .bind(input.targetProjectId, input.sourceProjectId, input.runId),
-    db
-      .prepare(
-        `update briar_issue_messages
-         set project_id = ?
-         where project_id = ? and run_id = ?`,
-      )
-      .bind(input.targetProjectId, input.sourceProjectId, input.runId),
-    db
-      .prepare(
-        `update briar_run_evidence
-         set project_id = ?
-         where project_id = ? and run_id = ?`,
-      )
-      .bind(input.targetProjectId, input.sourceProjectId, input.runId),
-    db
-      .prepare(
-        `update briar_run_evidence_images
-         set project_id = ?
-         where project_id = ? and run_id = ?`,
-      )
-      .bind(input.targetProjectId, input.sourceProjectId, input.runId),
-    db
-      .prepare(
-        `update briar_issue_agent_reply_jobs
-         set project_id = ?,
-             preferred_worker_id = null,
-             claimed_worker_id = null
-         where project_id = ? and run_id = ?`,
-      )
-      .bind(input.targetProjectId, input.sourceProjectId, input.runId),
-    db
-      .prepare(
-        `update briar_log_archives
-         set project_id = ?
-         where project_id = ? and run_id = ?`,
-      )
-      .bind(input.targetProjectId, input.sourceProjectId, input.runId),
-    db
-      .prepare(
-        `update briar_archive_cleanup_queue
-         set project_id = ?
-         where project_id = ? and run_id = ?`,
-      )
-      .bind(input.targetProjectId, input.sourceProjectId, input.runId),
-    db
-      .prepare(
-        `update briar_run_pull_requests
-         set project_id = ?
-         where project_id = ? and run_id = ?`,
-      )
-      .bind(input.targetProjectId, input.sourceProjectId, input.runId),
-    db
-      .prepare(
-        `update briar_agent_transcript_sessions
-         set project_id = ?
-         where project_id = ? and run_id = ?`,
-      )
-      .bind(input.targetProjectId, input.sourceProjectId, input.runId),
-  ]);
 
   return "transferred";
 }

@@ -2,6 +2,7 @@ import { createHmac } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 import worker, {
   approvedIssueCreation,
+  assertRunEventIdentityNotOverridden,
   assertChannelProposalAuthorScope,
   claimConversationJson,
   accountDeletionInputSchema,
@@ -10,8 +11,10 @@ import worker, {
   handleScheduledTask,
   issueUpdateInputSchema,
   issueExecutionPreferencesSchema,
+  issueClaimExecutionConfig,
   issueReplyExecutionConfig,
   legacyAgentSkillInstructions,
+  loadChannelCatalogSnapshot,
   organizationLogoInputSchema,
   organizationInvitationInputSchema,
   organizationMemberRoleInputSchema,
@@ -29,6 +32,7 @@ import worker, {
   readIssueRequest,
   readRunEvidenceRequest,
   resolveChannelProposalTargetProjectId,
+  responseWithPostCommitCleanup,
   runEvidenceInputSchema,
   runReworkInputSchema,
   transcriptSchema,
@@ -48,6 +52,12 @@ const createScheduledTaskDependencies = (): ScheduledTaskDependencies => ({
   })),
   expireArchives: vi.fn(async () => 0),
   processArchiveCleanupQueue: vi.fn(async () => ({ deleted: 0, failed: 0 })),
+  processSlackRevocationQueue: vi.fn(async () => ({
+    revoked: 0,
+    failed: 0,
+    deadLettered: 0,
+    deferred: 0,
+  })),
   pruneExpiredDashboardChanges: vi.fn(async () => ({
     cutoff: "2026-08-03 00:00:00",
     deleted: 0,
@@ -86,10 +96,119 @@ const scheduledEnv = {
 } as unknown as Env;
 
 describe("Worker HTTP contract", () => {
+  it("returns a committed response while cleanup remains registered in waitUntil", async () => {
+    let resolveCleanup: ((value: unknown) => void) | undefined;
+    const cleanup = new Promise<unknown>((resolve) => {
+      resolveCleanup = resolve;
+    });
+    const scheduled = scheduledContext();
+    const consoleLog = vi.spyOn(console, "log").mockImplementation(() => {});
+    try {
+      const response = responseWithPostCommitCleanup(
+        new Response(null, { status: 204 }),
+        {
+          context: scheduled.context,
+          operation: "issue_delete",
+          observedAt: "2026-08-11T00:00:00.000Z",
+          tasks: [{ queue: "archive", run: () => cleanup }],
+        },
+      );
+
+      expect(response.status).toBe(204);
+      expect(scheduled.pending).toHaveLength(1);
+      let settled = false;
+      void scheduled.pending[0].then(() => {
+        settled = true;
+      });
+      await Promise.resolve();
+      expect(settled).toBe(false);
+
+      resolveCleanup?.({
+        deleted: 1,
+        failed: 0,
+        encryptedCredential: "must-not-be-logged",
+      });
+      await scheduled.pending[0];
+      expect(consoleLog).toHaveBeenCalledOnce();
+      const log = String(consoleLog.mock.calls[0]?.[0]);
+      expect(log).toContain('"deleted":1');
+      expect(log).not.toContain("must-not-be-logged");
+    } finally {
+      consoleLog.mockRestore();
+    }
+  });
+
+  it("keeps a successful response independent from rejected cleanup without a context", async () => {
+    const secret = "xoxb-must-not-be-logged";
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const response = responseWithPostCommitCleanup(
+        new Response(null, { status: 204 }),
+        {
+          operation: "slack_uninstall",
+          observedAt: "2026-08-11T00:00:00.000Z",
+          tasks: [{
+            queue: "slack",
+            run: async () => {
+              throw new Error(secret);
+            },
+          }],
+        },
+      );
+
+      expect(response.status).toBe(204);
+      await vi.waitFor(() => expect(consoleError).toHaveBeenCalledOnce());
+      const log = String(consoleError.mock.calls[0]?.[0]);
+      expect(log).toContain("Post-commit cleanup task rejected");
+      expect(log).toContain('"errorType":"Error"');
+      expect(log).not.toContain(secret);
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
+  it("reads the channel cursor before its catalog snapshot", async () => {
+    const reads: string[] = [];
+    const snapshot = await loadChannelCatalogSnapshot(
+      async () => {
+        reads.push("cursor");
+        return 41;
+      },
+      async () => {
+        reads.push("channels");
+        return [{ id: "channel-created-during-snapshot" }];
+      },
+    );
+
+    expect(reads).toEqual(["cursor", "channels"]);
+    expect(snapshot).toEqual({
+      cursor: 41,
+      channels: [{ id: "channel-created-during-snapshot" }],
+    });
+  });
+
   it("keeps issue creation approval separate from execution approval", () => {
     expect(
       approvedIssueCreation({ title: "Ship it", status: "queued" }),
     ).toEqual({ title: "Ship it", status: "backlog", checkpoints: [] });
+  });
+
+  it("rejects identity overrides on claimed run events", () => {
+    const run = { source: "issue", source_key: "existing-identity" } as const;
+    expect(() =>
+      assertRunEventIdentityNotOverridden({
+        run,
+        source: "issue",
+        sourceKey: "briar-channel-proposal:predictable-id",
+      })
+    ).toThrow("identity cannot be changed");
+    expect(() =>
+      assertRunEventIdentityNotOverridden({
+        run,
+        source: "issue",
+        sourceKey: "existing-identity",
+      })
+    ).not.toThrow();
   });
 
   it("keeps an Agent-bound channel proposal on its proposed project", () => {
@@ -207,6 +326,7 @@ describe("Worker HTTP contract", () => {
     expect(sweepDependencies.archiveCompletedLogs).toHaveBeenCalledOnce();
     expect(sweepDependencies.expireArchives).toHaveBeenCalledOnce();
     expect(sweepDependencies.processArchiveCleanupQueue).toHaveBeenCalledOnce();
+    expect(sweepDependencies.processSlackRevocationQueue).toHaveBeenCalledOnce();
     expect(sweepDependencies.reconcileGithubMergedRuns).toHaveBeenCalledOnce();
 
     const unknownDependencies = createScheduledTaskDependencies();
@@ -294,6 +414,55 @@ describe("Worker HTTP contract", () => {
         agent: null,
       }),
     ).toEqual({ model: null, effort: null });
+  });
+
+  it("keeps the approved dispatch snapshot ahead of issue preferences", () => {
+    expect(
+      issueClaimExecutionConfig({
+        preferred: {
+          provider: "codex",
+          model: "gpt-5.6-sol",
+          effort: "xhigh",
+        },
+        requested: {
+          provider: "claude",
+          model: "claude-sonnet-4-0",
+          effort: "medium",
+        },
+        activeSkill: {
+          provider: "grok",
+          model: "grok-4",
+          effort: "high",
+        },
+        agent: {
+          provider: "codex",
+          model: "gpt-5.6-sol",
+          effort: "high",
+        },
+      }),
+    ).toEqual({
+      provider: "claude",
+      model: "claude-sonnet-4-0",
+      effort: "medium",
+    });
+
+    expect(
+      issueReplyExecutionConfig({
+        provider: "claude",
+        preferred: {
+          provider: "claude",
+          model: "claude-opus-4-1",
+          effort: "high",
+        },
+        requested: {
+          provider: "claude",
+          model: "claude-sonnet-4-0",
+          effort: "medium",
+        },
+        activeSkill: null,
+        agent: null,
+      }),
+    ).toEqual({ model: "claude-sonnet-4-0", effort: "medium" });
   });
 
   it("projects active Skill instructions through the legacy Agent field", () => {

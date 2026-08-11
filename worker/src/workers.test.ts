@@ -477,6 +477,7 @@ describe("detached execution workers", () => {
 
   it("dispatches a queued issue to a selected Worker without an Agent", async () => {
     const selected = await register("agentless");
+    const requestId = "99999999-aaaa-4999-8999-999999999999";
     const runId = await recordHuntEvent(
       db,
       projectId,
@@ -491,7 +492,7 @@ describe("detached execution workers", () => {
         effort: "high",
         workerId: selected.worker.id,
         requestedByUserId: "member",
-        requestId: "99999999-aaaa-4999-8999-999999999999",
+        requestId,
         occurredAt: atMinute(2),
       }),
     ).resolves.toMatchObject({
@@ -500,6 +501,58 @@ describe("detached execution workers", () => {
       requestedWorkerId: selected.worker.id,
       dispatchMode: "specific",
     });
+    await expect(
+      db.prepare(
+        `select count(*) as count from briar_execution_audit_events
+         where project_id = ? and action = 'dispatched' and request_id = ?`,
+      ).bind(projectId, requestId).first<number>("count"),
+    ).resolves.toBe(1);
+
+    // Idempotent retries repair the split-write gap left by older dispatchers.
+    // The retry endpoint cannot choose the missing historical action.
+    await db.prepare(
+      `delete from briar_execution_audit_events
+       where project_id = ? and action = 'dispatched' and request_id = ?`,
+    ).bind(projectId, requestId).run();
+    await expect(
+      dispatchHuntRun(db, projectId, projectId, {
+        runId,
+        provider: "codex",
+        model: "gpt-5.6-sol",
+        effort: "high",
+        workerId: selected.worker.id,
+        requestedByUserId: "member",
+        requestId,
+        occurredAt: atMinute(2),
+        reassign: true,
+      }),
+    ).resolves.toMatchObject({ outcome: "already_dispatched" });
+    const repairedAudit = await db.prepare(
+      `select action, detail_json from briar_execution_audit_events
+       where project_id = ? and request_id = ?`,
+    ).bind(projectId, requestId).first<{
+      action: string;
+      detail_json: string;
+    }>();
+    expect(repairedAudit?.action).toBe("dispatched");
+    expect(JSON.parse(repairedAudit!.detail_json)).toMatchObject({
+      legacyActionUnknown: true,
+      recoveredFromRunState: true,
+    });
+    await dispatchHuntRun(db, projectId, projectId, {
+      runId,
+      provider: "codex",
+      workerId: selected.worker.id,
+      requestedByUserId: "member",
+      requestId,
+      occurredAt: atMinute(2),
+    });
+    await expect(
+      db.prepare(
+        `select count(*) as count from briar_execution_audit_events
+         where project_id = ? and request_id = ?`,
+      ).bind(projectId, requestId).first<number>("count"),
+    ).resolves.toBe(1);
 
     const claimed = await claimNextQueuedHuntRun(db, projectId, {
       claimTokenHash: fingerprint("agentless-claim"),
@@ -1636,6 +1689,106 @@ describe("detached execution workers", () => {
       requested_agent_provider: "claude",
       worker_id: registered.worker.id,
     });
+  });
+
+  it("claims explicit dispatch snapshots ahead of pre-existing or mutated preferences", async () => {
+    const registered = await register("dispatch-snapshot");
+    await recordWorkerHeartbeat(db, projectId, {
+      workerId: registered.worker.id,
+      capabilities: {
+        providers: ["codex", "claude", "grok"],
+        providerHealth: {
+          codex: { installed: true, authenticated: true, healthy: true },
+          claude: { installed: true, authenticated: true, healthy: true },
+          grok: { installed: true, authenticated: true, healthy: true },
+        },
+        worktrees: true,
+      },
+      observedAt: atMinute(2),
+    });
+    const runIds = await Promise.all([
+      recordHuntEvent(db, projectId, queuedEvent("dispatch-snapshot-existing", 3)),
+      recordHuntEvent(db, projectId, queuedEvent("dispatch-snapshot-mutated", 4)),
+    ]);
+    for (const runId of runIds) {
+      await db
+        .prepare(
+          `update briar_hunt_runs
+           set preferred_agent_provider = 'codex',
+               preferred_agent_model = 'gpt-5.6-sol',
+               preferred_agent_effort = 'xhigh'
+           where id = ?`,
+        )
+        .bind(runId)
+        .run();
+    }
+    await dispatchHuntRun(db, projectId, projectId, {
+      runId: runIds[0],
+      provider: "claude",
+      model: "claude-sonnet-4-0",
+      effort: "medium",
+      workerId: registered.worker.id,
+      requestedByUserId: "member",
+      requestId: "12121212-aaaa-4121-8121-121212121212",
+      occurredAt: atMinute(5),
+    });
+    await dispatchHuntRun(db, projectId, projectId, {
+      runId: runIds[1],
+      provider: "claude",
+      model: "claude-sonnet-4-0",
+      effort: "medium",
+      workerId: registered.worker.id,
+      requestedByUserId: "member",
+      requestId: "34343434-aaaa-4343-8343-343434343434",
+      occurredAt: atMinute(5),
+    });
+    await db
+      .prepare(
+        `update briar_hunt_runs
+         set preferred_agent_provider = 'grok',
+             preferred_agent_model = 'grok-4',
+             preferred_agent_effort = 'high'
+         where id = ?`,
+      )
+      .bind(runIds[1])
+      .run();
+
+    for (const [runId, staleProvider, claimSeed] of [
+      [runIds[0], "codex", "existing"],
+      [runIds[1], "grok", "mutated"],
+    ] as const) {
+      await expect(
+        claimNextQueuedHuntRun(db, projectId, {
+          claimTokenHash: fingerprint(`stale-${claimSeed}`),
+          claimedBy: registered.worker.label,
+          claimedAt: atMinute(6),
+          leaseExpiresAt: leaseExpiryFrom(atMinute(6)),
+          runId,
+          workerId: registered.worker.id,
+          agentProvider: staleProvider,
+          detachedOnly: true,
+        }),
+      ).resolves.toBeNull();
+
+      await expect(
+        claimNextQueuedHuntRun(db, projectId, {
+          claimTokenHash: fingerprint(`requested-${claimSeed}`),
+          claimedBy: registered.worker.label,
+          claimedAt: atMinute(6),
+          leaseExpiresAt: leaseExpiryFrom(atMinute(6)),
+          runId,
+          workerId: registered.worker.id,
+          agentProvider: "claude",
+          detachedOnly: true,
+        }),
+      ).resolves.toMatchObject({
+        id: runId,
+        requested_agent_provider: "claude",
+        requested_agent_model: "claude-sonnet-4-0",
+        requested_agent_effort: "medium",
+        worker_id: registered.worker.id,
+      });
+    }
   });
 
   it("enforces the project Worker allowlist for dispatch and claim", async () => {

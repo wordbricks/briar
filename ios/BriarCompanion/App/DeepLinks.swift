@@ -103,8 +103,16 @@ final class CompanionNavigationModel: ObservableObject {
     @Published var pendingChannelMessageID: UUID?
     @Published var pendingChannelRootMessageID: UUID?
     @Published var pathChannelToken = 0
+    @Published private(set) var preparingIssue = false
+    private var issuePreparationRevision = 0
 
     func open(_ target: BriarLinkTarget) {
+        issuePreparationRevision &+= 1
+        preparingIssue = false
+        stage(target)
+    }
+
+    private func stage(_ target: BriarLinkTarget) {
         pendingProjectID = target.projectID
         switch target {
         case let .issue(_, runID):
@@ -120,6 +128,33 @@ final class CompanionNavigationModel: ObservableObject {
         }
     }
 
+    /// Keeps channel approval on its current surface while a canonical
+    /// dashboard is loaded. A newer request or a departed source surface makes
+    /// the delayed completion a no-op.
+    func openIssueWhenAvailable(
+        projectID: UUID,
+        runID: UUID,
+        ensureAvailable: @escaping @MainActor (UUID, UUID) async -> Bool,
+        sourceIsCurrent: @escaping @MainActor () -> Bool
+    ) async -> Bool {
+        issuePreparationRevision &+= 1
+        let expectedRevision = issuePreparationRevision
+        preparingIssue = true
+        defer {
+            if expectedRevision == issuePreparationRevision {
+                preparingIssue = false
+            }
+        }
+        guard sourceIsCurrent() else { return false }
+        guard await ensureAvailable(projectID, runID) else { return false }
+        guard
+            expectedRevision == issuePreparationRevision,
+            sourceIsCurrent()
+        else { return false }
+        stage(.issue(projectID: projectID, runID: runID))
+        return true
+    }
+
     func openInboxMessage(_ message: InboxMessage) {
         switch message.kind {
         case .issue, .conversation:
@@ -132,6 +167,10 @@ final class CompanionNavigationModel: ObservableObject {
             guard let channelID = UUID(uuidString: message.targetId),
                   let messageID = message.channelMessageId,
                   let rootMessageID = message.rootMessageId else { return }
+            issuePreparationRevision &+= 1
+            preparingIssue = false
+            pendingIssueID = nil
+            pendingSessionID = nil
             pendingProjectID = message.projectId
             pendingChannelID = channelID
             pendingChannelMessageID = messageID
@@ -142,12 +181,40 @@ final class CompanionNavigationModel: ObservableObject {
     }
 
     func consumePendingIssue() -> UUID? {
-        defer { pendingIssueID = nil }
+        defer {
+            pendingIssueID = nil
+            pendingProjectID = nil
+        }
         return pendingIssueID
     }
 
+    func consumePendingIssue(
+        projectID: UUID,
+        runID: UUID,
+        pathToken: Int
+    ) -> UUID? {
+        guard
+            pendingProjectID == projectID,
+            pendingIssueID == runID,
+            pathIssueToken == pathToken,
+            selectedTab == .tasks
+        else { return nil }
+        return consumePendingIssue()
+    }
+
+    func cancelPendingIssue() {
+        issuePreparationRevision &+= 1
+        preparingIssue = false
+        guard pendingIssueID != nil else { return }
+        pendingIssueID = nil
+        pendingProjectID = nil
+    }
+
     func consumePendingSession() -> String? {
-        defer { pendingSessionID = nil }
+        defer {
+            pendingSessionID = nil
+            pendingProjectID = nil
+        }
         return pendingSessionID
     }
 
@@ -158,6 +225,7 @@ final class CompanionNavigationModel: ObservableObject {
         pendingChannelID = nil
         pendingChannelMessageID = nil
         pendingChannelRootMessageID = nil
+        pendingProjectID = nil
         return (channelID, messageID, rootMessageID)
     }
 }

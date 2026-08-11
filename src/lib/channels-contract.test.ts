@@ -63,4 +63,29 @@ describe("channel reply completion contract", () => {
     });
     expect(expanded.success).toBe(false);
   });
+
+  it("only lets new issue proposals request backlog creation", () => {
+    const proposal = {
+      body: "Create this after approval.",
+      document: null,
+      delegation: null,
+      issueProposal: {
+        projectId,
+        issue: {
+          title: "Safe proposal",
+          description: null,
+          priority: null,
+          status: "backlog",
+        },
+      },
+    };
+    expect(channelReplyCompletionSchema.safeParse(proposal).success).toBe(true);
+    expect(channelReplyCompletionSchema.safeParse({
+      ...proposal,
+      issueProposal: {
+        ...proposal.issueProposal,
+        issue: { ...proposal.issueProposal.issue, status: "queued" },
+      },
+    }).success).toBe(false);
+  });
 });

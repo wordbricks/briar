@@ -86,6 +86,29 @@ struct CompanionRootView: View {
                     api: api,
                     user: companion.user,
                     refresh: { await dashboard.refresh(forceSnapshot: true) },
+                    ensureIssueAvailable: { projectID, runID in
+                        guard let target = companion.projects.first(where: {
+                            $0.id == projectID
+                        }) else { return false }
+                        // Keep the account selection and every project-scoped
+                        // store aligned before loading the canonical dashboard.
+                        companion.selectedProjectID = projectID
+                        dashboard.select(projectID: projectID, token: token)
+                        channels.select(
+                            organizationID: target.organizationId,
+                            token: token
+                        )
+                        agents.select(
+                            projectID: projectID,
+                            token: token,
+                            locale: locale.rawValue
+                        )
+                        return await dashboard.ensureRunAvailable(
+                            projectID: projectID,
+                            runID: runID,
+                            token: token
+                        )
+                    },
                     selectProject: { companion.selectedProjectID = $0 },
                     signOut: signOut
                 )
@@ -159,9 +182,8 @@ struct CompanionRootView: View {
         }
         .onChange(of: navigation.pendingProjectID) { _, projectID in
             guard let projectID else { return }
-            applyPendingProjectIfNeeded()
-            if companion.selectedProjectID == projectID {
-                navigation.pendingProjectID = nil
+            Task {
+                await refreshAndApplyPendingProjectIfNeeded()
             }
         }
         .onOpenURL { url in
@@ -214,6 +236,30 @@ struct CompanionRootView: View {
             if session.token != nil {
                 projectSelectionComplete = true
             }
+        }
+    }
+
+    private func refreshAndApplyPendingProjectIfNeeded() async {
+        guard let pending = navigation.pendingProjectID else { return }
+        guard let token = session.token else { return }
+        if !companion.projects.contains(where: { $0.id == pending }) {
+            do {
+                try await companion.refreshProjects(token: token)
+            } catch {
+                // Clear the routing key so another tap can trigger a fresh
+                // catalog lookup instead of leaving navigation stuck forever.
+                if navigation.pendingProjectID == pending {
+                    navigation.pendingProjectID = nil
+                }
+                return
+            }
+        }
+        guard navigation.pendingProjectID == pending else { return }
+        applyPendingProjectIfNeeded()
+        if companion.selectedProjectID != pending {
+            // A successful refresh can still race eventual project creation.
+            // Clear only this unresolved request so tapping the link again
+            // performs a new catalog lookup.
             navigation.pendingProjectID = nil
         }
     }

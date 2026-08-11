@@ -23,6 +23,7 @@ import {
 import {
   organizationAgentContextCapability,
 } from "../../src/lib/organization-agent-context-contract";
+import { isChannelApprovedIssue } from "./db";
 
 export type {
   AgentProvider,
@@ -1389,7 +1390,6 @@ export async function auditExecutionEvent(
     action:
       | "dispatched"
       | "reassigned"
-      | "unassigned"
       | "claimed"
       | "lease_lost"
       | "cancelled"
@@ -1608,8 +1608,46 @@ export async function dispatchHuntRun(
       requested_by_user_id: string;
       dispatch_mode: "any" | "specific";
       dispatched_at: string;
-    }>();
+  }>();
   if (existing) {
+    // A pre-atomic dispatcher may have committed the run update and failed
+    // before writing its audit event. An idempotent retry repairs that durable
+    // evidence instead of returning early forever.
+    const existingAudit = await db
+      .prepare(
+        `select action from briar_execution_audit_events
+         where project_id = ? and request_id = ?
+         limit 1`,
+      )
+      .bind(projectId, input.requestId)
+      .first<{ action: string }>();
+    if (!existingAudit) {
+      await auditExecutionEvent(db, {
+        organizationId,
+        projectId,
+        runId: existing.id,
+        workerId: existing.requested_worker_id,
+        agentId: existing.agent_id,
+        actorUserId: existing.requested_by_user_id ?? input.requestedByUserId,
+        // The old split write did not persist which endpoint initiated the
+        // request. A retry must not be allowed to rewrite history by choosing
+        // the opposite endpoint, so record the conservative fixed action and
+        // make the uncertainty explicit in durable detail.
+        action: "dispatched",
+        requestId: input.requestId,
+        detail: {
+          legacyActionUnknown: true,
+          recoveredFromRunState: true,
+          previousWorkerId: null,
+          provider:
+            existing.requested_agent_provider ?? agent?.provider ?? provider,
+          model: existing.requested_agent_model,
+          effort: existing.requested_agent_effort,
+          dispatchMode: existing.dispatch_mode,
+        },
+        occurredAt: existing.dispatched_at,
+      });
+    }
     return {
       runId: existing.id,
       agentId: existing.agent_id,
@@ -1665,71 +1703,94 @@ export async function dispatchHuntRun(
   const detail = input.workerId
     ? "사용자가 특정 Worker에 작업을 배정했습니다."
     : "사용자가 적합한 Worker에 작업을 배정했습니다.";
-  const result = await db
-    .prepare(
-      `update briar_hunt_runs
-       set agent_id = ?, requested_agent_provider = ?,
-           requested_agent_model = ?, requested_agent_effort = ?,
-           preferred_agent_provider = case when ? = 1 then ? else preferred_agent_provider end,
-           preferred_agent_model = case when ? = 1 then ? else preferred_agent_model end,
-           preferred_agent_effort = case when ? = 1 then ? else preferred_agent_effort end,
-           requested_worker_id = ?,
-           requested_by_user_id = ?,
-           dispatch_mode = ?, dispatch_request_id = ?, dispatched_at = ?,
-           status = 'queued', stage = 'queued', workflow_stage = null,
-           current_attempt = ?, current_revision = 1,
-           worker_id = null, claim_token_hash = null, claimed_by = null,
-           claimed_at = null, lease_expires_at = null, completed_at = null,
-           resume_requested_at = null, execution_metrics_json = null,
-           detail = ?, last_event_at = ?, updated_at = ?
-       where id = ? and project_id = ?
-         and status not in ('completed', 'cancelled')`,
-    )
-    .bind(
-      agent?.id ?? null,
-      provider,
-      model,
-      effort,
-      input.persistPreferences ? 1 : 0,
-      provider,
-      input.persistPreferences ? 1 : 0,
-      model,
-      input.persistPreferences ? 1 : 0,
-      effort,
-      input.workerId ?? null,
-      input.requestedByUserId,
-      input.workerId ? "specific" : "any",
-      input.requestId,
-      input.occurredAt,
-      nextAttempt,
-      detail,
-      input.occurredAt,
-      input.occurredAt,
-      input.runId,
-      projectId,
-    )
-    .run();
-  if (result.meta.changes < 1) {
+  const dispatchMode = input.workerId ? "specific" : "any";
+  const auditDetail = JSON.stringify({
+    previousWorkerId: run.worker_id,
+    provider,
+    model,
+    effort,
+    dispatchMode,
+  });
+  const [dispatchUpdate] = await db.batch([
+    db
+      .prepare(
+        `update briar_hunt_runs
+         set agent_id = ?, requested_agent_provider = ?,
+             requested_agent_model = ?, requested_agent_effort = ?,
+             preferred_agent_provider = case when ? = 1 then ? else preferred_agent_provider end,
+             preferred_agent_model = case when ? = 1 then ? else preferred_agent_model end,
+             preferred_agent_effort = case when ? = 1 then ? else preferred_agent_effort end,
+             requested_worker_id = ?,
+             requested_by_user_id = ?,
+             dispatch_mode = ?, dispatch_request_id = ?, dispatched_at = ?,
+             status = 'queued', stage = 'queued', workflow_stage = null,
+             current_attempt = ?, current_revision = 1,
+             worker_id = null, claim_token_hash = null, claimed_by = null,
+             claimed_at = null, lease_expires_at = null, completed_at = null,
+             resume_requested_at = null, execution_metrics_json = null,
+             detail = ?, last_event_at = ?, updated_at = ?
+         where id = ? and project_id = ?
+           and status not in ('completed', 'cancelled')
+         returning id`,
+      )
+      .bind(
+        agent?.id ?? null,
+        provider,
+        model,
+        effort,
+        input.persistPreferences ? 1 : 0,
+        provider,
+        input.persistPreferences ? 1 : 0,
+        model,
+        input.persistPreferences ? 1 : 0,
+        effort,
+        input.workerId ?? null,
+        input.requestedByUserId,
+        dispatchMode,
+        input.requestId,
+        input.occurredAt,
+        nextAttempt,
+        detail,
+        input.occurredAt,
+        input.occurredAt,
+        input.runId,
+        projectId,
+      ),
+    db
+      .prepare(
+        `insert into briar_execution_audit_events (
+           id, organization_id, project_id, run_id, worker_id, agent_id,
+           actor_user_id, actor_device_id, action, request_id, detail_json,
+           occurred_at
+         )
+         select ?, ?, ?, run.id, ?, ?, ?, null, ?, ?, ?, ?
+         from briar_hunt_runs run
+         where run.id = ? and run.project_id = ?
+           and run.dispatch_request_id = ? and run.dispatched_at = ?
+           and run.requested_by_user_id = ?
+         on conflict do nothing`,
+      )
+      .bind(
+        crypto.randomUUID(),
+        organizationId,
+        projectId,
+        input.workerId ?? null,
+        agent?.id ?? null,
+        input.requestedByUserId,
+        action,
+        input.requestId,
+        auditDetail,
+        input.occurredAt,
+        input.runId,
+        projectId,
+        input.requestId,
+        input.occurredAt,
+        input.requestedByUserId,
+      ),
+  ]);
+  if (!dispatchUpdate.results[0]) {
     throw new WorkerConflictError("Run dispatch raced with another update");
   }
-  await auditExecutionEvent(db, {
-    organizationId,
-    projectId,
-    runId: input.runId,
-    workerId: input.workerId ?? null,
-    agentId: agent?.id ?? null,
-    actorUserId: input.requestedByUserId,
-    action,
-    requestId: input.requestId,
-    detail: {
-      previousWorkerId: run.worker_id,
-      provider,
-      model,
-      effort,
-      dispatchMode: input.workerId ? "specific" : "any",
-    },
-    occurredAt: input.occurredAt,
-  });
   return {
     runId: input.runId,
     agentId: agent?.id ?? null,
@@ -1738,7 +1799,7 @@ export async function dispatchHuntRun(
     effort,
     requestedWorkerId: input.workerId ?? null,
     requestedByUserId: input.requestedByUserId,
-    dispatchMode: input.workerId ? "specific" : "any",
+    dispatchMode,
     dispatchedAt: input.occurredAt,
     outcome: "dispatched",
   };
@@ -1752,12 +1813,14 @@ export async function unassignHuntRun(
 ) {
   const run = await db
     .prepare(
-      `select id, status, current_attempt, claim_token_hash, worker_id, requested_worker_id
+      `select id, source_key, status, current_attempt, claim_token_hash,
+              worker_id, requested_worker_id
        from briar_hunt_runs where id = ? and project_id = ?`,
     )
     .bind(input.runId, projectId)
     .first<{
       id: string;
+      source_key: string;
       status: string;
       current_attempt: number;
       claim_token_hash: string | null;
@@ -1771,44 +1834,99 @@ export async function unassignHuntRun(
   if (!run.worker_id && !run.requested_worker_id) {
     return { runId: input.runId, outcome: "not_assigned" as const };
   }
+  const channelApproved = await isChannelApprovedIssue(db, run);
+  const resetExecutionApproval = channelApproved ? 1 : 0;
   const nextAttempt = run.claim_token_hash ? run.current_attempt + 1 : run.current_attempt;
-  const result = await db
-    .prepare(
+  const detail = channelApproved
+    ? "사용자가 Worker 배정을 취소했습니다. 다시 실행하려면 명시적인 승인이 필요합니다."
+    : "사용자가 Worker 배정을 취소했습니다.";
+  const auditDetail = JSON.stringify({
+    previousWorkerId: run.worker_id,
+    previousRequestedWorkerId: run.requested_worker_id,
+    reason: "user_unassigned",
+    executionApprovalReset: channelApproved,
+  });
+  const [unassignUpdate, auditInsert] = await db.batch([
+    db.prepare(
       `update briar_hunt_runs
        set requested_worker_id = null, requested_by_user_id = null,
            dispatch_mode = null, dispatch_request_id = null, dispatched_at = null,
+           requested_agent_provider = case when ? = 1 then null else requested_agent_provider end,
+           requested_agent_model = case when ? = 1 then null else requested_agent_model end,
+           requested_agent_effort = case when ? = 1 then null else requested_agent_effort end,
+           agent_id = case when ? = 1 then null else agent_id end,
            worker_id = null, claim_token_hash = null, claimed_by = null,
            claimed_at = null, lease_expires_at = null,
-           status = 'queued', stage = 'queued', workflow_stage = null,
+           last_execution_id = case when ? = 1 then null else last_execution_id end,
+           claim_attempts = case when ? = 1 then 0 else claim_attempts end,
+           status = case when ? = 1 then 'backlog' else 'queued' end,
+           stage = 'queued', workflow_stage = null,
            current_attempt = ?, current_revision = 1, paused_at = null,
            resume_requested_at = null, completed_at = null,
            detail = ?, last_event_at = ?, updated_at = ?
        where id = ? and project_id = ? and status not in ('completed', 'cancelled')
-         and (worker_id is not null or requested_worker_id is not null)`,
+         and (worker_id is not null or requested_worker_id is not null)
+         and not exists (
+           select 1 from briar_execution_audit_events audit
+           where audit.project_id = ? and audit.action = 'requeued'
+             and audit.request_id = ?
+         )
+       returning id`,
     )
     .bind(
+      resetExecutionApproval,
+      resetExecutionApproval,
+      resetExecutionApproval,
+      resetExecutionApproval,
+      resetExecutionApproval,
+      resetExecutionApproval,
+      resetExecutionApproval,
       nextAttempt,
-      "사용자가 Worker 배정을 취소했습니다.",
+      detail,
       input.occurredAt,
       input.occurredAt,
       input.runId,
       projectId,
-    )
-    .run();
-  if (result.meta.changes < 1) {
+      projectId,
+      input.requestId,
+    ),
+    db.prepare(
+      `insert into briar_execution_audit_events (
+         id, organization_id, project_id, run_id, worker_id, agent_id,
+         actor_user_id, actor_device_id, action, request_id, detail_json,
+         occurred_at
+       )
+       select ?, ?, ?, current.id, ?, null, ?, null, 'requeued', ?, ?, ?
+       from briar_hunt_runs current
+       where changes() = 1
+         and current.id = ? and current.project_id = ?
+         and current.status = ? and current.worker_id is null
+         and current.requested_worker_id is null
+         and current.dispatch_request_id is null
+         and current.last_event_at = ? and current.updated_at = ?
+       returning id`,
+    ).bind(
+      crypto.randomUUID(),
+      organizationId,
+      projectId,
+      run.worker_id,
+      input.requestedByUserId,
+      input.requestId,
+      auditDetail,
+      input.occurredAt,
+      input.runId,
+      projectId,
+      channelApproved ? "backlog" : "queued",
+      input.occurredAt,
+      input.occurredAt,
+    ),
+  ]);
+  if (!unassignUpdate.results[0]) {
     throw new WorkerConflictError("Worker assignment changed before it could be cancelled");
   }
-  await auditExecutionEvent(db, {
-    organizationId,
-    projectId,
-    runId: input.runId,
-    workerId: run.worker_id,
-    actorUserId: input.requestedByUserId,
-    action: "unassigned",
-    requestId: input.requestId,
-    detail: { previousWorkerId: run.worker_id, previousRequestedWorkerId: run.requested_worker_id },
-    occurredAt: input.occurredAt,
-  });
+  if (!auditInsert.results[0]) {
+    throw new WorkerConflictError("Worker unassignment audit was not recorded");
+  }
   return { runId: input.runId, outcome: "unassigned" as const };
 }
 
@@ -2087,10 +2205,31 @@ export async function appendAgentTranscript(
   const existing = await db
     .prepare(
       `select * from briar_agent_transcript_sessions
-       where session_id = ? and project_id = ?`,
+       where session_id = ?`,
     )
-    .bind(sessionId, projectId)
+    .bind(sessionId)
     .first<TranscriptSessionRow>();
+  if (existing?.project_id !== undefined && existing.project_id !== projectId) {
+    throw new WorkerConflictError(
+      "Transcript session belongs to another project",
+    );
+  }
+  if (existing?.run_id && input.runId && existing.run_id !== input.runId) {
+    throw new WorkerConflictError("Transcript session belongs to another run");
+  }
+  const effectiveRunId = existing?.run_id ?? input.runId;
+  if (effectiveRunId) {
+    const currentRun = await db
+      .prepare(
+        `select 1 as current
+         from briar_hunt_runs where id = ? and project_id = ?`,
+      )
+      .bind(effectiveRunId, projectId)
+      .first<{ current: number }>();
+    if (!currentRun) {
+      throw new WorkerConflictError("Transcript run belongs to another project");
+    }
+  }
   if (
     existing &&
     (existing.event_count + payloads.length > MAX_TRANSCRIPT_SESSION_EVENTS ||
@@ -2122,6 +2261,60 @@ export async function appendAgentTranscript(
       .run();
   }
 
+  const boundSession = await db
+    .prepare(
+      `update briar_agent_transcript_sessions
+       set run_id = coalesce(run_id, ?), worker_id = coalesce(worker_id, ?)
+       where session_id = ? and project_id = ?
+         and (? is null or run_id is null or run_id = ?)
+         and (
+           ? is null
+           or exists (
+             select 1 from briar_hunt_runs run
+             where run.id = ? and run.project_id = ?
+           )
+         )`,
+    )
+    .bind(
+      input.runId,
+      input.workerId,
+      sessionId,
+      projectId,
+      input.runId,
+      input.runId,
+      input.runId,
+      input.runId,
+      projectId,
+    )
+    .run();
+  if (boundSession.meta.changes < 1) {
+    throw new WorkerConflictError(
+      "Transcript session belongs to another project or run",
+    );
+  }
+
+  // The session id is globally unique. Re-read after the INSERT so a
+  // concurrent creator in another project cannot win the conflict and then
+  // receive this request's events.
+  const ownedSession = await db
+    .prepare(
+      `select session.*
+       from briar_agent_transcript_sessions session
+       left join briar_hunt_runs run on run.id = session.run_id
+       where session.session_id = ? and session.project_id = ?
+         and (session.run_id is null or run.project_id = session.project_id)`,
+    )
+    .bind(sessionId, projectId)
+    .first<TranscriptSessionRow>();
+  if (!ownedSession) {
+    throw new WorkerConflictError(
+      "Transcript session belongs to another project",
+    );
+  }
+  if (ownedSession.run_id && input.runId && ownedSession.run_id !== input.runId) {
+    throw new WorkerConflictError("Transcript session belongs to another run");
+  }
+
   let stored = 0;
   let storedBytes = 0;
   for (const event of payloads) {
@@ -2129,10 +2322,22 @@ export async function appendAgentTranscript(
       .prepare(
         `insert into briar_agent_transcripts (
            session_id, sequence, direction, payload_json, recorded_at
-         ) values (?, ?, ?, ?, ?)
+         )
+         select session.session_id, ?, ?, ?, ?
+         from briar_agent_transcript_sessions session
+         left join briar_hunt_runs run on run.id = session.run_id
+         where session.session_id = ? and session.project_id = ?
+           and (session.run_id is null or run.project_id = session.project_id)
          on conflict (session_id, sequence) do nothing`,
       )
-      .bind(sessionId, event.sequence, event.direction, event.serialized, input.observedAt)
+      .bind(
+        event.sequence,
+        event.direction,
+        event.serialized,
+        input.observedAt,
+        sessionId,
+        projectId,
+      )
       .run();
     // A retried batch must not inflate the counters it is charged against.
     if (result.meta.changes > 0) {
@@ -2141,7 +2346,7 @@ export async function appendAgentTranscript(
     }
   }
 
-  await db
+  const updated = await db
     .prepare(
       `update briar_agent_transcript_sessions
        set last_event_at = ?,
@@ -2149,7 +2354,15 @@ export async function appendAgentTranscript(
            byte_count = byte_count + ?,
            run_id = coalesce(run_id, ?),
            worker_id = coalesce(worker_id, ?)
-       where session_id = ?`,
+       where session_id = ? and project_id = ?
+         and (
+           run_id is null
+           or exists (
+             select 1 from briar_hunt_runs run
+             where run.id = briar_agent_transcript_sessions.run_id
+               and run.project_id = briar_agent_transcript_sessions.project_id
+           )
+         )`,
     )
     .bind(
       input.observedAt,
@@ -2158,8 +2371,14 @@ export async function appendAgentTranscript(
       input.runId,
       input.workerId,
       sessionId,
+      projectId,
     )
     .run();
+  if (updated.meta.changes < 1) {
+    throw new WorkerConflictError(
+      "Transcript session moved to another project before it could be updated",
+    );
+  }
 
   return { sessionId, stored, storedBytes, pruned: [] as string[] };
 }
@@ -2178,8 +2397,14 @@ export async function readAgentTranscript(
 ) {
   const session = await db
     .prepare(
-      `select * from briar_agent_transcript_sessions
-       where session_id = ? and project_id = ?`,
+      `select session.*
+       from briar_agent_transcript_sessions session
+       left join briar_hunt_runs run on run.id = session.run_id
+       where session.session_id = ? and session.project_id = ?
+         and (
+           session.run_id is null
+           or run.project_id = session.project_id
+         )`,
     )
     .bind(sessionId, projectId)
     .first<TranscriptSessionRow>();
@@ -2215,9 +2440,13 @@ export async function readLatestAgentTranscriptForRun(
 ) {
   const latest = await db
     .prepare(
-      `select session_id from briar_agent_transcript_sessions
-       where project_id = ? and run_id = ?
-       order by last_event_at desc, started_at desc, session_id desc
+      `select session.session_id
+       from briar_agent_transcript_sessions session
+       join briar_hunt_runs run
+         on run.id = session.run_id and run.project_id = session.project_id
+       where session.project_id = ? and session.run_id = ?
+       order by session.last_event_at desc, session.started_at desc,
+                session.session_id desc
        limit 1`,
     )
     .bind(projectId, runId)

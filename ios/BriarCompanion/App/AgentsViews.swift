@@ -141,11 +141,13 @@ struct AgentsHomeView: View {
             }
         }
         .onChange(of: navigation.pathSessionToken) { _, _ in
+            guard navigation.pendingProjectID == project.id else { return }
             if let sessionID = navigation.consumePendingSession() {
                 path.append(AgentRoute.session(sessionID))
             }
         }
-        .task(id: navigation.pathSessionToken) {
+        .task(id: "\(project.id.uuidString):\(navigation.pathSessionToken)") {
+            guard navigation.pendingProjectID == project.id else { return }
             if let sessionID = navigation.pendingSessionID {
                 _ = navigation.consumePendingSession()
                 path.append(AgentRoute.session(sessionID))

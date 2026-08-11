@@ -2616,7 +2616,8 @@
                 "enum": [
                   "backlog",
                   "queued"
-                ]
+                ],
+                "description": "Legacy queued values are display-only. Accepting this proposal always creates a backlog issue and never starts execution."
               }
             },
             "additionalProperties": false
@@ -3895,6 +3896,76 @@
               "null"
             ],
             "format": "uuid"
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "actionType": {
+                  "const": "request_issue_create"
+                }
+              },
+              "required": [
+                "actionType"
+              ]
+            },
+            "then": {
+              "properties": {
+                "payload": {
+                  "$ref": "#/components/schemas/ChannelIssueProposalPayload"
+                }
+              }
+            }
+          }
+        ],
+        "additionalProperties": false
+      },
+      "ChannelIssueProposalPayload": {
+        "type": "object",
+        "required": [
+          "issue"
+        ],
+        "properties": {
+          "issue": {
+            "type": "object",
+            "required": [
+              "title",
+              "description",
+              "priority",
+              "status"
+            ],
+            "properties": {
+              "title": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 300
+              },
+              "description": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "maxLength": 100000
+              },
+              "priority": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 1,
+                "maximum": 4
+              },
+              "status": {
+                "type": "string",
+                "description": "Legacy stored proposals may read as queued; accepting either value always creates a backlog issue and never starts execution.",
+                "enum": [
+                  "backlog",
+                  "queued"
+                ]
+              }
+            },
+            "additionalProperties": false
           }
         },
         "additionalProperties": false

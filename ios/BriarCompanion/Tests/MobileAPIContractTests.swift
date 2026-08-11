@@ -28,6 +28,95 @@ final class MobileAPIContractTests: XCTestCase {
         XCTAssertEqual(DeviceCodeRequest(), DeviceCodeRequest(clientID: "briar-mobile"))
     }
 
+    func testChannelIssueProposalPayloadIsDetailedAndBackwardCompatible() throws {
+        let detailed = try JSONDecoder.mobileContract.decode(
+            ChannelMessage.Proposal.self,
+            from: Data(
+                #"""
+                {
+                  "id": "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+                  "actionType": "request_issue_create",
+                  "status": "pending",
+                  "projectId": null,
+                  "payload": {
+                    "issue": {
+                      "title": "Build onboarding",
+                      "description": "Ship the guided setup.",
+                      "priority": 2,
+                      "status": "queued"
+                    }
+                  },
+                  "resultRunId": null
+                }
+                """#.utf8
+            )
+        )
+        XCTAssertEqual(detailed.payload?.issue?.title, "Build onboarding")
+        XCTAssertEqual(detailed.payload?.issue?.description, "Ship the guided setup.")
+        XCTAssertEqual(detailed.payload?.issue?.priority, 2)
+        XCTAssertEqual(detailed.payload?.issue?.status, .queued)
+
+        let legacy = try JSONDecoder.mobileContract.decode(
+            ChannelMessage.Proposal.self,
+            from: Data(
+                #"""
+                {
+                  "id": "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+                  "actionType": "request_issue_create",
+                  "status": "pending",
+                  "projectId": null,
+                  "resultRunId": null
+                }
+                """#.utf8
+            )
+        )
+        XCTAssertNil(legacy.payload)
+
+        let unknownPayload = try JSONDecoder.mobileContract.decode(
+            ChannelMessage.Proposal.self,
+            from: Data(
+                #"""
+                {
+                  "id": "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+                  "actionType": "request_issue_create",
+                  "status": "pending",
+                  "projectId": null,
+                  "payload": "legacy-shape",
+                  "resultRunId": null
+                }
+                """#.utf8
+            )
+        )
+        XCTAssertNil(unknownPayload.payload)
+    }
+
+    func testChannelIssueProposalRejectsPartiallyMalformedCanonicalDetails() throws {
+        let malformedIssues = [
+            #"{"title":"Missing fields"}"#,
+            #"{"title":"","description":null,"priority":2,"status":"backlog"}"#,
+            #"{"title":"Bad priority","description":null,"priority":5,"status":"backlog"}"#,
+        ]
+
+        for issue in malformedIssues {
+            let proposal = try JSONDecoder.mobileContract.decode(
+                ChannelMessage.Proposal.self,
+                from: Data(
+                    """
+                    {
+                      "id": "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+                      "actionType": "request_issue_create",
+                      "status": "pending",
+                      "projectId": null,
+                      "payload": {"issue": \(issue)},
+                      "resultRunId": null
+                    }
+                    """.utf8
+                )
+            )
+            XCTAssertNil(proposal.payload, "Malformed issue unexpectedly decoded: \(issue)")
+        }
+    }
+
     func testSharedFixtureOperationsMatchOpenAPI() throws {
         let bundle = Bundle(for: Self.self)
         let openAPIURL = try XCTUnwrap(
@@ -164,6 +253,14 @@ final class MobileAPIContractTests: XCTestCase {
             [UUID(uuidString: "66666666-6666-4666-8666-666666666666")!]
         )
         XCTAssertEqual(channelMessages.messages.last?.proposal?.status, .pending)
+        XCTAssertEqual(
+            channelMessages.messages.last?.proposal?.payload?.issue?.title,
+            "온보딩 개편"
+        )
+        XCTAssertEqual(
+            channelMessages.messages.last?.proposal?.payload?.issue?.status,
+            .backlog
+        )
         XCTAssertEqual(acceptedChannelProposal.outcome, .accepted)
         XCTAssertEqual(
             acceptedChannelProposal.projectId.uuidString.lowercased(),

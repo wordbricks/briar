@@ -506,6 +506,76 @@ final class AgentsInboxSystemTests: XCTestCase {
         XCTAssertNil(BriarLinkParser.parse("briar-companion://auth-complete"))
     }
 
+    @MainActor
+    func testPreparedIssueWaitsForAvailabilityBeforeItCanBeConsumed() async {
+        let projectID = UUID(uuidString: "11111111-1111-4111-8111-111111111111")!
+        let runID = UUID(uuidString: "33333333-3333-4333-8333-333333333333")!
+        let navigation = CompanionNavigationModel()
+        var resumeAvailability: ((Bool) -> Void)?
+        let preparation = Task {
+            await navigation.openIssueWhenAvailable(
+                projectID: projectID,
+                runID: runID,
+                ensureAvailable: { _, _ in
+                    await withCheckedContinuation { continuation in
+                        resumeAvailability = { continuation.resume(returning: $0) }
+                    }
+                },
+                sourceIsCurrent: { true }
+            )
+        }
+        while resumeAvailability == nil { await Task.yield() }
+
+        XCTAssertTrue(navigation.preparingIssue)
+        XCTAssertNil(navigation.pendingIssueID)
+        resumeAvailability?(true)
+        let prepared = await preparation.value
+        XCTAssertTrue(prepared)
+        XCTAssertEqual(navigation.pendingProjectID, projectID)
+        XCTAssertEqual(navigation.pendingIssueID, runID)
+        let token = navigation.pathIssueToken
+        XCTAssertNil(navigation.consumePendingIssue(
+            projectID: projectID,
+            runID: runID,
+            pathToken: token &+ 1
+        ))
+        XCTAssertEqual(navigation.consumePendingIssue(
+            projectID: projectID,
+            runID: runID,
+            pathToken: token
+        ), runID)
+    }
+
+    @MainActor
+    func testStalePreparedIssueCannotNavigateAfterItsSourceLeaves() async {
+        let projectID = UUID(uuidString: "11111111-1111-4111-8111-111111111111")!
+        let runID = UUID(uuidString: "33333333-3333-4333-8333-333333333333")!
+        let navigation = CompanionNavigationModel()
+        var sourceIsCurrent = true
+        var resumeAvailability: ((Bool) -> Void)?
+        let preparation = Task {
+            await navigation.openIssueWhenAvailable(
+                projectID: projectID,
+                runID: runID,
+                ensureAvailable: { _, _ in
+                    await withCheckedContinuation { continuation in
+                        resumeAvailability = { continuation.resume(returning: $0) }
+                    }
+                },
+                sourceIsCurrent: { sourceIsCurrent }
+            )
+        }
+        while resumeAvailability == nil { await Task.yield() }
+
+        sourceIsCurrent = false
+        resumeAvailability?(true)
+        let prepared = await preparation.value
+        XCTAssertFalse(prepared)
+        XCTAssertFalse(navigation.preparingIssue)
+        XCTAssertNil(navigation.pendingProjectID)
+        XCTAssertNil(navigation.pendingIssueID)
+    }
+
     func testShareLinksMatchOpenPathShape() {
         let projectID = UUID(uuidString: "11111111-1111-4111-8111-111111111111")!
         let runID = UUID(uuidString: "33333333-3333-4333-8333-333333333333")!

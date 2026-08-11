@@ -10,6 +10,7 @@ import {
   completeChannelReply,
   createChannel,
   createChannelMessage,
+  deleteChannel,
   enqueueChannelAgentReplies,
   failChannelReply,
   getChannelById,
@@ -29,6 +30,7 @@ import {
   renewChannelReplyLease,
   toggleChannelMessageReaction,
 } from "./channels";
+import { processArchiveCleanupQueue } from "./archive";
 import {
   createOrganizationAgent,
   listOrganizationAgents,
@@ -363,6 +365,149 @@ describe("organization channels", () => {
         attachmentId,
       ),
     ).resolves.toMatchObject({ object_key: expect.stringContaining(attachmentId) });
+  });
+
+  it("atomically queues channel attachments for retryable deletion", async () => {
+    const channelId = "e0000000-0000-4000-8000-000000000016";
+    const messageId = "f0000000-0000-4000-8000-000000000016";
+    const attachmentId = "fa000000-0000-4000-8000-000000000016";
+    const objectKey =
+      `channel-attachments/${organizationId}/${channelId}/${messageId}/${attachmentId}`;
+    await createChannel(db, {
+      id: channelId,
+      organizationId,
+      slug: "delete-image-room",
+      name: "Delete image room",
+      topic: null,
+      visibility: "public",
+      defaultProjectId: null,
+      createdByUserId: ownerId,
+      createdAt: at(8),
+    });
+    await createChannelMessage(db, {
+      id: messageId,
+      channelId,
+      parentMessageId: null,
+      authorUserId: ownerId,
+      authorAgentId: null,
+      authorAgentName: null,
+      authorAgentProvider: null,
+      body: "Delete this image",
+      mentionedUserIds: [],
+      mentionedAgentIds: [],
+      attachments: [{
+        id: attachmentId,
+        organization_id: organizationId,
+        object_key: objectKey,
+        filename: "delete.png",
+        content_type: "image/png",
+        byte_size: 5,
+      }],
+      createdAt: at(8),
+    });
+    await archives.put(objectKey, "image");
+
+    await expect(
+      deleteChannel(db, organizationId, channelId, ownerId, at(9)),
+    ).resolves.toBe(true);
+    await expect(
+      db
+        .prepare(
+          `select project_id, run_id from briar_archive_cleanup_queue
+           where bucket = 'attachments' and object_key = ?`,
+        )
+        .bind(objectKey)
+        .first(),
+    ).resolves.toEqual({ project_id: `channel:${channelId}`, run_id: null });
+
+    await expect(
+      processArchiveCleanupQueue(db, archives, archives, at(9), 10),
+    ).resolves.toEqual({ deleted: 1, failed: 0 });
+    await expect(archives.head(objectKey)).resolves.toBeNull();
+  });
+
+  it("does not delete or queue attachments after an admin role is removed", async () => {
+    const channelId = "e0000000-0000-4000-8000-000000000017";
+    const messageId = "f0000000-0000-4000-8000-000000000017";
+    const attachmentId = "fa000000-0000-4000-8000-000000000017";
+    const objectKey =
+      `channel-attachments/${organizationId}/${channelId}/${messageId}/${attachmentId}`;
+    await db
+      .prepare(
+        `update briar_organization_members
+         set role = 'admin', updated_at = ?
+         where organization_id = ? and user_id = ?`,
+      )
+      .bind(at(8), organizationId, outsiderId)
+      .run();
+    await createChannel(db, {
+      id: channelId,
+      organizationId,
+      slug: "role-race-room",
+      name: "Role race room",
+      topic: null,
+      visibility: "public",
+      defaultProjectId: null,
+      createdByUserId: ownerId,
+      createdAt: at(8),
+    });
+    await createChannelMessage(db, {
+      id: messageId,
+      channelId,
+      parentMessageId: null,
+      authorUserId: ownerId,
+      authorAgentId: null,
+      authorAgentName: null,
+      authorAgentProvider: null,
+      body: "Keep this image",
+      mentionedUserIds: [],
+      mentionedAgentIds: [],
+      attachments: [{
+        id: attachmentId,
+        organization_id: organizationId,
+        object_key: objectKey,
+        filename: "keep.png",
+        content_type: "image/png",
+        byte_size: 5,
+      }],
+      createdAt: at(8),
+    });
+
+    // The route may have observed the prior admin role. The deletion batch must
+    // authorize again after the downgrade and leave both D1 resources intact.
+    await db
+      .prepare(
+        `update briar_organization_members
+         set role = 'member', updated_at = ?
+         where organization_id = ? and user_id = ?`,
+      )
+      .bind(at(9), organizationId, outsiderId)
+      .run();
+
+    await expect(
+      deleteChannel(db, organizationId, channelId, outsiderId, at(9)),
+    ).resolves.toBe(false);
+    await expect(
+      getChannelById(db, organizationId, channelId),
+    ).resolves.toMatchObject({ id: channelId });
+    await expect(
+      getChannelMessageAttachment(
+        db,
+        organizationId,
+        channelId,
+        messageId,
+        attachmentId,
+      ),
+    ).resolves.toMatchObject({ object_key: objectKey });
+    await expect(
+      db
+        .prepare(
+          `select object_key from briar_archive_cleanup_queue
+           where bucket = 'attachments' and object_key = ?`,
+        )
+        .bind(objectKey)
+        .first(),
+    ).resolves.toBeNull();
   });
 
   it("limits a claimed reply image to its device, token, and trigger message", async () => {

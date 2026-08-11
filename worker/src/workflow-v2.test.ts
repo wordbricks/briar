@@ -151,6 +151,11 @@ describe("workflow v2 D1 persistence and transitions", () => {
         "0059_workflow_v2_progress.sql",
         "0061_workflow_stage_status_events.sql",
         "0078_workflow_v2_only.sql",
+        // 0090 validates the checkpoint wait columns introduced by 0059.
+        // Keep this historical fixture in real dependency order instead of
+        // applying the approval guards against the deliberately pre-0059
+        // schema assembled above.
+        "0090_channel_issue_approval.sql",
       ],
     });
 
@@ -213,6 +218,9 @@ describe("workflow v2 D1 persistence and transitions", () => {
       .run();
     await applyD1Migrations(db, {
       files: ["0061_workflow_stage_status_events.sql"],
+    });
+    await applyD1Migrations(db, {
+      files: ["0090_channel_issue_approval.sql"],
     });
     const backfilled = await db
       .prepare(
