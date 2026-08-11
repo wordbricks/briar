@@ -776,7 +776,13 @@ export function HuntDashboard({
     toast(displayedError, { tone: "error" });
   }, [displayedError, selected, toast]);
   const selectedInboxVersion = selected
-    ? inboxIssueMessageVersion(selected)
+    ? [
+        inboxIssueMessageVersion(selected),
+        ...(dashboard?.conversationNotifications ?? [])
+          .filter((notification) => notification.runId === selected.id)
+          .map((notification) => notification.id)
+          .sort(),
+      ].join(":")
     : null;
   const editingRun = runs.find((run) => run.id === editingRunId) ?? null;
   const deletingRunFromMenu =

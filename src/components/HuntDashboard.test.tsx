@@ -2634,28 +2634,60 @@ describe("HuntDashboard", () => {
     const viewedRun = demoDashboard.runs[0];
     expect(onIssueViewed).toHaveBeenLastCalledWith(viewedRun.id);
     const callsAfterOpening = onIssueViewed.mock.calls.length;
+    const updatedDashboard = {
+      ...demoDashboard,
+      runs: demoDashboard.runs.map((run) =>
+        run.id === viewedRun.id
+          ? {
+              ...run,
+              eventCount: run.eventCount + 1,
+              lastEventAt: "2026-08-06T03:00:00.000Z",
+            }
+          : run,
+      ),
+    };
 
     await act(async () => root.render(
       <HuntDashboard
         {...dashboardProps}
-        dashboard={{
-          ...demoDashboard,
-          runs: demoDashboard.runs.map((run) =>
-            run.id === viewedRun.id
-              ? {
-                  ...run,
-                  eventCount: run.eventCount + 1,
-                  lastEventAt: "2026-08-06T03:00:00.000Z",
-                }
-              : run,
-          ),
-        }}
+        dashboard={updatedDashboard}
         onIssueViewed={onIssueViewed}
       />,
     ));
 
     expect(onIssueViewed).toHaveBeenLastCalledWith(viewedRun.id);
     expect(onIssueViewed).toHaveBeenCalledTimes(callsAfterOpening + 1);
+    const callsAfterIssueUpdate = onIssueViewed.mock.calls.length;
+
+    await act(async () => root.render(
+      <HuntDashboard
+        {...dashboardProps}
+        dashboard={{
+          ...updatedDashboard,
+          conversationNotifications: [
+            {
+              id: "new-reply",
+              runId: viewedRun.id,
+              runTitle: viewedRun.title,
+              rootMessageId: "root-message",
+              body: "I added the requested answer.",
+              author: {
+                id: "reply-author",
+                name: "Reply author",
+                image: null,
+                provider: null,
+              },
+              reason: "thread_reply",
+              createdAt: "2026-08-06T03:01:00.000Z",
+            },
+          ],
+        }}
+        onIssueViewed={onIssueViewed}
+      />,
+    ));
+
+    expect(onIssueViewed).toHaveBeenLastCalledWith(viewedRun.id);
+    expect(onIssueViewed).toHaveBeenCalledTimes(callsAfterIssueUpdate + 1);
 
     await act(async () => root.unmount());
     container.remove();
