@@ -612,6 +612,44 @@ describe("HuntDashboard", () => {
     },
   );
 
+  it("keeps a completed issue linked to its last Worker outside the card", async () => {
+    const run = {
+      ...demoDashboard.runs[0],
+      status: "completed" as const,
+      workflowStage: null,
+      workerId: dashboardWorker.id,
+    };
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => root.render(
+      <HuntDashboard
+        {...dashboardProps}
+        dashboard={{
+          ...demoDashboard,
+          runs: [run],
+          workers: [dashboardWorker],
+        }}
+      />,
+    ));
+
+    expect(container.querySelector(".kanban-card-worker-badge")).toBeNull();
+    await act(async () => {
+      container.querySelector<HTMLElement>(".kanban-card")?.click();
+    });
+    expect(
+      container.querySelector(
+        '.run-page-property-badge.worker[aria-label="배정된 Worker: Lemon Worker"]',
+      ),
+    ).not.toBeNull();
+    expect(container.querySelector(".run-result-metrics")?.textContent).toContain(
+      dashboardWorker.label,
+    );
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
   it("keeps the assigned worker avatar and omits the workflow-stage icon on completed companion tasks", () => {
     const run = {
       ...demoDashboard.runs[0],
