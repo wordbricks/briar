@@ -50,6 +50,7 @@ const dashboardProps = {
 const dashboardAgent: ProjectAgent = {
   id: "agent-1",
   projectId: demoDashboard.project.id,
+  handle: "briar-agent",
   name: "Briar Agent",
   avatar: "data:image/png;base64,avatar",
   codexPet: null,

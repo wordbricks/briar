@@ -24,6 +24,7 @@ import {
   projectAgentAvatarFromFile,
 } from "../lib/project-agent-avatar";
 import { projectAgentAvatarFromCodexPet } from "../lib/codex-pets";
+import { handleFromName } from "../lib/channels-contract";
 import type { Project, ProjectAgent, UpdateProjectAgentInput } from "../types";
 import { CodexPetAttribution, CodexPetPicker } from "./CodexPetPicker";
 import { NativeSelect } from "./NativeSelect";
@@ -71,6 +72,9 @@ export function ProjectAgentSettings({
   const { t } = useI18n();
   const { toast } = useToast();
   const [name, setName] = useState(agent.name);
+  const [handle, setHandle] = useState(
+    agent.handle ?? handleFromName(agent.name),
+  );
   const [avatar, setAvatar] = useState(agent.avatar);
   const [codexPet, setCodexPet] = useState(agent.codexPet);
   const [provider, setProvider] = useState<AgentProvider>(agent.provider);
@@ -83,6 +87,7 @@ export function ProjectAgentSettings({
   );
   const [savedProfile, setSavedProfile] = useState({
     name: agent.name,
+    handle: agent.handle ?? handleFromName(agent.name),
     avatar: agent.avatar,
     codexPet: agent.codexPet,
     provider: agent.provider,
@@ -100,6 +105,7 @@ export function ProjectAgentSettings({
 
   const profileChanged =
     name !== savedProfile.name ||
+    handle !== savedProfile.handle ||
     avatar !== savedProfile.avatar ||
     codexPet?.slug !== savedProfile.codexPet?.slug ||
     provider !== savedProfile.provider ||
@@ -111,10 +117,13 @@ export function ProjectAgentSettings({
   const selectedModelKnown = agentModels[provider].some(
     (option) => option.value === model,
   );
+  const handleValid =
+    !handle || /^[a-z0-9]+(?:-[a-z0-9]+)*$/u.test(handle);
 
   const saveProfile = async () => {
     if (
       !responsibility.trim() ||
+      !handleValid ||
       !projectAgentSkillsValid(skills) ||
       profileSaving
     ) return;
@@ -122,6 +131,7 @@ export function ProjectAgentSettings({
     try {
       const saved = await onSave({
         name: name.trim() || null,
+        handle: handle || undefined,
         avatar,
         codexPet,
         provider,
@@ -133,6 +143,7 @@ export function ProjectAgentSettings({
       });
       const nextProfile = {
         name: saved.name,
+        handle: saved.handle ?? handleFromName(saved.name),
         avatar: saved.avatar,
         codexPet: saved.codexPet,
         provider: saved.provider,
@@ -143,6 +154,7 @@ export function ProjectAgentSettings({
         calendarColor: saved.calendarColor,
       };
       setName(nextProfile.name);
+      setHandle(nextProfile.handle);
       setAvatar(nextProfile.avatar);
       setCodexPet(nextProfile.codexPet);
       setProvider(nextProfile.provider);
@@ -186,6 +198,7 @@ export function ProjectAgentSettings({
             disabled={
               profileSaving ||
               !responsibility.trim() ||
+              !handleValid ||
               !profileChanged ||
               !projectAgentSkillsValid(skills)
             }
@@ -360,6 +373,31 @@ export function ProjectAgentSettings({
                     value={name}
                   />
                 </div>
+                <div className="project-agent-settings-field">
+                  <Label htmlFor="project-agent-settings-handle">
+                    {t("agents.handle")}
+                  </Label>
+                  <div className="project-agent-handle-input">
+                    <span>@</span>
+                    <Input
+                      id="project-agent-settings-handle"
+                      maxLength={63}
+                      onChange={(event) =>
+                        setHandle(event.target.value.toLowerCase())
+                      }
+                      pattern="[a-z0-9]+(-[a-z0-9]+)*"
+                      placeholder={
+                        handleFromName(name) || t("agents.handleGenerated")
+                      }
+                      value={handle}
+                    />
+                  </div>
+                  <Typography as="small" tone="muted" variant="caption">
+                    {name.trim() && !handleFromName(name) && !handle
+                      ? t("agents.handleFallback")
+                      : t("agents.handleHint")}
+                  </Typography>
+                </div>
                 <div className="project-agent-settings-runtime-heading">
                   <Cpu aria-hidden="true" size={15} />
                   <span>
@@ -485,6 +523,7 @@ export function ProjectAgentSettings({
                   disabled={
                     profileSaving ||
                     !responsibility.trim() ||
+                    !handleValid ||
                     !projectAgentSkillsValid(skills) ||
                     !profileChanged
                   }

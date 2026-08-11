@@ -1533,6 +1533,65 @@ describe("organization channels", () => {
     ).toEqual([elsewhere!.id]);
   });
 
+  it("rechecks truncated suffixes for 60 to 63 character handles", async () => {
+    let sequence = 30;
+    for (const [offset, length] of [60, 61, 62, 63].entries()) {
+      const character = String.fromCharCode("a".charCodeAt(0) + offset);
+      const desired = character.repeat(length);
+      const agents: Awaited<ReturnType<typeof createOrganizationAgent>>[] = [];
+      for (let index = 0; index < 3; index += 1) {
+        sequence += 1;
+        agents.push(await createOrganizationAgent(db, {
+          id: `aa000000-0000-4000-8000-${String(sequence).padStart(12, "0")}`,
+          organizationId,
+          name: desired,
+          handle: desired,
+          provider: "claude",
+          model: null,
+          responsibility: `Long handle ${length}-${index + 1}`,
+          effort: null,
+          createdAt: at(23),
+        }));
+      }
+
+      expect(agents.map((agent) => agent?.handle)).toEqual([
+        desired,
+        `${character.repeat(Math.min(length, 61))}-2`,
+        `${character.repeat(Math.min(length, 61))}-3`,
+      ]);
+    }
+  }, 30_000);
+
+  it("recovers when concurrent agents initially select the same handle", async () => {
+    const agents = await Promise.all([
+      createOrganizationAgent(db, {
+        id: "aa000000-0000-4000-8000-000000000050",
+        organizationId,
+        name: "Concurrent Honey",
+        provider: "claude",
+        model: null,
+        responsibility: "Concurrent writer one",
+        effort: null,
+        createdAt: at(23),
+      }),
+      createOrganizationAgent(db, {
+        id: "aa000000-0000-4000-8000-000000000051",
+        organizationId,
+        name: "Concurrent Honey",
+        provider: "claude",
+        model: null,
+        responsibility: "Concurrent writer two",
+        effort: null,
+        createdAt: at(23),
+      }),
+    ]);
+
+    expect(agents.map((agent) => agent?.handle).sort()).toEqual([
+      "concurrent-honey",
+      "concurrent-honey-2",
+    ]);
+  });
+
   it("falls back to an id-derived handle when a name has no handle characters", async () => {
     const agent = await createOrganizationAgent(db, {
       id: "aa000000-0000-4000-8000-000000000008",

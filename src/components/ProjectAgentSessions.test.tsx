@@ -10,6 +10,7 @@ import { ProjectAgentSessions } from "./ProjectAgentSessions";
 const agent: ProjectAgent = {
   id: "agent-1",
   projectId: "project-1",
+  handle: "release-agent",
   name: "Release agent",
   avatar: null,
   codexPet: null,

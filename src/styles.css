@@ -3695,6 +3695,11 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .project-agent-form label > span em { color:var(--muted-foreground); font-style:normal; }
 .project-agent-form input,.project-agent-form textarea { width:100%; padding:12px 13px; border:1px solid var(--border); border-radius:11px; outline:none; color:var(--foreground); background:var(--muted); font-size:var(--text-xs); resize:vertical; }
 .project-agent-form input:focus,.project-agent-form textarea:focus { border-color:#8068ce; background:var(--card); box-shadow:0 0 0 3px rgba(128,104,206,.12); }
+.project-agent-handle-input { min-width:0; height:42px; display:flex; align-items:center; border:1px solid var(--border); border-radius:11px; color:var(--muted-foreground); background:var(--muted); }
+.project-agent-handle-input:focus-within { border-color:#8068ce; background:var(--card); box-shadow:0 0 0 3px rgba(128,104,206,.12); }
+.project-agent-handle-input > span { padding-left:13px; font-size:var(--text-xs); font-weight:500; }
+.project-agent-form .project-agent-handle-input input,.project-agent-settings-fields .project-agent-handle-input input { min-width:0; height:40px; flex:1; padding:0 13px 0 3px; border:0; border-radius:0; outline:0; background:transparent; box-shadow:none; }
+.project-agent-form .project-agent-handle-input input:focus,.project-agent-settings-fields .project-agent-handle-input input:focus { border:0; background:transparent; box-shadow:none; }
 .project-agent-form label > small { color:var(--muted-foreground); font-size:var(--text-2xs); font-weight:500; line-height:1.5; }
 .project-agent-color-field > div { height:42px; padding:0 11px; display:flex; align-items:center; gap:10px; border:1px solid var(--border); border-radius:11px; background:var(--muted); }
 .project-agent-form .project-agent-color-field input[type="color"] { width:28px; height:28px; padding:2px; border:1px solid var(--border); border-radius:8px; background:var(--card); cursor:pointer; }
