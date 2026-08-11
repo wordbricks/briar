@@ -23,6 +23,19 @@ export const changelogCopy = {
     backTop: "맨 위로 ↑",
     entries: [
       {
+        version: "1.2.106",
+        date: "2026년 8월 12일",
+        title: "프로젝트를 바꿔도 모든 Inbox 알림을 놓치지 않습니다",
+        summary:
+          "선택한 프로젝트와 관계없이 접근 가능한 조직 전체의 이슈, 대화, 채널과 에이전트 알림을 한곳에 모아 주기적으로 동기화합니다.",
+        items: [
+          "조직 안의 모든 프로젝트에서 이슈 상태, 답글과 멘션, 채널 알림, 에이전트 세션을 인증된 Inbox 피드로 모읍니다.",
+          "데스크탑과 Android 공용 앱은 선택한 프로젝트의 상세 데이터와 조직 피드를 합치고 포그라운드에서 15초마다 갱신합니다.",
+          "읽음 버전을 완료 이벤트와 일치시키고 첫 동기화 기준선을 적용해 과거 알림이 한꺼번에 다시 울리지 않도록 합니다.",
+          "iOS Companion도 같은 조직 Inbox 모델과 포그라운드 동기화 흐름을 사용합니다.",
+        ],
+      },
+      {
         version: "1.2.105",
         date: "2026년 8월 11일",
         title: "프로젝트 대화 에이전트가 실제 작업 환경에서 검증합니다",
@@ -360,6 +373,19 @@ export const changelogCopy = {
     home: "Home",
     backTop: "Back to top ↑",
     entries: [
+      {
+        version: "1.2.106",
+        date: "August 12, 2026",
+        title: "Keep every Inbox notification visible across projects",
+        summary:
+          "Collect issue, conversation, channel, and agent notifications from every accessible project in the organization, regardless of which project is selected.",
+        items: [
+          "Aggregate issue state, replies and mentions, channel notifications, and agent sessions from every project into an authenticated organization Inbox feed.",
+          "Merge selected-project details with the organization feed in the shared desktop and Android app, refreshing every 15 seconds while in the foreground.",
+          "Align read versions with completion events and establish an initial-sync baseline so historical notifications do not fire all at once.",
+          "Use the same organization Inbox model and foreground synchronization flow in the iOS Companion.",
+        ],
+      },
       {
         version: "1.2.105",
         date: "August 11, 2026",
@@ -710,9 +736,9 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <h1>{changelog.title}</h1>
           <p>{changelog.description}</p>
         </div>
-        <a href="#v1-2-105" className="changelog-current">
+        <a href="#v1-2-106" className="changelog-current">
           <span>{changelog.current}</span>
-          <strong>v1.2.105</strong>
+          <strong>v1.2.106</strong>
           <i aria-hidden="true">↓</i>
         </a>
       </section>
@@ -737,39 +763,41 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   {index === 0 ? <span>{changelog.latest}</span> : null}
                   <time
                     dateTime={
-                      entry.version === "1.2.105" ||
-                      entry.version === "1.2.104" ||
-                      entry.version === "1.2.103" ||
-                      entry.version === "1.2.100" ||
-                      entry.version === "1.2.99" ||
-                      entry.version === "1.2.98" ||
-                      entry.version === "1.2.97" ||
-                      entry.version === "1.2.96" ||
-                      entry.version === "1.2.95" ||
-                      entry.version === "1.2.94" ||
-                      entry.version === "1.2.93" ||
-                      entry.version === "1.2.92" ||
-                      entry.version === "1.2.91" ||
-                      entry.version === "1.2.90" ||
-                      entry.version === "1.2.89" ||
-                      entry.version === "1.2.88"
-                        ? entry.version === "1.2.105" ||
-                          entry.version === "1.2.104" ||
-                          entry.version === "1.2.103" ||
-                          entry.version === "1.2.100"
-                          ? "2026-08-11"
-                          : entry.version === "1.2.99" ||
-                          entry.version === "1.2.98" ||
-                          entry.version === "1.2.97" ||
-                          entry.version === "1.2.96" ||
-                          entry.version === "1.2.95" ||
-                          entry.version === "1.2.94" ||
-                          entry.version === "1.2.93"
-                          ? "2026-08-10"
-                          : entry.version === "1.2.92"
-                            ? "2026-08-09"
-                            : "2026-08-08"
-                        : "2026-08-07"
+                      entry.version === "1.2.106"
+                        ? "2026-08-12"
+                        : entry.version === "1.2.105" ||
+                            entry.version === "1.2.104" ||
+                            entry.version === "1.2.103" ||
+                            entry.version === "1.2.100" ||
+                            entry.version === "1.2.99" ||
+                            entry.version === "1.2.98" ||
+                            entry.version === "1.2.97" ||
+                            entry.version === "1.2.96" ||
+                            entry.version === "1.2.95" ||
+                            entry.version === "1.2.94" ||
+                            entry.version === "1.2.93" ||
+                            entry.version === "1.2.92" ||
+                            entry.version === "1.2.91" ||
+                            entry.version === "1.2.90" ||
+                            entry.version === "1.2.89" ||
+                            entry.version === "1.2.88"
+                          ? entry.version === "1.2.105" ||
+                              entry.version === "1.2.104" ||
+                              entry.version === "1.2.103" ||
+                              entry.version === "1.2.100"
+                            ? "2026-08-11"
+                            : entry.version === "1.2.99" ||
+                                entry.version === "1.2.98" ||
+                                entry.version === "1.2.97" ||
+                                entry.version === "1.2.96" ||
+                                entry.version === "1.2.95" ||
+                                entry.version === "1.2.94" ||
+                                entry.version === "1.2.93"
+                              ? "2026-08-10"
+                              : entry.version === "1.2.92"
+                                ? "2026-08-09"
+                                : "2026-08-08"
+                          : "2026-08-07"
                     }
                   >
                     {changelog.released} · {entry.date}
