@@ -702,7 +702,7 @@ final class RunDetailStore: ObservableObject {
     private func preservingLocallyAcceptedSkillExecutionProposals(
         in incoming: [IssueMessage]
     ) -> [IssueMessage] {
-        let acceptedByID = Dictionary(
+        let acceptedByID: [UUID: AgentSkillExecutionProposal] = Dictionary(
             messages.compactMap { message in
                 guard let proposal = message.skillExecutionProposal,
                       proposal.status == .accepted

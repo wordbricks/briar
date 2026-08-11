@@ -515,6 +515,7 @@ final class DashboardSyncTests: XCTestCase {
         )
     }
 
+    @MainActor
     private func waitForRequests(
         _ api: StubAPIClient,
         count: Int,

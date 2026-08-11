@@ -321,7 +321,8 @@ final class IssueMutationStore: ObservableObject {
                 as: AcceptIssueActionProposalResponse.self
             )
             let proposalMatches = response.proposal.id == proposal.id
-            let executionProposal = response.executionProposal.flatMap { candidate in
+            let executionProposal: IssueExecutionProposal? =
+                response.executionProposal.flatMap { candidate in
                 guard response.proposal.type == .create,
                       let resultRunID = response.resultRunId,
                       issueExecutionProposalMatchesCreatedRun(
