@@ -194,6 +194,8 @@ export type AnalysisWorktree = {
   path: string;
   baseRef: string;
   baseSha: string;
+  /** Gitignored paths copied in from the connected checkout. */
+  includedPaths: string[];
   warning?: string;
 };
 
@@ -676,9 +678,9 @@ export async function allocateIssueWorktree(
 }
 
 /**
- * Create a short-lived detached checkout for read-only repository analysis.
- * Unlike issue worktrees it has no branch and copies no ignored files, so
- * provider context cannot accidentally include local secrets.
+ * Create a short-lived detached checkout for a conversational Agent turn.
+ * It has no branch, but otherwise receives the same `.worktreeinclude`
+ * inputs as an execution worktree so it can run the project locally.
  */
 export async function allocateAnalysisWorktree(input: {
   repositoryPath: string;
@@ -732,9 +734,14 @@ export async function allocateAnalysisWorktree(input: {
       message: "최신 원격 기준 분석 워크트리를 만들지 못했습니다.",
     },
   );
+  const includedPaths = await copyWorktreeIncludes(
+    input.repositoryPath,
+    path,
+  );
   return {
     path,
     baseRef,
+    includedPaths,
     baseSha: gitOrThrow(input.git, ["rev-parse", "HEAD"], {
       cwd: path,
       message: "분석 워크트리의 HEAD를 읽지 못했습니다.",
