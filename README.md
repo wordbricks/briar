@@ -6,7 +6,7 @@ Briar is a local-first Agent Development Environment for taking coding-agent wor
 
 It turns issues into structured runs, gives each run an isolated Git worktree, and keeps progress, evidence, conversations, and human review in one place. Use Codex, Claude, Grok, or OpenCode through the accounts and local CLIs you already have.
 
-<video src="./landing/public/briar-issue-to-complete-demo.mp4" controls title="Briar issue-to-complete demo"></video>
+[![Briar issue-to-complete demo](./landing/public/briar-issue-to-complete-demo.gif)](./landing/public/briar-issue-to-complete-demo.mp4)
 
 ## What it does
 
