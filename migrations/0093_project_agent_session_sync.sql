@@ -96,7 +96,10 @@ after update on briar_project_agent_session_summaries BEGIN
 END;
 
 create trigger briar_project_agent_session_summaries_delete_sync
-before delete on briar_project_agent_session_summaries BEGIN
+after delete on briar_project_agent_session_summaries
+when exists (
+  select 1 from briar_projects where id = old.project_id
+) BEGIN
   insert into briar_project_agent_session_changes (
     project_id, session_id, operation, created_at
   ) values (old.project_id, old.session_id, 'delete', datetime('now'));
