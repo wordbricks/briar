@@ -75,6 +75,7 @@ import type {
   RunEvidence,
   RunEvidenceImage,
   SessionUser,
+  StatusTrayRunsPayload,
   UpdateProjectAgentInput,
   UpdateProjectAgentScheduleInput,
   UpdateIssueInput,
@@ -948,6 +949,18 @@ export async function loadDashboardDelta(
     { signal },
   );
   return { ...delta, runs: normalizeDashboardRuns(delta.runs) };
+}
+
+export async function loadStatusTrayRuns(
+  token: string,
+  organizationId: string,
+  signal?: AbortSignal,
+): Promise<StatusTrayRunsPayload> {
+  return request<StatusTrayRunsPayload>(
+    `/organizations/${encodeURIComponent(organizationId)}/status-tray/runs`,
+    token,
+    { signal },
+  );
 }
 
 export async function loadRunEvents(

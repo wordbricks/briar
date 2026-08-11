@@ -5,8 +5,7 @@ import {
   statusLabelForRun,
   syncStatusTray,
 } from "./status-tray";
-import type { HuntRun } from "../types";
-import { repositoryWorkflowBootstrap } from "./auto-hunt-contract";
+import type { StatusTrayRun } from "../types";
 
 const invoke = vi.hoisted(() => vi.fn());
 
@@ -21,89 +20,43 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function run(partial: Partial<HuntRun> & Pick<HuntRun, "id" | "title" | "status">): HuntRun {
+function run(
+  partial: Partial<StatusTrayRun> & Pick<StatusTrayRun, "id" | "title">,
+): StatusTrayRun {
   return {
-    runNumber: 1,
-    currentAttempt: 1,
-    currentRevision: 1,
-    source: "issue",
-    sourceKey: `issue:${partial.id}`,
+    projectId: "project-1",
+    projectName: "Briar",
+    status: "running",
     workflowStage: partial.workflowStage ?? "implementing",
-    workflow: partial.workflow ?? {
-      ...repositoryWorkflowBootstrap,
-      stages: [
-        { id: "analyzing", label: "분석", required: true },
-        { id: "implementing", label: "구현", required: true },
-      ],
-      execution: { checkpoints: [] },
-      completion: { requiredStages: ["analyzing", "implementing"] },
-    },
-    progress: 0.4,
-    detail: null,
-    priority: null,
-    repository: "briar",
-    branch: null,
-    commitSha: null,
-    tracker: null,
-    issueDescription: null,
-    attachments: [],
-    resultSummary: null,
-    structuredResult: null,
-    pullRequestUrls: [],
-    targetSha: null,
-    sourceCreatedAt: null,
-    stagingQaStatus: null,
-    productionQaStatus: null,
-    stagingQaDetail: null,
-    productionQaDetail: null,
-    context: null,
-    claimedBy: null,
-    claimedAt: null,
-    leaseExpiresAt: null,
-    claimAttempts: 0,
+    workflowStageLabel: partial.workflowStageLabel ?? "구현",
     startedAt: "2026-08-03T00:00:00.000Z",
     updatedAt: "2026-08-03T01:00:00.000Z",
-    completedAt: null,
     lastEventAt: "2026-08-03T01:00:00.000Z",
-    eventCount: 1,
     ...partial,
   };
 }
 
 describe("status tray snapshot builders", () => {
-  it("keeps only running issues sorted by most recent activity", () => {
+  it("sorts running issue projections by most recent activity", () => {
     const items = buildStatusTrayItems([
-      {
-        project: { id: "project-1", name: "briar" },
-        runs: [
-          run({
-            id: "older",
-            title: "Older running",
-            status: "running",
-            updatedAt: "2026-08-03T01:00:00.000Z",
-          }),
-          run({
-            id: "done",
-            title: "Completed",
-            status: "completed",
-            workflowStage: null,
-            updatedAt: "2026-08-03T03:00:00.000Z",
-          }),
-          run({
-            id: "newer",
-            title: "Newer running",
-            status: "running",
-            workflowStage: "analyzing",
-            updatedAt: "2026-08-03T02:00:00.000Z",
-          }),
-        ],
-      },
+      run({
+        id: "older",
+        title: "Older running",
+        updatedAt: "2026-08-03T01:00:00.000Z",
+      }),
+      run({
+        id: "newer",
+        title: "Newer running",
+        workflowStage: "analyzing",
+        workflowStageLabel: "분석",
+        updatedAt: "2026-08-03T02:00:00.000Z",
+      }),
     ]);
 
     expect(items.map((item) => item.runId)).toEqual(["newer", "older"]);
     expect(items[0]).toMatchObject({
       projectId: "project-1",
-      projectName: "briar",
+      projectName: "Briar",
       title: "Newer running",
       statusLabel: "분석",
     });
@@ -111,19 +64,13 @@ describe("status tray snapshot builders", () => {
 
   it("includes running issues from every project and keeps project groups separate", () => {
     const items = buildStatusTrayItems([
-      {
-        project: { id: "project-1", name: "Briar" },
-        runs: [
-          run({ id: "briar-run", title: "Briar issue", status: "running" }),
-        ],
-      },
-      {
-        project: { id: "project-2", name: "Crane" },
-        runs: [
-          run({ id: "crane-run", title: "Crane issue", status: "running" }),
-          run({ id: "crane-done", title: "Done", status: "completed" }),
-        ],
-      },
+      run({ id: "briar-run", title: "Briar issue" }),
+      run({
+        id: "crane-run",
+        title: "Crane issue",
+        projectId: "project-2",
+        projectName: "Crane",
+      }),
     ]);
 
     expect(
@@ -144,8 +91,8 @@ describe("status tray snapshot builders", () => {
         run({
           id: "r1",
           title: "t",
-          status: "running",
           workflowStage: "implementing",
+          workflowStageLabel: "구현",
         }),
       ),
     ).toBe("구현");
@@ -157,8 +104,8 @@ describe("status tray snapshot builders", () => {
         run({
           id: "r1",
           title: "t",
-          status: "running",
           workflowStage: "implementing",
+          workflowStageLabel: "구현",
         }),
         () => "Implement",
       ),

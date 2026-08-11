@@ -122,7 +122,6 @@ import {
   addOrganizationMember,
   assertQueuedHuntClaim,
   attemptGithubMergeAutoResume,
-  channelApprovalTablesAvailable,
   agentSkillExecutionApprovalTablesAvailable,
   acceptAgentSkillExecutionProposal,
   claimGithubDelivery,
@@ -205,8 +204,10 @@ import {
   initializeWorkflowProgress,
   importLinearHuntRuns,
   listIssueAttachments,
+  listIssueAttachmentsByRunIds,
   listChannelConversationNotifications,
   listIssueDependencies,
+  listIssueDependenciesByRunIds,
   listIssueConversationNotifications,
   listIssueActionProposals,
   listIssueExecutionProposals,
@@ -215,15 +216,18 @@ import {
   listIssueReworkProposals,
   listIssueThreadMessages,
   listIssueResultReviews,
+  listIssueResultReviewsByRunIds,
   listInboxReadStates,
   listEvidenceImagesForEvidence,
   listDashboardRuns,
+  listDashboardRunsByIds,
   listDashboardChanges,
   listHuntRunEvents,
   listRunEvidence,
   listRunEvidenceImages,
   listRunStageRevisions,
   listOrganizationMembers,
+  listOrganizationStatusTrayRuns,
   listOrganizationInvitations,
   listOrganizationUsageRuns,
   listOrganizationUsageExecutionAttempts,
@@ -314,6 +318,7 @@ import {
   type ProjectAgentScheduleRow,
   type ProjectSettingsRow,
   type OrganizationMemberRow,
+  type OrganizationStatusTrayRunRow,
   type OrganizationInvitationRow,
   type OrganizationUsageRunRow,
   type OrganizationCostRecordRow,
@@ -5839,6 +5844,26 @@ function dashboardRunJson(
   };
 }
 
+function statusTrayRunJson(run: OrganizationStatusTrayRunRow) {
+  const workflow = normalizeAutoHuntWorkflow(
+    JSON.parse(run.workflow_snapshot_json),
+  );
+  return {
+    projectId: run.project_id,
+    projectName: run.project_name,
+    id: run.id,
+    title: run.title,
+    status: run.status,
+    workflowStage: run.workflow_stage,
+    workflowStageLabel:
+      workflow.stages.find((stage) => stage.id === run.workflow_stage)?.label ??
+      null,
+    startedAt: run.started_at,
+    updatedAt: run.updated_at,
+    lastEventAt: run.last_event_at,
+  };
+}
+
 async function claimWorkflowContext(
   db: D1Database,
   projectId: string,
@@ -9079,6 +9104,25 @@ async function route(
     return json({ agentToken });
   }
 
+  const statusTrayRunsMatch = pathname.match(
+    /^\/organizations\/([0-9a-f-]+)\/status-tray\/runs$/u,
+  );
+  if (statusTrayRunsMatch && request.method === "GET") {
+    const session = await requireSession(auth, request);
+    const organizationId = statusTrayRunsMatch[1];
+    const role = await getOrganizationRole(
+      db,
+      organizationId,
+      session.user.id,
+    );
+    if (!role) throw new HttpError(404, "Organization not found");
+    const runs = await listOrganizationStatusTrayRuns(db, organizationId);
+    return json({
+      runs: runs.map(statusTrayRunJson),
+      generatedAt: new Date().toISOString(),
+    });
+  }
+
   const dashboardDeltaMatch = pathname.match(
     /^\/projects\/([0-9a-f-]+)\/dashboard\/delta$/u,
   );
@@ -9117,6 +9161,7 @@ async function route(
           : [],
       ),
     );
+    const changedRunIdList = [...changedRunIds];
     const metadataChanged = page.changes.some(
       (change) => change.entity_type === "metadata",
     );
@@ -9133,18 +9178,10 @@ async function route(
       organizationProviders,
     ] =
       await Promise.all([
-        changedRunIds.size > 0
-          ? listDashboardRuns(db, project.id)
-          : Promise.resolve([]),
-        changedRunIds.size > 0
-          ? listIssueAttachments(db, project.id)
-          : Promise.resolve([]),
-        changedRunIds.size > 0
-          ? listIssueDependencies(db, project.id)
-          : Promise.resolve([]),
-        changedRunIds.size > 0
-          ? listIssueResultReviews(db, project.id)
-          : Promise.resolve([]),
+        listDashboardRunsByIds(db, project.id, changedRunIdList),
+        listIssueAttachmentsByRunIds(db, project.id, changedRunIdList),
+        listIssueDependenciesByRunIds(db, project.id, changedRunIdList),
+        listIssueResultReviewsByRunIds(db, project.id, changedRunIdList),
         listExecutionWorkers(db, project.id, observedAt),
         listOrganizationExecutionProviders(
           db,
@@ -12831,17 +12868,8 @@ async function route(
   }
 
   if (pathname === "/queue/claims" && request.method === "POST") {
+    // Migration 0090 is applied by worker:deploy before this code can run.
     const input = claimInputSchema.parse(await readJson(request));
-    if (!(await channelApprovalTablesAvailable(db))) {
-      // Migration-first is a security boundary, not just an operational
-      // preference. Refuse all claims when a new Worker is accidentally
-      // deployed before 0090 so a legacy cross-project transfer cannot run in
-      // the target project during that window.
-      throw new HttpError(
-        503,
-        "Channel issue approval migration 0090 must be applied before claiming work",
-      );
-    }
     let authenticatedWorkerId: string | undefined;
     let authenticatedWorker:
       | Awaited<ReturnType<typeof requireWorkerProjectBinding>>

@@ -54,13 +54,16 @@ import {
   HuntClaimError,
   HuntTransitionError,
   listIssueAttachments,
+  listIssueAttachmentsByRunIds,
   listIssueActionProposals,
   listIssueDependencies,
+  listIssueDependenciesByRunIds,
   listIssueConversationNotifications,
   listChannelConversationNotifications,
   listIssueMessages,
   listIssueThreadMessages,
   listIssueResultReviews,
+  listIssueResultReviewsByRunIds,
   listIssueReworkProposals,
   updateIssueMessage,
   deleteIssueMessage,
@@ -68,10 +71,12 @@ import {
   listDashboardChanges,
   pruneExpiredDashboardChanges,
   listDashboardRuns,
+  listDashboardRunsByIds,
   listHuntRunEvents,
   listOrganizations,
   listOrganizationInvitations,
   listOrganizationMembers,
+  listOrganizationStatusTrayRuns,
   listOrganizationUsageRuns,
   isOrganizationHandleAvailable,
   issueProjectAgentToken,
@@ -905,6 +910,17 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
          last_error text,
          dead_lettered_at text,
          dead_letter_reason text
+       );
+       alter table briar_project_agent_task_jobs
+         add column skill_execution_proposal_id text;
+       create table briar_agent_skill_execution_approval_audit (
+         proposal_id text primary key not null,
+         project_id text not null,
+         result_session_id text not null,
+         agent_id text not null,
+         skill_id text not null,
+         request text not null,
+         worker_id text not null
        );`,
     );
     await executeSql(
@@ -1209,6 +1225,115 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       expired: false,
       changes: [],
     });
+  });
+
+  it("loads dashboard deltas and tray state from bounded run projections", async () => {
+    await setStoredWorkflow(db, projectId, releaseWorkflow);
+    const changedRunId = await recordHuntEvent(
+      db,
+      projectId,
+      event("queued", 900, {
+        sourceKey: "bounded-dashboard-changed",
+        eventKey: "bounded-dashboard-changed:queued",
+        title: "Changed dashboard run",
+      }),
+    );
+    const otherRunId = await recordHuntEvent(
+      db,
+      projectId,
+      event("queued", 901, {
+        sourceKey: "bounded-dashboard-other",
+        eventKey: "bounded-dashboard-other:queued",
+        title: "Unchanged dashboard run",
+      }),
+    );
+    await createIssueAttachments(db, projectId, changedRunId, [{
+      id: "2d2242f8-8ae5-474b-9a9d-315990ddb490",
+      object_key: "issue-attachments/bounded-dashboard-changed/changed.png",
+      filename: "changed.png",
+      content_type: "image/png",
+      byte_size: 7,
+    }]);
+    await createIssueAttachments(db, projectId, otherRunId, [{
+      id: "1d2242f8-8ae5-474b-9a9d-315990ddb491",
+      object_key: "issue-attachments/bounded-dashboard-other/other.png",
+      filename: "other.png",
+      content_type: "image/png",
+      byte_size: 5,
+    }]);
+    await createIssueDependency(db, projectId, {
+      prerequisiteRunId: otherRunId,
+      dependentRunId: changedRunId,
+      createdByUserId: "owner",
+      createdAt: atMinute(903),
+    });
+    await recordHuntEvent(
+      db,
+      projectId,
+      event("analyzing", 902, {
+        sourceKey: "bounded-dashboard-changed",
+        eventKey: "bounded-dashboard-changed:analyzing",
+        title: "Changed dashboard run",
+        workflowStage: "analyzing",
+      }),
+    );
+    await completeIssueResultReview(
+      db,
+      projectId,
+      changedRunId,
+      "owner",
+      atMinute(904),
+    );
+
+    await expect(
+      listDashboardRunsByIds(db, projectId, [changedRunId]),
+    ).resolves.toEqual([
+      expect.objectContaining({ id: changedRunId }),
+    ]);
+    await expect(
+      listIssueAttachmentsByRunIds(db, projectId, [changedRunId]),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        run_id: changedRunId,
+        filename: "changed.png",
+      }),
+    ]);
+    await expect(
+      listIssueDependenciesByRunIds(db, projectId, [changedRunId]),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        prerequisite_run_id: otherRunId,
+        dependent_run_id: changedRunId,
+      }),
+    ]);
+    await expect(
+      listIssueResultReviewsByRunIds(db, projectId, [changedRunId]),
+    ).resolves.toEqual([
+      expect.objectContaining({ run_id: changedRunId, user_id: "owner" }),
+    ]);
+    await expect(
+      listOrganizationStatusTrayRuns(db, projectId),
+    ).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: changedRunId,
+          project_id: projectId,
+          project_name: "Example",
+          status: "running",
+        }),
+      ]),
+    );
+
+    await recordHuntEvent(
+      db,
+      projectId,
+      event("cancelled", 905, {
+        sourceKey: "bounded-dashboard-changed",
+        eventKey: "bounded-dashboard-changed:cancelled",
+        title: "Changed dashboard run",
+      }),
+    );
+    await setStoredWorkflow(db, projectId, repositoryWorkflowBootstrap);
   });
 
   it("preserves existing run data and child foreign keys in the backlog migration", async () => {

@@ -101,6 +101,11 @@ Entries are **copied**, never symlinked, so an agent editing one issue's file
 cannot mutate the shared checkout. Missing entries are skipped silently — a
 worktree is never failed over an unavailable include.
 
+Project-scoped channel and issue conversation turns also receive these inputs
+in their detached, disposable worktrees. They run with the project's configured
+Worker filesystem profile and full execution tool surface; their local checkout
+changes are discarded when the reply finishes.
+
 Build outputs are not copied. Agents run the project's own install/setup
 commands inside the worktree.
 

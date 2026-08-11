@@ -27,25 +27,26 @@ approval.
    count, scheduled invocation state, and drain completion in release evidence.
    Abort the deployment unless both the gate and drain are verified; do not
    rely on the migration to make an overlapping old deletion or R2 cleanup safe.
-6. Apply migrations with `bun run d1:migrate:remote`.
-7. Immediately deploy the Worker from the same verified SHA with
-   `bun run worker:deploy`.
-8. While the maintenance gate remains closed to normal traffic, allow only the
+6. Deploy the Worker from the same verified SHA with
+   `bun run worker:deploy`. The command applies all pending remote D1
+   migrations first and aborts before deployment if migration fails.
+7. While the maintenance gate remains closed to normal traffic, allow only the
    recorded release smoke identity and test all of the following: both proposal
    origins create a `backlog` issue with an opaque source key, a retry returns
    the same issue, an unapproved event/claim fails, and transferring a
    previously dispatched approval-created issue requires a fresh target-
    project execution approval.
-9. Re-enable the gated approval/deletion routes and scheduled archive/cleanup
+8. Re-enable the gated approval/deletion routes and scheduled archive/cleanup
    only after the smoke tests pass and the new deployment ID is verified.
 
-After step 6, the database guards make old approval writes fail closed. They do
+After the migration phase of step 6, the database guards make old approval
+writes fail closed. They do
 not make an old account/project/issue/channel deletion, Slack uninstall, or R2
 archive cleanup safe. That is why the hard gate and verified drain in steps
 4–5 are mandatory. If evidence shows an overlapping old request or scheduled
 invocation, keep the gate closed, stop the rollout, reconcile its effects, and
 restart from a new bookmark. Gated requests are safe to retry only after the
-compatible Worker is verified and the routes reopen in step 9.
+compatible Worker is verified and the routes reopen in step 8.
 
 ## Rollback and recovery
 
