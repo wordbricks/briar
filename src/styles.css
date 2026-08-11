@@ -6122,21 +6122,6 @@ button.issue-message-state { width:100%; cursor:pointer; }
   padding: 1px 5px;
   font-size: 10px;
 }
-.channel-thread-link {
-  align-self: flex-start;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  border: 0;
-  border-radius: 7px;
-  background: transparent;
-  padding: 3px 6px;
-  color: var(--muted-foreground, #777168);
-  font: inherit;
-  font-size: 11px;
-}
-.channel-thread-link:hover { background: var(--muted, #f2efe9); color: inherit; }
-
 .channel-document-card,
 .channel-proposal-card {
   display: flex;
