@@ -487,6 +487,10 @@ final class MobileAPIContractTests: XCTestCase {
             }
         }
 
+        let expectedQueryTemplates = [
+            "getChannelDelta": "since={since}",
+            "getDashboardDelta": "cursor={cursor}",
+        ]
         for (operationID, fixtureOperation) in operations {
             let openAPIOperation = try XCTUnwrap(
                 openAPIOperations[operationID],
@@ -503,10 +507,13 @@ final class MobileAPIContractTests: XCTestCase {
             XCTAssertEqual(fixtureMethod.lowercased(), openAPIOperation.method)
             XCTAssertEqual(String(pathParts[0]), openAPIOperation.path)
             if pathParts.count == 2 {
-                XCTAssertEqual(operationID, "getDashboardDelta")
-                XCTAssertEqual(String(pathParts[1]), "cursor={cursor}")
-            } else if operationID == "getDashboardDelta" {
-                XCTFail("dashboard delta fixture에는 cursor query template이 필요합니다.")
+                let expectedQuery = try XCTUnwrap(
+                    expectedQueryTemplates[operationID],
+                    "fixture operation \(operationID)에 예상하지 않은 query template이 있습니다."
+                )
+                XCTAssertEqual(String(pathParts[1]), expectedQuery)
+            } else if expectedQueryTemplates[operationID] != nil {
+                XCTFail("\(operationID) fixture에는 query template이 필요합니다.")
             }
         }
     }

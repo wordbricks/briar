@@ -558,7 +558,8 @@ final class ChannelsStore: ObservableObject {
                 expectedFocusedChannelID == focusedChannelID,
                 expectedFocusedThreadParentID == focusedThreadParentID
             else { return nil }
-            let executionProposal = response.executionProposal.flatMap { candidate in
+            let normalizedExecutionProposal: IssueExecutionProposal? =
+                response.executionProposal.flatMap { candidate in
                 issueExecutionProposalMatchesCreatedRun(
                     candidate,
                     projectID: response.projectId,
@@ -569,7 +570,7 @@ final class ChannelsStore: ObservableObject {
                 outcome: response.outcome,
                 projectId: response.projectId,
                 resultRunId: response.resultRunId,
-                executionProposal: executionProposal
+                executionProposal: normalizedExecutionProposal
             )
             if proposalRevisions[proposalID, default: 0] != expectedProposalRevision {
                 var latest = latestProposals[proposalID]
