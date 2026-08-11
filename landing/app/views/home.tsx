@@ -1,4 +1,5 @@
 import { type LandingCopy, type Locale, copy, localizedPath } from "../i18n";
+import { DesktopDownloadLink } from "../desktop-download-link";
 import { resolveOrigin } from "../seo";
 import { Arrow, SiteFooter, SiteHeader } from "../site-chrome";
 import {
@@ -228,13 +229,16 @@ export default async function HomeView({ locale }: { locale: Locale }) {
             >
               {c.hero.openWebApp} <Arrow />
             </a>
-            <a
+            <DesktopDownloadLink
               className="button button-secondary hero-action-download"
               href={MAC_DOWNLOAD_URL}
               aria-label={c.aria.macDownload}
+              locale={locale}
+              trackingLabel={c.hero.macDownload}
+              trackingLocation="home_hero"
             >
               {c.hero.macDownload} <span aria-hidden="true">↓</span>
-            </a>
+            </DesktopDownloadLink>
           </div>
           <div className="hero-actions-compact">
             <a href={localizedPath(locale, "/download")}>
@@ -485,13 +489,16 @@ export default async function HomeView({ locale }: { locale: Locale }) {
           >
             {c.final.openWebApp} <Arrow />
           </a>
-          <a
+          <DesktopDownloadLink
             className="button button-secondary"
             href={MAC_DOWNLOAD_URL}
             aria-label={c.aria.macDownload}
+            locale={locale}
+            trackingLabel={c.final.macDownload}
+            trackingLocation="home_final"
           >
             {c.final.macDownload} <span aria-hidden="true">↓</span>
-          </a>
+          </DesktopDownloadLink>
           <a
             className="button button-secondary"
             href={GITHUB_LATEST_RELEASE_URL}

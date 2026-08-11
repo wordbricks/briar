@@ -1,5 +1,6 @@
 import localFont from "next/font/local";
 import "./globals.css";
+import { GoogleAnalytics } from "./google-analytics";
 import { copy, supportedLocales, type Locale } from "./i18n";
 
 // Self-hosted latin-only slices of the Geist variable fonts, extracted
@@ -57,6 +58,9 @@ export function RootHtml({
 
   return (
     <html lang={locale} data-theme="light" style={{ colorScheme: "light" }}>
+      <head>
+        <GoogleAnalytics />
+      </head>
       <body className={`${geistSans.variable} ${geistMono.variable}`}>
         {otherLocales.map((otherLocale) => (
           <meta
