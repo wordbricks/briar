@@ -12,6 +12,7 @@ import type {
   ChannelMessage,
   ChannelSummary,
 } from "../lib/channels-contract";
+import { requestMobileNavigationBack } from "../lib/mobile-navigation";
 
 const listChannels = vi.fn();
 const loadChannel = vi.fn();
@@ -240,7 +241,7 @@ describe("CompanionChannels", () => {
     expect(names).toEqual(["Welcome", "Briar dev", "Sprout talk"]);
   });
 
-  it("opens a channel's messages and then one message's thread", async () => {
+  it("opens a channel thread and unwinds each level through mobile back", async () => {
     loadChannel.mockResolvedValue({
       channel: channel("c-common", "Welcome", null),
       members: [],
@@ -271,7 +272,7 @@ describe("CompanionChannels", () => {
     ).toBe("WelcomeMembers 2 • Agents 1");
     expect(
       container.querySelector(".companion-channel-bar-status"),
-    ).not.toBeNull();
+    ).toBeNull();
 
     const messageButton = container.querySelector<HTMLButtonElement>(
       ".companion-channel-message-button",
@@ -291,6 +292,24 @@ describe("CompanionChannels", () => {
     );
     expect(container.textContent).toContain("On it");
     expect(container.textContent).toContain("Thread");
+
+    let handled = false;
+    await act(async () => {
+      handled = requestMobileNavigationBack();
+      await Promise.resolve();
+    });
+    expect(handled).toBe(true);
+    expect(
+      container.querySelector(".companion-channel-bar-identity")?.textContent,
+    ).toBe("WelcomeMembers 2 • Agents 1");
+
+    await act(async () => {
+      handled = requestMobileNavigationBack();
+      await Promise.resolve();
+    });
+    expect(handled).toBe(true);
+    expect(container.querySelector(".companion-channel-bar")).toBeNull();
+    expect(container.textContent).toContain("Common channels");
   });
 
   it("preserves materialized approvals when a reaction returns a stale message", async () => {

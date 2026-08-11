@@ -3,13 +3,11 @@ import {
   ChevronLeft,
   FileText,
   Hash,
-  Headphones,
   LoaderCircle,
   Lock,
   MessageSquare,
   Plus,
   Send,
-  Sparkles,
 } from "lucide-react";
 import {
   useCallback,
@@ -58,6 +56,7 @@ import {
 import { maxIssueAttachmentCount } from "../lib/issue-attachments";
 import { useI18n } from "../i18n";
 import { useChannelComposer } from "../hooks/useChannelComposer";
+import { useMobileBackHandler } from "../hooks/useMobileNavigation";
 import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
 import {
   ChannelDraftImages,
@@ -67,6 +66,7 @@ import { ChannelMentionMenu } from "./ChannelMentionMenu";
 import { MentionComposerField } from "./MentionComposerField";
 import { ChannelMessageText } from "./ChannelMessageText";
 import { ChannelMessageReactions } from "./ChannelMessageReactions";
+import { Button } from "./ui/button";
 import {
   ProfileDialog,
   profileTargetForChannelAgent,
@@ -983,18 +983,39 @@ export function CompanionChannels({
     [channel, organizationId, token],
   );
 
+  const closeThread = useCallback(() => {
+    if (!channel || !threadParentId) return false;
+    channelSelectionVersion.current += 1;
+    invalidateChannelSurface(channel.id, null);
+    setThreadParentId(null);
+    setThread(null);
+    setLoading(false);
+    setError(null);
+    return true;
+  }, [channel, invalidateChannelSurface, threadParentId]);
+
+  const closeChannel = useCallback(() => {
+    if (!channel) return false;
+    channelSelectionVersion.current += 1;
+    invalidateChannelSurface(null, null);
+    setChannel(null);
+    setMessages([]);
+    setReplies([]);
+    setLoading(false);
+    setError(null);
+    return true;
+  }, [channel, invalidateChannelSurface]);
+
+  useMobileBackHandler(
+    () => closeThread() || closeChannel(),
+    { enabled: Boolean(channel), priority: 100 },
+  );
+
   if (channel && threadParentId) {
     return (
       <section className="companion-channels companion-channel-detail">
         <ChannelBar
-          onBack={() => {
-            channelSelectionVersion.current += 1;
-            invalidateChannelSurface(channel.id, null);
-            setThreadParentId(null);
-            setThread(null);
-            setLoading(false);
-            setError(null);
-          }}
+          onBack={closeThread}
           title={t("companion.channelThread")}
         />
         {error ? <p className="companion-channel-error">{error}</p> : null}
@@ -1063,15 +1084,7 @@ export function CompanionChannels({
     return (
       <section className="companion-channels companion-channel-detail">
         <ChannelBar
-          onBack={() => {
-            channelSelectionVersion.current += 1;
-            invalidateChannelSurface(null, null);
-            setChannel(null);
-            setMessages([]);
-            setReplies([]);
-            setLoading(false);
-            setError(null);
-          }}
+          onBack={closeChannel}
           channel={channel}
         />
         {error ? <p className="companion-channel-error">{error}</p> : null}
@@ -1199,14 +1212,16 @@ function ChannelBar({
     <header
       className={`companion-channel-bar${channel ? " is-channel" : ""}`}
     >
-      <button
+      <Button
         aria-label={t("navigation.back")}
-        className="companion-channel-bar-back"
+        className="companion-channel-bar-back size-10 shrink-0"
         onClick={onBack}
+        size="icon"
         type="button"
+        variant="ghost"
       >
         <ChevronLeft size={18} />
-      </button>
+      </Button>
       {channel ? (
         <>
           <div className="companion-channel-bar-identity">
@@ -1221,10 +1236,6 @@ function ChannelBar({
                 {memberLabel} • {agentLabel}
               </small>
             </span>
-          </div>
-          <div aria-hidden="true" className="companion-channel-bar-status">
-            <Sparkles size={18} />
-            <Headphones size={18} />
           </div>
         </>
       ) : (
@@ -1587,15 +1598,17 @@ export function CompanionChannelComposer({
         />
       ) : null}
       <ChannelDraftImages images={images} onRemove={removeImage} />
-      <button
+      <Button
         aria-label={t("channel.toolAttach")}
         className="companion-channel-composer-add"
         disabled={busy || images.length >= maxIssueAttachmentCount}
         onClick={() => attachmentInputRef.current?.click()}
+        size="icon"
         type="button"
+        variant="outline"
       >
         <Plus size={20} />
-      </button>
+      </Button>
       <MentionComposerField
         body={body}
         className="companion-channel-composer-field"
@@ -1638,9 +1651,14 @@ export function CompanionChannelComposer({
         type="file"
       />
       {body.trim() || images.length > 0 ? (
-        <button aria-label={t("run.sendMessage")} disabled={busy} type="submit">
+        <Button
+          aria-label={t("run.sendMessage")}
+          disabled={busy}
+          size="icon"
+          type="submit"
+        >
           <Send size={16} />
-        </button>
+        </Button>
       ) : null}
       {attachmentError ? (
         <p className="channel-composer-error">{attachmentError}</p>
