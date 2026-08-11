@@ -8187,6 +8187,19 @@ function IssueMessageItem({
     () => [remarkGfm, remarkIssueMentions(mentionHandles)],
     [mentionHandles],
   );
+  const messageAttachmentsRef = useRef(message.attachments ?? []);
+  messageAttachmentsRef.current = message.attachments ?? [];
+  const renderMessageMarkdownImage = useCallback(
+    ({ alt, src }: ComponentProps<"img">) => (
+      <IssueMarkdownImage
+        alt={alt ?? ""}
+        attachments={messageAttachmentsRef.current}
+        onLoadAttachment={onLoadAttachment}
+        src={src}
+      />
+    ),
+    [onLoadAttachment],
+  );
   const canManage = Boolean(
     currentUserId && message.author.id === currentUserId && onEdit && onDelete,
   );
@@ -8241,14 +8254,7 @@ function IssueMessageItem({
                   </a>
                 );
               },
-              img: ({ alt = "", src }) => (
-                <IssueMarkdownImage
-                  alt={alt}
-                  attachments={message.attachments ?? []}
-                  onLoadAttachment={onLoadAttachment}
-                  src={src}
-                />
-              ),
+              img: renderMessageMarkdownImage,
             }}
             remarkPlugins={remarkPlugins}
             skipHtml
