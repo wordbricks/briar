@@ -1,4 +1,5 @@
 import { type Locale, copy, localizedPath } from "../i18n";
+import { DesktopDownloadLink } from "../desktop-download-link";
 import { Arrow, SiteFooter, SiteHeader } from "../site-chrome";
 import {
   GITHUB_LATEST_RELEASE_URL,
@@ -128,9 +129,15 @@ export default function DownloadView({ locale }: { locale: Locale }) {
                 <p>{d.macDetail}</p>
               </div>
             </div>
-            <a className="button button-primary" href={MAC_DOWNLOAD_URL}>
+            <DesktopDownloadLink
+              className="button button-primary"
+              href={MAC_DOWNLOAD_URL}
+              locale={locale}
+              trackingLabel={d.macAction}
+              trackingLocation="download_page"
+            >
               {d.macAction} <Arrow direction="down" />
-            </a>
+            </DesktopDownloadLink>
           </article>
         </section>
 
