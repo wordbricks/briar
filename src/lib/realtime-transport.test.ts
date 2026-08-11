@@ -2,7 +2,27 @@ import { describe, expect, it } from "vitest";
 import {
   SseEventDecoder,
   SseRealtimeTransport,
+  WebSocketRealtimeTransport,
 } from "./realtime-transport";
+
+class FakeWebSocket {
+  private readonly listeners = new Map<string, Set<(event: Event) => void>>();
+  closeCode: number | undefined;
+
+  addEventListener(type: string, listener: (event: Event) => void) {
+    const listeners = this.listeners.get(type) ?? new Set();
+    listeners.add(listener);
+    this.listeners.set(type, listeners);
+  }
+
+  close(code?: number) {
+    this.closeCode = code;
+  }
+
+  emit(type: string, event: Event) {
+    for (const listener of this.listeners.get(type) ?? []) listener(event);
+  }
+}
 
 describe("SseEventDecoder", () => {
   it("decodes fragmented named events and multiline data", () => {
@@ -51,5 +71,43 @@ describe("SseRealtimeTransport", () => {
     expect(new Headers(request?.headers).get("authorization"))
       .toBe("Bearer secret-token");
     transport.stop();
+  });
+});
+
+describe("WebSocketRealtimeTransport", () => {
+  it("exchanges the bearer token for a short-lived socket URL", async () => {
+    let request: RequestInit | undefined;
+    const socket = new FakeWebSocket();
+    const fetchMock = async (_input: RequestInfo | URL, init?: RequestInit) => {
+      request = init;
+      return Response.json({
+        url: "wss://api.test/channel-events?ticket=signed",
+        expiresAt: "2026-08-12T00:00:00.000Z",
+      });
+    };
+    const transport = new WebSocketRealtimeTransport({
+      url: "https://api.test/channel-events",
+      token: "secret-token",
+      fetch: fetchMock,
+      createWebSocket: () => socket as unknown as WebSocket,
+    });
+    const notification = new Promise<{ topic: "channels"; cursor: number }>(
+      (resolve) => transport.subscribe(resolve),
+    );
+
+    transport.start();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    socket.emit("open", new Event("open"));
+    socket.emit(
+      "message",
+      { data: '{"topic":"channels","cursor":34}' } as MessageEvent,
+    );
+
+    await expect(notification).resolves.toEqual({ topic: "channels", cursor: 34 });
+    expect(request?.method).toBe("POST");
+    expect(new Headers(request?.headers).get("authorization"))
+      .toBe("Bearer secret-token");
+    transport.stop();
+    expect(socket.closeCode).toBe(1000);
   });
 });

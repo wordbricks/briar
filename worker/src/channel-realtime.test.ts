@@ -1,24 +1,39 @@
-import { describe, expect, it } from "vitest";
-import { ChannelRealtimeHub } from "./channel-realtime";
+import { describe, expect, it, vi } from "vitest";
+import {
+  ChannelRealtimeHub,
+  legacyChannelRealtimeResponse,
+} from "./channel-realtime";
 
-const decode = (value: Uint8Array | undefined) =>
-  value ? new TextDecoder().decode(value) : "";
+class FakeSocket {
+  sent: string[] = [];
+  attachment: { cursor: number } | null;
+  close = vi.fn();
+
+  constructor(cursor: number) {
+    this.attachment = { cursor };
+  }
+
+  deserializeAttachment() {
+    return this.attachment;
+  }
+
+  serializeAttachment(attachment: { cursor: number }) {
+    this.attachment = attachment;
+  }
+
+  send(value: string) {
+    this.sent.push(value);
+  }
+}
 
 describe("ChannelRealtimeHub", () => {
-  it("fans out cursor-only notifications to a subscribed organization", async () => {
+  it("fans out only newer cursors through hibernatable sockets", async () => {
+    const socket = new FakeSocket(9);
     const hub = new ChannelRealtimeHub(
-      {} as DurableObjectState,
+      {
+        getWebSockets: () => [socket],
+      } as unknown as DurableObjectState,
       {} as Env,
-    );
-    const response = await hub.fetch(
-      new Request("https://realtime.test/subscribe?cursor=9"),
-    );
-    expect(response.headers.get("content-type")).toContain("text/event-stream");
-    const reader = response.body!.getReader();
-
-    expect(decode((await reader.read()).value)).toBe("retry: 3000\n\n");
-    expect(decode((await reader.read()).value)).toContain(
-      'event: ready\ndata: {"topic":"channels","cursor":9}',
     );
 
     const published = await hub.fetch(new Request("https://realtime.test/notify", {
@@ -27,10 +42,31 @@ describe("ChannelRealtimeHub", () => {
       body: JSON.stringify({ topic: "channels", cursor: 12 }),
     }));
     expect(published.status).toBe(204);
-    expect(decode((await reader.read()).value)).toContain(
-      'event: change\ndata: {"topic":"channels","cursor":12}',
+    expect(socket.sent).toEqual(['{"topic":"channels","cursor":12}']);
+    expect(socket.attachment).toEqual({ cursor: 12 });
+
+    await hub.fetch(new Request("https://realtime.test/notify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ topic: "channels", cursor: 11 }),
+    }));
+    expect(socket.sent).toHaveLength(1);
+  });
+
+  it("does not create a long-lived stream for legacy subscribers", async () => {
+    const response = legacyChannelRealtimeResponse();
+    expect(response.status).toBe(426);
+    expect(response.headers.get("retry-after")).toBe("60");
+    expect(await response.text()).toBe("WebSocket transport required");
+
+    const hub = new ChannelRealtimeHub(
+      {} as DurableObjectState,
+      {} as Env,
     );
-    await reader.cancel();
+    const upgradeRequired = await hub.fetch(
+      new Request("https://realtime.test/subscribe?cursor=9"),
+    );
+    expect(upgradeRequired.status).toBe(426);
   });
 
   it("rejects malformed notifications", async () => {

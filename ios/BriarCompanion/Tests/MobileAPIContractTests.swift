@@ -28,7 +28,7 @@ final class MobileAPIContractTests: XCTestCase {
         XCTAssertEqual(DeviceCodeRequest(), DeviceCodeRequest(clientID: "briar-mobile"))
     }
 
-    func testChannelRealtimeEndpointAndSSEDecoderUseCursorNotifications() throws {
+    func testChannelRealtimeEndpointAndSocketPayloadUseCursorNotifications() throws {
         let organizationID = UUID(
             uuidString: "22222222-2222-4222-8222-222222222222"
         )!
@@ -40,12 +40,18 @@ final class MobileAPIContractTests: XCTestCase {
             "/organizations/22222222-2222-4222-8222-222222222222/channel-events?cursor=41"
         )
 
-        var decoder = MobileSSEDecoder()
-        XCTAssertNil(try decoder.append(line: ": connected"))
-        XCTAssertNil(try decoder.append(line: "event: change"))
-        XCTAssertNil(try decoder.append(line: "data: {\"topic\":\"channels\",\"cursor\":42}"))
+        let ticket = try JSONDecoder.mobileContract.decode(
+            ChannelRealtimeTicketResponse.self,
+            from: Data(
+                #"{"url":"wss://api.briartechnologies.com/organizations/22222222-2222-4222-8222-222222222222/channel-events?ticket=signed","expiresAt":"2026-08-12T00:01:00.000Z"}"#.utf8
+            )
+        )
+        XCTAssertEqual(ticket.url.hasPrefix("wss://"), true)
         XCTAssertEqual(
-            try decoder.append(line: ""),
+            try JSONDecoder.mobileContract.decode(
+                ChannelRealtimeNotification.self,
+                from: Data(#"{"topic":"channels","cursor":42}"#.utf8)
+            ),
             ChannelRealtimeNotification(topic: "channels", cursor: 42)
         )
     }

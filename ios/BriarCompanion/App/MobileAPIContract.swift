@@ -414,6 +414,11 @@ struct ChannelRealtimeNotification: Codable, Equatable, Sendable {
     let cursor: Int
 }
 
+struct ChannelRealtimeTicketResponse: Codable, Equatable, Sendable {
+    let url: String
+    let expiresAt: String
+}
+
 protocol MobileRealtimeClientProtocol: Sendable {
     func realtimeEvents(
         _ path: String,
@@ -622,10 +627,9 @@ struct MobileAPIClient: MobileAPIClientProtocol, MobileRealtimeClientProtocol, S
         return destination
     }
 
-    /// Opens Briar's authenticated server-sent-event stream. The stream only
-    /// carries a cursor notification; callers fetch authoritative data through
-    /// the regular delta endpoint so this transport can later be replaced by a
-    /// WebSocket implementation without changing synchronization semantics.
+    /// Exchanges the bearer credential for a short-lived signed URL, then opens
+    /// a WebSocket that only carries cursor notifications. Authoritative data
+    /// still comes from the regular delta endpoint.
     func realtimeEvents(
         _ path: String,
         token: String
@@ -633,21 +637,43 @@ struct MobileAPIClient: MobileAPIClientProtocol, MobileRealtimeClientProtocol, S
         AsyncThrowingStream { continuation in
             let task = Task {
                 do {
-                    guard let url = endpointURL(path) else {
+                    let ticket: ChannelRealtimeTicketResponse = try await send(
+                        path,
+                        method: "POST",
+                        token: token,
+                        body: nil,
+                        as: ChannelRealtimeTicketResponse.self
+                    )
+                    guard
+                        let url = URL(string: ticket.url),
+                        let scheme = url.scheme?.lowercased(),
+                        scheme == "ws" || scheme == "wss"
+                    else {
                         throw MobileAPIError.invalidRequest
                     }
-                    var request = URLRequest(url: url)
-                    request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
-                    request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-                    let (bytes, response) = try await session.bytes(for: request)
-                    try validate(response: response, data: Data())
-
-                    var decoder = MobileSSEDecoder()
-                    for try await line in bytes.lines {
-                        try Task.checkCancellation()
-                        if let event = try decoder.append(line: line) {
-                            continuation.yield(event)
+                    let socket = session.webSocketTask(with: url)
+                    socket.resume()
+                    try await withTaskCancellationHandler {
+                        while !Task.isCancelled {
+                            let message = try await socket.receive()
+                            let data: Data
+                            switch message {
+                            case .data(let value):
+                                data = value
+                            case .string(let value):
+                                data = Data(value.utf8)
+                            @unknown default:
+                                continue
+                            }
+                            continuation.yield(
+                                try JSONDecoder.mobileContract.decode(
+                                    ChannelRealtimeNotification.self,
+                                    from: data
+                                )
+                            )
                         }
+                    } onCancel: {
+                        socket.cancel(with: .goingAway, reason: nil)
                     }
                     continuation.finish()
                 } catch is CancellationError {
@@ -683,26 +709,6 @@ struct MobileAPIClient: MobileAPIClientProtocol, MobileRealtimeClientProtocol, S
                     HTTPURLResponse.localizedString(forStatusCode: httpResponse.statusCode)
             )
         }
-    }
-}
-
-struct MobileSSEDecoder: Sendable {
-    private var dataLines: [String] = []
-
-    mutating func append(line: String) throws -> ChannelRealtimeNotification? {
-        if line.isEmpty {
-            defer { dataLines.removeAll(keepingCapacity: true) }
-            guard !dataLines.isEmpty else { return nil }
-            return try JSONDecoder.mobileContract.decode(
-                ChannelRealtimeNotification.self,
-                from: Data(dataLines.joined(separator: "\n").utf8)
-            )
-        }
-        guard line.hasPrefix("data:") else { return nil }
-        var value = String(line.dropFirst(5))
-        if value.first == " " { value.removeFirst() }
-        dataLines.append(value)
-        return nil
     }
 }
 
