@@ -361,6 +361,26 @@ final class IssueMutationStore: ObservableObject {
         }
     }
 
+    func acceptAgentSkillExecutionProposal(
+        conversationRunID: UUID,
+        proposalID: UUID,
+        request: AcceptAgentSkillExecutionProposalRequest
+    ) async throws -> AcceptAgentSkillExecutionProposalResponse {
+        try await perform("agent-skill-execution-proposal-\(proposalID)") {
+            try await api.send(
+                MobileAPIContract.Endpoint.acceptIssueSkillExecutionProposal(
+                    projectID: projectID,
+                    conversationRunID: conversationRunID,
+                    proposalID: proposalID
+                ),
+                method: "POST",
+                token: token,
+                body: request,
+                as: AcceptAgentSkillExecutionProposalResponse.self
+            )
+        }
+    }
+
     func sendMessage(
         runID: UUID,
         body: String,

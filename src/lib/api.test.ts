@@ -5,7 +5,9 @@ import {
   addIssueDependency,
   acceptChannelProposal,
   acceptChannelExecutionProposal,
+  acceptChannelSkillExecutionProposal,
   acceptIssueExecutionProposal,
+  acceptIssueSkillExecutionProposal,
   beginDeviceAuthorization,
   claimProjectAgentScheduleRun,
   completeProjectAgentScheduleRun,
@@ -51,6 +53,7 @@ import {
 } from "./api";
 import { cloneAutoHuntWorkflow } from "./auto-hunt-contract";
 import { demoDashboard, demoRunEvents } from "./demo-data";
+import type { AgentSkillExecutionProposal } from "../types";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -200,6 +203,112 @@ describe("API errors", () => {
         }),
       }),
     );
+  });
+
+  it("accepts a saved Skill only with exact immutable evidence and a canonical session", async () => {
+    const projectId = "11111111-1111-4111-8111-111111111111";
+    const agentId = "22222222-2222-4222-8222-222222222222";
+    const skillId = "33333333-3333-4333-8333-333333333333";
+    const pending: AgentSkillExecutionProposal = {
+      id: "proposal-skill-1",
+      type: "request_agent_skill_execute",
+      status: "pending",
+      projectId,
+      agentId,
+      agentName: "Release Agent",
+      skillId,
+      skillName: "iOS deploy",
+      request: "Ship the iOS app",
+      provider: "codex",
+      model: "gpt-5.6-sol",
+      effort: "high",
+      createdAt: "2026-08-11T00:00:00.000Z",
+      acceptedAt: null,
+      requestedWorkerId: null,
+      requestedWorkerLabel: null,
+      resultSessionId: null,
+      delegatedByAgentId: null,
+      delegatedByAgentName: null,
+    };
+    const accepted = {
+      ...pending,
+      status: "accepted" as const,
+      acceptedAt: "2026-08-11T00:01:00.000Z",
+      requestedWorkerId: "worker-1",
+      requestedWorkerLabel: "Build Mac",
+      resultSessionId: "session-1",
+    };
+    const session = {
+      id: "session-1",
+      projectId,
+      dispatchGroupId: "session-1",
+      agentId,
+      agentName: "Release Agent",
+      skillId,
+      sessionType: "task",
+      trigger: "manual",
+      scheduleId: null,
+      scheduleRunId: null,
+      parentSessionId: null,
+      request: pending.request,
+      status: "running",
+      issues: [],
+      startedAt: "2026-08-11T00:01:00.000Z",
+      completedAt: null,
+      conversationId: null,
+      workspaceRoot: null,
+      requestedWorkerId: "worker-1",
+      workerId: "worker-1",
+      summary: null,
+      error: null,
+      events: [],
+      dispatchEvents: [],
+      workers: [],
+      updatedAt: "2026-08-11T00:01:00.000Z",
+    };
+    const fetchMock = vi.fn(async () =>
+      new Response(JSON.stringify({
+        outcome: "accepted",
+        proposal: accepted,
+        projectId,
+        session,
+      }), { headers: { "Content-Type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(acceptChannelSkillExecutionProposal(
+      "token",
+      "organization-1",
+      "channel-1",
+      pending,
+      { workerId: "worker-1" },
+    )).resolves.toEqual(expect.objectContaining({
+      proposal: accepted,
+      session: expect.objectContaining({ id: "session-1", localOwner: false }),
+    }));
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "/organizations/organization-1/channels/channel-1/skill-execution-proposals/proposal-skill-1/accept",
+      ),
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ workerId: "worker-1" }),
+      }),
+    );
+
+    fetchMock.mockImplementationOnce(async () =>
+      new Response(JSON.stringify({
+        outcome: "accepted",
+        proposal: { ...accepted, skillName: "Tampered Skill" },
+        projectId,
+        session,
+      }), { headers: { "Content-Type": "application/json" } }));
+    await expect(acceptIssueSkillExecutionProposal(
+      "token",
+      projectId,
+      "conversation-run",
+      pending,
+      { workerId: "worker-1" },
+    )).rejects.toThrow("inconsistent immutable evidence");
   });
 
   it("adds a member to a channel with the member role", async () => {

@@ -394,6 +394,125 @@ final class CompanionReadTests: XCTestCase {
         XCTAssertNotNil(store.captureExecutionProposal(proposalID: execution.id))
     }
 
+    @MainActor
+    func testRunDetailOtherClientSkillApprovalInvalidatesPendingContext() async throws {
+        let pending = skillExecutionProposal()
+        let accepted = skillExecutionProposal(status: .accepted)
+        let api = RunDetailSnapshotAPI(messageSnapshots: [
+            IssueMessagesResponse(messages: [issueMessage(
+                skillExecutionProposal: pending
+            )]),
+            IssueMessagesResponse(messages: [issueMessage(
+                skillExecutionProposal: accepted
+            )]),
+        ])
+        let store = RunDetailStore(
+            api: api,
+            projectID: pending.projectId,
+            runID: UUID(uuidString: "33333333-3333-4333-8333-333333333333")!,
+            token: "token"
+        )
+        await store.load()
+        let context = try XCTUnwrap(
+            store.captureSkillExecutionProposal(proposalID: pending.id)
+        )
+
+        await store.load()
+
+        XCTAssertFalse(store.skillExecutionProposalIsCurrent(context))
+        XCTAssertNil(store.captureSkillExecutionProposal(proposalID: pending.id))
+        XCTAssertEqual(store.messages.first?.skillExecutionProposal?.status, .accepted)
+    }
+
+    @MainActor
+    func testRunDetailSkillProposalReplacementInvalidatesTheOriginalContext() throws {
+        let pending = skillExecutionProposal()
+        let replacement = skillExecutionProposal(
+            id: UUID(uuidString: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")!
+        )
+        let store = RunDetailStore(
+            api: RunDetailSnapshotAPI(messageSnapshots: []),
+            projectID: pending.projectId,
+            runID: UUID(uuidString: "33333333-3333-4333-8333-333333333333")!,
+            token: "token"
+        )
+        store.appendMessages([issueMessage(skillExecutionProposal: pending)])
+        let context = try XCTUnwrap(
+            store.captureSkillExecutionProposal(proposalID: pending.id)
+        )
+
+        store.appendMessages([issueMessage(skillExecutionProposal: replacement)])
+
+        XCTAssertFalse(store.skillExecutionProposalIsCurrent(context))
+        XCTAssertNil(store.captureSkillExecutionProposal(proposalID: pending.id))
+        XCTAssertNotNil(store.captureSkillExecutionProposal(proposalID: replacement.id))
+    }
+
+    @MainActor
+    func testLeavingRunDetailInvalidatesAnInFlightSkillPreparationContext() throws {
+        let pending = skillExecutionProposal()
+        let store = RunDetailStore(
+            api: RunDetailSnapshotAPI(messageSnapshots: []),
+            projectID: pending.projectId,
+            runID: UUID(uuidString: "33333333-3333-4333-8333-333333333333")!,
+            token: "token"
+        )
+        store.appendMessages([issueMessage(skillExecutionProposal: pending)])
+        let context = try XCTUnwrap(
+            store.captureSkillExecutionProposal(proposalID: pending.id)
+        )
+
+        store.close()
+
+        XCTAssertFalse(store.skillExecutionProposalIsCurrent(context))
+    }
+
+    @MainActor
+    func testAcceptedSkillProposalIsImmediatelyMaterializedInIssueHistory() throws {
+        let pending = skillExecutionProposal()
+        let accepted = skillExecutionProposal(status: .accepted)
+        let store = RunDetailStore(
+            api: RunDetailSnapshotAPI(messageSnapshots: []),
+            projectID: pending.projectId,
+            runID: UUID(uuidString: "33333333-3333-4333-8333-333333333333")!,
+            token: "token"
+        )
+        store.appendMessages([issueMessage(skillExecutionProposal: pending)])
+        let context = try XCTUnwrap(
+            store.captureSkillExecutionProposal(proposalID: pending.id)
+        )
+
+        store.updateSkillExecutionProposal(accepted)
+
+        XCTAssertFalse(store.skillExecutionProposalIsCurrent(context))
+        XCTAssertEqual(store.messages.first?.skillExecutionProposal, accepted)
+        XCTAssertEqual(
+            store.messages.first?.skillExecutionProposal?.resultSessionId,
+            "session-1"
+        )
+    }
+
+    @MainActor
+    func testDelayedPendingIssueMessageCannotRegressAcceptedSkillHistory() {
+        let pending = skillExecutionProposal()
+        let accepted = skillExecutionProposal(status: .accepted)
+        let store = RunDetailStore(
+            api: RunDetailSnapshotAPI(messageSnapshots: []),
+            projectID: pending.projectId,
+            runID: UUID(uuidString: "33333333-3333-4333-8333-333333333333")!,
+            token: "token"
+        )
+        store.appendMessages([issueMessage(skillExecutionProposal: pending)])
+        store.updateSkillExecutionProposal(accepted)
+
+        store.appendMessages([issueMessage(skillExecutionProposal: pending)])
+
+        XCTAssertEqual(store.messages.first?.skillExecutionProposal, accepted)
+
+        store.appendMessages([issueMessage(skillExecutionProposal: nil)])
+        XCTAssertNil(store.messages.first?.skillExecutionProposal)
+    }
+
     private func executionProposal(
         status: IssueExecutionProposal.Status = .pending
     ) -> IssueExecutionProposal {
@@ -412,9 +531,38 @@ final class CompanionReadTests: XCTestCase {
         )
     }
 
+    private func skillExecutionProposal(
+        id: UUID = UUID(uuidString: "abababab-abab-4bab-8bab-abababababab")!,
+        status: AgentSkillExecutionProposal.Status = .pending
+    ) -> AgentSkillExecutionProposal {
+        AgentSkillExecutionProposal(
+            id: id,
+            status: status,
+            projectId: UUID(uuidString: "11111111-1111-4111-8111-111111111111")!,
+            agentId: UUID(uuidString: "66666666-6666-4666-8666-666666666666")!,
+            agentName: "Project Agent",
+            skillId: UUID(uuidString: "77777777-7777-4777-8777-777777777777")!,
+            skillName: "iOS 배포",
+            request: "TestFlight에 최신 빌드를 배포해 줘",
+            provider: .codex,
+            model: "gpt-5.6-sol",
+            effort: .high,
+            createdAt: Date(timeIntervalSince1970: 1_700_000_000),
+            acceptedAt: status == .accepted
+                ? Date(timeIntervalSince1970: 1_700_000_100)
+                : nil,
+            requestedWorkerId: status == .accepted ? "worker-1" : nil,
+            requestedWorkerLabel: status == .accepted ? "Build Mac" : nil,
+            resultSessionId: status == .accepted ? "session-1" : nil,
+            delegatedByAgentId: nil,
+            delegatedByAgentName: nil
+        )
+    }
+
     private func issueMessage(
         proposedAction: IssueProposedAction? = nil,
-        executionProposal: IssueExecutionProposal?
+        executionProposal: IssueExecutionProposal? = nil,
+        skillExecutionProposal: AgentSkillExecutionProposal? = nil
     ) -> IssueMessage {
         IssueMessage(
             id: UUID(uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!,
@@ -426,6 +574,7 @@ final class CompanionReadTests: XCTestCase {
             replyCount: 0,
             proposedAction: proposedAction,
             executionProposal: executionProposal,
+            skillExecutionProposal: skillExecutionProposal,
             createdAt: Date(timeIntervalSince1970: 1_700_000_000),
             updatedAt: Date(timeIntervalSince1970: 1_700_000_000)
         )

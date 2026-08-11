@@ -563,6 +563,207 @@ final class IssueMutationTests: XCTestCase {
         XCTAssertNil(body["requestId"])
     }
 
+    func testAgentSkillExecutionApprovalRequiresOneExactEligibleWorker() throws {
+        let worker = DashboardWorker(
+            id: "worker-1",
+            label: "Build Mac",
+            agentProvider: .codex,
+            providers: [.codex],
+            readiness: "available",
+            acceptingWork: true,
+            readinessDetail: nil,
+            activeSessions: 0,
+            availableSessions: 1
+        )
+        let snapshot = DashboardSnapshot(
+            project: ProjectsResponse.Project(
+                id: Self.projectID,
+                name: "Target",
+                icon: nil,
+                organizationId: UUID(
+                    uuidString: "22222222-2222-4222-8222-222222222222"
+                )!,
+                organizationName: "Wordbricks",
+                role: .owner,
+                createdAt: .now
+            ),
+            runs: [],
+            workers: [worker],
+            organizationProviders: [.codex],
+            executionPolicy: ProjectExecutionWorkerPolicy(
+                selectionMode: .allowlist,
+                defaultWorkerId: worker.id,
+                allowedWorkerIds: [worker.id],
+                updatedAt: .now
+            ),
+            cursor: nil,
+            generatedAt: .now
+        )
+        let proposal = agentSkillExecutionProposal()
+
+        XCTAssertEqual(
+            try validateAgentSkillExecutionApproval(
+                snapshot: snapshot,
+                proposal: proposal,
+                request: AcceptAgentSkillExecutionProposalRequest(workerId: worker.id)
+            ).map(\.id),
+            [worker.id]
+        )
+        XCTAssertThrowsError(
+            try validateAgentSkillExecutionApproval(
+                snapshot: snapshot,
+                proposal: proposal,
+                request: AcceptAgentSkillExecutionProposalRequest(workerId: "")
+            )
+        ) { error in
+            XCTAssertEqual(error as? AgentSkillExecutionApprovalError, .workerRequired)
+        }
+        for invalidWorkerID in ["any", " worker-1", "worker-2"] {
+            XCTAssertThrowsError(
+                try validateAgentSkillExecutionApproval(
+                    snapshot: snapshot,
+                    proposal: proposal,
+                    request: AcceptAgentSkillExecutionProposalRequest(
+                        workerId: invalidWorkerID
+                    )
+                )
+            ) { error in
+                XCTAssertEqual(
+                    error as? AgentSkillExecutionApprovalError,
+                    .workerUnavailable
+                )
+            }
+        }
+    }
+
+    func testAgentSkillExecutionResponseMustPreserveEvidenceAndSessionIdentity() {
+        let pending = agentSkillExecutionProposal()
+        let request = AcceptAgentSkillExecutionProposalRequest(workerId: "worker-1")
+        let response = AcceptAgentSkillExecutionProposalResponse(
+            outcome: .accepted,
+            proposal: agentSkillExecutionProposal(status: .accepted),
+            projectId: Self.projectID,
+            session: agentSkillExecutionSession()
+        )
+
+        XCTAssertTrue(
+            agentSkillExecutionApprovalResponseMatches(
+                response: response,
+                expected: pending,
+                request: request
+            )
+        )
+        let mismatches = [
+            AcceptAgentSkillExecutionProposalResponse(
+                outcome: .accepted,
+                proposal: agentSkillExecutionProposal(
+                    id: UUID(uuidString: "cccccccc-cccc-4ccc-8ccc-cccccccccccc")!,
+                    status: .accepted
+                ),
+                projectId: Self.projectID,
+                session: agentSkillExecutionSession()
+            ),
+            AcceptAgentSkillExecutionProposalResponse(
+                outcome: .accepted,
+                proposal: agentSkillExecutionProposal(
+                    status: .accepted,
+                    model: "different-runtime"
+                ),
+                projectId: Self.projectID,
+                session: agentSkillExecutionSession()
+            ),
+            AcceptAgentSkillExecutionProposalResponse(
+                outcome: .accepted,
+                proposal: agentSkillExecutionProposal(
+                    status: .accepted,
+                    acceptedWorkerID: "worker-2"
+                ),
+                projectId: Self.projectID,
+                session: agentSkillExecutionSession()
+            ),
+            AcceptAgentSkillExecutionProposalResponse(
+                outcome: .accepted,
+                proposal: agentSkillExecutionProposal(status: .accepted),
+                projectId: Self.projectID,
+                session: agentSkillExecutionSession(id: "different-session")
+            ),
+            AcceptAgentSkillExecutionProposalResponse(
+                outcome: .accepted,
+                proposal: agentSkillExecutionProposal(status: .accepted),
+                projectId: Self.projectID,
+                session: agentSkillExecutionSession(request: "다른 요청")
+            ),
+            AcceptAgentSkillExecutionProposalResponse(
+                outcome: .accepted,
+                proposal: agentSkillExecutionProposal(status: .accepted),
+                projectId: Self.projectID,
+                session: agentSkillExecutionSession(agentName: "다른 Agent")
+            ),
+            AcceptAgentSkillExecutionProposalResponse(
+                outcome: .accepted,
+                proposal: agentSkillExecutionProposal(status: .accepted),
+                projectId: Self.projectID,
+                session: agentSkillExecutionSession(sessionType: .dispatch)
+            ),
+            AcceptAgentSkillExecutionProposalResponse(
+                outcome: .accepted,
+                proposal: agentSkillExecutionProposal(status: .accepted),
+                projectId: Self.projectID,
+                session: agentSkillExecutionSession(trigger: .scheduled)
+            ),
+            AcceptAgentSkillExecutionProposalResponse(
+                outcome: .accepted,
+                proposal: agentSkillExecutionProposal(status: .accepted),
+                projectId: Self.projectID,
+                session: agentSkillExecutionSession(workerID: nil)
+            ),
+        ]
+        for mismatch in mismatches {
+            XCTAssertFalse(
+                agentSkillExecutionApprovalResponseMatches(
+                    response: mismatch,
+                    expected: pending,
+                    request: request
+                )
+            )
+        }
+    }
+
+    func testAcceptAgentSkillExecutionProposalUsesDedicatedPathAndWorkerOnlyBody() async throws {
+        let recorder = MutationAPIRecorder()
+        let proposalID = UUID(uuidString: "abababab-abab-4bab-8bab-abababababab")!
+        let store = IssueMutationStore(
+            api: recorder,
+            projectID: Self.projectID,
+            token: "token"
+        )
+
+        let response = try await store.acceptAgentSkillExecutionProposal(
+            conversationRunID: Self.runID,
+            proposalID: proposalID,
+            request: AcceptAgentSkillExecutionProposalRequest(workerId: "worker-1")
+        )
+
+        XCTAssertEqual(response.proposal.id, proposalID)
+        XCTAssertEqual(response.session.id, "session-1")
+        let recordedPath = await recorder.lastPath()
+        XCTAssertEqual(
+            recordedPath,
+            MobileAPIContract.Endpoint.acceptIssueSkillExecutionProposal(
+                projectID: Self.projectID,
+                conversationRunID: Self.runID,
+                proposalID: proposalID
+            )
+        )
+        let capturedBodyData = await recorder.lastJSONBodyData()
+        let body = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: XCTUnwrap(capturedBodyData))
+                as? [String: Any]
+        )
+        XCTAssertEqual(Set(body.keys), ["workerId"])
+        XCTAssertEqual(body["workerId"] as? String, "worker-1")
+    }
+
     func testDuplicateCreateTapSendsOnlyOneRequest() async throws {
         let recorder = MutationAPIRecorder(delay: .milliseconds(100))
         let store = IssueMutationStore(
@@ -818,6 +1019,71 @@ final class IssueMutationTests: XCTestCase {
     private static let projectID = UUID(uuidString: "11111111-1111-4111-8111-111111111111")!
     private static let runID = UUID(uuidString: "33333333-3333-4333-8333-333333333333")!
 
+    private func agentSkillExecutionProposal(
+        id: UUID = UUID(uuidString: "abababab-abab-4bab-8bab-abababababab")!,
+        status: AgentSkillExecutionProposal.Status = .pending,
+        model: String? = "gpt-5.6-sol",
+        acceptedWorkerID: String = "worker-1",
+        resultSessionID: String = "session-1"
+    ) -> AgentSkillExecutionProposal {
+        AgentSkillExecutionProposal(
+            id: id,
+            status: status,
+            projectId: Self.projectID,
+            agentId: UUID(uuidString: "66666666-6666-4666-8666-666666666666")!,
+            agentName: "Project Agent",
+            skillId: UUID(uuidString: "77777777-7777-4777-8777-777777777777")!,
+            skillName: "iOS 배포",
+            request: "TestFlight에 최신 빌드를 배포해 줘",
+            provider: .codex,
+            model: model,
+            effort: .high,
+            createdAt: Date(timeIntervalSince1970: 1_700_000_010),
+            acceptedAt: status == .accepted
+                ? Date(timeIntervalSince1970: 1_700_000_100)
+                : nil,
+            requestedWorkerId: status == .accepted ? acceptedWorkerID : nil,
+            requestedWorkerLabel: status == .accepted ? "Build Mac" : nil,
+            resultSessionId: status == .accepted ? resultSessionID : nil
+        )
+    }
+
+    private func agentSkillExecutionSession(
+        id: String = "session-1",
+        request: String = "TestFlight에 최신 빌드를 배포해 줘",
+        agentName: String? = "Project Agent",
+        sessionType: ProjectAgentSession.SessionType = .task,
+        trigger: ProjectAgentSession.Trigger = .manual,
+        workerID: String? = "worker-1"
+    ) -> ProjectAgentSession {
+        ProjectAgentSession(
+            id: id,
+            projectId: Self.projectID,
+            dispatchGroupId: nil,
+            agentId: UUID(uuidString: "66666666-6666-4666-8666-666666666666")!,
+            agentName: agentName,
+            skillId: UUID(uuidString: "77777777-7777-4777-8777-777777777777")!,
+            sessionType: sessionType,
+            trigger: trigger,
+            scheduleId: nil,
+            scheduleRunId: nil,
+            parentSessionId: nil,
+            request: request,
+            status: .running,
+            issues: [],
+            startedAt: Date(timeIntervalSince1970: 1_700_000_100),
+            completedAt: nil,
+            conversationId: nil,
+            workspaceRoot: nil,
+            requestedWorkerId: "worker-1",
+            workerId: workerID,
+            summary: nil,
+            error: nil,
+            events: nil,
+            updatedAt: Date(timeIntervalSince1970: 1_700_000_100)
+        )
+    }
+
     private func executionRun(
         status: DashboardRun.Status = .backlog,
         workflowStage: String? = nil,
@@ -1018,6 +1284,8 @@ private actor MutationAPIRecorder: MobileAPIClientProtocol {
             payload = #"{"runId":"33333333-3333-4333-8333-333333333333","outcome":"approved","workflowStage":"production_qa","startStage":"production_qa","checkpointKey":"user-before-production_qa","attempt":2,"revision":3,"terminalReviewOnly":false}"#
         } else if path.hasSuffix("/dispatch") || path.hasSuffix("/reassign") {
             payload = #"{"runId":"33333333-3333-4333-8333-333333333333","agentId":null,"provider":"codex","model":null,"effort":null,"requestedWorkerId":"worker-1","requestedByUserId":"fixture-user","dispatchMode":"specific","dispatchedAt":"2026-08-02T01:00:00.000Z","outcome":"dispatched"}"#
+        } else if path.contains("/skill-execution-proposals/") && path.hasSuffix("/accept") {
+            payload = #"{"outcome":"accepted","projectId":"11111111-1111-4111-8111-111111111111","proposal":{"id":"abababab-abab-4bab-8bab-abababababab","type":"request_agent_skill_execute","status":"accepted","projectId":"11111111-1111-4111-8111-111111111111","agentId":"66666666-6666-4666-8666-666666666666","agentName":"Project Agent","skillId":"77777777-7777-4777-8777-777777777777","skillName":"iOS 배포","request":"TestFlight에 최신 빌드를 배포해 줘","provider":"codex","model":"gpt-5.6-sol","effort":"high","createdAt":"2026-08-11T01:00:00.000Z","acceptedAt":"2026-08-11T01:01:00.000Z","requestedWorkerId":"worker-1","requestedWorkerLabel":"Build Mac","resultSessionId":"session-1","delegatedByAgentId":null,"delegatedByAgentName":null},"session":{"id":"session-1","projectId":"11111111-1111-4111-8111-111111111111","agentId":"66666666-6666-4666-8666-666666666666","agentName":"Project Agent","skillId":"77777777-7777-4777-8777-777777777777","sessionType":"task","trigger":"manual","request":"TestFlight에 최신 빌드를 배포해 줘","status":"running","issues":[],"startedAt":"2026-08-11T01:01:00.000Z","requestedWorkerId":"worker-1","workerId":"worker-1","updatedAt":"2026-08-11T01:01:00.000Z"}}"#
         } else if path.contains("/issue-execution-proposals/") && path.hasSuffix("/accept") {
             payload = #"{"proposal":{"id":"77777777-7777-4777-8777-777777777777","type":"request_issue_execute","status":"accepted","projectId":"11111111-1111-4111-8111-111111111111","runId":"33333333-3333-4333-8333-333333333333","title":"Fresh backlog","createdAt":"2026-08-11T01:00:00.000Z","acceptedAt":"2026-08-11T01:01:00.000Z","requestedProvider":"codex","requestedModel":null,"requestedEffort":"high","requestedWorkerId":null,"delegatedByAgentId":null,"delegatedByAgentName":null},"outcome":"accepted","projectId":"11111111-1111-4111-8111-111111111111","runId":"33333333-3333-4333-8333-333333333333","dispatch":{"runId":"33333333-3333-4333-8333-333333333333","agentId":null,"provider":"codex","model":null,"effort":"high","requestedWorkerId":null,"requestedByUserId":"fixture-user","dispatchMode":"any","dispatchedAt":"2026-08-11T01:01:00.000Z","outcome":"dispatched"}}"#
         } else {

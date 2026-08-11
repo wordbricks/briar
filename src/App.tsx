@@ -148,6 +148,7 @@ export function App() {
   const [acceptingInvitation, setAcceptingInvitation] = useState(false);
   const plannedUpdateRecoveryRef = useRef<Promise<void> | null>(null);
   const scheduleSessionOptions = useMemo<UseBriarOptions>(() => ({
+    adoptRemoteAgentSession: autoHunt.adoptRemoteSession,
     deferDefaultOrganization: invitationToken !== null,
     startScheduledAgentSession: (run) =>
       autoHunt.startTaskSession(run.projectId, run.agent.id, {
@@ -175,6 +176,7 @@ export function App() {
       },
     ),
   }), [
+    autoHunt.adoptRemoteSession,
     autoHunt.settleTaskSession,
     autoHunt.startTaskSession,
     autoHunt.startWorkerDispatchSession,
@@ -1451,6 +1453,7 @@ export function App() {
             currentUserId={briar.user?.id ?? null}
             onChannelSelect={setActiveChannelId}
             onChannelsChange={setOrganizationChannels}
+            onSkillSessionAccepted={autoHunt.adoptRemoteSession}
             organizationId={briar.activeOrganizationId}
             token={briar.token}
             requestedMessage={requestedChannelMessage}
@@ -1501,6 +1504,7 @@ export function App() {
             onAddIssueDependency={briar.addIssueDependency}
             onAcceptIssueAction={briar.acceptConversationIssueAction}
             onAcceptIssueExecution={briar.acceptConversationIssueExecution}
+            onAcceptSkillExecution={briar.acceptConversationSkillExecution}
             onRemoveIssueDependency={briar.removeIssueDependency}
             onUpdateIssue={briar.editIssue}
             onUpdateIssueCheckpoints={briar.editIssueCheckpoints}
@@ -1638,6 +1642,12 @@ export function App() {
                       (agent) => agent.id === inboxDetailRun.agentId,
                     )?.name ?? null
                   }
+                  onAcceptSkillExecution={(proposal, input) =>
+                    briar.acceptConversationSkillExecution(
+                      inboxDetailRun.id,
+                      proposal,
+                      input,
+                    )}
                   projectId={inboxDetailTarget.projectId}
                   run={inboxDetailRun}
                   token={briar.token}
@@ -1799,6 +1809,7 @@ export function App() {
               currentUserId={briar.user?.id ?? null}
               organizationId={briar.activeOrganizationId}
               projects={activeOrganizationProjects}
+              onSkillSessionAccepted={autoHunt.adoptRemoteSession}
               token={briar.token}
               requestedMessage={requestedChannelMessage}
               onRequestedMessageOpen={clearRequestedChannelMessage}
@@ -1927,6 +1938,7 @@ export function App() {
             onAddIssueDependency={briar.addIssueDependency}
             onAcceptIssueAction={briar.acceptConversationIssueAction}
             onAcceptIssueExecution={briar.acceptConversationIssueExecution}
+            onAcceptSkillExecution={briar.acceptConversationSkillExecution}
             onRemoveIssueDependency={briar.removeIssueDependency}
             onUpdateIssue={briar.editIssue}
             onUpdateIssueCheckpoints={briar.editIssueCheckpoints}

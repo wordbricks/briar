@@ -13,6 +13,9 @@ final class ChannelsStoreTests: XCTestCase {
     private let executionProposalID = UUID(
         uuidString: "cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd"
     )!
+    private let skillExecutionProposalID = UUID(
+        uuidString: "abababab-abab-4bab-8bab-abababababab"
+    )!
     private let projectID = UUID(uuidString: "11111111-1111-4111-8111-111111111111")!
     private let resultRunID = UUID(uuidString: "88888888-8888-4888-8888-888888888888")!
 
@@ -1346,6 +1349,424 @@ final class ChannelsStoreTests: XCTestCase {
         configured.store.applicationDidEnterBackground()
     }
 
+    func testArchivedChannelCannotOpenSkillExecutionApproval() {
+        let proposal = skillExecutionProposal()
+        XCTAssertTrue(
+            channelSkillExecutionProposalApprovalIsEnabled(
+                acceptanceInFlight: false,
+                channelArchived: false,
+                proposal: proposal
+            )
+        )
+        XCTAssertFalse(
+            channelSkillExecutionProposalApprovalIsEnabled(
+                acceptanceInFlight: false,
+                channelArchived: true,
+                proposal: proposal
+            )
+        )
+        XCTAssertFalse(
+            channelSkillExecutionProposalApprovalIsEnabled(
+                acceptanceInFlight: false,
+                channelArchived: false,
+                proposal: skillExecutionProposal(status: .accepted)
+            )
+        )
+    }
+
+    @MainActor
+    func testPreparingSkillExecutionApprovalOnlyLoadsEligibleWorkerContext() async throws {
+        let configured = try await skillExecutionProposalStore(
+            dashboardSnapshots: [executionDashboard(dispatched: false)]
+        )
+
+        let context = await configured.store.prepareSkillExecutionProposal(
+            channelID: channelID,
+            proposalID: skillExecutionProposalID
+        )
+
+        XCTAssertEqual(context?.proposalID, skillExecutionProposalID)
+        XCTAssertEqual(context?.snapshot.project.id, projectID)
+        XCTAssertEqual(context?.snapshot.workers?.map(\.id), ["worker-1"])
+        let dashboardRequests = await configured.api.requestCount(
+            for: configured.dashboardPath
+        )
+        let approvalRequests = await configured.api.requestCount(for: configured.acceptPath)
+        XCTAssertEqual(dashboardRequests, 1)
+        XCTAssertEqual(approvalRequests, 0, "opening the sheet must never execute the Skill")
+        configured.store.applicationDidEnterBackground()
+    }
+
+    @MainActor
+    func testSlowSkillPrepareCannotPresentAfterLeavingTheChannel() async throws {
+        let configured = try await skillExecutionProposalStore(
+            dashboardSnapshots: [executionDashboard(dispatched: false)],
+            dashboardDelay: .milliseconds(120)
+        )
+        let preparation = Task {
+            await configured.store.prepareSkillExecutionProposal(
+                channelID: channelID,
+                proposalID: skillExecutionProposalID
+            )
+        }
+        await waitForRequests(configured.api, path: configured.dashboardPath, count: 1)
+
+        configured.store.closeChannelFocus(channelID: channelID)
+        let context = await preparation.value
+
+        XCTAssertNil(context)
+        XCTAssertNil(configured.store.preparingSkillExecutionProposalID)
+        let approvalRequests = await configured.api.requestCount(for: configured.acceptPath)
+        XCTAssertEqual(approvalRequests, 0)
+        configured.store.applicationDidEnterBackground()
+    }
+
+    @MainActor
+    func testSkillAndIssueExecutionPreparationAreMutuallyExclusiveInFlight() async throws {
+        let configured = try await skillExecutionProposalStore(
+            dashboardSnapshots: [executionDashboard(dispatched: false)],
+            dashboardDelay: .milliseconds(120),
+            includeIssueExecutionProposal: true
+        )
+        let skillPreparation = Task {
+            await configured.store.prepareSkillExecutionProposal(
+                channelID: channelID,
+                proposalID: skillExecutionProposalID
+            )
+        }
+        await waitForRequests(configured.api, path: configured.dashboardPath, count: 1)
+
+        let issueContext = await configured.store.prepareExecutionProposal(
+            channelID: channelID,
+            proposalID: executionProposalID
+        )
+
+        XCTAssertNil(issueContext)
+        let dashboardRequests = await configured.api.requestCount(
+            for: configured.dashboardPath
+        )
+        XCTAssertEqual(dashboardRequests, 1)
+        let skillContext = await skillPreparation.value
+        XCTAssertNotNil(skillContext)
+        configured.store.applicationDidEnterBackground()
+    }
+
+    @MainActor
+    func testSkillSubmitRechecksWorkerAvailabilityBeforePosting() async throws {
+        let configured = try await skillExecutionProposalStore(
+            dashboardSnapshots: [
+                executionDashboard(dispatched: false),
+                executionDashboard(
+                    dispatched: false,
+                    workerReadiness: "busy",
+                    workerAcceptingWork: false
+                ),
+            ],
+            approvalResponse: skillExecutionApprovalResponse()
+        )
+        let opened = await configured.store.prepareSkillExecutionProposal(
+            channelID: channelID,
+            proposalID: skillExecutionProposalID
+        )
+        XCTAssertNotNil(opened)
+
+        let response = await configured.store.acceptSkillExecutionProposal(
+            channelID: channelID,
+            proposalID: skillExecutionProposalID,
+            request: AcceptAgentSkillExecutionProposalRequest(workerId: "worker-1")
+        )
+
+        XCTAssertNil(response)
+        XCTAssertEqual(
+            configured.store.messages.first?.skillExecutionProposal?.status,
+            .pending
+        )
+        let approvalRequests = await configured.api.requestCount(for: configured.acceptPath)
+        XCTAssertEqual(approvalRequests, 0)
+        XCTAssertNotNil(configured.store.errorMessage)
+        configured.store.applicationDidEnterBackground()
+    }
+
+    @MainActor
+    func testSkillExecutionApprovalSendsOnlyExactWorkerAndAppliesSessionResult() async throws {
+        let configured = try await skillExecutionProposalStore(
+            dashboardSnapshots: [executionDashboard(dispatched: false)],
+            approvalResponse: skillExecutionApprovalResponse()
+        )
+
+        let response = await configured.store.acceptSkillExecutionProposal(
+            channelID: channelID,
+            proposalID: skillExecutionProposalID,
+            request: AcceptAgentSkillExecutionProposalRequest(workerId: "worker-1")
+        )
+
+        XCTAssertEqual(response?.outcome, .accepted)
+        XCTAssertEqual(response?.session.id, "session-1")
+        XCTAssertEqual(
+            configured.store.messages.first?.skillExecutionProposal?.status,
+            .accepted
+        )
+        XCTAssertEqual(
+            configured.store.messages.first?.skillExecutionProposal?.resultSessionId,
+            "session-1"
+        )
+        let recordedBody = await configured.api.lastJSONBody(for: configured.acceptPath)
+        let bodyData = try XCTUnwrap(recordedBody)
+        let body = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: bodyData) as? [String: Any]
+        )
+        XCTAssertEqual(Set(body.keys), ["workerId"])
+        XCTAssertEqual(body["workerId"] as? String, "worker-1")
+        configured.store.applicationDidEnterBackground()
+    }
+
+    @MainActor
+    func testDuplicateSkillApprovalTapPostsOnlyOnce() async throws {
+        let configured = try await skillExecutionProposalStore(
+            dashboardSnapshots: [executionDashboard(dispatched: false)],
+            approvalResponse: skillExecutionApprovalResponse(),
+            approvalDelay: .milliseconds(120)
+        )
+        let first = Task {
+            await configured.store.acceptSkillExecutionProposal(
+                channelID: channelID,
+                proposalID: skillExecutionProposalID,
+                request: AcceptAgentSkillExecutionProposalRequest(workerId: "worker-1")
+            )
+        }
+        await waitForRequests(configured.api, path: configured.acceptPath, count: 1)
+
+        let duplicate = await configured.store.acceptSkillExecutionProposal(
+            channelID: channelID,
+            proposalID: skillExecutionProposalID,
+            request: AcceptAgentSkillExecutionProposalRequest(workerId: "worker-1")
+        )
+        let accepted = await first.value
+
+        XCTAssertNil(duplicate)
+        XCTAssertEqual(accepted?.proposal.status, .accepted)
+        let approvalRequests = await configured.api.requestCount(for: configured.acceptPath)
+        XCTAssertEqual(approvalRequests, 1)
+        configured.store.applicationDidEnterBackground()
+    }
+
+    @MainActor
+    func testSkillApprovalRejectsAMismatchedReturnedSession() async throws {
+        let malformed = AcceptAgentSkillExecutionProposalResponse(
+            outcome: .accepted,
+            proposal: skillExecutionProposal(status: .accepted),
+            projectId: projectID,
+            session: skillExecutionSession(id: "other-session")
+        )
+        let configured = try await skillExecutionProposalStore(
+            dashboardSnapshots: [executionDashboard(dispatched: false)],
+            approvalResponse: malformed
+        )
+
+        let response = await configured.store.acceptSkillExecutionProposal(
+            channelID: channelID,
+            proposalID: skillExecutionProposalID,
+            request: AcceptAgentSkillExecutionProposalRequest(workerId: "worker-1")
+        )
+
+        XCTAssertNil(response)
+        XCTAssertEqual(
+            configured.store.messages.first?.skillExecutionProposal?.status,
+            .pending
+        )
+        XCTAssertNotNil(configured.store.errorMessage)
+        configured.store.applicationDidEnterBackground()
+    }
+
+    @MainActor
+    func testDelayedPendingDeltaCannotRegressAcceptedSkillExecutionProposal() async throws {
+        let pendingDelta = ChannelDeltaResponse(
+            cursor: 11,
+            hasMore: false,
+            channels: [],
+            removedChannelIds: [],
+            messages: [message(
+                id: rootID,
+                channelID: channelID,
+                body: "Delayed pending Skill proposal",
+                authorKind: .agent,
+                skillExecutionProposal: skillExecutionProposal()
+            )],
+            removedMessageIds: []
+        )
+        let configured = try await skillExecutionProposalStore(
+            dashboardSnapshots: [executionDashboard(dispatched: false)],
+            approvalResponse: skillExecutionApprovalResponse(),
+            delta: pendingDelta
+        )
+
+        let response = await configured.store.acceptSkillExecutionProposal(
+            channelID: channelID,
+            proposalID: skillExecutionProposalID,
+            request: AcceptAgentSkillExecutionProposalRequest(workerId: "worker-1")
+        )
+        XCTAssertEqual(response?.proposal.status, .accepted)
+
+        await configured.store.refreshChanges()
+
+        XCTAssertEqual(
+            configured.store.messages.first?.skillExecutionProposal?.status,
+            .accepted
+        )
+        configured.store.applicationDidEnterBackground()
+    }
+
+    @MainActor
+    func testReactionResponsesPreserveAcceptedSkillProposalButHonorTombstone() async throws {
+        let reactionPath = MobileAPIContract.Endpoint.channelMessageReactions(
+            organizationID: organizationID,
+            channelID: channelID,
+            messageID: rootID
+        )
+        let stalePending = ToggleChannelMessageReactionResponse(message: message(
+            id: rootID,
+            channelID: channelID,
+            body: "Skill execution proposal",
+            authorKind: .agent,
+            reactions: [ChannelMessageReaction(
+                emoji: "👍",
+                count: 1,
+                userIds: ["fixture-user"]
+            )],
+            skillExecutionProposal: skillExecutionProposal()
+        ))
+        let tombstone = ToggleChannelMessageReactionResponse(message: message(
+            id: rootID,
+            channelID: channelID,
+            body: "Skill execution proposal",
+            authorKind: .agent,
+            reactions: [ChannelMessageReaction(
+                emoji: "👍",
+                count: 0,
+                userIds: []
+            )],
+            skillExecutionProposal: nil
+        ))
+        let configured = try await skillExecutionProposalStore(
+            dashboardSnapshots: [executionDashboard(dispatched: false)],
+            approvalResponse: skillExecutionApprovalResponse(),
+            reactionResponses: [stalePending, tombstone],
+            reactionDelays: [.milliseconds(120), .zero]
+        )
+        let delayedReaction = Task {
+            await configured.store.toggleReaction(
+                channelID: channelID,
+                messageID: rootID,
+                emoji: "👍"
+            )
+        }
+        await waitForRequests(configured.api, path: reactionPath, count: 1)
+
+        let accepted = await configured.store.acceptSkillExecutionProposal(
+            channelID: channelID,
+            proposalID: skillExecutionProposalID,
+            request: AcceptAgentSkillExecutionProposalRequest(workerId: "worker-1")
+        )
+        await delayedReaction.value
+
+        XCTAssertEqual(accepted?.proposal.status, .accepted)
+        XCTAssertEqual(
+            configured.store.messages.first?.skillExecutionProposal?.status,
+            .accepted
+        )
+        XCTAssertEqual(
+            configured.store.messages.first?.skillExecutionProposal?.resultSessionId,
+            "session-1"
+        )
+        XCTAssertEqual(configured.store.messages.first?.reactions.first?.count, 1)
+
+        await configured.store.toggleReaction(
+            channelID: channelID,
+            messageID: rootID,
+            emoji: "👍"
+        )
+
+        XCTAssertNil(configured.store.messages.first?.skillExecutionProposal)
+        XCTAssertEqual(configured.store.messages.first?.reactions.first?.count, 0)
+        configured.store.applicationDidEnterBackground()
+    }
+
+    @MainActor
+    func testSkillProposalRemovalInvalidatesDelayedApprovalResponse() async throws {
+        let configured = try await skillExecutionProposalStore(
+            dashboardSnapshots: [executionDashboard(dispatched: false)],
+            approvalResponse: skillExecutionApprovalResponse(),
+            approvalDelay: .milliseconds(120),
+            delta: ChannelDeltaResponse(
+                cursor: 11,
+                hasMore: false,
+                channels: [],
+                removedChannelIds: [],
+                messages: [],
+                removedMessageIds: [rootID]
+            )
+        )
+        let approval = Task {
+            await configured.store.acceptSkillExecutionProposal(
+                channelID: channelID,
+                proposalID: skillExecutionProposalID,
+                request: AcceptAgentSkillExecutionProposalRequest(workerId: "worker-1")
+            )
+        }
+        await waitForRequests(configured.api, path: configured.acceptPath, count: 1)
+
+        await configured.store.refreshChanges()
+        let response = await approval.value
+
+        XCTAssertNil(response)
+        XCTAssertTrue(configured.store.messages.isEmpty)
+        XCTAssertNil(configured.store.approvingSkillExecutionProposalID)
+        XCTAssertNil(configured.store.errorMessage)
+        configured.store.applicationDidEnterBackground()
+    }
+
+    @MainActor
+    func testArchivingChannelInvalidatesDelayedSkillApprovalResponse() async throws {
+        let archived = summary(
+            id: channelID,
+            name: "Briar",
+            archivedAt: Date(timeIntervalSince1970: 1_700_000_100)
+        )
+        let configured = try await skillExecutionProposalStore(
+            dashboardSnapshots: [executionDashboard(dispatched: false)],
+            approvalResponse: skillExecutionApprovalResponse(),
+            approvalDelay: .milliseconds(120),
+            delta: ChannelDeltaResponse(
+                cursor: 11,
+                hasMore: false,
+                channels: [archived],
+                removedChannelIds: [],
+                messages: [],
+                removedMessageIds: []
+            )
+        )
+        let approval = Task {
+            await configured.store.acceptSkillExecutionProposal(
+                channelID: channelID,
+                proposalID: skillExecutionProposalID,
+                request: AcceptAgentSkillExecutionProposalRequest(workerId: "worker-1")
+            )
+        }
+        await waitForRequests(configured.api, path: configured.acceptPath, count: 1)
+
+        await configured.store.refreshChanges()
+        let response = await approval.value
+
+        XCTAssertNil(response)
+        XCTAssertNotNil(configured.store.channels.first?.archivedAt)
+        XCTAssertEqual(
+            configured.store.messages.first?.skillExecutionProposal?.status,
+            .pending
+        )
+        XCTAssertNil(configured.store.approvingSkillExecutionProposalID)
+        configured.store.applicationDidEnterBackground()
+    }
+
     private func summary(
         id: UUID,
         name: String,
@@ -1377,8 +1798,10 @@ final class ChannelsStoreTests: XCTestCase {
         lastReplyAt: Date? = nil,
         createdAt: Date = Date(timeIntervalSince1970: 1_700_000_010),
         authorKind: ChannelMessage.Author.Kind = .user,
+        reactions: [ChannelMessageReaction] = [],
         proposal: ChannelMessage.Proposal? = nil,
-        executionProposal: IssueExecutionProposal? = nil
+        executionProposal: IssueExecutionProposal? = nil,
+        skillExecutionProposal: AgentSkillExecutionProposal? = nil
     ) -> ChannelMessage {
         ChannelMessage(
             id: id,
@@ -1391,11 +1814,13 @@ final class ChannelsStoreTests: XCTestCase {
                 image: nil,
                 provider: authorKind == .agent ? "codex" : nil
             ),
+            reactions: reactions,
             replyCount: replyCount,
             lastReplyAt: lastReplyAt,
             document: nil,
             proposal: proposal,
             executionProposal: executionProposal,
+            skillExecutionProposal: skillExecutionProposal,
             createdAt: createdAt
         )
     }
@@ -1420,6 +1845,74 @@ final class ChannelsStoreTests: XCTestCase {
             requestedWorkerId: status == .accepted ? "worker-1" : nil,
             delegatedByAgentId: UUID(uuidString: "66666666-6666-4666-8666-666666666666"),
             delegatedByAgentName: "Bumble"
+        )
+    }
+
+    private func skillExecutionProposal(
+        status: AgentSkillExecutionProposal.Status = .pending
+    ) -> AgentSkillExecutionProposal {
+        AgentSkillExecutionProposal(
+            id: skillExecutionProposalID,
+            status: status,
+            projectId: projectID,
+            agentId: UUID(uuidString: "66666666-6666-4666-8666-666666666666")!,
+            agentName: "Project Agent",
+            skillId: UUID(uuidString: "99999999-9999-4999-8999-999999999999")!,
+            skillName: "iOS 배포",
+            request: "TestFlight에 최신 빌드를 배포해 줘",
+            provider: .codex,
+            model: "gpt-5.6-sol",
+            effort: .high,
+            createdAt: Date(timeIntervalSince1970: 1_700_000_010),
+            acceptedAt: status == .accepted
+                ? Date(timeIntervalSince1970: 1_700_000_100)
+                : nil,
+            requestedWorkerId: status == .accepted ? "worker-1" : nil,
+            requestedWorkerLabel: status == .accepted ? "Build Mac" : nil,
+            resultSessionId: status == .accepted ? "session-1" : nil,
+            delegatedByAgentId: UUID(
+                uuidString: "77777777-7777-4777-8777-777777777777"
+            ),
+            delegatedByAgentName: "Bumble"
+        )
+    }
+
+    private func skillExecutionSession(id: String = "session-1") -> ProjectAgentSession {
+        ProjectAgentSession(
+            id: id,
+            projectId: projectID,
+            dispatchGroupId: nil,
+            agentId: UUID(uuidString: "66666666-6666-4666-8666-666666666666")!,
+            agentName: "Project Agent",
+            skillId: UUID(uuidString: "99999999-9999-4999-8999-999999999999")!,
+            sessionType: .task,
+            trigger: .manual,
+            scheduleId: nil,
+            scheduleRunId: nil,
+            parentSessionId: nil,
+            request: "TestFlight에 최신 빌드를 배포해 줘",
+            status: .running,
+            issues: [],
+            startedAt: Date(timeIntervalSince1970: 1_700_000_100),
+            completedAt: nil,
+            conversationId: nil,
+            workspaceRoot: nil,
+            requestedWorkerId: "worker-1",
+            workerId: "worker-1",
+            summary: nil,
+            error: nil,
+            events: nil,
+            updatedAt: Date(timeIntervalSince1970: 1_700_000_100)
+        )
+    }
+
+    private func skillExecutionApprovalResponse()
+        -> AcceptAgentSkillExecutionProposalResponse {
+        AcceptAgentSkillExecutionProposalResponse(
+            outcome: .accepted,
+            proposal: skillExecutionProposal(status: .accepted),
+            projectId: projectID,
+            session: skillExecutionSession()
         )
     }
 
@@ -1453,7 +1946,11 @@ final class ChannelsStoreTests: XCTestCase {
         )
     }
 
-    private func executionDashboard(dispatched: Bool) -> DashboardSnapshot {
+    private func executionDashboard(
+        dispatched: Bool,
+        workerReadiness: String = "available",
+        workerAcceptingWork: Bool = true
+    ) -> DashboardSnapshot {
         let project = ProjectsResponse.Project(
             id: projectID,
             name: "Target",
@@ -1485,8 +1982,8 @@ final class ChannelsStoreTests: XCTestCase {
                 label: "Build Mac",
                 agentProvider: .codex,
                 providers: [.codex],
-                readiness: "available",
-                acceptingWork: true,
+                readiness: workerReadiness,
+                acceptingWork: workerAcceptingWork,
                 readinessDetail: nil,
                 activeSessions: 0,
                 availableSessions: 1
@@ -1559,6 +2056,95 @@ final class ChannelsStoreTests: XCTestCase {
         let api = ChannelPollingAPI(
             routes: routes,
             delays: approvalDelay.map { [acceptPath: $0] } ?? [:]
+        )
+        let store = ChannelsStore(api: api, pollInterval: .seconds(3_600))
+        store.select(organizationID: organizationID, token: "token")
+        await waitForRequests(api, path: listPath, count: 1)
+        await waitForChannels(store, count: 1)
+        await store.openChannel(channelID)
+        return (store, api, dashboardPath, acceptPath)
+    }
+
+    @MainActor
+    private func skillExecutionProposalStore(
+        dashboardSnapshots: [DashboardSnapshot],
+        approvalResponse: AcceptAgentSkillExecutionProposalResponse? = nil,
+        approvalDelay: Duration? = nil,
+        dashboardDelay: Duration? = nil,
+        delta: ChannelDeltaResponse? = nil,
+        includeIssueExecutionProposal: Bool = false,
+        reactionResponses: [ToggleChannelMessageReactionResponse] = [],
+        reactionDelays: [Duration]? = nil
+    ) async throws -> (
+        store: ChannelsStore,
+        api: ChannelPollingAPI,
+        dashboardPath: String,
+        acceptPath: String
+    ) {
+        let channel = summary(id: channelID, name: "Briar")
+        let initialMessage = message(
+            id: rootID,
+            channelID: channelID,
+            body: "Skill execution proposal",
+            authorKind: .agent,
+            skillExecutionProposal: skillExecutionProposal()
+        )
+        let initialMessages = [initialMessage] + (includeIssueExecutionProposal
+            ? [message(
+                id: replyID,
+                channelID: channelID,
+                body: "Historical issue execution proposal",
+                authorKind: .agent,
+                executionProposal: executionProposal()
+            )]
+            : [])
+        let listPath = MobileAPIContract.Endpoint.channels(organizationID: organizationID)
+        let detailPath = MobileAPIContract.Endpoint.channel(
+            organizationID: organizationID,
+            channelID: channelID
+        )
+        let dashboardPath = MobileAPIContract.Endpoint.dashboard(projectID: projectID)
+        let acceptPath = MobileAPIContract.Endpoint.acceptChannelSkillExecutionProposal(
+            organizationID: organizationID,
+            channelID: channelID,
+            proposalID: skillExecutionProposalID
+        )
+        let reactionPath = MobileAPIContract.Endpoint.channelMessageReactions(
+            organizationID: organizationID,
+            channelID: channelID,
+            messageID: rootID
+        )
+        var routes: [String: [Data]] = [
+            listPath: [try encoded(ChannelsResponse(channels: [channel], cursor: 10))],
+            detailPath: [try encoded(ChannelDetailResponse(
+                channel: channel,
+                members: [],
+                agents: [],
+                messages: initialMessages
+            ))],
+            dashboardPath: try dashboardSnapshots.map { try encoded($0) },
+        ]
+        if let approvalResponse {
+            routes[acceptPath] = [try encoded(approvalResponse)]
+        }
+        if !reactionResponses.isEmpty {
+            routes[reactionPath] = try reactionResponses.map { try encoded($0) }
+        }
+        if let delta {
+            routes[MobileAPIContract.Endpoint.channelChanges(
+                organizationID: organizationID,
+                cursor: 10
+            )] = [try encoded(delta)]
+        }
+        let api = ChannelPollingAPI(
+            routes: routes,
+            delays: {
+                var configured: [String: Duration] = [:]
+                if let approvalDelay { configured[acceptPath] = approvalDelay }
+                if let dashboardDelay { configured[dashboardPath] = dashboardDelay }
+                return configured
+            }(),
+            requestDelays: reactionDelays.map { [reactionPath: $0] } ?? [:]
         )
         let store = ChannelsStore(api: api, pollInterval: .seconds(3_600))
         store.select(organizationID: organizationID, token: "token")
@@ -1740,6 +2326,7 @@ private actor ChannelPollingAPI: MobileAPIClientProtocol {
     private let delays: [String: Duration]
     private var requestDelays: [String: [Duration]]
     private var requests: [String] = []
+    private var JSONBodies: [String: [Data]] = [:]
 
     init(
         routes: [String: [Data]],
@@ -1757,6 +2344,10 @@ private actor ChannelPollingAPI: MobileAPIClientProtocol {
         requests.filter { $0 == path }.count
     }
 
+    func lastJSONBody(for path: String) -> Data? {
+        JSONBodies[path]?.last
+    }
+
     func send<Response: Decodable & Sendable>(
         _ path: String,
         method: String,
@@ -1765,6 +2356,11 @@ private actor ChannelPollingAPI: MobileAPIClientProtocol {
         as responseType: Response.Type
     ) async throws -> Response {
         requests.append(path)
+        if let body {
+            JSONBodies[path, default: []].append(
+                try JSONEncoder.mobileContract.encode(ChannelTestAnyEncodable(body))
+            )
+        }
         let data: Data
         if var queued = routes[path], !queued.isEmpty {
             data = queued.removeFirst()
@@ -1783,6 +2379,18 @@ private actor ChannelPollingAPI: MobileAPIClientProtocol {
             try await Task.sleep(for: delay)
         }
         return try JSONDecoder.mobileContract.decode(responseType, from: data)
+    }
+}
+
+private struct ChannelTestAnyEncodable: Encodable {
+    let value: any Encodable
+
+    init(_ value: any Encodable) {
+        self.value = value
+    }
+
+    func encode(to encoder: Encoder) throws {
+        try value.encode(to: encoder)
     }
 }
 

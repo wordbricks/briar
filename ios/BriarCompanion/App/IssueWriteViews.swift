@@ -682,6 +682,171 @@ struct ExecutionProposalApprovalSheet: View {
     }
 }
 
+/// Separate approval for an Agent-authored saved-Skill execution. Runtime
+/// fields are immutable evidence; the only user choice is one exact Worker.
+struct AgentSkillExecutionApprovalSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @State private var workerID: String?
+    @State private var submitting = false
+    @State private var completed = false
+    @State private var errorMessage: String?
+    @State private var presentationRevision = 0
+
+    let proposal: AgentSkillExecutionProposal
+    let workers: [DashboardWorker]
+    let policy: ProjectExecutionWorkerPolicy?
+    let locale: CompanionLocale
+    let approve: @MainActor (
+        AcceptAgentSkillExecutionProposalRequest
+    ) async throws -> Bool
+
+    private var eligibleWorkers: [DashboardWorker] {
+        eligibleExecutionWorkers(
+            workers: workers,
+            provider: proposal.provider,
+            policy: policy
+        )
+        .filter { $0.readiness == "available" }
+        .sorted {
+            $0.label.localizedCaseInsensitiveCompare($1.label) == .orderedAscending
+        }
+    }
+
+    private var runtimeLabel: String {
+        [
+            proposal.provider.displayName,
+            proposal.model,
+            proposal.effort?.rawValue,
+        ].compactMap { $0 }.joined(separator: " · ")
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section(L10n.text("Skill 실행 승인", locale: locale)) {
+                    LabeledContent("Agent", value: proposal.agentName)
+                    LabeledContent(L10n.text("Skill", locale: locale), value: proposal.skillName)
+                    LabeledContent(L10n.text("런타임", locale: locale), value: runtimeLabel)
+                    Text(
+                        L10n.text(
+                            "Agent, Skill, 요청과 런타임은 제안 시점의 읽기 전용 값입니다.",
+                            locale: locale
+                        )
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("skill-execution-immutable-notice")
+                }
+
+                Section(L10n.text("요청", locale: locale)) {
+                    Text(proposal.request)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("skill-execution-request")
+                }
+
+                if let delegatedBy = proposal.delegatedByAgentName {
+                    Section(L10n.text("위임", locale: locale)) {
+                        Label(
+                            L10n.format(
+                                "%@ Agent가 Project Agent에게 위임했습니다.",
+                                locale: locale,
+                                delegatedBy
+                            ),
+                            systemImage: "arrow.triangle.branch"
+                        )
+                    }
+                }
+
+                Section("Worker") {
+                    Picker(
+                        L10n.text("실행 Worker", locale: locale),
+                        selection: $workerID
+                    ) {
+                        Text(L10n.text("Worker 선택", locale: locale))
+                            .tag(String?.none)
+                        ForEach(eligibleWorkers) { worker in
+                            Text("\(worker.label) · \(worker.readiness)")
+                                .tag(String?.some(worker.id))
+                        }
+                    }
+                    .accessibilityIdentifier("skill-execution-worker")
+                    Text(
+                        L10n.text(
+                            "자동 선택 없이 정확한 Worker를 선택해야 실행할 수 있습니다.",
+                            locale: locale
+                        )
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+
+                if let errorMessage {
+                    Text(errorMessage)
+                        .foregroundStyle(.red)
+                        .accessibilityIdentifier("skill-execution-error")
+                }
+            }
+            .navigationTitle(L10n.text("Skill 실행 승인", locale: locale))
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(L10n.text("취소", locale: locale)) { dismiss() }
+                        .disabled(submitting)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button { Task { await submit() } } label: {
+                        if completed {
+                            Image(systemName: "checkmark").bold()
+                        } else if submitting {
+                            ProgressView()
+                        } else {
+                            Text(L10n.text("승인하고 실행", locale: locale))
+                        }
+                    }
+                    .disabled(submitting || completed || !canSubmit)
+                    .accessibilityIdentifier("skill-execution-approve")
+                }
+            }
+        }
+        .interactiveDismissDisabled(submitting)
+        .onDisappear { presentationRevision &+= 1 }
+    }
+
+    private var canSubmit: Bool {
+        guard let workerID else { return false }
+        return eligibleWorkers.contains(where: { $0.id == workerID })
+    }
+
+    @MainActor
+    private func submit() async {
+        guard !submitting, !completed,
+              let workerID,
+              eligibleWorkers.contains(where: { $0.id == workerID })
+        else { return }
+        let expectedRevision = presentationRevision
+        submitting = true
+        errorMessage = nil
+        do {
+            let accepted = try await approve(
+                AcceptAgentSkillExecutionProposalRequest(workerId: workerID)
+            )
+            guard expectedRevision == presentationRevision else { return }
+            guard accepted else {
+                submitting = false
+                return
+            }
+            completed = true
+            submitting = false
+            try? await Task.sleep(for: .milliseconds(350))
+            guard expectedRevision == presentationRevision else { return }
+            dismiss()
+        } catch {
+            guard expectedRevision == presentationRevision else { return }
+            submitting = false
+            errorMessage = error.localizedDescription
+        }
+    }
+}
+
 struct DispatchIssueSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var preferences: IssueExecutionPreferences

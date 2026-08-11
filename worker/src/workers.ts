@@ -948,6 +948,91 @@ export async function listExecutionWorkers(
   }));
 }
 
+/**
+ * Resolve one exact Worker for an approved saved-Skill task. This is a
+ * preflight for a helpful HTTP error; migration 0092 repeats every authority
+ * check in the atomic acceptance trigger so a concurrent change fails closed.
+ */
+export async function availableExecutionWorkerForAgentSkill(
+  db: D1Database,
+  input: {
+    organizationId: string;
+    projectId: string;
+    workerId: string;
+    provider: AgentProvider;
+    observedAt: string;
+  },
+) {
+  const worker = (await listExecutionWorkers(
+    db,
+    input.projectId,
+    input.observedAt,
+  )).find((candidate) => candidate.id === input.workerId);
+  if (!worker) {
+    throw new WorkerConflictError("Worker not found for this project");
+  }
+  const device = await db
+    .prepare(
+      `select device.organization_id, device.owner_user_id, device.state,
+              device.last_heartbeat_at,
+              exists (
+                select 1 from briar_organization_members membership
+                where membership.organization_id = device.organization_id
+                  and membership.user_id = device.owner_user_id
+              ) as owner_is_member
+       from briar_execution_worker_devices device
+       where device.id = ?`,
+    )
+    .bind(worker.device_id)
+    .first<{
+      organization_id: string;
+      owner_user_id: string;
+      state: ExecutionWorkerState;
+      last_heartbeat_at: string;
+      owner_is_member: number;
+    }>();
+  if (device?.organization_id !== input.organizationId) {
+    throw new WorkerConflictError("Worker is outside this organization");
+  }
+  if (device.owner_is_member !== 1) {
+    throw new WorkerConflictError(
+      "Worker owner is not a member of this organization",
+    );
+  }
+  if (
+    workerStateAt(device.last_heartbeat_at, input.observedAt, device.state) !==
+      "online"
+  ) {
+    throw new WorkerConflictError("Worker device is not online");
+  }
+  if (
+    worker.state !== "online" || worker.accepting_work !== 1 ||
+    worker.readiness_state === "needs_attention"
+  ) {
+    throw new WorkerConflictError("Worker is not ready to accept Agent tasks");
+  }
+  if (!executionWorkerProviders(worker).includes(input.provider)) {
+    throw new WorkerConflictError(
+      `Worker does not support the ${input.provider} provider`,
+    );
+  }
+  if (!(await isExecutionWorkerAllowedForProject(
+    db,
+    input.projectId,
+    worker.id,
+  ))) {
+    throw new WorkerConflictError(
+      "Worker is not allowed by this project's execution policy",
+    );
+  }
+  if (
+    (worker.active_sessions ?? 0) >= (worker.max_concurrent_sessions ?? 1)
+  ) {
+    throw new WorkerConflictError("Worker has no available execution slot");
+  }
+  return worker;
+}
+
 export async function listOrganizationExecutionWorkers(
   db: D1Database,
   organizationId: string,
@@ -1224,6 +1309,13 @@ export async function updateProjectExecutionWorkerPolicy(
       "The default Worker must be in the allowlist",
     );
   }
+  const skillExecutionApprovalsAvailable = Boolean(await db
+    .prepare(
+      `select 1 as available
+       from pragma_table_info('briar_project_agent_task_jobs')
+       where name = 'skill_execution_proposal_id'`,
+    )
+    .first<{ available: number }>());
   await db.batch([
     db
       .prepare(
@@ -1260,6 +1352,33 @@ export async function updateProjectExecutionWorkerPolicy(
         )
         .bind(projectId, workerId, input.observedAt),
     ),
+    ...(skillExecutionApprovalsAvailable
+      ? [db
+          .prepare(
+            `update briar_project_agent_task_jobs
+             set status = 'failed',
+                 error = 'Approved Worker was removed from the project allowlist.',
+                 claim_token_hash = null, claimed_worker_id = null,
+                 claimed_at = null, lease_expires_at = null,
+                 completed_at = ?, updated_at = ?
+             where project_id = ? and status in ('queued', 'running')
+               and skill_execution_proposal_id is not null
+               and ? = 'allowlist'
+               and not exists (
+                 select 1
+                 from briar_project_execution_worker_allowlist allowed
+                 where allowed.project_id = briar_project_agent_task_jobs.project_id
+                   and allowed.worker_id =
+                     briar_project_agent_task_jobs.preferred_worker_id
+               )`,
+          )
+          .bind(
+            input.observedAt,
+            input.observedAt,
+            projectId,
+            input.selectionMode,
+          )]
+      : []),
   ]);
   return getProjectExecutionWorkerPolicy(db, projectId);
 }
@@ -2001,7 +2120,7 @@ export async function listExecutionAuditEvents(
   return result.results ?? [];
 }
 
-/** Return the number of live run leases held across every project binding. */
+/** Return all live Hunt and Project Agent task leases on one device. */
 export async function countExecutionWorkerDeviceSessions(
   db: D1Database,
   deviceId: string,
@@ -2009,18 +2128,27 @@ export async function countExecutionWorkerDeviceSessions(
 ) {
   const row = await db
     .prepare(
-      `select count(*) as active_sessions
-       from briar_hunt_runs run
-       join briar_execution_workers worker on worker.id = run.worker_id
-       where worker.device_id = ?
-         and run.claim_token_hash is not null
-         and run.lease_expires_at is not null
-         and run.lease_expires_at > ?
-         and run.status not in (
-           'backlog', 'completed', 'cancelled', 'blocked', 'failed'
-         )`,
+      `select count(*) as active_sessions from (
+         select run.id
+         from briar_hunt_runs run
+         join briar_execution_workers worker on worker.id = run.worker_id
+         where worker.device_id = ?
+           and run.claim_token_hash is not null
+           and run.lease_expires_at is not null
+           and run.lease_expires_at > ?
+           and run.status not in (
+             'backlog', 'completed', 'cancelled', 'blocked', 'failed'
+           )
+         union all
+         select task.id
+         from briar_project_agent_task_jobs task
+         join briar_execution_workers worker
+           on worker.id = task.claimed_worker_id
+         where worker.device_id = ? and task.status = 'running'
+           and task.lease_expires_at > ?
+       ) active_work`,
     )
-    .bind(deviceId, observedAt)
+    .bind(deviceId, observedAt, deviceId, observedAt)
     .first<{ active_sessions: number }>();
   return row?.active_sessions ?? 0;
 }

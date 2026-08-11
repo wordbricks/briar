@@ -443,6 +443,9 @@ struct IssueMessage: Codable, Equatable, Identifiable, Sendable {
     /// Kept separate so an accepted create proposal and its pending execution
     /// follow-up can be rendered together without collapsing either approval.
     var executionProposal: IssueExecutionProposal? = nil
+    /// Saved-Skill execution is a separate, mutually exclusive reply action.
+    /// It remains independent from historical issue proposal messages.
+    var skillExecutionProposal: AgentSkillExecutionProposal? = nil
     let createdAt: Date
     let updatedAt: Date
 
