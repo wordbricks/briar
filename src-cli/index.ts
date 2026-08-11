@@ -130,7 +130,6 @@ import {
   hydrateOrganizationAgentContext,
   prepareOrganizationAgentWorkspace,
 } from "./organization-agent-context";
-import { prepareReadOnlyAgentEnvironment } from "./read-only-agent-environment";
 import {
   healthyWorkerProviders,
   inspectWorkerProviderHealth,
@@ -2771,9 +2770,9 @@ async function runClaimedIssueReply(
     (message) => message.id === issue.triggerMessageId,
   );
   if (!trigger) throw new Error("Mention message is missing from the reply snapshot");
-  // Conversational reads use a detached checkout that never copies ignored
-  // files such as .env.keys from .worktreeinclude. Existing execution
-  // worktrees can contain credentials and are therefore never model context.
+  // Conversational execution uses a detached checkout so local mutations do
+  // not affect a durable issue branch. The checkout receives the same
+  // .worktreeinclude inputs and execution permissions as a project Worker.
   const analysisWorktree = await allocateAnalysisWorktree({
     repositoryPath: project.repositoryPath,
     projectId: project.id,
@@ -2864,18 +2863,19 @@ async function runClaimedIssueReply(
       skillExecutionTarget: issue.skillExecutionTarget,
     });
     let sequence = 0;
-    const providerRuntime = await prepareReadOnlyAgentEnvironment(
-      agent.provider,
-      { workspaceRoot: workspacePath },
-    );
     const turn = await runDetachedProviderTurn({
       agent,
       prompt,
       workspacePath,
-      fullAccess: false,
-      readOnly: true,
+      fullAccess: project.autoHunt?.sandbox?.fullAccess ?? true,
       attachments,
-      environment: providerRuntime.environment,
+      environment: {
+        ...process.env,
+        PATH: workerExecutionPath(),
+        BRIAR_CLI: workerCliPath(),
+        BRIAR_WORKER_TOKEN: workerToken,
+        BRIAR_PROJECT_ID: project.id,
+      },
       signal,
       onPayload: async (payload, line) => {
         sequence += 1;
@@ -2899,8 +2899,7 @@ async function runClaimedIssueReply(
           }
         }
       },
-    })
-      .finally(providerRuntime.cleanup);
+    });
     assertDetachedProviderTurnSucceeded(turn);
     if (!turn.resultText) throw new Error("Agent returned an empty issue reply");
     const result = parseDetachedIssueReplyResult(turn.resultText, {
@@ -3073,80 +3072,77 @@ async function runClaimedChannelReply(
       delegation: reply.delegation,
       skillExecutionTarget: reply.skillExecutionTarget,
     });
-    const providerRuntime = await prepareReadOnlyAgentEnvironment(
-      agent.provider,
-      { workspaceRoot: workspacePath },
-    );
     let conversationId: string | null = null;
     let lookupRounds = 0;
     let turnPrompt = prompt;
     let result: z.infer<typeof channelReplyCompletionSchema> | null = null;
-    try {
-      while (!result) {
-        const turn = await runDetachedProviderTurn({
-          agent,
-          prompt: turnPrompt,
-          workspacePath,
-          fullAccess: false,
-          readOnly: true,
-          conversationId,
-          attachments: lookupRounds === 0
-            ? downloadedImages.attachments
-            : undefined,
-          organizationContextManifestPath:
-            organizationContext?.manifestPath ?? null,
-          delegationTargets: reply.scope.kind === "organization"
-            ? reply.delegationTargets
-            : undefined,
-          environment: providerRuntime.environment,
-          signal,
-        });
-        assertDetachedProviderTurnSucceeded(turn);
-        if (!turn.resultText) {
-          throw new Error("Agent returned an empty channel reply");
-        }
-        const parsed = parseDetachedJsonResult(turn.resultText);
-        const lookup = organizationAgentContextRequestTurnSchema.safeParse(
-          parsed,
-        );
-        if (!lookup.success) {
-          result = channelReplyCompletionSchema.parse(parsed);
-          break;
-        }
-        if (!organizationContext) {
-          throw new Error(
-            "Project reply cannot request organization context",
-          );
-        }
-        if (lookupRounds >= 3) {
-          throw new Error("Organization Agent context lookup limit exceeded");
-        }
-        const hydrated = await hydrateOrganizationAgentContext({
-          apiUrl: config.apiUrl,
-          workerToken,
-          organizationId: reply.organizationId,
-          workId: reply.workId,
-          workerId: registered.workerId,
-          claimToken: reply.claimToken,
-          snapshotAt: reply.organizationContext!.snapshotAt,
-          workspacePath,
-          requests: lookup.data.contextRequests,
-          signal,
-        });
-        if (hydrated.loaded === 0) {
-          throw new Error("Organization Agent repeated a loaded context query");
-        }
-        lookupRounds += 1;
-        conversationId = turn.conversationId;
-        const continuation = [
-          `Briar loaded ${hydrated.loaded} requested organization context file(s).`,
-          `Re-read the manifest at ${JSON.stringify(hydrated.manifestPath)} and the newly referenced lookup files.`,
-          "Use those facts to continue. Request another smallest-possible lookup only if essential; otherwise return the normal channel reply JSON now.",
-        ].join("\n\n");
-        turnPrompt = conversationId ? continuation : `${prompt}\n\n${continuation}`;
+    while (!result) {
+      const turn = await runDetachedProviderTurn({
+        agent,
+        prompt: turnPrompt,
+        workspacePath,
+        fullAccess: project.autoHunt?.sandbox?.fullAccess ?? true,
+        conversationId,
+        attachments: lookupRounds === 0
+          ? downloadedImages.attachments
+          : undefined,
+        organizationContextManifestPath:
+          organizationContext?.manifestPath ?? null,
+        delegationTargets: reply.scope.kind === "organization"
+          ? reply.delegationTargets
+          : undefined,
+        environment: {
+          ...process.env,
+          PATH: workerExecutionPath(),
+          BRIAR_CLI: workerCliPath(),
+          BRIAR_WORKER_TOKEN: workerToken,
+          BRIAR_PROJECT_ID: project.id,
+        },
+        signal,
+      });
+      assertDetachedProviderTurnSucceeded(turn);
+      if (!turn.resultText) {
+        throw new Error("Agent returned an empty channel reply");
       }
-    } finally {
-      await providerRuntime.cleanup();
+      const parsed = parseDetachedJsonResult(turn.resultText);
+      const lookup = organizationAgentContextRequestTurnSchema.safeParse(
+        parsed,
+      );
+      if (!lookup.success) {
+        result = channelReplyCompletionSchema.parse(parsed);
+        break;
+      }
+      if (!organizationContext) {
+        throw new Error(
+          "Project reply cannot request organization context",
+        );
+      }
+      if (lookupRounds >= 3) {
+        throw new Error("Organization Agent context lookup limit exceeded");
+      }
+      const hydrated = await hydrateOrganizationAgentContext({
+        apiUrl: config.apiUrl,
+        workerToken,
+        organizationId: reply.organizationId,
+        workId: reply.workId,
+        workerId: registered.workerId,
+        claimToken: reply.claimToken,
+        snapshotAt: reply.organizationContext!.snapshotAt,
+        workspacePath,
+        requests: lookup.data.contextRequests,
+        signal,
+      });
+      if (hydrated.loaded === 0) {
+        throw new Error("Organization Agent repeated a loaded context query");
+      }
+      lookupRounds += 1;
+      conversationId = turn.conversationId;
+      const continuation = [
+        `Briar loaded ${hydrated.loaded} requested organization context file(s).`,
+        `Re-read the manifest at ${JSON.stringify(hydrated.manifestPath)} and the newly referenced lookup files.`,
+        "Use those facts to continue. Request another smallest-possible lookup only if essential; otherwise return the normal channel reply JSON now.",
+      ].join("\n\n");
+      turnPrompt = conversationId ? continuation : `${prompt}\n\n${continuation}`;
     }
     if (!result) throw new Error("Agent returned no channel reply");
     if (result.skillExecutionProposal && !reply.skillExecutionTarget) {

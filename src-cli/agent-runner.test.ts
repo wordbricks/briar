@@ -454,7 +454,7 @@ describe("detached Agent runner", () => {
       },
     });
     expect(delegatedProjectPrompt).toContain(
-      "This non-mutating conversational turn was delegated by Organization Lead",
+      "This conversational turn was delegated by Organization Lead",
     );
     expect(delegatedProjectPrompt).toContain(
       "Which module owns authentication?",
@@ -632,7 +632,7 @@ describe("detached Agent runner", () => {
     });
   });
 
-  it("answers issue mentions read-only even without the issue worktree", () => {
+  it("gives issue conversations the full Worker execution profile", () => {
     const prompt = detachedIssueReplyPrompt({
       agent,
       snapshot: {
@@ -646,8 +646,7 @@ describe("detached Agent runner", () => {
       agent,
       prompt,
       workspacePath: "/connected-repository",
-      fullAccess: false,
-      readOnly: true,
+      fullAccess: true,
       agentBinary: "/bin/codex",
     });
 
@@ -660,8 +659,9 @@ describe("detached Agent runner", () => {
     expect(prompt).toContain("confirmation button");
     expect(launch.kind).toBe("runner");
     expect(launch.request).toMatchObject({
-      sandboxMode: "readOnly",
-      networkAccess: false,
+      sandboxMode: "dangerFullAccess",
+      networkAccess: true,
+      externalTools: true,
       codexBinary: "/bin/codex",
     });
   });

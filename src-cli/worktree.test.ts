@@ -511,7 +511,7 @@ describe("allocation", () => {
   });
 });
 
-describe("read-only analysis allocation", () => {
+describe("conversation worktree allocation", () => {
   it("uses a detached latest-remote checkout and removes it without a branch", async () => {
     const root = await temporaryDirectory("briar-analysis-root-");
     const { git, calls } = fakeGit((gitArgs) => {
@@ -533,7 +533,11 @@ describe("read-only analysis allocation", () => {
     expect(worktree.path).toBe(
       join(root, "project-1", "analysis", "analysis-abababab-abab-4bab-8bab-abababababab"),
     );
-    expect(worktree).toMatchObject({ baseRef: "origin/main", baseSha: "base-sha" });
+    expect(worktree).toMatchObject({
+      baseRef: "origin/main",
+      baseSha: "base-sha",
+      includedPaths: [],
+    });
     expect(calls).toContainEqual([
       "worktree", "add", "--detach", worktree.path, "refs/remotes/origin/main",
     ]);
@@ -541,6 +545,36 @@ describe("read-only analysis allocation", () => {
 
     await removeAnalysisWorktree({ repositoryPath: "/repo", path: worktree.path, git });
     expect(calls).toContainEqual(["worktree", "remove", "--force", worktree.path]);
+  });
+
+  it("copies .worktreeinclude inputs into the disposable checkout", async () => {
+    const repository = await temporaryDirectory("briar-conversation-repo-");
+    const root = await temporaryDirectory("briar-conversation-root-");
+    await writeFile(join(repository, ".worktreeinclude"), ".env.keys\n");
+    await writeFile(join(repository, ".env.keys"), "DOTENV_PRIVATE_KEY=abc");
+    const { git } = fakeGit((gitArgs) => {
+      if (gitArgs[0] === "remote") return ok("origin\n");
+      if (gitArgs[0] === "symbolic-ref") return ok("refs/remotes/origin/main\n");
+      if (gitArgs[0] === "rev-parse" && gitArgs[1] === "--verify") {
+        return ok("base-sha\n");
+      }
+      if (gitArgs[0] === "rev-parse") return ok("base-sha\n");
+      if (gitArgs[0] === "-c") return ok();
+      return ok();
+    });
+
+    const worktree = await allocateAnalysisWorktree({
+      repositoryPath: repository,
+      projectId: "project-1",
+      workId: "cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd",
+      settings: { root, branchPrefix: "unused" },
+      git,
+    });
+
+    expect(worktree.includedPaths).toEqual([".env.keys"]);
+    expect(await readFile(join(worktree.path, ".env.keys"), "utf8")).toBe(
+      "DOTENV_PRIVATE_KEY=abc",
+    );
   });
 });
 
