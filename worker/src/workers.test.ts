@@ -55,6 +55,7 @@ import {
   updateProjectExecutionWorkerPolicy,
   WorkerConflictError,
   workerStateAt,
+  WORKER_CREDENTIAL_TOUCH_INTERVAL_MS,
 } from "./workers";
 import { applyD1Migrations, executeD1Sql } from "./test-helpers/d1";
 
@@ -962,6 +963,31 @@ describe("detached execution workers", () => {
     await expect(
       authenticateExecutionWorker(db, fingerprint("token-a"), atMinute(6)),
     ).resolves.toBeNull();
+  });
+
+  it("coalesces credential usage writes into five-minute buckets", async () => {
+    const tokenHash = fingerprint("credential-touch-token");
+    const registered = await register("credential-touch", 1, tokenHash);
+    const lastUsedAt = async () =>
+      (await db.prepare(
+        `select last_used_at from briar_execution_worker_credentials
+         where device_id = ?`,
+      ).bind(registered.device.id).first<{ last_used_at: string | null }>())
+        ?.last_used_at ?? null;
+
+    expect(WORKER_CREDENTIAL_TOUCH_INTERVAL_MS).toBe(5 * 60_000);
+    expect(await lastUsedAt()).toBeNull();
+    await expect(
+      authenticateExecutionWorker(db, tokenHash, atMinute(2)),
+    ).resolves.toMatchObject({ deviceId: registered.device.id });
+    expect(await lastUsedAt()).toBe(atMinute(2));
+
+    await authenticateExecutionWorker(db, tokenHash, atMinute(3));
+    await authenticateExecutionWorker(db, tokenHash, atMinute(6));
+    expect(await lastUsedAt()).toBe(atMinute(2));
+
+    await authenticateExecutionWorker(db, tokenHash, atMinute(7));
+    expect(await lastUsedAt()).toBe(atMinute(7));
   });
 
   it("binds an enrolled device to another project without rotating its credential", async () => {
