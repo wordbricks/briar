@@ -26,6 +26,7 @@ import {
   deleteProjectAgentSchedule,
   loadDashboard,
   loadDashboardDelta,
+  loadInboxFeed,
   loadStatusTrayRuns,
   loadAgentUsageReport,
   loadAgentUsageRuns,
@@ -1184,6 +1185,26 @@ describe("API errors", () => {
     });
     expect(String(fetchMock.mock.calls[0]?.[0])).toContain(
       `/projects/${projectId}/agent-sessions/changes?cursor=7`,
+    );
+  });
+
+  it("uses the organization Inbox ETag for unchanged polls", async () => {
+    const organizationId = "22222222-2222-4222-8222-222222222222";
+    const etag = `W/"organization-inbox:${organizationId}:7"`;
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      expect(new Headers(init?.headers).get("If-None-Match")).toBe(etag);
+      return new Response(null, { status: 304, headers: { ETag: etag } });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(loadInboxFeed("token", organizationId, { etag }))
+      .resolves.toEqual({
+        state: { etag },
+        notModified: true,
+        messages: [],
+      });
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain(
+      `/organizations/${organizationId}/inbox`,
     );
   });
 

@@ -16,6 +16,7 @@ final class InboxStore: ObservableObject {
     private var syncTask: Task<Void, Never>?
     private var feedRefreshTask: Task<Void, Never>?
     private var feedPollingTask: Task<Void, Never>?
+    private var feedETag: String?
     private var accountGeneration: UInt64 = 0
     private var feedGeneration: UInt64 = 0
     private var syncRequestGeneration: UInt64 = 0
@@ -73,6 +74,7 @@ final class InboxStore: ObservableObject {
         feedPollingTask?.cancel()
         feedRefreshTask = nil
         feedPollingTask = nil
+        feedETag = nil
         self.organizationID = organizationID
         feedReady = false
         let accountScope = self.userID ?? "signed-out"
@@ -173,9 +175,10 @@ final class InboxStore: ObservableObject {
         let task = Task { [weak self] in
             guard let self else { return }
             do {
-                let response: InboxFeedResponse = try await api.get(
+                let result = try await api.conditionalGet(
                     MobileAPIContract.Endpoint.inbox(organizationID: organizationID),
                     token: token,
+                    eTag: self.feedETag,
                     as: InboxFeedResponse.self
                 )
                 guard
@@ -184,8 +187,16 @@ final class InboxStore: ObservableObject {
                     self.token == token,
                     self.organizationID == organizationID
                 else { return }
+                self.feedETag = result.eTag
                 self.notificationBaselineID =
                     "\(userID):\(organizationID.uuidString.lowercased()):feed"
+                if result.notModified {
+                    self.feedReady = true
+                    return
+                }
+                guard let response = result.value else {
+                    throw MobileAPIError.invalidResponse
+                }
                 let storedByID = Dictionary(
                     uniqueKeysWithValues: self.messages.map { ($0.id, $0) }
                 )

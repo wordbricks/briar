@@ -136,10 +136,29 @@
         "responses": {
           "200": {
             "description": "Selection-independent inbox feed for every project in the organization",
+            "headers": {
+              "ETag": {
+                "description": "Opaque organization Inbox revision for conditional refreshes",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/InboxFeedResponse"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "The organization Inbox revision has not changed",
+            "headers": {
+              "ETag": {
+                "description": "Current opaque organization Inbox revision",
+                "schema": {
+                  "type": "string"
                 }
               }
             }

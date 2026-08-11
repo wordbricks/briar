@@ -102,7 +102,11 @@ async function flushPromises() {
 describe("useInbox read-state synchronization", () => {
   beforeEach(() => {
     window.localStorage.clear();
-    mockedLoadInboxFeed.mockReset().mockResolvedValue([]);
+    mockedLoadInboxFeed.mockReset().mockResolvedValue({
+      state: { etag: 'W/"organization-inbox:org:0"' },
+      notModified: false,
+      messages: [],
+    });
     mockedLoadInboxReadStates.mockReset().mockResolvedValue({});
     mockedSaveInboxReadStates.mockReset().mockResolvedValue({});
     container = document.createElement("div");
@@ -120,21 +124,25 @@ describe("useInbox read-state synchronization", () => {
       id: "22222222-2222-4222-8222-222222222222",
       name: "Second project",
     };
-    mockedLoadInboxFeed.mockResolvedValue([{
-      id: "issue:bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
-      kind: "issue",
-      projectId: secondProject.id,
-      projectName: secondProject.name,
-      targetId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
-      title: "Needs attention in the second project",
-      occurredAt: "2026-08-11T00:00:02.000Z",
-      version: "1:1:blocked:implementing:2026-08-11T00:00:02.000Z:2",
-      runNumber: 2,
-      status: "blocked",
-      workflowStage: "implementing",
-      priority: 1,
-      structuredResult: null,
-    }]);
+    mockedLoadInboxFeed.mockResolvedValue({
+      state: { etag: 'W/"organization-inbox:org:1"' },
+      notModified: false,
+      messages: [{
+        id: "issue:bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        kind: "issue",
+        projectId: secondProject.id,
+        projectName: secondProject.name,
+        targetId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        title: "Needs attention in the second project",
+        occurredAt: "2026-08-11T00:00:02.000Z",
+        version: "1:1:blocked:implementing:2026-08-11T00:00:02.000Z:2",
+        runNumber: 2,
+        status: "blocked",
+        workflowStage: "implementing",
+        priority: 1,
+        structuredResult: null,
+      }],
+    });
 
     await renderHarness({
       dashboard,
@@ -147,6 +155,7 @@ describe("useInbox read-state synchronization", () => {
     expect(mockedLoadInboxFeed).toHaveBeenCalledWith(
       "token-a",
       dashboard.project.organizationId,
+      null,
       expect.any(AbortSignal),
     );
     expect(inbox.messages).toEqual(expect.arrayContaining([
@@ -235,10 +244,43 @@ describe("useInbox read-state synchronization", () => {
     });
     const selectedMessage = inbox.messages[0]!;
 
-    feed.resolve([{ ...selectedMessage, title: "Compact feed title" }]);
+    feed.resolve({
+      state: { etag: 'W/"organization-inbox:org:1"' },
+      notModified: false,
+      messages: [{ ...selectedMessage, title: "Compact feed title" }],
+    });
     await flushPromises();
 
     expect(inbox.messages[0]?.title).toBe(selectedMessage.title);
+  });
+
+  it("reuses the organization Inbox ETag after reconnecting", async () => {
+    const etag = 'W/"organization-inbox:org:7"';
+    mockedLoadInboxFeed
+      .mockResolvedValueOnce({
+        state: { etag },
+        notModified: false,
+        messages: [],
+      })
+      .mockResolvedValueOnce({
+        state: { etag },
+        notModified: true,
+        messages: [],
+      });
+
+    const dashboard = dashboardAt(1);
+    await renderHarness({ dashboard, token: "token-a", userId: "user-a" });
+    await flushPromises();
+    await act(async () => window.dispatchEvent(new Event("online")));
+    await flushPromises();
+
+    expect(mockedLoadInboxFeed).toHaveBeenNthCalledWith(
+      2,
+      "token-a",
+      dashboard.project.organizationId,
+      { etag },
+      expect.any(AbortSignal),
+    );
   });
 
   it("refreshes account read state when the app regains focus", async () => {

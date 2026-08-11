@@ -483,17 +483,54 @@ export async function loadSession(token: string): Promise<SessionUser> {
 
 const inboxReadVersionsSchema = z.record(z.string().min(1), z.string().min(1));
 
+export type InboxFeedSyncState = {
+  etag: string | null;
+};
+
+export type InboxFeedSyncResult = {
+  state: InboxFeedSyncState;
+  notModified: boolean;
+  messages: InboxMessage[];
+};
+
 export async function loadInboxFeed(
   token: string,
   organizationId: string,
+  state: InboxFeedSyncState | null = null,
   signal?: AbortSignal,
-): Promise<InboxMessage[]> {
-  const result = await request<{ messages?: InboxMessage[] }>(
-    `/organizations/${encodeURIComponent(organizationId)}/inbox`,
-    token,
-    { signal },
+): Promise<InboxFeedSyncResult> {
+  if (!apiUrl) throw new Error("Briar API URL이 설정되지 않았습니다.");
+  const headers = new Headers({
+    Accept: "application/json",
+    Authorization: `Bearer ${token}`,
+  });
+  if (state?.etag) headers.set("If-None-Match", state.etag);
+  const response = await fetch(
+    `${apiUrl}/organizations/${encodeURIComponent(organizationId)}/inbox`,
+    { headers, signal },
   );
-  return Array.isArray(result.messages) ? result.messages : [];
+  if (response.status === 304 && state) {
+    return {
+      state: { etag: response.headers.get("ETag") ?? state.etag },
+      notModified: true,
+      messages: [],
+    };
+  }
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new ApiError(
+      response.status,
+      body?.message ?? `Briar API 요청 실패 (${response.status})`,
+      body?.code,
+      Array.isArray(body?.issues) ? body.issues : undefined,
+    );
+  }
+  const result = await response.json() as { messages?: InboxMessage[] };
+  return {
+    state: { etag: response.headers.get("ETag") },
+    notModified: false,
+    messages: Array.isArray(result.messages) ? result.messages : [],
+  };
 }
 
 export async function loadInboxReadStates(

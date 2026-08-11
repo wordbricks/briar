@@ -182,6 +182,7 @@ describe("D1 migrations", () => {
     "0091_issue_execution_approvals.sql",
     "0092_agent_skill_execution_approvals.sql",
     "0093_project_agent_session_sync.sql",
+    "0095_organization_inbox_sync.sql",
   ])("keeps each trigger in a separate Wrangler statement: %s", async (name) => {
     const sql = await readFile(resolve("migrations", name), "utf8");
     const statements = unstable_splitSqlQuery(sql);
@@ -191,6 +192,96 @@ describe("D1 migrations", () => {
 
     expect(Math.max(...triggerCounts)).toBeLessThanOrEqual(1);
     expect(triggerCounts.filter((count) => count === 1)).not.toHaveLength(0);
+  });
+
+  it("advances one organization Inbox revision for every feed source", async () => {
+    const miniflare = new Miniflare({
+      modules: true,
+      script: "export default { fetch() { return new Response('ok') } }",
+      d1Databases: { DB: "briar-organization-inbox-sync-migration-test" },
+    });
+    try {
+      const db = (await miniflare.getD1Database("DB")) as unknown as D1Database;
+      await applyD1Migrations(db);
+      const userId = "inbox-sync-user";
+      const organizationId = "91000000-0000-4000-8000-000000000001";
+      const projectId = "92000000-0000-4000-8000-000000000001";
+      const channelId = "93000000-0000-4000-8000-000000000001";
+      const now = "2026-08-12T00:00:00.000Z";
+
+      await db.prepare(
+        `insert into "user" (id, name, email, emailVerified, createdAt, updatedAt)
+         values (?, 'Inbox User', 'inbox-sync@example.com', 1, ?, ?)`,
+      ).bind(userId, now, now).run();
+      await db.prepare(
+        `insert into briar_organizations (
+           id, name, handle, created_at, updated_at
+         ) values (?, 'Inbox Org', 'inbox-org', ?, ?)`,
+      ).bind(organizationId, now, now).run();
+      await db.prepare(
+        `insert into briar_organization_members (
+           organization_id, user_id, role, created_at, updated_at
+         ) values (?, ?, 'owner', ?, ?)`,
+      ).bind(organizationId, userId, now, now).run();
+      await db.prepare(
+        `insert into briar_projects (
+           id, owner_user_id, organization_id, name, agent_token_hash,
+           created_at, updated_at
+         ) values (?, ?, ?, 'Inbox Project', ?, ?, ?)`,
+      ).bind(
+        projectId,
+        userId,
+        organizationId,
+        "9".repeat(64),
+        now,
+        now,
+      ).run();
+
+      const version = async () =>
+        (await db.prepare(
+          `select current_version
+           from briar_organization_inbox_sync_state
+           where organization_id = ?`,
+        ).bind(organizationId).first<{ current_version: number }>())
+          ?.current_version ?? 0;
+
+      expect(await version()).toBe(1);
+      await db.prepare(
+        `insert into briar_dashboard_sync_state (project_id, current_version)
+         values (?, 1)`,
+      ).bind(projectId).run();
+      expect(await version()).toBe(2);
+
+      await db.prepare(
+        `insert into briar_project_agent_session_sync_state (
+           project_id, current_version
+         ) values (?, 1)`,
+      ).bind(projectId).run();
+      expect(await version()).toBe(3);
+
+      await db.prepare(
+        `insert into briar_channels (
+           id, organization_id, slug, name, visibility,
+           created_by_user_id, created_at, updated_at
+         ) values (?, ?, 'inbox', 'Inbox', 'private', ?, ?, ?)`,
+      ).bind(channelId, organizationId, userId, now, now).run();
+      expect(await version()).toBe(4);
+
+      await db.prepare(
+        `insert into briar_channel_members (
+           channel_id, user_id, role, created_at
+         ) values (?, ?, 'owner', ?)`,
+      ).bind(channelId, userId, now).run();
+      expect(await version()).toBe(5);
+
+      await db.prepare(
+        `update "user" set name = 'Renamed Inbox User', updatedAt = ?
+         where id = ?`,
+      ).bind("2026-08-12T00:01:00.000Z", userId).run();
+      expect(await version()).toBe(6);
+    } finally {
+      await miniflare.dispose();
+    }
   });
 
   it("only finalizes a canonical reserved channel issue run", async () => {
