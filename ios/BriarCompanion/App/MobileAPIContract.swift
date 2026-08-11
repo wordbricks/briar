@@ -394,6 +394,19 @@ protocol MobileAPIClientProtocol: Sendable {
     ) async throws -> Response
 
     func download(_ path: String, token: String, to destination: URL) async throws -> URL
+
+    func conditionalGet<Response: Decodable & Sendable>(
+        _ path: String,
+        token: String,
+        eTag: String?,
+        as responseType: Response.Type
+    ) async throws -> ConditionalGETResponse<Response>
+}
+
+struct ConditionalGETResponse<Value: Sendable>: Sendable {
+    let value: Value?
+    let eTag: String?
+    let notModified: Bool
 }
 
 struct ChannelRealtimeNotification: Codable, Equatable, Sendable {
@@ -445,6 +458,19 @@ extension MobileAPIClientProtocol {
     func download(_ path: String, token: String, to destination: URL) async throws -> URL {
         throw MobileAPIError.invalidDownload
     }
+
+    func conditionalGet<Response: Decodable & Sendable>(
+        _ path: String,
+        token: String,
+        eTag: String?,
+        as responseType: Response.Type = Response.self
+    ) async throws -> ConditionalGETResponse<Response> {
+        ConditionalGETResponse(
+            value: try await get(path, token: token, as: responseType),
+            eTag: nil,
+            notModified: false
+        )
+    }
 }
 
 private struct EmptyAPIResponse: Decodable, Sendable {}
@@ -493,6 +519,40 @@ struct MobileAPIClient: MobileAPIClientProtocol, MobileRealtimeClientProtocol, S
         body: (any Encodable & Sendable)?
     ) async throws {
         _ = try await sendData(path, method: method, token: token, body: body)
+    }
+
+    func conditionalGet<Response: Decodable & Sendable>(
+        _ path: String,
+        token: String,
+        eTag: String?,
+        as responseType: Response.Type = Response.self
+    ) async throws -> ConditionalGETResponse<Response> {
+        guard let url = endpointURL(path) else { throw MobileAPIError.invalidRequest }
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        if let eTag {
+            request.setValue(eTag, forHTTPHeaderField: "If-None-Match")
+        }
+        let (data, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw MobileAPIError.invalidResponse
+        }
+        let responseETag = httpResponse.value(forHTTPHeaderField: "ETag")
+        if httpResponse.statusCode == 304 {
+            return ConditionalGETResponse(
+                value: nil,
+                eTag: responseETag ?? eTag,
+                notModified: true
+            )
+        }
+        try validate(response: response, data: data)
+        return ConditionalGETResponse(
+            value: try JSONDecoder.mobileContract.decode(responseType, from: data),
+            eTag: responseETag,
+            notModified: false
+        )
     }
 
     /// Executes a JSON API request after applying Briar's shared URL, auth, encoding,

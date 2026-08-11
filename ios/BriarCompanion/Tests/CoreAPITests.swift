@@ -146,6 +146,39 @@ final class CoreAPITests: XCTestCase {
         )
         XCTAssertTrue(response.ok)
     }
+
+    func testConditionalGetSendsETagAndAcceptsNotModified() async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [URLProtocolStub.self]
+        let client = MobileAPIClient(
+            baseURL: URL(string: "https://briar-api.example")!,
+            session: URLSession(configuration: configuration)
+        )
+        let eTag = "W/\"organization-inbox:organization-1:7\""
+        URLProtocolStub.handler = { request in
+            XCTAssertEqual(request.httpMethod, "GET")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "If-None-Match"), eTag)
+            return (
+                HTTPURLResponse(
+                    url: request.url!,
+                    statusCode: 304,
+                    httpVersion: nil,
+                    headerFields: ["ETag": eTag]
+                )!,
+                Data()
+            )
+        }
+
+        let result: ConditionalGETResponse<HealthResponse> = try await client.conditionalGet(
+            "/organizations/organization-1/inbox",
+            token: "token",
+            eTag: eTag
+        )
+
+        XCTAssertTrue(result.notModified)
+        XCTAssertNil(result.value)
+        XCTAssertEqual(result.eTag, eTag)
+    }
 }
 
 private struct UploadResponse: Codable { let ok: Bool }

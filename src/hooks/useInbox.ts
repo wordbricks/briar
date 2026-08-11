@@ -17,6 +17,7 @@ import {
   loadInboxFeed,
   loadInboxReadStates,
   saveInboxReadStates,
+  type InboxFeedSyncState,
 } from "../lib/api";
 import { startDashboardPolling } from "../lib/dashboard-polling";
 
@@ -565,6 +566,10 @@ export function useInbox(
   >(null);
   const readSyncGenerationRef = useRef<InboxReadSyncGeneration | null>(null);
   const nextReadSyncGenerationIdRef = useRef(0);
+  const feedSyncStateRef = useRef<{
+    scope: string;
+    state: InboxFeedSyncState | null;
+  } | null>(null);
 
   const applyRemoteReadVersions = useCallback(
     (
@@ -879,6 +884,9 @@ export function useInbox(
     }
 
     const feedScope = `${userId}:${organizationId}`;
+    if (feedSyncStateRef.current?.scope !== feedScope) {
+      feedSyncStateRef.current = { scope: feedScope, state: null };
+    }
     setNotificationFeedScope((current) =>
       current === feedScope ? current : null,
     );
@@ -894,36 +902,42 @@ export function useInbox(
       }
       refreshInFlight = true;
       try {
-        const feedMessages = await loadInboxFeed(
+        const result = await loadInboxFeed(
           token,
           organizationId,
+          feedSyncStateRef.current?.scope === feedScope
+            ? feedSyncStateRef.current.state
+            : null,
           abort.signal,
         );
         if (disposed) return;
-        setState((current) => {
-          if (current.storageKey !== storageKey) return current;
-          const storedById = new Map(
-            current.messages.map((message) => [message.id, message]),
-          );
-          const feedSnapshot = feedMessages.map((message) => {
-            const stored = storedById.get(message.id);
-            // The organization feed intentionally uses compact summaries.
-            // Preserve richer selected-project/session details and the active
-            // channel association when the canonical read version is equal.
-            return stored?.version === message.version ? stored : message;
+        feedSyncStateRef.current = { scope: feedScope, state: result.state };
+        if (!result.notModified) {
+          setState((current) => {
+            if (current.storageKey !== storageKey) return current;
+            const storedById = new Map(
+              current.messages.map((message) => [message.id, message]),
+            );
+            const feedSnapshot = result.messages.map((message) => {
+              const stored = storedById.get(message.id);
+              // The organization feed intentionally uses compact summaries.
+              // Preserve richer selected-project/session details and the active
+              // channel association when the canonical read version is equal.
+              return stored?.version === message.version ? stored : message;
+            });
+            const messages = mergeInboxMessages(
+              current.messages,
+              feedSnapshot,
+              projects,
+            );
+            if (inboxMessageSnapshotsEqual(current.messages, messages)) {
+              return current;
+            }
+            const next = { messages, readVersions: current.readVersions };
+            writeInboxStorage(storageKey, next);
+            return { storageKey, ...next };
           });
-          const messages = mergeInboxMessages(
-            current.messages,
-            feedSnapshot,
-            projects,
-          );
-          if (inboxMessageSnapshotsEqual(current.messages, messages)) {
-            return current;
-          }
-          const next = { messages, readVersions: current.readVersions };
-          writeInboxStorage(storageKey, next);
-          return { storageKey, ...next };
-        });
+        }
         // Changing this key resets the OS-notification baseline on the first
         // authoritative feed load, so existing messages from other projects do
         // not arrive as a burst. Later feed refreshes keep the same baseline.

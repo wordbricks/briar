@@ -15,6 +15,7 @@ import worker, {
   issueReplyExecutionConfig,
   legacyAgentSkillInstructions,
   loadChannelCatalogSnapshot,
+  loadOrganizationInboxConditionalSnapshot,
   organizationLogoInputSchema,
   organizationInvitationInputSchema,
   organizationMemberRoleInputSchema,
@@ -96,6 +97,23 @@ const scheduledEnv = {
 } as unknown as Env;
 
 describe("Worker HTTP contract", () => {
+  it("skips the organization Inbox snapshot when its ETag is unchanged", async () => {
+    const loadSnapshot = vi.fn(async () => ({ messages: ["expensive"] }));
+    const result = await loadOrganizationInboxConditionalSnapshot({
+      organizationId: "22222222-2222-4222-8222-222222222222",
+      ifNoneMatch:
+        'W/"organization-inbox:22222222-2222-4222-8222-222222222222:7"',
+      readVersion: async () => 7,
+      loadSnapshot,
+    });
+
+    expect(result).toEqual({
+      etag: 'W/"organization-inbox:22222222-2222-4222-8222-222222222222:7"',
+      snapshot: null,
+    });
+    expect(loadSnapshot).not.toHaveBeenCalled();
+  });
+
   it("returns a committed response while cleanup remains registered in waitUntil", async () => {
     let resolveCleanup: ((value: unknown) => void) | undefined;
     const cleanup = new Promise<unknown>((resolve) => {

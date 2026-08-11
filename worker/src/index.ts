@@ -183,6 +183,7 @@ import {
   getIssueMessage,
   getRunEvidenceImage,
   getOrganizationRole,
+  getOrganizationInboxSyncVersion,
   getOrganizationInvitationByTokenHash,
   getGithubConnectionByInstallation,
   getGithubConnectionForOrganization,
@@ -235,6 +236,7 @@ import {
   listOrganizationUsageRecords,
   listGithubConnectionRepositories,
   listOrganizationProjects,
+  listOrganizationInboxProjects,
   listOrganizations,
   listProjects,
   listProjectAgents,
@@ -3526,6 +3528,34 @@ const projectAgentSessionSummaryJson = (row: {
 const projectAgentSessionSyncEtag = (projectId: string, cursor: number) =>
   `"project-agent-sessions:${projectId}:${cursor}"`;
 
+export const organizationInboxSyncEtag = (
+  organizationId: string,
+  version: number,
+) => `W/"organization-inbox:${organizationId}:${version}"`;
+
+export async function loadOrganizationInboxConditionalSnapshot<T>(input: {
+  organizationId: string;
+  ifNoneMatch: string | null;
+  readVersion: () => Promise<number>;
+  loadSnapshot: () => Promise<T>;
+}) {
+  const version = await input.readVersion();
+  const etag = organizationInboxSyncEtag(input.organizationId, version);
+  if (input.ifNoneMatch === etag) {
+    return { etag, snapshot: null };
+  }
+  return { etag, snapshot: await input.loadSnapshot() };
+}
+
+const organizationInboxSyncJson = (body: unknown, etag: string) =>
+  Response.json(body, {
+    headers: {
+      ...corsHeaders,
+      "Cache-Control": "private, no-cache",
+      ETag: etag,
+    },
+  });
+
 const projectAgentSessionSyncJson = (
   body: unknown,
   etag: string,
@@ -5999,40 +6029,56 @@ async function route(
     if (!(await getOrganizationRole(db, organizationId, session.user.id))) {
       throw new HttpError(404, "Organization not found");
     }
-    const projects = (await listProjects(db, session.user.id)).filter(
-      (project) => project.organization_id === organizationId,
-    );
-    const [projectData, channelNotifications] = await Promise.all([
-      Promise.all(
-        projects.map(async (project) => {
-          const [runs, conversationNotifications, sessionSummaries] =
-            await Promise.all([
-              listDashboardRuns(db, project.id),
-              listIssueConversationNotifications(
-                db,
-                project.id,
-                session.user.id,
-              ),
-              listProjectAgentSessionSummaries(db, project.id),
-            ]);
-          return {
-            project,
-            runs,
-            conversationNotifications,
-            sessionSummaries,
-          };
-        }),
-      ),
-      listChannelConversationNotifications(
-        db,
-        organizationId,
-        session.user.id,
-      ),
-    ]);
-    return privateNoStoreJson({
-      messages: buildInboxFeedMessages(projectData, channelNotifications),
-      generatedAt: new Date().toISOString(),
+    const result = await loadOrganizationInboxConditionalSnapshot({
+      organizationId,
+      ifNoneMatch: request.headers.get("if-none-match"),
+      readVersion: () => getOrganizationInboxSyncVersion(db, organizationId),
+      loadSnapshot: async () => {
+        const projects = await listOrganizationInboxProjects(db, organizationId);
+        const [projectData, channelNotifications] = await Promise.all([
+          Promise.all(
+            projects.map(async (project) => {
+              const [runs, conversationNotifications, sessionSummaries] =
+                await Promise.all([
+                  listDashboardRuns(db, project.id),
+                  listIssueConversationNotifications(
+                    db,
+                    project.id,
+                    session.user.id,
+                  ),
+                  listProjectAgentSessionSummaries(db, project.id),
+                ]);
+              return {
+                project,
+                runs,
+                conversationNotifications,
+                sessionSummaries,
+              };
+            }),
+          ),
+          listChannelConversationNotifications(
+            db,
+            organizationId,
+            session.user.id,
+          ),
+        ]);
+        return {
+          messages: buildInboxFeedMessages(projectData, channelNotifications),
+          generatedAt: new Date().toISOString(),
+        };
+      },
     });
+    if (result.snapshot === null) {
+      return new Response(null, {
+        status: 304,
+        headers: {
+          ...corsHeaders,
+          "Cache-Control": "private, no-cache",
+          ETag: result.etag,
+        },
+      });
+    }
+    return organizationInboxSyncJson(result.snapshot, result.etag);
   }
 
   if (pathname === "/me" && request.method === "PATCH") {

@@ -4195,6 +4195,37 @@ export async function listOrganizationProjects(
   return result.results;
 }
 
+export async function listOrganizationInboxProjects(
+  db: D1Database,
+  organizationId: string,
+) {
+  const result = await db
+    .prepare(
+      `select id, name, issue_key_prefix
+       from briar_projects
+       where organization_id = ?
+       order by created_at, id`,
+    )
+    .bind(organizationId)
+    .all<Pick<ProjectRow, "id" | "name" | "issue_key_prefix">>();
+  return result.results;
+}
+
+export async function getOrganizationInboxSyncVersion(
+  db: D1Database,
+  organizationId: string,
+) {
+  const state = await db
+    .prepare(
+      `select current_version
+       from briar_organization_inbox_sync_state
+       where organization_id = ?`,
+    )
+    .bind(organizationId)
+    .first<{ current_version: number }>();
+  return state?.current_version ?? 0;
+}
+
 export async function createProject(
   db: D1Database,
   input: {
