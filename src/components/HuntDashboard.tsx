@@ -1503,6 +1503,11 @@ export function HuntDashboard({
                       ) ?? null
                     }
                     assignedWorker={
+                      workerById.get(run.workerId ?? "") ??
+                      workerById.get(run.requestedWorkerId ?? "") ??
+                      null
+                    }
+                    hideAssignmentBadges={
                       !companionMode && [
                         "completed",
                         "cancelled",
@@ -1510,10 +1515,6 @@ export function HuntDashboard({
                         "blocked",
                         "failed",
                       ].includes(run.status)
-                        ? null
-                        : workerById.get(run.workerId ?? "") ??
-                          workerById.get(run.requestedWorkerId ?? "") ??
-                          null
                     }
                     contextMenuDisabled={companionMode}
                     deletingIssueId={deletingIssueId}
@@ -3086,6 +3087,7 @@ function KanbanCard({
   activeAgent,
   assignee,
   assignedWorker,
+  hideAssignmentBadges = false,
   contextMenuDisabled,
   deletingIssueId,
   isDragging = false,
@@ -3113,6 +3115,7 @@ function KanbanCard({
   activeAgent: ProjectAgent | null;
   assignee: OrganizationMember | null;
   assignedWorker: ExecutionWorker | null;
+  hideAssignmentBadges?: boolean;
   contextMenuDisabled: boolean;
   deletingIssueId: string | null;
   isDragging?: boolean;
@@ -3150,11 +3153,9 @@ function KanbanCard({
       activeAgent?.provider ??
       null
     : null;
-  const assignmentBadgeCount = [
-    activeAgent,
-    assignedProvider,
-    assignedWorker,
-  ].filter(Boolean).length;
+  const assignmentBadgeCount = hideAssignmentBadges
+    ? 0
+    : [activeAgent, assignedProvider, assignedWorker].filter(Boolean).length;
   return (
     <IssueContextMenu
       availableProviders={availableProviders}
