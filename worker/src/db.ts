@@ -5252,14 +5252,13 @@ export async function renewProjectAgentTaskLease(
   return db
     .prepare(
       `update briar_project_agent_task_jobs
-       set lease_expires_at = ?, updated_at = ?
+       set lease_expires_at = ?
        where id = ? and project_id = ? and status = 'running'
          and claimed_worker_id = ? and claim_token_hash = ?
        returning *`,
     )
     .bind(
       input.leaseExpiresAt,
-      input.updatedAt,
       jobId,
       projectId,
       input.workerId,
@@ -6145,14 +6144,13 @@ export async function renewProjectAgentScheduleRunLease(
   return db
     .prepare(
       `update briar_project_agent_schedule_runs
-       set lease_expires_at = ?, updated_at = ?
+       set lease_expires_at = ?
        where id = ? and project_id = ? and status = 'running'
          and claim_token_hash = ?
        returning id, lease_expires_at`,
     )
     .bind(
       scheduleLeaseExpiresAt(input.observedAt),
-      input.observedAt,
       runId,
       projectId,
       input.claimTokenHash,
@@ -7598,7 +7596,7 @@ export async function renewIssueAgentReplyLease(
   return await db
     .prepare(
       `update briar_issue_agent_reply_jobs
-       set lease_expires_at = ?, updated_at = ?
+       set lease_expires_at = ?
        where id = ? and project_id = ? and status = 'running'
          and claimed_worker_id = ? and claim_token_hash = ?
          and lease_expires_at > ?
@@ -7611,7 +7609,6 @@ export async function renewIssueAgentReplyLease(
     )
     .bind(
       input.leaseExpiresAt,
-      input.updatedAt,
       jobId,
       projectId,
       input.workerId,

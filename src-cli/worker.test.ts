@@ -6,6 +6,7 @@ import {
   defaultWorkerLabel,
   errorDelayMs,
   idleDelayWithBackoffMs,
+  leaseRenewDelayMs,
   launchdPlist,
   runWorkerLoop,
   restartInstalledServices,
@@ -323,6 +324,12 @@ describe("briar worker loop", () => {
     expect(idleDelayWithBackoffMs(50, 15_000, 60_000, () => 1)).toBe(
       DEFAULT_MAX_IDLE_DELAY_MS,
     );
+  });
+
+  it("jitters five-minute lease renewal without approaching expiry", () => {
+    expect(leaseRenewDelayMs(5 * 60_000, () => 0)).toBe(4.5 * 60_000);
+    expect(leaseRenewDelayMs(5 * 60_000, () => 0.5)).toBe(5 * 60_000);
+    expect(leaseRenewDelayMs(5 * 60_000, () => 1)).toBe(5.5 * 60_000);
   });
 
   it("heartbeats on the first iteration and then on the interval", async () => {
