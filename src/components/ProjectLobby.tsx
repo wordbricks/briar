@@ -1,0 +1,333 @@
+import {
+  ArrowRight,
+  Bot,
+  CheckCircle2,
+  CircleAlert,
+  Clock3,
+  Github,
+  Home,
+  ListTodo,
+  RefreshCw,
+  Settings,
+  Sparkles,
+} from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+
+import { MainContent, PageHeader } from "./layout";
+import { ProjectIcon } from "./ProjectIcon";
+import { useI18n } from "../i18n";
+import type { MessageKey } from "../i18n/messages";
+import {
+  aggregateAgentUsageOverview,
+  type AgentUsageOverviewRun,
+} from "../lib/agent-usage-overview";
+import { formatUsageDuration } from "../lib/agent-usage";
+import type { RepositoryReadiness } from "../lib/project-connection";
+import type {
+  AgentUsageReport,
+  DashboardPayload,
+  HuntRun,
+  Project,
+} from "../types";
+
+const overviewDays = 30;
+const activeStatuses = new Set(["queued", "running", "paused"]);
+const attentionStatuses = new Set(["blocked", "failed"]);
+
+function formatCompact(value: number, locale: string) {
+  return new Intl.NumberFormat(locale, {
+    maximumFractionDigits: value >= 1_000 ? 1 : 0,
+    notation: value >= 10_000 ? "compact" : "standard",
+  }).format(value);
+}
+
+function runTimestamp(run: AgentUsageOverviewRun) {
+  return Date.parse(run.completedAt ?? run.updatedAt ?? run.startedAt);
+}
+
+export function projectTrackedDuration(
+  runs: readonly AgentUsageOverviewRun[],
+  now: number,
+) {
+  const start = new Date(now);
+  start.setHours(0, 0, 0, 0);
+  start.setDate(start.getDate() - (overviewDays - 1));
+  return runs.reduce((total, run) => {
+    const timestamp = runTimestamp(run);
+    if (!Number.isFinite(timestamp) || timestamp < start.getTime()) return total;
+    return total + (run.executionMetrics?.durationMs ?? 0);
+  }, 0);
+}
+
+function statusLabel(run: HuntRun, t: ReturnType<typeof useI18n>["t"]) {
+  const key = `status.${run.status}` as MessageKey;
+  return t(key);
+}
+
+export function ProjectLobby({
+  dashboard,
+  isSidebarOpen,
+  onLoadUsageReport,
+  onOpenAgents,
+  onOpenIssue,
+  onOpenIssues,
+  onOpenRepository,
+  onOpenSettings,
+  project,
+  readiness,
+}: {
+  dashboard: DashboardPayload | null;
+  isSidebarOpen: boolean;
+  onLoadUsageReport: () => Promise<AgentUsageReport>;
+  onOpenAgents: () => void;
+  onOpenIssue: (runId: string) => void;
+  onOpenIssues: () => void;
+  onOpenRepository: () => void;
+  onOpenSettings: () => void;
+  project: Project;
+  readiness: RepositoryReadiness | null;
+}) {
+  const { localeTag, t } = useI18n();
+  const [usageReport, setUsageReport] = useState<AgentUsageReport | null>(null);
+  const [usageError, setUsageError] = useState<string | null>(null);
+  const [usageLoading, setUsageLoading] = useState(false);
+  const [now, setNow] = useState(Date.now);
+
+  const refreshUsage = useCallback(async () => {
+    setUsageLoading(true);
+    setUsageError(null);
+    try {
+      setUsageReport(await onLoadUsageReport());
+      setNow(Date.now());
+    } catch (cause) {
+      setUsageError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setUsageLoading(false);
+    }
+  }, [onLoadUsageReport]);
+
+  useEffect(() => {
+    setUsageReport(null);
+    setUsageError(null);
+    void refreshUsage();
+  }, [project.id, refreshUsage]);
+
+  const dashboardRuns = dashboard?.project.id === project.id
+    ? dashboard.runs
+    : [];
+  const reportedProjectRuns = useMemo(
+    () => (usageReport?.runs ?? []).filter((run) => run.projectId === project.id),
+    [project.id, usageReport],
+  );
+  const usageRuns: AgentUsageOverviewRun[] = reportedProjectRuns.length > 0
+    ? reportedProjectRuns
+    : dashboardRuns;
+  const usage = useMemo(
+    () => aggregateAgentUsageOverview(usageRuns, overviewDays, now),
+    [now, usageRuns],
+  );
+  const trackedDuration = projectTrackedDuration(usageRuns, now);
+  const activeRuns = dashboardRuns.filter((run) => activeStatuses.has(run.status));
+  const completedRuns = dashboardRuns.filter((run) => run.status === "completed");
+  const attentionRuns = dashboardRuns.filter((run) =>
+    attentionStatuses.has(run.status)
+  );
+  const recentRuns = [...dashboardRuns]
+    .sort(
+      (left, right) =>
+        Date.parse(right.lastEventAt || right.updatedAt) -
+        Date.parse(left.lastEventAt || left.updatedAt),
+    )
+    .slice(0, 5);
+  const githubRepository =
+    dashboard?.settings.githubRepository ?? readiness?.githubRepository ?? null;
+  const githubReady = Boolean(
+    githubRepository && (readiness ? readiness.prReady : true),
+  );
+  const dateFormatter = new Intl.DateTimeFormat(localeTag, {
+    day: "numeric",
+    month: "short",
+  });
+
+  return (
+    <MainContent id="project-lobby">
+      <PageHeader
+        className={`app-page-header project-lobby-header${
+          isSidebarOpen ? "" : " sidebar-closed"
+        }`}
+        data-tauri-drag-region="deep"
+        title={
+          <span className="project-lobby-title">
+            <ProjectIcon className="size-5" project={project} />
+            <span>{project.name}</span>
+          </span>
+        }
+      />
+      <div className="project-lobby-scroll">
+        <div className="project-lobby-content">
+          <section className="project-lobby-intro">
+            <div>
+              <span className="project-lobby-kicker">
+                <Sparkles aria-hidden size={14} />
+                {t("lobby.period", { days: overviewDays })}
+              </span>
+              <h1>{t("lobby.title")}</h1>
+              <p>{t("lobby.description", { project: project.name })}</p>
+            </div>
+            <button
+              aria-label={t("lobby.refresh")}
+              className="project-lobby-refresh"
+              disabled={usageLoading}
+              onClick={() => void refreshUsage()}
+              type="button"
+            >
+              <RefreshCw aria-hidden className={usageLoading ? "spinning" : ""} size={15} />
+              <span>{t("lobby.refresh")}</span>
+            </button>
+          </section>
+
+          <section aria-label={t("lobby.metrics")} className="project-lobby-metrics">
+            <article className="project-lobby-metric primary">
+              <span><Sparkles aria-hidden size={16} />{t("lobby.tokens")}</span>
+              <strong>{formatCompact(usage.totals.totalTokens, localeTag)}</strong>
+              <small>
+                {usageLoading && !usageReport
+                  ? t("lobby.loadingUsage")
+                  : t("lobby.tokenRuns", {
+                      count: usage.reportedRuns,
+                      total: usage.observedRuns,
+                    })}
+              </small>
+            </article>
+            <article className="project-lobby-metric">
+              <span><Clock3 aria-hidden size={16} />{t("lobby.workTime")}</span>
+              <strong>{formatUsageDuration(trackedDuration)}</strong>
+              <small>{t("lobby.trackedTimeHint")}</small>
+            </article>
+            <article className="project-lobby-metric">
+              <span><CheckCircle2 aria-hidden size={16} />{t("lobby.completed")}</span>
+              <strong>{formatCompact(completedRuns.length, localeTag)}</strong>
+              <small>{t("lobby.completedHint")}</small>
+            </article>
+            <article className="project-lobby-metric">
+              <span><CircleAlert aria-hidden size={16} />{t("lobby.active")}</span>
+              <strong>{formatCompact(activeRuns.length, localeTag)}</strong>
+              <small>
+                {attentionRuns.length > 0
+                  ? t("lobby.attentionCount", { count: attentionRuns.length })
+                  : t("lobby.noAttention")}
+              </small>
+            </article>
+          </section>
+
+          {usageError ? (
+            <p className="project-lobby-usage-error" role="status">
+              {t("lobby.usageUnavailable")}
+              <span title={usageError}>{usageError}</span>
+            </p>
+          ) : null}
+
+          <div className="project-lobby-grid">
+            <section className="project-lobby-panel repository-panel">
+              <header>
+                <span className="project-lobby-panel-icon"><Github aria-hidden size={18} /></span>
+                <div>
+                  <h2>{t("lobby.githubTitle")}</h2>
+                  <p>{t("lobby.githubDescription")}</p>
+                </div>
+                <span className={`project-lobby-state ${githubReady ? "ready" : "attention"}`}>
+                  {githubReady ? t("lobby.connected") : t("lobby.needsConnection")}
+                </span>
+              </header>
+              <div className="project-lobby-repository">
+                <div>
+                  <small>{t("lobby.repository")}</small>
+                  <strong>{githubRepository ?? t("lobby.noRepository")}</strong>
+                  <span>
+                    {readiness?.ghAccount
+                      ? t("lobby.githubAccount", { account: readiness.ghAccount })
+                      : githubReady
+                        ? t("lobby.githubReady")
+                        : t("lobby.githubSetupHint")}
+                  </span>
+                </div>
+                <button onClick={onOpenRepository} type="button">
+                  {githubReady ? t("lobby.manageConnection") : t("lobby.connectRepository")}
+                  <ArrowRight aria-hidden size={14} />
+                </button>
+              </div>
+            </section>
+
+            <section className="project-lobby-panel quick-panel">
+              <header>
+                <span className="project-lobby-panel-icon"><Home aria-hidden size={18} /></span>
+                <div>
+                  <h2>{t("lobby.quickActions")}</h2>
+                  <p>{t("lobby.quickActionsDescription")}</p>
+                </div>
+              </header>
+              <div className="project-lobby-actions">
+                <button onClick={onOpenIssues} type="button">
+                  <ListTodo aria-hidden size={17} />
+                  <span><strong>{t("sidebar.issues")}</strong><small>{t("lobby.openIssues")}</small></span>
+                  <ArrowRight aria-hidden size={14} />
+                </button>
+                <button onClick={onOpenAgents} type="button">
+                  <Bot aria-hidden size={17} />
+                  <span><strong>{t("sidebar.agents")}</strong><small>{t("lobby.openAgents")}</small></span>
+                  <ArrowRight aria-hidden size={14} />
+                </button>
+                <button onClick={onOpenSettings} type="button">
+                  <Settings aria-hidden size={17} />
+                  <span><strong>{t("sidebar.projectSettings")}</strong><small>{t("lobby.openSettings")}</small></span>
+                  <ArrowRight aria-hidden size={14} />
+                </button>
+              </div>
+            </section>
+
+            <section className="project-lobby-panel activity-panel">
+              <header>
+                <div>
+                  <h2>{t("lobby.recentActivity")}</h2>
+                  <p>{t("lobby.recentActivityDescription")}</p>
+                </div>
+                <button onClick={onOpenIssues} type="button">
+                  {t("lobby.viewAll")}<ArrowRight aria-hidden size={14} />
+                </button>
+              </header>
+              {recentRuns.length > 0 ? (
+                <div className="project-lobby-activity-list">
+                  {recentRuns.map((run) => (
+                    <button key={run.id} onClick={() => onOpenIssue(run.id)} type="button">
+                      <span className={`project-lobby-status-dot ${run.status}`} aria-hidden />
+                      <span>
+                        <strong>{run.title}</strong>
+                        <small>
+                          {project.issueKeyPrefix
+                            ? `${project.issueKeyPrefix}-${run.runNumber}`
+                            : `#${run.runNumber}`}
+                          <i>·</i>
+                          {statusLabel(run, t)}
+                        </small>
+                      </span>
+                      <time dateTime={run.lastEventAt}>
+                        {dateFormatter.format(Date.parse(run.lastEventAt || run.updatedAt))}
+                      </time>
+                      <ArrowRight aria-hidden size={14} />
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="project-lobby-empty">
+                  <ListTodo aria-hidden size={22} />
+                  <strong>{t("lobby.noActivity")}</strong>
+                  <p>{t("lobby.noActivityDescription")}</p>
+                </div>
+              )}
+            </section>
+          </div>
+        </div>
+      </div>
+    </MainContent>
+  );
+}
