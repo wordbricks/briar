@@ -111,7 +111,7 @@ test("server-renders Korean at /ko regardless of Accept-Language", async () => {
 
   const html = await response.text();
   assert.match(html, /<html lang="ko"[\s>]/i);
-  assert.match(html, /Briar — 로컬 우선 Agent Development Environment/);
+  assert.match(html, /Briar — 로컬 실행형 Agent Development Environment/);
   assert.match(html, /이슈에서 PR까지/);
   assert.match(html, /에이전트 작업을 운영하세요/);
   assert.match(html, /코드는 로컬에/);
@@ -129,9 +129,9 @@ test("server-renders Korean at /ko regardless of Accept-Language", async () => {
   // translated (or, for pure proper nouns, intentionally identical).
   assert.match(html, /저장소 무관/);
   assert.match(html, /Codex \+ Claude/);
-  assert.match(html, /로컬 우선/);
+  assert.match(html, /로컬 실행/);
   assert.doesNotMatch(html, /Repository-agnostic/);
-  assert.doesNotMatch(html, /Local-first/);
+  assert.doesNotMatch(html, /local-first/i);
   // Section-index eyebrows must pull from the Korean nav vocabulary
   // instead of leaking hardcoded English category words.
   assert.match(html, /01 \/ (?:<!-- -->)?제품/);
@@ -190,7 +190,8 @@ test("server-renders English for an English browser", async () => {
   assert.match(html, /class="detail-properties"/);
   assert.match(html, /Download Briar for Mac/);
   assert.match(html, /Repository-agnostic/);
-  assert.match(html, /Local-first/);
+  assert.match(html, /Local execution/);
+  assert.doesNotMatch(html, /local-first/i);
   assert.match(html, /01 \/ (?:<!-- -->)?PRODUCT/);
   assert.match(html, /02 \/ (?:<!-- -->)?WORKFLOW/);
   assert.match(html, /03 \/ (?:<!-- -->)?AGENTS/);

@@ -53,11 +53,11 @@ export function localizedPath(locale: Locale, path: RoutePath | string): string 
 export const copy = {
   ko: {
     metadata: {
-      title: "Briar — 로컬 우선 Agent Development Environment",
+      title: "Briar — 로컬 실행형 Agent Development Environment",
       description:
-        "이슈에서 PR까지, 사람과 코딩 에이전트가 함께 일하는 과정을 연결하고 관찰하는 로컬 우선 Agent Development Environment.",
+        "이슈에서 PR까지, 사람과 코딩 에이전트의 작업을 클라우드에서 조율하고 로컬 저장소에서 실행하는 Agent Development Environment.",
       socialDescription:
-        "Briar는 로컬 우선 Agent Development Environment입니다. 코드는 로컬에, 에이전트 작업은 이슈에서 PR까지 한눈에.",
+        "Briar는 클라우드로 조율하고 로컬에서 실행하는 Agent Development Environment입니다. 코드는 로컬에, 에이전트 작업은 이슈에서 PR까지 한눈에.",
       locale: "ko_KR",
     },
     aria: {
@@ -99,7 +99,7 @@ export const copy = {
       line1: "이슈에서 PR까지.",
       line2: "에이전트 작업을 운영하세요.",
       description:
-        "Briar는 사람과 코딩 에이전트가 실제 저장소에서 함께 일하는 과정을 연결하고, 관찰하고, 끝까지 완료하는 로컬 우선 Agent Development Environment입니다.",
+        "Briar는 사람과 코딩 에이전트의 작업을 클라우드에서 연결하고 조율하며, 실제 저장소의 코드 작업은 로컬에서 실행하는 Agent Development Environment입니다.",
       openWebApp: "웹에서 Briar 열기",
       macDownload: "Mac용 Briar 다운로드",
       androidDownload: "Android용 다운로드",
@@ -110,7 +110,7 @@ export const copy = {
         "Android 컴패니언",
         "저장소 무관",
         "Codex + Claude",
-        "로컬 우선",
+        "로컬 실행",
       ],
     },
     dashboard: {
@@ -299,7 +299,7 @@ export const copy = {
         "Briar는 Apache-2.0 라이선스로 GitHub에 공개되어 있습니다. 저장소를 연결하려면 로그인이 필요합니다.",
     },
     footer: {
-      tagline: "이슈에서 PR까지, 로컬 우선 Agent Development Environment.",
+      tagline: "이슈에서 PR까지, 클라우드 조율과 로컬 실행을 결합한 Agent Development Environment.",
       security: "보안",
       backToTop: "맨 위로 ↑",
     },
@@ -323,9 +323,9 @@ export const copy = {
     metadata: {
       title: "Briar — Agent Development Environment",
       description:
-        "A local-first Agent Development Environment that connects and observes how people and coding agents work together, from issue to PR.",
+        "A cloud-coordinated, local-execution Agent Development Environment that connects people and coding agents from issue to PR.",
       socialDescription:
-        "Briar is a local-first Agent Development Environment. Keep code local and see every agent task from issue to PR.",
+        "Briar is a cloud-coordinated, local-execution Agent Development Environment. Keep code local and see every agent task from issue to PR.",
       locale: "en_US",
     },
     aria: {
@@ -368,7 +368,7 @@ export const copy = {
       line1: "From issue to PR.",
       line2: "Operate your agent work.",
       description:
-        "Briar is a local-first Agent Development Environment that connects, observes, and completes the work people and coding agents do together in real repositories.",
+        "Briar is a cloud-coordinated, local-execution Agent Development Environment that connects and observes agent work while running code tasks in repositories on your machine.",
       openWebApp: "Open Briar on the web",
       macDownload: "Download Briar for Mac",
       androidDownload: "Download for Android",
@@ -379,7 +379,7 @@ export const copy = {
         "Android companion",
         "Repository-agnostic",
         "Codex + Claude",
-        "Local-first",
+        "Local execution",
       ],
     },
     dashboard: {
@@ -572,7 +572,7 @@ export const copy = {
         "Briar is released under the Apache-2.0 license on GitHub. You'll need to sign in to connect a repository.",
     },
     footer: {
-      tagline: "A local-first Agent Development Environment, from issue to PR.",
+      tagline: "A cloud-coordinated, local-execution Agent Development Environment, from issue to PR.",
       security: "Security",
       backToTop: "Back to top ↑",
     },

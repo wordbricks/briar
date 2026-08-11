@@ -2,7 +2,7 @@
 
 # Briar
 
-Briar is a local-first Agent Development Environment for taking coding-agent work from issue to PR.
+Briar is a cloud-coordinated, local-execution Agent Development Environment for taking coding-agent work from issue to PR.
 
 It turns issues into structured runs, gives each run an isolated Git worktree, and keeps progress, evidence, conversations, and human review in one place. Use Codex, Claude, Grok, or OpenCode through the accounts and local CLIs you already have.
 
