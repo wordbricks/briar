@@ -48,9 +48,15 @@ export type ClaimedIssue = {
   } | null;
 };
 
+export type WorkerClaimResult = {
+  work: ClaimedIssue | null;
+  /** Server-provided lower bound for the next empty-queue poll. */
+  retryAfterMs?: number;
+};
+
 export type WorkerLoopDependencies = {
-  /** Claim the next queued issue, or null when the queue is empty. */
-  claim: () => Promise<ClaimedIssue | null>;
+  /** Claim the next queued issue, or report an empty queue. */
+  claim: () => Promise<ClaimedIssue | null | WorkerClaimResult>;
   /** Renew the lease of the run currently in flight. */
   renewLease: (issue: ClaimedIssue) => Promise<void>;
   heartbeat: (
@@ -68,6 +74,8 @@ export type WorkerLoopDependencies = {
    */
   sleep: (milliseconds: number, signal?: AbortSignal) => Promise<void>;
   now: () => number;
+  /** Injectable jitter source; production defaults to Math.random. */
+  random?: () => number;
   log: (line: string) => void;
 };
 
@@ -76,6 +84,7 @@ export type WorkerLoopOptions = {
   maxConcurrentSessions?: number;
   once?: boolean;
   idleDelayMs?: number;
+  maxIdleDelayMs?: number;
   heartbeatIntervalMs?: number;
   leaseRenewIntervalMs?: number;
   maxErrorDelayMs?: number;
@@ -88,6 +97,7 @@ export type WorkerLoopResult = {
 };
 
 export const DEFAULT_IDLE_DELAY_MS = 15_000;
+export const DEFAULT_MAX_IDLE_DELAY_MS = 60_000;
 export const DEFAULT_HEARTBEAT_INTERVAL_MS = 60_000;
 /** Also serves as the cancellation/reassignment control poll. */
 export const DEFAULT_LEASE_RENEW_INTERVAL_MS = 30_000;
@@ -144,6 +154,21 @@ export function errorDelayMs(
 }
 
 /**
+ * Empty queues back off separately from failures. A small jitter prevents a
+ * fleet of workers that started together from polling in lockstep.
+ */
+export function idleDelayWithBackoffMs(
+  consecutiveEmptyClaims: number,
+  baseDelayMs = DEFAULT_IDLE_DELAY_MS,
+  maxDelayMs = DEFAULT_MAX_IDLE_DELAY_MS,
+  random = Math.random,
+): number {
+  const exponential = baseDelayMs * 2 ** Math.max(0, consecutiveEmptyClaims - 1);
+  const jitter = 0.8 + Math.min(1, Math.max(0, random())) * 0.4;
+  return Math.max(1, Math.min(maxDelayMs, Math.round(exponential * jitter)));
+}
+
+/**
  * Claim-run-report loop. All I/O is injected so the state machine is testable
  * without a server, an agent, or real time.
  */
@@ -153,6 +178,7 @@ export async function runWorkerLoop(
 ): Promise<WorkerLoopResult> {
   const maxIssues = options.once ? 1 : (options.maxIssues ?? Number.POSITIVE_INFINITY);
   const idleDelayMs = options.idleDelayMs ?? DEFAULT_IDLE_DELAY_MS;
+  const maxIdleDelayMs = options.maxIdleDelayMs ?? DEFAULT_MAX_IDLE_DELAY_MS;
   const heartbeatIntervalMs = options.heartbeatIntervalMs ?? DEFAULT_HEARTBEAT_INTERVAL_MS;
   const leaseRenewIntervalMs =
     options.leaseRenewIntervalMs ?? DEFAULT_LEASE_RENEW_INTERVAL_MS;
@@ -164,6 +190,7 @@ export async function runWorkerLoop(
   let processed = 0;
   let failures = 0;
   let consecutiveFailures = 0;
+  let consecutiveEmptyClaims = 0;
   // Negative infinity so the first iteration always beats: a worker that has
   // not reported yet must not wait out a whole interval before appearing.
   let lastHeartbeatAt = Number.NEGATIVE_INFINITY;
@@ -234,6 +261,7 @@ export async function runWorkerLoop(
 
   while (processed < maxIssues) {
     let queueWasEmpty = false;
+    let emptyQueueDelayMs = idleDelayMs;
     try {
       await beat();
       while (
@@ -241,18 +269,42 @@ export async function runWorkerLoop(
         active.size < maxConcurrentSessions &&
         processed + active.size < maxIssues
       ) {
-        const issue = await dependencies.claim();
+        const claim = await dependencies.claim();
+        const issue = isWorkerClaimResult(claim) ? claim.work : claim;
         if (!issue) {
           queueWasEmpty = true;
           consecutiveFailures = 0;
+          consecutiveEmptyClaims += 1;
+          const serverDelayMs = isWorkerClaimResult(claim) &&
+              Number.isFinite(claim.retryAfterMs) &&
+              (claim.retryAfterMs ?? 0) > 0
+            ? claim.retryAfterMs!
+            : idleDelayMs;
+          emptyQueueDelayMs = Math.max(
+            serverDelayMs,
+            idleDelayWithBackoffMs(
+              consecutiveEmptyClaims,
+              Math.max(idleDelayMs, serverDelayMs),
+              Math.max(maxIdleDelayMs, serverDelayMs),
+              dependencies.random,
+            ),
+          );
           break;
         }
+        consecutiveEmptyClaims = 0;
         dependencies.log(`claimed ${issue.sourceKey} (${issue.runId})`);
         active.set(workKey(issue), execute(issue));
         await reportState();
       }
       if (!acceptingWork && active.size === 0) {
         queueWasEmpty = true;
+        consecutiveEmptyClaims += 1;
+        emptyQueueDelayMs = idleDelayWithBackoffMs(
+          consecutiveEmptyClaims,
+          idleDelayMs,
+          maxIdleDelayMs,
+          dependencies.random,
+        );
       }
     } catch (error) {
       failures += 1;
@@ -270,7 +322,13 @@ export async function runWorkerLoop(
       if (options.once) {
         return { processed, failures, stoppedBecause: "emptyQueue" };
       }
-      if (queueWasEmpty) await dependencies.sleep(idleDelayMs);
+      if (queueWasEmpty) {
+        const heartbeatDelayMs = Math.max(
+          0,
+          heartbeatIntervalMs - (dependencies.now() - lastHeartbeatAt),
+        );
+        await dependencies.sleep(Math.min(emptyQueueDelayMs, heartbeatDelayMs));
+      }
       continue;
     }
 
@@ -281,7 +339,7 @@ export async function runWorkerLoop(
     );
     const waitDelayMs =
       queueWasEmpty && active.size < maxConcurrentSessions
-        ? Math.min(idleDelayMs, heartbeatDelayMs)
+        ? Math.min(emptyQueueDelayMs, heartbeatDelayMs)
         : heartbeatDelayMs;
     // Wake for the next heartbeat even when every execution slot is occupied.
     // Otherwise a long-running issue makes the server report the live worker
@@ -329,6 +387,10 @@ const normalizeConcurrency = (value: number) =>
       Number.isInteger(value) ? value : DEFAULT_MAX_CONCURRENT_SESSIONS,
     ),
   );
+
+const isWorkerClaimResult = (
+  claim: ClaimedIssue | WorkerClaimResult | null,
+): claim is WorkerClaimResult => Boolean(claim && "work" in claim);
 
 const describe = (error: unknown) =>
   error instanceof Error ? error.message : String(error);

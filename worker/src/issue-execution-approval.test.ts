@@ -375,6 +375,30 @@ describe("conversational issue execution approval", () => {
     },
   );
 
+  it("checks every worker queue through one empty claim response", async () => {
+    const response = await worker.fetch(
+      new Request("https://briar.example/worker-claims", {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${executionWorkerCredential}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          claimedBy: "Execution Worker",
+          workerId: "execution-any-worker",
+          projectId: projectAId,
+        }),
+      }),
+      env(),
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      work: null,
+      retryAfterMs: 15_000,
+    });
+  });
+
   it("dispatches only after explicit approval and finalizes both audits atomically", async () => {
     const { runId, proposalId } = await seedIssueProposal();
     expect(await getIssueExecutionProposal(db, projectAId, runId, proposalId))
