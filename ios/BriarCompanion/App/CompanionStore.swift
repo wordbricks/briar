@@ -392,6 +392,12 @@ final class DashboardStore: ObservableObject {
 
 @MainActor
 final class RunDetailStore: ObservableObject {
+    struct ExecutionProposalContext: Equatable, Sendable {
+        let lifecycleRevision: Int
+        let proposalRevision: Int
+        let proposalID: UUID
+    }
+
     @Published private(set) var events: [RunEvent] = []
     @Published private(set) var messages: [IssueMessage] = []
     @Published private(set) var evidence: [RunEvidence] = []
@@ -402,6 +408,10 @@ final class RunDetailStore: ObservableObject {
     private let projectID: UUID
     private let runID: UUID
     private let token: String
+    private var lifecycleRevision = 0
+    private var executionProposalRevisions: [UUID: Int] = [:]
+    private var executionProposalIDsByMessage: [UUID: UUID] = [:]
+    private var authoritativeReloadPending = false
 
     init(
         api: any MobileAPIClientProtocol,
@@ -415,54 +425,182 @@ final class RunDetailStore: ObservableObject {
         self.token = token
     }
 
-    func load() async {
-        guard !loading else { return }
-        loading = true
-        defer { loading = false }
-        do {
-            async let eventResponse: RunEventsResponse = api.send(
-                MobileAPIContract.Endpoint.runEvents(projectID: projectID, runID: runID),
-                method: "GET",
-                token: token,
-                body: nil,
-                as: RunEventsResponse.self
-            )
-            async let messageResponse: IssueMessagesResponse = api.send(
-                MobileAPIContract.Endpoint.runMessages(projectID: projectID, runID: runID),
-                method: "GET",
-                token: token,
-                body: nil,
-                as: IssueMessagesResponse.self
-            )
-            async let evidenceResponse: RunEvidenceResponse = api.send(
-                MobileAPIContract.Endpoint.runEvidence(projectID: projectID, runID: runID),
-                method: "GET",
-                token: token,
-                body: nil,
-                as: RunEvidenceResponse.self
-            )
-            let loaded = try await (eventResponse, messageResponse, evidenceResponse)
-            events = loaded.0.events
-            messages = loaded.1.messages
-            evidence = loaded.2.evidence
-            errorMessage = nil
-        } catch {
-            errorMessage = CompanionStore.message(for: error)
+    func load(queueIfLoading: Bool = false) async {
+        if loading {
+            if queueIfLoading { authoritativeReloadPending = true }
+            return
         }
+        let expectedLifecycleRevision = lifecycleRevision
+        loading = true
+        defer {
+            if expectedLifecycleRevision == lifecycleRevision {
+                loading = false
+            }
+        }
+        repeat {
+            authoritativeReloadPending = false
+            do {
+                async let eventResponse: RunEventsResponse = api.send(
+                    MobileAPIContract.Endpoint.runEvents(projectID: projectID, runID: runID),
+                    method: "GET",
+                    token: token,
+                    body: nil,
+                    as: RunEventsResponse.self
+                )
+                async let messageResponse: IssueMessagesResponse = api.send(
+                    MobileAPIContract.Endpoint.runMessages(projectID: projectID, runID: runID),
+                    method: "GET",
+                    token: token,
+                    body: nil,
+                    as: IssueMessagesResponse.self
+                )
+                async let evidenceResponse: RunEvidenceResponse = api.send(
+                    MobileAPIContract.Endpoint.runEvidence(projectID: projectID, runID: runID),
+                    method: "GET",
+                    token: token,
+                    body: nil,
+                    as: RunEvidenceResponse.self
+                )
+                let loaded = try await (eventResponse, messageResponse, evidenceResponse)
+                guard expectedLifecycleRevision == lifecycleRevision else { return }
+                events = loaded.0.events
+                reconcileExecutionProposals(loaded.1.messages, authoritative: true)
+                messages = loaded.1.messages
+                evidence = loaded.2.evidence
+                errorMessage = nil
+            } catch {
+                guard expectedLifecycleRevision == lifecycleRevision else { return }
+                errorMessage = CompanionStore.message(for: error)
+            }
+        } while authoritativeReloadPending &&
+            expectedLifecycleRevision == lifecycleRevision
     }
 
     func appendMessages(_ newMessages: [IssueMessage]) {
+        reconcileExecutionProposals(newMessages, authoritative: false)
+        let replacements = Dictionary(uniqueKeysWithValues: newMessages.map { ($0.id, $0) })
         let existing = Set(messages.map(\.id))
+        messages = messages.map { replacements[$0.id] ?? $0 }
         messages.append(contentsOf: newMessages.filter { !existing.contains($0.id) })
         messages.sort { $0.createdAt < $1.createdAt }
     }
 
-    func updateIssueProposal(_ proposal: IssueProposedAction) {
-        messages = messages.map { message in
-            guard message.proposedAction?.id == proposal.id else { return message }
+    func updateIssueProposal(
+        _ proposal: IssueProposedAction,
+        executionProposal: IssueExecutionProposal? = nil
+    ) {
+        let updatedMessages = messages.map { message in
             var updated = message
-            updated.proposedAction = proposal
+            if message.proposedAction?.id == proposal.id {
+                updated.proposedAction = proposal
+                if let executionProposal {
+                    updated.executionProposal = executionProposal
+                }
+            }
             return updated
+        }
+        if executionProposal != nil {
+            reconcileExecutionProposals(updatedMessages, authoritative: false)
+        }
+        messages = updatedMessages
+    }
+
+    func updateExecutionProposal(_ proposal: IssueExecutionProposal) {
+        messages = messages.map { message in
+            guard message.executionProposal?.id == proposal.id else { return message }
+            var updated = message
+            updated.executionProposal = proposal
+            return updated
+        }
+        executionProposalRevisions[proposal.id, default: 0] &+= 1
+    }
+
+    func captureExecutionProposal(
+        proposalID: UUID
+    ) -> ExecutionProposalContext? {
+        guard messages.contains(where: {
+            $0.executionProposal?.id == proposalID &&
+                $0.executionProposal?.status == .pending
+        }) else { return nil }
+        return ExecutionProposalContext(
+            lifecycleRevision: lifecycleRevision,
+            proposalRevision: executionProposalRevisions[proposalID, default: 0],
+            proposalID: proposalID
+        )
+    }
+
+    func executionProposalIsCurrent(
+        _ context: ExecutionProposalContext
+    ) -> Bool {
+        context.lifecycleRevision == lifecycleRevision &&
+            context.proposalRevision == executionProposalRevisions[
+                context.proposalID,
+                default: 0
+            ] &&
+            messages.contains(where: {
+                $0.executionProposal?.id == context.proposalID &&
+                    $0.executionProposal?.status == .pending
+            })
+    }
+
+    /// Invalidates delayed loads and mutation presentation when navigation
+    /// leaves this exact run detail.
+    func close() {
+        lifecycleRevision &+= 1
+        authoritativeReloadPending = false
+        loading = false
+    }
+
+    private func reconcileExecutionProposals(
+        _ incoming: [IssueMessage],
+        authoritative: Bool
+    ) {
+        let previousProposals = Dictionary(
+            messages.compactMap { message in
+                message.executionProposal.map { ($0.id, $0) }
+            },
+            uniquingKeysWith: { current, _ in current }
+        )
+        let incomingMessageIDs = Set(incoming.map(\.id))
+        var invalidatedProposalIDs: Set<UUID> = []
+
+        for message in incoming {
+            let previousID = executionProposalIDsByMessage[message.id]
+            let incomingID = message.executionProposal?.id
+            if previousID != incomingID {
+                if let previousID { invalidatedProposalIDs.insert(previousID) }
+                if let incomingID { invalidatedProposalIDs.insert(incomingID) }
+            } else if let proposal = message.executionProposal,
+                      previousProposals[proposal.id] != proposal {
+                invalidatedProposalIDs.insert(proposal.id)
+            }
+        }
+
+        if authoritative {
+            for (messageID, proposalID) in executionProposalIDsByMessage
+                where !incomingMessageIDs.contains(messageID) {
+                invalidatedProposalIDs.insert(proposalID)
+            }
+        }
+
+        for proposalID in invalidatedProposalIDs {
+            executionProposalRevisions[proposalID, default: 0] &+= 1
+        }
+
+        if authoritative {
+            executionProposalIDsByMessage = Dictionary(
+                uniqueKeysWithValues: incoming.compactMap { message in
+                    message.executionProposal.map { (message.id, $0.id) }
+                }
+            )
+        } else {
+            for message in incoming {
+                if let proposalID = message.executionProposal?.id {
+                    executionProposalIDsByMessage[message.id] = proposalID
+                } else {
+                    executionProposalIDsByMessage.removeValue(forKey: message.id)
+                }
+            }
         }
     }
 

@@ -191,6 +191,10 @@ export const mobileDashboardRunSchema = z.object({
   requestedModel: z.string().nullable().optional(),
   requestedEffort: mobileEffortSchema.nullable().optional(),
   requestedWorkerId: z.string().nullable().optional(),
+  requestedByUserId: z.string().nullable().optional(),
+  dispatchMode: z.enum(["any", "specific"]).nullable().optional(),
+  claimedBy: z.string().nullable().optional(),
+  claimedAt: z.iso.datetime().nullable().optional(),
   workerId: z.string().nullable().optional(),
   updatedAt: z.iso.datetime(),
   completedAt: z.iso.datetime().nullable().optional(),
@@ -216,6 +220,13 @@ export const mobileDashboardWorkerSchema = z.object({
   readinessDetail: z.string().nullable(),
   activeSessions: z.number().int().nonnegative(),
   availableSessions: z.number().int().nonnegative(),
+});
+
+export const mobileProjectExecutionWorkerPolicySchema = z.object({
+  selectionMode: z.enum(["any", "allowlist"]),
+  defaultWorkerId: z.string().nullable(),
+  allowedWorkerIds: z.array(z.string()),
+  updatedAt: z.iso.datetime().nullable(),
 });
 
 export const mobileConversationNotificationSchema = z.object({
@@ -247,6 +258,7 @@ export const mobileDashboardSnapshotSchema = z.object({
   runs: z.array(mobileDashboardRunSchema),
   workers: z.array(mobileDashboardWorkerSchema).optional(),
   organizationProviders: z.array(mobileProviderSchema).optional(),
+  executionPolicy: mobileProjectExecutionWorkerPolicySchema.optional(),
   members: z.array(mobileOrganizationMemberSchema).optional(),
   conversationNotifications: z.array(mobileConversationNotificationSchema).optional(),
   channelNotifications: z.array(mobileChannelNotificationSchema).optional(),
@@ -262,6 +274,7 @@ export const mobileDashboardDeltaSchema = z.object({
   project: mobileDashboardProjectSchema.optional(),
   workers: z.array(mobileDashboardWorkerSchema).optional(),
   organizationProviders: z.array(mobileProviderSchema).optional(),
+  executionPolicy: mobileProjectExecutionWorkerPolicySchema.optional(),
   members: z.array(mobileOrganizationMemberSchema).optional(),
   conversationNotifications: z.array(mobileConversationNotificationSchema).optional(),
   channelNotifications: z.array(mobileChannelNotificationSchema).optional(),
@@ -312,10 +325,28 @@ export const mobileIssueCreateProposalSchema = z.object({
     priority: z.number().int().min(1).max(4).nullable(),
     status: z.enum(["backlog", "queued"]),
   }),
+  executeAfterCreate: z.boolean().optional(),
   status: z.enum(["pending", "accepted"]),
   acceptedAt: z.iso.datetime().nullable(),
   resultRunId: z.uuid().nullable(),
 });
+
+export const mobileIssueExecutionProposalSchema = z.object({
+  id: z.uuid(),
+  type: z.literal("request_issue_execute"),
+  status: z.enum(["pending", "accepted"]),
+  projectId: z.uuid(),
+  runId: z.uuid(),
+  title: z.string().trim().min(1).max(300),
+  createdAt: z.iso.datetime(),
+  acceptedAt: z.iso.datetime().nullable(),
+  requestedProvider: mobileProviderSchema.nullable(),
+  requestedModel: z.string().nullable(),
+  requestedEffort: mobileEffortSchema.nullable(),
+  requestedWorkerId: z.string().nullable(),
+  delegatedByAgentId: z.uuid().nullable(),
+  delegatedByAgentName: z.string().nullable(),
+}).strict();
 
 export const mobileIssueProposedActionSchema = z.discriminatedUnion("type", [
   mobileIssueReworkProposalSchema,
@@ -333,6 +364,7 @@ export const mobileIssueMessagesResponseSchema = z.object({
     author: mobileMessageAuthorSchema,
     replyCount: z.number().int().nonnegative(),
     proposedAction: mobileIssueProposedActionSchema.nullable().optional(),
+    executionProposal: mobileIssueExecutionProposalSchema.nullable().optional(),
     createdAt: z.iso.datetime(),
     updatedAt: z.iso.datetime(),
   })),
@@ -364,6 +396,7 @@ export const mobileChannelIssueProposalPayloadSchema = z.object({
     priority: z.number().int().min(1).max(4).nullable(),
     status: z.enum(["backlog", "queued"]),
   }).strict(),
+  executeAfterCreate: z.boolean().default(false),
 }).strict();
 
 const mobileChannelProposalBaseShape = {
@@ -429,6 +462,7 @@ export const mobileChannelMessageSchema = z.object({
       }),
     ])
     .nullable(),
+  executionProposal: mobileIssueExecutionProposalSchema.nullable().optional(),
   createdAt: z.iso.datetime(),
 });
 
@@ -516,7 +550,15 @@ export const mobileAcceptChannelProposalResponseSchema = z.object({
   outcome: z.enum(["accepted", "already_accepted"]),
   projectId: z.uuid(),
   resultRunId: z.uuid(),
+  executionProposal: mobileIssueExecutionProposalSchema.nullable().optional(),
 });
+
+export const mobileIssueExecutionApprovalRequestSchema = z.object({
+  provider: mobileProviderSchema,
+  model: z.string().nullable(),
+  effort: mobileEffortSchema.nullable(),
+  workerId: z.string().nullable(),
+}).strict();
 
 export const mobileRunEvidenceResponseSchema = z.object({
   evidence: z.array(z.object({
@@ -690,6 +732,13 @@ export const mobileDispatchResponseSchema = z.object({
   dispatchedAt: z.iso.datetime(),
   outcome: z.enum(["dispatched", "already_dispatched"]),
 });
+export const mobileIssueExecutionApprovalResponseSchema = z.object({
+  proposal: mobileIssueExecutionProposalSchema,
+  outcome: z.enum(["accepted", "already_accepted"]),
+  projectId: z.uuid(),
+  runId: z.uuid(),
+  dispatch: mobileDispatchResponseSchema,
+}).strict();
 export const mobileIssueMessageSchema = mobileIssueMessagesResponseSchema.shape.messages.element;
 export const mobileCreateMessageRequestSchema = z.object({
   body: z.string().trim().min(1).max(10_000),
@@ -725,6 +774,7 @@ export const mobileAcceptIssueActionProposalResponseSchema = z.object({
   ]),
   outcome: z.enum(["accepted", "already_accepted"]),
   resultRunId: z.uuid().nullable(),
+  executionProposal: mobileIssueExecutionProposalSchema.nullable().optional(),
 });
 export const mobileResultReviewSchema = mobileDashboardRunSchema.shape.resultReviews.unwrap().element;
 
@@ -879,6 +929,10 @@ export const mobileOperationSchemas = {
   acceptIssueActionProposal: {
     response: mobileAcceptIssueActionProposalResponseSchema,
   },
+  acceptIssueExecutionProposal: {
+    request: mobileIssueExecutionApprovalRequestSchema,
+    response: mobileIssueExecutionApprovalResponseSchema,
+  },
   listProjectAgents: { response: mobileProjectAgentsResponseSchema },
   listProjectAgentSessions: { response: mobileProjectAgentSessionsResponseSchema },
   runProjectAgentTask: {
@@ -900,6 +954,10 @@ export const mobileOperationSchemas = {
   acceptChannelProposal: {
     request: mobileAcceptChannelProposalRequestSchema,
     response: mobileAcceptChannelProposalResponseSchema,
+  },
+  acceptChannelExecutionProposal: {
+    request: mobileIssueExecutionApprovalRequestSchema,
+    response: mobileIssueExecutionApprovalResponseSchema,
   },
 } as const;
 

@@ -90,6 +90,135 @@ final class MobileAPIContractTests: XCTestCase {
         XCTAssertNil(unknownPayload.payload)
     }
 
+    func testExecutionProposalIsSeparateAndRequiresCanonicalServerSnapshot() throws {
+        let proposal = try JSONDecoder.mobileContract.decode(
+            IssueExecutionProposal.self,
+            from: Data(
+                #"""
+                {
+                  "id": "cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd",
+                  "type": "request_issue_execute",
+                  "status": "pending",
+                  "projectId": "11111111-1111-4111-8111-111111111111",
+                  "runId": "33333333-3333-4333-8333-333333333333",
+                  "title": "Build onboarding",
+                  "createdAt": "2026-08-11T01:00:00.000Z",
+                  "acceptedAt": null,
+                  "requestedProvider": null,
+                  "requestedModel": null,
+                  "requestedEffort": null,
+                  "requestedWorkerId": null,
+                  "delegatedByAgentId": "66666666-6666-4666-8666-666666666666",
+                  "delegatedByAgentName": "Bumble"
+                }
+                """#.utf8
+            )
+        )
+
+        XCTAssertEqual(proposal.type, .executeIssue)
+        XCTAssertEqual(proposal.status, .pending)
+        XCTAssertEqual(proposal.title, "Build onboarding")
+        XCTAssertEqual(proposal.delegatedByAgentName, "Bumble")
+
+        let create = IssueProposedAction(
+            id: UUID(uuidString: "abababab-abab-4bab-8bab-abababababab")!,
+            type: .create,
+            issue: .init(
+                title: "Build onboarding",
+                description: nil,
+                priority: 2,
+                status: "backlog"
+            ),
+            status: .accepted,
+            resultRunId: proposal.runId,
+            executeAfterCreate: true
+        )
+        let message = IssueMessage(
+            id: UUID(uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!,
+            runId: proposal.runId,
+            parentMessageId: nil,
+            body: "Create it, then propose execution.",
+            attachments: nil,
+            author: .init(id: nil, name: "Bumble", image: nil, provider: "codex"),
+            replyCount: 0,
+            proposedAction: create,
+            executionProposal: proposal,
+            createdAt: Date(timeIntervalSince1970: 1_786_413_600),
+            updatedAt: Date(timeIntervalSince1970: 1_786_413_600)
+        )
+        let roundTrip = try JSONDecoder.mobileContract.decode(
+            IssueMessage.self,
+            from: JSONEncoder.mobileContract.encode(message)
+        )
+        XCTAssertEqual(roundTrip.proposedAction?.executeAfterCreate, true)
+        XCTAssertEqual(roundTrip.executionProposal?.id, proposal.id)
+    }
+
+    func testExecutionApprovalRequestEncodesEveryNullableChoiceWithoutRequestID() throws {
+        let request = AcceptIssueExecutionProposalRequest(
+            provider: .codex,
+            model: nil,
+            effort: nil,
+            workerId: nil
+        )
+        let object = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder.mobileContract.encode(request)
+            ) as? [String: Any]
+        )
+
+        XCTAssertEqual(object["provider"] as? String, "codex")
+        XCTAssertTrue(object["model"] is NSNull)
+        XCTAssertTrue(object["effort"] is NSNull)
+        XCTAssertTrue(object["workerId"] is NSNull)
+        XCTAssertNil(object["requestId"])
+        XCTAssertEqual(Set(object.keys), ["provider", "model", "effort", "workerId"])
+    }
+
+    func testExecutionProposalRejectsMissingCanonicalNullableFields() {
+        let missingRequestedWorker = Data(
+            #"{"id":"cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd","type":"request_issue_execute","status":"pending","projectId":"11111111-1111-4111-8111-111111111111","runId":"33333333-3333-4333-8333-333333333333","title":"Build onboarding","createdAt":"2026-08-11T01:00:00.000Z","acceptedAt":null,"requestedProvider":null,"requestedModel":null,"requestedEffort":null,"delegatedByAgentId":null,"delegatedByAgentName":null}"#.utf8
+        )
+
+        XCTAssertThrowsError(
+            try JSONDecoder.mobileContract.decode(
+                IssueExecutionProposal.self,
+                from: missingRequestedWorker
+            )
+        )
+    }
+
+    func testCreateAcceptanceExecutionProposalIsOptionalForOlderServers() throws {
+        let channelResponses = [
+            #"{"outcome":"accepted","projectId":"11111111-1111-4111-8111-111111111111","resultRunId":"33333333-3333-4333-8333-333333333333"}"#,
+            #"{"outcome":"accepted","projectId":"11111111-1111-4111-8111-111111111111","resultRunId":"33333333-3333-4333-8333-333333333333","executionProposal":null}"#,
+        ]
+        for payload in channelResponses {
+            let response = try JSONDecoder.mobileContract.decode(
+                AcceptChannelProposalResponse.self,
+                from: Data(payload.utf8)
+            )
+            XCTAssertNil(response.executionProposal)
+        }
+
+        var actionPayload = try XCTUnwrap(
+            operations["acceptIssueActionProposal"]?["response"] as? [String: Any]
+        )
+        actionPayload.removeValue(forKey: "executionProposal")
+        let missing = try JSONDecoder.mobileContract.decode(
+            AcceptIssueActionProposalResponse.self,
+            from: JSONSerialization.data(withJSONObject: actionPayload)
+        )
+        XCTAssertNil(missing.executionProposal)
+
+        actionPayload["executionProposal"] = NSNull()
+        let null = try JSONDecoder.mobileContract.decode(
+            AcceptIssueActionProposalResponse.self,
+            from: JSONSerialization.data(withJSONObject: actionPayload)
+        )
+        XCTAssertNil(null.executionProposal)
+    }
+
     func testChannelIssueProposalRejectsPartiallyMalformedCanonicalDetails() throws {
         let malformedIssues = [
             #"{"title":"Missing fields"}"#,
@@ -128,6 +257,19 @@ final class MobileAPIContractTests: XCTestCase {
         )
         let info = try XCTUnwrap(document["info"] as? [String: Any])
         XCTAssertEqual(info["version"] as? String, MobileAPIContract.version)
+
+        let components = try XCTUnwrap(document["components"] as? [String: Any])
+        let schemas = try XCTUnwrap(components["schemas"] as? [String: Any])
+        for responseName in [
+            "AcceptIssueActionProposalResponse",
+            "AcceptChannelProposalResponse",
+        ] {
+            let schema = try XCTUnwrap(schemas[responseName] as? [String: Any])
+            let properties = try XCTUnwrap(schema["properties"] as? [String: Any])
+            XCTAssertNotNil(properties["executionProposal"])
+            let required = schema["required"] as? [String] ?? []
+            XCTAssertFalse(required.contains("executionProposal"))
+        }
 
         let paths = try XCTUnwrap(document["paths"] as? [String: Any])
         let httpMethods: Set<String> = ["get", "post", "put", "patch", "delete"]
@@ -196,6 +338,9 @@ final class MobileAPIContractTests: XCTestCase {
         let acceptedAction: AcceptIssueActionProposalResponse = try decodeResponse(
             "acceptIssueActionProposal"
         )
+        let acceptedExecution: AcceptIssueExecutionProposalResponse = try decodeResponse(
+            "acceptIssueExecutionProposal"
+        )
         let channels: ChannelsResponse = try decodeResponse("listChannels")
         let channel: ChannelDetailResponse = try decodeResponse("getChannel")
         let channelMessages: ChannelMessagesResponse = try decodeResponse(
@@ -203,6 +348,9 @@ final class MobileAPIContractTests: XCTestCase {
         )
         let acceptedChannelProposal: AcceptChannelProposalResponse = try decodeResponse(
             "acceptChannelProposal"
+        )
+        let acceptedChannelExecution: AcceptChannelExecutionProposalResponse = try decodeResponse(
+            "acceptChannelExecutionProposal"
         )
 
         XCTAssertTrue(health.ok)
@@ -243,8 +391,14 @@ final class MobileAPIContractTests: XCTestCase {
         XCTAssertEqual(reassign.requestedWorkerId, "worker-1")
         XCTAssertEqual(accepted.proposal.status, .accepted)
         XCTAssertEqual(accepted.revision, 2)
-        XCTAssertEqual(acceptedAction.proposal.type, .update)
-        XCTAssertEqual(acceptedAction.proposal.changes?.description, "Use the revised acceptance criteria.")
+        XCTAssertEqual(acceptedAction.proposal.type, .create)
+        XCTAssertEqual(acceptedAction.proposal.issue?.title, "Native dashboard sync")
+        XCTAssertEqual(acceptedAction.proposal.executeAfterCreate, true)
+        XCTAssertEqual(acceptedAction.executionProposal?.status, .pending)
+        XCTAssertNil(acceptedAction.executionProposal?.delegatedByAgentName)
+        XCTAssertEqual(acceptedExecution.proposal.status, .accepted)
+        XCTAssertEqual(acceptedExecution.proposal.requestedProvider, .codex)
+        XCTAssertEqual(acceptedExecution.dispatch.dispatchMode, "any")
         XCTAssertEqual(channels.channels.count, 2)
         XCTAssertEqual(channels.cursor, 12)
         XCTAssertEqual(channel.messages.first?.body, "@honey 온보딩 개편 계획서를 정리해줘")
@@ -261,11 +415,23 @@ final class MobileAPIContractTests: XCTestCase {
             channelMessages.messages.last?.proposal?.payload?.issue?.status,
             .backlog
         )
+        XCTAssertEqual(
+            channelMessages.messages.last?.proposal?.payload?.executeAfterCreate,
+            true
+        )
         XCTAssertEqual(acceptedChannelProposal.outcome, .accepted)
         XCTAssertEqual(
             acceptedChannelProposal.projectId.uuidString.lowercased(),
             "11111111-1111-4111-8111-111111111111"
         )
+        XCTAssertEqual(acceptedChannelProposal.executionProposal?.status, .pending)
+        XCTAssertEqual(
+            acceptedChannelProposal.executionProposal?.delegatedByAgentName,
+            "Bumble"
+        )
+        XCTAssertEqual(acceptedChannelExecution.outcome, .accepted)
+        XCTAssertEqual(acceptedChannelExecution.proposal.delegatedByAgentName, "Bumble")
+        XCTAssertEqual(acceptedChannelExecution.dispatch.requestedWorkerId, "worker-1")
     }
 
     func testEndpointBuildersProduceExpectedPaths() {
@@ -323,6 +489,14 @@ final class MobileAPIContractTests: XCTestCase {
             "/organizations/22222222-2222-4222-8222-222222222222/channels/33333333-3333-4333-8333-333333333333/proposals/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee/accept"
         )
         XCTAssertEqual(
+            MobileAPIContract.Endpoint.acceptChannelExecutionProposal(
+                organizationID: organizationID,
+                channelID: channelID,
+                proposalID: proposalID
+            ),
+            "/organizations/22222222-2222-4222-8222-222222222222/channels/33333333-3333-4333-8333-333333333333/proposals/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee/accept-execution"
+        )
+        XCTAssertEqual(
             MobileAPIContract.Endpoint.acceptIssueReworkProposal(
                 projectID: projectID,
                 runID: runID,
@@ -337,6 +511,14 @@ final class MobileAPIContractTests: XCTestCase {
                 proposalID: proposalID
             ),
             "/projects/11111111-1111-4111-8111-111111111111/runs/33333333-3333-4333-8333-333333333333/issue-action-proposals/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee/accept"
+        )
+        XCTAssertEqual(
+            MobileAPIContract.Endpoint.acceptIssueExecutionProposal(
+                projectID: projectID,
+                conversationRunID: runID,
+                proposalID: proposalID
+            ),
+            "/projects/11111111-1111-4111-8111-111111111111/runs/33333333-3333-4333-8333-333333333333/issue-execution-proposals/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee/accept"
         )
         XCTAssertEqual(
             MobileAPIContract.Endpoint.projectAgents(projectID: projectID, locale: "en"),

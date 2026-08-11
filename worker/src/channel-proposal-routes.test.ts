@@ -21,6 +21,7 @@ import {
   transferIssue,
 } from "./db";
 import { applyD1Migrations } from "./test-helpers/d1";
+import { mobileAcceptIssueActionProposalResponseSchema } from "./mobile-contract";
 import {
   dispatchHuntRun,
   leaseExpiryFrom,
@@ -557,6 +558,74 @@ describe("channel issue proposal approval route", () => {
     });
   });
 
+  it("serializes executeAfterCreate only for create proposals and keeps update retries exact", async () => {
+    const { conversationRunId } = await seedConversationProposal(120);
+    const updateProposalId = "71000000-0000-4000-8000-000000000102";
+    const updateProposal = await createIssueActionProposal(db, {
+      id: updateProposalId,
+      projectId: projectAId,
+      conversationRunId,
+      triggerMessageId: "72000000-0000-4000-8000-000000000102",
+      replyMessageId: "73000000-0000-4000-8000-000000000102",
+      actionType: "request_issue_update",
+      payloadJson: JSON.stringify({
+        changes: { description: "Approved updated description." },
+      }),
+      createdAt: now,
+    });
+    expect(updateProposal).not.toBeNull();
+    const url =
+      `https://briar.example/projects/${projectAId}/runs/${conversationRunId}` +
+      `/issue-action-proposals/${updateProposalId}/accept`;
+
+    const accepted = await worker.fetch(new Request(url, {
+      method: "POST",
+      headers: { authorization: `Bearer ${ownerToken}` },
+    }), env());
+    expect(accepted.status).toBe(200);
+    const acceptedBody = await accepted.json();
+    expect(mobileAcceptIssueActionProposalResponseSchema.parse(acceptedBody))
+      .toEqual({
+        proposal: {
+          id: updateProposalId,
+          type: "request_issue_update",
+          changes: { description: "Approved updated description." },
+          changedFields: ["description"],
+          status: "accepted",
+          acceptedAt: expect.any(String),
+          resultRunId: conversationRunId,
+        },
+        outcome: "accepted",
+        resultRunId: conversationRunId,
+      });
+    expect((acceptedBody as { proposal: Record<string, unknown> }).proposal)
+      .not.toHaveProperty("executeAfterCreate");
+
+    const retried = await worker.fetch(new Request(url, {
+      method: "POST",
+      headers: { authorization: `Bearer ${ownerToken}` },
+    }), env());
+    expect(retried.status).toBe(200);
+    const retriedBody = await retried.json();
+    expect(mobileAcceptIssueActionProposalResponseSchema.parse(retriedBody))
+      .toEqual({
+        proposal: {
+          id: updateProposalId,
+          type: "request_issue_update",
+          changes: { description: "Approved updated description." },
+          changedFields: ["description"],
+          status: "accepted",
+          acceptedAt: expect.any(String),
+          resultRunId: conversationRunId,
+        },
+        executionProposal: null,
+        outcome: "already_accepted",
+        resultRunId: conversationRunId,
+      });
+    expect((retriedBody as { proposal: Record<string, unknown> }).proposal)
+      .not.toHaveProperty("executeAfterCreate");
+  });
+
   it("resets conversation-approved execution on unassign and transfer", async () => {
     const { conversationRunId, proposalId } =
       await seedConversationProposal(103);
@@ -814,6 +883,7 @@ describe("channel issue proposal approval route", () => {
       outcome: "already_accepted",
       projectId: projectAId,
       resultRunId: acceptedBody.resultRunId,
+      executionProposal: null,
     });
 
     const runs = await db.prepare(
@@ -1165,6 +1235,7 @@ describe("channel issue proposal approval route", () => {
       outcome: "already_accepted",
       projectId: projectBId,
       resultRunId: acceptedBody.resultRunId,
+      executionProposal: null,
     });
     await expect(transferIssue(db, {
       sourceProjectId: projectBId,
@@ -1987,6 +2058,7 @@ describe("channel issue proposal approval route", () => {
         outcome: "already_accepted",
         projectId: projectAId,
         resultRunId: acceptedBody.resultRunId,
+        executionProposal: null,
       });
       const pending = await worker.fetch(
         request(pendingProposalId, projectAId),

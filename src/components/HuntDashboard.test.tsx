@@ -3464,6 +3464,255 @@ describe("HuntDashboard", () => {
     container.remove();
   });
 
+  it("reloads execution proposals when the run execution snapshot changes", async () => {
+    const conversationRun = demoDashboard.runs[1];
+    const targetRun = {
+      ...demoDashboard.runs[0],
+      status: "backlog" as const,
+      workflowStage: null,
+      executionReadiness: "ready" as const,
+      claimedBy: null,
+      claimedAt: null,
+      workerId: null,
+      dispatchedAt: null,
+      requestedByUserId: null,
+      dispatchMode: null,
+    };
+    const createdAt = "2026-08-11T00:00:00.000Z";
+    const message: IssueMessage = {
+      id: "message-execution-proposal",
+      runId: conversationRun.id,
+      parentMessageId: null,
+      body: "이 이슈의 실행을 제안합니다.",
+      author: { id: null, name: "Briar · Codex", image: null, provider: "codex" },
+      replyCount: 0,
+      executionProposal: {
+        id: "40404040-dddd-4ddd-8ddd-dddddddddddd",
+        type: "request_issue_execute",
+        status: "pending",
+        projectId: demoDashboard.project.id,
+        runId: targetRun.id,
+        title: targetRun.title,
+        createdAt,
+        acceptedAt: null,
+        requestedProvider: null,
+        requestedModel: null,
+        requestedEffort: null,
+        requestedWorkerId: null,
+        delegatedByAgentId: null,
+        delegatedByAgentName: null,
+      },
+      createdAt,
+      updatedAt: createdAt,
+    };
+    const onLoadIssueMessages = vi
+      .fn<() => Promise<IssueMessage[]>>()
+      .mockResolvedValueOnce([message])
+      .mockResolvedValue([{ ...message, executionProposal: null }]);
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    const renderPage = (nextTargetRun: HuntRun) => (
+      <RunPage
+        availableRuns={[conversationRun, nextTargetRun]}
+        isSidebarOpen
+        error={null}
+        isRecovering={false}
+        onBack={() => undefined}
+        onCancel={async () => undefined}
+        onLoadAttachment={async () => new Blob()}
+        onLoadIssueMessages={onLoadIssueMessages}
+        onLoadRunEvidence={async () => []}
+        onMove={async () => undefined}
+        onRetry={async () => undefined}
+        onSendIssueMessage={async () => {
+          throw new Error("not implemented in this test");
+        }}
+        run={conversationRun}
+      />
+    );
+
+    await act(async () => root.render(renderPage(targetRun)));
+    expect(container.querySelector(".execution-proposal-card")).not.toBeNull();
+
+    await act(async () => {
+      root.render(renderPage({ ...targetRun, agentId: dashboardAgent.id }));
+      await Promise.resolve();
+    });
+
+    expect(onLoadIssueMessages).toHaveBeenCalledTimes(2);
+    expect(container.querySelector(".execution-proposal-card")).toBeNull();
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("revalidates a newly loaded pending proposal when its target changed during the load", async () => {
+    const conversationRun = demoDashboard.runs[1];
+    const targetRun = {
+      ...demoDashboard.runs[0],
+      status: "backlog" as const,
+      workflowStage: null,
+      executionReadiness: "ready" as const,
+      claimedBy: null,
+      claimedAt: null,
+      workerId: null,
+      dispatchedAt: null,
+      requestedByUserId: null,
+      dispatchMode: null,
+    };
+    const createdAt = "2026-08-11T00:00:00.000Z";
+    const message: IssueMessage = {
+      id: "message-delayed-execution-proposal",
+      runId: conversationRun.id,
+      parentMessageId: null,
+      body: "늦게 도착한 실행 제안입니다.",
+      author: { id: null, name: "Briar · Codex", image: null, provider: "codex" },
+      replyCount: 0,
+      executionProposal: {
+        id: "51515151-dddd-4ddd-8ddd-dddddddddddd",
+        type: "request_issue_execute",
+        status: "pending",
+        projectId: demoDashboard.project.id,
+        runId: targetRun.id,
+        title: targetRun.title,
+        createdAt,
+        acceptedAt: null,
+        requestedProvider: null,
+        requestedModel: null,
+        requestedEffort: null,
+        requestedWorkerId: null,
+        delegatedByAgentId: null,
+        delegatedByAgentName: null,
+      },
+      createdAt,
+      updatedAt: createdAt,
+    };
+    let resolveInitialLoad!: (messages: IssueMessage[]) => void;
+    const initialLoad = new Promise<IssueMessage[]>((resolve) => {
+      resolveInitialLoad = resolve;
+    });
+    const onLoadIssueMessages = vi
+      .fn<() => Promise<IssueMessage[]>>()
+      .mockImplementationOnce(() => initialLoad)
+      .mockResolvedValue([{ ...message, executionProposal: null }]);
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    const renderPage = (nextTargetRun: HuntRun) => (
+      <RunPage
+        availableRuns={[conversationRun, nextTargetRun]}
+        isSidebarOpen
+        error={null}
+        isRecovering={false}
+        onBack={() => undefined}
+        onCancel={async () => undefined}
+        onLoadAttachment={async () => new Blob()}
+        onLoadIssueMessages={onLoadIssueMessages}
+        onLoadRunEvidence={async () => []}
+        onMove={async () => undefined}
+        onRetry={async () => undefined}
+        onSendIssueMessage={async () => {
+          throw new Error("not implemented in this test");
+        }}
+        run={conversationRun}
+      />
+    );
+
+    await act(async () => root.render(renderPage(targetRun)));
+    await act(async () => {
+      root.render(renderPage({
+        ...targetRun,
+        status: "queued",
+        updatedAt: "2026-08-11T00:01:00.000Z",
+      }));
+      resolveInitialLoad([message]);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(onLoadIssueMessages).toHaveBeenCalledTimes(2);
+    expect(container.querySelector(".execution-proposal-card")).toBeNull();
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("does not reload accepted proposal history as its target progresses", async () => {
+    const conversationRun = demoDashboard.runs[1];
+    const targetRun = demoDashboard.runs[0];
+    const createdAt = "2026-08-11T00:00:00.000Z";
+    const message: IssueMessage = {
+      id: "message-accepted-execution-proposal",
+      runId: conversationRun.id,
+      parentMessageId: null,
+      body: "승인된 실행 기록입니다.",
+      author: { id: null, name: "Briar · Codex", image: null, provider: "codex" },
+      replyCount: 0,
+      executionProposal: {
+        id: "62626262-dddd-4ddd-8ddd-dddddddddddd",
+        type: "request_issue_execute",
+        status: "accepted",
+        projectId: demoDashboard.project.id,
+        runId: targetRun.id,
+        title: targetRun.title,
+        createdAt,
+        acceptedAt: "2026-08-11T00:01:00.000Z",
+        requestedProvider: "codex",
+        requestedModel: "gpt-5.6-sol",
+        requestedEffort: "high",
+        requestedWorkerId: null,
+        delegatedByAgentId: null,
+        delegatedByAgentName: null,
+      },
+      createdAt,
+      updatedAt: createdAt,
+    };
+    const onLoadIssueMessages = vi
+      .fn<() => Promise<IssueMessage[]>>()
+      .mockResolvedValue([message]);
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    const renderPage = (nextTargetRun: HuntRun) => (
+      <RunPage
+        availableRuns={[conversationRun, nextTargetRun]}
+        isSidebarOpen
+        error={null}
+        isRecovering={false}
+        onBack={() => undefined}
+        onCancel={async () => undefined}
+        onLoadAttachment={async () => new Blob()}
+        onLoadIssueMessages={onLoadIssueMessages}
+        onLoadRunEvidence={async () => []}
+        onMove={async () => undefined}
+        onRetry={async () => undefined}
+        onSendIssueMessage={async () => {
+          throw new Error("not implemented in this test");
+        }}
+        run={conversationRun}
+      />
+    );
+
+    await act(async () => root.render(renderPage(targetRun)));
+    expect(onLoadIssueMessages).toHaveBeenCalledOnce();
+    await act(async () => {
+      root.render(renderPage({
+        ...targetRun,
+        status: "queued",
+        updatedAt: "2026-08-11T00:02:00.000Z",
+      }));
+      await Promise.resolve();
+    });
+
+    expect(onLoadIssueMessages).toHaveBeenCalledOnce();
+    expect(container.querySelector(".execution-proposal-card")).not.toBeNull();
+    expect(container.querySelector(".issue-message-state")).toBeNull();
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
   it("keeps attachment images loaded when the run snapshot refreshes", async () => {
     const createObjectUrl = vi.fn((blob: Blob) =>
       `blob:issue-attachment-${blob.size}`
@@ -5002,6 +5251,161 @@ describe("HuntDashboard", () => {
     });
     expect(onAccept).toHaveBeenCalledWith(message.proposedAction);
     expect(container.textContent).toContain("새 이슈가 생성되었습니다.");
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("keeps create evidence while approving its distinct follow-up run", async () => {
+    const conversationRun = demoDashboard.runs[1];
+    const targetRun = {
+      ...demoDashboard.runs[0],
+      id: "30303030-cccc-4ccc-8ccc-cccccccccccc",
+      title: "후속 QA 실행",
+      status: "backlog" as const,
+      workflowStage: null,
+      executionReadiness: "ready" as const,
+      claimedBy: null,
+      claimedAt: null,
+      workerId: null,
+      dispatchedAt: null,
+      requestedByUserId: null,
+      dispatchMode: null,
+    };
+    const executionProposal = {
+      id: "40404040-cccc-4ccc-8ccc-cccccccccccc",
+      type: "request_issue_execute" as const,
+      status: "pending" as const,
+      projectId: demoDashboard.project.id,
+      runId: targetRun.id,
+      title: targetRun.title,
+      createdAt: "2026-08-11T00:00:00.000Z",
+      acceptedAt: null,
+      requestedProvider: null,
+      requestedModel: null,
+      requestedEffort: null,
+      requestedWorkerId: null,
+      delegatedByAgentId: null,
+      delegatedByAgentName: null,
+    };
+    const message: IssueMessage = {
+      id: "10101010-cccc-4ccc-8ccc-cccccccccccc",
+      runId: conversationRun.id,
+      parentMessageId: null,
+      body: "후속 QA 이슈 생성과 실행을 제안합니다.",
+      author: { id: null, name: "Briar · Codex", image: null, provider: "codex" },
+      replyCount: 0,
+      proposedAction: {
+        id: "20202020-cccc-4ccc-8ccc-cccccccccccc",
+        type: "request_issue_create",
+        issue: {
+          title: targetRun.title,
+          description: "생성과 실행 경계를 분리합니다.",
+          priority: 2,
+          status: "backlog",
+        },
+        executeAfterCreate: true,
+        status: "pending",
+        acceptedAt: null,
+        resultRunId: null,
+      },
+      executionProposal: null,
+      createdAt: "2026-08-11T00:00:00.000Z",
+      updatedAt: "2026-08-11T00:01:00.000Z",
+    };
+    const acceptedCreate = {
+      ...message.proposedAction!,
+      status: "accepted" as const,
+      acceptedAt: "2026-08-11T00:01:00.000Z",
+      resultRunId: targetRun.id,
+    };
+    const materializedMessage: IssueMessage = {
+      ...message,
+      proposedAction: acceptedCreate,
+      executionProposal,
+    };
+    const onLoadMessages = vi.fn()
+      .mockResolvedValueOnce([message])
+      .mockResolvedValue([materializedMessage]);
+    const onAcceptCreate = vi.fn(async () => acceptedCreate);
+    const onAcceptExecution = vi.fn(async (_proposal, input) => ({
+      ...executionProposal,
+      status: "accepted" as const,
+      acceptedAt: "2026-08-11T00:02:00.000Z",
+      requestedProvider: input.provider,
+      requestedModel: input.model,
+      requestedEffort: input.effort,
+      requestedWorkerId: input.workerId,
+    }));
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => root.render(
+      <TooltipProvider>
+        <RunPage
+          availableRuns={[conversationRun, targetRun]}
+          error={null}
+          executionWorkers={[{
+            ...dashboardWorker,
+            readiness: "available",
+            activeSessions: 0,
+            availableSessions: 1,
+          }]}
+          isRecovering={false}
+          isSidebarOpen
+          onAcceptIssueAction={onAcceptCreate}
+          onAcceptIssueExecution={onAcceptExecution}
+          onBack={() => undefined}
+          onCancel={async () => undefined}
+          onLoadAttachment={async () => new Blob()}
+          onLoadIssueMessages={onLoadMessages}
+          onLoadRunEvidence={async () => []}
+          onMove={async () => undefined}
+          onRetry={async () => undefined}
+          onSendIssueMessage={async () => { throw new Error("not implemented"); }}
+          run={conversationRun}
+        />
+      </TooltipProvider>,
+    ));
+    await act(async () => { await Promise.resolve(); });
+
+    expect(container.textContent).not.toContain("새 이슈가 생성되었습니다");
+    expect(container.textContent).not.toContain("이슈 실행 제안");
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(
+        ".issue-rework-proposal-accept",
+      )?.click();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(onAcceptCreate).toHaveBeenCalledWith(message.proposedAction);
+    expect(onLoadMessages).toHaveBeenCalledTimes(2);
+    expect(container.textContent).toContain("새 이슈가 생성되었습니다");
+    expect(container.textContent).toContain("이슈 실행 제안");
+    expect(onAcceptExecution).not.toHaveBeenCalled();
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(
+        ".execution-proposal-approve",
+      )?.click();
+    });
+    expect(document.body.textContent).toContain("후속 QA 실행");
+    expect(document.body.textContent).toContain("이슈 실행 승인");
+    const finalApprove = Array.from(
+      document.body.querySelectorAll<HTMLButtonElement>("button"),
+    ).find((button) => button.textContent?.includes("승인하고 실행"));
+    await act(async () => finalApprove?.click());
+
+    expect(onAcceptExecution).toHaveBeenCalledWith(
+      executionProposal,
+      {
+        provider: "codex",
+        model: targetRun.preferredModel,
+        effort: targetRun.preferredEffort,
+        workerId: null,
+      },
+    );
+    expect(container.textContent).toContain("새 이슈가 생성되었습니다");
+    expect(container.textContent).toContain("실행이 명시적으로 승인");
 
     await act(async () => root.unmount());
     container.remove();

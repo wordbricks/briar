@@ -8,6 +8,13 @@ final class ChannelsStore: ObservableObject {
         let threadParentID: UUID?
     }
 
+    struct ExecutionApprovalContext: Identifiable, Sendable {
+        let proposalID: UUID
+        let snapshot: DashboardSnapshot
+
+        var id: UUID { proposalID }
+    }
+
     @Published private(set) var channels: [ChannelSummary] = []
     @Published private(set) var messages: [ChannelMessage] = []
     @Published private(set) var thread: [ChannelMessage] = []
@@ -16,6 +23,8 @@ final class ChannelsStore: ObservableObject {
     @Published private(set) var loading = false
     @Published private(set) var sending = false
     @Published private(set) var acceptingProposalID: UUID?
+    @Published private(set) var approvingExecutionProposalID: UUID?
+    @Published private(set) var preparingExecutionProposalID: UUID?
     @Published private(set) var errorMessage: String?
 
     private let api: any MobileAPIClientProtocol
@@ -35,6 +44,8 @@ final class ChannelsStore: ObservableObject {
     private var conversationLoadInFlight = false
     private var proposalRevisions: [UUID: Int] = [:]
     private var latestProposals: [UUID: ChannelMessage.Proposal] = [:]
+    private var latestExecutionProposals: [UUID: IssueExecutionProposal] = [:]
+    private var executionProposalIDsByMessage: [UUID: UUID] = [:]
     private var isForeground = true
     private var pollingTask: Task<Void, Never>?
 
@@ -65,6 +76,8 @@ final class ChannelsStore: ObservableObject {
         syncCursor = nil
         proposalRevisions = [:]
         latestProposals = [:]
+        latestExecutionProposals = [:]
+        executionProposalIDsByMessage = [:]
         focusedChannelID = nil
         focusedThreadParentID = nil
         channels = []
@@ -76,6 +89,8 @@ final class ChannelsStore: ObservableObject {
         catalogRefreshInFlight = false
         conversationLoadInFlight = false
         acceptingProposalID = nil
+        approvingExecutionProposalID = nil
+        preparingExecutionProposalID = nil
         errorMessage = nil
         guard organizationID != nil, token != nil else { return }
         if isForeground { startPolling() }
@@ -125,6 +140,7 @@ final class ChannelsStore: ObservableObject {
 
     func openChannel(_ channelID: UUID) async {
         guard let organizationID, let token else { return }
+        let previousMessageIDs = Set(messages.map(\.id)).union(thread.map(\.id))
         if focusedChannelID != channelID || focusedThreadParentID != nil {
             invalidateProposalAcceptancePresentation()
         }
@@ -164,6 +180,9 @@ final class ChannelsStore: ObservableObject {
                 focusedChannelID == channelID
             else { return }
             upsertChannel(response.channel)
+            invalidateExecutionProposals(
+                forMessageIDs: previousMessageIDs.subtracting(Set(response.messages.map(\.id)))
+            )
             recordProposalMessages(response.messages)
             messages = response.messages
             members = response.members
@@ -210,6 +229,7 @@ final class ChannelsStore: ObservableObject {
 
     func openThread(channelID: UUID, parentMessageID: UUID) async {
         guard let organizationID, let token else { return }
+        let previousThreadMessageIDs = Set(thread.map(\.id))
         if focusedChannelID != channelID || focusedThreadParentID != parentMessageID {
             invalidateProposalAcceptancePresentation()
         }
@@ -247,6 +267,11 @@ final class ChannelsStore: ObservableObject {
                 focusedChannelID == channelID,
                 focusedThreadParentID == parentMessageID
             else { return }
+            invalidateExecutionProposals(
+                forMessageIDs: previousThreadMessageIDs.subtracting(
+                    Set(response.messages.map(\.id))
+                )
+            )
             recordProposalMessages(response.messages)
             thread = response.messages
             errorMessage = nil
@@ -463,12 +488,14 @@ final class ChannelsStore: ObservableObject {
         guard focusedChannelID == channelID else { return nil }
         // Approval is a state-changing operation. Keep one request in flight so
         // repeated taps (including on another card) cannot race each other.
-        guard acceptingProposalID == nil else { return nil }
+        guard acceptingProposalID == nil, approvingExecutionProposalID == nil else { return nil }
         let expectedGeneration = generation
         let expectedFocusRevision = authoritativeLoadRevision
         let expectedFocusedChannelID = focusedChannelID
         let expectedFocusedThreadParentID = focusedThreadParentID
         let expectedProposalRevision = proposalRevisions[proposalID, default: 0]
+        let requestsExecutionFollowUp = latestProposals[proposalID]?
+            .payload?.executeAfterCreate == true
         acceptanceRevision &+= 1
         let expectedAcceptanceRevision = acceptanceRevision
         acceptingProposalID = proposalID
@@ -498,6 +525,19 @@ final class ChannelsStore: ObservableObject {
                 expectedFocusedChannelID == focusedChannelID,
                 expectedFocusedThreadParentID == focusedThreadParentID
             else { return nil }
+            let executionProposal = response.executionProposal.flatMap { candidate in
+                issueExecutionProposalMatchesCreatedRun(
+                    candidate,
+                    projectID: response.projectId,
+                    runID: response.resultRunId
+                ) ? candidate : nil
+            }
+            let normalizedResponse = AcceptChannelProposalResponse(
+                outcome: response.outcome,
+                projectId: response.projectId,
+                resultRunId: response.resultRunId,
+                executionProposal: executionProposal
+            )
             if proposalRevisions[proposalID, default: 0] != expectedProposalRevision {
                 var latest = latestProposals[proposalID]
                 if latest?.status != .accepted {
@@ -520,7 +560,10 @@ final class ChannelsStore: ObservableObject {
                     return AcceptChannelProposalResponse(
                         outcome: .alreadyAccepted,
                         projectId: projectID,
-                        resultRunId: runID
+                        resultRunId: runID,
+                        executionProposal: executionProposal(
+                            forCreateProposalID: proposalID
+                        )
                     )
                 }
                 // A pending proposal on the accepted target is the reservation
@@ -530,19 +573,25 @@ final class ChannelsStore: ObservableObject {
                 guard
                     errorMessage == nil,
                     latest?.status == .pending,
-                    latest?.projectId == response.projectId
+                    latest?.projectId == normalizedResponse.projectId
                 else { return nil }
             }
             for index in messages.indices where messages[index].proposal?.id == proposalID {
                 messages[index].proposal = acceptedProposal(
                     messages[index].proposal,
-                    response: response
+                    response: normalizedResponse
                 )
             }
             for index in thread.indices where thread[index].proposal?.id == proposalID {
                 thread[index].proposal = acceptedProposal(
                     thread[index].proposal,
-                    response: response
+                    response: normalizedResponse
+                )
+            }
+            if let executionProposal = normalizedResponse.executionProposal {
+                applyCreatedExecutionProposal(
+                    executionProposal,
+                    createProposalID: proposalID
                 )
             }
             latestProposals[proposalID] = messages
@@ -550,6 +599,161 @@ final class ChannelsStore: ObservableObject {
                 .first(where: { $0.id == proposalID })
                 ?? thread.compactMap(\.proposal).first(where: { $0.id == proposalID })
             proposalRevisions[proposalID, default: 0] &+= 1
+            errorMessage = nil
+            let droppedMismatchedExecutionProposal = response.executionProposal != nil &&
+                normalizedResponse.executionProposal == nil
+            if (requestsExecutionFollowUp && normalizedResponse.executionProposal == nil) ||
+                droppedMismatchedExecutionProposal {
+                let beforeRefreshRevision = authoritativeLoadRevision
+                if let parentID = expectedFocusedThreadParentID {
+                    await openThread(channelID: channelID, parentMessageID: parentID)
+                } else {
+                    await openChannel(channelID)
+                }
+                guard
+                    authoritativeLoadRevision == (beforeRefreshRevision &+ 1),
+                    focusedChannelID == expectedFocusedChannelID,
+                    focusedThreadParentID == expectedFocusedThreadParentID
+                else { return nil }
+            }
+            return normalizedResponse
+        } catch {
+            guard
+                expectedGeneration == generation,
+                expectedAcceptanceRevision == acceptanceRevision,
+                expectedFocusRevision == authoritativeLoadRevision,
+                expectedFocusedChannelID == focusedChannelID,
+                expectedFocusedThreadParentID == focusedThreadParentID
+            else { return nil }
+            errorMessage = CompanionStore.message(for: error)
+            return nil
+        }
+    }
+
+    func acceptExecutionProposal(
+        channelID: UUID,
+        proposalID: UUID,
+        request: AcceptIssueExecutionProposalRequest
+    ) async -> AcceptChannelExecutionProposalResponse? {
+        guard let organizationID, let token else { return nil }
+        guard focusedChannelID == channelID else { return nil }
+        guard channels.first(where: { $0.id == channelID })?.archivedAt == nil else {
+            return nil
+        }
+        guard acceptingProposalID == nil, approvingExecutionProposalID == nil else { return nil }
+        guard latestExecutionProposals[proposalID]?.status == .pending else { return nil }
+
+        let expectedGeneration = generation
+        let expectedFocusRevision = authoritativeLoadRevision
+        let expectedFocusedChannelID = focusedChannelID
+        let expectedFocusedThreadParentID = focusedThreadParentID
+        let expectedProposalRevision = proposalRevisions[proposalID, default: 0]
+        guard let expectedProposal = latestExecutionProposals[proposalID] else { return nil }
+        acceptanceRevision &+= 1
+        let expectedAcceptanceRevision = acceptanceRevision
+        approvingExecutionProposalID = proposalID
+        defer {
+            if expectedGeneration == generation,
+               expectedAcceptanceRevision == acceptanceRevision,
+               approvingExecutionProposalID == proposalID {
+                approvingExecutionProposalID = nil
+            }
+        }
+
+        do {
+            let preflight: DashboardSnapshot = try await api.get(
+                MobileAPIContract.Endpoint.dashboard(projectID: expectedProposal.projectId),
+                token: token,
+                as: DashboardSnapshot.self
+            )
+            guard
+                expectedGeneration == generation,
+                expectedAcceptanceRevision == acceptanceRevision,
+                expectedFocusRevision == authoritativeLoadRevision,
+                expectedFocusedChannelID == focusedChannelID,
+                expectedFocusedThreadParentID == focusedThreadParentID,
+                proposalRevisions[proposalID, default: 0] == expectedProposalRevision,
+                latestExecutionProposals[proposalID] == expectedProposal
+            else { return nil }
+            _ = try validateIssueExecutionApproval(
+                snapshot: preflight,
+                proposal: expectedProposal,
+                request: request
+            )
+
+            let response: AcceptChannelExecutionProposalResponse = try await api.send(
+                MobileAPIContract.Endpoint.acceptChannelExecutionProposal(
+                    organizationID: organizationID,
+                    channelID: channelID,
+                    proposalID: proposalID
+                ),
+                method: "POST",
+                token: token,
+                body: request,
+                as: AcceptChannelExecutionProposalResponse.self
+            )
+            guard
+                expectedGeneration == generation,
+                expectedAcceptanceRevision == acceptanceRevision,
+                expectedFocusRevision == authoritativeLoadRevision,
+                expectedFocusedChannelID == focusedChannelID,
+                expectedFocusedThreadParentID == focusedThreadParentID
+            else { return nil }
+
+            guard response.projectId == expectedProposal.projectId,
+                  response.runId == expectedProposal.runId,
+                  issueExecutionApprovalResponseMatches(
+                      proposal: response.proposal,
+                      projectID: response.projectId,
+                      runID: response.runId,
+                      dispatch: response.dispatch,
+                      expectedProposalID: proposalID,
+                      request: request
+                  )
+            else { throw MobileAPIError.invalidResponse }
+            let acceptedSnapshot: DashboardSnapshot = try await api.get(
+                MobileAPIContract.Endpoint.dashboard(projectID: response.projectId),
+                token: token,
+                as: DashboardSnapshot.self
+            )
+            guard
+                expectedGeneration == generation,
+                expectedAcceptanceRevision == acceptanceRevision,
+                expectedFocusRevision == authoritativeLoadRevision,
+                expectedFocusedChannelID == focusedChannelID,
+                expectedFocusedThreadParentID == focusedThreadParentID
+            else { return nil }
+            guard issueExecutionApprovalAcceptedStateMatches(
+                run: acceptedSnapshot.runs.first(where: { $0.id == response.runId }),
+                request: request
+            ) else { throw IssueExecutionApprovalError.stateChanged }
+
+            if proposalRevisions[proposalID, default: 0] != expectedProposalRevision {
+                var latest = latestExecutionProposals[proposalID]
+                if latest?.status != .accepted {
+                    let beforeRefreshRevision = authoritativeLoadRevision
+                    if let parentID = expectedFocusedThreadParentID {
+                        await openThread(channelID: channelID, parentMessageID: parentID)
+                    } else {
+                        await openChannel(channelID)
+                    }
+                    guard
+                        authoritativeLoadRevision == (beforeRefreshRevision &+ 1),
+                        focusedChannelID == expectedFocusedChannelID,
+                        focusedThreadParentID == expectedFocusedThreadParentID
+                    else { return nil }
+                    latest = latestExecutionProposals[proposalID]
+                }
+                if latest?.status == .accepted {
+                    guard latest?.projectId == response.projectId,
+                          latest?.runId == response.runId
+                    else { return nil }
+                    return response
+                }
+                guard errorMessage == nil, latest?.status == .pending else { return nil }
+            }
+
+            applyAcceptedExecutionProposal(response.proposal)
             errorMessage = nil
             return response
         } catch {
@@ -559,6 +763,71 @@ final class ChannelsStore: ObservableObject {
                 expectedFocusRevision == authoritativeLoadRevision,
                 expectedFocusedChannelID == focusedChannelID,
                 expectedFocusedThreadParentID == focusedThreadParentID
+            else { return nil }
+            errorMessage = CompanionStore.message(for: error)
+            return nil
+        }
+    }
+
+    func prepareExecutionProposal(
+        channelID: UUID,
+        proposalID: UUID
+    ) async -> ExecutionApprovalContext? {
+        guard let token else { return nil }
+        guard focusedChannelID == channelID else { return nil }
+        guard channels.first(where: { $0.id == channelID })?.archivedAt == nil else {
+            return nil
+        }
+        guard acceptingProposalID == nil,
+              approvingExecutionProposalID == nil,
+              preparingExecutionProposalID == nil,
+              let proposal = latestExecutionProposals[proposalID],
+              proposal.status == .pending
+        else { return nil }
+
+        let expectedGeneration = generation
+        let expectedFocusRevision = authoritativeLoadRevision
+        let expectedFocusedThreadParentID = focusedThreadParentID
+        let expectedProposalRevision = proposalRevisions[proposalID, default: 0]
+        acceptanceRevision &+= 1
+        let expectedAcceptanceRevision = acceptanceRevision
+        preparingExecutionProposalID = proposalID
+        defer {
+            if expectedGeneration == generation,
+               expectedAcceptanceRevision == acceptanceRevision,
+               preparingExecutionProposalID == proposalID {
+                preparingExecutionProposalID = nil
+            }
+        }
+
+        do {
+            let snapshot: DashboardSnapshot = try await api.get(
+                MobileAPIContract.Endpoint.dashboard(projectID: proposal.projectId),
+                token: token,
+                as: DashboardSnapshot.self
+            )
+            guard
+                expectedGeneration == generation,
+                expectedAcceptanceRevision == acceptanceRevision,
+                expectedFocusRevision == authoritativeLoadRevision,
+                focusedChannelID == channelID,
+                focusedThreadParentID == expectedFocusedThreadParentID,
+                proposalRevisions[proposalID, default: 0] == expectedProposalRevision,
+                latestExecutionProposals[proposalID] == proposal
+            else { return nil }
+            _ = try validateIssueExecutionApproval(
+                snapshot: snapshot,
+                proposal: proposal
+            )
+            errorMessage = nil
+            return ExecutionApprovalContext(proposalID: proposalID, snapshot: snapshot)
+        } catch {
+            guard
+                expectedGeneration == generation,
+                expectedAcceptanceRevision == acceptanceRevision,
+                expectedFocusRevision == authoritativeLoadRevision,
+                focusedChannelID == channelID,
+                focusedThreadParentID == expectedFocusedThreadParentID
             else { return nil }
             errorMessage = CompanionStore.message(for: error)
             return nil
@@ -589,6 +858,8 @@ final class ChannelsStore: ObservableObject {
     private func invalidateProposalAcceptancePresentation() {
         acceptanceRevision &+= 1
         acceptingProposalID = nil
+        approvingExecutionProposalID = nil
+        preparingExecutionProposalID = nil
     }
 
     private func acceptedProposal(
@@ -606,15 +877,106 @@ final class ChannelsStore: ObservableObject {
         )
     }
 
-    private func recordProposalMessages(_ incoming: [ChannelMessage]) {
-        var recorded: Set<UUID> = []
-        for message in incoming {
-            guard let proposal = message.proposal, recorded.insert(proposal.id).inserted else {
-                continue
+    private func applyAcceptedExecutionProposal(_ proposal: IssueExecutionProposal) {
+        for index in messages.indices
+            where messages[index].executionProposal?.id == proposal.id {
+            messages[index].executionProposal = proposal
+        }
+        for index in thread.indices
+            where thread[index].executionProposal?.id == proposal.id {
+            thread[index].executionProposal = proposal
+        }
+        latestExecutionProposals[proposal.id] = proposal
+        proposalRevisions[proposal.id, default: 0] &+= 1
+    }
+
+    private func applyCreatedExecutionProposal(
+        _ proposal: IssueExecutionProposal,
+        createProposalID: UUID
+    ) {
+        var affectedMessageIDs: Set<UUID> = []
+        for index in messages.indices
+            where messages[index].proposal?.id == createProposalID {
+            affectedMessageIDs.insert(messages[index].id)
+            messages[index].executionProposal = proposal
+        }
+        for index in thread.indices
+            where thread[index].proposal?.id == createProposalID {
+            affectedMessageIDs.insert(thread[index].id)
+            thread[index].executionProposal = proposal
+        }
+        for messageID in affectedMessageIDs {
+            if let previousID = executionProposalIDsByMessage[messageID],
+               previousID != proposal.id {
+                latestExecutionProposals.removeValue(forKey: previousID)
+                proposalRevisions[previousID, default: 0] &+= 1
             }
-            if latestProposals[proposal.id] == proposal { continue }
-            latestProposals[proposal.id] = proposal
+            executionProposalIDsByMessage[messageID] = proposal.id
+        }
+        if latestExecutionProposals[proposal.id] != proposal {
+            latestExecutionProposals[proposal.id] = proposal
             proposalRevisions[proposal.id, default: 0] &+= 1
+        }
+    }
+
+    private func executionProposal(
+        forCreateProposalID proposalID: UUID
+    ) -> IssueExecutionProposal? {
+        messages.first(where: { $0.proposal?.id == proposalID })?
+            .executionProposal
+            ?? thread.first(where: { $0.proposal?.id == proposalID })?
+                .executionProposal
+    }
+
+    private func recordProposalMessages(_ incoming: [ChannelMessage]) {
+        var recordedCreate: Set<UUID> = []
+        var recordedExecution: Set<UUID> = []
+        for message in incoming {
+            if let proposal = message.proposal,
+               recordedCreate.insert(proposal.id).inserted {
+                if latestProposals[proposal.id] != proposal {
+                    latestProposals[proposal.id] = proposal
+                    proposalRevisions[proposal.id, default: 0] &+= 1
+                }
+            }
+
+            let previousExecutionID = executionProposalIDsByMessage[message.id]
+            let nextExecutionID = message.executionProposal?.id
+            if let previousExecutionID, previousExecutionID != nextExecutionID {
+                invalidateExecutionProposal(previousExecutionID)
+            }
+            if let nextExecutionID {
+                executionProposalIDsByMessage[message.id] = nextExecutionID
+            } else {
+                executionProposalIDsByMessage.removeValue(forKey: message.id)
+            }
+            if let proposal = message.executionProposal,
+               recordedExecution.insert(proposal.id).inserted,
+               latestExecutionProposals[proposal.id] != proposal {
+                latestExecutionProposals[proposal.id] = proposal
+                proposalRevisions[proposal.id, default: 0] &+= 1
+            }
+        }
+    }
+
+    private func invalidateExecutionProposal(_ proposalID: UUID) {
+        latestExecutionProposals.removeValue(forKey: proposalID)
+        proposalRevisions[proposalID, default: 0] &+= 1
+        acceptanceRevision &+= 1
+        if approvingExecutionProposalID == proposalID {
+            approvingExecutionProposalID = nil
+        }
+        if preparingExecutionProposalID == proposalID {
+            preparingExecutionProposalID = nil
+        }
+    }
+
+    private func invalidateExecutionProposals(forMessageIDs messageIDs: Set<UUID>) {
+        for messageID in messageIDs {
+            guard let proposalID = executionProposalIDsByMessage.removeValue(
+                forKey: messageID
+            ) else { continue }
+            invalidateExecutionProposal(proposalID)
         }
     }
 
@@ -630,6 +992,13 @@ final class ChannelsStore: ObservableObject {
         }
         channels = nextChannels
 
+        if let focusedChannelID,
+           delta.channels.contains(where: {
+               $0.id == focusedChannelID && $0.archivedAt != nil
+           }) {
+            invalidateProposalAcceptancePresentation()
+        }
+
         if let focusedChannelID, removedChannelIDs.contains(focusedChannelID) {
             authoritativeLoadRevision &+= 1
             invalidateProposalAcceptancePresentation()
@@ -643,9 +1012,13 @@ final class ChannelsStore: ObservableObject {
         }
 
         guard let focusedChannelID else { return }
-        recordProposalMessages(delta.messages)
         let removedMessageIDs = Set(delta.removedMessageIds)
-        let relevant = delta.messages.filter { $0.channelId == focusedChannelID }
+        invalidateExecutionProposals(forMessageIDs: removedMessageIDs)
+        let stabilizedMessages = preservingLocallyAcceptedExecutionProposals(
+            in: delta.messages
+        )
+        recordProposalMessages(stabilizedMessages)
+        let relevant = stabilizedMessages.filter { $0.channelId == focusedChannelID }
         messages = Self.mergeMessages(
             messages,
             updates: relevant.filter { $0.parentMessageId == nil },
@@ -661,6 +1034,24 @@ final class ChannelsStore: ObservableObject {
             },
             removing: removedMessageIDs
         )
+    }
+
+    /// Deltas may have been produced before this client approved the proposal.
+    /// Keep the accepted local value for the same proposal ID; a null or a new
+    /// ID still passes through so authoritative tombstones and replacements win.
+    private func preservingLocallyAcceptedExecutionProposals(
+        in incoming: [ChannelMessage]
+    ) -> [ChannelMessage] {
+        incoming.map { message in
+            guard let incomingProposal = message.executionProposal,
+                  incomingProposal.status == .pending,
+                  let accepted = latestExecutionProposals[incomingProposal.id],
+                  accepted.status == .accepted
+            else { return message }
+            var stabilized = message
+            stabilized.executionProposal = accepted
+            return stabilized
+        }
     }
 
     private func upsertChannel(_ updated: ChannelSummary) {

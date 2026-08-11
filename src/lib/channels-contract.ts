@@ -143,6 +143,15 @@ export const channelProposalAcceptInputSchema = z
   .object({ projectId: z.string().uuid().nullable().default(null) })
   .strict();
 
+export const channelExecutionProposalAcceptInputSchema = z
+  .object({
+    provider: z.enum(channelAgentProviders),
+    model: z.string().trim().min(1).max(100).nullable(),
+    effort: z.enum(channelAgentEfforts).nullable(),
+    workerId: z.string().trim().min(1).max(128).nullable(),
+  })
+  .strict();
+
 export type ChannelSummary = {
   id: string;
   organizationId: string;
@@ -231,6 +240,23 @@ export type ChannelMessageProposal = {
   resultRunId: string | null;
 };
 
+export type ChannelExecutionProposal = {
+  id: string;
+  type: "request_issue_execute";
+  status: "pending" | "accepted";
+  projectId: string;
+  runId: string;
+  title: string;
+  createdAt: string;
+  acceptedAt: string | null;
+  requestedProvider: ChannelAgentProvider | null;
+  requestedModel: string | null;
+  requestedEffort: ChannelAgentEffort | null;
+  requestedWorkerId: string | null;
+  delegatedByAgentId: string | null;
+  delegatedByAgentName: string | null;
+};
+
 export type ChannelMessageAttachment = {
   id: string;
   filename: string;
@@ -262,6 +288,7 @@ export type ChannelMessage = {
   replyAuthors?: ChannelMessageAuthor[];
   document: ChannelMessageDocument | null;
   proposal: ChannelMessageProposal | null;
+  executionProposal: ChannelExecutionProposal | null;
   createdAt: string;
 };
 
@@ -323,6 +350,7 @@ export const channelReplyCompletionSchema = z
     issueProposal: z
       .object({
         projectId: z.string().uuid().nullable().default(null),
+        executeAfterCreate: z.boolean().default(false),
         issue: z
           .object({
             title: z.string().trim().min(1).max(300),
@@ -331,6 +359,14 @@ export const channelReplyCompletionSchema = z
             status: z.literal("backlog"),
           })
           .strict(),
+      })
+      .strict()
+      .nullable()
+      .default(null),
+    executionProposal: z
+      .object({
+        projectId: z.string().uuid(),
+        runId: z.string().uuid(),
       })
       .strict()
       .nullable()
@@ -352,11 +388,21 @@ export const channelReplyCompletionSchema = z
   })
   .strict()
   .superRefine((reply, context) => {
-    if (reply.delegation && (reply.document || reply.issueProposal)) {
+    if (
+      reply.delegation &&
+      (reply.document || reply.issueProposal || reply.executionProposal)
+    ) {
       context.addIssue({
         code: "custom",
-        message: "A delegated reply cannot also attach a document or issue proposal",
+        message: "A delegated reply cannot also attach an artifact proposal",
         path: ["delegation"],
+      });
+    }
+    if (reply.issueProposal && reply.executionProposal) {
+      context.addIssue({
+        code: "custom",
+        message: "Use executeAfterCreate for a create-and-execute request",
+        path: ["executionProposal"],
       });
     }
   });
@@ -392,4 +438,19 @@ export const channelIssueProposalPayloadSchema = z.object({
       status: z.enum(["backlog", "queued"]),
     })
     .strict(),
+  executeAfterCreate: z.boolean().default(false),
 });
+
+export const channelExecutionProposalPayloadSchema = z
+  .object({
+    runId: z.string().uuid(),
+    title: z.string().trim().min(1).max(300),
+    delegation: z
+      .object({
+        delegatedByAgentId: z.string().uuid(),
+        delegatedByAgentName: z.string().trim().min(1).max(100),
+      })
+      .strict()
+      .nullable(),
+  })
+  .strict();

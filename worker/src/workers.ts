@@ -1450,6 +1450,85 @@ export async function dispatchHuntRun(
     reassign?: boolean;
   },
 ): Promise<ExecutionDispatchRow | null> {
+  // Idempotency is checked before mutable eligibility, dependency, Agent, or
+  // Worker state. A committed dispatch remains the same committed dispatch
+  // even if one of those inputs changes before the HTTP retry arrives.
+  const existing = await db
+    .prepare(
+      `select id, agent_id, requested_agent_provider, requested_agent_model,
+              requested_agent_effort, requested_worker_id,
+              requested_by_user_id, dispatch_mode, dispatched_at
+       from briar_hunt_runs
+       where project_id = ? and dispatch_request_id = ?`,
+    )
+    .bind(projectId, input.requestId)
+    .first<{
+      id: string;
+      agent_id: string | null;
+      requested_agent_provider: AgentProvider | null;
+      requested_agent_model: string | null;
+      requested_agent_effort: ModelEffort | null;
+      requested_worker_id: string | null;
+      requested_by_user_id: string;
+      dispatch_mode: "any" | "specific";
+      dispatched_at: string;
+  }>();
+  if (existing) {
+    if (existing.id !== input.runId) {
+      throw new WorkerConflictError("Dispatch request belongs to another run");
+    }
+    const existingProvider = existing.requested_agent_provider ?? input.provider;
+    if (!existingProvider) {
+      throw new WorkerConflictError("Committed dispatch has no provider snapshot");
+    }
+    // A pre-atomic dispatcher may have committed the run update and failed
+    // before writing its audit event. An idempotent retry repairs that durable
+    // evidence; 0091 also finalizes a matching conversational approval in the
+    // same audit INSERT transaction.
+    const existingAudit = await db
+      .prepare(
+        `select action from briar_execution_audit_events
+         where project_id = ? and request_id = ?
+         limit 1`,
+      )
+      .bind(projectId, input.requestId)
+      .first<{ action: string }>();
+    if (!existingAudit) {
+      await auditExecutionEvent(db, {
+        organizationId,
+        projectId,
+        runId: existing.id,
+        workerId: existing.requested_worker_id,
+        agentId: existing.agent_id,
+        actorUserId: existing.requested_by_user_id ?? input.requestedByUserId,
+        action: "dispatched",
+        requestId: input.requestId,
+        detail: {
+          legacyActionUnknown: true,
+          recoveredFromRunState: true,
+          previousWorkerId: null,
+          provider: existingProvider,
+          model: existing.requested_agent_model,
+          effort: existing.requested_agent_effort,
+          dispatchMode: existing.dispatch_mode,
+        },
+        occurredAt: existing.dispatched_at,
+      });
+    }
+    return {
+      runId: existing.id,
+      agentId: existing.agent_id,
+      provider: existingProvider,
+      model: existing.requested_agent_model,
+      effort: existing.requested_agent_effort,
+      requestedWorkerId: existing.requested_worker_id,
+      requestedByUserId: existing.requested_by_user_id,
+      dispatchMode: existing.dispatch_mode,
+      dispatchedAt: existing.dispatched_at,
+      outcome: "already_dispatched",
+    };
+  }
+
   const agent = input.agentId
     ? await db
         .prepare(
@@ -1587,79 +1666,6 @@ export async function dispatchHuntRun(
         `No worker is configured for the ${provider} provider`,
       );
     }
-  }
-
-  const existing = await db
-    .prepare(
-      `select id, agent_id, requested_agent_provider, requested_agent_model,
-              requested_agent_effort, requested_worker_id,
-              requested_by_user_id, dispatch_mode, dispatched_at
-       from briar_hunt_runs
-       where project_id = ? and dispatch_request_id = ?`,
-    )
-    .bind(projectId, input.requestId)
-    .first<{
-      id: string;
-      agent_id: string | null;
-      requested_agent_provider: AgentProvider | null;
-      requested_agent_model: string | null;
-      requested_agent_effort: ModelEffort | null;
-      requested_worker_id: string | null;
-      requested_by_user_id: string;
-      dispatch_mode: "any" | "specific";
-      dispatched_at: string;
-  }>();
-  if (existing) {
-    // A pre-atomic dispatcher may have committed the run update and failed
-    // before writing its audit event. An idempotent retry repairs that durable
-    // evidence instead of returning early forever.
-    const existingAudit = await db
-      .prepare(
-        `select action from briar_execution_audit_events
-         where project_id = ? and request_id = ?
-         limit 1`,
-      )
-      .bind(projectId, input.requestId)
-      .first<{ action: string }>();
-    if (!existingAudit) {
-      await auditExecutionEvent(db, {
-        organizationId,
-        projectId,
-        runId: existing.id,
-        workerId: existing.requested_worker_id,
-        agentId: existing.agent_id,
-        actorUserId: existing.requested_by_user_id ?? input.requestedByUserId,
-        // The old split write did not persist which endpoint initiated the
-        // request. A retry must not be allowed to rewrite history by choosing
-        // the opposite endpoint, so record the conservative fixed action and
-        // make the uncertainty explicit in durable detail.
-        action: "dispatched",
-        requestId: input.requestId,
-        detail: {
-          legacyActionUnknown: true,
-          recoveredFromRunState: true,
-          previousWorkerId: null,
-          provider:
-            existing.requested_agent_provider ?? agent?.provider ?? provider,
-          model: existing.requested_agent_model,
-          effort: existing.requested_agent_effort,
-          dispatchMode: existing.dispatch_mode,
-        },
-        occurredAt: existing.dispatched_at,
-      });
-    }
-    return {
-      runId: existing.id,
-      agentId: existing.agent_id,
-      provider: existing.requested_agent_provider ?? agent?.provider ?? provider,
-      model: existing.requested_agent_model,
-      effort: existing.requested_agent_effort,
-      requestedWorkerId: existing.requested_worker_id,
-      requestedByUserId: existing.requested_by_user_id,
-      dispatchMode: existing.dispatch_mode,
-      dispatchedAt: existing.dispatched_at,
-      outcome: "already_dispatched",
-    };
   }
 
   const run = await db
@@ -1814,7 +1820,7 @@ export async function unassignHuntRun(
   const run = await db
     .prepare(
       `select id, source_key, status, current_attempt, claim_token_hash,
-              worker_id, requested_worker_id
+              worker_id, requested_worker_id, dispatch_request_id
        from briar_hunt_runs where id = ? and project_id = ?`,
     )
     .bind(input.runId, projectId)
@@ -1826,25 +1832,57 @@ export async function unassignHuntRun(
       claim_token_hash: string | null;
       worker_id: string | null;
       requested_worker_id: string | null;
+      dispatch_request_id: string | null;
     }>();
   if (!run) return null;
   if (["completed", "cancelled"].includes(run.status)) {
     throw new WorkerConflictError("Completed or cancelled runs cannot be unassigned");
   }
-  if (!run.worker_id && !run.requested_worker_id) {
+  if (!run.worker_id && !run.requested_worker_id && !run.dispatch_request_id) {
     return { runId: input.runId, outcome: "not_assigned" as const };
   }
   const channelApproved = await isChannelApprovedIssue(db, run);
-  const resetExecutionApproval = channelApproved ? 1 : 0;
+  const executionApprovalTable = await db
+    .prepare(
+      `select 1 as available from sqlite_master
+       where type = 'table' and name = 'briar_issue_execution_proposals'`,
+    )
+    .first<{ available: number }>();
+  const conversationalExecutionApproved = Boolean(
+    executionApprovalTable && run.dispatch_request_id && await db
+      .prepare(
+        `select 1 as approved
+         where exists (
+           select 1 from briar_issue_execution_proposals proposal
+           where proposal.target_run_id = ? and proposal.project_id = ?
+             and proposal.dispatch_request_id = ?
+         ) or exists (
+           select 1 from briar_issue_execution_approval_audit approval
+           where approval.run_id = ? and approval.project_id = ?
+             and approval.dispatch_request_id = ?
+         )`,
+      )
+      .bind(
+        run.id,
+        projectId,
+        run.dispatch_request_id,
+        run.id,
+        projectId,
+        run.dispatch_request_id,
+      )
+      .first<{ approved: number }>(),
+  );
+  const resetExecutionApproval =
+    channelApproved || conversationalExecutionApproved ? 1 : 0;
   const nextAttempt = run.claim_token_hash ? run.current_attempt + 1 : run.current_attempt;
-  const detail = channelApproved
+  const detail = resetExecutionApproval
     ? "사용자가 Worker 배정을 취소했습니다. 다시 실행하려면 명시적인 승인이 필요합니다."
     : "사용자가 Worker 배정을 취소했습니다.";
   const auditDetail = JSON.stringify({
     previousWorkerId: run.worker_id,
     previousRequestedWorkerId: run.requested_worker_id,
     reason: "user_unassigned",
-    executionApprovalReset: channelApproved,
+    executionApprovalReset: Boolean(resetExecutionApproval),
   });
   const [unassignUpdate, auditInsert] = await db.batch([
     db.prepare(
@@ -1865,7 +1903,10 @@ export async function unassignHuntRun(
            resume_requested_at = null, completed_at = null,
            detail = ?, last_event_at = ?, updated_at = ?
        where id = ? and project_id = ? and status not in ('completed', 'cancelled')
-         and (worker_id is not null or requested_worker_id is not null)
+         and (
+           worker_id is not null or requested_worker_id is not null
+           or dispatch_request_id is not null
+         )
          and not exists (
            select 1 from briar_execution_audit_events audit
            where audit.project_id = ? and audit.action = 'requeued'
@@ -1916,7 +1957,7 @@ export async function unassignHuntRun(
       input.occurredAt,
       input.runId,
       projectId,
-      channelApproved ? "backlog" : "queued",
+      resetExecutionApproval ? "backlog" : "queued",
       input.occurredAt,
       input.occurredAt,
     ),

@@ -730,6 +730,64 @@
         }
       }
     },
+    "/projects/{projectId}/runs/{runId}/issue-execution-proposals/{proposalId}/accept": {
+      "post": {
+        "operationId": "acceptIssueExecutionProposal",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ProjectId"
+          },
+          {
+            "$ref": "#/components/parameters/RunId"
+          },
+          {
+            "name": "proposalId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IssueExecutionApprovalRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Issue execution proposal explicitly approved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IssueExecutionApprovalResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
     "/projects/{projectId}/runs/{runId}/cancel": {
       "post": {
         "operationId": "cancelRun",
@@ -1259,6 +1317,64 @@
             "$ref": "#/components/responses/Error"
           },
           "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/organizations/{organizationId}/channels/{channelId}/proposals/{proposalId}/accept-execution": {
+      "post": {
+        "operationId": "acceptChannelExecutionProposal",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OrganizationId"
+          },
+          {
+            "$ref": "#/components/parameters/ChannelId"
+          },
+          {
+            "name": "proposalId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IssueExecutionApprovalRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Channel execution proposal explicitly approved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IssueExecutionApprovalResponse"
+                }
+              }
+            }
+          },
+          "400": {
             "$ref": "#/components/responses/Error"
           },
           "404": {
@@ -2003,6 +2119,36 @@
               "null"
             ]
           },
+          "requestedByUserId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "dispatchMode": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "any",
+              "specific",
+              null
+            ]
+          },
+          "claimedBy": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "claimedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
           "workerId": {
             "type": [
               "string",
@@ -2065,6 +2211,9 @@
                 "opencode"
               ]
             }
+          },
+          "executionPolicy": {
+            "$ref": "#/components/schemas/ProjectExecutionWorkerPolicy"
           },
           "members": {
             "type": "array",
@@ -2145,6 +2294,9 @@
                 "opencode"
               ]
             }
+          },
+          "executionPolicy": {
+            "$ref": "#/components/schemas/ProjectExecutionWorkerPolicy"
           },
           "members": {
             "type": "array",
@@ -2258,6 +2410,44 @@
           }
         },
         "additionalProperties": true
+      },
+      "ProjectExecutionWorkerPolicy": {
+        "type": "object",
+        "required": [
+          "selectionMode",
+          "defaultWorkerId",
+          "allowedWorkerIds",
+          "updatedAt"
+        ],
+        "properties": {
+          "selectionMode": {
+            "type": "string",
+            "enum": [
+              "any",
+              "allowlist"
+            ]
+          },
+          "defaultWorkerId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "allowedWorkerIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "updatedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
       },
       "WorkerIcon": {
         "oneOf": [
@@ -2622,6 +2812,11 @@
             },
             "additionalProperties": false
           },
+          "executeAfterCreate": {
+            "type": "boolean",
+            "default": false,
+            "description": "Requests a separate execution proposal after backlog creation; accepting this create proposal never dispatches the issue."
+          },
           "status": {
             "type": "string",
             "enum": [
@@ -2658,6 +2853,119 @@
             "$ref": "#/components/schemas/IssueCreateProposal"
           }
         ]
+      },
+      "IssueExecutionProposal": {
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "status",
+          "projectId",
+          "runId",
+          "title",
+          "createdAt",
+          "acceptedAt",
+          "requestedProvider",
+          "requestedModel",
+          "requestedEffort",
+          "requestedWorkerId",
+          "delegatedByAgentId",
+          "delegatedByAgentName"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "type": {
+            "const": "request_issue_execute"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "accepted"
+            ]
+          },
+          "projectId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "runId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "acceptedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "requestedProvider": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "codex",
+              "claude",
+              "grok",
+              "opencode",
+              null
+            ]
+          },
+          "requestedModel": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "requestedEffort": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "low",
+              "medium",
+              "high",
+              "xhigh",
+              "max",
+              "ultra",
+              null
+            ]
+          },
+          "requestedWorkerId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "delegatedByAgentId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "delegatedByAgentName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": false
       },
       "AcceptIssueReworkProposalResponse": {
         "type": "object",
@@ -2724,6 +3032,16 @@
               "null"
             ],
             "format": "uuid"
+          },
+          "executionProposal": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/IssueExecutionProposal"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "additionalProperties": false
@@ -2778,6 +3096,16 @@
                   "oneOf": [
                     {
                       "$ref": "#/components/schemas/IssueProposedAction"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "executionProposal": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/IssueExecutionProposal"
                     },
                     {
                       "type": "null"
@@ -3546,6 +3874,16 @@
               }
             ]
           },
+          "executionProposal": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/IssueExecutionProposal"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time"
@@ -3966,6 +4304,179 @@
               }
             },
             "additionalProperties": false
+          },
+          "executeAfterCreate": {
+            "type": "boolean",
+            "default": false,
+            "description": "Requests a separate execution proposal after backlog creation; never dispatches during create acceptance."
+          }
+        },
+        "additionalProperties": false
+      },
+      "IssueExecutionApprovalRequest": {
+        "type": "object",
+        "required": [
+          "provider",
+          "model",
+          "effort",
+          "workerId"
+        ],
+        "properties": {
+          "provider": {
+            "type": "string",
+            "enum": [
+              "codex",
+              "claude",
+              "grok",
+              "opencode"
+            ]
+          },
+          "model": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "effort": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "low",
+              "medium",
+              "high",
+              "xhigh",
+              "max",
+              "ultra",
+              null
+            ]
+          },
+          "workerId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "IssueExecutionDispatch": {
+        "type": "object",
+        "required": [
+          "runId",
+          "agentId",
+          "provider",
+          "model",
+          "effort",
+          "requestedWorkerId",
+          "requestedByUserId",
+          "dispatchMode",
+          "dispatchedAt",
+          "outcome"
+        ],
+        "properties": {
+          "runId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "agentId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "provider": {
+            "type": "string",
+            "enum": [
+              "codex",
+              "claude",
+              "grok",
+              "opencode"
+            ]
+          },
+          "model": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "effort": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "low",
+              "medium",
+              "high",
+              "xhigh",
+              "max",
+              "ultra",
+              null
+            ]
+          },
+          "requestedWorkerId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "requestedByUserId": {
+            "type": "string"
+          },
+          "dispatchMode": {
+            "type": "string",
+            "enum": [
+              "any",
+              "specific"
+            ]
+          },
+          "dispatchedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "dispatched",
+              "already_dispatched"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "IssueExecutionApprovalResponse": {
+        "type": "object",
+        "required": [
+          "proposal",
+          "outcome",
+          "projectId",
+          "runId",
+          "dispatch"
+        ],
+        "properties": {
+          "proposal": {
+            "$ref": "#/components/schemas/IssueExecutionProposal"
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "accepted",
+              "already_accepted"
+            ]
+          },
+          "projectId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "runId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "dispatch": {
+            "$ref": "#/components/schemas/IssueExecutionDispatch"
           }
         },
         "additionalProperties": false
@@ -4008,6 +4519,16 @@
           "resultRunId": {
             "type": "string",
             "format": "uuid"
+          },
+          "executionProposal": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/IssueExecutionProposal"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "additionalProperties": false

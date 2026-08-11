@@ -1511,6 +1511,15 @@ describe("detached execution workers", () => {
     });
     expect(wrongWorkerClaim).toBeNull();
 
+    const legacyAgentClaim = await claimNextQueuedHuntRun(db, projectId, {
+      claimTokenHash: fingerprint("legacy-agent-claim"),
+      claimedBy: "legacy-agent",
+      claimedAt: atMinute(3),
+      leaseExpiresAt: leaseExpiryFrom(atMinute(3)),
+      runId: run,
+    });
+    expect(legacyAgentClaim).toBeNull();
+
     const assignedClaim = await claimNextQueuedHuntRun(db, projectId, {
       claimTokenHash: fingerprint("assigned-worker-claim"),
       claimedBy: first.worker.label,

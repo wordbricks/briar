@@ -725,9 +725,50 @@ export type IssueActionProposalRow = {
   approval_reserved_by_user_id: string | null;
   approval_reserved_at: string | null;
   issue_source_key: string | null;
+  execute_after_create: number;
+  execution_proposal_id: string | null;
   result_run_id: string | null;
   created_at: string;
   updated_at: string;
+};
+
+export type IssueExecutionProposalRow = {
+  id: string;
+  organization_id: string;
+  project_id: string;
+  source_kind: "channel" | "issue";
+  channel_id: string | null;
+  conversation_run_id: string | null;
+  trigger_message_id: string;
+  reply_message_id: string;
+  target_run_id: string;
+  target_title: string;
+  target_run_updated_at: string;
+  proposed_by_agent_id: string | null;
+  delegated_by_agent_id: string | null;
+  delegated_by_agent_name: string | null;
+  origin_create_proposal_id: string | null;
+  generation: number;
+  status: "pending" | "accepted" | "invalidated";
+  approval_reserved_by_user_id: string | null;
+  approval_reserved_at: string | null;
+  requested_provider: ProjectAgentProvider | null;
+  requested_model: string | null;
+  requested_effort: ModelEffort | null;
+  requested_worker_id: string | null;
+  dispatch_request_id: string | null;
+  accepted_by_user_id: string | null;
+  accepted_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type FreshBacklogExecutionTargetRow = {
+  id: string;
+  run_number: number;
+  source_key: string;
+  title: string;
+  status: "backlog";
 };
 
 export type IssueConversationNotificationRow = IssueMessageRow & {
@@ -6724,6 +6765,7 @@ export async function renewIssueAgentReplyLease(
        set lease_expires_at = ?, updated_at = ?
        where id = ? and project_id = ? and status = 'running'
          and claimed_worker_id = ? and claim_token_hash = ?
+         and lease_expires_at > ?
          and exists (
            select 1 from briar_hunt_runs run
            where run.id = briar_issue_agent_reply_jobs.run_id
@@ -6738,6 +6780,7 @@ export async function renewIssueAgentReplyLease(
       projectId,
       input.workerId,
       input.claimTokenHash,
+      input.updatedAt,
     )
     .first<IssueAgentReplyJobRow>();
 }
@@ -6746,7 +6789,11 @@ export async function getClaimedIssueAgentReply(
   db: D1Database,
   projectId: string,
   jobId: string,
-  input: { workerId: string; claimTokenHash: string },
+  input: {
+    workerId: string;
+    claimTokenHash: string;
+    observedAt: string;
+  },
 ) {
   return await db
     .prepare(
@@ -6755,9 +6802,16 @@ export async function getClaimedIssueAgentReply(
        join briar_hunt_runs run
          on run.id = job.run_id and run.project_id = job.project_id
        where job.id = ? and job.project_id = ? and job.status = 'running'
-         and job.claimed_worker_id = ? and job.claim_token_hash = ?`,
+         and job.claimed_worker_id = ? and job.claim_token_hash = ?
+         and job.lease_expires_at > ?`,
     )
-    .bind(jobId, projectId, input.workerId, input.claimTokenHash)
+    .bind(
+      jobId,
+      projectId,
+      input.workerId,
+      input.claimTokenHash,
+      input.observedAt,
+    )
     .first<IssueAgentReplyJobRow>();
 }
 
@@ -6781,6 +6835,7 @@ export async function failIssueAgentReply(
            error = ?, updated_at = ?
        where id = ? and project_id = ? and status = 'running'
          and claimed_worker_id = ? and claim_token_hash = ?
+         and lease_expires_at > ?
          and exists (
            select 1 from briar_hunt_runs run
            where run.id = briar_issue_agent_reply_jobs.run_id
@@ -6795,6 +6850,7 @@ export async function failIssueAgentReply(
       projectId,
       input.workerId,
       input.claimTokenHash,
+      input.updatedAt,
     )
     .first<IssueAgentReplyJobRow>();
 }
@@ -6816,6 +6872,7 @@ export async function completeIssueAgentReply(
            lease_expires_at = null, completed_at = ?, updated_at = ?
        where id = ? and project_id = ? and status = 'running'
          and claimed_worker_id = ? and claim_token_hash = ?
+         and lease_expires_at > ?
          and exists (
            select 1 from briar_hunt_runs run
            where run.id = briar_issue_agent_reply_jobs.run_id
@@ -6830,8 +6887,327 @@ export async function completeIssueAgentReply(
       projectId,
       input.workerId,
       input.claimTokenHash,
+      input.completedAt,
     )
     .first<IssueAgentReplyJobRow>();
+}
+
+export type IssueAgentReplyCompletionOutput = {
+  body: string;
+  proposedAction:
+    | {
+        type: "request_issue_rework";
+        workflowStage: string;
+        reason: string;
+      }
+    | {
+        type: "request_issue_update";
+        changes: Record<string, unknown>;
+      }
+    | {
+        type: "request_issue_create";
+        issue: Record<string, unknown>;
+        executeAfterCreate: boolean;
+      }
+    | null;
+  executionProposal: boolean;
+};
+
+/**
+ * Commits the claim transition, reply, and optional approval card in one D1
+ * batch. The claim token intentionally remains on the completed row until the
+ * final statement so every artifact insert can prove it belongs to the exact
+ * live lease that won the transition.
+ */
+export async function completeIssueAgentReplyOutput(
+  db: D1Database,
+  projectId: string,
+  jobId: string,
+  input: {
+    workerId: string;
+    claimTokenHash: string;
+    completedAt: string;
+    output: IssueAgentReplyCompletionOutput;
+  },
+) {
+  const executionApprovalsAvailable =
+    await issueExecutionApprovalTablesAvailable(db);
+  if (
+    !executionApprovalsAvailable &&
+    (input.output.executionProposal ||
+      (input.output.proposedAction?.type === "request_issue_create" &&
+        input.output.proposedAction.executeAfterCreate))
+  ) {
+    throw new Error("issue execution approval schema is unavailable");
+  }
+
+  const proposedAction = input.output.proposedAction;
+  const rework = proposedAction?.type === "request_issue_rework"
+    ? proposedAction
+    : null;
+  const action = proposedAction && proposedAction.type !== "request_issue_rework"
+    ? proposedAction
+    : null;
+  const actionProposalId = action ? crypto.randomUUID() : null;
+  const reworkProposalId = rework ? crypto.randomUUID() : null;
+  const executionProposalId = input.output.executionProposal
+    ? crypto.randomUUID()
+    : null;
+  const createExecutionProposalId =
+    action?.type === "request_issue_create" && action.executeAfterCreate
+      ? crypto.randomUUID()
+      : null;
+  const staleExecutionGuard = executionApprovalsAvailable
+    ? `and not exists (
+         select 1 from briar_issue_execution_proposals stale_execution
+         where stale_execution.reply_message_id = job.reply_message_id
+            or (
+              stale_execution.project_id = job.project_id
+              and stale_execution.trigger_message_id = job.trigger_message_id
+              and stale_execution.source_kind = 'issue'
+            )
+       )`
+    : "";
+
+  const transition = db
+    .prepare(
+      `update briar_issue_agent_reply_jobs as job
+       set status = 'completed', completed_at = ?, updated_at = ?
+       where job.id = ? and job.project_id = ? and job.status = 'running'
+         and job.claimed_worker_id = ? and job.claim_token_hash = ?
+         and job.lease_expires_at > ?
+         and exists (
+           select 1 from briar_hunt_runs run
+           where run.id = job.run_id and run.project_id = job.project_id
+         )
+         and not exists (
+           select 1 from briar_issue_messages stale_message
+           where stale_message.id = job.reply_message_id
+         )
+         and not exists (
+           select 1 from briar_issue_rework_proposals stale_rework
+           where stale_rework.reply_message_id = job.reply_message_id
+              or (
+                stale_rework.project_id = job.project_id
+                and stale_rework.trigger_message_id = job.trigger_message_id
+              )
+         )
+         and not exists (
+           select 1 from briar_issue_action_proposals stale_action
+           where stale_action.reply_message_id = job.reply_message_id
+              or (
+                stale_action.project_id = job.project_id
+                and stale_action.trigger_message_id = job.trigger_message_id
+              )
+         )
+         ${staleExecutionGuard}
+         and (
+           ? = 0
+           or exists (
+             select 1 from briar_hunt_runs run
+             where run.id = job.run_id and run.project_id = job.project_id
+               and run.status = 'completed'
+               and exists (
+                 select 1
+                 from json_each(run.workflow_snapshot_json, '$.stages') stage
+                 where json_extract(stage.value, '$.id') = ?
+               )
+           )
+         )
+         and (
+           ? = 0
+           or exists (
+             select 1 from briar_hunt_runs run
+             where run.id = job.run_id and run.project_id = job.project_id
+               and run.status = 'backlog' and run.stage = 'queued'
+               and run.workflow_stage is null
+               and run.worker_id is null and run.requested_worker_id is null
+               and run.claim_token_hash is null and run.claimed_by is null
+               and run.claimed_at is null and run.lease_expires_at is null
+               and run.last_execution_id is null
+               and run.dispatch_mode is null
+               and run.dispatch_request_id is null
+               and run.dispatched_at is null
+               and run.requested_by_user_id is null
+               and run.completed_at is null and run.paused_at is null
+               and run.resume_requested_at is null
+           )
+         )
+       returning *`,
+    )
+    .bind(
+      input.completedAt,
+      input.completedAt,
+      jobId,
+      projectId,
+      input.workerId,
+      input.claimTokenHash,
+      input.completedAt,
+      rework ? 1 : 0,
+      rework?.workflowStage ?? null,
+      input.output.executionProposal ? 1 : 0,
+    );
+
+  const completedClaim = (alias: string) =>
+    `${alias}.id = ? and ${alias}.project_id = ?
+     and ${alias}.status = 'completed'
+     and ${alias}.claimed_worker_id = ?
+     and ${alias}.claim_token_hash = ?
+     and ${alias}.completed_at = ?`;
+  const claimBindings = [
+    jobId,
+    projectId,
+    input.workerId,
+    input.claimTokenHash,
+    input.completedAt,
+  ];
+  const statements: D1PreparedStatement[] = [
+    transition,
+    db.prepare(
+      `insert into briar_issue_messages (
+         id, project_id, run_id, parent_message_id, author_user_id,
+         author_agent_provider, body, created_at, updated_at
+       )
+       select job.reply_message_id, job.project_id, job.run_id, parent.id,
+              null, job.agent_provider, ?, ?, ?
+       from briar_issue_agent_reply_jobs job
+       join briar_issue_messages parent
+         on parent.id = job.parent_message_id
+        and parent.project_id = job.project_id and parent.run_id = job.run_id
+       where ${completedClaim("job")}`,
+    ).bind(
+      input.output.body,
+      input.completedAt,
+      input.completedAt,
+      ...claimBindings,
+    ),
+  ];
+
+  if (rework) {
+    statements.push(db.prepare(
+      `insert into briar_issue_rework_proposals (
+         id, project_id, run_id, trigger_message_id, reply_message_id,
+         workflow_stage, reason, expected_attempt, expected_revision,
+         created_at, updated_at
+       )
+       select ?, job.project_id, run.id, job.trigger_message_id,
+              job.reply_message_id, ?, ?, run.current_attempt,
+              run.current_revision, ?, ?
+       from briar_issue_agent_reply_jobs job
+       join briar_hunt_runs run
+         on run.id = job.run_id and run.project_id = job.project_id
+       where ${completedClaim("job")}`,
+    ).bind(
+      reworkProposalId,
+      rework.workflowStage,
+      rework.reason,
+      input.completedAt,
+      input.completedAt,
+      ...claimBindings,
+    ));
+  }
+
+  if (action) {
+    const payloadJson = JSON.stringify(
+      action.type === "request_issue_update"
+        ? { changes: action.changes }
+        : { issue: action.issue },
+    );
+    statements.push(db.prepare(
+      executionApprovalsAvailable
+        ? `insert into briar_issue_action_proposals (
+             id, project_id, conversation_run_id, trigger_message_id,
+             reply_message_id, action_type, payload_json,
+             expected_run_updated_at, execute_after_create,
+             execution_proposal_id, created_at, updated_at
+           )
+           select ?, job.project_id, run.id, job.trigger_message_id,
+                  job.reply_message_id, ?, ?,
+                  case when ? = 'request_issue_update'
+                    then run.updated_at else null end,
+                  ?, ?, ?, ?
+           from briar_issue_agent_reply_jobs job
+           join briar_hunt_runs run
+             on run.id = job.run_id and run.project_id = job.project_id
+           where ${completedClaim("job")}`
+        : `insert into briar_issue_action_proposals (
+             id, project_id, conversation_run_id, trigger_message_id,
+             reply_message_id, action_type, payload_json,
+             expected_run_updated_at, created_at, updated_at
+           )
+           select ?, job.project_id, run.id, job.trigger_message_id,
+                  job.reply_message_id, ?, ?,
+                  case when ? = 'request_issue_update'
+                    then run.updated_at else null end,
+                  ?, ?
+           from briar_issue_agent_reply_jobs job
+           join briar_hunt_runs run
+             on run.id = job.run_id and run.project_id = job.project_id
+           where ${completedClaim("job")}`,
+    ).bind(...(
+      executionApprovalsAvailable
+        ? [
+            actionProposalId,
+            action.type,
+            payloadJson,
+            action.type,
+            action.type === "request_issue_create" && action.executeAfterCreate
+              ? 1
+              : 0,
+            createExecutionProposalId,
+            input.completedAt,
+            input.completedAt,
+            ...claimBindings,
+          ]
+        : [
+            actionProposalId,
+            action.type,
+            payloadJson,
+            action.type,
+            input.completedAt,
+            input.completedAt,
+            ...claimBindings,
+          ]
+    )));
+  }
+
+  if (input.output.executionProposal) {
+    statements.push(db.prepare(
+      `insert into briar_issue_execution_proposals (
+         id, organization_id, project_id, source_kind, channel_id,
+         conversation_run_id, trigger_message_id, reply_message_id,
+         target_run_id, target_title, target_run_updated_at,
+         proposed_by_agent_id, delegated_by_agent_id,
+         delegated_by_agent_name, created_at, updated_at
+       )
+       select ?, project.organization_id, job.project_id, 'issue', null,
+              job.run_id, job.trigger_message_id, job.reply_message_id,
+              run.id, run.title, run.updated_at, run.agent_id,
+              null, null, ?, ?
+       from briar_issue_agent_reply_jobs job
+       join briar_hunt_runs run
+         on run.id = job.run_id and run.project_id = job.project_id
+       join briar_projects project on project.id = job.project_id
+       where ${completedClaim("job")}`,
+    ).bind(
+      executionProposalId,
+      input.completedAt,
+      input.completedAt,
+      ...claimBindings,
+    ));
+  }
+
+  statements.push(db.prepare(
+    `update briar_issue_agent_reply_jobs
+     set claim_token_hash = null, lease_expires_at = null
+     where ${completedClaim("briar_issue_agent_reply_jobs")}`,
+  ).bind(...claimBindings));
+
+  const results = await db.batch(statements);
+  const completed = results[0]?.results[0] as IssueAgentReplyJobRow | undefined;
+  return completed
+    ? { ...completed, claim_token_hash: null, lease_expires_at: null }
+    : null;
 }
 
 export async function createIssueReworkProposal(
@@ -6965,12 +7341,33 @@ export async function createIssueActionProposal(
     replyMessageId: string;
     actionType: IssueActionProposalRow["action_type"];
     payloadJson: string;
+    executeAfterCreate?: boolean;
+    executionProposalId?: string | null;
     createdAt: string;
   },
 ) {
+  const executionApprovalsAvailable =
+    await issueExecutionApprovalTablesAvailable(db);
+  if (input.executeAfterCreate && !executionApprovalsAvailable) {
+    throw new Error("issue execution approval schema is unavailable");
+  }
   return await db
     .prepare(
-      `insert into briar_issue_action_proposals (
+      executionApprovalsAvailable
+        ? `insert into briar_issue_action_proposals (
+         id, project_id, conversation_run_id, trigger_message_id,
+         reply_message_id, action_type, payload_json,
+         expected_run_updated_at, execute_after_create,
+         execution_proposal_id, created_at, updated_at
+       )
+       select ?, run.project_id, run.id, ?, ?, ?, ?,
+              case when ? = 'request_issue_update' then run.updated_at else null end,
+              ?, ?, ?, ?
+       from briar_hunt_runs run
+       where run.id = ? and run.project_id = ?
+       on conflict (project_id, trigger_message_id) do nothing
+       returning *`
+        : `insert into briar_issue_action_proposals (
          id, project_id, conversation_run_id, trigger_message_id,
          reply_message_id, action_type, payload_json,
          expected_run_updated_at, created_at, updated_at
@@ -6983,19 +7380,45 @@ export async function createIssueActionProposal(
        on conflict (project_id, trigger_message_id) do nothing
        returning *`,
     )
-    .bind(
-      input.id,
-      input.triggerMessageId,
-      input.replyMessageId,
-      input.actionType,
-      input.payloadJson,
-      input.actionType,
-      input.createdAt,
-      input.createdAt,
-      input.conversationRunId,
-      input.projectId,
-    )
+    .bind(...(
+      executionApprovalsAvailable
+        ? [
+            input.id,
+            input.triggerMessageId,
+            input.replyMessageId,
+            input.actionType,
+            input.payloadJson,
+            input.actionType,
+            input.executeAfterCreate ? 1 : 0,
+            input.executionProposalId ?? null,
+            input.createdAt,
+            input.createdAt,
+            input.conversationRunId,
+            input.projectId,
+          ]
+        : [
+            input.id,
+            input.triggerMessageId,
+            input.replyMessageId,
+            input.actionType,
+            input.payloadJson,
+            input.actionType,
+            input.createdAt,
+            input.createdAt,
+            input.conversationRunId,
+            input.projectId,
+          ]
+    ))
     .first<IssueActionProposalRow>();
+}
+
+export async function issueExecutionApprovalTablesAvailable(db: D1Database) {
+  return Boolean(await db
+    .prepare(
+      `select 1 as available from sqlite_master
+       where type = 'table' and name = 'briar_issue_execution_proposals'`,
+    )
+    .first<{ available: number }>());
 }
 
 export async function listIssueActionProposals(
@@ -7245,6 +7668,253 @@ export async function reserveIssueCreateProposalApproval(
       input.conversationRunId,
     )
     .first<IssueActionProposalRow>();
+}
+
+export async function createIssueExecutionProposal(
+  db: D1Database,
+  input: {
+    id: string;
+    projectId: string;
+    conversationRunId: string;
+    triggerMessageId: string;
+    replyMessageId: string;
+    createdAt: string;
+  },
+) {
+  return db
+    .prepare(
+      `insert into briar_issue_execution_proposals (
+         id, organization_id, project_id, source_kind, channel_id,
+         conversation_run_id, trigger_message_id, reply_message_id,
+         target_run_id, target_title, target_run_updated_at,
+         proposed_by_agent_id, delegated_by_agent_id,
+         delegated_by_agent_name, created_at, updated_at
+       )
+       select ?, project.organization_id, run.project_id, 'issue', null,
+              run.id, ?, ?, run.id, run.title, run.updated_at,
+              run.agent_id, null, null, ?, ?
+       from briar_hunt_runs run
+       join briar_projects project on project.id = run.project_id
+       join briar_issue_agent_reply_jobs job
+         on job.project_id = run.project_id and job.run_id = run.id
+        and job.trigger_message_id = ? and job.reply_message_id = ?
+       where run.id = ? and run.project_id = ?
+         and run.status = 'backlog' and run.stage = 'queued'
+         and run.workflow_stage is null
+         and run.worker_id is null and run.requested_worker_id is null
+         and run.claim_token_hash is null and run.claimed_by is null
+         and run.claimed_at is null and run.lease_expires_at is null
+         and run.last_execution_id is null
+         and run.dispatch_mode is null and run.dispatch_request_id is null
+         and run.dispatched_at is null and run.requested_by_user_id is null
+         and run.completed_at is null and run.paused_at is null
+         and run.resume_requested_at is null
+       on conflict (reply_message_id) do nothing
+       returning *`,
+    )
+    .bind(
+      input.id,
+      input.triggerMessageId,
+      input.replyMessageId,
+      input.createdAt,
+      input.createdAt,
+      input.triggerMessageId,
+      input.replyMessageId,
+      input.conversationRunId,
+      input.projectId,
+    )
+    .first<IssueExecutionProposalRow>();
+}
+
+export async function listIssueExecutionProposals(
+  db: D1Database,
+  projectId: string,
+  conversationRunId: string,
+) {
+  if (!(await issueExecutionApprovalTablesAvailable(db))) return [];
+  const rows = await db
+    .prepare(
+      `select proposal.*
+       from briar_issue_execution_proposals proposal
+       join briar_hunt_runs conversation
+         on conversation.id = proposal.conversation_run_id
+        and conversation.project_id = proposal.project_id
+       where proposal.source_kind = 'issue'
+         and proposal.project_id = ? and proposal.conversation_run_id = ?
+         and proposal.status in ('pending', 'accepted')
+       order by proposal.created_at, proposal.id`,
+    )
+    .bind(projectId, conversationRunId)
+    .all<IssueExecutionProposalRow>();
+  return rows.results;
+}
+
+export async function getIssueExecutionProposal(
+  db: D1Database,
+  projectId: string,
+  conversationRunId: string,
+  proposalId: string,
+) {
+  return db
+    .prepare(
+      `select proposal.*
+       from briar_issue_execution_proposals proposal
+       join briar_hunt_runs conversation
+         on conversation.id = proposal.conversation_run_id
+        and conversation.project_id = proposal.project_id
+       where proposal.id = ? and proposal.source_kind = 'issue'
+         and proposal.project_id = ? and proposal.conversation_run_id = ?`,
+    )
+    .bind(proposalId, projectId, conversationRunId)
+    .first<IssueExecutionProposalRow>();
+}
+
+export async function reserveIssueExecutionProposalApproval(
+  db: D1Database,
+  input: {
+    projectId: string;
+    conversationRunId: string;
+    proposalId: string;
+    userId: string;
+    provider: ProjectAgentProvider;
+    model: string | null;
+    effort: ModelEffort | null;
+    workerId: string | null;
+    dispatchRequestId: string;
+    reservedAt: string;
+  },
+) {
+  return db
+    .prepare(
+      `update briar_issue_execution_proposals
+       set approval_reserved_by_user_id = coalesce(
+             approval_reserved_by_user_id, ?
+           ),
+           approval_reserved_at = coalesce(approval_reserved_at, ?),
+           requested_provider = coalesce(requested_provider, ?),
+           requested_model = case
+             when dispatch_request_id is null then ? else requested_model end,
+           requested_effort = case
+             when dispatch_request_id is null then ? else requested_effort end,
+           requested_worker_id = case
+             when dispatch_request_id is null then ? else requested_worker_id end,
+           dispatch_request_id = coalesce(dispatch_request_id, ?),
+           updated_at = case
+             when dispatch_request_id is null then ? else updated_at end
+       where id = ? and source_kind = 'issue' and status = 'pending'
+         and project_id = ? and conversation_run_id = ?
+         and (
+           target_run_id = conversation_run_id
+           or origin_create_proposal_id is not null
+         )
+         and (
+           dispatch_request_id is null
+           or (
+             approval_reserved_by_user_id = ?
+             and requested_provider = ? and requested_model is ?
+             and requested_effort is ? and requested_worker_id is ?
+           )
+         )
+         and exists (
+           select 1
+           from briar_hunt_runs run
+           join briar_projects project on project.id = run.project_id
+           join briar_organization_members membership
+             on membership.organization_id = project.organization_id
+            and membership.user_id = ?
+           where run.id = briar_issue_execution_proposals.target_run_id
+             and run.project_id = briar_issue_execution_proposals.project_id
+             and run.updated_at =
+               briar_issue_execution_proposals.target_run_updated_at
+             and run.status = 'backlog' and run.stage = 'queued'
+             and run.workflow_stage is null
+             and run.worker_id is null and run.requested_worker_id is null
+             and run.claim_token_hash is null and run.claimed_by is null
+             and run.claimed_at is null and run.lease_expires_at is null
+             and run.last_execution_id is null
+             and run.dispatch_mode is null and run.dispatch_request_id is null
+             and run.dispatched_at is null and run.requested_by_user_id is null
+             and run.completed_at is null and run.paused_at is null
+             and run.resume_requested_at is null
+         )
+       returning *`,
+    )
+    .bind(
+      input.userId,
+      input.reservedAt,
+      input.provider,
+      input.model,
+      input.effort,
+      input.workerId,
+      input.dispatchRequestId,
+      input.reservedAt,
+      input.proposalId,
+      input.projectId,
+      input.conversationRunId,
+      input.userId,
+      input.provider,
+      input.model,
+      input.effort,
+      input.workerId,
+      input.userId,
+    )
+    .first<IssueExecutionProposalRow>();
+}
+
+export async function acceptIssueExecutionProposal(
+  db: D1Database,
+  input: {
+    proposalId: string;
+    projectId: string;
+    userId: string;
+    acceptedAt: string;
+  },
+) {
+  return db
+    .prepare(
+      `update briar_issue_execution_proposals
+       set status = 'accepted',
+           accepted_by_user_id = approval_reserved_by_user_id,
+           accepted_at = approval_reserved_at,
+           updated_at = approval_reserved_at
+       where id = ? and project_id = ? and status = 'pending'
+         and approval_reserved_by_user_id = ?
+         and approval_reserved_at = ?
+       returning *`,
+    )
+    .bind(
+      input.proposalId,
+      input.projectId,
+      input.userId,
+      input.acceptedAt,
+    )
+    .first<IssueExecutionProposalRow>();
+}
+
+export async function listFreshBacklogExecutionTargets(
+  db: D1Database,
+  projectId: string,
+  limit = 100,
+) {
+  const rows = await db
+    .prepare(
+      `select id, run_number, source_key, title, status
+       from briar_hunt_runs
+       where project_id = ? and status = 'backlog' and stage = 'queued'
+         and workflow_stage is null
+         and worker_id is null and requested_worker_id is null
+         and claim_token_hash is null and claimed_by is null
+         and claimed_at is null and lease_expires_at is null
+         and last_execution_id is null
+         and dispatch_mode is null and dispatch_request_id is null
+         and dispatched_at is null and requested_by_user_id is null
+         and completed_at is null and paused_at is null
+         and resume_requested_at is null
+       order by run_number desc limit ?`,
+    )
+    .bind(projectId, Math.max(1, Math.min(limit, 100)))
+    .all<FreshBacklogExecutionTargetRow>();
+  return rows.results;
 }
 
 export async function listIssueConversationNotifications(
@@ -7678,7 +8348,14 @@ export async function claimNextQueuedHuntRun(
                and prerequisite.status != 'completed'
            )
            and (? = 0 or dispatched_at is not null)
-           and (? is null or requested_worker_id is null or requested_worker_id = ?)
+           and (
+             (? = 0 and dispatch_mode is null)
+             or (? = 1 and dispatch_mode = 'any')
+             or (
+               ? = 1 and dispatch_mode = 'specific'
+               and requested_worker_id = ?
+             )
+           )
            and (
              ? is null
              or not exists (
@@ -7818,7 +8495,9 @@ export async function claimNextQueuedHuntRun(
       input.runId ?? null,
       input.runId ?? null,
       input.detachedOnly ? 1 : 0,
-      input.workerId ?? null,
+      input.detachedOnly ? 1 : 0,
+      input.detachedOnly ? 1 : 0,
+      input.detachedOnly ? 1 : 0,
       input.workerId ?? null,
       input.workerId ?? null,
       input.workerId ?? null,
@@ -11634,11 +12313,43 @@ export async function transferIssue(
     .first<{ archiving: number }>();
   if (verifiedArchive) return "archive_in_progress";
   const channelApprovedIssue = await isChannelApprovedIssue(db, run);
+  const executionProposalTable = await db
+    .prepare(
+      `select 1 as available from sqlite_master
+       where type = 'table' and name = 'briar_issue_execution_proposals'`,
+    )
+    .first<{ available: number }>();
+  const conversationalExecutionApproved = Boolean(
+    executionProposalTable && run.dispatch_request_id && await db
+      .prepare(
+        `select 1 as approved
+         where exists (
+           select 1 from briar_issue_execution_proposals proposal
+           where proposal.target_run_id = ? and proposal.project_id = ?
+             and proposal.dispatch_request_id = ?
+         ) or exists (
+           select 1 from briar_issue_execution_approval_audit approval
+           where approval.run_id = ? and approval.project_id = ?
+             and approval.dispatch_request_id = ?
+         )`,
+      )
+      .bind(
+        run.id,
+        input.sourceProjectId,
+        run.dispatch_request_id,
+        run.id,
+        input.sourceProjectId,
+        run.dispatch_request_id,
+      )
+      .first<{ approved: number }>(),
+  );
+  const executionApprovedIssue =
+    channelApprovedIssue || conversationalExecutionApproved;
   // A terminal result is historical state, so do not silently turn it into a
   // target-project execution candidate. Rework needs a separate approval-aware
   // flow instead of carrying the source project's execution authority across.
   if (
-    channelApprovedIssue &&
+    executionApprovedIssue &&
     (["completed", "cancelled"] as AutoHuntRunStatus[]).includes(run.status)
   ) {
     return "execution_approval_boundary";
@@ -11657,7 +12368,7 @@ export async function transferIssue(
   const resetExecutionApproval =
     (["queued", "blocked", "failed"] as AutoHuntRunStatus[]).includes(
       run.status,
-    ) && channelApprovedIssue;
+    ) && executionApprovedIssue;
   const targetSettings = await getProjectSettings(db, input.targetProjectId);
   const adoptTargetWorkflow =
     run.status === "backlog" || run.status === "queued" ||

@@ -18,6 +18,8 @@ const loadChannelDelta = vi.fn();
 const listChannelMessages = vi.fn();
 const sendChannelMessage = vi.fn();
 const acceptChannelProposal = vi.fn();
+const acceptChannelExecutionProposal = vi.fn();
+const loadDashboard = vi.fn();
 const toggleChannelMessageReaction = vi.fn();
 
 vi.mock("../lib/api", () => ({
@@ -27,6 +29,9 @@ vi.mock("../lib/api", () => ({
   listChannelMessages: (...args: unknown[]) => listChannelMessages(...args),
   sendChannelMessage: (...args: unknown[]) => sendChannelMessage(...args),
   acceptChannelProposal: (...args: unknown[]) => acceptChannelProposal(...args),
+  acceptChannelExecutionProposal: (...args: unknown[]) =>
+    acceptChannelExecutionProposal(...args),
+  loadDashboard: (...args: unknown[]) => loadDashboard(...args),
   toggleChannelMessageReaction: (...args: unknown[]) =>
     toggleChannelMessageReaction(...args),
 }));
@@ -77,6 +82,7 @@ const message = (id: string, body: string, replyCount = 0): ChannelMessage => ({
   lastReplyAt: null,
   document: null,
   proposal: null,
+  executionProposal: null,
   createdAt: "2026-08-01T01:00:00.000Z",
 });
 
@@ -254,6 +260,78 @@ describe("CompanionChannels", () => {
     );
     expect(container.textContent).toContain("On it");
     expect(container.textContent).toContain("Thread");
+  });
+
+  it("preserves materialized approvals when a reaction returns a stale message", async () => {
+    const item = message("m-reaction-safe", "승인 기록이 있는 메시지");
+    item.reactions = [{ emoji: "👍", count: 1, userIds: ["user-1"] }];
+    item.proposal = {
+      id: "proposal-reaction-safe",
+      actionType: "request_issue_create",
+      status: "accepted",
+      projectId: "project-1",
+      payload: {
+        issue: {
+          title: "Companion reaction-safe issue",
+          description: null,
+          priority: 2,
+          status: "backlog",
+        },
+      },
+      resultRunId: "run-reaction-safe",
+    };
+    item.executionProposal = {
+      id: "execution-reaction-safe",
+      type: "request_issue_execute",
+      status: "accepted",
+      projectId: "project-1",
+      runId: "run-reaction-safe",
+      title: "Companion reaction-safe issue",
+      createdAt: "2026-08-11T00:00:00.000Z",
+      acceptedAt: "2026-08-11T00:01:00.000Z",
+      requestedProvider: "codex",
+      requestedModel: "gpt-5.6-sol",
+      requestedEffort: "high",
+      requestedWorkerId: null,
+      delegatedByAgentId: null,
+      delegatedByAgentName: null,
+    };
+    loadChannel.mockResolvedValue({
+      channel: channel("c-common", "Welcome", null),
+      members: [],
+      agents: [agent],
+      messages: [item],
+    });
+    toggleChannelMessageReaction.mockResolvedValue({
+      message: message(item.id, item.body),
+    });
+    await render();
+    const channelButton = [
+      ...container.querySelectorAll<HTMLButtonElement>(
+        ".companion-channel-group button",
+      ),
+    ].find((button) => button.textContent?.includes("Welcome"));
+    await act(async () => {
+      channelButton!.click();
+      await Promise.resolve();
+    });
+
+    expect(container.querySelector(".companion-channel-proposal")).not.toBeNull();
+    expect(container.querySelector(".execution-proposal-card")).not.toBeNull();
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(".channel-reaction-chip")?.click();
+      await Promise.resolve();
+    });
+
+    expect(toggleChannelMessageReaction).toHaveBeenCalledWith(
+      "token",
+      "org-1",
+      "c-common",
+      item.id,
+      "👍",
+    );
+    expect(container.querySelector(".companion-channel-proposal")).not.toBeNull();
+    expect(container.querySelector(".execution-proposal-card")).not.toBeNull();
   });
 
   it("polls the selected channel for pending and completed Agent replies", async () => {
@@ -656,6 +734,96 @@ describe("CompanionChannels", () => {
     expect(onIssueOpen).toHaveBeenCalledWith("project-2", "run-2");
   });
 
+  it("stays in the channel for a server-returned legacy execution follow-up", async () => {
+    const selectedChannel = channel("c-current", "Briar dev", "project-1");
+    const initial = message("m-create-execute", "생성과 실행을 제안합니다");
+    initial.channelId = selectedChannel.id;
+    initial.author = {
+      type: "agent",
+      id: "agent-1",
+      name: "Honey",
+      provider: "codex",
+    };
+    initial.proposal = {
+      id: "proposal-create-execute",
+      actionType: "request_issue_create",
+      status: "pending",
+      projectId: "project-1",
+      payload: {
+        issue: {
+          title: "Mobile two-step approval",
+          description: null,
+          priority: 2,
+          status: "backlog",
+        },
+      },
+      resultRunId: null,
+    };
+    const materialized: ChannelMessage = {
+      ...initial,
+      proposal: {
+        ...initial.proposal,
+        status: "accepted",
+        resultRunId: "run-create-execute",
+      },
+      executionProposal: {
+        id: "execution-create-execute",
+        type: "request_issue_execute",
+        status: "pending",
+        projectId: "project-1",
+        runId: "run-create-execute",
+        title: "Mobile two-step approval",
+        createdAt: "2026-08-11T00:00:00.000Z",
+        acceptedAt: null,
+        requestedProvider: null,
+        requestedModel: null,
+        requestedEffort: null,
+        requestedWorkerId: null,
+        delegatedByAgentId: null,
+        delegatedByAgentName: null,
+      },
+    };
+    listChannels.mockResolvedValue({ channels: [selectedChannel], cursor: 1 });
+    loadChannel
+      .mockResolvedValueOnce({
+        channel: selectedChannel,
+        members: [],
+        agents: [agent],
+        messages: [initial],
+      })
+      .mockResolvedValue({
+        channel: selectedChannel,
+        members: [],
+        agents: [agent],
+        messages: [materialized],
+      });
+    acceptChannelProposal.mockResolvedValue({
+      outcome: "accepted",
+      projectId: "project-1",
+      resultRunId: "run-create-execute",
+      executionProposal: materialized.executionProposal,
+    });
+    const onIssueOpen = vi.fn();
+    await render(onIssueOpen);
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(
+        ".companion-channel-group button",
+      )!.click();
+      await Promise.resolve();
+    });
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(
+        ".channel-proposal-approve-button",
+      )?.click();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(onIssueOpen).not.toHaveBeenCalled();
+    expect(container.textContent).toContain("Issue execution proposal");
+    expect(container.textContent).toContain("Accepted — the issue was created");
+  });
+
   it("keeps a newer transferred proposal over a delayed approval response", async () => {
     vi.useFakeTimers();
     const selectedChannel = channel("c-current", "Briar dev", "project-1");
@@ -1023,6 +1191,22 @@ describe("CompanionChannels", () => {
       },
       resultRunId: null,
     };
+    proposal.executionProposal = {
+      id: "execution-archived",
+      type: "request_issue_execute",
+      status: "pending",
+      projectId: "project-1",
+      runId: "run-archived",
+      title: "Review the complete issue",
+      createdAt: "2026-08-10T00:00:00.000Z",
+      acceptedAt: null,
+      requestedProvider: null,
+      requestedModel: null,
+      requestedEffort: null,
+      requestedWorkerId: null,
+      delegatedByAgentId: null,
+      delegatedByAgentName: null,
+    };
     listChannels.mockResolvedValue({
       channels: [channel("c-common", "Archived", "project-1")],
       cursor: 1,
@@ -1057,6 +1241,109 @@ describe("CompanionChannels", () => {
     expect(approve.disabled).toBe(true);
     approve.click();
     expect(acceptChannelProposal).not.toHaveBeenCalled();
+    const execute = container.querySelector<HTMLButtonElement>(
+      ".execution-proposal-approve",
+    )!;
+    expect(execute.disabled).toBe(true);
+    execute.click();
+    expect(acceptChannelExecutionProposal).not.toHaveBeenCalled();
+  });
+
+  it("uses the same explicit execution approval on the Companion surface", async () => {
+    const selectedChannel = channel("c-current", "Briar dev", "project-1");
+    const item = message("m-execution", "실행을 제안합니다");
+    item.channelId = selectedChannel.id;
+    item.author = {
+      type: "agent",
+      id: "agent-1",
+      name: "Honey",
+      provider: "codex",
+    };
+    item.executionProposal = {
+      id: "execution-companion",
+      type: "request_issue_execute",
+      status: "pending",
+      projectId: "project-1",
+      runId: "run-companion",
+      title: "Companion approval",
+      createdAt: "2026-08-11T00:00:00.000Z",
+      acceptedAt: null,
+      requestedProvider: null,
+      requestedModel: null,
+      requestedEffort: null,
+      requestedWorkerId: null,
+      delegatedByAgentId: null,
+      delegatedByAgentName: null,
+    };
+    const worker = {
+      id: "worker-companion",
+      label: "Companion Mac",
+      agentProvider: "codex",
+      providers: ["codex"],
+      readiness: "available",
+      acceptingWork: true,
+    };
+    listChannels.mockResolvedValue({ channels: [selectedChannel], cursor: 1 });
+    loadChannel.mockResolvedValue({
+      channel: selectedChannel,
+      members: [],
+      agents: [agent],
+      messages: [item],
+    });
+    loadDashboard.mockResolvedValue({
+      runs: [{
+        id: "run-companion",
+        title: "Companion approval",
+        status: "backlog",
+        executionReadiness: "ready",
+        claimedBy: null,
+        claimedAt: null,
+        workerId: null,
+        dispatchedAt: null,
+        requestedByUserId: null,
+        dispatchMode: null,
+      }],
+      workers: [worker],
+    });
+    acceptChannelExecutionProposal.mockResolvedValue({
+      proposal: {
+        ...item.executionProposal,
+        status: "accepted",
+        acceptedAt: "2026-08-11T00:01:00.000Z",
+        requestedProvider: "codex",
+      },
+      outcome: "accepted",
+      projectId: "project-1",
+      runId: "run-companion",
+      dispatch: { outcome: "dispatched" },
+    });
+    await render();
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(
+        ".companion-channel-group button",
+      )!.click();
+      await Promise.resolve();
+    });
+
+    expect(acceptChannelExecutionProposal).not.toHaveBeenCalled();
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(
+        ".execution-proposal-approve",
+      )?.click();
+    });
+    expect(document.body.textContent).toContain("Approve issue execution");
+    const finalApprove = Array.from(
+      document.body.querySelectorAll<HTMLButtonElement>("button"),
+    ).find((button) => button.textContent?.includes("Approve and run"));
+    await act(async () => finalApprove?.click());
+
+    expect(acceptChannelExecutionProposal).toHaveBeenCalledWith(
+      "token",
+      "org-1",
+      selectedChannel.id,
+      "execution-companion",
+      { provider: "codex", model: null, effort: null, workerId: null },
+    );
   });
 
   it("opens the result from an already accepted proposal", async () => {

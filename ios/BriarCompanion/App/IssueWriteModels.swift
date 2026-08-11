@@ -1,7 +1,7 @@
 import Foundation
 import UIKit
 
-enum AgentProvider: String, Codable, CaseIterable, Identifiable, Sendable {
+enum AgentProvider: String, Codable, CaseIterable, Hashable, Identifiable, Sendable {
     case codex
     case claude
     case grok
@@ -28,7 +28,7 @@ enum AgentProvider: String, Codable, CaseIterable, Identifiable, Sendable {
     }
 }
 
-enum ModelEffort: String, Codable, CaseIterable, Identifiable, Sendable {
+enum ModelEffort: String, Codable, CaseIterable, Hashable, Identifiable, Sendable {
     case low
     case medium
     case high
@@ -37,6 +37,11 @@ enum ModelEffort: String, Codable, CaseIterable, Identifiable, Sendable {
     case ultra
 
     var id: String { rawValue }
+
+    /// Conversational execution approvals intentionally expose the bounded
+    /// effort contract accepted by both approval endpoints. Ordinary manual
+    /// dispatch continues to support provider-specific max/ultra values.
+    static let conversationalApprovalCases: [ModelEffort] = ModelEffort.allCases
 }
 
 struct IssueDependencyReference: Codable, Equatable, Identifiable, Sendable {
@@ -199,6 +204,327 @@ struct IssueExecutionPreferences: Codable, Equatable, Sendable {
         guard let model else { return effort == nil }
         guard provider == .opencode || provider.models.contains(model) else { return false }
         return effort.map(provider.efforts.contains) ?? true
+    }
+
+    var isValidForConversationApproval: Bool {
+        guard provider != nil, isValid else { return false }
+        return effort.map(Self.conversationalEffortsContain) ?? true
+    }
+
+    private static func conversationalEffortsContain(_ effort: ModelEffort) -> Bool {
+        ModelEffort.conversationalApprovalCases.contains(effort)
+    }
+}
+
+enum IssueExecutionApprovalUnavailable: Equatable, Sendable {
+    case targetUnavailable
+    case prerequisites
+    case stateChanged
+}
+
+/// `delegatedByAgentName` identifies the Organization Agent that delegated the
+/// work. A direct Project Agent proposal has no delegation label.
+func issueExecutionDelegationNotice(
+    agentName: String?,
+    locale: CompanionLocale
+) -> String? {
+    guard let name = agentName?.trimmingCharacters(in: .whitespacesAndNewlines),
+          !name.isEmpty
+    else { return nil }
+    return L10n.format(
+        "Organization Agent %@의 위임",
+        locale: locale,
+        name
+    )
+}
+
+/// The fields that can make a previously valid execution approval stale. This
+/// intentionally excludes presentation-only issue fields while covering
+/// assignment, dispatch, claim, worker, provider/model/effort, dependency, and
+/// server-version changes.
+struct IssueExecutionSignature: Equatable, Sendable {
+    let runID: UUID
+    let status: DashboardRun.Status
+    let workflowStage: String?
+    let executionReadiness: String?
+    let waitingOnPrerequisiteCount: Int?
+    let prerequisiteStates: [IssueExecutionPrerequisiteSignature]
+    let assigneeUserID: String?
+    let preferredProvider: AgentProvider?
+    let preferredModel: String?
+    let preferredEffort: ModelEffort?
+    let dispatchedAt: Date?
+    let requestedProvider: AgentProvider?
+    let requestedModel: String?
+    let requestedEffort: ModelEffort?
+    let requestedWorkerID: String?
+    let requestedByUserID: String?
+    let dispatchMode: String?
+    let claimedBy: String?
+    let claimedAt: Date?
+    let workerID: String?
+    let startedAt: Date?
+    let updatedAt: Date
+}
+
+struct IssueExecutionPrerequisiteSignature: Equatable, Sendable {
+    let runID: UUID
+    let status: DashboardRun.Status
+}
+
+struct PendingIssueExecutionTargetSignature: Equatable, Sendable {
+    let proposalID: UUID
+    let targetSignature: IssueExecutionSignature?
+}
+
+/// Only a target change for an already-observed pending proposal should cause
+/// an authoritative conversation reload. Initial loads, newly added cards, and
+/// cards already removed by an authoritative response must not create loops.
+func pendingIssueExecutionTargetChanged(
+    from previous: [PendingIssueExecutionTargetSignature],
+    to current: [PendingIssueExecutionTargetSignature]
+) -> Bool {
+    let currentByID = Dictionary(
+        current.map { ($0.proposalID, $0.targetSignature) },
+        uniquingKeysWith: { existing, _ in existing }
+    )
+    return previous.contains { previousValue in
+        guard let currentValue = currentByID[previousValue.proposalID] else {
+            return false
+        }
+        return currentValue != previousValue.targetSignature
+    }
+}
+
+func issueExecutionSignature(_ run: DashboardRun?) -> IssueExecutionSignature? {
+    guard let run else { return nil }
+    return IssueExecutionSignature(
+        runID: run.id,
+        status: run.status,
+        workflowStage: run.workflowStage,
+        executionReadiness: run.executionReadiness,
+        waitingOnPrerequisiteCount: run.waitingOnPrerequisiteCount,
+        prerequisiteStates: (run.prerequisites ?? [])
+            .map {
+                IssueExecutionPrerequisiteSignature(
+                    runID: $0.id,
+                    status: $0.status
+                )
+            }
+            .sorted { $0.runID.uuidString < $1.runID.uuidString },
+        assigneeUserID: run.assigneeUserId,
+        preferredProvider: run.preferredProvider,
+        preferredModel: run.preferredModel,
+        preferredEffort: run.preferredEffort,
+        dispatchedAt: run.dispatchedAt,
+        requestedProvider: run.requestedProvider,
+        requestedModel: run.requestedModel,
+        requestedEffort: run.requestedEffort,
+        requestedWorkerID: run.requestedWorkerId,
+        requestedByUserID: run.requestedByUserId,
+        dispatchMode: run.dispatchMode,
+        claimedBy: run.claimedBy,
+        claimedAt: run.claimedAt,
+        workerID: run.workerId,
+        startedAt: run.startedAt,
+        updatedAt: run.updatedAt
+    )
+}
+
+/// Mirrors the shared web/Android preflight. The server remains authoritative,
+/// but mobile re-reads these fields before opening and immediately before the
+/// mutation so a claim, transfer, dispatch, or dependency change cannot be
+/// approved from an old snapshot.
+func issueExecutionApprovalUnavailable(
+    run: DashboardRun?,
+    targetRunID: UUID
+) -> IssueExecutionApprovalUnavailable? {
+    guard let run, run.id == targetRunID else { return .targetUnavailable }
+    if run.executionReadiness == "waiting" { return .prerequisites }
+    if run.status != .backlog ||
+        run.claimedBy != nil ||
+        run.claimedAt != nil ||
+        run.workerId != nil ||
+        run.dispatchedAt != nil ||
+        run.requestedByUserId != nil ||
+        run.dispatchMode != nil {
+        return .stateChanged
+    }
+    return nil
+}
+
+func eligibleExecutionWorkers(
+    workers: [DashboardWorker],
+    provider: AgentProvider?,
+    policy: ProjectExecutionWorkerPolicy?
+) -> [DashboardWorker] {
+    guard let provider else { return [] }
+    return workers.filter { worker in
+        worker.readiness != "disabled" &&
+            worker.acceptingWork &&
+            (policy?.allows(workerID: worker.id) ?? true) &&
+            (worker.providers ?? worker.agentProvider.map { [$0] } ?? []).contains(provider)
+    }
+}
+
+func issueExecutionApprovalAcceptedStateMatches(
+    run: DashboardRun?,
+    request: AcceptIssueExecutionProposalRequest
+) -> Bool {
+    guard let run else { return false }
+    return run.status != .backlog &&
+        run.dispatchedAt != nil &&
+        run.requestedByUserId != nil &&
+        run.dispatchMode != nil &&
+        run.requestedProvider == request.provider &&
+        run.requestedModel == request.model &&
+        run.requestedEffort == request.effort &&
+        run.requestedWorkerId == request.workerId
+}
+
+func issueExecutionApprovalResponseMatches(
+    proposal: IssueExecutionProposal,
+    projectID: UUID,
+    runID: UUID,
+    dispatch: DispatchRunResponse,
+    expectedProposalID: UUID,
+    request: AcceptIssueExecutionProposalRequest
+) -> Bool {
+    proposal.id == expectedProposalID &&
+        proposal.status == .accepted &&
+        proposal.projectId == projectID &&
+        proposal.runId == runID &&
+        proposal.acceptedAt != nil &&
+        proposal.requestedProvider == request.provider &&
+        proposal.requestedModel == request.model &&
+        proposal.requestedEffort == request.effort &&
+        proposal.requestedWorkerId == request.workerId &&
+        dispatch.runId == runID &&
+        dispatch.provider == request.provider &&
+        dispatch.model == request.model &&
+        dispatch.effort == request.effort &&
+        dispatch.requestedWorkerId == request.workerId &&
+        dispatch.dispatchMode == (request.workerId == nil ? "any" : "specific")
+}
+
+func issueExecutionProposalMatchesCreatedRun(
+    _ proposal: IssueExecutionProposal,
+    projectID: UUID,
+    runID: UUID
+) -> Bool {
+    proposal.projectId == projectID && proposal.runId == runID
+}
+
+enum IssueExecutionApprovalError: LocalizedError, Equatable, Sendable {
+    case targetUnavailable
+    case prerequisites
+    case stateChanged
+    case providerUnavailable
+    case configurationUnavailable
+    case workerUnavailable
+
+    var errorDescription: String? {
+        switch self {
+        case .targetUnavailable:
+            L10n.text("실행 대상 이슈를 최신 프로젝트 스냅샷에서 찾을 수 없습니다.")
+        case .prerequisites:
+            L10n.text("완료되지 않은 선행 이슈가 있어 아직 실행할 수 없습니다.")
+        case .stateChanged:
+            L10n.text("이슈 상태가 변경되었습니다. 최신 상태를 확인해 다시 승인해 주세요.")
+        case .providerUnavailable:
+            L10n.text("이 프로젝트에서 사용할 수 없는 프로바이더입니다.")
+        case .configurationUnavailable:
+            L10n.text("선택한 모델 또는 Effort를 이 프로바이더에서 사용할 수 없습니다.")
+        case .workerUnavailable:
+            L10n.text("선택한 설정으로 실행 가능한 Worker가 없습니다.")
+        }
+    }
+
+    init(_ unavailable: IssueExecutionApprovalUnavailable) {
+        switch unavailable {
+        case .targetUnavailable: self = .targetUnavailable
+        case .prerequisites: self = .prerequisites
+        case .stateChanged: self = .stateChanged
+        }
+    }
+}
+
+@discardableResult
+func validateIssueExecutionApproval(
+    snapshot: DashboardSnapshot,
+    proposal: IssueExecutionProposal,
+    request: AcceptIssueExecutionProposalRequest? = nil
+) throws -> DashboardRun {
+    guard snapshot.project.id == proposal.projectId else {
+        throw IssueExecutionApprovalError.targetUnavailable
+    }
+    let run = snapshot.runs.first(where: { $0.id == proposal.runId })
+    if let unavailable = issueExecutionApprovalUnavailable(
+        run: run,
+        targetRunID: proposal.runId
+    ) {
+        throw IssueExecutionApprovalError(unavailable)
+    }
+    guard let run else { throw IssueExecutionApprovalError.targetUnavailable }
+
+    // Conversational approval is based on the target project's exact
+    // capability snapshot. Missing provider data is not permission to infer
+    // that every provider is available.
+    let providers = snapshot.organizationProviders ?? []
+    if let request {
+        guard providers.contains(request.provider) else {
+            throw IssueExecutionApprovalError.providerUnavailable
+        }
+        guard IssueExecutionPreferences(
+            provider: request.provider,
+            model: request.model,
+            effort: request.effort
+        ).isValidForConversationApproval else {
+            throw IssueExecutionApprovalError.configurationUnavailable
+        }
+        let eligible = eligibleExecutionWorkers(
+            workers: snapshot.workers ?? [],
+            provider: request.provider,
+            policy: snapshot.executionPolicy
+        )
+        guard !eligible.isEmpty else {
+            throw IssueExecutionApprovalError.workerUnavailable
+        }
+        if let workerID = request.workerId,
+           !eligible.contains(where: {
+               $0.id == workerID && $0.readiness == "available"
+           }) {
+            throw IssueExecutionApprovalError.workerUnavailable
+        }
+    } else {
+        let hasExecutableProvider = providers.contains { provider in
+            !eligibleExecutionWorkers(
+                workers: snapshot.workers ?? [],
+                provider: provider,
+                policy: snapshot.executionPolicy
+            ).isEmpty
+        }
+        guard hasExecutableProvider else {
+            throw IssueExecutionApprovalError.workerUnavailable
+        }
+    }
+    return run
+}
+
+extension AcceptIssueExecutionProposalRequest {
+    init(
+        preferences: IssueExecutionPreferences,
+        workerID: String?
+    ) throws {
+        guard let provider = preferences.provider,
+              preferences.isValidForConversationApproval
+        else { throw IssueMutationError.invalidPreferences }
+        self.init(
+            provider: provider,
+            model: preferences.model,
+            effort: preferences.effort,
+            workerId: workerID
+        )
     }
 }
 

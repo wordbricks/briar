@@ -1500,6 +1500,7 @@ export function App() {
             onTransferIssue={briar.transferIssue}
             onAddIssueDependency={briar.addIssueDependency}
             onAcceptIssueAction={briar.acceptConversationIssueAction}
+            onAcceptIssueExecution={briar.acceptConversationIssueExecution}
             onRemoveIssueDependency={briar.removeIssueDependency}
             onUpdateIssue={briar.editIssue}
             onUpdateIssueCheckpoints={briar.editIssueCheckpoints}
@@ -1569,6 +1570,14 @@ export function App() {
                       inboxDetailRun.id,
                       proposal,
                     )}
+                  onAcceptIssueExecution={(proposal, input) =>
+                    briar.acceptConversationIssueExecution(
+                      inboxDetailRun.id,
+                      proposal,
+                      input,
+                    )}
+                  executionPolicy={briar.dashboard?.executionPolicy}
+                  executionWorkers={briar.dashboard?.workers ?? []}
                   onBack={() => setInboxDetailTarget(null)}
                   onCancel={() => briar.cancelRun(inboxDetailRun.id)}
                   onDelete={async () => {
@@ -1917,6 +1926,7 @@ export function App() {
             onTransferIssue={briar.transferIssue}
             onAddIssueDependency={briar.addIssueDependency}
             onAcceptIssueAction={briar.acceptConversationIssueAction}
+            onAcceptIssueExecution={briar.acceptConversationIssueExecution}
             onRemoveIssueDependency={briar.removeIssueDependency}
             onUpdateIssue={briar.editIssue}
             onUpdateIssueCheckpoints={briar.editIssueCheckpoints}

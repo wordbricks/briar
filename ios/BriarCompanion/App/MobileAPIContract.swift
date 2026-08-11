@@ -74,6 +74,14 @@ enum MobileAPIContract {
             "\(channel(organizationID: organizationID, channelID: channelID))/proposals/\(proposalID.uuidString.lowercased())/accept"
         }
 
+        static func acceptChannelExecutionProposal(
+            organizationID: UUID,
+            channelID: UUID,
+            proposalID: UUID
+        ) -> String {
+            "\(channel(organizationID: organizationID, channelID: channelID))/proposals/\(proposalID.uuidString.lowercased())/accept-execution"
+        }
+
         static func runEvents(projectID: UUID, runID: UUID) -> String {
             "/projects/\(projectID.uuidString.lowercased())/runs/\(runID.uuidString.lowercased())/events"
         }
@@ -132,6 +140,14 @@ enum MobileAPIContract {
             proposalID: UUID
         ) -> String {
             "\(run(projectID: projectID, runID: runID))/issue-action-proposals/\(proposalID.uuidString.lowercased())/accept"
+        }
+
+        static func acceptIssueExecutionProposal(
+            projectID: UUID,
+            conversationRunID: UUID,
+            proposalID: UUID
+        ) -> String {
+            "\(run(projectID: projectID, runID: conversationRunID))/issue-execution-proposals/\(proposalID.uuidString.lowercased())/accept"
         }
 
         static func projectAgents(projectID: UUID, locale: String) -> String {

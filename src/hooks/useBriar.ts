@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   acceptOrganizationInvitation as acceptRemoteOrganizationInvitation,
   acceptIssueActionProposal as acceptRemoteIssueActionProposal,
+  acceptIssueExecutionProposal as acceptRemoteIssueExecutionProposal,
   acceptIssueReworkProposal as acceptRemoteIssueReworkProposal,
   addIssueDependency,
   beginDeviceAuthorization,
@@ -145,6 +146,8 @@ import type {
   IssueMessage,
   IssueMessageSendResult,
   IssueProposedAction,
+  IssueExecutionApprovalInput,
+  IssueExecutionProposal,
   IssueExecutionPreferences,
   IssueResultReview,
   Organization,
@@ -2325,7 +2328,7 @@ export function useBriar(options: UseBriarOptions = {}) {
         setUpdatingIssueId(null);
       }
     },
-    [activeProjectId, dashboard, refresh, token],
+    [activeProjectId, dashboard, demoMode, refresh, token],
   );
 
   const editIssueExecutionPreferences = useCallback(
@@ -2964,11 +2967,54 @@ export function useBriar(options: UseBriarOptions = {}) {
             runId,
             proposal.id,
           );
+      const materializedExecutionProposal =
+        "executionProposal" in result ? result.executionProposal : null;
       issueMessagesByRun.current = {
         ...issueMessagesByRun.current,
         [runId]: (issueMessagesByRun.current[runId] ?? []).map((message) =>
           message.proposedAction?.id === proposal.id
-            ? { ...message, proposedAction: result.proposal }
+            ? {
+                ...message,
+                proposedAction: result.proposal,
+                executionProposal:
+                  materializedExecutionProposal ??
+                  message.executionProposal ??
+                  null,
+              }
+            : message,
+        ),
+      };
+      await refresh("snapshot");
+      return result.proposal;
+    },
+    [activeProjectId, dashboard, demoMode, refresh, token],
+  );
+
+  const acceptConversationIssueExecution = useCallback(
+    async (
+      runId: string,
+      proposal: IssueExecutionProposal,
+      input: IssueExecutionApprovalInput,
+    ) => {
+      if (!activeProjectId || !dashboard) {
+        throw new Error("실행할 이슈 처리 작업이 없습니다.");
+      }
+      if (demoMode) {
+        throw new Error("데모에서는 이슈 실행을 승인할 수 없습니다.");
+      }
+      if (!token) throw new Error("로그인이 필요합니다.");
+      const result = await acceptRemoteIssueExecutionProposal(
+        token,
+        activeProjectId,
+        runId,
+        proposal.id,
+        input,
+      );
+      issueMessagesByRun.current = {
+        ...issueMessagesByRun.current,
+        [runId]: (issueMessagesByRun.current[runId] ?? []).map((message) =>
+          message.executionProposal?.id === proposal.id
+            ? { ...message, executionProposal: result.proposal }
             : message,
         ),
       };
@@ -3521,6 +3567,7 @@ export function useBriar(options: UseBriarOptions = {}) {
     updateIssueMessage,
     removeIssueMessage,
     acceptConversationIssueAction,
+    acceptConversationIssueExecution,
     setActiveOrganizationId: selectOrganization,
     setActiveProjectId: selectProject,
     ensureProjectSelected,

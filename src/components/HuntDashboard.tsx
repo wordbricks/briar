@@ -171,6 +171,10 @@ import {
   type ConversationReplyParticipant,
 } from "./ConversationReplySummary";
 import {
+  IssueExecutionApproval,
+} from "./IssueExecutionApproval";
+import { issueExecutionApprovalUnavailable } from "../lib/issue-execution-approval";
+import {
   copyIssueId,
   copyIssueShareLink,
   shareIssueLink,
@@ -188,11 +192,14 @@ import type {
   IssueMessage,
   IssueMessageSendResult,
   IssueProposedAction,
+  IssueExecutionApprovalInput,
+  IssueExecutionProposal,
   IssueExecutionPreferences,
   IssueResultReview,
   OrganizationMember,
   Project,
   ProjectAgent,
+  ProjectExecutionWorkerPolicy,
   RunEvidence,
   RunEvidenceImage,
   UpdateIssueInput,
@@ -429,6 +436,7 @@ export function HuntDashboard({
   onTransferIssue,
   onAddIssueDependency,
   onAcceptIssueAction,
+  onAcceptIssueExecution,
   onRemoveIssueDependency,
   onUpdateIssue,
   onUpdateIssueCheckpoints = async () => undefined,
@@ -499,6 +507,11 @@ export function HuntDashboard({
     runId: string,
     proposal: IssueProposedAction,
   ) => Promise<IssueProposedAction>;
+  onAcceptIssueExecution?: (
+    runId: string,
+    proposal: IssueExecutionProposal,
+    input: IssueExecutionApprovalInput,
+  ) => Promise<IssueExecutionProposal>;
   onRemoveIssueDependency?: (
     dependentRunId: string,
     prerequisiteRunId: string,
@@ -1117,6 +1130,10 @@ export function HuntDashboard({
             ? (proposal) =>
                 onAcceptIssueAction(selected.id, proposal)
             : undefined}
+          onAcceptIssueExecution={onAcceptIssueExecution
+            ? (proposal, input) =>
+                onAcceptIssueExecution(selected.id, proposal, input)
+            : undefined}
           onRemoveDependency={onRemoveIssueDependency
             ? (prerequisiteRunId) =>
                 onRemoveIssueDependency(selected.id, prerequisiteRunId)
@@ -1153,6 +1170,8 @@ export function HuntDashboard({
           onUpdateIssuePreferences={(input) =>
             onUpdateIssuePreferences(selected.id, input)}
           availableProviders={availableProviders}
+          executionPolicy={dashboard?.executionPolicy}
+          executionWorkers={dashboard?.workers ?? []}
           performedAgentName={
             agentAssociationsByRunId.performedAgents.get(selected.id)?.name ??
             null
@@ -3956,6 +3975,8 @@ export function RunPage({
   companionMode = false,
   currentUserId = null,
   error,
+  executionPolicy,
+  executionWorkers = [],
   isDeletingIssue = false,
   isProcessing = false,
   isRecovering,
@@ -3965,6 +3986,7 @@ export function RunPage({
   onBack,
   onAddDependency,
   onAcceptIssueAction,
+  onAcceptIssueExecution,
   onCancel,
   onUnassignRun,
   onDelete,
@@ -4006,6 +4028,8 @@ export function RunPage({
   companionMode?: boolean;
   currentUserId?: string | null;
   error: string | null;
+  executionPolicy?: ProjectExecutionWorkerPolicy;
+  executionWorkers?: ExecutionWorker[];
   isDeletingIssue?: boolean;
   isProcessing?: boolean;
   isRecovering: boolean;
@@ -4017,6 +4041,10 @@ export function RunPage({
   onAcceptIssueAction?: (
     proposal: IssueProposedAction,
   ) => Promise<IssueProposedAction>;
+  onAcceptIssueExecution?: (
+    proposal: IssueExecutionProposal,
+    input: IssueExecutionApprovalInput,
+  ) => Promise<IssueExecutionProposal>;
   onCancel: () => Promise<unknown>;
   onUnassignRun?: (runId: string) => Promise<unknown>;
   onDelete?: () => Promise<unknown>;
@@ -5838,8 +5866,12 @@ export function RunPage({
                   >
                     <IssueConversation
                       currentUserId={currentUserId}
+                      executionRuns={availableRuns}
                       mentionMembers={mentionMembers}
                       onAcceptIssueAction={onAcceptIssueAction}
+                      onAcceptIssueExecution={onAcceptIssueExecution}
+                      executionPolicy={executionPolicy}
+                      executionWorkers={executionWorkers}
                       onDelete={onDeleteIssueMessage}
                       onEdit={onEditIssueMessage}
                       onLoadAttachment={onLoadAttachment}
@@ -5870,8 +5902,12 @@ export function RunPage({
                   />
                   <IssueConversation
                     currentUserId={currentUserId}
+                    executionRuns={availableRuns}
                     mentionMembers={mentionMembers}
                     onAcceptIssueAction={onAcceptIssueAction}
+                    onAcceptIssueExecution={onAcceptIssueExecution}
+                    executionPolicy={executionPolicy}
+                    executionWorkers={executionWorkers}
                     onDelete={onDeleteIssueMessage}
                     onEdit={onEditIssueMessage}
                     onLoadAttachment={onLoadAttachment}
@@ -7390,8 +7426,12 @@ const issueReplyParticipant = (
 
 function IssueConversation({
   currentUserId = null,
+  executionPolicy,
+  executionRuns,
+  executionWorkers,
   mentionMembers,
   onAcceptIssueAction,
+  onAcceptIssueExecution,
   onDelete,
   onEdit,
   onLoadAttachment,
@@ -7400,10 +7440,17 @@ function IssueConversation({
   run,
 }: {
   currentUserId?: string | null;
+  executionPolicy?: ProjectExecutionWorkerPolicy;
+  executionRuns: HuntRun[];
+  executionWorkers: ExecutionWorker[];
   mentionMembers: OrganizationMember[];
   onAcceptIssueAction?: (
     proposal: IssueProposedAction,
   ) => Promise<IssueProposedAction>;
+  onAcceptIssueExecution?: (
+    proposal: IssueExecutionProposal,
+    input: IssueExecutionApprovalInput,
+  ) => Promise<IssueExecutionProposal>;
   onDelete: (messageId: string) => Promise<unknown>;
   onEdit: (messageId: string, input: {
     body: string;
@@ -7442,23 +7489,113 @@ function IssueConversation({
   const [activeProfile, setActiveProfile] = useState<ProfileTarget | null>(null);
   const messageListRef = useRef<HTMLDivElement | null>(null);
   const onLoadRef = useRef(onLoad);
+  const mountedRef = useRef(true);
+  const activeRunIdRef = useRef(run.id);
+  const messageLoadVersion = useRef(0);
+  const executionProposalStateByIdRef = useRef(new Map<string, string>());
+  if (activeRunIdRef.current !== run.id) {
+    activeRunIdRef.current = run.id;
+    messageLoadVersion.current += 1;
+    executionProposalStateByIdRef.current.clear();
+  }
   onLoadRef.current = onLoad;
 
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      messageLoadVersion.current += 1;
+    };
+  }, []);
+
   const loadMessages = useCallback(async () => {
+    const requestedRunId = activeRunIdRef.current;
+    const requestedVersion = ++messageLoadVersion.current;
     setLoading(true);
     setLoadError(null);
     try {
-      setMessages(await onLoadRef.current());
+      const loaded = await onLoadRef.current();
+      if (
+        mountedRef.current &&
+        activeRunIdRef.current === requestedRunId &&
+        messageLoadVersion.current === requestedVersion
+      ) {
+        setMessages(loaded);
+      }
     } catch {
-      setLoadError(t("run.messagesLoadFailed"));
+      if (
+        mountedRef.current &&
+        activeRunIdRef.current === requestedRunId &&
+        messageLoadVersion.current === requestedVersion
+      ) {
+        setLoadError(t("run.messagesLoadFailed"));
+      }
     } finally {
-      setLoading(false);
+      if (
+        mountedRef.current &&
+        activeRunIdRef.current === requestedRunId &&
+        messageLoadVersion.current === requestedVersion
+      ) {
+        setLoading(false);
+      }
     }
   }, [t]);
 
   useEffect(() => {
     void loadMessages();
   }, [loadMessages, run.id]);
+
+  const executionProposalStates = useMemo(() => {
+    const runsById = new Map(
+      executionRuns.map((candidate) => [candidate.id, candidate]),
+    );
+    runsById.set(run.id, run);
+    return messages.flatMap((message) => {
+      const proposal = message.executionProposal;
+      if (!proposal || proposal.status !== "pending") return [];
+      const target = runsById.get(proposal.runId);
+      return [[
+        proposal.id,
+        JSON.stringify(target
+          ? [
+              target.updatedAt,
+              target.status,
+              target.executionReadiness ?? null,
+              target.agentId ?? null,
+              target.requestedProvider ?? null,
+              target.requestedModel ?? null,
+              target.requestedEffort ?? null,
+              target.requestedWorkerId ?? null,
+              target.requestedByUserId ?? null,
+              target.dispatchMode ?? null,
+              target.workerId ?? null,
+              target.claimedBy ?? null,
+              target.claimedAt ?? null,
+              target.dispatchedAt ?? null,
+            ]
+          : null),
+        issueExecutionApprovalUnavailable(target ?? null, proposal.runId) !== null,
+      ] as const];
+    });
+  }, [executionRuns, messages, run]);
+  const executionProposalStateSignature = JSON.stringify(
+    executionProposalStates,
+  );
+
+  useEffect(() => {
+    const previous = executionProposalStateByIdRef.current;
+    const next = new Map(
+      executionProposalStates.map(([proposalId, state]) => [proposalId, state]),
+    );
+    const changed = executionProposalStates.some(
+      ([proposalId, state, initiallyUnavailable]) =>
+        previous.has(proposalId)
+          ? previous.get(proposalId) !== state
+          : initiallyUnavailable,
+    );
+    executionProposalStateByIdRef.current = next;
+    if (changed) void loadMessages();
+  }, [executionProposalStateSignature, loadMessages]);
 
   const messagesById = useMemo(() => {
     const byId = new Map<string, IssueMessage>();
@@ -7624,12 +7761,14 @@ function IssueConversation({
 
   const acceptIssueAction = async (proposal: IssueProposedAction) => {
     if (!onAcceptIssueAction) return;
+    const requestedRunId = activeRunIdRef.current;
     setActionProposalStates((current) => ({
       ...current,
       [proposal.id]: { accepting: true, error: null },
     }));
     try {
       const accepted = await onAcceptIssueAction(proposal);
+      if (!mountedRef.current || activeRunIdRef.current !== requestedRunId) return;
       setMessages((current) =>
         current.map((message) =>
           message.proposedAction?.id === proposal.id
@@ -7637,12 +7776,25 @@ function IssueConversation({
             : message,
         )
       );
+      if (
+        proposal.type === "request_issue_create" &&
+        proposal.executeAfterCreate
+      ) {
+        // The create transaction materializes a separate execution proposal
+        // on this same reply. Reload the conversation authoritatively so the
+        // accepted creation evidence and second approval card coexist.
+        await loadMessages();
+        if (!mountedRef.current || activeRunIdRef.current !== requestedRunId) {
+          return;
+        }
+      }
       setActionProposalStates((current) => {
         const next = { ...current };
         delete next[proposal.id];
         return next;
       });
     } catch (caught) {
+      if (!mountedRef.current || activeRunIdRef.current !== requestedRunId) return;
       setActionProposalStates((current) => ({
         ...current,
         [proposal.id]: {
@@ -7798,6 +7950,27 @@ function IssueConversation({
                   onAcceptIssueAction={onAcceptIssueAction && message.proposedAction
                     ? () => void acceptIssueAction(message.proposedAction!)
                     : undefined}
+                  onAcceptIssueExecution={
+                    onAcceptIssueExecution && message.executionProposal
+                      ? (input) =>
+                          onAcceptIssueExecution(message.executionProposal!, input)
+                      : undefined
+                  }
+                  onExecutionProposalAccepted={(accepted) => {
+                    setMessages((current) => current.map((candidate) =>
+                      candidate.id === message.id
+                        ? { ...candidate, executionProposal: accepted }
+                        : candidate,
+                    ));
+                  }}
+                  executionPolicy={executionPolicy}
+                  executionRun={message.executionProposal
+                    ? executionRuns.find(
+                        (candidate) =>
+                          candidate.id === message.executionProposal?.runId,
+                      ) ?? null
+                    : run}
+                  executionWorkers={executionWorkers}
                   onDelete={() => void deleteMessage(message.id)}
                   onEdit={() =>
                     setActiveEditMessageId((current) =>
@@ -7918,6 +8091,11 @@ function IssueMessageItem({
   mentionHandles,
   onMentionOpen,
   onAcceptIssueAction,
+  onAcceptIssueExecution,
+  onExecutionProposalAccepted,
+  executionPolicy,
+  executionRun,
+  executionWorkers,
   onDelete,
   onEdit,
   onLoadAttachment,
@@ -7939,6 +8117,13 @@ function IssueMessageItem({
   mentionHandles: readonly string[];
   onMentionOpen: (handle: string) => void;
   onAcceptIssueAction?: () => void;
+  onAcceptIssueExecution?: (
+    input: IssueExecutionApprovalInput,
+  ) => Promise<IssueExecutionProposal>;
+  onExecutionProposalAccepted: (proposal: IssueExecutionProposal) => void;
+  executionPolicy?: ProjectExecutionWorkerPolicy;
+  executionRun: HuntRun | null;
+  executionWorkers: ExecutionWorker[];
   onDelete?: () => void;
   onEdit?: () => void;
   onLoadAttachment: (attachment: IssueAttachment) => Promise<Blob>;
@@ -8068,6 +8253,9 @@ function IssueMessageItem({
                 <small>
                   {t("run.issueProposalPriorityField")}: {proposal.issue.priority ? `P${proposal.issue.priority}` : t("run.issueProposalClearValue")}
                 </small>
+                {proposal.executeAfterCreate ? (
+                  <small>{t("channel.issueProposalExecutionRequested")}</small>
+                ) : null}
               </div>
             )}
             {proposal.status === "accepted" ? (
@@ -8107,6 +8295,27 @@ function IssueMessageItem({
               </p>
             ) : null}
           </section>
+        ) : null}
+        {message.executionProposal ? (
+          <IssueExecutionApproval
+            disabledReason={!onAcceptIssueExecution
+              ? t("executionApproval.approvalUnavailable")
+              : null}
+            executionContext={{
+              run: executionRun,
+              workers: executionWorkers,
+              policy: executionPolicy,
+            }}
+            onAccept={async (input) => {
+              if (!onAcceptIssueExecution) {
+                throw new Error(t("executionApproval.targetUnavailable"));
+              }
+              return onAcceptIssueExecution(input);
+            }}
+            onAccepted={onExecutionProposalAccepted}
+            proposal={message.executionProposal}
+            surfaceKey={`${executionRun?.id ?? message.executionProposal.runId}:${message.id}`}
+          />
         ) : null}
         {message.replyCount > 0 ? (
           <ConversationReplySummary

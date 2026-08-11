@@ -2,6 +2,7 @@ import {
   type ChannelActionType,
   type ChannelAgentProvider as AgentProvider,
   type ChannelAgentReply,
+  type ChannelExecutionProposal,
   type ChannelMessage,
   type ChannelMessageAttachment,
   type ChannelMessageReaction,
@@ -11,6 +12,7 @@ import {
 } from "../../src/lib/channels-contract";
 import { isWorkerEmoji } from "../../src/lib/worker-icon-validation";
 import type { AgentSkillEffort } from "./agent-skills";
+import type { IssueExecutionProposalRow } from "./db";
 
 export type ChannelRow = {
   id: string;
@@ -49,7 +51,21 @@ export type ChannelMessageRow = {
   proposal_status: "pending" | "accepted" | null;
   proposal_project_id: string | null;
   proposal_payload_json: string | null;
+  proposal_execute_after_create: number | null;
   proposal_result_run_id: string | null;
+  execution_proposal_id: string | null;
+  execution_proposal_project_id: string | null;
+  execution_proposal_run_id: string | null;
+  execution_proposal_title: string | null;
+  execution_proposal_status: "pending" | "accepted" | null;
+  execution_proposal_created_at: string | null;
+  execution_proposal_accepted_at: string | null;
+  execution_requested_provider: AgentProvider | null;
+  execution_requested_model: string | null;
+  execution_requested_effort: AgentSkillEffort | null;
+  execution_requested_worker_id: string | null;
+  execution_delegated_by_agent_id: string | null;
+  execution_delegated_by_agent_name: string | null;
   created_at: string;
 };
 
@@ -109,6 +125,7 @@ export type ChannelReplyJobRow = {
   selected_skill_id_snapshot: string | null;
   delegated_by_reply_job_id: string | null;
   delegation_request: string | null;
+  execution_target_ids_json?: string;
 };
 
 const MAX_REPLY_ATTEMPTS = 3;
@@ -166,7 +183,7 @@ const visibleToUser = `(
   )
 )`;
 
-const messageSelect = `
+const messageSelect = (withExecutionProposals: boolean) => `
   select message.id, message.channel_id, message.parent_message_id,
          message.author_user_id, author.name as author_name,
          author.email as author_email, author.image as author_image,
@@ -185,13 +202,81 @@ const messageSelect = `
          proposal.project_id as proposal_project_id,
          proposal.payload_json as proposal_payload_json,
          proposal.result_run_id as proposal_result_run_id,
+         ${withExecutionProposals ? `
+         proposal.execute_after_create as proposal_execute_after_create,
+         execution.id as execution_proposal_id,
+         execution.project_id as execution_proposal_project_id,
+         execution.target_run_id as execution_proposal_run_id,
+         execution.target_title as execution_proposal_title,
+         execution.status as execution_proposal_status,
+         execution.created_at as execution_proposal_created_at,
+         execution.accepted_at as execution_proposal_accepted_at,
+         execution.requested_provider as execution_requested_provider,
+         execution.requested_model as execution_requested_model,
+         execution.requested_effort as execution_requested_effort,
+         execution.requested_worker_id as execution_requested_worker_id,
+         execution.delegated_by_agent_id as execution_delegated_by_agent_id,
+         execution.delegated_by_agent_name as execution_delegated_by_agent_name
+         ` : `
+         null as proposal_execute_after_create,
+         null as execution_proposal_id,
+         null as execution_proposal_project_id,
+         null as execution_proposal_run_id,
+         null as execution_proposal_title,
+         null as execution_proposal_status,
+         null as execution_proposal_created_at,
+         null as execution_proposal_accepted_at,
+         null as execution_requested_provider,
+         null as execution_requested_model,
+         null as execution_requested_effort,
+         null as execution_requested_worker_id,
+         null as execution_delegated_by_agent_id,
+         null as execution_delegated_by_agent_name
+         `},
          message.created_at
   from briar_channel_messages message
   left join "user" author on author.id = message.author_user_id
   left join briar_channel_message_documents document
     on document.message_id = message.id
   left join briar_channel_action_proposals proposal
-    on proposal.reply_message_id = message.id`;
+    on proposal.reply_message_id = message.id
+  ${withExecutionProposals ? `left join briar_issue_execution_proposals execution
+    on execution.reply_message_id = message.id
+   and execution.source_kind = 'channel'
+   and execution.status in ('pending', 'accepted')` : ""}`;
+
+export async function channelExecutionProposalTablesAvailable(db: D1Database) {
+  return Boolean(await db
+    .prepare(
+      `select 1 as available from sqlite_master
+       where type = 'table' and name = 'briar_issue_execution_proposals'`,
+    )
+    .first<{ available: number }>());
+}
+
+const messageSelectFor = async (db: D1Database) =>
+  messageSelect(await channelExecutionProposalTablesAvailable(db));
+
+const channelExecutionProposalJson = (
+  row: ChannelMessageRow,
+): ChannelExecutionProposal | null => row.execution_proposal_id
+  ? {
+      id: row.execution_proposal_id,
+      type: "request_issue_execute",
+      status: row.execution_proposal_status ?? "pending",
+      projectId: row.execution_proposal_project_id ?? "",
+      runId: row.execution_proposal_run_id ?? "",
+      title: row.execution_proposal_title ?? "",
+      createdAt: row.execution_proposal_created_at ?? row.created_at,
+      acceptedAt: row.execution_proposal_accepted_at,
+      requestedProvider: row.execution_requested_provider,
+      requestedModel: row.execution_requested_model,
+      requestedEffort: row.execution_requested_effort,
+      requestedWorkerId: row.execution_requested_worker_id,
+      delegatedByAgentId: row.execution_delegated_by_agent_id,
+      delegatedByAgentName: row.execution_delegated_by_agent_name,
+    }
+  : null;
 
 export const channelJson = (row: ChannelRow): ChannelSummary => ({
   id: row.id,
@@ -283,10 +368,14 @@ export const channelMessageJson = (
         actionType: row.proposal_action_type ?? "request_issue_create",
         status: row.proposal_status ?? "pending",
         projectId: row.proposal_project_id,
-        payload: JSON.parse(row.proposal_payload_json ?? "{}"),
+        payload: {
+          ...JSON.parse(row.proposal_payload_json ?? "{}"),
+          executeAfterCreate: row.proposal_execute_after_create === 1,
+        },
         resultRunId: row.proposal_result_run_id,
-      }
+    }
     : null,
+  executionProposal: channelExecutionProposalJson(row),
   createdAt: row.created_at,
 });
 
@@ -876,9 +965,10 @@ export async function listChannelRootMessages(
   channelId: string,
   limit = 200,
 ) {
+  const select = await messageSelectFor(db);
   const rows = await db
     .prepare(
-      `${messageSelect}
+      `${select}
        where message.channel_id = ? and message.parent_message_id is null
        order by message.created_at desc, message.id desc
        limit ?`,
@@ -893,9 +983,10 @@ export async function listChannelThreadMessages(
   channelId: string,
   parentMessageId: string,
 ) {
+  const select = await messageSelectFor(db);
   const rows = await db
     .prepare(
-      `${messageSelect}
+      `${select}
        where message.channel_id = ?
          and (message.id = ? or message.parent_message_id = ?)
        order by message.created_at, message.id`,
@@ -910,8 +1001,9 @@ export async function getChannelMessage(
   channelId: string,
   messageId: string,
 ) {
+  const select = await messageSelectFor(db);
   const row = await db
-    .prepare(`${messageSelect} where message.channel_id = ? and message.id = ?`)
+    .prepare(`${select} where message.channel_id = ? and message.id = ?`)
     .bind(channelId, messageId)
     .first<ChannelMessageRow>();
   if (!row) return null;
@@ -1340,6 +1432,104 @@ export async function claimNextChannelAgentReply(
     .first<ChannelReplyJobRow>();
 }
 
+export type ChannelReplyExecutionTargetRow = {
+  id: string;
+  run_number: number;
+  source_key: string;
+  title: string;
+  status: "backlog";
+};
+
+/**
+ * Freezes the bounded target allowlist before it is returned to the Agent.
+ * Completion checks this durable list as well as the run's current fresh
+ * backlog state, so a later rank shift can never expand the Agent's authority.
+ */
+export async function snapshotChannelReplyExecutionTargets(
+  db: D1Database,
+  input: {
+    jobId: string;
+    deviceId: string;
+    workerId: string;
+    claimTokenHash: string;
+    claimedAt: string;
+  },
+) {
+  // D1 batches run in one transaction. Keeping the snapshot mutation and its
+  // projection in the same batch guarantees that every stored ID is either
+  // disclosed in this response or the whole operation rolls back.
+  const [snapshot, projection] = await db.batch([
+    db.prepare(
+      `update briar_channel_agent_reply_jobs as job
+       set execution_target_ids_json = coalesce((
+         select json_group_array(target.id)
+         from (
+           select run.id
+           from briar_hunt_runs run
+           where run.project_id = job.project_id
+             and run.status = 'backlog' and run.stage = 'queued'
+             and run.workflow_stage is null
+             and run.worker_id is null and run.requested_worker_id is null
+             and run.claim_token_hash is null and run.claimed_by is null
+             and run.claimed_at is null and run.lease_expires_at is null
+             and run.last_execution_id is null
+             and run.dispatch_mode is null
+             and run.dispatch_request_id is null
+             and run.dispatched_at is null
+             and run.requested_by_user_id is null
+             and run.completed_at is null and run.paused_at is null
+             and run.resume_requested_at is null
+           order by run.run_number desc
+           limit 100
+         ) target
+       ), '[]')
+       where job.id = ? and job.project_id is not null
+         and job.claimed_device_id = ? and job.claimed_worker_id = ?
+         and job.claim_token_hash = ? and job.status = 'running'
+         and job.claimed_at = ? and job.lease_expires_at > ?
+       returning execution_target_ids_json`,
+    ).bind(
+      input.jobId,
+      input.deviceId,
+      input.workerId,
+      input.claimTokenHash,
+      input.claimedAt,
+      input.claimedAt,
+    ),
+    db.prepare(
+      `select run.id, run.run_number, run.source_key, run.title, run.status
+       from briar_channel_agent_reply_jobs job
+       join json_each(job.execution_target_ids_json) target
+       join briar_hunt_runs run
+         on run.id = target.value and run.project_id = job.project_id
+       where job.id = ? and job.claimed_device_id = ?
+         and job.claimed_worker_id = ? and job.claim_token_hash = ?
+         and job.status = 'running' and job.claimed_at = ?
+         and job.lease_expires_at > ?
+         and run.status = 'backlog' and run.stage = 'queued'
+         and run.workflow_stage is null
+         and run.worker_id is null and run.requested_worker_id is null
+         and run.claim_token_hash is null and run.claimed_by is null
+         and run.claimed_at is null and run.lease_expires_at is null
+         and run.last_execution_id is null
+         and run.dispatch_mode is null and run.dispatch_request_id is null
+         and run.dispatched_at is null and run.requested_by_user_id is null
+         and run.completed_at is null and run.paused_at is null
+         and run.resume_requested_at is null
+       order by run.run_number desc`,
+    ).bind(
+      input.jobId,
+      input.deviceId,
+      input.workerId,
+      input.claimTokenHash,
+      input.claimedAt,
+      input.claimedAt,
+    ),
+  ]);
+  if ((snapshot?.results.length ?? 0) !== 1) return null;
+  return (projection?.results ?? []) as ChannelReplyExecutionTargetRow[];
+}
+
 /**
  * Revalidates the complete authority chain for one Organization Agent context
  * page. A valid token alone is insufficient: the claim, Worker binding,
@@ -1558,6 +1748,11 @@ export type ChannelReplyCompletionInput = {
   issueProposal: {
     projectId: string | null;
     issue: Record<string, unknown>;
+    executeAfterCreate: boolean;
+  } | null;
+  executionProposal: {
+    projectId: string;
+    runId: string;
   } | null;
   delegation?: {
     projectId: string;
@@ -1580,10 +1775,22 @@ export async function completeChannelReply(
   job: ChannelReplyJobRow,
   input: ChannelReplyCompletionInput,
 ) {
+  const executionApprovalsAvailable =
+    await channelExecutionProposalTablesAvailable(db);
+  if (
+    !executionApprovalsAvailable &&
+    (input.executionProposal || input.issueProposal?.executeAfterCreate)
+  ) {
+    throw new Error("issue execution approval schema is unavailable");
+  }
   const delegation = input.delegation ?? null;
   if (
     job.project_id !== null &&
-    [input.document?.projectId, input.issueProposal?.projectId].some(
+    [
+      input.document?.projectId,
+      input.issueProposal?.projectId,
+      input.executionProposal?.projectId,
+    ].some(
       (projectId) => projectId !== undefined && projectId !== job.project_id,
     )
   ) {
@@ -1592,8 +1799,21 @@ export async function completeChannelReply(
   if (delegation && (job.project_id !== null || job.delegated_by_reply_job_id)) {
     throw new Error("Only a top-level Organization Agent reply can delegate");
   }
-  if (delegation && (input.document || input.issueProposal)) {
+  if (delegation && (
+    input.document || input.issueProposal || input.executionProposal
+  )) {
     throw new Error("A delegated reply cannot also create an artifact proposal");
+  }
+  if (input.executionProposal && job.project_id === null) {
+    throw new Error("Only a Project Agent can propose issue execution");
+  }
+  if (input.issueProposal?.executeAfterCreate && job.project_id === null) {
+    throw new Error(
+      "An Organization Agent must delegate create-and-execute requests",
+    );
+  }
+  if (input.issueProposal && input.executionProposal) {
+    throw new Error("Use executeAfterCreate for a create-and-execute request");
   }
   const delegationGuardBindings = delegation
     ? [
@@ -1606,6 +1826,47 @@ export async function completeChannelReply(
         delegation.provider,
       ]
     : [0, null, null, null, null, null, null];
+  const executionGuardSql = executionApprovalsAvailable
+    ? `and (
+         ? = 0
+         or (
+           briar_channel_agent_reply_jobs.project_id = ?
+           and exists (
+             select 1
+             from json_each(
+               briar_channel_agent_reply_jobs.execution_target_ids_json
+             ) allowed
+             join briar_hunt_runs target on target.id = allowed.value
+             where target.id = ?
+               and target.project_id =
+                 briar_channel_agent_reply_jobs.project_id
+               and target.status = 'backlog' and target.stage = 'queued'
+               and target.workflow_stage is null
+               and target.worker_id is null
+               and target.requested_worker_id is null
+               and target.claim_token_hash is null
+               and target.claimed_by is null and target.claimed_at is null
+               and target.lease_expires_at is null
+               and target.last_execution_id is null
+               and target.dispatch_mode is null
+               and target.dispatch_request_id is null
+               and target.dispatched_at is null
+               and target.requested_by_user_id is null
+               and target.completed_at is null and target.paused_at is null
+               and target.resume_requested_at is null
+           )
+         )
+       )`
+    : "and ? = 0";
+  const executionGuardBindings = executionApprovalsAvailable
+    ? input.executionProposal
+      ? [
+          1,
+          input.executionProposal.projectId,
+          input.executionProposal.runId,
+        ]
+      : [0, null, null]
+    : [0];
   const statements = [
     db
       .prepare(
@@ -1662,6 +1923,7 @@ export async function completeChannelReply(
                )
              )
            )
+           ${executionGuardSql}
          returning *`,
       )
       .bind(
@@ -1673,6 +1935,7 @@ export async function completeChannelReply(
         input.claimTokenHash,
         input.completedAt,
         ...delegationGuardBindings,
+        ...executionGuardBindings,
       ),
     db
       .prepare(
@@ -1734,10 +1997,25 @@ export async function completeChannelReply(
     );
   }
   if (input.issueProposal) {
+    const executionProposalId = input.issueProposal.executeAfterCreate
+      ? crypto.randomUUID()
+      : null;
     statements.push(
       db
         .prepare(
-          `insert into briar_channel_action_proposals (
+          executionApprovalsAvailable
+            ? `insert into briar_channel_action_proposals (
+             id, channel_id, project_id, trigger_message_id, reply_message_id,
+             action_type, payload_json, execute_after_create,
+             execution_proposal_id, created_at, updated_at
+           )
+           select ?, ?, ?, ?, ?, 'request_issue_create', ?, ?, ?, ?, ?
+           from briar_channel_agent_reply_jobs claim
+           where claim.id = ? and claim.claimed_device_id = ?
+             and claim.claimed_worker_id = ? and claim.claim_token_hash = ?
+             and claim.status = 'completed' and claim.completed_at = ?
+           on conflict (channel_id, trigger_message_id) do nothing`
+            : `insert into briar_channel_action_proposals (
              id, channel_id, project_id, trigger_message_id, reply_message_id,
              action_type, payload_json, created_at, updated_at
            )
@@ -1748,20 +2026,99 @@ export async function completeChannelReply(
              and claim.status = 'completed' and claim.completed_at = ?
            on conflict (channel_id, trigger_message_id) do nothing`,
         )
+        .bind(...(
+          executionApprovalsAvailable
+            ? [
+                crypto.randomUUID(),
+                job.channel_id,
+                input.issueProposal.projectId,
+                job.trigger_message_id,
+                job.reply_message_id,
+                JSON.stringify({ issue: input.issueProposal.issue }),
+                input.issueProposal.executeAfterCreate ? 1 : 0,
+                executionProposalId,
+                input.completedAt,
+                input.completedAt,
+                input.jobId,
+                input.deviceId,
+                input.workerId,
+                input.claimTokenHash,
+                input.completedAt,
+              ]
+            : [
+                crypto.randomUUID(),
+                job.channel_id,
+                input.issueProposal.projectId,
+                job.trigger_message_id,
+                job.reply_message_id,
+                JSON.stringify({ issue: input.issueProposal.issue }),
+                input.completedAt,
+                input.completedAt,
+                input.jobId,
+                input.deviceId,
+                input.workerId,
+                input.claimTokenHash,
+                input.completedAt,
+              ]
+        )),
+    );
+  }
+  if (input.executionProposal) {
+    statements.push(
+      db
+        .prepare(
+          `insert into briar_issue_execution_proposals (
+             id, organization_id, project_id, source_kind, channel_id,
+             conversation_run_id, trigger_message_id, reply_message_id,
+             target_run_id, target_title, target_run_updated_at,
+             proposed_by_agent_id, delegated_by_agent_id,
+             delegated_by_agent_name, created_at, updated_at
+           )
+           select ?, job.organization_id, job.project_id, 'channel',
+                  job.channel_id, null, job.trigger_message_id,
+                  job.reply_message_id, run.id, run.title, run.updated_at,
+                  job.agent_id, parent.agent_id, parent_agent.name, ?, ?
+           from briar_channel_agent_reply_jobs job
+           join briar_hunt_runs run
+             on run.id = ? and run.project_id = job.project_id
+           join briar_project_agents agent
+             on agent.id = job.agent_id and agent.project_id = job.project_id
+            and agent.organization_id = job.organization_id
+           join briar_channel_agents roster
+             on roster.channel_id = job.channel_id and roster.agent_id = agent.id
+           left join briar_channel_agent_reply_jobs parent
+             on parent.id = job.delegated_by_reply_job_id
+           left join briar_project_agents parent_agent
+             on parent_agent.id = parent.agent_id
+            and parent_agent.organization_id = job.organization_id
+            and parent_agent.project_id is null
+           where job.id = ? and job.claimed_device_id = ?
+             and job.claimed_worker_id = ? and job.claim_token_hash = ?
+             and job.status = 'completed' and job.completed_at = ?
+             and job.project_id = ?
+             and run.status = 'backlog' and run.stage = 'queued'
+             and run.workflow_stage is null
+             and run.worker_id is null and run.requested_worker_id is null
+             and run.claim_token_hash is null and run.claimed_by is null
+             and run.claimed_at is null and run.lease_expires_at is null
+             and run.last_execution_id is null
+             and run.dispatch_mode is null and run.dispatch_request_id is null
+             and run.dispatched_at is null and run.requested_by_user_id is null
+             and run.completed_at is null and run.paused_at is null
+             and run.resume_requested_at is null
+           on conflict (reply_message_id) do nothing`,
+        )
         .bind(
           crypto.randomUUID(),
-          job.channel_id,
-          input.issueProposal.projectId,
-          job.trigger_message_id,
-          job.reply_message_id,
-          JSON.stringify({ issue: input.issueProposal.issue }),
           input.completedAt,
           input.completedAt,
+          input.executionProposal.runId,
           input.jobId,
           input.deviceId,
           input.workerId,
           input.claimTokenHash,
           input.completedAt,
+          input.executionProposal.projectId,
         ),
     );
   }
@@ -1898,6 +2255,8 @@ export async function getChannelActionProposal(
       accepted_by_user_id: string | null;
       accepted_at: string | null;
       issue_source_key: string | null;
+      execute_after_create: number;
+      execution_proposal_id: string | null;
       result_run_id: string | null;
       reply_author_agent_id: string | null;
       reply_author_agent_organization_id: string | null;
@@ -2070,6 +2429,152 @@ export async function acceptChannelActionProposal(
     .first<{ id: string; status: "pending" | "accepted" }>();
 }
 
+export async function getChannelExecutionProposal(
+  db: D1Database,
+  input: {
+    organizationId: string;
+    channelId: string;
+    proposalId: string;
+    userId: string;
+  },
+) {
+  return db
+    .prepare(
+      `select proposal.*
+       from briar_issue_execution_proposals proposal
+       join briar_channels channel on channel.id = proposal.channel_id
+       where proposal.id = ? and proposal.source_kind = 'channel'
+         and proposal.organization_id = ? and proposal.channel_id = ?
+         and channel.organization_id = proposal.organization_id
+         and (
+           channel.visibility = 'public'
+           or exists (
+             select 1 from briar_channel_members member
+             where member.channel_id = channel.id and member.user_id = ?
+           )
+         )`,
+    )
+    .bind(
+      input.proposalId,
+      input.organizationId,
+      input.channelId,
+      input.userId,
+    )
+    .first<IssueExecutionProposalRow>();
+}
+
+export async function reserveChannelExecutionProposalApproval(
+  db: D1Database,
+  input: {
+    organizationId: string;
+    channelId: string;
+    proposalId: string;
+    userId: string;
+    provider: AgentProvider;
+    model: string | null;
+    effort: AgentSkillEffort | null;
+    workerId: string | null;
+    dispatchRequestId: string;
+    reservedAt: string;
+  },
+) {
+  return db
+    .prepare(
+      `update briar_issue_execution_proposals
+       set approval_reserved_by_user_id = coalesce(
+             approval_reserved_by_user_id, ?
+           ),
+           approval_reserved_at = coalesce(approval_reserved_at, ?),
+           requested_provider = coalesce(requested_provider, ?),
+           requested_model = case
+             when dispatch_request_id is null then ? else requested_model end,
+           requested_effort = case
+             when dispatch_request_id is null then ? else requested_effort end,
+           requested_worker_id = case
+             when dispatch_request_id is null then ? else requested_worker_id end,
+           dispatch_request_id = coalesce(dispatch_request_id, ?),
+           updated_at = case
+             when dispatch_request_id is null then ? else updated_at end
+       where id = ? and source_kind = 'channel' and status = 'pending'
+         and organization_id = ? and channel_id = ?
+         and (
+           dispatch_request_id is null
+           or (
+             approval_reserved_by_user_id = ?
+             and requested_provider = ? and requested_model is ?
+             and requested_effort is ? and requested_worker_id is ?
+           )
+         )
+         and exists (
+           select 1
+           from briar_channels channel
+           join briar_organization_members membership
+             on membership.organization_id = channel.organization_id
+            and membership.user_id = ?
+           join briar_projects project
+             on project.id = briar_issue_execution_proposals.project_id
+            and project.organization_id = channel.organization_id
+           join briar_hunt_runs run
+             on run.id = briar_issue_execution_proposals.target_run_id
+            and run.project_id = project.id
+           join briar_channel_messages reply
+             on reply.id = briar_issue_execution_proposals.reply_message_id
+            and reply.channel_id = channel.id
+           join briar_project_agents agent
+             on agent.id = briar_issue_execution_proposals.proposed_by_agent_id
+            and agent.id = reply.author_agent_id
+            and agent.project_id = project.id
+            and agent.organization_id = channel.organization_id
+           join briar_channel_agents roster
+             on roster.channel_id = channel.id and roster.agent_id = agent.id
+           where channel.id = briar_issue_execution_proposals.channel_id
+             and channel.archived_at is null
+             and (
+               channel.visibility = 'public'
+               or exists (
+                 select 1 from briar_channel_members channel_member
+                 where channel_member.channel_id = channel.id
+                   and channel_member.user_id = ?
+               )
+             )
+             and run.updated_at =
+               briar_issue_execution_proposals.target_run_updated_at
+             and run.status = 'backlog' and run.stage = 'queued'
+             and run.workflow_stage is null
+             and run.worker_id is null and run.requested_worker_id is null
+             and run.claim_token_hash is null and run.claimed_by is null
+             and run.claimed_at is null and run.lease_expires_at is null
+             and run.last_execution_id is null
+             and run.dispatch_mode is null and run.dispatch_request_id is null
+             and run.dispatched_at is null and run.requested_by_user_id is null
+             and run.completed_at is null and run.paused_at is null
+             and run.resume_requested_at is null
+         )
+       returning *`,
+    )
+    .bind(
+      input.userId,
+      input.reservedAt,
+      input.provider,
+      input.model,
+      input.effort,
+      input.workerId,
+      input.dispatchRequestId,
+      input.reservedAt,
+      input.proposalId,
+      input.organizationId,
+      input.channelId,
+      input.userId,
+      input.provider,
+      input.model,
+      input.effort,
+      input.workerId,
+      input.userId,
+      input.userId,
+    )
+    .first<IssueExecutionProposalRow>();
+}
+
 export async function getChannelSyncCursor(
   db: D1Database,
   organizationId: string,
@@ -2096,6 +2601,8 @@ export async function loadChannelDelta(
   since: number,
   limit = 200,
 ) {
+  const executionProposalsAvailable =
+    await channelExecutionProposalTablesAvailable(db);
   const changes = await db
     .prepare(
       `select version, channel_id, entity_type, entity_id, operation
@@ -2139,10 +2646,21 @@ export async function loadChannelDelta(
       // A proposal is rendered on its reply message, so refresh that message.
       const proposal = await db
         .prepare(
-          `select reply_message_id from briar_channel_action_proposals
-           where id = ?`,
+          executionProposalsAvailable
+            ? `select reply_message_id from briar_channel_action_proposals
+               where id = ?
+               union all
+               select reply_message_id from briar_issue_execution_proposals
+               where id = ? and source_kind = 'channel'
+               limit 1`
+            : `select reply_message_id from briar_channel_action_proposals
+               where id = ?`,
         )
-        .bind(change.entity_id)
+        .bind(...(
+          executionProposalsAvailable
+            ? [change.entity_id, change.entity_id]
+            : [change.entity_id]
+        ))
         .first<{ reply_message_id: string }>();
       if (proposal) messageIds.add(proposal.reply_message_id);
     }
@@ -2176,7 +2694,7 @@ export async function loadChannelDelta(
     ? (
         await db
           .prepare(
-            `${messageSelect} where message.id in (${[...messageIds]
+            `${await messageSelectFor(db)} where message.id in (${[...messageIds]
               .map(() => "?")
               .join(", ")})`,
           )

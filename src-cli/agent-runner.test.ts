@@ -407,7 +407,7 @@ describe("detached Agent runner", () => {
       "Repository Guide",
     );
     expect(organizationPrompt).toContain(
-      "user's explicit question requires current repository inspection",
+      "user's explicit question or project action request",
     );
     expect(organizationPrompt).toContain(
       '"delegation":{"projectId":"eligible project UUID"',
@@ -448,7 +448,7 @@ describe("detached Agent runner", () => {
       },
     });
     expect(delegatedProjectPrompt).toContain(
-      "This read-only turn was delegated by Organization Lead",
+      "This non-mutating conversational turn was delegated by Organization Lead",
     );
     expect(delegatedProjectPrompt).toContain(
       "Which module owns authentication?",
@@ -668,6 +668,7 @@ describe("detached Agent runner", () => {
         workflowStage: "implementing",
         reason: "D를 D′로 변경하고 영향받는 QA를 다시 확인한다.",
       },
+      executionProposal: null,
     }))).toEqual({
       reply: "D를 D′로 바꾸는 개정을 제안했습니다. 수락이 필요합니다.",
       proposedAction: {
@@ -675,10 +676,12 @@ describe("detached Agent runner", () => {
         workflowStage: "implementing",
         reason: "D를 D′로 변경하고 영향받는 QA를 다시 확인한다.",
       },
+      executionProposal: null,
     });
     expect(parseDetachedIssueReplyResult("plain fallback")).toEqual({
       reply: "plain fallback",
       proposedAction: null,
+      executionProposal: null,
     });
   });
 
@@ -689,12 +692,14 @@ describe("detached Agent runner", () => {
         type: "request_issue_update",
         changes: { description: "새 승인 기준", priority: 1 },
       },
+      executionProposal: null,
     }))).toEqual({
       reply: "설명 변경을 제안했습니다. 수락해 주세요.",
       proposedAction: {
         type: "request_issue_update",
         changes: { description: "새 승인 기준", priority: 1 },
       },
+      executionProposal: null,
     });
     expect(parseDetachedIssueReplyResult(JSON.stringify({
       reply: "후속 이슈 생성을 제안했습니다. 수락해 주세요.",
@@ -713,6 +718,115 @@ describe("detached Agent runner", () => {
         issue: { title: "후속 QA", status: "backlog" },
       },
     });
+  });
+
+  it("parses standalone and create-then-execute approval intents", () => {
+    expect(parseDetachedIssueReplyResult(JSON.stringify({
+      reply: "실행 설정 승인이 필요합니다.",
+      proposedAction: null,
+      executionProposal: { type: "request_issue_execute" },
+    }))).toEqual({
+      reply: "실행 설정 승인이 필요합니다.",
+      proposedAction: null,
+      executionProposal: { type: "request_issue_execute" },
+    });
+    expect(parseDetachedIssueReplyResult(JSON.stringify({
+      reply: "백로그 생성 후 별도 실행 승인을 요청합니다.",
+      proposedAction: {
+        type: "request_issue_create",
+        executeAfterCreate: true,
+        issue: {
+          title: "승인 후 실행",
+          description: null,
+          priority: 2,
+          status: "backlog",
+        },
+      },
+      executionProposal: null,
+    }))).toMatchObject({
+      proposedAction: {
+        type: "request_issue_create",
+        executeAfterCreate: true,
+      },
+      executionProposal: null,
+    });
+  });
+
+  it("rejects dual or expanded execution authority from provider output", () => {
+    for (const proposed of [
+      {
+        reply: "invalid dual",
+        proposedAction: {
+          type: "request_issue_update",
+          changes: { priority: 1 },
+        },
+        executionProposal: { type: "request_issue_execute" },
+      },
+      {
+        reply: "invalid expanded",
+        proposedAction: null,
+        executionProposal: {
+          type: "request_issue_execute",
+          runId: "11111111-1111-4111-8111-111111111111",
+        },
+      },
+    ]) {
+      expect(parseDetachedIssueReplyResult(JSON.stringify(proposed))).toEqual({
+        reply: JSON.stringify(proposed),
+        proposedAction: null,
+        executionProposal: null,
+      });
+    }
+  });
+
+  it("constrains channel execution proposals to delegated Project targets", () => {
+    const organizationPrompt = detachedChannelReplyPrompt({
+      agent: {
+        ...agent,
+        scope: {
+          kind: "organization",
+          organizationId: "11111111-1111-4111-8111-111111111111",
+        },
+      },
+      snapshot: { messages: [{ body: "Briar 이슈를 실행해 줘" }] },
+      workspaceAvailable: false,
+      delegationTargets: [{
+        agentId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        agentName: "Briar Agent",
+        projectId: "22222222-2222-4222-8222-222222222222",
+        projectName: "Briar",
+        responsibility: "Own Briar work",
+        skills: [],
+      }],
+    });
+    expect(organizationPrompt).toContain("executionProposal must always be null");
+    expect(organizationPrompt).toContain("delegate every create-and-execute");
+
+    const projectPrompt = detachedChannelReplyPrompt({
+      agent: {
+        ...agent,
+        scope: {
+          kind: "project",
+          organizationId: "11111111-1111-4111-8111-111111111111",
+          projectId: "22222222-2222-4222-8222-222222222222",
+        },
+      },
+      snapshot: {
+        executionTargets: [{
+          id: "33333333-3333-4333-8333-333333333333",
+          projectId: "22222222-2222-4222-8222-222222222222",
+          runId: "33333333-3333-4333-8333-333333333333",
+          runNumber: 42,
+          sourceKey: "BRIAR-42",
+          title: "Execution target",
+          status: "backlog",
+        }],
+      },
+      workspaceAvailable: true,
+    });
+    expect(projectPrompt).toContain("snapshot.executionTargets");
+    expect(projectPrompt).toContain("exact server-supplied target");
+    expect(projectPrompt).toContain('"executionProposal":{"projectId"');
   });
 
   it("extracts final replies from every detached provider event shape", () => {

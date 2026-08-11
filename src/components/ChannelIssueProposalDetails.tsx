@@ -13,6 +13,14 @@ export function channelIssueProposalDetails(
   return parsed.success ? parsed.data.issue : null;
 }
 
+export function channelIssueProposalRequestsExecution(
+  proposal: ChannelMessageProposal | null | undefined,
+) {
+  if (proposal?.actionType !== "request_issue_create") return false;
+  const parsed = channelIssueProposalPayloadSchema.safeParse(proposal.payload);
+  return parsed.success && parsed.data.executeAfterCreate === true;
+}
+
 export function ChannelIssueProposalDetails({
   projectName,
   proposal,
@@ -72,6 +80,11 @@ export function ChannelIssueProposalDetails({
         ) : null}
         <span>{t("channel.issueProposalBacklogOnly")}</span>
       </div>
+      {channelIssueProposalRequestsExecution(proposal) ? (
+        <p className="channel-proposal-execution-intent">
+          {t("channel.issueProposalExecutionRequested")}
+        </p>
+      ) : null}
     </div>
   );
 }

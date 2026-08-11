@@ -33,27 +33,38 @@ import { useI18n } from "../i18n";
 import { useChannelComposer } from "../hooks/useChannelComposer";
 import { useHorizontalPaneResize } from "../hooks/useHorizontalPaneResize";
 import {
+  acceptChannelExecutionProposal,
   acceptChannelProposal,
   listChannelMessages,
   listChannels,
   listOrganizationAgents,
   loadChannel,
   loadChannelDelta,
+  loadDashboard,
   loadOrganizationMembers,
   sendChannelMessage,
   setChannelAgent,
   setChannelMember,
   toggleChannelMessageReaction,
 } from "../lib/api";
-import type { OrganizationMember, Project } from "../types";
+import type {
+  ExecutionWorker,
+  HuntRun,
+  IssueExecutionApprovalInput,
+  OrganizationMember,
+  Project,
+  ProjectExecutionWorkerPolicy,
+} from "../types";
 import type {
   ChannelAgentReply,
   ChannelAgentSummary,
   ChannelMember,
   ChannelMessage,
+  ChannelExecutionProposal,
   ChannelSummary,
 } from "../lib/channels-contract";
 import type { MentionTarget } from "../lib/channel-mentions";
+import { mergeChannelMessages } from "../lib/channel-message-merge";
 import { maxIssueAttachmentCount } from "../lib/issue-attachments";
 import {
   ChannelDraftImages,
@@ -77,7 +88,9 @@ import {
 import {
   ChannelIssueProposalDetails,
   channelIssueProposalDetails,
+  channelIssueProposalRequestsExecution,
 } from "./ChannelIssueProposalDetails";
+import { IssueExecutionApproval } from "./IssueExecutionApproval";
 
 /** Chat needs a tighter cadence than the 15s dashboard poll. */
 const CHANNEL_POLL_INTERVAL_MS = 3_000;
@@ -104,21 +117,6 @@ type ChannelsProps = {
 type ChannelInviteCandidate =
   | { type: "user"; id: string; member: OrganizationMember }
   | { type: "agent"; id: string; agent: ChannelAgentSummary };
-
-const mergeMessages = (
-  current: ChannelMessage[],
-  incoming: ChannelMessage[],
-  removedIds: string[],
-) => {
-  const byId = new Map(current.map((message) => [message.id, message]));
-  for (const message of incoming) byId.set(message.id, message);
-  for (const id of removedIds) byId.delete(id);
-  return [...byId.values()].sort((left, right) =>
-    left.createdAt === right.createdAt
-      ? left.id.localeCompare(right.id)
-      : left.createdAt.localeCompare(right.createdAt),
-  );
-};
 
 const dayKey = (iso: string, localeTag: string) => {
   const date = new Date(iso);
@@ -283,6 +281,9 @@ export function Channels({
   const latestProposals = useRef(
     new Map<string, NonNullable<ChannelMessage["proposal"]>>(),
   );
+  const executionHistoryDashboards = useRef(
+    new Map<string, ReturnType<typeof loadDashboard>>(),
+  );
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const activeChannelIdRef = useRef(activeChannelId);
   const threadParentIdRef = useRef(threadParentId);
@@ -333,6 +334,10 @@ export function Channels({
     // the newly selected surface disabled.
     setBusy(false);
   }, [activeChannelId, threadParentId]);
+
+  useEffect(() => {
+    executionHistoryDashboards.current.clear();
+  }, [token]);
 
   useEffect(
     () => () => {
@@ -606,7 +611,7 @@ export function Channels({
         if (relevant.length || delta.removedMessageIds.length) {
           recordProposalMessages(relevant);
           setMessages((current) =>
-            mergeMessages(
+            mergeChannelMessages(
               current,
               relevant.filter((message) => message.parentMessageId === null),
               delta.removedMessageIds,
@@ -620,7 +625,11 @@ export function Channels({
               );
               if (threadUpdates.length) {
                 setThreadMessages((current) =>
-                  mergeMessages(current, threadUpdates, delta.removedMessageIds),
+                  mergeChannelMessages(
+                    current,
+                    threadUpdates,
+                    delta.removedMessageIds,
+                  ),
                 );
               }
             }
@@ -731,7 +740,7 @@ export function Channels({
             ),
           );
           setThreadMessages((current) =>
-            mergeMessages(
+            mergeChannelMessages(
               current.map((message) =>
                 message.id === parentMessageId
                   ? appendChannelReplySummary(message, result.message)
@@ -742,7 +751,8 @@ export function Channels({
             ),
           );
         } else {
-          setMessages((current) => mergeMessages(current, [result.message], []));
+          setMessages((current) =>
+            mergeChannelMessages(current, [result.message], []));
         }
       } catch (cause) {
         setError(errorMessage(cause));
@@ -768,6 +778,82 @@ export function Channels({
       }
     },
     [captureChannelSurface, channelSurfaceIsCurrent, onIssueCreated],
+  );
+
+  const loadExecutionProposalContext = useCallback(
+    async (proposal: ChannelExecutionProposal) => {
+      const cacheHistory = proposal.status === "accepted";
+      let dashboardRequest = cacheHistory
+        ? executionHistoryDashboards.current.get(proposal.projectId)
+        : undefined;
+      if (!dashboardRequest) {
+        dashboardRequest = loadDashboard(token, proposal.projectId);
+        if (cacheHistory) {
+          executionHistoryDashboards.current.set(
+            proposal.projectId,
+            dashboardRequest,
+          );
+        }
+      }
+      let dashboard: Awaited<ReturnType<typeof loadDashboard>>;
+      try {
+        dashboard = await dashboardRequest;
+      } catch (cause) {
+        if (
+          cacheHistory &&
+          executionHistoryDashboards.current.get(proposal.projectId) ===
+            dashboardRequest
+        ) {
+          executionHistoryDashboards.current.delete(proposal.projectId);
+        }
+        throw cause;
+      }
+      return {
+        run: dashboard.runs.find((run) => run.id === proposal.runId) ?? null,
+        workers: dashboard.workers ?? [],
+        policy: dashboard.executionPolicy,
+      };
+    },
+    [token],
+  );
+
+  const acceptExecutionProposal = useCallback(
+    async (
+      message: ChannelMessage,
+      input: IssueExecutionApprovalInput,
+    ) => {
+      const proposal = message.executionProposal;
+      if (
+        !proposal ||
+        proposal.status !== "pending" ||
+        !activeChannelId ||
+        activeChannelId !== message.channelId
+      ) {
+        throw new Error(t("executionApproval.targetUnavailable"));
+      }
+      const result = await acceptChannelExecutionProposal(
+        token,
+        organizationId,
+        message.channelId,
+        proposal.id,
+        input,
+      );
+      return result.proposal;
+    },
+    [activeChannelId, organizationId, t, token],
+  );
+
+  const applyAcceptedExecutionProposal = useCallback(
+    (messageId: string, proposal: ChannelExecutionProposal) => {
+      const apply = (message: ChannelMessage): ChannelMessage =>
+        message.id === messageId &&
+        message.executionProposal?.id === proposal.id
+          ? { ...message, executionProposal: proposal }
+          : message;
+      setMessages((current) => current.map(apply));
+      setThreadMessages((current) => current.map(apply));
+    },
+    [],
   );
 
   const refreshProposalState = useCallback(
@@ -823,6 +909,9 @@ export function Channels({
     async (message: ChannelMessage) => {
       if (!activeChannelId || !message.proposal) return;
       const proposalId = message.proposal.id;
+      const requestsExecution = channelIssueProposalRequestsExecution(
+        message.proposal,
+      );
       const projectId =
         message.proposal.projectId ??
         activeChannel?.defaultProjectId ??
@@ -847,6 +936,8 @@ export function Channels({
           proposalId,
           projectId,
         );
+        const hasExecutionFollowUp =
+          requestsExecution || result.executionProposal != null;
         if (!approvalContextIsCurrent()) return;
         const applyResult = (candidate: ChannelMessage): ChannelMessage =>
           candidate.proposal?.id === proposalId
@@ -858,6 +949,8 @@ export function Channels({
                   projectId: result.projectId,
                   resultRunId: result.resultRunId,
                 },
+                executionProposal:
+                  result.executionProposal ?? candidate.executionProposal,
               }
             : candidate;
         if (
@@ -867,7 +960,13 @@ export function Channels({
           setMessages((current) => current.map(applyResult));
           setThreadMessages((current) => current.map(applyResult));
           recordProposalMessages([applyResult(message)]);
-          await openIssue(result.projectId, result.resultRunId, approvalContext);
+          if (hasExecutionFollowUp) {
+            if (!result.executionProposal) {
+              await refreshProposalState(applyResult(message), proposalId);
+            }
+          } else {
+            await openIssue(result.projectId, result.resultRunId, approvalContext);
+          }
         } else {
           let latest = latestProposals.current.get(proposalId);
           if (latest?.status !== "accepted") {
@@ -876,7 +975,17 @@ export function Channels({
           }
           if (!approvalContextIsCurrent()) return;
           if (latest?.status === "accepted" && latest.projectId && latest.resultRunId) {
-            await openIssue(latest.projectId, latest.resultRunId, approvalContext);
+            if (hasExecutionFollowUp) {
+              if (result.executionProposal) {
+                setMessages((current) => current.map(applyResult));
+                setThreadMessages((current) => current.map(applyResult));
+                recordProposalMessages([applyResult(message)]);
+              } else {
+                await refreshProposalState(message, proposalId);
+              }
+            } else {
+              await openIssue(latest.projectId, latest.resultRunId, approvalContext);
+            }
           } else if (
             latest?.status === "pending" &&
             latest.projectId === result.projectId
@@ -888,7 +997,13 @@ export function Channels({
             setMessages((current) => current.map(applyResult));
             setThreadMessages((current) => current.map(applyResult));
             recordProposalMessages([applyResult(message)]);
-            await openIssue(result.projectId, result.resultRunId, approvalContext);
+            if (hasExecutionFollowUp) {
+              if (!result.executionProposal) {
+                await refreshProposalState(applyResult(message), proposalId);
+              }
+            } else {
+              await openIssue(result.projectId, result.resultRunId, approvalContext);
+            }
           }
         }
       } catch (cause) {
@@ -928,10 +1043,12 @@ export function Channels({
           message.id,
           emoji,
         );
-        setMessages((current) => mergeMessages(current, [result.message], []));
-        setThreadMessages((current) =>
-          mergeMessages(current, [result.message], []),
-        );
+        const applyReactions = (candidate: ChannelMessage) =>
+          candidate.id === result.message.id
+            ? { ...candidate, reactions: result.message.reactions }
+            : candidate;
+        setMessages((current) => current.map(applyReactions));
+        setThreadMessages((current) => current.map(applyReactions));
       } catch (cause) {
         setError(errorMessage(cause));
       } finally {
@@ -1041,6 +1158,12 @@ export function Channels({
                       localeTag={localeTag}
                       currentUserId={currentUserId}
                       onAcceptProposal={() => void acceptProposal(message)}
+                      loadExecutionProposalContext={() =>
+                        loadExecutionProposalContext(message.executionProposal!)}
+                      onAcceptExecutionProposal={(input) =>
+                        acceptExecutionProposal(message, input)}
+                      onExecutionProposalAccepted={(proposal) =>
+                        applyAcceptedExecutionProposal(message.id, proposal)}
                       onIssueOpen={openIssue}
                       onOpenThread={() => void openThread(message.id)}
                       onProjectChange={(projectId) => {
@@ -1136,6 +1259,12 @@ export function Channels({
                 localeTag={localeTag}
                 currentUserId={currentUserId}
                 onAcceptProposal={() => void acceptProposal(message)}
+                loadExecutionProposalContext={() =>
+                  loadExecutionProposalContext(message.executionProposal!)}
+                onAcceptExecutionProposal={(input) =>
+                  acceptExecutionProposal(message, input)}
+                onExecutionProposalAccepted={(proposal) =>
+                  applyAcceptedExecutionProposal(message.id, proposal)}
                 onIssueOpen={openIssue}
                 onProjectChange={(projectId) => {
                   const proposalId = message.proposal?.id;
@@ -1479,12 +1608,15 @@ function ChannelInviteDialog({
 function MessageRow({
   agents,
   channel,
+  loadExecutionProposalContext,
   message,
   members,
   localeTag,
   currentUserId,
   onOpenThread,
   onAcceptProposal,
+  onAcceptExecutionProposal,
+  onExecutionProposalAccepted,
   onIssueOpen,
   onProjectChange,
   onToggleReaction,
@@ -1495,12 +1627,21 @@ function MessageRow({
 }: {
   agents: ChannelAgentSummary[];
   channel: ChannelSummary;
+  loadExecutionProposalContext: () => Promise<{
+    run: HuntRun | null;
+    workers: ExecutionWorker[];
+    policy?: ProjectExecutionWorkerPolicy;
+  }>;
   message: ChannelMessage;
   members: ChannelMember[];
   localeTag: string;
   currentUserId: string | null;
   onOpenThread?: () => void;
   onAcceptProposal: () => void;
+  onAcceptExecutionProposal: (
+    input: IssueExecutionApprovalInput,
+  ) => Promise<ChannelExecutionProposal>;
+  onExecutionProposalAccepted: (proposal: ChannelExecutionProposal) => void;
   onIssueOpen?: (projectId: string, runId: string) => void | Promise<void>;
   onProjectChange: (projectId: string) => void;
   onToggleReaction: (emoji: string) => void;
@@ -1534,6 +1675,11 @@ function MessageRow({
     issueProposal?.status === "pending" && !issueProposal.projectId &&
     !channel.defaultProjectId;
   const proposalIssue = channelIssueProposalDetails(issueProposal);
+  const executionProjectName = message.executionProposal
+    ? availableProjects.find(
+        (project) => project.id === message.executionProposal?.projectId,
+      )?.name ?? message.executionProposal.projectId
+    : null;
 
   return (
     <article
@@ -1641,6 +1787,26 @@ function MessageRow({
               </button>
             ) : null}
           </div>
+        ) : null}
+
+        {message.executionProposal ? (
+          <IssueExecutionApproval
+            disabledReason={channel.archivedAt
+              ? t("executionApproval.archived")
+              : null}
+            loadExecutionContext={loadExecutionProposalContext}
+            onAccept={onAcceptExecutionProposal}
+            onAccepted={onExecutionProposalAccepted}
+            onIssueOpen={onIssueOpen
+              ? (runId) => onIssueOpen(
+                  message.executionProposal!.projectId,
+                  runId,
+                )
+              : undefined}
+            projectName={executionProjectName}
+            proposal={message.executionProposal}
+            surfaceKey={`${channel.id}:${message.parentMessageId ?? "root"}:${message.id}`}
+          />
         ) : null}
 
         <ChannelMessageReactions

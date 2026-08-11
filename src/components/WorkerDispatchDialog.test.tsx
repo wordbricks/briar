@@ -26,6 +26,15 @@ const worker = (id: string, label: string): ExecutionWorker => ({
   createdAt: "2026-07-29T00:00:00Z",
 });
 
+function changeInput(input: HTMLInputElement, value: string) {
+  const valueSetter = Object.getOwnPropertyDescriptor(
+    HTMLInputElement.prototype,
+    "value",
+  )?.set;
+  valueSetter?.call(input, value);
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
 describe("WorkerDispatchDialog", () => {
   beforeEach(() => {
     (
@@ -37,6 +46,43 @@ describe("WorkerDispatchDialog", () => {
 
   afterEach(() => {
     document.body.innerHTML = "";
+  });
+
+  it("uses explicit approval language without changing the selected execution input", async () => {
+    const onSubmit = vi.fn();
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <WorkerDispatchDialog
+          error={null}
+          intent="approve_execution"
+          isDispatching={false}
+          onOpenChange={vi.fn()}
+          onSubmit={onSubmit}
+          open
+          run={{ title: "Approval boundary" } as never}
+          workers={[worker("worker-approval", "Approval Mac")]}
+        />,
+      );
+    });
+
+    expect(document.body.textContent).toContain("이슈 실행 승인");
+    expect(document.body.textContent).toContain("명시적으로 승인");
+    const approveButton = Array.from(
+      document.body.querySelectorAll<HTMLButtonElement>("button"),
+    ).find((button) => button.textContent?.includes("승인하고 실행"));
+    await act(async () => approveButton?.click());
+    expect(onSubmit).toHaveBeenCalledWith({
+      effort: null,
+      model: null,
+      provider: "codex",
+      workerId: null,
+    });
+
+    await act(async () => root.unmount());
   });
 
   it("shows a disabled completion state after dispatch succeeds", async () => {
@@ -64,6 +110,32 @@ describe("WorkerDispatchDialog", () => {
     );
     expect(completeButton?.disabled).toBe(true);
     expect(completeButton?.textContent).toContain("실행 완료");
+
+    await act(async () => root.unmount());
+  });
+
+  it("announces an approval error inside the active dialog", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <WorkerDispatchDialog
+          error="승인 상태가 변경되었습니다."
+          intent="approve_execution"
+          isDispatching={false}
+          onOpenChange={vi.fn()}
+          onSubmit={vi.fn()}
+          open
+          run={{ title: "Approval conflict" } as never}
+          workers={[worker("worker-error", "Error Mac")]}
+        />,
+      );
+    });
+
+    const alert = document.body.querySelector('[role="alert"]');
+    expect(alert?.textContent).toContain("승인 상태가 변경되었습니다.");
 
     await act(async () => root.unmount());
   });
@@ -242,6 +314,205 @@ describe("WorkerDispatchDialog", () => {
 
     expect(document.body.textContent).toContain("Claude Mac");
     expect(document.body.textContent).not.toContain("Codex Mac");
+
+    await act(async () => root.unmount());
+  });
+
+  it("clears an incompatible preferred model when its provider is unavailable", async () => {
+    const onSubmit = vi.fn();
+    const claudeWorker = {
+      ...worker("worker-claude-only", "Claude Mac"),
+      providers: ["claude"] as ExecutionWorker["providers"],
+      agentProvider: "claude" as const,
+    };
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <WorkerDispatchDialog
+          error={null}
+          intent="approve_execution"
+          isDispatching={false}
+          onOpenChange={vi.fn()}
+          onSubmit={onSubmit}
+          open
+          run={{
+            title: "Provider fallback",
+            preferredProvider: "codex",
+            preferredModel: "gpt-5.6-sol",
+            preferredEffort: "ultra",
+          } as never}
+          workers={[claudeWorker]}
+        />,
+      );
+    });
+    const approve = Array.from(
+      document.body.querySelectorAll<HTMLButtonElement>("button"),
+    ).find((button) => button.textContent?.includes("승인하고 실행"));
+    await act(async () => approve?.click());
+
+    expect(onSubmit).toHaveBeenCalledWith({
+      provider: "claude",
+      model: null,
+      effort: null,
+      workerId: null,
+    });
+    await act(async () => root.unmount());
+  });
+
+  it("keeps an OpenCode custom model editable and submits its exact value", async () => {
+    const openCodeWorker = {
+      ...worker("worker-opencode", "OpenCode Mac"),
+      agentProvider: "opencode" as const,
+      providers: ["opencode"] as ExecutionWorker["providers"],
+    };
+    const onSubmit = vi.fn();
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <WorkerDispatchDialog
+          error={null}
+          intent="approve_execution"
+          isDispatching={false}
+          onOpenChange={vi.fn()}
+          onSubmit={onSubmit}
+          open
+          run={{
+            id: "run-opencode",
+            title: "Custom OpenCode model",
+            preferredProvider: "opencode",
+            preferredModel: "openai/original-model",
+            preferredEffort: "high",
+          } as never}
+          workers={[openCodeWorker]}
+        />,
+      );
+    });
+
+    const modelInput = document.body.querySelector<HTMLInputElement>(
+      'input[aria-label="선호 모델"]',
+    )!;
+    expect(modelInput.value).toBe("openai/original-model");
+    await act(async () => {
+      changeInput(modelInput, "anthropic/claude-opus-custom");
+    });
+    expect(modelInput.value).toBe("anthropic/claude-opus-custom");
+
+    const approve = Array.from(
+      document.body.querySelectorAll<HTMLButtonElement>("button"),
+    ).find((button) => button.textContent?.includes("승인하고 실행"));
+    await act(async () => approve?.click());
+
+    expect(onSubmit).toHaveBeenCalledWith({
+      provider: "opencode",
+      model: "anthropic/claude-opus-custom",
+      effort: "high",
+      workerId: null,
+    });
+    await act(async () => root.unmount());
+  });
+
+  it("shows an unknown strict-provider model until the user selects a supported one", async () => {
+    const onSubmit = vi.fn();
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <WorkerDispatchDialog
+          error={null}
+          intent="approve_execution"
+          isDispatching={false}
+          onOpenChange={vi.fn()}
+          onSubmit={onSubmit}
+          open
+          run={{
+            id: "run-retired-model",
+            title: "Retired model",
+            preferredProvider: "codex",
+            preferredModel: "gpt-retired-preview",
+            preferredEffort: "high",
+          } as never}
+          workers={[worker("worker-strict", "Strict Mac")]}
+        />,
+      );
+    });
+
+    const modelSelect = document.body.querySelector<HTMLButtonElement>(
+      '[aria-label="선호 모델"]',
+    )!;
+    expect(modelSelect.textContent).toContain("gpt-retired-preview");
+    await act(async () => modelSelect.click());
+    expect(
+      document.body.querySelector(
+        '.select-menu-option[data-value="gpt-retired-preview"]',
+      ),
+    ).not.toBeNull();
+    await act(async () => {
+      document.body
+        .querySelector<HTMLButtonElement>(
+          '.select-menu-option[data-value="gpt-5.6-sol"]',
+        )
+        ?.click();
+    });
+    const approve = Array.from(
+      document.body.querySelectorAll<HTMLButtonElement>("button"),
+    ).find((button) => button.textContent?.includes("승인하고 실행"));
+    await act(async () => approve?.click());
+
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
+      provider: "codex",
+      model: "gpt-5.6-sol",
+      effort: "high",
+    }));
+    await act(async () => root.unmount());
+  });
+
+  it("cannot submit a hidden provider value when every Worker is offline", async () => {
+    const offlineWorker = {
+      ...worker("worker-offline", "Offline Mac"),
+      readiness: "offline" as const,
+      state: "stale" as const,
+    };
+    const onSubmit = vi.fn();
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <WorkerDispatchDialog
+          error={null}
+          intent="approve_execution"
+          isDispatching={false}
+          onOpenChange={vi.fn()}
+          onSubmit={onSubmit}
+          open
+          run={{ id: "run-offline", title: "Offline approval" } as never}
+          workers={[offlineWorker]}
+        />,
+      );
+    });
+
+    const providerSelect = document.body.querySelector<HTMLButtonElement>(
+      '[aria-label="실행 프로바이더"]',
+    )!;
+    await act(async () => providerSelect.click());
+    expect(
+      document.body.querySelector('.select-menu-option[data-value="codex"]'),
+    ).toBeNull();
+    const approve = Array.from(
+      document.body.querySelectorAll<HTMLButtonElement>("button"),
+    ).find((button) => button.textContent?.includes("승인하고 실행"))!;
+    expect(approve.disabled).toBe(true);
+    await act(async () => approve.click());
+    expect(onSubmit).not.toHaveBeenCalled();
 
     await act(async () => root.unmount());
   });

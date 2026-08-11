@@ -285,6 +285,284 @@ final class IssueMutationTests: XCTestCase {
         XCTAssertEqual(body["provider"] as? String, "claude")
     }
 
+    func testExecutionApprovalRequiresAnUnclaimedFreshBacklog() {
+        XCTAssertNil(issueExecutionApprovalUnavailable(
+            run: executionRun(),
+            targetRunID: Self.runID
+        ))
+        XCTAssertEqual(
+            issueExecutionApprovalUnavailable(
+                run: executionRun(executionReadiness: "waiting"),
+                targetRunID: Self.runID
+            ),
+            .prerequisites
+        )
+
+        let staleRuns = [
+            executionRun(status: .queued),
+            executionRun(claimedBy: "worker-1"),
+            executionRun(claimedAt: .now),
+            executionRun(workerID: "worker-1"),
+            executionRun(dispatchedAt: .now),
+            executionRun(requestedByUserID: "fixture-user"),
+            executionRun(dispatchMode: "any"),
+        ]
+        for run in staleRuns {
+            XCTAssertEqual(
+                issueExecutionApprovalUnavailable(run: run, targetRunID: Self.runID),
+                .stateChanged,
+                "\(run) must not remain approvable"
+            )
+        }
+        XCTAssertEqual(
+            issueExecutionApprovalUnavailable(run: nil, targetRunID: Self.runID),
+            .targetUnavailable
+        )
+    }
+
+    func testExecutionSignatureTracksEveryApprovalRelevantTargetChange() throws {
+        let changedAt = Date(timeIntervalSince1970: 1_700_000_100)
+        let baseline = try XCTUnwrap(issueExecutionSignature(executionRun()))
+        let variants = [
+            executionRun(status: .queued),
+            executionRun(workflowStage: "implementing"),
+            executionRun(executionReadiness: "waiting"),
+            executionRun(waitingOnPrerequisiteCount: 1),
+            executionRun(assigneeUserID: "fixture-user"),
+            executionRun(preferredProvider: .codex),
+            executionRun(preferredModel: "gpt-5.6-sol"),
+            executionRun(preferredEffort: .high),
+            executionRun(dispatchedAt: changedAt),
+            executionRun(requestedProvider: .codex),
+            executionRun(requestedModel: "gpt-5.6-sol"),
+            executionRun(requestedEffort: .high),
+            executionRun(requestedWorkerID: "worker-requested"),
+            executionRun(requestedByUserID: "fixture-user"),
+            executionRun(dispatchMode: "specific"),
+            executionRun(claimedBy: "worker-1"),
+            executionRun(claimedAt: changedAt),
+            executionRun(workerID: "worker-1"),
+            executionRun(startedAt: changedAt),
+            executionRun(updatedAt: changedAt),
+        ]
+
+        for variant in variants {
+            XCTAssertNotEqual(issueExecutionSignature(variant), baseline)
+        }
+        XCTAssertEqual(issueExecutionSignature(executionRun()), baseline)
+        XCTAssertNil(issueExecutionSignature(nil))
+    }
+
+    func testPendingTargetSignatureReloadTriggerIgnoresStableAndInitialState() throws {
+        let proposalID = UUID(uuidString: "77777777-7777-4777-8777-777777777777")!
+        let baseline = try XCTUnwrap(issueExecutionSignature(executionRun()))
+        let approvedElsewhere = try XCTUnwrap(
+            issueExecutionSignature(executionRun(status: .queued))
+        )
+        let assigned = try XCTUnwrap(
+            issueExecutionSignature(executionRun(assigneeUserID: "fixture-user"))
+        )
+        let previous = [PendingIssueExecutionTargetSignature(
+            proposalID: proposalID,
+            targetSignature: baseline
+        )]
+
+        XCTAssertFalse(pendingIssueExecutionTargetChanged(from: [], to: previous))
+        XCTAssertFalse(pendingIssueExecutionTargetChanged(from: previous, to: previous))
+        XCTAssertFalse(pendingIssueExecutionTargetChanged(from: previous, to: []))
+        XCTAssertTrue(pendingIssueExecutionTargetChanged(
+            from: previous,
+            to: [PendingIssueExecutionTargetSignature(
+                proposalID: proposalID,
+                targetSignature: approvedElsewhere
+            )]
+        ))
+        XCTAssertTrue(pendingIssueExecutionTargetChanged(
+            from: previous,
+            to: [PendingIssueExecutionTargetSignature(
+                proposalID: proposalID,
+                targetSignature: nil
+            )]
+        ))
+        XCTAssertTrue(pendingIssueExecutionTargetChanged(
+            from: [PendingIssueExecutionTargetSignature(
+                proposalID: proposalID,
+                targetSignature: assigned
+            )],
+            to: previous
+        ))
+    }
+
+    func testCreateResponseAcceptsAlreadyApprovedExecutionSnapshotForExactRun() {
+        let proposal = IssueExecutionProposal(
+            id: UUID(uuidString: "77777777-7777-4777-8777-777777777777")!,
+            status: .accepted,
+            projectId: Self.projectID,
+            runId: Self.runID,
+            title: "Fresh backlog",
+            createdAt: Date(timeIntervalSince1970: 1_700_000_000),
+            acceptedAt: Date(timeIntervalSince1970: 1_700_000_100),
+            requestedProvider: .codex,
+            requestedModel: "gpt-5.6-sol",
+            requestedEffort: .high,
+            requestedWorkerId: "worker-1"
+        )
+
+        XCTAssertTrue(issueExecutionProposalMatchesCreatedRun(
+            proposal,
+            projectID: Self.projectID,
+            runID: Self.runID
+        ))
+        XCTAssertFalse(issueExecutionProposalMatchesCreatedRun(
+            proposal,
+            projectID: UUID(),
+            runID: Self.runID
+        ))
+        XCTAssertFalse(issueExecutionProposalMatchesCreatedRun(
+            proposal,
+            projectID: Self.projectID,
+            runID: UUID()
+        ))
+    }
+
+    func testConversationApprovalUsesProviderEffortAndWorkerPolicyLimits() {
+        XCTAssertEqual(AgentProvider.codex.efforts, ModelEffort.allCases)
+        XCTAssertEqual(
+            AgentProvider.claude.efforts,
+            [.low, .medium, .high, .xhigh, .max]
+        )
+        XCTAssertEqual(AgentProvider.grok.efforts, [.low, .medium, .high])
+        XCTAssertEqual(AgentProvider.opencode.efforts, [.low, .medium, .high])
+        XCTAssertFalse(IssueExecutionPreferences(
+            provider: .claude,
+            model: "sonnet",
+            effort: .ultra
+        ).isValidForConversationApproval)
+
+        let allowed = DashboardWorker(
+            id: "allowed",
+            label: "Allowed Mac",
+            providers: [.codex],
+            readiness: "available",
+            acceptingWork: true,
+            readinessDetail: nil,
+            activeSessions: 0,
+            availableSessions: 1
+        )
+        let blocked = DashboardWorker(
+            id: "blocked",
+            label: "Blocked Mac",
+            providers: [.codex],
+            readiness: "available",
+            acceptingWork: true,
+            readinessDetail: nil,
+            activeSessions: 0,
+            availableSessions: 1
+        )
+        let policy = ProjectExecutionWorkerPolicy(
+            selectionMode: .allowlist,
+            defaultWorkerId: allowed.id,
+            allowedWorkerIds: [allowed.id],
+            updatedAt: .now
+        )
+
+        XCTAssertEqual(
+            eligibleExecutionWorkers(
+                workers: [allowed, blocked],
+                provider: .codex,
+                policy: policy
+            ).map(\.id),
+            [allowed.id]
+        )
+
+        let snapshot = DashboardSnapshot(
+            project: ProjectsResponse.Project(
+                id: Self.projectID,
+                name: "Target",
+                icon: nil,
+                organizationId: UUID(
+                    uuidString: "22222222-2222-4222-8222-222222222222"
+                )!,
+                organizationName: "Wordbricks",
+                role: .owner,
+                createdAt: .now
+            ),
+            runs: [executionRun()],
+            workers: [allowed, blocked],
+            organizationProviders: [.codex],
+            executionPolicy: policy,
+            cursor: nil,
+            generatedAt: .now
+        )
+        let proposal = IssueExecutionProposal(
+            id: UUID(uuidString: "77777777-7777-4777-8777-777777777777")!,
+            status: .pending,
+            projectId: Self.projectID,
+            runId: Self.runID,
+            title: "Fresh backlog",
+            createdAt: .now
+        )
+        XCTAssertThrowsError(
+            try validateIssueExecutionApproval(
+                snapshot: snapshot,
+                proposal: proposal,
+                request: AcceptIssueExecutionProposalRequest(
+                    provider: .codex,
+                    model: "gpt-5.6-sol",
+                    effort: .high,
+                    workerId: blocked.id
+                )
+            )
+        ) { error in
+            XCTAssertEqual(error as? IssueExecutionApprovalError, .workerUnavailable)
+        }
+    }
+
+    func testAcceptIssueExecutionProposalUsesDedicatedPathAndStrictBody() async throws {
+        let recorder = MutationAPIRecorder()
+        let proposalID = UUID(uuidString: "77777777-7777-4777-8777-777777777777")!
+        let store = IssueMutationStore(
+            api: recorder,
+            projectID: Self.projectID,
+            token: "token"
+        )
+        let request = AcceptIssueExecutionProposalRequest(
+            provider: .codex,
+            model: "gpt-5.6-sol",
+            effort: .ultra,
+            workerId: "worker-1"
+        )
+
+        let response = try await store.acceptIssueExecutionProposal(
+            conversationRunID: Self.runID,
+            proposalID: proposalID,
+            request: request
+        )
+
+        XCTAssertEqual(response.proposal.id, proposalID)
+        XCTAssertEqual(response.runId, Self.runID)
+        let recordedPath = await recorder.lastPath()
+        XCTAssertEqual(
+            recordedPath,
+            MobileAPIContract.Endpoint.acceptIssueExecutionProposal(
+                projectID: Self.projectID,
+                conversationRunID: Self.runID,
+                proposalID: proposalID
+            )
+        )
+        let capturedBodyData = await recorder.lastJSONBodyData()
+        let recordedBodyData = try XCTUnwrap(capturedBodyData)
+        let body = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: recordedBodyData) as? [String: Any]
+        )
+        XCTAssertEqual(Set(body.keys), ["provider", "model", "effort", "workerId"])
+        XCTAssertEqual(body["provider"] as? String, "codex")
+        XCTAssertEqual(body["model"] as? String, "gpt-5.6-sol")
+        XCTAssertEqual(body["effort"] as? String, "ultra")
+        XCTAssertEqual(body["workerId"] as? String, "worker-1")
+        XCTAssertNil(body["requestId"])
+    }
+
     func testDuplicateCreateTapSendsOnlyOneRequest() async throws {
         let recorder = MutationAPIRecorder(delay: .milliseconds(100))
         let store = IssueMutationStore(
@@ -539,6 +817,54 @@ final class IssueMutationTests: XCTestCase {
 
     private static let projectID = UUID(uuidString: "11111111-1111-4111-8111-111111111111")!
     private static let runID = UUID(uuidString: "33333333-3333-4333-8333-333333333333")!
+
+    private func executionRun(
+        status: DashboardRun.Status = .backlog,
+        workflowStage: String? = nil,
+        executionReadiness: String? = "ready",
+        waitingOnPrerequisiteCount: Int? = nil,
+        assigneeUserID: String? = nil,
+        preferredProvider: AgentProvider? = nil,
+        preferredModel: String? = nil,
+        preferredEffort: ModelEffort? = nil,
+        claimedBy: String? = nil,
+        claimedAt: Date? = nil,
+        workerID: String? = nil,
+        dispatchedAt: Date? = nil,
+        requestedProvider: AgentProvider? = nil,
+        requestedModel: String? = nil,
+        requestedEffort: ModelEffort? = nil,
+        requestedWorkerID: String? = nil,
+        requestedByUserID: String? = nil,
+        dispatchMode: String? = nil,
+        startedAt: Date? = nil,
+        updatedAt: Date = Date(timeIntervalSince1970: 1_700_000_000)
+    ) -> DashboardRun {
+        DashboardRun(
+            id: Self.runID,
+            title: "Fresh backlog",
+            status: status,
+            workflowStage: workflowStage,
+            assigneeUserId: assigneeUserID,
+            executionReadiness: executionReadiness,
+            waitingOnPrerequisiteCount: waitingOnPrerequisiteCount,
+            preferredProvider: preferredProvider,
+            preferredModel: preferredModel,
+            preferredEffort: preferredEffort,
+            dispatchedAt: dispatchedAt,
+            requestedProvider: requestedProvider,
+            requestedModel: requestedModel,
+            requestedEffort: requestedEffort,
+            requestedWorkerId: requestedWorkerID,
+            requestedByUserId: requestedByUserID,
+            dispatchMode: dispatchMode,
+            claimedBy: claimedBy,
+            claimedAt: claimedAt,
+            workerId: workerID,
+            startedAt: startedAt,
+            updatedAt: updatedAt
+        )
+    }
 }
 
 private actor MessageAttachmentAPIRecorder: MobileAPIClientProtocol {
@@ -626,6 +952,7 @@ private actor MentionMessageAPIRecorder: MobileAPIClientProtocol {
 
 private actor MutationAPIRecorder: MobileAPIClientProtocol {
     private var count = 0
+    private var paths: [String] = []
     private var recordedRequestID: String?
     private var recordedRequestIDs: [String] = []
     private var recordedJSONBodyData: Data?
@@ -639,6 +966,8 @@ private actor MutationAPIRecorder: MobileAPIClientProtocol {
     }
 
     func requestCount() -> Int { count }
+
+    func lastPath() -> String? { paths.last }
 
     func lastRequestID() -> String? { recordedRequestID }
 
@@ -658,6 +987,7 @@ private actor MutationAPIRecorder: MobileAPIClientProtocol {
         as responseType: Response.Type
     ) async throws -> Response {
         count += 1
+        paths.append(path)
         if let body {
             let data = try JSONEncoder.mobileContract.encode(TestAnyEncodable(body))
             recordedJSONBodyData = data
@@ -688,6 +1018,8 @@ private actor MutationAPIRecorder: MobileAPIClientProtocol {
             payload = #"{"runId":"33333333-3333-4333-8333-333333333333","outcome":"approved","workflowStage":"production_qa","startStage":"production_qa","checkpointKey":"user-before-production_qa","attempt":2,"revision":3,"terminalReviewOnly":false}"#
         } else if path.hasSuffix("/dispatch") || path.hasSuffix("/reassign") {
             payload = #"{"runId":"33333333-3333-4333-8333-333333333333","agentId":null,"provider":"codex","model":null,"effort":null,"requestedWorkerId":"worker-1","requestedByUserId":"fixture-user","dispatchMode":"specific","dispatchedAt":"2026-08-02T01:00:00.000Z","outcome":"dispatched"}"#
+        } else if path.contains("/issue-execution-proposals/") && path.hasSuffix("/accept") {
+            payload = #"{"proposal":{"id":"77777777-7777-4777-8777-777777777777","type":"request_issue_execute","status":"accepted","projectId":"11111111-1111-4111-8111-111111111111","runId":"33333333-3333-4333-8333-333333333333","title":"Fresh backlog","createdAt":"2026-08-11T01:00:00.000Z","acceptedAt":"2026-08-11T01:01:00.000Z","requestedProvider":"codex","requestedModel":null,"requestedEffort":"high","requestedWorkerId":null,"delegatedByAgentId":null,"delegatedByAgentName":null},"outcome":"accepted","projectId":"11111111-1111-4111-8111-111111111111","runId":"33333333-3333-4333-8333-333333333333","dispatch":{"runId":"33333333-3333-4333-8333-333333333333","agentId":null,"provider":"codex","model":null,"effort":"high","requestedWorkerId":null,"requestedByUserId":"fixture-user","dispatchMode":"any","dispatchedAt":"2026-08-11T01:01:00.000Z","outcome":"dispatched"}}"#
         } else {
             throw MobileAPIError.invalidRequest
         }

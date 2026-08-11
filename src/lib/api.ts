@@ -28,6 +28,7 @@ import type {
   ChannelMember,
   ChannelMessage,
   ChannelMessageAttachment,
+  ChannelExecutionProposal,
   ChannelSummary,
   ChannelVisibility,
 } from "./channels-contract";
@@ -53,6 +54,8 @@ import type {
   IssueMessage,
   IssueProposedAction,
   IssueExecutionPreferences,
+  IssueExecutionApprovalInput,
+  IssueExecutionProposal,
   IssueResultReview,
   ClaimedProjectAgentScheduleRun,
   Project,
@@ -1601,10 +1604,32 @@ export async function acceptChannelProposal(
     outcome: "accepted" | "already_accepted";
     projectId: string;
     resultRunId: string;
+    /** Present on new servers when create approval materializes execution. */
+    executionProposal?: ChannelExecutionProposal | null;
   }>(
     `/organizations/${organizationId}/channels/${channelId}/proposals/${proposalId}/accept`,
     token,
     { method: "POST", body: JSON.stringify({ projectId }) },
+  );
+}
+
+export async function acceptChannelExecutionProposal(
+  token: string,
+  organizationId: string,
+  channelId: string,
+  proposalId: string,
+  input: IssueExecutionApprovalInput,
+) {
+  return request<{
+    proposal: ChannelExecutionProposal;
+    outcome: "accepted" | "already_accepted";
+    projectId: string;
+    runId: string;
+    dispatch: HuntDispatchResult;
+  }>(
+    `/organizations/${organizationId}/channels/${channelId}/proposals/${proposalId}/accept-execution`,
+    token,
+    { method: "POST", body: JSON.stringify(input) },
   );
 }
 
@@ -2054,12 +2079,33 @@ export async function acceptIssueActionProposal(
 ) {
   return request<{
     proposal: Exclude<IssueProposedAction, { type: "request_issue_rework" }>;
+    executionProposal?: IssueExecutionProposal | null;
     outcome: "accepted" | "already_accepted";
     resultRunId: string | null;
   }>(
     `/projects/${projectId}/runs/${runId}/issue-action-proposals/${proposalId}/accept`,
     token,
     { method: "POST", body: JSON.stringify({}) },
+  );
+}
+
+export async function acceptIssueExecutionProposal(
+  token: string,
+  projectId: string,
+  conversationRunId: string,
+  proposalId: string,
+  input: IssueExecutionApprovalInput,
+) {
+  return request<{
+    proposal: IssueExecutionProposal;
+    outcome: "accepted" | "already_accepted";
+    projectId: string;
+    runId: string;
+    dispatch: HuntDispatchResult;
+  }>(
+    `/projects/${projectId}/runs/${conversationRunId}/issue-execution-proposals/${proposalId}/accept`,
+    token,
+    { method: "POST", body: JSON.stringify(input) },
   );
 }
 
