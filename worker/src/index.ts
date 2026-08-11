@@ -453,6 +453,11 @@ import {
   updateChannel,
 } from "./channels";
 import {
+  publishChannelRealtime,
+  subscribeToChannelRealtime,
+} from "./channel-realtime";
+export { ChannelRealtimeHub } from "./channel-realtime";
+import {
   createOrganizationAgent,
   deleteOrganizationAgent,
   getOrganizationAgent,
@@ -528,6 +533,37 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "DELETE, GET, HEAD, PATCH, POST, PUT, OPTIONS",
   "Access-Control-Allow-Origin": "*",
 };
+
+function scheduleChannelRealtimePublish(
+  env: Env,
+  db: D1Database,
+  organizationId: string,
+  context?: ExecutionContext,
+) {
+  if (!env.CHANNEL_REALTIME) return;
+  const publish = getChannelSyncCursor(db, organizationId)
+    .then((cursor) => publishChannelRealtime(env, organizationId, cursor))
+    .catch((error) => {
+      console.error(JSON.stringify({
+        message: "Channel realtime publish failed",
+        organizationId,
+        error: error instanceof Error ? error.message : String(error),
+      }));
+    });
+  if (context) context.waitUntil(publish);
+  else void publish;
+}
+
+function channelMutationOrganization(
+  pathname: string,
+  method: string,
+  status: number,
+) {
+  if (status >= 400 || method === "GET" || method === "HEAD") return null;
+  return pathname.match(
+    /^\/organizations\/([0-9a-f-]+)\/channels(?:\/|$)/u,
+  )?.[1] ?? null;
+}
 const accountDeletionFreshAgeMs = 24 * 60 * 60 * 1_000;
 const organizationInvitationTtlMs = 7 * 24 * 60 * 60 * 1_000;
 const usageRangeFetchPaddingDays = 1;
@@ -6467,6 +6503,31 @@ async function route(
     return json({ deleted: true });
   }
 
+  const channelEventsMatch = pathname.match(
+    /^\/organizations\/([0-9a-f-]+)\/channel-events$/u,
+  );
+  if (channelEventsMatch && request.method === "GET") {
+    const session = await requireSession(auth, request);
+    const organizationId = channelEventsMatch[1];
+    const role = await getOrganizationRole(db, organizationId, session.user.id);
+    if (!role) throw new HttpError(404, "Organization not found");
+    const cursor = await getChannelSyncCursor(db, organizationId);
+    const response = await subscribeToChannelRealtime(
+      env,
+      organizationId,
+      cursor,
+    );
+    const headers = new Headers(response.headers);
+    for (const [name, value] of Object.entries(corsHeaders)) {
+      headers.set(name, value);
+    }
+    return new Response(response.body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers,
+    });
+  }
+
   const channelChangesMatch = pathname.match(
     /^\/organizations\/([0-9a-f-]+)\/channel-changes$/u,
   );
@@ -11482,6 +11543,7 @@ async function route(
       leaseExpiresAt: leaseExpiryFrom(observedAt),
     });
     if (!job) return json({ work: null });
+    scheduleChannelRealtimePublish(env, db, input.organizationId, context);
     try {
       if (job.claimed_worker_id !== binding.id) {
         throw new HttpError(409, "Reply claim is bound to another Worker");
@@ -11740,6 +11802,7 @@ async function route(
         error: error instanceof Error ? error.message : String(error),
         updatedAt: new Date().toISOString(),
       });
+      scheduleChannelRealtimePublish(env, db, input.organizationId, context);
       throw error;
     }
   }
@@ -11943,6 +12006,7 @@ async function route(
         updatedAt: observedAt,
       });
       if (!failed) throw new HttpError(409, "Reply claim is no longer active");
+      scheduleChannelRealtimePublish(env, db, input.organizationId, context);
       return json({ agentReply: channelReplyJson(failed) });
     }
     const agent = await getOrganizationAgent(
@@ -12095,6 +12159,7 @@ async function route(
       completedAt: observedAt,
     });
     if (!completed) throw new HttpError(409, "Reply claim is no longer active");
+    scheduleChannelRealtimePublish(env, db, input.organizationId, context);
     return json({
       agentReply: channelReplyJson(completed),
       message: await getChannelMessage(
@@ -13367,7 +13432,23 @@ export default {
 
     try {
       const auth = createAuth(env, url.origin);
-      return await route(request, auth, env.DB, env.ATTACHMENTS, env, ctx);
+      const response = await route(
+        request,
+        auth,
+        env.DB,
+        env.ATTACHMENTS,
+        env,
+        ctx,
+      );
+      const organizationId = channelMutationOrganization(
+        url.pathname,
+        request.method,
+        response.status,
+      );
+      if (organizationId) {
+        scheduleChannelRealtimePublish(env, env.DB, organizationId, ctx);
+      }
+      return response;
     } catch (error) {
       const skillConflictMessage = agentSkillConflictMessage(error);
       if (skillConflictMessage) {

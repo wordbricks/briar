@@ -106,9 +106,11 @@ import {
 } from "./ChannelIssueProposalDetails";
 import { IssueExecutionApproval } from "./IssueExecutionApproval";
 import { AgentSkillExecutionApproval } from "./AgentSkillExecutionApproval";
-
-/** Chat needs a tighter cadence than the 15s dashboard poll. */
-const CHANNEL_POLL_INTERVAL_MS = 3_000;
+import {
+  CHANNEL_REALTIME_FALLBACK_MS,
+  createChannelRealtimeTransport,
+  MAX_CHANNEL_DELTA_PAGES_PER_SYNC,
+} from "../lib/channel-realtime";
 
 type ChannelsProps = {
   organizationId: string;
@@ -581,90 +583,156 @@ export function Channels({
     token,
   ]);
 
-  // The change feed is organization-wide, so messages for other channels are
-  // dropped here rather than filtered server-side.
+  // SSE carries only the latest organization cursor. D1 remains authoritative:
+  // every notification drains the delta feed, and a low-frequency fallback
+  // closes gaps after sleep, proxy disconnects, or a missed publish.
   useEffect(() => {
     let stopped = false;
     let inFlight = false;
-    const tick = async () => {
+    let pending = false;
+    let blockedRetry: number | null = null;
+    const abortController = new AbortController();
+    const transport = createChannelRealtimeTransport(token, organizationId);
+
+    const scheduleBlockedRetry = () => {
+      if (blockedRetry !== null || stopped) return;
+      blockedRetry = window.setTimeout(() => {
+        blockedRetry = null;
+        if (pending) void sync();
+      }, 250);
+    };
+
+    const sync = async () => {
+      pending = true;
       if (
         !channelListReady ||
         document.hidden ||
         inFlight ||
         authoritativeLoadVersion.current != null
       ) {
+        if (authoritativeLoadVersion.current != null) scheduleBlockedRetry();
         return;
       }
-      const requestedCursor = cursor.current;
-      const requestedDataVersion = channelDataVersion.current;
       inFlight = true;
       try {
-        const delta = await loadChannelDelta(token, organizationId, requestedCursor);
-        if (
-          stopped ||
-          requestedCursor !== cursor.current ||
-          requestedDataVersion !== channelDataVersion.current ||
-          authoritativeLoadVersion.current != null
-        ) return;
-        cursor.current = delta.cursor;
-        if (delta.channels.length || delta.removedChannelIds.length) {
-          onChannelsChange((current) => {
-            const byId = new Map(current.map((channel) => [channel.id, channel]));
-            for (const channel of delta.channels) byId.set(channel.id, channel);
-            for (const id of delta.removedChannelIds) byId.delete(id);
-            return [...byId.values()].sort((left, right) =>
-              left.name.localeCompare(right.name),
+        while (pending && !stopped) {
+          pending = false;
+          for (
+            let page = 0;
+            page < MAX_CHANNEL_DELTA_PAGES_PER_SYNC;
+            page += 1
+          ) {
+            const requestedCursor = cursor.current;
+            const requestedDataVersion = channelDataVersion.current;
+            const delta = await loadChannelDelta(
+              token,
+              organizationId,
+              requestedCursor,
+              abortController.signal,
             );
-          });
-        }
-        if (delta.agentReplies.length) {
-          setReplies((current) => {
-            const byId = new Map(current.map((reply) => [reply.id, reply]));
-            for (const reply of delta.agentReplies) byId.set(reply.id, reply);
-            return [...byId.values()];
-          });
-        }
-        const relevant = delta.messages.filter(
-          (message) => message.channelId === activeChannelId,
-        );
-        if (relevant.length || delta.removedMessageIds.length) {
-          recordProposalMessages(relevant);
-          setMessages((current) =>
-            mergeChannelMessages(
-              current,
-              relevant.filter((message) => message.parentMessageId === null),
-              delta.removedMessageIds,
-            ),
-          );
-          setThreadParentId((parentId) => {
-            if (parentId) {
-              const threadUpdates = relevant.filter(
-                (message) =>
-                  message.parentMessageId === parentId || message.id === parentId,
-              );
-              if (threadUpdates.length) {
-                setThreadMessages((current) =>
-                  mergeChannelMessages(
-                    current,
-                    threadUpdates,
-                    delta.removedMessageIds,
-                  ),
+            if (
+              stopped ||
+              requestedCursor !== cursor.current ||
+              requestedDataVersion !== channelDataVersion.current ||
+              authoritativeLoadVersion.current != null
+            ) return;
+            cursor.current = delta.cursor;
+            if (delta.channels.length || delta.removedChannelIds.length) {
+              onChannelsChange((current) => {
+                const byId = new Map(
+                  current.map((channel) => [channel.id, channel]),
                 );
-              }
+                for (const channel of delta.channels) {
+                  byId.set(channel.id, channel);
+                }
+                for (const id of delta.removedChannelIds) byId.delete(id);
+                return [...byId.values()].sort((left, right) =>
+                  left.name.localeCompare(right.name),
+                );
+              });
             }
-            return parentId;
-          });
+            if (delta.agentReplies.length) {
+              setReplies((current) => {
+                const byId = new Map(
+                  current.map((reply) => [reply.id, reply]),
+                );
+                for (const reply of delta.agentReplies) byId.set(reply.id, reply);
+                return [...byId.values()];
+              });
+            }
+            const relevant = delta.messages.filter(
+              (message) => message.channelId === activeChannelId,
+            );
+            if (relevant.length || delta.removedMessageIds.length) {
+              recordProposalMessages(relevant);
+              setMessages((current) =>
+                mergeChannelMessages(
+                  current,
+                  relevant.filter(
+                    (message) => message.parentMessageId === null,
+                  ),
+                  delta.removedMessageIds,
+                ),
+              );
+              setThreadParentId((parentId) => {
+                if (parentId) {
+                  const threadUpdates = relevant.filter(
+                    (message) =>
+                      message.parentMessageId === parentId ||
+                      message.id === parentId,
+                  );
+                  if (threadUpdates.length) {
+                    setThreadMessages((current) =>
+                      mergeChannelMessages(
+                        current,
+                        threadUpdates,
+                        delta.removedMessageIds,
+                      ),
+                    );
+                  }
+                }
+                return parentId;
+              });
+            }
+            if (!delta.hasMore || delta.cursor <= requestedCursor) break;
+          }
         }
-      } catch {
-        // A dropped poll is retried on the next interval.
+      } catch (error) {
+        if (!abortController.signal.aborted) {
+          console.warn("Channel delta refresh failed", error);
+        }
       } finally {
         inFlight = false;
+        if (pending && !stopped) {
+          window.queueMicrotask(() => void sync());
+        }
       }
     };
-    const timer = window.setInterval(() => void tick(), CHANNEL_POLL_INTERVAL_MS);
+
+    const unsubscribe = transport.subscribe((notification) => {
+      if (notification.cursor > cursor.current) void sync();
+    });
+    const updateVisibility = () => {
+      if (document.hidden) {
+        transport.stop();
+      } else {
+        transport.start();
+      }
+    };
+    document.addEventListener("visibilitychange", updateVisibility);
+    const fallback = window.setInterval(
+      () => void sync(),
+      CHANNEL_REALTIME_FALLBACK_MS,
+    );
+    updateVisibility();
     return () => {
       stopped = true;
-      window.clearInterval(timer);
+      unsubscribe();
+      transport.stop();
+      abortController.abort();
+      document.removeEventListener("visibilitychange", updateVisibility);
+      window.clearInterval(fallback);
+      if (blockedRetry !== null) window.clearTimeout(blockedRetry);
     };
   }, [
     activeChannelId,

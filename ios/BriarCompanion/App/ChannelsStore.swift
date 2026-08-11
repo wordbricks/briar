@@ -37,6 +37,7 @@ final class ChannelsStore: ObservableObject {
     @Published private(set) var errorMessage: String?
 
     private let api: any MobileAPIClientProtocol
+    private let realtime: (any MobileRealtimeClientProtocol)?
     private let attachmentReference: @Sendable () -> String
     private let pollInterval: Duration
     private let maxDeltaPagesPerRefresh: Int
@@ -60,16 +61,19 @@ final class ChannelsStore: ObservableObject {
     private var skillExecutionProposalIDsByMessage: [UUID: UUID] = [:]
     private var isForeground = true
     private var pollingTask: Task<Void, Never>?
+    private var realtimeTask: Task<Void, Never>?
 
     init(
         api: any MobileAPIClientProtocol,
-        pollInterval: Duration = .seconds(3),
+        realtime: (any MobileRealtimeClientProtocol)? = nil,
+        pollInterval: Duration = .seconds(60),
         maxDeltaPagesPerRefresh: Int = 20,
         attachmentReference: @escaping @Sendable () -> String = {
             UUID().uuidString.lowercased()
         }
     ) {
         self.api = api
+        self.realtime = realtime ?? (api as? any MobileRealtimeClientProtocol)
         self.pollInterval = pollInterval
         self.maxDeltaPagesPerRefresh = min(max(maxDeltaPagesPerRefresh, 1), 20)
         self.attachmentReference = attachmentReference
@@ -83,6 +87,8 @@ final class ChannelsStore: ObservableObject {
         acceptanceRevision &+= 1
         pollingTask?.cancel()
         pollingTask = nil
+        realtimeTask?.cancel()
+        realtimeTask = nil
         self.organizationID = organizationID
         self.token = token
         syncCursor = nil
@@ -110,7 +116,7 @@ final class ChannelsStore: ObservableObject {
         preparingSkillExecutionProposalID = nil
         errorMessage = nil
         guard organizationID != nil, token != nil else { return }
-        if isForeground { startPolling() }
+        if isForeground { startSynchronization() }
     }
 
     func refresh() async {
@@ -355,13 +361,15 @@ final class ChannelsStore: ObservableObject {
     func applicationDidBecomeActive() {
         isForeground = true
         guard organizationID != nil, token != nil else { return }
-        startPolling()
+        startSynchronization()
     }
 
     func applicationDidEnterBackground() {
         isForeground = false
         pollingTask?.cancel()
         pollingTask = nil
+        realtimeTask?.cancel()
+        realtimeTask = nil
     }
 
     private var authoritativeLoadInFlight: Bool {
@@ -1380,10 +1388,12 @@ final class ChannelsStore: ObservableObject {
         }
     }
 
-    private func startPolling() {
+    private func startSynchronization() {
         pollingTask?.cancel()
+        realtimeTask?.cancel()
         guard isForeground, organizationID != nil, token != nil else {
             pollingTask = nil
+            realtimeTask = nil
             return
         }
         let expectedGeneration = generation
@@ -1409,6 +1419,54 @@ final class ChannelsStore: ObservableObject {
                     expectedGeneration == self.generation
                 else { return }
                 await self.refreshChanges()
+            }
+        }
+
+        guard let realtime, let organizationID, let token else {
+            realtimeTask = nil
+            return
+        }
+        realtimeTask = Task { [weak self] in
+            var reconnectAttempt = 0
+            while !Task.isCancelled {
+                guard
+                    let self,
+                    expectedGeneration == self.generation,
+                    self.isForeground
+                else { return }
+                let cursor = self.syncCursor ?? 0
+                do {
+                    let events = realtime.realtimeEvents(
+                        MobileAPIContract.Endpoint.channelEvents(
+                            organizationID: organizationID,
+                            cursor: cursor
+                        ),
+                        token: token
+                    )
+                    for try await event in events {
+                        guard
+                            !Task.isCancelled,
+                            expectedGeneration == self.generation,
+                            self.isForeground
+                        else { return }
+                        reconnectAttempt = 0
+                        if event.topic == "channels",
+                           event.cursor > (self.syncCursor ?? -1) {
+                            await self.refreshChanges()
+                        }
+                    }
+                } catch is CancellationError {
+                    return
+                } catch {
+                    // The low-frequency delta refresh remains authoritative
+                    // while the notification connection reconnects.
+                }
+                reconnectAttempt = min(reconnectAttempt + 1, 5)
+                do {
+                    try await Task.sleep(for: .seconds(1 << reconnectAttempt))
+                } catch {
+                    return
+                }
             }
         }
     }

@@ -65,6 +65,20 @@
       "migrations_dir": "migrations"
     }
   ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "CHANNEL_REALTIME",
+        "class_name": "ChannelRealtimeHub"
+      }
+    ]
+  },
+  "exports": {
+    "ChannelRealtimeHub": {
+      "type": "durable-object",
+      "storage": "sqlite"
+    }
+  },
   "r2_buckets": [
     {
       "binding": "RELEASES",

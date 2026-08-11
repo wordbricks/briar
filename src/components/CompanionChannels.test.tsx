@@ -23,6 +23,9 @@ const acceptChannelExecutionProposal = vi.fn();
 const acceptChannelSkillExecutionProposal = vi.fn();
 const loadDashboard = vi.fn();
 const toggleChannelMessageReaction = vi.fn();
+const channelRealtime = vi.hoisted(() => ({
+  listeners: new Set<(notification: { topic: "channels"; cursor: number }) => void>(),
+}));
 
 vi.mock("../lib/api", () => ({
   listChannels: (...args: unknown[]) => listChannels(...args),
@@ -40,12 +43,33 @@ vi.mock("../lib/api", () => ({
     toggleChannelMessageReaction(...args),
 }));
 
+vi.mock("../lib/channel-realtime", () => ({
+  CHANNEL_REALTIME_FALLBACK_MS: 60_000,
+  MAX_CHANNEL_DELTA_PAGES_PER_SYNC: 20,
+  createChannelRealtimeTransport: () => ({
+    start: vi.fn(),
+    stop: vi.fn(),
+    subscribe: (
+      listener: (notification: { topic: "channels"; cursor: number }) => void,
+    ) => {
+      channelRealtime.listeners.add(listener);
+      return () => channelRealtime.listeners.delete(listener);
+    },
+  }),
+}));
+
 vi.mock("@emoji-mart/data", () => ({ default: {} }));
 vi.mock("@emoji-mart/react", () => ({
   default: () => null,
 }));
 
 const { CompanionChannels } = await import("./CompanionChannels");
+
+const emitChannelChange = (cursor: number) => {
+  for (const listener of channelRealtime.listeners) {
+    listener({ topic: "channels", cursor });
+  }
+};
 
 const channel = (
   id: string,
@@ -180,6 +204,7 @@ describe("CompanionChannels", () => {
   beforeEach(() => {
     vi.useRealTimers();
     vi.clearAllMocks();
+    channelRealtime.listeners.clear();
     listChannels.mockResolvedValue({
       channels: [
         channel("c-other", "Sprout talk", "project-2"),
@@ -390,7 +415,7 @@ describe("CompanionChannels", () => {
     expect(container.textContent).toContain("session-1");
   });
 
-  it("polls the selected channel for pending and completed Agent replies", async () => {
+  it("applies pending and completed Agent replies after realtime notifications", async () => {
     vi.useFakeTimers();
     const initial = message("m-1", "Please investigate");
     loadChannel.mockResolvedValue({
@@ -454,7 +479,8 @@ describe("CompanionChannels", () => {
     });
 
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(3_000);
+      emitChannelChange(2);
+      await Promise.resolve();
     });
     expect(loadChannelDelta).toHaveBeenCalledWith(
       "token",
@@ -473,7 +499,8 @@ describe("CompanionChannels", () => {
       .toContain("An agent is writing a reply");
 
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(3_000);
+      emitChannelChange(3);
+      await Promise.resolve();
     });
     expect(loadChannelDelta).toHaveBeenLastCalledWith(
       "token",
@@ -520,7 +547,8 @@ describe("CompanionChannels", () => {
       ]
         .find((button) => button.textContent?.includes("Welcome"))!
         .click();
-      await vi.advanceTimersByTimeAsync(6_000);
+      emitChannelChange(2);
+      await Promise.resolve();
     });
     expect(loadChannelDelta).not.toHaveBeenCalled();
 
@@ -534,7 +562,8 @@ describe("CompanionChannels", () => {
       await Promise.resolve();
     });
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(3_000);
+      emitChannelChange(2);
+      await Promise.resolve();
     });
     expect(loadChannelDelta).toHaveBeenCalledWith(
       "token",
@@ -545,7 +574,7 @@ describe("CompanionChannels", () => {
     expect(container.textContent).toContain("1 replies");
   });
 
-  it("retains channel-list upserts and removals consumed by delta polling", async () => {
+  it("retains channel-list upserts and removals consumed after realtime notification", async () => {
     vi.useFakeTimers();
     loadChannel.mockResolvedValue({
       channel: channel("c-common", "Welcome", null),
@@ -570,7 +599,8 @@ describe("CompanionChannels", () => {
       await Promise.resolve();
     });
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(3_000);
+      emitChannelChange(2);
+      await Promise.resolve();
     });
 
     expect(container.textContent).toContain("New channel");
@@ -578,7 +608,7 @@ describe("CompanionChannels", () => {
     expect(container.querySelector(".companion-channel-detail")).toBeNull();
   });
 
-  it("does not overlap polls and stops applying them after leaving the channel", async () => {
+  it("does not overlap realtime syncs and stops applying them after leaving the channel", async () => {
     vi.useFakeTimers();
     loadChannel.mockImplementation(
       (_token: string, _organizationId: string, channelId: string) =>
@@ -614,7 +644,10 @@ describe("CompanionChannels", () => {
     });
 
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(9_000);
+      emitChannelChange(2);
+      emitChannelChange(3);
+      emitChannelChange(4);
+      await Promise.resolve();
     });
     expect(loadChannelDelta).toHaveBeenCalledTimes(1);
     const pollSignal = loadChannelDelta.mock.calls[0]?.[3] as AbortSignal;
@@ -641,7 +674,8 @@ describe("CompanionChannels", () => {
       await Promise.resolve();
     });
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(3_000);
+      emitChannelChange(2);
+      await Promise.resolve();
     });
 
     expect(loadChannelDelta).toHaveBeenCalledTimes(2);
@@ -673,7 +707,8 @@ describe("CompanionChannels", () => {
       await Promise.resolve();
     });
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(3_000);
+      emitChannelChange(2);
+      await Promise.resolve();
     });
 
     expect(container.querySelector(".companion-channel-error")?.textContent)
@@ -958,7 +993,8 @@ describe("CompanionChannels", () => {
       await Promise.resolve();
     });
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(3_000);
+      emitChannelChange(2);
+      await Promise.resolve();
     });
     await act(async () => {
       resolveAccept({
@@ -1066,7 +1102,8 @@ describe("CompanionChannels", () => {
       await Promise.resolve();
     });
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(3_000);
+      emitChannelChange(2);
+      await Promise.resolve();
     });
     await act(async () => {
       resolveAccept({

@@ -44,6 +44,10 @@ enum MobileAPIContract {
             "/organizations/\(organizationID.uuidString.lowercased())/channel-changes?since=\(cursor)"
         }
 
+        static func channelEvents(organizationID: UUID, cursor: Int) -> String {
+            "/organizations/\(organizationID.uuidString.lowercased())/channel-events?cursor=\(cursor)"
+        }
+
         static func channel(organizationID: UUID, channelID: UUID) -> String {
             "\(channels(organizationID: organizationID))/\(channelID.uuidString.lowercased())"
         }
@@ -388,6 +392,18 @@ protocol MobileAPIClientProtocol: Sendable {
     func download(_ path: String, token: String, to destination: URL) async throws -> URL
 }
 
+struct ChannelRealtimeNotification: Codable, Equatable, Sendable {
+    let topic: String
+    let cursor: Int
+}
+
+protocol MobileRealtimeClientProtocol: Sendable {
+    func realtimeEvents(
+        _ path: String,
+        token: String
+    ) -> AsyncThrowingStream<ChannelRealtimeNotification, Error>
+}
+
 extension MobileAPIClientProtocol {
     func get<Response: Decodable & Sendable>(
         _ path: String,
@@ -429,7 +445,7 @@ extension MobileAPIClientProtocol {
 
 private struct EmptyAPIResponse: Decodable, Sendable {}
 
-struct MobileAPIClient: MobileAPIClientProtocol, Sendable {
+struct MobileAPIClient: MobileAPIClientProtocol, MobileRealtimeClientProtocol, Sendable {
     let baseURL: URL
     let session: URLSession
 
@@ -542,6 +558,44 @@ struct MobileAPIClient: MobileAPIClientProtocol, Sendable {
         return destination
     }
 
+    /// Opens Briar's authenticated server-sent-event stream. The stream only
+    /// carries a cursor notification; callers fetch authoritative data through
+    /// the regular delta endpoint so this transport can later be replaced by a
+    /// WebSocket implementation without changing synchronization semantics.
+    func realtimeEvents(
+        _ path: String,
+        token: String
+    ) -> AsyncThrowingStream<ChannelRealtimeNotification, Error> {
+        AsyncThrowingStream { continuation in
+            let task = Task {
+                do {
+                    guard let url = endpointURL(path) else {
+                        throw MobileAPIError.invalidRequest
+                    }
+                    var request = URLRequest(url: url)
+                    request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
+                    request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+                    let (bytes, response) = try await session.bytes(for: request)
+                    try validate(response: response, data: Data())
+
+                    var decoder = MobileSSEDecoder()
+                    for try await line in bytes.lines {
+                        try Task.checkCancellation()
+                        if let event = try decoder.append(line: line) {
+                            continuation.yield(event)
+                        }
+                    }
+                    continuation.finish()
+                } catch is CancellationError {
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+            continuation.onTermination = { _ in task.cancel() }
+        }
+    }
+
     private func endpointURL(_ path: String) -> URL? {
         guard var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false) else {
             return nil
@@ -565,6 +619,26 @@ struct MobileAPIClient: MobileAPIClientProtocol, Sendable {
                     HTTPURLResponse.localizedString(forStatusCode: httpResponse.statusCode)
             )
         }
+    }
+}
+
+struct MobileSSEDecoder: Sendable {
+    private var dataLines: [String] = []
+
+    mutating func append(line: String) throws -> ChannelRealtimeNotification? {
+        if line.isEmpty {
+            defer { dataLines.removeAll(keepingCapacity: true) }
+            guard !dataLines.isEmpty else { return nil }
+            return try JSONDecoder.mobileContract.decode(
+                ChannelRealtimeNotification.self,
+                from: Data(dataLines.joined(separator: "\n").utf8)
+            )
+        }
+        guard line.hasPrefix("data:") else { return nil }
+        var value = String(line.dropFirst(5))
+        if value.first == " " { value.removeFirst() }
+        dataLines.append(value)
+        return nil
     }
 }
 
