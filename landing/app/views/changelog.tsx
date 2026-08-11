@@ -23,6 +23,22 @@ export const changelogCopy = {
     backTop: "맨 위로 ↑",
     entries: [
       {
+        version: "1.2.104",
+        date: "2026년 8월 11일",
+        title: "실시간 협업과 에이전트 동기화를 더 가볍고 정확하게 만듭니다",
+        summary:
+          "채널과 에이전트 화면이 필요한 변경만 받아오고, 조직과 프로젝트가 커져도 대화·세션·대시보드 상태를 빠르고 정확하게 유지합니다.",
+        items: [
+          "채널 변경 알림을 SSE로 받고 delta API에서 새 항목만 가져오며, 연결이 끊겨도 주기적인 복구 동기화로 누락을 방지합니다.",
+          "Project Agent 세션 목록은 가벼운 요약과 cursor delta로 동기화하고, 전체 로그와 보관된 결과는 세션을 열 때만 불러옵니다.",
+          "Organization Agent가 질문에 필요한 프로젝트 설정, Agent·Skill, 이슈·PR과 세션 정보만 권한 범위 안에서 요청해 읽습니다.",
+          "macOS 상태 트레이는 조직 전체의 실행 중 작업을 한 번에 조회하고, 대시보드는 실제로 바뀐 실행의 관계 데이터만 읽습니다.",
+          "Worker 배포가 먼저 D1 마이그레이션을 적용한 뒤 새 코드를 올리도록 고정하고, 반복되는 실행 요청에서 불필요한 스키마 확인 쿼리를 제거했습니다.",
+          "이슈 상세에서 확인한 답글과 상태 알림은 함께 읽음 처리하되 관련 없는 Inbox 알림은 그대로 유지합니다.",
+          "완료된 이슈도 마지막으로 작업한 Worker를 상세 화면과 결과 지표에 보존해 실행 주체를 계속 확인할 수 있습니다.",
+        ],
+      },
+      {
         version: "1.2.103",
         date: "2026년 8월 11일",
         title: "프로젝트 에이전트 실행 승인을 더 안전하게 배포합니다",
@@ -331,6 +347,22 @@ export const changelogCopy = {
     home: "Home",
     backTop: "Back to top ↑",
     entries: [
+      {
+        version: "1.2.104",
+        date: "August 11, 2026",
+        title: "Make real-time collaboration and agent sync lighter and more precise",
+        summary:
+          "Fetch only the channel, agent, and dashboard changes that matter so conversations and run state stay fast and accurate as organizations grow.",
+        items: [
+          "Receive channel change notifications over SSE, drain only new records from the delta API, and recover missed updates with a periodic fallback sync.",
+          "Synchronize Project Agent sessions through lightweight summaries and cursor deltas, loading full logs and archived results only when a session opens.",
+          "Let Organization Agents request only the project settings, Agents, Skills, issues, pull requests, and sessions needed for a question within their authorized scope.",
+          "Fetch all running work for the macOS status tray with one organization query, while dashboard deltas load relations only for changed runs.",
+          "Apply D1 migrations before every Worker deployment, then skip redundant schema probes from recurring claim requests once the deployment baseline is established.",
+          "Mark replies and status notifications read together when they are viewed in issue detail, without clearing unrelated Inbox items.",
+          "Retain the last assigned Worker on completed issues so the execution owner remains visible in details and result metrics.",
+        ],
+      },
       {
         version: "1.2.103",
         date: "August 11, 2026",
@@ -652,9 +684,9 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <h1>{changelog.title}</h1>
           <p>{changelog.description}</p>
         </div>
-        <a href="#v1-2-103" className="changelog-current">
+        <a href="#v1-2-104" className="changelog-current">
           <span>{changelog.current}</span>
-          <strong>v1.2.103</strong>
+          <strong>v1.2.104</strong>
           <i aria-hidden="true">↓</i>
         </a>
       </section>
@@ -679,6 +711,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   {index === 0 ? <span>{changelog.latest}</span> : null}
                   <time
                     dateTime={
+                      entry.version === "1.2.104" ||
                       entry.version === "1.2.103" ||
                       entry.version === "1.2.100" ||
                       entry.version === "1.2.99" ||
@@ -693,7 +726,8 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                       entry.version === "1.2.90" ||
                       entry.version === "1.2.89" ||
                       entry.version === "1.2.88"
-                        ? entry.version === "1.2.103" ||
+                        ? entry.version === "1.2.104" ||
+                          entry.version === "1.2.103" ||
                           entry.version === "1.2.100"
                           ? "2026-08-11"
                           : entry.version === "1.2.99" ||
