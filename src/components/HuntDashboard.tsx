@@ -2861,6 +2861,7 @@ function draftIssueDescriptionParts(
 
 function DraftIssueDescriptionEditor({
   attachments,
+  className,
   description,
   editorRef,
   label,
@@ -2871,6 +2872,7 @@ function DraftIssueDescriptionEditor({
   removeLabel,
 }: {
   attachments: IssueDraftInlineAttachment[];
+  className?: string;
   description: string;
   editorRef: RefObject<HTMLDivElement | null>;
   label: string;
@@ -2888,7 +2890,7 @@ function DraftIssueDescriptionEditor({
 
   return (
     <div
-      className={`issue-description-editor${
+      className={`issue-description-editor${className ? ` ${className}` : ""}${
         hasInlineAttachments ? " has-inline-attachments" : ""
       }`}
       ref={editorRef}
@@ -4132,6 +4134,9 @@ export function RunPage({
   const [inlineDescription, setInlineDescription] = useState(
     run.issueDescription ?? "",
   );
+  const [inlineKeptAttachmentIds, setInlineKeptAttachmentIds] = useState<
+    string[]
+  >(() => (run.attachments ?? []).map((attachment) => attachment.id));
   const [inlineSaveStatus, setInlineSaveStatus] = useState<
     "saved" | "saving" | "failed"
   >("saved");
@@ -4140,11 +4145,15 @@ export function RunPage({
   const inlineSaveQueueRef = useRef<Promise<unknown>>(Promise.resolve());
   const inlineSavePendingRef = useRef({ runId: run.id, count: 0 });
   const inlineUpdateIssueRef = useRef(onUpdateIssue);
+  const inlineDescriptionEditorRef = useRef<HTMLDivElement>(null);
   const canEditIssueInline = Boolean(onUpdateIssue);
   const lastSavedInlineIssueRef = useRef({
     runId: run.id,
     title: run.title.trim(),
     description: run.issueDescription?.trim() || null,
+    keptAttachmentIds: (run.attachments ?? []).map(
+      (attachment) => attachment.id,
+    ),
   });
   inlineUpdateIssueRef.current = onUpdateIssue;
   const [activeDetailTab, setActiveDetailTab] = useState<IssueDetailTab>(() =>
@@ -4236,11 +4245,17 @@ export function RunPage({
     }
     setInlineTitle(run.title);
     setInlineDescription(run.issueDescription ?? "");
+    setInlineKeptAttachmentIds(
+      (run.attachments ?? []).map((attachment) => attachment.id),
+    );
     setInlineSaveStatus("saved");
     lastSavedInlineIssueRef.current = {
       runId: run.id,
       title: run.title.trim(),
       description: run.issueDescription?.trim() || null,
+      keptAttachmentIds: (run.attachments ?? []).map(
+        (attachment) => attachment.id,
+      ),
     };
     inlineSavePendingRef.current = { runId: run.id, count: 0 };
   }, [run.id]);
@@ -4248,23 +4263,51 @@ export function RunPage({
     const lastSaved = lastSavedInlineIssueRef.current;
     const currentTitle = inlineTitle.trim();
     const currentDescription = inlineDescription.trim() || null;
+    const currentKeptAttachmentIds = inlineKeptAttachmentIds;
     if (
       lastSaved.runId !== run.id ||
       currentTitle !== lastSaved.title ||
-      currentDescription !== lastSaved.description
+      currentDescription !== lastSaved.description ||
+      currentKeptAttachmentIds.length !==
+        lastSaved.keptAttachmentIds.length ||
+      currentKeptAttachmentIds.some(
+        (attachmentId, index) =>
+          attachmentId !== lastSaved.keptAttachmentIds[index],
+      )
     ) {
       return;
     }
     const nextTitle = run.title.trim();
     const nextDescription = run.issueDescription?.trim() || null;
+    const nextKeptAttachmentIds = (run.attachments ?? []).map(
+      (attachment) => attachment.id,
+    );
     lastSavedInlineIssueRef.current = {
       runId: run.id,
       title: nextTitle,
       description: nextDescription,
+      keptAttachmentIds: nextKeptAttachmentIds,
     };
     setInlineTitle(run.title);
     setInlineDescription(run.issueDescription ?? "");
-  }, [inlineDescription, inlineTitle, run.id, run.issueDescription, run.title]);
+    setInlineKeptAttachmentIds((current) =>
+      current.length === nextKeptAttachmentIds.length &&
+      current.every(
+        (attachmentId, index) =>
+          attachmentId === nextKeptAttachmentIds[index],
+      )
+        ? current
+        : nextKeptAttachmentIds,
+    );
+  }, [
+    inlineDescription,
+    inlineKeptAttachmentIds,
+    inlineTitle,
+    run.attachments,
+    run.id,
+    run.issueDescription,
+    run.title,
+  ]);
   useEffect(() => {
     if (inlineSaveTimerRef.current) {
       clearTimeout(inlineSaveTimerRef.current);
@@ -4274,11 +4317,17 @@ export function RunPage({
 
     const title = inlineTitle.trim();
     const description = inlineDescription.trim() || null;
+    const keptAttachmentIds = inlineKeptAttachmentIds;
     const lastSaved = lastSavedInlineIssueRef.current;
     if (
       lastSaved.runId === run.id &&
       title === lastSaved.title &&
       description === lastSaved.description &&
+      keptAttachmentIds.length === lastSaved.keptAttachmentIds.length &&
+      keptAttachmentIds.every(
+        (attachmentId, index) =>
+          attachmentId === lastSaved.keptAttachmentIds[index],
+      ) &&
       inlineSavePendingRef.current.runId === run.id &&
       inlineSavePendingRef.current.count === 0
     ) {
@@ -4296,6 +4345,15 @@ export function RunPage({
       inlineSaveTimerRef.current = null;
       const update = inlineUpdateIssueRef.current;
       if (!update) return;
+      const runAttachmentIds = (run.attachments ?? []).map(
+        (attachment) => attachment.id,
+      );
+      const attachmentsChanged =
+        keptAttachmentIds.length !== runAttachmentIds.length ||
+        keptAttachmentIds.some(
+          (attachmentId, index) =>
+            attachmentId !== runAttachmentIds[index],
+        );
       if (inlineSavePendingRef.current.runId === run.id) {
         inlineSavePendingRef.current.count += 1;
       }
@@ -4307,6 +4365,7 @@ export function RunPage({
             description,
             priority: run.priority,
             attachments: [],
+            ...(attachmentsChanged ? { keptAttachmentIds } : {}),
           }),
         );
       inlineSaveQueueRef.current = save;
@@ -4317,6 +4376,7 @@ export function RunPage({
               runId: run.id,
               title,
               description,
+              keptAttachmentIds,
             };
           }
           if (inlineSavePendingRef.current.runId === run.id) {
@@ -4349,7 +4409,14 @@ export function RunPage({
         inlineSaveTimerRef.current = null;
       }
     };
-  }, [canEditIssueInline, inlineDescription, inlineTitle, run.id, run.priority]);
+  }, [
+    canEditIssueInline,
+    inlineDescription,
+    inlineKeptAttachmentIds,
+    inlineTitle,
+    run.id,
+    run.priority,
+  ]);
   useEffect(() => {
     void loadRunEvents();
   }, [loadRunEvents, run.eventCount, run.id]);
@@ -4380,6 +4447,13 @@ export function RunPage({
   ];
   const priorityValue = run.priority === null ? "none" : String(run.priority);
   const issueContent = run.issueDescription?.trim() || null;
+  const editableIssueAttachments = (run.attachments ?? [])
+    .filter((attachment) => inlineKeptAttachmentIds.includes(attachment.id))
+    .map((attachment) => ({
+      attachment,
+      reference: attachment.id,
+      type: "existing" as const,
+    }));
   const issueAttachmentsRef = useRef(run.attachments ?? []);
   issueAttachmentsRef.current = run.attachments ?? [];
   const renderIssueMarkdownImage = useCallback(
@@ -4393,10 +4467,14 @@ export function RunPage({
     ),
     [onLoadAttachment],
   );
-  const embeddedAttachmentReferences = issueAttachmentReferences(issueContent);
-  const remainingAttachments = (run.attachments ?? []).filter(
-    (attachment) => !embeddedAttachmentReferences.has(attachment.id),
+  const embeddedAttachmentReferences = issueAttachmentReferences(
+    onUpdateIssue ? inlineDescription : issueContent,
   );
+  const remainingAttachments = editableIssueAttachments
+    .map(({ attachment }) => attachment)
+    .filter(
+      (attachment) => !embeddedAttachmentReferences.has(attachment.id),
+    );
   const completionSummary =
     run.structuredResult?.summary?.trim() ||
     run.resultSummary?.trim() ||
@@ -5198,14 +5276,28 @@ export function RunPage({
                         </section>
                       ) : null}
                       {onUpdateIssue ? (
-                        <textarea
-                          aria-label={t("issue.description")}
+                        <DraftIssueDescriptionEditor
+                          attachments={editableIssueAttachments}
                           className="issue-description-inline-editor"
-                          onChange={(event) =>
-                            setInlineDescription(event.currentTarget.value)
-                          }
+                          description={inlineDescription}
+                          editorRef={inlineDescriptionEditorRef}
+                          label={t("issue.description")}
+                          onChange={setInlineDescription}
+                          onLoadAttachment={onLoadAttachment}
+                          onRemoveAttachment={(reference) => {
+                            setInlineKeptAttachmentIds((current) =>
+                              current.filter(
+                                (attachmentId) => attachmentId !== reference,
+                              ),
+                            );
+                            setInlineDescription((current) =>
+                              removeIssueAttachmentMarkdown(current, reference),
+                            );
+                          }}
                           placeholder={t("issue.descriptionPlaceholder")}
-                          value={inlineDescription}
+                          removeLabel={(name) =>
+                            t("issue.remove", { name })
+                          }
                         />
                       ) : issueContent ? (
                         <div className="issue-description-markdown">
@@ -5227,12 +5319,9 @@ export function RunPage({
                       ) : (
                         <p className="issue-description-empty">{t("run.notSet")}</p>
                       )}
-                      {(onUpdateIssue ? run.attachments ?? [] : remainingAttachments)
-                        .length > 0 && (
+                      {remainingAttachments.length > 0 && (
                         <IssueAttachmentGallery
-                          attachments={
-                            onUpdateIssue ? run.attachments ?? [] : remainingAttachments
-                          }
+                          attachments={remainingAttachments}
                           onLoadAttachment={onLoadAttachment}
                         />
                       )}
