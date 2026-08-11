@@ -23,6 +23,20 @@ export const changelogCopy = {
     backTop: "맨 위로 ↑",
     entries: [
       {
+        version: "1.2.100",
+        date: "2026년 8월 11일",
+        title: "대화형 이슈와 에이전트 협업을 더 안전하게 운영합니다",
+        summary:
+          "채널에서 이슈 생성과 실행을 승인 단계로 보호하고, Organization Agent가 프로젝트 맥락을 읽고 위임할 수 있도록 하면서 데스크톱·iOS 동기화와 편집 경험을 다듬었습니다.",
+        items: [
+          "채널 대화에서 이슈를 만들거나 실행하기 전에 제안과 승인 화면으로 의도를 확인하고, Inbox와 모바일에서도 같은 상태를 처리합니다.",
+          "Organization Agent가 필요한 읽기 전용 프로젝트 질문을 정확한 Project Agent에 위임하고, 권한 범위와 실행 상태를 안전하게 분리합니다.",
+          "데스크톱과 iOS Inbox 읽음 상태를 포커스·포그라운드와 계정 전환에 맞춰 동기화해 오래된 읽지 않음 표시를 줄입니다.",
+          "이슈 편집 중 첨부 파일을 인라인으로 확인하고, Inbox 사이드 패널에서도 대기 중인 이슈 제안을 바로 승인할 수 있습니다.",
+          "iOS Companion을 한국어·영어로 현지화하고 실행 알림과 로그 표시를 더 정확하게 다듬었습니다.",
+        ],
+      },
+      {
         version: "1.2.99",
         date: "2026년 8월 10일",
         title: "동시 작업과 긴 대화를 더 안정적으로 처리합니다",
@@ -302,6 +316,20 @@ export const changelogCopy = {
     home: "Home",
     backTop: "Back to top ↑",
     entries: [
+      {
+        version: "1.2.100",
+        date: "August 11, 2026",
+        title: "Make conversational issues and agent collaboration safer",
+        summary:
+          "Protect conversational issue creation and execution with explicit approval, give Organization Agents controlled project context, and make desktop and iOS collaboration more consistent.",
+        items: [
+          "Review and approve issue proposals and executions from channel conversations, with the same state handling in Inbox and on mobile.",
+          "Let Organization Agents delegate a narrowly scoped, read-only project question to the exact Project Agent while keeping authority and execution state separate.",
+          "Synchronize desktop and iOS Inbox read state across focus, foreground, retries, and account changes so stale unread indicators are less likely.",
+          "Preview attachments inline while editing issues and approve pending issue proposals directly from the Inbox side panel.",
+          "Localize the native iOS Companion in Korean and English, and make session notifications and execution logs more precise.",
+        ],
+      },
       {
         version: "1.2.99",
         date: "August 10, 2026",
@@ -594,9 +622,9 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <h1>{changelog.title}</h1>
           <p>{changelog.description}</p>
         </div>
-        <a href="#v1-2-99" className="changelog-current">
+        <a href="#v1-2-100" className="changelog-current">
           <span>{changelog.current}</span>
-          <strong>v1.2.99</strong>
+          <strong>v1.2.100</strong>
           <i aria-hidden="true">↓</i>
         </a>
       </section>
@@ -621,6 +649,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   {index === 0 ? <span>{changelog.latest}</span> : null}
                   <time
                     dateTime={
+                      entry.version === "1.2.100" ||
                       entry.version === "1.2.99" ||
                       entry.version === "1.2.98" ||
                       entry.version === "1.2.97" ||
@@ -633,7 +662,8 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                       entry.version === "1.2.90" ||
                       entry.version === "1.2.89" ||
                       entry.version === "1.2.88"
-                        ? entry.version === "1.2.99" ||
+                        ? entry.version === "1.2.100" ||
+                          entry.version === "1.2.99" ||
                           entry.version === "1.2.98" ||
                           entry.version === "1.2.97" ||
                           entry.version === "1.2.96" ||
