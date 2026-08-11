@@ -498,6 +498,7 @@ import {
   OrganizationAgentContextPageTooLargeError,
 } from "./organization-agent-context";
 import {
+  agentHandleSchema,
   channelInputSchema,
   channelIssueProposalPayloadSchema,
   channelExecutionProposalAcceptInputSchema,
@@ -1371,6 +1372,7 @@ export const projectIssueKeyPrefixInputSchema = z
 export const projectAgentInputSchema = z
   .object({
     name: z.string().trim().min(1).max(100).nullable().optional(),
+    handle: agentHandleSchema.optional(),
     avatar: z
       .string()
       .max(400_000)
@@ -3495,6 +3497,7 @@ const projectAgentJson = (row: ProjectAgentRow) => {
   return {
     id: row.id,
     projectId: row.project_id,
+    handle: row.handle,
     name: row.name,
     avatar: row.avatar,
     codexPet: row.avatar_pet_json
@@ -8706,6 +8709,7 @@ async function route(
     const providerName = agentProviderLabels[input.provider];
     const agent = await createProjectAgent(db, project.id, {
       name: input.name ?? `${providerName} Agent`,
+      handle: input.handle,
       avatar: input.avatar ?? null,
       provider: input.provider,
       model: input.model ?? null,
@@ -8961,6 +8965,7 @@ async function route(
         projectAgentMatch[2],
         {
           name: input.name ?? `${providerName} Agent`,
+          handle: input.handle,
           avatar: input.avatar,
           codexPet: nextCodexPet,
           provider: input.provider,

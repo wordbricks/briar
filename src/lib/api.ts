@@ -112,6 +112,7 @@ const projectSchema = z.object({
 const projectAgentSchema = z.object({
   id: z.string().uuid(),
   projectId: z.string().uuid(),
+  handle: z.string().min(1).max(63).nullable().default(null),
   name: z.string(),
   avatar: z
     .string()

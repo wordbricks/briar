@@ -35,6 +35,7 @@ import {
   type ModelEffort,
 } from "../lib/project-llm";
 import { demoProjectAgents } from "../lib/demo-project-agents";
+import { handleFromName } from "../lib/channels-contract";
 import {
   agentWithSkillRuntime,
   defaultProjectAgentCalendarColor,
@@ -681,6 +682,10 @@ export function ProjectAgentDialog({
 }) {
   const { t } = useI18n();
   const [name, setName] = useState(agent?.name ?? "");
+  const [handle, setHandle] = useState(
+    agent?.handle ?? handleFromName(agent?.name ?? ""),
+  );
+  const [isHandleCustomized, setIsHandleCustomized] = useState(agent !== null);
   const [provider, setProvider] = useState<AgentProvider>(
     agent?.provider ?? "codex",
   );
@@ -696,6 +701,9 @@ export function ProjectAgentDialog({
   );
   const [submitError, setSubmitError] = useState<string | null>(null);
   const isEditing = agent !== null;
+  const generatedHandle = useMemo(() => handleFromName(name), [name]);
+  const handleValid =
+    !handle || /^[a-z0-9]+(?:-[a-z0-9]+)*$/u.test(handle);
 
   return (
     <div
@@ -712,10 +720,11 @@ export function ProjectAgentDialog({
         className="project-agent-dialog"
         onSubmit={(event) => {
           event.preventDefault();
-          if (!responsibility.trim() || isSubmitting) return;
+          if (!responsibility.trim() || !handleValid || isSubmitting) return;
           setSubmitError(null);
           void onSubmit({
             name: name.trim() || null,
+            handle: handle || undefined,
             provider,
             model: model || null,
             effort,
@@ -756,10 +765,35 @@ export function ProjectAgentDialog({
             <input
               autoFocus
               maxLength={100}
-              onChange={(event) => setName(event.target.value)}
+              onChange={(event) => {
+                const nextName = event.target.value;
+                setName(nextName);
+                if (!isHandleCustomized) setHandle(handleFromName(nextName));
+              }}
               placeholder={t("agents.namePlaceholder")}
               value={name}
             />
+          </label>
+          <label>
+            <span>{t("agents.handle")}</span>
+            <div className="project-agent-handle-input">
+              <span>@</span>
+              <input
+                maxLength={63}
+                onChange={(event) => {
+                  setIsHandleCustomized(true);
+                  setHandle(event.target.value.toLowerCase());
+                }}
+                pattern="[a-z0-9]+(-[a-z0-9]+)*"
+                placeholder={generatedHandle || t("agents.handleGenerated")}
+                value={handle}
+              />
+            </div>
+            <small>
+              {name.trim() && !generatedHandle && !handle
+                ? t("agents.handleFallback")
+                : t("agents.handleHint")}
+            </small>
           </label>
           <div className="project-agent-form-runtime">
             <label>
@@ -866,7 +900,7 @@ export function ProjectAgentDialog({
           </button>
           <button
             className="project-agent-submit"
-            disabled={isSubmitting || !responsibility.trim()}
+            disabled={isSubmitting || !responsibility.trim() || !handleValid}
             type="submit"
           >
             {isSubmitting ? (
@@ -907,6 +941,7 @@ function localProjectAgent(
   return {
     id,
     projectId,
+    handle: input.handle ?? (handleFromName(name) || null),
     name,
     avatar: input.avatar ?? null,
     codexPet: null,

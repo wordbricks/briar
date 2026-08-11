@@ -80,6 +80,7 @@ async function chooseTaskSkill(skillId = "skill-release") {
 const agent: ProjectAgent = {
   id: "agent-1",
   projectId: "project-1",
+  handle: "release-agent",
   name: "릴리스 에이전트",
   avatar: null,
   codexPet: null,

@@ -10,6 +10,7 @@ import { CreateProjectAgentScheduleDialog } from "./ProjectSchedule";
 const agent: ProjectAgent = {
   id: "11111111-1111-4111-8111-111111111111",
   projectId: "22222222-2222-4222-8222-222222222222",
+  handle: "auto-hunt-agent",
   name: "Auto Hunt agent",
   avatar: null,
   codexPet: null,

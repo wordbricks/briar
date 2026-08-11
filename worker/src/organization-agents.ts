@@ -75,19 +75,58 @@ export async function allocateAgentHandle(
     handleFromName(desired) || `agent-${agentId.replaceAll("-", "")}`;
   const taken = await db
     .prepare(
-      `select handle from briar_project_agents
-       where organization_id = ? and handle is not null
-         and (handle = ? or handle glob ?)`,
+      `select id, handle from briar_project_agents
+       where organization_id = ? and handle is not null`,
     )
-    .bind(organizationId, base, `${base}-[0-9]*`)
-    .all<{ handle: string }>();
-  const used = new Set(taken.results.map((row) => row.handle));
+    .bind(organizationId)
+    .all<{ id: string; handle: string }>();
+  const used = new Set(
+    taken.results
+      .filter((row) => row.id !== agentId)
+      .map((row) => row.handle),
+  );
   if (!used.has(base)) return base;
   for (let suffix = 2; suffix < 1000; suffix += 1) {
-    const candidate = `${base.slice(0, 59)}-${suffix}`;
+    const suffixText = `-${suffix}`;
+    const candidate = `${base.slice(0, 63 - suffixText.length)}${suffixText}`;
     if (!used.has(candidate)) return candidate;
   }
   return `agent-${agentId.replaceAll("-", "")}`;
+}
+
+function isAgentHandleConflict(error: unknown) {
+  const message = error instanceof Error ? error.message.toLowerCase() : "";
+  return message.includes("unique") &&
+    message.includes("briar_project_agents") &&
+    message.includes("handle");
+}
+
+/**
+ * Allocation and mutation cannot be one D1 statement for the Agent writes that
+ * also replace skills. If another request claims the candidate between the
+ * lookup and the batch, rerun allocation and retry the whole atomic batch.
+ */
+export async function withAllocatedAgentHandle<T>(
+  db: D1Database,
+  organizationId: string,
+  desired: string,
+  agentId: string,
+  write: (handle: string) => Promise<T>,
+) {
+  for (let attempt = 0; attempt < 1000; attempt += 1) {
+    const handle = await allocateAgentHandle(
+      db,
+      organizationId,
+      desired,
+      agentId,
+    );
+    try {
+      return await write(handle);
+    } catch (error) {
+      if (!isAgentHandleConflict(error) || attempt === 999) throw error;
+    }
+  }
+  throw new Error("Agent handle allocation exhausted");
 }
 
 export async function listOrganizationAgents(
@@ -150,12 +189,6 @@ export async function createOrganizationAgent(
     createdAt: string;
   },
 ) {
-  const handle = await allocateAgentHandle(
-    db,
-    input.organizationId,
-    input.handle ?? input.name,
-    input.id,
-  );
   const skillRows = normalizedAgentSkillRows(
     input.id,
     input.skills,
@@ -169,26 +202,33 @@ export async function createOrganizationAgent(
     },
     input.createdAt,
   );
-  await db.batch([
-    db.prepare(
-      `insert into briar_project_agents (
-         id, organization_id, project_id, handle, name, provider, model,
-         responsibility, effort, created_at, updated_at
-       ) values (?, ?, null, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).bind(
-      input.id,
-      input.organizationId,
-      handle,
-      input.name,
-      input.provider,
-      input.model,
-      input.responsibility,
-      input.effort,
-      input.createdAt,
-      input.createdAt,
-    ),
-    ...skillRows.map((skill) => insertAgentSkillStatement(db, skill)),
-  ]);
+  await withAllocatedAgentHandle(
+    db,
+    input.organizationId,
+    input.handle ?? input.name,
+    input.id,
+    async (handle) =>
+      db.batch([
+        db.prepare(
+          `insert into briar_project_agents (
+             id, organization_id, project_id, handle, name, provider, model,
+             responsibility, effort, created_at, updated_at
+           ) values (?, ?, null, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ).bind(
+          input.id,
+          input.organizationId,
+          handle,
+          input.name,
+          input.provider,
+          input.model,
+          input.responsibility,
+          input.effort,
+          input.createdAt,
+          input.createdAt,
+        ),
+        ...skillRows.map((skill) => insertAgentSkillStatement(db, skill)),
+      ]),
+  );
   return getOrganizationAgent(db, input.organizationId, input.id);
 }
 
@@ -214,32 +254,7 @@ export async function updateOrganizationAgent(
   );
   if (!existing || existing.project_id !== null) return null;
   const desired = input.handle ?? existing.handle ?? input.name;
-  const handle =
-    desired === existing.handle
-      ? existing.handle
-      : await allocateAgentHandle(
-          db,
-          input.organizationId,
-          desired,
-          input.agentId,
-        );
-  const updateStatement = db.prepare(
-      `update briar_project_agents
-       set handle = ?, name = ?, provider = ?, model = ?, responsibility = ?,
-           effort = ?, updated_at = ?
-       where id = ? and organization_id = ? and project_id is null`,
-    ).bind(
-      handle,
-      input.name,
-      input.provider,
-      input.model,
-      input.responsibility,
-      input.effort,
-      input.updatedAt,
-      input.agentId,
-      input.organizationId,
-    );
-  const statements: D1PreparedStatement[] = [updateStatement];
+  const supplementalStatements: D1PreparedStatement[] = [];
   if (input.skills !== undefined) {
     const skillRows = normalizedAgentSkillRows(
       input.agentId,
@@ -259,7 +274,7 @@ export async function updateOrganizationAgent(
       input.agentId,
       skillRows,
     );
-    statements.push(
+    supplementalStatements.push(
       ...replaceAgentSkillStatements(db, input.agentId, skillRows),
     );
   } else {
@@ -272,12 +287,41 @@ export async function updateOrganizationAgent(
       });
     if (legacySkill) {
       await assertAgentSkillReplacementAllowed(db, input.agentId, [legacySkill]);
-      statements.push(
+      supplementalStatements.push(
         ...replaceAgentSkillStatements(db, input.agentId, [legacySkill]),
       );
     }
   }
-  await db.batch(statements);
+  const write = async (handle: string) =>
+    db.batch([
+      db.prepare(
+        `update briar_project_agents
+         set handle = ?, name = ?, provider = ?, model = ?, responsibility = ?,
+             effort = ?, updated_at = ?
+         where id = ? and organization_id = ? and project_id is null`,
+      ).bind(
+        handle,
+        input.name,
+        input.provider,
+        input.model,
+        input.responsibility,
+        input.effort,
+        input.updatedAt,
+        input.agentId,
+        input.organizationId,
+      ),
+      ...supplementalStatements,
+    ]);
+  if (desired === existing.handle) await write(existing.handle);
+  else {
+    await withAllocatedAgentHandle(
+      db,
+      input.organizationId,
+      desired,
+      input.agentId,
+      write,
+    );
+  }
   return getOrganizationAgent(db, input.organizationId, input.agentId);
 }
 

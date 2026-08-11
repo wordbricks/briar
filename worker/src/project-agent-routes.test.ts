@@ -82,6 +82,7 @@ describe("project Agent routes", () => {
 
   it("uses the OpenCode label for default names on create and update", async () => {
     const input = {
+      handle: "opencode-agent",
       provider: "opencode",
       model: "vendor/custom-model",
       effort: "high",
@@ -94,10 +95,17 @@ describe("project Agent routes", () => {
 
     expect(createdResponse.status).toBe(201);
     const created = await createdResponse.json<{
-      agent: { id: string; name: string; provider: string; model: string | null };
+      agent: {
+        id: string;
+        handle: string;
+        name: string;
+        provider: string;
+        model: string | null;
+      };
     }>();
     expect(created.agent).toMatchObject({
       name: "OpenCode Agent",
+      handle: "opencode-agent",
       provider: "opencode",
       model: "vendor/custom-model",
     });
@@ -116,6 +124,7 @@ describe("project Agent routes", () => {
       agent: {
         id: created.agent.id,
         name: "OpenCode Agent",
+        handle: "opencode-agent",
         provider: "opencode",
         model: "vendor/custom-model",
       },

@@ -17,6 +17,7 @@ const project = { ...demoDashboard.project, id: projectId };
 const agentA: ProjectAgent = {
   id: "11111111-1111-4111-8111-111111111111",
   projectId,
+  handle: "agent-a",
   name: "Agent A",
   avatar: null,
   codexPet: null,

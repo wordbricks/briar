@@ -112,6 +112,7 @@ describe("ProjectSchedule", () => {
     const agent: ProjectAgent = {
       id: "11111111-1111-4111-8111-111111111111",
       projectId: demoDashboard.project.id,
+      handle: "calendar-agent",
       name: "Calendar agent",
       avatar: null,
       codexPet: null,
@@ -221,6 +222,7 @@ describe("ProjectSchedule", () => {
     const agent: ProjectAgent = {
       id: "77777777-7777-4777-8777-777777777777",
       projectId: demoDashboard.project.id,
+      handle: "overlap-agent",
       name: "Overlap agent",
       avatar: null,
       codexPet: null,

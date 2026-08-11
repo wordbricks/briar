@@ -32,6 +32,7 @@ export function demoProjectAgents(
     {
       id: "demo-agent-auto-hunt",
       projectId,
+      handle: "briar",
       name: defaultAgent.name,
       avatar: null,
       codexPet: null,
@@ -55,6 +56,7 @@ export function demoProjectAgents(
     {
       id: "demo-agent-sentry",
       projectId,
+      handle: "sentry-agent",
       name: "Sentry 오류 탐지 에이전트",
       avatar: null,
       codexPet: null,
@@ -86,6 +88,7 @@ export function demoProjectAgents(
     {
       id: "demo-agent-feedback",
       projectId,
+      handle: "feedback-agent",
       name: "Feedback 분석 에이전트",
       avatar: null,
       codexPet: null,

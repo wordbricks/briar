@@ -41,7 +41,7 @@ import {
   type ProjectAgentScheduleNotificationLevel,
   type ProjectAgentScheduleRecurrence,
 } from "../../src/lib/project-agent-schedule";
-import { allocateAgentHandle } from "./organization-agents";
+import { withAllocatedAgentHandle } from "./organization-agents";
 import {
   assertAgentSkillReplacementAllowed,
   hydrateAgentSkills,
@@ -259,7 +259,9 @@ export type ProjectSettingsRow = {
 
 export type ProjectAgentRow = {
   id: string;
+  organization_id: string;
   project_id: string;
+  handle: string | null;
   name: string;
   avatar: string | null;
   avatar_pet_json: string | null;
@@ -4252,7 +4254,9 @@ export async function createProject(
   const defaultSkillCopy = defaultProjectAgentSkillCopy(locale);
   const defaultAgent: ProjectAgentRow = {
     id: crypto.randomUUID(),
+    organization_id: input.organizationId,
     project_id: project.id,
+    handle: null,
     name: defaultAgentCopy.name,
     avatar: null,
     avatar_pet_json: null,
@@ -4291,60 +4295,70 @@ export async function createProject(
     createdAt,
   );
   const initialWorkflow = cloneAutoHuntWorkflow();
-  await db.batch([
-    db
-      .prepare(
-        `insert into briar_projects (
-           id, owner_user_id, organization_id, name, agent_token_hash,
-           created_at, updated_at
-         ) values (?, ?, ?, ?, ?, ?, ?)`,
-      )
-      .bind(
-        project.id,
-        input.ownerUserId,
-        input.organizationId,
-        project.name,
-        input.agentTokenHash,
-        createdAt,
-        createdAt,
-      ),
-    db
-      .prepare(
-        `insert into briar_project_settings (
-           project_id, workflow_json, mandatory_checkpoints_json,
-           created_at, updated_at
-         ) values (?, ?, ?, ?, ?)`,
-      )
-      .bind(
-        project.id,
-        stableJson(initialWorkflow),
-        stableJson([]),
-        createdAt,
-        createdAt,
-      ),
-    db
-      .prepare(
-        `insert into briar_project_agents (
-           id, organization_id, project_id, name, provider, model,
-           responsibility, skill_markdown, calendar_color, created_at,
-           updated_at
-         ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      )
-      .bind(
-        defaultAgent.id,
-        input.organizationId,
-        defaultAgent.project_id,
-        defaultAgent.name,
-        defaultAgent.provider,
-        defaultAgent.model,
-        defaultAgent.responsibility,
-        defaultAgent.skill_markdown,
-        defaultAgent.calendar_color,
-        defaultAgent.created_at,
-        defaultAgent.updated_at,
-      ),
-    insertAgentSkillStatement(db, defaultSkill),
-  ]);
+  await withAllocatedAgentHandle(
+    db,
+    input.organizationId,
+    defaultAgent.name,
+    defaultAgent.id,
+    async (handle) => {
+      await db.batch([
+        db
+          .prepare(
+            `insert into briar_projects (
+               id, owner_user_id, organization_id, name, agent_token_hash,
+               created_at, updated_at
+             ) values (?, ?, ?, ?, ?, ?, ?)`,
+          )
+          .bind(
+            project.id,
+            input.ownerUserId,
+            input.organizationId,
+            project.name,
+            input.agentTokenHash,
+            createdAt,
+            createdAt,
+          ),
+        db
+          .prepare(
+            `insert into briar_project_settings (
+               project_id, workflow_json, mandatory_checkpoints_json,
+               created_at, updated_at
+             ) values (?, ?, ?, ?, ?)`,
+          )
+          .bind(
+            project.id,
+            stableJson(initialWorkflow),
+            stableJson([]),
+            createdAt,
+            createdAt,
+          ),
+        db
+          .prepare(
+            `insert into briar_project_agents (
+               id, organization_id, project_id, handle, name, provider, model,
+               responsibility, skill_markdown, calendar_color, created_at,
+               updated_at
+             ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          )
+          .bind(
+            defaultAgent.id,
+            input.organizationId,
+            defaultAgent.project_id,
+            handle,
+            defaultAgent.name,
+            defaultAgent.provider,
+            defaultAgent.model,
+            defaultAgent.responsibility,
+            defaultAgent.skill_markdown,
+            defaultAgent.calendar_color,
+            defaultAgent.created_at,
+            defaultAgent.updated_at,
+          ),
+        insertAgentSkillStatement(db, defaultSkill),
+      ]);
+      defaultAgent.handle = handle;
+    },
+  );
   return project;
 }
 
@@ -4596,7 +4610,7 @@ export async function getProjectRunChildMismatch(
 export async function listProjectAgents(db: D1Database, projectId: string) {
   const result = await db
     .prepare(
-      `select id, project_id, name, avatar, avatar_pet_json,
+      `select id, organization_id, project_id, handle, name, avatar, avatar_pet_json,
               avatar_spritesheet_object_key, provider, model, effort, responsibility, skill_markdown, calendar_color,
               created_at, updated_at
        from briar_project_agents
@@ -4615,7 +4629,7 @@ export async function getProjectAgent(
 ) {
   const agent = await db
     .prepare(
-      `select id, project_id, name, avatar, avatar_pet_json,
+      `select id, organization_id, project_id, handle, name, avatar, avatar_pet_json,
               avatar_spritesheet_object_key, provider, model, effort, responsibility,
               skill_markdown, calendar_color, created_at, updated_at
        from briar_project_agents
@@ -5434,6 +5448,7 @@ export async function createProjectAgent(
   projectId: string,
   input: {
     name: string;
+    handle?: string;
     avatar?: string | null;
     avatarPetJson?: string | null;
     avatarSpritesheetObjectKey?: string | null;
@@ -5448,7 +5463,9 @@ export async function createProjectAgent(
   const createdAt = new Date().toISOString();
   const agent: ProjectAgentRow = {
     id: crypto.randomUUID(),
+    organization_id: "",
     project_id: projectId,
+    handle: null,
     name: input.name,
     avatar: input.avatar ?? null,
     avatar_pet_json: input.avatarPetJson ?? null,
@@ -5472,12 +5489,7 @@ export async function createProjectAgent(
     .bind(projectId)
     .first<{ organization_id: string }>();
   if (!organization) throw new Error("Project not found");
-  const handle = await allocateAgentHandle(
-    db,
-    organization.organization_id,
-    input.name,
-    agent.id,
-  );
+  agent.organization_id = organization.organization_id;
   const skillRows = normalizedAgentSkillRows(
     agent.id,
     input.skills,
@@ -5491,35 +5503,44 @@ export async function createProjectAgent(
     },
     createdAt,
   );
-  await db.batch([
-    db.prepare(
-      `insert into briar_project_agents (
-         id, organization_id, handle, project_id, name, avatar,
-         avatar_pet_json, avatar_spritesheet_object_key, provider, model,
-         effort, responsibility, skill_markdown, calendar_color, created_at,
-         updated_at
-       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    )
-    .bind(
-      agent.id,
-      organization.organization_id,
-      handle,
-      agent.project_id,
-      agent.name,
-      agent.avatar,
-      agent.avatar_pet_json,
-      agent.avatar_spritesheet_object_key,
-      agent.provider,
-      agent.model,
-      agent.effort,
-      agent.responsibility,
-      agent.skill_markdown,
-      agent.calendar_color,
-      agent.created_at,
-      agent.updated_at,
-    ),
-    ...skillRows.map((skill) => insertAgentSkillStatement(db, skill)),
-  ]);
+  await withAllocatedAgentHandle(
+    db,
+    organization.organization_id,
+    input.handle ?? input.name,
+    agent.id,
+    async (handle) => {
+      await db.batch([
+        db.prepare(
+          `insert into briar_project_agents (
+             id, organization_id, handle, project_id, name, avatar,
+             avatar_pet_json, avatar_spritesheet_object_key, provider, model,
+             effort, responsibility, skill_markdown, calendar_color, created_at,
+             updated_at
+           ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .bind(
+          agent.id,
+          organization.organization_id,
+          handle,
+          agent.project_id,
+          agent.name,
+          agent.avatar,
+          agent.avatar_pet_json,
+          agent.avatar_spritesheet_object_key,
+          agent.provider,
+          agent.model,
+          agent.effort,
+          agent.responsibility,
+          agent.skill_markdown,
+          agent.calendar_color,
+          agent.created_at,
+          agent.updated_at,
+        ),
+        ...skillRows.map((skill) => insertAgentSkillStatement(db, skill)),
+      ]);
+      agent.handle = handle;
+    },
+  );
   return (await getProjectAgent(db, projectId, agent.id))!;
 }
 
@@ -5536,7 +5557,7 @@ export async function deleteProjectAgent(
            select 1 from briar_project_agent_schedule_runs
            where project_id = ? and agent_id = ? and status = 'running'
          )
-       returning id, project_id, name, avatar, avatar_pet_json,
+       returning id, organization_id, project_id, handle, name, avatar, avatar_pet_json,
                  avatar_spritesheet_object_key, provider, model, effort,
                  responsibility, skill_markdown, calendar_color,
                  created_at, updated_at`,
@@ -6164,6 +6185,7 @@ export async function updateProjectAgent(
   agentId: string,
   input: {
     name: string;
+    handle?: string;
     avatar?: string | null;
     codexPet?: {
       json: string;
@@ -6180,38 +6202,12 @@ export async function updateProjectAgent(
   const updatedAt = new Date().toISOString();
   const existing = await getProjectAgent(db, projectId, agentId);
   if (!existing) return null;
+  const desiredHandle = input.handle ?? existing.handle ?? input.name;
   const skill = projectAgentSkill({
     name: input.name,
     responsibility: input.responsibility,
   });
-  const updateStatement = db.prepare(
-      `update briar_project_agents
-       set name = ?, avatar = case when ? = 1 then ? else avatar end,
-           avatar_pet_json = case when ? = 1 then ? else avatar_pet_json end,
-           avatar_spritesheet_object_key =
-             case when ? = 1 then ? else avatar_spritesheet_object_key end,
-           provider = ?, model = ?, effort = ?, responsibility = ?,
-           skill_markdown = ?, calendar_color = ?, updated_at = ?
-       where id = ? and project_id = ?`,
-    ).bind(
-      input.name,
-      input.avatar === undefined ? 0 : 1,
-      input.avatar ?? null,
-      input.codexPet === undefined ? 0 : 1,
-      input.codexPet ? input.codexPet.json : null,
-      input.codexPet === undefined ? 0 : 1,
-      input.codexPet ? input.codexPet.objectKey : null,
-      input.provider,
-      input.model,
-      input.effort,
-      input.responsibility,
-      skill,
-      input.calendarColor,
-      updatedAt,
-      agentId,
-      projectId,
-    );
-  const statements: D1PreparedStatement[] = [updateStatement];
+  const supplementalStatements: D1PreparedStatement[] = [];
   if (input.skills !== undefined) {
     const skillRows = normalizedAgentSkillRows(
       agentId,
@@ -6231,7 +6227,9 @@ export async function updateProjectAgent(
       agentId,
       skillRows,
     );
-    statements.push(...replaceAgentSkillStatements(db, agentId, skillRows));
+    supplementalStatements.push(
+      ...replaceAgentSkillStatements(db, agentId, skillRows),
+    );
   } else {
     const legacySkill = soleAgentSkillRowFromLegacy(existing.skills, {
         instructions: input.responsibility,
@@ -6242,12 +6240,53 @@ export async function updateProjectAgent(
       });
     if (legacySkill) {
       await assertAgentSkillReplacementAllowed(db, agentId, [legacySkill]);
-      statements.push(
+      supplementalStatements.push(
         ...replaceAgentSkillStatements(db, agentId, [legacySkill]),
       );
     }
   }
-  const results = await db.batch(statements);
+  const write = (handle: string) =>
+    db.batch([
+      db.prepare(
+        `update briar_project_agents
+         set handle = ?, name = ?,
+             avatar = case when ? = 1 then ? else avatar end,
+             avatar_pet_json = case when ? = 1 then ? else avatar_pet_json end,
+             avatar_spritesheet_object_key =
+               case when ? = 1 then ? else avatar_spritesheet_object_key end,
+             provider = ?, model = ?, effort = ?, responsibility = ?,
+             skill_markdown = ?, calendar_color = ?, updated_at = ?
+         where id = ? and project_id = ?`,
+      ).bind(
+        handle,
+        input.name,
+        input.avatar === undefined ? 0 : 1,
+        input.avatar ?? null,
+        input.codexPet === undefined ? 0 : 1,
+        input.codexPet ? input.codexPet.json : null,
+        input.codexPet === undefined ? 0 : 1,
+        input.codexPet ? input.codexPet.objectKey : null,
+        input.provider,
+        input.model,
+        input.effort,
+        input.responsibility,
+        skill,
+        input.calendarColor,
+        updatedAt,
+        agentId,
+        projectId,
+      ),
+      ...supplementalStatements,
+    ]);
+  const results = desiredHandle === existing.handle
+    ? await write(existing.handle)
+    : await withAllocatedAgentHandle(
+      db,
+      existing.organization_id,
+      desiredHandle,
+      agentId,
+      write,
+    );
   if ((results[0]?.meta.changes ?? 0) === 0) return null;
   return getProjectAgent(db, projectId, agentId);
 }
