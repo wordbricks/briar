@@ -468,10 +468,15 @@ import {
   updateChannel,
 } from "./channels";
 import {
+  legacyChannelRealtimeResponse,
   publishChannelRealtime,
   subscribeToChannelRealtime,
 } from "./channel-realtime";
 export { ChannelRealtimeHub } from "./channel-realtime";
+import {
+  createChannelRealtimeTicket,
+  verifyChannelRealtimeTicket,
+} from "./channel-realtime-ticket";
 import {
   createOrganizationAgent,
   deleteOrganizationAgent,
@@ -6708,17 +6713,43 @@ async function route(
   const channelEventsMatch = pathname.match(
     /^\/organizations\/([0-9a-f-]+)\/channel-events$/u,
   );
-  if (channelEventsMatch && request.method === "GET") {
+  if (channelEventsMatch && request.method === "POST") {
     const session = await requireSession(auth, request);
     const organizationId = channelEventsMatch[1];
     const role = await getOrganizationRole(db, organizationId, session.user.id);
     if (!role) throw new HttpError(404, "Organization not found");
-    const cursor = await getChannelSyncCursor(db, organizationId);
-    const response = await subscribeToChannelRealtime(
-      env,
+    const issued = await createChannelRealtimeTicket(env.BETTER_AUTH_SECRET, {
       organizationId,
-      cursor,
-    );
+      userId: session.user.id,
+    });
+    const socketUrl = new URL(request.url);
+    socketUrl.protocol = socketUrl.protocol === "https:" ? "wss:" : "ws:";
+    socketUrl.search = "";
+    socketUrl.searchParams.set("ticket", issued.ticket);
+    return privateNoStoreJson({
+      url: socketUrl.toString(),
+      expiresAt: issued.expiresAt,
+    });
+  }
+  if (channelEventsMatch && request.method === "GET") {
+    const organizationId = channelEventsMatch[1];
+    if (request.headers.get("Upgrade")?.toLowerCase() === "websocket") {
+      const ticket = new URL(request.url).searchParams.get("ticket") ?? "";
+      if (
+        !(await verifyChannelRealtimeTicket(
+          env.BETTER_AUTH_SECRET,
+          ticket,
+          organizationId,
+        ))
+      ) {
+        throw new HttpError(401, "Invalid or expired realtime ticket");
+      }
+      const cursor = await getChannelSyncCursor(db, organizationId);
+      return subscribeToChannelRealtime(env, organizationId, cursor);
+    }
+    // Rolling-upgrade compatibility: old SSE clients keep their authoritative
+    // delta fallback but never pin the Durable Object or perform D1 reads here.
+    const response = legacyChannelRealtimeResponse();
     const headers = new Headers(response.headers);
     for (const [name, value] of Object.entries(corsHeaders)) {
       headers.set(name, value);

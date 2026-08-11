@@ -3,16 +3,9 @@ export type ChannelRealtimeNotification = {
   cursor: number;
 };
 
-const encoder = new TextEncoder();
-
-export function encodeChannelRealtimeEvent(
-  notification: ChannelRealtimeNotification,
-  event = "change",
-) {
-  return encoder.encode(
-    `id: ${notification.cursor}\nevent: ${event}\ndata: ${JSON.stringify(notification)}\n\n`,
-  );
-}
+type ChannelRealtimeSocketAttachment = {
+  cursor: number;
+};
 
 function parseCursor(value: string | null) {
   if (!value || !/^\d+$/u.test(value)) return null;
@@ -23,22 +16,22 @@ function parseCursor(value: string | null) {
 /**
  * Organization-scoped fan-out for channel cursor notifications.
  *
- * The Durable Object owns only live transports. D1's channel change log stays
- * authoritative, so reconnecting clients always recover through the delta API
- * and a later WebSocket transport can reuse the same notification envelope.
+ * D1's channel change log stays authoritative. The Durable Object owns only
+ * hibernatable sockets and persists each socket's last cursor as an attachment,
+ * so no in-memory controller or timer keeps the object billable while idle.
  */
 export class ChannelRealtimeHub {
-  private readonly clients = new Map<
-    string,
-    ReadableStreamDefaultController<Uint8Array>
-  >();
-  private latestCursor = 0;
-
-  constructor(_state: DurableObjectState, _env: Env) {}
+  constructor(
+    private readonly state: DurableObjectState,
+    _env: Env,
+  ) {}
 
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
     if (url.pathname === "/subscribe" && request.method === "GET") {
+      if (request.headers.get("Upgrade")?.toLowerCase() !== "websocket") {
+        return new Response("Expected WebSocket", { status: 426 });
+      }
       return this.subscribe(parseCursor(url.searchParams.get("cursor")) ?? 0);
     }
     if (url.pathname === "/notify" && request.method === "POST") {
@@ -57,46 +50,65 @@ export class ChannelRealtimeHub {
   }
 
   private subscribe(cursor: number) {
-    const clientId = crypto.randomUUID();
-    const initialCursor = Math.max(cursor, this.latestCursor);
-    const stream = new ReadableStream<Uint8Array>({
-      start: (controller) => {
-        this.clients.set(clientId, controller);
-        controller.enqueue(
-          encoder.encode("retry: 3000\n\n"),
-        );
-        controller.enqueue(
-          encodeChannelRealtimeEvent(
-            { topic: "channels", cursor: initialCursor },
-            "ready",
-          ),
-        );
-      },
-      cancel: () => {
-        this.clients.delete(clientId);
-      },
-    });
-    return new Response(stream, {
-      headers: {
-        "Cache-Control": "no-cache, no-transform",
-        "Content-Type": "text/event-stream; charset=utf-8",
-        "X-Accel-Buffering": "no",
-      },
+    const pair = new WebSocketPair();
+    const [client, server] = Object.values(pair);
+    this.state.acceptWebSocket(server);
+    server.serializeAttachment(
+      { cursor } satisfies ChannelRealtimeSocketAttachment,
+    );
+    server.send(JSON.stringify({ topic: "channels", cursor }));
+    return new Response(null, {
+      status: 101,
+      webSocket: client,
     });
   }
 
   private publish(notification: ChannelRealtimeNotification) {
-    if (notification.cursor < this.latestCursor) return;
-    this.latestCursor = notification.cursor;
-    const payload = encodeChannelRealtimeEvent(notification);
-    for (const [clientId, controller] of this.clients) {
+    const payload = JSON.stringify(notification);
+    for (const client of this.state.getWebSockets()) {
+      const attachment = client.deserializeAttachment() as
+        | ChannelRealtimeSocketAttachment
+        | null;
+      if ((attachment?.cursor ?? -1) >= notification.cursor) continue;
       try {
-        controller.enqueue(payload);
+        client.send(payload);
+        client.serializeAttachment({ cursor: notification.cursor });
       } catch {
-        this.clients.delete(clientId);
+        client.close(1011, "Realtime delivery failed");
       }
     }
   }
+
+  webSocketMessage(_socket: WebSocket, _message: string | ArrayBuffer) {
+    // Notifications are server-to-client only. Protocol ping/pong is handled
+    // by the runtime without waking a hibernated object.
+  }
+
+  webSocketClose(
+    socket: WebSocket,
+    code: number,
+    reason: string,
+    _wasClean: boolean,
+  ) {
+    socket.close(code, reason);
+  }
+
+  webSocketError(socket: WebSocket) {
+    socket.close(1011, "Realtime socket error");
+  }
+}
+
+export function legacyChannelRealtimeResponse() {
+  // Old clients retain their authoritative 60-second delta fallback. A 426
+  // makes their reconnect delay back off instead of opening a billable stream
+  // or resetting the SSE adapter's delay after every finite 200 response.
+  return new Response("WebSocket transport required", {
+    status: 426,
+    headers: {
+      "Cache-Control": "private, no-store",
+      "Retry-After": "60",
+    },
+  });
 }
 
 export async function subscribeToChannelRealtime(
@@ -107,6 +119,7 @@ export async function subscribeToChannelRealtime(
   const hub = env.CHANNEL_REALTIME.getByName(organizationId);
   return hub.fetch(
     `https://channel-realtime.internal/subscribe?cursor=${cursor}`,
+    { headers: { Upgrade: "websocket" } },
   );
 }
 
