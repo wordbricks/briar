@@ -528,6 +528,118 @@ extension AcceptIssueExecutionProposalRequest {
     }
 }
 
+enum AgentSkillExecutionApprovalError: LocalizedError, Equatable, Sendable {
+    case proposalChanged
+    case projectUnavailable
+    case workerRequired
+    case workerUnavailable
+
+    var errorDescription: String? {
+        switch self {
+        case .proposalChanged:
+            L10n.text("Agent 또는 Skill 실행 요청이 변경되었습니다. 최신 대화를 확인해 주세요.")
+        case .projectUnavailable:
+            L10n.text("Skill 실행 프로젝트의 최신 컨텍스트를 불러올 수 없습니다.")
+        case .workerRequired:
+            L10n.text("실행할 Worker를 명시적으로 선택해 주세요.")
+        case .workerUnavailable:
+            L10n.text("선택한 Skill 런타임으로 실행 가능한 Worker가 없습니다.")
+        }
+    }
+}
+
+func agentSkillExecutionImmutableFieldsMatch(
+    _ candidate: AgentSkillExecutionProposal,
+    _ expected: AgentSkillExecutionProposal
+) -> Bool {
+    candidate.id == expected.id &&
+        candidate.type == expected.type &&
+        candidate.projectId == expected.projectId &&
+        candidate.agentId == expected.agentId &&
+        candidate.agentName == expected.agentName &&
+        candidate.skillId == expected.skillId &&
+        candidate.skillName == expected.skillName &&
+        candidate.request == expected.request &&
+        candidate.provider == expected.provider &&
+        candidate.model == expected.model &&
+        candidate.effort == expected.effort &&
+        candidate.createdAt == expected.createdAt &&
+        candidate.delegatedByAgentId == expected.delegatedByAgentId &&
+        candidate.delegatedByAgentName == expected.delegatedByAgentName
+}
+
+func eligibleAgentSkillExecutionWorkers(
+    snapshot: DashboardSnapshot,
+    proposal: AgentSkillExecutionProposal
+) -> [DashboardWorker] {
+    guard snapshot.project.id == proposal.projectId else { return [] }
+    return eligibleExecutionWorkers(
+        workers: snapshot.workers ?? [],
+        provider: proposal.provider,
+        policy: snapshot.executionPolicy
+    ).filter { $0.readiness == "available" }
+}
+
+@discardableResult
+func validateAgentSkillExecutionApproval(
+    snapshot: DashboardSnapshot,
+    proposal: AgentSkillExecutionProposal,
+    request: AcceptAgentSkillExecutionProposalRequest? = nil
+) throws -> [DashboardWorker] {
+    guard proposal.status == .pending else {
+        throw AgentSkillExecutionApprovalError.proposalChanged
+    }
+    guard snapshot.project.id == proposal.projectId else {
+        throw AgentSkillExecutionApprovalError.projectUnavailable
+    }
+    let workers = eligibleAgentSkillExecutionWorkers(
+        snapshot: snapshot,
+        proposal: proposal
+    )
+    guard !workers.isEmpty else {
+        throw AgentSkillExecutionApprovalError.workerUnavailable
+    }
+    if let request {
+        let workerID = request.workerId.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !workerID.isEmpty else {
+            throw AgentSkillExecutionApprovalError.workerRequired
+        }
+        guard workerID == request.workerId,
+              workers.contains(where: { $0.id == workerID })
+        else {
+            throw AgentSkillExecutionApprovalError.workerUnavailable
+        }
+    }
+    return workers
+}
+
+func agentSkillExecutionApprovalResponseMatches(
+    response: AcceptAgentSkillExecutionProposalResponse,
+    expected: AgentSkillExecutionProposal,
+    request: AcceptAgentSkillExecutionProposalRequest
+) -> Bool {
+    let proposal = response.proposal
+    return response.projectId == expected.projectId &&
+        agentSkillExecutionImmutableFieldsMatch(proposal, expected) &&
+        proposal.status == .accepted &&
+        proposal.acceptedAt != nil &&
+        proposal.requestedWorkerId == request.workerId &&
+        proposal.requestedWorkerLabel?.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        ).isEmpty == false &&
+        proposal.resultSessionId != nil &&
+        proposal.resultSessionId == response.session.id &&
+        response.session.projectId == expected.projectId &&
+        response.session.agentId == expected.agentId &&
+        response.session.agentName == expected.agentName &&
+        response.session.skillId == expected.skillId &&
+        response.session.sessionType == .task &&
+        response.session.trigger == .manual &&
+        response.session.request == expected.request &&
+        response.session.requestedWorkerId == request.workerId &&
+        response.session.workerId == request.workerId
+}
+
 struct IssueExecutionPreferencesResponse: Codable, Sendable {
     let runId: UUID
     let provider: AgentProvider?

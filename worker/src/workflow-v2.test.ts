@@ -157,6 +157,7 @@ describe("workflow v2 D1 persistence and transitions", () => {
         // schema assembled above.
         "0090_channel_issue_approval.sql",
         "0091_issue_execution_approvals.sql",
+        "0092_agent_skill_execution_approvals.sql",
       ],
     });
 
@@ -225,6 +226,9 @@ describe("workflow v2 D1 persistence and transitions", () => {
     });
     await applyD1Migrations(db, {
       files: ["0091_issue_execution_approvals.sql"],
+    });
+    await applyD1Migrations(db, {
+      files: ["0092_agent_skill_execution_approvals.sql"],
     });
     const backfilled = await db
       .prepare(

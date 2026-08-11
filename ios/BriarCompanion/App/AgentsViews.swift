@@ -110,7 +110,13 @@ struct AgentsHomeView: View {
                             token: token,
                             api: api,
                             snapshot: snapshot,
-                            refreshDashboard: refreshDashboard
+                            refreshDashboard: refreshDashboard,
+                            onSkillSessionMaterialized: { agents.materialize($0) },
+                            onSkillSessionOpen: { projectID, sessionID in
+                                navigation.open(
+                                    .session(projectID: projectID, sessionID: sessionID)
+                                )
+                            }
                         )
                     } else {
                         ContentUnavailableView(L10n.text("세션을 찾을 수 없음"), systemImage: "list.bullet.rectangle")
@@ -599,6 +605,30 @@ struct SessionDetailView: View {
     let api: any MobileAPIClientProtocol
     let snapshot: DashboardSnapshot?
     let refreshDashboard: () async -> Void
+    let onSkillSessionMaterialized: SkillSessionMaterializedHandler
+    let onSkillSessionOpen: SkillSessionOpenHandler
+
+    init(
+        session: ProjectAgentSession,
+        agent: ProjectAgent?,
+        project: ProjectsResponse.Project,
+        token: String,
+        api: any MobileAPIClientProtocol,
+        snapshot: DashboardSnapshot?,
+        refreshDashboard: @escaping () async -> Void,
+        onSkillSessionMaterialized: @escaping SkillSessionMaterializedHandler = { _ in },
+        onSkillSessionOpen: @escaping SkillSessionOpenHandler = { _, _ in }
+    ) {
+        self.session = session
+        self.agent = agent
+        self.project = project
+        self.token = token
+        self.api = api
+        self.snapshot = snapshot
+        self.refreshDashboard = refreshDashboard
+        self.onSkillSessionMaterialized = onSkillSessionMaterialized
+        self.onSkillSessionOpen = onSkillSessionOpen
+    }
 
     @AppStorage("companion-locale") private var localeRaw = CompanionLocale.ko.rawValue
     @State private var copied = false
@@ -670,7 +700,9 @@ struct SessionDetailView: View {
                                     allRuns: snapshot?.runs ?? [],
                                     workers: snapshot?.workers ?? [],
                                     providers: snapshot?.organizationProviders ?? [],
-                                    refresh: refreshDashboard
+                                    refresh: refreshDashboard,
+                                    onSkillSessionMaterialized: onSkillSessionMaterialized,
+                                    onSkillSessionOpen: onSkillSessionOpen
                                 )
                             } label: {
                                 issueLabel(issue)

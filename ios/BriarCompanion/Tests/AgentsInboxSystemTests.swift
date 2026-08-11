@@ -155,6 +155,170 @@ final class AgentsInboxSystemTests: XCTestCase {
     }
 
     @MainActor
+    func testApprovedSkillSessionMaterializesImmediatelyForTheSelectedProject() async {
+        let projectID = UUID(uuidString: "11111111-1111-4111-8111-111111111111")!
+        let otherProjectID = UUID(uuidString: "22222222-2222-4222-8222-222222222222")!
+        let api = AgentExecutionAPIRecorder(projectID: projectID)
+        let store = AgentsStore(api: api)
+        store.select(projectID: projectID, token: "token", locale: "ko")
+        while (await api.requests()).count < 2 {
+            await Task.yield()
+        }
+        while store.isRefreshing {
+            await Task.yield()
+        }
+        let session = ProjectAgentSession(
+            id: "approved-session",
+            projectId: projectID,
+            dispatchGroupId: nil,
+            agentId: UUID(uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"),
+            agentName: "Project Agent",
+            skillId: UUID(uuidString: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"),
+            sessionType: .task,
+            trigger: .manual,
+            scheduleId: nil,
+            scheduleRunId: nil,
+            parentSessionId: nil,
+            request: "iOS를 배포해 줘",
+            status: .running,
+            issues: [],
+            startedAt: Date(timeIntervalSince1970: 1_700_000_000),
+            completedAt: nil,
+            conversationId: nil,
+            workspaceRoot: nil,
+            requestedWorkerId: "worker-1",
+            workerId: "worker-1",
+            summary: nil,
+            error: nil,
+            events: nil,
+            updatedAt: Date(timeIntervalSince1970: 1_700_000_000)
+        )
+
+        store.materialize(session)
+        XCTAssertEqual(store.session(id: session.id), session)
+
+        let otherSession = ProjectAgentSession(
+            id: "other-session",
+            projectId: otherProjectID,
+            dispatchGroupId: nil,
+            agentId: nil,
+            sessionType: .task,
+            trigger: .manual,
+            scheduleId: nil,
+            scheduleRunId: nil,
+            parentSessionId: nil,
+            request: "다른 프로젝트",
+            status: .running,
+            issues: [],
+            startedAt: Date(timeIntervalSince1970: 1_700_000_000),
+            completedAt: nil,
+            conversationId: nil,
+            workspaceRoot: nil,
+            summary: nil,
+            error: nil,
+            events: nil,
+            updatedAt: nil
+        )
+        store.materialize(otherSession)
+        XCTAssertNil(store.session(id: otherSession.id))
+    }
+
+    @MainActor
+    func testMaterializedSessionSurvivesAStaleRefreshAndAcceptsNewerServerState() async {
+        let projectID = UUID(uuidString: "11111111-1111-4111-8111-111111111111")!
+        let agentID = UUID(uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!
+        let skillID = UUID(uuidString: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")!
+        let startedAt = Date(timeIntervalSince1970: 1_700_000_000)
+        let materialized = ProjectAgentSession(
+            id: "approved-session",
+            projectId: projectID,
+            dispatchGroupId: "approved-session",
+            agentId: agentID,
+            agentName: "Project Agent",
+            skillId: skillID,
+            sessionType: .task,
+            trigger: .manual,
+            scheduleId: nil,
+            scheduleRunId: nil,
+            parentSessionId: nil,
+            request: "iOS를 배포해 줘",
+            status: .running,
+            issues: [],
+            startedAt: startedAt,
+            completedAt: nil,
+            conversationId: nil,
+            workspaceRoot: nil,
+            requestedWorkerId: "worker-1",
+            workerId: "worker-1",
+            summary: nil,
+            error: nil,
+            events: [.init(id: "started", type: .started, occurredAt: startedAt)],
+            updatedAt: startedAt
+        )
+        let completedAt = startedAt.addingTimeInterval(30)
+        let completed = ProjectAgentSession(
+            id: materialized.id,
+            projectId: projectID,
+            dispatchGroupId: materialized.dispatchGroupId,
+            agentId: agentID,
+            agentName: materialized.agentName,
+            skillId: skillID,
+            sessionType: .task,
+            trigger: .manual,
+            scheduleId: nil,
+            scheduleRunId: nil,
+            parentSessionId: nil,
+            request: materialized.request,
+            status: .completed,
+            issues: [],
+            startedAt: startedAt,
+            completedAt: completedAt,
+            conversationId: "conversation-1",
+            workspaceRoot: nil,
+            requestedWorkerId: "worker-1",
+            workerId: "worker-1",
+            summary: "배포 완료",
+            error: nil,
+            events: [
+                .init(id: "started", type: .started, occurredAt: startedAt),
+                .init(id: "completed", type: .completed, occurredAt: completedAt),
+            ],
+            updatedAt: completedAt
+        )
+        let api = AgentExecutionAPIRecorder(
+            projectID: projectID,
+            sessionSnapshots: [[], [completed]],
+            suspendFirstSessionList: true
+        )
+        let store = AgentsStore(api: api, pollInterval: .seconds(3_600))
+        store.select(projectID: projectID, token: "token", locale: "ko")
+        await api.waitForSessionListStarts(1)
+
+        store.materialize(materialized)
+        await api.releaseSessionList()
+        for _ in 0..<100 where store.isRefreshing {
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+
+        XCTAssertFalse(store.isRefreshing)
+        XCTAssertEqual(store.session(id: materialized.id), materialized)
+
+        await store.refresh()
+
+        XCTAssertEqual(store.session(id: materialized.id), completed)
+        XCTAssertEqual(store.session(id: materialized.id)?.status, .completed)
+        XCTAssertEqual(store.session(id: materialized.id)?.summary, "배포 완료")
+
+        store.materialize(materialized)
+        XCTAssertEqual(
+            store.session(id: materialized.id),
+            completed,
+            "an older approval response must not regress newer server state"
+        )
+        store.applicationDidEnterBackground()
+    }
+
+    @MainActor
     func testDirectAgentTaskAllowsConcurrentRunsForTheSameAgent() async throws {
         let projectID = UUID(uuidString: "11111111-1111-4111-8111-111111111111")!
         let agentID = UUID(uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!
@@ -865,7 +1029,15 @@ private actor AgentExecutionAPIRecorder: MobileAPIClientProtocol {
 
     private let projectID: UUID
     private let suspendDirectTasks: Bool
+    private let suspendFirstSessionList: Bool
     private var recorded: [Request] = []
+    private var sessionSnapshots: [[ProjectAgentSession]]
+    private var sessionListStartCount = 0
+    private var sessionListStartWaiters: [(
+        count: Int,
+        continuation: CheckedContinuation<Void, Never>
+    )] = []
+    private var sessionListReleases: [CheckedContinuation<Void, Never>] = []
     private var directTaskStartCount = 0
     private var directTaskStartWaiters: [(
         count: Int,
@@ -873,12 +1045,31 @@ private actor AgentExecutionAPIRecorder: MobileAPIClientProtocol {
     )] = []
     private var directTaskReleases: [CheckedContinuation<Void, Never>] = []
 
-    init(projectID: UUID, suspendDirectTasks: Bool = false) {
+    init(
+        projectID: UUID,
+        suspendDirectTasks: Bool = false,
+        sessionSnapshots: [[ProjectAgentSession]] = [[]],
+        suspendFirstSessionList: Bool = false
+    ) {
         self.projectID = projectID
         self.suspendDirectTasks = suspendDirectTasks
+        self.sessionSnapshots = sessionSnapshots
+        self.suspendFirstSessionList = suspendFirstSessionList
     }
 
     func requests() -> [Request] { recorded }
+
+    func waitForSessionListStarts(_ count: Int) async {
+        if sessionListStartCount >= count { return }
+        await withCheckedContinuation { continuation in
+            sessionListStartWaiters.append((count, continuation))
+        }
+    }
+
+    func releaseSessionList() {
+        guard !sessionListReleases.isEmpty else { return }
+        sessionListReleases.removeFirst().resume()
+    }
 
     func waitForDirectTaskStarts(_ count: Int) async {
         if directTaskStartCount >= count { return }
@@ -994,7 +1185,26 @@ private actor AgentExecutionAPIRecorder: MobileAPIClientProtocol {
             return try response(["agents": []], as: responseType)
         }
         if path.hasSuffix("/agent-sessions") {
-            return try response(["sessions": []], as: responseType)
+            let snapshot = sessionSnapshots.isEmpty
+                ? []
+                : sessionSnapshots.removeFirst()
+            sessionListStartCount += 1
+            let waiters = sessionListStartWaiters.filter {
+                $0.count <= sessionListStartCount
+            }
+            sessionListStartWaiters.removeAll {
+                $0.count <= sessionListStartCount
+            }
+            waiters.forEach { $0.continuation.resume() }
+            if suspendFirstSessionList, sessionListStartCount == 1 {
+                await withCheckedContinuation { continuation in
+                    sessionListReleases.append(continuation)
+                }
+            }
+            let data = try JSONEncoder.mobileContract.encode(
+                ProjectAgentSessionsResponse(sessions: snapshot)
+            )
+            return try JSONDecoder.mobileContract.decode(responseType, from: data)
         }
         throw MobileAPIError.invalidRequest
     }

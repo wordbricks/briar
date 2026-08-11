@@ -102,6 +102,7 @@ import {
   collectStorageMetrics,
   expireArchives,
   getArchivedEvidenceImage,
+  getArchivedProjectAgentSession,
   listArchivedExecutionAuditEvents,
   listArchivedIssueMessages,
   listArchivedProjectAgentSessions,
@@ -117,6 +118,8 @@ import {
   assertQueuedHuntClaim,
   attemptGithubMergeAutoResume,
   channelApprovalTablesAvailable,
+  agentSkillExecutionApprovalTablesAvailable,
+  acceptAgentSkillExecutionProposal,
   claimGithubDelivery,
   claimNextIssueAgentReply,
   claimNextProjectAgentTask,
@@ -168,6 +171,8 @@ import {
   getClaimedIssueAgentReply,
   getIssueActionProposal,
   getIssueExecutionProposal,
+  getIssueAgentSkillExecutionProposal,
+  getAgentSkillExecutionApprovalAudit,
   getIssueAgentReplyJob,
   getIssueReworkProposal,
   getIssueAttachment,
@@ -183,9 +188,9 @@ import {
   getProjectRunChildMismatch,
   getProjectSettings,
   getProjectAgentSession,
+  projectAgentSessionIsApprovalOwned,
   getProjectAgentTaskJob,
   getProjectAgentTaskJobByRequest,
-  getClaimedProjectAgentTask,
   getDashboardSyncCursor,
   getHuntRunForProject,
   getRunExecutionAttempt,
@@ -199,6 +204,7 @@ import {
   listIssueConversationNotifications,
   listIssueActionProposals,
   listIssueExecutionProposals,
+  listIssueAgentSkillExecutionProposals,
   listIssueMessages,
   listIssueReworkProposals,
   listIssueThreadMessages,
@@ -245,7 +251,7 @@ import {
   renewProjectAgentScheduleRunLease,
   renewIssueAgentReplyLease,
   renewProjectAgentTaskLease,
-  completeProjectAgentTask,
+  completeProjectAgentTaskWithReceipt,
   reapProjectAgentTaskJobs,
   acceptIssueCreateProposal,
   acceptIssueUpdateProposal,
@@ -285,6 +291,7 @@ import {
   type IssueAttachmentRow,
   type IssueActionProposalRow,
   type IssueExecutionProposalRow,
+  type AgentSkillExecutionProposalRow,
   type IssueAgentReplyJobRow,
   type ChannelConversationNotificationRow,
   type IssueConversationNotificationRow,
@@ -351,6 +358,7 @@ import {
 } from "../../src/lib/linear-import";
 import {
   appendAgentTranscript,
+  availableExecutionWorkerForAgentSkill,
   auditExecutionEvent,
   authenticateExecutionWorker,
   bindExecutionWorkerProject,
@@ -404,6 +412,7 @@ import {
   addChannelMember,
   channelJson,
   channelExecutionProposalTablesAvailable,
+  channelSkillExecutionProposalTablesAvailable,
   channelMessageJson,
   channelReplyJson,
   claimNextChannelAgentReply,
@@ -416,6 +425,7 @@ import {
   getChannel,
   getChannelActionProposal,
   getChannelExecutionProposal,
+  getChannelAgentSkillExecutionProposal,
   getChannelAgentReplyJob,
   getChannelById,
   getClaimedChannelReplyAttachment,
@@ -1988,6 +1998,11 @@ const issueAgentReplyCompletionSchema = z
       .strict()
       .nullable()
       .optional(),
+    skillExecutionProposal: z
+      .object({ type: z.literal("request_agent_skill_execute") })
+      .strict()
+      .nullable()
+      .optional(),
     error: z.string().trim().min(1).max(4_000).optional(),
   })
   .strict()
@@ -2002,7 +2017,29 @@ const issueAgentReplyCompletionSchema = z
         path: ["executionProposal"],
       });
     }
+    if (
+      input.skillExecutionProposal &&
+      (input.executionProposal || input.proposedAction)
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "Agent Skill execution cannot be combined with another proposal",
+        path: ["skillExecutionProposal"],
+      });
+    }
   });
+
+const agentSkillExecutionProposalAcceptInputSchema = z
+  .object({
+    workerId: z
+      .string()
+      .min(1)
+      .max(128)
+      .refine((workerId) => workerId === workerId.trim(), {
+        message: "workerId cannot contain leading or trailing whitespace",
+      }),
+  })
+  .strict();
 
 const issueAgentReplyLeaseSchema = z
   .object({
@@ -5104,6 +5141,220 @@ const liveIssueExecutionProposalJson = (
   ? issueExecutionProposalJson(proposal)
   : null;
 
+const agentSkillExecutionProposalJson = (
+  proposal: AgentSkillExecutionProposalRow,
+) => {
+  if (proposal.status !== "pending" && proposal.status !== "accepted") {
+    throw new Error("Invalidated Agent Skill execution proposals cannot be serialized");
+  }
+  return {
+    id: proposal.id,
+    type: "request_agent_skill_execute" as const,
+    status: proposal.status,
+    projectId: proposal.project_id,
+    agentId: proposal.agent_id,
+    agentName: proposal.agent_name,
+    skillId: proposal.skill_id,
+    skillName: proposal.skill_name,
+    provider: proposal.provider,
+    model: proposal.model,
+    effort: proposal.effort,
+    request: proposal.request,
+    delegatedByAgentId: proposal.delegated_by_agent_id,
+    delegatedByAgentName: proposal.delegated_by_agent_name,
+    requestedWorkerId: proposal.requested_worker_id,
+    requestedWorkerLabel: proposal.requested_worker_label,
+    resultSessionId: proposal.result_session_id,
+    createdAt: proposal.created_at,
+    acceptedAt: proposal.accepted_at,
+  };
+};
+
+const liveAgentSkillExecutionProposalJson = (
+  proposal: AgentSkillExecutionProposalRow | null,
+) => proposal && (proposal.status === "pending" || proposal.status === "accepted")
+  ? agentSkillExecutionProposalJson(proposal)
+  : null;
+
+async function approveAgentSkillExecutionProposal(
+  db: D1Database,
+  archives: Parameters<typeof getArchivedProjectAgentSession>[1],
+  proposal: AgentSkillExecutionProposalRow,
+  input: {
+    sourceKind: "channel" | "issue";
+    userId: string;
+    workerId: string;
+    staleCode:
+      | "CHANNEL_SKILL_EXECUTION_PROPOSAL_STALE"
+      | "ISSUE_SKILL_EXECUTION_PROPOSAL_STALE";
+    conflictCode:
+      | "CHANNEL_SKILL_EXECUTION_PROPOSAL_CONFLICT"
+      | "ISSUE_SKILL_EXECUTION_PROPOSAL_CONFLICT";
+    reload: () => Promise<AgentSkillExecutionProposalRow | null>;
+  },
+) {
+  const stale = (message = "This Agent Skill execution proposal is stale") =>
+    new HttpError(409, message, input.staleCode);
+  const conflict = (
+    message = "Agent Skill execution was approved by another member or Worker",
+  ) => new HttpError(409, message, input.conflictCode);
+  const acceptedResponse = async (
+    current: AgentSkillExecutionProposalRow,
+    outcome: "accepted" | "already_accepted",
+  ) => {
+    if (
+      current.status !== "accepted" ||
+      current.accepted_by_user_id !== input.userId ||
+      current.requested_worker_id !== input.workerId
+    ) {
+      throw conflict();
+    }
+    if (!current.result_session_id || !current.requested_worker_label) {
+      throw stale("The approved Agent Skill execution lost its task session");
+    }
+    const approval = await getAgentSkillExecutionApprovalAudit(
+      db,
+      current.project_id,
+      current.id,
+    );
+    if (
+      !approval ||
+      approval.organization_id !== current.organization_id ||
+      approval.source_kind !== current.source_kind ||
+      approval.channel_id !== current.channel_id ||
+      approval.conversation_run_id !== current.conversation_run_id ||
+      approval.trigger_message_id !== current.trigger_message_id ||
+      approval.reply_message_id !== current.reply_message_id ||
+      approval.source_reply_job_id !== current.source_reply_job_id ||
+      approval.delegated_by_reply_job_id !== current.delegated_by_reply_job_id ||
+      approval.agent_id !== current.agent_id ||
+      approval.agent_name !== current.agent_name ||
+      approval.agent_responsibility !== current.agent_responsibility ||
+      approval.skill_id !== current.skill_id ||
+      approval.skill_name !== current.skill_name ||
+      approval.skill_instructions !== current.skill_instructions ||
+      approval.skill_kind !== current.skill_kind ||
+      approval.provider !== current.provider ||
+      approval.model !== current.model ||
+      approval.effort !== current.effort ||
+      approval.request !== current.request ||
+      approval.worker_id !== current.requested_worker_id ||
+      approval.worker_label !== current.requested_worker_label ||
+      approval.result_session_id !== current.result_session_id ||
+      approval.approved_by_user_id !== current.accepted_by_user_id ||
+      approval.approved_at !== current.accepted_at ||
+      approval.delegated_by_agent_id !== current.delegated_by_agent_id ||
+      approval.delegated_by_agent_name !== current.delegated_by_agent_name
+    ) {
+      throw stale("The approved Agent Skill execution audit is invalid");
+    }
+    const session = await getProjectAgentSession(
+      db,
+      current.project_id,
+      current.result_session_id,
+    ) ?? await getArchivedProjectAgentSession(
+      db,
+      archives,
+      current.project_id,
+      current.result_session_id,
+    );
+    if (!session) {
+      throw stale("The approved Agent Skill execution session was not found");
+    }
+    let sessionPayload: Record<string, unknown>;
+    try {
+      sessionPayload = JSON.parse(session.payload_json) as Record<string, unknown>;
+    } catch {
+      throw stale("The approved Agent Skill execution session is invalid");
+    }
+    if (
+      session.id !== current.result_session_id ||
+      session.project_id !== current.project_id ||
+      session.agent_id !== current.agent_id ||
+      session.session_type !== "task" ||
+      sessionPayload.dispatchGroupId !== current.result_session_id ||
+      sessionPayload.agentId !== current.agent_id ||
+      sessionPayload.agentName !== current.agent_name ||
+      sessionPayload.skillId !== current.skill_id ||
+      sessionPayload.sessionType !== "task" ||
+      sessionPayload.trigger !== "manual" ||
+      sessionPayload.request !== current.request ||
+      sessionPayload.requestedWorkerId !== current.requested_worker_id ||
+      sessionPayload.workerId !== current.requested_worker_id
+    ) {
+      throw stale("The approved Agent Skill execution session lost its Worker binding");
+    }
+    return {
+      outcome,
+      proposal: agentSkillExecutionProposalJson(current),
+      projectId: current.project_id,
+      session: projectAgentSessionJson(session),
+    };
+  };
+
+  if (proposal.status === "accepted") {
+    return acceptedResponse(proposal, "already_accepted");
+  }
+  if (proposal.status !== "pending") throw stale();
+
+  const acceptedAt = new Date().toISOString();
+  let worker: Awaited<ReturnType<typeof availableExecutionWorkerForAgentSkill>>;
+  try {
+    worker = await availableExecutionWorkerForAgentSkill(db, {
+      organizationId: proposal.organization_id,
+      projectId: proposal.project_id,
+      workerId: input.workerId,
+      provider: proposal.provider,
+      observedAt: acceptedAt,
+    });
+  } catch (error) {
+    if (error instanceof WorkerConflictError) {
+      throw conflict(error.message);
+    }
+    throw error;
+  }
+
+  let accepted: AgentSkillExecutionProposalRow | null = null;
+  try {
+    accepted = await acceptAgentSkillExecutionProposal(db, {
+      proposalId: proposal.id,
+      sourceKind: input.sourceKind,
+      organizationId: proposal.organization_id,
+      projectId: proposal.project_id,
+      channelId: proposal.channel_id,
+      conversationRunId: proposal.conversation_run_id,
+      userId: input.userId,
+      workerId: worker.id,
+      workerLabel: worker.label,
+      resultSessionId: crypto.randomUUID(),
+      acceptedAt,
+    });
+  } catch (error) {
+    const current = await input.reload();
+    if (current?.status === "accepted") {
+      return acceptedResponse(current, "already_accepted");
+    }
+    if (
+      error instanceof Error &&
+      error.message.includes("Agent Skill execution proposal is stale")
+    ) {
+      throw stale(error.message);
+    }
+    if (error instanceof WorkerConflictError) {
+      throw conflict(error.message);
+    }
+    throw error;
+  }
+  if (!accepted) {
+    const current = await input.reload();
+    if (current?.status === "accepted") {
+      return acceptedResponse(current, "already_accepted");
+    }
+    throw stale("The Agent Skill execution proposal changed before approval");
+  }
+  return acceptedResponse(accepted, "accepted");
+}
+
 type IssueProposalRow = IssueReworkProposalRow | IssueActionProposalRow;
 
 const issueProposalJson = (proposal: IssueProposalRow) =>
@@ -5116,6 +5367,7 @@ const issueMessageJson = (
   attachments: IssueAttachmentRow[] = [],
   proposal: IssueProposalRow | null = null,
   executionProposal: IssueExecutionProposalRow | null = null,
+  skillExecutionProposal: AgentSkillExecutionProposalRow | null = null,
 ) => ({
   id: message.id,
   runId: message.run_id,
@@ -5144,6 +5396,9 @@ const issueMessageJson = (
   proposedAction: proposal ? issueProposalJson(proposal) : null,
   executionProposal: executionProposal
     ? issueExecutionProposalJson(executionProposal)
+    : null,
+  skillExecutionProposal: skillExecutionProposal
+    ? agentSkillExecutionProposalJson(skillExecutionProposal)
     : null,
   createdAt: message.created_at,
   updatedAt: message.updated_at,
@@ -6852,6 +7107,59 @@ async function route(
     });
   }
 
+  const channelSkillExecutionProposalAcceptMatch = pathname.match(
+    /^\/organizations\/([0-9a-f-]+)\/channels\/([0-9a-f-]+)\/skill-execution-proposals\/([0-9a-f-]+)\/accept$/u,
+  );
+  if (channelSkillExecutionProposalAcceptMatch && request.method === "POST") {
+    const session = await requireSession(auth, request);
+    const channel = await requireChannelAccess(
+      db,
+      channelSkillExecutionProposalAcceptMatch[1],
+      channelSkillExecutionProposalAcceptMatch[2],
+      session.user.id,
+    );
+    if (!(await channelSkillExecutionProposalTablesAvailable(db))) {
+      throw new HttpError(
+        503,
+        "Agent Skill execution approval is not available during this upgrade",
+        "AGENT_SKILL_EXECUTION_APPROVAL_UNAVAILABLE",
+      );
+    }
+    const proposalId = channelSkillExecutionProposalAcceptMatch[3];
+    const loadProposal = () => getChannelAgentSkillExecutionProposal(db, {
+      organizationId: channel.organization_id,
+      channelId: channel.id,
+      proposalId,
+      userId: session.user.id,
+    });
+    const proposal = await loadProposal();
+    if (!proposal) {
+      throw new HttpError(404, "Agent Skill execution proposal not found");
+    }
+    const input = agentSkillExecutionProposalAcceptInputSchema.parse(
+      await readJson(request),
+    );
+    const project = await getProject(db, proposal.project_id, session.user.id);
+    if (!project || project.organization_id !== channel.organization_id) {
+      throw new HttpError(404, "Project not found");
+    }
+    if (proposal.status === "pending" && channel.archived_at) {
+      throw new HttpError(
+        409,
+        "Channel is archived",
+        "CHANNEL_SKILL_EXECUTION_PROPOSAL_STALE",
+      );
+    }
+    return json(await approveAgentSkillExecutionProposal(db, env.ARCHIVES, proposal, {
+      sourceKind: "channel",
+      userId: session.user.id,
+      workerId: input.workerId,
+      staleCode: "CHANNEL_SKILL_EXECUTION_PROPOSAL_STALE",
+      conflictCode: "CHANNEL_SKILL_EXECUTION_PROPOSAL_CONFLICT",
+      reload: loadProposal,
+    }));
+  }
+
   const channelExecutionProposalAcceptMatch = pathname.match(
     /^\/organizations\/([0-9a-f-]+)\/channels\/([0-9a-f-]+)\/proposals\/([0-9a-f-]+)\/accept-execution$/u,
   );
@@ -7932,6 +8240,20 @@ async function route(
       session.user.id,
     );
     if (!project) throw new HttpError(404, "Project not found");
+    if (
+      await agentSkillExecutionApprovalTablesAvailable(db) &&
+      await projectAgentSessionIsApprovalOwned(
+        db,
+        project.id,
+        projectAgentSessionMatch[2],
+      )
+    ) {
+      throw new HttpError(
+        409,
+        "Approved Agent Skill execution sessions are updated by their assigned Worker",
+        "AGENT_SKILL_EXECUTION_SESSION_SERVER_OWNED",
+      );
+    }
     const input = projectAgentSessionInputSchema.parse(await readJson(request));
     const observedAt = new Date().toISOString();
     const row = await upsertProjectAgentSession(db, {
@@ -8844,12 +9166,14 @@ async function route(
       reworkProposals,
       actionProposals,
       executionProposals,
+      skillExecutionProposals,
     ] = await Promise.all([
       listIssueMessagesWithArchive(db, env.ARCHIVES, project.id, run.id),
       listIssueAttachments(db, project.id, run.id),
       listIssueReworkProposals(db, project.id, run.id),
       listIssueActionProposals(db, project.id, run.id),
       listIssueExecutionProposals(db, project.id, run.id),
+      listIssueAgentSkillExecutionProposals(db, project.id, run.id),
     ]);
     const proposalsByReply = new Map(
       [...reworkProposals, ...actionProposals].map((proposal) => [
@@ -8864,6 +9188,9 @@ async function route(
           attachments,
           proposalsByReply.get(message.id) ?? null,
           executionProposals.find(
+            (proposal) => proposal.reply_message_id === message.id,
+          ) ?? null,
+          skillExecutionProposals.find(
             (proposal) => proposal.reply_message_id === message.id,
           ) ?? null,
         )
@@ -8967,7 +9294,7 @@ async function route(
         input.parentMessageId ? "Thread message not found" : "Run not found",
       );
     }
-    const agentReply =
+    const shouldEnqueueAgentReply =
       !agentProvider && shouldBriarReply(
         (message.parent_message_id
           ? await listIssueThreadMessages(
@@ -8984,7 +9311,23 @@ async function route(
           author: { provider: threadMessage.author_agent_provider },
         })),
         { body: input.body, parentMessageId: message.parent_message_id ?? null },
-      )
+      );
+    let selectedSkillId: string | null = null;
+    if (shouldEnqueueAgentReply &&
+        await agentSkillExecutionApprovalTablesAvailable(db)) {
+      const conversationRun = await getHuntRunForProject(
+        db,
+        project.id,
+        issueMessagesMatch[2],
+      );
+      const assignedAgent = conversationRun?.agent_id
+        ? await getProjectAgent(db, project.id, conversationRun.agent_id)
+        : null;
+      selectedSkillId = assignedAgent
+        ? agentSkillForMessage(assignedAgent.skills, input.body)?.id ?? null
+        : null;
+    }
+    const agentReply = shouldEnqueueAgentReply
         ? await enqueueIssueAgentReply(db, {
             id: crypto.randomUUID(),
             projectId: project.id,
@@ -8995,6 +9338,7 @@ async function route(
               parentMessageId: message.parent_message_id,
             }),
             replyMessageId: crypto.randomUUID(),
+            skillId: selectedSkillId,
             createdAt,
           })
         : null;
@@ -9061,11 +9405,17 @@ async function route(
       reworkProposals,
       actionProposals,
       executionProposals,
+      skillExecutionProposals,
     ] = await Promise.all([
       listIssueAttachments(db, project.id, issueMessageEditMatch[2]),
       listIssueReworkProposals(db, project.id, issueMessageEditMatch[2]),
       listIssueActionProposals(db, project.id, issueMessageEditMatch[2]),
       listIssueExecutionProposals(db, project.id, issueMessageEditMatch[2]),
+      listIssueAgentSkillExecutionProposals(
+        db,
+        project.id,
+        issueMessageEditMatch[2],
+      ),
     ]);
     const proposal = [...reworkProposals, ...actionProposals].find(
       (candidate) => candidate.reply_message_id === updated.id,
@@ -9079,6 +9429,9 @@ async function route(
         attachments,
         proposal,
         executionProposal,
+        skillExecutionProposals.find(
+          (candidate) => candidate.reply_message_id === updated.id,
+        ) ?? null,
       ),
     });
   }
@@ -9136,7 +9489,13 @@ async function route(
     if (!job || job.run_id !== issueAgentReplyStatusMatch[2]) {
       throw new HttpError(404, "Agent reply not found");
     }
-    const [messages, reworkProposals, actionProposals, executionProposals] =
+    const [
+      messages,
+      reworkProposals,
+      actionProposals,
+      executionProposals,
+      skillExecutionProposals,
+    ] =
       job.status === "completed"
         ? await Promise.all([
             listIssueMessagesWithArchive(
@@ -9148,8 +9507,9 @@ async function route(
             listIssueReworkProposals(db, project.id, job.run_id),
             listIssueActionProposals(db, project.id, job.run_id),
             listIssueExecutionProposals(db, project.id, job.run_id),
+            listIssueAgentSkillExecutionProposals(db, project.id, job.run_id),
           ])
-        : [[], [], [], []];
+        : [[], [], [], [], []];
     const reply = messages.find(
       (message) => message.id === job.reply_message_id,
     );
@@ -9164,6 +9524,9 @@ async function route(
             [],
             proposal,
             executionProposals.find(
+              (candidate) => candidate.reply_message_id === job.reply_message_id,
+            ) ?? null,
+            skillExecutionProposals.find(
               (candidate) => candidate.reply_message_id === job.reply_message_id,
             ) ?? null,
           )
@@ -9460,6 +9823,49 @@ async function route(
           : "accepted",
       resultRunId: accepted.result_run_id,
     });
+  }
+
+  const issueSkillExecutionProposalAcceptMatch = pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/skill-execution-proposals\/([0-9a-f-]+)\/accept$/u,
+  );
+  if (issueSkillExecutionProposalAcceptMatch && request.method === "POST") {
+    const session = await requireSession(auth, request);
+    const project = await getProject(
+      db,
+      issueSkillExecutionProposalAcceptMatch[1],
+      session.user.id,
+    );
+    if (!project) throw new HttpError(404, "Project not found");
+    if (!(await agentSkillExecutionApprovalTablesAvailable(db))) {
+      throw new HttpError(
+        503,
+        "Agent Skill execution approval is not available during this upgrade",
+        "AGENT_SKILL_EXECUTION_APPROVAL_UNAVAILABLE",
+      );
+    }
+    const conversationRunId = issueSkillExecutionProposalAcceptMatch[2];
+    const proposalId = issueSkillExecutionProposalAcceptMatch[3];
+    const loadProposal = () => getIssueAgentSkillExecutionProposal(
+      db,
+      project.id,
+      conversationRunId,
+      proposalId,
+    );
+    const proposal = await loadProposal();
+    if (!proposal) {
+      throw new HttpError(404, "Agent Skill execution proposal not found");
+    }
+    const input = agentSkillExecutionProposalAcceptInputSchema.parse(
+      await readJson(request),
+    );
+    return json(await approveAgentSkillExecutionProposal(db, env.ARCHIVES, proposal, {
+      sourceKind: "issue",
+      userId: session.user.id,
+      workerId: input.workerId,
+      staleCode: "ISSUE_SKILL_EXECUTION_PROPOSAL_STALE",
+      conflictCode: "ISSUE_SKILL_EXECUTION_PROPOSAL_CONFLICT",
+      reload: loadProposal,
+    }));
   }
 
   const issueExecutionProposalAcceptMatch = pathname.match(
@@ -10874,12 +11280,55 @@ async function route(
     if (!run || !job.agent_provider) {
       throw new HttpError(409, "Reply job lost its issue context");
     }
-    const agent = run.agent_id
+    const liveAgent = run.agent_id
       ? await getProjectAgent(db, input.projectId, run.agent_id)
       : null;
-    const activeSkill = agent
-      ? issueProcessingAgentSkillRow(agent.skills)
+    const triggerMessage = messages.find(
+      (message) => message.id === job.trigger_message_id,
+    ) ?? null;
+    const selectedSkillId = job.skill_id ?? null;
+    const selectedSkillSnapshotId = job.selected_skill_id_snapshot ?? null;
+    const liveSelectedSkill = selectedSkillId && liveAgent
+      ? liveAgent.skills.find((skill) => skill.id === selectedSkillId) ?? null
       : null;
+    if (
+      selectedSkillSnapshotId !== selectedSkillId ||
+      (selectedSkillId !== null && (
+        !liveSelectedSkill || !triggerMessage ||
+        !job.selected_agent_name_snapshot ||
+        !job.selected_agent_responsibility_snapshot ||
+        !job.selected_skill_name_snapshot ||
+        job.selected_skill_instructions_snapshot == null ||
+        !job.selected_skill_provider_snapshot ||
+        !job.skill_execution_request_snapshot ||
+        job.skill_execution_request_snapshot !== triggerMessage.body
+      ))
+    ) {
+      throw new HttpError(409, "Reply job lost its selected Agent Skill");
+    }
+    const selectedSkill = liveSelectedSkill
+      ? {
+          ...liveSelectedSkill,
+          name: job.selected_skill_name_snapshot!,
+          instructions: job.selected_skill_instructions_snapshot!,
+          provider: job.selected_skill_provider_snapshot!,
+          model: job.selected_skill_model_snapshot ?? null,
+          effort: job.selected_skill_effort_snapshot ?? null,
+        }
+      : null;
+    const agent = liveAgent && selectedSkill
+      ? {
+          ...liveAgent,
+          name: job.selected_agent_name_snapshot!,
+          responsibility: job.selected_agent_responsibility_snapshot!,
+          skills: liveAgent.skills.map((skill) =>
+            skill.id === selectedSkill.id ? selectedSkill : skill
+          ),
+        }
+      : liveAgent;
+    const activeSkill = selectedSkill ?? (agent
+      ? issueProcessingAgentSkillRow(agent.skills)
+      : null);
     const replyExecution = issueReplyExecutionConfig({
       provider: job.agent_provider,
       preferred: {
@@ -10908,6 +11357,15 @@ async function route(
         model: replyExecution.model,
         effort: replyExecution.effort,
         activeSkill: activeSkill ? agentSkillJson(activeSkill) : null,
+        skillExecutionTarget: selectedSkill && agent && triggerMessage
+          ? {
+              projectId: input.projectId,
+              agentId: agent.id,
+              skillId: selectedSkill.id,
+              skillName: selectedSkill.name,
+              request: job.skill_execution_request_snapshot!,
+            }
+          : null,
         agent: agent
           ? {
               id: agent.id,
@@ -11028,26 +11486,61 @@ async function route(
       if (job.claimed_worker_id !== binding.id) {
         throw new HttpError(409, "Reply claim is bound to another Worker");
       }
-      const [channel, agent, messages] = await Promise.all([
+      const [channel, liveAgent, messages] = await Promise.all([
         getChannelById(db, job.organization_id, job.channel_id),
         getOrganizationAgent(db, job.organization_id, job.agent_id),
         listChannelThreadMessages(db, job.channel_id, job.parent_message_id),
       ]);
-      if (!channel || !agent || !job.agent_provider) {
+      if (!channel || !liveAgent || !job.agent_provider) {
         throw new HttpError(409, "Reply job lost its channel context");
       }
-      if (job.project_id !== agent.project_id) {
+      if (job.project_id !== liveAgent.project_id) {
         throw new HttpError(409, "Reply job no longer matches its Agent scope");
       }
-      const activeSkill = job.skill_id
-        ? agent.skills.find((skill) => skill.id === job.skill_id) ?? null
+      const triggerMessage = messages.find(
+        (message) => message.id === job.trigger_message_id,
+      ) ?? null;
+      const liveActiveSkill = job.skill_id
+        ? liveAgent.skills.find((skill) => skill.id === job.skill_id) ?? null
         : null;
       if (
         job.selected_skill_id_snapshot !== job.skill_id ||
-        (job.skill_id && !activeSkill)
+        (job.skill_id && (
+          !liveActiveSkill || !triggerMessage ||
+          !job.selected_agent_name_snapshot ||
+          !job.selected_agent_responsibility_snapshot ||
+          !job.selected_skill_name_snapshot ||
+          job.selected_skill_instructions_snapshot == null ||
+          !job.selected_skill_provider_snapshot ||
+          !job.skill_execution_request_snapshot ||
+          job.skill_execution_request_snapshot !==
+            (job.delegated_by_reply_job_id
+              ? job.delegation_request
+              : triggerMessage.body)
+        ))
       ) {
         throw new HttpError(409, "Reply job lost its selected Agent Skill");
       }
+      const activeSkill = liveActiveSkill
+        ? {
+            ...liveActiveSkill,
+            name: job.selected_skill_name_snapshot!,
+            instructions: job.selected_skill_instructions_snapshot!,
+            provider: job.selected_skill_provider_snapshot!,
+            model: job.selected_skill_model_snapshot ?? null,
+            effort: job.selected_skill_effort_snapshot ?? null,
+          }
+        : null;
+      const agent = activeSkill
+        ? {
+            ...liveAgent,
+            name: job.selected_agent_name_snapshot!,
+            responsibility: job.selected_agent_responsibility_snapshot!,
+            skills: liveAgent.skills.map((skill) =>
+              skill.id === activeSkill.id ? activeSkill : skill
+            ),
+          }
+        : liveAgent;
       const replyRuntime = activeSkill ?? agent;
       if (replyRuntime.provider !== job.agent_provider) {
         throw new HttpError(409, "Reply job provider was revoked");
@@ -11090,6 +11583,8 @@ async function route(
         );
         if (
           !delegatedByJob || delegatedByJob.project_id !== null ||
+          delegatedByJob.status !== "completed" ||
+          delegatedByJob.delegated_by_reply_job_id !== null ||
           delegatedByJob.channel_id !== job.channel_id ||
           delegatedByJob.trigger_message_id !== job.trigger_message_id ||
           delegatedByJob.parent_message_id !== job.parent_message_id ||
@@ -11111,6 +11606,10 @@ async function route(
           delegatedByAgentName: delegatedByAgent.name,
           request: job.delegation_request,
         };
+      }
+      const skillExecutionRequest = job.skill_execution_request_snapshot ?? null;
+      if (activeSkill && agent.project_id !== null && !skillExecutionRequest) {
+        throw new HttpError(409, "Reply job lost its Skill execution request");
       }
       const delegationTargets = agent.project_id === null
         ? channelAgents.flatMap((target) =>
@@ -11158,6 +11657,16 @@ async function route(
           model: replyModel,
           effort: replyEffort,
           activeSkill: activeSkill ? agentSkillJson(activeSkill) : null,
+          skillExecutionTarget:
+            activeSkill && agent.project_id !== null && skillExecutionRequest
+              ? {
+                  projectId: agent.project_id,
+                  agentId: agent.id,
+                  skillId: activeSkill.id,
+                  skillName: activeSkill.name,
+                  request: skillExecutionRequest,
+                }
+              : null,
           agent: {
             id: agent.id,
             name: agent.name,
@@ -11454,6 +11963,16 @@ async function route(
       );
     }
     if (
+      result.skillExecutionProposal &&
+      !(await channelSkillExecutionProposalTablesAvailable(db))
+    ) {
+      throw new HttpError(
+        503,
+        "Agent Skill execution approval is not available during this upgrade",
+        "AGENT_SKILL_EXECUTION_APPROVAL_UNAVAILABLE",
+      );
+    }
+    if (
       result.delegation &&
       (agent.project_id !== null || job.delegated_by_reply_job_id !== null)
     ) {
@@ -11486,11 +12005,25 @@ async function route(
     const executionProposal = result.executionProposal;
     if (
       agent.project_id === null &&
-      (executionProposal || issueProposal?.executeAfterCreate)
+      (executionProposal || issueProposal?.executeAfterCreate ||
+        result.skillExecutionProposal)
     ) {
       throw new HttpError(
         400,
         "Organization Agents must delegate execution requests to a Project Agent",
+      );
+    }
+    if (
+      result.skillExecutionProposal &&
+      (!job.skill_id || job.selected_skill_id_snapshot !== job.skill_id ||
+        !agent.skills.some((skill) =>
+          skill.id === job.skill_id && skill.provider === job.agent_provider
+        ))
+    ) {
+      throw new HttpError(
+        409,
+        "Agent Skill execution requires the server-selected Skill",
+        "CHANNEL_SKILL_EXECUTION_PROPOSAL_STALE",
       );
     }
     let delegation: {
@@ -11555,6 +12088,7 @@ async function route(
       document,
       issueProposal,
       executionProposal,
+      skillExecutionProposal: Boolean(result.skillExecutionProposal),
       delegation,
       agentName: agent.name,
       agentProvider: job.agent_provider ?? agent.provider,
@@ -11614,6 +12148,16 @@ async function route(
         "ISSUE_EXECUTION_APPROVAL_UNAVAILABLE",
       );
     }
+    if (
+      input.skillExecutionProposal &&
+      !(await agentSkillExecutionApprovalTablesAvailable(db))
+    ) {
+      throw new HttpError(
+        503,
+        "Agent Skill execution approval is not available during this upgrade",
+        "AGENT_SKILL_EXECUTION_APPROVAL_UNAVAILABLE",
+      );
+    }
     const worker = await requireWorkerProjectBinding(
       db,
       request,
@@ -11644,6 +12188,16 @@ async function route(
       if (!failed) throw new HttpError(409, "Reply claim is no longer active");
       return json({ agentReply: issueAgentReplyJson(failed) });
     }
+    if (
+      input.skillExecutionProposal &&
+      (!job.skill_id || job.selected_skill_id_snapshot !== job.skill_id)
+    ) {
+      throw new HttpError(
+        409,
+        "Agent Skill execution requires the server-selected Skill",
+        "ISSUE_SKILL_EXECUTION_PROPOSAL_STALE",
+      );
+    }
 
     const completedAt = new Date().toISOString();
     const completed = await completeIssueAgentReplyOutput(
@@ -11658,11 +12212,18 @@ async function route(
           body: input.body!,
           proposedAction: input.proposedAction ?? null,
           executionProposal: Boolean(input.executionProposal),
+          skillExecutionProposal: Boolean(input.skillExecutionProposal),
         },
       },
     );
     if (!completed) throw new HttpError(409, "Reply claim is no longer active");
-    const [messages, reworkProposals, actionProposals, executionProposals] =
+    const [
+      messages,
+      reworkProposals,
+      actionProposals,
+      executionProposals,
+      skillExecutionProposals,
+    ] =
       await Promise.all([
         listIssueMessagesWithArchive(
           db,
@@ -11673,6 +12234,11 @@ async function route(
         listIssueReworkProposals(db, input.projectId, job.run_id),
         listIssueActionProposals(db, input.projectId, job.run_id),
         listIssueExecutionProposals(db, input.projectId, job.run_id),
+        listIssueAgentSkillExecutionProposals(
+          db,
+          input.projectId,
+          job.run_id,
+        ),
       ]);
     const reply = messages.find(
       (message) => message.id === job.reply_message_id,
@@ -11688,9 +12254,19 @@ async function route(
       executionProposals.find(
         (candidate) => candidate.trigger_message_id === job.trigger_message_id,
       ) ?? null;
+    const skillExecutionProposal: AgentSkillExecutionProposalRow | null =
+      skillExecutionProposals.find(
+        (candidate) => candidate.trigger_message_id === job.trigger_message_id,
+      ) ?? null;
     return json({
       agentReply: issueAgentReplyJson(completed),
-      message: issueMessageJson(reply, [], proposal, executionProposal),
+      message: issueMessageJson(
+        reply,
+        [],
+        proposal,
+        executionProposal,
+        skillExecutionProposal,
+      ),
     });
   }
 
@@ -11735,7 +12311,7 @@ async function route(
       error: "Worker lease expired after repeated attempts.",
     });
     await Promise.all(
-      reaped.map((job) =>
+      reaped.filter((job) => !job.skill_execution_proposal_id).map((job) =>
         syncProjectAgentTaskSession(db, job, { error: job.error }),
       ),
     );
@@ -11815,31 +12391,54 @@ async function route(
       input.workerId,
     );
     const claimTokenHash = await sha256(input.claimToken);
-    const job = await getClaimedProjectAgentTask(
+    const observedAt = new Date().toISOString();
+    const completion = await completeProjectAgentTaskWithReceipt(
       db,
       input.projectId,
       projectAgentTaskClaimMatch[1],
-      { workerId: worker.binding.id, claimTokenHash },
-    );
-    if (!job) throw new HttpError(409, "Agent task claim is no longer active");
-    const observedAt = new Date().toISOString();
-    const completed = await completeProjectAgentTask(
-      db,
-      input.projectId,
-      job.id,
       {
         workerId: worker.binding.id,
         claimTokenHash,
         updatedAt: observedAt,
+        summary: input.summary ?? null,
+        conversationId: input.conversationId ?? null,
         error: input.error,
       },
     );
-    if (!completed) throw new HttpError(409, "Agent task claim is no longer active");
-    const session = await syncProjectAgentTaskSession(db, completed, {
-      summary: input.summary ?? null,
-      conversationId: input.conversationId ?? null,
-      error: input.error ?? null,
-    });
+    if (!completion) {
+      throw new HttpError(409, "Agent task completion conflicts with its receipt");
+    }
+    const completed = completion.job;
+    const hotSession = await getProjectAgentSession(
+      db,
+      input.projectId,
+      projectAgentTaskClaimMatch[1],
+    );
+    let session = hotSession ? projectAgentSessionJson(hotSession) : null;
+    if (
+      completed && !completed.skill_execution_proposal_id &&
+      hotSession &&
+      (
+        !completion.replayed || hotSession.updated_at !== completed.updated_at ||
+        hotSession.status !== (completed.status === "queued" ? "running" : completed.status)
+      )
+    ) {
+      session = await syncProjectAgentTaskSession(db, completed, {
+        summary: completed.result_summary ?? input.summary ?? null,
+        conversationId:
+          completed.result_conversation_id ?? input.conversationId ?? null,
+        error: completed.error ?? input.error ?? null,
+      });
+    }
+    if (!session) {
+      const archived = await getArchivedProjectAgentSession(
+        db,
+        env.ARCHIVES,
+        input.projectId,
+        projectAgentTaskClaimMatch[1],
+      );
+      session = archived ? projectAgentSessionJson(archived) : null;
+    }
     if (!session) throw new HttpError(409, "Agent task session is missing");
     return json({ session });
   }

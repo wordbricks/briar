@@ -788,6 +788,64 @@
         }
       }
     },
+    "/projects/{projectId}/runs/{runId}/skill-execution-proposals/{proposalId}/accept": {
+      "post": {
+        "operationId": "acceptIssueSkillExecutionProposal",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ProjectId"
+          },
+          {
+            "$ref": "#/components/parameters/RunId"
+          },
+          {
+            "name": "proposalId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentSkillExecutionApprovalRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Issue Agent Skill execution explicitly approved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentSkillExecutionApprovalResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
     "/projects/{projectId}/runs/{runId}/cancel": {
       "post": {
         "operationId": "cancelRun",
@@ -1370,6 +1428,64 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/IssueExecutionApprovalResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/organizations/{organizationId}/channels/{channelId}/skill-execution-proposals/{proposalId}/accept": {
+      "post": {
+        "operationId": "acceptChannelSkillExecutionProposal",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OrganizationId"
+          },
+          {
+            "$ref": "#/components/parameters/ChannelId"
+          },
+          {
+            "name": "proposalId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentSkillExecutionApprovalRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Channel Agent Skill execution explicitly approved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentSkillExecutionApprovalResponse"
                 }
               }
             }
@@ -2967,6 +3083,67 @@
         },
         "additionalProperties": false
       },
+      "AgentSkillExecutionProposal": {
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "status",
+          "projectId",
+          "agentId",
+          "agentName",
+          "skillId",
+          "skillName",
+          "provider",
+          "model",
+          "effort",
+          "request",
+          "delegatedByAgentId",
+          "delegatedByAgentName",
+          "requestedWorkerId",
+          "requestedWorkerLabel",
+          "resultSessionId",
+          "createdAt",
+          "acceptedAt"
+        ],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "type": { "const": "request_agent_skill_execute" },
+          "status": {
+            "type": "string",
+            "enum": ["pending", "accepted"]
+          },
+          "projectId": { "type": "string", "format": "uuid" },
+          "agentId": { "type": "string", "format": "uuid" },
+          "agentName": { "type": "string", "minLength": 1, "maxLength": 100 },
+          "skillId": { "type": "string", "format": "uuid" },
+          "skillName": { "type": "string", "minLength": 1, "maxLength": 100 },
+          "provider": {
+            "type": "string",
+            "enum": ["codex", "claude", "grok", "opencode"]
+          },
+          "model": { "type": ["string", "null"] },
+          "effort": {
+            "type": ["string", "null"],
+            "enum": ["low", "medium", "high", "xhigh", "max", "ultra", null]
+          },
+          "request": { "type": "string", "minLength": 1, "maxLength": 10000 },
+          "delegatedByAgentId": {
+            "type": ["string", "null"],
+            "format": "uuid"
+          },
+          "delegatedByAgentName": { "type": ["string", "null"] },
+          "requestedWorkerId": { "type": ["string", "null"] },
+          "requestedWorkerLabel": { "type": ["string", "null"] },
+          "resultSessionId": { "type": ["string", "null"] },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "acceptedAt": {
+            "type": ["string", "null"],
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
       "AcceptIssueReworkProposalResponse": {
         "type": "object",
         "required": [
@@ -3106,6 +3283,16 @@
                   "oneOf": [
                     {
                       "$ref": "#/components/schemas/IssueExecutionProposal"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "skillExecutionProposal": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/AgentSkillExecutionProposal"
                     },
                     {
                       "type": "null"
@@ -3884,6 +4071,16 @@
               }
             ]
           },
+          "skillExecutionProposal": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/AgentSkillExecutionProposal"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time"
@@ -4477,6 +4674,40 @@
           },
           "dispatch": {
             "$ref": "#/components/schemas/IssueExecutionDispatch"
+          }
+        },
+        "additionalProperties": false
+      },
+      "AgentSkillExecutionApprovalRequest": {
+        "type": "object",
+        "required": ["workerId"],
+        "properties": {
+          "workerId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^\\S(?:.*\\S)?$"
+          }
+        },
+        "additionalProperties": false
+      },
+      "AgentSkillExecutionApprovalResponse": {
+        "type": "object",
+        "required": ["outcome", "proposal", "projectId", "session"],
+        "properties": {
+          "outcome": {
+            "type": "string",
+            "enum": ["accepted", "already_accepted"]
+          },
+          "proposal": {
+            "$ref": "#/components/schemas/AgentSkillExecutionProposal"
+          },
+          "projectId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "session": {
+            "$ref": "#/components/schemas/ProjectAgentSession"
           }
         },
         "additionalProperties": false

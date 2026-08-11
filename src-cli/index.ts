@@ -59,6 +59,7 @@ import {
   detachedTranscriptSessionId,
   parseDetachedIssueReplyResult,
   parseDetachedJsonResult,
+  runProjectAgentTaskCompletionFlow,
   shouldPersistDetachedTranscriptPayload,
   type DetachedAgent,
 } from "./agent-runner";
@@ -1974,6 +1975,14 @@ const detachedAgentSkillSchema = z.object({
   position: z.number().int().nonnegative(),
 });
 
+const detachedAgentSkillExecutionTargetSchema = z.object({
+  projectId: z.string().uuid(),
+  agentId: z.string().uuid(),
+  skillId: z.string().uuid(),
+  skillName: z.string().trim().min(1).max(100),
+  request: z.string().trim().min(1).max(10_000),
+}).strict();
+
 const detachedAgentClaimSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
@@ -2027,6 +2036,8 @@ const claimedIssueReplySchema = z.object({
   effort: detachedAgentEffortSchema.nullable().optional(),
   agent: detachedAgentClaimSchema.nullable().optional(),
   activeSkill: detachedAgentSkillSchema.nullable().optional(),
+  skillExecutionTarget:
+    detachedAgentSkillExecutionTargetSchema.nullable().default(null),
   branch: z.string().nullable(),
   claimToken: z.string().startsWith("briar_reply_claim_"),
   claimedAt: z.string().datetime({ offset: true }),
@@ -2088,6 +2099,8 @@ const claimedChannelReplySchema = z.object({
   effort: detachedAgentEffortSchema.nullable().optional(),
   agent: detachedAgentClaimSchema.nullable().optional(),
   activeSkill: detachedAgentSkillSchema.nullable().optional(),
+  skillExecutionTarget:
+    detachedAgentSkillExecutionTargetSchema.nullable().default(null),
   claimToken: z.string().startsWith("briar_channel_claim_"),
   claimedAt: z.string().datetime({ offset: true }),
   leaseExpiresAt: z.string().datetime({ offset: true }),
@@ -2139,6 +2152,13 @@ const claimedChannelReplySchema = z.object({
         path: ["delegation"],
       });
     }
+    if (reply.skillExecutionTarget) {
+      context.addIssue({
+        code: "custom",
+        message: "Organization reply cannot receive a Skill execution target",
+        path: ["skillExecutionTarget"],
+      });
+    }
     return;
   }
   if (reply.organizationContext) {
@@ -2160,6 +2180,19 @@ const claimedChannelReplySchema = z.object({
       code: "custom",
       message: "Project reply cannot receive delegation targets",
       path: ["delegationTargets"],
+    });
+  }
+  if (
+    reply.skillExecutionTarget &&
+    (reply.skillExecutionTarget.projectId !== scope.projectId ||
+      reply.skillExecutionTarget.agentId !== reply.agent?.id ||
+      reply.skillExecutionTarget.skillId !== reply.activeSkill?.id ||
+      reply.skillExecutionTarget.skillName !== reply.activeSkill?.name)
+  ) {
+    context.addIssue({
+      code: "custom",
+      message: "Skill execution target does not match the claimed Agent Skill",
+      path: ["skillExecutionTarget"],
     });
   }
 }).transform((reply) => ({
@@ -2663,19 +2696,36 @@ async function runClaimedProjectAgentTask(
   });
   assertDetachedProviderTurnSucceeded(turn);
   if (!turn.resultText) throw new Error("Agent returned an empty direct-run summary");
+  return {
+    projectId: project.id,
+    workerId,
+    claimToken: task.claimToken,
+    summary: turn.resultText.slice(0, 50_000),
+    conversationId: turn.conversationId ?? null,
+  };
+}
+
+async function completeClaimedProjectAgentTask(
+  config: Config,
+  task: ClaimedProjectAgentTask,
+  workerToken: string,
+  completion: {
+    projectId: string;
+    workerId: string;
+    claimToken: string;
+    summary: string;
+    conversationId: string | null;
+  },
+  signal: AbortSignal,
+) {
   await request(
     config.apiUrl,
     `/agent-task-claims/${task.workId}/complete`,
     workerToken,
     {
       method: "POST",
-      body: JSON.stringify({
-        projectId: project.id,
-        workerId,
-        claimToken: task.claimToken,
-        summary: turn.resultText.slice(0, 50_000),
-        conversationId: turn.conversationId,
-      }),
+      signal,
+      body: JSON.stringify(completion),
     },
   );
 }
@@ -2789,6 +2839,18 @@ async function runClaimedIssueReply(
         projectId: project.id,
       },
     });
+    if (
+      issue.skillExecutionTarget &&
+      (issue.skillExecutionTarget.projectId !== project.id ||
+        issue.skillExecutionTarget.agentId !== agent.id ||
+        issue.skillExecutionTarget.skillId !== agent.activeSkill?.id ||
+        issue.skillExecutionTarget.skillName !== agent.activeSkill?.name ||
+        issue.skillExecutionTarget.request !== trigger.body)
+    ) {
+      throw new Error(
+        "Issue reply Skill execution target does not match its claimed context",
+      );
+    }
     const prompt = detachedIssueReplyPrompt({
       agent,
       snapshot: {
@@ -2797,6 +2859,7 @@ async function runClaimedIssueReply(
       },
       userMessage: trigger.body,
       workspaceAvailable: true,
+      skillExecutionTarget: issue.skillExecutionTarget,
     });
     let sequence = 0;
     const providerRuntime = await prepareReadOnlyAgentEnvironment(
@@ -2838,7 +2901,9 @@ async function runClaimedIssueReply(
       .finally(providerRuntime.cleanup);
     assertDetachedProviderTurnSucceeded(turn);
     if (!turn.resultText) throw new Error("Agent returned an empty issue reply");
-    const result = parseDetachedIssueReplyResult(turn.resultText);
+    const result = parseDetachedIssueReplyResult(turn.resultText, {
+      allowSkillExecutionProposal: issue.skillExecutionTarget !== null,
+    });
     if (!result.reply) throw new Error("Agent returned an empty issue reply");
     // Private images and the repository snapshot must be removed before the
     // durable reply succeeds. Cleanup failure leaves the claim retryable.
@@ -2856,6 +2921,7 @@ async function runClaimedIssueReply(
           body: result.reply,
           proposedAction: result.proposedAction,
           executionProposal: result.executionProposal,
+          skillExecutionProposal: result.skillExecutionProposal,
         }),
       },
     );
@@ -3003,6 +3069,7 @@ async function runClaimedChannelReply(
       organizationContextAvailable: organizationContext !== null,
       delegationTargets: reply.delegationTargets,
       delegation: reply.delegation,
+      skillExecutionTarget: reply.skillExecutionTarget,
     });
     const providerRuntime = await prepareReadOnlyAgentEnvironment(
       agent.provider,
@@ -3029,6 +3096,11 @@ async function runClaimedChannelReply(
     const result = channelReplyCompletionSchema.parse(
       parseDetachedJsonResult(turn.resultText),
     );
+    if (result.skillExecutionProposal && !reply.skillExecutionTarget) {
+      throw new Error(
+        "Channel reply Agent Skill execution target is not authorized",
+      );
+    }
     // Private context must be gone before the durable reply is marked complete.
     // A cleanup failure leaves the claim retryable instead of silently
     // succeeding with organization data on disk.
@@ -3684,24 +3756,36 @@ async function workerCommand() {
       runIssue: async (issue, signal) => {
         if (issue.workType === "projectAgentTask") {
           const task = claimedProjectAgentTaskSchema.parse(issue);
-          try {
-            await runClaimedProjectAgentTask(
+          await runProjectAgentTaskCompletionFlow({
+            runProvider: () => runClaimedProjectAgentTask(
               config,
               project,
               task,
               workerToken,
               workerId,
               signal,
-            );
-          } catch (error) {
-            await failClaimedProjectAgentTask(
+            ),
+            completeSuccess: (completion) => completeClaimedProjectAgentTask(
+              config,
+              task,
+              workerToken,
+              completion,
+              signal,
+            ),
+            completeFailure: (error) => failClaimedProjectAgentTask(
               config,
               project,
               task,
               workerToken,
               error,
-            );
-          }
+            ),
+            isRetryableCompletionError: (error) =>
+              !(error instanceof HttpRequestError) ||
+              error.status === 408 || error.status === 429 ||
+              error.status >= 500,
+            sleep: interruptibleSleep,
+            signal,
+          });
           return;
         }
         if (issue.workType === "channelReply") {

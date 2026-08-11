@@ -51,6 +51,7 @@ import {
   soleAgentSkillRowFromLegacy,
   type AgentSkillEffort,
   type AgentSkillInput,
+  type AgentSkillKind,
   type AgentSkillProvider,
   type AgentSkillRow,
 } from "./agent-skills";
@@ -303,6 +304,31 @@ export type ProjectAgentTaskJobRow = {
   created_at: string;
   updated_at: string;
   completed_at: string | null;
+  skill_execution_proposal_id?: string | null;
+  result_summary?: string | null;
+  result_conversation_id?: string | null;
+};
+
+export type ProjectAgentTaskCompletionReceiptRow = {
+  id: string;
+  organization_id: string;
+  project_id: string;
+  task_id: string;
+  skill_execution_proposal_id: string | null;
+  worker_id: string;
+  claim_token_hash: string;
+  outcome_status: "queued" | "completed" | "failed";
+  summary: string | null;
+  conversation_id: string | null;
+  error: string | null;
+  completed_at: string;
+  created_at: string;
+};
+
+export type ProjectAgentTaskCompletionResult = {
+  job: ProjectAgentTaskJobRow | null;
+  receipt: ProjectAgentTaskCompletionReceiptRow | null;
+  replayed: boolean;
 };
 
 export type ClaimedProjectAgentTaskRow = ProjectAgentTaskJobRow & {
@@ -682,6 +708,17 @@ export type IssueAgentReplyJobRow = {
   claimed_worker_id: string | null;
   preferred_provider: ProjectAgentProvider | null;
   agent_provider: ProjectAgentProvider | null;
+  skill_id?: string | null;
+  selected_skill_id_snapshot?: string | null;
+  selected_agent_name_snapshot?: string | null;
+  selected_agent_responsibility_snapshot?: string | null;
+  selected_skill_name_snapshot?: string | null;
+  selected_skill_instructions_snapshot?: string | null;
+  selected_skill_kind_snapshot?: AgentSkillKind | null;
+  selected_skill_provider_snapshot?: ProjectAgentProvider | null;
+  selected_skill_model_snapshot?: string | null;
+  selected_skill_effort_snapshot?: ModelEffort | null;
+  skill_execution_request_snapshot?: string | null;
   claim_token_hash: string | null;
   claimed_at: string | null;
   lease_expires_at: string | null;
@@ -761,6 +798,74 @@ export type IssueExecutionProposalRow = {
   accepted_at: string | null;
   created_at: string;
   updated_at: string;
+};
+
+export type AgentSkillExecutionProposalRow = {
+  id: string;
+  organization_id: string;
+  project_id: string;
+  source_kind: "channel" | "issue";
+  channel_id: string | null;
+  conversation_run_id: string | null;
+  trigger_message_id: string;
+  reply_message_id: string;
+  source_reply_job_id: string;
+  delegated_by_reply_job_id: string | null;
+  agent_id: string;
+  agent_name: string;
+  agent_responsibility: string;
+  skill_id: string;
+  skill_name: string;
+  skill_instructions: string;
+  skill_kind: AgentSkillKind;
+  provider: ProjectAgentProvider;
+  model: string | null;
+  effort: ModelEffort | null;
+  request: string;
+  delegated_by_agent_id: string | null;
+  delegated_by_agent_name: string | null;
+  generation: number;
+  status: "pending" | "accepted" | "invalidated";
+  requested_worker_id: string | null;
+  requested_worker_label: string | null;
+  result_session_id: string | null;
+  accepted_by_user_id: string | null;
+  accepted_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AgentSkillExecutionApprovalAuditRow = {
+  id: string;
+  proposal_id: string;
+  organization_id: string;
+  project_id: string;
+  source_kind: "channel" | "issue";
+  channel_id: string | null;
+  conversation_run_id: string | null;
+  trigger_message_id: string;
+  reply_message_id: string;
+  source_reply_job_id: string;
+  delegated_by_reply_job_id: string | null;
+  agent_id: string;
+  agent_name: string;
+  agent_responsibility: string;
+  skill_id: string;
+  skill_name: string;
+  skill_instructions: string;
+  skill_kind: AgentSkillKind;
+  provider: ProjectAgentProvider;
+  model: string | null;
+  effort: ModelEffort | null;
+  request: string;
+  worker_id: string;
+  worker_label: string;
+  result_session_id: string;
+  approved_by_user_id: string | null;
+  approved_at: string;
+  delegated_by_agent_id: string | null;
+  delegated_by_agent_name: string | null;
+  created_at: string;
 };
 
 export type FreshBacklogExecutionTargetRow = {
@@ -4487,6 +4592,23 @@ export async function getProjectAgentSession(
     .first<ProjectAgentSessionRow>();
 }
 
+export async function projectAgentSessionIsApprovalOwned(
+  db: D1Database,
+  projectId: string,
+  sessionId: string,
+) {
+  const row = await db
+    .prepare(
+      `select 1 as owned
+       from briar_agent_skill_execution_approval_audit
+       where project_id = ? and result_session_id = ?
+       limit 1`,
+    )
+    .bind(projectId, sessionId)
+    .first<{ owned: number }>();
+  return row?.owned === 1;
+}
+
 export async function upsertProjectAgentSession(
   db: D1Database,
   input: ProjectAgentSessionRow,
@@ -4667,6 +4789,25 @@ export async function claimNextProjectAgentTask(
   },
 ) {
   const providerPlaceholders = input.agentProviders.map(() => "?").join(", ");
+  const skillExecutionApprovalsAvailable =
+    await agentSkillExecutionApprovalTablesAvailable(db);
+  const skillExecutionEligibility = skillExecutionApprovalsAvailable
+    ? `and (
+         job.skill_execution_proposal_id is null
+         or exists (
+           select 1
+           from briar_agent_skill_execution_approval_audit approval
+           where approval.proposal_id = job.skill_execution_proposal_id
+             and approval.project_id = job.project_id
+             and approval.result_session_id = job.id
+             and approval.agent_id = job.agent_id
+             and approval.skill_id = job.skill_id
+             and approval.request = job.request
+             and approval.proposal_id = job.request_id
+             and approval.worker_id = job.preferred_worker_id
+         )
+       )`
+    : "";
   const claimed = await db
     .prepare(
       `update briar_project_agent_task_jobs
@@ -4683,6 +4824,35 @@ export async function claimNextProjectAgentTask(
          where job.project_id = ?
            and job.preferred_worker_id = ?
            and skill.provider in (${providerPlaceholders})
+           ${skillExecutionEligibility}
+           and exists (
+             select 1
+             from briar_execution_workers selected_worker
+             join briar_execution_worker_devices selected_device
+               on selected_device.id = selected_worker.device_id
+             where selected_worker.id = ?
+               and (
+                 (select count(*)
+                  from briar_hunt_runs active
+                  join briar_execution_workers holder
+                    on holder.id = active.worker_id
+                  where holder.device_id = selected_device.id
+                    and active.claim_token_hash is not null
+                    and active.lease_expires_at is not null
+                    and active.lease_expires_at > ?
+                    and active.status not in (
+                      'backlog', 'completed', 'cancelled', 'blocked', 'failed'
+                    ))
+                 +
+                 (select count(*)
+                  from briar_project_agent_task_jobs active_task
+                  join briar_execution_workers holder
+                    on holder.id = active_task.claimed_worker_id
+                  where holder.device_id = selected_device.id
+                    and active_task.status = 'running'
+                    and active_task.lease_expires_at > ?)
+               ) < selected_device.max_concurrent_sessions
+           )
            and job.attempts < 3
            and (
              job.status = 'queued'
@@ -4702,10 +4872,88 @@ export async function claimNextProjectAgentTask(
       projectId,
       input.workerId,
       ...input.agentProviders,
+      input.workerId,
+      input.claimedAt,
+      input.claimedAt,
       input.claimedAt,
     )
-    .first<ProjectAgentTaskJobRow>();
+    .first<ProjectAgentTaskJobRow>()
+    .catch((error: unknown) => {
+      if (
+        error instanceof Error &&
+        error.message.includes(
+          "Agent Skill execution approval audit is missing or stale",
+        )
+      ) {
+        return null;
+      }
+      throw error;
+    });
   if (!claimed) return null;
+  if (claimed.skill_execution_proposal_id) {
+    const approval = await db
+      .prepare(
+        `select approval.*
+         from briar_agent_skill_execution_approval_audit approval
+         where approval.proposal_id = ? and approval.project_id = ?
+           and approval.result_session_id = ?
+           and approval.agent_id = ? and approval.skill_id = ?
+           and approval.request = ? and approval.worker_id = ?`,
+      )
+      .bind(
+        claimed.skill_execution_proposal_id,
+        claimed.project_id,
+        claimed.id,
+        claimed.agent_id,
+        claimed.skill_id,
+        claimed.request,
+        input.workerId,
+      )
+      .first<{
+        agent_name: string;
+        agent_responsibility: string;
+        skill_id: string;
+        skill_name: string;
+        skill_instructions: string;
+        skill_kind: AgentSkillKind;
+        provider: ProjectAgentProvider;
+        model: string | null;
+        effort: AgentSkillEffort | null;
+        approved_at: string;
+      }>();
+    if (!approval) {
+      throw new Error(
+        "Agent Skill execution approval snapshot disappeared after claim",
+      );
+    }
+    const approvedSkill: AgentSkillRow = {
+      id: approval.skill_id,
+      agent_id: claimed.agent_id,
+      name: approval.skill_name,
+      instructions: approval.skill_instructions,
+      provider: approval.provider,
+      model: approval.model,
+      effort: approval.effort,
+      kind: approval.skill_kind,
+      is_default: 0,
+      position: 0,
+      created_at: approval.approved_at,
+      updated_at: approval.approved_at,
+    };
+    return {
+      ...claimed,
+      agent_name: approval.agent_name,
+      agent_provider: approval.provider,
+      agent_model: approval.model,
+      agent_effort: approval.effort,
+      agent_responsibility: approval.agent_responsibility,
+      agent_skill: approval.skill_instructions,
+      selected_skill_id: approval.skill_id,
+      selected_skill_name: approval.skill_name,
+      selected_skill_instructions: approval.skill_instructions,
+      agent_skills: [approvedSkill],
+    };
+  }
   const selected = await db
     .prepare(
       `select job.*, agent.name as agent_name, skill.provider as agent_provider,
@@ -4775,7 +5023,7 @@ export async function renewProjectAgentTaskLease(
     .first<ProjectAgentTaskJobRow>();
 }
 
-export async function completeProjectAgentTask(
+export async function completeProjectAgentTaskWithReceipt(
   db: D1Database,
   projectId: string,
   jobId: string,
@@ -4783,15 +5031,23 @@ export async function completeProjectAgentTask(
     workerId: string;
     claimTokenHash: string;
     updatedAt: string;
+    summary?: string | null;
+    conversationId?: string | null;
     error?: string;
   },
 ) {
-  return db
+  const approvalColumnsAvailable =
+    await agentSkillExecutionApprovalTablesAvailable(db);
+  const resultProjection = approvalColumnsAvailable
+    ? `result_summary = ?, result_conversation_id = ?,`
+    : "";
+  const completionStatement = (receiptId: string | null) => db
     .prepare(
-      `update briar_project_agent_task_jobs
+      `update briar_project_agent_task_jobs as task
        set status = case when ? is null then 'completed' else
          case when attempts >= 3 then 'failed' else 'queued' end end,
            error = ?,
+           ${resultProjection}
            claim_token_hash = null, claimed_worker_id = null,
            claimed_at = null, lease_expires_at = null,
            completed_at = case when ? is null then ? else
@@ -4799,11 +5055,25 @@ export async function completeProjectAgentTask(
            updated_at = ?
        where id = ? and project_id = ? and status = 'running'
          and claimed_worker_id = ? and claim_token_hash = ?
+         ${receiptId
+           ? `and exists (
+                select 1
+                from briar_project_agent_task_completion_receipts receipt
+                where receipt.id = ?
+                  and receipt.project_id = task.project_id
+                  and receipt.task_id = task.id
+                  and receipt.worker_id = task.claimed_worker_id
+                  and receipt.claim_token_hash = task.claim_token_hash
+              )`
+           : ""}
        returning *`,
     )
     .bind(
       input.error ?? null,
       input.error ?? null,
+      ...(approvalColumnsAvailable
+        ? [input.summary ?? null, input.conversationId ?? null]
+        : []),
       input.error ?? null,
       input.updatedAt,
       input.updatedAt,
@@ -4812,8 +5082,107 @@ export async function completeProjectAgentTask(
       projectId,
       input.workerId,
       input.claimTokenHash,
+      ...(receiptId ? [receiptId] : []),
+    );
+  if (!approvalColumnsAvailable) {
+    const job = await completionStatement(null).first<ProjectAgentTaskJobRow>();
+    return job ? { job, receipt: null, replayed: false } : null;
+  }
+
+  const summary = input.summary ?? null;
+  const conversationId = input.conversationId ?? null;
+  const error = input.error ?? null;
+  const receiptId = crypto.randomUUID();
+  const receiptStatement = db
+    .prepare(
+      `insert into briar_project_agent_task_completion_receipts (
+         id, organization_id, project_id, task_id,
+         skill_execution_proposal_id, worker_id, claim_token_hash,
+         outcome_status, summary, conversation_id, error,
+         completed_at, created_at
+       )
+       select ?, project.organization_id, task.project_id, task.id,
+              task.skill_execution_proposal_id, task.claimed_worker_id,
+              task.claim_token_hash,
+              case when ? is null then 'completed'
+                else case when task.attempts >= 3 then 'failed'
+                  else 'queued' end end,
+              ?, ?, ?, ?, ?
+       from briar_project_agent_task_jobs task
+       join briar_projects project on project.id = task.project_id
+       where task.id = ? and task.project_id = ? and task.status = 'running'
+         and task.claimed_worker_id = ? and task.claim_token_hash = ?
+       on conflict (project_id, task_id, worker_id, claim_token_hash)
+       do nothing
+       returning *`,
     )
-    .first<ProjectAgentTaskJobRow>();
+    .bind(
+      receiptId,
+      error,
+      summary,
+      conversationId,
+      error,
+      input.updatedAt,
+      input.updatedAt,
+      jobId,
+      projectId,
+      input.workerId,
+      input.claimTokenHash,
+    );
+  const [receiptResult, completionResult] = await db.batch([
+    receiptStatement,
+    completionStatement(receiptId),
+  ]);
+  const receipt = receiptResult.results[0] as
+    | ProjectAgentTaskCompletionReceiptRow
+    | undefined;
+  const job = completionResult.results[0] as ProjectAgentTaskJobRow | undefined;
+  if (receipt && job) {
+    return { job, receipt, replayed: false };
+  }
+  if (receipt || job) {
+    throw new Error("Project Agent task completion was not atomic");
+  }
+  const existing = await db
+    .prepare(
+      `select * from briar_project_agent_task_completion_receipts
+       where project_id = ? and task_id = ? and worker_id = ?
+         and claim_token_hash = ?`,
+    )
+    .bind(projectId, jobId, input.workerId, input.claimTokenHash)
+    .first<ProjectAgentTaskCompletionReceiptRow>();
+  if (
+    !existing || existing.summary !== summary ||
+    existing.conversation_id !== conversationId || existing.error !== error
+  ) {
+    return null;
+  }
+  return {
+    job: await getProjectAgentTaskJob(db, projectId, jobId),
+    receipt: existing,
+    replayed: true,
+  };
+}
+
+export async function completeProjectAgentTask(
+  db: D1Database,
+  projectId: string,
+  jobId: string,
+  input: {
+    workerId: string;
+    claimTokenHash: string;
+    updatedAt: string;
+    summary?: string | null;
+    conversationId?: string | null;
+    error?: string;
+  },
+) {
+  return (await completeProjectAgentTaskWithReceipt(
+    db,
+    projectId,
+    jobId,
+    input,
+  ))?.job ?? null;
 }
 
 export async function createProjectAgent(
@@ -6558,12 +6927,67 @@ export async function enqueueIssueAgentReply(
     triggerMessageId: string;
     parentMessageId: string;
     replyMessageId: string;
+    skillId?: string | null;
     createdAt: string;
   },
 ) {
+  const skillExecutionAvailable =
+    await agentSkillExecutionApprovalTablesAvailable(db);
   await db
     .prepare(
-      `insert into briar_issue_agent_reply_jobs (
+      skillExecutionAvailable
+        ? `insert into briar_issue_agent_reply_jobs (
+         id, project_id, run_id, trigger_message_id, parent_message_id,
+         reply_message_id, preferred_worker_id, preferred_provider,
+         skill_id, selected_skill_id_snapshot,
+         selected_agent_name_snapshot,
+         selected_agent_responsibility_snapshot,
+         selected_skill_name_snapshot, selected_skill_instructions_snapshot,
+         selected_skill_kind_snapshot,
+         selected_skill_provider_snapshot, selected_skill_model_snapshot,
+         selected_skill_effort_snapshot, skill_execution_request_snapshot,
+         created_at, updated_at
+       )
+       select ?, run.project_id, run.id, trigger.id, parent.id, ?,
+              run.worker_id,
+              coalesce(
+                selected_skill.provider,
+                run.requested_agent_provider,
+                (
+                  select skill.provider
+                  from briar_agent_skills skill
+                  where skill.agent_id = agent.id
+                    and skill.kind = 'issue_processing'
+                  order by skill.position, skill.created_at, skill.id
+                  limit 1
+                ),
+                agent.provider
+              ),
+              selected_skill.id, selected_skill.id,
+              case when selected_skill.id is null then null else agent.name end,
+              case when selected_skill.id is null then null
+                else agent.responsibility end,
+              selected_skill.name, selected_skill.instructions,
+              selected_skill.kind,
+              selected_skill.provider, selected_skill.model,
+              selected_skill.effort,
+              case when selected_skill.id is null then null else trigger.body end,
+              ?, ?
+       from briar_hunt_runs run
+       join briar_issue_messages trigger
+         on trigger.id = ? and trigger.project_id = run.project_id
+        and trigger.run_id = run.id
+       join briar_issue_messages parent
+         on parent.id = ? and parent.project_id = run.project_id
+        and parent.run_id = run.id
+       left join briar_project_agents agent
+         on agent.id = run.agent_id and agent.project_id = run.project_id
+       left join briar_agent_skills selected_skill
+         on selected_skill.id = ? and selected_skill.agent_id = agent.id
+       where run.id = ? and run.project_id = ?
+         and (? is null or selected_skill.id is not null)
+       on conflict (project_id, trigger_message_id) do nothing`
+        : `insert into briar_issue_agent_reply_jobs (
          id, project_id, run_id, trigger_message_id, parent_message_id,
          reply_message_id, preferred_worker_id, preferred_provider,
          created_at, updated_at
@@ -6595,16 +7019,31 @@ export async function enqueueIssueAgentReply(
        where run.id = ? and run.project_id = ?
        on conflict (project_id, trigger_message_id) do nothing`,
     )
-    .bind(
-      input.id,
-      input.replyMessageId,
-      input.createdAt,
-      input.createdAt,
-      input.triggerMessageId,
-      input.parentMessageId,
-      input.runId,
-      input.projectId,
-    )
+    .bind(...(
+      skillExecutionAvailable
+        ? [
+            input.id,
+            input.replyMessageId,
+            input.createdAt,
+            input.createdAt,
+            input.triggerMessageId,
+            input.parentMessageId,
+            input.skillId ?? null,
+            input.runId,
+            input.projectId,
+            input.skillId ?? null,
+          ]
+        : [
+            input.id,
+            input.replyMessageId,
+            input.createdAt,
+            input.createdAt,
+            input.triggerMessageId,
+            input.parentMessageId,
+            input.runId,
+            input.projectId,
+          ]
+    ))
     .run();
   return getIssueAgentReplyJob(db, input.projectId, input.triggerMessageId);
 }
@@ -6639,6 +7078,47 @@ export async function claimNextIssueAgentReply(
     staleBefore: string;
   },
 ) {
+  const skillExecutionAvailable =
+    await agentSkillExecutionApprovalTablesAvailable(db);
+  const skillProviderPlaceholders = input.agentProviders
+    .map(() => "?")
+    .join(", ");
+  const selectedSkillGuard = skillExecutionAvailable
+    ? `and (
+         job.selected_skill_id_snapshot is null
+         or (
+           job.skill_id = job.selected_skill_id_snapshot
+           and exists (
+             select 1
+             from briar_projects project
+             join briar_project_agents selected_agent
+               on selected_agent.id = run.agent_id
+              and selected_agent.project_id = run.project_id
+              and selected_agent.organization_id = project.organization_id
+             join briar_agent_skills selected_skill
+               on selected_skill.id = job.selected_skill_id_snapshot
+              and selected_skill.agent_id = selected_agent.id
+             join briar_issue_messages trigger
+               on trigger.id = job.trigger_message_id
+              and trigger.project_id = job.project_id
+              and trigger.run_id = job.run_id
+             where project.id = run.project_id
+               and selected_skill.provider in (${skillProviderPlaceholders})
+               and selected_agent.name = job.selected_agent_name_snapshot
+               and selected_agent.responsibility =
+                 job.selected_agent_responsibility_snapshot
+               and selected_skill.name = job.selected_skill_name_snapshot
+               and selected_skill.instructions =
+                 job.selected_skill_instructions_snapshot
+               and selected_skill.kind = job.selected_skill_kind_snapshot
+               and selected_skill.provider = job.selected_skill_provider_snapshot
+               and selected_skill.model is job.selected_skill_model_snapshot
+               and selected_skill.effort is job.selected_skill_effort_snapshot
+               and trigger.body = job.skill_execution_request_snapshot
+           )
+         )
+       )`
+    : "";
   await db
     .prepare(
       `update briar_issue_agent_reply_jobs
@@ -6723,6 +7203,7 @@ export async function claimNextIssueAgentReply(
                  )
              )
            )
+           ${selectedSkillGuard}
          order by job.created_at, job.id
          limit 1
        )
@@ -6744,6 +7225,7 @@ export async function claimNextIssueAgentReply(
       input.workerId,
       input.workerId,
       input.staleBefore,
+      ...(skillExecutionAvailable ? input.agentProviders : []),
     )
     .first<IssueAgentReplyJobRow>();
 }
@@ -6911,6 +7393,7 @@ export type IssueAgentReplyCompletionOutput = {
       }
     | null;
   executionProposal: boolean;
+  skillExecutionProposal?: boolean;
 };
 
 /**
@@ -6932,6 +7415,8 @@ export async function completeIssueAgentReplyOutput(
 ) {
   const executionApprovalsAvailable =
     await issueExecutionApprovalTablesAvailable(db);
+  const skillExecutionApprovalsAvailable =
+    await agentSkillExecutionApprovalTablesAvailable(db);
   if (
     !executionApprovalsAvailable &&
     (input.output.executionProposal ||
@@ -6939,6 +7424,20 @@ export async function completeIssueAgentReplyOutput(
         input.output.proposedAction.executeAfterCreate))
   ) {
     throw new Error("issue execution approval schema is unavailable");
+  }
+  if (
+    input.output.skillExecutionProposal &&
+    !skillExecutionApprovalsAvailable
+  ) {
+    throw new Error("Agent Skill execution approval schema is unavailable");
+  }
+  if (
+    input.output.skillExecutionProposal &&
+    (input.output.executionProposal || input.output.proposedAction)
+  ) {
+    throw new Error(
+      "Agent Skill execution cannot be combined with another proposal",
+    );
   }
 
   const proposedAction = input.output.proposedAction;
@@ -6957,6 +7456,9 @@ export async function completeIssueAgentReplyOutput(
     action?.type === "request_issue_create" && action.executeAfterCreate
       ? crypto.randomUUID()
       : null;
+  const skillExecutionProposalId = input.output.skillExecutionProposal
+    ? crypto.randomUUID()
+    : null;
   const staleExecutionGuard = executionApprovalsAvailable
     ? `and not exists (
          select 1 from briar_issue_execution_proposals stale_execution
@@ -6965,6 +7467,19 @@ export async function completeIssueAgentReplyOutput(
               stale_execution.project_id = job.project_id
               and stale_execution.trigger_message_id = job.trigger_message_id
               and stale_execution.source_kind = 'issue'
+            )
+       )`
+    : "";
+  const staleSkillExecutionGuard = skillExecutionApprovalsAvailable
+    ? `and not exists (
+         select 1
+         from briar_agent_skill_execution_proposals stale_skill_execution
+         where stale_skill_execution.reply_message_id = job.reply_message_id
+            or (
+              stale_skill_execution.project_id = job.project_id
+              and stale_skill_execution.trigger_message_id =
+                job.trigger_message_id
+              and stale_skill_execution.source_kind = 'issue'
             )
        )`
     : "";
@@ -7001,6 +7516,7 @@ export async function completeIssueAgentReplyOutput(
               )
          )
          ${staleExecutionGuard}
+         ${staleSkillExecutionGuard}
          and (
            ? = 0
            or exists (
@@ -7033,6 +7549,36 @@ export async function completeIssueAgentReplyOutput(
                and run.resume_requested_at is null
            )
          )
+         and (
+           ? = 0
+           or exists (
+             select 1
+             from briar_hunt_runs run
+             join briar_projects project on project.id = run.project_id
+             join briar_project_agents agent
+               on agent.id = run.agent_id and agent.project_id = run.project_id
+              and agent.organization_id = project.organization_id
+             join briar_agent_skills skill
+               on skill.id = job.skill_id and skill.agent_id = agent.id
+              and job.selected_skill_id_snapshot = skill.id
+             join briar_issue_messages trigger
+               on trigger.id = job.trigger_message_id
+              and trigger.project_id = job.project_id
+              and trigger.run_id = job.run_id
+             where run.id = job.run_id and run.project_id = job.project_id
+               and agent.name = job.selected_agent_name_snapshot
+               and agent.responsibility =
+                 job.selected_agent_responsibility_snapshot
+               and skill.name = job.selected_skill_name_snapshot
+               and skill.instructions =
+                 job.selected_skill_instructions_snapshot
+               and skill.kind = job.selected_skill_kind_snapshot
+               and skill.provider = job.selected_skill_provider_snapshot
+               and skill.model is job.selected_skill_model_snapshot
+               and skill.effort is job.selected_skill_effort_snapshot
+               and trigger.body = job.skill_execution_request_snapshot
+           )
+         )
        returning *`,
     )
     .bind(
@@ -7046,6 +7592,7 @@ export async function completeIssueAgentReplyOutput(
       rework ? 1 : 0,
       rework?.workflowStage ?? null,
       input.output.executionProposal ? 1 : 0,
+      input.output.skillExecutionProposal ? 1 : 0,
     );
 
   const completedClaim = (alias: string) =>
@@ -7191,6 +7738,59 @@ export async function completeIssueAgentReplyOutput(
        where ${completedClaim("job")}`,
     ).bind(
       executionProposalId,
+      input.completedAt,
+      input.completedAt,
+      ...claimBindings,
+    ));
+  }
+
+  if (input.output.skillExecutionProposal) {
+    statements.push(db.prepare(
+      `insert into briar_agent_skill_execution_proposals (
+         id, organization_id, project_id, source_kind, channel_id,
+         conversation_run_id, trigger_message_id, reply_message_id,
+         source_reply_job_id, delegated_by_reply_job_id,
+         agent_id, agent_name, agent_responsibility,
+         skill_id, skill_name, skill_instructions,
+         skill_kind, provider, model, effort, request, delegated_by_agent_id,
+         delegated_by_agent_name, created_at, updated_at
+       )
+       select ?, project.organization_id, job.project_id, 'issue', null,
+              job.run_id, job.trigger_message_id, job.reply_message_id,
+              job.id, null, agent.id, job.selected_agent_name_snapshot,
+              job.selected_agent_responsibility_snapshot,
+              skill.id, job.selected_skill_name_snapshot,
+              job.selected_skill_instructions_snapshot,
+              job.selected_skill_kind_snapshot,
+              job.selected_skill_provider_snapshot,
+              job.selected_skill_model_snapshot,
+              job.selected_skill_effort_snapshot,
+              job.skill_execution_request_snapshot, null, null, ?, ?
+       from briar_issue_agent_reply_jobs job
+       join briar_hunt_runs run
+         on run.id = job.run_id and run.project_id = job.project_id
+       join briar_projects project on project.id = job.project_id
+       join briar_project_agents agent
+         on agent.id = run.agent_id and agent.project_id = run.project_id
+        and agent.organization_id = project.organization_id
+       join briar_agent_skills skill
+         on skill.id = job.skill_id and skill.agent_id = agent.id
+        and job.selected_skill_id_snapshot = skill.id
+       join briar_issue_messages trigger
+         on trigger.id = job.trigger_message_id
+        and trigger.project_id = job.project_id and trigger.run_id = job.run_id
+       and agent.name = job.selected_agent_name_snapshot
+       and agent.responsibility = job.selected_agent_responsibility_snapshot
+       and skill.name = job.selected_skill_name_snapshot
+       and skill.instructions = job.selected_skill_instructions_snapshot
+       and skill.kind = job.selected_skill_kind_snapshot
+       and skill.provider = job.selected_skill_provider_snapshot
+       and skill.model is job.selected_skill_model_snapshot
+       and skill.effort is job.selected_skill_effort_snapshot
+       and trigger.body = job.skill_execution_request_snapshot
+       where ${completedClaim("job")}`,
+    ).bind(
+      skillExecutionProposalId,
       input.completedAt,
       input.completedAt,
       ...claimBindings,
@@ -7417,6 +8017,18 @@ export async function issueExecutionApprovalTablesAvailable(db: D1Database) {
     .prepare(
       `select 1 as available from sqlite_master
        where type = 'table' and name = 'briar_issue_execution_proposals'`,
+    )
+    .first<{ available: number }>());
+}
+
+export async function agentSkillExecutionApprovalTablesAvailable(
+  db: D1Database,
+) {
+  return Boolean(await db
+    .prepare(
+      `select 1 as available from sqlite_master
+       where type = 'table'
+         and name = 'briar_agent_skill_execution_proposals'`,
     )
     .first<{ available: number }>());
 }
@@ -7915,6 +8527,107 @@ export async function listFreshBacklogExecutionTargets(
     .bind(projectId, Math.max(1, Math.min(limit, 100)))
     .all<FreshBacklogExecutionTargetRow>();
   return rows.results;
+}
+
+export async function listIssueAgentSkillExecutionProposals(
+  db: D1Database,
+  projectId: string,
+  conversationRunId: string,
+) {
+  if (!(await agentSkillExecutionApprovalTablesAvailable(db))) return [];
+  const rows = await db
+    .prepare(
+      `select proposal.*
+       from briar_agent_skill_execution_proposals proposal
+       join briar_hunt_runs conversation
+         on conversation.id = proposal.conversation_run_id
+        and conversation.project_id = proposal.project_id
+       where proposal.source_kind = 'issue'
+         and proposal.project_id = ? and proposal.conversation_run_id = ?
+         and proposal.status in ('pending', 'accepted')
+       order by proposal.created_at, proposal.id`,
+    )
+    .bind(projectId, conversationRunId)
+    .all<AgentSkillExecutionProposalRow>();
+  return rows.results;
+}
+
+export async function getIssueAgentSkillExecutionProposal(
+  db: D1Database,
+  projectId: string,
+  conversationRunId: string,
+  proposalId: string,
+) {
+  return db
+    .prepare(
+      `select proposal.*
+       from briar_agent_skill_execution_proposals proposal
+       join briar_hunt_runs conversation
+         on conversation.id = proposal.conversation_run_id
+        and conversation.project_id = proposal.project_id
+       where proposal.id = ? and proposal.source_kind = 'issue'
+         and proposal.project_id = ? and proposal.conversation_run_id = ?`,
+    )
+    .bind(proposalId, projectId, conversationRunId)
+    .first<AgentSkillExecutionProposalRow>();
+}
+
+export async function getAgentSkillExecutionApprovalAudit(
+  db: D1Database,
+  projectId: string,
+  proposalId: string,
+) {
+  return db
+    .prepare(
+      `select * from briar_agent_skill_execution_approval_audit
+       where project_id = ? and proposal_id = ?`,
+    )
+    .bind(projectId, proposalId)
+    .first<AgentSkillExecutionApprovalAuditRow>();
+}
+
+export async function acceptAgentSkillExecutionProposal(
+  db: D1Database,
+  input: {
+    proposalId: string;
+    sourceKind: "channel" | "issue";
+    organizationId: string;
+    projectId: string;
+    channelId: string | null;
+    conversationRunId: string | null;
+    userId: string;
+    workerId: string;
+    workerLabel: string;
+    resultSessionId: string;
+    acceptedAt: string;
+  },
+) {
+  return db
+    .prepare(
+      `update briar_agent_skill_execution_proposals
+       set status = 'accepted', requested_worker_id = ?,
+           requested_worker_label = ?, result_session_id = ?,
+           accepted_by_user_id = ?, accepted_at = ?, updated_at = ?
+       where id = ? and source_kind = ? and organization_id = ?
+         and project_id = ? and channel_id is ? and conversation_run_id is ?
+         and status = 'pending'
+       returning *`,
+    )
+    .bind(
+      input.workerId,
+      input.workerLabel,
+      input.resultSessionId,
+      input.userId,
+      input.acceptedAt,
+      input.acceptedAt,
+      input.proposalId,
+      input.sourceKind,
+      input.organizationId,
+      input.projectId,
+      input.channelId,
+      input.conversationRunId,
+    )
+    .first<AgentSkillExecutionProposalRow>();
 }
 
 export async function listIssueConversationNotifications(
@@ -8455,17 +9168,25 @@ export async function claimNextQueuedHuntRun(
            )
            and (
              ? is null or (
-               select count(*)
-               from briar_hunt_runs active
-               join briar_execution_workers holder
-                 on holder.id = active.worker_id
-               where holder.device_id = ?
-                 and active.claim_token_hash is not null
-                 and active.lease_expires_at is not null
-                 and active.lease_expires_at > ?
-                 and active.status not in (
-                   'backlog', 'completed', 'cancelled', 'blocked', 'failed'
-                 )
+             (select count(*)
+              from briar_hunt_runs active
+              join briar_execution_workers holder
+                on holder.id = active.worker_id
+              where holder.device_id = ?
+                and active.claim_token_hash is not null
+                and active.lease_expires_at is not null
+                and active.lease_expires_at > ?
+                and active.status not in (
+                  'backlog', 'completed', 'cancelled', 'blocked', 'failed'
+                ))
+             +
+             (select count(*)
+              from briar_project_agent_task_jobs active_task
+              join briar_execution_workers holder
+                on holder.id = active_task.claimed_worker_id
+              where holder.device_id = ?
+                and active_task.status = 'running'
+                and active_task.lease_expires_at > ?)
              ) < coalesce((
                select device.max_concurrent_sessions
                from briar_execution_worker_devices device
@@ -8507,6 +9228,8 @@ export async function claimNextQueuedHuntRun(
       allowedProviders?.includes("grok") ? 1 : 0,
       allowedProviders?.includes("opencode") ? 1 : 0,
       input.workerDeviceId ?? null,
+      input.workerDeviceId ?? null,
+      input.claimedAt,
       input.workerDeviceId ?? null,
       input.claimedAt,
       input.workerDeviceId ?? null,

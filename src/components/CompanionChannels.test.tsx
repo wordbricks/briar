@@ -4,6 +4,7 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { I18nProvider } from "../i18n";
+import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
 import type {
   ChannelAgentReply,
   ChannelAgentSummary,
@@ -19,6 +20,7 @@ const listChannelMessages = vi.fn();
 const sendChannelMessage = vi.fn();
 const acceptChannelProposal = vi.fn();
 const acceptChannelExecutionProposal = vi.fn();
+const acceptChannelSkillExecutionProposal = vi.fn();
 const loadDashboard = vi.fn();
 const toggleChannelMessageReaction = vi.fn();
 
@@ -31,6 +33,8 @@ vi.mock("../lib/api", () => ({
   acceptChannelProposal: (...args: unknown[]) => acceptChannelProposal(...args),
   acceptChannelExecutionProposal: (...args: unknown[]) =>
     acceptChannelExecutionProposal(...args),
+  acceptChannelSkillExecutionProposal: (...args: unknown[]) =>
+    acceptChannelSkillExecutionProposal(...args),
   loadDashboard: (...args: unknown[]) => loadDashboard(...args),
   toggleChannelMessageReaction: (...args: unknown[]) =>
     toggleChannelMessageReaction(...args),
@@ -146,6 +150,7 @@ describe("CompanionChannels", () => {
     onIssueOpen?: (projectId: string, runId: string) => void | Promise<void>,
     requestedMessage?: { channelId: string; messageId: string; rootMessageId: string },
     onRequestedMessageOpen?: () => void,
+    onSkillSessionAccepted?: (session: AutoHuntSession) => void,
   ) => {
     await act(async () => {
       root.render(
@@ -162,6 +167,7 @@ describe("CompanionChannels", () => {
             onIssueOpen={onIssueOpen}
             requestedMessage={requestedMessage}
             onRequestedMessageOpen={onRequestedMessageOpen}
+            onSkillSessionAccepted={onSkillSessionAccepted}
           />
         </I18nProvider>,
       );
@@ -332,6 +338,56 @@ describe("CompanionChannels", () => {
     );
     expect(container.querySelector(".companion-channel-proposal")).not.toBeNull();
     expect(container.querySelector(".execution-proposal-card")).not.toBeNull();
+  });
+
+  it("preserves accepted Skill history when a mobile reaction response is stale", async () => {
+    const item = message("m-skill-reaction-safe", "Skill approval history");
+    item.reactions = [{ emoji: "👍", count: 1, userIds: ["user-1"] }];
+    item.skillExecutionProposal = {
+      id: "skill-reaction-safe",
+      type: "request_agent_skill_execute",
+      status: "accepted",
+      projectId: "project-1",
+      agentId: "project-agent-1",
+      agentName: "Release Agent",
+      skillId: "skill-release",
+      skillName: "Deploy",
+      request: "Deploy the app",
+      provider: "codex",
+      model: null,
+      effort: null,
+      createdAt: "2026-08-11T00:00:00.000Z",
+      acceptedAt: "2026-08-11T00:01:00.000Z",
+      requestedWorkerId: "worker-1",
+      requestedWorkerLabel: "Build Mac",
+      resultSessionId: "session-1",
+      delegatedByAgentId: null,
+      delegatedByAgentName: null,
+    };
+    loadChannel.mockResolvedValue({
+      channel: channel("c-common", "Welcome", null),
+      members: [],
+      agents: [agent],
+      messages: [item],
+    });
+    toggleChannelMessageReaction.mockResolvedValue({
+      message: message(item.id, item.body),
+    });
+    await render();
+    await act(async () => {
+      [...container.querySelectorAll<HTMLButtonElement>(
+        ".companion-channel-group button",
+      )].find((button) => button.textContent?.includes("Welcome"))?.click();
+      await Promise.resolve();
+    });
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(".channel-reaction-chip")
+        ?.click();
+      await Promise.resolve();
+    });
+    expect(container.querySelector(".skill-execution-proposal-card"))
+      .not.toBeNull();
+    expect(container.textContent).toContain("session-1");
   });
 
   it("polls the selected channel for pending and completed Agent replies", async () => {
@@ -1344,6 +1400,115 @@ describe("CompanionChannels", () => {
       "execution-companion",
       { provider: "codex", model: null, effort: null, workerId: null },
     );
+  });
+
+  it("uses exact Worker approval for a saved Skill and adopts its session", async () => {
+    const selectedChannel = channel("c-current", "Briar dev", "project-1");
+    const item = message("m-skill", "Run the deploy Skill");
+    item.channelId = selectedChannel.id;
+    item.author = {
+      type: "agent",
+      id: "agent-1",
+      name: "Honey",
+      provider: "codex",
+    };
+    const pending = {
+      id: "skill-companion",
+      type: "request_agent_skill_execute" as const,
+      status: "pending" as const,
+      projectId: "project-1",
+      agentId: "project-agent-1",
+      agentName: "Release Agent",
+      skillId: "skill-1",
+      skillName: "Deploy",
+      request: "Deploy the mobile app",
+      provider: "codex" as const,
+      model: null,
+      effort: null,
+      createdAt: "2026-08-11T00:00:00.000Z",
+      acceptedAt: null,
+      requestedWorkerId: null,
+      requestedWorkerLabel: null,
+      resultSessionId: null,
+      delegatedByAgentId: null,
+      delegatedByAgentName: null,
+    };
+    item.skillExecutionProposal = pending;
+    const remoteSession = { id: "session-companion" } as AutoHuntSession;
+    listChannels.mockResolvedValue({ channels: [selectedChannel], cursor: 1 });
+    loadChannel.mockResolvedValue({
+      channel: selectedChannel,
+      members: [],
+      agents: [agent],
+      messages: [item],
+    });
+    loadDashboard.mockResolvedValue({
+      runs: [],
+      workers: [{
+        id: "worker-companion-skill",
+        label: "Companion Build Mac",
+        agentProvider: "codex",
+        providers: ["codex"],
+        readiness: "available",
+        acceptingWork: true,
+      }],
+      executionPolicy: {
+        selectionMode: "any",
+        defaultWorkerId: null,
+        allowedWorkerIds: [],
+        updatedAt: null,
+      },
+    });
+    acceptChannelSkillExecutionProposal.mockResolvedValue({
+      outcome: "accepted",
+      proposal: {
+        ...pending,
+        status: "accepted",
+        acceptedAt: "2026-08-11T00:01:00.000Z",
+        requestedWorkerId: "worker-companion-skill",
+        requestedWorkerLabel: "Companion Build Mac",
+        resultSessionId: remoteSession.id,
+      },
+      projectId: "project-1",
+      session: remoteSession,
+    });
+    const adopt = vi.fn();
+    await render(undefined, undefined, undefined, adopt);
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(
+        ".companion-channel-group button",
+      )?.click();
+      await Promise.resolve();
+    });
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(
+        ".skill-execution-proposal-card footer button",
+      )?.click();
+    });
+    expect(acceptChannelSkillExecutionProposal).not.toHaveBeenCalled();
+    await act(async () => {
+      document.body.querySelector<HTMLButtonElement>(
+        'button[aria-label="Exact Worker to execute"]',
+      )?.click();
+    });
+    await act(async () => {
+      document.body.querySelector<HTMLButtonElement>(
+        '[role="option"][data-value="worker-companion-skill"]',
+      )?.click();
+    });
+    const approve = Array.from(
+      document.body.querySelectorAll<HTMLButtonElement>("button"),
+    ).find((button) => button.textContent?.includes("Approve and run Skill"));
+    await act(async () => approve?.click());
+
+    expect(acceptChannelSkillExecutionProposal).toHaveBeenCalledWith(
+      "token",
+      "org-1",
+      selectedChannel.id,
+      pending,
+      { workerId: "worker-companion-skill" },
+    );
+    expect(adopt).toHaveBeenCalledWith(remoteSession);
   });
 
   it("opens the result from an already accepted proposal", async () => {

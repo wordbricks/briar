@@ -21,11 +21,23 @@ export function mergeChannelMessages(
       message.executionProposal?.id === acceptedExecution.id &&
       message.executionProposal.status === "pending",
     );
+    const acceptedSkillExecution =
+      previous?.skillExecutionProposal?.status === "accepted"
+        ? previous.skillExecutionProposal
+        : null;
+    const keepsAcceptedSkillExecution = Boolean(
+      acceptedSkillExecution &&
+      message.skillExecutionProposal?.id === acceptedSkillExecution.id &&
+      message.skillExecutionProposal.status === "pending",
+    );
+    const merged = keepsAcceptedExecution
+      ? { ...message, executionProposal: acceptedExecution }
+      : message;
     byId.set(
       message.id,
-      keepsAcceptedExecution
-        ? { ...message, executionProposal: acceptedExecution }
-        : message,
+      keepsAcceptedSkillExecution
+        ? { ...merged, skillExecutionProposal: acceptedSkillExecution }
+        : merged,
     );
   }
   for (const id of removedIds) byId.delete(id);
@@ -33,5 +45,20 @@ export function mergeChannelMessages(
     left.createdAt === right.createdAt
       ? left.id.localeCompare(right.id)
       : left.createdAt.localeCompare(right.createdAt),
+  );
+}
+
+/** Merge a complete server snapshot while preserving only monotonic accepts. */
+export function mergeChannelMessageSnapshot(
+  current: ChannelMessage[],
+  incoming: ChannelMessage[],
+) {
+  const incomingIds = new Set(incoming.map((message) => message.id));
+  return mergeChannelMessages(
+    current,
+    incoming,
+    current
+      .filter((message) => !incomingIds.has(message.id))
+      .map((message) => message.id),
   );
 }

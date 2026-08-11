@@ -426,6 +426,140 @@ describe("Organization Agent channel delegation", () => {
     });
   });
 
+  it("lets only the delegated Project Agent propose its selected saved Skill", async () => {
+    const request = "Repository questions: run the saved repository workflow.";
+    const parent = await queueOrganizationReply(request);
+    const parentClaim = await claim(otherWorkerId);
+    expect(parentClaim.work).toMatchObject({
+      workId: parent.id,
+      projectId: null,
+      skillExecutionTarget: null,
+    });
+    const parentClaimToken = String(parentClaim.work?.claimToken);
+
+    const organizationAttempt = await apiWorker.fetch(
+      workerRequest(`/channel-reply-claims/${parent.id}/complete`, {
+        organizationId,
+        workerId: otherWorkerId,
+        claimToken: parentClaimToken,
+        result: {
+          body: "Trying to run a Project Skill directly.",
+          document: null,
+          issueProposal: null,
+          executionProposal: null,
+          skillExecutionProposal: {
+            type: "request_agent_skill_execute",
+          },
+          delegation: null,
+        },
+      }),
+      env(),
+    );
+    expect(organizationAttempt.status).toBe(400);
+    await expect(db.prepare(
+      `select count(*) as count
+       from briar_agent_skill_execution_proposals
+       where source_reply_job_id = ?`,
+    ).bind(parent.id).first()).resolves.toEqual({ count: 0 });
+    await expect(
+      getChannelMessage(db, channelId, parent.reply_message_id),
+    ).resolves.toBeNull();
+
+    const delegated = await apiWorker.fetch(
+      workerRequest(`/channel-reply-claims/${parent.id}/complete`, {
+        organizationId,
+        workerId: otherWorkerId,
+        claimToken: parentClaimToken,
+        result: {
+          body: "Delegating the saved Skill request to Briar Guide.",
+          document: null,
+          issueProposal: null,
+          executionProposal: null,
+          skillExecutionProposal: null,
+          delegation: { projectId, agentId: projectAgent.id, request },
+        },
+      }),
+      env(),
+    );
+    expect(delegated.status).toBe(200);
+    const replies = await listChannelAgentReplies(
+      db,
+      channelId,
+      parent.trigger_message_id,
+    );
+    const child = replies.find((reply) => reply.agent_id === projectAgent.id)!;
+    const childClaim = await claim(projectWorkerId);
+    expect(childClaim.work).toMatchObject({
+      workId: child.id,
+      projectId,
+      activeSkill: { id: projectAgent.skills[0].id },
+      skillExecutionTarget: {
+        projectId,
+        agentId: projectAgent.id,
+        skillId: projectAgent.skills[0].id,
+        skillName: projectAgent.skills[0].name,
+        request,
+      },
+      delegation: {
+        delegatedByReplyId: parent.id,
+        delegatedByAgentId: organizationAgent.id,
+        delegatedByAgentName: organizationAgent.name,
+        request,
+      },
+    });
+
+    const childCompleted = await apiWorker.fetch(
+      workerRequest(`/channel-reply-claims/${child.id}/complete`, {
+        organizationId,
+        workerId: projectWorkerId,
+        claimToken: String(childClaim.work?.claimToken),
+        result: {
+          body: "The saved Skill requires explicit Worker approval.",
+          document: null,
+          issueProposal: null,
+          executionProposal: null,
+          skillExecutionProposal: {
+            type: "request_agent_skill_execute",
+          },
+          delegation: null,
+        },
+      }),
+      env(),
+    );
+    expect(childCompleted.status).toBe(200);
+    await expect(childCompleted.json()).resolves.toMatchObject({
+      message: {
+        skillExecutionProposal: {
+          type: "request_agent_skill_execute",
+          status: "pending",
+          projectId,
+          agentId: projectAgent.id,
+          agentName: projectAgent.name,
+          skillId: projectAgent.skills[0].id,
+          skillName: projectAgent.skills[0].name,
+          request,
+          delegatedByAgentId: organizationAgent.id,
+          delegatedByAgentName: organizationAgent.name,
+          requestedWorkerId: null,
+          resultSessionId: null,
+        },
+      },
+    });
+    await expect(db.prepare(
+      `select status, delegated_by_reply_job_id, delegated_by_agent_id,
+              delegated_by_agent_name, requested_worker_id, result_session_id
+       from briar_agent_skill_execution_proposals
+       where source_reply_job_id = ?`,
+    ).bind(child.id).first()).resolves.toEqual({
+      status: "pending",
+      delegated_by_reply_job_id: parent.id,
+      delegated_by_agent_id: organizationAgent.id,
+      delegated_by_agent_name: organizationAgent.name,
+      requested_worker_id: null,
+      result_session_id: null,
+    });
+  });
+
   it("requires Organization delegation and preserves it on a Project Agent execution card", async () => {
     const workflow = JSON.stringify({
       version: 2,
