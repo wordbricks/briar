@@ -92,6 +92,19 @@ actions tied to the current ChatGPT user. Leave public content anonymous.
 - `npm test`: build the starter and verify its rendered loading skeleton
 - `npm run db:generate`: generate Drizzle migrations after schema changes
 
+## Google Analytics
+
+Production uses the Briar landing GA4 web stream (`G-SQDQ3YZ6TL`) by default.
+Set `NEXT_PUBLIC_GA_MEASUREMENT_ID` only when a staging or test build needs to
+send data to a different stream. Invalid override IDs disable Google Analytics
+rather than emitting a broken tag.
+
+The landing page sends an explicit `file_download` event for every macOS DMG
+link. The event count measures download starts; register `download_location`,
+`download_platform`, and `download_architecture` as event-scoped custom
+dimensions when those breakdowns are needed. The release Worker's request
+count remains the source for files actually served.
+
 ## Learn More
 
 - [vinext Documentation](https://github.com/cloudflare/vinext)
