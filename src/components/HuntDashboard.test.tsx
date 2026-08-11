@@ -912,41 +912,27 @@ describe("HuntDashboard", () => {
     const trigger = container.querySelector<HTMLButtonElement>(
       ".run-page-actions-trigger",
     );
-    const copyLink = container.querySelector<HTMLButtonElement>(
-      ".run-page-share-copy",
-    );
-    const copyId = container.querySelector<HTMLButtonElement>(
-      ".run-page-id-copy",
-    );
     const titlebarActions = container.querySelector(
       ".run-page-titlebar-actions",
     );
-    expect(copyLink?.getAttribute("aria-label")).toBe("링크 복사");
-    expect(copyId?.getAttribute("aria-label")).toBe("이슈 ID 복사");
-    await act(async () => copyId?.click());
-    expect(writeText).toHaveBeenCalledWith(
-      `BR-${demoDashboard.runs[0].runNumber}`,
-    );
-    const toastMessages = () =>
-      Array.from(
-        document.body.querySelectorAll<HTMLElement>('[data-testid="app-toast"]'),
-      ).map((node) => node.textContent ?? "");
-    expect(toastMessages().some((text) => text.includes("이슈 ID가 복사되었습니다")))
-      .toBe(true);
-    await act(async () => copyLink?.click());
-    expect(writeText).toHaveBeenCalledWith(
-      expect.stringContaining(`/open/issues/${demoDashboard.project.id}/`),
-    );
-    expect(toastMessages().some((text) => text.includes("링크가 복사되었습니다")))
-      .toBe(true);
+    expect(container.querySelector(".run-page-id-copy")).toBeNull();
+    expect(container.querySelector(".run-page-share-copy")).toBeNull();
     expect(titlebarActions?.querySelector(".run-page-share-status")).toBeNull();
     const saveStatus = container.querySelector(".run-page-save-status");
     expect(title?.nextElementSibling).toBe(saveStatus);
-    expect(saveStatus?.textContent).toContain("저장됨");
+    expect(saveStatus?.classList.contains("saved")).toBe(true);
+    expect(saveStatus?.getAttribute("aria-label")).toBe("저장됨");
+    expect(saveStatus?.textContent?.trim()).toBe("");
     expect(saveStatus?.nextElementSibling).toBe(titlebarActions);
     expect(titlebarActions?.firstElementChild?.classList).toContain(
       "run-page-property-badges",
     );
+    expect(
+      titlebarActions?.querySelector(".run-page-titlebar-divider"),
+    ).not.toBeNull();
+    expect(
+      titlebarActions?.querySelector(".run-page-titlebar-tools"),
+    ).not.toBeNull();
     const processNow = titlebarActions?.querySelector<HTMLButtonElement>(
       ".run-page-process-now",
     );
@@ -956,8 +942,6 @@ describe("HuntDashboard", () => {
     expect(
       titlebarActions?.querySelector(".run-page-properties-toggle"),
     ).not.toBeNull();
-    expect(copyId?.nextElementSibling).toBe(copyLink);
-    expect(copyLink?.nextElementSibling).toBe(trigger);
     expect(container.querySelector(".run-page-edit")).toBeNull();
 
     await act(async () => {
@@ -966,12 +950,50 @@ describe("HuntDashboard", () => {
       );
     });
     const menu = document.body.querySelector('[role="menu"]');
+    expect(menu?.textContent).toContain("이슈 ID 복사");
+    expect(menu?.textContent).toContain("링크 복사");
     expect(menu?.textContent).not.toContain("링크 공유");
     expect(menu?.textContent).not.toContain("수정");
     expect(menu?.textContent).toContain("삭제");
 
-    const deleteItem = Array.from(
+    const copyIdItem = Array.from(
       menu?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [],
+    ).find((item) => item.textContent?.includes("이슈 ID 복사"));
+    await act(async () => copyIdItem?.click());
+    expect(writeText).toHaveBeenCalledWith(
+      `BR-${demoDashboard.runs[0].runNumber}`,
+    );
+    const toastMessages = () =>
+      Array.from(
+        document.body.querySelectorAll<HTMLElement>('[data-testid="app-toast"]'),
+      ).map((node) => node.textContent ?? "");
+    expect(toastMessages().some((text) => text.includes("이슈 ID가 복사되었습니다")))
+      .toBe(true);
+
+    await act(async () => {
+      trigger?.dispatchEvent(
+        new MouseEvent("pointerdown", { bubbles: true, button: 0 }),
+      );
+    });
+    const reopenedMenu = document.body.querySelector('[role="menu"]');
+    const copyLinkItem = Array.from(
+      reopenedMenu?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [],
+    ).find((item) => item.textContent?.includes("링크 복사"));
+    await act(async () => copyLinkItem?.click());
+    expect(writeText).toHaveBeenCalledWith(
+      expect.stringContaining(`/open/issues/${demoDashboard.project.id}/`),
+    );
+    expect(toastMessages().some((text) => text.includes("링크가 복사되었습니다")))
+      .toBe(true);
+
+    await act(async () => {
+      trigger?.dispatchEvent(
+        new MouseEvent("pointerdown", { bubbles: true, button: 0 }),
+      );
+    });
+    const deleteMenu = document.body.querySelector('[role="menu"]');
+    const deleteItem = Array.from(
+      deleteMenu?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [],
     ).find((item) => item.textContent?.includes("삭제"));
     await act(async () => deleteItem?.click());
     expect(document.body.textContent).toContain(
@@ -1026,8 +1048,12 @@ describe("HuntDashboard", () => {
       );
       expect(title?.value).toBe(run.title);
       expect(description?.value).toBe(run.issueDescription ?? "");
-      expect(container.querySelector(".run-page-save-status")?.textContent)
-        .toContain("저장됨");
+      expect(
+        container.querySelector(".run-page-save-status")?.getAttribute("aria-label"),
+      ).toBe("저장됨");
+      expect(
+        container.querySelector(".run-page-save-status")?.classList.contains("saved"),
+      ).toBe(true);
 
       await act(async () => {
         Object.getOwnPropertyDescriptor(
@@ -1057,8 +1083,12 @@ describe("HuntDashboard", () => {
         priority: run.priority,
         attachments: [],
       });
-      expect(container.querySelector(".run-page-save-status")?.textContent)
-        .toContain("저장됨");
+      expect(
+        container.querySelector(".run-page-save-status")?.getAttribute("aria-label"),
+      ).toBe("저장됨");
+      expect(
+        container.querySelector(".run-page-save-status")?.classList.contains("saved"),
+      ).toBe(true);
     } finally {
       await act(async () => root.unmount());
       container.remove();
@@ -1249,8 +1279,12 @@ describe("HuntDashboard", () => {
         priority: run.priority,
         attachments: [],
       });
-      expect(container.querySelector(".run-page-save-status")?.textContent)
-        .toContain("저장됨");
+      expect(
+        container.querySelector(".run-page-save-status")?.getAttribute("aria-label"),
+      ).toBe("저장됨");
+      expect(
+        container.querySelector(".run-page-save-status")?.classList.contains("saved"),
+      ).toBe(true);
     } finally {
       await act(async () => root.unmount());
       container.remove();
@@ -1345,6 +1379,56 @@ describe("HuntDashboard", () => {
     expect(markup).toContain("worker-icon");
     expect(markup).toContain(`담당자: ${member.name}`);
     expect(markup).toContain(`배정된 Worker: ${dashboardWorker.label}`);
+    expect(markup).not.toContain('class="run-page-property-badge agent"');
+  });
+
+  it("shows the performed agent badge only when an agent is assigned", () => {
+    const withoutAgent = renderToStaticMarkup(
+      <TooltipProvider>
+        <RunPage
+          isSidebarOpen
+          error={null}
+          isRecovering={false}
+          onBack={() => undefined}
+          onCancel={async () => undefined}
+          onLoadAttachment={async () => new Blob()}
+          onLoadIssueMessages={async () => []}
+          onLoadRunEvidence={async () => []}
+          onMove={async () => undefined}
+          onRetry={async () => undefined}
+          onSendIssueMessage={async () => {
+            throw new Error("not implemented in this test");
+          }}
+          run={demoDashboard.runs[0]}
+        />
+      </TooltipProvider>,
+    );
+    expect(withoutAgent).not.toContain('class="run-page-property-badge agent"');
+
+    const withAgent = renderToStaticMarkup(
+      <TooltipProvider>
+        <RunPage
+          isSidebarOpen
+          error={null}
+          isRecovering={false}
+          onBack={() => undefined}
+          onCancel={async () => undefined}
+          onLoadAttachment={async () => new Blob()}
+          onLoadIssueMessages={async () => []}
+          onLoadRunEvidence={async () => []}
+          onMove={async () => undefined}
+          onRetry={async () => undefined}
+          onSendIssueMessage={async () => {
+            throw new Error("not implemented in this test");
+          }}
+          performedAgentName="Honey"
+          run={demoDashboard.runs[0]}
+        />
+      </TooltipProvider>,
+    );
+    expect(withAgent).toContain('class="run-page-property-badge agent"');
+    expect(withAgent).toContain("Honey");
+    expect(withAgent).toContain("에이전트: Honey");
   });
 
   it("lets users change status and priority from compact property badges", async () => {
@@ -2352,7 +2436,7 @@ describe("HuntDashboard", () => {
     ).toHaveLength(2);
     expect(
       container.querySelectorAll(".run-page-property-badge"),
-    ).toHaveLength(1);
+    ).toHaveLength(0);
     expect(
       container.querySelector(".run-page-property-select.status .select-menu-trigger"),
     ).not.toBeNull();
@@ -4940,7 +5024,9 @@ describe("HuntDashboard", () => {
     expect(markup).toContain('class="recovery-panel"');
     expect(markup).toContain("run-page-property-select status red");
     expect(markup).toContain(">실패</span>");
-    expect(markup).toContain('aria-expanded="false" aria-label="속성" class="run-page-properties-toggle"');
+    expect(markup).toContain(
+      'aria-expanded="false" aria-label="속성" class="run-page-tool-button run-page-properties-toggle"',
+    );
   });
 
   it("shows a concise paused checkpoint summary in the result tab", () => {

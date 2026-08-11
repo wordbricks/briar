@@ -4889,10 +4889,16 @@ export function RunPage({
           <WorkerIcon icon={executionWorker.icon} size={18} />
         </span>
       )}
-      <span className="run-page-property-badge agent" title={t("run.agent")}>
-        <Bot aria-hidden="true" size={13} />
-        {performedAgentName ?? t("run.unassigned")}
-      </span>
+      {performedAgentName ? (
+        <span
+          aria-label={`${t("run.agent")}: ${performedAgentName}`}
+          className="run-page-property-badge agent"
+          title={`${t("run.agent")}: ${performedAgentName}`}
+        >
+          <Bot aria-hidden="true" size={13} />
+          {performedAgentName}
+        </span>
+      ) : null}
     </div>
   );
   const processNowLabel = t(
@@ -4925,11 +4931,20 @@ export function RunPage({
       </Tooltip>
     </TooltipProvider>
   );
+  const inlineSaveLabel = t(
+    inlineSaveStatus === "saving"
+      ? "common.saving"
+      : inlineSaveStatus === "failed"
+        ? "issue.saveFailed"
+        : "common.saved",
+  );
   const inlineSaveIndicator = onUpdateIssue ? (
     <span
+      aria-label={inlineSaveLabel}
       aria-live="polite"
       className={`run-page-save-status ${inlineSaveStatus}`}
       role="status"
+      title={inlineSaveLabel}
     >
       {inlineSaveStatus === "saving" ? (
         <LoaderCircle aria-hidden="true" className="spin" size={13} />
@@ -4938,13 +4953,7 @@ export function RunPage({
       ) : (
         <Check aria-hidden="true" size={13} />
       )}
-      {t(
-        inlineSaveStatus === "saving"
-          ? "common.saving"
-          : inlineSaveStatus === "failed"
-            ? "issue.saveFailed"
-            : "common.saved",
-      )}
+      {inlineSaveStatus === "saved" ? null : <span>{inlineSaveLabel}</span>}
     </span>
   ) : null;
   return (
@@ -4981,73 +4990,59 @@ export function RunPage({
           {inlineSaveIndicator}
           <div className="run-page-titlebar-actions">
             {compactProperties}
-            {processNowButton}
-            {onOpenFullPage ? (
+            <span aria-hidden="true" className="run-page-titlebar-divider" />
+            <div className="run-page-titlebar-tools">
+              {processNowButton}
+              {onOpenFullPage ? (
+                <button
+                  aria-label={t("inbox.openFullPage")}
+                  className="run-page-tool-button run-page-open-full-page"
+                  onClick={onOpenFullPage}
+                  title={t("inbox.openFullPage")}
+                  type="button"
+                >
+                  <Maximize2 aria-hidden="true" size={15} />
+                </button>
+              ) : null}
               <button
-                aria-label={t("inbox.openFullPage")}
-                className="run-page-link-copy run-page-open-full-page"
-                onClick={onOpenFullPage}
-                title={t("inbox.openFullPage")}
+                aria-controls="run-properties-panel"
+                aria-expanded={isPropertiesOpen}
+                aria-label={t("run.properties")}
+                className="run-page-tool-button run-page-properties-toggle"
+                onClick={() => setIsPropertiesOpen((open) => !open)}
+                title={t("run.properties")}
                 type="button"
               >
-                <Maximize2 aria-hidden="true" size={16} />
+                <Columns3 aria-hidden="true" size={15} />
               </button>
-            ) : null}
-            <button
-              aria-controls="run-properties-panel"
-              aria-expanded={isPropertiesOpen}
-              aria-label={t("run.properties")}
-              className="run-page-properties-toggle"
-              onClick={() => setIsPropertiesOpen((open) => !open)}
-              type="button"
-            >
-              <Columns3 aria-hidden="true" size={15} />
-              <ChevronDown aria-hidden="true" size={13} />
-            </button>
-            <button
-              aria-label={t("issue.copyId")}
-              className="run-page-link-copy run-page-id-copy"
-              onClick={() => void copyId()}
-              title={t("issue.copyId")}
-              type="button"
-            >
-              <Copy aria-hidden="true" size={16} />
-            </button>
-            <button
-              aria-label={t("issue.copyLink")}
-              className="run-page-link-copy run-page-share-copy"
-              disabled={!projectId}
-              onClick={() => void copyIssueLink()}
-              title={t("issue.copyLink")}
-              type="button"
-            >
-              <Link2 aria-hidden="true" size={16} />
-            </button>
-            <IssueActionsMenu
-              disabled={isUpdatingIssue || isDeletingIssue || isRecovering}
-              onCancel={
-                canCancelRemoteExecution
-                  ? () => void runAction(onCancel)
-                  : undefined
-              }
-              onUnassign={
-                canUnassign
-                  ? () => void runAction(() => onUnassignRun!(run.id))
-                  : undefined
-              }
-              onDelete={onDelete ? () => setIsDeleteDialogOpen(true) : undefined}
-              onTransfer={
-                onTransfer
-                  ? () => {
-                      setTransferError(null);
-                      setTransferTargetProjectId(
-                        transferProjects[0]?.id ?? "",
-                      );
-                      setIsTransferDialogOpen(true);
-                    }
-                  : undefined
-              }
-            />
+              <IssueActionsMenu
+                disabled={isUpdatingIssue || isDeletingIssue || isRecovering}
+                onCancel={
+                  canCancelRemoteExecution
+                    ? () => void runAction(onCancel)
+                    : undefined
+                }
+                onCopyId={() => void copyId()}
+                onCopyLink={projectId ? () => void copyIssueLink() : undefined}
+                onUnassign={
+                  canUnassign
+                    ? () => void runAction(() => onUnassignRun!(run.id))
+                    : undefined
+                }
+                onDelete={onDelete ? () => setIsDeleteDialogOpen(true) : undefined}
+                onTransfer={
+                  onTransfer
+                    ? () => {
+                        setTransferError(null);
+                        setTransferTargetProjectId(
+                          transferProjects[0]?.id ?? "",
+                        );
+                        setIsTransferDialogOpen(true);
+                      }
+                    : undefined
+                }
+              />
+            </div>
           </div>
         </header>
       )}
@@ -5114,18 +5109,21 @@ export function RunPage({
                 </div>
                 <div className="run-page-companion-actions">
                   {compactProperties}
-                  {processNowButton}
-                  <button
-                    aria-controls="run-properties-panel"
-                    aria-expanded={isPropertiesOpen}
-                    aria-label={t("run.properties")}
-                    className="run-page-properties-toggle"
-                    onClick={() => setIsPropertiesOpen((open) => !open)}
-                    type="button"
-                  >
-                    <Columns3 aria-hidden="true" size={15} />
-                    <ChevronDown aria-hidden="true" size={13} />
-                  </button>
+                  <span aria-hidden="true" className="run-page-titlebar-divider" />
+                  <div className="run-page-titlebar-tools">
+                    {processNowButton}
+                    <button
+                      aria-controls="run-properties-panel"
+                      aria-expanded={isPropertiesOpen}
+                      aria-label={t("run.properties")}
+                      className="run-page-tool-button run-page-properties-toggle"
+                      onClick={() => setIsPropertiesOpen((open) => !open)}
+                      title={t("run.properties")}
+                      type="button"
+                    >
+                      <Columns3 aria-hidden="true" size={15} />
+                    </button>
+                  </div>
                 </div>
               </div>
             </header>
@@ -6388,6 +6386,8 @@ export function RunPage({
 function IssueActionsMenu({
   disabled,
   onCancel,
+  onCopyId,
+  onCopyLink,
   onUnassign,
   onDelete,
   onTransfer,
@@ -6395,6 +6395,8 @@ function IssueActionsMenu({
 }: {
   disabled: boolean;
   onCancel?: () => void;
+  onCopyId?: () => void;
+  onCopyLink?: () => void;
   onUnassign?: () => void;
   onDelete?: () => void;
   onTransfer?: () => void;
@@ -6406,14 +6408,14 @@ function IssueActionsMenu({
       <DropdownMenu.Trigger asChild>
         <button
           aria-label={t("issue.actions")}
-          className="run-page-actions-trigger"
+          className="run-page-tool-button run-page-actions-trigger"
           disabled={disabled}
           type="button"
         >
           {disabled ? (
             <LoaderCircle className="spin" size={15} />
           ) : (
-            <MoreHorizontal size={17} />
+            <MoreHorizontal size={16} />
           )}
         </button>
       </DropdownMenu.Trigger>
@@ -6423,6 +6425,24 @@ function IssueActionsMenu({
           className="run-page-actions-menu"
           sideOffset={6}
         >
+          {onCopyId ? (
+            <DropdownMenu.Item
+              className="run-page-actions-item"
+              onSelect={onCopyId}
+            >
+              <Copy size={14} />
+              {t("issue.copyId")}
+            </DropdownMenu.Item>
+          ) : null}
+          {onCopyLink ? (
+            <DropdownMenu.Item
+              className="run-page-actions-item"
+              onSelect={onCopyLink}
+            >
+              <Link2 size={14} />
+              {t("issue.copyLink")}
+            </DropdownMenu.Item>
+          ) : null}
           {onShare ? (
             <DropdownMenu.Item
               className="run-page-actions-item"
