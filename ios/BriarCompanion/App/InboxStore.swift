@@ -97,7 +97,18 @@ final class InboxStore: ObservableObject {
     }
 
     func markIssueRead(runID: UUID) {
-        markRead(id: "issue:\(runID.uuidString.lowercased())")
+        let normalizedRunID = runID.uuidString.lowercased()
+        var pushed: [String: String] = [:]
+        for message in messages where
+            message.targetId == normalizedRunID &&
+            (message.kind == .issue || message.kind == .conversation) {
+            guard readVersions[message.id] != message.version else { continue }
+            readVersions[message.id] = message.version
+            pushed[message.id] = message.version
+        }
+        guard !pushed.isEmpty else { return }
+        recompute()
+        queuePush(pushed)
     }
 
     func markAllRead() {

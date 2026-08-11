@@ -798,6 +798,36 @@ export function useInbox(
     [queueReadStatePush, storageKey],
   );
 
+  const markIssueRead = useCallback(
+    (runId: string) => {
+      setState((current) => {
+        if (current.storageKey !== storageKey) return current;
+        const issueReadVersions = Object.fromEntries(
+          current.messages
+            .filter(
+              (message) =>
+                message.targetId === runId &&
+                (message.kind === "issue" || message.kind === "conversation") &&
+                current.readVersions[message.id] !== message.version,
+            )
+            .map((message) => [message.id, message.version]),
+        );
+        if (Object.keys(issueReadVersions).length === 0) return current;
+        const next = {
+          messages: current.messages,
+          readVersions: {
+            ...current.readVersions,
+            ...issueReadVersions,
+          },
+        };
+        writeInboxStorage(storageKey, next);
+        queueReadStatePush(issueReadVersions);
+        return { storageKey, ...next };
+      });
+    },
+    [queueReadStatePush, storageKey],
+  );
+
   const markAllRead = useCallback(() => {
     setState((current) => {
       if (current.storageKey !== storageKey) return current;
@@ -825,6 +855,7 @@ export function useInbox(
   return {
     messages,
     markAllRead,
+    markIssueRead,
     markRead,
     unreadCount: messages.filter(
       (message) =>

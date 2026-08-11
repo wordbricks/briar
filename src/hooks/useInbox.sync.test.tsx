@@ -125,6 +125,53 @@ describe("useInbox read-state synchronization", () => {
     expect(inbox.messages[0]?.isUnread).toBe(false);
   });
 
+  it("marks an issue and its conversation replies read together", async () => {
+    const dashboard = dashboardAt(1);
+    dashboard.conversationNotifications = [
+      {
+        id: "reply-message",
+        runId: "inbox-sync-run",
+        runTitle: "Needs attention",
+        rootMessageId: "root-message",
+        body: "I added the requested answer.",
+        author: {
+          id: "reply-author",
+          name: "Reply author",
+          image: null,
+          provider: null,
+        },
+        reason: "thread_reply",
+        createdAt: "2026-08-11T00:00:02.000Z",
+      },
+    ];
+    await renderHarness({
+      dashboard,
+      token: "token-a",
+      userId: "user-a",
+    });
+
+    expect(inbox.messages).toEqual([
+      expect.objectContaining({
+        id: "conversation:reply-message",
+        isUnread: true,
+      }),
+      expect.objectContaining({
+        id: "issue:inbox-sync-run",
+        isUnread: true,
+      }),
+    ]);
+
+    await act(async () => inbox.markIssueRead("inbox-sync-run"));
+
+    expect(inbox.messages.every((message) => !message.isUnread)).toBe(true);
+    expect(mockedSaveInboxReadStates).toHaveBeenCalledWith(
+      "token-a",
+      Object.fromEntries(
+        inbox.messages.map((message) => [message.id, message.version]),
+      ),
+    );
+  });
+
   it("isolates an old account PUT from the new account generation", async () => {
     const accountAPush = deferred<Record<string, string>>();
     const accountBPush = deferred<Record<string, string>>();

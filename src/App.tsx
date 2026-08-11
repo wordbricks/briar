@@ -259,8 +259,8 @@ export function App() {
     briar.token,
   );
   const markInboxIssueRead = useCallback(
-    (runId: string) => inbox.markRead(`issue:${runId}`),
-    [inbox.markRead],
+    (runId: string) => inbox.markIssueRead(runId),
+    [inbox.markIssueRead],
   );
   useInboxNotifications(
     briar.user?.id ?? null,

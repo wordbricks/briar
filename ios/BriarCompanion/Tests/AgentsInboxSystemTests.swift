@@ -955,7 +955,13 @@ final class AgentsInboxSystemTests: XCTestCase {
             XCTAssertEqual(store.messages(in: .urgent).count, 1)
             XCTAssertEqual(store.messages(in: .actionRequired).count, 3)
             store.markIssueRead(runID: blocked.id)
-            XCTAssertEqual(store.unreadCount, 3)
+            XCTAssertEqual(store.unreadCount, 2)
+            XCTAssertFalse(
+                store.messages.contains {
+                    $0.targetId == blocked.id.uuidString.lowercased() && $0.isUnread
+                }
+            )
+            XCTAssertTrue(store.messages.first { $0.kind == .channel }?.isUnread == true)
             store.markAllRead()
             XCTAssertEqual(store.unreadCount, 0)
 
