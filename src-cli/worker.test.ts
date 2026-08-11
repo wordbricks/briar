@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_MAX_ERROR_DELAY_MS,
+  DEFAULT_MAX_IDLE_DELAY_MS,
   createWorkerDeviceIdentity,
   defaultWorkerLabel,
   errorDelayMs,
+  idleDelayWithBackoffMs,
+  leaseRenewDelayMs,
   launchdPlist,
   runWorkerLoop,
   restartInstalledServices,
@@ -79,6 +82,7 @@ const harness = (
       clock += milliseconds;
     },
     now: () => clock,
+    random: () => 0.5,
     log: (line) => logs.push(line),
     ...overrides,
   };
@@ -135,7 +139,28 @@ describe("briar worker loop", () => {
     });
 
     expect(result.processed).toBe(1);
-    expect(test.sleeps).toEqual([15_000, 15_000]);
+    expect(test.sleeps).toEqual([15_000, 30_000]);
+  });
+
+  it("honors the server retry floor and caps sustained idle polling", async () => {
+    let polls = 0;
+    const test = harness([], {
+      claim: async () => {
+        polls += 1;
+        return polls > 4
+          ? { work: issue("issue-late") }
+          : { work: null, retryAfterMs: 20_000 };
+      },
+    });
+    const result = await runWorkerLoop(test.dependencies, {
+      maxIssues: 1,
+      idleDelayMs: 15_000,
+      maxIdleDelayMs: 60_000,
+      heartbeatIntervalMs: 10 * 60_000,
+    });
+
+    expect(result.processed).toBe(1);
+    expect(test.sleeps).toEqual([20_000, 40_000, 60_000, 60_000]);
   });
 
   it("holds exactly one issue in flight and renews its lease while it runs", async () => {
@@ -291,6 +316,20 @@ describe("briar worker loop", () => {
     expect(errorDelayMs(4)).toBe(16_000);
     expect(errorDelayMs(50)).toBe(DEFAULT_MAX_ERROR_DELAY_MS);
     expect(errorDelayMs(50, 30_000)).toBe(30_000);
+  });
+
+  it("jitters empty-queue backoff without exceeding its configured band", () => {
+    expect(idleDelayWithBackoffMs(1, 15_000, 60_000, () => 0)).toBe(12_000);
+    expect(idleDelayWithBackoffMs(2, 15_000, 60_000, () => 0.5)).toBe(30_000);
+    expect(idleDelayWithBackoffMs(50, 15_000, 60_000, () => 1)).toBe(
+      DEFAULT_MAX_IDLE_DELAY_MS,
+    );
+  });
+
+  it("jitters five-minute lease renewal without approaching expiry", () => {
+    expect(leaseRenewDelayMs(5 * 60_000, () => 0)).toBe(4.5 * 60_000);
+    expect(leaseRenewDelayMs(5 * 60_000, () => 0.5)).toBe(5 * 60_000);
+    expect(leaseRenewDelayMs(5 * 60_000, () => 1)).toBe(5.5 * 60_000);
   });
 
   it("heartbeats on the first iteration and then on the interval", async () => {

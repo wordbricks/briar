@@ -4195,6 +4195,37 @@ export async function listOrganizationProjects(
   return result.results;
 }
 
+export async function listOrganizationInboxProjects(
+  db: D1Database,
+  organizationId: string,
+) {
+  const result = await db
+    .prepare(
+      `select id, name, issue_key_prefix
+       from briar_projects
+       where organization_id = ?
+       order by created_at, id`,
+    )
+    .bind(organizationId)
+    .all<Pick<ProjectRow, "id" | "name" | "issue_key_prefix">>();
+  return result.results;
+}
+
+export async function getOrganizationInboxSyncVersion(
+  db: D1Database,
+  organizationId: string,
+) {
+  const state = await db
+    .prepare(
+      `select current_version
+       from briar_organization_inbox_sync_state
+       where organization_id = ?`,
+    )
+    .bind(organizationId)
+    .first<{ current_version: number }>();
+  return state?.current_version ?? 0;
+}
+
 export async function createProject(
   db: D1Database,
   input: {
@@ -5221,14 +5252,13 @@ export async function renewProjectAgentTaskLease(
   return db
     .prepare(
       `update briar_project_agent_task_jobs
-       set lease_expires_at = ?, updated_at = ?
+       set lease_expires_at = ?
        where id = ? and project_id = ? and status = 'running'
          and claimed_worker_id = ? and claim_token_hash = ?
        returning *`,
     )
     .bind(
       input.leaseExpiresAt,
-      input.updatedAt,
       jobId,
       projectId,
       input.workerId,
@@ -6114,14 +6144,13 @@ export async function renewProjectAgentScheduleRunLease(
   return db
     .prepare(
       `update briar_project_agent_schedule_runs
-       set lease_expires_at = ?, updated_at = ?
+       set lease_expires_at = ?
        where id = ? and project_id = ? and status = 'running'
          and claim_token_hash = ?
        returning id, lease_expires_at`,
     )
     .bind(
       scheduleLeaseExpiresAt(input.observedAt),
-      input.observedAt,
       runId,
       projectId,
       input.claimTokenHash,
@@ -7567,7 +7596,7 @@ export async function renewIssueAgentReplyLease(
   return await db
     .prepare(
       `update briar_issue_agent_reply_jobs
-       set lease_expires_at = ?, updated_at = ?
+       set lease_expires_at = ?
        where id = ? and project_id = ? and status = 'running'
          and claimed_worker_id = ? and claim_token_hash = ?
          and lease_expires_at > ?
@@ -7580,7 +7609,6 @@ export async function renewIssueAgentReplyLease(
     )
     .bind(
       input.leaseExpiresAt,
-      input.updatedAt,
       jobId,
       projectId,
       input.workerId,

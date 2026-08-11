@@ -1858,7 +1858,7 @@ export async function renewChannelReplyLease(
   return db
     .prepare(
       `update briar_channel_agent_reply_jobs
-       set lease_expires_at = ?, updated_at = ?
+       set lease_expires_at = ?
        where id = ? and claimed_device_id = ? and claimed_worker_id = ?
          and claim_token_hash = ? and status = 'running'
          and lease_expires_at > ?
@@ -1881,7 +1881,6 @@ export async function renewChannelReplyLease(
        returning *`,
     )
     .bind(
-      input.leaseExpiresAt,
       input.leaseExpiresAt,
       input.jobId,
       input.deviceId,

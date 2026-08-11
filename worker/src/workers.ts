@@ -278,6 +278,8 @@ export type TranscriptEventInput = {
 export const WORKER_STALE_AFTER_MS = 3 * 60_000;
 /** Lease length granted at claim time and by every renewal. */
 export const LEASE_DURATION_MS = 15 * 60_000;
+/** Credential usage is operational telemetry, so persist it at coarse granularity. */
+export const WORKER_CREDENTIAL_TOUCH_INTERVAL_MS = 5 * 60_000;
 /** Workers renew every 5 minutes, so a lease this far past expiry is stalled. */
 export const STALLED_RUN_GRACE_MS = 5 * 60_000;
 /** Reaping past this many attempts blocks the run instead of looping forever. */
@@ -796,7 +798,8 @@ export async function authenticateExecutionWorker(
 ): Promise<ExecutionWorkerCredentialPrincipal | null> {
   const row = await db
     .prepare(
-      `select device.id, device.organization_id, device.owner_user_id
+      `select device.id, device.organization_id, device.owner_user_id,
+              credential.last_used_at
        from briar_execution_worker_credentials credential
        join briar_execution_worker_devices device
          on device.id = credential.device_id
@@ -813,16 +816,28 @@ export async function authenticateExecutionWorker(
       id: string;
       organization_id: string;
       owner_user_id: string;
+      last_used_at: string | null;
     }>();
   if (!row) return null;
-  await db
-    .prepare(
-      `update briar_execution_worker_credentials
-       set last_used_at = ?
-       where device_id = ? and token_hash = ?`,
-    )
-    .bind(observedAt, row.id, tokenHash)
-    .run();
+  const observedAtMs = Date.parse(observedAt);
+  const lastUsedAtMs = row.last_used_at ? Date.parse(row.last_used_at) : NaN;
+  if (
+    !Number.isFinite(lastUsedAtMs) ||
+    lastUsedAtMs <= observedAtMs - WORKER_CREDENTIAL_TOUCH_INTERVAL_MS
+  ) {
+    const touchBefore = new Date(
+      observedAtMs - WORKER_CREDENTIAL_TOUCH_INTERVAL_MS,
+    ).toISOString();
+    await db
+      .prepare(
+        `update briar_execution_worker_credentials
+         set last_used_at = ?
+         where device_id = ? and token_hash = ?
+           and (last_used_at is null or last_used_at <= ?)`,
+      )
+      .bind(observedAt, row.id, tokenHash, touchBefore)
+      .run();
+  }
   return {
     deviceId: row.id,
     organizationId: row.organization_id,
@@ -2172,7 +2187,7 @@ export async function renewHuntRunLease(
   const row = await db
     .prepare(
       `update briar_hunt_runs
-       set lease_expires_at = ?, updated_at = ?
+       set lease_expires_at = ?
        where id = ? and project_id = ? and claim_token_hash = ?
          and (? is null or worker_id = ?)
          and status not in ('completed', 'cancelled')
@@ -2180,7 +2195,6 @@ export async function renewHuntRunLease(
     )
     .bind(
       leaseExpiresAt,
-      input.observedAt,
       input.runId,
       projectId,
       input.claimTokenHash,

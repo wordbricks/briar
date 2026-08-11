@@ -183,6 +183,7 @@ import {
   getIssueMessage,
   getRunEvidenceImage,
   getOrganizationRole,
+  getOrganizationInboxSyncVersion,
   getOrganizationInvitationByTokenHash,
   getGithubConnectionByInstallation,
   getGithubConnectionForOrganization,
@@ -235,6 +236,7 @@ import {
   listOrganizationUsageRecords,
   listGithubConnectionRepositories,
   listOrganizationProjects,
+  listOrganizationInboxProjects,
   listOrganizations,
   listProjects,
   listProjectAgents,
@@ -2295,6 +2297,14 @@ const claimInputSchema = z
   })
   .strict();
 
+const workerClaimInputSchema = z
+  .object({
+    claimedBy: z.string().trim().min(1).max(128),
+    workerId: z.string().trim().min(1).max(128),
+    projectId: z.string().uuid(),
+  })
+  .strict();
+
 const providerHealthSchema = z.record(
   z.enum(agentProviders),
   z
@@ -3346,6 +3356,15 @@ async function requireWorkerOrganization(
   return principal;
 }
 
+type AuthenticatedWorkerProject = {
+  principal: NonNullable<
+    Awaited<ReturnType<typeof authenticateExecutionWorker>>
+  >;
+  binding: NonNullable<
+    Awaited<ReturnType<typeof executionWorkerBindingById>>
+  >;
+};
+
 async function requireChannelAccess(
   db: D1Database,
   organizationId: string,
@@ -3364,7 +3383,18 @@ async function requireWorkerProjectBinding(
   request: Request,
   projectId: string,
   workerId?: string,
-) {
+  preauthenticated?: AuthenticatedWorkerProject,
+): Promise<AuthenticatedWorkerProject> {
+  if (preauthenticated) {
+    if (
+      preauthenticated.binding.project_id !== projectId ||
+      (workerId !== undefined && preauthenticated.binding.id !== workerId) ||
+      preauthenticated.binding.state === "disabled"
+    ) {
+      throw new HttpError(403, "Worker is not enabled for this project");
+    }
+    return preauthenticated;
+  }
   const principal = await requireWorkerCredential(db, request);
   const binding = workerId
     ? await executionWorkerBindingById(db, principal.deviceId, workerId)
@@ -3525,6 +3555,34 @@ const projectAgentSessionSummaryJson = (row: {
 
 const projectAgentSessionSyncEtag = (projectId: string, cursor: number) =>
   `"project-agent-sessions:${projectId}:${cursor}"`;
+
+export const organizationInboxSyncEtag = (
+  organizationId: string,
+  version: number,
+) => `W/"organization-inbox:${organizationId}:${version}"`;
+
+export async function loadOrganizationInboxConditionalSnapshot<T>(input: {
+  organizationId: string;
+  ifNoneMatch: string | null;
+  readVersion: () => Promise<number>;
+  loadSnapshot: () => Promise<T>;
+}) {
+  const version = await input.readVersion();
+  const etag = organizationInboxSyncEtag(input.organizationId, version);
+  if (input.ifNoneMatch === etag) {
+    return { etag, snapshot: null };
+  }
+  return { etag, snapshot: await input.loadSnapshot() };
+}
+
+const organizationInboxSyncJson = (body: unknown, etag: string) =>
+  Response.json(body, {
+    headers: {
+      ...corsHeaders,
+      "Cache-Control": "private, no-cache",
+      ETag: etag,
+    },
+  });
 
 const projectAgentSessionSyncJson = (
   body: unknown,
@@ -5941,6 +5999,7 @@ async function route(
   attachmentsBucket: R2Bucket,
   env: Env,
   context?: ExecutionContext,
+  workerClaimContext?: AuthenticatedWorkerProject,
 ): Promise<Response> {
   const { pathname } = new URL(request.url);
 
@@ -5999,40 +6058,56 @@ async function route(
     if (!(await getOrganizationRole(db, organizationId, session.user.id))) {
       throw new HttpError(404, "Organization not found");
     }
-    const projects = (await listProjects(db, session.user.id)).filter(
-      (project) => project.organization_id === organizationId,
-    );
-    const [projectData, channelNotifications] = await Promise.all([
-      Promise.all(
-        projects.map(async (project) => {
-          const [runs, conversationNotifications, sessionSummaries] =
-            await Promise.all([
-              listDashboardRuns(db, project.id),
-              listIssueConversationNotifications(
-                db,
-                project.id,
-                session.user.id,
-              ),
-              listProjectAgentSessionSummaries(db, project.id),
-            ]);
-          return {
-            project,
-            runs,
-            conversationNotifications,
-            sessionSummaries,
-          };
-        }),
-      ),
-      listChannelConversationNotifications(
-        db,
-        organizationId,
-        session.user.id,
-      ),
-    ]);
-    return privateNoStoreJson({
-      messages: buildInboxFeedMessages(projectData, channelNotifications),
-      generatedAt: new Date().toISOString(),
+    const result = await loadOrganizationInboxConditionalSnapshot({
+      organizationId,
+      ifNoneMatch: request.headers.get("if-none-match"),
+      readVersion: () => getOrganizationInboxSyncVersion(db, organizationId),
+      loadSnapshot: async () => {
+        const projects = await listOrganizationInboxProjects(db, organizationId);
+        const [projectData, channelNotifications] = await Promise.all([
+          Promise.all(
+            projects.map(async (project) => {
+              const [runs, conversationNotifications, sessionSummaries] =
+                await Promise.all([
+                  listDashboardRuns(db, project.id),
+                  listIssueConversationNotifications(
+                    db,
+                    project.id,
+                    session.user.id,
+                  ),
+                  listProjectAgentSessionSummaries(db, project.id),
+                ]);
+              return {
+                project,
+                runs,
+                conversationNotifications,
+                sessionSummaries,
+              };
+            }),
+          ),
+          listChannelConversationNotifications(
+            db,
+            organizationId,
+            session.user.id,
+          ),
+        ]);
+        return {
+          messages: buildInboxFeedMessages(projectData, channelNotifications),
+          generatedAt: new Date().toISOString(),
+        };
+      },
     });
+    if (result.snapshot === null) {
+      return new Response(null, {
+        status: 304,
+        headers: {
+          ...corsHeaders,
+          "Cache-Control": "private, no-cache",
+          ETag: result.etag,
+        },
+      });
+    }
+    return organizationInboxSyncJson(result.snapshot, result.etag);
   }
 
   if (pathname === "/me" && request.method === "PATCH") {
@@ -11522,6 +11597,59 @@ async function route(
     });
   }
 
+  if (pathname === "/worker-claims" && request.method === "POST") {
+    const input = workerClaimInputSchema.parse(await readJson(request));
+    const authenticatedWorker = await requireWorkerProjectBinding(
+      db,
+      request,
+      input.projectId,
+      input.workerId,
+    );
+    const claimRoutes = [
+      {
+        pathname: "/issue-reply-claims",
+        body: input,
+      },
+      {
+        pathname: "/agent-task-claims",
+        body: { workerId: input.workerId, projectId: input.projectId },
+      },
+      {
+        pathname: "/channel-reply-claims",
+        body: {
+          organizationId: authenticatedWorker.principal.organizationId,
+          workerId: input.workerId,
+        },
+      },
+      {
+        pathname: "/queue/claims",
+        body: input,
+      },
+    ];
+    for (const candidate of claimRoutes) {
+      const internalRequest = new Request(
+        new URL(candidate.pathname, request.url),
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(candidate.body),
+        },
+      );
+      const response = await route(
+        internalRequest,
+        auth,
+        db,
+        attachmentsBucket,
+        env,
+        context,
+        authenticatedWorker,
+      );
+      const result = await response.json<{ work: unknown }>();
+      if (result.work !== null) return json({ work: result.work });
+    }
+    return json({ work: null, retryAfterMs: 15_000 });
+  }
+
   if (pathname === "/issue-reply-claims" && request.method === "POST") {
     const input = claimInputSchema
       .pick({ claimedBy: true, workerId: true, projectId: true })
@@ -11532,6 +11660,7 @@ async function route(
       request,
       input.projectId,
       input.workerId,
+      workerClaimContext,
     );
     const observedAt = new Date().toISOString();
     if (
@@ -11749,19 +11878,20 @@ async function route(
 
   if (pathname === "/channel-reply-claims" && request.method === "POST") {
     const input = channelReplyClaimInputSchema.parse(await readJson(request));
-    const principal = await requireWorkerOrganization(
-      db,
-      request,
-      input.organizationId,
-    );
+    const principal = workerClaimContext?.principal ??
+      await requireWorkerOrganization(db, request, input.organizationId);
+    if (principal.organizationId !== input.organizationId) {
+      throw new HttpError(403, "Worker is not enabled for this organization");
+    }
     // Readiness and provider health still come from a project binding, which
     // every registered device has. Eligibility per job is enforced in the claim.
-    const binding = await executionWorkerBindingById(
-      db,
-      principal.deviceId,
-      input.workerId,
-    );
-    if (!binding || binding.state === "disabled") {
+    const binding = workerClaimContext?.binding ??
+      await executionWorkerBindingById(db, principal.deviceId, input.workerId);
+    if (
+      !binding ||
+      binding.id !== input.workerId ||
+      binding.state === "disabled"
+    ) {
       throw new HttpError(403, "Worker is not enabled for this organization");
     }
     const observedAt = new Date().toISOString();
@@ -12701,6 +12831,7 @@ async function route(
       request,
       input.projectId,
       input.workerId,
+      workerClaimContext,
     );
     const observedAt = new Date().toISOString();
     if (
@@ -12888,6 +13019,7 @@ async function route(
         request,
         projectId,
         input.workerId,
+        workerClaimContext,
       );
       authenticatedWorkerId = authenticatedWorker.binding.id;
       if (

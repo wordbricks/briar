@@ -182,6 +182,8 @@ describe("D1 migrations", () => {
     "0091_issue_execution_approvals.sql",
     "0092_agent_skill_execution_approvals.sql",
     "0093_project_agent_session_sync.sql",
+    "0095_organization_inbox_sync.sql",
+    "0096_suppress_lease_sync_changes.sql",
   ])("keeps each trigger in a separate Wrangler statement: %s", async (name) => {
     const sql = await readFile(resolve("migrations", name), "utf8");
     const statements = unstable_splitSqlQuery(sql);
@@ -191,6 +193,203 @@ describe("D1 migrations", () => {
 
     expect(Math.max(...triggerCounts)).toBeLessThanOrEqual(1);
     expect(triggerCounts.filter((count) => count === 1)).not.toHaveLength(0);
+  });
+
+  it("suppresses lease-only run and channel deltas", async () => {
+    const miniflare = new Miniflare({
+      modules: true,
+      script: "export default { fetch() { return new Response('ok') } }",
+      d1Databases: { DB: "briar-lease-sync-suppression-test" },
+    });
+    try {
+      const db = (await miniflare.getD1Database("DB")) as unknown as D1Database;
+      await executeD1Sql(
+        db,
+        `create table briar_hunt_runs (
+           id text primary key, project_id text not null, status text not null,
+           lease_expires_at text, updated_at text not null
+         );
+         create table briar_dashboard_changes (
+           version integer primary key autoincrement, project_id text not null,
+           entity_type text not null, entity_id text, operation text not null,
+           created_at text not null
+         );
+         create table briar_dashboard_sync_state (
+           project_id text primary key, current_version integer not null
+         );
+         create table briar_channel_agent_reply_jobs (
+           id text primary key, organization_id text not null,
+           channel_id text not null, status text not null,
+           lease_expires_at text, updated_at text not null
+         );
+         create table briar_channel_changes (
+           version integer primary key autoincrement,
+           organization_id text not null, channel_id text,
+           entity_type text not null, entity_id text, operation text not null,
+           created_at text not null
+         );
+         create table briar_channel_sync_state (
+           organization_id text primary key, current_version integer not null
+         );
+         create trigger briar_dashboard_runs_update_sync
+         after update on briar_hunt_runs begin select new.id; end;
+         create trigger briar_channel_changes_reply_jobs_update_sync
+         after update on briar_channel_agent_reply_jobs begin select new.id; end;`,
+      );
+      await executeD1Sql(
+        db,
+        await readFile(
+          resolve("migrations", "0096_suppress_lease_sync_changes.sql"),
+          "utf8",
+        ),
+      );
+      const initialAt = "2026-08-12T00:00:00.000Z";
+      await db.prepare(
+        `insert into briar_hunt_runs (
+           id, project_id, status, lease_expires_at, updated_at
+         ) values ('run-1', 'project-1', 'running', ?, ?)`,
+      ).bind(initialAt, initialAt).run();
+      await db.prepare(
+        `insert into briar_channel_agent_reply_jobs (
+           id, organization_id, channel_id, status, lease_expires_at, updated_at
+         ) values (
+           'reply-1', 'organization-1', 'channel-1', 'running', ?, ?
+         )`,
+      ).bind(initialAt, initialAt).run();
+
+      await db.prepare(
+        `update briar_hunt_runs set lease_expires_at = ? where id = 'run-1'`,
+      ).bind("2026-08-12T00:05:00.000Z").run();
+      await db.prepare(
+        `update briar_channel_agent_reply_jobs
+         set lease_expires_at = ? where id = 'reply-1'`,
+      ).bind("2026-08-12T00:05:00.000Z").run();
+      await expect(db.prepare(
+        `select count(*) as count from briar_dashboard_changes`,
+      ).first()).resolves.toEqual({ count: 0 });
+      await expect(db.prepare(
+        `select count(*) as count from briar_channel_changes`,
+      ).first()).resolves.toEqual({ count: 0 });
+
+      const claimedAt = "2026-08-12T00:06:00.000Z";
+      await db.prepare(
+        `update briar_hunt_runs
+         set lease_expires_at = ?, updated_at = ? where id = 'run-1'`,
+      ).bind("2026-08-12T00:21:00.000Z", claimedAt).run();
+      await db.prepare(
+        `update briar_channel_agent_reply_jobs
+         set lease_expires_at = ?, updated_at = ? where id = 'reply-1'`,
+      ).bind("2026-08-12T00:21:00.000Z", claimedAt).run();
+      await expect(db.prepare(
+        `select project_id, entity_type, entity_id
+         from briar_dashboard_changes`,
+      ).first()).resolves.toEqual({
+        project_id: "project-1",
+        entity_type: "run",
+        entity_id: "run-1",
+      });
+      await expect(db.prepare(
+        `select organization_id, channel_id, entity_type, entity_id
+         from briar_channel_changes`,
+      ).first()).resolves.toEqual({
+        organization_id: "organization-1",
+        channel_id: "channel-1",
+        entity_type: "reply_job",
+        entity_id: "reply-1",
+      });
+    } finally {
+      await miniflare.dispose();
+    }
+  });
+
+  it("advances one organization Inbox revision for every feed source", async () => {
+    const miniflare = new Miniflare({
+      modules: true,
+      script: "export default { fetch() { return new Response('ok') } }",
+      d1Databases: { DB: "briar-organization-inbox-sync-migration-test" },
+    });
+    try {
+      const db = (await miniflare.getD1Database("DB")) as unknown as D1Database;
+      await applyD1Migrations(db);
+      const userId = "inbox-sync-user";
+      const organizationId = "91000000-0000-4000-8000-000000000001";
+      const projectId = "92000000-0000-4000-8000-000000000001";
+      const channelId = "93000000-0000-4000-8000-000000000001";
+      const now = "2026-08-12T00:00:00.000Z";
+
+      await db.prepare(
+        `insert into "user" (id, name, email, emailVerified, createdAt, updatedAt)
+         values (?, 'Inbox User', 'inbox-sync@example.com', 1, ?, ?)`,
+      ).bind(userId, now, now).run();
+      await db.prepare(
+        `insert into briar_organizations (
+           id, name, handle, created_at, updated_at
+         ) values (?, 'Inbox Org', 'inbox-org', ?, ?)`,
+      ).bind(organizationId, now, now).run();
+      await db.prepare(
+        `insert into briar_organization_members (
+           organization_id, user_id, role, created_at, updated_at
+         ) values (?, ?, 'owner', ?, ?)`,
+      ).bind(organizationId, userId, now, now).run();
+      await db.prepare(
+        `insert into briar_projects (
+           id, owner_user_id, organization_id, name, agent_token_hash,
+           created_at, updated_at
+         ) values (?, ?, ?, 'Inbox Project', ?, ?, ?)`,
+      ).bind(
+        projectId,
+        userId,
+        organizationId,
+        "9".repeat(64),
+        now,
+        now,
+      ).run();
+
+      const version = async () =>
+        (await db.prepare(
+          `select current_version
+           from briar_organization_inbox_sync_state
+           where organization_id = ?`,
+        ).bind(organizationId).first<{ current_version: number }>())
+          ?.current_version ?? 0;
+
+      expect(await version()).toBe(1);
+      await db.prepare(
+        `insert into briar_dashboard_sync_state (project_id, current_version)
+         values (?, 1)`,
+      ).bind(projectId).run();
+      expect(await version()).toBe(2);
+
+      await db.prepare(
+        `insert into briar_project_agent_session_sync_state (
+           project_id, current_version
+         ) values (?, 1)`,
+      ).bind(projectId).run();
+      expect(await version()).toBe(3);
+
+      await db.prepare(
+        `insert into briar_channels (
+           id, organization_id, slug, name, visibility,
+           created_by_user_id, created_at, updated_at
+         ) values (?, ?, 'inbox', 'Inbox', 'private', ?, ?, ?)`,
+      ).bind(channelId, organizationId, userId, now, now).run();
+      expect(await version()).toBe(4);
+
+      await db.prepare(
+        `insert into briar_channel_members (
+           channel_id, user_id, role, created_at
+         ) values (?, ?, 'owner', ?)`,
+      ).bind(channelId, userId, now).run();
+      expect(await version()).toBe(5);
+
+      await db.prepare(
+        `update "user" set name = 'Renamed Inbox User', updatedAt = ?
+         where id = ?`,
+      ).bind("2026-08-12T00:01:00.000Z", userId).run();
+      expect(await version()).toBe(6);
+    } finally {
+      await miniflare.dispose();
+    }
   });
 
   it("only finalizes a canonical reserved channel issue run", async () => {
