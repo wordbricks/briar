@@ -4991,10 +4991,9 @@ export async function claimNextProjectAgentTask(
   },
 ) {
   const providerPlaceholders = input.agentProviders.map(() => "?").join(", ");
-  const skillExecutionApprovalsAvailable =
-    await agentSkillExecutionApprovalTablesAvailable(db);
-  const skillExecutionEligibility = skillExecutionApprovalsAvailable
-    ? `and (
+  // Migration 0092 is a deployment prerequisite, so this hot path never
+  // probes schema metadata or drops the approval guard.
+  const skillExecutionEligibility = `and (
          job.skill_execution_proposal_id is null
          or exists (
            select 1
@@ -5008,8 +5007,7 @@ export async function claimNextProjectAgentTask(
              and approval.proposal_id = job.request_id
              and approval.worker_id = job.preferred_worker_id
          )
-       )`
-    : "";
+       )`;
   const claimed = await db
     .prepare(
       `update briar_project_agent_task_jobs
@@ -7391,13 +7389,12 @@ export async function claimNextIssueAgentReply(
     staleBefore: string;
   },
 ) {
-  const skillExecutionAvailable =
-    await agentSkillExecutionApprovalTablesAvailable(db);
   const skillProviderPlaceholders = input.agentProviders
     .map(() => "?")
     .join(", ");
-  const selectedSkillGuard = skillExecutionAvailable
-    ? `and (
+  // Migration 0092 is a deployment prerequisite, so every claim enforces the
+  // saved-Skill snapshot without a runtime compatibility branch.
+  const selectedSkillGuard = `and (
          job.selected_skill_id_snapshot is null
          or (
            job.skill_id = job.selected_skill_id_snapshot
@@ -7428,10 +7425,9 @@ export async function claimNextIssueAgentReply(
                and selected_skill.model is job.selected_skill_model_snapshot
                and selected_skill.effort is job.selected_skill_effort_snapshot
                and trigger.body = job.skill_execution_request_snapshot
-           )
+             )
          )
-       )`
-    : "";
+       )`;
   await db
     .prepare(
       `update briar_issue_agent_reply_jobs
@@ -7538,7 +7534,7 @@ export async function claimNextIssueAgentReply(
       input.workerId,
       input.workerId,
       input.staleBefore,
-      ...(skillExecutionAvailable ? input.agentProviders : []),
+      ...input.agentProviders,
     )
     .first<IssueAgentReplyJobRow>();
 }

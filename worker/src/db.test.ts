@@ -909,6 +909,17 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
          last_error text,
          dead_lettered_at text,
          dead_letter_reason text
+       );
+       alter table briar_project_agent_task_jobs
+         add column skill_execution_proposal_id text;
+       create table briar_agent_skill_execution_approval_audit (
+         proposal_id text primary key not null,
+         project_id text not null,
+         result_session_id text not null,
+         agent_id text not null,
+         skill_id text not null,
+         request text not null,
+         worker_id text not null
        );`,
     );
     await executeSql(

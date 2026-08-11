@@ -24,10 +24,10 @@ It must be applied before deploying the Worker that accepts execution cards.
 
 1. Record a D1 Time Travel bookmark and the current Worker deployment ID.
 2. Gate execution-proposal acceptance and drain in-flight Worker requests.
-3. Apply migrations with `bun run d1:migrate:remote`.
-4. Deploy the Worker from the same verified SHA with
-   `bun run worker:deploy`.
-5. Smoke-test both issue and channel conversations:
+3. Deploy the Worker from the same verified SHA with
+   `bun run worker:deploy`. The command applies all pending remote D1
+   migrations first and aborts before deployment if migration fails.
+4. Smoke-test both issue and channel conversations:
    - Agent output creates one pending execution card and leaves the run in
      `backlog`;
    - create-and-execute requires a create approval and then a separate
@@ -36,7 +36,7 @@ It must be applied before deploying the Worker that accepts execution cards.
    - a retry returns the same accepted dispatch, while another member or
      different settings returns a conflict;
    - a legacy project Agent token cannot claim a Worker-dispatched run.
-6. Verify one `dispatched` execution audit and one immutable approval audit for
+5. Verify one `dispatched` execution audit and one immutable approval audit for
    the opaque request ID before reopening the gate.
 
 ## Recovery

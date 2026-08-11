@@ -178,6 +178,36 @@ describe("detached execution workers", () => {
     });
     await executeD1Sql(
       db,
+      `alter table briar_project_agents add column organization_id text;
+       update briar_project_agents
+       set organization_id = (
+         select project.organization_id from briar_projects project
+         where project.id = briar_project_agents.project_id
+       );
+       alter table briar_issue_agent_reply_jobs add column skill_id text;
+       alter table briar_issue_agent_reply_jobs
+         add column selected_skill_id_snapshot text;
+       alter table briar_issue_agent_reply_jobs
+         add column selected_agent_name_snapshot text;
+       alter table briar_issue_agent_reply_jobs
+         add column selected_agent_responsibility_snapshot text;
+       alter table briar_issue_agent_reply_jobs
+         add column selected_skill_name_snapshot text;
+       alter table briar_issue_agent_reply_jobs
+         add column selected_skill_instructions_snapshot text;
+       alter table briar_issue_agent_reply_jobs
+         add column selected_skill_kind_snapshot text;
+       alter table briar_issue_agent_reply_jobs
+         add column selected_skill_provider_snapshot text;
+       alter table briar_issue_agent_reply_jobs
+         add column selected_skill_model_snapshot text;
+       alter table briar_issue_agent_reply_jobs
+         add column selected_skill_effort_snapshot text;
+       alter table briar_issue_agent_reply_jobs
+         add column skill_execution_request_snapshot text;`,
+    );
+    await executeD1Sql(
+      db,
       `
       insert into user (id, name, email, emailVerified, createdAt, updatedAt)
       values ('owner', 'Owner', 'owner@example.com', 1, '${atMinute(0)}', '${atMinute(0)}');
@@ -218,10 +248,10 @@ describe("detached execution workers", () => {
         '${atMinute(0)}', '${atMinute(0)}'
       );
       insert into briar_project_agents (
-        id, project_id, name, provider, model, responsibility,
+        id, project_id, organization_id, name, provider, model, responsibility,
         skill_markdown, created_at, updated_at
       ) values (
-        'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', '${projectId}',
+        'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', '${projectId}', '${projectId}',
         'Codex Agent', 'codex', null, 'Perform the assigned issue.',
         '# Codex Agent', '${atMinute(0)}', '${atMinute(0)}'
       );

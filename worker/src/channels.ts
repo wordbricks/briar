@@ -1487,10 +1487,9 @@ export async function claimNextChannelAgentReply(
     leaseExpiresAt: string;
   },
 ) {
-  const skillSnapshotsAvailable =
-    await channelSkillExecutionProposalTablesAvailable(db);
-  const liveSkillSnapshot = (job: string) => skillSnapshotsAvailable
-    ? `(
+  // Migration 0092 is a deployment prerequisite, so every claim enforces the
+  // saved-Skill snapshot without a runtime compatibility branch.
+  const liveSkillSnapshot = (job: string) => `(
          ${job}.selected_skill_id_snapshot is null
          or (
            ${job}.skill_id = ${job}.selected_skill_id_snapshot
@@ -1527,10 +1526,9 @@ export async function claimNextChannelAgentReply(
                    and ${job}.skill_execution_request_snapshot =
                      ${job}.delegation_request)
                )
-           )
+             )
          )
-       )`
-    : "1 = 1";
+       )`;
   await db
     .prepare(
       `update briar_channel_agent_reply_jobs
