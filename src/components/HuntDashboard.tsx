@@ -5016,7 +5016,8 @@ export function RunPage({
                 <Columns3 aria-hidden="true" size={15} />
               </button>
               <IssueActionsMenu
-                disabled={isUpdatingIssue || isDeletingIssue || isRecovering}
+                disabled={isDeletingIssue || isRecovering}
+                mutatingDisabled={isUpdatingIssue}
                 onCancel={
                   canCancelRemoteExecution
                     ? () => void runAction(onCancel)
@@ -5078,7 +5079,8 @@ export function RunPage({
                     />
                     {inlineSaveIndicator}
                     <IssueActionsMenu
-                      disabled={isUpdatingIssue || isDeletingIssue || isRecovering}
+                      disabled={isDeletingIssue || isRecovering}
+                      mutatingDisabled={isUpdatingIssue}
                       onCancel={
                         canCancelRemoteExecution
                           ? () => void runAction(onCancel)
@@ -6385,6 +6387,7 @@ export function RunPage({
 
 function IssueActionsMenu({
   disabled,
+  mutatingDisabled = false,
   onCancel,
   onCopyId,
   onCopyLink,
@@ -6394,6 +6397,7 @@ function IssueActionsMenu({
   onShare,
 }: {
   disabled: boolean;
+  mutatingDisabled?: boolean;
   onCancel?: () => void;
   onCopyId?: () => void;
   onCopyLink?: () => void;
@@ -6446,6 +6450,7 @@ function IssueActionsMenu({
           {onShare ? (
             <DropdownMenu.Item
               className="run-page-actions-item"
+              disabled={mutatingDisabled}
               onSelect={onShare}
             >
               <Share2 size={14} />
@@ -6455,6 +6460,7 @@ function IssueActionsMenu({
           {onTransfer ? (
             <DropdownMenu.Item
               className="run-page-actions-item"
+              disabled={mutatingDisabled}
               onSelect={onTransfer}
             >
               <FolderInput size={14} />
@@ -6464,6 +6470,7 @@ function IssueActionsMenu({
           {onCancel ? (
             <DropdownMenu.Item
               className="run-page-actions-item danger"
+              disabled={mutatingDisabled}
               onSelect={onCancel}
             >
               <X size={14} />
@@ -6473,6 +6480,7 @@ function IssueActionsMenu({
           {onUnassign ? (
             <DropdownMenu.Item
               className="run-page-actions-item"
+              disabled={mutatingDisabled}
               onSelect={onUnassign}
             >
               <X size={14} />
@@ -6482,6 +6490,7 @@ function IssueActionsMenu({
           {onDelete ? (
             <DropdownMenu.Item
               className="run-page-actions-item danger"
+              disabled={mutatingDisabled}
               onSelect={onDelete}
             >
               <Trash2 size={14} />
