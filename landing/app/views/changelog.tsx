@@ -23,6 +23,19 @@ export const changelogCopy = {
     backTop: "맨 위로 ↑",
     entries: [
       {
+        version: "1.2.105",
+        date: "2026년 8월 11일",
+        title: "프로젝트 대화 에이전트가 실제 작업 환경에서 검증합니다",
+        summary:
+          "채널과 이슈의 Project Agent가 프로젝트 Worker와 같은 실행 권한을 사용해 개발 서버, 브라우저 자동화와 로컬 검증을 직접 수행합니다.",
+        items: [
+          "프로젝트 채널과 이슈 대화 에이전트가 프로젝트 Worker와 같은 셸, 네트워크, 브라우저, 파일시스템과 환경 설정을 사용합니다.",
+          "새 대화 작업 공간에도 `.worktreeinclude` 입력을 복사해 로컬 실행에 필요한 gitignore 파일을 안전하게 제공합니다.",
+          "각 대화는 분리된 일회용 worktree에서 실행되어 응답이 끝나면 로컬 변경을 폐기합니다.",
+          "Briar 이슈 변경과 실행 제안은 기존 인증된 확인 절차를 그대로 유지합니다.",
+        ],
+      },
+      {
         version: "1.2.104",
         date: "2026년 8월 11일",
         title: "실시간 협업과 에이전트 동기화를 더 가볍고 정확하게 만듭니다",
@@ -347,6 +360,19 @@ export const changelogCopy = {
     home: "Home",
     backTop: "Back to top ↑",
     entries: [
+      {
+        version: "1.2.105",
+        date: "August 11, 2026",
+        title: "Let project conversation agents verify work in a real runtime",
+        summary:
+          "Give Project Agents in channels and issues the same execution profile as project Workers so they can run development servers, browser automation, and local verification directly.",
+        items: [
+          "Run project-channel and issue-conversation agents with the same shell, network, browser, filesystem, and environment settings as project Workers.",
+          "Copy `.worktreeinclude` inputs into fresh conversation workspaces so required gitignored runtime files are available safely.",
+          "Keep every conversation isolated in a disposable worktree whose local changes are discarded after the reply finishes.",
+          "Preserve the existing authenticated confirmation flow for Briar issue mutations and execution proposals.",
+        ],
+      },
       {
         version: "1.2.104",
         date: "August 11, 2026",
@@ -684,9 +710,9 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <h1>{changelog.title}</h1>
           <p>{changelog.description}</p>
         </div>
-        <a href="#v1-2-104" className="changelog-current">
+        <a href="#v1-2-105" className="changelog-current">
           <span>{changelog.current}</span>
-          <strong>v1.2.104</strong>
+          <strong>v1.2.105</strong>
           <i aria-hidden="true">↓</i>
         </a>
       </section>
@@ -711,6 +737,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   {index === 0 ? <span>{changelog.latest}</span> : null}
                   <time
                     dateTime={
+                      entry.version === "1.2.105" ||
                       entry.version === "1.2.104" ||
                       entry.version === "1.2.103" ||
                       entry.version === "1.2.100" ||
@@ -726,7 +753,8 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                       entry.version === "1.2.90" ||
                       entry.version === "1.2.89" ||
                       entry.version === "1.2.88"
-                        ? entry.version === "1.2.104" ||
+                        ? entry.version === "1.2.105" ||
+                          entry.version === "1.2.104" ||
                           entry.version === "1.2.103" ||
                           entry.version === "1.2.100"
                           ? "2026-08-11"
