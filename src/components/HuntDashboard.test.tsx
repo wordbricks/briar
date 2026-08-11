@@ -352,6 +352,7 @@ describe("HuntDashboard", () => {
     expect(markup).toContain('aria-label="Briar Agent 할당"');
     expect(markup).toContain(`src="${dashboardAgent.avatar}"`);
     expect(markup).toContain('class="kanban-card-provider-badge codex"');
+    expect(markup).toContain('aria-label="프로바이더: Codex"');
   });
 
   it("shows the source as a card badge without an attachment badge", () => {
@@ -459,7 +460,8 @@ describe("HuntDashboard", () => {
     const card = container.querySelector(".kanban-card");
 
     expect(card?.classList.contains("has-assignees")).toBe(true);
-    expect(card?.classList.contains("has-multiple-assignees")).toBe(false);
+    expect(card?.classList.contains("has-multiple-assignees")).toBe(true);
+    expect(card?.classList.contains("has-three-assignees")).toBe(false);
     expect(
       card?.querySelector(
         ".kanban-card-badges .kanban-assignee .issue-assignee-avatar",
@@ -499,7 +501,7 @@ describe("HuntDashboard", () => {
     );
 
     expect(markup).toContain(
-      "kanban-card violet has-assignees has-multiple-assignees",
+      "kanban-card violet has-assignees has-multiple-assignees has-three-assignees",
     );
     expect(markup).toContain('class="kanban-card-assignee-badges"');
     expect(markup).toContain('class="kanban-card-worker-badge"');
@@ -509,9 +511,50 @@ describe("HuntDashboard", () => {
     expect(
       container.querySelector(".kanban-card-worker-badge .worker-icon"),
     ).not.toBeNull();
+    expect(
+      container.querySelector<HTMLElement>(
+        ".kanban-card-worker-badge .worker-icon",
+      )?.style.fontSize,
+    ).toBe("16px");
     expect(container.querySelector(".kanban-card-stage-icon")).toBeNull();
     expect(markup).toContain('class="kanban-card-agent-badge"');
     expect(markup).toContain('class="kanban-card-provider-badge codex"');
+    expect(
+      container.querySelector(".kanban-card-assignee-badges")
+        ?.lastElementChild?.classList.contains("kanban-card-worker-badge"),
+    ).toBe(true);
+  });
+
+  it("shows the assigned provider beside the Worker in the same badge group", () => {
+    const run = {
+      ...demoDashboard.runs[0],
+      preferredProvider: null,
+      requestedProvider: "claude" as const,
+      workerId: dashboardWorker.id,
+    };
+    const markup = renderToStaticMarkup(
+      <HuntDashboard
+        {...dashboardProps}
+        dashboard={{
+          ...demoDashboard,
+          runs: [run],
+          workers: [dashboardWorker],
+        }}
+      />,
+    );
+    const container = document.createElement("div");
+    container.innerHTML = markup;
+    const badges = container.querySelector(".kanban-card-assignee-badges");
+
+    expect(badges?.children).toHaveLength(2);
+    expect(
+      badges?.querySelector(
+        '.kanban-card-provider-badge.claude[aria-label="프로바이더: Claude"]',
+      ),
+    ).not.toBeNull();
+    expect(
+      badges?.lastElementChild?.classList.contains("kanban-card-worker-badge"),
+    ).toBe(true);
   });
 
   it("shows a specifically requested worker before it claims the issue", () => {
