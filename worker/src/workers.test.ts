@@ -2825,20 +2825,37 @@ describe("detached execution workers", () => {
   });
 
   it("charges a retried batch only once", async () => {
+    const payloads = [
+      { type: "run" },
+      { text: "한글 transcript" },
+      { result: true },
+    ];
     const batch = {
       sessionId: "session-retry",
       runId: null,
       workerId: null,
       agentProvider: "codex" as const,
       observedAt: atMinute(2),
-      events: [{ sequence: 1, direction: "client" as const, payload: { type: "run" } }],
+      events: payloads.map((payload, index) => ({
+        sequence: index + 1,
+        direction: "client" as const,
+        payload,
+      })),
     };
-    await appendAgentTranscript(db, projectId, batch);
+    const initial = await appendAgentTranscript(db, projectId, batch);
     const retry = await appendAgentTranscript(db, projectId, batch);
+    expect(initial).toMatchObject({
+      stored: 3,
+      storedBytes: payloads.reduce(
+        (total, payload) =>
+          total + new TextEncoder().encode(JSON.stringify(payload)).byteLength,
+        0,
+      ),
+    });
     expect(retry.stored).toBe(0);
     const transcript = await readAgentTranscript(db, projectId, "session-retry");
-    expect(transcript?.session.event_count).toBe(1);
-    expect(transcript?.events).toHaveLength(1);
+    expect(transcript?.session.event_count).toBe(3);
+    expect(transcript?.events).toHaveLength(3);
   });
 
   it("rejects oversized and malformed transcript events", async () => {

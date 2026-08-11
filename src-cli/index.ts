@@ -69,6 +69,7 @@ import {
   assertDetachedProviderTurnSucceeded,
   runDetachedProviderTurn,
 } from "./detached-provider-turn";
+import { TranscriptBatcher } from "./transcript-batcher";
 import {
   HttpRequestError,
   uploadExecutionMetricsWithCostCompatibility,
@@ -2438,6 +2439,29 @@ async function runClaimedIssueInRuntime(
   const usageCollector = createAgentExecutionUsageCollector(provider, {
     configuredModel: execution.model,
   });
+  const transcriptBatcher = new TranscriptBatcher({
+    send: async (events) => {
+      await request(config.apiUrl, "/transcripts", workerToken, {
+        method: "POST",
+        body: JSON.stringify({
+          projectId: project.id,
+          sessionId,
+          runId: issue.runId,
+          ...(issue.executionId ? { executionId: issue.executionId } : {}),
+          workerId: activeProject.executionWorker?.workerId,
+          agentProvider: provider,
+          events,
+        }),
+      });
+    },
+    onError: (error) => {
+      console.error(
+        `transcript upload failed for ${issue.sourceKey}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    },
+  });
   let conversationId: string | null = null;
   let nextPrompt = prompt;
   let turnNumber = 0;
@@ -2464,35 +2488,15 @@ async function runClaimedIssueInRuntime(
           const payload = detachedTranscriptPayload(rawPayload, line);
           const transcriptSequence = transcriptSequencer.nextForPayload(payload);
           if (transcriptSequence !== null) {
-            try {
-              await request(config.apiUrl, "/transcripts", workerToken, {
-                method: "POST",
-                body: JSON.stringify({
-                  projectId: project.id,
-                  sessionId,
-                  runId: issue.runId,
-                  ...(issue.executionId
-                    ? { executionId: issue.executionId }
-                    : {}),
-                  workerId: activeProject.executionWorker?.workerId,
-                  agentProvider: provider,
-                  events: [{
-                    sequence: transcriptSequence,
-                    direction,
-                    payload,
-                  }],
-                }),
-              });
-            } catch (error) {
-              console.error(
-                `transcript upload failed for ${issue.sourceKey}: ${
-                  error instanceof Error ? error.message : String(error)
-                }`,
-              );
-            }
+            await transcriptBatcher.enqueue({
+              sequence: transcriptSequence,
+              direction,
+              payload,
+            });
           }
         },
       });
+      await transcriptBatcher.flush();
       conversationId = turn.conversationId;
       if (runnerBlock) {
         await request(config.apiUrl, "/run-events", workerToken, {
@@ -2560,6 +2564,7 @@ async function runClaimedIssueInRuntime(
     }
     throw error;
   } finally {
+    await transcriptBatcher.flush();
     const usageObservations = usageCollector.finish();
     const usageRecords = agentExecutionUsageRecordsFromObservations(
       usageObservations,
@@ -2863,43 +2868,56 @@ async function runClaimedIssueReply(
       skillExecutionTarget: issue.skillExecutionTarget,
     });
     let sequence = 0;
-    const turn = await runDetachedProviderTurn({
-      agent,
-      prompt,
-      workspacePath,
-      fullAccess: project.autoHunt?.sandbox?.fullAccess ?? true,
-      attachments,
-      environment: {
-        ...process.env,
-        PATH: workerExecutionPath(),
-        BRIAR_CLI: workerCliPath(),
-        BRIAR_WORKER_TOKEN: workerToken,
-        BRIAR_PROJECT_ID: project.id,
-      },
-      signal,
-      onPayload: async (payload, line) => {
-        sequence += 1;
-        const direction = detachedPayloadDirection(payload);
-        const bounded = detachedTranscriptPayload(payload, line);
-        if (shouldPersistDetachedTranscriptPayload(bounded)) {
-          try {
-            await request(config.apiUrl, "/transcripts", workerToken, {
-              method: "POST",
-              body: JSON.stringify({
-                projectId: project.id,
-                sessionId: `reply-${issue.workId}`,
-                runId: issue.runId,
-                workerId: registered.workerId,
-                agentProvider: provider,
-                events: [{ sequence, direction, payload: bounded }],
-              }),
-            });
-          } catch {
-            // The durable reply result is more important than optional transcript data.
-          }
-        }
+    const transcriptBatcher = new TranscriptBatcher({
+      send: async (events) => {
+        await request(config.apiUrl, "/transcripts", workerToken, {
+          method: "POST",
+          body: JSON.stringify({
+            projectId: project.id,
+            sessionId: `reply-${issue.workId}`,
+            runId: issue.runId,
+            workerId: registered.workerId,
+            agentProvider: provider,
+            events,
+          }),
+        });
       },
     });
+    const turn = await (async () => {
+      try {
+        return await runDetachedProviderTurn({
+          agent,
+          prompt,
+          workspacePath,
+          fullAccess: project.autoHunt?.sandbox?.fullAccess ?? true,
+          attachments,
+          environment: {
+            ...process.env,
+            PATH: workerExecutionPath(),
+            BRIAR_CLI: workerCliPath(),
+            BRIAR_WORKER_TOKEN: workerToken,
+            BRIAR_PROJECT_ID: project.id,
+          },
+          signal,
+          onPayload: async (payload, line) => {
+            sequence += 1;
+            const direction = detachedPayloadDirection(payload);
+            const bounded = detachedTranscriptPayload(payload, line);
+            if (shouldPersistDetachedTranscriptPayload(bounded)) {
+              await transcriptBatcher.enqueue({
+                sequence,
+                direction,
+                payload: bounded,
+              });
+            }
+          },
+        });
+      } finally {
+        // The durable reply result remains more important than optional
+        // transcript data, but buffered events must get one final send chance.
+        await transcriptBatcher.flush();
+      }
+    })();
     assertDetachedProviderTurnSucceeded(turn);
     if (!turn.resultText) throw new Error("Agent returned an empty issue reply");
     const result = parseDetachedIssueReplyResult(turn.resultText, {
