@@ -19,6 +19,21 @@ export const organizationAgentContextResources = [
 
 export const organizationAgentContextCapability = { protocol: 1 } as const;
 
+/**
+ * Protocol 1 originally exposed only eager, paginated collections. These
+ * request types are additive so older Workers can keep using those pages while
+ * newer Workers fetch a small manifest and hydrate only the context selected by
+ * an Organization Agent.
+ */
+export const organizationAgentContextLookupResources = [
+  "project-settings",
+  "agents",
+  "skills",
+  "issues",
+  "issue-pull-requests",
+  "agent-sessions",
+] as const;
+
 export type OrganizationAgentContextResource =
   (typeof organizationAgentContextResources)[number];
 
@@ -51,6 +66,126 @@ export const organizationAgentContextQuerySchema = z
     workerId: z.string().trim().min(1).max(64),
     limit: organizationAgentContextLimitSchema,
     cursor: z.string().min(1).max(4096).optional(),
+  })
+  .strict();
+
+const organizationAgentContextLookupIdsSchema = z
+  .array(organizationAgentContextIdSchema)
+  .min(1)
+  .max(50);
+
+const organizationAgentContextSummaryLookupSchema = z
+  .object({
+    resource: z.enum(["agents", "issues", "agent-sessions"]),
+    projectId: organizationAgentContextIdSchema,
+    detail: z.literal("summary"),
+    limit: z.number().int().min(1).max(50).default(25),
+    cursor: z.string().min(1).max(4096).nullable().default(null),
+  })
+  .strict();
+
+const organizationAgentContextDetailLookupSchema = z
+  .object({
+    resource: z.enum(["agents", "issues", "agent-sessions"]),
+    projectId: organizationAgentContextIdSchema,
+    detail: z.literal("full"),
+    ids: organizationAgentContextLookupIdsSchema,
+  })
+  .strict();
+
+export const organizationAgentContextLookupRequestSchema = z.union([
+  z.object({
+    resource: z.literal("project-settings"),
+    projectId: organizationAgentContextIdSchema,
+  }).strict(),
+  organizationAgentContextSummaryLookupSchema,
+  organizationAgentContextDetailLookupSchema,
+  z.object({
+    resource: z.literal("skills"),
+    projectId: organizationAgentContextIdSchema,
+    ids: organizationAgentContextLookupIdsSchema,
+  }).strict(),
+  z.object({
+    resource: z.literal("issue-pull-requests"),
+    projectId: organizationAgentContextIdSchema,
+    issueIds: organizationAgentContextLookupIdsSchema,
+  }).strict(),
+]);
+
+export const organizationAgentContextLookupInputSchema = z
+  .object({
+    workerId: z.string().trim().min(1).max(64),
+    requests: z.array(organizationAgentContextLookupRequestSchema).min(1).max(12),
+  })
+  .strict();
+
+export const organizationAgentContextLookupResultSchema = z
+  .object({
+    request: organizationAgentContextLookupRequestSchema,
+    data: z.unknown(),
+  })
+  .strict();
+
+export const organizationAgentContextLookupResponseSchema = z
+  .object({
+    schemaVersion: z.literal(2),
+    organizationId: organizationAgentContextIdSchema,
+    workId: organizationAgentContextIdSchema,
+    snapshotAt: organizationAgentContextTimestampSchema,
+    results: z.array(organizationAgentContextLookupResultSchema).max(12),
+  })
+  .strict();
+
+const organizationAgentContextResourceRevisionSchema = z
+  .object({
+    count: z.number().int().nonnegative(),
+    revision: organizationAgentContextTimestampSchema.nullable(),
+  })
+  .strict();
+
+export const organizationAgentContextManifestProjectSchema = z
+  .object({
+    id: organizationAgentContextIdSchema,
+    name: z.string().min(1).max(100),
+    issueKeyPrefix: z.string().regex(/^[A-Z0-9]{1,3}$/u),
+    createdAt: organizationAgentContextTimestampSchema,
+    updatedAt: organizationAgentContextTimestampSchema,
+    resources: z.object({
+      settings: z.object({
+        revision: organizationAgentContextTimestampSchema.nullable(),
+      }).strict(),
+      agents: organizationAgentContextResourceRevisionSchema,
+      issues: organizationAgentContextResourceRevisionSchema.extend({
+        openCount: z.number().int().nonnegative(),
+        pullRequestCount: z.number().int().nonnegative(),
+      }).strict(),
+      sessions: organizationAgentContextResourceRevisionSchema.extend({
+        archivedCount: z.number().int().nonnegative(),
+      }).strict(),
+    }).strict(),
+  })
+  .strict();
+
+export const organizationAgentContextManifestSchema = z
+  .object({
+    schemaVersion: z.literal(2),
+    organizationId: organizationAgentContextIdSchema,
+    workId: organizationAgentContextIdSchema,
+    snapshotAt: organizationAgentContextTimestampSchema,
+    revision: z.string().regex(/^[0-9a-f]{64}$/u),
+    projects: z.array(organizationAgentContextManifestProjectSchema).max(5_000),
+    loadedQueries: z.array(z.object({
+      file: z.string().min(1).max(1_024),
+      request: organizationAgentContextLookupRequestSchema,
+    }).strict()).max(36).default([]),
+  })
+  .strict();
+
+export const organizationAgentContextRequestTurnSchema = z
+  .object({
+    contextRequests: z.array(organizationAgentContextLookupRequestSchema)
+      .min(1)
+      .max(12),
   })
   .strict();
 
@@ -389,4 +524,13 @@ export type OrganizationAgentContextSessionsPage = z.infer<
 >;
 export type OrganizationAgentContextResourcePage = z.infer<
   typeof organizationAgentContextResourcePageSchema
+>;
+export type OrganizationAgentContextLookupRequest = z.output<
+  typeof organizationAgentContextLookupRequestSchema
+>;
+export type OrganizationAgentContextLookupInput = z.output<
+  typeof organizationAgentContextLookupInputSchema
+>;
+export type OrganizationAgentContextManifest = z.infer<
+  typeof organizationAgentContextManifestSchema
 >;

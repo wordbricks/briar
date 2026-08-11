@@ -936,6 +936,69 @@ describe("organization channels", () => {
       complete: false,
     });
 
+    const manifestUrl =
+      `https://briar-api.example/organizations/${organizationId}/channel-reply-claims/${claimed!.id}/organization-context/manifest?workerId=${otherWorkerId}`;
+    const manifestResponse = await apiWorker.fetch(
+      new Request(manifestUrl, {
+        headers: {
+          authorization: `Bearer ${contextWorkerToken}`,
+          [channelReplyClaimTokenHeader]: claimPayload.work.claimToken,
+        },
+      }),
+      apiEnv,
+    );
+    expect(manifestResponse.status).toBe(200);
+    expect(manifestResponse.headers.get("ETag")).toMatch(
+      /^"[0-9a-f]{64}"$/u,
+    );
+    await expect(manifestResponse.json()).resolves.toMatchObject({
+      schemaVersion: 2,
+      organizationId,
+      workId: claimed!.id,
+      projects: expect.arrayContaining([
+        expect.objectContaining({ id: projectId }),
+      ]),
+      loadedQueries: [],
+    });
+    const unchangedManifest = await apiWorker.fetch(
+      new Request(manifestUrl, {
+        headers: {
+          authorization: `Bearer ${contextWorkerToken}`,
+          [channelReplyClaimTokenHeader]: claimPayload.work.claimToken,
+          "If-None-Match": manifestResponse.headers.get("ETag")!,
+        },
+      }),
+      apiEnv,
+    );
+    expect(unchangedManifest.status).toBe(304);
+
+    const lookupResponse = await apiWorker.fetch(
+      new Request(
+        `https://briar-api.example/organizations/${organizationId}/channel-reply-claims/${claimed!.id}/organization-context/lookup`,
+        {
+          method: "POST",
+          headers: {
+            authorization: `Bearer ${contextWorkerToken}`,
+            "content-type": "application/json",
+            [channelReplyClaimTokenHeader]: claimPayload.work.claimToken,
+          },
+          body: JSON.stringify({
+            workerId: otherWorkerId,
+            requests: [{ resource: "project-settings", projectId }],
+          }),
+        },
+      ),
+      apiEnv,
+    );
+    expect(lookupResponse.status).toBe(200);
+    await expect(lookupResponse.json()).resolves.toMatchObject({
+      schemaVersion: 2,
+      results: [{
+        request: { resource: "project-settings", projectId },
+        data: { id: projectId, settings: expect.any(Object) },
+      }],
+    });
+
     const completed = await completeChannelReply(db, claimed!, {
       jobId: claimed!.id,
       deviceId,
