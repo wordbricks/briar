@@ -2498,36 +2498,51 @@ export async function appendAgentTranscript(
     throw new WorkerConflictError("Transcript session belongs to another run");
   }
 
-  let stored = 0;
-  let storedBytes = 0;
-  for (const event of payloads) {
-    const result = await db
-      .prepare(
-        `insert into briar_agent_transcripts (
-           session_id, sequence, direction, payload_json, recorded_at
-         )
-         select session.session_id, ?, ?, ?, ?
-         from briar_agent_transcript_sessions session
-         left join briar_hunt_runs run on run.id = session.run_id
-         where session.session_id = ? and session.project_id = ?
-           and (session.run_id is null or run.project_id = session.project_id)
-         on conflict (session_id, sequence) do nothing`,
-      )
-      .bind(
-        event.sequence,
-        event.direction,
-        event.serialized,
-        input.observedAt,
-        sessionId,
-        projectId,
-      )
-      .run();
-    // A retried batch must not inflate the counters it is charged against.
-    if (result.meta.changes > 0) {
-      stored += 1;
-      storedBytes += event.bytes;
-    }
-  }
+  const inserted = await db
+    .prepare(
+      `with incoming as (
+         select
+           cast(json_extract(event.value, '$.sequence') as integer) as sequence,
+           json_extract(event.value, '$.direction') as direction,
+           json_extract(event.value, '$.payloadJson') as payload_json
+         from json_each(?) event
+       )
+       insert into briar_agent_transcripts (
+         session_id, sequence, direction, payload_json, recorded_at
+       )
+       select
+         session.session_id,
+         incoming.sequence,
+         incoming.direction,
+         incoming.payload_json,
+         ?
+       from briar_agent_transcript_sessions session
+       cross join incoming
+       left join briar_hunt_runs run on run.id = session.run_id
+       where session.session_id = ? and session.project_id = ?
+         and (session.run_id is null or run.project_id = session.project_id)
+       on conflict (session_id, sequence) do nothing
+       returning sequence, length(cast(payload_json as blob)) as bytes`,
+    )
+    .bind(
+      JSON.stringify(
+        payloads.map((event) => ({
+          sequence: event.sequence,
+          direction: event.direction,
+          payloadJson: event.serialized,
+        })),
+      ),
+      input.observedAt,
+      sessionId,
+      projectId,
+    )
+    .all<{ sequence: number; bytes: number }>();
+  // A retried batch must not inflate the counters it is charged against.
+  const stored = inserted.results.length;
+  const storedBytes = inserted.results.reduce(
+    (total, event) => total + event.bytes,
+    0,
+  );
 
   const updated = await db
     .prepare(
