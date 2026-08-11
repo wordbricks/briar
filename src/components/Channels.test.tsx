@@ -242,6 +242,32 @@ describe("Channels", () => {
     expect(container.querySelector(".channel-composer-shell")).not.toBeNull();
   });
 
+  it("hides the persistent reply link when a message has no thread", async () => {
+    const rootMessage = message({ id: "message-without-replies" });
+    listChannelMessages.mockResolvedValue({ messages: [rootMessage] });
+    await render([rootMessage]);
+
+    expect(container.querySelector(".channel-thread-link")).toBeNull();
+    expect(container.textContent).not.toContain("스레드에서 답글");
+
+    const hoverReply = container.querySelector<HTMLButtonElement>(
+      ".channel-quick-reaction.open-thread",
+    );
+    expect(hoverReply).not.toBeNull();
+    expect(hoverReply?.getAttribute("aria-label")).toBe("스레드에서 답글");
+
+    await act(async () => {
+      hoverReply?.click();
+      await Promise.resolve();
+    });
+    expect(listChannelMessages).toHaveBeenCalledWith(
+      "token",
+      "org-1",
+      channel.id,
+      rootMessage.id,
+    );
+  });
+
   it("establishes the initial change cursor before loading channel detail", async () => {
     let resolveList!: (value: { channels: ChannelSummary[]; cursor: number }) => void;
     const pendingList = new Promise<{ channels: ChannelSummary[]; cursor: number }>(

@@ -1819,29 +1819,20 @@ function MessageRow({
           showHoverActions
         />
 
-        {onOpenThread
-          ? message.replyCount > 0
-            ? (
-              <ConversationReplySummary
-                countLabel={t("channel.replyCount", {
-                  count: message.replyCount,
-                })}
-                lastReplyLabel={message.lastReplyAt
-                  ? t("conversation.lastReply", {
-                      time: replyRelativeTime(message.lastReplyAt, t),
-                    })
-                  : null}
-                onClick={onOpenThread}
-                participants={channelReplyParticipants(message)}
-              />
-            )
-            : (
-              <button className="channel-thread-link" onClick={onOpenThread}>
-                <MessageSquare size={13} />
-                {t("channel.replyInThread")}
-              </button>
-            )
-          : null}
+        {onOpenThread && message.replyCount > 0 ? (
+          <ConversationReplySummary
+            countLabel={t("channel.replyCount", {
+              count: message.replyCount,
+            })}
+            lastReplyLabel={message.lastReplyAt
+              ? t("conversation.lastReply", {
+                  time: replyRelativeTime(message.lastReplyAt, t),
+                })
+              : null}
+            onClick={onOpenThread}
+            participants={channelReplyParticipants(message)}
+          />
+        ) : null}
       </div>
     </article>
   );
