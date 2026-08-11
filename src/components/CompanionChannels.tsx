@@ -64,8 +64,15 @@ import {
   ChannelMessageImages,
 } from "./ChannelImages";
 import { ChannelMentionMenu } from "./ChannelMentionMenu";
+import { MentionComposerField } from "./MentionComposerField";
 import { ChannelMessageText } from "./ChannelMessageText";
 import { ChannelMessageReactions } from "./ChannelMessageReactions";
+import {
+  ProfileDialog,
+  profileTargetForChannelAgent,
+  profileTargetForChannelMember,
+  type ProfileTarget,
+} from "./ProfileDialog";
 import {
   ChannelIssueProposalDetails,
   channelIssueProposalDetails,
@@ -1469,6 +1476,7 @@ export function CompanionChannelComposer({
   ) => void;
 }) {
   const { t } = useI18n();
+  const [profile, setProfile] = useState<ProfileTarget | null>(null);
   const {
     activeSuggestionIndex,
     attachmentError,
@@ -1488,6 +1496,7 @@ export function CompanionChannelComposer({
     images,
     inputRef,
     mentionListId,
+    mentions,
     pickSuggestion,
     removeImage,
     setActiveSuggestionIndex,
@@ -1500,16 +1509,41 @@ export function CompanionChannelComposer({
     members,
     onSend,
   });
+  const connectedMentions = useMemo(
+    () => mentions.map((mention) => ({
+      key: `${mention.type}:${mention.id}`,
+      handle: mention.handle,
+      label: mention.label,
+    })),
+    [mentions],
+  );
+  const profilesByMentionKey = useMemo(() => {
+    const profiles = new Map<string, ProfileTarget>();
+    for (const agent of agents) {
+      profiles.set(
+        `agent:${agent.agentId}`,
+        profileTargetForChannelAgent(agent),
+      );
+    }
+    for (const member of members) {
+      profiles.set(
+        `user:${member.userId}`,
+        profileTargetForChannelMember(member),
+      );
+    }
+    return profiles;
+  }, [agents, members]);
 
   return (
-    <form
-      className={`companion-channel-composer${dragging ? " is-dragging" : ""}`}
-      onDragEnter={handleDragEnter}
-      onDragLeave={handleDragLeave}
-      onDragOver={handleDragOver}
-      onDrop={handleDrop}
-      onSubmit={handleSubmit}
-    >
+    <>
+      <form
+        className={`companion-channel-composer${dragging ? " is-dragging" : ""}`}
+        onDragEnter={handleDragEnter}
+        onDragLeave={handleDragLeave}
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}
+        onSubmit={handleSubmit}
+      >
       {showsSuggestions ? (
         <ChannelMentionMenu
           activeSuggestionIndex={activeSuggestionIndex}
@@ -1531,27 +1565,38 @@ export function CompanionChannelComposer({
       >
         <Plus size={20} />
       </button>
-      <input
-        aria-activedescendant={
-          showsSuggestions
-            ? `${mentionListId}-option-${activeSuggestionIndex}`
-            : undefined
-        }
-        aria-autocomplete="list"
-        aria-controls={showsSuggestions ? mentionListId : undefined}
-        aria-expanded={showsSuggestions}
-        aria-label={t("companion.channelMessagePlaceholder")}
-        disabled={busy}
-        onChange={handleChange}
-        onClick={handleCaret}
-        onKeyDown={handleKeyDown}
-        onKeyUp={handleCaret}
-        onPaste={handlePaste}
-        placeholder={t("companion.channelMessagePlaceholder")}
-        ref={inputRef}
-        role="combobox"
-        value={body}
-      />
+      <MentionComposerField
+        body={body}
+        className="companion-channel-composer-field"
+        controlRef={inputRef}
+        mentions={connectedMentions}
+        onMentionClick={(mention) => {
+          const nextProfile = profilesByMentionKey.get(mention.key);
+          if (nextProfile) setProfile(nextProfile);
+        }}
+      >
+        <input
+          aria-activedescendant={
+            showsSuggestions
+              ? `${mentionListId}-option-${activeSuggestionIndex}`
+              : undefined
+          }
+          aria-autocomplete="list"
+          aria-controls={showsSuggestions ? mentionListId : undefined}
+          aria-expanded={showsSuggestions}
+          aria-label={t("companion.channelMessagePlaceholder")}
+          disabled={busy}
+          onChange={handleChange}
+          onClick={handleCaret}
+          onKeyDown={handleKeyDown}
+          onKeyUp={handleCaret}
+          onPaste={handlePaste}
+          placeholder={t("companion.channelMessagePlaceholder")}
+          ref={inputRef}
+          role="combobox"
+          value={body}
+        />
+      </MentionComposerField>
       <input
         accept="image/*"
         className="channel-composer-file-input"
@@ -1569,7 +1614,14 @@ export function CompanionChannelComposer({
       {attachmentError ? (
         <p className="channel-composer-error">{attachmentError}</p>
       ) : null}
-    </form>
+      </form>
+      <ProfileDialog
+        profile={profile}
+        onOpenChange={(open) => {
+          if (!open) setProfile(null);
+        }}
+      />
+    </>
   );
 }
 

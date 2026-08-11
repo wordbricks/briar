@@ -78,6 +78,13 @@ import {
   ChannelMessageImages,
 } from "./ChannelImages";
 import { ChannelMentionMenu } from "./ChannelMentionMenu";
+import { MentionComposerField } from "./MentionComposerField";
+import {
+  ProfileDialog,
+  profileTargetForChannelAgent,
+  profileTargetForChannelMember,
+  type ProfileTarget,
+} from "./ProfileDialog";
 import {
   channelThreadWidthDefault,
   channelThreadWidthMax,
@@ -1971,6 +1978,7 @@ function Composer({
   ) => void;
 }) {
   const { t } = useI18n();
+  const [profile, setProfile] = useState<ProfileTarget | null>(null);
   const {
     activeSuggestionIndex,
     attachmentError,
@@ -1991,6 +1999,7 @@ function Composer({
     inputRef: textareaRef,
     insertAtCaret,
     mentionListId,
+    mentions,
     pickSuggestion,
     removeImage,
     setActiveSuggestionIndex,
@@ -2008,16 +2017,41 @@ function Composer({
 
   const resolvedPlaceholder =
     placeholder ?? t("channel.messagePlaceholder", { name: channelName });
+  const connectedMentions = useMemo(
+    () => mentions.map((mention) => ({
+      key: `${mention.type}:${mention.id}`,
+      handle: mention.handle,
+      label: mention.label,
+    })),
+    [mentions],
+  );
+  const profilesByMentionKey = useMemo(() => {
+    const profiles = new Map<string, ProfileTarget>();
+    for (const agent of agents) {
+      profiles.set(
+        `agent:${agent.agentId}`,
+        profileTargetForChannelAgent(agent),
+      );
+    }
+    for (const member of members) {
+      profiles.set(
+        `user:${member.userId}`,
+        profileTargetForChannelMember(member),
+      );
+    }
+    return profiles;
+  }, [agents, members]);
 
   return (
-    <form
-      className={`channel-composer${dragging ? " is-dragging" : ""}`}
-      onDragEnter={handleDragEnter}
-      onDragLeave={handleDragLeave}
-      onDragOver={handleDragOver}
-      onDrop={handleDrop}
-      onSubmit={handleSubmit}
-    >
+    <>
+      <form
+        className={`channel-composer${dragging ? " is-dragging" : ""}`}
+        onDragEnter={handleDragEnter}
+        onDragLeave={handleDragLeave}
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}
+        onSubmit={handleSubmit}
+      >
       {showsSuggestions ? (
         <ChannelMentionMenu
           activeSuggestionIndex={activeSuggestionIndex}
@@ -2032,28 +2066,39 @@ function Composer({
 
       <div className="channel-composer-shell">
         <ChannelDraftImages images={images} onRemove={removeImage} />
-        <textarea
-          aria-activedescendant={
-            showsSuggestions
-              ? `${mentionListId}-option-${activeSuggestionIndex}`
-              : undefined
-          }
-          aria-autocomplete="list"
-          aria-controls={showsSuggestions ? mentionListId : undefined}
-          aria-expanded={showsSuggestions}
-          aria-label={t("channel.messageAria")}
-          disabled={busy}
-          placeholder={resolvedPlaceholder}
-          value={body}
-          onChange={handleChange}
-          onKeyDown={handleKeyDown}
-          onKeyUp={handleCaret}
-          onPaste={handlePaste}
-          onClick={handleCaret}
-          ref={textareaRef}
-          role="combobox"
-          rows={1}
-        />
+        <MentionComposerField
+          body={body}
+          className="channel-composer-field"
+          controlRef={textareaRef}
+          mentions={connectedMentions}
+          onMentionClick={(mention) => {
+            const nextProfile = profilesByMentionKey.get(mention.key);
+            if (nextProfile) setProfile(nextProfile);
+          }}
+        >
+          <textarea
+            aria-activedescendant={
+              showsSuggestions
+                ? `${mentionListId}-option-${activeSuggestionIndex}`
+                : undefined
+            }
+            aria-autocomplete="list"
+            aria-controls={showsSuggestions ? mentionListId : undefined}
+            aria-expanded={showsSuggestions}
+            aria-label={t("channel.messageAria")}
+            disabled={busy}
+            placeholder={resolvedPlaceholder}
+            value={body}
+            onChange={handleChange}
+            onKeyDown={handleKeyDown}
+            onKeyUp={handleCaret}
+            onPaste={handlePaste}
+            onClick={handleCaret}
+            ref={textareaRef}
+            role="combobox"
+            rows={1}
+          />
+        </MentionComposerField>
         <div className="channel-composer-toolbar">
           <div className="channel-composer-tools">
             <button
@@ -2106,7 +2151,14 @@ function Composer({
           <p className="channel-composer-error">{attachmentError}</p>
         ) : null}
       </div>
-    </form>
+      </form>
+      <ProfileDialog
+        profile={profile}
+        onOpenChange={(open) => {
+          if (!open) setProfile(null);
+        }}
+      />
+    </>
   );
 }
 

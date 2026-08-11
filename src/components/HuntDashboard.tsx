@@ -166,6 +166,7 @@ import {
   remarkIssueMentions,
 } from "../lib/issue-mentions";
 import { ProfileDialog, type ProfileTarget } from "./ProfileDialog";
+import { MentionComposerField } from "./MentionComposerField";
 import {
   ConversationReplySummary,
   type ConversationReplyParticipant,
@@ -7782,6 +7783,10 @@ function IssueConversation({
     }
     return profiles;
   }, [mentionMembers, t]);
+  const openMentionProfile = useCallback((handle: string) => {
+    const profile = profilesByHandle.get(handle.toLowerCase());
+    if (profile) setActiveProfile(profile);
+  }, [profilesByHandle]);
 
   useLayoutEffect(() => {
     const messageList = messageListRef.current;
@@ -8040,10 +8045,7 @@ function IssueConversation({
                   localeTag={localeTag}
                   message={message}
                   mentionHandles={mentionHandles}
-                  onMentionOpen={(handle) => {
-                    const profile = profilesByHandle.get(handle.toLowerCase());
-                    if (profile) setActiveProfile(profile);
-                  }}
+                  onMentionOpen={openMentionProfile}
                   onAcceptIssueAction={onAcceptIssueAction && message.proposedAction
                     ? () => void acceptIssueAction(message.proposedAction!)
                     : undefined}
@@ -8130,6 +8132,7 @@ function IssueConversation({
                       compact
                       mentionMembers={mentionMembers}
                       onCancel={() => setActiveReplyMessageId(null)}
+                      onMentionOpen={openMentionProfile}
                       onSubmit={async (
                         body,
                         mentionedUserIds,
@@ -8163,6 +8166,7 @@ function IssueConversation({
                       initialBody={message.body}
                       mentionMembers={mentionMembers}
                       onCancel={() => setActiveEditMessageId(null)}
+                      onMentionOpen={openMentionProfile}
                       onSubmit={async (
                         body,
                         mentionedUserIds,
@@ -8182,6 +8186,7 @@ function IssueConversation({
       </div>
       <MessageComposer
         mentionMembers={mentionMembers}
+        onMentionOpen={openMentionProfile}
         onSubmit={(body, mentionedUserIds, attachments, references) =>
           sendMessage(body, null, mentionedUserIds, attachments, references)
         }
@@ -8319,19 +8324,26 @@ function IssueMessageItem({
               a: ({ children, href, node: _node, ...props }) => {
                 const mentionHandle = issueMentionHandleFromUrl(href);
                 const isMention = mentionHandle !== null;
+                if (isMention) {
+                  return (
+                    <button
+                      className="conversation-mention-button issue-mention-button"
+                      onClick={(event) => {
+                        event.preventDefault();
+                        onMentionOpen(mentionHandle);
+                      }}
+                      type="button"
+                    >
+                      {children}
+                    </button>
+                  );
+                }
                 return (
                   <a
                     {...props}
-                    className={isMention ? "issue-mention-link" : props.className}
+                    className={props.className}
                     href={href}
-                    onClick={
-                      isMention
-                        ? (event) => {
-                            event.preventDefault();
-                            onMentionOpen(mentionHandle);
-                          }
-                        : props.onClick
-                    }
+                    onClick={props.onClick}
                   >
                     {children}
                   </a>
@@ -8593,6 +8605,7 @@ function MessageComposer({
   initialBody = "",
   mentionMembers,
   onCancel,
+  onMentionOpen,
   onSubmit,
   placeholder,
 }: {
@@ -8602,6 +8615,7 @@ function MessageComposer({
   initialBody?: string;
   mentionMembers: OrganizationMember[];
   onCancel?: () => void;
+  onMentionOpen: (handle: string) => void;
   onSubmit: (
     body: string,
     mentionedUserIds: string[],
@@ -8618,14 +8632,28 @@ function MessageComposer({
   const [composerFocused, setComposerFocused] = useState(false);
   const [mentionDismissed, setMentionDismissed] = useState(false);
   const [selectedMentions, setSelectedMentions] = useState<
-    Record<string, string>
+    Record<string, { handle: string; label: string; userId: string | null }>
   >(() => {
-    const existing: Record<string, string> = {};
+    const existing: Record<
+      string,
+      { handle: string; label: string; userId: string | null }
+    > = {};
     if (initialBody) {
+      if (mentionsIssueHandle(initialBody, "briar")) {
+        existing["agent:briar"] = {
+          handle: "briar",
+          label: "Briar",
+          userId: null,
+        };
+      }
       for (const member of mentionMembers) {
         const handle = issueMentionHandle(member);
         if (handle && mentionsIssueHandle(initialBody, handle)) {
-          existing[member.userId] = handle;
+          existing[`user:${member.userId}`] = {
+            handle,
+            label: member.name,
+            userId: member.userId,
+          };
         }
       }
     }
@@ -8637,6 +8665,14 @@ function MessageComposer({
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const attachmentInputRef = useRef<HTMLInputElement | null>(null);
   const mentionListId = useId();
+  const connectedMentions = useMemo(
+    () => Object.entries(selectedMentions).map(([key, mention]) => ({
+      key,
+      handle: mention.handle,
+      label: mention.label,
+    })),
+    [selectedMentions],
+  );
   const activeMention = issueMentionAtCaret(body, caret);
   const mentionSuggestions = activeMention
     ? [
@@ -8677,9 +8713,12 @@ function MessageComposer({
       )
       .join("\n\n");
     const nextBody = [textBody, attachmentMarkdown].filter(Boolean).join("\n\n");
-    const nextMentionedUserIds = Object.entries(selectedMentions)
-      .filter(([, handle]) => mentionsIssueHandle(nextBody, handle))
-      .map(([userId]) => userId);
+    const nextMentionedUserIds = Object.values(selectedMentions).flatMap(
+      (mention) =>
+        mention.userId && mentionsIssueHandle(nextBody, mention.handle)
+          ? [mention.userId]
+          : [],
+    );
     const previousMentions = selectedMentions;
     const previousAttachments = attachments;
     setSending(true);
@@ -8739,13 +8778,17 @@ function MessageComposer({
     setBody(nextBody);
     setCaret(nextCaret);
     setMentionDismissed(false);
-    if (suggestion.userId) {
-      const userId = suggestion.userId;
-      setSelectedMentions((current) => ({
-        ...current,
-        [userId]: suggestion.handle,
-      }));
-    }
+    const mentionKey = suggestion.userId
+      ? `user:${suggestion.userId}`
+      : "agent:briar";
+    setSelectedMentions((current) => ({
+      ...current,
+      [mentionKey]: {
+        handle: suggestion.handle,
+        label: suggestion.name,
+        userId: suggestion.userId,
+      },
+    }));
     requestAnimationFrame(() => {
       textarea.focus();
       textarea.setSelectionRange(nextCaret, nextCaret);
@@ -8824,63 +8867,71 @@ function MessageComposer({
           ))}
         </div>
       )}
-      <textarea
-        autoFocus={autoFocus}
-        aria-autocomplete="list"
-        aria-controls={showsMentionSuggestion ? mentionListId : undefined}
-        aria-expanded={showsMentionSuggestion}
-        aria-label={placeholder}
-        disabled={sending}
-        maxLength={10_000}
-        onChange={(event) => {
-          setBody(event.currentTarget.value);
-          setCaret(event.currentTarget.selectionStart);
-          setMentionDismissed(false);
-        }}
-        onKeyDown={(event) => {
-          if (
-            showsMentionSuggestion &&
-            (event.key === "Tab" ||
-              (event.key === "Enter" && !event.metaKey && !event.ctrlKey))
-          ) {
+      <MentionComposerField
+        body={body}
+        className="issue-composer-field"
+        controlRef={textareaRef}
+        mentions={connectedMentions}
+        onMentionClick={(mention) => onMentionOpen(mention.handle)}
+      >
+        <textarea
+          autoFocus={autoFocus}
+          aria-autocomplete="list"
+          aria-controls={showsMentionSuggestion ? mentionListId : undefined}
+          aria-expanded={showsMentionSuggestion}
+          aria-label={placeholder}
+          disabled={sending}
+          maxLength={10_000}
+          onChange={(event) => {
+            setBody(event.currentTarget.value);
+            setCaret(event.currentTarget.selectionStart);
+            setMentionDismissed(false);
+          }}
+          onKeyDown={(event) => {
+            if (
+              showsMentionSuggestion &&
+              (event.key === "Tab" ||
+                (event.key === "Enter" && !event.metaKey && !event.ctrlKey))
+            ) {
+              event.preventDefault();
+              completeMention(mentionSuggestions[0]);
+              return;
+            }
+            if (showsMentionSuggestion && event.key === "Escape") {
+              event.preventDefault();
+              setMentionDismissed(true);
+              return;
+            }
+            if (event.key === "Escape" && onCancel && !sending) {
+              event.preventDefault();
+              onCancel();
+              return;
+            }
+            if (
+              event.key === "Enter" &&
+              !event.shiftKey &&
+              !event.nativeEvent.isComposing
+            ) {
+              event.preventDefault();
+              void submit();
+            }
+          }}
+          onPaste={(event) => {
+            if (disableAttachments) return;
+            const images = filesFromDataTransfer(event.clipboardData).filter(
+              (file) => file.type.startsWith("image/"),
+            );
+            if (images.length === 0) return;
             event.preventDefault();
-            completeMention(mentionSuggestions[0]);
-            return;
-          }
-          if (showsMentionSuggestion && event.key === "Escape") {
-            event.preventDefault();
-            setMentionDismissed(true);
-            return;
-          }
-          if (event.key === "Escape" && onCancel && !sending) {
-            event.preventDefault();
-            onCancel();
-            return;
-          }
-          if (
-            event.key === "Enter" &&
-            !event.shiftKey &&
-            !event.nativeEvent.isComposing
-          ) {
-            event.preventDefault();
-            void submit();
-          }
-        }}
-        onPaste={(event) => {
-          if (disableAttachments) return;
-          const images = filesFromDataTransfer(event.clipboardData).filter(
-            (file) => file.type.startsWith("image/"),
-          );
-          if (images.length === 0) return;
-          event.preventDefault();
-          addImages(images);
-        }}
-        onSelect={(event) => setCaret(event.currentTarget.selectionStart)}
-        placeholder={placeholder}
-        ref={textareaRef}
-        rows={2}
-        value={body}
-      />
+            addImages(images);
+          }}
+          onSelect={(event) => setCaret(event.currentTarget.selectionStart)}
+          placeholder={placeholder}
+          ref={textareaRef}
+          rows={2}
+          value={body}
+        />
+      </MentionComposerField>
       <footer>
         {onCancel ? (
           <button

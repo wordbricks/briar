@@ -13,7 +13,12 @@ import {
   remarkIssueMentions,
 } from "../lib/issue-mentions";
 import { channelBodyWithoutImages } from "./ChannelImages";
-import { ProfileDialog, type ProfileTarget } from "./ProfileDialog";
+import {
+  ProfileDialog,
+  profileTargetForChannelAgent,
+  profileTargetForChannelMember,
+  type ProfileTarget,
+} from "./ProfileDialog";
 
 export function ChannelMessageText({
   agents,
@@ -33,33 +38,16 @@ export function ChannelMessageText({
     for (const agent of agents) {
       if (!mentionedAgentIds.has(agent.agentId)) continue;
       const handle = mentionHandle(agent.handle?.trim() || agent.name);
-      profiles.set(handle.toLowerCase(), {
-        type: "agent",
-        id: agent.agentId,
-        name: agent.name,
-        handle,
-        provider: agent.provider,
-        model: agent.model,
-        responsibility: agent.responsibility,
-        skills: agent.skills,
-        projectId: agent.projectId,
-        createdAt: agent.createdAt,
-      });
+      profiles.set(
+        handle.toLowerCase(),
+        profileTargetForChannelAgent(agent, handle),
+      );
     }
     for (const member of members) {
       if (!mentionedUserIds.has(member.userId)) continue;
       const handle = mentionHandle(member.email.split("@")[0] || member.userId);
       if (profiles.has(handle.toLowerCase())) continue;
-      profiles.set(handle.toLowerCase(), {
-        type: "user",
-        id: member.userId,
-        name: member.name,
-        email: member.email,
-        image: member.image,
-        role: member.role,
-        roleContext: "channel",
-        createdAt: member.createdAt,
-      });
+      profiles.set(handle.toLowerCase(), profileTargetForChannelMember(member));
     }
     return profiles;
   }, [agents, members, message.mentionedAgentIds, message.mentionedUserIds]);
@@ -81,22 +69,27 @@ export function ChannelMessageText({
               const mentionedProfile = handle
                 ? profilesByHandle.get(handle) ?? null
                 : null;
+              if (mentionedProfile) {
+                return (
+                  <button
+                    className="conversation-mention-button channel-mention-button"
+                    onClick={(event: MouseEvent<HTMLButtonElement>) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      setProfile(mentionedProfile);
+                    }}
+                    type="button"
+                  >
+                    {children}
+                  </button>
+                );
+              }
               return (
                 <a
                   {...props}
-                  className={
-                    mentionedProfile ? "channel-mention-link" : props.className
-                  }
+                  className={props.className}
                   href={href}
-                  onClick={
-                    mentionedProfile
-                      ? (event: MouseEvent<HTMLAnchorElement>) => {
-                          event.preventDefault();
-                          event.stopPropagation();
-                          setProfile(mentionedProfile);
-                        }
-                      : props.onClick
-                  }
+                  onClick={props.onClick}
                 >
                   {children}
                 </a>

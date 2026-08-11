@@ -293,6 +293,7 @@ export function useChannelComposer<T extends ComposerInput>({
     inputRef,
     insertAtCaret,
     mentionListId,
+    mentions,
     pickSuggestion,
     removeImage,
     setActiveSuggestionIndex,

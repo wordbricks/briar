@@ -1675,10 +1675,16 @@ button.conversation-reply-summary:focus-visible { outline:2px solid var(--ring);
 .issue-message-body > :last-child { margin-bottom:0; }
 .issue-message-body p { margin:0; white-space:pre-wrap; overflow-wrap:anywhere; }
 .issue-message-body a { overflow-wrap:anywhere; }
-.issue-message-body a.issue-mention-link { color:#2563eb; text-decoration-thickness:1px; text-underline-offset:2px; }
-.issue-message-body a.issue-mention-link:hover { color:#1d4ed8; }
-.dark .issue-message-body a.issue-mention-link { color:#60a5fa; }
-.dark .issue-message-body a.issue-mention-link:hover { color:#93c5fd; }
+.conversation-mention-button { appearance:none; display:inline; margin:0; padding:.06em .36em; border:0; border-radius:.38em; color:inherit; background:var(--secondary); font:inherit; font-weight:650; line-height:inherit; text-align:inherit; vertical-align:baseline; cursor:pointer; box-decoration-break:clone; -webkit-box-decoration-break:clone; }
+.conversation-mention-button:hover { color:var(--foreground); background:color-mix(in srgb,var(--secondary) 76%,var(--foreground) 12%); }
+.conversation-mention-button:focus-visible { outline:2px solid var(--ring); outline-offset:1px; }
+.mention-composer-field { min-width:0; position:relative; }
+.mention-composer-mirror { position:absolute; z-index:2; inset:0; overflow:hidden; color:var(--foreground); pointer-events:none; }
+.mention-composer-mirror .conversation-mention-button { margin:-.06em -.36em; pointer-events:auto; }
+.mention-composer-field > input,
+.mention-composer-field > textarea { position:relative; z-index:1; color:transparent !important; caret-color:var(--foreground); -webkit-text-fill-color:transparent; }
+.mention-composer-field > input::placeholder,
+.mention-composer-field > textarea::placeholder { -webkit-text-fill-color:var(--muted-foreground); }
 .issue-message-body ul,.issue-message-body ol { margin:.45em 0; padding-left:1.45em; }
 .issue-message-body li + li { margin-top:.2em; }
 .issue-message-body blockquote { margin:.45em 0; padding:.25em 0 .25em .8em; border-left:3px solid var(--border); color:var(--muted-foreground); overflow-wrap:anywhere; }
@@ -1810,7 +1816,9 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .issue-composer-mention-menu button small { margin-left:auto; overflow:hidden; color:var(--muted-foreground); font-size:var(--text-2xs); text-overflow:ellipsis; white-space:nowrap; }
 .issue-composer-mention-menu button:hover { color:var(--accent-foreground); background:var(--secondary); }
 .issue-composer-mention-menu button:focus-visible { outline:2px solid #8b70dd; outline-offset:1px; }
-.issue-message-composer textarea { width:100%; min-height:68px; padding:18px 18px 6px; resize:none; border:0; outline:0; color:var(--foreground); background:transparent; font:400 var(--text-sm)/1.55 inherit; }
+.issue-message-composer .issue-composer-field > textarea,
+.issue-message-composer .issue-composer-field > .mention-composer-mirror { width:100%; min-height:68px; padding:18px 18px 6px; font:400 var(--text-sm)/1.55 inherit; white-space:pre-wrap; overflow-wrap:anywhere; }
+.issue-message-composer .issue-composer-field > textarea { resize:none; border:0; outline:0; background:transparent; }
 .issue-message-composer textarea::placeholder { color:var(--muted-foreground); }
 .issue-composer-attachments { padding:10px 12px 0; display:flex; flex-wrap:wrap; gap:7px; }
 .issue-composer-attachment { max-width:180px; height:38px; padding:3px 5px 3px 3px; display:flex; align-items:center; gap:6px; border:1px solid var(--border); border-radius:9px; background:var(--muted); }
@@ -1830,7 +1838,8 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .issue-message-composer.compact { box-shadow:0 4px 14px rgba(43,42,37,.07); }
 .issue-inline-reply-composer { min-width:0; max-width:100%; margin:7px 10px 7px 54px; }
 .issue-inline-reply-composer .issue-message-composer { min-width:0; border-radius:12px; }
-.issue-inline-reply-composer .issue-message-composer textarea { min-height:52px; padding:12px 14px 3px; font-size:var(--text-xs); }
+.issue-inline-reply-composer .issue-message-composer .issue-composer-field > textarea,
+.issue-inline-reply-composer .issue-message-composer .issue-composer-field > .mention-composer-mirror { min-height:52px; padding:12px 14px 3px; font-size:var(--text-xs); }
 .issue-inline-reply-composer .issue-message-composer footer { min-height:42px; padding:3px 8px 7px; }
 @media (hover:none) {
   .issue-message-actions { top:4px; opacity:1; pointer-events:auto; transform:none; }
@@ -6115,10 +6124,6 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .channel-message-text { min-width:0; }
 .channel-message-text > :first-child { margin-top:0; }
 .channel-message-text > :last-child { margin-bottom:0; }
-.channel-message-text a.channel-mention-link { color:#2563eb; font-weight:620; text-decoration:underline; text-decoration-thickness:1px; text-underline-offset:2px; }
-.channel-message-text a.channel-mention-link:hover { color:#1d4ed8; }
-.dark .channel-message-text a.channel-mention-link { color:#60a5fa; }
-.dark .channel-message-text a.channel-mention-link:hover { color:#93c5fd; }
 .channel-message-images {
   display: grid;
   width: min(520px, 100%);
@@ -6279,20 +6284,19 @@ button.issue-message-state { width:100%; cursor:pointer; }
   color: #a33f31;
   font-size: 12px;
 }
-.channel-composer textarea {
+.channel-composer-field > textarea,
+.channel-composer-field > .mention-composer-mirror {
   min-height: 24px;
   max-height: 140px;
   width: 100%;
-  resize: none;
-  border: 0;
-  outline: 0;
-  background: transparent;
   padding: 4px 4px 2px;
-  color: inherit;
   font: inherit;
   font-size: 14px;
   line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
+.channel-composer-field > textarea { resize:none; border:0; outline:0; background:transparent; }
 .channel-composer textarea::placeholder { color: var(--muted-foreground, #9a948a); }
 .channel-composer-toolbar {
   display: flex;
@@ -6459,7 +6463,10 @@ button.issue-message-state { width:100%; cursor:pointer; }
 
 .companion-channel-composer { min-height:58px; position: sticky; bottom: 0; margin:0 max(12px,env(safe-area-inset-right)) calc(10px + env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left)); display: flex; flex-wrap:wrap; align-items:center; gap: 8px; border: 1px solid color-mix(in srgb,var(--border,#d6d1c8) 72%,transparent); border-radius:22px; background:var(--muted,#f2efe9); padding: 7px 8px; box-shadow:0 8px 24px rgba(22,20,28,.08); }
 .companion-channel-composer-add { width:40px; height:40px; flex:0 0 40px; display:grid; place-items:center; border:1px solid color-mix(in srgb,var(--border,#d6d1c8) 72%,transparent); border-radius:50%; color:var(--muted-foreground,#777168); background:var(--background,#faf9f6); }
-.companion-channel-composer input { min-width:0; flex: 1; border: 0; outline:0; background: transparent; padding: 8px 2px; color: inherit; font: inherit; font-size: 16px; }
+.companion-channel-composer-field { min-width:0; flex:1; }
+.companion-channel-composer-field > input,
+.companion-channel-composer-field > .mention-composer-mirror { min-width:0; width:100%; border:0; padding:8px 2px; font:inherit; font-size:16px; line-height:normal; white-space:pre; }
+.companion-channel-composer-field > input { outline:0; background:transparent; }
 .companion-channel-composer input::placeholder { color:var(--muted-foreground,#777168); }
 .companion-channel-composer > button:not(.companion-channel-composer-add) { display: grid; width: 40px; height: 40px; flex:0 0 40px; place-items: center; border: 0; border-radius: 50%; background: var(--primary,#5943a4); color: white; }
 .companion-channel-composer > button:disabled { opacity: .4; }
