@@ -2172,7 +2172,7 @@ export async function renewHuntRunLease(
   const row = await db
     .prepare(
       `update briar_hunt_runs
-       set lease_expires_at = ?, updated_at = ?
+       set lease_expires_at = ?
        where id = ? and project_id = ? and claim_token_hash = ?
          and (? is null or worker_id = ?)
          and status not in ('completed', 'cancelled')
@@ -2180,7 +2180,6 @@ export async function renewHuntRunLease(
     )
     .bind(
       leaseExpiresAt,
-      input.observedAt,
       input.runId,
       projectId,
       input.claimTokenHash,

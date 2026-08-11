@@ -99,8 +99,8 @@ export type WorkerLoopResult = {
 export const DEFAULT_IDLE_DELAY_MS = 15_000;
 export const DEFAULT_MAX_IDLE_DELAY_MS = 60_000;
 export const DEFAULT_HEARTBEAT_INTERVAL_MS = 60_000;
-/** Also serves as the cancellation/reassignment control poll. */
-export const DEFAULT_LEASE_RENEW_INTERVAL_MS = 30_000;
+/** A 15-minute server lease leaves ample recovery margin at this cadence. */
+export const DEFAULT_LEASE_RENEW_INTERVAL_MS = 5 * 60_000;
 export const DEFAULT_MAX_ERROR_DELAY_MS = 5 * 60_000;
 export const DEFAULT_MAX_CONCURRENT_SESSIONS = 1;
 export const MAX_CONCURRENT_SESSIONS = 16;
@@ -168,6 +168,14 @@ export function idleDelayWithBackoffMs(
   return Math.max(1, Math.min(maxDelayMs, Math.round(exponential * jitter)));
 }
 
+export function leaseRenewDelayMs(
+  intervalMs = DEFAULT_LEASE_RENEW_INTERVAL_MS,
+  random = Math.random,
+): number {
+  const jitter = 0.9 + Math.min(1, Math.max(0, random())) * 0.2;
+  return Math.max(1, Math.round(intervalMs * jitter));
+}
+
 /**
  * Claim-run-report loop. All I/O is injected so the state machine is testable
  * without a server, an agent, or real time.
@@ -231,7 +239,10 @@ export async function runWorkerLoop(
     let leaseFailure: unknown = null;
     const renewalLoop = (async () => {
       while (!renewal.signal.aborted) {
-        await dependencies.sleep(leaseRenewIntervalMs, renewal.signal);
+        await dependencies.sleep(
+          leaseRenewDelayMs(leaseRenewIntervalMs, dependencies.random),
+          renewal.signal,
+        );
         if (renewal.signal.aborted) break;
         try {
           await dependencies.renewLease(issue);
