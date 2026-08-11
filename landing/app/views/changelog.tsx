@@ -23,7 +23,7 @@ export const changelogCopy = {
     backTop: "맨 위로 ↑",
     entries: [
       {
-        version: "1.2.102",
+        version: "1.2.103",
         date: "2026년 8월 11일",
         title: "프로젝트 에이전트 실행 승인을 더 안전하게 배포합니다",
         summary:
@@ -31,7 +31,7 @@ export const changelogCopy = {
         items: [
           "대화에서 Project Agent Skill 실행을 요청하면 먼저 읽기 전용 제안을 만들고, 사용할 Worker와 정확한 실행 내용을 확인한 뒤 승인합니다.",
           "승인된 실행의 에이전트·스킬·요청·Worker 정보를 감사 기록으로 보존하고, 승인되지 않았거나 오래된 요청이 실행되지 않도록 서버에서 검증합니다.",
-          "채널 에이전트 위임 스키마의 트리거를 D1이 원격에서 안전하게 적용하도록 마이그레이션 문장 경계를 명시했습니다.",
+          "채널 에이전트 위임 스키마의 트리거를 Wrangler가 한 문장으로 인식하도록 표준 구문과 마이그레이션 경계를 적용했습니다.",
           "연결된 사람과 에이전트 멘션을 메시지 안에서 바로 알아보고 누를 수 있는 버튼으로 표시합니다.",
           "새로고침 뒤에도 대화 이미지가 유지되고, 실제 스레드가 없을 때 불필요한 답글 링크를 숨깁니다.",
           "이슈 헤더의 속성과 작업 메뉴를 정리하고 배정 배지를 다듬어 중요한 상태와 동작을 더 빠르게 찾을 수 있습니다.",
@@ -332,7 +332,7 @@ export const changelogCopy = {
     backTop: "Back to top ↑",
     entries: [
       {
-        version: "1.2.102",
+        version: "1.2.103",
         date: "August 11, 2026",
         title: "Roll out Project Agent execution approvals safely",
         summary:
@@ -340,7 +340,7 @@ export const changelogCopy = {
         items: [
           "Turn conversational Project Agent Skill requests into read-only proposals, then confirm the exact task and Worker before execution.",
           "Preserve the approved agent, Skill, request, and Worker in an audit record, and reject unapproved or stale execution attempts on the server.",
-          "Add explicit D1 statement boundaries so the channel-agent delegation triggers apply safely in production.",
+          "Use Wrangler-compatible trigger syntax and D1 statement boundaries so channel-agent delegation applies safely in production.",
           "Render connected people and agent mentions as recognizable, clickable buttons inside messages.",
           "Keep conversation images loaded after refresh and hide reply links when no real thread exists.",
           "Simplify issue header properties and action menus, and refine assignment badges so important state and actions are easier to find.",
@@ -652,9 +652,9 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <h1>{changelog.title}</h1>
           <p>{changelog.description}</p>
         </div>
-        <a href="#v1-2-102" className="changelog-current">
+        <a href="#v1-2-103" className="changelog-current">
           <span>{changelog.current}</span>
-          <strong>v1.2.102</strong>
+          <strong>v1.2.103</strong>
           <i aria-hidden="true">↓</i>
         </a>
       </section>
@@ -679,7 +679,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   {index === 0 ? <span>{changelog.latest}</span> : null}
                   <time
                     dateTime={
-                      entry.version === "1.2.102" ||
+                      entry.version === "1.2.103" ||
                       entry.version === "1.2.100" ||
                       entry.version === "1.2.99" ||
                       entry.version === "1.2.98" ||
@@ -693,7 +693,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                       entry.version === "1.2.90" ||
                       entry.version === "1.2.89" ||
                       entry.version === "1.2.88"
-                        ? entry.version === "1.2.102" ||
+                        ? entry.version === "1.2.103" ||
                           entry.version === "1.2.100"
                           ? "2026-08-11"
                           : entry.version === "1.2.99" ||
