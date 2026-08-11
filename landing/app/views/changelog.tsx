@@ -23,6 +23,19 @@ export const changelogCopy = {
     backTop: "맨 위로 ↑",
     entries: [
       {
+        version: "1.2.108",
+        date: "2026년 8월 12일",
+        title: "프로젝트 현황과 에이전트 동기화를 한눈에 확인합니다",
+        summary:
+          "프로젝트별 홈 로비에서 최근 사용량과 실행 상태를 빠르게 확인하고, Inbox·Worker·채널 동기화가 실제로 바뀐 데이터만 처리하도록 다듬었습니다.",
+        items: [
+          "프로젝트 로비에서 최근 30일 사용량, 실행 시간, 이슈 상태, GitHub 연결 상태와 최근 활동을 한 화면에 보여줍니다.",
+          "조직 Inbox 스냅샷과 Worker claim polling이 변경이 없을 때 불필요한 응답·쿼리를 건너뛰어 동기화 비용을 줄입니다.",
+          "Worker lease 갱신과 자격 증명 사용량 기록을 묶어 쓰고, 채널 실시간 연결은 유휴 상태에서 잠들 수 있어 운영 부하를 낮춥니다.",
+          "긴 에이전트 transcript 쓰기를 배치 처리하고 멘션 입력 caret 위치를 맞춰 실행 기록과 대화 편집 경험을 안정화했습니다.",
+        ],
+      },
+      {
         version: "1.2.107",
         date: "2026년 8월 12일",
         title: "모바일 채널을 자연스럽게 다듬고 반복 알림을 멈춥니다",
@@ -387,6 +400,19 @@ export const changelogCopy = {
     home: "Home",
     backTop: "Back to top ↑",
     entries: [
+      {
+        version: "1.2.108",
+        date: "August 12, 2026",
+        title: "See project health and agent synchronization at a glance",
+        summary:
+          "Review recent project activity and execution health in a project lobby while keeping Inbox, Worker, and channel synchronization focused on data that actually changed.",
+        items: [
+          "Show the last 30 days of usage, execution time, issue status, GitHub connection state, and recent activity in one project lobby.",
+          "Skip unchanged organization Inbox snapshots and Worker claim polls so synchronization avoids redundant responses and queries.",
+          "Batch Worker lease renewals and credential-usage writes, and let idle channel realtime connections hibernate to reduce operational overhead.",
+          "Batch long agent transcript writes and align the mention-composer caret to make execution history and conversation editing more reliable.",
+        ],
+      },
       {
         version: "1.2.107",
         date: "August 12, 2026",
@@ -764,9 +790,9 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <h1>{changelog.title}</h1>
           <p>{changelog.description}</p>
         </div>
-        <a href="#v1-2-107" className="changelog-current">
+        <a href="#v1-2-108" className="changelog-current">
           <span>{changelog.current}</span>
-          <strong>v1.2.107</strong>
+          <strong>v1.2.108</strong>
           <i aria-hidden="true">↓</i>
         </a>
       </section>
@@ -791,6 +817,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   {index === 0 ? <span>{changelog.latest}</span> : null}
                   <time
                     dateTime={
+                      entry.version === "1.2.108" ||
                       entry.version === "1.2.107" ||
                       entry.version === "1.2.106"
                         ? "2026-08-12"
