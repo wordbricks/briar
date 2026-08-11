@@ -328,7 +328,7 @@ export const channelReplyCompletionSchema = z
             title: z.string().trim().min(1).max(300),
             description: z.string().trim().max(100_000).nullable(),
             priority: z.number().int().min(1).max(4).nullable(),
-            status: z.enum(["backlog", "queued"]),
+            status: z.literal("backlog"),
           })
           .strict(),
       })
@@ -387,6 +387,8 @@ export const channelIssueProposalPayloadSchema = z.object({
       title: z.string().trim().min(1).max(300),
       description: z.string().trim().max(100_000).nullable(),
       priority: z.number().int().min(1).max(4).nullable(),
+      // Read compatibility for proposals persisted by pre-approval-boundary
+      // Workers. Acceptance always normalizes either value to backlog.
       status: z.enum(["backlog", "queued"]),
     })
     .strict(),

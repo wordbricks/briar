@@ -7954,7 +7954,7 @@ function IssueMessageItem({
                 </small>
               ) : proposal.type === "request_issue_create" ? (
                 <small>
-                  {t("run.issueProposalStatus", { status: proposal.issue.status })}
+                  {t("channel.issueProposalBacklogOnly")}
                 </small>
               ) : null}
             </header>
@@ -8001,6 +8001,8 @@ function IssueMessageItem({
               >
                 {actionProposalState?.accepting ? (
                   <LoaderCircle aria-hidden="true" className="spin" size={15} />
+                ) : proposal.type === "request_issue_create" ? (
+                  <Plus aria-hidden="true" size={15} />
                 ) : (
                   <Play aria-hidden="true" size={15} />
                 )}

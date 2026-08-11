@@ -45,7 +45,7 @@ import {
   setChannelMember,
   toggleChannelMessageReaction,
 } from "../lib/api";
-import type { OrganizationMember } from "../types";
+import type { OrganizationMember, Project } from "../types";
 import type {
   ChannelAgentReply,
   ChannelAgentSummary,
@@ -74,6 +74,10 @@ import {
   ConversationReplySummary,
   type ConversationReplyParticipant,
 } from "./ConversationReplySummary";
+import {
+  ChannelIssueProposalDetails,
+  channelIssueProposalDetails,
+} from "./ChannelIssueProposalDetails";
 
 /** Chat needs a tighter cadence than the 15s dashboard poll. */
 const CHANNEL_POLL_INTERVAL_MS = 3_000;
@@ -83,10 +87,11 @@ type ChannelsProps = {
   token: string;
   currentUserId: string | null;
   channels: ChannelSummary[];
+  projects?: readonly Pick<Project, "id" | "name" | "organizationId">[];
   activeChannelId: string | null;
   onChannelSelect: (channelId: string | null) => void;
   onChannelsChange: Dispatch<SetStateAction<ChannelSummary[]>>;
-  onIssueCreated?: (runId: string) => void;
+  onIssueCreated?: (projectId: string, runId: string) => void | Promise<void>;
   onCreateAgent?: () => void;
   requestedMessage?: {
     channelId: string;
@@ -157,6 +162,12 @@ const authorInitial = (name: string) =>
 
 type Translate = ReturnType<typeof useI18n>["t"];
 
+type ChannelSurfaceContext = {
+  generation: number;
+  channelId: string | null;
+  threadParentId: string | null;
+};
+
 const replyRelativeTime = (value: string, t: Translate) => {
   const minutes = Math.max(
     1,
@@ -218,6 +229,7 @@ export function Channels({
   token,
   currentUserId,
   channels,
+  projects = [],
   activeChannelId,
   onChannelSelect,
   onChannelsChange,
@@ -233,6 +245,10 @@ export function Channels({
   const [replies, setReplies] = useState<ChannelAgentReply[]>([]);
   const [threadParentId, setThreadParentId] = useState<string | null>(null);
   const [threadMessages, setThreadMessages] = useState<ChannelMessage[]>([]);
+  const [proposalProjects, setProposalProjects] = useState<
+    Record<string, string>
+  >({});
+  const [channelListReady, setChannelListReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -256,14 +272,99 @@ export function Channels({
     save: saveChannelThreadWidth,
   });
   const cursor = useRef(0);
+  const channelDataVersion = useRef(0);
+  const authoritativeLoadVersion = useRef<number | null>(null);
+  const channelSurfaceGeneration = useRef(0);
+  const renderedChannelSurface = useRef({
+    channelId: activeChannelId,
+    threadParentId,
+  });
+  const proposalVersions = useRef(new Map<string, number>());
+  const latestProposals = useRef(
+    new Map<string, NonNullable<ChannelMessage["proposal"]>>(),
+  );
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const activeChannelIdRef = useRef(activeChannelId);
+  const threadParentIdRef = useRef(threadParentId);
+  if (
+    renderedChannelSurface.current.channelId !== activeChannelId ||
+    renderedChannelSurface.current.threadParentId !== threadParentId
+  ) {
+    channelSurfaceGeneration.current += 1;
+    renderedChannelSurface.current = {
+      channelId: activeChannelId,
+      threadParentId,
+    };
+  }
   activeChannelIdRef.current = activeChannelId;
+  threadParentIdRef.current = threadParentId;
+
+  const captureChannelSurface = useCallback(
+    (): ChannelSurfaceContext => ({
+      generation: channelSurfaceGeneration.current,
+      channelId: activeChannelIdRef.current,
+      threadParentId: threadParentIdRef.current,
+    }),
+    [],
+  );
+
+  const channelSurfaceIsCurrent = useCallback(
+    (context: ChannelSurfaceContext) =>
+      context.generation === channelSurfaceGeneration.current &&
+      context.channelId === activeChannelIdRef.current &&
+      context.threadParentId === threadParentIdRef.current,
+    [],
+  );
+
+  const invalidateChannelSurface = useCallback(
+    (channelId: string | null, parentMessageId: string | null) => {
+      channelSurfaceGeneration.current += 1;
+      activeChannelIdRef.current = channelId;
+      threadParentIdRef.current = parentMessageId;
+      setBusy(false);
+    },
+    [],
+  );
+
+  useEffect(() => {
+    // A parent-selected channel change and a rendered thread transition both
+    // invalidate the previous surface synchronously above. Clear its shared
+    // busy presentation here so a deliberately ignored completion cannot leave
+    // the newly selected surface disabled.
+    setBusy(false);
+  }, [activeChannelId, threadParentId]);
+
+  useEffect(
+    () => () => {
+      channelSurfaceGeneration.current += 1;
+      activeChannelIdRef.current = null;
+      threadParentIdRef.current = null;
+    },
+    [],
+  );
 
   const activeChannel = useMemo(
     () => channels.find((channel) => channel.id === activeChannelId) ?? null,
     [channels, activeChannelId],
   );
+
+  const recordProposalMessages = useCallback((incoming: ChannelMessage[]) => {
+    const recorded = new Set<string>();
+    for (const message of incoming) {
+      const proposal = message.proposal;
+      if (!proposal || recorded.has(proposal.id)) continue;
+      recorded.add(proposal.id);
+      const previous = latestProposals.current.get(proposal.id);
+      latestProposals.current.set(proposal.id, proposal);
+      if (previous && JSON.stringify(previous) === JSON.stringify(proposal)) {
+        continue;
+      }
+      proposalVersions.current.set(
+        proposal.id,
+        (proposalVersions.current.get(proposal.id) ?? 0) + 1,
+      );
+    }
+  }, []);
 
   const openInvite = useCallback(() => {
     if (!activeChannelId) return;
@@ -351,17 +452,27 @@ export function Channels({
 
   useEffect(() => {
     let cancelled = false;
+    cursor.current = 0;
+    setChannelListReady(false);
+    proposalVersions.current.clear();
+    latestProposals.current.clear();
     void (async () => {
       try {
         const result = await listChannels(token, organizationId);
         if (cancelled) return;
         cursor.current = result.cursor;
         onChannelsChange(result.channels);
+        setChannelListReady(true);
         if (!activeChannelIdRef.current) {
           onChannelSelect(result.channels[0]?.id ?? null);
         }
       } catch (cause) {
-        if (!cancelled) setError(errorMessage(cause));
+        if (!cancelled) {
+          setError(errorMessage(cause));
+          // A channel detail can still load from the parent's last catalog;
+          // polling from cursor zero will reconcile once connectivity returns.
+          setChannelListReady(true);
+        }
       }
     })();
     return () => {
@@ -370,14 +481,25 @@ export function Channels({
   }, [onChannelSelect, onChannelsChange, organizationId, token]);
 
   useEffect(() => {
-    if (!activeChannelId) return;
+    if (!activeChannelId || !channelListReady) return;
     let cancelled = false;
+    const loadVersion = ++channelDataVersion.current;
+    authoritativeLoadVersion.current = loadVersion;
+    setProposalProjects({});
     void (async () => {
       try {
         const result = await loadChannel(token, organizationId, activeChannelId);
-        if (cancelled) return;
+        if (cancelled || loadVersion !== channelDataVersion.current) return;
+        onChannelsChange((current) =>
+          current.some((channel) => channel.id === result.channel.id)
+            ? current.map((channel) =>
+                channel.id === result.channel.id ? result.channel : channel,
+              )
+            : [...current, result.channel],
+        );
         setMembers(result.members);
         setAgents(result.agents);
+        recordProposalMessages(result.messages);
         setMessages(result.messages);
         const target = requestedMessage?.channelId === activeChannelId
           ? requestedMessage
@@ -389,7 +511,8 @@ export function Channels({
             activeChannelId,
             target.rootMessageId,
           );
-          if (cancelled) return;
+          if (cancelled || loadVersion !== channelDataVersion.current) return;
+          recordProposalMessages(threadResult.messages);
           setThreadParentId(target.rootMessageId);
           setThreadMessages(threadResult.messages);
         } else {
@@ -405,17 +528,32 @@ export function Channels({
           });
         }
       } catch (cause) {
-        if (!cancelled) setError(errorMessage(cause));
+        if (!cancelled && loadVersion === channelDataVersion.current) {
+          setError(errorMessage(cause));
+        }
+      } finally {
+        if (authoritativeLoadVersion.current === loadVersion) {
+          authoritativeLoadVersion.current = null;
+        }
       }
     })();
     return () => {
       cancelled = true;
+      if (loadVersion === channelDataVersion.current) {
+        channelDataVersion.current += 1;
+      }
+      if (authoritativeLoadVersion.current === loadVersion) {
+        authoritativeLoadVersion.current = null;
+      }
     };
   }, [
     activeChannelId,
+    channelListReady,
     onRequestedMessageOpen,
+    onChannelsChange,
     organizationId,
     requestedMessage,
+    recordProposalMessages,
     token,
   ]);
 
@@ -423,11 +561,27 @@ export function Channels({
   // dropped here rather than filtered server-side.
   useEffect(() => {
     let stopped = false;
+    let inFlight = false;
     const tick = async () => {
-      if (document.hidden) return;
+      if (
+        !channelListReady ||
+        document.hidden ||
+        inFlight ||
+        authoritativeLoadVersion.current != null
+      ) {
+        return;
+      }
+      const requestedCursor = cursor.current;
+      const requestedDataVersion = channelDataVersion.current;
+      inFlight = true;
       try {
-        const delta = await loadChannelDelta(token, organizationId, cursor.current);
-        if (stopped) return;
+        const delta = await loadChannelDelta(token, organizationId, requestedCursor);
+        if (
+          stopped ||
+          requestedCursor !== cursor.current ||
+          requestedDataVersion !== channelDataVersion.current ||
+          authoritativeLoadVersion.current != null
+        ) return;
         cursor.current = delta.cursor;
         if (delta.channels.length || delta.removedChannelIds.length) {
           onChannelsChange((current) => {
@@ -450,6 +604,7 @@ export function Channels({
           (message) => message.channelId === activeChannelId,
         );
         if (relevant.length || delta.removedMessageIds.length) {
+          recordProposalMessages(relevant);
           setMessages((current) =>
             mergeMessages(
               current,
@@ -474,6 +629,8 @@ export function Channels({
         }
       } catch {
         // A dropped poll is retried on the next interval.
+      } finally {
+        inFlight = false;
       }
     };
     const timer = window.setInterval(() => void tick(), CHANNEL_POLL_INTERVAL_MS);
@@ -481,7 +638,14 @@ export function Channels({
       stopped = true;
       window.clearInterval(timer);
     };
-  }, [activeChannelId, onChannelsChange, organizationId, token]);
+  }, [
+    activeChannelId,
+    channelListReady,
+    onChannelsChange,
+    organizationId,
+    recordProposalMessages,
+    token,
+  ]);
 
   useEffect(() => {
     if (
@@ -500,6 +664,9 @@ export function Channels({
   const openThread = useCallback(
     async (parentId: string) => {
       if (!activeChannelId) return;
+      invalidateChannelSurface(activeChannelId, parentId);
+      const loadVersion = ++channelDataVersion.current;
+      authoritativeLoadVersion.current = loadVersion;
       setThreadParentId(parentId);
       try {
         const result = await listChannelMessages(
@@ -508,12 +675,26 @@ export function Channels({
           activeChannelId,
           parentId,
         );
+        if (loadVersion !== channelDataVersion.current) return;
+        recordProposalMessages(result.messages);
         setThreadMessages(result.messages);
       } catch (cause) {
-        setError(errorMessage(cause));
+        if (loadVersion === channelDataVersion.current) {
+          setError(errorMessage(cause));
+        }
+      } finally {
+        if (authoritativeLoadVersion.current === loadVersion) {
+          authoritativeLoadVersion.current = null;
+        }
       }
     },
-    [activeChannelId, organizationId, token],
+    [
+      activeChannelId,
+      invalidateChannelSurface,
+      organizationId,
+      recordProposalMessages,
+      token,
+    ],
   );
 
   const send = useCallback(
@@ -572,30 +753,164 @@ export function Channels({
     [activeChannelId, organizationId, token],
   );
 
+  const openIssue = useCallback(
+    async (
+      projectId: string,
+      runId: string,
+      context: ChannelSurfaceContext = captureChannelSurface(),
+    ) => {
+      try {
+        await onIssueCreated?.(projectId, runId);
+      } catch (cause) {
+        if (channelSurfaceIsCurrent(context)) {
+          setError(errorMessage(cause));
+        }
+      }
+    },
+    [captureChannelSurface, channelSurfaceIsCurrent, onIssueCreated],
+  );
+
+  const refreshProposalState = useCallback(
+    async (message: ChannelMessage, proposalId: string) => {
+      if (!activeChannelId) return null;
+      const loadVersion = ++channelDataVersion.current;
+      authoritativeLoadVersion.current = loadVersion;
+      try {
+        if (message.parentMessageId) {
+          const result = await listChannelMessages(
+            token,
+            organizationId,
+            activeChannelId,
+            message.parentMessageId,
+          );
+          if (loadVersion !== channelDataVersion.current) {
+            return latestProposals.current.get(proposalId) ?? null;
+          }
+          recordProposalMessages(result.messages);
+          setThreadMessages(result.messages);
+        } else {
+          const result = await loadChannel(token, organizationId, activeChannelId);
+          if (loadVersion !== channelDataVersion.current) {
+            return latestProposals.current.get(proposalId) ?? null;
+          }
+          recordProposalMessages(result.messages);
+          setMembers(result.members);
+          setAgents(result.agents);
+          setMessages(result.messages);
+          onChannelsChange((current) =>
+            current.map((item) =>
+              item.id === result.channel.id ? result.channel : item,
+            ),
+          );
+        }
+        return latestProposals.current.get(proposalId) ?? null;
+      } finally {
+        if (authoritativeLoadVersion.current === loadVersion) {
+          authoritativeLoadVersion.current = null;
+        }
+      }
+    },
+    [
+      activeChannelId,
+      onChannelsChange,
+      organizationId,
+      recordProposalMessages,
+      token,
+    ],
+  );
+
   const acceptProposal = useCallback(
     async (message: ChannelMessage) => {
       if (!activeChannelId || !message.proposal) return;
+      const proposalId = message.proposal.id;
+      const projectId =
+        message.proposal.projectId ??
+        activeChannel?.defaultProjectId ??
+        proposalProjects[proposalId] ??
+        null;
+      if (!projectId) return;
+      const approvalChannelId = activeChannelId;
+      const approvalThreadParentId = threadParentIdRef.current;
+      const approvalContext = captureChannelSurface();
+      const approvalContextIsCurrent = () =>
+        approvalContext.channelId === approvalChannelId &&
+        approvalContext.threadParentId === approvalThreadParentId &&
+        channelSurfaceIsCurrent(approvalContext);
+      const approvalProposalVersion = proposalVersions.current.get(proposalId) ?? 0;
       setBusy(true);
+      setError(null);
       try {
         const result = await acceptChannelProposal(
           token,
           organizationId,
           activeChannelId,
-          message.proposal.id,
-          message.proposal.projectId ?? activeChannel?.defaultProjectId ?? null,
+          proposalId,
+          projectId,
         );
-        if (result.resultRunId) onIssueCreated?.(result.resultRunId);
+        if (!approvalContextIsCurrent()) return;
+        const applyResult = (candidate: ChannelMessage): ChannelMessage =>
+          candidate.proposal?.id === proposalId
+            ? {
+                ...candidate,
+                proposal: {
+                  ...candidate.proposal,
+                  status: "accepted",
+                  projectId: result.projectId,
+                  resultRunId: result.resultRunId,
+                },
+              }
+            : candidate;
+        if (
+          (proposalVersions.current.get(proposalId) ?? 0) ===
+            approvalProposalVersion
+        ) {
+          setMessages((current) => current.map(applyResult));
+          setThreadMessages((current) => current.map(applyResult));
+          recordProposalMessages([applyResult(message)]);
+          await openIssue(result.projectId, result.resultRunId, approvalContext);
+        } else {
+          let latest = latestProposals.current.get(proposalId);
+          if (latest?.status !== "accepted") {
+            latest =
+              (await refreshProposalState(message, proposalId)) ?? undefined;
+          }
+          if (!approvalContextIsCurrent()) return;
+          if (latest?.status === "accepted" && latest.projectId && latest.resultRunId) {
+            await openIssue(latest.projectId, latest.resultRunId, approvalContext);
+          } else if (
+            latest?.status === "pending" &&
+            latest.projectId === result.projectId
+          ) {
+            // A reservation delta can be visible before the same approval
+            // transaction's accepted delta. The post-response refresh proves
+            // it is still that exact reservation, so the successful response
+            // is safe to apply without overwriting a reopen or transfer.
+            setMessages((current) => current.map(applyResult));
+            setThreadMessages((current) => current.map(applyResult));
+            recordProposalMessages([applyResult(message)]);
+            await openIssue(result.projectId, result.resultRunId, approvalContext);
+          }
+        }
       } catch (cause) {
-        setError(errorMessage(cause));
+        if (approvalContextIsCurrent()) {
+          setError(errorMessage(cause));
+        }
       } finally {
-        setBusy(false);
+        if (approvalContextIsCurrent()) {
+          setBusy(false);
+        }
       }
     },
     [
       activeChannel?.defaultProjectId,
       activeChannelId,
-      onIssueCreated,
+      captureChannelSurface,
+      channelSurfaceIsCurrent,
+      openIssue,
       organizationId,
+      proposalProjects,
+      recordProposalMessages,
+      refreshProposalState,
       token,
     ],
   );
@@ -720,16 +1035,32 @@ export function Channels({
                     ) : null}
                     <MessageRow
                       agents={agents}
+                      channel={activeChannel}
                       message={message}
                       members={members}
                       localeTag={localeTag}
                       currentUserId={currentUserId}
                       onAcceptProposal={() => void acceptProposal(message)}
+                      onIssueOpen={openIssue}
                       onOpenThread={() => void openThread(message.id)}
+                      onProjectChange={(projectId) => {
+                        const proposalId = message.proposal?.id;
+                        if (!proposalId) return;
+                        setProposalProjects((current) => ({
+                          ...current,
+                          [proposalId]: projectId,
+                        }));
+                      }}
                       onToggleReaction={(emoji) =>
                         void toggleReaction(message, emoji)
                       }
                       busy={busy}
+                      projects={projects}
+                      selectedProjectId={
+                        message.proposal
+                          ? proposalProjects[message.proposal.id] ?? null
+                          : null
+                      }
                       token={token}
                     />
                   </div>
@@ -786,7 +1117,10 @@ export function Channels({
             </span>
             <button
               aria-label={t("channel.closeThread")}
-              onClick={() => setThreadParentId(null)}
+              onClick={() => {
+                invalidateChannelSurface(activeChannel.id, null);
+                setThreadParentId(null);
+              }}
             >
               <X size={15} />
             </button>
@@ -795,16 +1129,32 @@ export function Channels({
             {threadMessages.map((message) => (
               <MessageRow
                 agents={agents}
+                channel={activeChannel}
                 key={message.id}
                 message={message}
                 members={members}
                 localeTag={localeTag}
                 currentUserId={currentUserId}
                 onAcceptProposal={() => void acceptProposal(message)}
+                onIssueOpen={openIssue}
+                onProjectChange={(projectId) => {
+                  const proposalId = message.proposal?.id;
+                  if (!proposalId) return;
+                  setProposalProjects((current) => ({
+                    ...current,
+                    [proposalId]: projectId,
+                  }));
+                }}
                 onToggleReaction={(emoji) =>
                   void toggleReaction(message, emoji)
                 }
                 busy={busy}
+                projects={projects}
+                selectedProjectId={
+                  message.proposal
+                    ? proposalProjects[message.proposal.id] ?? null
+                    : null
+                }
                 token={token}
               />
             ))}
@@ -1128,25 +1478,35 @@ function ChannelInviteDialog({
 
 function MessageRow({
   agents,
+  channel,
   message,
   members,
   localeTag,
   currentUserId,
   onOpenThread,
   onAcceptProposal,
+  onIssueOpen,
+  onProjectChange,
   onToggleReaction,
   busy,
+  projects,
+  selectedProjectId,
   token,
 }: {
   agents: ChannelAgentSummary[];
+  channel: ChannelSummary;
   message: ChannelMessage;
   members: ChannelMember[];
   localeTag: string;
   currentUserId: string | null;
   onOpenThread?: () => void;
   onAcceptProposal: () => void;
+  onIssueOpen?: (projectId: string, runId: string) => void | Promise<void>;
+  onProjectChange: (projectId: string) => void;
   onToggleReaction: (emoji: string) => void;
   busy: boolean;
+  projects: readonly Pick<Project, "id" | "name" | "organizationId">[];
+  selectedProjectId: string | null;
   token: string;
 }) {
   const { t } = useI18n();
@@ -1157,6 +1517,23 @@ function MessageRow({
   const displayName = isSelf ? t("channel.you") : message.author.name;
   const image =
     message.author.type === "user" ? message.author.image : null;
+  const issueProposal = message.proposal?.actionType === "request_issue_create"
+    ? message.proposal
+    : null;
+  const availableProjects = projects.filter(
+    (project) =>
+      !project.organizationId || project.organizationId === channel.organizationId,
+  );
+  const proposalProjectId =
+    issueProposal?.projectId ?? channel.defaultProjectId ?? selectedProjectId;
+  const proposalProjectName = proposalProjectId
+    ? availableProjects.find((project) => project.id === proposalProjectId)?.name ??
+      proposalProjectId
+    : null;
+  const needsProject =
+    issueProposal?.status === "pending" && !issueProposal.projectId &&
+    !channel.defaultProjectId;
+  const proposalIssue = channelIssueProposalDetails(issueProposal);
 
   return (
     <article
@@ -1204,19 +1581,63 @@ function MessageRow({
           </div>
         ) : null}
 
-        {message.proposal ? (
+        {issueProposal ? (
           <div className="channel-proposal-card">
-            <div>
+            <div className="channel-proposal-copy">
               <strong>{t("channel.issueProposal")}</strong>
               <span>
-                {message.proposal.status === "accepted"
+                {issueProposal.status === "accepted"
                   ? t("channel.issueProposalAccepted")
                   : t("channel.issueProposalPending")}
               </span>
+              <ChannelIssueProposalDetails
+                projectName={proposalProjectName}
+                proposal={issueProposal}
+              />
             </div>
-            {message.proposal.status === "pending" ? (
-              <button disabled={busy} onClick={onAcceptProposal}>
-                {t("channel.createIssue")}
+            {needsProject ? (
+              <select
+                aria-label={t("channel.selectProposalProject")}
+                disabled={busy || Boolean(channel.archivedAt)}
+                onChange={(event) => onProjectChange(event.currentTarget.value)}
+                value={selectedProjectId ?? ""}
+              >
+                <option disabled value="">
+                  {t("channel.selectProposalProject")}
+                </option>
+                {availableProjects.map((project) => (
+                  <option key={project.id} value={project.id}>
+                    {project.name}
+                  </option>
+                ))}
+              </select>
+            ) : null}
+            {issueProposal.status === "pending" ? (
+              <button
+                className="channel-proposal-approve-button"
+                disabled={
+                  busy || Boolean(channel.archivedAt) ||
+                  !proposalProjectId || !proposalIssue
+                }
+                onClick={onAcceptProposal}
+                type="button"
+              >
+                {t("channel.approveCreateIssue")}
+              </button>
+            ) : issueProposal.projectId &&
+              issueProposal.resultRunId &&
+              onIssueOpen ? (
+              <button
+                className="channel-proposal-view-button"
+                onClick={() => {
+                  void onIssueOpen(
+                    issueProposal.projectId!,
+                    issueProposal.resultRunId!,
+                  );
+                }}
+                type="button"
+              >
+                {t("channel.viewIssue")}
               </button>
             ) : null}
           </div>

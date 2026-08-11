@@ -143,7 +143,143 @@ struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
         let actionType: ActionType
         let status: Status
         let projectId: UUID?
+        let payload: Payload?
         let resultRunId: UUID?
+
+        init(
+            id: UUID,
+            actionType: ActionType,
+            status: Status,
+            projectId: UUID?,
+            payload: Payload? = nil,
+            resultRunId: UUID?
+        ) {
+            self.id = id
+            self.actionType = actionType
+            self.status = status
+            self.projectId = projectId
+            self.payload = payload
+            self.resultRunId = resultRunId
+        }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            id = try container.decode(UUID.self, forKey: .id)
+            actionType = try container.decode(ActionType.self, forKey: .actionType)
+            status = try container.decode(Status.self, forKey: .status)
+            projectId = try container.decodeIfPresent(UUID.self, forKey: .projectId)
+            // Older responses omitted payload, while future action types may use
+            // a different shape. Neither should make the channel unreadable.
+            payload = try? container.decodeIfPresent(Payload.self, forKey: .payload)
+            resultRunId = try container.decodeIfPresent(UUID.self, forKey: .resultRunId)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case id
+            case actionType
+            case status
+            case projectId
+            case payload
+            case resultRunId
+        }
+
+        struct Payload: Codable, Hashable, Sendable {
+            let issue: Issue
+
+            struct Issue: Codable, Hashable, Sendable {
+                let title: String
+                let description: String?
+                let priority: Int?
+                let status: IssueStatus
+
+                init(
+                    title: String,
+                    description: String?,
+                    priority: Int?,
+                    status: IssueStatus
+                ) {
+                    self.title = title
+                    self.description = description
+                    self.priority = priority
+                    self.status = status
+                }
+
+                init(from decoder: Decoder) throws {
+                    let container = try decoder.container(keyedBy: CodingKeys.self)
+                    let decodedTitle = try container.decode(String.self, forKey: .title)
+                    let normalizedTitle = decodedTitle.trimmingCharacters(
+                        in: .whitespacesAndNewlines
+                    )
+                    guard !normalizedTitle.isEmpty, normalizedTitle.count <= 300 else {
+                        throw DecodingError.dataCorruptedError(
+                            forKey: .title,
+                            in: container,
+                            debugDescription: "Issue title must contain 1...300 characters"
+                        )
+                    }
+                    guard container.contains(.description) else {
+                        throw DecodingError.keyNotFound(
+                            CodingKeys.description,
+                            .init(
+                                codingPath: decoder.codingPath,
+                                debugDescription: "Issue description is required, and may be null"
+                            )
+                        )
+                    }
+                    let decodedDescription = try container.decodeIfPresent(
+                        String.self,
+                        forKey: .description
+                    )
+                    if let decodedDescription,
+                       decodedDescription.trimmingCharacters(
+                           in: .whitespacesAndNewlines
+                       ).count > 100_000 {
+                        throw DecodingError.dataCorruptedError(
+                            forKey: .description,
+                            in: container,
+                            debugDescription: "Issue description is too long"
+                        )
+                    }
+                    guard container.contains(.priority) else {
+                        throw DecodingError.keyNotFound(
+                            CodingKeys.priority,
+                            .init(
+                                codingPath: decoder.codingPath,
+                                debugDescription: "Issue priority is required, and may be null"
+                            )
+                        )
+                    }
+                    let decodedPriority = try container.decodeIfPresent(Int.self, forKey: .priority)
+                    if let decodedPriority, !(1 ... 4).contains(decodedPriority) {
+                        throw DecodingError.dataCorruptedError(
+                            forKey: .priority,
+                            in: container,
+                            debugDescription: "Issue priority must be between 1 and 4"
+                        )
+                    }
+
+                    title = normalizedTitle
+                    description = decodedDescription?.trimmingCharacters(
+                        in: .whitespacesAndNewlines
+                    )
+                    priority = decodedPriority
+                    status = try container.decode(IssueStatus.self, forKey: .status)
+                }
+
+                private enum CodingKeys: String, CodingKey {
+                    case title
+                    case description
+                    case priority
+                    case status
+                }
+
+                enum IssueStatus: String, Codable, Hashable, Sendable {
+                    case backlog
+                    /// Read compatibility only. Approval always creates backlog.
+                    case queued
+                }
+            }
+        }
 
         enum ActionType: String, Codable, Hashable, Sendable {
             case createIssue = "request_issue_create"

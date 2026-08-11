@@ -33,6 +33,9 @@ record every decision in the incident timeline.
   `latest.json`, build a new patch version, and preserve evidence.
 - Worker regression: use `wrangler rollback` to the verified deployment, then
   confirm `/health`, auth, project dashboard, and update endpoints.
+- Channel issue approval regression: migration 0090 is a paired, forward-only
+  Worker/D1 rollout. Do not roll back the Worker independently; follow
+  [`channel-issue-approval-rollout.md`](channel-issue-approval-rollout.md).
 - D1 regression: prefer a forward migration. If unsafe, restore a pre-migration
   Time Travel bookmark only after recording the affected window and impact.
 - Key compromise: stop releases, remove environment access, rotate Apple and

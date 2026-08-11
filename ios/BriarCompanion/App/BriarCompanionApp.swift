@@ -98,6 +98,12 @@ private struct UITestCompanionFlow: View {
                     image: nil
                 ),
                 refresh: { await refreshSnapshot() },
+                ensureIssueAvailable: { projectID, runID in
+                    selectedProjectID = projectID
+                    await refreshSnapshot()
+                    return snapshot.project.id == projectID &&
+                        snapshot.runs.contains(where: { $0.id == runID })
+                },
                 selectProject: { selectedProjectID = $0 },
                 signOut: {
                     selectedProjectID = project.id

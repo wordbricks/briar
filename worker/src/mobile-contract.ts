@@ -357,6 +357,22 @@ export const mobileChannelSummarySchema = z.object({
   updatedAt: z.iso.datetime(),
 });
 
+export const mobileChannelIssueProposalPayloadSchema = z.object({
+  issue: z.object({
+    title: z.string().trim().min(1).max(300),
+    description: z.string().trim().max(100_000).nullable(),
+    priority: z.number().int().min(1).max(4).nullable(),
+    status: z.enum(["backlog", "queued"]),
+  }).strict(),
+}).strict();
+
+const mobileChannelProposalBaseShape = {
+  id: z.uuid(),
+  status: z.enum(["pending", "accepted"]),
+  projectId: z.uuid().nullable(),
+  resultRunId: z.uuid().nullable(),
+};
+
 export const mobileChannelMessageSchema = z.object({
   id: z.uuid(),
   channelId: z.uuid(),
@@ -399,14 +415,19 @@ export const mobileChannelMessageSchema = z.object({
     })
     .nullable(),
   proposal: z
-    .object({
-      id: z.uuid(),
-      actionType: z.enum(["request_issue_create", "request_plan_document"]),
-      status: z.enum(["pending", "accepted"]),
-      projectId: z.uuid().nullable(),
-      payload: z.unknown(),
-      resultRunId: z.uuid().nullable(),
-    })
+    .union([
+      z.object({
+        ...mobileChannelProposalBaseShape,
+        actionType: z.literal("request_issue_create"),
+        payload: mobileChannelIssueProposalPayloadSchema,
+      }),
+      // Retain decode compatibility for the never-produced legacy DB action.
+      z.object({
+        ...mobileChannelProposalBaseShape,
+        actionType: z.literal("request_plan_document"),
+        payload: z.unknown(),
+      }),
+    ])
     .nullable(),
   createdAt: z.iso.datetime(),
 });

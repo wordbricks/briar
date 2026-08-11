@@ -1131,6 +1131,36 @@ export function useBriar(options: UseBriarOptions = {}) {
     [projects],
   );
 
+  const ensureProjectSelected = useCallback(
+    async (projectId: string) => {
+      let nextProjects = projects;
+      let project = nextProjects.find((candidate) => candidate.id === projectId);
+      if (!project && token && !demoMode) {
+        nextProjects = await loadProjects(token);
+        setProjects(nextProjects);
+        project = nextProjects.find((candidate) => candidate.id === projectId);
+      }
+      if (!project) {
+        throw new Error("요청한 프로젝트를 찾을 수 없습니다.");
+      }
+      setActiveProjectId(project.id);
+      setActiveOrganizationId((current) => project.organizationId ?? current);
+      if (!demoMode) {
+        setDashboard(null);
+        setError(null);
+        return project;
+      }
+      setDashboard(
+        project.id === demoDashboard.project.id
+          ? demoDashboard
+          : emptyDashboard(project),
+      );
+      setError(null);
+      return project;
+    },
+    [demoMode, projects, token],
+  );
+
   const selectOrganization = useCallback(
     (organizationId: string) => {
       if (!organizations.some((organization) => organization.id === organizationId)) {
@@ -3493,6 +3523,7 @@ export function useBriar(options: UseBriarOptions = {}) {
     acceptConversationIssueAction,
     setActiveOrganizationId: selectOrganization,
     setActiveProjectId: selectProject,
+    ensureProjectSelected,
     selectProjectRepository,
     createProjectRepository,
     inspectProjectRepository: inspectRepositoryReadiness,

@@ -90,6 +90,35 @@ attempted immediately and retried by later scheduled runs. A cleanup failure
 may temporarily retain an inaccessible object, but cannot erase live issue
 history or lose the retry instruction.
 
+Cleanup retries use exponential backoff from one minute up to 64 minutes. After
+eight failed attempts the row is dead-lettered (`dead_lettered_at`), excluded
+from automatic selection, and exposes a structured pending alert in
+`alert_detail_json` with code `ARCHIVE_CLEANUP_DEAD_LETTER`. Alert on every row
+whose `alert_state = 'pending'`; investigate R2 credentials, bindings, and the
+specific bucket/key before replaying it. Permanent failures therefore cannot
+consume the selection limit and starve newer privacy deletions.
+
+To replay one verified dead letter, acknowledge it and create a new CAS
+generation. Use the exact bucket and object key from its structured alert:
+
+```sql
+update briar_archive_cleanup_queue
+set attempts = 0,
+    last_attempt_at = null,
+    next_attempt_at = null,
+    dead_lettered_at = null,
+    alert_state = 'acknowledged',
+    generation = generation + 1,
+    queued_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+where bucket = :bucket
+  and object_key = :object_key
+  and dead_lettered_at is not null;
+```
+
+Do not delete a dead-letter row manually. Cleanup completion globally rechecks
+live metadata and removes only the exact selected generation, so a concurrent
+owner refresh remains queued.
+
 ## Backup and audit operations
 
 Maintain both layers:

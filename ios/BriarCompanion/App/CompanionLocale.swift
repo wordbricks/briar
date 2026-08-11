@@ -645,6 +645,11 @@ enum L10n {
         case channelIssueProposal
         case channelIssueProposalAccepted
         case channelIssueProposalPending
+        case channelIssuePriority
+        case channelIssueProject
+        case channelIssueCreationSafety
+        case channelIssueShowDescription
+        case channelIssueHideDescription
         case channelCreateIssue
         case channelSelectProposalProject
         case channelViewIssue
@@ -687,7 +692,12 @@ enum L10n {
             case .channelIssueProposal: "이슈 생성 제안"
             case .channelIssueProposalAccepted: "승인되어 이슈가 생성되었습니다."
             case .channelIssueProposalPending: "승인하면 이슈가 생성됩니다."
-            case .channelCreateIssue: "이슈 만들기"
+            case .channelIssuePriority: "우선순위 P%d"
+            case .channelIssueProject: "대상 프로젝트: %@"
+            case .channelIssueCreationSafety: "백로그 이슈로만 생성되며 실행은 시작되지 않습니다. 실행하려면 별도 승인이 필요합니다."
+            case .channelIssueShowDescription: "설명 전체 보기"
+            case .channelIssueHideDescription: "설명 접기"
+            case .channelCreateIssue: "승인하고 이슈 만들기"
             case .channelSelectProposalProject: "프로젝트 선택"
             case .channelViewIssue: "이슈 보기"
             case .notificationHint: "선택한 분류의 새 항목이 도착하면 로컬 알림을 보냅니다."
@@ -732,7 +742,12 @@ enum L10n {
             case .channelIssueProposal: "Issue proposal"
             case .channelIssueProposalAccepted: "Accepted — the issue was created."
             case .channelIssueProposalPending: "Accept to create an issue."
-            case .channelCreateIssue: "Create issue"
+            case .channelIssuePriority: "Priority P%d"
+            case .channelIssueProject: "Target project: %@"
+            case .channelIssueCreationSafety: "Creates a backlog issue only; execution will not start. Separate approval is required to execute it."
+            case .channelIssueShowDescription: "Show full description"
+            case .channelIssueHideDescription: "Collapse description"
+            case .channelCreateIssue: "Approve and create issue"
             case .channelSelectProposalProject: "Select project"
             case .channelViewIssue: "View issue"
             case .notificationHint: "Local notifications fire for newly arrived items in the selected categories."
@@ -777,7 +792,12 @@ enum L10n {
             case .channelIssueProposal: "创建问题建议"
             case .channelIssueProposalAccepted: "已批准并创建问题。"
             case .channelIssueProposalPending: "批准后将创建问题。"
-            case .channelCreateIssue: "创建问题"
+            case .channelIssuePriority: "优先级 P%d"
+            case .channelIssueProject: "目标项目：%@"
+            case .channelIssueCreationSafety: "仅创建为待办问题，不会开始执行。执行需另行批准。"
+            case .channelIssueShowDescription: "查看完整说明"
+            case .channelIssueHideDescription: "收起说明"
+            case .channelCreateIssue: "批准并创建问题"
             case .channelSelectProposalProject: "选择项目"
             case .channelViewIssue: "查看问题"
             case .notificationHint: "所选分类有新项目时会发送本地通知。"

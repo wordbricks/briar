@@ -14,6 +14,12 @@ export const defaultArchiveRowLimit = 500;
 export const maxArchiveUncompressedBytes = 16 * 1024 * 1024;
 const deleteBatchSize = 100;
 
+export const archiveCleanupRetryPolicy = {
+  maxAttempts: 8,
+  baseDelayMilliseconds: 60_000,
+  maxDelayMilliseconds: 64 * 60_000,
+} as const;
+
 type ArchiveObjectMetadata = {
   size: number;
   checksums: { sha256?: ArrayBuffer | ArrayBufferView };
@@ -484,14 +490,20 @@ const auditCandidate = async (
 ): Promise<ArchiveCandidate | null> => {
   const run = await db
     .prepare(
-      `select run.id, run.project_id
-       from briar_hunt_runs run
+      `select audit.run_id as id, audit.project_id
+       from briar_execution_audit_events audit
+       join briar_hunt_runs run on run.id = audit.run_id
        where run.status = 'completed' and run.completed_at <= ?
-         and exists (
-           select 1 from briar_execution_audit_events audit
-           where audit.run_id = run.id and audit.occurred_at <= ?
+         and audit.occurred_at <= ?
+         and not (
+           run.dispatch_request_id is not null
+           and audit.project_id = run.project_id
+           and audit.request_id = run.dispatch_request_id
+           and audit.action in ('dispatched', 'reassigned')
          )
-       order by run.completed_at, run.id limit 1`,
+       order by run.completed_at, run.id, audit.project_id,
+                audit.occurred_at, audit.id
+       limit 1`,
     )
     .bind(cutoff, cutoff)
     .first<{ id: string; project_id: string }>();
@@ -511,13 +523,22 @@ const auditCandidate = async (
   const result = run
     ? await db
         .prepare(
-          `select id, run_id, worker_id, agent_id, actor_user_id,
-                  actor_device_id, action, request_id, detail_json, occurred_at
-           from briar_execution_audit_events
-           where run_id = ? and occurred_at <= ?
-           order by occurred_at, id limit ?`,
+          `select audit.id, audit.run_id, audit.worker_id, audit.agent_id,
+                  audit.actor_user_id, audit.actor_device_id, audit.action,
+                  audit.request_id, audit.detail_json, audit.occurred_at
+           from briar_execution_audit_events audit
+           join briar_hunt_runs run on run.id = audit.run_id
+           where audit.run_id = ? and audit.project_id = ?
+             and audit.occurred_at <= ?
+             and not (
+               run.dispatch_request_id is not null
+               and audit.project_id = run.project_id
+               and audit.request_id = run.dispatch_request_id
+               and audit.action in ('dispatched', 'reassigned')
+             )
+           order by audit.occurred_at, audit.id limit ?`,
         )
-        .bind(run.id, cutoff, rowLimit)
+        .bind(run.id, projectId, cutoff, rowLimit)
         .all<ExecutionAuditArchiveRow>()
     : await db
         .prepare(
@@ -554,7 +575,13 @@ const transcriptCandidate = async (
        from briar_agent_transcript_sessions session
        left join briar_hunt_runs run on run.id = session.run_id
        where session.last_event_at <= ?
-         and (session.run_id is null or run.status = 'completed')
+         and (
+           session.run_id is null
+           or (
+             run.status = 'completed'
+             and run.project_id = session.project_id
+           )
+         )
        order by session.last_event_at, session.session_id limit 1`,
     )
     .bind(cutoff)
@@ -787,7 +814,7 @@ const insertArchiveMetadata = async (
   status: ArchiveMetadataRow["status"],
   error: string | null,
 ) => {
-  await db
+  const result = await db
     .prepare(
       `insert into briar_log_archives (
          id, project_id, run_id, scope_id, archive_kind, object_key,
@@ -795,7 +822,14 @@ const insertArchiveMetadata = async (
          content_sha256, period_start, period_end, created_at, verified_at,
          completed_at, expires_at, failure_count, last_error,
          related_object_keys_json
-       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, null, ?, ?, ?, ?)
+       )
+       select ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, null, ?, ?, ?, ?
+       where ? = 'execution_audit'
+          or ? is null
+          or exists (
+            select 1 from briar_hunt_runs run
+            where run.id = ? and run.project_id = ?
+          )
        on conflict (id) do update set
          status = excluded.status,
          byte_size = excluded.byte_size,
@@ -827,8 +861,13 @@ const insertArchiveMetadata = async (
       status === "failed" ? 1 : 0,
       error,
       JSON.stringify(candidate.relatedObjectKeys),
+      candidate.kind,
+      candidate.runId,
+      candidate.runId,
+      candidate.projectId,
     )
     .run();
+  return result.meta.changes > 0;
 };
 
 const deleteIds = async (
@@ -843,6 +882,34 @@ const deleteIds = async (
     await db.prepare(`delete from ${table} where ${column} in (${placeholders})`).bind(
       ...batch,
     ).run();
+  }
+};
+
+const deleteArchivedExecutionAuditIds = async (
+  db: D1Database,
+  ids: string[],
+) => {
+  for (let offset = 0; offset < ids.length; offset += deleteBatchSize) {
+    const batch = ids.slice(offset, offset + deleteBatchSize);
+    const placeholders = batch.map(() => "?").join(",");
+    // A verified archive may have been produced by the previous Worker just
+    // before this retention rule deployed. Preserve the exact current
+    // dispatch/reassign audit even when finishing that already-staged purge.
+    await db.prepare(
+      `delete from briar_execution_audit_events
+       where id in (${placeholders})
+         and not exists (
+           select 1 from briar_hunt_runs run
+           where run.id = briar_execution_audit_events.run_id
+             and run.dispatch_request_id is not null
+             and run.project_id = briar_execution_audit_events.project_id
+             and run.dispatch_request_id =
+               briar_execution_audit_events.request_id
+             and briar_execution_audit_events.action in (
+               'dispatched', 'reassigned'
+             )
+         )`,
+    ).bind(...batch).run();
   }
 };
 
@@ -871,10 +938,8 @@ const purgeArchiveRecords = async (
       );
       break;
     case "execution_audit":
-      await deleteIds(
+      await deleteArchivedExecutionAuditIds(
         db,
-        "briar_execution_audit_events",
-        "id",
         records.map((record) => executionAuditSchema.parse(record.data).id),
       );
       break;
@@ -1009,6 +1074,8 @@ const completeVerifiedArchive = async (
   }
 };
 
+class ArchiveCandidateOwnershipChangedError extends Error {}
+
 export type ArchiveSweepResult = {
   attemptedObjects: number;
   completedObjects: number;
@@ -1093,7 +1160,7 @@ export async function archiveCompletedLogs(
           serialized.objectSha256,
           serialized.contentSha256,
         );
-        await insertArchiveMetadata(
+        const persisted = await insertArchiveMetadata(
           db,
           candidate,
           serialized,
@@ -1101,6 +1168,12 @@ export async function archiveCompletedLogs(
           "verified",
           null,
         );
+        if (!persisted) {
+          await bucket.delete(serialized.objectKey);
+          throw new ArchiveCandidateOwnershipChangedError(
+            "Archive candidate moved to another project before verification",
+          );
+        }
         verifiedMetadataPersisted = true;
         const metadata = await db
           .prepare(`select * from briar_log_archives where id = ?`)
@@ -1115,7 +1188,11 @@ export async function archiveCompletedLogs(
         );
         result.completedObjects += 1;
       } catch (error) {
-        if (serialized && !verifiedMetadataPersisted) {
+        if (
+          serialized &&
+          !verifiedMetadataPersisted &&
+          !(error instanceof ArchiveCandidateOwnershipChangedError)
+        ) {
           await insertArchiveMetadata(
             db,
             candidate,
@@ -1175,12 +1252,25 @@ const archivedRecords = async (
   return records;
 };
 
+const runCurrentlyBelongsToProject = async (
+  db: D1Database,
+  projectId: string,
+  runId: string,
+) => Boolean(await db
+  .prepare(
+    `select 1 as current
+     from briar_hunt_runs where id = ? and project_id = ?`,
+  )
+  .bind(runId, projectId)
+  .first<{ current: number }>());
+
 export async function listArchivedRunEvents(
   db: D1Database,
   bucket: ArchiveBucket,
   projectId: string,
   runId: string,
 ) {
+  if (!(await runCurrentlyBelongsToProject(db, projectId, runId))) return [];
   const records = await archivedRecords(db, bucket, projectId, {
     runId,
     kind: "run_events",
@@ -1194,6 +1284,9 @@ export async function listArchivedRunEvidence(
   projectId: string,
   runId: string,
 ) {
+  if (!(await runCurrentlyBelongsToProject(db, projectId, runId))) {
+    return { evidence: [], images: [] };
+  }
   const records = await archivedRecords(db, bucket, projectId, {
     runId,
     kind: "run_evidence",
@@ -1201,10 +1294,18 @@ export async function listArchivedRunEvidence(
   return {
     evidence: records
       .filter((record) => record.recordType === "run_evidence")
-      .map((record) => runEvidenceSchema.parse(record.data)),
+      .map((record) => ({
+        ...runEvidenceSchema.parse(record.data),
+        project_id: projectId,
+        run_id: runId,
+      })),
     images: records
       .filter((record) => record.recordType === "run_evidence_image")
-      .map((record) => runEvidenceImageSchema.parse(record.data)),
+      .map((record) => ({
+        ...runEvidenceImageSchema.parse(record.data),
+        project_id: projectId,
+        run_id: runId,
+      })),
   };
 }
 
@@ -1214,6 +1315,7 @@ export async function listArchivedIssueMessages(
   projectId: string,
   runId: string,
 ) {
+  if (!(await runCurrentlyBelongsToProject(db, projectId, runId))) return [];
   const records = await archivedRecords(db, bucket, projectId, {
     runId,
     kind: "issue_messages",
@@ -1240,11 +1342,30 @@ export async function readArchivedTranscript(
   projectId: string,
   sessionId: string,
 ) {
-  const records = await archivedRecords(db, bucket, projectId, {
+  const metadata = await listArchiveMetadata(db, projectId, {
     kind: "agent_transcript",
     scopeId: sessionId,
   });
-  return archivedTranscriptFromRecords(records);
+  const records: ArchiveRecord[] = [];
+  for (const archive of metadata) {
+    if (
+      archive.run_id &&
+      !(await runCurrentlyBelongsToProject(db, projectId, archive.run_id))
+    ) {
+      continue;
+    }
+    records.push(...await readArchiveObject(bucket, archive));
+  }
+  const transcript = archivedTranscriptFromRecords(records);
+  if (!transcript?.session.run_id) return transcript;
+  const currentRun = await db
+    .prepare(
+      `select 1 as current
+       from briar_hunt_runs where id = ? and project_id = ?`,
+    )
+    .bind(transcript.session.run_id, projectId)
+    .first<{ current: number }>();
+  return currentRun ? transcript : null;
 }
 
 const archivedTranscriptFromRecords = (records: ArchiveRecord[]) => {
@@ -1267,6 +1388,7 @@ export async function readLatestArchivedTranscriptForRun(
   projectId: string,
   runId: string,
 ) {
+  if (!(await runCurrentlyBelongsToProject(db, projectId, runId))) return null;
   const metadata = await db
     .prepare(
       `select * from briar_log_archives
@@ -1300,6 +1422,7 @@ export async function getArchivedEvidenceImage(
   runId: string,
   imageId: string,
 ) {
+  if (!(await runCurrentlyBelongsToProject(db, projectId, runId))) return null;
   const archive = await listArchivedRunEvidence(db, bucket, projectId, runId);
   return archive.images.find((image) => image.id === imageId) ?? null;
 }
@@ -1312,10 +1435,17 @@ export async function listArchiveObjectsForDeletion(
   const result = await db
     .prepare(
       `select object_key, related_object_keys_json
-       from briar_log_archives
-       where project_id = ? and (? is null or run_id = ?)`,
+       from briar_log_archives archive
+       where (? is null or archive.run_id = ?)
+         and (
+           archive.project_id = ?
+           or exists (
+             select 1 from briar_hunt_runs run
+             where run.id = archive.run_id and run.project_id = ?
+           )
+         )`,
     )
-    .bind(projectId, runId ?? null, runId ?? null)
+    .bind(runId ?? null, runId ?? null, projectId, projectId)
     .all<{ object_key: string; related_object_keys_json: string }>();
   const archives: string[] = [];
   const attachments: string[] = [];
@@ -1344,33 +1474,22 @@ export async function enqueueArchiveCleanup(
         db
           .prepare(
             `insert into briar_archive_cleanup_queue (
-               bucket, object_key, project_id, run_id, queued_at
+             bucket, object_key, project_id, run_id, queued_at
              ) values (?, ?, ?, ?, ?)
-             on conflict (bucket, object_key) do nothing`,
+             on conflict (bucket, object_key) do update set
+               project_id = excluded.project_id,
+               run_id = excluded.run_id,
+               queued_at = excluded.queued_at,
+               attempts = 0,
+               last_attempt_at = null,
+               last_error = null,
+               generation = briar_archive_cleanup_queue.generation + 1,
+               next_attempt_at = null,
+               dead_lettered_at = null,
+               alert_state = 'none',
+               alert_detail_json = null`,
           )
           .bind(entry.bucket, entry.objectKey, projectId, runId, observedAt),
-      ),
-    );
-  }
-}
-
-export async function cancelArchiveCleanup(
-  db: D1Database,
-  objects: { archives: string[]; attachments: string[] },
-) {
-  const entries = [
-    ...objects.archives.map((objectKey) => ({ bucket: "archives", objectKey })),
-    ...objects.attachments.map((objectKey) => ({ bucket: "attachments", objectKey })),
-  ] as const;
-  for (let offset = 0; offset < entries.length; offset += deleteBatchSize) {
-    await db.batch(
-      entries.slice(offset, offset + deleteBatchSize).map((entry) =>
-        db
-          .prepare(
-            `delete from briar_archive_cleanup_queue
-             where bucket = ? and object_key = ?`,
-          )
-          .bind(entry.bucket, entry.objectKey),
       ),
     );
   }
@@ -1385,27 +1504,38 @@ export async function processArchiveCleanupQueue(
 ) {
   const result = await db
     .prepare(
-      `select queue.bucket, queue.object_key, queue.project_id, queue.run_id
+      `select queue.bucket, queue.object_key, queue.project_id, queue.run_id,
+              queue.queued_at, queue.attempts, queue.generation
        from briar_archive_cleanup_queue queue
-       where (
-         queue.run_id is not null
-         and not exists (
-           select 1 from briar_hunt_runs run where run.id = queue.run_id
+       where queue.dead_lettered_at is null
+         and (queue.next_attempt_at is null or queue.next_attempt_at <= ?)
+         and (
+           (
+             queue.run_id is not null
+             and not exists (
+               select 1 from briar_hunt_runs run where run.id = queue.run_id
+             )
+           ) or (
+             queue.run_id is null
+             and not exists (
+               select 1 from briar_projects project
+               where project.id = queue.project_id
+             )
+           )
          )
-       ) or (
-         queue.run_id is null
-         and not exists (
-           select 1 from briar_projects project where project.id = queue.project_id
-         )
-       )
-       order by queue.queued_at, queue.bucket, queue.object_key limit ?`,
+       order by coalesce(queue.next_attempt_at, queue.queued_at),
+                queue.queued_at, queue.bucket, queue.object_key
+       limit ?`,
     )
-    .bind(Math.max(1, Math.min(limit, 1_000)))
+    .bind(observedAt, Math.max(1, Math.min(limit, 1_000)))
     .all<{
       bucket: "archives" | "attachments";
       object_key: string;
       project_id: string;
       run_id: string | null;
+      queued_at: string;
+      attempts: number;
+      generation: number;
     }>();
   let deleted = 0;
   let failed = 0;
@@ -1420,33 +1550,230 @@ export async function processArchiveCleanupQueue(
           .bind(item.project_id)
           .first<{ present: number }>();
     if (stillOwned) continue;
+    const referenced = item.bucket === "archives"
+      ? await db
+          .prepare(
+            `select 1 as present from briar_log_archives
+             where object_key = ? limit 1`,
+          )
+          .bind(item.object_key)
+          .first<{ present: number }>()
+      : await db
+          .prepare(
+            `select 1 as present
+             where exists (
+               select 1 from briar_issue_attachments
+               where object_key = ?
+             )
+             or exists (
+               select 1 from briar_run_evidence_images
+               where object_key = ?
+             )
+             or exists (
+               select 1 from briar_project_agents
+               where avatar_spritesheet_object_key = ?
+             )
+             or exists (
+               select 1 from briar_channel_message_attachments
+               where object_key = ?
+             )
+             or exists (
+               select 1
+               from briar_log_archives archive,
+                    json_each(archive.related_object_keys_json) related
+               where related.type = 'text' and related.value = ?
+             )`,
+          )
+          .bind(
+            item.object_key,
+            item.object_key,
+            item.object_key,
+            item.object_key,
+            item.object_key,
+          )
+          .first<{ present: number }>();
+    if (referenced) {
+      // Ownership moved after this cleanup item was queued. The destination
+      // metadata is authoritative; a future destination deletion will enqueue
+      // the object again under its own lifecycle. Recheck that reference in
+      // the same statement as the generation CAS so a stale worker cannot
+      // remove a cleanup request that was concurrently refreshed.
+      await db
+        .prepare(
+          `delete from briar_archive_cleanup_queue
+           where bucket = ? and object_key = ?
+             and project_id = ? and run_id is ? and queued_at = ?
+             and generation = ?
+             and (
+               (
+                 bucket = 'archives'
+                 and exists (
+                   select 1 from briar_log_archives archive
+                   where archive.object_key = briar_archive_cleanup_queue.object_key
+                 )
+               ) or (
+                 bucket = 'attachments'
+                 and (
+                   exists (
+                     select 1 from briar_issue_attachments attachment
+                     where attachment.object_key = briar_archive_cleanup_queue.object_key
+                   )
+                   or exists (
+                     select 1 from briar_run_evidence_images image
+                     where image.object_key = briar_archive_cleanup_queue.object_key
+                   )
+                   or exists (
+                     select 1 from briar_project_agents agent
+                     where agent.avatar_spritesheet_object_key = briar_archive_cleanup_queue.object_key
+                   )
+                   or exists (
+                     select 1 from briar_channel_message_attachments attachment
+                     where attachment.object_key = briar_archive_cleanup_queue.object_key
+                   )
+                   or exists (
+                     select 1
+                     from briar_log_archives archive,
+                          json_each(archive.related_object_keys_json) related
+                     where related.type = 'text'
+                       and related.value = briar_archive_cleanup_queue.object_key
+                   )
+                 )
+               )
+             )`,
+        )
+        .bind(
+          item.bucket,
+          item.object_key,
+          item.project_id,
+          item.run_id,
+          item.queued_at,
+          item.generation,
+        )
+        .run();
+      continue;
+    }
     try {
       await (item.bucket === "archives" ? archivesBucket : attachmentsBucket).delete(
         item.object_key,
       );
-      await db
+      const completion = await db
         .prepare(
           `delete from briar_archive_cleanup_queue
-           where bucket = ? and object_key = ?`,
-        )
-        .bind(item.bucket, item.object_key)
-        .run();
-      deleted += 1;
-    } catch (error) {
-      failed += 1;
-      await db
-        .prepare(
-          `update briar_archive_cleanup_queue
-           set attempts = attempts + 1, last_attempt_at = ?, last_error = ?
-           where bucket = ? and object_key = ?`,
+           where bucket = ? and object_key = ?
+             and project_id = ? and run_id is ? and queued_at = ?
+             and generation = ?
+             and (
+               (
+                 run_id is not null
+                 and not exists (
+                   select 1 from briar_hunt_runs run
+                   where run.id = briar_archive_cleanup_queue.run_id
+                 )
+               ) or (
+                 run_id is null
+                 and not exists (
+                   select 1 from briar_projects project
+                   where project.id = briar_archive_cleanup_queue.project_id
+                 )
+               )
+             )
+             and (
+               (
+                 bucket = 'archives'
+                 and not exists (
+                   select 1 from briar_log_archives archive
+                   where archive.object_key = briar_archive_cleanup_queue.object_key
+                 )
+               ) or (
+                 bucket = 'attachments'
+                 and not exists (
+                   select 1 from briar_issue_attachments attachment
+                   where attachment.object_key = briar_archive_cleanup_queue.object_key
+                 )
+                 and not exists (
+                   select 1 from briar_run_evidence_images image
+                   where image.object_key = briar_archive_cleanup_queue.object_key
+                 )
+                 and not exists (
+                   select 1 from briar_project_agents agent
+                   where agent.avatar_spritesheet_object_key = briar_archive_cleanup_queue.object_key
+                 )
+                 and not exists (
+                   select 1 from briar_channel_message_attachments attachment
+                   where attachment.object_key = briar_archive_cleanup_queue.object_key
+                 )
+                 and not exists (
+                   select 1
+                   from briar_log_archives archive,
+                        json_each(archive.related_object_keys_json) related
+                   where related.type = 'text'
+                     and related.value = briar_archive_cleanup_queue.object_key
+                 )
+               )
+             )`,
         )
         .bind(
-          observedAt,
-          error instanceof Error ? error.message.slice(0, 1_000) : String(error),
           item.bucket,
           item.object_key,
+          item.project_id,
+          item.run_id,
+          item.queued_at,
+          item.generation,
         )
         .run();
+      if ((completion.meta.changes ?? 0) > 0) deleted += 1;
+    } catch (error) {
+      const message = error instanceof Error
+        ? error.message.slice(0, 1_000)
+        : String(error).slice(0, 1_000);
+      const attempts = item.attempts + 1;
+      const deadLettered = attempts >= archiveCleanupRetryPolicy.maxAttempts;
+      const delay = Math.min(
+        archiveCleanupRetryPolicy.baseDelayMilliseconds * (2 ** (attempts - 1)),
+        archiveCleanupRetryPolicy.maxDelayMilliseconds,
+      );
+      const nextAttemptAt = deadLettered
+        ? null
+        : new Date(Date.parse(observedAt) + delay).toISOString();
+      const alertDetail = deadLettered
+        ? JSON.stringify({
+            code: "ARCHIVE_CLEANUP_DEAD_LETTER",
+            bucket: item.bucket,
+            objectKey: item.object_key,
+            projectId: item.project_id,
+            runId: item.run_id,
+            attempts,
+            lastError: message,
+            deadLetteredAt: observedAt,
+          })
+        : null;
+      const failure = await db
+        .prepare(
+          `update briar_archive_cleanup_queue
+           set attempts = ?, last_attempt_at = ?, last_error = ?,
+               next_attempt_at = ?, dead_lettered_at = ?,
+               alert_state = ?, alert_detail_json = ?
+           where bucket = ? and object_key = ?
+             and project_id = ? and run_id is ? and queued_at = ?
+             and generation = ?`,
+        )
+        .bind(
+          attempts,
+          observedAt,
+          message,
+          nextAttemptAt,
+          deadLettered ? observedAt : null,
+          deadLettered ? "pending" : "none",
+          alertDetail,
+          item.bucket,
+          item.object_key,
+          item.project_id,
+          item.run_id,
+          item.queued_at,
+          item.generation,
+        )
+        .run();
+      if ((failure.meta.changes ?? 0) > 0) failed += 1;
     }
   }
   return { deleted, failed };
@@ -1454,7 +1781,8 @@ export async function processArchiveCleanupQueue(
 
 export async function expireArchives(
   db: D1Database,
-  bucket: ArchiveBucket,
+  archivesBucket: ArchiveBucket,
+  attachmentsBucket: ArchiveBucket,
   observedAt: string,
   limit = 100,
 ) {
@@ -1471,10 +1799,10 @@ export async function expireArchives(
     const related = z
       .array(z.string())
       .safeParse(JSON.parse(archive.related_object_keys_json));
-    await bucket.delete([
-      archive.object_key,
-      ...(related.success ? related.data : []),
-    ]);
+    await archivesBucket.delete(archive.object_key);
+    if (related.success && related.data.length > 0) {
+      await attachmentsBucket.delete(related.data);
+    }
     if (archive.archive_kind === "project_agent_sessions") {
       await db.batch([
         db.prepare(`delete from briar_log_archives where id = ?`).bind(archive.id),

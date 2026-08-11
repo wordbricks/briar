@@ -496,27 +496,59 @@ export async function deleteChannel(
   db: D1Database,
   organizationId: string,
   channelId: string,
+  userId: string,
+  observedAt: string,
 ) {
-  const result = await db
-    .prepare(`delete from briar_channels where id = ? and organization_id = ?`)
-    .bind(channelId, organizationId)
-    .run();
-  return (result.meta.changes ?? 0) > 0;
-}
-
-export async function listChannelAttachmentObjectKeys(
-  db: D1Database,
-  organizationId: string,
-  channelId: string,
-) {
-  const rows = await db
-    .prepare(
-      `select object_key from briar_channel_message_attachments
-       where organization_id = ? and channel_id = ?`,
-    )
-    .bind(organizationId, channelId)
-    .all<{ object_key: string }>();
-  return rows.results.map((row) => row.object_key);
+  const results = await db.batch([
+    db
+      .prepare(
+        `insert into briar_archive_cleanup_queue (
+           bucket, object_key, project_id, run_id, queued_at
+         )
+         select 'attachments', attachment.object_key,
+                'channel:' || attachment.channel_id, null, ?
+         from briar_channel_message_attachments attachment
+         where attachment.organization_id = ? and attachment.channel_id = ?
+           and exists (
+             select 1 from briar_organization_members membership
+             where membership.organization_id = attachment.organization_id
+               and membership.user_id = ?
+               and membership.role in ('owner', 'admin')
+           )
+           and exists (
+             select 1 from briar_channels channel
+             where channel.id = attachment.channel_id
+               and channel.organization_id = attachment.organization_id
+           )
+         on conflict (bucket, object_key) do update set
+           project_id = excluded.project_id,
+           run_id = excluded.run_id,
+           queued_at = excluded.queued_at,
+           attempts = 0,
+           last_attempt_at = null,
+           last_error = null,
+           generation = briar_archive_cleanup_queue.generation + 1,
+           next_attempt_at = null,
+           dead_lettered_at = null,
+           alert_state = 'none',
+           alert_detail_json = null`,
+      )
+      .bind(observedAt, organizationId, channelId, userId),
+    db
+      .prepare(
+        `delete from briar_channels
+         where id = ? and organization_id = ?
+           and exists (
+             select 1 from briar_organization_members membership
+             where membership.organization_id = briar_channels.organization_id
+               and membership.user_id = ?
+               and membership.role in ('owner', 'admin')
+           )
+         returning id`,
+      )
+      .bind(channelId, organizationId, userId),
+  ]);
+  return (results[1]?.results?.length ?? 0) > 0;
 }
 
 export async function listChannelMembers(db: D1Database, channelId: string) {
@@ -1863,12 +1895,130 @@ export async function getChannelActionProposal(
       action_type: ChannelActionType;
       payload_json: string;
       status: "pending" | "accepted";
+      accepted_by_user_id: string | null;
+      accepted_at: string | null;
+      issue_source_key: string | null;
       result_run_id: string | null;
       reply_author_agent_id: string | null;
       reply_author_agent_organization_id: string | null;
       reply_author_agent_project_id: string | null;
       created_at: string;
       updated_at: string;
+    }>();
+}
+
+/**
+ * Records the member's approval target before creating the issue. The guarded
+ * update is the serialization point for organization Agent proposals whose
+ * project is chosen at approval time: two members may retry the same target,
+ * but they can never create the proposal in two different projects.
+ *
+ * The proposal deliberately remains `pending` until issue creation succeeds.
+ * A failed request can therefore be retried without losing the approval, while
+ * `accepted_by_user_id` keeps the original approver authoritative for audit
+ * metadata even when another member completes that retry. If an ON DELETE SET
+ * NULL breaks a reserved project/approver tuple before finalization, the next
+ * explicit click replaces the whole reservation instead of leaving the card
+ * permanently unapprovable or reinterpreting the earlier click.
+ */
+export async function reserveChannelActionProposalApproval(
+  db: D1Database,
+  input: {
+    organizationId: string;
+    channelId: string;
+    proposalId: string;
+    projectId: string;
+    userId: string;
+    approvedAt: string;
+    issueSourceKey: string;
+  },
+) {
+  return db
+    .prepare(
+      `update briar_channel_action_proposals
+       set project_id = ?,
+           accepted_by_user_id = case
+             when project_id = ? and accepted_by_user_id is not null
+               and accepted_at is not null and issue_source_key is not null
+             then accepted_by_user_id else ? end,
+           accepted_at = case
+             when project_id = ? and accepted_by_user_id is not null
+               and accepted_at is not null and issue_source_key is not null
+             then accepted_at else ? end,
+           issue_source_key = case
+             when project_id = ? and accepted_by_user_id is not null
+               and accepted_at is not null and issue_source_key is not null
+             then issue_source_key else ? end,
+           updated_at = ?
+       where id = ? and channel_id = ? and status = 'pending'
+         and action_type = 'request_issue_create'
+         and (project_id is null or project_id = ?)
+         and not exists (
+           select 1 from briar_hunt_runs legacy_run
+           where legacy_run.source = 'issue'
+             and legacy_run.source_key =
+               'briar-channel-proposal:' || briar_channel_action_proposals.id
+             and not exists (
+               select 1 from briar_channel_issue_approval_reconciliation finding
+               where finding.run_id = legacy_run.id
+             )
+         )
+         and exists (
+           select 1
+           from briar_channels channel
+           join briar_organization_members membership
+             on membership.organization_id = channel.organization_id
+            and membership.user_id = ?
+           join briar_projects target_project
+             on target_project.id = ?
+            and target_project.organization_id = channel.organization_id
+           join briar_channel_messages reply
+             on reply.id = briar_channel_action_proposals.reply_message_id
+            and reply.channel_id = channel.id
+           join briar_project_agents agent
+             on agent.id = reply.author_agent_id
+            and agent.organization_id = channel.organization_id
+           where channel.id = briar_channel_action_proposals.channel_id
+             and channel.organization_id = ?
+             and channel.archived_at is null
+             and (
+               channel.visibility = 'public'
+               or exists (
+                 select 1 from briar_channel_members channel_member
+                 where channel_member.channel_id = channel.id
+                   and channel_member.user_id = ?
+               )
+             )
+             and (agent.project_id is null or agent.project_id = ?)
+         )
+       returning id, project_id, status, accepted_by_user_id, accepted_at,
+                 issue_source_key`,
+    )
+    .bind(
+      input.projectId,
+      input.projectId,
+      input.userId,
+      input.projectId,
+      input.approvedAt,
+      input.projectId,
+      input.issueSourceKey,
+      input.approvedAt,
+      input.proposalId,
+      input.channelId,
+      input.projectId,
+      input.userId,
+      input.projectId,
+      input.organizationId,
+      input.userId,
+      input.projectId,
+    )
+    .first<{
+      id: string;
+      project_id: string;
+      status: "pending";
+      accepted_by_user_id: string;
+      accepted_at: string;
+      issue_source_key: string;
     }>();
 }
 
@@ -1880,15 +2030,27 @@ export async function acceptChannelActionProposal(
     projectId: string;
     userId: string;
     resultRunId: string;
+    issueSourceKey: string;
     acceptedAt: string;
   },
 ) {
   return db
     .prepare(
       `update briar_channel_action_proposals
-       set status = 'accepted', accepted_by_user_id = ?, accepted_at = ?,
+       set status = 'accepted',
+           accepted_by_user_id = coalesce(accepted_by_user_id, ?),
+           accepted_at = coalesce(accepted_at, ?),
            project_id = ?, result_run_id = ?, updated_at = ?
        where id = ? and channel_id = ? and status = 'pending'
+         and action_type = 'request_issue_create'
+         and project_id = ?
+         and issue_source_key = ?
+         and accepted_by_user_id is not null and accepted_at is not null
+         and exists (
+           select 1 from briar_hunt_runs result
+           where result.id = ? and result.project_id = ?
+             and result.source = 'issue' and result.source_key = ?
+         )
        returning *`,
     )
     .bind(
@@ -1899,6 +2061,11 @@ export async function acceptChannelActionProposal(
       input.acceptedAt,
       input.proposalId,
       input.channelId,
+      input.projectId,
+      input.issueSourceKey,
+      input.resultRunId,
+      input.projectId,
+      input.issueSourceKey,
     )
     .first<{ id: string; status: "pending" | "accepted" }>();
 }

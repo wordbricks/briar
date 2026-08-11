@@ -68,6 +68,120 @@ final class DashboardSyncTests: XCTestCase {
     }
 
     @MainActor
+    func testEnsureRunAvailableSupersedesIncrementalRefreshWithCanonicalSnapshot() async {
+        let initial = snapshot(cursor: 10, title: "Before approval")
+        let createdRun = run(
+            id: "77777777-7777-4777-8777-777777777777",
+            title: "Created from channel",
+            status: .backlog
+        )
+        let canonical = DashboardSnapshot(
+            project: project,
+            runs: initial.runs + [createdRun],
+            cursor: 12,
+            generatedAt: .now
+        )
+        let delayedDelta = DashboardDelta(
+            cursor: 11,
+            hasMore: false,
+            runs: [],
+            deletedRunIds: [],
+            project: nil,
+            generatedAt: .now
+        )
+        let api = StubAPIClient(stubs: [
+            .response(initial),
+            .response(delayedDelta, delay: .milliseconds(250)),
+            .response(canonical),
+        ])
+        let store = DashboardStore(api: api, pollInterval: .seconds(3_600))
+        store.select(projectID: project.id, token: "token")
+        await store.refresh(forceSnapshot: true)
+        let incremental = Task { await store.refresh() }
+        await waitForRequests(api, count: 2)
+
+        let available = await store.ensureRunAvailable(
+            projectID: project.id,
+            runID: createdRun.id,
+            token: "token"
+        )
+        await incremental.value
+
+        XCTAssertTrue(available)
+        XCTAssertEqual(store.snapshot?.cursor, 12)
+        XCTAssertTrue(store.snapshot?.runs.contains(where: { $0.id == createdRun.id }) == true)
+        let requestCount = await api.requestCount()
+        XCTAssertEqual(requestCount, 3)
+        store.applicationDidEnterBackground()
+    }
+
+    @MainActor
+    func testEnsureRunAvailableFailureNeverClaimsTheMissingRun() async {
+        let initial = snapshot(cursor: 10, title: "Before approval")
+        let missingRunID = UUID(uuidString: "77777777-7777-4777-8777-777777777777")!
+        let api = StubAPIClient(stubs: [
+            .response(initial),
+            .failure(URLError(.notConnectedToInternet)),
+        ])
+        let store = DashboardStore(api: api, pollInterval: .seconds(3_600))
+        store.select(projectID: project.id, token: "token")
+        await store.refresh(forceSnapshot: true)
+
+        let available = await store.ensureRunAvailable(
+            projectID: project.id,
+            runID: missingRunID,
+            token: "token"
+        )
+
+        XCTAssertFalse(available)
+        XCTAssertFalse(store.snapshot?.runs.contains(where: { $0.id == missingRunID }) == true)
+        XCTAssertNotNil(store.errorMessage)
+        store.applicationDidEnterBackground()
+    }
+
+    @MainActor
+    func testEnsureRunAvailableSelectsAndLoadsTheTargetProject() async {
+        let targetProject = ProjectsResponse.Project(
+            id: UUID(uuidString: "55555555-5555-4555-8555-555555555555")!,
+            name: "Target",
+            icon: nil,
+            organizationId: project.organizationId,
+            organizationName: project.organizationName,
+            role: .member,
+            createdAt: project.createdAt
+        )
+        let targetRun = run(
+            id: "66666666-6666-4666-8666-666666666666",
+            title: "Cross-project issue",
+            status: .backlog
+        )
+        let targetSnapshot = DashboardSnapshot(
+            project: targetProject,
+            runs: [targetRun],
+            cursor: 1,
+            generatedAt: .now
+        )
+        let api = StubAPIClient(stubs: [
+            .response(snapshot(cursor: 10, title: "Current project")),
+            .response(targetSnapshot),
+        ])
+        let store = DashboardStore(api: api, pollInterval: .seconds(3_600))
+        store.select(projectID: project.id, token: "token")
+        await store.refresh(forceSnapshot: true)
+
+        let available = await store.ensureRunAvailable(
+            projectID: targetProject.id,
+            runID: targetRun.id,
+            token: "token"
+        )
+
+        XCTAssertTrue(available)
+        XCTAssertEqual(store.snapshot?.project.id, targetProject.id)
+        XCTAssertEqual(store.snapshot?.runs.map(\.id), [targetRun.id])
+        store.applicationDidEnterBackground()
+    }
+
+    @MainActor
     func testDeviceLoginLoadsAccountProjectsAndDashboard() async throws {
         let deviceCode = DeviceCodeResponse(
             deviceCode: "device-code",
@@ -279,6 +393,96 @@ final class DashboardSyncTests: XCTestCase {
         XCTAssertEqual(store.selectedProjectID, project.id)
     }
 
+    @MainActor
+    func testProjectCatalogRefreshFindsProjectsCreatedAfterLogin() async throws {
+        let newProject = ProjectsResponse.Project(
+            id: UUID(uuidString: "99999999-9999-4999-8999-999999999999")!,
+            name: "Created by teammate",
+            icon: nil,
+            organizationId: project.organizationId,
+            organizationName: project.organizationName,
+            role: .member,
+            createdAt: project.createdAt
+        )
+        let user = CurrentUserResponse(user: .init(
+            id: "user-refresh",
+            username: "briar",
+            name: "Briar User",
+            email: "user@example.com",
+            image: nil
+        ))
+        let api = RoutingAPIClient(routes: [
+            MobileAPIContract.Endpoint.currentUser: [user],
+            MobileAPIContract.Endpoint.projects: [
+                ProjectsResponse(projects: [project]),
+                ProjectsResponse(projects: [project, newProject]),
+            ],
+        ])
+        let store = CompanionStore(api: api, defaults: isolatedDefaults())
+        try await store.load(token: "token")
+
+        try await store.refreshProjects(token: "token")
+
+        XCTAssertTrue(store.projects.contains(where: { $0.id == newProject.id }))
+        XCTAssertEqual(store.selectedProjectID, project.id)
+    }
+
+    @MainActor
+    func testPreviousAccountProjectRefreshCannotOverwriteANewLogin() async throws {
+        let previousProject = project
+        let nextProject = ProjectsResponse.Project(
+            id: UUID(uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!,
+            name: "Next account project",
+            icon: nil,
+            organizationId: UUID(uuidString: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")!,
+            organizationName: "Next organization",
+            role: .owner,
+            createdAt: project.createdAt
+        )
+        let previousUser = CurrentUserResponse(user: .init(
+            id: "previous-user",
+            username: "previous",
+            name: "Previous User",
+            email: "previous@example.com",
+            image: nil
+        ))
+        let nextUser = CurrentUserResponse(user: .init(
+            id: "next-user",
+            username: "next",
+            name: "Next User",
+            email: "next@example.com",
+            image: nil
+        ))
+        let api = TokenRoutingAPIClient(
+            routes: [
+                "previous:\(MobileAPIContract.Endpoint.currentUser)": previousUser,
+                "previous:\(MobileAPIContract.Endpoint.projects)": ProjectsResponse(
+                    projects: [previousProject]
+                ),
+                "next:\(MobileAPIContract.Endpoint.currentUser)": nextUser,
+                "next:\(MobileAPIContract.Endpoint.projects)": ProjectsResponse(
+                    projects: [nextProject]
+                ),
+            ],
+            delays: ["previous": .milliseconds(150), "next": .milliseconds(10)]
+        )
+        let store = CompanionStore(api: api, defaults: isolatedDefaults())
+        let previousLoad = Task { try? await store.load(token: "previous") }
+        for _ in 0..<100 {
+            if await api.requestCount(token: "previous") >= 2 { break }
+            try await Task.sleep(for: .milliseconds(5))
+        }
+
+        store.clear()
+        try await store.load(token: "next")
+        _ = await previousLoad.value
+
+        XCTAssertEqual(store.user?.id, "next-user")
+        XCTAssertEqual(store.projects.map(\.id), [nextProject.id])
+        XCTAssertEqual(store.organizations.map(\.name), ["Next organization"])
+        XCTAssertEqual(store.selectedProjectID, nextProject.id)
+    }
+
     private func isolatedDefaults() -> UserDefaults {
         let suiteName = "companion-store-tests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
@@ -309,6 +513,19 @@ final class DashboardSyncTests: XCTestCase {
             detail: nil,
             updatedAt: .now
         )
+    }
+
+    private func waitForRequests(
+        _ api: StubAPIClient,
+        count: Int,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) async {
+        for _ in 0..<100 {
+            if await api.requestCount() >= count { return }
+            try? await Task.sleep(for: .milliseconds(5))
+        }
+        XCTFail("Timed out waiting for \(count) dashboard request(s)", file: file, line: line)
     }
 }
 
@@ -358,6 +575,42 @@ private actor RoutingAPIClient: MobileAPIClientProtocol {
         if let delay = delays[path] { try await Task.sleep(for: delay) }
         let data = values.removeFirst()
         routes[path] = values
+        return try JSONDecoder.mobileContract.decode(responseType, from: data)
+    }
+}
+
+private actor TokenRoutingAPIClient: MobileAPIClientProtocol {
+    private let routes: [String: Data]
+    private let delays: [String: Duration]
+    private var requests: [String] = []
+
+    init(
+        routes: [String: any Encodable & Sendable],
+        delays: [String: Duration]
+    ) {
+        self.routes = routes.mapValues { value in
+            try! JSONEncoder.mobileContract.encode(TestAnyEncodable(value))
+        }
+        self.delays = delays
+    }
+
+    func requestCount(token: String) -> Int {
+        requests.filter { $0 == token }.count
+    }
+
+    func send<Response: Decodable & Sendable>(
+        _ path: String,
+        method: String,
+        token: String?,
+        body: (any Encodable & Sendable)?,
+        as responseType: Response.Type
+    ) async throws -> Response {
+        let token = token ?? ""
+        requests.append(token)
+        guard let data = routes["\(token):\(path)"] else {
+            throw MobileAPIError.httpStatus(404, "Missing token route")
+        }
+        if let delay = delays[token] { try await Task.sleep(for: delay) }
         return try JSONDecoder.mobileContract.decode(responseType, from: data)
     }
 }

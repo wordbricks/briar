@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 
-import { act } from "react";
+import { act, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
@@ -234,6 +234,52 @@ describe("Channels", () => {
     expect(container.textContent).toContain("에이전트 만들기");
     expect(container.textContent).toContain("사람 추가");
     expect(container.querySelector(".channel-composer-shell")).not.toBeNull();
+  });
+
+  it("establishes the initial change cursor before loading channel detail", async () => {
+    let resolveList!: (value: { channels: ChannelSummary[]; cursor: number }) => void;
+    const pendingList = new Promise<{ channels: ChannelSummary[]; cursor: number }>(
+      (resolve) => { resolveList = resolve; },
+    );
+    listChannels.mockReturnValue(pendingList);
+    loadChannel.mockResolvedValue({
+      channel,
+      members: [member],
+      agents: [agent],
+      messages: [message()],
+    });
+    loadChannelDelta.mockResolvedValue({
+      cursor: 7,
+      hasMore: false,
+      channels: [],
+      removedChannelIds: [],
+      messages: [],
+      removedMessageIds: [],
+      agentReplies: [],
+    });
+
+    await act(async () => {
+      root.render(
+        <Channels
+          activeChannelId="channel-1"
+          channels={[channel]}
+          currentUserId="user-1"
+          onChannelSelect={() => undefined}
+          onChannelsChange={() => undefined}
+          organizationId="org-1"
+          token="token"
+        />,
+      );
+      await Promise.resolve();
+    });
+    expect(loadChannel).not.toHaveBeenCalled();
+
+    await act(async () => {
+      resolveList({ channels: [channel], cursor: 7 });
+      await pendingList;
+      await Promise.resolve();
+    });
+    expect(loadChannel).toHaveBeenCalledWith("token", "org-1", "channel-1");
   });
 
   it("shows reply participants, count, and last reply time", async () => {
@@ -681,7 +727,14 @@ describe("Channels", () => {
             actionType: "request_issue_create",
             status: "pending",
             projectId: null,
-            payload: {},
+            payload: {
+              issue: {
+                title: "Improve onboarding",
+                description: "Make the first-run flow clearer.",
+                priority: 2,
+                status: "backlog",
+              },
+            },
             resultRunId: null,
           },
         }),
@@ -698,6 +751,7 @@ describe("Channels", () => {
     });
     acceptChannelProposal.mockResolvedValue({
       outcome: "accepted",
+      projectId: "project-1",
       resultRunId: "run-9",
     });
 
@@ -710,6 +764,13 @@ describe("Channels", () => {
           onChannelSelect={() => undefined}
           onChannelsChange={() => undefined}
           organizationId="org-1"
+          projects={[
+            {
+              id: "project-1",
+              name: "Briar",
+              organizationId: "org-1",
+            },
+          ]}
           token="token"
           onIssueCreated={onIssueCreated}
         />,
@@ -734,7 +795,919 @@ describe("Channels", () => {
       "proposal-1",
       "project-1",
     );
-    expect(onIssueCreated).toHaveBeenCalledWith("run-9");
+    expect(onIssueCreated).toHaveBeenCalledWith("project-1", "run-9");
+    expect(container.textContent).toContain("Improve onboarding");
+    expect(container.textContent).toContain("우선순위 P2");
+    expect(container.textContent).toContain("실행하지 않음");
+    expect(container.textContent).toContain("대상 프로젝트: Briar");
+    expect(container.querySelector(".channel-proposal-card select")).toBeNull();
+    expect(container.textContent).toContain("이슈 보기");
+  });
+
+  it("keeps a newer transferred proposal over a delayed approval response", async () => {
+    vi.useFakeTimers();
+    const pendingProposal = message({
+      id: "message-delayed-approval",
+      author: { type: "agent", id: "agent-1", name: "Honey", provider: "claude" },
+      proposal: {
+        id: "proposal-delayed-approval",
+        actionType: "request_issue_create",
+        status: "pending",
+        projectId: "project-1",
+        payload: {
+          issue: {
+            title: "Transfer-safe approval",
+            description: null,
+            priority: 2,
+            status: "backlog",
+          },
+        },
+        resultRunId: null,
+      },
+    });
+    const transferredProposal: ChannelMessage = {
+      ...pendingProposal,
+      proposal: {
+        ...pendingProposal.proposal!,
+        status: "accepted",
+        projectId: "project-2",
+        resultRunId: "run-new",
+      },
+    };
+    let resolveAccept!: (value: {
+      outcome: "accepted";
+      projectId: string;
+      resultRunId: string;
+    }) => void;
+    const pendingAccept = new Promise<{
+      outcome: "accepted";
+      projectId: string;
+      resultRunId: string;
+    }>((resolve) => { resolveAccept = resolve; });
+    const onIssueCreated = vi.fn();
+    listChannels.mockResolvedValue({ channels: [channel], cursor: 7 });
+    loadChannel.mockResolvedValue({
+      channel,
+      members: [member],
+      agents: [agent],
+      messages: [pendingProposal],
+    });
+    loadChannelDelta.mockResolvedValue({
+      cursor: 8,
+      hasMore: false,
+      channels: [],
+      removedChannelIds: [],
+      messages: [transferredProposal],
+      removedMessageIds: [],
+      agentReplies: [],
+    });
+    acceptChannelProposal.mockReturnValue(pendingAccept);
+
+    await act(async () => {
+      root.render(
+        <Channels
+          activeChannelId="channel-1"
+          channels={[channel]}
+          currentUserId="user-1"
+          onChannelSelect={() => undefined}
+          onChannelsChange={() => undefined}
+          onIssueCreated={onIssueCreated}
+          organizationId="org-1"
+          projects={[
+            { id: "project-1", name: "Briar", organizationId: "org-1" },
+            { id: "project-2", name: "Sprout", organizationId: "org-1" },
+          ]}
+          token="token"
+        />,
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(
+        ".channel-proposal-approve-button",
+      )!.click();
+      await Promise.resolve();
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3_000);
+    });
+    await act(async () => {
+      resolveAccept({
+        outcome: "accepted",
+        projectId: "project-1",
+        resultRunId: "run-stale",
+      });
+      await pendingAccept;
+      await Promise.resolve();
+    });
+
+    expect(onIssueCreated).toHaveBeenCalledTimes(1);
+    expect(onIssueCreated).toHaveBeenCalledWith("project-2", "run-new");
+    expect(container.textContent).toContain("대상 프로젝트: Sprout");
+  });
+
+  it("still opens the accepted issue when an unchanged delta arrives", async () => {
+    vi.useFakeTimers();
+    const pendingProposal = message({
+      id: "message-unchanged-approval",
+      author: { type: "agent", id: "agent-1", name: "Honey", provider: "claude" },
+      proposal: {
+        id: "proposal-unchanged-approval",
+        actionType: "request_issue_create",
+        status: "pending",
+        projectId: "project-1",
+        payload: {
+          issue: {
+            title: "Unchanged proposal",
+            description: null,
+            priority: 3,
+            status: "backlog",
+          },
+        },
+        resultRunId: null,
+      },
+    });
+    let resolveAccept!: (value: {
+      outcome: "accepted";
+      projectId: string;
+      resultRunId: string;
+    }) => void;
+    const pendingAccept = new Promise<{
+      outcome: "accepted";
+      projectId: string;
+      resultRunId: string;
+    }>((resolve) => { resolveAccept = resolve; });
+    const onIssueCreated = vi.fn();
+    listChannels.mockResolvedValue({ channels: [channel], cursor: 7 });
+    loadChannel.mockResolvedValue({
+      channel,
+      members: [member],
+      agents: [agent],
+      messages: [pendingProposal],
+    });
+    loadChannelDelta.mockResolvedValue({
+      cursor: 8,
+      hasMore: false,
+      channels: [],
+      removedChannelIds: [],
+      messages: [pendingProposal],
+      removedMessageIds: [],
+      agentReplies: [],
+    });
+    acceptChannelProposal.mockReturnValue(pendingAccept);
+    await act(async () => {
+      root.render(
+        <Channels
+          activeChannelId="channel-1"
+          channels={[channel]}
+          currentUserId="user-1"
+          onChannelSelect={() => undefined}
+          onChannelsChange={() => undefined}
+          onIssueCreated={onIssueCreated}
+          organizationId="org-1"
+          projects={[
+            { id: "project-1", name: "Briar", organizationId: "org-1" },
+          ]}
+          token="token"
+        />,
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(
+        ".channel-proposal-approve-button",
+      )!.click();
+      await Promise.resolve();
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3_000);
+    });
+    await act(async () => {
+      resolveAccept({
+        outcome: "accepted",
+        projectId: "project-1",
+        resultRunId: "run-current",
+      });
+      await pendingAccept;
+      await Promise.resolve();
+    });
+
+    expect(onIssueCreated).toHaveBeenCalledWith("project-1", "run-current");
+    expect(container.textContent).toContain("이슈 보기");
+  });
+
+  it("refreshes an intermediate reservation delta before opening the issue", async () => {
+    vi.useFakeTimers();
+    const pendingProposal = message({
+      id: "message-reservation-approval",
+      author: { type: "agent", id: "agent-1", name: "Honey", provider: "claude" },
+      proposal: {
+        id: "proposal-reservation-approval",
+        actionType: "request_issue_create",
+        status: "pending",
+        projectId: null,
+        payload: {
+          issue: {
+            title: "Reserved approval",
+            description: null,
+            priority: 2,
+            status: "backlog",
+          },
+        },
+        resultRunId: null,
+      },
+    });
+    const reservedProposal: ChannelMessage = {
+      ...pendingProposal,
+      proposal: {
+        ...pendingProposal.proposal!,
+        projectId: "project-1",
+      },
+    };
+    const acceptedProposal: ChannelMessage = {
+      ...reservedProposal,
+      proposal: {
+        ...reservedProposal.proposal!,
+        status: "accepted",
+        resultRunId: "run-reserved",
+      },
+    };
+    let resolveAccept!: (value: {
+      outcome: "accepted";
+      projectId: string;
+      resultRunId: string;
+    }) => void;
+    const pendingAccept = new Promise<{
+      outcome: "accepted";
+      projectId: string;
+      resultRunId: string;
+    }>((resolve) => { resolveAccept = resolve; });
+    const onIssueCreated = vi.fn();
+    listChannels.mockResolvedValue({ channels: [channel], cursor: 7 });
+    loadChannel
+      .mockResolvedValueOnce({
+        channel,
+        members: [member],
+        agents: [agent],
+        messages: [pendingProposal],
+      })
+      .mockResolvedValueOnce({
+        channel,
+        members: [member],
+        agents: [agent],
+        messages: [acceptedProposal],
+      });
+    loadChannelDelta.mockResolvedValue({
+      cursor: 8,
+      hasMore: false,
+      channels: [],
+      removedChannelIds: [],
+      messages: [reservedProposal],
+      removedMessageIds: [],
+      agentReplies: [],
+    });
+    acceptChannelProposal.mockReturnValue(pendingAccept);
+    await act(async () => {
+      root.render(
+        <Channels
+          activeChannelId="channel-1"
+          channels={[channel]}
+          currentUserId="user-1"
+          onChannelSelect={() => undefined}
+          onChannelsChange={() => undefined}
+          onIssueCreated={onIssueCreated}
+          organizationId="org-1"
+          projects={[
+            { id: "project-1", name: "Briar", organizationId: "org-1" },
+          ]}
+          token="token"
+        />,
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(
+        ".channel-proposal-approve-button",
+      )!.click();
+      await Promise.resolve();
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3_000);
+    });
+    await act(async () => {
+      resolveAccept({
+        outcome: "accepted",
+        projectId: "project-1",
+        resultRunId: "run-reserved",
+      });
+      await pendingAccept;
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(loadChannel).toHaveBeenCalledTimes(2);
+    expect(onIssueCreated).toHaveBeenCalledWith("project-1", "run-reserved");
+    expect(container.textContent).toContain("이슈 보기");
+  });
+
+  it("does not refresh or navigate an approval after the channel changes", async () => {
+    vi.useFakeTimers();
+    const otherChannel: ChannelSummary = {
+      ...channel,
+      id: "channel-2",
+      slug: "other",
+      name: "Other",
+      defaultProjectId: "project-2",
+    };
+    const pendingProposal = message({
+      id: "message-channel-switch",
+      proposal: {
+        id: "proposal-channel-switch",
+        actionType: "request_issue_create",
+        status: "pending",
+        projectId: null,
+        payload: {
+          issue: {
+            title: "Stay in the original channel",
+            description: null,
+            priority: 2,
+            status: "backlog",
+          },
+        },
+        resultRunId: null,
+      },
+    });
+    const reservation: ChannelMessage = {
+      ...pendingProposal,
+      proposal: { ...pendingProposal.proposal!, projectId: "project-1" },
+    };
+    const otherMessage = message({
+      id: "message-other-channel",
+      channelId: otherChannel.id,
+      body: "Current channel remains visible",
+    });
+    let resolveAccept!: (value: {
+      outcome: "accepted";
+      projectId: string;
+      resultRunId: string;
+    }) => void;
+    const pendingAccept = new Promise<{
+      outcome: "accepted";
+      projectId: string;
+      resultRunId: string;
+    }>((resolve) => { resolveAccept = resolve; });
+    const onIssueCreated = vi.fn();
+    listChannels.mockResolvedValue({
+      channels: [channel, otherChannel],
+      cursor: 7,
+    });
+    loadChannel
+      .mockResolvedValueOnce({
+        channel,
+        members: [member],
+        agents: [agent],
+        messages: [pendingProposal],
+      })
+      .mockResolvedValueOnce({
+        channel: otherChannel,
+        members: [member],
+        agents: [agent],
+        messages: [otherMessage],
+      });
+    loadChannelDelta.mockResolvedValue({
+      cursor: 8,
+      hasMore: false,
+      channels: [],
+      removedChannelIds: [],
+      messages: [reservation],
+      removedMessageIds: [],
+      agentReplies: [],
+    });
+    acceptChannelProposal.mockReturnValue(pendingAccept);
+    const channelsProps = {
+      channels: [channel, otherChannel],
+      currentUserId: "user-1",
+      onChannelSelect: () => undefined,
+      onChannelsChange: () => undefined,
+      onIssueCreated,
+      organizationId: "org-1",
+      projects: [
+        { id: "project-1", name: "Briar", organizationId: "org-1" },
+        { id: "project-2", name: "Other", organizationId: "org-1" },
+      ],
+      token: "token",
+    };
+    await act(async () => {
+      root.render(<Channels {...channelsProps} activeChannelId="channel-1" />);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(
+        ".channel-proposal-approve-button",
+      )!.click();
+      await Promise.resolve();
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3_000);
+    });
+    await act(async () => {
+      root.render(<Channels {...channelsProps} activeChannelId="channel-2" />);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    await act(async () => {
+      resolveAccept({
+        outcome: "accepted",
+        projectId: "project-1",
+        resultRunId: "run-old-channel",
+      });
+      await pendingAccept;
+      await Promise.resolve();
+    });
+
+    expect(loadChannel).toHaveBeenCalledTimes(2);
+    expect(onIssueCreated).not.toHaveBeenCalled();
+    expect(container.textContent).toContain("Current channel remains visible");
+  });
+
+  it("drops a delayed approval failure after the channel changes", async () => {
+    const otherChannel: ChannelSummary = {
+      ...channel,
+      id: "channel-2",
+      slug: "other",
+      name: "Other",
+      defaultProjectId: "project-2",
+    };
+    const pendingProposal = message({
+      id: "message-old-failure",
+      proposal: {
+        id: "proposal-old-failure",
+        actionType: "request_issue_create",
+        status: "pending",
+        projectId: "project-1",
+        payload: {
+          issue: {
+            title: "Old channel proposal",
+            description: null,
+            priority: 2,
+            status: "backlog",
+          },
+        },
+        resultRunId: null,
+      },
+    });
+    const currentProposal = message({
+      id: "message-current-proposal",
+      channelId: otherChannel.id,
+      proposal: {
+        id: "proposal-current",
+        actionType: "request_issue_create",
+        status: "pending",
+        projectId: "project-2",
+        payload: {
+          issue: {
+            title: "Current channel proposal",
+            description: null,
+            priority: 3,
+            status: "backlog",
+          },
+        },
+        resultRunId: null,
+      },
+    });
+    let rejectAccept!: (reason: Error) => void;
+    const pendingAccept = new Promise<never>((_resolve, reject) => {
+      rejectAccept = reject;
+    });
+    acceptChannelProposal.mockReturnValue(pendingAccept);
+    listChannels.mockResolvedValue({ channels: [channel, otherChannel], cursor: 7 });
+    loadChannel
+      .mockResolvedValueOnce({
+        channel,
+        members: [member],
+        agents: [agent],
+        messages: [pendingProposal],
+      })
+      .mockResolvedValueOnce({
+        channel: otherChannel,
+        members: [member],
+        agents: [agent],
+        messages: [currentProposal],
+      });
+    loadChannelDelta.mockResolvedValue({
+      cursor: 7,
+      hasMore: false,
+      channels: [],
+      removedChannelIds: [],
+      messages: [],
+      removedMessageIds: [],
+      agentReplies: [],
+    });
+    const props = {
+      channels: [channel, otherChannel],
+      currentUserId: "user-1",
+      onChannelSelect: () => undefined,
+      onChannelsChange: () => undefined,
+      organizationId: "org-1",
+      projects: [
+        { id: "project-1", name: "Briar", organizationId: "org-1" },
+        { id: "project-2", name: "Other", organizationId: "org-1" },
+      ],
+      token: "token",
+    };
+    await act(async () => {
+      root.render(<Channels {...props} activeChannelId={channel.id} />);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(
+        ".channel-proposal-approve-button",
+      )!.click();
+      await Promise.resolve();
+    });
+    await act(async () => {
+      root.render(<Channels {...props} activeChannelId={otherChannel.id} />);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(
+      container.querySelector<HTMLButtonElement>(
+        ".channel-proposal-approve-button",
+      )!.disabled,
+    ).toBe(false);
+
+    await act(async () => {
+      rejectAccept(new Error("stale approval failed"));
+      await pendingAccept.catch(() => undefined);
+    });
+
+    expect(container.textContent).toContain("Current channel proposal");
+    expect(container.textContent).not.toContain("stale approval failed");
+    expect(container.querySelector(".channel-error")).toBeNull();
+    expect(
+      container.querySelector<HTMLButtonElement>(
+        ".channel-proposal-approve-button",
+      )!.disabled,
+    ).toBe(false);
+  });
+
+  it("drops a delayed issue-navigation failure after the channel changes", async () => {
+    const otherChannel: ChannelSummary = {
+      ...channel,
+      id: "channel-2",
+      slug: "other",
+      name: "Other",
+      defaultProjectId: "project-2",
+    };
+    const proposal = message({
+      id: "message-navigation-failure",
+      proposal: {
+        id: "proposal-navigation-failure",
+        actionType: "request_issue_create",
+        status: "pending",
+        projectId: "project-1",
+        payload: {
+          issue: {
+            title: "Navigate after approval",
+            description: null,
+            priority: 2,
+            status: "backlog",
+          },
+        },
+        resultRunId: null,
+      },
+    });
+    let rejectNavigation!: (reason: Error) => void;
+    const pendingNavigation = new Promise<void>((_resolve, reject) => {
+      rejectNavigation = reject;
+    });
+    const onIssueCreated = vi.fn(() => pendingNavigation);
+    listChannels.mockResolvedValue({ channels: [channel, otherChannel], cursor: 7 });
+    loadChannel
+      .mockResolvedValueOnce({
+        channel,
+        members: [member],
+        agents: [agent],
+        messages: [proposal],
+      })
+      .mockResolvedValueOnce({
+        channel: otherChannel,
+        members: [member],
+        agents: [agent],
+        messages: [message({
+          id: "message-current-after-navigation",
+          channelId: otherChannel.id,
+          body: "Current channel remains clean",
+        })],
+      });
+    loadChannelDelta.mockResolvedValue({
+      cursor: 7,
+      hasMore: false,
+      channels: [],
+      removedChannelIds: [],
+      messages: [],
+      removedMessageIds: [],
+      agentReplies: [],
+    });
+    acceptChannelProposal.mockResolvedValue({
+      outcome: "accepted",
+      projectId: "project-1",
+      resultRunId: "run-navigation",
+    });
+    const props = {
+      channels: [channel, otherChannel],
+      currentUserId: "user-1",
+      onChannelSelect: () => undefined,
+      onChannelsChange: () => undefined,
+      onIssueCreated,
+      organizationId: "org-1",
+      projects: [
+        { id: "project-1", name: "Briar", organizationId: "org-1" },
+        { id: "project-2", name: "Other", organizationId: "org-1" },
+      ],
+      token: "token",
+    };
+    await act(async () => {
+      root.render(<Channels {...props} activeChannelId={channel.id} />);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(
+        ".channel-proposal-approve-button",
+      )!.click();
+      await Promise.resolve();
+    });
+    expect(onIssueCreated).toHaveBeenCalledWith("project-1", "run-navigation");
+    await act(async () => {
+      root.render(<Channels {...props} activeChannelId={otherChannel.id} />);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    await act(async () => {
+      rejectNavigation(new Error("stale navigation failed"));
+      await pendingNavigation.catch(() => undefined);
+    });
+
+    expect(container.textContent).toContain("Current channel remains clean");
+    expect(container.textContent).not.toContain("stale navigation failed");
+    expect(container.querySelector(".channel-error")).toBeNull();
+  });
+
+  it("upserts authoritative archived detail before enabling approval", async () => {
+    const archivedChannel: ChannelSummary = {
+      ...channel,
+      archivedAt: "2026-08-10T00:00:00.000Z",
+      updatedAt: "2026-08-10T00:00:00.000Z",
+    };
+    const proposal = message({
+      id: "message-detail-archive",
+      proposal: {
+        id: "proposal-detail-archive",
+        actionType: "request_issue_create",
+        status: "pending",
+        projectId: "project-1",
+        payload: {
+          issue: {
+            title: "Archive-aware proposal",
+            description: null,
+            priority: 2,
+            status: "backlog",
+          },
+        },
+        resultRunId: null,
+      },
+    });
+    listChannels.mockResolvedValue({ channels: [channel], cursor: 7 });
+    loadChannel.mockResolvedValue({
+      channel: archivedChannel,
+      members: [member],
+      agents: [agent],
+      messages: [proposal],
+    });
+    loadChannelDelta.mockResolvedValue({
+      cursor: 7,
+      hasMore: false,
+      channels: [],
+      removedChannelIds: [],
+      messages: [],
+      removedMessageIds: [],
+      agentReplies: [],
+    });
+    const onChannelSelect = vi.fn();
+
+    function StatefulChannels() {
+      const [catalog, setCatalog] = useState<ChannelSummary[]>([channel]);
+      return (
+        <Channels
+          activeChannelId={channel.id}
+          channels={catalog}
+          currentUserId="user-1"
+          onChannelSelect={onChannelSelect}
+          onChannelsChange={setCatalog}
+          organizationId="org-1"
+          projects={[
+            { id: "project-1", name: "Briar", organizationId: "org-1" },
+          ]}
+          token="token"
+        />
+      );
+    }
+
+    await act(async () => {
+      root.render(<StatefulChannels />);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    await vi.waitFor(() => {
+      expect(
+        container.querySelector<HTMLButtonElement>(
+          ".channel-proposal-approve-button",
+        )?.disabled,
+      ).toBe(true);
+    });
+    container.querySelector<HTMLButtonElement>(
+      ".channel-proposal-approve-button",
+    )!.click();
+    expect(acceptChannelProposal).not.toHaveBeenCalled();
+  });
+
+  it("shows the complete proposal and disables approval in an archived channel", async () => {
+    const archivedChannel = {
+      ...channel,
+      archivedAt: "2026-08-10T00:00:00.000Z",
+    };
+    const finalClause = "Final clause that must remain visible before approval.";
+    const proposalMessage = message({
+      id: "message-archived-proposal",
+      author: { type: "agent", id: "agent-1", name: "Honey", provider: "claude" },
+      proposal: {
+        id: "proposal-archived",
+        actionType: "request_issue_create",
+        status: "pending",
+        projectId: "project-1",
+        payload: {
+          issue: {
+            title: "Review the complete issue",
+            description: `First line\nSecond line\nThird line\nFourth line\n${finalClause}`,
+            priority: 2,
+            status: "backlog",
+          },
+        },
+        resultRunId: null,
+      },
+    });
+    listChannels.mockResolvedValue({ channels: [archivedChannel], cursor: 7 });
+    loadChannel.mockResolvedValue({
+      channel: archivedChannel,
+      members: [member],
+      agents: [agent],
+      messages: [proposalMessage],
+    });
+    loadChannelDelta.mockResolvedValue({
+      cursor: 7,
+      hasMore: false,
+      channels: [],
+      removedChannelIds: [],
+      messages: [],
+      removedMessageIds: [],
+      agentReplies: [],
+    });
+
+    await act(async () => {
+      root.render(
+        <Channels
+          activeChannelId={archivedChannel.id}
+          channels={[archivedChannel]}
+          currentUserId="user-1"
+          onChannelSelect={() => undefined}
+          onChannelsChange={() => undefined}
+          organizationId="org-1"
+          projects={[{ id: "project-1", name: "Briar", organizationId: "org-1" }]}
+          token="token"
+        />,
+      );
+    });
+    await act(async () => Promise.resolve());
+
+    expect(
+      container.querySelector(".channel-proposal-description")?.textContent,
+    ).toContain(finalClause);
+    const showDescription = container.querySelector<HTMLButtonElement>(
+      ".channel-proposal-description-toggle",
+    )!;
+    expect(showDescription.getAttribute("aria-expanded")).toBe("false");
+    await act(async () => showDescription.click());
+    expect(showDescription.getAttribute("aria-expanded")).toBe("true");
+    expect(
+      container.querySelector(".channel-proposal-description")?.classList,
+    ).toContain("is-expanded");
+    const approve = container.querySelector<HTMLButtonElement>(
+      ".channel-proposal-approve-button",
+    )!;
+    expect(approve.disabled).toBe(true);
+    approve.click();
+    expect(acceptChannelProposal).not.toHaveBeenCalled();
+  });
+
+  it("requires a project selection for an organization proposal", async () => {
+    const commonChannel = { ...channel, defaultProjectId: null };
+    const proposalMessage = message({
+      id: "message-project-choice",
+      author: {
+        type: "agent",
+        id: "agent-1",
+        name: "Honey",
+        provider: "claude",
+      },
+      proposal: {
+        id: "proposal-project-choice",
+        actionType: "request_issue_create",
+        status: "pending",
+        projectId: null,
+        payload: {
+          issue: {
+            title: "Route this issue",
+            description: null,
+            priority: null,
+            status: "backlog",
+          },
+        },
+        resultRunId: null,
+      },
+    });
+    listChannels.mockResolvedValue({ channels: [commonChannel], cursor: 7 });
+    loadChannel.mockResolvedValue({
+      channel: commonChannel,
+      members: [member],
+      agents: [agent],
+      messages: [proposalMessage],
+    });
+    loadChannelDelta.mockResolvedValue({
+      cursor: 7,
+      hasMore: false,
+      channels: [],
+      removedChannelIds: [],
+      messages: [],
+      removedMessageIds: [],
+      agentReplies: [],
+    });
+    acceptChannelProposal.mockResolvedValue({
+      outcome: "accepted",
+      projectId: "project-2",
+      resultRunId: "run-project-2",
+    });
+
+    await act(async () => {
+      root.render(
+        <Channels
+          activeChannelId="channel-1"
+          channels={[commonChannel]}
+          currentUserId="user-1"
+          onChannelSelect={() => undefined}
+          onChannelsChange={() => undefined}
+          organizationId="org-1"
+          projects={[
+            { id: "project-1", name: "Briar", organizationId: "org-1" },
+            { id: "project-2", name: "Sprout", organizationId: "org-1" },
+            { id: "project-x", name: "Other", organizationId: "org-2" },
+          ]}
+          token="token"
+        />,
+      );
+    });
+    await act(async () => Promise.resolve());
+
+    const card = container.querySelector<HTMLElement>(".channel-proposal-card")!;
+    const select = card.querySelector<HTMLSelectElement>("select")!;
+    const approve = card.querySelector<HTMLButtonElement>("button")!;
+    expect(approve.disabled).toBe(true);
+    expect([...select.options].map((option) => option.textContent)).toEqual([
+      "프로젝트 선택",
+      "Briar",
+      "Sprout",
+    ]);
+
+    await act(async () => {
+      select.value = "project-2";
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    expect(approve.disabled).toBe(false);
+    expect(card.textContent).toContain("대상 프로젝트: Sprout");
+    await act(async () => approve.click());
+
+    expect(acceptChannelProposal).toHaveBeenCalledWith(
+      "token",
+      "org-1",
+      "channel-1",
+      "proposal-project-choice",
+      "project-2",
+    );
   });
 
   it("shows a plan document card with its organization scope", async () => {

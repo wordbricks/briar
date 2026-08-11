@@ -3,7 +3,23 @@ import { resolve } from "node:path";
 import { Miniflare } from "miniflare";
 import { unstable_splitSqlQuery } from "wrangler";
 import { describe, expect, it } from "vitest";
+import {
+  createChannel,
+  createChannelMessage,
+  reserveChannelActionProposalApproval,
+} from "./channels";
+import {
+  channelApprovalTablesAvailable,
+  createIssueAttachments,
+  createIssueMessage,
+  getIssueAttachment,
+  getRunEvidenceImage,
+  recordHuntEvent,
+  transferIssue,
+} from "./db";
+import { createOrganizationAgent } from "./organization-agents";
 import { applyD1Migrations, executeD1Sql } from "./test-helpers/d1";
+import { readAgentTranscript } from "./workers";
 
 async function withPreWorkflowMigrationDatabase(
   name: string,
@@ -161,6 +177,7 @@ describe("D1 migrations", () => {
     "0074_channel_delta_sync.sql",
     "0081_optimize_dashboard_worker_device_sync.sql",
     "0083_suppress_heartbeat_dashboard_changes.sql",
+    "0090_channel_issue_approval.sql",
   ])("keeps each trigger in a separate Wrangler statement: %s", async (name) => {
     const sql = await readFile(resolve("migrations", name), "utf8");
     const statements = unstable_splitSqlQuery(sql);
@@ -171,6 +188,2065 @@ describe("D1 migrations", () => {
     expect(Math.max(...triggerCounts)).toBeLessThanOrEqual(1);
     expect(triggerCounts.filter((count) => count === 1)).not.toHaveLength(0);
   });
+
+  it("only finalizes a canonical reserved channel issue run", async () => {
+    const miniflare = new Miniflare({
+      modules: true,
+      script: "export default { fetch() { return new Response('ok') } }",
+      d1Databases: { DB: "briar-channel-canonical-approval-test" },
+    });
+    try {
+      const db = (await miniflare.getD1Database("DB")) as unknown as D1Database;
+      await applyD1Migrations(db, {
+        through: "0090_channel_issue_approval.sql",
+      });
+      const ownerId = "channel-canonical-owner";
+      const approverId = "channel-canonical-approver";
+      const organizationId = "81000000-0000-4000-8000-000000000001";
+      const projectId = "82000000-0000-4000-8000-000000000001";
+      const channelId = "83000000-0000-4000-8000-000000000001";
+      const agentId = "84000000-0000-4000-8000-000000000001";
+      const triggerMessageId = "85000000-0000-4000-8000-000000000001";
+      const replyMessageId = "86000000-0000-4000-8000-000000000001";
+      const proposalId = "87000000-0000-4000-8000-000000000001";
+      const sourceKey = `briar-channel-approved:${"7".repeat(64)}`;
+      const now = "2026-08-10T00:00:00.000Z";
+      const approvedAt = "2026-08-10T00:01:00.000Z";
+      const canonicalPayload = JSON.stringify({
+        issue: {
+          title: "Canonical issue",
+          description: "The member approved this exact content.",
+          priority: 3,
+          status: "backlog",
+        },
+      });
+
+      for (const [id, email] of [
+        [ownerId, "canonical-owner@example.com"],
+        [approverId, "canonical-approver@example.com"],
+      ]) {
+        await db.prepare(
+          `insert into "user" (
+             id, name, email, emailVerified, createdAt, updatedAt
+           ) values (?, ?, ?, 1, ?, ?)`,
+        ).bind(id, id, email, now, now).run();
+      }
+      await db.prepare(
+        `insert into briar_organizations (id, name, handle, created_at, updated_at)
+         values (?, 'Canonical Org', 'canonical-org', ?, ?)`,
+      ).bind(organizationId, now, now).run();
+      for (const [id, role] of [[ownerId, "owner"], [approverId, "member"]]) {
+        await db.prepare(
+          `insert into briar_organization_members (
+             organization_id, user_id, role, created_at, updated_at
+           ) values (?, ?, ?, ?, ?)`,
+        ).bind(organizationId, id, role, now, now).run();
+      }
+      await db.prepare(
+        `insert into briar_projects (
+           id, owner_user_id, organization_id, name, agent_token_hash,
+           created_at, updated_at
+         ) values (?, ?, ?, 'Canonical Project', ?, ?, ?)`,
+      ).bind(
+        projectId,
+        ownerId,
+        organizationId,
+        "d".repeat(64),
+        now,
+        now,
+      ).run();
+      await db.prepare(
+        `insert into briar_project_settings (
+           project_id, github_repository, workflow_json,
+           mandatory_checkpoints_json, created_at, updated_at
+         ) values (?, 'wordbricks/canonical-project', ?, '[]', ?, ?)`,
+      ).bind(
+        projectId,
+        JSON.stringify({
+          version: 2,
+          requirements: [],
+          stages: [{ id: "implementing", label: "Implement", required: true }],
+          execution: { checkpoints: [] },
+          completion: { requiredStages: ["implementing"] },
+        }),
+        now,
+        now,
+      ).run();
+      await createChannel(db, {
+        id: channelId,
+        organizationId,
+        slug: "canonical",
+        name: "Canonical",
+        topic: null,
+        visibility: "public",
+        defaultProjectId: projectId,
+        createdByUserId: ownerId,
+        createdAt: now,
+      });
+      await createOrganizationAgent(db, {
+        id: agentId,
+        organizationId,
+        name: "Canonical Agent",
+        provider: "codex",
+        model: null,
+        responsibility: "Propose canonical issues.",
+        effort: null,
+        createdAt: now,
+      });
+      await createChannelMessage(db, {
+        id: triggerMessageId,
+        channelId,
+        parentMessageId: null,
+        authorUserId: ownerId,
+        authorAgentId: null,
+        authorAgentName: null,
+        authorAgentProvider: null,
+        body: "Create the canonical issue",
+        mentionedUserIds: [],
+        mentionedAgentIds: [agentId],
+        createdAt: now,
+      });
+      await createChannelMessage(db, {
+        id: replyMessageId,
+        channelId,
+        parentMessageId: triggerMessageId,
+        authorUserId: null,
+        authorAgentId: agentId,
+        authorAgentName: "Canonical Agent",
+        authorAgentProvider: "codex",
+        body: "Canonical issue proposal",
+        mentionedUserIds: [],
+        mentionedAgentIds: [],
+        createdAt: now,
+      });
+      const insertProposal = (payloadJson: string) => db.prepare(
+        `insert into briar_channel_action_proposals (
+           id, channel_id, project_id, trigger_message_id, reply_message_id,
+           action_type, payload_json, created_at, updated_at
+         ) values (?, ?, ?, ?, ?, 'request_issue_create', ?, ?, ?)`,
+      ).bind(
+        proposalId,
+        channelId,
+        projectId,
+        triggerMessageId,
+        replyMessageId,
+        payloadJson,
+        now,
+        now,
+      ).run();
+      await insertProposal(canonicalPayload);
+      await expect(reserveChannelActionProposalApproval(db, {
+        organizationId,
+        channelId,
+        proposalId,
+        projectId,
+        userId: approverId,
+        approvedAt,
+        issueSourceKey: sourceKey,
+      })).resolves.toMatchObject({ issue_source_key: sourceKey });
+
+      type HuntInput = Parameters<typeof recordHuntEvent>[2];
+      const context = {
+        origin: "briar-channel",
+        proposalId,
+        channelId,
+        issueId: proposalId,
+        attachmentCount: 0,
+        fullAuto: false,
+      };
+      const canonicalInput: HuntInput = {
+        source: "issue",
+        sourceKey,
+        title: "Canonical issue",
+        stage: "queued",
+        status: "backlog",
+        workflowStage: null,
+        eventKey: `${sourceKey}:backlog:intake`,
+        occurredAt: now,
+        actor: "briar-channel",
+        repository: "wordbricks/canonical-project",
+        detail: "채널 대화에서 사용자가 승인한 제안으로 생성된 이슈입니다.",
+        priority: 3,
+        assigneeUserId: null,
+        issueCheckpoints: [],
+        fullAuto: false,
+        branch: null,
+        commitSha: null,
+        tracker: null,
+        issueDescription: "The member approved this exact content.",
+        resultSummary: null,
+        structuredResult: null,
+        pullRequestUrls: [],
+        targetSha: null,
+        sourceCreatedAt: now,
+        qaStatus: null,
+        stagingQaDetail: null,
+        productionQaDetail: null,
+        context,
+        createdByUserId: approverId,
+        preferredAgentProvider: null,
+        preferredAgentModel: null,
+        preferredAgentEffort: null,
+      };
+      const assertStillReserved = async () => {
+        await expect(db.prepare(
+          `select status, result_run_id from briar_channel_action_proposals
+           where id = ?`,
+        ).bind(proposalId).first()).resolves.toEqual({
+          status: "pending",
+          result_run_id: null,
+        });
+        await expect(db.prepare(
+          `select count(*) as count from briar_hunt_runs
+           where source = 'issue'
+             and source_key like 'briar-channel-approved:%'`,
+        ).first()).resolves.toEqual({ count: 0 });
+        await expect(db.prepare(
+          `select count(*) as count from briar_channel_issue_approval_audit
+           where proposal_id = ?`,
+        ).bind(proposalId).first()).resolves.toEqual({ count: 0 });
+      };
+      const attempt = (overrides: Partial<HuntInput>) =>
+        recordHuntEvent(db, projectId, { ...canonicalInput, ...overrides });
+
+      await expect(attempt({ title: "Injected title" })).rejects.toThrow(
+        "channel proposal approval reservation not found",
+      );
+      await assertStillReserved();
+      await expect(attempt({
+        repository: "attacker/poisoned-repository",
+        context: { ...context, fullAuto: true },
+      })).rejects.toThrow("channel proposal approval reservation not found");
+      await assertStillReserved();
+      await expect(attempt({
+        status: "queued",
+        preferredAgentProvider: "codex",
+      })).rejects.toThrow("channel proposal approval reservation not found");
+      await assertStillReserved();
+
+      const malformedSourceKey = `briar-channel-approved:${"A".repeat(64)}`;
+      await db.prepare(
+        `update briar_channel_action_proposals set issue_source_key = ?
+         where id = ?`,
+      ).bind(malformedSourceKey, proposalId).run();
+      await expect(attempt({
+        sourceKey: malformedSourceKey,
+        eventKey: `${malformedSourceKey}:backlog:intake`,
+      })).rejects.toThrow("channel proposal approval reservation not found");
+      await assertStillReserved();
+      await db.prepare(
+        `update briar_channel_action_proposals set issue_source_key = ?
+         where id = ?`,
+      ).bind(sourceKey, proposalId).run();
+
+      await db.prepare(
+        `delete from briar_channel_action_proposals where id = ?`,
+      ).bind(proposalId).run();
+      await insertProposal(JSON.stringify({
+        issue: { title: "Canonical issue", priority: 3, status: "backlog" },
+      }));
+      await expect(reserveChannelActionProposalApproval(db, {
+        organizationId,
+        channelId,
+        proposalId,
+        projectId,
+        userId: approverId,
+        approvedAt,
+        issueSourceKey: sourceKey,
+      })).resolves.toMatchObject({ issue_source_key: sourceKey });
+      await expect(attempt({ issueDescription: null })).rejects.toThrow(
+        "channel proposal approval reservation not found",
+      );
+      await assertStillReserved();
+      await db.prepare(
+        `delete from briar_channel_action_proposals where id = ?`,
+      ).bind(proposalId).run();
+      await insertProposal(canonicalPayload);
+      await expect(reserveChannelActionProposalApproval(db, {
+        organizationId,
+        channelId,
+        proposalId,
+        projectId,
+        userId: approverId,
+        approvedAt,
+        issueSourceKey: sourceKey,
+      })).resolves.toMatchObject({ issue_source_key: sourceKey });
+
+      const runId = await recordHuntEvent(db, projectId, canonicalInput);
+      await expect(db.prepare(
+        `select status, stage, repository from briar_hunt_runs where id = ?`,
+      ).bind(runId).first()).resolves.toEqual({
+        status: "backlog",
+        stage: "queued",
+        repository: "wordbricks/canonical-project",
+      });
+      await expect(db.prepare(
+        `select status, result_run_id from briar_channel_action_proposals
+         where id = ?`,
+      ).bind(proposalId).first()).resolves.toEqual({
+        status: "accepted",
+        result_run_id: runId,
+      });
+      await expect(db.prepare(
+        `select run_id, result_verification
+         from briar_channel_issue_approval_audit where proposal_id = ?`,
+      ).bind(proposalId).first()).resolves.toEqual({
+        run_id: runId,
+        result_verification: "atomic",
+      });
+    } finally {
+      await miniflare.dispose();
+    }
+  });
+
+  it("upgrades channel approvals with audit backfill and legacy quarantine", async () => {
+    const miniflare = new Miniflare({
+      modules: true,
+      script: "export default { fetch() { return new Response('ok') } }",
+      d1Databases: { DB: "briar-channel-approval-upgrade-test" },
+    });
+    try {
+      const db = (await miniflare.getD1Database("DB")) as unknown as D1Database;
+      await applyD1Migrations(db, { through: "0089_channel_agent_delegation.sql" });
+      const userId = "channel-upgrade-owner";
+      const approverId = "channel-upgrade-approver";
+      const organizationId = "91000000-0000-4000-8000-000000000001";
+      const projectId = "92000000-0000-4000-8000-000000000001";
+      const targetProjectId = "92000000-0000-4000-8000-000000000002";
+      const unconfiguredTargetProjectId =
+        "92000000-0000-4000-8000-000000000003";
+      const channelId = "93000000-0000-4000-8000-000000000001";
+      const agentId = "94000000-0000-4000-8000-000000000001";
+      const now = "2026-08-10T00:00:00.000Z";
+
+      for (const [id, email] of [
+        [userId, "upgrade-owner@example.com"],
+        [approverId, "upgrade-approver@example.com"],
+      ]) {
+        await db.prepare(
+          `insert into "user" (
+             id, name, email, emailVerified, createdAt, updatedAt
+           ) values (?, ?, ?, 1, ?, ?)`,
+        ).bind(id, id, email, now, now).run();
+      }
+      await db.prepare(
+        `insert into briar_organizations (id, name, handle, created_at, updated_at)
+         values (?, 'Upgrade Org', 'upgrade-org', ?, ?)`,
+      ).bind(organizationId, now, now).run();
+      for (const [id, role] of [[userId, "owner"], [approverId, "member"]]) {
+        await db.prepare(
+          `insert into briar_organization_members (
+             organization_id, user_id, role, created_at, updated_at
+           ) values (?, ?, ?, ?, ?)`,
+        ).bind(organizationId, id, role, now, now).run();
+      }
+      await db.prepare(
+        `insert into briar_projects (
+           id, owner_user_id, organization_id, name, agent_token_hash,
+           created_at, updated_at
+         ) values (?, ?, ?, 'Upgrade Project', ?, ?, ?)`,
+      ).bind(projectId, userId, organizationId, "a".repeat(64), now, now).run();
+      await db.prepare(
+        `insert into briar_projects (
+           id, owner_user_id, organization_id, name, agent_token_hash,
+           created_at, updated_at
+         ) values (?, ?, ?, 'Transfer Target', ?, ?, ?)`,
+      ).bind(
+        targetProjectId,
+        userId,
+        organizationId,
+        "b".repeat(64),
+        now,
+        now,
+      ).run();
+      await db.prepare(
+        `insert into briar_projects (
+           id, owner_user_id, organization_id, name, agent_token_hash,
+           created_at, updated_at
+         ) values (?, ?, ?, 'Unconfigured Transfer Target', ?, ?, ?)`,
+      ).bind(
+        unconfiguredTargetProjectId,
+        userId,
+        organizationId,
+        "c".repeat(64),
+        now,
+        now,
+      ).run();
+      await db.prepare(
+        `insert into briar_project_settings (
+           project_id, workflow_json, mandatory_checkpoints_json,
+           created_at, updated_at
+         ) values (?, ?, '[]', ?, ?)`,
+      ).bind(
+        projectId,
+        JSON.stringify({
+          version: 2,
+          requirements: [],
+          stages: [{ id: "implementing", label: "Implement", required: true }],
+          execution: { checkpoints: [] },
+          completion: { requiredStages: ["implementing"] },
+        }),
+        now,
+        now,
+      ).run();
+      await db.prepare(
+        `insert into briar_project_settings (
+           project_id, github_repository, workflow_json,
+           mandatory_checkpoints_json,
+           created_at, updated_at
+         ) values (?, 'wordbricks/transfer-target', ?, '[]', ?, ?)`,
+      ).bind(
+        targetProjectId,
+        JSON.stringify({
+          version: 2,
+          requirements: [],
+          stages: [
+            { id: "planning", label: "Plan", required: true },
+            { id: "implementing", label: "Implement", required: true },
+          ],
+          execution: { checkpoints: [] },
+          completion: { requiredStages: ["planning", "implementing"] },
+        }),
+        now,
+        now,
+      ).run();
+      await createChannel(db, {
+        id: channelId,
+        organizationId,
+        slug: "upgrade",
+        name: "Upgrade",
+        topic: null,
+        visibility: "public",
+        defaultProjectId: projectId,
+        createdByUserId: userId,
+        createdAt: now,
+      });
+      await createOrganizationAgent(db, {
+        id: agentId,
+        organizationId,
+        name: "Upgrade Agent",
+        provider: "codex",
+        model: null,
+        responsibility: "Propose issues.",
+        effort: null,
+        createdAt: now,
+      });
+
+      const seedProposal = async (
+        suffix: string,
+        status: "pending" | "accepted" = "pending",
+      ) => {
+        const triggerId = `95000000-0000-4000-8000-${suffix}`;
+        const replyId = `96000000-0000-4000-8000-${suffix}`;
+        const proposalId = `97000000-0000-4000-8000-${suffix}`;
+        await createChannelMessage(db, {
+          id: triggerId,
+          channelId,
+          parentMessageId: null,
+          authorUserId: userId,
+          authorAgentId: null,
+          authorAgentName: null,
+          authorAgentProvider: null,
+          body: `Create ${suffix}`,
+          mentionedUserIds: [],
+          mentionedAgentIds: [agentId],
+          createdAt: now,
+        });
+        await createChannelMessage(db, {
+          id: replyId,
+          channelId,
+          parentMessageId: triggerId,
+          authorUserId: null,
+          authorAgentId: agentId,
+          authorAgentName: "Upgrade Agent",
+          authorAgentProvider: "codex",
+          body: `Proposal ${suffix}`,
+          mentionedUserIds: [],
+          mentionedAgentIds: [],
+          createdAt: now,
+        });
+        await db.prepare(
+          `insert into briar_channel_action_proposals (
+             id, channel_id, project_id, trigger_message_id, reply_message_id,
+             action_type, payload_json, status, accepted_by_user_id,
+             accepted_at, created_at, updated_at
+           ) values (?, ?, ?, ?, ?, 'request_issue_create', ?, ?, ?, ?, ?, ?)`,
+        ).bind(
+          proposalId,
+          channelId,
+          projectId,
+          triggerId,
+          replyId,
+          JSON.stringify({
+            issue: {
+              title: `Upgrade ${suffix}`,
+              description: null,
+              priority: 2,
+              status: "backlog",
+            },
+          }),
+          status,
+          status === "accepted" ? approverId : null,
+          status === "accepted" ? now : null,
+          now,
+          now,
+        ).run();
+        return proposalId;
+      };
+      const legacyRun = (
+        proposalId: string,
+        title: string,
+        canonical = true,
+      ) => {
+        const sourceKey = `briar-channel-proposal:${proposalId}`;
+        return recordHuntEvent(db, projectId, {
+          source: "issue",
+          sourceKey,
+          title,
+          stage: "queued",
+          status: "backlog",
+          workflowStage: null,
+          eventKey: `${sourceKey}:backlog:intake`,
+          occurredAt: now,
+          actor: canonical ? "briar-channel" : "legacy-worker",
+          repository: "Upgrade Project",
+          detail: null,
+          priority: 2,
+          branch: null,
+          commitSha: null,
+          tracker: null,
+          issueDescription: null,
+          resultSummary: null,
+          structuredResult: null,
+          pullRequestUrls: [],
+          targetSha: null,
+          sourceCreatedAt: now,
+          qaStatus: null,
+          stagingQaDetail: null,
+          productionQaDetail: null,
+          context: {
+            origin: "briar-channel",
+            proposalId,
+            channelId,
+            issueId: proposalId,
+            attachmentCount: 0,
+            fullAuto: false,
+          },
+        });
+      };
+
+      const acceptedId = await seedProposal("000000000001");
+      const acceptedRunId = await legacyRun(acceptedId, "Upgrade 000000000001");
+      await db.prepare(
+        `update briar_channel_action_proposals
+         set status = 'accepted', accepted_by_user_id = ?, accepted_at = ?,
+             result_run_id = ?, updated_at = ? where id = ?`,
+      ).bind(approverId, now, acceptedRunId, now, acceptedId).run();
+      // A canonical-looking legacy backlog row still has a predictable source
+      // identity. Without durable dispatch evidence, execution metadata could
+      // have been supplied by a caller that preempted the old create-before-CAS
+      // flow and must not survive as an authorized result.
+      await db.prepare(
+        `update briar_hunt_runs
+         set repository = 'attacker/poisoned-channel-repository',
+             branch = 'agent-controlled-channel-branch'
+         where id = ?`,
+      ).bind(acceptedRunId).run();
+
+      const dispatchedId = await seedProposal("000000000005");
+      const dispatchedRunId = await legacyRun(
+        dispatchedId,
+        "Upgrade 000000000005",
+      );
+      await db.prepare(
+        `update briar_channel_action_proposals
+         set status = 'accepted', accepted_by_user_id = ?, accepted_at = ?,
+             result_run_id = ?, updated_at = ? where id = ?`,
+      ).bind(approverId, now, dispatchedRunId, now, dispatchedId).run();
+      const dispatchedAt = "2026-08-10T00:00:30.000Z";
+      await db.prepare(
+        `update briar_hunt_runs
+         set status = 'queued', stage = 'queued', workflow_stage = null,
+             requested_agent_provider = 'codex', requested_by_user_id = ?,
+             dispatch_mode = 'any', dispatch_request_id = ?,
+             dispatched_at = ?, last_event_at = ?, updated_at = ?
+         where id = ?`,
+      ).bind(
+        approverId,
+        `dispatch:${dispatchedId}`,
+        dispatchedAt,
+        dispatchedAt,
+        dispatchedAt,
+        dispatchedRunId,
+      ).run();
+      await db.prepare(
+        `insert into briar_execution_audit_events (
+           id, organization_id, project_id, run_id, worker_id, agent_id,
+           actor_user_id, actor_device_id, action, request_id, detail_json,
+           occurred_at
+         ) values (?, ?, ?, ?, null, null, ?, null, 'dispatched', ?, '{}', ?)`,
+      ).bind(
+        `audit:${dispatchedId}`,
+        organizationId,
+        projectId,
+        dispatchedRunId,
+        approverId,
+        `dispatch:${dispatchedId}`,
+        dispatchedAt,
+      ).run();
+      await db.prepare(
+        `update briar_hunt_runs
+         set title = 'User-edited dispatched issue', context_json = '{}',
+             preferred_agent_provider = 'claude',
+             preferred_agent_model = 'claude-opus-4-1',
+             preferred_agent_effort = 'high'
+         where id = ?`,
+      ).bind(dispatchedRunId).run();
+
+      const poisonedId = await seedProposal("000000000006");
+      const poisonedRunId = await legacyRun(
+        poisonedId,
+        "Upgrade 000000000006",
+        false,
+      );
+      await db.prepare(
+        `update briar_channel_action_proposals
+         set status = 'accepted', accepted_by_user_id = ?, accepted_at = ?,
+             result_run_id = ?, updated_at = ? where id = ?`,
+      ).bind(approverId, now, poisonedRunId, now, poisonedId).run();
+      await db.prepare(
+        `update briar_hunt_runs
+         set status = 'running', stage = 'implementing',
+             workflow_stage = 'implementing', updated_at = ?
+         where id = ?`,
+      ).bind("2026-08-10T00:00:20.000Z", poisonedRunId).run();
+
+      const transferId = await seedProposal("000000000009");
+      const transferRunId = await legacyRun(
+        transferId,
+        "Upgrade 000000000009",
+      );
+      await db.prepare(
+        `update briar_channel_action_proposals
+         set status = 'accepted', accepted_by_user_id = ?, accepted_at = ?,
+             result_run_id = ?, updated_at = ? where id = ?`,
+      ).bind(approverId, now, transferRunId, now, transferId).run();
+      const transferDispatchedAt = "2026-08-10T00:00:40.000Z";
+      await db.prepare(
+        `update briar_hunt_runs
+         set status = 'queued', stage = 'queued', workflow_stage = null,
+             requested_agent_provider = 'codex', requested_by_user_id = ?,
+             dispatch_mode = 'any', dispatch_request_id = ?,
+             dispatched_at = ?, last_event_at = ?, updated_at = ?
+         where id = ?`,
+      ).bind(
+        approverId,
+        `dispatch:${transferId}`,
+        transferDispatchedAt,
+        transferDispatchedAt,
+        transferDispatchedAt,
+        transferRunId,
+      ).run();
+      await db.prepare(
+        `insert into briar_execution_audit_events (
+           id, organization_id, project_id, run_id, worker_id, agent_id,
+           actor_user_id, actor_device_id, action, request_id, detail_json,
+           occurred_at
+         ) values (?, ?, ?, ?, null, null, ?, null, 'dispatched', ?, '{}', ?)`,
+      ).bind(
+        `audit:${transferId}`,
+        organizationId,
+        projectId,
+        transferRunId,
+        approverId,
+        `dispatch:${transferId}`,
+        transferDispatchedAt,
+      ).run();
+
+      const prematurelyMovedId = await seedProposal("000000000010");
+      const prematurelyMovedRunId = await legacyRun(
+        prematurelyMovedId,
+        "Upgrade 000000000010",
+      );
+      await db.prepare(
+        `update briar_channel_action_proposals
+         set status = 'accepted', accepted_by_user_id = ?, accepted_at = ?,
+             result_run_id = ?, updated_at = ? where id = ?`,
+      ).bind(
+        approverId,
+        now,
+        prematurelyMovedRunId,
+        now,
+        prematurelyMovedId,
+      ).run();
+      const prematurelyMovedAt = "2026-08-10T00:00:50.000Z";
+      await db.prepare(
+        `update briar_hunt_runs
+         set status = 'queued', stage = 'queued', workflow_stage = null,
+             requested_agent_provider = 'codex', requested_by_user_id = ?,
+             dispatch_mode = 'any', dispatch_request_id = ?,
+             dispatched_at = ?, last_event_at = ?, updated_at = ?
+         where id = ?`,
+      ).bind(
+        approverId,
+        `dispatch:${prematurelyMovedId}`,
+        prematurelyMovedAt,
+        prematurelyMovedAt,
+        prematurelyMovedAt,
+        prematurelyMovedRunId,
+      ).run();
+      await db.prepare(
+        `insert into briar_execution_audit_events (
+           id, organization_id, project_id, run_id, worker_id, agent_id,
+           actor_user_id, actor_device_id, action, request_id, detail_json,
+           occurred_at
+         ) values (?, ?, ?, ?, null, null, ?, null, 'dispatched', ?, '{}', ?)`,
+      ).bind(
+        `audit:${prematurelyMovedId}`,
+        organizationId,
+        projectId,
+        prematurelyMovedRunId,
+        approverId,
+        `dispatch:${prematurelyMovedId}`,
+        prematurelyMovedAt,
+      ).run();
+      const strandedAttachmentId = "98000000-0000-4000-8000-000000000010";
+      const strandedMessageId = "99000000-0000-4000-8000-000000000010";
+      const strandedEvidenceId = "9a000000-0000-4000-8000-000000000010";
+      const strandedEvidenceImageId =
+        "9b000000-0000-4000-8000-000000000010";
+      const strandedTranscriptSessionId =
+        "legacy-transfer-transcript-000000000010";
+      await createIssueAttachments(db, projectId, prematurelyMovedRunId, [{
+        id: strandedAttachmentId,
+        object_key: "issue-attachments/premature-transfer/stranded.png",
+        filename: "stranded.png",
+        content_type: "image/png",
+        byte_size: 8,
+      }]);
+      await createIssueMessage(db, {
+        id: strandedMessageId,
+        projectId,
+        runId: prematurelyMovedRunId,
+        parentMessageId: null,
+        authorUserId: approverId,
+        authorAgentProvider: null,
+        body: "Repair this stranded relation",
+        createdAt: prematurelyMovedAt,
+      });
+      await db.prepare(
+        `insert into briar_run_evidence (
+           id, project_id, run_id, attempt, revision, evidence_key,
+           workflow_stage, evidence_type, status, detail, command, url,
+           metadata_json, actor, observed_at, recorded_at
+         ) values (?, ?, ?, 1, 1, 'legacy-transfer:evidence',
+                   'implementing', 'diff', 'passed', 'Verified transfer',
+                   null, null, '{}', 'legacy-worker', ?, ?)`,
+      ).bind(
+        strandedEvidenceId,
+        projectId,
+        prematurelyMovedRunId,
+        prematurelyMovedAt,
+        prematurelyMovedAt,
+      ).run();
+      await db.prepare(
+        `insert into briar_run_evidence_images (
+           id, project_id, run_id, evidence_id, object_key, filename,
+           content_type, byte_size, sha256, position, created_at
+         ) values (?, ?, ?, ?, ?, 'legacy-transfer.png', 'image/png', 8, ?, 0, ?)`,
+      ).bind(
+        strandedEvidenceImageId,
+        projectId,
+        prematurelyMovedRunId,
+        strandedEvidenceId,
+        `run-evidence/${projectId}/${prematurelyMovedRunId}/${strandedEvidenceImageId}`,
+        "d".repeat(64),
+        prematurelyMovedAt,
+      ).run();
+      await db.prepare(
+        `insert into briar_agent_transcript_sessions (
+           session_id, project_id, run_id, worker_id, agent_provider,
+           started_at, last_event_at, event_count, byte_count
+         ) values (?, ?, ?, null, 'codex', ?, ?, 1, 16)`,
+      ).bind(
+        strandedTranscriptSessionId,
+        projectId,
+        prematurelyMovedRunId,
+        prematurelyMovedAt,
+        prematurelyMovedAt,
+      ).run();
+      await db.prepare(
+        `insert into briar_agent_transcripts (
+           session_id, sequence, direction, payload_json, recorded_at
+         ) values (?, 1, 'server', '{"legacy":true}', ?)`,
+      ).bind(strandedTranscriptSessionId, prematurelyMovedAt).run();
+      // Reproduce the pre-0090 transfer shape: execution identity was cleared,
+      // but the issue remained queued in a project that never approved it.
+      await db.prepare(
+        `update briar_hunt_runs
+         set project_id = ?, agent_id = null, worker_id = null,
+             requested_worker_id = null, claim_token_hash = null,
+             claimed_by = null, claimed_at = null, lease_expires_at = null,
+             last_execution_id = null, dispatch_mode = null,
+             dispatch_request_id = null, dispatched_at = null,
+             requested_by_user_id = null, requested_agent_provider = null,
+             requested_agent_model = null, requested_agent_effort = null
+         where id = ?`,
+      ).bind(targetProjectId, prematurelyMovedRunId).run();
+      // A multi-hop run may have an older audit in the current project. It is
+      // not valid unless it matches the run's current dispatch identity.
+      await db.prepare(
+        `insert into briar_execution_audit_events (
+           id, organization_id, project_id, run_id, worker_id, agent_id,
+           actor_user_id, actor_device_id, action, request_id, detail_json,
+           occurred_at
+         ) values (?, ?, ?, ?, null, null, ?, null, 'dispatched', ?, '{}', ?)`,
+      ).bind(
+        `historical-target-audit:${prematurelyMovedId}`,
+        organizationId,
+        targetProjectId,
+        prematurelyMovedRunId,
+        approverId,
+        `historical-target-dispatch:${prematurelyMovedId}`,
+        "2026-08-10T00:00:45.000Z",
+      ).run();
+      const prematurelyMovedExecutableRuns: Array<{ runId: string }> = [];
+      let prematurelyMovedCompletedRunId = "";
+      for (const [suffix, status, paused] of [
+        ["000000000013", "blocked", false],
+        ["000000000014", "failed", false],
+        ["000000000015", "running", false],
+        ["000000000016", "running", true],
+        ["000000000017", "completed", false],
+      ] as const) {
+        const proposalId = await seedProposal(suffix);
+        const runId = await legacyRun(
+          proposalId,
+          `Prematurely moved ${status} issue`,
+        );
+        await db.prepare(
+          `update briar_channel_action_proposals
+           set status = 'accepted', accepted_by_user_id = ?, accepted_at = ?,
+               result_run_id = ?, updated_at = ? where id = ?`,
+        ).bind(approverId, now, runId, now, proposalId).run();
+        const dispatchRequestId = `dispatch:${proposalId}`;
+        await db.prepare(
+          `update briar_hunt_runs
+           set status = ?, stage = ?, workflow_stage = ?, paused_at = ?,
+               completed_at = ?,
+               requested_agent_provider = 'codex', requested_by_user_id = ?,
+               dispatch_mode = 'any', dispatch_request_id = ?,
+               dispatched_at = ?, last_event_at = ?, updated_at = ?
+           where id = ?`,
+        ).bind(
+          status,
+          status === "running" ? "implementing" : status,
+          status === "running" ? "implementing" : null,
+          paused ? prematurelyMovedAt : null,
+          status === "completed" ? prematurelyMovedAt : null,
+          approverId,
+          dispatchRequestId,
+          prematurelyMovedAt,
+          prematurelyMovedAt,
+          prematurelyMovedAt,
+          runId,
+        ).run();
+        await db.prepare(
+          `insert into briar_execution_audit_events (
+             id, organization_id, project_id, run_id, worker_id, agent_id,
+             actor_user_id, actor_device_id, action, request_id, detail_json,
+             occurred_at
+           ) values (?, ?, ?, ?, null, null, ?, null, 'dispatched', ?, '{}', ?)`,
+        ).bind(
+          `audit:${proposalId}`,
+          organizationId,
+          projectId,
+          runId,
+          approverId,
+          dispatchRequestId,
+          prematurelyMovedAt,
+        ).run();
+        await db.prepare(
+          `update briar_hunt_runs
+           set project_id = ?, agent_id = null, worker_id = null,
+               requested_worker_id = null, claim_token_hash = null,
+               claimed_by = null, claimed_at = null, lease_expires_at = null,
+               last_execution_id = null, dispatch_mode = null,
+               dispatch_request_id = null, dispatched_at = null,
+               requested_by_user_id = null, requested_agent_provider = null,
+               requested_agent_model = null, requested_agent_effort = null
+           where id = ?`,
+        ).bind(targetProjectId, runId).run();
+        if (status === "completed") {
+          prematurelyMovedCompletedRunId = runId;
+        } else {
+          prematurelyMovedExecutableRuns.push({ runId });
+        }
+      }
+      const unconfiguredProposalId = await seedProposal("000000000018");
+      const unconfiguredTransferRunId = await legacyRun(
+        unconfiguredProposalId,
+        "Prematurely moved into an unconfigured project",
+      );
+      await db.prepare(
+        `update briar_channel_action_proposals
+         set status = 'accepted', accepted_by_user_id = ?, accepted_at = ?,
+             result_run_id = ?, updated_at = ? where id = ?`,
+      ).bind(
+        approverId,
+        now,
+        unconfiguredTransferRunId,
+        now,
+        unconfiguredProposalId,
+      ).run();
+      const unconfiguredDispatchId = `dispatch:${unconfiguredProposalId}`;
+      await db.prepare(
+        `update briar_hunt_runs
+         set status = 'queued', stage = 'queued', workflow_stage = null,
+             requested_agent_provider = 'codex', requested_by_user_id = ?,
+             dispatch_mode = 'any', dispatch_request_id = ?,
+             dispatched_at = ?, last_event_at = ?, updated_at = ?
+         where id = ?`,
+      ).bind(
+        approverId,
+        unconfiguredDispatchId,
+        prematurelyMovedAt,
+        prematurelyMovedAt,
+        prematurelyMovedAt,
+        unconfiguredTransferRunId,
+      ).run();
+      await db.prepare(
+        `insert into briar_execution_audit_events (
+           id, organization_id, project_id, run_id, worker_id, agent_id,
+           actor_user_id, actor_device_id, action, request_id, detail_json,
+           occurred_at
+         ) values (?, ?, ?, ?, null, null, ?, null, 'dispatched', ?, '{}', ?)`,
+      ).bind(
+        `audit:${unconfiguredProposalId}`,
+        organizationId,
+        projectId,
+        unconfiguredTransferRunId,
+        approverId,
+        unconfiguredDispatchId,
+        prematurelyMovedAt,
+      ).run();
+      await db.prepare(
+        `update briar_hunt_runs
+         set project_id = ?, agent_id = null, worker_id = null,
+             requested_worker_id = null, claim_token_hash = null,
+             claimed_by = null, claimed_at = null, lease_expires_at = null,
+             last_execution_id = null, dispatch_mode = null,
+             dispatch_request_id = null, dispatched_at = null,
+             requested_by_user_id = null, requested_agent_provider = null,
+             requested_agent_model = null, requested_agent_effort = null
+         where id = ?`,
+      ).bind(unconfiguredTargetProjectId, unconfiguredTransferRunId).run();
+      const orphanProposalId = "97000000-0000-4000-8000-000000000011";
+      const orphanRunId = await legacyRun(
+        orphanProposalId,
+        "Orphaned deleted channel proposal",
+      );
+      const fallbackTransferId = await seedProposal("000000000012");
+      const fallbackTransferRunId = await legacyRun(
+        fallbackTransferId,
+        "Pre-migration fallback transfer",
+      );
+      await db.prepare(
+        `update briar_channel_action_proposals
+         set status = 'accepted', accepted_by_user_id = ?, accepted_at = ?,
+             result_run_id = ?, updated_at = ? where id = ?`,
+      ).bind(
+        approverId,
+        now,
+        fallbackTransferRunId,
+        now,
+        fallbackTransferId,
+      ).run();
+      const fallbackDispatchedAt = "2026-08-10T00:00:55.000Z";
+      await db.prepare(
+        `update briar_hunt_runs
+         set status = 'queued', stage = 'queued', workflow_stage = null,
+             requested_agent_provider = 'codex', requested_by_user_id = ?,
+             dispatch_mode = 'any', dispatch_request_id = ?,
+             dispatched_at = ?, last_event_at = ?, updated_at = ?
+         where id = ?`,
+      ).bind(
+        approverId,
+        `dispatch:${fallbackTransferId}`,
+        fallbackDispatchedAt,
+        fallbackDispatchedAt,
+        fallbackDispatchedAt,
+        fallbackTransferRunId,
+      ).run();
+      await db.prepare(
+        `insert into briar_execution_audit_events (
+           id, organization_id, project_id, run_id, worker_id, agent_id,
+           actor_user_id, actor_device_id, action, request_id, detail_json,
+           occurred_at
+         ) values (?, ?, ?, ?, null, null, ?, null, 'dispatched', ?, '{}', ?)`,
+      ).bind(
+        `audit:${fallbackTransferId}`,
+        organizationId,
+        projectId,
+        fallbackTransferRunId,
+        approverId,
+        `dispatch:${fallbackTransferId}`,
+        fallbackDispatchedAt,
+      ).run();
+      await expect(transferIssue(db, {
+        sourceProjectId: projectId,
+        targetProjectId,
+        targetProjectName: "Transfer Target",
+        runId: fallbackTransferRunId,
+        observedAt: "2026-08-10T00:00:56.000Z",
+      })).resolves.toBe("transferred");
+      await expect(db.prepare(
+        `select project_id, status, dispatch_request_id
+         from briar_hunt_runs where id = ?`,
+      ).bind(fallbackTransferRunId).first()).resolves.toEqual({
+        project_id: targetProjectId,
+        status: "backlog",
+        dispatch_request_id: null,
+      });
+      const preemptedId = await seedProposal("000000000008");
+      const preemptedRunId = await legacyRun(
+        preemptedId,
+        "Upgrade 000000000008",
+        false,
+      );
+      await db.prepare(
+        `update briar_channel_action_proposals
+         set status = 'accepted', accepted_by_user_id = ?, accepted_at = ?,
+             result_run_id = ?, updated_at = ? where id = ?`,
+      ).bind(approverId, now, preemptedRunId, now, preemptedId).run();
+      const pendingId = await seedProposal("000000000002");
+      const pendingRunId = await legacyRun(pendingId, "Upgrade 000000000002");
+      const missingResultId = await seedProposal("000000000003", "accepted");
+      const planProposalId = await seedProposal("000000000007");
+      await db.prepare(
+        `update briar_channel_action_proposals
+         set action_type = 'request_plan_document' where id = ?`,
+      ).bind(planProposalId).run();
+
+      const conversationSourceKey = "legacy-conversation-thread";
+      const conversationRunId = await recordHuntEvent(db, projectId, {
+        source: "issue",
+        sourceKey: conversationSourceKey,
+        title: "Legacy conversation",
+        stage: "queued",
+        status: "backlog",
+        workflowStage: null,
+        eventKey: `${conversationSourceKey}:backlog`,
+        occurredAt: now,
+        actor: "user",
+        repository: "Upgrade Project",
+        detail: null,
+        priority: null,
+        branch: null,
+        commitSha: null,
+        tracker: null,
+        issueDescription: null,
+        resultSummary: null,
+        structuredResult: null,
+        pullRequestUrls: [],
+        targetSha: null,
+        sourceCreatedAt: now,
+        qaStatus: null,
+        stagingQaDetail: null,
+        productionQaDetail: null,
+        context: null,
+      });
+      const conversationProposalId =
+        "9c000000-0000-4000-8000-000000000001";
+      await db.prepare(
+        `insert into briar_issue_action_proposals (
+           id, project_id, conversation_run_id, trigger_message_id,
+           reply_message_id, action_type, payload_json, status,
+           created_at, updated_at
+         ) values (?, ?, ?, ?, ?, 'request_issue_create', ?, 'pending', ?, ?)`,
+      ).bind(
+        conversationProposalId,
+        projectId,
+        conversationRunId,
+        "9d000000-0000-4000-8000-000000000001",
+        "9e000000-0000-4000-8000-000000000001",
+        JSON.stringify({
+          issue: {
+            title: "Approved conversation follow-up",
+            description: "Expected body",
+            priority: 2,
+            status: "backlog",
+          },
+        }),
+        now,
+        now,
+      ).run();
+      const poisonedConversationSourceKey =
+        `briar-conversation-proposal:${conversationProposalId}`;
+      const poisonedConversationRunId = await recordHuntEvent(
+        db,
+        projectId,
+        {
+          source: "issue",
+          sourceKey: poisonedConversationSourceKey,
+          title: "Agent-substituted title",
+          stage: "queued",
+          status: "backlog",
+          workflowStage: null,
+          eventKey: `${poisonedConversationSourceKey}:backlog`,
+          occurredAt: now,
+          actor: "project-agent",
+          repository: "Upgrade Project",
+          detail: null,
+          priority: 1,
+          issueCheckpoints: [],
+          fullAuto: true,
+          branch: null,
+          commitSha: null,
+          tracker: null,
+          issueDescription: "Agent-substituted body",
+          resultSummary: null,
+          structuredResult: null,
+          pullRequestUrls: [],
+          targetSha: null,
+          sourceCreatedAt: now,
+          qaStatus: null,
+          stagingQaDetail: null,
+          productionQaDetail: null,
+          context: {
+            origin: "project-agent",
+            proposalId: conversationProposalId,
+            fullAuto: true,
+          },
+        },
+      );
+
+      const neverDispatchedConversationProposalId =
+        "9c000000-0000-4000-8000-000000000002";
+      await db.prepare(
+        `insert into briar_issue_action_proposals (
+           id, project_id, conversation_run_id, trigger_message_id,
+           reply_message_id, action_type, payload_json, status,
+           created_at, updated_at
+         ) values (?, ?, ?, ?, ?, 'request_issue_create', ?, 'pending', ?, ?)`,
+      ).bind(
+        neverDispatchedConversationProposalId,
+        projectId,
+        conversationRunId,
+        "9d000000-0000-4000-8000-000000000002",
+        "9e000000-0000-4000-8000-000000000002",
+        JSON.stringify({
+          issue: {
+            title: "Legacy accepted conversation issue",
+            description: "Approved text with poisoned execution metadata",
+            priority: 2,
+            status: "backlog",
+          },
+        }),
+        now,
+        now,
+      ).run();
+      const neverDispatchedConversationSourceKey =
+        `briar-conversation-proposal:${neverDispatchedConversationProposalId}`;
+      const neverDispatchedConversationRunId = await recordHuntEvent(
+        db,
+        projectId,
+        {
+          source: "issue",
+          sourceKey: neverDispatchedConversationSourceKey,
+          title: "Legacy accepted conversation issue",
+          stage: "queued",
+          status: "backlog",
+          workflowStage: null,
+          eventKey: `${neverDispatchedConversationSourceKey}:backlog`,
+          occurredAt: now,
+          actor: "project-agent",
+          repository: "attacker/poisoned-repository",
+          detail: null,
+          priority: 2,
+          issueCheckpoints: [],
+          fullAuto: false,
+          branch: "agent-controlled-branch",
+          commitSha: null,
+          tracker: null,
+          issueDescription: "Approved text with poisoned execution metadata",
+          resultSummary: null,
+          structuredResult: null,
+          pullRequestUrls: [],
+          targetSha: null,
+          sourceCreatedAt: now,
+          qaStatus: null,
+          stagingQaDetail: null,
+          productionQaDetail: null,
+          context: {
+            origin: "briar-conversation",
+            proposalId: neverDispatchedConversationProposalId,
+            conversationRunId,
+            issueId: neverDispatchedConversationProposalId,
+            attachmentCount: 0,
+            fullAuto: false,
+          },
+        },
+      );
+      await db.prepare(
+        `update briar_issue_action_proposals
+         set status = 'accepted', accepted_by_user_id = ?, accepted_at = ?,
+             result_run_id = ?, updated_at = ? where id = ?`,
+      ).bind(
+        approverId,
+        now,
+        neverDispatchedConversationRunId,
+        now,
+        neverDispatchedConversationProposalId,
+      ).run();
+
+      const dispatchedConversationProposalId =
+        "9c000000-0000-4000-8000-000000000003";
+      await db.prepare(
+        `insert into briar_issue_action_proposals (
+           id, project_id, conversation_run_id, trigger_message_id,
+           reply_message_id, action_type, payload_json, status,
+           created_at, updated_at
+         ) values (?, ?, ?, ?, ?, 'request_issue_create', ?, 'pending', ?, ?)`,
+      ).bind(
+        dispatchedConversationProposalId,
+        projectId,
+        conversationRunId,
+        "9d000000-0000-4000-8000-000000000003",
+        "9e000000-0000-4000-8000-000000000003",
+        JSON.stringify({
+          issue: {
+            title: "Dispatched legacy conversation issue",
+            description: "A member separately approved execution.",
+            priority: 2,
+            status: "backlog",
+          },
+        }),
+        now,
+        now,
+      ).run();
+      const dispatchedConversationSourceKey =
+        `briar-conversation-proposal:${dispatchedConversationProposalId}`;
+      const dispatchedConversationRunId = await recordHuntEvent(
+        db,
+        projectId,
+        {
+          source: "issue",
+          sourceKey: dispatchedConversationSourceKey,
+          title: "Dispatched legacy conversation issue",
+          stage: "queued",
+          status: "backlog",
+          workflowStage: null,
+          eventKey: `${dispatchedConversationSourceKey}:backlog`,
+          occurredAt: now,
+          actor: "briar-conversation",
+          repository: "Upgrade Project",
+          detail: null,
+          priority: 2,
+          issueCheckpoints: [],
+          fullAuto: false,
+          branch: null,
+          commitSha: null,
+          tracker: null,
+          issueDescription: "A member separately approved execution.",
+          resultSummary: null,
+          structuredResult: null,
+          pullRequestUrls: [],
+          targetSha: null,
+          sourceCreatedAt: now,
+          qaStatus: null,
+          stagingQaDetail: null,
+          productionQaDetail: null,
+          context: {
+            origin: "briar-conversation",
+            proposalId: dispatchedConversationProposalId,
+            conversationRunId,
+            issueId: dispatchedConversationProposalId,
+            attachmentCount: 0,
+            fullAuto: false,
+          },
+        },
+      );
+      await db.prepare(
+        `update briar_issue_action_proposals
+         set status = 'accepted', accepted_by_user_id = ?, accepted_at = ?,
+             result_run_id = ?, updated_at = ? where id = ?`,
+      ).bind(
+        approverId,
+        now,
+        dispatchedConversationRunId,
+        now,
+        dispatchedConversationProposalId,
+      ).run();
+      const dispatchedConversationAt = "2026-08-10T00:00:50.000Z";
+      await db.prepare(
+        `update briar_hunt_runs
+         set status = 'completed', stage = 'completed', workflow_stage = null,
+             requested_agent_provider = 'codex', requested_by_user_id = ?,
+             dispatch_mode = 'any', dispatch_request_id = ?,
+             dispatched_at = ?, completed_at = ?, last_event_at = ?, updated_at = ?
+         where id = ?`,
+      ).bind(
+        approverId,
+        `dispatch:${dispatchedConversationProposalId}`,
+        dispatchedConversationAt,
+        dispatchedConversationAt,
+        dispatchedConversationAt,
+        dispatchedConversationAt,
+        dispatchedConversationRunId,
+      ).run();
+      await db.prepare(
+        `insert into briar_execution_audit_events (
+           id, organization_id, project_id, run_id, worker_id, agent_id,
+           actor_user_id, actor_device_id, action, request_id, detail_json,
+           occurred_at
+         ) values (?, ?, ?, ?, null, null, ?, null, 'dispatched', ?, '{}', ?)`,
+      ).bind(
+        `audit:${dispatchedConversationProposalId}`,
+        organizationId,
+        projectId,
+        dispatchedConversationRunId,
+        approverId,
+        `dispatch:${dispatchedConversationProposalId}`,
+        dispatchedConversationAt,
+      ).run();
+
+      const beforeApprovalUpgradeCursor = await db.prepare(
+        `select current_version from briar_channel_sync_state
+         where organization_id = ?`,
+      ).bind(organizationId).first<{ current_version: number }>();
+
+      await expect(channelApprovalTablesAvailable(db)).resolves.toBe(false);
+      await applyD1Migrations(db, { files: ["0090_channel_issue_approval.sql"] });
+      await expect(channelApprovalTablesAvailable(db)).resolves.toBe(true);
+
+      await expect(db.prepare(
+        `select status, result_run_id, issue_source_key,
+                approval_reserved_by_user_id
+         from briar_issue_action_proposals where id = ?`,
+      ).bind(conversationProposalId).first()).resolves.toEqual({
+        status: "pending",
+        result_run_id: null,
+        issue_source_key: null,
+        approval_reserved_by_user_id: null,
+      });
+      await expect(db.prepare(
+        `select status, stage from briar_hunt_runs where id = ?`,
+      ).bind(poisonedConversationRunId).first()).resolves.toEqual({
+        status: "cancelled",
+        stage: "cancelled",
+      });
+      await expect(db.prepare(
+        `select reason from briar_conversation_issue_approval_quarantine
+         where result_run_id = ?`,
+      ).bind(poisonedConversationRunId).first()).resolves.toEqual({
+        reason: "unfinalized_legacy_issue",
+      });
+      await expect(db.prepare(
+        `update briar_hunt_runs
+         set status = 'queued', stage = 'queued' where id = ?`,
+      ).bind(poisonedConversationRunId).run()).rejects.toThrow(
+        "reconciled channel proposal issue is quarantined",
+      );
+
+      await expect(db.prepare(
+        `select status, result_run_id, issue_source_key,
+                approval_reserved_by_user_id
+         from briar_issue_action_proposals where id = ?`,
+      ).bind(neverDispatchedConversationProposalId).first()).resolves.toEqual({
+        status: "pending",
+        result_run_id: null,
+        issue_source_key: null,
+        approval_reserved_by_user_id: null,
+      });
+      await expect(db.prepare(
+        `select result_verification from briar_channel_issue_approval_audit
+         where proposal_id = ? and channel_id = ?`,
+      ).bind(
+        neverDispatchedConversationProposalId,
+        `conversation:${conversationRunId}`,
+      ).first()).resolves.toEqual({ result_verification: "unverifiable" });
+      await expect(db.prepare(
+        `select reason from briar_conversation_issue_approval_quarantine
+         where result_run_id = ?`,
+      ).bind(neverDispatchedConversationRunId).first()).resolves.toEqual({
+        reason: "unverifiable_legacy_result",
+      });
+      await expect(db.prepare(
+        `select status, stage, repository, branch
+         from briar_hunt_runs where id = ?`,
+      ).bind(neverDispatchedConversationRunId).first()).resolves.toEqual({
+        status: "cancelled",
+        stage: "cancelled",
+        repository: "attacker/poisoned-repository",
+        branch: "agent-controlled-branch",
+      });
+      await expect(db.prepare(
+        `update briar_hunt_runs
+         set status = 'queued', stage = 'queued', completed_at = null
+         where id = ?`,
+      ).bind(neverDispatchedConversationRunId).run()).rejects.toThrow(
+        "reconciled channel proposal issue is quarantined",
+      );
+
+      await expect(db.prepare(
+        `select status, result_run_id, issue_source_key
+         from briar_issue_action_proposals where id = ?`,
+      ).bind(dispatchedConversationProposalId).first()).resolves.toEqual({
+        status: "accepted",
+        result_run_id: dispatchedConversationRunId,
+        issue_source_key: dispatchedConversationSourceKey,
+      });
+      await expect(db.prepare(
+        `select result_verification from briar_channel_issue_approval_audit
+         where proposal_id = ? and channel_id = ?`,
+      ).bind(
+        dispatchedConversationProposalId,
+        `conversation:${conversationRunId}`,
+      ).first()).resolves.toEqual({ result_verification: "legacy_authorized" });
+      await expect(db.prepare(
+        `select reason from briar_conversation_issue_approval_quarantine
+         where result_run_id = ?`,
+      ).bind(dispatchedConversationRunId).first()).resolves.toBeNull();
+      await expect(db.prepare(
+        `select status, stage, dispatch_request_id,
+                preferred_agent_provider
+         from briar_hunt_runs where id = ?`,
+      ).bind(dispatchedConversationRunId).first()).resolves.toEqual({
+        status: "completed",
+        stage: "completed",
+        dispatch_request_id: `dispatch:${dispatchedConversationProposalId}`,
+        preferred_agent_provider: "codex",
+      });
+      await expect(db.prepare(
+        `update briar_hunt_runs
+         set status = 'queued', stage = 'queued', completed_at = null
+         where id = ?`,
+      ).bind(dispatchedConversationRunId).run()).rejects.toThrow(
+        "approved issue terminal reactivation requires fresh execution approval",
+      );
+
+      await expect(db.prepare(
+        `select project_id, status, dispatch_request_id, claim_token_hash
+         from briar_hunt_runs where id = ?`,
+      ).bind(prematurelyMovedRunId).first()).resolves.toEqual({
+        project_id: targetProjectId,
+        status: "backlog",
+        dispatch_request_id: null,
+        claim_token_hash: null,
+      });
+      await expect(getIssueAttachment(
+        db,
+        projectId,
+        prematurelyMovedRunId,
+        strandedAttachmentId,
+      )).resolves.toBeNull();
+      await expect(getRunEvidenceImage(
+        db,
+        projectId,
+        prematurelyMovedRunId,
+        strandedEvidenceImageId,
+      )).resolves.toBeNull();
+      await expect(getRunEvidenceImage(
+        db,
+        targetProjectId,
+        prematurelyMovedRunId,
+        strandedEvidenceImageId,
+      )).resolves.toMatchObject({
+        id: strandedEvidenceImageId,
+        project_id: targetProjectId,
+      });
+      await expect(readAgentTranscript(
+        db,
+        projectId,
+        strandedTranscriptSessionId,
+      )).resolves.toBeNull();
+      await expect(readAgentTranscript(
+        db,
+        targetProjectId,
+        strandedTranscriptSessionId,
+      )).resolves.toBeNull();
+      await expect(db.prepare(
+        `select entity_kind, source_project_id, target_project_id
+         from briar_channel_issue_transfer_quarantine where entity_id = ?`,
+      ).bind(strandedTranscriptSessionId).first()).resolves.toEqual({
+        entity_kind: "agent_transcript_session",
+        source_project_id: projectId,
+        target_project_id: targetProjectId,
+      });
+      const unconfiguredTransfer = await db.prepare(
+        `select project_id, repository, status, workflow_snapshot_json
+         from briar_hunt_runs where id = ?`,
+      ).bind(unconfiguredTransferRunId).first<{
+        project_id: string;
+        repository: string;
+        status: string;
+        workflow_snapshot_json: string;
+      }>();
+      expect(unconfiguredTransfer).toMatchObject({
+        project_id: unconfiguredTargetProjectId,
+        repository: "Unconfigured Transfer Target",
+        status: "backlog",
+      });
+      expect(JSON.parse(unconfiguredTransfer!.workflow_snapshot_json)).toEqual({
+        version: 2,
+        requirements: [],
+        stages: [{
+          id: "repository_workflow_pending",
+          label: "Repository workflow pending",
+          required: true,
+        }],
+        execution: {
+          checkpoints: [{
+            key: "project-after-repository_workflow_pending",
+            stage: "repository_workflow_pending",
+            position: "after",
+          }],
+        },
+        completion: { requiredStages: ["repository_workflow_pending"] },
+      });
+      await expect(transferIssue(db, {
+        sourceProjectId: projectId,
+        targetProjectId,
+        targetProjectName: "Transfer Target",
+        runId: prematurelyMovedRunId,
+        observedAt: "2026-08-10T00:01:10.000Z",
+      })).resolves.toBe("transferred");
+      await expect(db.prepare(
+        `select project_id from briar_issue_attachments where id = ?`,
+      ).bind(strandedAttachmentId).first()).resolves.toEqual({
+        project_id: targetProjectId,
+      });
+      await expect(db.prepare(
+        `select project_id from briar_issue_messages where id = ?`,
+      ).bind(strandedMessageId).first()).resolves.toEqual({
+        project_id: targetProjectId,
+      });
+      await expect(db.prepare(
+        `select project_id from briar_agent_transcript_sessions
+         where session_id = ?`,
+      ).bind(strandedTranscriptSessionId).first()).resolves.toEqual({
+        project_id: projectId,
+      });
+      await expect(db.prepare(
+        `select count(*) as count from briar_dashboard_changes
+         where project_id = ? and entity_type = 'run' and entity_id = ?
+           and operation = 'delete'`,
+      ).bind(projectId, prematurelyMovedRunId).first()).resolves.toMatchObject({
+        count: 1,
+      });
+      for (const { runId } of prematurelyMovedExecutableRuns) {
+        await expect(db.prepare(
+          `select project_id, repository, status, stage, workflow_stage,
+                  workflow_snapshot_json, issue_checkpoints_json,
+                  dispatch_request_id, claim_token_hash, paused_at
+           from briar_hunt_runs where id = ?`,
+        ).bind(runId).first()).resolves.toMatchObject({
+          project_id: targetProjectId,
+          repository: "wordbricks/transfer-target",
+          status: "backlog",
+          stage: "queued",
+          workflow_stage: null,
+          dispatch_request_id: null,
+          claim_token_hash: null,
+          paused_at: null,
+          issue_checkpoints_json: "[]",
+        });
+        const rebound = await db.prepare(
+          `select workflow_snapshot_json from briar_hunt_runs where id = ?`,
+        ).bind(runId).first<{ workflow_snapshot_json: string }>();
+        expect(JSON.parse(rebound!.workflow_snapshot_json).stages).toEqual([
+          { id: "planning", label: "Plan", required: true },
+          { id: "implementing", label: "Implement", required: true },
+        ]);
+      }
+      await expect(db.prepare(
+        `insert into briar_hunt_events (
+           id, run_id, event_key, attempt, revision, stage, status,
+           workflow_stage, detail, actor, pull_request_urls,
+           occurred_at, recorded_at
+         ) values (
+           'stale-target-worker-event', ?, 'stale-target-worker:running',
+           1, 1, 'implementing', 'running', 'implementing', null,
+           'stale-target-worker', '[]', ?, ?
+         )`,
+      ).bind(
+        prematurelyMovedExecutableRuns[0].runId,
+        "2026-08-10T00:01:20.000Z",
+        "2026-08-10T00:01:20.000Z",
+      ).run()).rejects.toThrow(
+        "channel-approved issue execution requires explicit dispatch",
+      );
+      await expect(db.prepare(
+        `select project_id, status, dispatch_request_id
+         from briar_hunt_runs where id = ?`,
+      ).bind(prematurelyMovedCompletedRunId).first()).resolves.toEqual({
+        project_id: targetProjectId,
+        status: "completed",
+        dispatch_request_id: null,
+      });
+      await expect(db.prepare(
+        `update briar_hunt_runs
+         set status = 'queued', stage = 'queued', workflow_stage = null
+         where id = ?`,
+      ).bind(prematurelyMovedCompletedRunId).run()).rejects.toThrow(
+        "approved issue terminal reactivation requires fresh execution approval",
+      );
+      await expect(db.prepare(
+        `select reason, channel_id
+         from briar_channel_issue_approval_reconciliation where run_id = ?`,
+      ).bind(orphanRunId).first()).resolves.toEqual({
+        reason: "orphaned_legacy_issue",
+        channel_id: null,
+      });
+      await expect(db.prepare(
+        `select status, stage from briar_hunt_runs where id = ?`,
+      ).bind(orphanRunId).first()).resolves.toEqual({
+        status: "cancelled",
+        stage: "cancelled",
+      });
+
+      const migrationProposalChanges = await db.prepare(
+        `select entity_id from briar_channel_changes
+         where organization_id = ? and version > ?
+           and entity_type = 'proposal' and operation = 'upsert'`,
+      ).bind(
+        organizationId,
+        beforeApprovalUpgradeCursor?.current_version ?? 0,
+      ).all<{ entity_id: string }>();
+      expect(migrationProposalChanges.results.map((change) => change.entity_id))
+        .toEqual(expect.arrayContaining([acceptedId, dispatchedId, missingResultId]));
+
+      await expect(db.prepare(
+        `select run_id, approved_by_user_id, result_verification
+         from briar_channel_issue_approval_audit
+         where proposal_id = ?`,
+      ).bind(acceptedId).first()).resolves.toEqual({
+        run_id: acceptedRunId,
+        approved_by_user_id: approverId,
+        result_verification: "unverifiable",
+      });
+      await expect(db.prepare(
+        `select status, result_run_id, issue_source_key
+         from briar_channel_action_proposals where id = ?`,
+      ).bind(acceptedId).first()).resolves.toEqual({
+        status: "pending",
+        result_run_id: null,
+        issue_source_key: null,
+      });
+      await expect(db.prepare(
+        `select reason from briar_channel_issue_approval_reconciliation
+         where run_id = ?`,
+      ).bind(acceptedRunId).first()).resolves.toEqual({
+        reason: "unverifiable_legacy_result",
+      });
+      await expect(db.prepare(
+        `select status, stage, repository, branch
+         from briar_hunt_runs where id = ?`,
+      ).bind(acceptedRunId).first()).resolves.toEqual({
+        status: "cancelled",
+        stage: "cancelled",
+        repository: "attacker/poisoned-channel-repository",
+        branch: "agent-controlled-channel-branch",
+      });
+      await expect(db.prepare(
+        `update briar_hunt_runs
+         set status = 'queued', stage = 'queued' where id = ?`,
+      ).bind(acceptedRunId).run()).rejects.toThrow(
+        "reconciled channel proposal issue is quarantined",
+      );
+
+      const reapprovalSourceKey = `briar-channel-approved:${"8".repeat(64)}`;
+      await expect(reserveChannelActionProposalApproval(db, {
+        organizationId,
+        channelId,
+        proposalId: acceptedId,
+        projectId,
+        userId: approverId,
+        approvedAt: "2026-08-10T00:01:30.000Z",
+        issueSourceKey: reapprovalSourceKey,
+      })).resolves.toMatchObject({ issue_source_key: reapprovalSourceKey });
+      const reapprovedRunId = await recordHuntEvent(db, projectId, {
+        source: "issue",
+        sourceKey: reapprovalSourceKey,
+        title: "Upgrade 000000000001",
+        stage: "queued",
+        status: "backlog",
+        workflowStage: null,
+        eventKey: `${reapprovalSourceKey}:backlog:intake`,
+        occurredAt: now,
+        actor: "briar-channel",
+        repository: "Upgrade Project",
+        detail: "채널 대화에서 사용자가 승인한 제안으로 생성된 이슈입니다.",
+        priority: 2,
+        assigneeUserId: null,
+        issueCheckpoints: [],
+        fullAuto: false,
+        branch: null,
+        commitSha: null,
+        tracker: null,
+        issueDescription: null,
+        resultSummary: null,
+        structuredResult: null,
+        pullRequestUrls: [],
+        targetSha: null,
+        sourceCreatedAt: now,
+        qaStatus: null,
+        stagingQaDetail: null,
+        productionQaDetail: null,
+        context: {
+          origin: "briar-channel",
+          proposalId: acceptedId,
+          channelId,
+          issueId: acceptedId,
+          attachmentCount: 0,
+          fullAuto: false,
+        },
+        createdByUserId: approverId,
+        preferredAgentProvider: null,
+        preferredAgentModel: null,
+        preferredAgentEffort: null,
+      });
+      await expect(db.prepare(
+        `select status, result_run_id, issue_source_key
+         from briar_channel_action_proposals where id = ?`,
+      ).bind(acceptedId).first()).resolves.toEqual({
+        status: "accepted",
+        result_run_id: reapprovedRunId,
+        issue_source_key: reapprovalSourceKey,
+      });
+      await expect(db.prepare(
+        `select result_verification, count(*) as count
+         from briar_channel_issue_approval_audit
+         where proposal_id = ?
+         group by result_verification order by result_verification`,
+      ).bind(acceptedId).all()).resolves.toMatchObject({
+        results: [
+          { result_verification: "atomic", count: 1 },
+          { result_verification: "unverifiable", count: 1 },
+        ],
+      });
+      await expect(recordHuntEvent(db, projectId, {
+        source: "issue",
+        sourceKey: reapprovalSourceKey,
+        title: "Stale Worker bypass",
+        stage: "implementing",
+        status: "running",
+        workflowStage: "implementing",
+        eventKey: "stale-worker:running",
+        occurredAt: "2026-08-10T00:02:00.000Z",
+        actor: "stale-worker",
+        repository: "Upgrade Project",
+        detail: null,
+        priority: 2,
+        branch: null,
+        commitSha: null,
+        tracker: null,
+        issueDescription: null,
+        resultSummary: null,
+        structuredResult: null,
+        pullRequestUrls: [],
+        targetSha: null,
+        sourceCreatedAt: now,
+        qaStatus: null,
+        stagingQaDetail: null,
+        productionQaDetail: null,
+        context: { fullAuto: true },
+      })).rejects.toThrow(
+        "channel-approved issue execution requires explicit dispatch",
+      );
+      await expect(db.prepare(
+        `update briar_hunt_runs set context_json = '{"fullAuto":true}'
+         where id = ?`,
+      ).bind(reapprovedRunId).run()).rejects.toThrow(
+        "channel-approved issue context is immutable before dispatch",
+      );
+      await expect(db.prepare(
+        `select status, context_json,
+                (select count(*) from briar_hunt_events event
+                 where event.run_id = run.id) as event_count
+         from briar_hunt_runs run where id = ?`,
+      ).bind(reapprovedRunId).first()).resolves.toMatchObject({
+        status: "backlog",
+        event_count: 1,
+      });
+      await expect(db.prepare(
+        `select run_id, result_verification
+         from briar_channel_issue_approval_audit where proposal_id = ?`,
+      ).bind(missingResultId).first()).resolves.toEqual({
+        run_id: null,
+        result_verification: "missing",
+      });
+      await expect(db.prepare(
+        `select status, result_run_id from briar_channel_action_proposals
+         where id = ?`,
+      ).bind(missingResultId).first()).resolves.toEqual({
+        status: "pending",
+        result_run_id: null,
+      });
+      await expect(db.prepare(
+        `select result_verification from briar_channel_issue_approval_audit
+         where proposal_id = ?`,
+      ).bind(dispatchedId).first()).resolves.toEqual({
+        result_verification: "legacy_authorized",
+      });
+      await expect(db.prepare(
+        `select reason from briar_channel_issue_approval_reconciliation
+         where run_id = ?`,
+      ).bind(dispatchedRunId).first()).resolves.toBeNull();
+      await expect(db.prepare(
+        `select status, stage, requested_agent_provider,
+                preferred_agent_provider, preferred_agent_model,
+                preferred_agent_effort
+         from briar_hunt_runs where id = ?`,
+      ).bind(dispatchedRunId).first()).resolves.toEqual({
+        status: "queued",
+        stage: "queued",
+        requested_agent_provider: "codex",
+        preferred_agent_provider: "codex",
+        preferred_agent_model: null,
+        preferred_agent_effort: null,
+      });
+      await expect(db.prepare(
+        `update briar_hunt_runs
+         set preferred_agent_provider = 'grok',
+             preferred_agent_model = 'grok-4',
+             preferred_agent_effort = 'high'
+         where id = ?`,
+      ).bind(dispatchedRunId).run()).rejects.toThrow(
+        "approved channel issue dispatch preferences are immutable",
+      );
+      await expect(db.prepare(
+        `update briar_hunt_runs
+         set project_id = ?, agent_id = null, worker_id = null,
+             requested_worker_id = null, claim_token_hash = null,
+             claimed_by = null, claimed_at = null, lease_expires_at = null,
+             last_execution_id = null, dispatch_mode = null,
+             dispatch_request_id = null, dispatched_at = null,
+             requested_by_user_id = null, requested_agent_provider = null,
+             requested_agent_model = null, requested_agent_effort = null
+         where id = ?`,
+      ).bind(targetProjectId, transferRunId).run()).rejects.toThrow(
+        "channel-approved dispatch cancellation requires backlog reset",
+      );
+      for (const status of ["blocked", "failed"] as const) {
+        await db.prepare(
+          `update briar_hunt_runs
+           set status = ?, stage = ?, workflow_stage = null where id = ?`,
+        ).bind(status, status, transferRunId).run();
+        await expect(db.prepare(
+          `update briar_hunt_runs
+           set project_id = ?, agent_id = null, worker_id = null,
+               requested_worker_id = null, claim_token_hash = null,
+               claimed_by = null, claimed_at = null, lease_expires_at = null,
+               last_execution_id = null, dispatch_mode = null,
+               dispatch_request_id = null, dispatched_at = null,
+               requested_by_user_id = null, requested_agent_provider = null,
+               requested_agent_model = null, requested_agent_effort = null
+           where id = ?`,
+        ).bind(targetProjectId, transferRunId).run()).rejects.toThrow(
+          "channel-approved dispatch cancellation requires backlog reset",
+        );
+      }
+      await expect(db.prepare(
+        `update briar_hunt_runs
+         set project_id = ?, status = 'backlog', stage = 'queued',
+             workflow_stage = null, agent_id = null, worker_id = null,
+             requested_worker_id = null, claim_token_hash = null,
+             claimed_by = null, claimed_at = null, lease_expires_at = null,
+             last_execution_id = null, dispatch_mode = null,
+             dispatch_request_id = null, dispatched_at = null,
+             requested_by_user_id = null, requested_agent_provider = null,
+             requested_agent_model = null, requested_agent_effort = null
+         where id = ? returning id`,
+      ).bind(targetProjectId, transferRunId).first()).resolves.toEqual({
+        id: transferRunId,
+      });
+      await expect(db.prepare(
+        `select project_id, status, dispatch_request_id, requested_by_user_id
+         from briar_hunt_runs where id = ?`,
+      ).bind(transferRunId).first()).resolves.toEqual({
+        project_id: targetProjectId,
+        status: "backlog",
+        dispatch_request_id: null,
+        requested_by_user_id: null,
+      });
+      await expect(recordHuntEvent(db, projectId, {
+        source: "issue",
+        sourceKey: `briar-channel-proposal:${dispatchedId}`,
+        title: "User-edited dispatched issue",
+        stage: "implementing",
+        status: "running",
+        workflowStage: "implementing",
+        eventKey: "legacy-in-flight:implementing",
+        occurredAt: "2026-08-10T00:02:30.000Z",
+        actor: "legacy-in-flight-worker",
+        repository: "Upgrade Project",
+        detail: "The explicitly dispatched legacy run can finish in place.",
+        priority: 2,
+        branch: null,
+        commitSha: null,
+        tracker: null,
+        issueDescription: null,
+        resultSummary: null,
+        structuredResult: null,
+        pullRequestUrls: [],
+        targetSha: null,
+        sourceCreatedAt: now,
+        qaStatus: null,
+        stagingQaDetail: null,
+        productionQaDetail: null,
+        context: {},
+      })).resolves.toBe(dispatchedRunId);
+      await expect(db.prepare(
+        `select status, workflow_stage, source_key
+         from briar_hunt_runs where id = ?`,
+      ).bind(dispatchedRunId).first()).resolves.toEqual({
+        status: "running",
+        workflow_stage: "implementing",
+        source_key: `briar-channel-proposal:${dispatchedId}`,
+      });
+      await expect(db.prepare(
+        `select result_verification from briar_channel_issue_approval_audit
+         where proposal_id = ?`,
+      ).bind(poisonedId).first()).resolves.toEqual({
+        result_verification: "unverifiable",
+      });
+      await expect(db.prepare(
+        `select reason from briar_channel_issue_approval_reconciliation
+         where run_id = ?`,
+      ).bind(poisonedRunId).first()).resolves.toEqual({
+        reason: "unverifiable_legacy_result",
+      });
+      await expect(db.prepare(
+        `select status, stage from briar_hunt_runs where id = ?`,
+      ).bind(poisonedRunId).first()).resolves.toEqual({
+        status: "cancelled",
+        stage: "cancelled",
+      });
+      await expect(db.prepare(
+        `select audit.result_verification, proposal.issue_source_key
+         from briar_channel_issue_approval_audit audit
+         join briar_channel_action_proposals proposal
+           on proposal.id = audit.proposal_id
+         where audit.proposal_id = ?`,
+      ).bind(preemptedId).first()).resolves.toEqual({
+        result_verification: "unverifiable",
+        issue_source_key: null,
+      });
+      await expect(db.prepare(
+        `select reason from briar_channel_issue_approval_reconciliation
+         where run_id = ?`,
+      ).bind(preemptedRunId).first()).resolves.toEqual({
+        reason: "unverifiable_legacy_result",
+      });
+      await expect(db.prepare(
+        `select status, stage from briar_hunt_runs where id = ?`,
+      ).bind(preemptedRunId).first()).resolves.toEqual({
+        status: "cancelled",
+        stage: "cancelled",
+      });
+      await expect(db.prepare(
+        `select reason from briar_channel_issue_approval_reconciliation
+         where run_id = ?`,
+      ).bind(pendingRunId).first()).resolves.toEqual({
+        reason: "unfinalized_legacy_issue",
+      });
+      await expect(db.prepare(
+        `select status, stage from briar_hunt_runs where id = ?`,
+      ).bind(pendingRunId).first()).resolves.toEqual({
+        status: "cancelled",
+        stage: "cancelled",
+      });
+      await expect(db.prepare(
+        `insert into briar_hunt_events (
+           id, run_id, event_key, attempt, revision, stage, status,
+           workflow_stage, detail, actor, branch, commit_sha, qa_status,
+           tracker_issue_state, pull_request_urls, target_sha,
+           occurred_at, recorded_at
+         ) select ?, id, 'stale-revival:running', current_attempt,
+                  current_revision, 'implementing', 'running', 'implementing',
+                  null, 'stale-worker', null, null, null, null, '[]', null,
+                  ?, ?
+           from briar_hunt_runs where id = ?`,
+      ).bind(
+        "stale-revival-event",
+        "2026-08-10T00:03:00.000Z",
+        "2026-08-10T00:03:00.000Z",
+        pendingRunId,
+      ).run()).rejects.toThrow(
+        "reconciled channel proposal issue is quarantined",
+      );
+      await expect(db.prepare(
+        `update briar_hunt_runs
+         set status = 'queued', stage = 'queued', completed_at = null
+         where id = ?`,
+      ).bind(pendingRunId).run()).rejects.toThrow(
+        "reconciled channel proposal issue is quarantined",
+      );
+      await expect(db.prepare(
+        `update briar_channel_action_proposals
+         set status = 'accepted', accepted_by_user_id = ?, accepted_at = ?,
+             result_run_id = ? where id = ?`,
+      ).bind(approverId, now, pendingRunId, pendingId).run()).rejects.toThrow(
+        "legacy channel proposal acceptance is disabled",
+      );
+      await expect(db.prepare(
+        `update briar_channel_action_proposals
+         set status = 'accepted', accepted_by_user_id = ?, accepted_at = ?,
+             updated_at = ? where id = ?`,
+      ).bind(approverId, now, now, planProposalId).run()).resolves.toMatchObject({
+        meta: expect.objectContaining({ changes: expect.any(Number) }),
+      });
+      await expect(db.prepare(
+        `select status from briar_channel_action_proposals where id = ?`,
+      ).bind(planProposalId).first()).resolves.toEqual({ status: "accepted" });
+      await expect(reserveChannelActionProposalApproval(db, {
+        organizationId,
+        channelId,
+        proposalId: pendingId,
+        projectId,
+        userId: approverId,
+        approvedAt: "2026-08-10T00:01:00.000Z",
+        issueSourceKey: `briar-channel-approved:${"9".repeat(64)}`,
+      })).resolves.toMatchObject({
+        project_id: projectId,
+        accepted_by_user_id: approverId,
+        issue_source_key: `briar-channel-approved:${"9".repeat(64)}`,
+      });
+      await expect(db.prepare(
+        `update briar_channel_action_proposals
+         set status = 'accepted', result_run_id = ?, updated_at = ?
+         where id = ?`,
+      ).bind(pendingRunId, now, pendingId).run()).rejects.toThrow(
+        "legacy channel proposal acceptance is disabled",
+      );
+
+      const postMigrationId = await seedProposal("000000000004");
+      await expect(
+        legacyRun(postMigrationId, "Upgrade 000000000004"),
+      ).rejects.toThrow("legacy channel proposal issue creation is disabled");
+      await expect(
+        legacyRun(
+          "97000000-0000-4000-8000-000000009999",
+          "Unknown legacy channel proposal",
+        ),
+      ).rejects.toThrow("legacy channel proposal issue creation is disabled");
+
+      await db.prepare(`delete from "user" where id = ?`).bind(approverId).run();
+      await expect(db.prepare(
+        `select approved_by_user_id from briar_channel_issue_approval_audit
+         where proposal_id = ?`,
+      ).bind(acceptedId).first()).resolves.toEqual({ approved_by_user_id: null });
+      await db.prepare(`delete from briar_channels where id = ?`).bind(channelId).run();
+      await expect(db.prepare(
+        `select count(*) as count from briar_channel_issue_approval_audit
+         where proposal_id in (?, ?)`,
+      ).bind(acceptedId, missingResultId).first()).resolves.toEqual({ count: 3 });
+    } finally {
+      await miniflare.dispose();
+    }
+  }, 60_000);
 
   it("updates device fan-out cursors with indexed project lookups", async () => {
     const miniflare = new Miniflare({

@@ -2,6 +2,12 @@ import PhotosUI
 import SwiftUI
 import UIKit
 
+func issueProposalAcceptanceSystemImage(
+    for type: IssueProposedAction.ActionType
+) -> String {
+    type == .create ? "plus.circle.fill" : "play.fill"
+}
+
 struct CompanionShellView: View {
     @AppStorage("companion-appearance") private var appearance = CompanionAppearance.system.rawValue
     @AppStorage("companion-locale") private var localeRaw = CompanionLocale.ko.rawValue
@@ -9,6 +15,7 @@ struct CompanionShellView: View {
     @State private var showingSettings = false
     @State private var taskPath = NavigationPath()
     @State private var homePath = NavigationPath()
+    @State private var pendingIssueResolutionCount = 0
 
     @ObservedObject var navigation: CompanionNavigationModel
     @ObservedObject var agents: AgentsStore
@@ -24,6 +31,7 @@ struct CompanionShellView: View {
     let api: any MobileAPIClientProtocol
     let user: CurrentUserResponse.User?
     let refresh: () async -> Void
+    let ensureIssueAvailable: (UUID, UUID) async -> Bool
     let selectProject: (UUID) -> Void
     let signOut: () -> Void
 
@@ -39,8 +47,18 @@ struct CompanionShellView: View {
                     activeProjectID: project.id,
                     currentUserID: user?.id,
                     projects: projects,
-                    onIssueOpen: { projectID, runID in
-                        navigation.open(.issue(projectID: projectID, runID: runID))
+                    onIssueOpen: { projectID, runID, sourceIsCurrent in
+                        await navigation.openIssueWhenAvailable(
+                            projectID: projectID,
+                            runID: runID,
+                            ensureAvailable: { targetProjectID, targetRunID in
+                                await ensureIssueAvailable(
+                                    targetProjectID,
+                                    targetRunID
+                                )
+                            },
+                            sourceIsCurrent: sourceIsCurrent
+                        )
                     }
                 )
                 .navigationTitle(L10n.text(.channelHome, locale: companionLocale))
@@ -120,6 +138,15 @@ struct CompanionShellView: View {
             .badge(inbox.unreadCount)
 
         }
+        .overlay {
+            if navigation.preparingIssue || pendingIssueResolutionCount > 0 {
+                ProgressView()
+                    .padding(14)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+                    .allowsHitTesting(false)
+                    .accessibilityIdentifier("issue-navigation-loading")
+            }
+        }
         .environmentObject(inbox)
         .sheet(isPresented: $showingSettings) {
             CompanionSettingsView(
@@ -131,26 +158,59 @@ struct CompanionShellView: View {
             )
             .presentationDetents([.large, .medium])
         }
-        .onChange(of: navigation.pathIssueToken) { _, _ in
-            if let runID = navigation.consumePendingIssue() {
-                taskPath.append(runID)
-            }
-        }
         .onChange(of: navigation.pathChannelToken) { _, _ in
+            guard navigation.pendingProjectID == nil ||
+                    navigation.pendingProjectID == project.id else { return }
             Task { await openPendingChannel() }
         }
         .onChange(of: project.id) { _, _ in
             taskPath = NavigationPath()
         }
-        .task(id: navigation.pathIssueToken) {
-            if let runID = navigation.pendingIssueID {
-                _ = navigation.consumePendingIssue()
-                taskPath.append(runID)
+        .onChange(of: snapshot) { _, _ in
+            guard navigation.pendingIssueID != nil else { return }
+            Task { await resolvePendingIssue(forceRefresh: false) }
+        }
+        .onChange(of: navigation.selectedTab) { _, tab in
+            if tab != .tasks,
+               navigation.pendingIssueID != nil || navigation.preparingIssue {
+                navigation.cancelPendingIssue()
             }
         }
-        .task(id: navigation.pathChannelToken) {
+        .task(id: "\(project.id.uuidString):\(navigation.pathIssueToken)") {
+            await resolvePendingIssue(forceRefresh: true)
+        }
+        .task(id: "\(project.id.uuidString):\(navigation.pathChannelToken)") {
+            guard navigation.pendingProjectID == nil ||
+                    navigation.pendingProjectID == project.id else { return }
             await openPendingChannel()
         }
+    }
+
+    @MainActor
+    private func resolvePendingIssue(forceRefresh: Bool) async {
+        guard
+            navigation.selectedTab == .tasks,
+            navigation.pendingProjectID == project.id,
+            let runID = navigation.pendingIssueID
+        else { return }
+        let pathToken = navigation.pathIssueToken
+        let alreadyAvailable = snapshot?.project.id == project.id &&
+            snapshot?.runs.contains(where: { $0.id == runID }) == true
+        pendingIssueResolutionCount += 1
+        defer {
+            pendingIssueResolutionCount = max(0, pendingIssueResolutionCount - 1)
+        }
+        var available = alreadyAvailable
+        if !available, forceRefresh {
+            available = await ensureIssueAvailable(project.id, runID)
+        }
+        guard available else { return }
+        guard let resolvedRunID = navigation.consumePendingIssue(
+            projectID: project.id,
+            runID: runID,
+            pathToken: pathToken
+        ) else { return }
+        taskPath.append(resolvedRunID)
     }
 
     @MainActor
@@ -185,6 +245,7 @@ struct CompanionShellView: View {
                         id: \.id
                     ) { candidate in
                         Button {
+                            navigation.cancelPendingIssue()
                             selectProject(candidate.id)
                         } label: {
                             if candidate.id == project.id {
@@ -1464,9 +1525,15 @@ struct RunDetailView: View {
                             }
                             let issuePriority = issue.priority.map { "P\($0)" }
                                 ?? L10n.text("우선순위 없음", locale: locale)
-                            Text("\(issuePriority) · \(issue.status)")
+                            Text(issuePriority)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
+                            Label(
+                                L10n.text(.channelIssueCreationSafety, locale: locale),
+                                systemImage: "tray"
+                            )
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                         }
                         if proposal.status == .accepted {
                             Label(
@@ -1496,7 +1563,9 @@ struct RunDetailView: View {
                                             : proposal.type == .update
                                                 ? L10n.text("수락하고 이슈 수정", locale: locale)
                                                 : L10n.text("수락하고 이슈 만들기", locale: locale),
-                                        systemImage: "play.fill"
+                                        systemImage: issueProposalAcceptanceSystemImage(
+                                            for: proposal.type
+                                        )
                                     )
                                 }
                             }

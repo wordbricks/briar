@@ -5,6 +5,7 @@ import {
   mobileClientIds,
   mobileDashboardDeltaSchema,
   mobileDashboardSnapshotSchema,
+  mobileChannelIssueProposalPayloadSchema,
   mobileOperationSchemas,
   mobileProjectAgentTaskRequestSchema,
 } from "./mobile-contract";
@@ -32,6 +33,19 @@ const openapi = JSON.parse(readFileSync(
 )) as {
   openapi: string;
   paths: Record<string, Record<string, { operationId: string }>>;
+  components: {
+    schemas: {
+      ChannelIssueProposalPayload: {
+        properties: {
+          issue: {
+            properties: {
+              status: { enum: string[] };
+            };
+          };
+        };
+      };
+    };
+  };
 };
 
 describe("Companion mobile API contract", () => {
@@ -124,6 +138,39 @@ describe("Companion mobile API contract", () => {
     expect(
       mobileProjectAgentTaskRequestSchema.safeParse(requestWithoutSkill).success,
     ).toBe(false);
+  });
+
+  it("requires the canonical issue details on issue-create proposals", () => {
+    const channel = mobileOperationSchemas.listChannelMessages.response.parse(
+      fixture.operations.listChannelMessages.response,
+    );
+    const proposal = channel.messages.find((message) => message.proposal)
+      ?.proposal;
+    expect(proposal?.actionType).toBe("request_issue_create");
+    if (proposal?.actionType === "request_issue_create") {
+      expect(proposal.payload.issue).toMatchObject({
+        title: "온보딩 개편",
+        priority: 3,
+        status: "backlog",
+      });
+    }
+    expect(
+      mobileChannelIssueProposalPayloadSchema.safeParse({ issue: {} }).success,
+    ).toBe(false);
+    expect(
+      mobileChannelIssueProposalPayloadSchema.safeParse({
+        issue: {
+          title: "Legacy proposal",
+          description: null,
+          priority: null,
+          status: "queued",
+        },
+      }).success,
+    ).toBe(true);
+    expect(
+      openapi.components.schemas.ChannelIssueProposalPayload.properties.issue
+        .properties.status.enum,
+    ).toEqual(["backlog", "queued"]);
   });
 
   it("serves the documented health fixture from the Worker", async () => {

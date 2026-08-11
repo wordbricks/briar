@@ -5,14 +5,17 @@ import {
   completeWorkflowStageLifecycle,
   deleteIssue,
   recordHuntEvent,
+  reworkHuntRun,
   startWorkflowStageLifecycle,
 } from "./db";
 import {
   type ArchiveBucket,
+  archiveCleanupRetryPolicy,
   archiveCompletedLogs,
   collectStorageMetrics,
   defaultArchiveRowLimit,
   enqueueArchiveCleanup,
+  expireArchives,
   listArchivedExecutionAuditEvents,
   listArchivedIssueMessages,
   listArchivedProjectAgentSessions,
@@ -31,6 +34,23 @@ let runId = "";
 let secondRunId = "";
 const oldTime = "2020-01-01T00:00:00.000Z";
 const observedAt = "2028-01-01T00:00:00.000Z";
+
+const deleteOnlyBucket = (
+  onDelete: (keys: string | string[]) => Promise<void> | void,
+): ArchiveBucket => ({
+  async head() {
+    return null;
+  },
+  async get() {
+    return null;
+  },
+  async put() {
+    return undefined;
+  },
+  async delete(keys) {
+    await onDelete(keys);
+  },
+});
 
 const event = (
   sourceKey: string,
@@ -183,8 +203,15 @@ describe("D1 to R2 log archives", () => {
     }
     await recordHuntEvent(db, projectId, event("large-run", "completed", "completed", 3));
     await db
-      .prepare(`update briar_hunt_runs set completed_at = ? where id = ?`)
-      .bind(oldTime, runId)
+      .prepare(
+        `update briar_hunt_runs
+         set completed_at = ?, dispatch_mode = 'any',
+             dispatch_request_id = 'archive-current-dispatch',
+             dispatched_at = ?, requested_by_user_id = 'owner',
+             requested_agent_provider = 'codex'
+         where id = ?`,
+      )
+      .bind(oldTime, oldTime, runId)
       .run();
 
     const largeDetail = "x".repeat(2_048);
@@ -239,6 +266,24 @@ describe("D1 to R2 log archives", () => {
        ) values (
          'audit-1', '${projectId}', '${projectId}', '${runId}',
          'completed', '{"fixture":true}', '${oldTime}'
+       );
+       insert into briar_execution_audit_events (
+         id, organization_id, project_id, run_id, actor_user_id, action,
+         request_id, detail_json, occurred_at
+       ) values (
+         'audit-current-dispatch', '${projectId}', '${projectId}', '${runId}',
+         'owner', 'dispatched', 'archive-current-dispatch',
+         '{"fixture":true}', '${oldTime}'
+       );
+       insert into briar_channel_issue_approval_audit (
+         id, proposal_id, organization_id, channel_id, project_id, run_id,
+         approved_by_user_id, approved_at, issue_source_key,
+         result_verification, payload_json, created_at
+       ) values (
+         'archive-channel-approval', 'archive-proposal', '${projectId}',
+         'archive-channel', '${projectId}', '${runId}', 'owner', '${oldTime}',
+         'large-run', 'atomic', '{"issue":{"title":"Archive large run"}}',
+         '${oldTime}'
        );
        insert into briar_execution_audit_events (
          id, organization_id, project_id, action, detail_json, occurred_at
@@ -359,8 +404,21 @@ describe("D1 to R2 log archives", () => {
 
     const metrics = await collectStorageMetrics(db, projectId);
     expect(metrics.hotRows.run_events).toBe(0);
+    expect(metrics.hotRows.execution_audit).toBe(1);
     expect(metrics.archives.every((metric) => metric.status === "complete")).toBe(true);
     expect(metrics.databaseBytes).toBeGreaterThan(0);
+
+    await expect(reworkHuntRun(db, projectId, {
+      runId,
+      workflowStage: "archive_implementing",
+      requestId: "99999999-9999-4999-8999-999999999991",
+      actor: "archive-test",
+      reason: "Verify retained dispatch boundary after archival.",
+      occurredAt: "2028-01-01T00:01:00.000Z",
+      completed: { expectedAttempt: 1, expectedRevision: 1 },
+    })).rejects.toThrow(
+      "Approved issue execution requires fresh approval before rework",
+    );
   }, 30_000);
 
   it("keeps D1 originals when an R2 upload or checksum verification fails", async () => {
@@ -445,10 +503,581 @@ describe("D1 to R2 log archives", () => {
     ).toBe(0);
   }, 30_000);
 
+  it("expires archive and related evidence objects from separate buckets and retains metadata for retry", async () => {
+    const archiveId = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
+    const archiveObjectKey = "archives/expiry-bucket-separation.jsonl.gz";
+    const relatedObjectKey = "run-evidence/expiry-bucket-separation.png";
+    await db
+      .prepare(
+        `insert into briar_log_archives (
+           id, project_id, run_id, scope_id, archive_kind, object_key,
+           format_version, status, row_count, byte_size, sha256,
+           content_sha256, period_start, period_end, created_at, verified_at,
+           completed_at, expires_at, failure_count, last_error,
+           related_object_keys_json
+         ) values (
+           ?, ?, null, 'expiry-bucket-separation', 'run_evidence', ?,
+           1, 'complete', 1, 1, ?, ?, ?, ?, ?, ?, ?, ?, 0, null, ?
+         )`,
+      )
+      .bind(
+        archiveId,
+        projectId,
+        archiveObjectKey,
+        "c".repeat(64),
+        "d".repeat(64),
+        oldTime,
+        oldTime,
+        oldTime,
+        oldTime,
+        oldTime,
+        "1900-01-01T00:00:00.000Z",
+        JSON.stringify([relatedObjectKey]),
+      )
+      .run();
+
+    const archiveDeletes: Array<string | string[]> = [];
+    const attachmentDeletes: Array<string | string[]> = [];
+    let failAttachmentDelete = true;
+    const archivesBucket = deleteOnlyBucket((keys) => {
+      archiveDeletes.push(keys);
+    });
+    const attachmentsBucket = deleteOnlyBucket((keys) => {
+      attachmentDeletes.push(keys);
+      if (failAttachmentDelete) {
+        failAttachmentDelete = false;
+        throw new Error("attachments bucket unavailable");
+      }
+    });
+
+    await expect(
+      expireArchives(
+        db,
+        archivesBucket,
+        attachmentsBucket,
+        "1900-01-02T00:00:00.000Z",
+        1,
+      ),
+    ).rejects.toThrow("attachments bucket unavailable");
+    expect(
+      await db
+        .prepare(`select count(*) as count from briar_log_archives where id = ?`)
+        .bind(archiveId)
+        .first<number>("count"),
+    ).toBe(1);
+
+    await expect(
+      expireArchives(
+        db,
+        archivesBucket,
+        attachmentsBucket,
+        "1900-01-02T00:00:00.000Z",
+        1,
+      ),
+    ).resolves.toBe(1);
+    expect(archiveDeletes).toEqual([archiveObjectKey, archiveObjectKey]);
+    expect(attachmentDeletes).toEqual([
+      [relatedObjectKey],
+      [relatedObjectKey],
+    ]);
+    expect(
+      await db
+        .prepare(`select count(*) as count from briar_log_archives where id = ?`)
+        .bind(archiveId)
+        .first<number>("count"),
+    ).toBe(0);
+  });
+
+  it("preserves cleanup objects that are still referenced by live project metadata", async () => {
+    const archiveId = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
+    const archiveObjectKey = "archives/live-destination-metadata.jsonl.gz";
+    const relatedObjectKey = "run-evidence/live-destination-metadata.png";
+    await db
+      .prepare(
+        `insert into briar_log_archives (
+           id, project_id, run_id, scope_id, archive_kind, object_key,
+           format_version, status, row_count, byte_size, sha256,
+           content_sha256, period_start, period_end, created_at, verified_at,
+           completed_at, expires_at, failure_count, last_error,
+           related_object_keys_json
+         ) values (
+           ?, ?, null, 'live-destination-metadata', 'run_evidence', ?,
+           1, 'complete', 1, 1, ?, ?, ?, ?, ?, ?, ?, ?, 0, null, ?
+         )`,
+      )
+      .bind(
+        archiveId,
+        projectId,
+        archiveObjectKey,
+        "e".repeat(64),
+        "f".repeat(64),
+        oldTime,
+        oldTime,
+        oldTime,
+        oldTime,
+        oldTime,
+        "2099-01-01T00:00:00.000Z",
+        JSON.stringify([relatedObjectKey]),
+      )
+      .run();
+    await enqueueArchiveCleanup(
+      db,
+      "deleted-source-project",
+      null,
+      { archives: [archiveObjectKey], attachments: [relatedObjectKey] },
+      observedAt,
+    );
+
+    const archiveDeletes: Array<string | string[]> = [];
+    const attachmentDeletes: Array<string | string[]> = [];
+    const cleanup = await processArchiveCleanupQueue(
+      db,
+      deleteOnlyBucket((keys) => {
+        archiveDeletes.push(keys);
+      }),
+      deleteOnlyBucket((keys) => {
+        attachmentDeletes.push(keys);
+      }),
+      observedAt,
+      10,
+    );
+
+    expect(cleanup).toEqual({ deleted: 0, failed: 0 });
+    expect(archiveDeletes).toEqual([]);
+    expect(attachmentDeletes).toEqual([]);
+    expect(
+      await db
+        .prepare(
+          `select count(*) as count from briar_archive_cleanup_queue
+           where object_key in (?, ?)`,
+        )
+        .bind(archiveObjectKey, relatedObjectKey)
+        .first<number>("count"),
+    ).toBe(0);
+    expect(
+      await db
+        .prepare(`select count(*) as count from briar_log_archives where id = ?`)
+        .bind(archiveId)
+        .first<number>("count"),
+    ).toBe(1);
+  });
+
+  it("plans cleanup for historical project archives that cascade with the current run", async () => {
+    const historicalProjectId = "22222222-2222-4222-8222-222222222222";
+    const historicalArchiveId = "c".repeat(64);
+    const historicalObjectKey =
+      `logs/v1/projects/${historicalProjectId}/runs/${runId}/execution_audit/` +
+      `${historicalArchiveId}.jsonl.gz`;
+    await executeD1Sql(
+      db,
+      `insert into briar_projects (
+         id, owner_user_id, organization_id, name, agent_token_hash,
+         created_at, updated_at
+       ) values (
+         '${historicalProjectId}', 'owner', '${projectId}',
+         'Historical audit project',
+         'cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',
+         '${oldTime}', '${oldTime}'
+       );
+       insert into briar_log_archives (
+         id, project_id, run_id, scope_id, archive_kind, object_key,
+         format_version, status, row_count, byte_size, sha256,
+         content_sha256, period_start, period_end, created_at, verified_at,
+         completed_at, expires_at, failure_count, last_error,
+         related_object_keys_json
+       ) values (
+         '${historicalArchiveId}', '${historicalProjectId}', '${runId}',
+         '${runId}', 'execution_audit', '${historicalObjectKey}',
+         1, 'complete', 1, 1,
+         'cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',
+         'dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd',
+         '${oldTime}', '${oldTime}', '${oldTime}', '${oldTime}', '${oldTime}',
+         '${observedAt}', 0, null, '[]'
+       );`,
+    );
+
+    const cleanup = await listArchiveObjectsForDeletion(db, projectId, runId);
+    expect(cleanup.archives).toContain(historicalObjectKey);
+  });
+
+  it("retains a concurrently refreshed cleanup generation after R2 deletion", async () => {
+    const objectKey = "run-evidence/cleanup-generation-race.png";
+    const initialQueuedAt = "2027-11-01T00:00:00.000Z";
+    const refreshedQueuedAt = "2028-01-01T00:00:01.000Z";
+    await enqueueArchiveCleanup(
+      db,
+      "deleted-generation-source",
+      null,
+      { archives: [], attachments: [objectKey] },
+      initialQueuedAt,
+    );
+
+    const cleanup = await processArchiveCleanupQueue(
+      db,
+      deleteOnlyBucket(() => undefined),
+      deleteOnlyBucket(async () => {
+        await enqueueArchiveCleanup(
+          db,
+          "deleted-generation-destination",
+          null,
+          { archives: [], attachments: [objectKey] },
+          refreshedQueuedAt,
+        );
+      }),
+      observedAt,
+      1,
+    );
+
+    expect(cleanup).toEqual({ deleted: 0, failed: 0 });
+    await expect(
+      db
+        .prepare(
+          `select project_id, queued_at, generation
+           from briar_archive_cleanup_queue
+           where bucket = 'attachments' and object_key = ?`,
+        )
+        .bind(objectKey)
+        .first(),
+    ).resolves.toEqual({
+      project_id: "deleted-generation-destination",
+      queued_at: refreshedQueuedAt,
+      generation: 2,
+    });
+    await db
+      .prepare(
+        `delete from briar_archive_cleanup_queue
+         where bucket = 'attachments' and object_key = ?`,
+      )
+      .bind(objectKey)
+      .run();
+  });
+
+  it("atomically rechecks global references before completing cleanup", async () => {
+    const objectKey = "run-evidence/cleanup-reference-race.png";
+    const archiveId = "9".repeat(64);
+    const archiveObjectKey = "archives/cleanup-reference-race.jsonl.gz";
+    await enqueueArchiveCleanup(
+      db,
+      "deleted-reference-source",
+      null,
+      { archives: [], attachments: [objectKey] },
+      "2027-11-02T00:00:00.000Z",
+    );
+
+    const cleanup = await processArchiveCleanupQueue(
+      db,
+      deleteOnlyBucket(() => undefined),
+      deleteOnlyBucket(async () => {
+        await db
+          .prepare(
+            `insert into briar_log_archives (
+               id, project_id, run_id, scope_id, archive_kind, object_key,
+               format_version, status, row_count, byte_size, sha256,
+               content_sha256, period_start, period_end, created_at, verified_at,
+               completed_at, expires_at, failure_count, last_error,
+               related_object_keys_json
+             ) values (
+               ?, ?, null, 'cleanup-reference-race', 'run_evidence', ?,
+               1, 'complete', 1, 1, ?, ?, ?, ?, ?, ?, ?, ?, 0, null, ?
+             )`,
+          )
+          .bind(
+            archiveId,
+            projectId,
+            archiveObjectKey,
+            "9".repeat(64),
+            "8".repeat(64),
+            oldTime,
+            oldTime,
+            oldTime,
+            oldTime,
+            oldTime,
+            "2099-01-01T00:00:00.000Z",
+            JSON.stringify([objectKey]),
+          )
+          .run();
+      }),
+      observedAt,
+      1,
+    );
+
+    expect(cleanup).toEqual({ deleted: 0, failed: 0 });
+    expect(
+      await db
+        .prepare(
+          `select count(*) as count from briar_archive_cleanup_queue
+           where bucket = 'attachments' and object_key = ?`,
+        )
+        .bind(objectKey)
+        .first<number>("count"),
+    ).toBe(1);
+    await db.batch([
+      db.prepare(`delete from briar_log_archives where id = ?`).bind(archiveId),
+      db
+        .prepare(
+          `delete from briar_archive_cleanup_queue
+           where bucket = 'attachments' and object_key = ?`,
+        )
+        .bind(objectKey),
+    ]);
+  });
+
+  it("balances fresh cleanup with overdue retries in bounded batches", async () => {
+    const permanentKey = "run-evidence/permanent-cleanup-failure.png";
+    const duringBackoffKey = "run-evidence/during-backoff-privacy-cleanup.png";
+    const afterDueKey = "run-evidence/after-due-privacy-cleanup.png";
+    await enqueueArchiveCleanup(
+      db,
+      "deleted-backoff-source",
+      null,
+      { archives: [], attachments: [permanentKey] },
+      "2027-12-01T00:00:00.000Z",
+    );
+    const deletedKeys: string[] = [];
+    const attachments = deleteOnlyBucket((keys) => {
+      const key = typeof keys === "string" ? keys : keys[0];
+      if (key === permanentKey) throw new Error("permanent R2 failure");
+      deletedKeys.push(key);
+    });
+
+    await expect(
+      processArchiveCleanupQueue(db, attachments, attachments, observedAt, 1),
+    ).resolves.toEqual({ deleted: 0, failed: 1 });
+    await enqueueArchiveCleanup(
+      db,
+      "deleted-backoff-source",
+      null,
+      { archives: [], attachments: [duringBackoffKey] },
+      "2028-01-01T00:00:30.000Z",
+    );
+    await expect(
+      processArchiveCleanupQueue(
+        db,
+        attachments,
+        attachments,
+        "2028-01-01T00:00:30.000Z",
+        1,
+      ),
+    ).resolves.toEqual({ deleted: 1, failed: 0 });
+    expect(deletedKeys).toEqual([duringBackoffKey]);
+
+    await enqueueArchiveCleanup(
+      db,
+      "deleted-backoff-source",
+      null,
+      { archives: [], attachments: [afterDueKey] },
+      "2028-01-01T00:01:30.000Z",
+    );
+    await expect(
+      processArchiveCleanupQueue(
+        db,
+        attachments,
+        attachments,
+        "2028-01-01T00:02:00.000Z",
+        1,
+      ),
+    ).resolves.toEqual({ deleted: 0, failed: 1 });
+    expect(deletedKeys).toEqual([duringBackoffKey]);
+    await expect(
+      processArchiveCleanupQueue(
+        db,
+        attachments,
+        attachments,
+        "2028-01-01T00:02:00.000Z",
+        1,
+      ),
+    ).resolves.toEqual({ deleted: 1, failed: 0 });
+    expect(deletedKeys).toEqual([duringBackoffKey, afterDueKey]);
+    await expect(
+      db
+        .prepare(
+          `select attempts, next_attempt_at, dead_lettered_at
+           from briar_archive_cleanup_queue
+           where bucket = 'attachments' and object_key = ?`,
+        )
+        .bind(permanentKey)
+        .first(),
+    ).resolves.toEqual({
+      attempts: 2,
+      next_attempt_at: "2028-01-01T00:04:00.000Z",
+      dead_lettered_at: null,
+    });
+    await db
+      .prepare(
+        `delete from briar_archive_cleanup_queue
+         where bucket = 'attachments' and object_key = ?`,
+      )
+      .bind(permanentKey)
+      .run();
+  });
+
+  it("dead-letters bounded failures with a structured alert and supports manual replay", async () => {
+    const objectKey = "run-evidence/dead-letter-cleanup.png";
+    await enqueueArchiveCleanup(
+      db,
+      "deleted-dead-letter-source",
+      null,
+      { archives: [], attachments: [objectKey] },
+      "2027-12-03T00:00:00.000Z",
+    );
+    await db
+      .prepare(
+        `update briar_archive_cleanup_queue set attempts = ?
+         where bucket = 'attachments' and object_key = ?`,
+      )
+      .bind(archiveCleanupRetryPolicy.maxAttempts - 1, objectKey)
+      .run();
+
+    await expect(
+      processArchiveCleanupQueue(
+        db,
+        deleteOnlyBucket(() => undefined),
+        deleteOnlyBucket(() => {
+          throw new Error("R2 credentials rejected");
+        }),
+        observedAt,
+        1,
+      ),
+    ).resolves.toEqual({ deleted: 0, failed: 1 });
+    const deadLetter = await db
+      .prepare(
+        `select attempts, next_attempt_at, dead_lettered_at, alert_state,
+                alert_detail_json
+         from briar_archive_cleanup_queue
+         where bucket = 'attachments' and object_key = ?`,
+      )
+      .bind(objectKey)
+      .first<{
+        attempts: number;
+        next_attempt_at: string | null;
+        dead_lettered_at: string | null;
+        alert_state: string;
+        alert_detail_json: string;
+      }>();
+    expect(deadLetter).toMatchObject({
+      attempts: archiveCleanupRetryPolicy.maxAttempts,
+      next_attempt_at: null,
+      dead_lettered_at: observedAt,
+      alert_state: "pending",
+    });
+    expect(JSON.parse(deadLetter?.alert_detail_json ?? "{}")).toMatchObject({
+      code: "ARCHIVE_CLEANUP_DEAD_LETTER",
+      objectKey,
+      attempts: archiveCleanupRetryPolicy.maxAttempts,
+      lastError: "R2 credentials rejected",
+    });
+
+    let replayDeletes = 0;
+    await processArchiveCleanupQueue(
+      db,
+      deleteOnlyBucket(() => undefined),
+      deleteOnlyBucket(() => {
+        replayDeletes += 1;
+      }),
+      "2030-01-01T00:00:00.000Z",
+      1,
+    );
+    expect(replayDeletes).toBe(0);
+
+    const replayedAt = "2030-01-01T00:00:01.000Z";
+    await db
+      .prepare(
+        `update briar_archive_cleanup_queue
+         set attempts = 0, next_attempt_at = null, dead_lettered_at = null,
+             alert_state = 'acknowledged', generation = generation + 1,
+             queued_at = ?
+         where bucket = 'attachments' and object_key = ?`,
+      )
+      .bind(replayedAt, objectKey)
+      .run();
+    await expect(
+      processArchiveCleanupQueue(
+        db,
+        deleteOnlyBucket(() => undefined),
+        deleteOnlyBucket(() => {
+          replayDeletes += 1;
+        }),
+        replayedAt,
+        1,
+      ),
+    ).resolves.toEqual({ deleted: 1, failed: 0 });
+    expect(replayDeletes).toBe(1);
+  });
+
+  it("protects an organization Agent sprite that shares a queued object key", async () => {
+    const agentId = "organization-agent-cleanup-reference";
+    const objectKey =
+      `project-agent-spritesheets/${projectId}/${agentId}/sprites.webp`;
+    await db
+      .prepare(
+        `insert into briar_project_agents (
+           id, organization_id, project_id, handle, name, provider,
+           responsibility, avatar_spritesheet_object_key, created_at, updated_at
+         ) values (?, ?, null, 'cleanup-reference-agent', 'Cleanup reference',
+                   'codex', 'Protect shared sprite metadata', ?, ?, ?)`,
+      )
+      .bind(agentId, projectId, objectKey, oldTime, oldTime)
+      .run();
+    await enqueueArchiveCleanup(
+      db,
+      "deleted-agent-source",
+      null,
+      { archives: [], attachments: [objectKey] },
+      "2027-12-04T00:00:00.000Z",
+    );
+    const attachmentDeletes: Array<string | string[]> = [];
+
+    await expect(
+      processArchiveCleanupQueue(
+        db,
+        deleteOnlyBucket(() => undefined),
+        deleteOnlyBucket((keys) => {
+          attachmentDeletes.push(keys);
+        }),
+        observedAt,
+        1,
+      ),
+    ).resolves.toEqual({ deleted: 0, failed: 0 });
+    expect(attachmentDeletes).toEqual([]);
+    expect(
+      await db
+        .prepare(
+          `select count(*) as count from briar_archive_cleanup_queue
+           where bucket = 'attachments' and object_key = ?`,
+        )
+        .bind(objectKey)
+        .first<number>("count"),
+    ).toBe(0);
+    await db
+      .prepare(`delete from briar_project_agents where id = ?`)
+      .bind(agentId)
+      .run();
+  });
+
   it("retries linked R2 cleanup after an archived issue is deleted", async () => {
+    const hotAttachmentKey =
+      `issue-attachments/${projectId}/${runId}/delete-retry.png`;
+    await db
+      .prepare(
+        `insert into briar_issue_attachments (
+           id, run_id, project_id, object_key, filename, content_type,
+           byte_size, created_at
+         ) values (?, ?, ?, ?, 'delete-retry.png', 'image/png', 5, ?)`,
+      )
+      .bind(crypto.randomUUID(), runId, projectId, hotAttachmentKey, oldTime)
+      .run();
     const objects = await listArchiveObjectsForDeletion(db, projectId, runId);
     expect(objects.archives.length).toBeGreaterThan(0);
     expect(await deleteIssue(db, projectId, runId, observedAt)).toBe("deleted");
+    await expect(
+      db
+        .prepare(
+          `select project_id, run_id from briar_archive_cleanup_queue
+           where bucket = 'attachments' and object_key = ?`,
+        )
+        .bind(hotAttachmentKey)
+        .first(),
+    ).resolves.toEqual({ project_id: projectId, run_id: runId });
     await enqueueArchiveCleanup(db, projectId, runId, objects, observedAt);
 
     const cleanup = await processArchiveCleanupQueue(
@@ -459,7 +1088,9 @@ describe("D1 to R2 log archives", () => {
       1_000,
     );
     expect(cleanup.failed).toBe(0);
-    expect(cleanup.deleted).toBe(objects.archives.length + objects.attachments.length);
+    expect(cleanup.deleted).toBe(
+      objects.archives.length + objects.attachments.length + 1,
+    );
     for (const objectKey of objects.archives) {
       expect(await bucket.head(objectKey)).toBeNull();
     }

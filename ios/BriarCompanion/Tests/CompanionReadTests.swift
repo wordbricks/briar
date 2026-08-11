@@ -31,6 +31,27 @@ final class CompanionReadTests: XCTestCase {
         XCTAssertEqual(L10n.text("계정 메뉴", locale: .en), "Account menu")
     }
 
+    func testIssueCreateApprovalExplainsBacklogBoundaryInEveryLocale() {
+        XCTAssertTrue(
+            L10n.text(.channelIssueCreationSafety, locale: .ko).contains("별도 승인")
+        )
+        XCTAssertTrue(
+            L10n.text(.channelIssueCreationSafety, locale: .en)
+                .contains("Separate approval")
+        )
+        XCTAssertTrue(
+            L10n.text(.channelIssueCreationSafety, locale: .zh).contains("另行批准")
+        )
+        XCTAssertEqual(
+            issueProposalAcceptanceSystemImage(for: .create),
+            "plus.circle.fill"
+        )
+        XCTAssertEqual(
+            issueProposalAcceptanceSystemImage(for: .update),
+            "play.fill"
+        )
+    }
+
     private var runs: [DashboardRun] {
         [
             DashboardRun(

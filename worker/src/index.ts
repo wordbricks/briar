@@ -99,9 +99,7 @@ import {
 } from "./mobile-contract";
 import {
   archiveCompletedLogs,
-  cancelArchiveCleanup,
   collectStorageMetrics,
-  enqueueArchiveCleanup,
   expireArchives,
   getArchivedEvidenceImage,
   listArchivedExecutionAuditEvents,
@@ -109,7 +107,6 @@ import {
   listArchivedProjectAgentSessions,
   listArchivedRunEvidence,
   listArchivedRunEvents,
-  listArchiveObjectsForDeletion,
   processArchiveCleanupQueue,
   readArchivedTranscript,
   readLatestArchivedTranscriptForRun,
@@ -119,6 +116,7 @@ import {
   addOrganizationMember,
   assertQueuedHuntClaim,
   attemptGithubMergeAutoResume,
+  channelApprovalTablesAvailable,
   claimGithubDelivery,
   claimNextIssueAgentReply,
   claimNextProjectAgentTask,
@@ -128,6 +126,7 @@ import {
   completeIssueResultReview,
   completeProjectAgentScheduleRun,
   completeGithubDelivery,
+  completeSlackRevocation,
   completeSlackEvent,
   connectGithubInstallation,
   consumeGithubInstallState,
@@ -139,6 +138,7 @@ import {
   createIssueReworkProposal,
   createIssueDependency,
   createIssueAttachments,
+  issueAttachmentObjectKeysInUse,
   createRunEvidenceImages,
   createOrganization,
   createOrganizationInvitation,
@@ -149,6 +149,7 @@ import {
   createSlackOAuthState,
   claimSlackEvent,
   deleteAccountData,
+  deadLetterSlackRevocation,
   deleteSlackInstallation,
   disconnectGithubInstallation,
   disconnectGithubInstallationById,
@@ -162,6 +163,7 @@ import {
   EventKeyConflictError,
   enqueueIssueAgentReply,
   failIssueAgentReply,
+  failSlackRevocation,
   findProjectIdByAgentTokenHash,
   getProjectAgent,
   getClaimedIssueAgentReply,
@@ -178,6 +180,7 @@ import {
   getSlackInstallation,
   isOrganizationHandleAvailable,
   getProject,
+  getProjectRunChildMismatch,
   getProjectSettings,
   getProjectAgentSession,
   getProjectAgentTaskJob,
@@ -200,7 +203,6 @@ import {
   listIssueThreadMessages,
   listIssueResultReviews,
   listInboxReadStates,
-  listAllRunEvidenceImages,
   listEvidenceImagesForEvidence,
   listDashboardRuns,
   listDashboardChanges,
@@ -223,6 +225,7 @@ import {
   listProjectAgentScheduleRuns,
   listProjectAgentSchedules,
   listSlackInstallations,
+  listSlackRevocationQueue,
   moveHuntRun,
   planAccountDeletion,
   pruneExpiredDashboardChanges,
@@ -246,6 +249,7 @@ import {
   acceptIssueCreateProposal,
   acceptIssueUpdateProposal,
   acceptIssueReworkProposal,
+  reserveIssueCreateProposalApproval,
   rollbackNewAppIssue,
   startWorkflowStageLifecycle,
   releaseGithubDelivery,
@@ -262,6 +266,7 @@ import {
   updateProjectIcon,
   updateProjectIssueKeyPrefix,
   updateIssue,
+  updateIssueWithAttachmentMetadata,
   updateIssueCheckpoints,
   updateIssueExecutionPreferences,
   updateHuntRunExecutionMetrics,
@@ -416,7 +421,6 @@ import {
   getClaimedChannelReply,
   getOrganizationProject,
   listChannelAgentReplies,
-  listChannelAttachmentObjectKeys,
   listChannelAgents,
   listChannelMembers,
   listChannelRootMessages,
@@ -426,6 +430,7 @@ import {
   isChannelReactionEmoji,
   removeChannelAgent,
   removeChannelMember,
+  reserveChannelActionProposalApproval,
   renewChannelReplyLease,
   toggleChannelMessageReaction,
   updateChannel,
@@ -515,6 +520,30 @@ type IssueReplyExecutionSource = {
   effort: AgentSkillEffort | null;
 };
 
+export function issueClaimExecutionConfig(input: {
+  preferred: IssueReplyExecutionSource;
+  requested: IssueReplyExecutionSource;
+  activeSkill: IssueReplyExecutionSource | null;
+  agent: IssueReplyExecutionSource | null;
+}) {
+  // requested_* is the immutable choice approved for the current dispatch.
+  // preferred_* remains a default only until a dispatch snapshot exists.
+  const source = input.requested.provider
+    ? input.requested
+    : input.preferred.provider
+      ? input.preferred
+      : input.activeSkill?.provider
+        ? input.activeSkill
+        : input.agent?.provider
+          ? input.agent
+          : null;
+  return {
+    provider: source?.provider ?? null,
+    model: source?.model ?? null,
+    effort: source?.effort ?? null,
+  };
+}
+
 export function issueReplyExecutionConfig(input: {
   provider: AgentSkillProvider;
   preferred: IssueReplyExecutionSource;
@@ -523,8 +552,8 @@ export function issueReplyExecutionConfig(input: {
   agent: IssueReplyExecutionSource | null;
 }) {
   const source = [
-    input.preferred,
     input.requested,
+    input.preferred,
     input.activeSkill,
     input.agent,
   ].find((candidate) => candidate?.provider === input.provider);
@@ -639,6 +668,225 @@ export function approvedIssueCreation<T extends Record<string, unknown>>(
     status: "backlog" as const,
     checkpoints: [] as never[],
   };
+}
+
+/**
+ * Read the change cursor before the channel catalog. If a channel mutation
+ * lands between the two reads, the catalog already contains it and the older
+ * cursor safely replays the same mutation. Reading in the opposite order can
+ * return an old catalog with a new cursor and permanently skip that change.
+ */
+export async function loadChannelCatalogSnapshot<T>(
+  readCursor: () => Promise<number>,
+  readChannels: () => Promise<T[]>,
+) {
+  const cursor = await readCursor();
+  const channels = await readChannels();
+  return { channels, cursor };
+}
+
+type PostCommitCleanupOperation =
+  | "account_delete"
+  | "channel_delete"
+  | "issue_delete"
+  | "project_delete"
+  | "slack_uninstall";
+
+type PostCommitCleanupTask = {
+  queue: "archive" | "slack";
+  run: () => Promise<unknown>;
+};
+
+type PostCommitCleanupInput = {
+  context?: ExecutionContext;
+  operation: PostCommitCleanupOperation;
+  observedAt: string;
+  tasks: readonly PostCommitCleanupTask[];
+};
+
+const cleanupResultCounts = (result: unknown) => {
+  if (!result || typeof result !== "object") return {};
+  const allowed = new Set([
+    "deadLettered",
+    "deferred",
+    "deleted",
+    "failed",
+    "revoked",
+  ]);
+  return Object.fromEntries(
+    Object.entries(result).filter(
+      ([key, value]) =>
+        allowed.has(key) && typeof value === "number" && Number.isFinite(value),
+    ),
+  );
+};
+
+const logPostCommitCleanup = (input: {
+  operation: PostCommitCleanupOperation;
+  observedAt: string;
+  queue: PostCommitCleanupTask["queue"];
+  result?: unknown;
+  rejection?: unknown;
+}) => {
+  try {
+    if (input.rejection !== undefined) {
+      console.error(JSON.stringify({
+        message: "Post-commit cleanup task rejected",
+        operation: input.operation,
+        queue: input.queue,
+        observedAt: input.observedAt,
+        errorType: input.rejection instanceof Error
+          ? input.rejection.name
+          : "UnknownError",
+      }));
+      return;
+    }
+    const result = cleanupResultCounts(input.result);
+    const hasQueuedFailures = (result.failed ?? 0) > 0 ||
+      (result.deadLettered ?? 0) > 0;
+    const record = JSON.stringify({
+      message: hasQueuedFailures
+        ? "Post-commit cleanup completed with queued failures"
+        : "Post-commit cleanup completed",
+      operation: input.operation,
+      queue: input.queue,
+      observedAt: input.observedAt,
+      result,
+    });
+    if (hasQueuedFailures) console.error(record);
+    else console.log(record);
+  } catch {
+    // Logging must never turn durable deletion into a failed HTTP response or
+    // make the already-guarded cleanup promise reject.
+  }
+};
+
+/**
+ * External cleanup runs only after its D1 deletion/outbox transaction commits.
+ * The returned promise is observability-only: callers must not await it before
+ * returning the successful deletion response.
+ */
+export function schedulePostCommitCleanup(input: PostCommitCleanupInput) {
+  const guarded = Promise.all(
+    input.tasks.map(async (task) => {
+      try {
+        const result = await task.run();
+        logPostCommitCleanup({
+          operation: input.operation,
+          observedAt: input.observedAt,
+          queue: task.queue,
+          result,
+        });
+      } catch (rejection) {
+        logPostCommitCleanup({
+          operation: input.operation,
+          observedAt: input.observedAt,
+          queue: task.queue,
+          rejection,
+        });
+      }
+    }),
+  ).then(() => undefined);
+
+  if (input.context) {
+    try {
+      input.context.waitUntil(guarded);
+    } catch (rejection) {
+      // A test context or a late runtime context may reject registration. The
+      // task is already rejection-handled and can still make best-effort
+      // progress without changing the committed deletion response.
+      logPostCommitCleanup({
+        operation: input.operation,
+        observedAt: input.observedAt,
+        queue: input.tasks[0]?.queue ?? "archive",
+        rejection,
+      });
+      void guarded;
+    }
+  } else {
+    void guarded;
+  }
+  return guarded;
+}
+
+export function responseWithPostCommitCleanup(
+  response: Response,
+  input: PostCommitCleanupInput,
+) {
+  void schedulePostCommitCleanup(input);
+  return response;
+}
+
+export function assertRunEventIdentityNotOverridden(input: {
+  run: Pick<HuntRunRow, "source" | "source_key"> | null;
+  source?: string | null;
+  sourceKey?: string | null;
+}) {
+  if (
+    input.run &&
+    (
+      (input.source != null && input.source !== input.run.source) ||
+      (input.sourceKey != null && input.sourceKey !== input.run.source_key)
+    )
+  ) {
+    throw new HttpError(400, "A claimed run's identity cannot be changed");
+  }
+}
+
+async function createApprovedChannelProposalIssue(input: {
+  db: D1Database;
+  project: Pick<ProjectRow, "id" | "name">;
+  proposalId: string;
+  channelId: string;
+  sourceKey: string;
+  title: string;
+  description: string | null;
+  priority: number | null;
+  createdByUserId: string;
+  occurredAt: string;
+}) {
+  const settings = await getProjectSettings(input.db, input.project.id);
+  return recordHuntEvent(input.db, input.project.id, {
+    source: "issue",
+    sourceKey: input.sourceKey,
+    title: input.title,
+    stage: "queued",
+    status: "backlog",
+    workflowStage: null,
+    eventKey: `${input.sourceKey}:backlog:intake`,
+    occurredAt: input.occurredAt,
+    actor: "briar-channel",
+    repository: settings?.github_repository ?? input.project.name,
+    detail: "채널 대화에서 사용자가 승인한 제안으로 생성된 이슈입니다.",
+    priority: input.priority,
+    assigneeUserId: null,
+    issueCheckpoints: [],
+    fullAuto: false,
+    branch: null,
+    commitSha: null,
+    tracker: null,
+    issueDescription: input.description,
+    resultSummary: null,
+    structuredResult: null,
+    pullRequestUrls: [],
+    targetSha: null,
+    sourceCreatedAt: input.occurredAt,
+    qaStatus: null,
+    stagingQaDetail: null,
+    productionQaDetail: null,
+    context: {
+      origin: "briar-channel",
+      proposalId: input.proposalId,
+      channelId: input.channelId,
+      issueId: input.proposalId,
+      attachmentCount: 0,
+      fullAuto: false,
+    },
+    createdByUserId: input.createdByUserId,
+    preferredAgentProvider: null,
+    preferredAgentModel: null,
+    preferredAgentEffort: null,
+  });
 }
 
 async function readBoundedMultipartForm(
@@ -2443,6 +2691,29 @@ const sha256Bytes = async (value: ArrayBuffer) => {
     .join("");
 };
 
+const channelProposalIssueSourcePrefix = "briar-channel-approved:";
+const legacyChannelProposalIssueSourcePrefix = "briar-channel-proposal:";
+const conversationProposalIssueSourcePrefix =
+  "briar-conversation-approved:";
+const legacyConversationProposalIssueSourcePrefix =
+  "briar-conversation-proposal:";
+
+const newChannelProposalIssueSourceKey = () =>
+  `${channelProposalIssueSourcePrefix}${
+    crypto.randomUUID().replaceAll("-", "")
+  }${crypto.randomUUID().replaceAll("-", "")}`;
+
+const newConversationProposalIssueSourceKey = () =>
+  `${conversationProposalIssueSourcePrefix}${
+    crypto.randomUUID().replaceAll("-", "")
+  }${crypto.randomUUID().replaceAll("-", "")}`;
+
+const isReservedProposalIssueSourceKey = (sourceKey: string) =>
+  sourceKey.startsWith(channelProposalIssueSourcePrefix) ||
+  sourceKey.startsWith(legacyChannelProposalIssueSourcePrefix) ||
+  sourceKey.startsWith(conversationProposalIssueSourcePrefix) ||
+  sourceKey.startsWith(legacyConversationProposalIssueSourcePrefix);
+
 const pngResponse = (png: ArrayBuffer) =>
   new Response(png, {
     headers: {
@@ -2468,6 +2739,17 @@ const attachmentResponse = (
   headers.set("ETag", object.httpEtag);
   headers.set("X-Content-Type-Options", "nosniff");
   return new Response(body, { headers });
+};
+
+const deleteUnreferencedUploadedIssueObjects = async (
+  db: D1Database,
+  attachmentsBucket: R2Bucket,
+  objectKeys: string[],
+) => {
+  if (objectKeys.length === 0) return;
+  const inUse = await issueAttachmentObjectKeysInUse(db, objectKeys);
+  const deletable = objectKeys.filter((objectKey) => !inUse.has(objectKey));
+  if (deletable.length > 0) await attachmentsBucket.delete(deletable);
 };
 
 async function createIssueWithAttachments(input: {
@@ -2590,7 +2872,11 @@ async function createIssueWithAttachments(input: {
     }
     if (uploadedKeys.length > 0) {
       try {
-        await input.attachmentsBucket.delete(uploadedKeys);
+        await deleteUnreferencedUploadedIssueObjects(
+          input.db,
+          input.attachmentsBucket,
+          uploadedKeys,
+        );
       } catch (cleanupError) {
         console.error(
           JSON.stringify({
@@ -2657,46 +2943,35 @@ async function updateIssueWithAttachments(input: {
         projectId: input.project.id,
       }),
     );
-    const run = await updateIssue(input.db, input.project.id, input.runId, {
+    const updated = await updateIssueWithAttachmentMetadata(
+      input.db,
+      input.project.id,
+      input.runId,
+      {
       title: input.issue.title,
       description: issueDescription ?? null,
       priority: input.issue.priority ?? null,
       assigneeUserId: input.issue.assigneeUserId,
       updatedAt: input.updatedAt,
-    });
-    if (!run) throw new HttpError(404, "Run not found");
-    await createIssueAttachments(
-      input.db,
-      input.project.id,
-      input.runId,
-      storedAttachments.map(({ file: _file, ...attachment }) => attachment),
-    );
-    if (removed.length > 0) {
-      await deleteIssueAttachments(
-        input.db,
-        input.project.id,
-        input.runId,
-        removed.map((attachment) => attachment.id),
-      );
-      await Promise.all(
-        removed.map((attachment) =>
-          input.attachmentsBucket.delete(attachment.object_key),
+        attachments: storedAttachments.map(
+          ({ file: _file, ...attachment }) => attachment,
         ),
-      ).catch(() => undefined);
+        removedAttachmentIds: removed.map((attachment) => attachment.id),
+      },
+    );
+    if (!updated) throw new HttpError(404, "Run not found");
+    if (updated.deletedObjectKeys.length > 0) {
+      await input.attachmentsBucket
+        .delete(updated.deletedObjectKeys)
+        .catch(() => undefined);
     }
-    return run;
+    return updated.run;
   } catch (error) {
     if (uploadedKeys.length > 0) {
-      await Promise.all(
-        uploadedKeys.map((objectKey) =>
-          input.attachmentsBucket.delete(objectKey),
-        ),
-      ).catch(() => undefined);
-      await deleteIssueAttachments(
+      await deleteUnreferencedUploadedIssueObjects(
         input.db,
-        input.project.id,
-        input.runId,
-        storedAttachments.map((attachment) => attachment.id),
+        input.attachmentsBucket,
+        uploadedKeys,
       ).catch(() => undefined);
     }
     throw error;
@@ -3257,6 +3532,92 @@ const slackConfigAvailable = (env: Env) =>
       env.SLACK_SIGNING_SECRET?.trim() &&
       env.SLACK_TOKEN_ENCRYPTION_KEY?.trim(),
   );
+
+export async function processSlackRevocationQueue(
+  db: D1Database,
+  env: Pick<Env, "SLACK_TOKEN_ENCRYPTION_KEY">,
+  observedAt: string,
+  limit = 100,
+) {
+  const queued = await listSlackRevocationQueue(db, observedAt, limit);
+  const encryptionKey = env.SLACK_TOKEN_ENCRYPTION_KEY?.trim();
+  if (!encryptionKey) {
+    return {
+      revoked: 0,
+      failed: 0,
+      deadLettered: 0,
+      deferred: queued.length,
+    };
+  }
+  let revoked = 0;
+  let failed = 0;
+  let deadLettered = 0;
+  for (const item of queued) {
+    try {
+      const token = await decryptSlackToken(
+        item.encrypted_bot_token,
+        item.token_iv,
+        encryptionKey,
+      );
+      await callSlackApi("auth.revoke", token, { test: false });
+      await completeSlackRevocation(db, item.id);
+      revoked += 1;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      // An already-invalid token has reached the desired terminal state. Slack
+      // may report any of these when a previous revoke response was lost.
+      if (
+        message.includes("account_inactive") ||
+        message.includes("invalid_auth") ||
+        message.includes("token_revoked")
+      ) {
+        await completeSlackRevocation(db, item.id);
+        revoked += 1;
+        continue;
+      }
+      const nextAttempt = item.attempts + 1;
+      if (nextAttempt >= 8) {
+        const transitioned = await deadLetterSlackRevocation(
+          db,
+          item.id,
+          observedAt,
+          message,
+        );
+        if (transitioned) {
+          deadLettered += 1;
+          console.error(JSON.stringify({
+            message: "Slack token revocation dead-lettered",
+            queueId: item.id,
+            teamId: item.team_id,
+            attempts: nextAttempt,
+            deadLetteredAt: observedAt,
+            error: message,
+          }));
+        }
+        continue;
+      }
+      const retryDelayMs = Math.min(
+        24 * 60 * 60_000,
+        5 * 60_000 * 2 ** Math.max(0, nextAttempt - 1),
+      );
+      const nextAttemptAt = new Date(
+        Date.parse(observedAt) + retryDelayMs,
+      ).toISOString();
+      if (
+        await failSlackRevocation(
+          db,
+          item.id,
+          observedAt,
+          nextAttemptAt,
+          message,
+        )
+      ) {
+        failed += 1;
+      }
+    }
+  }
+  return { revoked, failed, deadLettered, deferred: 0 };
+}
 
 const slackOAuthRedirectUri = (origin: string) =>
   `${origin}/slack/oauth/callback`;
@@ -4854,15 +5215,21 @@ const readLatestTranscriptForRunWithArchive = async (
 
 const removeOrphanedIssueAttachments = async (
   db: D1Database,
+  archivesBucket: R2Bucket,
   attachmentsBucket: R2Bucket,
   projectId: string,
   runId: string,
 ) => {
-  const [messages, attachments] = await Promise.all([
-    listIssueMessages(db, projectId, runId),
+  const [run, messages, attachments] = await Promise.all([
+    getHuntRunForProject(db, projectId, runId),
+    listIssueMessagesWithArchive(db, archivesBucket, projectId, runId),
     listIssueAttachments(db, projectId, runId),
   ]);
+  if (!run) return;
   const referenced = new Set<string>();
+  for (const id of issueAttachmentReferences(run.issue_description ?? "")) {
+    referenced.add(id);
+  }
   for (const message of messages) {
     for (const id of issueAttachmentReferences(message.body)) {
       referenced.add(id);
@@ -4870,15 +5237,14 @@ const removeOrphanedIssueAttachments = async (
   }
   const orphaned = attachments.filter((attachment) => !referenced.has(attachment.id));
   if (orphaned.length === 0) return;
-  await deleteIssueAttachments(
+  const deletedObjectKeys = await deleteIssueAttachments(
     db,
     projectId,
     runId,
     orphaned.map((attachment) => attachment.id),
   );
-  await Promise.all(
-    orphaned.map((attachment) => attachmentsBucket.delete(attachment.object_key)),
-  ).catch((error) => {
+  if (deletedObjectKeys.length === 0) return;
+  await attachmentsBucket.delete(deletedObjectKeys).catch((error) => {
     console.error(
       JSON.stringify({
         message: "orphaned issue attachment cleanup failed",
@@ -5143,6 +5509,7 @@ async function route(
   db: D1Database,
   attachmentsBucket: R2Bucket,
   env: Env,
+  context?: ExecutionContext,
 ): Promise<Response> {
   const { pathname } = new URL(request.url);
 
@@ -5254,93 +5621,74 @@ async function route(
       );
     }
 
-    const cleanupPlans = await Promise.all(
-      plan.projectIds.map(async (projectId) => {
-        const [attachments, evidenceImages, archivedObjects, agents] =
-          await Promise.all([
-            listIssueAttachments(db, projectId),
-            listRunEvidenceImages(db, projectId),
-            listArchiveObjectsForDeletion(db, projectId),
-            listProjectAgents(db, projectId),
-          ]);
-        return {
-          projectId,
-          objects: {
-            archives: [...new Set(archivedObjects.archives)],
-            attachments: [
-              ...new Set([
-                ...archivedObjects.attachments,
-                ...attachments.map((attachment) => attachment.object_key),
-                ...(evidenceImages ?? []).map((image) => image.object_key),
-                ...agents.flatMap((agent) =>
-                  agent.avatar_spritesheet_object_key
-                    ? [agent.avatar_spritesheet_object_key]
-                    : [],
-                ),
-              ]),
-            ],
-          },
-        };
-      }),
-    );
+    for (const projectId of plan.projectIds) {
+      if (await getProjectRunChildMismatch(db, projectId)) {
+        throw new HttpError(
+          409,
+          "Project transfer reconciliation is required before deletion",
+          "PROJECT_TRANSFER_RECONCILIATION_REQUIRED",
+        );
+      }
+    }
+
     const observedAt = new Date().toISOString();
-    for (const cleanup of cleanupPlans) {
-      await enqueueArchiveCleanup(
-        db,
-        cleanup.projectId,
-        null,
-        cleanup.objects,
+    let deletion: Awaited<ReturnType<typeof deleteAccountData>>;
+    try {
+      deletion = await deleteAccountData(db, {
+        userId: session.user.id,
+        email: session.user.email,
         observedAt,
+      });
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        (
+          error.message.includes("project has stranded transferred issue data") ||
+          error.message.includes("quarantined transcript")
+        )
+      ) {
+        throw new HttpError(
+          409,
+          "Project transfer reconciliation is required before deletion",
+          "PROJECT_TRANSFER_RECONCILIATION_REQUIRED",
+        );
+      }
+      throw error;
+    }
+    if (deletion === "blocked") {
+      throw new HttpError(
+        409,
+        "Account deletion state changed; review organization ownership and try again",
+        "ACCOUNT_DELETION_STATE_CHANGED",
       );
     }
-
-    const slackInstallations = (
-      await Promise.all(
-        plan.organizationIds.map((organizationId) =>
-          listSlackInstallations(db, organizationId),
-        ),
-      )
-    ).flat();
-    if (slackConfigAvailable(env)) {
-      for (const installation of slackInstallations) {
-        try {
-          const token = await decryptSlackToken(
-            installation.encrypted_bot_token,
-            installation.token_iv,
-            env.SLACK_TOKEN_ENCRYPTION_KEY,
-          );
-          await callSlackApi("auth.revoke", token, { test: false });
-        } catch (error) {
-          console.error(
-            JSON.stringify({
-              message: "Slack token revoke failed during account deletion",
-              error: error instanceof Error ? error.message : String(error),
-              teamId: installation.team_id,
-            }),
-          );
-        }
-      }
-    }
-
-    const deleted = await deleteAccountData(db, {
-      userId: session.user.id,
-      email: session.user.email,
-      organizationIds: plan.organizationIds,
-    });
-    if (!deleted) {
-      for (const cleanup of cleanupPlans) {
-        await cancelArchiveCleanup(db, cleanup.objects);
-      }
+    if (deletion === "not_found") {
       throw new HttpError(404, "Account not found");
     }
-    await processArchiveCleanupQueue(
-      db,
-      env.ARCHIVES,
-      attachmentsBucket,
-      observedAt,
-      1_000,
+    return responseWithPostCommitCleanup(
+      new Response(null, { status: 204, headers: corsHeaders }),
+      {
+        context,
+        operation: "account_delete",
+        observedAt,
+        tasks: [
+          {
+            queue: "archive",
+            run: () => processArchiveCleanupQueue(
+              db,
+              env.ARCHIVES,
+              attachmentsBucket,
+              observedAt,
+              1_000,
+            ),
+          },
+          {
+            queue: "slack",
+            run: () => processSlackRevocationQueue(db, env, observedAt, 100),
+          },
+        ],
+      },
     );
-    return new Response(null, { status: 204, headers: corsHeaders });
   }
 
   const publicInvitationMatch = pathname.match(
@@ -5833,10 +6181,13 @@ async function route(
     const organizationId = organizationChannelsMatch[1];
     const role = await getOrganizationRole(db, organizationId, session.user.id);
     if (!role) throw new HttpError(404, "Organization not found");
-    const channels = await listChannels(db, organizationId, session.user.id);
+    const snapshot = await loadChannelCatalogSnapshot(
+      () => getChannelSyncCursor(db, organizationId),
+      () => listChannels(db, organizationId, session.user.id),
+    );
     return json({
-      channels: channels.map(channelJson),
-      cursor: await getChannelSyncCursor(db, organizationId),
+      channels: snapshot.channels.map(channelJson),
+      cursor: snapshot.cursor,
     });
   }
   if (organizationChannelsMatch && request.method === "POST") {
@@ -5937,31 +6288,30 @@ async function route(
     if (!canManageOrganization(role)) {
       throw new HttpError(403, "Organization admin access required");
     }
-    const attachmentKeys = await listChannelAttachmentObjectKeys(
-      db,
-      organizationId,
-      organizationChannelMatch[2],
-    );
+    const observedAt = new Date().toISOString();
     const deleted = await deleteChannel(
       db,
       organizationId,
       organizationChannelMatch[2],
+      session.user.id,
+      observedAt,
     );
     if (!deleted) throw new HttpError(404, "Channel not found");
-    if (attachmentKeys.length > 0) {
-      try {
-        await attachmentsBucket.delete(attachmentKeys);
-      } catch (error) {
-        console.error(JSON.stringify({
-          message: "Channel attachment cleanup failed",
-          organizationId,
-          channelId: organizationChannelMatch[2],
-          attachmentCount: attachmentKeys.length,
-          error: error instanceof Error ? error.message : String(error),
-        }));
-      }
-    }
-    return json({ deleted: true });
+    return responseWithPostCommitCleanup(json({ deleted: true }), {
+      context,
+      operation: "channel_delete",
+      observedAt,
+      tasks: [{
+        queue: "archive",
+        run: () => processArchiveCleanupQueue(
+          db,
+          env.ARCHIVES,
+          attachmentsBucket,
+          observedAt,
+          1_000,
+        ),
+      }],
+    });
   }
 
   const channelMemberMatch = pathname.match(
@@ -6314,6 +6664,12 @@ async function route(
         resultRunId: proposal.result_run_id,
       });
     }
+    if (channel.archived_at) {
+      throw new HttpError(409, "Channel is archived");
+    }
+    if (proposal.action_type !== "request_issue_create") {
+      throw new HttpError(409, "This proposal cannot create an issue");
+    }
     assertChannelProposalAuthorScope({
       channelOrganizationId: channel.organization_id,
       proposedProjectId: proposal.project_id,
@@ -6347,37 +6703,67 @@ async function route(
     const payload = channelIssueProposalPayloadSchema.parse(
       JSON.parse(proposal.payload_json),
     );
-    const created = await createIssueWithAttachments({
-      db,
-      attachmentsBucket,
-      project,
-      issue: approvedIssueCreation(payload.issue),
-      attachments: [],
-      sourceKey: `briar-channel-proposal:${proposal.id}`,
-      actor: "briar-channel",
-      detail: "채널 대화에서 사용자가 승인한 제안으로 생성된 이슈입니다.",
-      context: {
-        origin: "briar-channel",
-        proposalId: proposal.id,
-        channelId: channel.id,
-      },
-      issueId: proposal.id,
-      createdByUserId: session.user.id,
-      occurredAt: proposal.created_at,
-    });
-    const accepted = await acceptChannelActionProposal(db, {
+    const approvedAt = new Date().toISOString();
+    const reservation = await reserveChannelActionProposalApproval(db, {
+      organizationId: channel.organization_id,
       channelId: channel.id,
       proposalId: proposal.id,
       projectId: project.id,
       userId: session.user.id,
-      resultRunId: created.runId,
-      acceptedAt: new Date().toISOString(),
+      approvedAt,
+      issueSourceKey: newChannelProposalIssueSourceKey(),
     });
-    if (!accepted) throw new HttpError(409, "Proposal changed");
+    if (!reservation) {
+      const current = await getChannelActionProposal(db, channel.id, proposal.id);
+      if (
+        current?.status === "accepted" &&
+        current.project_id &&
+        current.result_run_id
+      ) {
+        return json({
+          outcome: "already_accepted",
+          projectId: current.project_id,
+          resultRunId: current.result_run_id,
+        });
+      }
+      if (
+        current?.status === "pending" &&
+        current.project_id &&
+        current.project_id !== project.id
+      ) {
+        throw new HttpError(
+          409,
+          "The proposal was already approved for another project",
+        );
+      }
+      throw new HttpError(409, "Proposal changed");
+    }
+    const approvedIssue = approvedIssueCreation(payload.issue);
+    const resultRunId = await createApprovedChannelProposalIssue({
+      db,
+      project,
+      sourceKey: reservation.issue_source_key,
+      proposalId: proposal.id,
+      channelId: channel.id,
+      title: approvedIssue.title,
+      description: approvedIssue.description,
+      priority: approvedIssue.priority,
+      createdByUserId: reservation.accepted_by_user_id,
+      occurredAt: proposal.created_at,
+    });
+    const finalized = await getChannelActionProposal(db, channel.id, proposal.id);
+    if (
+      finalized?.status !== "accepted" ||
+      finalized.project_id !== project.id ||
+      finalized.result_run_id !== resultRunId ||
+      finalized.issue_source_key !== reservation.issue_source_key
+    ) {
+      throw new HttpError(409, "Proposal approval was not finalized");
+    }
     return json({
       outcome: "accepted",
       projectId: project.id,
-      resultRunId: created.runId,
+      resultRunId,
     });
   }
 
@@ -6727,39 +7113,34 @@ async function route(
       organizationSlackInstallationMatch[2],
     );
     if (request.method === "DELETE") {
-      const installation = await getSlackInstallation(db, teamId);
-      if (
-        !installation ||
-        installation.organization_id !==
-          organizationSlackInstallationMatch[1]
-      ) {
+      const observedAt = new Date().toISOString();
+      const outcome = await deleteSlackInstallation(db, {
+        organizationId: organizationSlackInstallationMatch[1],
+        teamId,
+        actorUserId: session.user.id,
+        observedAt,
+      });
+      if (outcome === "forbidden") {
+        throw new HttpError(403, "Organization admin access required");
+      }
+      if (outcome === "not_found") {
         throw new HttpError(404, "Slack workspace not found");
       }
-      if (slackConfigAvailable(env)) {
-        try {
-          const token = await decryptSlackToken(
-            installation.encrypted_bot_token,
-            installation.token_iv,
-            env.SLACK_TOKEN_ENCRYPTION_KEY,
-          );
-          await callSlackApi("auth.revoke", token, { test: false });
-        } catch (error) {
-          console.error(
-            JSON.stringify({
-              message: "Slack token revoke failed",
-              error: error instanceof Error ? error.message : String(error),
-              teamId,
-            }),
-          );
-        }
-      }
-      const removed = await deleteSlackInstallation(
-        db,
-        organizationSlackInstallationMatch[1],
-        teamId,
+      // Credential durability is already committed. A missing encryption key
+      // or Slack outage leaves the row due for scheduled retry instead of
+      // risking credential loss; no OAuth/signing configuration is required.
+      return responseWithPostCommitCleanup(
+        new Response(null, { status: 204, headers: corsHeaders }),
+        {
+          context,
+          operation: "slack_uninstall",
+          observedAt,
+          tasks: [{
+            queue: "slack",
+            run: () => processSlackRevocationQueue(db, env, observedAt, 1),
+          }],
+        },
       );
-      if (!removed) throw new HttpError(404, "Slack workspace not found");
-      return new Response(null, { status: 204, headers: corsHeaders });
     }
     const input = slackInstallationUpdateSchema.parse(await readJson(request));
     const updated = await updateSlackInstallationProject(
@@ -6836,44 +7217,59 @@ async function route(
     if (project.member_role !== "owner") {
       throw new HttpError(403, "Organization owner access required");
     }
-    const [attachments, evidenceImages, archivedObjects] = await Promise.all([
-      listIssueAttachments(db, project.id),
-      listRunEvidenceImages(db, project.id),
-      listArchiveObjectsForDeletion(db, project.id),
-    ]);
+    if (await getProjectRunChildMismatch(db, project.id)) {
+      throw new HttpError(
+        409,
+        "Project transfer reconciliation is required before deletion",
+        "PROJECT_TRANSFER_RECONCILIATION_REQUIRED",
+      );
+    }
     const observedAt = new Date().toISOString();
-    await enqueueArchiveCleanup(
-      db,
-      project.id,
-      null,
-      archivedObjects,
-      observedAt,
-    );
-    const attachmentKeys = [...attachments, ...(evidenceImages ?? [])].map(
-      (attachment) => attachment.object_key,
-    );
+    let deleted = false;
     try {
-      for (let offset = 0; offset < attachmentKeys.length; offset += 1_000) {
-        await attachmentsBucket.delete(
-          attachmentKeys.slice(offset, offset + 1_000),
+      deleted = await deleteProject(
+        db,
+        project.id,
+        session.user.id,
+        observedAt,
+      );
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        (
+          error.message.includes("project has stranded transferred issue data") ||
+          error.message.includes("quarantined transcript")
+        )
+      ) {
+        throw new HttpError(
+          409,
+          "Project transfer reconciliation is required before deletion",
+          "PROJECT_TRANSFER_RECONCILIATION_REQUIRED",
         );
       }
-    } catch (error) {
-      await cancelArchiveCleanup(db, archivedObjects);
       throw error;
     }
-    if (!(await deleteProject(db, project.id, session.user.id))) {
-      await cancelArchiveCleanup(db, archivedObjects);
+    if (!deleted) {
       throw new HttpError(404, "Project not found");
     }
-    await processArchiveCleanupQueue(
-      db,
-      env.ARCHIVES,
-      attachmentsBucket,
-      observedAt,
-      1_000,
+    return responseWithPostCommitCleanup(
+      new Response(null, { status: 204, headers: corsHeaders }),
+      {
+        context,
+        operation: "project_delete",
+        observedAt,
+        tasks: [{
+          queue: "archive",
+          run: () => processArchiveCleanupQueue(
+            db,
+            env.ARCHIVES,
+            attachmentsBucket,
+            observedAt,
+            1_000,
+          ),
+        }],
+      },
     );
-    return new Response(null, { status: 204, headers: corsHeaders });
   }
 
   const projectIconMatch = pathname.match(
@@ -8295,8 +8691,10 @@ async function route(
         issueMessagesMatch[2],
         storedAttachments.map((attachment) => attachment.id),
       ).catch(() => undefined);
-      await Promise.all(
-        uploadedKeys.map((objectKey) => attachmentsBucket.delete(objectKey)),
+      await deleteUnreferencedUploadedIssueObjects(
+        db,
+        attachmentsBucket,
+        uploadedKeys,
       ).catch(() => undefined);
       throw error;
     }
@@ -8390,6 +8788,7 @@ async function route(
     if (!updated) throw new HttpError(404, "Message not found");
     await removeOrphanedIssueAttachments(
       db,
+      env.ARCHIVES,
       attachmentsBucket,
       project.id,
       issueMessageEditMatch[2],
@@ -8431,6 +8830,7 @@ async function route(
     if (!deleted) throw new HttpError(404, "Message not found");
     await removeOrphanedIssueAttachments(
       db,
+      env.ARCHIVES,
       attachmentsBucket,
       project.id,
       issueMessageEditMatch[2],
@@ -8637,40 +9037,102 @@ async function route(
       type: proposal.action_type,
       ...rawPayload,
     });
-    const created = await createIssueWithAttachments({
-      db,
-      attachmentsBucket,
-      project,
-      issue: approvedIssueCreation(action.issue),
-      attachments: [],
-      sourceKey: `briar-conversation-proposal:${proposal.id}`,
-      // Keep the event payload stable across retries. The accepting user is
-      // recorded on the proposal row itself.
-      actor: "briar-conversation",
-      detail: "대화창에서 사용자가 승인한 제안으로 생성된 이슈입니다.",
-      context: {
-        origin: "briar-conversation",
-        proposalId: proposal.id,
-        conversationRunId: proposal.conversation_run_id,
-      },
-      issueId: proposal.id,
-      createdByUserId: session.user.id,
-      occurredAt: proposal.created_at,
+    const reservation = await reserveIssueCreateProposalApproval(db, {
+      projectId: project.id,
+      conversationRunId: proposal.conversation_run_id,
+      proposalId: proposal.id,
+      userId: session.user.id,
+      reservedAt: acceptedAt,
+      issueSourceKey: newConversationProposalIssueSourceKey(),
     });
-    const accepted = await acceptIssueCreateProposal(db, {
+    if (!reservation) {
+      const latest = await getIssueActionProposal(
+        db,
+        project.id,
+        proposal.conversation_run_id,
+        proposal.id,
+      );
+      if (latest?.status === "accepted") {
+        return json({
+          proposal: issueActionProposalJson(latest),
+          outcome: "already_accepted",
+          resultRunId: latest.result_run_id,
+        });
+      }
+      throw new HttpError(
+        409,
+        "This issue proposal is being accepted by another member",
+        "ISSUE_ACTION_PROPOSAL_CONFLICT",
+      );
+    }
+    if (!reservation.issue_source_key) {
+      throw new HttpError(
+        409,
+        "This issue proposal has no approval identity",
+        "ISSUE_ACTION_PROPOSAL_CONFLICT",
+      );
+    }
+    let created: Awaited<ReturnType<typeof createIssueWithAttachments>>;
+    try {
+      created = await createIssueWithAttachments({
+        db,
+        attachmentsBucket,
+        project,
+        issue: approvedIssueCreation(action.issue),
+        attachments: [],
+        sourceKey: reservation.issue_source_key,
+        // Keep the event payload stable across retries. The accepting user is
+        // recorded on the proposal row itself.
+        actor: "briar-conversation",
+        detail: "대화창에서 사용자가 승인한 제안으로 생성된 이슈입니다.",
+        context: {
+          origin: "briar-conversation",
+          proposalId: proposal.id,
+          conversationRunId: proposal.conversation_run_id,
+        },
+        issueId: proposal.id,
+        createdByUserId: reservation.approval_reserved_by_user_id,
+        occurredAt: proposal.created_at,
+      });
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        error.message.includes(
+          "conversation proposal no longer belongs to project",
+        )
+      ) {
+        throw new HttpError(
+          409,
+          "The conversation moved before this proposal could be accepted",
+          "ISSUE_ACTION_PROPOSAL_CONFLICT",
+        );
+      }
+      throw error;
+    }
+    const finalized = await acceptIssueCreateProposal(db, {
       projectId: project.id,
       conversationRunId: proposal.conversation_run_id,
       proposalId: proposal.id,
       userId: session.user.id,
       acceptedAt,
       resultRunId: created.runId,
-    }) ?? await getIssueActionProposal(
+    });
+    const accepted = finalized ?? await getIssueActionProposal(
       db,
       project.id,
       proposal.conversation_run_id,
       proposal.id,
     );
-    if (!accepted) throw new HttpError(409, "Issue action proposal changed");
+    if (
+      !accepted || accepted.status !== "accepted" ||
+      accepted.result_run_id !== created.runId
+    ) {
+      throw new HttpError(
+        409,
+        "The created issue is not eligible for this approval",
+        "ISSUE_ACTION_PROPOSAL_CONFLICT",
+      );
+    }
     return json({
       proposal: issueActionProposalJson(accepted),
       outcome:
@@ -9023,19 +9485,7 @@ async function route(
     const session = await requireSession(auth, request);
     const project = await getProject(db, issueUpdateMatch[1], session.user.id);
     if (!project) throw new HttpError(404, "Project not found");
-    const [attachments, evidenceImages, archivedObjects] = await Promise.all([
-      listIssueAttachments(db, project.id, issueUpdateMatch[2]),
-      listAllRunEvidenceImages(db, project.id, issueUpdateMatch[2]),
-      listArchiveObjectsForDeletion(db, project.id, issueUpdateMatch[2]),
-    ]);
     const observedAt = new Date().toISOString();
-    await enqueueArchiveCleanup(
-      db,
-      project.id,
-      issueUpdateMatch[2],
-      archivedObjects,
-      observedAt,
-    );
     const outcome = await deleteIssue(
       db,
       project.id,
@@ -9043,37 +9493,29 @@ async function route(
       observedAt,
     );
     if (outcome === "not_found") {
-      await cancelArchiveCleanup(db, archivedObjects);
       throw new HttpError(404, "Run not found");
     }
     if (outcome === "active") {
-      await cancelArchiveCleanup(db, archivedObjects);
       throw new HttpError(409, "An active issue cannot be deleted");
     }
-    const attachmentKeys = [...attachments, ...(evidenceImages ?? [])].map(
-      (attachment) => attachment.object_key,
+    return responseWithPostCommitCleanup(
+      new Response(null, { status: 204, headers: corsHeaders }),
+      {
+        context,
+        operation: "issue_delete",
+        observedAt,
+        tasks: [{
+          queue: "archive",
+          run: () => processArchiveCleanupQueue(
+            db,
+            env.ARCHIVES,
+            attachmentsBucket,
+            observedAt,
+            1_000,
+          ),
+        }],
+      },
     );
-    if (attachmentKeys.length > 0) {
-      try {
-        await attachmentsBucket.delete(attachmentKeys);
-      } catch (error) {
-        console.error(
-          JSON.stringify({
-            message: "deleted issue attachment cleanup failed",
-            error: error instanceof Error ? error.message : String(error),
-            runId: issueUpdateMatch[2],
-          }),
-        );
-      }
-    }
-    await processArchiveCleanupQueue(
-      db,
-      env.ARCHIVES,
-      attachmentsBucket,
-      observedAt,
-      1_000,
-    );
-    return new Response(null, { status: 204, headers: corsHeaders });
   }
 
   const issueTransferMatch = pathname.match(
@@ -9130,6 +9572,24 @@ async function route(
       throw new HttpError(
         409,
         "The target project already has an issue with the same source key",
+      );
+    }
+    if (outcome === "archive_in_progress") {
+      throw new HttpError(
+        409,
+        "This issue is being archived; retry the transfer shortly",
+      );
+    }
+    if (outcome === "proposal_approval_in_progress") {
+      throw new HttpError(
+        409,
+        "This issue has an approval in progress; retry the transfer shortly",
+      );
+    }
+    if (outcome === "execution_approval_boundary") {
+      throw new HttpError(
+        409,
+        "Completed or cancelled channel-approved issues cannot be transferred",
       );
     }
     return json({
@@ -10882,6 +11342,16 @@ async function route(
 
   if (pathname === "/queue/claims" && request.method === "POST") {
     const input = claimInputSchema.parse(await readJson(request));
+    if (!(await channelApprovalTablesAvailable(db))) {
+      // Migration-first is a security boundary, not just an operational
+      // preference. Refuse all claims when a new Worker is accidentally
+      // deployed before 0090 so a legacy cross-project transfer cannot run in
+      // the target project during that window.
+      throw new HttpError(
+        503,
+        "Channel issue approval migration 0090 must be applied before claiming work",
+      );
+    }
     let authenticatedWorkerId: string | undefined;
     let authenticatedWorker:
       | Awaited<ReturnType<typeof requireWorkerProjectBinding>>
@@ -10971,27 +11441,22 @@ async function route(
     const activeSkill = agent
       ? issueProcessingAgentSkillRow(agent.skills)
       : null;
-    const executionProvider = run
-      ? run.preferred_agent_provider ??
-        run.requested_agent_provider ??
-        activeSkill?.provider ??
-        agent?.provider ??
-        null
+    const execution = run
+      ? issueClaimExecutionConfig({
+          preferred: {
+            provider: run.preferred_agent_provider,
+            model: run.preferred_agent_model,
+            effort: run.preferred_agent_effort,
+          },
+          requested: {
+            provider: run.requested_agent_provider,
+            model: run.requested_agent_model,
+            effort: run.requested_agent_effort,
+          },
+          activeSkill,
+          agent,
+        })
       : null;
-    const executionModel = run?.preferred_agent_provider
-      ? run.preferred_agent_model
-      : run?.requested_agent_provider
-        ? run.requested_agent_model
-        : activeSkill
-          ? activeSkill.model
-          : (agent?.model ?? null);
-    const executionEffort = run?.preferred_agent_provider
-      ? run.preferred_agent_effort
-      : run?.requested_agent_provider
-        ? run.requested_agent_effort
-        : activeSkill
-          ? activeSkill.effort
-          : (agent?.effort ?? null);
     const [attachments, messages, reworkFeedbackEvent] = run
       ? await Promise.all([
           listIssueAttachments(db, projectId, run.id),
@@ -11043,25 +11508,17 @@ async function route(
             claimedAt: run.claimed_at,
             leaseExpiresAt: run.lease_expires_at,
             claimAttempts: run.claim_attempts,
-            execution: executionProvider
-              ? {
-                  provider: executionProvider,
-                  model: executionModel,
-                  effort: executionEffort,
-                }
+            execution: execution?.provider
+              ? execution
               : null,
             activeSkill: activeSkill ? agentSkillJson(activeSkill) : null,
             agent: agent
               ? {
                   id: agent.id,
                   name: agent.name,
-                  provider:
-                    run.preferred_agent_provider ??
-                    run.requested_agent_provider ??
-                    activeSkill?.provider ??
-                    agent.provider,
-                  model: executionModel,
-                  effort: executionEffort,
+                  provider: execution?.provider ?? agent.provider,
+                  model: execution?.model ?? null,
+                  effort: execution?.effort ?? null,
                   responsibility: agent.responsibility,
                   skill: legacyAgentSkillInstructions(
                     activeSkill,
@@ -11420,11 +11877,22 @@ async function route(
       ? await getHuntRunForProject(db, projectId, parsed.runId)
       : null;
     if (parsed.runId && !run) throw new HttpError(404, "Run not found");
+    assertRunEventIdentityNotOverridden({
+      run,
+      source: parsed.source,
+      sourceKey: parsed.sourceKey,
+    });
     const source = parsed.source ?? run?.source;
     const sourceKey = parsed.sourceKey ?? run?.source_key;
     const title = parsed.title ?? run?.title;
     if (!source || !sourceKey || !title) {
       throw new HttpError(400, "Run identity is incomplete");
+    }
+    if (
+      !parsed.runId &&
+      isReservedProposalIssueSourceKey(sourceKey)
+    ) {
+      throw new HttpError(403, "Run identity is reserved for proposal approval");
     }
     const input = {
       ...parsed,
@@ -11518,6 +11986,7 @@ export type ScheduledTaskDependencies = {
   archiveCompletedLogs: typeof archiveCompletedLogs;
   expireArchives: typeof expireArchives;
   processArchiveCleanupQueue: typeof processArchiveCleanupQueue;
+  processSlackRevocationQueue: typeof processSlackRevocationQueue;
   pruneExpiredDashboardChanges: typeof pruneExpiredDashboardChanges;
   reconcileGithubMergedRuns: typeof reconcileGithubMergedRuns;
 };
@@ -11526,6 +11995,7 @@ const scheduledTaskDependencies: ScheduledTaskDependencies = {
   archiveCompletedLogs,
   expireArchives,
   processArchiveCleanupQueue,
+  processSlackRevocationQueue,
   pruneExpiredDashboardChanges,
   reconcileGithubMergedRuns,
 };
@@ -11590,15 +12060,22 @@ export async function handleScheduledTask(
           error: error instanceof Error ? error.message : String(error),
         }));
       }
-      const [archive, expired, cleanup, github] = await Promise.all([
+      const [archive, expired, cleanup, slackRevocations, github] =
+        await Promise.all([
         dependencies.archiveCompletedLogs(env.DB, env.ARCHIVES, observedAt),
-        dependencies.expireArchives(env.DB, env.ARCHIVES, observedAt),
+        dependencies.expireArchives(
+          env.DB,
+          env.ARCHIVES,
+          env.ATTACHMENTS,
+          observedAt,
+        ),
         dependencies.processArchiveCleanupQueue(
           env.DB,
           env.ARCHIVES,
           env.ATTACHMENTS,
           observedAt,
         ),
+        dependencies.processSlackRevocationQueue(env.DB, env, observedAt),
         dependencies.reconcileGithubMergedRuns(env.DB),
       ]);
       if (dashboardChangePruneFailed) {
@@ -11611,6 +12088,7 @@ export async function handleScheduledTask(
         archive,
         expiredObjects: expired,
         cleanup,
+        slackRevocations,
         github,
       }));
     } catch (error) {
@@ -11786,7 +12264,7 @@ export default {
 
     try {
       const auth = createAuth(env, url.origin);
-      return await route(request, auth, env.DB, env.ATTACHMENTS, env);
+      return await route(request, auth, env.DB, env.ATTACHMENTS, env, ctx);
     } catch (error) {
       const skillConflictMessage = agentSkillConflictMessage(error);
       if (skillConflictMessage) {

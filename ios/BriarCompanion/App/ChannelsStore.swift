@@ -2,6 +2,12 @@ import Foundation
 
 @MainActor
 final class ChannelsStore: ObservableObject {
+    struct FocusContext: Equatable, Sendable {
+        let revision: Int
+        let channelID: UUID
+        let threadParentID: UUID?
+    }
+
     @Published private(set) var channels: [ChannelSummary] = []
     @Published private(set) var messages: [ChannelMessage] = []
     @Published private(set) var thread: [ChannelMessage] = []
@@ -22,6 +28,13 @@ final class ChannelsStore: ObservableObject {
     private var focusedChannelID: UUID?
     private var focusedThreadParentID: UUID?
     private var generation = 0
+    private var catalogLoadRevision = 0
+    private var authoritativeLoadRevision = 0
+    private var acceptanceRevision = 0
+    private var catalogRefreshInFlight = false
+    private var conversationLoadInFlight = false
+    private var proposalRevisions: [UUID: Int] = [:]
+    private var latestProposals: [UUID: ChannelMessage.Proposal] = [:]
     private var isForeground = true
     private var pollingTask: Task<Void, Never>?
 
@@ -42,11 +55,16 @@ final class ChannelsStore: ObservableObject {
     func select(organizationID: UUID?, token: String?) {
         guard self.organizationID != organizationID || self.token != token else { return }
         generation += 1
+        catalogLoadRevision &+= 1
+        authoritativeLoadRevision &+= 1
+        acceptanceRevision &+= 1
         pollingTask?.cancel()
         pollingTask = nil
         self.organizationID = organizationID
         self.token = token
         syncCursor = nil
+        proposalRevisions = [:]
+        latestProposals = [:]
         focusedChannelID = nil
         focusedThreadParentID = nil
         channels = []
@@ -55,6 +73,9 @@ final class ChannelsStore: ObservableObject {
         members = []
         agents = []
         loading = false
+        catalogRefreshInFlight = false
+        conversationLoadInFlight = false
+        acceptingProposalID = nil
         errorMessage = nil
         guard organizationID != nil, token != nil else { return }
         if isForeground { startPolling() }
@@ -63,10 +84,15 @@ final class ChannelsStore: ObservableObject {
     func refresh() async {
         guard let organizationID, let token else { return }
         let expectedGeneration = generation
-        loading = channels.isEmpty
+        catalogLoadRevision &+= 1
+        let expectedCatalogRevision = catalogLoadRevision
+        catalogRefreshInFlight = true
+        updateLoadingState()
         defer {
-            if expectedGeneration == generation {
-                loading = false
+            if expectedGeneration == generation,
+               expectedCatalogRevision == catalogLoadRevision {
+                catalogRefreshInFlight = false
+                updateLoadingState()
             }
         }
         do {
@@ -75,7 +101,11 @@ final class ChannelsStore: ObservableObject {
                 token: token,
                 as: ChannelsResponse.self
             )
-            guard !Task.isCancelled, expectedGeneration == generation else { return }
+            guard
+                !Task.isCancelled,
+                expectedGeneration == generation,
+                expectedCatalogRevision == catalogLoadRevision
+            else { return }
             channels = response.channels
             // Only the first authoritative snapshot establishes the cursor.
             // Advancing it on a later list-only refresh could skip messages.
@@ -84,26 +114,38 @@ final class ChannelsStore: ObservableObject {
             }
             errorMessage = nil
         } catch {
-            guard !Task.isCancelled, expectedGeneration == generation else { return }
+            guard
+                !Task.isCancelled,
+                expectedGeneration == generation,
+                expectedCatalogRevision == catalogLoadRevision
+            else { return }
             errorMessage = CompanionStore.message(for: error)
         }
     }
 
     func openChannel(_ channelID: UUID) async {
         guard let organizationID, let token else { return }
+        if focusedChannelID != channelID || focusedThreadParentID != nil {
+            invalidateProposalAcceptancePresentation()
+        }
         let expectedGeneration = generation
+        authoritativeLoadRevision &+= 1
+        let expectedLoadRevision = authoritativeLoadRevision
         focusedChannelID = channelID
         focusedThreadParentID = nil
-        loading = true
+        conversationLoadInFlight = true
+        updateLoadingState()
         messages = []
         thread = []
         members = []
         agents = []
         defer {
             if expectedGeneration == generation,
+               expectedLoadRevision == authoritativeLoadRevision,
                focusedChannelID == channelID,
                focusedThreadParentID == nil {
-                loading = false
+                conversationLoadInFlight = false
+                updateLoadingState()
             }
         }
         do {
@@ -118,8 +160,11 @@ final class ChannelsStore: ObservableObject {
             guard
                 !Task.isCancelled,
                 expectedGeneration == generation,
+                expectedLoadRevision == authoritativeLoadRevision,
                 focusedChannelID == channelID
             else { return }
+            upsertChannel(response.channel)
+            recordProposalMessages(response.messages)
             messages = response.messages
             members = response.members
             agents = response.agents
@@ -128,6 +173,7 @@ final class ChannelsStore: ObservableObject {
             guard
                 !Task.isCancelled,
                 expectedGeneration == generation,
+                expectedLoadRevision == authoritativeLoadRevision,
                 focusedChannelID == channelID,
                 focusedThreadParentID == nil
             else { return }
@@ -135,18 +181,53 @@ final class ChannelsStore: ObservableObject {
         }
     }
 
+    /// Invalidates work owned by a channel detail after its root view closes.
+    /// The root view also disappears while a thread is pushed, so only clear a
+    /// root focus here; the thread owns its own close lifecycle below.
+    func closeChannelFocus(channelID: UUID) {
+        guard focusedChannelID == channelID, focusedThreadParentID == nil else { return }
+        authoritativeLoadRevision &+= 1
+        invalidateProposalAcceptancePresentation()
+        focusedChannelID = nil
+        conversationLoadInFlight = false
+        updateLoadingState()
+    }
+
+    /// Invalidates delayed thread loads and proposal responses when an
+    /// interactive pop or back action leaves that exact thread. The identity
+    /// guard prevents an old view's `onDisappear` from closing a newer thread.
+    func closeThreadFocus(channelID: UUID, parentMessageID: UUID) {
+        guard
+            focusedChannelID == channelID,
+            focusedThreadParentID == parentMessageID
+        else { return }
+        authoritativeLoadRevision &+= 1
+        invalidateProposalAcceptancePresentation()
+        focusedThreadParentID = nil
+        conversationLoadInFlight = false
+        updateLoadingState()
+    }
+
     func openThread(channelID: UUID, parentMessageID: UUID) async {
         guard let organizationID, let token else { return }
+        if focusedChannelID != channelID || focusedThreadParentID != parentMessageID {
+            invalidateProposalAcceptancePresentation()
+        }
         let expectedGeneration = generation
+        authoritativeLoadRevision &+= 1
+        let expectedLoadRevision = authoritativeLoadRevision
         focusedChannelID = channelID
         focusedThreadParentID = parentMessageID
-        loading = true
+        conversationLoadInFlight = true
+        updateLoadingState()
         thread = []
         defer {
             if expectedGeneration == generation,
+               expectedLoadRevision == authoritativeLoadRevision,
                focusedChannelID == channelID,
                focusedThreadParentID == parentMessageID {
-                loading = false
+                conversationLoadInFlight = false
+                updateLoadingState()
             }
         }
         do {
@@ -162,15 +243,18 @@ final class ChannelsStore: ObservableObject {
             guard
                 !Task.isCancelled,
                 expectedGeneration == generation,
+                expectedLoadRevision == authoritativeLoadRevision,
                 focusedChannelID == channelID,
                 focusedThreadParentID == parentMessageID
             else { return }
+            recordProposalMessages(response.messages)
             thread = response.messages
             errorMessage = nil
         } catch {
             guard
                 !Task.isCancelled,
                 expectedGeneration == generation,
+                expectedLoadRevision == authoritativeLoadRevision,
                 focusedChannelID == channelID,
                 focusedThreadParentID == parentMessageID
             else { return }
@@ -186,7 +270,7 @@ final class ChannelsStore: ObservableObject {
         // Do not advance the organization cursor while an authoritative
         // channel/thread snapshot is loading. A slower snapshot could otherwise
         // overwrite this delta and make the skipped reply unrecoverable.
-        guard !loading else { return }
+        guard !authoritativeLoadInFlight else { return }
         guard syncCursor != nil else {
             await refresh()
             return
@@ -208,7 +292,7 @@ final class ChannelsStore: ObservableObject {
                     expectedGeneration == generation,
                     self.organizationID == organizationID,
                     self.token == token,
-                    !loading,
+                    !authoritativeLoadInFlight,
                     syncCursor == requestedCursor
                 else { return }
                 guard response.cursor >= requestedCursor else {
@@ -236,6 +320,15 @@ final class ChannelsStore: ObservableObject {
         isForeground = false
         pollingTask?.cancel()
         pollingTask = nil
+    }
+
+    private var authoritativeLoadInFlight: Bool {
+        catalogRefreshInFlight || conversationLoadInFlight
+    }
+
+    private func updateLoadingState() {
+        loading = conversationLoadInFlight ||
+            (catalogRefreshInFlight && channels.isEmpty)
     }
 
     /// A nil `parentMessageID` posts to the channel; otherwise into that thread.
@@ -367,8 +460,25 @@ final class ChannelsStore: ObservableObject {
         projectID: UUID
     ) async -> AcceptChannelProposalResponse? {
         guard let organizationID, let token else { return nil }
+        guard focusedChannelID == channelID else { return nil }
+        // Approval is a state-changing operation. Keep one request in flight so
+        // repeated taps (including on another card) cannot race each other.
+        guard acceptingProposalID == nil else { return nil }
+        let expectedGeneration = generation
+        let expectedFocusRevision = authoritativeLoadRevision
+        let expectedFocusedChannelID = focusedChannelID
+        let expectedFocusedThreadParentID = focusedThreadParentID
+        let expectedProposalRevision = proposalRevisions[proposalID, default: 0]
+        acceptanceRevision &+= 1
+        let expectedAcceptanceRevision = acceptanceRevision
         acceptingProposalID = proposalID
-        defer { acceptingProposalID = nil }
+        defer {
+            if expectedGeneration == generation,
+               expectedAcceptanceRevision == acceptanceRevision,
+               acceptingProposalID == proposalID {
+                acceptingProposalID = nil
+            }
+        }
         do {
             let response: AcceptChannelProposalResponse = try await api.send(
                 MobileAPIContract.Endpoint.acceptChannelProposal(
@@ -381,24 +491,130 @@ final class ChannelsStore: ObservableObject {
                 body: AcceptChannelProposalRequest(projectId: projectID),
                 as: AcceptChannelProposalResponse.self
             )
-            let accepted = ChannelMessage.Proposal(
-                id: proposalID,
-                actionType: .createIssue,
-                status: .accepted,
-                projectId: response.projectId,
-                resultRunId: response.resultRunId
-            )
+            guard
+                expectedGeneration == generation,
+                expectedAcceptanceRevision == acceptanceRevision,
+                expectedFocusRevision == authoritativeLoadRevision,
+                expectedFocusedChannelID == focusedChannelID,
+                expectedFocusedThreadParentID == focusedThreadParentID
+            else { return nil }
+            if proposalRevisions[proposalID, default: 0] != expectedProposalRevision {
+                var latest = latestProposals[proposalID]
+                if latest?.status != .accepted {
+                    let beforeRefreshRevision = authoritativeLoadRevision
+                    if let parentID = expectedFocusedThreadParentID {
+                        await openThread(channelID: channelID, parentMessageID: parentID)
+                    } else {
+                        await openChannel(channelID)
+                    }
+                    guard
+                        authoritativeLoadRevision == (beforeRefreshRevision &+ 1),
+                        focusedChannelID == expectedFocusedChannelID,
+                        focusedThreadParentID == expectedFocusedThreadParentID
+                    else { return nil }
+                    latest = latestProposals[proposalID]
+                }
+                if latest?.status == .accepted,
+                   let projectID = latest?.projectId,
+                   let runID = latest?.resultRunId {
+                    return AcceptChannelProposalResponse(
+                        outcome: .alreadyAccepted,
+                        projectId: projectID,
+                        resultRunId: runID
+                    )
+                }
+                // A pending proposal on the accepted target is the reservation
+                // phase of this same successful request. A reopen clears that
+                // target, so only this exact post-response state may fall
+                // through and apply the response.
+                guard
+                    errorMessage == nil,
+                    latest?.status == .pending,
+                    latest?.projectId == response.projectId
+                else { return nil }
+            }
             for index in messages.indices where messages[index].proposal?.id == proposalID {
-                messages[index].proposal = accepted
+                messages[index].proposal = acceptedProposal(
+                    messages[index].proposal,
+                    response: response
+                )
             }
             for index in thread.indices where thread[index].proposal?.id == proposalID {
-                thread[index].proposal = accepted
+                thread[index].proposal = acceptedProposal(
+                    thread[index].proposal,
+                    response: response
+                )
             }
+            latestProposals[proposalID] = messages
+                .compactMap(\.proposal)
+                .first(where: { $0.id == proposalID })
+                ?? thread.compactMap(\.proposal).first(where: { $0.id == proposalID })
+            proposalRevisions[proposalID, default: 0] &+= 1
             errorMessage = nil
             return response
         } catch {
+            guard
+                expectedGeneration == generation,
+                expectedAcceptanceRevision == acceptanceRevision,
+                expectedFocusRevision == authoritativeLoadRevision,
+                expectedFocusedChannelID == focusedChannelID,
+                expectedFocusedThreadParentID == focusedThreadParentID
+            else { return nil }
             errorMessage = CompanionStore.message(for: error)
             return nil
+        }
+    }
+
+    func dismissError() {
+        errorMessage = nil
+    }
+
+    func captureFocus(channelID: UUID, threadParentID: UUID?) -> FocusContext? {
+        guard focusedChannelID == channelID, focusedThreadParentID == threadParentID else {
+            return nil
+        }
+        return FocusContext(
+            revision: authoritativeLoadRevision,
+            channelID: channelID,
+            threadParentID: threadParentID
+        )
+    }
+
+    func focusIsCurrent(_ context: FocusContext) -> Bool {
+        context.revision == authoritativeLoadRevision &&
+            context.channelID == focusedChannelID &&
+            context.threadParentID == focusedThreadParentID
+    }
+
+    private func invalidateProposalAcceptancePresentation() {
+        acceptanceRevision &+= 1
+        acceptingProposalID = nil
+    }
+
+    private func acceptedProposal(
+        _ proposal: ChannelMessage.Proposal?,
+        response: AcceptChannelProposalResponse
+    ) -> ChannelMessage.Proposal? {
+        guard let proposal else { return nil }
+        return ChannelMessage.Proposal(
+            id: proposal.id,
+            actionType: proposal.actionType,
+            status: .accepted,
+            projectId: response.projectId,
+            payload: proposal.payload,
+            resultRunId: response.resultRunId
+        )
+    }
+
+    private func recordProposalMessages(_ incoming: [ChannelMessage]) {
+        var recorded: Set<UUID> = []
+        for message in incoming {
+            guard let proposal = message.proposal, recorded.insert(proposal.id).inserted else {
+                continue
+            }
+            if latestProposals[proposal.id] == proposal { continue }
+            latestProposals[proposal.id] = proposal
+            proposalRevisions[proposal.id, default: 0] &+= 1
         }
     }
 
@@ -415,6 +631,8 @@ final class ChannelsStore: ObservableObject {
         channels = nextChannels
 
         if let focusedChannelID, removedChannelIDs.contains(focusedChannelID) {
+            authoritativeLoadRevision &+= 1
+            invalidateProposalAcceptancePresentation()
             self.focusedChannelID = nil
             focusedThreadParentID = nil
             messages = []
@@ -425,6 +643,7 @@ final class ChannelsStore: ObservableObject {
         }
 
         guard let focusedChannelID else { return }
+        recordProposalMessages(delta.messages)
         let removedMessageIDs = Set(delta.removedMessageIds)
         let relevant = delta.messages.filter { $0.channelId == focusedChannelID }
         messages = Self.mergeMessages(
@@ -442,6 +661,14 @@ final class ChannelsStore: ObservableObject {
             },
             removing: removedMessageIDs
         )
+    }
+
+    private func upsertChannel(_ updated: ChannelSummary) {
+        if let index = channels.firstIndex(where: { $0.id == updated.id }) {
+            channels[index] = updated
+        } else {
+            channels.append(updated)
+        }
     }
 
     private static func mergeMessages(

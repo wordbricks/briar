@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { Miniflare } from "miniflare";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import {
   cloneAutoHuntWorkflow,
   normalizeAutoHuntWorkflow,
@@ -11,6 +11,7 @@ import type { HuntEventInput } from "./db";
 import {
   acceptOrganizationInvitation,
   acceptIssueCreateProposal,
+  reserveIssueCreateProposalApproval,
   acceptIssueUpdateProposal,
   acceptIssueReworkProposal,
   assertQueuedHuntClaim,
@@ -105,6 +106,8 @@ import {
   upsertProjectAgentSession,
 } from "./db";
 import { registerExecutionWorker } from "./workers";
+import { processSlackRevocationQueue } from "./index";
+import { encryptSlackToken } from "./slack";
 import { executeD1Sql } from "./test-helpers/d1";
 
 const releaseWorkflow = normalizeAutoHuntWorkflow({
@@ -769,6 +772,15 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     );
     await executeSql(
       db,
+      `alter table briar_issue_action_proposals
+         add column approval_reserved_by_user_id text;
+       alter table briar_issue_action_proposals
+         add column approval_reserved_at text;
+       alter table briar_issue_action_proposals
+         add column issue_source_key text;`,
+    );
+    await executeSql(
+      db,
       await readFile(
         resolve("migrations/0069_project_agent_effort.sql"),
         "utf8",
@@ -796,6 +808,13 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     await executeSql(
       db,
       await readFile(resolve("migrations/0073_organization_channels.sql"), "utf8"),
+    );
+    await executeSql(
+      db,
+      await readFile(
+        resolve("migrations/0075_channel_message_attachments.sql"),
+        "utf8",
+      ),
     );
     await executeSql(
       db,
@@ -847,6 +866,44 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         resolve("migrations/0088_organization_agent_context.sql"),
         "utf8",
       ),
+    );
+    await executeSql(
+      db,
+      `alter table briar_archive_cleanup_queue
+         add column generation integer not null default 1 check (generation >= 1);
+       alter table briar_archive_cleanup_queue add column next_attempt_at text;
+       alter table briar_archive_cleanup_queue add column dead_lettered_at text;
+       alter table briar_archive_cleanup_queue
+         add column alert_state text not null default 'none'
+           check (alert_state in ('none', 'pending', 'acknowledged'));
+       alter table briar_archive_cleanup_queue
+         add column alert_detail_json text
+           check (alert_detail_json is null or json_valid(alert_detail_json));
+       create table briar_account_deletion_jobs (
+         id text primary key not null,
+         user_id text not null unique,
+         email text not null,
+         created_at text not null
+       );
+       create table briar_account_deletion_job_organizations (
+         job_id text not null
+           references briar_account_deletion_jobs (id) on delete cascade,
+         organization_id text not null,
+         primary key (job_id, organization_id)
+       );
+       create table briar_slack_revocation_queue (
+         id text primary key not null,
+         team_id text not null,
+         encrypted_bot_token text not null,
+         token_iv text not null,
+         queued_at text not null,
+         next_attempt_at text not null,
+         attempts integer not null default 0,
+         last_attempt_at text,
+         last_error text,
+         dead_lettered_at text,
+         dead_letter_reason text
+       );`,
     );
   }, 30_000);
 
@@ -2991,9 +3048,9 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       deleteAccountData(db, {
         userId,
         email,
-        organizationIds: plan.organizationIds,
+        observedAt: atMinute(1),
       }),
-    ).resolves.toBe(true);
+    ).resolves.toBe("deleted");
 
     await expect(
       db.prepare(`select id from "user" where id = ?`).bind(userId).first(),
@@ -3021,6 +3078,343 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     ).resolves.toBeNull();
   });
 
+  it("rechecks organization membership after the account deletion plan", async () => {
+    const ownerId = "account-deletion-race-owner";
+    const ownerEmail = "account-deletion-race-owner@example.com";
+    const memberId = "account-deletion-race-member";
+    const memberEmail = "account-deletion-race-member@example.com";
+    await executeSql(
+      db,
+      `insert into user (id, name, email, emailVerified, createdAt, updatedAt)
+       values
+         ('${ownerId}', 'Race Owner', '${ownerEmail}', 1,
+          '${atMinute(0)}', '${atMinute(0)}'),
+         ('${memberId}', 'Race Member', '${memberEmail}', 1,
+          '${atMinute(0)}', '${atMinute(0)}');`,
+    );
+    const organization = await createOrganization(db, {
+      name: "Account Deletion Race Organization",
+      handle: "account-deletion-race",
+      ownerUserId: ownerId,
+    });
+    const project = await createProject(db, {
+      ownerUserId: ownerId,
+      organizationId: organization.id,
+      name: "Account Deletion Race Project",
+      agentTokenHash: "8".repeat(64),
+    });
+    const objectKey = `project-agent-spritesheets/${organization.id}/race.webp`;
+    await db.prepare(
+      `insert into briar_project_agents (
+         id, organization_id, project_id, handle, name, provider, model,
+         responsibility, created_at, updated_at, calendar_color,
+         skill_markdown, avatar_spritesheet_object_key
+       ) values (?, ?, null, ?, ?, 'codex', null, ?, ?, ?, '#3275d5', '', ?)`,
+    ).bind(
+      "account-deletion-race-agent",
+      organization.id,
+      "account-deletion-race-agent",
+      "Race Agent",
+      "Proves cleanup is not queued when deletion is blocked.",
+      atMinute(0),
+      atMinute(0),
+      objectKey,
+    ).run();
+
+    await expect(planAccountDeletion(db, ownerId)).resolves.toMatchObject({
+      blockedOrganizations: [],
+      organizationIds: [organization.id],
+      projectIds: [project.id],
+    });
+    await expect(
+      addOrganizationMember(db, organization.id, memberEmail, "member"),
+    ).resolves.toBe(memberId);
+
+    await expect(deleteAccountData(db, {
+      userId: ownerId,
+      email: ownerEmail,
+      observedAt: atMinute(1),
+    })).resolves.toBe("blocked");
+    await expect(
+      db.prepare(`select id from "user" where id = ?`).bind(ownerId).first(),
+    ).resolves.not.toBeNull();
+    await expect(
+      db.prepare(`select id from briar_organizations where id = ?`)
+        .bind(organization.id).first(),
+    ).resolves.not.toBeNull();
+    await expect(
+      db.prepare(
+        `select object_key from briar_archive_cleanup_queue
+         where bucket = 'attachments' and object_key = ?`,
+      ).bind(objectKey).first(),
+    ).resolves.toBeNull();
+    await expect(
+      db.prepare(`select id from briar_account_deletion_jobs where user_id = ?`)
+        .bind(ownerId).first(),
+    ).resolves.toBeNull();
+
+    await db.batch([
+      db.prepare(`delete from briar_organizations where id = ?`)
+        .bind(organization.id),
+      db.prepare(`delete from "user" where id in (?, ?)`)
+        .bind(ownerId, memberId),
+    ]);
+  });
+
+  it("queues organization-scoped R2 objects and copies Slack credentials before deletion", async () => {
+    const userId = "account-deletion-outbox-owner";
+    const email = "account-deletion-outbox-owner@example.com";
+    const encryptionKey = "account-deletion-outbox-encryption-key";
+    const encrypted = await encryptSlackToken(
+      "xoxb-account-deletion",
+      encryptionKey,
+    );
+    await executeSql(
+      db,
+      `insert into user (id, name, email, emailVerified, createdAt, updatedAt)
+       values (
+         '${userId}', 'Outbox Owner', '${email}', 1,
+         '${atMinute(0)}', '${atMinute(0)}'
+       );`,
+    );
+    const organization = await createOrganization(db, {
+      name: "Account Deletion Outbox Organization",
+      handle: "account-deletion-outbox",
+      ownerUserId: userId,
+    });
+    const project = await createProject(db, {
+      ownerUserId: userId,
+      organizationId: organization.id,
+      name: "Account Deletion Outbox Project",
+      agentTokenHash: "7".repeat(64),
+    });
+    const agentId = "account-deletion-outbox-agent";
+    const channelId = "account-deletion-outbox-channel";
+    const messageId = "account-deletion-outbox-message";
+    const spriteKey = `project-agent-spritesheets/${organization.id}/agent.webp`;
+    const attachmentKey = `channel-attachments/${organization.id}/image.png`;
+    await db.batch([
+      db.prepare(
+        `insert into briar_project_agents (
+           id, organization_id, project_id, handle, name, provider, model,
+           responsibility, created_at, updated_at, calendar_color,
+           skill_markdown, avatar_spritesheet_object_key
+         ) values (?, ?, null, ?, ?, 'codex', null, ?, ?, ?, '#3275d5', '', ?)`,
+      ).bind(
+        agentId,
+        organization.id,
+        "account-deletion-outbox-agent",
+        "Outbox Agent",
+        "Organization-scoped cleanup fixture.",
+        atMinute(0),
+        atMinute(0),
+        spriteKey,
+      ),
+      db.prepare(
+        `insert into briar_channels (
+           id, organization_id, slug, name, topic, visibility,
+           default_project_id, created_by_user_id, created_at, updated_at
+         ) values (?, ?, ?, ?, null, 'public', ?, ?, ?, ?)`,
+      ).bind(
+        channelId,
+        organization.id,
+        "account-deletion-outbox",
+        "Outbox",
+        project.id,
+        userId,
+        atMinute(0),
+        atMinute(0),
+      ),
+      db.prepare(
+        `insert into briar_channel_messages (
+           id, channel_id, parent_message_id, author_user_id,
+           author_agent_id, author_agent_name, author_agent_provider,
+           body, created_at, updated_at
+         ) values (?, ?, null, null, ?, ?, 'codex', ?, ?, ?)`,
+      ).bind(
+        messageId,
+        channelId,
+        agentId,
+        "Outbox Agent",
+        "Attachment fixture",
+        atMinute(0),
+        atMinute(0),
+      ),
+      db.prepare(
+        `insert into briar_channel_message_attachments (
+           id, organization_id, channel_id, message_id, object_key,
+           filename, content_type, byte_size, created_at
+         ) values (?, ?, ?, ?, ?, 'image.png', 'image/png', 128, ?)`,
+      ).bind(
+        "account-deletion-outbox-attachment",
+        organization.id,
+        channelId,
+        messageId,
+        attachmentKey,
+        atMinute(0),
+      ),
+      db.prepare(
+        `insert into briar_slack_installations (
+           team_id, team_name, organization_id, default_project_id,
+           bot_user_id, encrypted_bot_token, token_iv,
+           installed_by_user_id, created_at, updated_at
+         ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ).bind(
+        "T-ACCOUNT-DELETION-OUTBOX",
+        "Account Deletion Outbox",
+        organization.id,
+        project.id,
+        "B-ACCOUNT-DELETION-OUTBOX",
+        encrypted.encryptedToken,
+        encrypted.iv,
+        userId,
+        atMinute(0),
+        atMinute(0),
+      ),
+    ]);
+
+    await expect(deleteAccountData(db, {
+      userId,
+      email,
+      observedAt: atMinute(1),
+    })).resolves.toBe("deleted");
+    const cleanup = await db.prepare(
+      `select bucket, object_key, project_id, run_id
+       from briar_archive_cleanup_queue
+       where object_key in (?, ?)
+       order by object_key`,
+    ).bind(attachmentKey, spriteKey).all<{
+      bucket: string;
+      object_key: string;
+      project_id: string;
+      run_id: string | null;
+    }>();
+    expect(cleanup.results).toEqual([
+      {
+        bucket: "attachments",
+        object_key: attachmentKey,
+        project_id: `organization:${organization.id}`,
+        run_id: null,
+      },
+      {
+        bucket: "attachments",
+        object_key: spriteKey,
+        project_id: `organization:${organization.id}`,
+        run_id: null,
+      },
+    ]);
+    await expect(
+      db.prepare(
+        `select team_id, encrypted_bot_token, token_iv, attempts,
+                next_attempt_at, last_attempt_at, last_error,
+                dead_lettered_at, dead_letter_reason
+         from briar_slack_revocation_queue
+         where team_id = ?`,
+      ).bind("T-ACCOUNT-DELETION-OUTBOX").first(),
+    ).resolves.toEqual({
+      team_id: "T-ACCOUNT-DELETION-OUTBOX",
+      encrypted_bot_token: encrypted.encryptedToken,
+      token_iv: encrypted.iv,
+      attempts: 0,
+      next_attempt_at: atMinute(1),
+      last_attempt_at: null,
+      last_error: null,
+      dead_lettered_at: null,
+      dead_letter_reason: null,
+    });
+    await expect(
+      db.prepare(`select team_id from briar_slack_installations where team_id = ?`)
+        .bind("T-ACCOUNT-DELETION-OUTBOX").first(),
+    ).resolves.toBeNull();
+    await db.prepare(
+      `delete from briar_slack_revocation_queue where team_id = ?`,
+    ).bind("T-ACCOUNT-DELETION-OUTBOX").run();
+  });
+
+  it("keeps failed Slack revocations retryable and removes them after success", async () => {
+    const encryptionKey = "account-deletion-revocation-retry-key";
+    const encrypted = await encryptSlackToken(
+      "xoxb-revocation-retry",
+      encryptionKey,
+    );
+    const queueId = "f".repeat(64);
+    await db.prepare(
+      `insert into briar_slack_revocation_queue (
+         id, team_id, encrypted_bot_token, token_iv, queued_at,
+         next_attempt_at
+       ) values (?, ?, ?, ?, ?, ?)`,
+    ).bind(
+      queueId,
+      "T-ACCOUNT-DELETION-RETRY",
+      encrypted.encryptedToken,
+      encrypted.iv,
+      atMinute(0),
+      atMinute(0),
+    ).run();
+    const fetchMock = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response(
+        JSON.stringify({ ok: false, error: "ratelimited" }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      ))
+      .mockResolvedValueOnce(new Response(
+        JSON.stringify({ ok: true }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      ));
+    vi.stubGlobal("fetch", fetchMock);
+    try {
+      await expect(processSlackRevocationQueue(
+        db,
+        { SLACK_TOKEN_ENCRYPTION_KEY: encryptionKey } as Env,
+        atMinute(1),
+        1,
+      )).resolves.toEqual({
+        revoked: 0,
+        failed: 1,
+        deadLettered: 0,
+        deferred: 0,
+      });
+      await expect(
+        db.prepare(
+          `select attempts, next_attempt_at, last_attempt_at, last_error
+           from briar_slack_revocation_queue where id = ?`,
+        ).bind(queueId).first(),
+      ).resolves.toEqual({
+        attempts: 1,
+        next_attempt_at: atMinute(6),
+        last_attempt_at: atMinute(1),
+        last_error: "Slack auth.revoke failed: ratelimited",
+      });
+
+      await expect(processSlackRevocationQueue(
+        db,
+        { SLACK_TOKEN_ENCRYPTION_KEY: encryptionKey } as Env,
+        atMinute(6),
+        1,
+      )).resolves.toEqual({
+        revoked: 1,
+        failed: 0,
+        deadLettered: 0,
+        deferred: 0,
+      });
+      await expect(
+        db.prepare(`select id from briar_slack_revocation_queue where id = ?`)
+          .bind(queueId).first(),
+      ).resolves.toBeNull();
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(fetchMock).toHaveBeenNthCalledWith(
+        2,
+        "https://slack.com/api/auth.revoke",
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            authorization: "Bearer xoxb-revocation-retry",
+          }),
+        }),
+      );
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("blocks shared owners while allowing a resource-free member to leave", async () => {
     const ownerId = "account-deletion-shared-owner";
     const memberId = "account-deletion-shared-member";
@@ -3043,6 +3437,12 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     await expect(
       addOrganizationMember(db, organization.id, memberEmail, "member"),
     ).resolves.toBe(memberId);
+    const sharedProject = await createProject(db, {
+      ownerUserId: ownerId,
+      organizationId: organization.id,
+      name: "Shared Project",
+      agentTokenHash: "5".repeat(64),
+    });
 
     await expect(planAccountDeletion(db, ownerId)).resolves.toMatchObject({
       blockedOrganizations: [{ id: organization.id, name: organization.name }],
@@ -3054,19 +3454,31 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       organizationIds: [],
       projectIds: [],
     });
+    const memberAgentTokenHash = "4".repeat(64);
+    await expect(
+      issueProjectAgentToken(
+        db,
+        sharedProject.id,
+        memberId,
+        memberAgentTokenHash,
+      ),
+    ).resolves.toBe(true);
     await expect(
       deleteAccountData(db, {
         userId: memberId,
         email: memberEmail,
-        organizationIds: memberPlan.organizationIds,
+        observedAt: atMinute(1),
       }),
-    ).resolves.toBe(true);
+    ).resolves.toBe("deleted");
     await expect(
       db
         .prepare(`select id from briar_organizations where id = ?`)
         .bind(organization.id)
         .first(),
     ).resolves.not.toBeNull();
+    await expect(
+      findProjectIdByAgentTokenHash(db, memberAgentTokenHash),
+    ).resolves.toBeNull();
 
     await db.batch([
       db.prepare(`delete from briar_organizations where id = ?`).bind(organization.id),
@@ -4766,15 +5178,44 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       }),
       createdAt: atMinute(87),
     });
-    expect(await acceptIssueCreateProposal(db, {
+    const issueSourceKey = "briar-conversation-approved:db-test";
+    expect(
+      await reserveIssueCreateProposalApproval(db, {
+        projectId,
+        conversationRunId: runId,
+        proposalId: createProposal!.id,
+        userId: "owner",
+        reservedAt: atMinute(88),
+        issueSourceKey,
+      }),
+    ).toMatchObject({
+      approval_reserved_by_user_id: "owner",
+      issue_source_key: issueSourceKey,
+    });
+    const createdRunId = await recordHuntEvent(
+      db,
       projectId,
-      conversationRunId: runId,
-      proposalId: createProposal!.id,
-      userId: "owner",
-      acceptedAt: atMinute(88),
-      resultRunId: runId,
-    })).toMatchObject({ status: "accepted", result_run_id: runId });
-    expect(await listIssueActionProposals(db, projectId, runId)).toHaveLength(3);
+      event("queued", 88, {
+        sourceKey: issueSourceKey,
+        eventKey: `${issueSourceKey}:backlog`,
+        title: "Follow-up",
+        status: "backlog",
+        workflowStage: null,
+      }),
+    );
+    expect(
+      await acceptIssueCreateProposal(db, {
+        projectId,
+        conversationRunId: runId,
+        proposalId: createProposal!.id,
+        userId: "owner",
+        acceptedAt: atMinute(89),
+        resultRunId: createdRunId,
+      }),
+    ).toMatchObject({ status: "accepted", result_run_id: createdRunId });
+    expect(await listIssueActionProposals(db, projectId, runId)).toHaveLength(
+      3,
+    );
   });
 
   it("allows manual complete without agent evidence required for run completion", async () => {
