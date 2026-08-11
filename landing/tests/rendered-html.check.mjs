@@ -340,6 +340,8 @@ test("server-renders the localized changelog from published releases", async () 
   assert.match(koreanHtml, /<html lang="ko"[\s>]/i);
   assert.match(koreanHtml, /Briar 변경 기록/);
   assert.match(koreanHtml, /현재 안정 버전/);
+  assert.match(koreanHtml, /대화형 이슈와 에이전트 협업을 더 안전하게 운영합니다/);
+  assert.match(koreanHtml, /v1\.2\.100/);
   assert.match(koreanHtml, /동시 작업과 긴 대화를 더 안정적으로 처리합니다/);
   assert.match(koreanHtml, /v1\.2\.99/);
   assert.match(koreanHtml, /대화와 실행 상태를 더 정확하게 확인합니다/);
@@ -362,7 +364,7 @@ test("server-renders the localized changelog from published releases", async () 
   assert.match(koreanHtml, /aria-current="page"[^>]*>변경 기록</);
   assert.match(
     koreanHtml,
-    /href="https:\/\/github\.com\/wordbricks\/briar\/releases\/tag\/v1\.2\.99"/,
+    /href="https:\/\/github\.com\/wordbricks\/briar\/releases\/tag\/v1\.2\.100"/,
   );
 
   const englishResponse = await render({ path: "/changelog" });
@@ -371,6 +373,7 @@ test("server-renders the localized changelog from published releases", async () 
   const englishHtml = await englishResponse.text();
   assert.match(englishHtml, /<html lang="en"[\s>]/i);
   assert.match(englishHtml, /Briar changelog/);
+  assert.match(englishHtml, /Make conversational issues and agent collaboration safer/);
   assert.match(englishHtml, /Handle concurrent runs and long conversations more reliably/);
   assert.match(englishHtml, /See conversations and run status more clearly/);
   assert.match(englishHtml, /React to channel messages with any emoji/);
