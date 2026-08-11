@@ -6,6 +6,8 @@ import {
   organizationAgentContextIssuesPageSchema,
   organizationAgentContextProjectsPageSchema,
   organizationAgentContextSessionsPageSchema,
+  organizationAgentContextLookupResponseSchema,
+  organizationAgentContextManifestSchema,
 } from "../../src/lib/organization-agent-context-contract";
 import {
   type ArchiveBucket,
@@ -17,6 +19,8 @@ import {
   listOrganizationAgentContextIssuesPage,
   listOrganizationAgentContextProjectsPage,
   listOrganizationAgentContextSessionsPage,
+  lookupOrganizationAgentContext,
+  organizationAgentContextManifest,
   OrganizationAgentContextCursorError,
   organizationAgentContextMaxEncodedPageBytes,
   OrganizationAgentContextPageTooLargeError,
@@ -652,6 +656,118 @@ describe("Organization Agent context pages", () => {
       },
     );
     expect(wrongProject).toMatchObject({ total: 0, items: [] });
+  });
+
+  it("builds a revision manifest without embedding settings or retained payloads", async () => {
+    const manifest = await organizationAgentContextManifest(db, {
+      organizationId,
+      workId,
+      snapshotAt,
+    });
+    expect(() => organizationAgentContextManifestSchema.parse(manifest))
+      .not.toThrow();
+    expect(manifest.revision).toMatch(/^[0-9a-f]{64}$/u);
+    expect(manifest.projects.map((project) => project.id)).toEqual([
+      projectId,
+      secondProjectId,
+    ]);
+    expect(manifest.projects[0]).toMatchObject({
+      resources: {
+        agents: { count: 1 },
+        issues: { count: 2, openCount: 2, pullRequestCount: 101 },
+        sessions: { count: 4 },
+      },
+    });
+    expect(manifest.projects[0]).not.toHaveProperty("settings");
+    expect(JSON.stringify(manifest)).not.toContain("Inspect project state.");
+    expect(JSON.stringify(manifest)).not.toContain("Visible issue description");
+    expect(JSON.stringify(manifest)).not.toContain("Archived only");
+  });
+
+  it("returns summaries first and batches only explicitly requested details", async () => {
+    const summaries = await lookupOrganizationAgentContext(db, archives, {
+      organizationId,
+      workId,
+      snapshotAt,
+      requests: [
+        {
+          resource: "agents",
+          projectId,
+          detail: "summary",
+          limit: 25,
+          cursor: null,
+        },
+        {
+          resource: "issues",
+          projectId,
+          detail: "summary",
+          limit: 25,
+          cursor: null,
+        },
+        {
+          resource: "agent-sessions",
+          projectId,
+          detail: "summary",
+          limit: 25,
+          cursor: null,
+        },
+      ],
+    });
+    expect(() => organizationAgentContextLookupResponseSchema.parse(summaries))
+      .not.toThrow();
+    expect(JSON.stringify(summaries)).not.toContain("Inspect project state.");
+    expect(JSON.stringify(summaries)).not.toContain("Visible issue description");
+    expect(JSON.stringify(summaries)).not.toContain("Archived only");
+    expect(summaries.results[0].data).toMatchObject({
+      detail: "summary",
+      items: [{ id: agentId, skills: [{ id: skillId, name: "Inspect" }] }],
+    });
+    expect(summaries.results[2].data).toMatchObject({
+      total: 4,
+      items: expect.arrayContaining([
+        expect.objectContaining({ id: "archived-only", archived: true }),
+        expect.objectContaining({ id: "hot-only", summary: "Hot only" }),
+      ]),
+    });
+
+    const details = await lookupOrganizationAgentContext(db, archives, {
+      organizationId,
+      workId,
+      snapshotAt,
+      requests: [
+        { resource: "skills", projectId, ids: [skillId] },
+        {
+          resource: "issues",
+          projectId,
+          detail: "full",
+          ids: ["60000000-0000-4000-8000-000000000010"],
+        },
+        {
+          resource: "agent-sessions",
+          projectId,
+          detail: "full",
+          ids: ["archived-only"],
+        },
+      ],
+    });
+    expect(details.results[0].data).toEqual([
+      expect.objectContaining({
+        id: skillId,
+        instructions: "Inspect project state.",
+      }),
+    ]);
+    expect(details.results[1].data).toEqual([
+      expect.objectContaining({
+        id: "60000000-0000-4000-8000-000000000010",
+        issueDescription: "Visible issue description",
+      }),
+    ]);
+    expect(details.results[2].data).toEqual([
+      expect.objectContaining({
+        id: "archived-only",
+        payload: expect.objectContaining({ summary: "Archived only" }),
+      }),
+    ]);
   });
 
   it("rejects malformed, cross-claim, cross-resource, and cross-project cursors", async () => {

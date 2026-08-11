@@ -39,6 +39,7 @@ import { channelReplyCompletionSchema } from "../src/lib/channels-contract";
 import {
   organizationAgentContextCapability,
   organizationAgentContextDescriptorSchema,
+  organizationAgentContextRequestTurnSchema,
 } from "../src/lib/organization-agent-context-contract";
 import {
   issueTitleAbsoluteMaxLength,
@@ -125,7 +126,8 @@ import { assertChannelReplyWorkspaceScope } from "./channel-reply-scope";
 import {
   cleanupOrphanedOrganizationAgentWorkspaces,
   cleanupOrganizationAgentContext,
-  downloadOrganizationAgentContext,
+  downloadOrganizationAgentContextManifest,
+  hydrateOrganizationAgentContext,
   prepareOrganizationAgentWorkspace,
 } from "./organization-agent-context";
 import { prepareReadOnlyAgentEnvironment } from "./read-only-agent-environment";
@@ -3026,7 +3028,7 @@ async function runClaimedChannelReply(
     ]);
   try {
     const organizationContext = reply.scope.kind === "organization"
-      ? await downloadOrganizationAgentContext({
+      ? await downloadOrganizationAgentContextManifest({
           apiUrl: config.apiUrl,
           workerToken,
           organizationId: reply.organizationId,
@@ -3075,27 +3077,78 @@ async function runClaimedChannelReply(
       agent.provider,
       { workspaceRoot: workspacePath },
     );
-    const turn = await runDetachedProviderTurn({
-      agent,
-      prompt,
-      workspacePath,
-      fullAccess: false,
-      readOnly: true,
-      attachments: downloadedImages.attachments,
-      organizationContextManifestPath:
-        organizationContext?.manifestPath ?? null,
-      delegationTargets: reply.scope.kind === "organization"
-        ? reply.delegationTargets
-        : undefined,
-      environment: providerRuntime.environment,
-      signal,
-    })
-      .finally(providerRuntime.cleanup);
-    assertDetachedProviderTurnSucceeded(turn);
-    if (!turn.resultText) throw new Error("Agent returned an empty channel reply");
-    const result = channelReplyCompletionSchema.parse(
-      parseDetachedJsonResult(turn.resultText),
-    );
+    let conversationId: string | null = null;
+    let lookupRounds = 0;
+    let turnPrompt = prompt;
+    let result: z.infer<typeof channelReplyCompletionSchema> | null = null;
+    try {
+      while (!result) {
+        const turn = await runDetachedProviderTurn({
+          agent,
+          prompt: turnPrompt,
+          workspacePath,
+          fullAccess: false,
+          readOnly: true,
+          conversationId,
+          attachments: lookupRounds === 0
+            ? downloadedImages.attachments
+            : undefined,
+          organizationContextManifestPath:
+            organizationContext?.manifestPath ?? null,
+          delegationTargets: reply.scope.kind === "organization"
+            ? reply.delegationTargets
+            : undefined,
+          environment: providerRuntime.environment,
+          signal,
+        });
+        assertDetachedProviderTurnSucceeded(turn);
+        if (!turn.resultText) {
+          throw new Error("Agent returned an empty channel reply");
+        }
+        const parsed = parseDetachedJsonResult(turn.resultText);
+        const lookup = organizationAgentContextRequestTurnSchema.safeParse(
+          parsed,
+        );
+        if (!lookup.success) {
+          result = channelReplyCompletionSchema.parse(parsed);
+          break;
+        }
+        if (!organizationContext) {
+          throw new Error(
+            "Project reply cannot request organization context",
+          );
+        }
+        if (lookupRounds >= 3) {
+          throw new Error("Organization Agent context lookup limit exceeded");
+        }
+        const hydrated = await hydrateOrganizationAgentContext({
+          apiUrl: config.apiUrl,
+          workerToken,
+          organizationId: reply.organizationId,
+          workId: reply.workId,
+          workerId: registered.workerId,
+          claimToken: reply.claimToken,
+          snapshotAt: reply.organizationContext!.snapshotAt,
+          workspacePath,
+          requests: lookup.data.contextRequests,
+          signal,
+        });
+        if (hydrated.loaded === 0) {
+          throw new Error("Organization Agent repeated a loaded context query");
+        }
+        lookupRounds += 1;
+        conversationId = turn.conversationId;
+        const continuation = [
+          `Briar loaded ${hydrated.loaded} requested organization context file(s).`,
+          `Re-read the manifest at ${JSON.stringify(hydrated.manifestPath)} and the newly referenced lookup files.`,
+          "Use those facts to continue. Request another smallest-possible lookup only if essential; otherwise return the normal channel reply JSON now.",
+        ].join("\n\n");
+        turnPrompt = conversationId ? continuation : `${prompt}\n\n${continuation}`;
+      }
+    } finally {
+      await providerRuntime.cleanup();
+    }
+    if (!result) throw new Error("Agent returned no channel reply");
     if (result.skillExecutionProposal && !reply.skillExecutionTarget) {
       throw new Error(
         "Channel reply Agent Skill execution target is not authorized",

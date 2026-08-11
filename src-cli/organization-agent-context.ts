@@ -12,7 +12,11 @@ import { dirname, join, resolve, sep } from "node:path";
 import { z } from "zod";
 import { channelReplyClaimTokenHeader } from "../src/lib/channels-contract";
 import {
+  organizationAgentContextLookupResponseSchema,
+  organizationAgentContextManifestSchema,
   organizationAgentContextResourcePageSchema,
+  type OrganizationAgentContextLookupRequest,
+  type OrganizationAgentContextManifest as OrganizationAgentContextIndexManifest,
   type OrganizationAgentContextResource,
 } from "../src/lib/organization-agent-context-contract";
 
@@ -172,7 +176,7 @@ const contextFilePath = (directory: string, relativePath: string) => {
 const boundedResponseText = async (
   response: Response,
   maxBytes: number,
-  resource: ContextResource,
+  resource: string,
 ) => {
   if (!response.body) return "";
   const reader = response.body.getReader();
@@ -445,4 +449,243 @@ export async function downloadOrganizationAgentContext(input: {
     await cleanupOrganizationAgentContext(input.workspacePath);
     throw error;
   }
+}
+
+type OrganizationContextManifestCacheEntry = {
+  etag: string;
+  revision: string;
+  projects: OrganizationAgentContextIndexManifest["projects"];
+};
+
+const organizationContextManifestCache = new Map<
+  string,
+  OrganizationContextManifestCacheEntry
+>();
+const maxOrganizationContextManifestCacheEntries = 16;
+
+const rememberOrganizationContextManifest = (
+  cacheKey: string,
+  entry: OrganizationContextManifestCacheEntry,
+) => {
+  organizationContextManifestCache.delete(cacheKey);
+  organizationContextManifestCache.set(cacheKey, entry);
+  while (
+    organizationContextManifestCache.size >
+      maxOrganizationContextManifestCacheEntries
+  ) {
+    const oldest = organizationContextManifestCache.keys().next().value;
+    if (typeof oldest !== "string") break;
+    organizationContextManifestCache.delete(oldest);
+  }
+};
+
+/**
+ * Prepares only the lightweight organization index. Detailed context remains
+ * server-side until hydrateOrganizationAgentContext is called with a bounded,
+ * model-selected request.
+ */
+export async function downloadOrganizationAgentContextManifest(input: {
+  apiUrl: string;
+  workerToken: string;
+  organizationId: string;
+  workId: string;
+  workerId: string;
+  claimToken: string;
+  snapshotAt: string;
+  workspacePath: string;
+  signal?: AbortSignal;
+  fetcher?: ContextFetcher;
+  maxPageBytes?: number;
+}) {
+  const directory = organizationAgentContextDirectory(input.workspacePath);
+  const fetcher = input.fetcher ?? fetch;
+  const cacheKey = `${input.apiUrl.replace(/\/$/u, "")}:${input.organizationId}`;
+  const cached = organizationContextManifestCache.get(cacheKey);
+  await cleanupOrganizationAgentContext(input.workspacePath);
+  await mkdir(directory, { recursive: true, mode: 0o700 });
+  await chmod(directory, 0o700);
+  try {
+    const query = new URLSearchParams({ workerId: input.workerId });
+    const response = await fetcher(
+      `${input.apiUrl.replace(/\/$/u, "")}/organizations/${input.organizationId}/channel-reply-claims/${input.workId}/organization-context/manifest?${query}`,
+      {
+        redirect: "error",
+        signal: input.signal,
+        headers: {
+          Accept: "application/json",
+          Authorization: `Bearer ${input.workerToken}`,
+          [channelReplyClaimTokenHeader]: input.claimToken,
+          ...(cached ? { "If-None-Match": cached.etag } : {}),
+        },
+      },
+    );
+    let manifest: OrganizationAgentContextIndexManifest;
+    if (response.status === 304) {
+      if (!cached) {
+        throw new Error("Organization Agent manifest cache is missing");
+      }
+      manifest = organizationAgentContextManifestSchema.parse({
+        schemaVersion: 2,
+        organizationId: input.organizationId,
+        workId: input.workId,
+        snapshotAt: input.snapshotAt,
+        revision: cached.revision,
+        projects: cached.projects,
+        loadedQueries: [],
+      });
+    } else {
+      if (!response.ok) {
+        throw new Error(
+          `Organization Agent manifest download failed (${response.status})`,
+        );
+      }
+      const text = await boundedResponseText(
+        response,
+        input.maxPageBytes ?? defaultMaxPageBytes,
+        "manifest",
+      );
+      manifest = organizationAgentContextManifestSchema.parse(JSON.parse(text));
+      if (
+        manifest.organizationId !== input.organizationId ||
+        manifest.workId !== input.workId ||
+        manifest.snapshotAt !== input.snapshotAt
+      ) {
+        throw new Error("Organization Agent manifest scope changed");
+      }
+      const etag = response.headers.get("ETag");
+      if (etag) {
+        rememberOrganizationContextManifest(cacheKey, {
+          etag,
+          revision: manifest.revision,
+          projects: manifest.projects,
+        });
+      }
+    }
+    const manifestPath = join(directory, "manifest.json");
+    await writeFile(manifestPath, encodedPage(manifest), { mode: 0o600 });
+    await chmod(manifestPath, 0o600);
+    return { directory, manifestPath, manifest };
+  } catch (error) {
+    await cleanupOrganizationAgentContext(input.workspacePath);
+    throw error;
+  }
+}
+
+export async function hydrateOrganizationAgentContext(input: {
+  apiUrl: string;
+  workerToken: string;
+  organizationId: string;
+  workId: string;
+  workerId: string;
+  claimToken: string;
+  snapshotAt: string;
+  workspacePath: string;
+  requests: OrganizationAgentContextLookupRequest[];
+  signal?: AbortSignal;
+  fetcher?: ContextFetcher;
+  maxContextBytes?: number;
+}) {
+  const directory = organizationAgentContextDirectory(input.workspacePath);
+  const manifestPath = join(directory, "manifest.json");
+  const manifest = organizationAgentContextManifestSchema.parse(
+    JSON.parse(await readFile(manifestPath, "utf8")),
+  );
+  if (
+    manifest.organizationId !== input.organizationId ||
+    manifest.workId !== input.workId ||
+    manifest.snapshotAt !== input.snapshotAt
+  ) {
+    throw new Error("Organization Agent manifest scope changed");
+  }
+  const loaded = new Set(
+    manifest.loadedQueries.map((item) => JSON.stringify(item.request)),
+  );
+  const requests = input.requests.filter(
+    (request) => !loaded.has(JSON.stringify(request)),
+  );
+  if (requests.length === 0) return { manifestPath, manifest, loaded: 0 };
+  const fetcher = input.fetcher ?? fetch;
+  const response = await fetcher(
+    `${input.apiUrl.replace(/\/$/u, "")}/organizations/${input.organizationId}/channel-reply-claims/${input.workId}/organization-context/lookup`,
+    {
+      method: "POST",
+      redirect: "error",
+      signal: input.signal,
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${input.workerToken}`,
+        [channelReplyClaimTokenHeader]: input.claimToken,
+      },
+      body: JSON.stringify({ workerId: input.workerId, requests }),
+    },
+  );
+  if (!response.ok) {
+    throw new Error(
+      `Organization Agent context lookup failed (${response.status})`,
+    );
+  }
+  const text = await boundedResponseText(
+    response,
+    input.maxContextBytes ?? defaultMaxContextBytes,
+    "lookup",
+  );
+  const lookup = organizationAgentContextLookupResponseSchema.parse(
+    JSON.parse(text),
+  );
+  if (
+    lookup.organizationId !== input.organizationId ||
+    lookup.workId !== input.workId ||
+    lookup.snapshotAt !== input.snapshotAt
+  ) {
+    throw new Error("Organization Agent lookup scope changed");
+  }
+  if (
+    lookup.results.length !== requests.length ||
+    lookup.results.some((result, index) =>
+      JSON.stringify(result.request) !== JSON.stringify(requests[index])
+    )
+  ) {
+    throw new Error("Organization Agent lookup response did not match its request");
+  }
+  const nextLoadedQueries = [...manifest.loadedQueries];
+  let contextBytes = new TextEncoder().encode(encodedPage(manifest)).byteLength;
+  for (const loadedQuery of manifest.loadedQueries) {
+    const loadedPath = contextFilePath(directory, loadedQuery.file);
+    contextBytes += new TextEncoder().encode(
+      await readFile(loadedPath, "utf8"),
+    ).byteLength;
+  }
+  for (const result of lookup.results) {
+    const relativePath = join(
+      "lookups",
+      `query-${String(nextLoadedQueries.length + 1).padStart(6, "0")}.json`,
+    );
+    const absolutePath = contextFilePath(directory, relativePath);
+    const serialized = encodedPage(result);
+    contextBytes += new TextEncoder().encode(serialized).byteLength;
+    if (contextBytes > (input.maxContextBytes ?? defaultMaxContextBytes)) {
+      throw new Error("Organization Agent context exceeds the local size limit");
+    }
+    await mkdir(dirname(absolutePath), { recursive: true, mode: 0o700 });
+    await writeFile(absolutePath, serialized, { mode: 0o600 });
+    await chmod(absolutePath, 0o600);
+    nextLoadedQueries.push({ file: relativePath, request: result.request });
+  }
+  const nextManifest = organizationAgentContextManifestSchema.parse({
+    ...manifest,
+    loadedQueries: nextLoadedQueries,
+  });
+  const temporaryManifestPath = join(directory, "manifest.partial.json");
+  await writeFile(temporaryManifestPath, encodedPage(nextManifest), {
+    mode: 0o600,
+  });
+  await chmod(temporaryManifestPath, 0o600);
+  await rename(temporaryManifestPath, manifestPath);
+  await chmod(manifestPath, 0o600);
+  return {
+    manifestPath,
+    manifest: nextManifest,
+    loaded: lookup.results.length,
+  };
 }

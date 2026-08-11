@@ -82,6 +82,9 @@ import {
   organizationAgentContextDescriptorSchema,
   organizationAgentContextIssuePullRequestsPageSchema,
   organizationAgentContextIssuesPageSchema,
+  organizationAgentContextLookupInputSchema,
+  organizationAgentContextLookupResponseSchema,
+  organizationAgentContextManifestSchema,
   organizationAgentContextProjectsPageSchema,
   organizationAgentContextQuerySchema,
   organizationAgentContextSessionsPageSchema,
@@ -475,7 +478,10 @@ import {
   listOrganizationAgentContextIssuesPage,
   listOrganizationAgentContextProjectsPage,
   listOrganizationAgentContextSessionsPage,
+  lookupOrganizationAgentContext,
+  organizationAgentContextManifest,
   OrganizationAgentContextCursorError,
+  organizationAgentContextMaxEncodedPageBytes,
   OrganizationAgentContextPageTooLargeError,
 } from "./organization-agent-context";
 import {
@@ -11960,6 +11966,115 @@ async function route(
       scheduleChannelRealtimePublish(env, db, input.organizationId, context);
       throw error;
     }
+  }
+
+  const organizationContextManifestMatch = pathname.match(
+    /^\/organizations\/([0-9a-f-]+)\/channel-reply-claims\/([0-9a-f-]+)\/organization-context\/manifest$/u,
+  );
+  if (organizationContextManifestMatch && request.method === "GET") {
+    const organizationId = organizationContextManifestMatch[1];
+    const workId = organizationContextManifestMatch[2];
+    const query = organizationAgentContextQuerySchema.parse(
+      Object.fromEntries(new URL(request.url).searchParams),
+    );
+    const principal = await requireWorkerOrganization(
+      db,
+      request,
+      organizationId,
+    );
+    const claimToken = request.headers.get(channelReplyClaimTokenHeader)?.trim();
+    if (
+      !claimToken?.startsWith("briar_channel_claim_") ||
+      claimToken.length > 200
+    ) {
+      throw new HttpError(401, "Channel reply claim token required");
+    }
+    const job = await getActiveOrganizationChannelReplyContextClaim(db, {
+      organizationId,
+      jobId: workId,
+      deviceId: principal.deviceId,
+      workerId: query.workerId,
+      claimTokenHash: await sha256(claimToken),
+      observedAt: new Date().toISOString(),
+    });
+    if (!job?.claimed_at) {
+      throw new HttpError(409, "Organization Agent claim is no longer active");
+    }
+    const manifest = organizationAgentContextManifestSchema.parse(
+      await organizationAgentContextManifest(db, {
+        organizationId,
+        workId,
+        snapshotAt: job.claimed_at,
+      }),
+    );
+    const etag = `"${manifest.revision}"`;
+    const headers = {
+      ...corsHeaders,
+      "Cache-Control": "private, no-store",
+      ETag: etag,
+    };
+    if (request.headers.get("If-None-Match") === etag) {
+      return new Response(null, { status: 304, headers });
+    }
+    return Response.json(manifest, { headers });
+  }
+
+  const organizationContextLookupMatch = pathname.match(
+    /^\/organizations\/([0-9a-f-]+)\/channel-reply-claims\/([0-9a-f-]+)\/organization-context\/lookup$/u,
+  );
+  if (organizationContextLookupMatch && request.method === "POST") {
+    const organizationId = organizationContextLookupMatch[1];
+    const workId = organizationContextLookupMatch[2];
+    const input = organizationAgentContextLookupInputSchema.parse(
+      await readJson(request),
+    );
+    const principal = await requireWorkerOrganization(
+      db,
+      request,
+      organizationId,
+    );
+    const claimToken = request.headers.get(channelReplyClaimTokenHeader)?.trim();
+    if (
+      !claimToken?.startsWith("briar_channel_claim_") ||
+      claimToken.length > 200
+    ) {
+      throw new HttpError(401, "Channel reply claim token required");
+    }
+    const job = await getActiveOrganizationChannelReplyContextClaim(db, {
+      organizationId,
+      jobId: workId,
+      deviceId: principal.deviceId,
+      workerId: input.workerId,
+      claimTokenHash: await sha256(claimToken),
+      observedAt: new Date().toISOString(),
+    });
+    if (!job?.claimed_at) {
+      throw new HttpError(409, "Organization Agent claim is no longer active");
+    }
+    const projectIds = [...new Set(input.requests.map((item) => item.projectId))];
+    const projects = await Promise.all(
+      projectIds.map((projectId) =>
+        getOrganizationProject(db, organizationId, projectId)
+      ),
+    );
+    if (projects.some((project) => !project)) {
+      throw new HttpError(404, "Project not found");
+    }
+    const response = organizationAgentContextLookupResponseSchema.parse(
+      await lookupOrganizationAgentContext(db, env.ARCHIVES, {
+        organizationId,
+        workId,
+        snapshotAt: job.claimed_at,
+        requests: input.requests,
+      }),
+    );
+    if (
+      new TextEncoder().encode(JSON.stringify(response)).byteLength >
+        organizationAgentContextMaxEncodedPageBytes
+    ) {
+      throw new OrganizationAgentContextPageTooLargeError();
+    }
+    return privateNoStoreJson(response);
   }
 
   const organizationContextMatch = pathname.match(
