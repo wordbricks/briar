@@ -18,6 +18,7 @@ const sidebarProps = {
   onAddProject: () => undefined,
   onAgentSessionOpen: () => undefined,
   onAgentsOpen: () => undefined,
+  onLobbyOpen: () => undefined,
   onScheduleOpen: () => undefined,
   onInboxOpen: () => undefined,
   onIssuesOpen: () => undefined,
@@ -172,6 +173,8 @@ describe("Sidebar", () => {
     expect(markup).toContain('aria-haspopup="menu"');
     expect(markup).toContain('aria-label="계정 메뉴"');
     expect(markup).toContain("이슈");
+    expect(markup).toContain("홈");
+    expect(markup).toContain('href="#project-lobby"');
     expect(markup).toContain('class="sidebar-issue-add"');
     expect(markup).toContain('aria-label="이슈 만들기"');
     expect(markup).toContain("에이전트");
@@ -232,7 +235,7 @@ describe("Sidebar", () => {
     expect(container.querySelector("#project-views-project-2")).not.toBeNull();
     expect(
       container.querySelectorAll(".sidebar-project-view").length,
-    ).toBeGreaterThanOrEqual(6);
+    ).toBeGreaterThanOrEqual(8);
 
     const collapseBriar = container.querySelector<HTMLButtonElement>(
       '[aria-label="Briar 프로젝트 접기"]',

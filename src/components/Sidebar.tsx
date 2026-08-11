@@ -10,6 +10,7 @@ import {
   Check,
   Ellipsis,
   Hash,
+  Home,
   Inbox,
   LogOut,
   Plus,
@@ -52,6 +53,7 @@ export function Sidebar({
   onAddProject,
   onAgentSessionOpen,
   onAgentsOpen,
+  onLobbyOpen,
   onScheduleOpen,
   onInboxOpen,
   onChannelCreate,
@@ -76,6 +78,7 @@ export function Sidebar({
 }: {
   activePage:
     | "issues"
+    | "lobby"
     | "agents"
     | "channels"
     | "schedule"
@@ -95,6 +98,7 @@ export function Sidebar({
   onAddProject: () => void;
   onAgentSessionOpen: (sessionId: string) => void;
   onAgentsOpen: () => void;
+  onLobbyOpen: () => void;
   onScheduleOpen: () => void;
   onInboxOpen: () => void;
   onChannelCreate?: (name: string) => Promise<void>;
@@ -340,8 +344,9 @@ export function Sidebar({
   };
 
   const selectProject = (projectId: string) => {
-    onProjectChange(projectId);
+    if (projectId !== activeProjectId) onProjectChange(projectId);
     setProjectExpanded(projectId, true);
+    onLobbyOpen();
   };
 
   return (
@@ -765,6 +770,22 @@ export function Sidebar({
                     className="sidebar-project-views"
                     id={`project-views-${project.id}`}
                   >
+                    <a
+                      aria-current={
+                        isActive && activePage === "lobby" ? "page" : undefined
+                      }
+                      className={`sidebar-project-view${
+                        isActive && activePage === "lobby" ? " active" : ""
+                      }`}
+                      href="#project-lobby"
+                      onClick={(event) => {
+                        event.preventDefault();
+                        openProjectPage(onLobbyOpen);
+                      }}
+                    >
+                      <Home size={14} strokeWidth={1.7} />
+                      <span>{t("sidebar.overview")}</span>
+                    </a>
                     <div className="sidebar-project-view-row">
                       <a
                         aria-current={

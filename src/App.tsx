@@ -23,6 +23,7 @@ import { LoginScreen } from "./components/LoginScreen";
 import { OrganizationSettings } from "./components/OrganizationSettings";
 import { OrganizationCreate } from "./components/OrganizationCreate";
 import { ProjectOnboarding } from "./components/ProjectOnboarding";
+import { ProjectLobby } from "./components/ProjectLobby";
 import { ProjectAgents } from "./components/ProjectAgents";
 import { ProjectAgentSessionDetail } from "./components/ProjectAgentSessionDetail";
 import { ProjectSchedule } from "./components/ProjectSchedule";
@@ -124,6 +125,7 @@ import { useI18n } from "./i18n";
 import type { HuntRun, ProjectAgent, StatusTrayRun } from "./types";
 
 type ActivePage =
+  | "lobby"
   | "issues"
   | "agents"
   | "channels"
@@ -425,7 +427,7 @@ export function App() {
     goForward,
     navigate: navigateToPage,
     reset: resetNavigation,
-  } = useNavigationHistory<ActivePage>("issues");
+  } = useNavigationHistory<ActivePage>("lobby");
   const createOrganizationChannel = useCallback(
     async (name: string) => {
       if (!briar.activeOrganizationId || !briar.token) {
@@ -1106,7 +1108,7 @@ export function App() {
           briar.finishProjectCreation();
           setRequestedRunId(null);
           setRequestedSessionId(null);
-          resetNavigation("issues");
+          resetNavigation("lobby");
         }}
         onLogout={() => void briar.logout()}
         onReviseWorkflow={briar.reviseWorkflow}
@@ -1152,6 +1154,7 @@ export function App() {
               navigateToPage("agents");
             }}
             onAgentsOpen={() => navigateToPage("agents")}
+            onLobbyOpen={() => navigateToPage("lobby")}
             onScheduleOpen={() => navigateToPage("schedule")}
             onInboxOpen={() => navigateToPage("inbox")}
             onChannelCreate={
@@ -1182,7 +1185,7 @@ export function App() {
               briar.setActiveOrganizationId(organizationId);
               setRequestedRunId(null);
               setRequestedSessionId(null);
-              resetNavigation("issues");
+              resetNavigation("lobby");
             }}
             onOrganizationSettings={(organizationId, section) => {
               setSettingsTarget({
@@ -1197,7 +1200,7 @@ export function App() {
               briar.setActiveProjectId(projectId);
               setRequestedRunId(null);
               setRequestedSessionId(null);
-              resetNavigation("issues");
+              resetNavigation("lobby");
             }}
             onProjectReadinessOpen={setRepositorySetupProjectId}
             onProjectSettings={(projectId) => {
@@ -1411,6 +1414,47 @@ export function App() {
             })}
             sessionToken={briar.token}
             velen={briar.velen}
+          />
+        ) : activePage === "lobby" && activeProject ? (
+          <ProjectLobby
+            dashboard={briar.dashboard}
+            isSidebarOpen={isSidebarOpen}
+            onLoadUsageReport={loadUsageReport}
+            onOpenAgents={() => navigateToPage("agents")}
+            onOpenIssue={(runId) => {
+              setRequestedSessionId(null);
+              setRequestedRunId(runId);
+              navigateToPage("issues");
+            }}
+            onOpenIssues={() => {
+              setRequestedRunId(null);
+              navigateToPage("issues");
+            }}
+            onOpenRepository={() => {
+              if (
+                briar.projectReadiness[activeProject.id]?.githubRepository ||
+                briar.dashboard?.settings.githubRepository
+              ) {
+                setSettingsTarget({
+                  scope: "project",
+                  projectId: activeProject.id,
+                  section: "general",
+                });
+                navigateToPage("settings");
+                return;
+              }
+              setRepositorySetupProjectId(activeProject.id);
+            }}
+            onOpenSettings={() => {
+              setSettingsTarget({
+                scope: "project",
+                projectId: activeProject.id,
+                section: "general",
+              });
+              navigateToPage("settings");
+            }}
+            project={activeProject}
+            readiness={briar.projectReadiness[activeProject.id] ?? null}
           />
         ) : activePage === "agents" && activeProject ? (
           <ProjectAgents
