@@ -34,6 +34,7 @@ where skill_id is not null and status in ('queued', 'running');
 -- Keep rolling deploys compatible with an older API writer that knows only
 -- `skill_id`. Once populated, the snapshot deliberately survives Skill
 -- deletion or reassignment.
+--> statement-breakpoint
 create trigger briar_channel_reply_skill_snapshot_insert
 after insert on briar_channel_agent_reply_jobs
 when new.skill_id is not null and new.selected_skill_id_snapshot is null
@@ -43,6 +44,7 @@ begin
   where id = new.id;
 end;
 
+--> statement-breakpoint
 create trigger briar_channel_reply_skill_snapshot_update
 after update of skill_id on briar_channel_agent_reply_jobs
 when new.skill_id is not null and new.selected_skill_id_snapshot is null
@@ -52,6 +54,7 @@ begin
   where id = new.id;
 end;
 
+--> statement-breakpoint
 create unique index briar_channel_agent_reply_jobs_delegation_target_idx
   on briar_channel_agent_reply_jobs (delegated_by_reply_job_id, agent_id)
   where delegated_by_reply_job_id is not null;
