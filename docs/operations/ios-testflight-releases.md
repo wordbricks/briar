@@ -468,3 +468,39 @@ entitlement verified before upload. The release gate also increased the native
 UI transition wait to tolerate slow simulator startup. The checked-in default
 implementation remains Tauri and `nativeStabilization` remains unset pending
 the internal observation checklist.
+
+## 2026-08-11 — 1.2.103 (1)
+
+- App: Briar Companion (`app.briar.companion`)
+- Marketing version: `1.2.103`
+- App Store Connect build: `1`
+- App Store Connect build ID: `44a663e2-f7e5-4e8c-a179-7d7cfe6ea743`
+- Latest main commit: `09ce884a`
+- Release source commit: `09ce884a91c4fa28efe1e349f967a39f398f71e9`
+- Implementation: native SwiftUI
+- Toolchain: Xcode 26.6, iOS 26.5 SDK
+- Minimum iOS version: 17.0
+- App Store Connect processing state: `VALID`
+- TestFlight state: `IN_BETA_TESTING`
+- Internal group: `wordbricks` (`hasAccessToAllBuilds=true`)
+- Automatic tester notification: enabled
+- IPA SHA-256: `0a07f5ad3f5fd2d9dd6c6762528eaa45bceed0969836a4c64abe768fcda264b8`
+
+The release includes native iOS localization, synchronized Inbox read state,
+conversational issue creation and execution approvals, natural-language
+Project Agent Skill execution approval, connected mention buttons, and stable
+conversation image loading. The latest-main gate exposed Swift 6 inference,
+actor-isolation, helper-shadowing, and channel-delta fixture validation
+regressions. They were corrected and merged in PR #894 before the archive was
+created.
+
+The corrected source passed the shared API contract, Swift unit and 12 UI
+tests, iPhone and iPad accessibility and layout tests, Production analyze and
+build checks, session/download/log security checks, and the Tauri iOS and
+Android regression builds. Archive identity, App Store provisioning,
+distribution signature, production entitlements, and all alternate app icons
+were verified before upload.
+
+The prior final handoff, `1.2.99 (2)`, remains `VALID`, but main advanced
+through the 1.2.103 release. Version `1.2.103 (1)` is therefore the final build
+handed off from the latest main commit.
