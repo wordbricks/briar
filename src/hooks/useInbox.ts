@@ -10,6 +10,10 @@ import {
 } from "../lib/auto-hunt-contract";
 import type { StructuredAgentResult } from "../lib/agent-result";
 import {
+  inboxSessionMessageVersion,
+  isCanonicalInboxSessionVersion,
+} from "../lib/inbox-session-version";
+import {
   loadInboxFeed,
   loadInboxReadStates,
   saveInboxReadStates,
@@ -248,6 +252,10 @@ export function buildCurrentInboxMessages(
     const finalEvent = [...session.events].reverse().find(
       (event) => event.type === session.status,
     );
+    const occurredAt =
+      session.completedAt ??
+      finalEvent?.occurredAt ??
+      session.startedAt;
     messages.push({
       id: `session:${session.id}`,
       kind: "session",
@@ -257,13 +265,8 @@ export function buildCurrentInboxMessages(
       title:
         session.request ??
         session.issues.map((issue) => issue.title).join(" · "),
-      occurredAt:
-        finalEvent?.occurredAt ??
-        session.completedAt ??
-        session.startedAt,
-      version:
-        finalEvent?.id ??
-        `${session.status}:${session.completedAt ?? session.startedAt}`,
+      occurredAt,
+      version: inboxSessionMessageVersion(session.status, occurredAt),
       status: session.status,
       agentName: session.agentName?.trim() || null,
       issueCount: session.issues.length,
@@ -467,25 +470,61 @@ function readInboxStorage(storageKey: string): InboxStorage {
   if (typeof window === "undefined") return emptyStorage();
   try {
     const value = JSON.parse(window.localStorage.getItem(storageKey) ?? "{}");
-    return {
-      messages: Array.isArray(value.messages)
-        ? value.messages.filter(
-            (message: unknown) =>
-              Boolean(message) &&
-              typeof message === "object" &&
-              typeof (message as { id?: unknown }).id === "string",
-          )
-        : [],
-      readVersions:
-        value.readVersions &&
+    const messages = (Array.isArray(value.messages)
+      ? value.messages.filter(
+          (message: unknown) =>
+            Boolean(message) &&
+            typeof message === "object" &&
+            typeof (message as { id?: unknown }).id === "string",
+        )
+      : []) as InboxMessage[];
+    const readVersions: Record<string, string> =
+      value.readVersions &&
         typeof value.readVersions === "object" &&
         !Array.isArray(value.readVersions)
-          ? value.readVersions
-          : {},
+        ? { ...value.readVersions }
+        : {};
+
+    const normalizedMessages = messages.map((message) => {
+      if (message.kind !== "session") return message;
+      const version = inboxSessionMessageVersion(
+        message.status,
+        message.occurredAt,
+      );
+      return message.version === version ? message : { ...message, version };
+    });
+
+    return {
+      messages: normalizedMessages,
+      readVersions: normalizeInboxReadVersions(
+        normalizedMessages,
+        readVersions,
+      ),
     };
   } catch {
     return emptyStorage();
   }
+}
+
+function normalizeInboxReadVersions(
+  messages: InboxMessage[],
+  readVersions: Record<string, string>,
+) {
+  const normalized = { ...readVersions };
+  for (const message of messages) {
+    const readVersion = normalized[message.id];
+    if (
+      message.kind === "session" &&
+      readVersion &&
+      !isCanonicalInboxSessionVersion(readVersion)
+    ) {
+      normalized[message.id] = inboxSessionMessageVersion(
+        message.status,
+        message.occurredAt,
+      );
+    }
+  }
+  return normalized;
 }
 
 function writeInboxStorage(storageKey: string, storage: InboxStorage) {
@@ -539,11 +578,15 @@ export function useInbox(
       ) {
         return;
       }
-      generation.remoteReadVersions = remote;
       setState((current) => {
         if (current.storageKey !== generation.storageKey) return current;
+        const normalizedRemote = normalizeInboxReadVersions(
+          current.messages,
+          remote,
+        );
+        generation.remoteReadVersions = normalizedRemote;
         const readVersions = mergeInboxReadVersions(
-          mergeInboxReadVersions(current.readVersions, remote),
+          mergeInboxReadVersions(current.readVersions, normalizedRemote),
           protectedLocal,
         );
         const next = { messages: current.messages, readVersions };

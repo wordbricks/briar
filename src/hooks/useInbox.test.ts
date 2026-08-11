@@ -183,7 +183,10 @@ describe("Inbox messages", () => {
       "session:session-completed",
       "session:session-failed",
     ]);
-    expect(messages[0]).toMatchObject({ agentName: "Inbox Agent" });
+    expect(messages[0]).toMatchObject({
+      agentName: "Inbox Agent",
+      version: "session:v1:completed:2026-07-24T01:10:00.000Z",
+    });
   });
 
   it("creates actionable inbox messages for mentions and thread replies", () => {

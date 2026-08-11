@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import type { InboxMessageWithReadState } from "./useInbox";
-import { findChangedInboxMessages } from "./useInboxNotifications";
+import {
+  findChangedInboxMessages,
+  inboxNotificationVersion,
+} from "./useInboxNotifications";
 
 const message = (
   id: string,
@@ -37,5 +40,36 @@ describe("inbox notification change detection", () => {
         messages,
       ).map((candidate) => candidate.id),
     ).toEqual(["changed", "new"]);
+  });
+
+  it("ignores legacy and canonical versions of the same terminal session", () => {
+    const terminalSession: InboxMessageWithReadState = {
+      id: "session:session-1",
+      kind: "session",
+      isUnread: true,
+      occurredAt: "2026-08-01T12:22:38.913Z",
+      projectId: "project-1",
+      projectName: "Briar",
+      targetId: "session-1",
+      title: "Completed task",
+      version: "legacy-terminal-event-id",
+      status: "failed",
+      agentName: "Inbox Agent",
+      issueCount: 1,
+      error: "Runner stopped",
+      summary: null,
+      requiresAttention: true,
+    };
+    const baselineVersion = inboxNotificationVersion(terminalSession);
+
+    expect(
+      findChangedInboxMessages(
+        { [terminalSession.id]: baselineVersion },
+        [{
+          ...terminalSession,
+          version: "failed:2026-08-01T12:22:38.913Z",
+        }],
+      ),
+    ).toEqual([]);
   });
 });
