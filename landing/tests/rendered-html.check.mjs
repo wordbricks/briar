@@ -356,6 +356,8 @@ test("server-renders the localized changelog from published releases", async () 
   assert.match(koreanHtml, /<html lang="ko"[\s>]/i);
   assert.match(koreanHtml, /Briar 변경 기록/);
   assert.match(koreanHtml, /현재 안정 버전/);
+  assert.match(koreanHtml, /프로젝트 대화 에이전트가 실제 작업 환경에서 검증합니다/);
+  assert.match(koreanHtml, /v1\.2\.105/);
   assert.match(koreanHtml, /실시간 협업과 에이전트 동기화를 더 가볍고 정확하게 만듭니다/);
   assert.match(koreanHtml, /프로젝트 에이전트 실행 승인을 더 안전하게 배포합니다/);
   assert.match(koreanHtml, /v1\.2\.104/);
@@ -393,6 +395,8 @@ test("server-renders the localized changelog from published releases", async () 
   const englishHtml = await englishResponse.text();
   assert.match(englishHtml, /<html lang="en"[\s>]/i);
   assert.match(englishHtml, /Briar changelog/);
+  assert.match(englishHtml, /Let project conversation agents verify work in a real runtime/);
+  assert.match(englishHtml, /v1\.2\.105/);
   assert.match(englishHtml, /Make real-time collaboration and agent sync lighter and more precise/);
   assert.match(englishHtml, /Roll out Project Agent execution approvals safely/);
   assert.match(englishHtml, /v1\.2\.104/);
