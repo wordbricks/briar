@@ -197,6 +197,8 @@ test("server-renders English for an English browser", async () => {
   assert.match(html, /04 \/ (?:<!-- -->)?SECURITY/);
   assert.match(html, /aria-label="Language"/);
   assert.match(html, /aria-pressed="true"[^>]*aria-label="English"/);
+  assert.match(html, /data-download-platform="macos"/);
+  assert.match(html, /data-download-architecture="arm64"/);
 });
 
 test("falls back to English when the browser language is unsupported", async () => {
@@ -279,6 +281,20 @@ test("server-renders the localized download catalog at /ko/download", async () =
     html,
     /https:\/\/github\.com\/wordbricks\/briar\/releases\/latest/,
   );
+  assert.match(html, /data-download-platform="macos"/);
+  assert.match(html, /data-download-architecture="arm64"/);
+});
+
+test("loads the configured GA4 tag", async () => {
+  const response = await render({ path: "/download" });
+  assert.equal(response.status, 200);
+
+  const html = await response.text();
+  assert.match(
+    html,
+    /https:\/\/www\.googletagmanager\.com\/gtag\/js\?id=G-SQDQ3YZ6TL/,
+  );
+  assert.match(html, /gtag\('config',\s*"G-SQDQ3YZ6TL"\)/);
 });
 
 test("standard pages render the same canonical desktop and mobile navigation", async () => {

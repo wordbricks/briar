@@ -3122,6 +3122,18 @@ function KanbanCard({
     run.status === "queued" &&
     Boolean(run.leaseExpiresAt) &&
     Date.parse(run.leaseExpiresAt!) > Date.now();
+  const assignedProvider = activeAgent || assignedWorker
+    ? run.preferredProvider ??
+      run.requestedProvider ??
+      assignedWorker?.agentProvider ??
+      activeAgent?.provider ??
+      null
+    : null;
+  const assignmentBadgeCount = [
+    activeAgent,
+    assignedProvider,
+    assignedWorker,
+  ].filter(Boolean).length;
   return (
     <IssueContextMenu
       availableProviders={availableProviders}
@@ -3147,7 +3159,7 @@ function KanbanCard({
       <div
         aria-label={t("run.details", { title: run.title })}
         aria-disabled={isMoving}
-        className={`kanban-card ${meta.tone}${isMoving ? " moving" : ""}${isDragging ? " dragging" : ""}${activeAgent || assignedWorker ? " has-assignees" : ""}${[activeAgent, assignedWorker].filter(Boolean).length > 1 ? " has-multiple-assignees" : ""}`}
+        className={`kanban-card ${meta.tone}${isMoving ? " moving" : ""}${isDragging ? " dragging" : ""}${assignmentBadgeCount > 0 ? " has-assignees" : ""}${assignmentBadgeCount > 1 ? " has-multiple-assignees" : ""}${assignmentBadgeCount > 2 ? " has-three-assignees" : ""}`}
         draggable={false}
         onClick={onOpen}
         onKeyDown={(event) => {
@@ -3162,21 +3174,8 @@ function KanbanCard({
         role="button"
         tabIndex={0}
       >
-        {(activeAgent || assignedWorker) && (
+        {assignmentBadgeCount > 0 && (
           <span className="kanban-card-assignee-badges">
-            {assignedWorker && (
-              <span
-                aria-label={t("run.workerAssigned", {
-                  worker: assignedWorker.label,
-                })}
-                className="kanban-card-worker-badge"
-                title={t("run.workerAssigned", {
-                  worker: assignedWorker.label,
-                })}
-              >
-                <WorkerIcon icon={assignedWorker.icon} size={18} />
-              </span>
-            )}
             {activeAgent && (
               <span
                 aria-label={t("run.assigned", { agent: activeAgent.name })}
@@ -3188,15 +3187,32 @@ function KanbanCard({
                   isRunning
                   token={token}
                 />
-                <span
-                  aria-hidden="true"
-                  className={`kanban-card-provider-badge ${activeAgent.provider}`}
-                >
-                  <AgentProviderIcon
-                    provider={activeAgent.provider}
-                    size={11}
-                  />
-                </span>
+              </span>
+            )}
+            {assignedProvider && (
+              <span
+                aria-label={`${t("run.metricsProvider")}: ${agentProviderLabels[assignedProvider]}`}
+                className={`kanban-card-provider-badge ${assignedProvider}`}
+                title={`${t("run.metricsProvider")}: ${agentProviderLabels[assignedProvider]}`}
+              >
+                <AgentProviderIcon provider={assignedProvider} size={13} />
+              </span>
+            )}
+            {assignedWorker && (
+              <span
+                aria-label={t("run.workerAssigned", {
+                  worker: assignedWorker.label,
+                })}
+                className="kanban-card-worker-badge"
+                title={t("run.workerAssigned", {
+                  worker: assignedWorker.label,
+                })}
+              >
+                <WorkerIcon
+                  glyphSize={16}
+                  icon={assignedWorker.icon}
+                  size={20}
+                />
               </span>
             )}
           </span>

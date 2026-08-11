@@ -1,4 +1,5 @@
 import { type Locale, copy, localizedPath } from "../i18n";
+import { DesktopDownloadLink } from "../desktop-download-link";
 import { Arrow, SiteFooter, SiteHeader } from "../site-chrome";
 import { MAC_DOWNLOAD_URL, WEB_APP_URL } from "../site-links";
 
@@ -450,9 +451,15 @@ export default function TutorialView({ locale }: { locale: Locale }) {
           <a className="button button-primary" href={WEB_APP_URL}>
             {t.openApp} <Arrow />
           </a>
-          <a className="button button-secondary" href={MAC_DOWNLOAD_URL}>
+          <DesktopDownloadLink
+            className="button button-secondary"
+            href={MAC_DOWNLOAD_URL}
+            locale={locale}
+            trackingLabel={t.download}
+            trackingLocation="tutorial"
+          >
             {t.download} <span aria-hidden="true">↓</span>
-          </a>
+          </DesktopDownloadLink>
         </div>
       </section>
 
