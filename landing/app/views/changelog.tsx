@@ -23,6 +23,20 @@ export const changelogCopy = {
     backTop: "맨 위로 ↑",
     entries: [
       {
+        version: "1.2.107",
+        date: "2026년 8월 12일",
+        title: "모바일 채널을 자연스럽게 다듬고 반복 알림을 멈춥니다",
+        summary:
+          "모바일 채널의 네이티브 탐색과 입력 경험을 복원하고, 같은 에이전트 세션이 여러 번 알림으로 나타나지 않도록 Inbox 동기화를 안정화했습니다.",
+        items: [
+          "iOS 채널 상세에 시스템 내비게이션 바와 뒤로가기, 네이티브 메시지 입력과 첨부·전송 버튼을 적용했습니다.",
+          "Android 공용 채널 화면도 투명한 모바일 레이아웃과 일관된 버튼을 사용하고, 스레드에서 채널 목록까지 뒤로가기를 순서대로 처리합니다.",
+          "완료·실패한 에이전트 세션의 Inbox 버전을 데스크탑과 Worker에서 하나로 맞춰 같은 상태가 반복해서 OS 알림을 만들지 않도록 했습니다.",
+          "D1의 기존 세션 요약과 읽음 상태를 표준 버전으로 이전하면서 이미 읽은 세션은 읽음으로 유지합니다.",
+          "제품 설명을 클라우드 조정과 로컬 실행 구조에 맞춰 정리해 저장소와 실행 위치를 더 정확하게 안내합니다.",
+        ],
+      },
+      {
         version: "1.2.106",
         date: "2026년 8월 12일",
         title: "프로젝트를 바꿔도 모든 Inbox 알림을 놓치지 않습니다",
@@ -373,6 +387,20 @@ export const changelogCopy = {
     home: "Home",
     backTop: "Back to top ↑",
     entries: [
+      {
+        version: "1.2.107",
+        date: "August 12, 2026",
+        title: "Refine mobile channels and stop repeated session alerts",
+        summary:
+          "Restore native mobile channel navigation and composition while stabilizing Inbox synchronization so the same agent session does not notify more than once.",
+        items: [
+          "Use the system navigation bar and back behavior in iOS channel detail, with native message input, attachment, and send controls.",
+          "Give the shared Android channel view a transparent mobile layout, consistent buttons, and ordered back navigation from thread to channel to channel list.",
+          "Share one canonical Inbox version for completed and failed agent sessions across desktop and the Worker so equivalent state cannot retrigger OS notifications.",
+          "Migrate existing D1 session summaries and account read state to the canonical version while keeping sessions that were already read marked as read.",
+          "Describe Briar accurately as cloud-coordinated with local repository access and agent execution.",
+        ],
+      },
       {
         version: "1.2.106",
         date: "August 12, 2026",
@@ -736,9 +764,9 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <h1>{changelog.title}</h1>
           <p>{changelog.description}</p>
         </div>
-        <a href="#v1-2-106" className="changelog-current">
+        <a href="#v1-2-107" className="changelog-current">
           <span>{changelog.current}</span>
-          <strong>v1.2.106</strong>
+          <strong>v1.2.107</strong>
           <i aria-hidden="true">↓</i>
         </a>
       </section>
@@ -763,6 +791,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   {index === 0 ? <span>{changelog.latest}</span> : null}
                   <time
                     dateTime={
+                      entry.version === "1.2.107" ||
                       entry.version === "1.2.106"
                         ? "2026-08-12"
                         : entry.version === "1.2.105" ||
