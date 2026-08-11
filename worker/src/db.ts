@@ -482,6 +482,21 @@ export type HuntRunRow = {
   event_count: number;
 };
 
+export type OrganizationStatusTrayRunRow = Pick<
+  HuntRunRow,
+  | "id"
+  | "title"
+  | "status"
+  | "workflow_stage"
+  | "workflow_snapshot_json"
+  | "started_at"
+  | "updated_at"
+  | "last_event_at"
+> & {
+  project_id: string;
+  project_name: string;
+};
+
 export type OrganizationUsageRunRow = {
   id: string;
   project_id: string;
@@ -6352,6 +6367,57 @@ export async function listDashboardRuns(db: D1Database, projectId: string) {
   return runs.results;
 }
 
+export async function listDashboardRunsByIds(
+  db: D1Database,
+  projectId: string,
+  runIds: readonly string[],
+) {
+  if (runIds.length === 0) return [];
+  const runs = await db
+    .prepare(
+      `select run.*,
+              run.event_count + coalesce((
+                select sum(archive.row_count)
+                from briar_log_archives archive
+                where archive.run_id = run.id
+                  and archive.archive_kind = 'run_events'
+                  and archive.status = 'complete'
+              ), 0) as event_count
+       from briar_hunt_runs run
+       where run.project_id = ?
+         and run.id in (select value from json_each(?))
+       order by run.updated_at desc`,
+    )
+    .bind(projectId, JSON.stringify([...new Set(runIds)]))
+    .all<HuntRunRow>();
+
+  return runs.results;
+}
+
+export async function listOrganizationStatusTrayRuns(
+  db: D1Database,
+  organizationId: string,
+) {
+  const runs = await db
+    .prepare(
+      `select project.id as project_id, project.name as project_name,
+              run.id, run.title, run.status, run.workflow_stage,
+              run.workflow_snapshot_json, run.started_at, run.updated_at,
+              run.last_event_at
+       from briar_hunt_runs run
+       join briar_projects project on project.id = run.project_id
+       where project.organization_id = ?
+         and run.status = 'running'
+         and run.paused_at is null
+       order by run.updated_at desc, run.id
+       limit 200`,
+    )
+    .bind(organizationId)
+    .all<OrganizationStatusTrayRunRow>();
+
+  return runs.results;
+}
+
 export async function listOrganizationUsageRuns(
   db: D1Database,
   organizationId: string,
@@ -6635,6 +6701,28 @@ export async function listIssueResultReviews(
   return reviews.results;
 }
 
+export async function listIssueResultReviewsByRunIds(
+  db: D1Database,
+  projectId: string,
+  runIds: readonly string[],
+) {
+  if (runIds.length === 0) return [];
+  const reviews = await db
+    .prepare(
+      `select review.run_id, user.id as user_id, user.name, user.username,
+              user.image, review.completed_at
+       from briar_issue_result_reviews review
+       join briar_hunt_runs run on run.id = review.run_id
+       join "user" user on user.id = review.reviewer_user_id
+       where run.project_id = ?
+         and review.run_id in (select value from json_each(?))
+       order by review.completed_at asc, lower(user.name), user.id`,
+    )
+    .bind(projectId, JSON.stringify([...new Set(runIds)]))
+    .all<IssueResultReviewRow>();
+  return reviews.results;
+}
+
 export async function updateHuntRunExecutionMetrics(
   db: D1Database,
   projectId: string,
@@ -6718,6 +6806,44 @@ export async function listIssueDependencies(
                 dependency.dependent_run_id`,
     )
     .bind(projectId)
+    .all<IssueDependencyRow>();
+  return result.results;
+}
+
+export async function listIssueDependenciesByRunIds(
+  db: D1Database,
+  projectId: string,
+  runIds: readonly string[],
+) {
+  if (runIds.length === 0) return [];
+  const serializedRunIds = JSON.stringify([...new Set(runIds)]);
+  const result = await db
+    .prepare(
+      `select dependency.project_id, dependency.prerequisite_run_id,
+              dependency.dependent_run_id, dependency.created_by_user_id,
+              dependency.created_at,
+              prerequisite.run_number as prerequisite_run_number,
+              prerequisite.title as prerequisite_title,
+              prerequisite.status as prerequisite_status,
+              prerequisite.paused_at as prerequisite_paused_at,
+              dependent.run_number as dependent_run_number,
+              dependent.title as dependent_title,
+              dependent.status as dependent_status,
+              dependent.paused_at as dependent_paused_at
+       from briar_issue_dependencies dependency
+       join briar_hunt_runs prerequisite
+         on prerequisite.id = dependency.prerequisite_run_id
+       join briar_hunt_runs dependent
+         on dependent.id = dependency.dependent_run_id
+       where dependency.project_id = ?
+         and (
+           dependency.prerequisite_run_id in (select value from json_each(?))
+           or dependency.dependent_run_id in (select value from json_each(?))
+         )
+       order by dependency.created_at, dependency.prerequisite_run_id,
+                dependency.dependent_run_id`,
+    )
+    .bind(projectId, serializedRunIds, serializedRunIds)
     .all<IssueDependencyRow>();
   return result.results;
 }
@@ -9132,6 +9258,31 @@ export async function listIssueAttachments(
   const result = runId
     ? await statement.bind(projectId, runId).all<IssueAttachmentRow>()
     : await statement.bind(projectId, projectId).all<IssueAttachmentRow>();
+  return result.results;
+}
+
+export async function listIssueAttachmentsByRunIds(
+  db: D1Database,
+  projectId: string,
+  runIds: readonly string[],
+) {
+  if (runIds.length === 0) return [];
+  const result = await db
+    .prepare(
+      `select id, run_id, project_id, object_key, filename, content_type,
+              byte_size, created_at
+       from briar_issue_attachments attachment
+       where attachment.project_id = ?
+         and attachment.run_id in (select value from json_each(?))
+         and exists (
+           select 1 from briar_hunt_runs run
+           where run.id = attachment.run_id
+             and run.project_id = attachment.project_id
+         )
+       order by created_at, id`,
+    )
+    .bind(projectId, JSON.stringify([...new Set(runIds)]))
+    .all<IssueAttachmentRow>();
   return result.results;
 }
 

@@ -336,6 +336,24 @@ export type HuntRun = {
   eventCount: number;
 };
 
+export type StatusTrayRun = {
+  projectId: string;
+  projectName: string;
+  id: string;
+  title: string;
+  status: "running";
+  workflowStage: AutoHuntWorkflowStageId | null;
+  workflowStageLabel: string | null;
+  startedAt: string;
+  updatedAt: string;
+  lastEventAt: string;
+};
+
+export type StatusTrayRunsPayload = {
+  runs: StatusTrayRun[];
+  generatedAt: string;
+};
+
 /** Lightweight execution projection used by the organization Usage page. */
 export type AgentUsageExecutionAttempt = {
   executionId: string;

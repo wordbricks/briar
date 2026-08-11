@@ -1,7 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { isMacDesktopTauri } from "./platform";
-import { runMeta } from "./stages";
-import type { HuntRun } from "../types";
+import type { StatusTrayRun } from "../types";
 
 export type StatusTrayRunItem = {
   projectId: string;
@@ -25,53 +24,45 @@ export type StatusTrayOpenRunPayload = {
   runId: string;
 };
 
-export type StatusTrayProjectRuns = {
-  project: { id: string; name: string };
-  runs: readonly HuntRun[];
-};
-
 export const STATUS_TRAY_OPEN_RUN_EVENT = "status-tray-open-run";
 
 export function statusLabelForRun(
-  run: HuntRun,
-  localize?: (fallback: string, run: HuntRun) => string,
+  run: StatusTrayRun,
+  localize?: (fallback: string, run: StatusTrayRun) => string,
 ): string {
-  const fallback = runMeta(run.status, run.workflowStage, run.workflow).label;
+  const fallback = run.workflowStageLabel?.trim() || "Running";
   return localize ? localize(fallback, run) : fallback;
 }
 
 export function buildStatusTrayItems(
-  projectRuns: readonly StatusTrayProjectRuns[],
+  runs: readonly StatusTrayRun[],
   options?: {
-    localizeStatus?: (fallback: string, run: HuntRun) => string;
+    localizeStatus?: (fallback: string, run: StatusTrayRun) => string;
     untitledTitle?: string;
   },
 ): StatusTrayRunItem[] {
   const untitledTitle = options?.untitledTitle ?? "Untitled issue";
-  return projectRuns.flatMap(({ project, runs }) =>
-    runs
-      .filter((run) => run.status === "running")
-      .slice()
-      .sort((left, right) => {
-        const leftAt = Date.parse(
-          left.updatedAt || left.startedAt || left.lastEventAt,
-        );
-        const rightAt = Date.parse(
-          right.updatedAt || right.startedAt || right.lastEventAt,
-        );
-        return (
-          (Number.isFinite(rightAt) ? rightAt : 0) -
-          (Number.isFinite(leftAt) ? leftAt : 0)
-        );
-      })
-      .map((run) => ({
-        projectId: project.id,
-        runId: run.id,
-        title: run.title?.trim() || untitledTitle,
-        statusLabel: statusLabelForRun(run, options?.localizeStatus),
-        projectName: project.name,
-      })),
-  );
+  return runs
+    .slice()
+    .sort((left, right) => {
+      const leftAt = Date.parse(
+        left.updatedAt || left.startedAt || left.lastEventAt,
+      );
+      const rightAt = Date.parse(
+        right.updatedAt || right.startedAt || right.lastEventAt,
+      );
+      return (
+        (Number.isFinite(rightAt) ? rightAt : 0) -
+        (Number.isFinite(leftAt) ? leftAt : 0)
+      );
+    })
+    .map((run) => ({
+      projectId: run.projectId,
+      runId: run.id,
+      title: run.title?.trim() || untitledTitle,
+      statusLabel: statusLabelForRun(run, options?.localizeStatus),
+      projectName: run.projectName,
+    }));
 }
 
 export function buildStatusTraySnapshot(
