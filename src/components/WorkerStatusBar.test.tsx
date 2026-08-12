@@ -504,6 +504,92 @@ describe("WorkerStatusBar", () => {
     await act(async () => root.unmount());
   });
 
+  it("refreshes worker status from the popover header", async () => {
+    let resolveRefresh: (() => void) | null = null;
+    const onRefresh = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveRefresh = resolve;
+        }),
+    );
+    vi.mocked(loadOrganizationExecutionWorkers).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          window.setTimeout(() => {
+            resolve({
+              workers: [],
+              latestVersion: null,
+              canManage: true,
+              generatedAt: "2026-07-29T00:00:00Z",
+            });
+          }, 0);
+        }),
+    );
+
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <I18nProvider>
+          <WorkerStatusBar
+            onOpenSettings={() => undefined}
+            onRefresh={onRefresh}
+            organizationId="organization-1"
+            token="token"
+            workers={[worker()]}
+          />
+        </I18nProvider>,
+      );
+    });
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>(".worker-status-trigger")
+        ?.click();
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    // Opening the popover loads update metadata once.
+    expect(loadOrganizationExecutionWorkers).toHaveBeenCalledTimes(1);
+
+    const refresh = container.querySelector<HTMLButtonElement>(
+      '[aria-label="Worker 상태 새로고침"]',
+    );
+    expect(refresh).not.toBeNull();
+    expect(
+      container.querySelector('[aria-label="Worker 설정 열기"]'),
+    ).not.toBeNull();
+
+    await act(async () => {
+      refresh?.click();
+    });
+
+    expect(onRefresh).toHaveBeenCalledOnce();
+    expect(refresh?.disabled).toBe(true);
+    expect(refresh?.getAttribute("aria-busy")).toBe("true");
+    expect(container.querySelector(".spin")).not.toBeNull();
+    expect(loadOrganizationExecutionWorkers).toHaveBeenCalledTimes(2);
+
+    await act(async () => {
+      resolveRefresh?.();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(
+      container
+        .querySelector<HTMLButtonElement>('[aria-label="Worker 상태 새로고침"]')
+        ?.disabled,
+    ).toBe(false);
+    expect(container.querySelector(".spin")).toBeNull();
+    expect(container.querySelector(".worker-status-popover")).not.toBeNull();
+
+    await act(async () => root.unmount());
+  });
+
   it("does not expose a provider when health information is missing", () => {
     expect(
       workerProviders(worker({ agentProvider: "grok", providers: undefined })),
