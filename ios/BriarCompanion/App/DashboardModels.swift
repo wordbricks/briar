@@ -23,6 +23,7 @@ struct DashboardRun: Codable, Equatable, Identifiable, Sendable {
     let detail: String?
     let priority: Int?
     let assigneeUserId: String?
+    let createdByUserId: String?
     let subscribers: [IssueSubscriber]?
     let issueDescription: String?
     let attachments: [IssueAttachment]?
@@ -73,6 +74,7 @@ struct DashboardRun: Codable, Equatable, Identifiable, Sendable {
         detail: String? = nil,
         priority: Int? = nil,
         assigneeUserId: String? = nil,
+        createdByUserId: String? = nil,
         subscribers: [IssueSubscriber]? = nil,
         issueDescription: String? = nil,
         attachments: [IssueAttachment]? = nil,
@@ -122,6 +124,7 @@ struct DashboardRun: Codable, Equatable, Identifiable, Sendable {
         self.detail = detail
         self.priority = priority
         self.assigneeUserId = assigneeUserId
+        self.createdByUserId = createdByUserId
         self.subscribers = subscribers
         self.issueDescription = issueDescription
         self.attachments = attachments

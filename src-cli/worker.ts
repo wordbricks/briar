@@ -30,6 +30,7 @@ export type ClaimedIssue = {
   runId: string;
   sourceKey: string;
   title: string;
+  createdByUserId?: string | null;
   claimToken: string;
   leaseExpiresAt: string;
   execution?: {

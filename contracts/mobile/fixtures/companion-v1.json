@@ -189,6 +189,7 @@
             "progress": 45,
             "detail": "Implementing",
             "assigneeUserId": "fixture-user",
+            "createdByUserId": "fixture-user",
             "subscribers": [
               {
                 "userId": "fixture-user",
@@ -287,6 +288,7 @@
             "title": "Native dashboard sync",
             "status": "completed",
             "detail": null,
+            "createdByUserId": "fixture-user",
             "resultSummary": "The shared contract passed.",
             "structuredResult": {
               "summary": "The shared contract passed.",
@@ -412,6 +414,7 @@
         "stage": "queued",
         "status": "queued",
         "assigneeUserId": "fixture-user",
+        "createdByUserId": "fixture-user",
         "attachments": []
       }
     },

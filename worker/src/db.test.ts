@@ -960,6 +960,44 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     await miniflare.dispose();
   });
 
+  it("preserves the issue creator from intake across later events", async () => {
+    const sourceKey = "creator-attribution";
+    await setStoredWorkflow(db, projectId, releaseWorkflow);
+    const runId = await recordHuntEvent(
+      db,
+      projectId,
+      event("queued", 79, {
+        sourceKey,
+        eventKey: `${sourceKey}:backlog:intake`,
+        title: "Keep the creator",
+        status: "backlog",
+        createdByUserId: "owner",
+        branch: null,
+        commitSha: null,
+      }),
+    );
+
+    await expect(getHuntRunForProject(db, projectId, runId)).resolves
+      .toMatchObject({ created_by_user_id: "owner" });
+
+    await recordHuntEvent(
+      db,
+      projectId,
+      event("queued", 79.1, {
+        sourceKey,
+        eventKey: `${sourceKey}:backlog:observed`,
+        title: "Keep the creator",
+        status: "backlog",
+      }),
+    );
+
+    await expect(getHuntRunForProject(db, projectId, runId)).resolves
+      .toMatchObject({ created_by_user_id: "owner" });
+    await expect(deleteIssue(db, projectId, runId, atMinute(79.2))).resolves
+      .toBe("deleted");
+    await setStoredWorkflow(db, projectId, repositoryWorkflowBootstrap);
+  });
+
   it("transfers an issue to another project with children and a source tombstone", async () => {
     const targetProjectId = "55555555-5555-4555-8555-555555555555";
     const attachmentId = "f1f1f1f1-f1f1-41f1-81f1-f1f1f1f1f1f1";

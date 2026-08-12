@@ -601,6 +601,7 @@ final class MobileAPIContractTests: XCTestCase {
         XCTAssertEqual(snapshot.runs.first?.workflow?.stages.count, 3)
         XCTAssertEqual(snapshot.runs.first?.requestedProvider, .codex)
         XCTAssertEqual(snapshot.runs.first?.requestedWorkerId, "worker-1")
+        XCTAssertEqual(snapshot.runs.first?.createdByUserId, "fixture-user")
         XCTAssertEqual(snapshot.runs.first?.attachments?.first?.filename, "design.png")
         XCTAssertEqual(snapshot.workers?.first?.readiness, "available")
         XCTAssertEqual(snapshot.workers?.first?.icon?.type, .emoji)

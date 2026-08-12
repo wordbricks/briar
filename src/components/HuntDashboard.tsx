@@ -4241,6 +4241,9 @@ export function RunPage({
   const assignee = mentionMembers.find(
     (member) => member.userId === run.assigneeUserId,
   ) ?? null;
+  const creator = mentionMembers.find(
+    (member) => member.userId === run.createdByUserId,
+  ) ?? null;
   const { toast } = useToast();
   useEffect(() => {
     if (!error) return;
@@ -6242,6 +6245,14 @@ export function RunPage({
                   >
                     <span className="run-property-icon assignee"><UserRound size={15} /></span>
                     <span className="run-property-copy"><strong>{assignee?.name ?? t("run.unassigned")}</strong></span>
+                  </div>
+                  <div
+                    aria-label={`${t("run.creator")}: ${creator?.name ?? t("run.creatorUnknown")}`}
+                    className="run-property"
+                    title={t("run.creator")}
+                  >
+                    <span className="run-property-icon assignee"><UserRound size={15} /></span>
+                    <span className="run-property-copy"><strong>{creator?.name ?? t("run.creatorUnknown")}</strong></span>
                   </div>
                   <div
                     aria-label={`${t("run.agent")}: ${performedAgentName ?? t("run.unassigned")}`}
