@@ -27,6 +27,11 @@ const listOrganizationAgents = vi.fn();
 const setChannelMember = vi.fn();
 const setChannelAgent = vi.fn();
 const toggleChannelMessageReaction = vi.fn();
+const listChannelWebhooks = vi.fn();
+const createChannelWebhook = vi.fn();
+const updateChannelWebhook = vi.fn();
+const rotateChannelWebhook = vi.fn();
+const revokeChannelWebhook = vi.fn();
 const channelRealtime = vi.hoisted(() => ({
   listeners: new Set<(notification: { topic: "channels"; cursor: number }) => void>(),
 }));
@@ -53,6 +58,11 @@ vi.mock("../lib/api", () => ({
   setChannelAgent: (...args: unknown[]) => setChannelAgent(...args),
   toggleChannelMessageReaction: (...args: unknown[]) =>
     toggleChannelMessageReaction(...args),
+  listChannelWebhooks: (...args: unknown[]) => listChannelWebhooks(...args),
+  createChannelWebhook: (...args: unknown[]) => createChannelWebhook(...args),
+  updateChannelWebhook: (...args: unknown[]) => updateChannelWebhook(...args),
+  rotateChannelWebhook: (...args: unknown[]) => rotateChannelWebhook(...args),
+  revokeChannelWebhook: (...args: unknown[]) => revokeChannelWebhook(...args),
 }));
 
 vi.mock("../lib/channel-realtime", () => ({
@@ -248,6 +258,7 @@ describe("Channels", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    listChannelWebhooks.mockResolvedValue({ webhooks: [] });
     channelRealtime.listeners.clear();
     container = document.createElement("div");
     document.body.append(container);
@@ -304,6 +315,45 @@ describe("Channels", () => {
     expect(typing?.textContent).toContain("Honey님이 답변을 작성하고 있습니다");
     expect(typing?.closest(".channel-message")?.textContent)
       .toContain("@honey 안녕");
+  });
+
+  it("renders webhook authors and opens channel webhook management", async () => {
+    listChannelWebhooks.mockResolvedValue({
+      webhooks: [{
+        id: "webhook-1",
+        channelId: channel.id,
+        name: "Deploy notifier",
+        active: true,
+        lastUsedAt: null,
+        createdAt: "2026-08-01T00:00:00.000Z",
+        updatedAt: "2026-08-01T00:00:00.000Z",
+      }],
+    });
+    await render([message({
+      author: { type: "webhook", id: "webhook-1", name: "Deploy notifier" },
+      body: "Production deployed",
+    })]);
+
+    expect(container.textContent).toContain("Deploy notifier");
+    expect(container.textContent).toContain("Production deployed");
+    expect(container.querySelector(".channel-agent-badge.webhook"))
+      .not.toBeNull();
+
+    const manageButton = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="수신 웹훅"]',
+    );
+    await act(async () => {
+      manageButton?.click();
+      await Promise.resolve();
+    });
+    expect(listChannelWebhooks).toHaveBeenCalledWith(
+      "token",
+      "org-1",
+      channel.id,
+    );
+    expect(container.querySelector<HTMLInputElement>(
+      ".channel-webhook-row input",
+    )?.value).toBe("Deploy notifier");
   });
 
   it("hides the persistent reply link when a message has no thread", async () => {

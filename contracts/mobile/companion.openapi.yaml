@@ -4213,7 +4213,8 @@
                 "type": "string",
                 "enum": [
                   "user",
-                  "agent"
+                  "agent",
+                  "webhook"
                 ]
               },
               "id": {

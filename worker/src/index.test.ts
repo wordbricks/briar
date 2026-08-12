@@ -1725,6 +1725,9 @@ describe("Worker HTTP contract", () => {
     expect(response.headers.get("Access-Control-Allow-Headers")).toContain(
       "authorization",
     );
+    expect(response.headers.get("Access-Control-Allow-Headers")).toContain(
+      "idempotency-key",
+    );
     expect(
       response.headers
         .get("Access-Control-Allow-Methods")

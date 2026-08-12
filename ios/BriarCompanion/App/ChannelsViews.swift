@@ -541,12 +541,20 @@ private struct ChannelMessageRow: View {
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    private var authorSystemImage: String {
+        switch message.author.type {
+        case .user: "person.fill"
+        case .agent: "cpu"
+        case .webhook: "point.3.connected.trianglepath.dotted"
+        }
+    }
+
     var body: some View {
         HStack(alignment: .top, spacing: 11) {
             ProfileImageView(
                 image: message.author.type == .user ? message.author.image : nil,
                 name: message.author.type == .user ? message.author.name : nil,
-                systemImage: message.author.type == .agent ? "cpu" : "person.fill",
+                systemImage: authorSystemImage,
                 size: 40
             )
             VStack(alignment: .leading, spacing: 3) {
@@ -556,6 +564,10 @@ private struct ChannelMessageRow: View {
                         .lineLimit(1)
                     if message.author.type == .agent {
                         Image(systemName: "cpu")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    } else if message.author.type == .webhook {
+                        Image(systemName: "point.3.connected.trianglepath.dotted")
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                     }

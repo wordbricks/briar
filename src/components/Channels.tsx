@@ -2,10 +2,10 @@ import {
   AtSign,
   Bot,
   Check,
+  Copy,
   FileText,
   Hash,
   Headphones,
-  LayoutGrid,
   LoaderCircle,
   Lock,
   MessageSquare,
@@ -13,9 +13,12 @@ import {
   Paperclip,
   Search,
   Send,
+  RefreshCw,
+  Trash2,
   Type,
   UserPlus,
   Users,
+  Webhook,
   X,
 } from "lucide-react";
 import {
@@ -37,7 +40,9 @@ import {
   acceptChannelSkillExecutionProposal,
   acceptChannelExecutionProposal,
   acceptChannelProposal,
+  createChannelWebhook,
   listChannelMessages,
+  listChannelWebhooks,
   listChannels,
   listOrganizationAgents,
   loadChannel,
@@ -45,9 +50,12 @@ import {
   loadDashboard,
   loadOrganizationMembers,
   sendChannelMessage,
+  revokeChannelWebhook,
+  rotateChannelWebhook,
   setChannelAgent,
   setChannelMember,
   toggleChannelMessageReaction,
+  updateChannelWebhook,
 } from "../lib/api";
 import type {
   AgentSkillExecutionApprovalInput,
@@ -66,6 +74,7 @@ import type {
   ChannelMessage,
   ChannelExecutionProposal,
   ChannelSummary,
+  ChannelWebhook,
 } from "../lib/channels-contract";
 import type { MentionTarget } from "../lib/channel-mentions";
 import {
@@ -214,9 +223,9 @@ const replyRelativeTime = (value: string, t: Translate) => {
 };
 
 const channelAuthorId = (author: ChannelMessage["author"]) =>
-  author.type === "agent"
-    ? `agent:${author.id ?? `${author.provider ?? "agent"}:${author.name}`}`
-    : `user:${author.id || author.email || author.name}`;
+  author.type === "user"
+    ? `user:${author.id || author.email || author.name}`
+    : `${author.type}:${author.id ?? author.name}`;
 
 const channelReplyParticipants = (
   message: ChannelMessage,
@@ -233,7 +242,7 @@ const channelReplyParticipants = (
       id: channelAuthorId(author),
       name: author.name,
       image: author.type === "user" ? author.image : null,
-      isAgent: author.type === "agent",
+      isAgent: author.type !== "user",
     }));
 
 const appendChannelReplySummary = (
@@ -294,6 +303,12 @@ export function Channels({
   const [inviteLoading, setInviteLoading] = useState(false);
   const [inviteSaving, setInviteSaving] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
+  const [webhooksOpen, setWebhooksOpen] = useState(false);
+  const [webhooks, setWebhooks] = useState<ChannelWebhook[]>([]);
+  const [webhooksLoading, setWebhooksLoading] = useState(false);
+  const [webhooksSaving, setWebhooksSaving] = useState(false);
+  const [webhooksError, setWebhooksError] = useState<string | null>(null);
+  const [revealedWebhookUrl, setRevealedWebhookUrl] = useState<string | null>(null);
   const {
     containerRef: channelsRef,
     effectiveWidth: effectiveThreadWidth,
@@ -429,6 +444,89 @@ export function Channels({
       })
       .catch((cause) => setInviteError(errorMessage(cause)))
       .finally(() => setInviteLoading(false));
+  }, [activeChannelId, organizationId, token]);
+
+  const openWebhooks = useCallback(() => {
+    if (!activeChannelId) return;
+    setWebhooksOpen(true);
+    setWebhooksLoading(true);
+    setWebhooksError(null);
+    setWebhooks([]);
+    setRevealedWebhookUrl(null);
+    void listChannelWebhooks(token, organizationId, activeChannelId)
+      .then((result) => setWebhooks(result.webhooks))
+      .catch((cause) => setWebhooksError(errorMessage(cause)))
+      .finally(() => setWebhooksLoading(false));
+  }, [activeChannelId, organizationId, token]);
+
+  const createWebhook = useCallback(async (name: string) => {
+    if (!activeChannelId) return;
+    setWebhooksSaving(true);
+    setWebhooksError(null);
+    try {
+      const result = await createChannelWebhook(
+        token, organizationId, activeChannelId, name,
+      );
+      setWebhooks((current) => [...current, result.webhook]);
+      setRevealedWebhookUrl(result.url);
+    } catch (cause) {
+      setWebhooksError(errorMessage(cause));
+      throw cause;
+    } finally {
+      setWebhooksSaving(false);
+    }
+  }, [activeChannelId, organizationId, token]);
+
+  const renameWebhook = useCallback(async (webhookId: string, name: string) => {
+    if (!activeChannelId) return;
+    setWebhooksSaving(true);
+    setWebhooksError(null);
+    try {
+      const result = await updateChannelWebhook(
+        token, organizationId, activeChannelId, webhookId, name,
+      );
+      setWebhooks((current) => current.map((item) =>
+        item.id === result.webhook.id ? result.webhook : item));
+    } catch (cause) {
+      setWebhooksError(errorMessage(cause));
+    } finally {
+      setWebhooksSaving(false);
+    }
+  }, [activeChannelId, organizationId, token]);
+
+  const rotateWebhook = useCallback(async (webhookId: string) => {
+    if (!activeChannelId) return;
+    setWebhooksSaving(true);
+    setWebhooksError(null);
+    try {
+      const result = await rotateChannelWebhook(
+        token, organizationId, activeChannelId, webhookId,
+      );
+      setWebhooks((current) => current.map((item) =>
+        item.id === result.webhook.id ? result.webhook : item));
+      setRevealedWebhookUrl(result.url);
+    } catch (cause) {
+      setWebhooksError(errorMessage(cause));
+    } finally {
+      setWebhooksSaving(false);
+    }
+  }, [activeChannelId, organizationId, token]);
+
+  const revokeWebhook = useCallback(async (webhookId: string) => {
+    if (!activeChannelId) return;
+    setWebhooksSaving(true);
+    setWebhooksError(null);
+    try {
+      const result = await revokeChannelWebhook(
+        token, organizationId, activeChannelId, webhookId,
+      );
+      setWebhooks((current) => current.map((item) =>
+        item.id === result.webhook.id ? result.webhook : item));
+    } catch (cause) {
+      setWebhooksError(errorMessage(cause));
+    } finally {
+      setWebhooksSaving(false);
+    }
   }, [activeChannelId, organizationId, token]);
 
   const addInvitees = useCallback(
@@ -1258,10 +1356,11 @@ export function Channels({
                 <button
                   type="button"
                   className="channel-header-icon"
-                  aria-label={t("channel.headerMembers", { count: memberCount })}
-                  title={t("channel.headerMembers", { count: memberCount })}
+                  aria-label={t("channel.webhooks")}
+                  title={t("channel.webhooks")}
+                  onClick={openWebhooks}
                 >
-                  <LayoutGrid size={16} aria-hidden="true" />
+                  <Webhook size={16} aria-hidden="true" />
                 </button>
                 <button
                   type="button"
@@ -1518,6 +1617,23 @@ export function Channels({
           }}
         />
       ) : null}
+      {webhooksOpen && activeChannel ? (
+        <ChannelWebhooksDialog
+          channel={activeChannel}
+          error={webhooksError}
+          loading={webhooksLoading}
+          revealedUrl={revealedWebhookUrl}
+          saving={webhooksSaving}
+          webhooks={webhooks}
+          onClose={() => {
+            if (!webhooksSaving) setWebhooksOpen(false);
+          }}
+          onCreate={createWebhook}
+          onRename={renameWebhook}
+          onRevoke={revokeWebhook}
+          onRotate={rotateWebhook}
+        />
+      ) : null}
     </div>
   );
 }
@@ -1580,6 +1696,172 @@ function ChannelWelcome({
           <span>{t("channel.addPeopleHint")}</span>
         </button>
       </div>
+    </div>
+  );
+}
+
+function ChannelWebhooksDialog({
+  channel,
+  error,
+  loading,
+  revealedUrl,
+  saving,
+  webhooks,
+  onClose,
+  onCreate,
+  onRename,
+  onRevoke,
+  onRotate,
+}: {
+  channel: ChannelSummary;
+  error: string | null;
+  loading: boolean;
+  revealedUrl: string | null;
+  saving: boolean;
+  webhooks: ChannelWebhook[];
+  onClose: () => void;
+  onCreate: (name: string) => Promise<void>;
+  onRename: (id: string, name: string) => Promise<void>;
+  onRevoke: (id: string) => Promise<void>;
+  onRotate: (id: string) => Promise<void>;
+}) {
+  const { t, localeTag } = useI18n();
+  const titleId = useId();
+  const [name, setName] = useState("");
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !saving) onClose();
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [onClose, saving]);
+
+  useEffect(() => setCopied(false), [revealedUrl]);
+
+  const submit = async () => {
+    const normalized = name.trim();
+    if (!normalized) return;
+    try {
+      await onCreate(normalized);
+      setName("");
+    } catch {
+      // The parent presents the request error and the input stays retryable.
+    }
+  };
+
+  return (
+    <div className="channel-invite-overlay" onMouseDown={(event) => {
+      if (event.target === event.currentTarget && !saving) onClose();
+    }}>
+      <section
+        aria-labelledby={titleId}
+        aria-modal="true"
+        className="channel-invite-dialog channel-webhooks-dialog"
+        role="dialog"
+      >
+        <header>
+          <div>
+            <h2 id={titleId}>{t("channel.webhooksTitle", { name: channel.name })}</h2>
+            <p>{t("channel.webhooksDescription")}</p>
+          </div>
+          <button aria-label={t("common.close")} disabled={saving} onClick={onClose} type="button">
+            <X size={20} />
+          </button>
+        </header>
+
+        <div className="channel-webhook-create">
+          <input
+            aria-label={t("channel.webhookName")}
+            disabled={loading || saving || Boolean(channel.archivedAt)}
+            maxLength={100}
+            onChange={(event) => setName(event.currentTarget.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") void submit();
+            }}
+            placeholder={t("channel.webhookNamePlaceholder")}
+            value={name}
+          />
+          <button
+            disabled={!name.trim() || loading || saving || Boolean(channel.archivedAt)}
+            onClick={() => void submit()}
+            type="button"
+          >
+            <Webhook size={15} /> {t("channel.webhookCreate")}
+          </button>
+        </div>
+
+        {revealedUrl ? (
+          <div className="channel-webhook-secret">
+            <strong>{t("channel.webhookUrlReady")}</strong>
+            <p>{t("channel.webhookUrlWarning")}</p>
+            <div>
+              <code>{revealedUrl}</code>
+              <button
+                onClick={() => {
+                  void navigator.clipboard.writeText(revealedUrl)
+                    .then(() => setCopied(true))
+                    .catch(() => setCopied(false));
+                }}
+                type="button"
+              >
+                <Copy size={14} /> {copied ? t("channel.webhookCopied") : t("channel.webhookCopy")}
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        <div className="channel-webhook-list">
+          {loading ? (
+            <p className="channel-invite-status"><LoaderCircle className="spin" size={16} />{t("channel.webhookLoading")}</p>
+          ) : webhooks.length === 0 ? (
+            <p className="channel-invite-status">{t("channel.webhookEmpty")}</p>
+          ) : webhooks.map((webhook) => (
+            <article className={`channel-webhook-row${webhook.active ? "" : " revoked"}`} key={webhook.id}>
+              <Webhook aria-hidden="true" size={18} />
+              <div>
+                <input
+                  aria-label={t("channel.webhookRename", { name: webhook.name })}
+                  defaultValue={webhook.name}
+                  disabled={!webhook.active || saving}
+                  maxLength={100}
+                  onBlur={(event) => {
+                    const next = event.currentTarget.value.trim();
+                    if (next && next !== webhook.name) void onRename(webhook.id, next);
+                  }}
+                />
+                <small>{webhook.active
+                  ? webhook.lastUsedAt
+                    ? t("channel.webhookLastUsed", { date: new Date(webhook.lastUsedAt).toLocaleString(localeTag) })
+                    : t("channel.webhookNeverUsed")
+                  : t("channel.webhookRevoked")}</small>
+              </div>
+              {webhook.active ? (
+                <span className="channel-webhook-actions">
+                  <button
+                    aria-label={t("channel.webhookRotate", { name: webhook.name })}
+                    disabled={saving || Boolean(channel.archivedAt)}
+                    onClick={() => {
+                      if (window.confirm(t("channel.webhookRotateConfirm"))) void onRotate(webhook.id);
+                    }}
+                    type="button"
+                  ><RefreshCw size={15} /></button>
+                  <button
+                    aria-label={t("channel.webhookRevoke", { name: webhook.name })}
+                    disabled={saving}
+                    onClick={() => {
+                      if (window.confirm(t("channel.webhookRevokeConfirm"))) void onRevoke(webhook.id);
+                    }}
+                    type="button"
+                  ><Trash2 size={15} /></button>
+                </span>
+              ) : null}
+            </article>
+          ))}
+        </div>
+        {error ? <p className="channel-invite-error" role="alert">{error}</p> : null}
+      </section>
     </div>
   );
 }
@@ -1862,6 +2144,7 @@ function MessageRow({
   const { t } = useI18n();
   const [reacting, setReacting] = useState(false);
   const isAgent = message.author.type === "agent";
+  const isWebhook = message.author.type === "webhook";
   const isSelf =
     message.author.type === "user" && message.author.id === currentUserId;
   const displayName = isSelf ? t("channel.you") : message.author.name;
@@ -1902,6 +2185,10 @@ function MessageRow({
           <span className="channel-message-avatar-fallback agent">
             <Bot size={16} />
           </span>
+        ) : isWebhook ? (
+          <span className="channel-message-avatar-fallback webhook">
+            <Webhook size={16} />
+          </span>
         ) : (
           <span className="channel-message-avatar-fallback">
             {authorInitial(message.author.name)}
@@ -1914,6 +2201,10 @@ function MessageRow({
           {message.author.type === "agent" ? (
             <span className="channel-agent-badge">
               <Bot size={12} /> {message.author.provider ?? "agent"}
+            </span>
+          ) : message.author.type === "webhook" ? (
+            <span className="channel-agent-badge webhook">
+              <Webhook size={12} /> {t("channel.webhookBadge")}
             </span>
           ) : null}
           <time dateTime={message.createdAt}>

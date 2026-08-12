@@ -5943,6 +5943,96 @@ button.issue-message-state { width:100%; cursor:pointer; }
 }
 .channel-invite-dialog button:disabled { opacity: .48; cursor: not-allowed; }
 
+.channel-webhooks-dialog { width: min(640px, calc(100vw - 40px)); }
+.channel-webhook-create {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 9px;
+  padding: 0 24px 14px;
+}
+.channel-webhook-create input,
+.channel-webhook-row input {
+  min-width: 0;
+  height: 40px;
+  border: 1px solid var(--input);
+  border-radius: 10px;
+  padding: 0 12px;
+  color: var(--foreground);
+  background: var(--background);
+  font: 500 var(--text-sm)/1 inherit;
+}
+.channel-webhook-create button,
+.channel-webhook-secret button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 40px;
+  border: 1px solid var(--primary);
+  border-radius: 10px;
+  padding: 0 14px;
+  color: var(--primary-foreground);
+  background: var(--primary);
+  font: 700 var(--text-xs)/1 inherit;
+}
+.channel-webhook-secret {
+  margin: 0 24px 14px;
+  padding: 13px;
+  border: 1px solid color-mix(in srgb, var(--primary) 28%, var(--border));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--primary) 6%, var(--card));
+}
+.channel-webhook-secret > strong { font-size: var(--text-xs); }
+.channel-webhook-secret > p {
+  margin: 4px 0 10px;
+  color: var(--muted-foreground);
+  font-size: var(--text-2xs);
+}
+.channel-webhook-secret > div { display: flex; gap: 8px; }
+.channel-webhook-secret code {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  padding: 10px;
+  border-radius: 8px;
+  background: var(--muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.channel-webhook-list {
+  min-height: 150px;
+  max-height: 340px;
+  overflow-y: auto;
+  padding: 0 24px 18px;
+}
+.channel-webhook-row {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 0;
+  border-top: 1px solid var(--border);
+}
+.channel-webhook-row > svg { color: var(--primary); }
+.channel-webhook-row > div { display: grid; gap: 3px; }
+.channel-webhook-row input { height: 34px; padding: 0 9px; }
+.channel-webhook-row small { color: var(--muted-foreground); font-size: var(--text-2xs); }
+.channel-webhook-row.revoked { opacity: .58; }
+.channel-webhook-actions { display: flex; gap: 4px; }
+.channel-webhook-actions button {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  color: var(--muted-foreground);
+  background: transparent;
+}
+.channel-webhook-actions button:hover:not(:disabled) { color: var(--foreground); background: var(--muted); }
+.channel-message-avatar-fallback.webhook { color: #17605b; background: #d9f3ee; }
+.channel-agent-badge.webhook { color: #17605b; background: #d9f3ee; }
+
 .channel-messages {
   display: flex;
   min-height: 0;

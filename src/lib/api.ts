@@ -35,6 +35,7 @@ import type {
   ChannelExecutionProposal,
   ChannelSummary,
   ChannelVisibility,
+  ChannelWebhook,
 } from "./channels-contract";
 import type {
   LinearImportConnectResult,
@@ -1798,6 +1799,70 @@ export async function setChannelMember(
       method: present ? "PUT" : "DELETE",
       body: present ? JSON.stringify({ role: "member" }) : undefined,
     },
+  );
+}
+
+export async function listChannelWebhooks(
+  token: string,
+  organizationId: string,
+  channelId: string,
+) {
+  return request<{ webhooks: ChannelWebhook[] }>(
+    `/organizations/${organizationId}/channels/${channelId}/webhooks`,
+    token,
+  );
+}
+
+export async function createChannelWebhook(
+  token: string,
+  organizationId: string,
+  channelId: string,
+  name: string,
+) {
+  return request<{ webhook: ChannelWebhook; url: string }>(
+    `/organizations/${organizationId}/channels/${channelId}/webhooks`,
+    token,
+    { method: "POST", body: JSON.stringify({ name }) },
+  );
+}
+
+export async function updateChannelWebhook(
+  token: string,
+  organizationId: string,
+  channelId: string,
+  webhookId: string,
+  name: string,
+) {
+  return request<{ webhook: ChannelWebhook }>(
+    `/organizations/${organizationId}/channels/${channelId}/webhooks/${webhookId}`,
+    token,
+    { method: "PATCH", body: JSON.stringify({ name }) },
+  );
+}
+
+export async function rotateChannelWebhook(
+  token: string,
+  organizationId: string,
+  channelId: string,
+  webhookId: string,
+) {
+  return request<{ webhook: ChannelWebhook; url: string }>(
+    `/organizations/${organizationId}/channels/${channelId}/webhooks/${webhookId}/rotate`,
+    token,
+    { method: "POST" },
+  );
+}
+
+export async function revokeChannelWebhook(
+  token: string,
+  organizationId: string,
+  channelId: string,
+  webhookId: string,
+) {
+  return request<{ webhook: ChannelWebhook }>(
+    `/organizations/${organizationId}/channels/${channelId}/webhooks/${webhookId}`,
+    token,
+    { method: "DELETE" },
   );
 }
 
