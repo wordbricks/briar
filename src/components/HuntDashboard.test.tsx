@@ -6312,6 +6312,32 @@ describe("HuntDashboard", () => {
           throw new Error("not implemented in this test");
         }}
         run={completedRun}
+        executionCostEstimate={{
+          pricing: {
+            status: "live",
+            source: "https://example.com/pricing.json",
+            fetchedAt: "2026-08-13T00:00:00.000Z",
+            knownModels: 1,
+          },
+          status: "estimated",
+          reason: null,
+          usageRecords: 1,
+          pricedUsageRecords: 1,
+          estimatedUsdTicks: 1_345_000,
+          pricedUsdTicks: 1_345_000,
+          models: [
+            {
+              pricingKey: "xai/grok-4-5",
+              modelProvider: "xai",
+              model: "grok-4.5",
+              inputCostPerToken: 1e-6,
+              outputCostPerToken: 4e-6,
+              cacheReadCostPerToken: 0.1e-6,
+              cacheWriteCostPerToken: 1.25e-6,
+              estimatedUsdTicks: 1_345_000,
+            },
+          ],
+        }}
       />,
     );
 
@@ -6337,6 +6363,11 @@ describe("HuntDashboard", () => {
     expect(markup).toContain("1,250");
     expect(markup).toContain("캐시");
     expect(markup).toContain("추론");
+    expect(markup).toContain("추정 API 비용");
+    expect(markup).toContain("현재 모델 단가");
+    expect(markup).toContain("$1.00 / 100만 토큰");
+    expect(markup).toContain("$4.00 / 100만 토큰");
+    expect(markup).toContain("캐시 토큰은 가격표의 전용 단가");
     expect(markup).not.toContain('class="issue-description-markdown"');
   });
 

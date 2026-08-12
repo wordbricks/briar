@@ -29,6 +29,29 @@ export type AgentUsageModelRateTable = {
   readonly suffix: ReadonlyMap<string, readonly AgentUsageModelRateEntry[]>;
 };
 
+export type AgentExecutionCostEstimateModel = AgentUsageModelRate & {
+  pricingKey: string;
+  modelProvider: string | null;
+  model: string;
+  estimatedUsdTicks: number;
+};
+
+export type AgentExecutionCostEstimate = {
+  pricing: AgentUsagePricing;
+  status: "estimated" | "partial" | "unavailable";
+  reason:
+    | "pricingUnavailable"
+    | "usageUnavailable"
+    | "modelRateUnavailable"
+    | "tokenBreakdownUnavailable"
+    | null;
+  usageRecords: number;
+  pricedUsageRecords: number;
+  estimatedUsdTicks: number | null;
+  pricedUsdTicks: number;
+  models: AgentExecutionCostEstimateModel[];
+};
+
 type LiteLlmPricingEntry = {
   input_cost_per_token?: unknown;
   output_cost_per_token?: unknown;

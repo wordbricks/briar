@@ -242,6 +242,7 @@ import {
   listOrganizationUsageExecutionAttempts,
   listOrganizationUsageCostRecords,
   listOrganizationUsageRecords,
+  listRunUsageRecords,
   listProjectUsageTotals,
   listProjectUsageRuns,
   listGithubConnectionRepositories,
@@ -369,6 +370,7 @@ import {
 } from "./codex-pets";
 import {
   estimateOrganizationUsageCosts,
+  estimateRunExecutionCost,
   loadAgentUsagePricing,
 } from "./usage-pricing";
 import {
@@ -9917,6 +9919,54 @@ async function route(
       cursor,
       generatedAt: observedAt,
     });
+  }
+
+  const runCostEstimateMatch = pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/cost-estimate$/u,
+  );
+  if (runCostEstimateMatch && request.method === "GET") {
+    const session = await requireSession(auth, request);
+    const projectId = runCostEstimateMatch[1];
+    const runId = runCostEstimateMatch[2];
+    const project = await getProject(db, projectId, session.user.id);
+    if (!project) throw new HttpError(404, "Project not found");
+    const run = await getHuntRunForProject(db, projectId, runId);
+    if (!run) throw new HttpError(404, "Run not found");
+    const [usageRecords, loadedPricing] = await Promise.all([
+      listRunUsageRecords(
+        db,
+        projectId,
+        runId,
+        run.current_attempt,
+        run.last_execution_id,
+      ),
+      loadAgentUsagePricing(),
+    ]);
+    const metrics = parseExecutionMetrics(run.execution_metrics_json);
+    const provider =
+      run.preferred_agent_provider ?? run.requested_agent_provider ?? null;
+    const model = run.preferred_agent_provider
+      ? run.preferred_agent_model
+      : run.requested_agent_provider
+        ? run.requested_agent_model
+        : null;
+    return json(
+      estimateRunExecutionCost({
+        usageRecords,
+        loadedPricing,
+        fallback:
+          metrics && provider
+            ? {
+                agentProvider: provider,
+                model,
+                inputTokens: metrics.inputTokens,
+                cacheReadTokens: metrics.cacheReadTokens,
+                cacheWriteTokens: metrics.cacheWriteTokens,
+                outputTokens: metrics.outputTokens,
+              }
+            : null,
+      }),
+    );
   }
 
   const runEventsMatch = pathname.match(

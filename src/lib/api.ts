@@ -48,6 +48,7 @@ import type {
   CreateProjectAgentScheduleInput,
   AgentUsageReport,
   AgentUsageRun,
+  AgentExecutionCostEstimate,
   DashboardPayload,
   DashboardDeltaPayload,
   ExecutionWorker,
@@ -1050,6 +1051,19 @@ export async function loadStatusTrayRuns(
 ): Promise<StatusTrayRunsPayload> {
   return request<StatusTrayRunsPayload>(
     `/organizations/${encodeURIComponent(organizationId)}/status-tray/runs`,
+    token,
+    { signal },
+  );
+}
+
+export async function loadRunCostEstimate(
+  token: string,
+  projectId: string,
+  runId: string,
+  signal?: AbortSignal,
+): Promise<AgentExecutionCostEstimate> {
+  return request<AgentExecutionCostEstimate>(
+    `/projects/${encodeURIComponent(projectId)}/runs/${encodeURIComponent(runId)}/cost-estimate`,
     token,
     { signal },
   );
