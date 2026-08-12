@@ -2,9 +2,34 @@
 
 import { act } from "react";
 import { createRoot } from "react-dom/client";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { repositoryWorkflowBootstrap } from "../lib/auto-hunt-contract";
+import { armMacPasswordEditor } from "../lib/macos-secure-input";
+import { isMacDesktopTauri } from "../lib/platform";
 import { LinearIssueImport } from "./LinearIssueImport";
+
+vi.mock("../lib/platform", () => ({
+  isMacDesktopTauri: vi.fn(() => false),
+}));
+vi.mock("../lib/macos-secure-input", () => ({
+  armMacPasswordEditor: vi.fn(),
+}));
+
+type BooleanMock = {
+  mockReset: () => BooleanMock;
+  mockReturnValue: (value: boolean) => BooleanMock;
+};
+const macDesktopTauriMock = isMacDesktopTauri as unknown as BooleanMock;
+const armPasswordEditorMock = armMacPasswordEditor as unknown as {
+  mockClear: () => void;
+  mock: { calls: unknown[][] };
+};
+
+afterEach(() => {
+  macDesktopTauriMock.mockReset().mockReturnValue(false);
+  armPasswordEditorMock.mockClear();
+  document.body.replaceChildren();
+});
 
 describe("LinearIssueImport", () => {
   it("walks connect → team select → status mapping → import", async () => {
@@ -57,6 +82,7 @@ describe("LinearIssueImport", () => {
     await act(async () => {
       root.render(
         <LinearIssueImport
+          active
           onConnect={onConnect}
           onImport={onImport}
           onLoadStates={onLoadStates}
@@ -134,6 +160,7 @@ describe("LinearIssueImport", () => {
     await act(async () => {
       root.render(
         <LinearIssueImport
+          active
           onConnect={onConnect}
           onImport={async () => ({
             imported: 0,
@@ -157,6 +184,168 @@ describe("LinearIssueImport", () => {
     expect(onConnect).not.toHaveBeenCalled();
 
     await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("uses a hard macOS window-focus boundary without weakening ordinary password blur", async () => {
+    macDesktopTauriMock.mockReturnValue(true);
+    const props = {
+      active: true,
+      onConnect: vi.fn(async () => ({
+        viewer: { name: "Jay", email: null, organizationName: "Org" },
+        teams: [],
+      })),
+      onImport: vi.fn(async () => ({
+        imported: 0,
+        skipped: 0,
+        failed: 0,
+        total: 0,
+        truncated: false,
+      })),
+      onLoadStates: vi.fn(async () => ({ states: [] })),
+      projectId: "project-1",
+      repositoryConnected: true,
+      workflow: repositoryWorkflowBootstrap,
+    };
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => root.render(<LinearIssueImport {...props} />));
+    const apiKey = container.querySelector<HTMLInputElement>(
+      ".project-settings-linear-import-api-key",
+    );
+    expect(apiKey?.type).toBe("password");
+    expect(apiKey?.getAttribute("aria-hidden")).toBeNull();
+    expect(apiKey?.style.getPropertyValue("-webkit-text-security")).toBe(
+      "disc",
+    );
+
+    await act(async () => apiKey?.focus());
+    expect(armPasswordEditorMock.mock.calls).toHaveLength(1);
+
+    await act(async () => apiKey?.blur());
+    await act(async () => root.render(<LinearIssueImport {...props} />));
+    expect(apiKey?.type).toBe("password");
+    expect(apiKey?.getAttribute("aria-hidden")).toBeNull();
+
+    await act(async () => apiKey?.focus());
+    expect(armPasswordEditorMock.mock.calls).toHaveLength(2);
+    await act(async () => window.dispatchEvent(new Event("blur")));
+    expect(apiKey?.type).toBe("text");
+    expect(apiKey?.getAttribute("aria-hidden")).toBe("true");
+    expect(document.activeElement).not.toBe(apiKey);
+
+    // The disarmed state is declarative and survives unrelated React renders.
+    await act(async () => root.render(<LinearIssueImport {...props} />));
+    expect(apiKey?.type).toBe("text");
+    expect(apiKey?.getAttribute("aria-hidden")).toBe("true");
+
+    await act(async () => window.dispatchEvent(new Event("focus")));
+    expect(apiKey?.type).toBe("password");
+    expect(apiKey?.getAttribute("aria-hidden")).toBeNull();
+    expect(document.activeElement).not.toBe(apiKey);
+    expect(armPasswordEditorMock.mock.calls).toHaveLength(2);
+
+    // A later switch without a newly focused password editor is a no-op.
+    await act(async () => window.dispatchEvent(new Event("blur")));
+    expect(apiKey?.type).toBe("password");
+    expect(apiKey?.getAttribute("aria-hidden")).toBeNull();
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("disarms the live macOS editor before hiding or removing it", async () => {
+    macDesktopTauriMock.mockReturnValue(true);
+    const props = {
+      onConnect: vi.fn(async () => ({
+        viewer: { name: "Jay", email: null, organizationName: "Org" },
+        teams: [],
+      })),
+      onImport: vi.fn(async () => ({
+        imported: 0,
+        skipped: 0,
+        failed: 0,
+        total: 0,
+        truncated: false,
+      })),
+      onLoadStates: vi.fn(async () => ({ states: [] })),
+      projectId: "project-1",
+      repositoryConnected: true,
+      workflow: repositoryWorkflowBootstrap,
+    };
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () =>
+      root.render(<LinearIssueImport {...props} active />),
+    );
+    const apiKey = container.querySelector<HTMLInputElement>(
+      ".project-settings-linear-import-api-key",
+    );
+    const typeDescriptor = Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      "type",
+    );
+    const blurSpy = vi.spyOn(apiKey as HTMLInputElement, "blur");
+    const transitions: Array<{
+      ariaHidden: string | null;
+      connected: boolean;
+      disabled: boolean;
+      value: string;
+    }> = [];
+    if (apiKey && typeDescriptor?.get && typeDescriptor.set) {
+      Object.defineProperty(apiKey, "type", {
+        configurable: true,
+        get: () => typeDescriptor.get?.call(apiKey),
+        set: (value: string) => {
+          transitions.push({
+            ariaHidden: apiKey.getAttribute("aria-hidden"),
+            connected: apiKey.isConnected,
+            disabled: apiKey.disabled,
+            value,
+          });
+          typeDescriptor.set?.call(apiKey, value);
+        },
+      });
+    }
+
+    await act(async () => apiKey?.focus());
+    await act(async () =>
+      root.render(<LinearIssueImport {...props} active={false} />),
+    );
+    expect(
+      transitions.find((transition) => transition.value === "text"),
+    ).toEqual({
+      ariaHidden: "true",
+      connected: true,
+      disabled: false,
+      value: "text",
+    });
+    expect(apiKey?.type).toBe("text");
+    expect(apiKey?.getAttribute("aria-hidden")).toBe("true");
+    expect(blurSpy).not.toHaveBeenCalled();
+
+    await act(async () =>
+      root.render(<LinearIssueImport {...props} active />),
+    );
+    expect(apiKey?.type).toBe("password");
+    expect(apiKey?.getAttribute("aria-hidden")).toBeNull();
+
+    transitions.length = 0;
+    await act(async () => apiKey?.focus());
+    await act(async () => root.unmount());
+    expect(
+      transitions.find((transition) => transition.value === "text"),
+    ).toEqual({
+      ariaHidden: "true",
+      connected: true,
+      disabled: false,
+      value: "text",
+    });
+    expect(blurSpy).not.toHaveBeenCalled();
     container.remove();
   });
 });
