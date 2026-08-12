@@ -10,6 +10,9 @@ test("production Worker config retains named asset and image bindings", async ()
   assert.equal(config.assets?.directory, "../client");
   assert.equal(config.images?.binding, "IMAGES");
   assert.ok(config.assets?.run_worker_first?.includes("/_vinext/image"));
+  assert.ok(config.assets?.run_worker_first?.includes("/docs"));
+  assert.ok(config.assets?.run_worker_first?.includes("/docs/*"));
+  assert.ok(!config.assets?.run_worker_first?.includes("/docs/webhooks"));
 });
 
 async function render({ acceptLanguage, cookie, path = "/" } = {}) {
@@ -166,6 +169,7 @@ test("server-renders Korean at /ko regardless of Accept-Language", async () => {
   // Header nav and footer must point at the /ko-prefixed pages, not the
   // unprefixed English ones.
   assert.match(html, /href="\/ko\/tutorial"/);
+  assert.match(html, /href="\/ko\/docs"/);
   assert.match(html, /href="\/ko\/blog"/);
   assert.match(html, /href="\/ko\/download"/);
 });
@@ -299,9 +303,17 @@ test("loads the configured GA4 tag", async () => {
 });
 
 test("standard pages render the same canonical desktop and mobile navigation", async () => {
-  const canonicalHrefs = ["/tutorial", "/changelog", "/blog", "/download"];
+  const canonicalHrefs = [
+    "/tutorial",
+    "/docs",
+    "/changelog",
+    "/blog",
+    "/download",
+  ];
   const pages = [
     { path: "/", current: null, mobileExtras: [] },
+    { path: "/docs", current: "/docs", mobileExtras: [] },
+    { path: "/docs/webhooks", current: "/docs", mobileExtras: [] },
     { path: "/download", current: "/download", mobileExtras: [] },
     {
       path: "/blog",
@@ -333,7 +345,7 @@ test("standard pages render the same canonical desktop and mobile navigation", a
   }
 });
 
-test("tutorial keeps its custom anchor navigation on desktop and mobile", async () => {
+test("tutorial keeps its focused navigation and exposes docs on desktop and mobile", async () => {
   const response = await render({ path: "/tutorial" });
   assert.equal(response.status, 200);
   const html = await response.text();
@@ -343,10 +355,84 @@ test("tutorial keeps its custom anchor navigation on desktop and mobile", async 
     "#run-auto-hunt",
     "#review-result",
     "#schedule-agents",
+    "/docs",
   ];
 
   assert.deepEqual(navigationHrefs(desktopNavigation), tutorialHrefs);
   assert.deepEqual(navigationHrefs(mobileNavigation), tutorialHrefs);
+});
+
+test("all public API docs routes render directly in English and Korean", async () => {
+  const pages = [
+    {
+      en: "/docs",
+      ko: "/ko/docs",
+      english: "Bring external events",
+      korean: "외부 이벤트를",
+    },
+    {
+      en: "/docs/get-started",
+      ko: "/ko/docs/get-started",
+      english: "Send your first event",
+      korean: "첫 이벤트를 보내기까지",
+    },
+    {
+      en: "/docs/webhooks",
+      ko: "/ko/docs/webhooks",
+      english: "Incoming channel webhooks",
+      korean: "채널 수신 웹훅",
+    },
+  ];
+
+  for (const page of pages) {
+    const englishResponse = await render({ path: page.en });
+    assert.equal(englishResponse.status, 200);
+    const englishHtml = await englishResponse.text();
+    assert.match(englishHtml, /<html lang="en"[\s>]/i);
+    assert.match(englishHtml, new RegExp(page.english));
+    assert.match(englishHtml, /aria-label="API documentation"/);
+    assert.match(englishHtml, /href="\/docs\/get-started"/);
+    assert.match(englishHtml, /href="\/docs\/webhooks"/);
+    assert.match(englishHtml, /href="#main-content"/);
+
+    const koreanResponse = await render({ path: page.ko });
+    assert.equal(koreanResponse.status, 200);
+    const koreanHtml = await koreanResponse.text();
+    assert.match(koreanHtml, /<html lang="ko"[\s>]/i);
+    assert.match(koreanHtml, new RegExp(page.korean));
+    assert.match(koreanHtml, /aria-label="API 문서 탐색"/);
+    assert.match(koreanHtml, /href="\/ko\/docs\/get-started"/);
+    assert.match(koreanHtml, /href="\/ko\/docs\/webhooks"/);
+    assert.match(koreanHtml, /href="#main-content"/);
+  }
+});
+
+test("webhook reference publishes the exact request contract and runnable curl", async () => {
+  const response = await render({ path: "/docs/webhooks" });
+  assert.equal(response.status, 200);
+  const html = await response.text();
+
+  assert.match(
+    html,
+    /POST https:\/\/briar-api\.wbai\.workers\.dev\/hooks\/channels\/\{webhook_id\}\/\{secret\}/,
+  );
+  assert.match(html, /Idempotency-Key/);
+  assert.match(html, /eventId/);
+  assert.match(html, /text/);
+  assert.match(html, /65,536 bytes/);
+  assert.match(html, /60 requests per webhook per 60 seconds/);
+  assert.match(html, /duplicate/);
+  assert.match(html, /curl --fail-with-body/);
+  assert.match(html, /Content-Type: application\/json/);
+  assert.match(html, /Rotate/);
+  assert.match(html, /Revoke/);
+  assert.match(html, />400</);
+  assert.match(html, />404</);
+  assert.match(html, />409</);
+  assert.match(html, />413</);
+  assert.match(html, />415</);
+  assert.match(html, />429</);
+  assert.match(html, />500</);
 });
 
 test("server-renders the localized changelog from published releases", async () => {
@@ -509,6 +595,36 @@ test("/tutorial and /ko/tutorial each carry their own canonical + hreflang pair"
   );
 });
 
+test("/docs/webhooks and /ko/docs/webhooks carry localized metadata", async () => {
+  const en = await (await render({ path: "/docs/webhooks" })).text();
+  const ko = await (await render({ path: "/ko/docs/webhooks" })).text();
+
+  assert.match(
+    en,
+    /<link rel="canonical" href="http:\/\/localhost\/docs\/webhooks"\s*\/>/,
+  );
+  assert.match(
+    en,
+    /<link rel="alternate" hrefLang="ko" href="http:\/\/localhost\/ko\/docs\/webhooks"\s*\/>/,
+  );
+  assert.match(
+    en,
+    /<title>Briar incoming webhook API — Requests, idempotency, and errors<\/title>/,
+  );
+  assert.match(
+    ko,
+    /<link rel="canonical" href="http:\/\/localhost\/ko\/docs\/webhooks"\s*\/>/,
+  );
+  assert.match(
+    ko,
+    /<link rel="alternate" hrefLang="en" href="http:\/\/localhost\/docs\/webhooks"\s*\/>/,
+  );
+  assert.match(
+    ko,
+    /<title>Briar 수신 웹훅 API — 요청, 중복 방지와 오류<\/title>/,
+  );
+});
+
 test("og:url and og:locale reflect the actual locale of the rendered page", async () => {
   const en = await (await render()).text();
   const ko = await (await render({ path: "/ko" })).text();
@@ -558,10 +674,16 @@ test("/sitemap.xml is well-formed and lists every route in every locale", async 
       "http://localhost/",
       "http://localhost/blog",
       "http://localhost/changelog",
+      "http://localhost/docs",
+      "http://localhost/docs/get-started",
+      "http://localhost/docs/webhooks",
       "http://localhost/download",
       "http://localhost/ko",
       "http://localhost/ko/blog",
       "http://localhost/ko/changelog",
+      "http://localhost/ko/docs",
+      "http://localhost/ko/docs/get-started",
+      "http://localhost/ko/docs/webhooks",
       "http://localhost/ko/download",
       "http://localhost/ko/tutorial",
       "http://localhost/tutorial",
@@ -573,7 +695,7 @@ test("/sitemap.xml is well-formed and lists every route in every locale", async 
 
   // Every <url> entry carries the full hreflang set, including x-default.
   const urlBlocks = xml.match(/<url>[\s\S]*?<\/url>/g) ?? [];
-  assert.equal(urlBlocks.length, 10);
+  assert.equal(urlBlocks.length, 16);
   for (const block of urlBlocks) {
     assert.match(block, /hreflang="en"/);
     assert.match(block, /hreflang="ko"/);
