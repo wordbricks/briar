@@ -172,12 +172,32 @@ mod tests {
             project_id: "project-1".to_string(),
             target_id: "run-1".to_string(),
             kind: "issue".to_string(),
+            channel_message_id: None,
+            root_message_id: None,
+        }
+    }
+
+    fn channel_target() -> InboxNotificationTarget {
+        InboxNotificationTarget {
+            message_id: "channel:reply-1".to_string(),
+            project_id: "project-1".to_string(),
+            target_id: "channel-1".to_string(),
+            kind: "channel".to_string(),
+            channel_message_id: Some("reply-1".to_string()),
+            root_message_id: Some("root-1".to_string()),
         }
     }
 
     #[test]
     fn round_trips_the_target_through_the_notification_identifier() {
         let target = target();
+        let identifier = notification_id(&target).expect("notification identifier");
+        assert_eq!(target_from_notification_id(&identifier), Some(target));
+    }
+
+    #[test]
+    fn round_trips_channel_message_context_through_the_notification_identifier() {
+        let target = channel_target();
         let identifier = notification_id(&target).expect("notification identifier");
         assert_eq!(target_from_notification_id(&identifier), Some(target));
     }
