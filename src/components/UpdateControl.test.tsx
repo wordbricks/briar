@@ -153,7 +153,7 @@ describe("UpdateControl", () => {
     // Idle "update available" state: install button only, no prompt text.
     expect(container.textContent).not.toContain("업데이트 사용 가능");
     expect(container.querySelector(".sidebar-update-feedback")).toBeNull();
-    expect(button?.className).toBe("sidebar-update-trigger");
+    expect(button?.className).toBe("sidebar-update-trigger is-available");
     expect(button?.getAttribute("aria-label")).toContain("v1.0.1");
 
     await act(async () => {
@@ -186,6 +186,7 @@ describe("UpdateControl", () => {
 
     expect(downloadAndInstall).toHaveBeenCalledOnce();
     expect(button?.hasAttribute("disabled")).toBe(true);
+    expect(button?.className).toBe("sidebar-update-trigger is-installing");
     expect(container.querySelector(".sidebar-update-feedback")).toBeNull();
     expect(container.textContent).not.toContain("업데이트를 설치하고 있습니다");
 

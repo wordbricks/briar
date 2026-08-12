@@ -28,7 +28,7 @@ export function UpdateControl() {
       )}
       <button
         aria-label={buttonLabel}
-        className="sidebar-update-trigger"
+        className={`sidebar-update-trigger ${isInstalling ? "is-installing" : "is-available"}`}
         disabled={isInstalling}
         onClick={() => void installUpdate()}
         title={buttonLabel}
