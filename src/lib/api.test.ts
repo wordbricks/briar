@@ -27,6 +27,8 @@ import {
   deleteProjectAgentSchedule,
   loadDashboard,
   loadDashboardDelta,
+  loadIssueConversationDelta,
+  loadIssueConversationSnapshot,
   loadInboxFeed,
   loadStatusTrayRuns,
   loadAgentUsageReport,
@@ -59,7 +61,6 @@ import {
   updateIssueSubscription,
   updateProjectSettings,
   upsertProjectAgentSession,
-  waitForIssueAgentReply,
 } from "./api";
 import { cloneAutoHuntWorkflow } from "./auto-hunt-contract";
 import { demoDashboard, demoRunEvents } from "./demo-data";
@@ -1021,6 +1022,37 @@ describe("API errors", () => {
     });
   });
 
+  it("loads issue conversations through snapshot and cursor delta endpoints", async () => {
+    const projectId = "22222222-2222-4222-8222-222222222222";
+    const runId = "11111111-1111-4111-8111-111111111111";
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        cursor: 7,
+        messages: [],
+        agentReplies: [],
+      }), { headers: { "Content-Type": "application/json" } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        cursor: 9,
+        hasMore: false,
+        changed: false,
+      }), { headers: { "Content-Type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      loadIssueConversationSnapshot("token", projectId, runId),
+    ).resolves.toEqual({ cursor: 7, messages: [], agentReplies: [] });
+    await expect(
+      loadIssueConversationDelta("token", projectId, runId, 7),
+    ).resolves.toEqual({ cursor: 9, hasMore: false, changed: false });
+
+    expect(fetchMock.mock.calls[0]?.[0]).toContain(
+      `/projects/${projectId}/runs/${runId}/messages`,
+    );
+    expect(fetchMock.mock.calls[1]?.[0]).toContain(
+      `/projects/${projectId}/runs/${runId}/messages/delta?cursor=7`,
+    );
+  });
+
   it("canonicalizes parent message IDs in JSON replies", async () => {
     const parentMessageId = "AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA";
     const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
@@ -1095,54 +1127,6 @@ describe("API errors", () => {
     expect(fetchMock).toHaveBeenCalledOnce();
     const form = fetchMock.mock.calls[0]?.[1]?.body as FormData;
     expect(form.get("parentMessageId")).toBe("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
-  });
-
-  it("polls the server until the assigned worker persists its reply", async () => {
-    const projectId = "22222222-2222-4222-8222-222222222222";
-    const runId = "11111111-1111-4111-8111-111111111111";
-    const triggerMessageId = "33333333-3333-4333-8333-333333333333";
-    const reply = {
-      id: "55555555-5555-4555-8555-555555555555",
-      runId,
-      parentMessageId: triggerMessageId,
-      body: "The worker fixed the retry race.",
-      author: { id: null, name: "Briar · Codex", image: null, provider: "codex" },
-      replyCount: 0,
-      createdAt: "2026-07-31T00:00:01.000Z",
-      updatedAt: "2026-07-31T00:00:01.000Z",
-    };
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            agentReply: { status: "running", error: null },
-            message: null,
-          }),
-          { headers: { "Content-Type": "application/json" } },
-        ),
-      )
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            agentReply: { status: "completed", error: null },
-            message: reply,
-          }),
-          { headers: { "Content-Type": "application/json" } },
-        ),
-      );
-    vi.stubGlobal("fetch", fetchMock);
-
-    await expect(
-      waitForIssueAgentReply(
-        "token",
-        projectId,
-        runId,
-        triggerMessageId,
-        { pollIntervalMs: 0, timeoutMs: 1_000 },
-      ),
-    ).resolves.toEqual(reply);
-    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it("loads synchronized agent sessions as remote-owned snapshots", async () => {

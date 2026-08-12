@@ -703,7 +703,7 @@ export function Channels({
     token,
   ]);
 
-  // SSE carries only the latest organization cursor. D1 remains authoritative:
+  // WebSocket carries only the latest organization cursor. D1 remains authoritative:
   // every notification drains the delta feed, and a low-frequency fallback
   // closes gaps after sleep, proxy disconnects, or a missed publish.
   useEffect(() => {
@@ -830,7 +830,12 @@ export function Channels({
     };
 
     const unsubscribe = transport.subscribe((notification) => {
-      if (notification.cursor > cursor.current) void sync();
+      if (
+        notification.topic === "channels" &&
+        notification.cursor > cursor.current
+      ) {
+        void sync();
+      }
     });
     const updateVisibility = () => {
       if (document.hidden) {

@@ -56,6 +56,9 @@ import type {
   HuntRunPlacement,
   HuntEvent,
   IssueAttachment,
+  IssueAgentReplyState,
+  IssueConversationDelta,
+  IssueConversationSnapshot,
   IssueMessage,
   IssueProposedAction,
   IssueExecutionPreferences,
@@ -2286,11 +2289,31 @@ export async function loadIssueMessages(
   projectId: string,
   runId: string,
 ) {
-  const result = await request<{ messages: IssueMessage[] }>(
+  const result = await loadIssueConversationSnapshot(token, projectId, runId);
+  return result.messages;
+}
+
+export async function loadIssueConversationSnapshot(
+  token: string,
+  projectId: string,
+  runId: string,
+) {
+  return request<IssueConversationSnapshot>(
     `/projects/${projectId}/runs/${runId}/messages`,
     token,
   );
-  return result.messages;
+}
+
+export async function loadIssueConversationDelta(
+  token: string,
+  projectId: string,
+  runId: string,
+  cursor: number,
+) {
+  return request<IssueConversationDelta>(
+    `/projects/${projectId}/runs/${runId}/messages/delta?cursor=${cursor}`,
+    token,
+  );
 }
 
 export async function loadRunEvidence(
@@ -2365,12 +2388,7 @@ export async function createIssueMessage(
   }
   const result = await request<{
     message: IssueMessage;
-    agentReply: {
-      id: string;
-      triggerMessageId: string;
-      status: "queued" | "running" | "completed" | "failed";
-      error: string | null;
-    } | null;
+    agentReply: IssueAgentReplyState | null;
   }>(
     `/projects/${projectId}/runs/${runId}/messages`,
     token,
@@ -2407,42 +2425,6 @@ export async function deleteIssueMessage(
     `/projects/${projectId}/runs/${runId}/messages/${messageId}`,
     token,
     { method: "DELETE" },
-  );
-}
-
-export async function waitForIssueAgentReply(
-  token: string,
-  projectId: string,
-  runId: string,
-  triggerMessageId: string,
-  options: { pollIntervalMs?: number; timeoutMs?: number } = {},
-) {
-  const pollIntervalMs = options.pollIntervalMs ?? 1_500;
-  const timeoutMs = options.timeoutMs ?? 5 * 60_000;
-  const startedAt = Date.now();
-  while (Date.now() - startedAt < timeoutMs) {
-    const result = await request<{
-      agentReply: {
-        status: "queued" | "running" | "completed" | "failed";
-        error: string | null;
-      };
-      message: IssueMessage | null;
-    }>(
-      `/projects/${projectId}/runs/${runId}/messages/${triggerMessageId}/agent-reply`,
-      token,
-    );
-    if (result.agentReply.status === "completed" && result.message) {
-      return result.message;
-    }
-    if (result.agentReply.status === "failed") {
-      throw new Error(
-        result.agentReply.error ?? "워커가 Briar 답변을 만들지 못했습니다.",
-      );
-    }
-    await new Promise((resolve) => globalThis.setTimeout(resolve, pollIntervalMs));
-  }
-  throw new Error(
-    "Briar 답변이 아직 대기 중입니다. 사용 가능한 워커가 있는지 확인해 주세요.",
   );
 }
 

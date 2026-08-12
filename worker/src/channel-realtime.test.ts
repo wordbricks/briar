@@ -6,18 +6,20 @@ import {
 
 class FakeSocket {
   sent: string[] = [];
-  attachment: { cursor: number } | null;
+  attachment: { cursors: Record<string, number> } | { cursor: number } | null;
   close = vi.fn();
 
   constructor(cursor: number) {
-    this.attachment = { cursor };
+    this.attachment = { cursors: { channels: cursor } };
   }
 
   deserializeAttachment() {
     return this.attachment;
   }
 
-  serializeAttachment(attachment: { cursor: number }) {
+  serializeAttachment(
+    attachment: { cursors: Record<string, number> } | { cursor: number },
+  ) {
     this.attachment = attachment;
   }
 
@@ -43,7 +45,7 @@ describe("ChannelRealtimeHub", () => {
     }));
     expect(published.status).toBe(204);
     expect(socket.sent).toEqual(['{"topic":"channels","cursor":12}']);
-    expect(socket.attachment).toEqual({ cursor: 12 });
+    expect(socket.attachment).toEqual({ cursors: { channels: 12 } });
 
     await hub.fetch(new Request("https://realtime.test/notify", {
       method: "POST",
@@ -51,6 +53,36 @@ describe("ChannelRealtimeHub", () => {
       body: JSON.stringify({ topic: "channels", cursor: 11 }),
     }));
     expect(socket.sent).toHaveLength(1);
+  });
+
+  it("tracks channel and project cursors independently", async () => {
+    const socket = new FakeSocket(42);
+    const hub = new ChannelRealtimeHub(
+      {
+        getWebSockets: () => [socket],
+      } as unknown as DurableObjectState,
+      {} as Env,
+    );
+
+    await hub.fetch(new Request("https://realtime.test/notify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        topic: "project",
+        projectId: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+        cursor: 3,
+      }),
+    }));
+
+    expect(socket.sent).toEqual([
+      '{"topic":"project","projectId":"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee","cursor":3}',
+    ]);
+    expect(socket.attachment).toEqual({
+      cursors: {
+        channels: 42,
+        "project:aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee": 3,
+      },
+    });
   });
 
   it("does not create a long-lived stream for legacy subscribers", async () => {

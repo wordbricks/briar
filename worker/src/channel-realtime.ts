@@ -1,10 +1,16 @@
-export type ChannelRealtimeNotification = {
-  topic: "channels";
-  cursor: number;
-};
+export type OrganizationRealtimeNotification =
+  | {
+      topic: "channels";
+      cursor: number;
+    }
+  | {
+      topic: "project";
+      projectId: string;
+      cursor: number;
+    };
 
-type ChannelRealtimeSocketAttachment = {
-  cursor: number;
+type OrganizationRealtimeSocketAttachment = {
+  cursors: Record<string, number>;
 };
 
 function parseCursor(value: string | null) {
@@ -14,11 +20,11 @@ function parseCursor(value: string | null) {
 }
 
 /**
- * Organization-scoped fan-out for channel cursor notifications.
+ * Organization-scoped fan-out for channel and project cursor notifications.
  *
- * D1's channel change log stays authoritative. The Durable Object owns only
- * hibernatable sockets and persists each socket's last cursor as an attachment,
- * so no in-memory controller or timer keeps the object billable while idle.
+ * D1's channel and project change logs stay authoritative. The Durable Object
+ * owns only hibernatable sockets and persists each topic's last cursor as an
+ * attachment, so no in-memory controller or timer keeps it billable while idle.
  */
 export class ChannelRealtimeHub {
   constructor(
@@ -35,9 +41,11 @@ export class ChannelRealtimeHub {
       return this.subscribe(parseCursor(url.searchParams.get("cursor")) ?? 0);
     }
     if (url.pathname === "/notify" && request.method === "POST") {
-      const notification = await request.json<ChannelRealtimeNotification>();
+      const notification = await request.json<OrganizationRealtimeNotification>();
       if (
-        notification.topic !== "channels" ||
+        (notification.topic !== "channels" &&
+          (notification.topic !== "project" ||
+            !/^[0-9a-f-]+$/iu.test(notification.projectId))) ||
         !Number.isSafeInteger(notification.cursor) ||
         notification.cursor < 0
       ) {
@@ -54,7 +62,9 @@ export class ChannelRealtimeHub {
     const [client, server] = Object.values(pair);
     this.state.acceptWebSocket(server);
     server.serializeAttachment(
-      { cursor } satisfies ChannelRealtimeSocketAttachment,
+      {
+        cursors: { channels: cursor },
+      } satisfies OrganizationRealtimeSocketAttachment,
     );
     server.send(JSON.stringify({ topic: "channels", cursor }));
     return new Response(null, {
@@ -63,16 +73,25 @@ export class ChannelRealtimeHub {
     });
   }
 
-  private publish(notification: ChannelRealtimeNotification) {
+  private publish(notification: OrganizationRealtimeNotification) {
     const payload = JSON.stringify(notification);
+    const cursorKey = notification.topic === "channels"
+      ? "channels"
+      : `project:${notification.projectId}`;
     for (const client of this.state.getWebSockets()) {
       const attachment = client.deserializeAttachment() as
-        | ChannelRealtimeSocketAttachment
+        | OrganizationRealtimeSocketAttachment
+        | { cursor: number }
         | null;
-      if ((attachment?.cursor ?? -1) >= notification.cursor) continue;
+      const cursors = attachment && "cursors" in attachment
+        ? attachment.cursors
+        : { channels: attachment?.cursor ?? -1 };
+      if ((cursors[cursorKey] ?? -1) >= notification.cursor) continue;
       try {
         client.send(payload);
-        client.serializeAttachment({ cursor: notification.cursor });
+        client.serializeAttachment({
+          cursors: { ...cursors, [cursorKey]: notification.cursor },
+        } satisfies OrganizationRealtimeSocketAttachment);
       } catch {
         client.close(1011, "Realtime delivery failed");
       }
@@ -111,7 +130,7 @@ export function legacyChannelRealtimeResponse() {
   });
 }
 
-export async function subscribeToChannelRealtime(
+export async function subscribeToOrganizationRealtime(
   env: Env,
   organizationId: string,
   cursor: number,
@@ -136,5 +155,22 @@ export async function publishChannelRealtime(
   });
   if (!response.ok) {
     throw new Error(`Channel realtime notification failed (${response.status})`);
+  }
+}
+
+export async function publishProjectRealtime(
+  env: Env,
+  organizationId: string,
+  projectId: string,
+  cursor: number,
+) {
+  const hub = env.CHANNEL_REALTIME.getByName(organizationId);
+  const response = await hub.fetch("https://channel-realtime.internal/notify", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ topic: "project", projectId, cursor }),
+  });
+  if (!response.ok) {
+    throw new Error(`Project realtime notification failed (${response.status})`);
   }
 }

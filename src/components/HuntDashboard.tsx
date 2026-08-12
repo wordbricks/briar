@@ -182,7 +182,16 @@ import {
   IssueExecutionApproval,
 } from "./IssueExecutionApproval";
 import { AgentSkillExecutionApproval } from "./AgentSkillExecutionApproval";
-import { loadDashboard } from "../lib/api";
+import {
+  isApiErrorStatus,
+  loadDashboard,
+  loadIssueConversationDelta,
+  loadIssueConversationSnapshot,
+} from "../lib/api";
+import {
+  MAX_PROJECT_DELTA_PAGES_PER_SYNC,
+  createProjectRealtimeTransport,
+} from "../lib/channel-realtime";
 import { issueExecutionApprovalUnavailable } from "../lib/issue-execution-approval";
 import { mergeIssueMessages } from "../lib/issue-message-merge";
 import {
@@ -202,6 +211,7 @@ import type {
   HuntRunPlacement,
   HuntSource,
   IssueAttachment,
+  IssueAgentReplyState,
   IssueMessage,
   IssueMessageSendResult,
   IssueProposedAction,
@@ -1245,6 +1255,7 @@ export function HuntDashboard({
             agentAssociationsByRunId.performedAgents.get(selected.id)?.model ??
             null
           }
+          organizationId={dashboard!.project.organizationId}
           projectId={dashboard!.project.id}
           run={selected}
           isProcessing={processingIssueIds.has(selected.id)}
@@ -4144,6 +4155,7 @@ export function RunPage({
   onUpdateIssueCheckpoints,
   onUpdateIssuePreferences = async () => undefined,
   onUpdateIssueSubscription,
+  organizationId = null,
   performedAgentName = null,
   performedAgentProvider = null,
   performedAgentModel = null,
@@ -4221,6 +4233,7 @@ export function RunPage({
     input: IssueExecutionPreferences,
   ) => Promise<unknown>;
   onUpdateIssueSubscription?: (subscribed: boolean) => Promise<unknown>;
+  organizationId?: string | null;
   performedAgentName?: string | null;
   performedAgentProvider?: AgentProvider | null;
   performedAgentModel?: string | null;
@@ -6017,6 +6030,7 @@ export function RunPage({
                       onLoad={onLoadIssueMessages}
                       onSend={onSendIssueMessage}
                       onUpdateSubscription={onUpdateIssueSubscription}
+                      organizationId={organizationId}
                       run={run}
                       projectId={projectId}
                       token={token}
@@ -6058,6 +6072,7 @@ export function RunPage({
                     onLoad={onLoadIssueMessages}
                     onSend={onSendIssueMessage}
                     onUpdateSubscription={onUpdateIssueSubscription}
+                    organizationId={organizationId}
                     run={run}
                     projectId={projectId}
                     token={token}
@@ -7584,6 +7599,7 @@ function IssueConversation({
   onLoad,
   onSend,
   onUpdateSubscription,
+  organizationId,
   projectId,
   run,
   token,
@@ -7620,6 +7636,7 @@ function IssueConversation({
     attachmentReferences?: string[];
   }) => Promise<IssueMessageSendResult>;
   onUpdateSubscription?: (subscribed: boolean) => Promise<unknown>;
+  organizationId: string | null;
   projectId: string;
   run: HuntRun;
   token: string | null;
@@ -7669,12 +7686,20 @@ function IssueConversation({
     boolean | null
   >(null);
   const [subscriptionPending, setSubscriptionPending] = useState(false);
+  const [conversationCursor, setConversationCursor] = useState<number | null>(
+    null,
+  );
   const isSubscribed = subscriptionOverride ?? backendSubscribed;
   const messageListRef = useRef<HTMLDivElement | null>(null);
   const onLoadRef = useRef(onLoad);
   const mountedRef = useRef(true);
   const activeRunIdRef = useRef(run.id);
   const messageLoadVersion = useRef(0);
+  const conversationCursorRef = useRef<number | null>(null);
+  const trackedAgentRepliesRef = useRef(
+    new Map<string, { replyThreadId: string }>(),
+  );
+  const agentRepliesByIdRef = useRef(new Map<string, IssueAgentReplyState>());
   const executionProposalStateByIdRef = useRef(new Map<string, string>());
   if (activeRunIdRef.current !== run.id) {
     activeRunIdRef.current = run.id;
@@ -7683,10 +7708,84 @@ function IssueConversation({
   }
   onLoadRef.current = onLoad;
 
+  const trackAgentReply = useCallback(
+    (job: IssueAgentReplyState, trigger: IssueMessage) => {
+      const observed = agentRepliesByIdRef.current.get(job.id);
+      if (observed?.status === "completed" || observed?.status === "failed") {
+        return;
+      }
+      if (trackedAgentRepliesRef.current.has(job.id)) return;
+      const replyThreadId = agentReplyParentMessageId(trigger);
+      trackedAgentRepliesRef.current.set(job.id, { replyThreadId });
+      setAgentReplyStates((current) => ({
+        ...current,
+        [replyThreadId]: {
+          pending: (current[replyThreadId]?.pending ?? 0) + 1,
+          error: null,
+        },
+      }));
+    },
+    [],
+  );
+
+  const finishTrackedAgentReply = useCallback(
+    (job: IssueAgentReplyState) => {
+      const tracked = trackedAgentRepliesRef.current.get(job.id);
+      if (!tracked) return;
+      trackedAgentRepliesRef.current.delete(job.id);
+      setAgentReplyStates((current) => {
+        const state = current[tracked.replyThreadId];
+        if (!state) return current;
+        const pending = Math.max(state.pending - 1, 0);
+        if (pending === 0 && !job.error) {
+          const next = { ...current };
+          delete next[tracked.replyThreadId];
+          return next;
+        }
+        return {
+          ...current,
+          [tracked.replyThreadId]: {
+            pending,
+            error: job.status === "failed"
+              ? job.error ?? "워커가 Briar 답변을 만들지 못했습니다."
+              : null,
+          },
+        };
+      });
+    },
+    [],
+  );
+
+  const reconcileAgentReplies = useCallback(
+    (jobs: IssueAgentReplyState[], snapshotMessages: IssueMessage[]) => {
+      const messagesById = new Map(
+        snapshotMessages.map((message) => [message.id, message]),
+      );
+      for (const job of jobs) {
+        agentRepliesByIdRef.current.set(job.id, job);
+        if (job.status === "queued" || job.status === "running") {
+          const trigger = messagesById.get(job.triggerMessageId);
+          if (trigger) trackAgentReply(job, trigger);
+        } else {
+          finishTrackedAgentReply(job);
+        }
+      }
+    },
+    [finishTrackedAgentReply, trackAgentReply],
+  );
+
   useEffect(() => {
     setSubscriptionOverride(null);
     setSubscriptionPending(false);
   }, [backendSubscribed, run.id]);
+
+  useEffect(() => {
+    conversationCursorRef.current = null;
+    trackedAgentRepliesRef.current.clear();
+    agentRepliesByIdRef.current.clear();
+    setConversationCursor(null);
+    setAgentReplyStates({});
+  }, [run.id]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -7702,13 +7801,21 @@ function IssueConversation({
     setLoading(true);
     setLoadError(null);
     try {
-      const loaded = await onLoadRef.current();
+      const snapshot = token && organizationId && projectId
+        ? await loadIssueConversationSnapshot(token, projectId, requestedRunId)
+        : null;
+      const loaded = snapshot?.messages ?? await onLoadRef.current();
       if (
         mountedRef.current &&
         activeRunIdRef.current === requestedRunId &&
         messageLoadVersion.current === requestedVersion
       ) {
         setMessages((current) => mergeIssueMessages(current, loaded));
+        if (snapshot && Number.isSafeInteger(snapshot.cursor)) {
+          conversationCursorRef.current = snapshot.cursor;
+          setConversationCursor(snapshot.cursor);
+          reconcileAgentReplies(snapshot.agentReplies ?? [], loaded);
+        }
       }
     } catch {
       if (
@@ -7727,7 +7834,7 @@ function IssueConversation({
         setLoading(false);
       }
     }
-  }, [t]);
+  }, [organizationId, projectId, reconcileAgentReplies, t, token]);
 
   const loadSkillExecutionContext = useCallback(
     async (proposal: AgentSkillExecutionProposal) => {
@@ -7749,6 +7856,106 @@ function IssueConversation({
   useEffect(() => {
     void loadMessages();
   }, [loadMessages, run.id]);
+
+  useEffect(() => {
+    if (!token || !organizationId || conversationCursor === null) return;
+    let disposed = false;
+    let syncing = false;
+    let pending = false;
+    let continuationTimer: number | null = null;
+
+    const sync = async () => {
+      pending = true;
+      if (disposed || syncing) return;
+      syncing = true;
+      let needsContinuation = false;
+      try {
+        while (pending && !disposed) {
+          pending = false;
+          let hasMore = false;
+          for (
+            let pageCount = 0;
+            pageCount < MAX_PROJECT_DELTA_PAGES_PER_SYNC;
+            pageCount += 1
+          ) {
+            const cursor = conversationCursorRef.current;
+            if (cursor === null) return;
+            const delta = await loadIssueConversationDelta(
+              token,
+              projectId,
+              run.id,
+              cursor,
+            );
+            if (disposed || activeRunIdRef.current !== run.id) return;
+            conversationCursorRef.current = delta.cursor;
+            if (delta.changed && delta.messages && delta.agentReplies) {
+              setMessages((current) =>
+                mergeIssueMessages(current, delta.messages!)
+              );
+              reconcileAgentReplies(delta.agentReplies, delta.messages);
+            }
+            hasMore = delta.hasMore;
+            if (!hasMore) break;
+          }
+          needsContinuation = hasMore;
+          if (needsContinuation) break;
+        }
+      } catch (caught) {
+        if (disposed) return;
+        if (isApiErrorStatus(caught, 410)) {
+          await loadMessages();
+        } else {
+          console.warn("Issue conversation realtime sync failed", caught);
+        }
+      } finally {
+        syncing = false;
+      }
+      if ((needsContinuation || pending) && !disposed) {
+        continuationTimer = window.setTimeout(() => void sync(), 0);
+      }
+    };
+
+    const transport = createProjectRealtimeTransport(token, organizationId);
+    const unsubscribe = transport.subscribe((notification) => {
+      if (
+        notification.topic === "project" &&
+        notification.projectId === projectId &&
+        notification.cursor > (conversationCursorRef.current ?? -1)
+      ) {
+        void sync();
+      } else if (notification.topic === "channels") {
+        // The organization hub emits this ready frame on every socket connect,
+        // which closes any notification gap after a reconnect.
+        void sync();
+      }
+    });
+    const updateVisibility = () => {
+      if (document.hidden) {
+        transport.stop();
+      } else {
+        transport.start();
+        void sync();
+      }
+    };
+    document.addEventListener("visibilitychange", updateVisibility);
+    updateVisibility();
+
+    return () => {
+      disposed = true;
+      if (continuationTimer !== null) window.clearTimeout(continuationTimer);
+      document.removeEventListener("visibilitychange", updateVisibility);
+      unsubscribe();
+      transport.stop();
+    };
+  }, [
+    conversationCursor,
+    loadMessages,
+    organizationId,
+    projectId,
+    reconcileAgentReplies,
+    run.id,
+    token,
+  ]);
 
   const executionProposalStates = useMemo(() => {
     const runsById = new Map(
@@ -7908,14 +8115,21 @@ function IssueConversation({
     attachmentReferences: string[],
   ) => {
     const appendMessage = (message: IssueMessage) =>
-      setMessages((current) => [
-        ...current.map((candidate) =>
-          candidate.id === message.parentMessageId
-            ? { ...candidate, replyCount: candidate.replyCount + 1 }
-            : candidate,
-        ),
-        message,
-      ]);
+      setMessages((current) => {
+        if (current.some((candidate) => candidate.id === message.id)) {
+          return current.map((candidate) =>
+            candidate.id === message.id ? message : candidate
+          );
+        }
+        return [
+          ...current.map((candidate) =>
+            candidate.id === message.parentMessageId
+              ? { ...candidate, replyCount: candidate.replyCount + 1 }
+              : candidate,
+          ),
+          message,
+        ];
+      });
     const result = await onSend({
       body,
       parentMessageId,
@@ -7925,6 +8139,9 @@ function IssueConversation({
         : {}),
     });
     appendMessage(result.message);
+    if (result.agentReplyJob) {
+      trackAgentReply(result.agentReplyJob, result.message);
+    }
     if (!result.agentReply) return;
     const replyThreadId = agentReplyParentMessageId(result.message);
     setAgentReplyStates((current) => ({

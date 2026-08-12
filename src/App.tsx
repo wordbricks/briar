@@ -1716,6 +1716,11 @@ export function App() {
                       proposal,
                       input,
                     )}
+                  organizationId={
+                    briar.projects.find(
+                      (project) => project.id === inboxDetailTarget.projectId,
+                    )?.organizationId ?? null
+                  }
                   projectId={inboxDetailTarget.projectId}
                   run={inboxDetailRun}
                   token={briar.token}

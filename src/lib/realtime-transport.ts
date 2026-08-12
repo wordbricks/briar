@@ -1,7 +1,13 @@
-export type RealtimeNotification = {
-  topic: "channels";
-  cursor: number;
-};
+export type RealtimeNotification =
+  | {
+      topic: "channels";
+      cursor: number;
+    }
+  | {
+      topic: "project";
+      projectId: string;
+      cursor: number;
+    };
 
 export interface RealtimeTransport {
   start(): void;
@@ -79,10 +85,21 @@ export class SseEventDecoder {
 const realtimeNotification = (value: unknown): RealtimeNotification | null => {
   if (!value || typeof value !== "object") return null;
   const candidate = value as Partial<RealtimeNotification>;
-  return candidate.topic === "channels" &&
-      Number.isSafeInteger(candidate.cursor) &&
-      (candidate.cursor ?? -1) >= 0
-    ? { topic: "channels", cursor: candidate.cursor! }
+  if (!Number.isSafeInteger(candidate.cursor) || (candidate.cursor ?? -1) < 0) {
+    return null;
+  }
+  if (candidate.topic === "channels") {
+    return { topic: "channels", cursor: candidate.cursor! };
+  }
+  const project = value as { topic?: unknown; projectId?: unknown };
+  return project.topic === "project" &&
+      typeof project.projectId === "string" &&
+      /^[0-9a-f-]+$/iu.test(project.projectId)
+    ? {
+        topic: "project",
+        projectId: project.projectId,
+        cursor: candidate.cursor!,
+      }
     : null;
 };
 
