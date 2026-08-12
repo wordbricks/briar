@@ -447,7 +447,11 @@ export type AgentUsageEstimatedCostRecord = Pick<
   costSource: "modelPriced";
 };
 
-export type { AgentUsagePricing } from "./lib/agent-usage-pricing";
+export type {
+  AgentExecutionCostEstimate,
+  AgentExecutionCostEstimateModel,
+  AgentUsagePricing,
+} from "./lib/agent-usage-pricing";
 
 export type AgentUsageRun = {
   id: string;

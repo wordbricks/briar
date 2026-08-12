@@ -8,6 +8,7 @@ import type {
 import {
   createAgentUsagePricingLoader,
   estimateOrganizationUsageCosts,
+  estimateRunExecutionCost,
 } from "./usage-pricing";
 
 const pricingDocument = {
@@ -258,5 +259,107 @@ describe("worker usage pricing", () => {
         table,
       }),
     ).toEqual([]);
+  });
+
+  it("returns current per-model rates and a complete run estimate", () => {
+    const table = parseAgentUsageModelRates(pricingDocument);
+    const estimate = estimateRunExecutionCost({
+      usageRecords: [
+        usageRow(),
+        usageRow({
+          usage_key: "usage-b",
+          model: "model-b",
+          uncached_input_tokens: 10,
+          cache_read_tokens: 0,
+          cache_write_tokens: 0,
+          output_tokens: 2,
+        }),
+      ],
+      loadedPricing: {
+        table,
+        pricing: {
+          status: "live",
+          source: "pricing-source",
+          fetchedAt: "2026-08-10T01:00:00.000Z",
+          knownModels: 2,
+        },
+      },
+      fallback: null,
+    });
+
+    expect(estimate).toMatchObject({
+      status: "estimated",
+      reason: null,
+      usageRecords: 2,
+      pricedUsageRecords: 2,
+      pricedUsdTicks: 1_645_000,
+      estimatedUsdTicks: 1_645_000,
+    });
+    expect(estimate.models).toEqual([
+      expect.objectContaining({
+        model: "model-a",
+        pricingKey: "model-a",
+        inputCostPerToken: 1e-6,
+        outputCostPerToken: 4e-6,
+        estimatedUsdTicks: 1_345_000,
+      }),
+      expect.objectContaining({
+        model: "model-b",
+        pricingKey: "model-b",
+        inputCostPerToken: 2e-6,
+        outputCostPerToken: 5e-6,
+        estimatedUsdTicks: 300_000,
+      }),
+    ]);
+  });
+
+  it("uses the execution summary for pre-ledger runs and marks partial coverage", () => {
+    const table = parseAgentUsageModelRates(pricingDocument);
+    const loadedPricing = {
+      table,
+      pricing: {
+        status: "cached" as const,
+        source: "pricing-source",
+        fetchedAt: "2026-08-10T01:00:00.000Z",
+        knownModels: 2,
+      },
+    };
+    expect(
+      estimateRunExecutionCost({
+        usageRecords: [],
+        loadedPricing,
+        fallback: {
+          agentProvider: "opencode",
+          model: "model-a",
+          inputTokens: 100,
+          cacheReadTokens: 20,
+          cacheWriteTokens: 10,
+          outputTokens: 5,
+        },
+      }),
+    ).toMatchObject({
+      status: "estimated",
+      usageRecords: 1,
+      pricedUsageRecords: 1,
+      estimatedUsdTicks: 1_345_000,
+    });
+
+    expect(
+      estimateRunExecutionCost({
+        usageRecords: [
+          usageRow(),
+          usageRow({ usage_key: "usage-b", model: "unknown-model" }),
+        ],
+        loadedPricing,
+        fallback: null,
+      }),
+    ).toMatchObject({
+      status: "partial",
+      reason: "modelRateUnavailable",
+      usageRecords: 2,
+      pricedUsageRecords: 1,
+      estimatedUsdTicks: null,
+      pricedUsdTicks: 1_345_000,
+    });
   });
 });

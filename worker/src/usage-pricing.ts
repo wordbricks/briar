@@ -3,6 +3,8 @@ import {
   lookupAgentUsageModelRate,
   parseAgentUsageModelRates,
   priceAgentExecutionUsage,
+  type AgentExecutionCostEstimate,
+  type AgentExecutionCostEstimateModel,
   type AgentUsagePricing,
   type AgentUsageModelRateTable,
 } from "../../src/lib/agent-usage-pricing";
@@ -135,6 +137,178 @@ export function createAgentUsagePricingLoader(
 }
 
 export const loadAgentUsagePricing = createAgentUsagePricingLoader();
+
+type RunUsagePricingInput = Pick<
+  OrganizationUsageRecordRow,
+  | "agent_provider"
+  | "model_provider"
+  | "model"
+  | "canonical_model"
+  | "uncached_input_tokens"
+  | "cache_read_tokens"
+  | "cache_write_tokens"
+  | "output_tokens"
+>;
+
+export type RunUsagePricingFallback = {
+  agentProvider: OrganizationUsageRecordRow["agent_provider"];
+  model: string | null;
+  inputTokens: number | null;
+  cacheReadTokens: number | null;
+  cacheWriteTokens: number | null;
+  outputTokens: number | null;
+};
+
+const fallbackModelProvider = (
+  provider: RunUsagePricingFallback["agentProvider"],
+) => {
+  if (provider === "codex") return "openai";
+  if (provider === "claude") return "anthropic";
+  if (provider === "grok") return "xai";
+  return null;
+};
+
+const fallbackUsage = (
+  fallback: RunUsagePricingFallback,
+): RunUsagePricingInput => {
+  const cacheReadTokens = fallback.cacheReadTokens ?? 0;
+  const cacheWriteTokens = fallback.cacheWriteTokens ?? 0;
+  const inputIncludesCache =
+    fallback.agentProvider === "codex" || fallback.agentProvider === "grok";
+  return {
+    agent_provider: fallback.agentProvider,
+    model_provider: fallbackModelProvider(fallback.agentProvider),
+    model: fallback.model,
+    canonical_model: null,
+    uncached_input_tokens:
+      fallback.inputTokens === null
+        ? null
+        : inputIncludesCache
+          ? Math.max(
+              0,
+              fallback.inputTokens - cacheReadTokens - cacheWriteTokens,
+            )
+          : fallback.inputTokens,
+    cache_read_tokens: fallback.cacheReadTokens,
+    cache_write_tokens: fallback.cacheWriteTokens,
+    output_tokens: fallback.outputTokens,
+  };
+};
+
+/**
+ * Reprice one run from immutable usage rows whenever the issue detail is read.
+ * The execution summary is used only for older runs that predate the ledger.
+ */
+export function estimateRunExecutionCost(input: {
+  usageRecords: readonly OrganizationUsageRecordRow[];
+  loadedPricing: LoadedAgentUsagePricing;
+  fallback: RunUsagePricingFallback | null;
+}): AgentExecutionCostEstimate {
+  const records: readonly RunUsagePricingInput[] =
+    input.usageRecords.length > 0
+      ? input.usageRecords
+      : input.fallback
+        ? [fallbackUsage(input.fallback)]
+        : [];
+  const unavailable = (
+    reason: NonNullable<AgentExecutionCostEstimate["reason"]>,
+  ): AgentExecutionCostEstimate => ({
+    pricing: input.loadedPricing.pricing,
+    status: "unavailable",
+    reason,
+    usageRecords: records.length,
+    pricedUsageRecords: 0,
+    estimatedUsdTicks: null,
+    pricedUsdTicks: 0,
+    models: [],
+  });
+  if (records.length === 0) return unavailable("usageUnavailable");
+  if (!input.loadedPricing.table) return unavailable("pricingUnavailable");
+
+  const models = new Map<string, AgentExecutionCostEstimateModel>();
+  let missingRate = 0;
+  let missingBreakdown = 0;
+  let pricedUsdTicks = 0;
+  let pricedUsageRecords = 0;
+  for (const usage of records) {
+    const rate = lookupAgentUsageModelRate(input.loadedPricing.table, {
+      model: usage.model,
+      canonicalModel: usage.canonical_model,
+      modelProvider: usage.model_provider,
+    });
+    if (!rate) {
+      missingRate += 1;
+      continue;
+    }
+    const amountUsdTicks = priceAgentExecutionUsage(
+      {
+        uncachedInputTokens: usage.uncached_input_tokens,
+        cacheReadTokens: usage.cache_read_tokens,
+        cacheWriteTokens: usage.cache_write_tokens,
+        outputTokens: usage.output_tokens,
+      },
+      rate,
+    );
+    if (amountUsdTicks === null) {
+      missingBreakdown += 1;
+      continue;
+    }
+    if (!Number.isSafeInteger(pricedUsdTicks + amountUsdTicks)) {
+      missingBreakdown += 1;
+      continue;
+    }
+    pricedUsageRecords += 1;
+    pricedUsdTicks += amountUsdTicks;
+    const model = usage.canonical_model ?? usage.model ?? rate.pricingKey;
+    const key = JSON.stringify([
+      rate.pricingKey,
+      usage.model_provider,
+      model,
+      rate.inputCostPerToken,
+      rate.outputCostPerToken,
+      rate.cacheReadCostPerToken,
+      rate.cacheWriteCostPerToken,
+    ]);
+    const current = models.get(key);
+    const next: AgentExecutionCostEstimateModel = {
+      pricingKey: rate.pricingKey,
+      modelProvider: usage.model_provider,
+      model,
+      inputCostPerToken: rate.inputCostPerToken,
+      outputCostPerToken: rate.outputCostPerToken,
+      cacheReadCostPerToken: rate.cacheReadCostPerToken,
+      cacheWriteCostPerToken: rate.cacheWriteCostPerToken,
+      estimatedUsdTicks:
+        (current?.estimatedUsdTicks ?? 0) + amountUsdTicks,
+    };
+    models.set(key, next);
+  }
+
+  const complete = pricedUsageRecords === records.length;
+  const status = complete
+    ? "estimated"
+    : pricedUsageRecords > 0
+      ? "partial"
+      : "unavailable";
+  return {
+    pricing: input.loadedPricing.pricing,
+    status,
+    reason: complete
+      ? null
+      : missingRate > 0
+        ? "modelRateUnavailable"
+        : missingBreakdown > 0
+          ? "tokenBreakdownUnavailable"
+          : "usageUnavailable",
+    usageRecords: records.length,
+    pricedUsageRecords,
+    estimatedUsdTicks: complete ? pricedUsdTicks : null,
+    pricedUsdTicks,
+    models: [...models.values()].sort((left, right) =>
+      left.model.localeCompare(right.model),
+    ),
+  };
+}
 
 const normalizedModel = (value: string | null) =>
   value?.trim().toLowerCase() ?? null;

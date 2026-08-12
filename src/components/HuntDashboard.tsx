@@ -118,6 +118,7 @@ import {
   formatExecutionDuration,
   formatExecutionTokens,
 } from "../lib/agent-execution-metrics";
+import { AGENT_EXECUTION_USD_TICKS_PER_DOLLAR } from "../lib/agent-execution-cost";
 import {
   dataTransferHasFiles,
   filesFromDataTransfer,
@@ -187,6 +188,7 @@ import {
   loadDashboard,
   loadIssueConversationDelta,
   loadIssueConversationSnapshot,
+  loadRunCostEstimate,
 } from "../lib/api";
 import {
   MAX_PROJECT_DELTA_PAGES_PER_SYNC,
@@ -203,6 +205,7 @@ import { formatIssueKey } from "../lib/issue-key";
 import type {
   AgentSkillExecutionApprovalInput,
   AgentSkillExecutionProposal,
+  AgentExecutionCostEstimate,
   CreateIssueInput,
   DashboardPayload,
   ExecutionWorker,
@@ -256,6 +259,33 @@ type KanbanPointerDrag = {
   startX: number;
   startY: number;
 };
+
+function formatExecutionUsdTicks(value: number, locale: string) {
+  const dollars = value / AGENT_EXECUTION_USD_TICKS_PER_DOLLAR;
+  const magnitude = Math.abs(dollars);
+  return new Intl.NumberFormat(locale, {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits:
+      magnitude === 0 || magnitude >= 1
+        ? 2
+        : magnitude >= 0.01
+          ? 4
+          : magnitude >= 0.0001
+            ? 6
+            : 8,
+    maximumFractionDigits: magnitude >= 1 ? 2 : 10,
+  }).format(dollars);
+}
+
+function formatRatePerMillion(value: number, locale: string) {
+  return new Intl.NumberFormat(locale, {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 6,
+  }).format(value * 1_000_000);
+}
 
 const checkpointBoundaryKey = (
   checkpoint: Pick<AutoHuntWorkflowCheckpoint, "stage" | "position">,
@@ -4115,6 +4145,7 @@ export function RunPage({
   error,
   executionPolicy,
   executionWorkers = [],
+  executionCostEstimate: providedExecutionCostEstimate = null,
   isDeletingIssue = false,
   isProcessing = false,
   isRecovering,
@@ -4171,6 +4202,7 @@ export function RunPage({
   error: string | null;
   executionPolicy?: ProjectExecutionWorkerPolicy;
   executionWorkers?: ExecutionWorker[];
+  executionCostEstimate?: AgentExecutionCostEstimate | null;
   isDeletingIssue?: boolean;
   isProcessing?: boolean;
   isRecovering: boolean;
@@ -4723,6 +4755,53 @@ export function RunPage({
     resultReviews.some((review) => review.userId === currentUserId),
   );
   const executionMetrics = run.executionMetrics ?? null;
+  const executionCostEstimateRequestKey = [
+    run.id,
+    executionMetrics?.inputTokens,
+    executionMetrics?.outputTokens,
+    executionMetrics?.cacheReadTokens,
+    executionMetrics?.cacheWriteTokens,
+  ].join(":");
+  const [loadedExecutionCostEstimate, setLoadedExecutionCostEstimate] =
+    useState<{
+      requestKey: string;
+      value: AgentExecutionCostEstimate;
+    } | null>(null);
+  useEffect(() => {
+    if (
+      providedExecutionCostEstimate ||
+      !executionMetrics ||
+      !token ||
+      !projectId
+    ) {
+      return;
+    }
+    const controller = new AbortController();
+    void loadRunCostEstimate(token, projectId, run.id, controller.signal)
+      .then((value) =>
+        setLoadedExecutionCostEstimate({
+          requestKey: executionCostEstimateRequestKey,
+          value,
+        }),
+      )
+      .catch(() => undefined);
+    return () => controller.abort();
+  }, [
+    executionMetrics?.cacheReadTokens,
+    executionMetrics?.cacheWriteTokens,
+    executionMetrics?.inputTokens,
+    executionMetrics?.outputTokens,
+    executionCostEstimateRequestKey,
+    projectId,
+    providedExecutionCostEstimate,
+    run.id,
+    token,
+  ]);
+  const executionCostEstimate =
+    providedExecutionCostEstimate ??
+    (loadedExecutionCostEstimate?.requestKey === executionCostEstimateRequestKey
+      ? loadedExecutionCostEstimate.value
+      : null);
   const cacheTokens = executionMetrics
     ? (executionMetrics.cacheReadTokens ?? 0) +
       (executionMetrics.cacheWriteTokens ?? 0)
@@ -4763,6 +4842,7 @@ export function RunPage({
   ) : null;
   const executionMetricsPanel =
     executionMetrics || executionProvider || executionWorker ? (
+    <>
     <dl className="run-result-metrics" aria-label={t("run.resultMetrics")}>
       {executionMetrics ? (
         <div>
@@ -4840,7 +4920,101 @@ export function RunPage({
           </dd>
         </div>
       ) : null}
+      {executionCostEstimate && executionCostEstimate.pricedUsageRecords > 0 ? (
+        <div className="run-result-metrics-cost">
+          <dt>
+            {executionCostEstimate.status === "estimated"
+              ? t("run.metricsEstimatedCost")
+              : t("run.metricsPartialEstimatedCost")}
+          </dt>
+          <dd>
+            {executionCostEstimate.status === "partial" ? "≥ " : ""}
+            {formatExecutionUsdTicks(
+              executionCostEstimate.estimatedUsdTicks ??
+                executionCostEstimate.pricedUsdTicks,
+              localeTag,
+            )}
+          </dd>
+        </div>
+      ) : null}
     </dl>
+    {executionCostEstimate ? (
+      <section className="run-cost-estimate" aria-label={t("run.currentModelRates")}>
+        <div className="run-cost-estimate-heading">
+          <strong>{t("run.currentModelRates")}</strong>
+          <span>
+            {executionCostEstimate.pricing.status === "unavailable"
+              ? t("usage.pricingUnavailable")
+              : t(
+                  executionCostEstimate.pricing.status === "live"
+                    ? "usage.pricingLive"
+                    : "usage.pricingCached",
+                  {
+                    time: executionCostEstimate.pricing.fetchedAt
+                      ? new Intl.DateTimeFormat(localeTag, {
+                          dateStyle: "medium",
+                          timeStyle: "short",
+                        }).format(
+                          new Date(executionCostEstimate.pricing.fetchedAt),
+                        )
+                      : t("usage.pricingTimeUnknown"),
+                  },
+                )}
+          </span>
+        </div>
+        {executionCostEstimate.models.length > 0 ? (
+          <div className="run-cost-estimate-models">
+            {executionCostEstimate.models.map((model) => (
+              <div className="run-cost-estimate-model" key={`${model.pricingKey}:${model.model}`}>
+                <span className="run-cost-estimate-model-name" title={model.pricingKey}>
+                  {model.model}
+                </span>
+                <span>
+                  {t("run.inputRate")}{" "}
+                  <strong>
+                    {t("run.ratePerMillion", {
+                      price: formatRatePerMillion(
+                        model.inputCostPerToken,
+                        localeTag,
+                      ),
+                    })}
+                  </strong>
+                </span>
+                <span>
+                  {t("run.outputRate")}{" "}
+                  <strong>
+                    {t("run.ratePerMillion", {
+                      price: formatRatePerMillion(
+                        model.outputCostPerToken,
+                        localeTag,
+                      ),
+                    })}
+                  </strong>
+                </span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p>
+            {executionCostEstimate.reason === "pricingUnavailable"
+              ? t("usage.costUnavailableNote")
+              : executionCostEstimate.reason === "usageUnavailable"
+                ? t("run.costEstimateUsageUnavailable")
+                : executionCostEstimate.reason === "tokenBreakdownUnavailable"
+                  ? t("run.costEstimateBreakdownUnavailable")
+                  : t("run.costEstimateUnavailable")}
+          </p>
+        )}
+        {executionCostEstimate.status !== "unavailable" ? (
+          <small>
+            {executionCostEstimate.status === "partial"
+              ? t("run.costEstimatePartial")
+              : t("run.costEstimateCacheNote")}
+          </small>
+        ) : null}
+      </section>
+    ) : null}
+  </>
   ) : null;
   const blockerReason =
     run.structuredResult?.summary?.trim() ||

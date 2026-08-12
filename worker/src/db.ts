@@ -6845,6 +6845,38 @@ export async function listOrganizationUsageRecords(
   return result.results;
 }
 
+export async function listRunUsageRecords(
+  db: D1Database,
+  projectId: string,
+  runId: string,
+  runAttempt: number,
+  executionId: string | null,
+) {
+  const result = await db
+    .prepare(
+      `select usage.execution_id, attempt.run_id, attempt.project_id,
+              attempt.run_attempt, attempt.claim_attempt, attempt.worker_id,
+              attempt.claimed_at, usage.usage_key, usage.session_id,
+              usage.turn_id, usage.scope_id, usage.agent_provider,
+              usage.model_provider, usage.model, usage.canonical_model,
+              usage.model_source, usage.source, usage.uncached_input_tokens,
+              usage.cache_read_tokens, usage.cache_write_tokens,
+              usage.output_tokens, usage.reasoning_output_tokens,
+              usage.total_tokens, usage.observed_at, usage.recorded_at
+       from briar_run_usage_records usage
+       join briar_run_execution_attempts attempt
+         on attempt.id = usage.execution_id
+       where attempt.project_id = ? and attempt.run_id = ?
+         and attempt.run_attempt = ?
+         and (? is null or attempt.id = ?)
+       order by unixepoch(usage.observed_at), attempt.claim_attempt,
+                usage.usage_key`,
+    )
+    .bind(projectId, runId, runAttempt, executionId, executionId)
+    .all<OrganizationUsageRecordRow>();
+  return result.results;
+}
+
 export async function listProjectUsageTotals(
   db: D1Database,
   projectId: string,
