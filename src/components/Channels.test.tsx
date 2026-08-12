@@ -1073,11 +1073,17 @@ describe("Channels", () => {
       removedMessageIds: [],
       agentReplies: [],
     });
-    acceptChannelProposal.mockResolvedValue({
-      outcome: "accepted",
-      projectId: "project-1",
-      resultRunId: "run-9",
-    });
+    let resolveAcceptance!: (value: {
+      outcome: "accepted";
+      projectId: string;
+      resultRunId: string;
+    }) => void;
+    const pendingAcceptance = new Promise<{
+      outcome: "accepted";
+      projectId: string;
+      resultRunId: string;
+    }>((resolve) => { resolveAcceptance = resolve; });
+    acceptChannelProposal.mockReturnValue(pendingAcceptance);
 
     await act(async () => {
       root.render(
@@ -1110,6 +1116,20 @@ describe("Channels", () => {
     expect(accept).not.toBeNull();
     await act(async () => {
       accept!.click();
+      await Promise.resolve();
+    });
+
+    expect(accept!.textContent).toContain("이슈 생성 중");
+    expect(accept!.querySelector(".spin")).not.toBeNull();
+    expect(accept!.getAttribute("aria-busy")).toBe("true");
+    expect(onIssueCreated).not.toHaveBeenCalled();
+    await act(async () => {
+      resolveAcceptance({
+        outcome: "accepted",
+        projectId: "project-1",
+        resultRunId: "run-9",
+      });
+      await pendingAcceptance;
     });
 
     expect(acceptChannelProposal).toHaveBeenCalledWith(
@@ -1119,7 +1139,7 @@ describe("Channels", () => {
       "proposal-1",
       "project-1",
     );
-    expect(onIssueCreated).toHaveBeenCalledWith("project-1", "run-9");
+    expect(onIssueCreated).not.toHaveBeenCalled();
     expect(container.textContent).toContain("Improve onboarding");
     expect(container.textContent).toContain("우선순위 P2");
     expect(container.textContent).toContain("실행하지 않음");
@@ -1406,12 +1426,11 @@ describe("Channels", () => {
       await Promise.resolve();
     });
 
-    expect(onIssueCreated).toHaveBeenCalledTimes(1);
-    expect(onIssueCreated).toHaveBeenCalledWith("project-2", "run-new");
+    expect(onIssueCreated).not.toHaveBeenCalled();
     expect(container.textContent).toContain("대상 프로젝트: Sprout");
   });
 
-  it("still opens the accepted issue when an unchanged delta arrives", async () => {
+  it("still shows the accepted issue when an unchanged delta arrives", async () => {
     vi.useFakeTimers();
     const pendingProposal = message({
       id: "message-unchanged-approval",
@@ -1499,11 +1518,11 @@ describe("Channels", () => {
       await Promise.resolve();
     });
 
-    expect(onIssueCreated).toHaveBeenCalledWith("project-1", "run-current");
+    expect(onIssueCreated).not.toHaveBeenCalled();
     expect(container.textContent).toContain("이슈 보기");
   });
 
-  it("refreshes an intermediate reservation delta before opening the issue", async () => {
+  it("refreshes an intermediate reservation delta before showing the issue", async () => {
     vi.useFakeTimers();
     const pendingProposal = message({
       id: "message-reservation-approval",
@@ -1615,7 +1634,7 @@ describe("Channels", () => {
     });
 
     expect(loadChannel).toHaveBeenCalledTimes(2);
-    expect(onIssueCreated).toHaveBeenCalledWith("project-1", "run-reserved");
+    expect(onIssueCreated).not.toHaveBeenCalled();
     expect(container.textContent).toContain("이슈 보기");
   });
 
@@ -1863,7 +1882,7 @@ describe("Channels", () => {
     ).toBe(false);
   });
 
-  it("drops a delayed issue-navigation failure after the channel changes", async () => {
+  it("does not navigate after approval when the channel changes", async () => {
     const otherChannel: ChannelSummary = {
       ...channel,
       id: "channel-2",
@@ -1889,11 +1908,7 @@ describe("Channels", () => {
         resultRunId: null,
       },
     });
-    let rejectNavigation!: (reason: Error) => void;
-    const pendingNavigation = new Promise<void>((_resolve, reject) => {
-      rejectNavigation = reject;
-    });
-    const onIssueCreated = vi.fn(() => pendingNavigation);
+    const onIssueCreated = vi.fn();
     listChannels.mockResolvedValue({ channels: [channel, otherChannel], cursor: 7 });
     loadChannel
       .mockResolvedValueOnce({
@@ -1950,19 +1965,13 @@ describe("Channels", () => {
       )!.click();
       await Promise.resolve();
     });
-    expect(onIssueCreated).toHaveBeenCalledWith("project-1", "run-navigation");
+    expect(onIssueCreated).not.toHaveBeenCalled();
     await act(async () => {
       root.render(<Channels {...props} activeChannelId={otherChannel.id} />);
       await Promise.resolve();
       await Promise.resolve();
     });
-    await act(async () => {
-      rejectNavigation(new Error("stale navigation failed"));
-      await pendingNavigation.catch(() => undefined);
-    });
-
     expect(container.textContent).toContain("Current channel remains clean");
-    expect(container.textContent).not.toContain("stale navigation failed");
     expect(container.querySelector(".channel-error")).toBeNull();
   });
 

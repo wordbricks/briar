@@ -2515,6 +2515,48 @@ describe("HuntDashboard", () => {
     container.remove();
   });
 
+  it("opens execution approval when a channel issue moves from backlog to todo", async () => {
+    const channelRun: HuntRun = {
+      ...demoDashboard.runs[0],
+      status: "backlog",
+      workflowStage: null,
+      context: { origin: "briar-channel" },
+    };
+    const onMoveRun = vi.fn(async () => undefined);
+    const onProcessIssueNow = vi.fn();
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <HuntDashboard
+          {...dashboardProps}
+          dashboard={{ ...demoDashboard, runs: [channelRun] }}
+          onMoveRun={onMoveRun}
+          onProcessIssueNow={onProcessIssueNow}
+          requestedRunId={channelRun.id}
+        />,
+      );
+      await Promise.resolve();
+    });
+
+    const statusTrigger = container.querySelector<HTMLButtonElement>(
+      ".run-page-property-select.status .select-menu-trigger",
+    );
+    await act(async () => statusTrigger?.click());
+    const todoOption = Array.from(
+      document.body.querySelectorAll<HTMLButtonElement>('[role="option"]'),
+    ).find((option) => option.textContent?.includes("대기"));
+    await act(async () => todoOption?.click());
+
+    expect(onProcessIssueNow).toHaveBeenCalledWith(channelRun);
+    expect(onMoveRun).not.toHaveBeenCalled();
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
   it("opens issue details as a page and returns to the kanban", async () => {
     const container = document.createElement("div");
     document.body.append(container);
