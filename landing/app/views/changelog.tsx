@@ -23,6 +23,19 @@ export const changelogCopy = {
     backTop: "맨 위로 ↑",
     entries: [
       {
+        version: "1.2.109",
+        date: "2026년 8월 12일",
+        title: "에이전트 핸들을 직접 정하고 실시간 채널 연결을 복원합니다",
+        summary:
+          "프로젝트 에이전트의 채널 호출용 @핸들을 직접 관리하고, 패키징된 데스크탑과 Android에서도 인증된 실시간 채널 연결을 사용합니다.",
+        items: [
+          "프로젝트 에이전트를 만들거나 설정할 때 기억하기 쉬운 @핸들을 지정하고, 이름 기반 자동 생성값도 바로 확인할 수 있습니다.",
+          "조직 안에서 중복되는 핸들은 안전한 suffix로 구분하고 비라틴 이름, 긴 핸들, 동시 생성 충돌도 고유하게 처리합니다.",
+          "Worker가 에이전트 핸들의 예약과 변경을 조직 범위에서 검증해 채널 멘션 대상을 안정적으로 유지합니다.",
+          "데스크탑과 Android의 보안 정책에 Briar API 전용 WSS 연결을 허용해 채널 변경을 주기적 폴링 대신 실시간으로 수신합니다.",
+        ],
+      },
+      {
         version: "1.2.108",
         date: "2026년 8월 12일",
         title: "프로젝트 현황과 에이전트 동기화를 한눈에 확인합니다",
@@ -400,6 +413,19 @@ export const changelogCopy = {
     home: "Home",
     backTop: "Back to top ↑",
     entries: [
+      {
+        version: "1.2.109",
+        date: "August 12, 2026",
+        title: "Choose agent handles and restore realtime channel connections",
+        summary:
+          "Manage the @handles used to call Project Agents in channels, while packaged desktop and Android clients use the authenticated realtime channel connection.",
+        items: [
+          "Set a memorable @handle when creating or configuring a Project Agent and see the name-derived default immediately.",
+          "Keep handles unique within the organization with safe suffixes and resilient fallback behavior for non-Latin names, long values, and concurrent creation.",
+          "Validate handle reservation and updates in the Worker so channel mentions continue to resolve to the intended agent.",
+          "Allow only the Briar API WSS origin in desktop and Android security policy so channel changes arrive in realtime instead of falling back to periodic polling.",
+        ],
+      },
       {
         version: "1.2.108",
         date: "August 12, 2026",
@@ -790,9 +816,9 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <h1>{changelog.title}</h1>
           <p>{changelog.description}</p>
         </div>
-        <a href="#v1-2-108" className="changelog-current">
+        <a href="#v1-2-109" className="changelog-current">
           <span>{changelog.current}</span>
-          <strong>v1.2.108</strong>
+          <strong>v1.2.109</strong>
           <i aria-hidden="true">↓</i>
         </a>
       </section>
@@ -817,6 +843,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   {index === 0 ? <span>{changelog.latest}</span> : null}
                   <time
                     dateTime={
+                      entry.version === "1.2.109" ||
                       entry.version === "1.2.108" ||
                       entry.version === "1.2.107" ||
                       entry.version === "1.2.106"
