@@ -23,6 +23,20 @@ export const changelogCopy = {
     backTop: "맨 위로 ↑",
     entries: [
       {
+        version: "1.2.113",
+        date: "2026년 8월 13일",
+        title: "이슈 대화와 실행 결과를 더 빠르고 선명하게 확인합니다",
+        summary:
+          "이슈 대화를 실시간으로 동기화하고, 에이전트 수행 로그와 예상 API 비용, 새 앱 업데이트를 한눈에 확인할 수 있도록 다듬었습니다.",
+        items: [
+          "채널과 이슈 대화가 조직 WebSocket 연결을 공유하고 프로젝트 cursor 기반 delta를 받아, 에이전트 답변과 제안 상태를 폴링 없이 실시간으로 갱신합니다.",
+          "이슈와 Project Agent 세션이 같은 수행 로그를 사용하며 최초·후속 요청은 별도 카드로 구분하고, 로그 내보내기와 자동 스크롤을 일관되게 제공합니다.",
+          "실제 토큰 원장과 가격표를 연결해 실행별·모델별 예상 API 비용, 입력·출력 단가와 가격 확인 시각을 결과 화면에 표시합니다.",
+          "새 앱 버전이 있으면 다운로드 버튼을 눈에 띄게 강조하되 hover와 설치 중에는 멈추고 모션 감소 설정을 존중합니다.",
+          "랜딩 공유 미리보기를 Briar 작업 보드가 포함된 새 소셜 카드와 제품 메시지로 교체했습니다.",
+        ],
+      },
+      {
         version: "1.2.112",
         date: "2026년 8월 12일",
         title: "데스크탑 설정과 채널 운영 도구를 강화합니다",
@@ -452,6 +466,20 @@ export const changelogCopy = {
     home: "Home",
     backTop: "Back to top ↑",
     entries: [
+      {
+        version: "1.2.113",
+        date: "August 13, 2026",
+        title: "See issue conversations and run results faster and more clearly",
+        summary:
+          "Synchronize issue conversations in realtime and make agent work logs, estimated API costs, and available app updates easier to understand at a glance.",
+        items: [
+          "Share one organization WebSocket connection across channels and issue conversations, then apply project cursor deltas so agent replies and proposal states update without polling.",
+          "Use one work-log view for issues and Project Agent sessions, separate initial and follow-up requests into clear cards, and keep export and automatic scrolling consistent.",
+          "Combine the actual token ledger with current pricing to show estimated API cost by run and model, input and output rates, and the price-check timestamp.",
+          "Emphasize the download button when a new app version is available, pause the effect during hover or installation, and respect reduced-motion preferences.",
+          "Refresh landing-page sharing with a Briar-branded social card featuring the task board and updated product message.",
+        ],
+      },
       {
         version: "1.2.112",
         date: "August 12, 2026",
@@ -894,9 +922,9 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <h1>{changelog.title}</h1>
           <p>{changelog.description}</p>
         </div>
-        <a href="#v1-2-112" className="changelog-current">
+        <a href="#v1-2-113" className="changelog-current">
           <span>{changelog.current}</span>
-          <strong>v1.2.112</strong>
+          <strong>v1.2.113</strong>
           <i aria-hidden="true">↓</i>
         </a>
       </section>
@@ -921,14 +949,16 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   {index === 0 ? <span>{changelog.latest}</span> : null}
                   <time
                     dateTime={
-                      entry.version === "1.2.112" ||
-                      entry.version === "1.2.111" ||
-                      entry.version === "1.2.110" ||
-                      entry.version === "1.2.109" ||
-                      entry.version === "1.2.108" ||
-                      entry.version === "1.2.107" ||
-                      entry.version === "1.2.106"
-                        ? "2026-08-12"
+                      entry.version === "1.2.113"
+                        ? "2026-08-13"
+                        : entry.version === "1.2.112" ||
+                            entry.version === "1.2.111" ||
+                            entry.version === "1.2.110" ||
+                            entry.version === "1.2.109" ||
+                            entry.version === "1.2.108" ||
+                            entry.version === "1.2.107" ||
+                            entry.version === "1.2.106"
+                          ? "2026-08-12"
                         : entry.version === "1.2.105" ||
                             entry.version === "1.2.104" ||
                             entry.version === "1.2.103" ||
