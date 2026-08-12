@@ -59,6 +59,7 @@ import {
   listIssueDependencies,
   listIssueDependenciesByRunIds,
   listIssueConversationNotifications,
+  listIssueSubscriptions,
   listChannelConversationNotifications,
   listIssueMessages,
   listIssueThreadMessages,
@@ -75,6 +76,7 @@ import {
   listHuntRunEvents,
   listOrganizations,
   listOrganizationInvitations,
+  listOrganizationIssueSubscriptionRunIds,
   listOrganizationMembers,
   listOrganizationStatusTrayRuns,
   listOrganizationUsageRuns,
@@ -96,6 +98,7 @@ import {
   reworkHuntRun,
   recordHuntEvent,
   recordRunEvidence,
+  subscribeIssue,
   resumeWorkflowCheckpoint,
   removeOrganizationMember,
   revokeOrganizationInvitation,
@@ -111,6 +114,7 @@ import {
   updateProjectIcon,
   updateProjectIssueKeyPrefix,
   updateIssue,
+  unsubscribeIssue,
   upsertInboxReadStates,
   upsertProjectAgentSession,
 } from "./db";
@@ -938,6 +942,10 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         resolve("migrations/0093_project_agent_session_sync.sql"),
         "utf8",
       ),
+    );
+    await executeSql(
+      db,
+      await readFile(resolve("migrations/0098_issue_subscriptions.sql"), "utf8"),
     );
   }, 30_000);
 
@@ -4183,6 +4191,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       event("queued", 29, {
         sourceKey: "inbox-conversation-run",
         eventKey: "inbox-conversation-run:queued",
+        assigneeUserId: "owner",
       }),
     );
     const ownerRootId = "11111111-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
@@ -4228,6 +4237,16 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       mentionedUserIds: ["owner"],
       createdAt: atMinute(29.4),
     });
+    await createIssueMessage(db, {
+      id: "55555555-eeee-4eee-8eee-eeeeeeeeeeee",
+      projectId,
+      runId,
+      parentMessageId: null,
+      authorUserId: "conversation-member",
+      authorAgentProvider: null,
+      body: "A regular update for subscribers.",
+      createdAt: atMinute(29.5),
+    });
 
     const notifications = await listIssueConversationNotifications(
       db,
@@ -4246,6 +4265,10 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
           notification_reason: "thread_reply",
           root_message_id: ownerRootId,
         }),
+        expect.objectContaining({
+          id: "55555555-eeee-4eee-8eee-eeeeeeeeeeee",
+          notification_reason: "subscription",
+        }),
       ]),
     );
     expect(
@@ -4254,8 +4277,73 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
           notification.id === "44444444-dddd-4ddd-8ddd-dddddddddddd",
       ),
     ).toBe(false);
+    await expect(
+      listIssueConversationNotifications(db, projectId, "conversation-member"),
+    ).resolves.toEqual([]);
 
     await removeOrganizationMember(db, projectId, "conversation-member");
+  });
+
+  it("keeps assignees subscribed and supports manual subscription changes", async () => {
+    await executeSql(
+      db,
+      `
+      insert into user (id, name, email, emailVerified, createdAt, updatedAt)
+      values (
+        'subscription-member', 'Subscription Member',
+        'subscription@example.com', 1, '${atMinute(0)}', '${atMinute(0)}'
+      );
+      insert into briar_organization_members (
+        organization_id, user_id, role, created_at, updated_at
+      ) values (
+        '${projectId}', 'subscription-member', 'member',
+        '${atMinute(0)}', '${atMinute(0)}'
+      );`,
+    );
+    const runId = await recordHuntEvent(
+      db,
+      projectId,
+      event("queued", 30, {
+        sourceKey: "subscription-run",
+        eventKey: "subscription-run:queued",
+        assigneeUserId: "owner",
+      }),
+    );
+
+    await expect(listIssueSubscriptions(db, projectId, runId)).resolves.toEqual([
+      expect.objectContaining({ user_id: "owner" }),
+    ]);
+    await subscribeIssue(
+      db,
+      projectId,
+      runId,
+      "subscription-member",
+      atMinute(31),
+    );
+    expect(
+      (await listIssueSubscriptions(db, projectId, runId)).map((row) => row.user_id),
+    ).toEqual(["owner", "subscription-member"]);
+    await expect(
+      listOrganizationIssueSubscriptionRunIds(
+        db,
+        projectId,
+        "subscription-member",
+      ),
+    ).resolves.toEqual([runId]);
+
+    await unsubscribeIssue(db, projectId, runId, "subscription-member");
+    await updateIssue(db, projectId, runId, {
+      title: "Assigned subscription run",
+      description: null,
+      priority: 2,
+      assigneeUserId: "subscription-member",
+      updatedAt: atMinute(32),
+    });
+    expect(
+      (await listIssueSubscriptions(db, projectId, runId)).map((row) => row.user_id),
+    ).toEqual(["owner", "subscription-member"]);
+
+    await removeOrganizationMember(db, projectId, "subscription-member");
   });
 
   it("lists visible channel mentions and replies to a user's root message", async () => {

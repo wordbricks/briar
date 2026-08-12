@@ -272,7 +272,8 @@ enum InboxNotificationPresentationBuilder {
             )
         }
 
-        if isReply(message) {
+        if isReply(message) ||
+            (message.kind == .conversation && message.reason == "subscription") {
             let destination = message.kind == .channel
                 ? "#\(message.channelName ?? message.title)"
                 : (message.issueKey ?? message.title)

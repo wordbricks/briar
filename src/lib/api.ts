@@ -500,6 +500,7 @@ export type InboxFeedSyncResult = {
   state: InboxFeedSyncState;
   notModified: boolean;
   messages: InboxMessage[];
+  subscribedIssueIds?: string[];
 };
 
 export async function loadInboxFeed(
@@ -534,11 +535,19 @@ export async function loadInboxFeed(
       Array.isArray(body?.issues) ? body.issues : undefined,
     );
   }
-  const result = await response.json() as { messages?: InboxMessage[] };
+  const result = await response.json() as {
+    messages?: InboxMessage[];
+    subscribedIssueIds?: string[];
+  };
   return {
     state: { etag: response.headers.get("ETag") },
     notModified: false,
     messages: Array.isArray(result.messages) ? result.messages : [],
+    subscribedIssueIds: Array.isArray(result.subscribedIssueIds)
+      ? result.subscribedIssueIds.filter(
+          (runId): runId is string => typeof runId === "string",
+        )
+      : undefined,
   };
 }
 
@@ -2043,6 +2052,20 @@ export async function updateIssue(
     token,
     { method: "PATCH", body: form },
   );
+}
+
+export async function updateIssueSubscription(
+  token: string,
+  projectId: string,
+  runId: string,
+  subscribed: boolean,
+) {
+  return request<{
+    runId: string;
+    subscribers: Array<{ userId: string; subscribedAt: string }>;
+  }>(`/projects/${projectId}/runs/${runId}/subscription`, token, {
+    method: subscribed ? "PUT" : "DELETE",
+  });
 }
 
 export async function updateIssueExecutionPreferences(

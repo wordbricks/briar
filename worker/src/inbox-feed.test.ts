@@ -66,6 +66,7 @@ describe("organization Inbox feed", () => {
 
     expect(() => mobileInboxFeedResponseSchema.parse({
       messages,
+      subscribedIssueIds: [],
       generatedAt: "2026-08-11T13:02:00.000Z",
     })).not.toThrow();
 
@@ -109,6 +110,7 @@ describe("organization Inbox feed", () => {
 
     expect(() => mobileInboxFeedResponseSchema.parse({
       messages,
+      subscribedIssueIds: [],
       generatedAt: "2026-08-11T13:02:00.000Z",
     })).not.toThrow();
 
@@ -141,6 +143,7 @@ describe("organization Inbox feed", () => {
 
     expect(() => mobileInboxFeedResponseSchema.parse({
       messages,
+      subscribedIssueIds: [],
       generatedAt: "2026-08-11T13:02:00.000Z",
     })).not.toThrow();
 

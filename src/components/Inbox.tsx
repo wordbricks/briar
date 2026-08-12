@@ -481,9 +481,15 @@ function messageTitle(
 ) {
   if (message.kind === "issue") return message.title;
   if (message.kind === "conversation" || message.kind === "channel") {
-    return message.reason === "mention"
-      ? t("inbox.conversationMention", { author: message.authorName })
-      : t("inbox.conversationThreadReply", { author: message.authorName });
+    if (message.reason === "mention") {
+      return t("inbox.conversationMention", { author: message.authorName });
+    }
+    if (message.reason === "subscription") {
+      return t("inbox.conversationSubscription", {
+        author: message.authorName,
+      });
+    }
+    return t("inbox.conversationThreadReply", { author: message.authorName });
   }
   return message.status === "completed"
     ? t("inbox.sessionCompleted")

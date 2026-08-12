@@ -105,7 +105,8 @@ final class InboxStore: ObservableObject {
         let built = InboxMessageBuilder.build(
             snapshot: snapshot,
             sessions: sessions,
-            project: project
+            project: project,
+            currentUserID: userID
         )
 
         mergeMessages(built)
@@ -196,6 +197,15 @@ final class InboxStore: ObservableObject {
                 }
                 guard let response = result.value else {
                     throw MobileAPIError.invalidResponse
+                }
+                if let subscribedIssueIds = response.subscribedIssueIds {
+                    let subscribed = Set(
+                        subscribedIssueIds.map { $0.uuidString.lowercased() }
+                    )
+                    self.messages.removeAll { message in
+                        (message.kind == .issue || message.kind == .conversation) &&
+                        !subscribed.contains(message.targetId)
+                    }
                 }
                 let storedByID = Dictionary(
                     uniqueKeysWithValues: self.messages.map { ($0.id, $0) }

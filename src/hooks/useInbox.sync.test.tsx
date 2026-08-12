@@ -50,6 +50,10 @@ function dashboardAt(revision: number): DashboardPayload {
       priority: 1,
       status: "completed",
       workflowStage: null,
+      subscribers: ["user-a", "user-b"].map((userId) => ({
+        userId,
+        subscribedAt: "2026-08-10T00:00:00.000Z",
+      })),
       lastEventAt: occurredAt,
       updatedAt: occurredAt,
       completedAt: occurredAt,
@@ -252,6 +256,24 @@ describe("useInbox read-state synchronization", () => {
     await flushPromises();
 
     expect(inbox.messages[0]?.title).toBe(selectedMessage.title);
+  });
+
+  it("removes cached issue messages after the member unsubscribes", async () => {
+    mockedLoadInboxFeed.mockResolvedValueOnce({
+      state: { etag: 'W/"organization-inbox:org:2"' },
+      notModified: false,
+      messages: [],
+      subscribedIssueIds: [],
+    });
+
+    await renderHarness({
+      dashboard: dashboardAt(1),
+      token: "token-a",
+      userId: "user-a",
+    });
+    await flushPromises();
+
+    expect(inbox.messages).toEqual([]);
   });
 
   it("reuses the organization Inbox ETag after reconnecting", async () => {

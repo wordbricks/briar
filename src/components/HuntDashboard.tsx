@@ -3,6 +3,7 @@ import {
   ArrowLeft,
   ArrowUp,
   BadgeCheck,
+  Bell,
   Bot,
   BrainCircuit,
   Check,
@@ -448,6 +449,7 @@ export function HuntDashboard({
   onUpdateIssue,
   onUpdateIssueCheckpoints = async () => undefined,
   onUpdateIssuePreferences = async () => undefined,
+  onUpdateIssueSubscription,
   onLoadAttachment,
   onLoadIssueMessages,
   onLoadRunEvents = async () => [],
@@ -536,6 +538,10 @@ export function HuntDashboard({
   onUpdateIssuePreferences?: (
     runId: string,
     input: IssueExecutionPreferences,
+  ) => Promise<unknown>;
+  onUpdateIssueSubscription?: (
+    runId: string,
+    subscribed: boolean,
   ) => Promise<unknown>;
   onLoadAttachment: (attachment: IssueAttachment) => Promise<Blob>;
   onLoadIssueMessages: (runId: string) => Promise<IssueMessage[]>;
@@ -1191,6 +1197,10 @@ export function HuntDashboard({
             onUpdateIssueCheckpoints(selected.id, checkpoints)}
           onUpdateIssuePreferences={(input) =>
             onUpdateIssuePreferences(selected.id, input)}
+          onUpdateIssueSubscription={onUpdateIssueSubscription
+            ? (subscribed) =>
+                onUpdateIssueSubscription(selected.id, subscribed)
+            : undefined}
           availableProviders={availableProviders}
           executionPolicy={dashboard?.executionPolicy}
           executionWorkers={dashboard?.workers ?? []}
@@ -4055,6 +4065,7 @@ export function RunPage({
   onUpdateIssue,
   onUpdateIssueCheckpoints,
   onUpdateIssuePreferences = async () => undefined,
+  onUpdateIssueSubscription,
   performedAgentName = null,
   performedAgentProvider = null,
   performedAgentModel = null,
@@ -4131,6 +4142,7 @@ export function RunPage({
   onUpdateIssuePreferences?: (
     input: IssueExecutionPreferences,
   ) => Promise<unknown>;
+  onUpdateIssueSubscription?: (subscribed: boolean) => Promise<unknown>;
   performedAgentName?: string | null;
   performedAgentProvider?: AgentProvider | null;
   performedAgentModel?: string | null;
@@ -5922,6 +5934,7 @@ export function RunPage({
                       onLoadAttachment={onLoadAttachment}
                       onLoad={onLoadIssueMessages}
                       onSend={onSendIssueMessage}
+                      onUpdateSubscription={onUpdateIssueSubscription}
                       run={run}
                       projectId={projectId}
                       token={token}
@@ -5961,6 +5974,7 @@ export function RunPage({
                     onLoadAttachment={onLoadAttachment}
                     onLoad={onLoadIssueMessages}
                     onSend={onSendIssueMessage}
+                    onUpdateSubscription={onUpdateIssueSubscription}
                     run={run}
                     projectId={projectId}
                     token={token}
@@ -7517,6 +7531,7 @@ function IssueConversation({
   onLoadAttachment,
   onLoad,
   onSend,
+  onUpdateSubscription,
   projectId,
   run,
   token,
@@ -7551,11 +7566,13 @@ function IssueConversation({
     attachments?: File[];
     attachmentReferences?: string[];
   }) => Promise<IssueMessageSendResult>;
+  onUpdateSubscription?: (subscribed: boolean) => Promise<unknown>;
   projectId: string;
   run: HuntRun;
   token: string | null;
 }) {
   const { localeTag, t } = useI18n();
+  const { toast } = useToast();
   const [messages, setMessages] = useState<IssueMessage[]>([]);
   const [activeReplyMessageId, setActiveReplyMessageId] = useState<
     string | null
@@ -7575,6 +7592,31 @@ function IssueConversation({
     Record<string, { accepting: boolean; error: string | null }>
   >({});
   const [activeProfile, setActiveProfile] = useState<ProfileTarget | null>(null);
+  const subscriberMembers = useMemo(
+    () => (run.subscribers ?? []).flatMap((subscriber) => {
+      const member = mentionMembers.find(
+        (candidate) => candidate.userId === subscriber.userId,
+      );
+      return member ? [member] : [];
+    }),
+    [mentionMembers, run.subscribers],
+  );
+  const backendSubscribed = Boolean(
+    currentUserId && (
+      run.assigneeUserId === currentUserId ||
+      (run.subscribers ?? []).some(
+        (subscriber) => subscriber.userId === currentUserId,
+      )
+    ),
+  );
+  const assigneeSubscriptionRequired = Boolean(
+    currentUserId && run.assigneeUserId === currentUserId,
+  );
+  const [subscriptionOverride, setSubscriptionOverride] = useState<
+    boolean | null
+  >(null);
+  const [subscriptionPending, setSubscriptionPending] = useState(false);
+  const isSubscribed = subscriptionOverride ?? backendSubscribed;
   const messageListRef = useRef<HTMLDivElement | null>(null);
   const onLoadRef = useRef(onLoad);
   const mountedRef = useRef(true);
@@ -7587,6 +7629,11 @@ function IssueConversation({
     executionProposalStateByIdRef.current.clear();
   }
   onLoadRef.current = onLoad;
+
+  useEffect(() => {
+    setSubscriptionOverride(null);
+    setSubscriptionPending(false);
+  }, [backendSubscribed, run.id]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -7996,6 +8043,21 @@ function IssueConversation({
     }
   };
 
+  const toggleSubscription = async () => {
+    if (!onUpdateSubscription || subscriptionPending) return;
+    const next = !isSubscribed;
+    setSubscriptionOverride(next);
+    setSubscriptionPending(true);
+    try {
+      await onUpdateSubscription(next);
+    } catch {
+      setSubscriptionOverride(null);
+      toast(t("run.subscriptionFailed"), { tone: "error" });
+    } finally {
+      setSubscriptionPending(false);
+    }
+  };
+
   return (
     <section className="issue-conversation" aria-label={t("run.messages")}>
       <header className="issue-conversation-header">
@@ -8003,7 +8065,57 @@ function IssueConversation({
           {t("run.messages")}
           {!loading && <span>{messages.length}</span>}
         </strong>
-        <small>{t("run.agentRepliesHere")}</small>
+        <div className="issue-conversation-header-actions">
+          {subscriberMembers.length > 0 ? (
+            <div
+              aria-label={t("run.subscribers", {
+                count: subscriberMembers.length,
+              })}
+              className="issue-subscriber-avatars"
+              title={subscriberMembers.map((member) => member.name).join(", ")}
+            >
+              {subscriberMembers.slice(0, 4).map((member) => (
+                <span className="issue-subscriber-avatar" key={member.userId}>
+                  {member.image ? (
+                    <img alt="" src={member.image} />
+                  ) : (
+                    member.name.trim().charAt(0).toUpperCase() || "?"
+                  )}
+                </span>
+              ))}
+              {subscriberMembers.length > 4 ? (
+                <span className="issue-subscriber-overflow">
+                  +{subscriberMembers.length - 4}
+                </span>
+              ) : null}
+            </div>
+          ) : null}
+          {currentUserId && onUpdateSubscription ? (
+            <button
+              aria-pressed={isSubscribed}
+              className={`issue-subscribe-button${isSubscribed ? " active" : ""}`}
+              disabled={subscriptionPending || (
+                isSubscribed && assigneeSubscriptionRequired
+              )}
+              onClick={() => void toggleSubscription()}
+              title={assigneeSubscriptionRequired
+                ? t("run.assigneeSubscriptionRequired")
+                : isSubscribed
+                  ? t("run.unsubscribe")
+                  : t("run.subscribe")}
+              type="button"
+            >
+              {subscriptionPending ? (
+                <LoaderCircle aria-hidden="true" className="spin" size={13} />
+              ) : (
+                <Bell aria-hidden="true" size={13} />
+              )}
+              {isSubscribed ? t("run.subscribed") : t("run.subscribe")}
+            </button>
+          ) : (
+            <small>{t("run.agentRepliesHere")}</small>
+          )}
+        </div>
       </header>
       <div className="issue-message-list" ref={messageListRef}>
         {loading ? (

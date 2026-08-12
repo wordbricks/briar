@@ -121,6 +121,10 @@
             "structuredResult": null
           }
         ],
+        "subscribedIssueIds": [
+          "33333333-3333-4333-8333-333333333333",
+          "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+        ],
         "generatedAt": "2026-08-11T13:01:01.000Z"
       }
     },
@@ -185,6 +189,12 @@
             "progress": 45,
             "detail": "Implementing",
             "assigneeUserId": "fixture-user",
+            "subscribers": [
+              {
+                "userId": "fixture-user",
+                "subscribedAt": "2026-08-02T00:30:00.000Z"
+              }
+            ],
             "issueDescription": "## Goal\nRead the complete Companion task.",
             "attachments": [
               {
@@ -421,6 +431,29 @@
         "description": null,
         "priority": null,
         "assigneeUserId": null
+      }
+    },
+    "putIssueSubscription": {
+      "method": "PUT",
+      "path": "/projects/{projectId}/runs/{runId}/subscription",
+      "status": 200,
+      "response": {
+        "runId": "33333333-3333-4333-8333-333333333333",
+        "subscribers": [
+          {
+            "userId": "fixture-user",
+            "subscribedAt": "2026-08-02T00:30:00.000Z"
+          }
+        ]
+      }
+    },
+    "deleteIssueSubscription": {
+      "method": "DELETE",
+      "path": "/projects/{projectId}/runs/{runId}/subscription",
+      "status": 200,
+      "response": {
+        "runId": "33333333-3333-4333-8333-333333333333",
+        "subscribers": []
       }
     },
     "deleteIssue": {

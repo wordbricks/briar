@@ -122,6 +122,24 @@ final class IssueMutationStore: ObservableObject {
         }
     }
 
+    func setSubscription(
+        runID: UUID,
+        subscribed: Bool
+    ) async throws -> IssueSubscriptionResponse {
+        try await perform("subscription-\(runID)") {
+            try await api.send(
+                MobileAPIContract.Endpoint.runSubscription(
+                    projectID: projectID,
+                    runID: runID
+                ),
+                method: subscribed ? "PUT" : "DELETE",
+                token: token,
+                body: nil,
+                as: IssueSubscriptionResponse.self
+            )
+        }
+    }
+
     func deleteIssue(runID: UUID) async throws {
         try await perform("delete-\(runID)") {
             try await api.sendVoid(

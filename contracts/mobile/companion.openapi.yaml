@@ -619,6 +619,37 @@
         }
       }
     },
+    "/projects/{projectId}/runs/{runId}/subscription": {
+      "put": {
+        "operationId": "putIssueSubscription",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Issue subscription enabled"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteIssueSubscription",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Issue subscription disabled"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
     "/projects/{projectId}/runs/{runId}/preferences": {
       "put": {
         "operationId": "updateIssuePreferences",
@@ -1660,6 +1691,7 @@
         "type": "object",
         "required": [
           "messages",
+          "subscribedIssueIds",
           "generatedAt"
         ],
         "properties": {
@@ -1667,6 +1699,13 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/InboxFeedMessage"
+            }
+          },
+          "subscribedIssueIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
             }
           },
           "generatedAt": {
@@ -1719,7 +1758,7 @@
           "issueKey": { "type": "string" },
           "reason": {
             "type": "string",
-            "enum": ["mention", "thread_reply"]
+            "enum": ["mention", "thread_reply", "subscription"]
           },
           "channelId": { "type": "string", "format": "uuid" },
           "channelName": { "type": "string" },
@@ -2251,6 +2290,25 @@
               "string",
               "null"
             ]
+          },
+          "subscribers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "userId",
+                "subscribedAt"
+              ],
+              "properties": {
+                "userId": {
+                  "type": "string"
+                },
+                "subscribedAt": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              }
+            }
           },
           "issueDescription": {
             "type": [
@@ -2809,7 +2867,8 @@
             "type": "string",
             "enum": [
               "mention",
-              "thread_reply"
+              "thread_reply",
+              "subscription"
             ]
           },
           "createdAt": {

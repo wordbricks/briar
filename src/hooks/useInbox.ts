@@ -34,6 +34,14 @@ export const inboxIssueNotifyingStatuses = new Set<HuntStatus>([
   "blocked",
 ]);
 
+const occurredAtOrAfter = (occurredAt: string, subscribedAt: string) => {
+  const occurredTime = Date.parse(occurredAt);
+  const subscribedTime = Date.parse(subscribedAt);
+  return Number.isFinite(occurredTime) &&
+    Number.isFinite(subscribedTime) &&
+    occurredTime >= subscribedTime;
+};
+
 export type InboxIssueMessage = {
   id: string;
   kind: "issue";
@@ -84,7 +92,7 @@ export type InboxConversationMessage = {
   authorName: string;
   /** Human-readable project issue key used by reply notifications. */
   issueKey?: string;
-  reason: "mention" | "thread_reply";
+  reason: "mention" | "thread_reply" | "subscription";
 };
 
 export type InboxChannelMessage = {
@@ -162,6 +170,7 @@ export function buildCurrentInboxMessages(
   dashboard: DashboardPayload | null,
   sessions: AutoHuntSession[],
   projects: Project[],
+  currentUserId?: string | null,
 ): InboxMessage[] {
   const projectNames = new Map(
     projects.map((project) => [project.id, project.name]),
@@ -172,6 +181,15 @@ export function buildCurrentInboxMessages(
     const issueKeyPrefix = dashboard.project.issueKeyPrefix?.trim() || "AH";
     for (const run of dashboard.runs) {
       if (!inboxIssueNotifyingStatuses.has(run.status)) continue;
+      if (currentUserId !== undefined && run.subscribers !== undefined) {
+        const subscription = run.subscribers?.find(
+          (subscriber) => subscriber.userId === currentUserId,
+        );
+        if (
+          !subscription ||
+          !occurredAtOrAfter(run.lastEventAt, subscription.subscribedAt)
+        ) continue;
+      }
       messages.push({
         id: `issue:${run.id}`,
         kind: "issue",
@@ -199,9 +217,24 @@ export function buildCurrentInboxMessages(
     }
 
     for (const notification of dashboard.conversationNotifications ?? []) {
-      const runNumber = dashboard.runs.find(
+      const notificationRun = dashboard.runs.find(
         (run) => run.id === notification.runId,
-      )?.runNumber;
+      );
+      if (
+        currentUserId !== undefined &&
+        notificationRun?.subscribers !== undefined
+      ) {
+        const subscription = notificationRun?.subscribers?.find(
+          (subscriber) => subscriber.userId === currentUserId,
+        );
+        if (
+          !subscription ||
+          !occurredAtOrAfter(notification.createdAt, subscription.subscribedAt)
+        ) {
+          continue;
+        }
+      }
+      const runNumber = notificationRun?.runNumber;
       messages.push({
         id: `conversation:${notification.id}`,
         kind: "conversation",
@@ -415,7 +448,10 @@ export function inboxReadVersionsToPush(
 export function classifyInboxMessage(
   message: InboxMessage,
 ): InboxCategory {
-  if (message.kind === "conversation" || message.kind === "channel") {
+  if (message.kind === "conversation") {
+    return message.reason === "subscription" ? "activity" : "action_required";
+  }
+  if (message.kind === "channel") {
     return "action_required";
   }
   if (message.kind === "session") {
@@ -546,7 +582,7 @@ export function useInbox(
 ) {
   const storageKey = `${storagePrefix}:${userId ?? "signed-out"}`;
   const currentMessages = useMemo(
-    () => buildCurrentInboxMessages(dashboard, sessions, projects),
+    () => buildCurrentInboxMessages(dashboard, sessions, projects, userId),
     [
       dashboard?.conversationNotifications,
       dashboard?.channelNotifications,
@@ -555,6 +591,7 @@ export function useInbox(
       dashboard?.runs,
       projects,
       sessions,
+      userId,
     ],
   );
   const [state, setState] = useState<InboxState>(() => ({
@@ -915,8 +952,18 @@ export function useInbox(
         if (!result.notModified) {
           setState((current) => {
             if (current.storageKey !== storageKey) return current;
+            const subscribedIssueIds = result.subscribedIssueIds
+              ? new Set(result.subscribedIssueIds)
+              : null;
+            const retainedMessages = subscribedIssueIds
+              ? current.messages.filter(
+                  (message) =>
+                    (message.kind !== "issue" && message.kind !== "conversation") ||
+                    subscribedIssueIds.has(message.targetId),
+                )
+              : current.messages;
             const storedById = new Map(
-              current.messages.map((message) => [message.id, message]),
+              retainedMessages.map((message) => [message.id, message]),
             );
             const feedSnapshot = result.messages.map((message) => {
               const stored = storedById.get(message.id);
@@ -926,7 +973,7 @@ export function useInbox(
               return stored?.version === message.version ? stored : message;
             });
             const messages = mergeInboxMessages(
-              current.messages,
+              retainedMessages,
               feedSnapshot,
               projects,
             );

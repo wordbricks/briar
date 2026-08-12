@@ -754,6 +754,7 @@ struct RunDetailView: View {
     @State private var replyTo: IssueMessage?
     @State private var reviewCompleted = false
     @State private var linkCopied = false
+    @State private var subscribers: [IssueSubscriber]
     @State private var selectedTab: RunDetailTab
 
     private var locale: CompanionLocale {
@@ -863,6 +864,7 @@ struct RunDetailView: View {
             effort: run.preferredEffort
         ))
         _reviewCompleted = State(initialValue: !(run.resultReviews ?? []).isEmpty)
+        _subscribers = State(initialValue: run.subscribers ?? [])
         _transferTargetProjectID = State(initialValue: projects.first(where: {
             $0.id != projectID &&
                 (projects.first(where: { $0.id == projectID })?.organizationId == nil ||
@@ -1025,6 +1027,9 @@ struct RunDetailView: View {
             .onChange(of: run.workflowStage) { _, stage in localWorkflowStage = stage }
             .onChange(of: run.prerequisites) { _, prerequisites in
                 dependencyIDs = Set((prerequisites ?? []).map(\.id))
+            }
+            .onChange(of: run.subscribers) { _, updatedSubscribers in
+                subscribers = updatedSubscribers ?? []
             }
             .onDisappear {
                 executionApprovalPresentation = nil
@@ -1429,13 +1434,63 @@ struct RunDetailView: View {
     private var conversationTabContent: some View {
         detailLoadingContent
 
-        if detail.messages.isEmpty, !detail.loading, detail.errorMessage == nil {
+        if !detail.loading, detail.errorMessage == nil {
             Section {
-                ContentUnavailableView(L10n.text("대화 없음", locale: locale), systemImage: "bubble.left.and.bubble.right")
-            }
-        } else if !detail.messages.isEmpty {
-            Section(L10n.text("대화", locale: locale)) {
-                ForEach(detail.messages) { message in messageRow(message) }
+                if detail.messages.isEmpty {
+                    ContentUnavailableView(
+                        L10n.text("대화 없음", locale: locale),
+                        systemImage: "bubble.left.and.bubble.right"
+                    )
+                } else {
+                    ForEach(detail.messages) { message in messageRow(message) }
+                }
+            } header: {
+                HStack(spacing: 8) {
+                    Text(L10n.text("대화", locale: locale))
+                    Spacer(minLength: 8)
+                    if !subscriberMembers.isEmpty {
+                        HStack(spacing: -6) {
+                            ForEach(Array(subscriberMembers.prefix(4)), id: \.userId) { member in
+                                ProfileImageView(
+                                    image: member.image,
+                                    name: member.name,
+                                    systemImage: "person.fill",
+                                    size: 24
+                                )
+                                .overlay(Circle().stroke(Color(.systemBackground), lineWidth: 2))
+                            }
+                        }
+                        .accessibilityLabel(
+                            L10n.format("구독 멤버 %d명", locale: locale, subscriberMembers.count)
+                        )
+                    }
+                    if currentUserID != nil {
+                        Button {
+                            Task { await toggleSubscription() }
+                        } label: {
+                            Label(
+                                isSubscribed
+                                    ? L10n.text("구독 중", locale: locale)
+                                    : L10n.text("구독", locale: locale),
+                                systemImage: isSubscribed ? "bell.fill" : "bell"
+                            )
+                            .font(.caption.weight(.semibold))
+                        }
+                        .buttonStyle(.borderless)
+                        .disabled(
+                            mutations.isActive("subscription-\(run.id)") ||
+                                (isSubscribed && assigneeSubscriptionRequired)
+                        )
+                        .accessibilityIdentifier("issue-subscribe-button")
+                        .help(
+                            assigneeSubscriptionRequired
+                                ? L10n.text("담당자는 이 이슈를 항상 구독합니다.", locale: locale)
+                                : isSubscribed
+                                    ? L10n.text("구독 해제", locale: locale)
+                                    : L10n.text("구독", locale: locale)
+                        )
+                    }
+                }
             }
         }
 
@@ -2376,6 +2431,37 @@ struct RunDetailView: View {
             return worker.label
         }
         return workerID
+    }
+
+    private var subscriberMembers: [OrganizationMember] {
+        subscribers.compactMap { subscriber in
+            members.first { $0.userId == subscriber.userId }
+        }
+    }
+
+    private var isSubscribed: Bool {
+        guard let currentUserID else { return false }
+        return run.assigneeUserId == currentUserID ||
+            subscribers.contains { $0.userId == currentUserID }
+    }
+
+    private var assigneeSubscriptionRequired: Bool {
+        currentUserID != nil && run.assigneeUserId == currentUserID
+    }
+
+    private func toggleSubscription() async {
+        guard currentUserID != nil else { return }
+        do {
+            let response = try await mutations.setSubscription(
+                runID: run.id,
+                subscribed: !isSubscribed
+            )
+            subscribers = response.subscribers
+            actionError = nil
+            await refresh()
+        } catch {
+            actionError = CompanionStore.message(for: error)
+        }
     }
 
     private func open(path: String, filename: String) async {

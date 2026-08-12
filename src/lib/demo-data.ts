@@ -35,6 +35,7 @@ const runDefaults = {
   currentAttempt: 1,
   currentRevision: 1,
   priority: null,
+  subscribers: [{ userId: "demo-user", subscribedAt: ago(10_000) }],
   tracker: null,
   issueDescription: null,
   attachments: [],
@@ -56,6 +57,7 @@ const runDefaults = {
 } satisfies Pick<
   HuntRun,
   | "priority"
+  | "subscribers"
   | "currentAttempt"
   | "currentRevision"
   | "tracker"
