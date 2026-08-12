@@ -9,10 +9,21 @@ import {
 } from "./AppUpdateProvider";
 import { UpdateControl } from "./UpdateControl";
 
-const { check, invoke, relaunch, updateLinkListener } = vi.hoisted(() => ({
+const {
+  appMenuUpdateListener,
+  check,
+  invoke,
+  relaunch,
+  syncAppUpdateMenu,
+  updateLinkListener,
+} = vi.hoisted(() => ({
+  appMenuUpdateListener: {
+    current: null as null | (() => void),
+  },
   check: vi.fn(),
   invoke: vi.fn(),
   relaunch: vi.fn(),
+  syncAppUpdateMenu: vi.fn(),
   updateLinkListener: {
     current: null as null | ((target: { targetVersion: string }) => void),
   },
@@ -21,6 +32,15 @@ const { check, invoke, relaunch, updateLinkListener } = vi.hoisted(() => ({
 vi.mock("@tauri-apps/api/core", () => ({ invoke }));
 vi.mock("@tauri-apps/plugin-updater", () => ({ check }));
 vi.mock("@tauri-apps/plugin-process", () => ({ relaunch }));
+vi.mock("../lib/app-menu", () => ({
+  listenForAppMenuUpdate: (listener: () => void) => {
+    appMenuUpdateListener.current = listener;
+    return () => {
+      appMenuUpdateListener.current = null;
+    };
+  },
+  syncAppUpdateMenu,
+}));
 vi.mock("../lib/worker-update-links", () => ({
   listenForWorkerUpdateLinks: (
     listener: (target: { targetVersion: string }) => void,
@@ -44,6 +64,9 @@ describe("UpdateControl", () => {
     invoke.mockReset();
     invoke.mockResolvedValue(0);
     relaunch.mockReset();
+    syncAppUpdateMenu.mockReset();
+    syncAppUpdateMenu.mockResolvedValue(undefined);
+    appMenuUpdateListener.current = null;
     updateLinkListener.current = null;
   });
 
@@ -82,6 +105,38 @@ describe("UpdateControl", () => {
     });
 
     expect(invoke).toHaveBeenCalledWith("refresh_execution_worker_runtime");
+    await act(async () => root.unmount());
+  });
+
+  it("checks first and changes the app menu before installing on the next selection", async () => {
+    const downloadAndInstall = vi.fn().mockResolvedValue(undefined);
+    check
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ version: "1.3.0", downloadAndInstall });
+    const root = createRoot(container);
+    await act(async () => root.render(control));
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      appMenuUpdateListener.current?.();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(check).toHaveBeenCalledTimes(2);
+    expect(downloadAndInstall).not.toHaveBeenCalled();
+    expect(syncAppUpdateMenu).toHaveBeenCalledWith(true);
+
+    await act(async () => {
+      appMenuUpdateListener.current?.();
+      await Promise.resolve();
+    });
+
+    expect(downloadAndInstall).toHaveBeenCalledOnce();
+    expect(invoke).toHaveBeenCalledWith("prepare_for_app_update");
+    expect(relaunch).toHaveBeenCalledOnce();
     await act(async () => root.unmount());
   });
 

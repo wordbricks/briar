@@ -9,6 +9,10 @@ import {
   useState,
 } from "react";
 import { isDesktopTauri } from "../lib/platform";
+import {
+  listenForAppMenuUpdate,
+  syncAppUpdateMenu,
+} from "../lib/app-menu";
 import { prepareForAppUpdate } from "../lib/planned-update-recovery";
 import { compareSemanticVersions } from "../lib/semantic-version";
 import { listenForWorkerUpdateLinks } from "../lib/worker-update-links";
@@ -116,6 +120,29 @@ export function AppUpdateProvider({
 
     return () => window.clearInterval(intervalId);
   }, [checkForUpdate, supported]);
+
+  useEffect(() => {
+    if (!supported) return;
+    void syncAppUpdateMenu(available !== null).catch(() => {
+      // Native menu synchronization is best-effort outside the packaged macOS app.
+    });
+  }, [available, supported]);
+
+  useEffect(() => {
+    if (!supported) return;
+    return listenForAppMenuUpdate(() => {
+      const update = availableRef.current;
+      if (update) {
+        void performInstall(update);
+        return;
+      }
+      void checkForUpdate().catch((caught) => {
+        setInstallError(
+          caught instanceof Error ? caught.message : String(caught),
+        );
+      });
+    });
+  }, [checkForUpdate, performInstall, supported]);
 
   useEffect(() => {
     if (!supported) return;

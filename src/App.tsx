@@ -123,6 +123,7 @@ import {
   takePlannedUpdateAgentRecoveries,
 } from "./lib/planned-update-recovery";
 import { installKeybindingShortcuts } from "./lib/keybindings";
+import { listenForAppMenuSettings } from "./lib/app-menu";
 import { useI18n } from "./i18n";
 import type { HuntRun, ProjectAgent, StatusTrayRun } from "./types";
 
@@ -1001,6 +1002,11 @@ export function App() {
     });
     navigateToPage("settings");
   }, [navigateToPage]);
+
+  useEffect(() => {
+    if (!runsOnDesktopTauri) return;
+    return listenForAppMenuSettings(openAppSettings);
+  }, [openAppSettings, runsOnDesktopTauri]);
 
   const unifiedSettingsSidebar = (
     <UnifiedSettingsSidebar
