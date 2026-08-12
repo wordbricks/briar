@@ -1879,50 +1879,62 @@ export const issueUpdateInputSchema = issueInputBaseSchema
 
 const modelEffortSchema = z.enum(modelEfforts);
 
-export const issueExecutionPreferencesSchema = z
-  .object({
-    provider: z.enum(agentProviders).nullable(),
-    model: z.string().trim().min(1).max(100).nullable(),
-    effort: modelEffortSchema.nullable(),
-  })
-  .strict()
-  .superRefine((input, context) => {
-    if (!input.provider && (input.model || input.effort)) {
-      context.addIssue({
-        code: "custom",
-        message: "A provider is required for a model or effort preference",
-      });
-    }
-    if (!input.model && input.effort) {
-      context.addIssue({
-        code: "custom",
-        message: "A model is required for an effort preference",
-      });
-    }
-    if (
-      input.provider &&
-      input.model &&
-      !agentProviderAllowsModel(input.provider, input.model)
-    ) {
-      context.addIssue({
-        code: "custom",
-        message: `${input.model} is not available from ${input.provider}`,
-      });
-    }
-    if (
-      input.provider &&
-      input.effort &&
-      !agentProviderAllowsEffort(input.provider, input.effort)
-    ) {
-      context.addIssue({
-        code: "custom",
-        message:
-          input.provider === "claude"
-            ? "Claude does not support ultra effort"
-            : `${input.provider} supports low, medium, or high effort`,
-      });
-    }
-  });
+function executionPreferencesSchema({
+  allowProviderReportedModels = false,
+}: {
+  allowProviderReportedModels?: boolean;
+} = {}) {
+  return z
+    .object({
+      provider: z.enum(agentProviders).nullable(),
+      model: z.string().trim().min(1).max(100).nullable(),
+      effort: modelEffortSchema.nullable(),
+    })
+    .strict()
+    .superRefine((input, context) => {
+      if (!input.provider && (input.model || input.effort)) {
+        context.addIssue({
+          code: "custom",
+          message: "A provider is required for a model or effort preference",
+        });
+      }
+      if (!input.model && input.effort) {
+        context.addIssue({
+          code: "custom",
+          message: "A model is required for an effort preference",
+        });
+      }
+      if (
+        input.provider &&
+        input.model &&
+        !allowProviderReportedModels &&
+        !agentProviderAllowsModel(input.provider, input.model)
+      ) {
+        context.addIssue({
+          code: "custom",
+          message: `${input.model} is not available from ${input.provider}`,
+        });
+      }
+      if (
+        input.provider &&
+        input.effort &&
+        !agentProviderAllowsEffort(input.provider, input.effort)
+      ) {
+        context.addIssue({
+          code: "custom",
+          message:
+            input.provider === "claude"
+              ? "Claude does not support ultra effort"
+              : `${input.provider} supports low, medium, or high effort`,
+        });
+      }
+    });
+}
+
+export const issueExecutionPreferencesSchema = executionPreferencesSchema();
+const dispatchExecutionPreferencesSchema = executionPreferencesSchema({
+  allowProviderReportedModels: true,
+});
 
 const linearApiKeySchema = z
   .object({
@@ -2526,7 +2538,7 @@ const dispatchRunSchema = z
       model: input.model ?? null,
       effort: input.effort ?? null,
     };
-    const parsed = issueExecutionPreferencesSchema.safeParse(preferences);
+    const parsed = dispatchExecutionPreferencesSchema.safeParse(preferences);
     if (!parsed.success) {
       for (const issue of parsed.error.issues) {
         context.addIssue({
@@ -7879,7 +7891,7 @@ async function route(
     const input = channelExecutionProposalAcceptInputSchema.parse(
       await readJson(request),
     );
-    issueExecutionPreferencesSchema.parse({
+    dispatchExecutionPreferencesSchema.parse({
       provider: input.provider,
       model: input.model,
       effort: input.effort,
@@ -10811,7 +10823,7 @@ async function route(
     const input = channelExecutionProposalAcceptInputSchema.parse(
       await readJson(request),
     );
-    issueExecutionPreferencesSchema.parse({
+    dispatchExecutionPreferencesSchema.parse({
       provider: input.provider,
       model: input.model,
       effort: input.effort,

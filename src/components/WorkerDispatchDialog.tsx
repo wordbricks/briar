@@ -20,9 +20,11 @@ import { useI18n } from "../i18n";
 import type { MessageKey } from "../i18n/messages";
 import {
   agentEfforts,
-  agentModels,
   agentProviders,
+  defaultAgentProviderModelCatalog,
+  loadAgentProviderModels,
   type AgentProvider,
+  type AgentProviderModelCatalog,
   type ModelEffort,
 } from "../lib/project-llm";
 import { agentProviderPolicies } from "../lib/agent-provider-contract";
@@ -70,6 +72,9 @@ export function WorkerDispatchDialog({
   const [model, setModel] = useState("");
   const [effort, setEffort] = useState("");
   const [workerId, setWorkerId] = useState("");
+  const [providerModels, setProviderModels] = useState<AgentProviderModelCatalog>(
+    defaultAgentProviderModelCatalog,
+  );
   const selectionSessionRef = useRef<string | null>(null);
   const selectionDirtyRef = useRef(false);
   const initializingProviderRef = useRef<AgentProvider | null>(null);
@@ -105,11 +110,36 @@ export function WorkerDispatchDialog({
       ),
     [policyWorkers, provider],
   );
-  const selectedModelKnown = agentModels[provider].some(
+  const modelOptions = useMemo(
+    () => [
+      { value: "", label: t("settings.providerDefaultModel") },
+      ...providerModels[provider].models.map((candidate) => ({
+        value: candidate.id,
+        label: candidate.label,
+      })),
+    ],
+    [provider, providerModels, t],
+  );
+  const selectedModelKnown = modelOptions.some(
     (option) => option.value === model,
   );
   const normalizedModel = model.trim();
   const selectionSessionKey = run?.id ?? "__without-run__";
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    void loadAgentProviderModels()
+      .then((models) => {
+        if (!cancelled) setProviderModels(models);
+      })
+      .catch(() => {
+        if (!cancelled) setProviderModels(defaultAgentProviderModelCatalog);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
 
   useEffect(() => {
     if (!open) {
@@ -269,12 +299,7 @@ export function WorkerDispatchDialog({
                   ...(!selectedModelKnown && model
                     ? [{ label: model, value: model }]
                     : []),
-                  ...agentModels[provider].map((option) => ({
-                    ...option,
-                    label: option.value
-                      ? option.label
-                      : t("settings.providerDefaultModel"),
-                  })),
+                  ...modelOptions,
                 ]}
                 value={model}
               />

@@ -84,6 +84,8 @@ export const defaultAgentProviderModelCatalog: AgentProviderModelCatalog =
     ]),
   ) as AgentProviderModelCatalog;
 
+let agentProviderModelsRequest: Promise<AgentProviderModelCatalog> | null = null;
+
 export type ProjectLlmSettings = {
   provider: AgentProvider;
   model: string | null;
@@ -377,10 +379,26 @@ export async function loadAppProviderSettings(): Promise<AppProviderSettings> {
   return invoke<AppProviderSettings>("load_app_provider_settings");
 }
 
-export async function loadAgentProviderModels(): Promise<AgentProviderModelCatalog> {
-  if (!isTauri()) return defaultAgentProviderModelCatalog;
-  const { invoke } = await import("@tauri-apps/api/core");
-  return invoke<AgentProviderModelCatalog>("load_agent_provider_models");
+export function loadAgentProviderModels({
+  refresh = false,
+}: {
+  refresh?: boolean;
+} = {}): Promise<AgentProviderModelCatalog> {
+  if (!isTauri()) return Promise.resolve(defaultAgentProviderModelCatalog);
+  if (!refresh && agentProviderModelsRequest) return agentProviderModelsRequest;
+
+  const request = import("@tauri-apps/api/core")
+    .then(({ invoke }) =>
+      invoke<AgentProviderModelCatalog>("load_agent_provider_models")
+    )
+    .catch((error) => {
+      if (agentProviderModelsRequest === request) {
+        agentProviderModelsRequest = null;
+      }
+      throw error;
+    });
+  agentProviderModelsRequest = request;
+  return request;
 }
 
 export async function updateAppProviderSettings(

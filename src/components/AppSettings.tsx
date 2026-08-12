@@ -219,7 +219,9 @@ export function AppSettings({
         inspectOnboardingPrerequisites(),
         loadAppProviderSettings(),
         loadAgentUsage().catch(() => null),
-        loadAgentProviderModels().catch(() => defaultAgentProviderModelCatalog),
+        loadAgentProviderModels({ refresh: true }).catch(
+          () => defaultAgentProviderModelCatalog,
+        ),
         inspectOpenCodeTerminalPath().catch(() => null),
       ]);
       setProviderStatuses(statuses);

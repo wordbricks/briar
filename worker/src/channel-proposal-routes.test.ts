@@ -1287,8 +1287,8 @@ describe("channel issue proposal approval route", () => {
         },
         body: JSON.stringify({
           provider: "codex",
-          model: null,
-          effort: null,
+          model: "gpt-provider-reported-model",
+          effort: "high",
           persistPreferences: false,
           workerId: null,
           requestId: "73000000-0000-4000-8000-000000000022",
@@ -1300,6 +1300,8 @@ describe("channel issue proposal approval route", () => {
       runId: acceptedBody.resultRunId,
       outcome: "dispatched",
       provider: "codex",
+      model: "gpt-provider-reported-model",
+      effort: "high",
       requestedByUserId: ownerId,
     });
   });
