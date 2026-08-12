@@ -187,6 +187,8 @@ export function CompanionChannels({
   const channelSurfaceGeneration = useRef(0);
   const channelIdRef = useRef(channel?.id ?? null);
   const threadParentIdRef = useRef(threadParentId);
+  const channelMessagesEndRef = useRef<HTMLDivElement | null>(null);
+  const threadMessagesEndRef = useRef<HTMLDivElement | null>(null);
   const proposalVersions = useRef(new Map<string, number>());
   const latestProposals = useRef(
     new Map<string, NonNullable<ChannelMessage["proposal"]>>(),
@@ -196,6 +198,16 @@ export function CompanionChannels({
   );
   channelIdRef.current = channel?.id ?? null;
   threadParentIdRef.current = threadParentId;
+
+  useEffect(() => {
+    if (!channel || threadParentId) return;
+    channelMessagesEndRef.current?.scrollIntoView?.({ block: "end" });
+  }, [channel, messages, replies.length, threadParentId]);
+
+  useEffect(() => {
+    if (!threadParentId) return;
+    threadMessagesEndRef.current?.scrollIntoView?.({ block: "end" });
+  }, [thread, threadParentId, replies.length]);
 
   const captureChannelSurface = useCallback(
     (): ChannelSurfaceContext => ({
@@ -1087,6 +1099,7 @@ export function CompanionChannels({
               )}
             />
           ))}
+          <div ref={threadMessagesEndRef} />
         </div>
         <CompanionChannelComposer
           agents={agents}
@@ -1163,6 +1176,7 @@ export function CompanionChannels({
               {t("companion.channelsEmpty")}
             </p>
           ) : null}
+          <div ref={channelMessagesEndRef} />
         </div>
         <CompanionChannelComposer
           agents={agents}
