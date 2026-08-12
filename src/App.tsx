@@ -1834,7 +1834,9 @@ export function App() {
               ? t("companion.navTasks")
               : companionPage === "inbox"
                 ? t("inbox.title")
-                : null
+                : companionPage === "agents"
+                  ? t("companion.navAgents")
+                  : null
           }
           projects={briar.projects}
           user={briar.user}

@@ -80,6 +80,7 @@ struct AgentsHomeView: View {
                 }
             }
             .navigationTitle("Agents")
+            .navigationBarTitleDisplayMode(.inline)
             .navigationDestination(for: AgentRoute.self) { route in
                 switch route {
                 case let .agent(id):

@@ -104,6 +104,16 @@ final class BriarCompanionUITests: XCTestCase {
         captureScreenshot(named: "companion-attention-filter")
     }
 
+    func testAgentsHeaderMatchesPrimaryTabs() {
+        let app = launchInsideCompanion()
+
+        app.tabBars.buttons["Agents"].tap()
+        XCTAssertTrue(app.navigationBars["Agents"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["project-menu"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["account-menu"].exists)
+        captureScreenshot(named: "companion-agents-header")
+    }
+
     func testChannelUsesNativeNavigationAndShowsParticipationCounts() {
         let app = launchInsideCompanion()
 
