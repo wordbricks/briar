@@ -258,12 +258,18 @@ describe("ProjectAgentDetail", () => {
     expect(onBack).toHaveBeenCalledOnce();
   });
 
-  it("opens a direct task dialog and sends the selected Worker on mobile", async () => {
+  it.each([
+    { surface: "desktop", companionMode: false, buttonLabel: "작업 실행" },
+    { surface: "mobile companion", companionMode: true, buttonLabel: "지금 실행" },
+  ])("opens a direct task dialog and sends the selected Worker on $surface", async ({
+    companionMode,
+    buttonLabel,
+  }) => {
     const onStartRemoteTask = vi.fn(async () => "remote-session");
     const container = await mount(
       <ProjectAgentDetail
         agent={agent}
-        companionMode
+        companionMode={companionMode}
         dashboard={dashboardWithWorker}
         isSidebarOpen
         onBack={() => undefined}
@@ -281,7 +287,7 @@ describe("ProjectAgentDetail", () => {
     const runButton = container.querySelector<HTMLButtonElement>(
       ".project-agent-run-task",
     );
-    expect(runButton?.textContent).toContain("지금 실행");
+    expect(runButton?.textContent).toContain(buttonLabel);
     await act(async () => runButton?.click());
 
     expect(document.querySelector('[role="dialog"]')).not.toBeNull();

@@ -1480,7 +1480,7 @@ export function App() {
               autoHunt.settleTaskSession(sessionId, settlement)}
             onStopSession={(sessionId) => autoHunt.stopSession(sessionId)}
             onStart={startAgentAutoHunt}
-            onStartRemoteTask={startProjectAgentTask}
+            onStartRemoteTask={briar.token ? startProjectAgentTask : undefined}
             onStartTaskSession={(agent, session) => {
               rememberIssueAgent(agent);
               autoHunt.startTaskSession(activeProject.id, agent.id, {
@@ -1941,7 +1941,7 @@ export function App() {
                 autoHunt.settleTaskSession(sessionId, settlement)}
               onStopSession={(sessionId) => autoHunt.stopSession(sessionId)}
               onStart={startAgentAutoHunt}
-              onStartRemoteTask={startProjectAgentTask}
+              onStartRemoteTask={briar.token ? startProjectAgentTask : undefined}
               onStartTaskSession={(agent, session) => {
                 rememberIssueAgent(agent);
                 autoHunt.startTaskSession(activeProject.id, agent.id, {

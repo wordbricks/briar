@@ -317,8 +317,8 @@ export function ProjectAgents({
     }
     setStartingAgentIds((current) => new Set(current).add(agent.id));
     try {
-      if (companionMode) {
-        if (!onStartRemoteTask || !input.workerId) {
+      if (input.workerId) {
+        if (!onStartRemoteTask) {
           throw new Error(t("agents.selectRunnableWorker"));
         }
         await onStartRemoteTask(agent, {
@@ -637,7 +637,6 @@ export function ProjectAgents({
       )}
       <ProjectAgentTaskDialog
         agent={taskDialogAgent}
-        companionMode={companionMode}
         dashboard={dashboard}
         isOpen={taskDialogAgent !== null}
         isSubmitting={
@@ -654,6 +653,7 @@ export function ProjectAgents({
           if (!taskDialogAgent) return;
           return runTask(taskDialogAgent, input);
         }}
+        workerSelectionRequired={Boolean(onStartRemoteTask)}
       />
     </MainContent>
   );
