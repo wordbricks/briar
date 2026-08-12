@@ -1472,6 +1472,46 @@ async function changeIssueDependencyCommand(action: "add" | "remove") {
   );
 }
 
+const channelMessagesUsage = `Usage: briar channel messages --channel-id <uuid>
+  [--limit <1-100>] [--cursor <message-uuid>]
+  [--parent-message-id <root-message-uuid>]`;
+
+async function listChannelMessagesCommand() {
+  if (has("--help")) {
+    console.log(channelMessagesUsage);
+    return;
+  }
+  const config = await loadConfig();
+  const project = await currentProject(config);
+  const input = z.object({
+    channelId: z.string().uuid(),
+    limit: z.number().int().min(1).max(100),
+    cursor: z.string().uuid().nullable(),
+    parentMessageId: z.string().uuid().nullable(),
+  }).parse({
+    channelId: required("--channel-id"),
+    limit: value("--limit") === undefined ? 50 : Number(value("--limit")),
+    cursor: value("--cursor") ?? null,
+    parentMessageId: value("--parent-message-id") ?? null,
+  });
+  const searchParams = new URLSearchParams({ limit: String(input.limit) });
+  if (input.cursor) searchParams.set("cursor", input.cursor);
+  if (input.parentMessageId) {
+    searchParams.set("parentMessageId", input.parentMessageId);
+  }
+  const result = await request<{
+    channel: unknown;
+    messages: unknown[];
+    nextCursor: string | null;
+  }>(
+    config.apiUrl,
+    `/projects/${encodeURIComponent(project.id)}` +
+      `/channels/${encodeURIComponent(input.channelId)}/messages?${searchParams}`,
+    process.env.BRIAR_AGENT_TOKEN ?? project.agentToken,
+  );
+  console.log(JSON.stringify(result));
+}
+
 async function addRunEvent(forcedStatus?: string) {
   const config = await loadConfig();
   const project = await currentProject(config);
@@ -4071,6 +4111,9 @@ const usage = `Briar CLI
     [--priority <1-4>] [--status <queued|backlog>]
   briar issue dependency add --dependent-run <uuid> --prerequisite-run <uuid>
   briar issue dependency remove --dependent-run <uuid> --prerequisite-run <uuid>
+  briar channel messages --channel-id <uuid>
+    [--limit <1-100>] [--cursor <message-uuid>]
+    [--parent-message-id <root-message-uuid>]
   briar workflow show
   briar queue claim [--run <uuid>] [--workspace <project|worktree|current|none>]
     [--base-branch <ref>]
@@ -4135,12 +4178,22 @@ async function main() {
   }
   if (args[0] === "skills" && args[1] === "list") return listSkillGuides();
   if (args[0] === "skills" && args[1] === "get") return showSkillGuide();
+  if (
+    args[0] === "channel" &&
+    (!args[1] || args[1] === "help" || args[1] === "--help")
+  ) {
+    console.log(channelMessagesUsage);
+    return;
+  }
   if (args[0] === "login") return login();
   if (args[0] === "project" && args[1] === "create") return createProject();
   if (args[0] === "connect") return connectProject();
   if (args[0] === "project" && args[1] === "doctor") return projectDoctor();
   if (args[0] === "project" && args[1] === "configure") return configureProject();
   if (args[0] === "issue" && args[1] === "create") return createIssueCommand();
+  if (args[0] === "channel" && args[1] === "messages") {
+    return listChannelMessagesCommand();
+  }
   if (
     args[0] === "issue" &&
     args[1] === "dependency" &&

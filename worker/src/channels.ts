@@ -634,6 +634,53 @@ export async function getChannelById(
     .first<ChannelRow>();
 }
 
+/**
+ * Project Agent tokens identify a project rather than one saved Agent. The
+ * project can read a channel when at least one of its Agents is on that
+ * channel's roster. This intentionally ignores user visibility: a public
+ * channel is not automatically visible to a Project Agent.
+ */
+export async function getProjectAgentChannel(
+  db: D1Database,
+  projectId: string,
+  channelId: string,
+) {
+  return db
+    .prepare(
+      `${channelSelect}
+       join briar_projects project
+         on project.organization_id = channel.organization_id
+       where project.id = ? and channel.id = ?
+         and exists (
+           select 1
+           from briar_channel_agents roster
+           join briar_project_agents agent on agent.id = roster.agent_id
+           where roster.channel_id = channel.id
+             and agent.organization_id = channel.organization_id
+             and agent.project_id = project.id
+         )`,
+    )
+    .bind(projectId, channelId)
+    .first<ChannelRow>();
+}
+
+/** Used to distinguish an inaccessible same-organization channel from 404. */
+export async function getProjectOrganizationChannel(
+  db: D1Database,
+  projectId: string,
+  channelId: string,
+) {
+  return db
+    .prepare(
+      `${channelSelect}
+       join briar_projects project
+         on project.organization_id = channel.organization_id
+       where project.id = ? and channel.id = ?`,
+    )
+    .bind(projectId, channelId)
+    .first<ChannelRow>();
+}
+
 /** Resolves a project only when it belongs to the given organization. */
 export async function getOrganizationProject(
   db: D1Database,
@@ -1315,6 +1362,99 @@ export async function listChannelThreadMessages(
     .bind(channelId, parentMessageId, parentMessageId)
     .all<ChannelMessageRow>();
   return attachMessageRelations(db, rows.results);
+}
+
+export type ChannelMessagePage = {
+  messages: ChannelMessage[];
+  nextCursor: string | null;
+};
+
+/**
+ * Read one page from the newest messages towards older history. Messages
+ * within a page remain chronological so CLI consumers can render them without
+ * re-sorting. A thread view includes its root message, matching the existing
+ * channel thread API.
+ */
+export async function listChannelMessagePage(
+  db: D1Database,
+  input: {
+    channelId: string;
+    parentMessageId: string | null;
+    cursor: string | null;
+    limit: number;
+  },
+): Promise<ChannelMessagePage | null> {
+  const cursor = input.cursor
+    ? await db
+        .prepare(
+          `select created_at
+           from briar_channel_messages
+           where channel_id = ? and id = ?
+             and ${
+               input.parentMessageId
+                 ? `(id = ? or parent_message_id = ?)`
+                 : "parent_message_id is null"
+             }`,
+        )
+        .bind(
+          input.channelId,
+          input.cursor,
+          ...(input.parentMessageId
+            ? [input.parentMessageId, input.parentMessageId]
+            : []),
+        )
+        .first<{ created_at: string }>()
+    : null;
+  if (input.cursor && !cursor) return null;
+
+  const select = await messageSelectFor(db);
+  const scope = input.parentMessageId
+    ? `(message.id = ? or message.parent_message_id = ?)`
+    : "message.parent_message_id is null";
+  const before = cursor
+    ? `and (message.created_at < ?
+            or (message.created_at = ? and message.id < ?))`
+    : "";
+  const rows = await db
+    .prepare(
+      `${select}
+       where message.channel_id = ? and ${scope}
+         ${before}
+       order by message.created_at desc, message.id desc
+       limit ?`,
+    )
+    .bind(
+      input.channelId,
+      ...(input.parentMessageId
+        ? [input.parentMessageId, input.parentMessageId]
+        : []),
+      ...(cursor ? [cursor.created_at, cursor.created_at, input.cursor] : []),
+      input.limit + 1,
+    )
+    .all<ChannelMessageRow>();
+  const hasMore = rows.results.length > input.limit;
+  const pageRows = rows.results.slice(0, input.limit);
+  const nextCursor = hasMore ? (pageRows.at(-1)?.id ?? null) : null;
+  return {
+    messages: await attachMessageRelations(db, pageRows.reverse()),
+    nextCursor,
+  };
+}
+
+export async function isChannelRootMessage(
+  db: D1Database,
+  channelId: string,
+  messageId: string,
+) {
+  return Boolean(
+    await db
+      .prepare(
+        `select 1 as present from briar_channel_messages
+         where channel_id = ? and id = ? and parent_message_id is null`,
+      )
+      .bind(channelId, messageId)
+      .first<{ present: number }>(),
+  );
 }
 
 export async function getChannelMessage(
