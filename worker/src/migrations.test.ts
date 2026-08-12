@@ -5,7 +5,6 @@ import { unstable_splitSqlQuery } from "wrangler";
 import { describe, expect, it } from "vitest";
 import {
   createChannel,
-  createChannelMessage,
   reserveChannelActionProposalApproval,
 } from "./channels";
 import {
@@ -103,7 +102,210 @@ async function seedPreWorkflowProjectRun(db: D1Database) {
   ).run();
 }
 
+async function createPreWebhookChannelMessage(
+  db: D1Database,
+  input: {
+    id: string;
+    channelId: string;
+    parentMessageId: string | null;
+    authorUserId: string | null;
+    authorAgentId: string | null;
+    authorAgentName: string | null;
+    authorAgentProvider: "codex" | "claude" | "grok" | "opencode" | null;
+    body: string;
+    mentionedUserIds: string[];
+    mentionedAgentIds: string[];
+    createdAt: string;
+  },
+) {
+  await db.batch([
+    db.prepare(
+      `insert into briar_channel_messages (
+         id, channel_id, parent_message_id, author_user_id, author_agent_id,
+         author_agent_name, author_agent_provider, body, created_at, updated_at
+       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(
+      input.id,
+      input.channelId,
+      input.parentMessageId,
+      input.authorUserId,
+      input.authorAgentId,
+      input.authorAgentName,
+      input.authorAgentProvider,
+      input.body,
+      input.createdAt,
+      input.createdAt,
+    ),
+    ...input.mentionedUserIds.map((userId) => db.prepare(
+      `insert into briar_channel_message_mentions (
+         message_id, user_id, created_at
+       ) values (?, ?, ?)`,
+    ).bind(input.id, userId, input.createdAt)),
+    ...input.mentionedAgentIds.map((agentId) => db.prepare(
+      `insert into briar_channel_message_agent_mentions (
+         message_id, agent_id, created_at
+       ) values (?, ?, ?)`,
+    ).bind(input.id, agentId, input.createdAt)),
+  ]);
+}
+
 describe("D1 migrations", () => {
+  it("preserves channel message relations while adding webhook authors", async () => {
+    const miniflare = new Miniflare({
+      modules: true,
+      script: "export default { fetch() { return new Response('ok') } }",
+      d1Databases: { DB: "briar-channel-webhook-migration-test" },
+    });
+    try {
+      const db = (await miniflare.getD1Database("DB")) as unknown as D1Database;
+      await applyD1Migrations(db, {
+        through: "0096_suppress_lease_sync_changes.sql",
+      });
+      const now = "2026-08-12T00:00:00.000Z";
+      const userId = "webhook-migration-owner";
+      const organizationId = "71000000-0000-4000-8000-000000000001";
+      const channelId = "72000000-0000-4000-8000-000000000001";
+      const agentId = "73000000-0000-4000-8000-000000000001";
+      const rootId = "74000000-0000-4000-8000-000000000001";
+      const replyId = "75000000-0000-4000-8000-000000000001";
+      await db.prepare(
+        `insert into "user" (id, name, email, emailVerified, createdAt, updatedAt)
+         values (?, 'Migration owner', 'webhook-migration@example.com', 1, ?, ?)`,
+      ).bind(userId, now, now).run();
+      await db.prepare(
+        `insert into briar_organizations (id, name, handle, created_at, updated_at)
+         values (?, 'Webhook migration', 'webhook-migration', ?, ?)`,
+      ).bind(organizationId, now, now).run();
+      await db.prepare(
+        `insert into briar_organization_members (
+           organization_id, user_id, role, created_at, updated_at
+         ) values (?, ?, 'owner', ?, ?)`,
+      ).bind(organizationId, userId, now, now).run();
+      await createChannel(db, {
+        id: channelId,
+        organizationId,
+        slug: "migration",
+        name: "Migration",
+        topic: null,
+        visibility: "public",
+        defaultProjectId: null,
+        createdByUserId: userId,
+        createdAt: now,
+      });
+      await createOrganizationAgent(db, {
+        id: agentId,
+        organizationId,
+        name: "Migration Agent",
+        provider: "codex",
+        model: null,
+        responsibility: "Verify the migration.",
+        effort: null,
+        createdAt: now,
+      });
+      await createPreWebhookChannelMessage(db, {
+        id: rootId,
+        channelId,
+        parentMessageId: null,
+        authorUserId: userId,
+        authorAgentId: null,
+        authorAgentName: null,
+        authorAgentProvider: null,
+        body: "Preserve this root",
+        mentionedUserIds: [userId],
+        mentionedAgentIds: [agentId],
+        createdAt: now,
+      });
+      await createPreWebhookChannelMessage(db, {
+        id: replyId,
+        channelId,
+        parentMessageId: rootId,
+        authorUserId: null,
+        authorAgentId: agentId,
+        authorAgentName: "Migration Agent",
+        authorAgentProvider: "codex",
+        body: "Preserve this reply",
+        mentionedUserIds: [],
+        mentionedAgentIds: [],
+        createdAt: now,
+      });
+      await db.batch([
+        db.prepare(
+          `insert into briar_channel_agent_reply_jobs (
+             id, organization_id, channel_id, project_id, agent_id,
+             trigger_message_id, parent_message_id, reply_message_id,
+             status, agent_provider, created_at, updated_at, completed_at
+           ) values (?, ?, ?, null, ?, ?, ?, ?, 'completed', 'codex', ?, ?, ?)`,
+        ).bind(
+          "76000000-0000-4000-8000-000000000001",
+          organizationId,
+          channelId,
+          agentId,
+          rootId,
+          rootId,
+          replyId,
+          now,
+          now,
+          now,
+        ),
+        db.prepare(
+          `insert into briar_channel_message_documents (
+             message_id, channel_id, project_id, title, markdown,
+             created_at, updated_at
+           ) values (?, ?, null, 'Migration plan', '# Preserve me', ?, ?)`,
+        ).bind(replyId, channelId, now, now),
+        db.prepare(
+          `insert into briar_channel_message_attachments (
+             id, organization_id, channel_id, message_id, object_key,
+             filename, content_type, byte_size, created_at
+           ) values (?, ?, ?, ?, ?, 'proof.png', 'image/png', 1, ?)`,
+        ).bind(
+          "77000000-0000-4000-8000-000000000001",
+          organizationId,
+          channelId,
+          rootId,
+          "channels/migration/proof.png",
+          now,
+        ),
+        db.prepare(
+          `insert into briar_channel_message_reactions (
+             message_id, user_id, emoji, created_at
+           ) values (?, ?, '✅', ?)`,
+        ).bind(rootId, userId, now),
+      ]);
+
+      await applyD1Migrations(db, {
+        files: ["0099_channel_incoming_webhooks.sql"],
+      });
+
+      await expect(db.prepare(
+        `select count(*) as count from briar_channel_messages`,
+      ).first()).resolves.toEqual({ count: 2 });
+      for (const table of [
+        "briar_channel_message_mentions",
+        "briar_channel_message_agent_mentions",
+        "briar_channel_agent_reply_jobs",
+        "briar_channel_message_documents",
+        "briar_channel_message_attachments",
+        "briar_channel_message_reactions",
+      ]) {
+        await expect(db.prepare(`select count(*) as count from ${table}`).first())
+          .resolves.toEqual({ count: 1 });
+      }
+      await expect(db.prepare(
+        `select parent_message_id, author_webhook_id, author_webhook_name
+         from briar_channel_messages where id = ?`,
+      ).bind(replyId).first()).resolves.toEqual({
+        parent_message_id: rootId,
+        author_webhook_id: null,
+        author_webhook_name: null,
+      });
+      await expect(db.prepare("pragma foreign_key_check").all())
+        .resolves.toMatchObject({ results: [] });
+    } finally {
+      await miniflare.dispose();
+    }
+  }, 60_000);
+
   it("creates an exact immutable provider-cost ledger", async () => {
     const miniflare = new Miniflare({
       modules: true,
@@ -185,6 +387,7 @@ describe("D1 migrations", () => {
     "0095_organization_inbox_sync.sql",
     "0096_suppress_lease_sync_changes.sql",
     "0098_issue_subscriptions.sql",
+    "0099_channel_incoming_webhooks.sql",
   ])("keeps each trigger in a separate Wrangler statement: %s", async (name) => {
     const sql = await readFile(resolve("migrations", name), "utf8");
     const statements = unstable_splitSqlQuery(sql);
@@ -404,6 +607,9 @@ describe("D1 migrations", () => {
       await applyD1Migrations(db, {
         through: "0090_channel_issue_approval.sql",
       });
+      await applyD1Migrations(db, {
+        files: ["0099_project_usage_analytics.sql"],
+      });
       const ownerId = "channel-canonical-owner";
       const approverId = "channel-canonical-approver";
       const organizationId = "81000000-0000-4000-8000-000000000001";
@@ -497,7 +703,7 @@ describe("D1 migrations", () => {
         effort: null,
         createdAt: now,
       });
-      await createChannelMessage(db, {
+      await createPreWebhookChannelMessage(db, {
         id: triggerMessageId,
         channelId,
         parentMessageId: null,
@@ -510,7 +716,7 @@ describe("D1 migrations", () => {
         mentionedAgentIds: [agentId],
         createdAt: now,
       });
-      await createChannelMessage(db, {
+      await createPreWebhookChannelMessage(db, {
         id: replyMessageId,
         channelId,
         parentMessageId: triggerMessageId,
@@ -712,6 +918,9 @@ describe("D1 migrations", () => {
     try {
       const db = (await miniflare.getD1Database("DB")) as unknown as D1Database;
       await applyD1Migrations(db, { through: "0089_channel_agent_delegation.sql" });
+      await applyD1Migrations(db, {
+        files: ["0099_project_usage_analytics.sql"],
+      });
       const userId = "channel-upgrade-owner";
       const approverId = "channel-upgrade-approver";
       const organizationId = "91000000-0000-4000-8000-000000000001";
@@ -843,7 +1052,7 @@ describe("D1 migrations", () => {
         const triggerId = `95000000-0000-4000-8000-${suffix}`;
         const replyId = `96000000-0000-4000-8000-${suffix}`;
         const proposalId = `97000000-0000-4000-8000-${suffix}`;
-        await createChannelMessage(db, {
+        await createPreWebhookChannelMessage(db, {
           id: triggerId,
           channelId,
           parentMessageId: null,
@@ -856,7 +1065,7 @@ describe("D1 migrations", () => {
           mentionedAgentIds: [agentId],
           createdAt: now,
         });
-        await createChannelMessage(db, {
+        await createPreWebhookChannelMessage(db, {
           id: replyId,
           channelId,
           parentMessageId: triggerId,

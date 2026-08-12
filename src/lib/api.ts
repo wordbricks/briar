@@ -20,6 +20,7 @@ import {
   type ModelEffort,
 } from "./agent-provider-contract";
 import type { UsageRangeDays } from "./agent-usage-overview";
+import type { ProjectUsagePeriod } from "./project-usage-summary";
 import { LITELLM_MAIN_PRICING_SOURCE } from "./agent-usage-pricing";
 import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
 import type { InboxMessage } from "../hooks/useInbox";
@@ -34,6 +35,7 @@ import type {
   ChannelExecutionProposal,
   ChannelSummary,
   ChannelVisibility,
+  ChannelWebhook,
 } from "./channels-contract";
 import type {
   LinearImportConnectResult,
@@ -111,10 +113,29 @@ const projectSchema = z.object({
   createdAt: z.string(),
 });
 const projectUsageSummarySchema = z.object({
+  period: z.enum(["day", "week", "month"]),
+  rangeStart: z.string(),
+  rangeEnd: z.string(),
   totalTokens: z.number().int().nonnegative(),
   trackedDurationMs: z.number().int().nonnegative(),
   observedRuns: z.number().int().nonnegative(),
   reportedRuns: z.number().int().nonnegative(),
+  completedIssues: z.number().int().nonnegative(),
+  timeline: z.array(z.object({
+    startAt: z.string(),
+    completedIssues: z.number().int().nonnegative(),
+    totalTokens: z.number().int().nonnegative(),
+  })),
+  issueCreators: z.array(z.object({
+    id: z.string().nullable(),
+    name: z.string().nullable(),
+    issues: z.number().int().nonnegative(),
+  })),
+  agents: z.array(z.object({
+    id: z.string().nullable(),
+    name: z.string().nullable(),
+    issues: z.number().int().nonnegative(),
+  })),
   generatedAt: z.string(),
 });
 const projectAgentSchema = z.object({
@@ -995,11 +1016,11 @@ export async function loadAgentUsageReport(
 export async function loadProjectUsageSummary(
   token: string,
   projectId: string,
-  days: UsageRangeDays = 30,
+  period: ProjectUsagePeriod = "day",
   signal?: AbortSignal,
 ): Promise<ProjectUsageSummary> {
   return projectUsageSummarySchema.parse(await request<ProjectUsageSummary>(
-    `/projects/${encodeURIComponent(projectId)}/usage/summary?days=${days}`,
+    `/projects/${encodeURIComponent(projectId)}/usage/summary?period=${period}`,
     token,
     { signal },
   ));
@@ -1778,6 +1799,70 @@ export async function setChannelMember(
       method: present ? "PUT" : "DELETE",
       body: present ? JSON.stringify({ role: "member" }) : undefined,
     },
+  );
+}
+
+export async function listChannelWebhooks(
+  token: string,
+  organizationId: string,
+  channelId: string,
+) {
+  return request<{ webhooks: ChannelWebhook[] }>(
+    `/organizations/${organizationId}/channels/${channelId}/webhooks`,
+    token,
+  );
+}
+
+export async function createChannelWebhook(
+  token: string,
+  organizationId: string,
+  channelId: string,
+  name: string,
+) {
+  return request<{ webhook: ChannelWebhook; url: string }>(
+    `/organizations/${organizationId}/channels/${channelId}/webhooks`,
+    token,
+    { method: "POST", body: JSON.stringify({ name }) },
+  );
+}
+
+export async function updateChannelWebhook(
+  token: string,
+  organizationId: string,
+  channelId: string,
+  webhookId: string,
+  name: string,
+) {
+  return request<{ webhook: ChannelWebhook }>(
+    `/organizations/${organizationId}/channels/${channelId}/webhooks/${webhookId}`,
+    token,
+    { method: "PATCH", body: JSON.stringify({ name }) },
+  );
+}
+
+export async function rotateChannelWebhook(
+  token: string,
+  organizationId: string,
+  channelId: string,
+  webhookId: string,
+) {
+  return request<{ webhook: ChannelWebhook; url: string }>(
+    `/organizations/${organizationId}/channels/${channelId}/webhooks/${webhookId}/rotate`,
+    token,
+    { method: "POST" },
+  );
+}
+
+export async function revokeChannelWebhook(
+  token: string,
+  organizationId: string,
+  channelId: string,
+  webhookId: string,
+) {
+  return request<{ webhook: ChannelWebhook }>(
+    `/organizations/${organizationId}/channels/${channelId}/webhooks/${webhookId}`,
+    token,
+    { method: "DELETE" },
   );
 }
 

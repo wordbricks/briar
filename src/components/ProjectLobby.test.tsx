@@ -13,15 +13,26 @@ import { ProjectLobby, projectTrackedDuration } from "./ProjectLobby";
   .IS_REACT_ACT_ENVIRONMENT = true;
 
 const emptyUsageSummary: ProjectUsageSummary = {
+  period: "day",
+  rangeStart: "2026-07-30T00:00:00.000Z",
+  rangeEnd: "2026-08-13T00:00:00.000Z",
   generatedAt: "2026-08-12T00:00:00.000Z",
   totalTokens: 0,
   trackedDurationMs: 0,
   observedRuns: 0,
   reportedRuns: 0,
+  completedIssues: 0,
+  timeline: Array.from({ length: 14 }, (_, index) => ({
+    startAt: new Date(Date.UTC(2026, 6, 30 + index)).toISOString(),
+    completedIssues: 0,
+    totalTokens: 0,
+  })),
+  issueCreators: [],
+  agents: [],
 };
 
 describe("ProjectLobby", () => {
-  it("summarizes only execution time inside the 30-day window", () => {
+  it("summarizes only execution time inside the daily analytics window", () => {
     const now = Date.parse("2026-08-12T12:00:00.000Z");
     const run = (updatedAt: string, durationMs: number) => ({
       id: updatedAt,
@@ -83,9 +94,11 @@ describe("ProjectLobby", () => {
     expect(onLoadUsageSummary).toHaveBeenCalledOnce();
     expect(onLoadUsageSummary).toHaveBeenCalledWith(
       demoDashboard.project.id,
+      "day",
       { force: false },
     );
     expect(container.textContent).toContain("Project overview");
+    expect(container.textContent).toContain("Work analytics");
     expect(container.textContent).toContain("Tokens used");
     expect(container.textContent).toContain("Agent work time");
     expect(container.textContent).toContain("GitHub connection");
@@ -94,6 +107,17 @@ describe("ProjectLobby", () => {
     );
     expect(container.textContent).toContain("Recent activity");
     expect(container.textContent).toContain(demoDashboard.runs[0].title);
+
+    await act(async () => {
+      [...container.querySelectorAll<HTMLButtonElement>(".project-lobby-period-picker button")]
+        .find((button) => button.textContent === "Weekly")
+        ?.click();
+    });
+    expect(onLoadUsageSummary).toHaveBeenLastCalledWith(
+      demoDashboard.project.id,
+      "week",
+      { force: false },
+    );
 
     await act(async () => {
       container

@@ -51,6 +51,7 @@
       "/health",
       "/github/*",
       "/slack/*",
+      "/hooks/*",
       "/.well-known/*",
       "/open/*",
       "/releases/*",

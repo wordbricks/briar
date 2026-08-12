@@ -817,18 +817,35 @@ describe("Worker HTTP contract", () => {
       updated_at: "2026-08-10T00:01:00.000Z",
       completed_at: "2026-08-10T00:01:00.000Z",
       has_usage_ledger: 1,
+      source_created_at: "2026-08-09T00:00:00.000Z",
+      created_by_user_id: "user-1",
+      created_by_name: "Ada",
+      agent_id: "agent-1",
+      agent_name: "Mango",
     }], [{
       run_id: "11111111-1111-4111-8111-111111111111",
       total_tokens: 37,
       usage_records: 2,
-    }], 30, generatedAt);
+      observed_at: "2026-08-10T00:00:30.000Z",
+    }], "day", generatedAt);
 
-    expect(summary).toEqual({
+    expect(summary).toMatchObject({
+      period: "day",
+      rangeStart: "2026-07-30T00:00:00.000Z",
+      rangeEnd: "2026-08-13T00:00:00.000Z",
       totalTokens: 37,
       trackedDurationMs: 1_000,
       observedRuns: 1,
       reportedRuns: 1,
+      completedIssues: 1,
+      issueCreators: [{ id: "user-1", name: "Ada", issues: 1 }],
+      agents: [{ id: "agent-1", name: "Mango", issues: 1 }],
       generatedAt: "2026-08-12T12:00:00.000Z",
+    });
+    expect(summary.timeline.at(-3)).toMatchObject({
+      startAt: "2026-08-10T00:00:00.000Z",
+      completedIssues: 1,
+      totalTokens: 37,
     });
   });
 
@@ -1707,6 +1724,9 @@ describe("Worker HTTP contract", () => {
     expect(response.headers.get("Access-Control-Allow-Origin")).toBe("*");
     expect(response.headers.get("Access-Control-Allow-Headers")).toContain(
       "authorization",
+    );
+    expect(response.headers.get("Access-Control-Allow-Headers")).toContain(
+      "idempotency-key",
     );
     expect(
       response.headers

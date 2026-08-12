@@ -80,6 +80,7 @@ import {
 import {
   projectUsageSummaryWindow,
   summarizeProjectUsage,
+  type ProjectUsagePeriod,
 } from "../../src/lib/project-usage-summary";
 import {
   organizationAgentContextAgentsPageSchema,
@@ -437,6 +438,7 @@ import {
   addChannelAgent,
   addChannelMember,
   channelJson,
+  channelWebhookJson,
   channelExecutionProposalTablesAvailable,
   channelSkillExecutionProposalTablesAvailable,
   channelMessageJson,
@@ -445,6 +447,8 @@ import {
   completeChannelReply,
   createChannel,
   createChannelMessage,
+  createChannelWebhook,
+  createIncomingChannelWebhookMessage,
   deleteChannel,
   enqueueChannelAgentReplies,
   failChannelReply,
@@ -458,6 +462,7 @@ import {
   getActiveOrganizationChannelReplyContextClaim,
   getChannelMessage,
   getChannelMessageAttachment,
+  getIncomingChannelWebhook,
   getChannelSyncCursor,
   getClaimedChannelReply,
   getOrganizationProject,
@@ -466,17 +471,22 @@ import {
   listChannelMembers,
   listChannelRootMessages,
   listChannelThreadMessages,
+  listChannelWebhooks,
   listChannels,
   loadChannelDelta,
   isChannelReactionEmoji,
   removeChannelAgent,
   removeChannelMember,
+  revokeChannelWebhook,
+  rotateChannelWebhook,
   reserveChannelActionProposalApproval,
   reserveChannelExecutionProposalApproval,
   renewChannelReplyLease,
   snapshotChannelReplyExecutionTargets,
   toggleChannelMessageReaction,
   updateChannel,
+  updateChannelWebhook,
+  consumeChannelWebhookRateLimit,
 } from "./channels";
 import {
   legacyChannelRealtimeResponse,
@@ -516,6 +526,7 @@ import {
   channelMemberInputSchema,
   channelMessageInputSchema,
   channelMessageReactionInputSchema,
+  channelIncomingWebhookMessageSchema,
   channelProposalAcceptInputSchema,
   channelReplyClaimTokenHeader,
   channelReplyClaimInputSchema,
@@ -523,6 +534,7 @@ import {
   channelReplyLeaseInputSchema,
   channelSlugFromName,
   channelUpdateInputSchema,
+  channelWebhookInputSchema,
   handleFromName,
   organizationAgentInputSchema,
   channelAgentSkillInputSchema,
@@ -564,7 +576,7 @@ import {
 
 const corsHeaders = {
   "Access-Control-Allow-Headers":
-    "authorization, content-type, if-none-match, x-briar-claim-token, x-briar-channel-claim-token",
+    "authorization, content-type, idempotency-key, if-none-match, x-briar-claim-token, x-briar-channel-claim-token",
   "Access-Control-Allow-Methods": "DELETE, GET, HEAD, PATCH, POST, PUT, OPTIONS",
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Expose-Headers": "ETag",
@@ -667,6 +679,8 @@ export const usageRangeDaysSchema = z.preprocess(
       : value,
   z.union([z.literal(7), z.literal(30), z.literal(90)]),
 );
+
+export const projectUsagePeriodSchema = z.enum(["day", "week", "month"]);
 
 export const organizationUsageQuerySince = (
   days: 7 | 30 | 90,
@@ -3396,6 +3410,34 @@ async function requireChannelAccess(
   return channel;
 }
 
+async function requireChannelWebhookManagement(
+  db: D1Database,
+  organizationId: string,
+  channelId: string,
+  userId: string,
+) {
+  const channel = await requireChannelAccess(
+    db,
+    organizationId,
+    channelId,
+    userId,
+  );
+  const organizationRole = await getOrganizationRole(
+    db,
+    organizationId,
+    userId,
+  );
+  if (canManageOrganization(organizationRole)) return channel;
+  const membership = await db.prepare(
+    `select role from briar_channel_members
+     where channel_id = ? and user_id = ?`,
+  ).bind(channelId, userId).first<{ role: "owner" | "member" }>();
+  if (membership?.role !== "owner") {
+    throw new HttpError(403, "Channel owner access required");
+  }
+  return channel;
+}
+
 async function requireWorkerProjectBinding(
   db: D1Database,
   request: Request,
@@ -5249,30 +5291,37 @@ export const organizationUsageRunJson = (
 export function projectUsageSummaryJson(
   runs: readonly OrganizationUsageRunRow[],
   totals: readonly ProjectUsageTotalRow[],
-  days: 7 | 30 | 90,
+  period: ProjectUsagePeriod,
   generatedAt: number,
 ) {
-  const totalsByRun = new Map(totals.map((total) => [total.run_id, total]));
-  const observedAt = new Date(generatedAt).toISOString();
+  const totalsByRun = new Map<string, ProjectUsageTotalRow[]>();
+  for (const total of totals) {
+    const entries = totalsByRun.get(total.run_id) ?? [];
+    entries.push(total);
+    totalsByRun.set(total.run_id, entries);
+  }
   return summarizeProjectUsage(
     runs.map((run) => {
-      const total = totalsByRun.get(run.id);
+      const runTotals = totalsByRun.get(run.id) ?? [];
       return {
         ...organizationUsageRunJson(run),
+        sourceCreatedAt: run.source_created_at,
+        createdByUserId: run.created_by_user_id,
+        createdByName: run.created_by_name,
+        agentId: run.agent_id,
+        agentName: run.agent_name,
         hasUsageLedger: Boolean(run.has_usage_ledger),
-        usageRecords: total?.usage_records
-          ? [{
+        usageRecords: runTotals.map((total) => ({
               uncachedInputTokens: null,
               cacheReadTokens: null,
               cacheWriteTokens: null,
               outputTokens: null,
               totalTokens: total.total_tokens,
-              observedAt,
-            }]
-          : [],
+              observedAt: total.observed_at,
+            })),
       };
     }),
-    days,
+    period,
     generatedAt,
   );
 }
@@ -7095,6 +7144,100 @@ async function route(
       await listChannelAgents(db, channel.id),
     );
     return json({ agents: agents.map(organizationAgentJson) });
+  }
+
+  const channelWebhooksMatch = pathname.match(
+    /^\/organizations\/([0-9a-f-]+)\/channels\/([0-9a-f-]+)\/webhooks$/u,
+  );
+  if (channelWebhooksMatch && request.method === "GET") {
+    const session = await requireSession(auth, request);
+    const channel = await requireChannelWebhookManagement(
+      db, channelWebhooksMatch[1], channelWebhooksMatch[2], session.user.id,
+    );
+    return json({
+      webhooks: (await listChannelWebhooks(db, channel.id)).map(channelWebhookJson),
+    });
+  }
+  if (channelWebhooksMatch && request.method === "POST") {
+    const session = await requireSession(auth, request);
+    const channel = await requireChannelWebhookManagement(
+      db, channelWebhooksMatch[1], channelWebhooksMatch[2], session.user.id,
+    );
+    if (channel.archived_at) throw new HttpError(409, "Channel is archived");
+    const input = channelWebhookInputSchema.parse(await readJson(request));
+    const secret = randomUrlSafeToken();
+    const createdAt = new Date().toISOString();
+    const webhook = await createChannelWebhook(db, {
+      id: crypto.randomUUID(),
+      channelId: channel.id,
+      name: input.name,
+      secretHash: await sha256(secret),
+      createdByUserId: session.user.id,
+      createdAt,
+    });
+    if (!webhook) throw new HttpError(500, "Webhook was not created");
+    return json({
+      webhook: channelWebhookJson(webhook),
+      url: new URL(`/hooks/channels/${webhook.id}/${secret}`, request.url).toString(),
+    }, 201);
+  }
+
+  const channelWebhookMatch = pathname.match(
+    /^\/organizations\/([0-9a-f-]+)\/channels\/([0-9a-f-]+)\/webhooks\/([0-9a-f-]+)$/u,
+  );
+  if (channelWebhookMatch && request.method === "PATCH") {
+    const session = await requireSession(auth, request);
+    const channel = await requireChannelWebhookManagement(
+      db, channelWebhookMatch[1], channelWebhookMatch[2], session.user.id,
+    );
+    const input = channelWebhookInputSchema.parse(await readJson(request));
+    const webhook = await updateChannelWebhook(db, {
+      channelId: channel.id,
+      webhookId: channelWebhookMatch[3],
+      name: input.name,
+      updatedAt: new Date().toISOString(),
+    });
+    if (!webhook) throw new HttpError(404, "Webhook not found");
+    return json({ webhook: channelWebhookJson(webhook) });
+  }
+  if (channelWebhookMatch && request.method === "DELETE") {
+    const session = await requireSession(auth, request);
+    const channel = await requireChannelWebhookManagement(
+      db, channelWebhookMatch[1], channelWebhookMatch[2], session.user.id,
+    );
+    const webhook = await revokeChannelWebhook(db, {
+      channelId: channel.id,
+      webhookId: channelWebhookMatch[3],
+      revokedAt: new Date().toISOString(),
+    });
+    if (!webhook) throw new HttpError(404, "Webhook not found");
+    return json({ webhook: channelWebhookJson(webhook) });
+  }
+
+  const channelWebhookRotateMatch = pathname.match(
+    /^\/organizations\/([0-9a-f-]+)\/channels\/([0-9a-f-]+)\/webhooks\/([0-9a-f-]+)\/rotate$/u,
+  );
+  if (channelWebhookRotateMatch && request.method === "POST") {
+    const session = await requireSession(auth, request);
+    const channel = await requireChannelWebhookManagement(
+      db,
+      channelWebhookRotateMatch[1],
+      channelWebhookRotateMatch[2],
+      session.user.id,
+    );
+    if (channel.archived_at) throw new HttpError(409, "Channel is archived");
+    const secret = randomUrlSafeToken();
+    const webhook = await rotateChannelWebhook(db, {
+      channelId: channel.id,
+      webhookId: channelWebhookRotateMatch[3],
+      secretHash: await sha256(secret),
+      updatedAt: new Date().toISOString(),
+    });
+    if (!webhook) throw new HttpError(404, "Webhook not found");
+    return json({
+      webhook: channelWebhookJson(webhook),
+      url: new URL(`/hooks/channels/${webhook.id}/${secret}`, request.url).toString(),
+    });
   }
 
   const channelMessagesMatch = pathname.match(
@@ -9329,18 +9472,18 @@ async function route(
       session.user.id,
     );
     if (!project) throw new HttpError(404, "Project not found");
-    const days = usageRangeDaysSchema.parse(
-      new URL(request.url).searchParams.get("days") ?? "30",
+    const period = projectUsagePeriodSchema.parse(
+      new URL(request.url).searchParams.get("period") ?? "day",
     );
     const generatedAt = Date.now();
     const since = new Date(
-      projectUsageSummaryWindow(days, generatedAt).startAt,
+      projectUsageSummaryWindow(period, generatedAt).startAt,
     ).toISOString();
     const [runs, totals] = await Promise.all([
       listProjectUsageRuns(db, project.id, since),
       listProjectUsageTotals(db, project.id, since),
     ]);
-    return json(projectUsageSummaryJson(runs, totals, days, generatedAt));
+    return json(projectUsageSummaryJson(runs, totals, period, generatedAt));
   }
 
   const dashboardDeltaMatch = pathname.match(
@@ -13944,6 +14087,70 @@ export async function handleScheduledTask(
   })());
 }
 
+async function handleIncomingChannelWebhook(
+  request: Request,
+  env: Env,
+  context: ExecutionContext | undefined,
+  webhookId: string,
+  secret: string,
+) {
+  const webhook = await getIncomingChannelWebhook(
+    env.DB,
+    webhookId,
+    await sha256(secret),
+  );
+  if (!webhook) throw new HttpError(404, "Webhook not found");
+  if (webhook.channel_archived_at) {
+    throw new HttpError(409, "Channel is archived");
+  }
+  if (!request.headers.get("content-type")?.toLowerCase().startsWith(
+    "application/json",
+  )) {
+    throw new HttpError(415, "Content-Type must be application/json");
+  }
+  const observedAt = new Date();
+  const allowed = await consumeChannelWebhookRateLimit(
+    env.DB,
+    webhook.id,
+    observedAt.toISOString(),
+    new Date(observedAt.getTime() - 60_000).toISOString(),
+  );
+  if (!allowed) throw new HttpError(429, "Webhook rate limit exceeded");
+  const input = channelIncomingWebhookMessageSchema.parse(
+    await readJson(request, 65_536),
+  );
+  const rawHeaderEventId = request.headers.get("idempotency-key");
+  const headerEventId = rawHeaderEventId?.trim() ?? null;
+  if (rawHeaderEventId !== null &&
+    (!headerEventId || headerEventId.length > 200)) {
+    throw new HttpError(400, "Invalid idempotency key");
+  }
+  if (headerEventId && input.eventId && input.eventId !== headerEventId) {
+    throw new HttpError(400, "Invalid idempotency key");
+  }
+  const eventId = input.eventId ?? headerEventId;
+  const result = await createIncomingChannelWebhookMessage(env.DB, {
+    id: crypto.randomUUID(),
+    webhookId: webhook.id,
+    channelId: webhook.channel_id,
+    webhookName: webhook.name,
+    eventId,
+    body: input.text,
+    createdAt: observedAt.toISOString(),
+  });
+  if (!result?.message) throw new HttpError(500, "Message was not created");
+  if (result.created) {
+    scheduleChannelRealtimePublish(
+      env,
+      env.DB,
+      webhook.organization_id,
+      context,
+    );
+  }
+  return json({ message: result.message, duplicate: !result.created },
+    result.created ? 201 : 200);
+}
+
 export default {
   scheduled: handleScheduledTask,
   async fetch(
@@ -13970,6 +14177,33 @@ export default {
         database: "cloudflare-d1",
         updates: "cloudflare-r2",
       }));
+    }
+    const incomingChannelWebhookMatch = url.pathname.match(
+      /^\/hooks\/channels\/([0-9a-f-]+)\/([A-Za-z0-9_-]{43})$/u,
+    );
+    if (incomingChannelWebhookMatch && request.method === "POST") {
+      try {
+        return await handleIncomingChannelWebhook(
+          request,
+          env,
+          ctx,
+          incomingChannelWebhookMatch[1],
+          incomingChannelWebhookMatch[2],
+        );
+      } catch (error) {
+        if (error instanceof HttpError) {
+          return json({ message: error.message }, error.status);
+        }
+        if (error instanceof z.ZodError) {
+          return json({ message: "Invalid request", issues: error.issues }, 400);
+        }
+        console.error(JSON.stringify({
+          message: "Incoming channel webhook failed",
+          webhookId: incomingChannelWebhookMatch[1],
+          error: error instanceof Error ? error.message : String(error),
+        }));
+        return json({ message: "Internal server error" }, 500);
+      }
     }
     if (url.pathname === "/github/webhooks" && request.method === "POST") {
       try {

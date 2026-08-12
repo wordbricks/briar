@@ -294,6 +294,28 @@ function canEditIssueCheckpoints(run: HuntRun) {
   );
 }
 
+function needsExecutionApprovalForTodo(
+  run: HuntRun,
+  placement: HuntRunPlacement,
+) {
+  const origin = run.context?.origin;
+  return (
+    run.status === "backlog" &&
+    placement.status === "queued" &&
+    (origin === "briar-channel" || origin === "briar-conversation")
+  );
+}
+
+function canOpenExecutionApproval(run: HuntRun) {
+  return (
+    run.status === "queued" ||
+    needsExecutionApprovalForTodo(run, {
+      status: "queued",
+      workflowStage: null,
+    })
+  );
+}
+
 const kanbanPointerDragThreshold = 6;
 const kanbanAutoScrollEdge = 72;
 const kanbanAutoScrollInterval = 16;
@@ -901,6 +923,19 @@ export function HuntDashboard({
       ),
     ];
   }, [dashboard?.organizationProviders, dashboard?.workers]);
+  const requestRunMove = useCallback(
+    (run: HuntRun, placement: HuntRunPlacement) => {
+      if (
+        needsExecutionApprovalForTodo(run, placement) &&
+        onProcessIssueNow
+      ) {
+        onProcessIssueNow(run);
+        return Promise.resolve();
+      }
+      return onMoveRun(run.id, placement);
+    },
+    [onMoveRun, onProcessIssueNow],
+  );
 
   useEffect(() => {
     setSelectedRunId(null);
@@ -1205,7 +1240,7 @@ export function HuntDashboard({
             ? () => onCompleteResultReview(selected.id)
             : undefined}
           mentionMembers={dashboard?.members ?? []}
-          onMove={(placement) => onMoveRun(selected.id, placement)}
+          onMove={(placement) => requestRunMove(selected, placement)}
           onProcessNow={
             onProcessIssueNow ? () => onProcessIssueNow(selected) : undefined
           }
@@ -1442,7 +1477,7 @@ export function HuntDashboard({
                 : undefined
             }
             onMove={(run, placement) =>
-              onMoveRun(run.id, placement).catch(() => undefined)
+              requestRunMove(run, placement).catch(() => undefined)
             }
             onOpen={(runId) => setSelectedRunId(runId)}
             onProcessIssueNow={onProcessIssueNow}
@@ -1689,13 +1724,13 @@ export function HuntDashboard({
                         targetColumn.id === "status:paused" ||
                         placementMatchesRun(run, targetColumn.placement)
                       ) return;
-                      void onMoveRun(run.id, targetColumn.placement).catch(
+                      void requestRunMove(run, targetColumn.placement).catch(
                         () => undefined,
                       );
                     }}
                     onEdit={() => setEditingRunId(run.id)}
                     onMove={(placement) =>
-                      onMoveRun(run.id, placement).catch(() => undefined)
+                      requestRunMove(run, placement).catch(() => undefined)
                     }
                     onOpen={() => {
                       if (suppressCardClickRef.current) {
@@ -3501,7 +3536,7 @@ function IssueContextMenu({
   const processNowDisabled =
     !onProcessNow ||
     run.executionReadiness === "waiting" ||
-    (run.status !== "queued" && !canReassign) ||
+    (!canOpenExecutionApproval(run) && !canReassign) ||
     (isClaimed && !canReassign) ||
     isProcessing;
 
@@ -3533,7 +3568,7 @@ function IssueContextMenu({
               <small>{t("issue.waitingOnPrerequisites", {
                 count: run.waitingOnPrerequisiteCount ?? 0,
               })}</small>
-            ) : run.status !== "queued" ? (
+            ) : !canOpenExecutionApproval(run) ? (
               <small>{t("issue.processNowQueuedOnly")}</small>
             ) : isClaimed ? (
               <small>{t("issue.processNowClaimed")}</small>
@@ -4236,7 +4271,7 @@ export function RunPage({
   const processNowDisabled =
     !onProcessNow ||
     run.executionReadiness === "waiting" ||
-    (run.status !== "queued" && !canReassign) ||
+    (!canOpenExecutionApproval(run) && !canReassign) ||
     (isClaimed && !canReassign) ||
     isProcessing;
   const assignee = mentionMembers.find(

@@ -1,8 +1,27 @@
 import { describe, expect, it } from "vitest";
-import { channelReplyCompletionSchema } from "./channels-contract";
+import {
+  channelIncomingWebhookMessageSchema,
+  channelReplyCompletionSchema,
+  channelWebhookInputSchema,
+} from "./channels-contract";
 
 const projectId = "11111111-1111-4111-8111-111111111111";
 const agentId = "22222222-2222-4222-8222-222222222222";
+
+describe("channel webhook contract", () => {
+  it("trims bounded names and message fields without accepting extra input", () => {
+    expect(channelWebhookInputSchema.parse({ name: " Deploy notifier " }))
+      .toEqual({ name: "Deploy notifier" });
+    expect(channelIncomingWebhookMessageSchema.parse({
+      text: " Deployment complete ",
+      eventId: " deploy-42 ",
+    })).toEqual({ text: "Deployment complete", eventId: "deploy-42" });
+    expect(channelIncomingWebhookMessageSchema.safeParse({
+      text: "Deployment complete",
+      channelId: projectId,
+    }).success).toBe(false);
+  });
+});
 
 describe("channel reply completion contract", () => {
   it("keeps delegation null for rolling-compatible ordinary replies", () => {

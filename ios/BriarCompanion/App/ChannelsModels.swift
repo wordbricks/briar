@@ -149,6 +149,7 @@ struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
         enum Kind: String, Codable, Hashable, Sendable {
             case user
             case agent
+            case webhook
         }
     }
 
