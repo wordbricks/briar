@@ -121,7 +121,7 @@ test("server-renders Korean at /ko regardless of Accept-Language", async () => {
   assert.match(html, /에이전트 이벤트 스트림 연결/);
   assert.doesNotMatch(html, /hero-art|briar-hero-orchestration/);
   assert.match(html, /<video[^>]*autoplay[^>]*loop[^>]*muted[^>]*playsinline/i);
-  assert.match(html, /briar-x-demo-20s\.mp4/);
+  assert.match(html, /briar-issue-to-complete-demo\.mp4/);
   assert.match(html, /class="product-stage product-stage-video"/);
   assert.match(html, /class="detail-properties"/);
   assert.match(html, /Mac용 Briar 다운로드/);
@@ -189,7 +189,7 @@ test("server-renders English for an English browser", async () => {
   assert.match(html, /Turn agent development/);
   assert.doesNotMatch(html, /hero-art|briar-hero-orchestration/);
   assert.match(html, /<video[^>]*autoplay[^>]*loop[^>]*muted[^>]*playsinline/i);
-  assert.match(html, /briar-x-demo-20s\.mp4/);
+  assert.match(html, /briar-issue-to-complete-demo\.mp4/);
   assert.match(html, /class="product-stage product-stage-video"/);
   assert.match(html, /class="detail-properties"/);
   assert.match(html, /Download Briar for Mac/);
