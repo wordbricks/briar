@@ -410,8 +410,8 @@ export function ProjectAgents({
 
   return (
     <MainContent className="project-agents-page" id="project-agents">
-      <PageHeader
-        action={
+      {companionMode ? (
+        <div className="project-agents-companion-actions">
           <Button
             className="project-agent-create"
             onClick={openCreateDialog}
@@ -420,15 +420,29 @@ export function ProjectAgents({
             <Plus size={16} />
             {t("agents.create")}
           </Button>
-        }
-        className={`app-page-header project-agents-heading${isSidebarOpen ? "" : " sidebar-closed"}`}
-        data-tauri-drag-region
-        title={t("agents.title")}
-        titleId="project-agents-title"
-      />
+        </div>
+      ) : (
+        <PageHeader
+          action={
+            <Button
+              className="project-agent-create"
+              onClick={openCreateDialog}
+              type="button"
+            >
+              <Plus size={16} />
+              {t("agents.create")}
+            </Button>
+          }
+          className={`app-page-header project-agents-heading${isSidebarOpen ? "" : " sidebar-closed"}`}
+          data-tauri-drag-region
+          title={t("agents.title")}
+          titleId="project-agents-title"
+        />
+      )}
       <div className="project-agents-scroll">
         <section
-          aria-labelledby="project-agents-title"
+          aria-label={companionMode ? t("agents.title") : undefined}
+          aria-labelledby={companionMode ? undefined : "project-agents-title"}
           className="project-agents-content"
         >
           <div className="project-agents-body">

@@ -132,7 +132,7 @@ struct CompanionShellView: View {
                 snapshot: snapshot,
                 refreshDashboard: refresh
             )
-            .toolbar { companionToolbar() }
+            .toolbar { companionToolbar(showsProjectMenu: true) }
             .tabItem { Label(L10n.text("Agents", locale: companionLocale), systemImage: "cpu") }
             .tag(CompanionNavigationModel.Tab.agents)
             .badge(agents.sessions.filter { $0.status == .running }.count)

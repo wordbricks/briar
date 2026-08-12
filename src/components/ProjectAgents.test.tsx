@@ -98,6 +98,22 @@ const projectAgentsProps = {
 };
 
 describe("ProjectAgents", () => {
+  it("uses the shared page title in companion mode without a duplicate local heading", async () => {
+    const container = await mount(
+      <ProjectAgents {...projectAgentsProps} companionMode />,
+    );
+    await act(async () => Promise.resolve());
+
+    expect(container.querySelector(".project-agents-heading")).toBeNull();
+    expect(
+      container.querySelector(".project-agents-companion-actions button")
+        ?.textContent,
+    ).toContain("에이전트 만들기");
+    expect(
+      container.querySelector(".project-agents-content")?.getAttribute("aria-label"),
+    ).toBe("에이전트");
+  });
+
   it("shows the example responsibility-based agent roster in demo mode", async () => {
     const container = await mount(
       <ProjectAgents
