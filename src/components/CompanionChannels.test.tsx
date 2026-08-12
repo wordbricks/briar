@@ -1749,6 +1749,18 @@ describe("CompanionChannels", () => {
       await Promise.resolve();
     });
 
+    const threadScroller = container.querySelector(
+      ".companion-channel-messages",
+    );
+    expect(threadScroller).not.toBeNull();
+    const endSentinel = threadScroller?.lastElementChild as HTMLElement | null;
+    expect(endSentinel).not.toBeNull();
+    const scrollIntoView = vi.fn();
+    if (endSentinel) {
+      endSentinel.scrollIntoView = scrollIntoView;
+    }
+    scrollIntoView.mockClear();
+
     const input = container.querySelector<HTMLInputElement>(
       ".companion-channel-composer input",
     )!;
@@ -1764,6 +1776,7 @@ describe("CompanionChannels", () => {
       container
         .querySelector("form.companion-channel-composer")!
         .dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+      await Promise.resolve();
     });
 
     expect(sendChannelMessage).toHaveBeenCalledWith("token", "org-1", "c-common", {
@@ -1774,6 +1787,8 @@ describe("CompanionChannels", () => {
       attachments: [],
       attachmentReferences: [],
     });
+    expect(container.textContent).toContain("답글");
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: "end" });
   });
 
   it("opens @ candidates and sends a picked Agent as a structured mention", async () => {

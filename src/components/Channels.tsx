@@ -304,6 +304,7 @@ export function Channels({
     new Map<string, ReturnType<typeof loadDashboard>>(),
   );
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const threadMessagesEndRef = useRef<HTMLDivElement | null>(null);
   const activeChannelIdRef = useRef(activeChannelId);
   const threadParentIdRef = useRef(threadParentId);
   if (
@@ -756,6 +757,11 @@ export function Channels({
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView?.({ block: "end" });
   }, [messages, activeChannelId, replies.length]);
+
+  useEffect(() => {
+    if (!threadParentId) return;
+    threadMessagesEndRef.current?.scrollIntoView?.({ block: "end" });
+  }, [threadMessages, threadParentId]);
 
   const openThread = useCallback(
     async (parentId: string) => {
@@ -1444,6 +1450,7 @@ export function Channels({
                 token={token}
               />
             ))}
+            <div ref={threadMessagesEndRef} />
           </div>
           <Composer
             agents={agents}

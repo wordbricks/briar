@@ -2197,6 +2197,79 @@ describe("Channels", () => {
     expect(card?.textContent).toContain("조직 문서");
   });
 
+  it("scrolls the thread panel to the bottom when a thread reply is sent", async () => {
+    const rootMessage = message({
+      id: "message-root",
+      replyCount: 1,
+      parentMessageId: null,
+    });
+    const existingReply = message({
+      id: "message-reply-1",
+      parentMessageId: "message-root",
+      body: "Earlier reply",
+    });
+    const sentReply = message({
+      id: "message-reply-2",
+      parentMessageId: "message-root",
+      body: "Newest reply",
+    });
+    listChannelMessages.mockResolvedValue({
+      messages: [rootMessage, existingReply],
+    });
+    sendChannelMessage.mockResolvedValue({
+      message: sentReply,
+      agentReplies: [],
+    });
+    await render([rootMessage]);
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(
+        ".conversation-reply-summary",
+      )?.click();
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    const threadPanel = container.querySelector(".channel-thread");
+    expect(threadPanel).not.toBeNull();
+    const threadScroller = threadPanel?.querySelector(".channel-messages");
+    expect(threadScroller).not.toBeNull();
+    const endSentinel = threadScroller?.lastElementChild as HTMLElement | null;
+    expect(endSentinel).not.toBeNull();
+    const scrollIntoView = vi.fn();
+    if (endSentinel) {
+      endSentinel.scrollIntoView = scrollIntoView;
+    }
+    scrollIntoView.mockClear();
+
+    const threadComposer = threadPanel?.querySelector<HTMLTextAreaElement>(
+      "form.channel-composer textarea",
+    );
+    expect(threadComposer).not.toBeNull();
+    await typeInto(threadComposer!, "Newest reply");
+    await act(async () => {
+      threadPanel
+        ?.querySelector("form.channel-composer")
+        ?.dispatchEvent(
+          new Event("submit", { bubbles: true, cancelable: true }),
+        );
+      await Promise.resolve();
+    });
+
+    expect(sendChannelMessage).toHaveBeenCalledWith(
+      "token",
+      "org-1",
+      "channel-1",
+      expect.objectContaining({
+        body: "Newest reply",
+        parentMessageId: "message-root",
+      }),
+    );
+    expect(threadPanel?.textContent).toContain("Newest reply");
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: "end" });
+  });
+
   it("resizes the thread panel with the separator", async () => {
     listChannelMessages.mockResolvedValue({ messages: [] });
     await render([
