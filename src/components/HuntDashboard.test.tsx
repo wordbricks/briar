@@ -2582,6 +2582,93 @@ describe("HuntDashboard", () => {
     container.remove();
   });
 
+  it("shows subscriber avatars and toggles the current member subscription", async () => {
+    const member = demoDashboard.members![0]!;
+    const onUpdateIssueSubscription = vi.fn(async () => undefined);
+    const run = {
+      ...demoDashboard.runs[0],
+      assigneeUserId: null,
+      subscribers: [{
+        userId: member.userId,
+        subscribedAt: "2026-08-12T00:00:00.000Z",
+      }],
+    };
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => root.render(
+      <RunPage
+        currentUserId={member.userId}
+        error={null}
+        isRecovering={false}
+        isSidebarOpen
+        mentionMembers={[member]}
+        onBack={() => undefined}
+        onCancel={async () => undefined}
+        onLoadAttachment={async () => new Blob()}
+        onLoadIssueMessages={async () => []}
+        onLoadRunEvidence={async () => []}
+        onMove={async () => undefined}
+        onRetry={async () => undefined}
+        onSendIssueMessage={async () => {
+          throw new Error("not implemented in this test");
+        }}
+        onUpdateIssueSubscription={onUpdateIssueSubscription}
+        run={run}
+      />,
+    ));
+
+    expect(container.querySelectorAll(".issue-subscriber-avatar")).toHaveLength(1);
+    const subscribe = container.querySelector<HTMLButtonElement>(
+      ".issue-subscribe-button",
+    );
+    expect(subscribe?.textContent).toContain("구독 중");
+    expect(subscribe?.getAttribute("aria-pressed")).toBe("true");
+    await act(async () => subscribe?.click());
+    expect(onUpdateIssueSubscription).toHaveBeenCalledWith(false);
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("keeps an assignee subscribed", async () => {
+    const member = demoDashboard.members![0]!;
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => root.render(
+      <RunPage
+        currentUserId={member.userId}
+        error={null}
+        isRecovering={false}
+        isSidebarOpen
+        mentionMembers={[member]}
+        onBack={() => undefined}
+        onCancel={async () => undefined}
+        onLoadAttachment={async () => new Blob()}
+        onLoadIssueMessages={async () => []}
+        onLoadRunEvidence={async () => []}
+        onMove={async () => undefined}
+        onRetry={async () => undefined}
+        onSendIssueMessage={async () => {
+          throw new Error("not implemented in this test");
+        }}
+        onUpdateIssueSubscription={async () => undefined}
+        run={{ ...demoDashboard.runs[0], assigneeUserId: member.userId }}
+      />,
+    ));
+
+    const subscribe = container.querySelector<HTMLButtonElement>(
+      ".issue-subscribe-button",
+    );
+    expect(subscribe?.disabled).toBe(true);
+    expect(subscribe?.title).toBe("담당자는 이 이슈를 항상 구독합니다.");
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
   it("resizes the desktop conversation window with the separator", async () => {
     const container = document.createElement("div");
     document.body.append(container);

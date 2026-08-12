@@ -1740,6 +1740,16 @@ button.paused-review-state { width:100%; border:0; border-radius:8px; cursor:poi
 .issue-conversation-tab-panel[hidden] { display:none; }
 .issue-conversation-header { min-height:46px; flex:0 0 46px; padding:0 18px; display:flex; align-items:center; justify-content:space-between; gap:10px; border-bottom:1px solid var(--border); }
 .issue-conversation-header strong { min-width:0; display:flex; align-items:center; gap:7px; color:var(--foreground); font-size:var(--text-sm); }.issue-conversation-header strong span { color:var(--muted-foreground); font:500 var(--text-2xs) "DM Mono",monospace; }.issue-conversation-header small { overflow:hidden; color:var(--muted-foreground); font-size:var(--text-2xs); text-overflow:ellipsis; white-space:nowrap; }
+.issue-conversation-header-actions { min-width:0; display:flex; align-items:center; justify-content:flex-end; gap:9px; }
+.issue-subscriber-avatars { display:flex; align-items:center; padding-left:5px; }
+.issue-subscriber-avatar,.issue-subscriber-overflow { width:23px; height:23px; flex:0 0 23px; overflow:hidden; display:grid; place-items:center; margin-left:-5px; border:2px solid var(--card); border-radius:50%; color:#fff; background:linear-gradient(145deg,#8068ce,#5943a4); font-size:9px; font-weight:720; }
+.issue-subscriber-avatar img { width:100%; height:100%; display:block; object-fit:cover; }
+.issue-subscriber-overflow { color:var(--muted-foreground); background:var(--muted); font-size:8px; }
+.issue-subscribe-button { min-height:28px; padding:0 9px; display:inline-flex; align-items:center; justify-content:center; gap:5px; border:1px solid var(--border); border-radius:8px; color:var(--muted-foreground); background:var(--background); font-size:var(--text-2xs); font-weight:650; white-space:nowrap; cursor:pointer; transition:border-color .12s ease-out,color .12s ease-out,background-color .12s ease-out; }
+.issue-subscribe-button:hover { border-color:color-mix(in srgb,var(--primary) 35%,var(--border)); color:var(--foreground); background:var(--accent); }
+.issue-subscribe-button.active { border-color:color-mix(in srgb,var(--primary) 32%,var(--border)); color:var(--primary); background:color-mix(in srgb,var(--primary) 9%,var(--card)); }
+.issue-subscribe-button:disabled { cursor:not-allowed; opacity:.62; }
+.issue-subscribe-button:focus-visible { outline:2px solid var(--ring); outline-offset:2px; }
 .issue-message-list { min-width:0; min-height:0; flex:1; margin:0 8px; display:grid; align-content:start; overflow-x:hidden; overflow-y:auto; overscroll-behavior:contain; scrollbar-gutter:stable; scrollbar-width:thin; }
 .issue-message-list::before,.issue-message-list::after { content:""; height:10px; }
 .issue-message-list::after { height:12px; }

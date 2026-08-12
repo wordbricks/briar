@@ -352,6 +352,31 @@ describe("inbox notification content", () => {
     });
   });
 
+  it("shows the author and message for a subscribed issue conversation", () => {
+    const subscribedMessage: InboxMessage = {
+      id: "conversation:message-1",
+      kind: "conversation",
+      projectId: "project-1",
+      projectName: "Briar",
+      targetId: "run-1",
+      messageId: "message-1",
+      rootMessageId: "message-1",
+      title: "Fix checkout",
+      issueKey: "WB-1321",
+      occurredAt: "2026-08-08T00:00:00.000Z",
+      version: "message-1",
+      body: "The rollout is ready.",
+      authorName: "Sam",
+      reason: "subscription",
+    };
+
+    expect(inboxNotificationContent(subscribedMessage, "Recent activity"))
+      .toEqual({
+        title: "Sam in WB-1321",
+        body: "The rollout is ready.",
+      });
+  });
+
   it("keeps the importance wording for a top-level mention", () => {
     const mention: InboxMessage = {
       id: "conversation:mention-1",

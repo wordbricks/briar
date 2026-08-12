@@ -51,6 +51,7 @@ import {
   updateIssue,
   updateIssueCheckpoints,
   updateIssueExecutionPreferences,
+  updateIssueSubscription,
   updateProjectSettings,
   upsertProjectAgentSession,
   waitForIssueAgentReply,
@@ -674,6 +675,32 @@ describe("API errors", () => {
     expect(uploaded[0]?.name).toBe("inline.png");
   });
 
+  it("toggles the current member's issue subscription", async () => {
+    const projectId = "22222222-2222-4222-8222-222222222222";
+    const runId = "11111111-1111-4111-8111-111111111111";
+    const fetchMock = vi.fn(async () =>
+      new Response(JSON.stringify({ runId, subscribers: [] }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await updateIssueSubscription("token", projectId, runId, true);
+    await updateIssueSubscription("token", projectId, runId, false);
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      expect.stringContaining(`/projects/${projectId}/runs/${runId}/subscription`),
+      expect.objectContaining({ method: "PUT" }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining(`/projects/${projectId}/runs/${runId}/subscription`),
+      expect.objectContaining({ method: "DELETE" }),
+    );
+  });
+
   it("records a result review through the project-scoped run endpoint", async () => {
     const projectId = "22222222-2222-4222-8222-222222222222";
     const runId = "11111111-1111-4111-8111-111111111111";
@@ -1207,6 +1234,27 @@ describe("API errors", () => {
     expect(String(fetchMock.mock.calls[0]?.[0])).toContain(
       `/organizations/${organizationId}/inbox`,
     );
+  });
+
+  it("reads the authoritative subscribed issue ids from the Inbox feed", async () => {
+    const organizationId = "22222222-2222-4222-8222-222222222222";
+    const runId = "11111111-1111-4111-8111-111111111111";
+    vi.stubGlobal("fetch", vi.fn(async () =>
+      new Response(JSON.stringify({
+        messages: [],
+        subscribedIssueIds: [runId, null, 3],
+      }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      })
+    ));
+
+    await expect(loadInboxFeed("token", organizationId, null))
+      .resolves.toMatchObject({
+        notModified: false,
+        messages: [],
+        subscribedIssueIds: [runId],
+      });
   });
 
   it("canonicalizes the Agent ID before running a task on a Worker", async () => {

@@ -101,7 +101,7 @@ export type InboxFeedMessage = {
   body?: string;
   authorName?: string;
   issueKey?: string;
-  reason?: "mention" | "thread_reply";
+  reason?: "mention" | "thread_reply" | "subscription";
   channelId?: string;
   channelName?: string;
   agentName?: string | null;

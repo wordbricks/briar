@@ -52,6 +52,7 @@ import {
   updateIssue,
   updateIssueCheckpoints,
   updateIssueExecutionPreferences,
+  updateIssueSubscription,
   updateAccountProfile as updateRemoteAccountProfile,
   updateOrganization as updateRemoteOrganization,
   updateOrganizationLogo as updateRemoteOrganizationLogo,
@@ -2338,6 +2339,64 @@ export function useBriar(options: UseBriarOptions = {}) {
     [activeProjectId, dashboard, demoMode, refresh, token],
   );
 
+  const editIssueSubscription = useCallback(
+    async (runId: string, subscribed: boolean) => {
+      if (!activeProjectId || !dashboard || !user) {
+        throw new Error("이슈 구독을 변경할 수 없습니다.");
+      }
+      setError(null);
+      try {
+        if (demoMode) {
+          const run = dashboard.runs.find((candidate) => candidate.id === runId);
+          if (!subscribed && run?.assigneeUserId === user.id) {
+            throw new Error("담당자는 이슈 구독을 해제할 수 없습니다.");
+          }
+          const existing = run?.subscribers ?? [];
+          const subscribers = subscribed
+            ? existing.some((subscriber) => subscriber.userId === user.id)
+              ? existing
+              : [...existing, {
+                  userId: user.id,
+                  subscribedAt: new Date().toISOString(),
+                }]
+            : existing.filter((subscriber) => subscriber.userId !== user.id);
+          setDashboard((current) => current
+            ? {
+                ...current,
+                runs: current.runs.map((candidate) =>
+                  candidate.id === runId ? { ...candidate, subscribers } : candidate
+                ),
+              }
+            : current);
+          return { runId, subscribers };
+        }
+        if (!token) throw new Error("로그인이 필요합니다.");
+        const result = await updateIssueSubscription(
+          token,
+          activeProjectId,
+          runId,
+          subscribed,
+        );
+        setDashboard((current) => current
+          ? {
+              ...current,
+              runs: current.runs.map((run) =>
+                run.id === runId
+                  ? { ...run, subscribers: result.subscribers }
+                  : run
+              ),
+            }
+          : current);
+        return result;
+      } catch (caught) {
+        const message = caught instanceof Error ? caught.message : String(caught);
+        setError(message);
+        throw caught;
+      }
+    },
+    [activeProjectId, dashboard, demoMode, token, user],
+  );
+
   const editIssueExecutionPreferences = useCallback(
     async (runId: string, input: IssueExecutionPreferences) => {
       if (!activeProjectId || !dashboard) {
@@ -3603,6 +3662,7 @@ export function useBriar(options: UseBriarOptions = {}) {
     refreshVelen,
     readIssueAttachment,
     editIssue,
+    editIssueSubscription,
     editIssueCheckpoints,
     editIssueExecutionPreferences,
     completeResultReview,

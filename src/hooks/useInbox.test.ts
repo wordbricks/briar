@@ -299,6 +299,57 @@ describe("Inbox messages", () => {
     expect(classifyInboxMessage(message)).toBe("action_required");
   });
 
+  it("includes only subscribed issue updates and treats regular messages as activity", () => {
+    // Use an equivalent offset form so filtering compares instants rather
+    // than relying on lexicographic timestamp formatting.
+    const subscribedAt = "2026-07-30T09:30:00.000+09:00";
+    const subscribedRun = {
+      ...demoDashboard.runs[0]!,
+      id: "run-subscribed",
+      status: "completed" as const,
+      lastEventAt: "2026-07-30T01:00:00.000Z",
+      subscribers: [{ userId: "owner", subscribedAt }],
+    };
+    const otherRun = {
+      ...subscribedRun,
+      id: "run-other",
+      subscribers: [{ userId: "member", subscribedAt }],
+    };
+    const messages = buildCurrentInboxMessages(
+      {
+        ...demoDashboard,
+        runs: [subscribedRun, otherRun],
+        conversationNotifications: [{
+          id: "message-subscription",
+          runId: subscribedRun.id,
+          runTitle: subscribedRun.title,
+          rootMessageId: "message-subscription",
+          body: "A normal subscriber update",
+          author: {
+            id: "member",
+            name: "Member",
+            image: null,
+            provider: null,
+          },
+          reason: "subscription",
+          createdAt: "2026-07-30T01:01:00.000Z",
+        }],
+      },
+      [],
+      [project],
+      "owner",
+    );
+
+    expect(messages.map((message) => message.targetId)).toEqual([
+      subscribedRun.id,
+      subscribedRun.id,
+    ]);
+    const conversation = messages.find(
+      (message) => message.kind === "conversation",
+    );
+    expect(conversation && classifyInboxMessage(conversation)).toBe("activity");
+  });
+
   it("creates one message for a task and its linked Auto Hunt dispatch", () => {
     const taskSession = {
       ...session("completed", "task-session"),

@@ -1,5 +1,10 @@
 import Foundation
 
+struct IssueSubscriber: Codable, Equatable, Sendable {
+    let userId: String
+    let subscribedAt: Date
+}
+
 struct DashboardRun: Codable, Equatable, Identifiable, Sendable {
     let id: UUID
     let runNumber: Int?
@@ -18,6 +23,7 @@ struct DashboardRun: Codable, Equatable, Identifiable, Sendable {
     let detail: String?
     let priority: Int?
     let assigneeUserId: String?
+    let subscribers: [IssueSubscriber]?
     let issueDescription: String?
     let attachments: [IssueAttachment]?
     let prerequisites: [IssueDependencyReference]?
@@ -67,6 +73,7 @@ struct DashboardRun: Codable, Equatable, Identifiable, Sendable {
         detail: String? = nil,
         priority: Int? = nil,
         assigneeUserId: String? = nil,
+        subscribers: [IssueSubscriber]? = nil,
         issueDescription: String? = nil,
         attachments: [IssueAttachment]? = nil,
         prerequisites: [IssueDependencyReference]? = nil,
@@ -115,6 +122,7 @@ struct DashboardRun: Codable, Equatable, Identifiable, Sendable {
         self.detail = detail
         self.priority = priority
         self.assigneeUserId = assigneeUserId
+        self.subscribers = subscribers
         self.issueDescription = issueDescription
         self.attachments = attachments
         self.prerequisites = prerequisites

@@ -214,6 +214,8 @@ import {
   listIssueDependencies,
   listIssueDependenciesByRunIds,
   listIssueConversationNotifications,
+  listIssueSubscriptions,
+  listOrganizationIssueSubscriptionRunIds,
   listIssueActionProposals,
   listIssueExecutionProposals,
   listIssueAgentSkillExecutionProposals,
@@ -266,6 +268,7 @@ import {
   recordRunEvidence,
   recordRunCostRecords,
   recordRunUsageRecords,
+  subscribeIssue,
   removeOrganizationMember,
   revokeOrganizationInvitation,
   renewProjectAgentScheduleRunLease,
@@ -299,6 +302,7 @@ import {
   updateIssueExecutionPreferences,
   updateHuntRunExecutionMetrics,
   updateIssueMessage,
+  unsubscribeIssue,
   deleteIssueMessage,
   updateSlackInstallationProject,
   upsertInboxReadStates,
@@ -5098,6 +5102,27 @@ const parseJsonArray = (value: string) => {
   return Array.isArray(parsed) ? parsed : [];
 };
 
+const issueSubscribers = (run: Pick<HuntRunRow, "subscribers_json">) =>
+  parseJsonArray(run.subscribers_json ?? "[]").flatMap((value) => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return [];
+    const subscriber = value as Record<string, unknown>;
+    return typeof subscriber.userId === "string" &&
+        typeof subscriber.subscribedAt === "string"
+      ? [{
+          userId: subscriber.userId,
+          subscribedAt: subscriber.subscribedAt,
+        }]
+      : [];
+  });
+
+const occurredAtOrAfter = (occurredAt: string, subscribedAt: string) => {
+  const occurredTime = Date.parse(occurredAt);
+  const subscribedTime = Date.parse(subscribedAt);
+  return Number.isFinite(occurredTime) &&
+    Number.isFinite(subscribedTime) &&
+    occurredTime >= subscribedTime;
+};
+
 const parseJsonObject = (value: string | null) => {
   if (!value) return null;
   const parsed: unknown = JSON.parse(value);
@@ -5871,6 +5896,7 @@ function dashboardRunJson(
     detail: run.detail,
     priority: run.priority,
     assigneeUserId: run.assignee_user_id,
+    subscribers: issueSubscribers(run),
     repository: run.repository,
     branch: run.branch,
     commitSha: run.commit_sha,
@@ -6110,7 +6136,11 @@ async function route(
       readVersion: () => getOrganizationInboxSyncVersion(db, organizationId),
       loadSnapshot: async () => {
         const projects = await listOrganizationInboxProjects(db, organizationId);
-        const [projectData, channelNotifications] = await Promise.all([
+        const [
+          projectData,
+          channelNotifications,
+          subscribedIssueIds,
+        ] = await Promise.all([
           Promise.all(
             projects.map(async (project) => {
               const [runs, conversationNotifications, sessionSummaries] =
@@ -6125,7 +6155,17 @@ async function route(
                 ]);
               return {
                 project,
-                runs,
+                runs: runs.filter((run) => {
+                  const subscription = issueSubscribers(run).find(
+                    (subscriber) => subscriber.userId === session.user.id,
+                  );
+                  return Boolean(
+                    subscription && occurredAtOrAfter(
+                      run.last_event_at,
+                      subscription.subscribedAt,
+                    ),
+                  );
+                }),
                 conversationNotifications,
                 sessionSummaries,
               };
@@ -6136,9 +6176,15 @@ async function route(
             organizationId,
             session.user.id,
           ),
+          listOrganizationIssueSubscriptionRunIds(
+            db,
+            organizationId,
+            session.user.id,
+          ),
         ]);
         return {
           messages: buildInboxFeedMessages(projectData, channelNotifications),
+          subscribedIssueIds,
           generatedAt: new Date().toISOString(),
         };
       },
@@ -10674,6 +10720,9 @@ async function route(
   const issueUpdateMatch = pathname.match(
     /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)$/u,
   );
+  const issueSubscriptionMatch = pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/subscription$/u,
+  );
   const issueDependencyMatch = pathname.match(
     /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/dependencies\/([0-9a-f-]+)$/u,
   );
@@ -10686,6 +10735,50 @@ async function route(
   const issueResultReviewsMatch = pathname.match(
     /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/result-reviews$/u,
   );
+  if (
+    issueSubscriptionMatch &&
+    (request.method === "PUT" || request.method === "DELETE")
+  ) {
+    const session = await requireSession(auth, request);
+    const project = await getProject(
+      db,
+      issueSubscriptionMatch[1],
+      session.user.id,
+    );
+    if (!project) throw new HttpError(404, "Project not found");
+    const run = await getHuntRunForProject(
+      db,
+      project.id,
+      issueSubscriptionMatch[2],
+    );
+    if (!run) throw new HttpError(404, "Run not found");
+    if (request.method === "DELETE") {
+      if (run.assignee_user_id === session.user.id) {
+        throw new HttpError(
+          409,
+          "The issue assignee must remain subscribed",
+          "ISSUE_ASSIGNEE_SUBSCRIPTION_REQUIRED",
+        );
+      }
+      await unsubscribeIssue(db, project.id, run.id, session.user.id);
+    } else {
+      await subscribeIssue(
+        db,
+        project.id,
+        run.id,
+        session.user.id,
+        new Date().toISOString(),
+      );
+    }
+    const subscribers = await listIssueSubscriptions(db, project.id, run.id);
+    return json({
+      runId: run.id,
+      subscribers: subscribers.map((subscriber) => ({
+        userId: subscriber.user_id,
+        subscribedAt: subscriber.created_at,
+      })),
+    });
+  }
   if (issueDependencyMatch && request.method === "PUT") {
     const session = await requireSession(auth, request);
     const project = await getProject(

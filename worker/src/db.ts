@@ -433,6 +433,7 @@ export type HuntRunRow = {
   detail: string | null;
   priority: number | null;
   assignee_user_id: string | null;
+  subscribers_json?: string;
   repository: string;
   branch: string | null;
   commit_sha: string | null;
@@ -926,7 +927,14 @@ export type FreshBacklogExecutionTargetRow = {
 export type IssueConversationNotificationRow = IssueMessageRow & {
   run_title: string;
   root_message_id: string;
-  notification_reason: "mention" | "thread_reply";
+  notification_reason: "mention" | "thread_reply" | "subscription";
+};
+
+export type IssueSubscriptionRow = {
+  run_id: string;
+  organization_id: string;
+  user_id: string;
+  created_at: string;
 };
 
 export type ChannelConversationNotificationRow = {
@@ -6434,6 +6442,18 @@ export async function listDashboardRuns(db: D1Database, projectId: string) {
   const runs = await db
     .prepare(
       `select run.*,
+              coalesce((
+                select json_group_array(json_object(
+                  'userId', subscriber.user_id,
+                  'subscribedAt', subscriber.created_at
+                ))
+                from (
+                  select subscription.user_id, subscription.created_at
+                  from briar_issue_subscriptions subscription
+                  where subscription.run_id = run.id
+                  order by subscription.created_at, subscription.user_id
+                ) subscriber
+              ), '[]') as subscribers_json,
               run.event_count + coalesce((
                 select sum(archive.row_count)
                 from briar_log_archives archive
@@ -6463,6 +6483,18 @@ export async function listDashboardRunsByIds(
   const runs = await db
     .prepare(
       `select run.*,
+              coalesce((
+                select json_group_array(json_object(
+                  'userId', subscriber.user_id,
+                  'subscribedAt', subscriber.created_at
+                ))
+                from (
+                  select subscription.user_id, subscription.created_at
+                  from briar_issue_subscriptions subscription
+                  where subscription.run_id = run.id
+                  order by subscription.created_at, subscription.user_id
+                ) subscriber
+              ), '[]') as subscribers_json,
               run.event_count + coalesce((
                 select sum(archive.row_count)
                 from briar_log_archives archive
@@ -9138,11 +9170,17 @@ export async function listIssueConversationNotifications(
               message.body, 0 as reply_count, message.created_at,
               message.updated_at, run.title as run_title,
               coalesce(message.parent_message_id, message.id) as root_message_id,
-              case when mention.user_id is not null
-                then 'mention' else 'thread_reply' end as notification_reason
+              case
+                when mention.user_id is not null then 'mention'
+                when message.parent_message_id is not null
+                 and root.author_user_id = ? then 'thread_reply'
+                else 'subscription'
+              end as notification_reason
        from briar_issue_messages message
        join briar_hunt_runs run
          on run.id = message.run_id and run.project_id = message.project_id
+       join briar_issue_subscriptions subscription
+         on subscription.run_id = run.id and subscription.user_id = ?
        left join "user" author on author.id = message.author_user_id
        left join briar_issue_messages root
          on root.id = message.parent_message_id
@@ -9151,20 +9189,97 @@ export async function listIssueConversationNotifications(
        left join briar_issue_message_mentions mention
          on mention.message_id = message.id and mention.user_id = ?
        where message.project_id = ?
+         and julianday(message.created_at) >= julianday(subscription.created_at)
          and (message.author_user_id is null or message.author_user_id != ?)
-         and (
-           mention.user_id is not null
-           or (
-             message.parent_message_id is not null
-             and root.author_user_id = ?
-           )
-         )
        order by message.created_at desc, message.id desc
        limit 500`,
     )
-    .bind(userId, projectId, userId, userId)
+    .bind(userId, userId, userId, projectId, userId)
     .all<IssueConversationNotificationRow>();
   return result.results;
+}
+
+export async function listIssueSubscriptions(
+  db: D1Database,
+  projectId: string,
+  runId: string,
+) {
+  const result = await db
+    .prepare(
+      `select subscription.run_id, subscription.organization_id,
+              subscription.user_id, subscription.created_at
+       from briar_issue_subscriptions subscription
+       join briar_hunt_runs run on run.id = subscription.run_id
+       where run.project_id = ? and run.id = ?
+       order by subscription.created_at, subscription.user_id`,
+    )
+    .bind(projectId, runId)
+    .all<IssueSubscriptionRow>();
+  return result.results;
+}
+
+export async function listOrganizationIssueSubscriptionRunIds(
+  db: D1Database,
+  organizationId: string,
+  userId: string,
+) {
+  const result = await db
+    .prepare(
+      `select run_id
+       from briar_issue_subscriptions
+       where organization_id = ? and user_id = ?
+       order by created_at, run_id`,
+    )
+    .bind(organizationId, userId)
+    .all<{ run_id: string }>();
+  return result.results.map((row) => row.run_id);
+}
+
+export async function subscribeIssue(
+  db: D1Database,
+  projectId: string,
+  runId: string,
+  userId: string,
+  createdAt: string,
+) {
+  return db
+    .prepare(
+      `insert into briar_issue_subscriptions (
+         run_id, organization_id, user_id, created_at
+       )
+       select run.id, project.organization_id, ?, ?
+       from briar_hunt_runs run
+       join briar_projects project on project.id = run.project_id
+       join briar_organization_members membership
+         on membership.organization_id = project.organization_id
+        and membership.user_id = ?
+       where run.id = ? and run.project_id = ?
+       on conflict (run_id, user_id) do nothing
+       returning run_id`,
+    )
+    .bind(userId, createdAt, userId, runId, projectId)
+    .first<{ run_id: string }>();
+}
+
+export async function unsubscribeIssue(
+  db: D1Database,
+  projectId: string,
+  runId: string,
+  userId: string,
+) {
+  return db
+    .prepare(
+      `delete from briar_issue_subscriptions
+       where run_id = ? and user_id = ?
+         and exists (
+           select 1 from briar_hunt_runs run
+           where run.id = briar_issue_subscriptions.run_id
+             and run.project_id = ?
+         )
+       returning run_id`,
+    )
+    .bind(runId, userId, projectId)
+    .first<{ run_id: string }>();
 }
 
 /**

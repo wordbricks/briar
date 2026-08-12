@@ -103,6 +103,11 @@ export const mobileOrganizationMemberSchema = z.object({
   createdAt: z.iso.datetime(),
 });
 
+export const mobileIssueSubscriberSchema = z.object({
+  userId: z.string().min(1),
+  subscribedAt: z.iso.datetime(),
+});
+
 export const mobileDashboardRunSchema = z.object({
   id: z.uuid(),
   runNumber: z.number().int().positive().optional(),
@@ -146,6 +151,7 @@ export const mobileDashboardRunSchema = z.object({
   detail: z.string().nullable().optional(),
   priority: z.number().int().min(1).max(4).nullable().optional(),
   assigneeUserId: z.string().nullable().optional(),
+  subscribers: z.array(mobileIssueSubscriberSchema).optional(),
   issueDescription: z.string().nullable().optional(),
   attachments: z.array(mobileIssueAttachmentSchema).optional(),
   prerequisites: z.array(z.object({
@@ -233,7 +239,7 @@ const mobileInboxConversationMessageSchema = mobileInboxMessageBaseSchema.extend
   body: z.string(),
   authorName: z.string(),
   issueKey: z.string().optional(),
-  reason: z.enum(["mention", "thread_reply"]),
+  reason: z.enum(["mention", "thread_reply", "subscription"]),
 });
 
 const mobileInboxChannelMessageSchema = mobileInboxMessageBaseSchema.extend({
@@ -257,6 +263,11 @@ const mobileInboxSessionMessageSchema = mobileInboxMessageBaseSchema.extend({
   requiresAttention: z.boolean(),
 });
 
+export const mobileIssueSubscriptionResponseSchema = z.object({
+  runId: z.uuid(),
+  subscribers: z.array(mobileIssueSubscriberSchema),
+});
+
 export const mobileInboxFeedResponseSchema = z.object({
   messages: z.array(z.discriminatedUnion("kind", [
     mobileInboxIssueMessageSchema,
@@ -264,6 +275,7 @@ export const mobileInboxFeedResponseSchema = z.object({
     mobileInboxChannelMessageSchema,
     mobileInboxSessionMessageSchema,
   ])),
+  subscribedIssueIds: z.array(z.uuid()),
   generatedAt: z.iso.datetime(),
 });
 
@@ -297,7 +309,7 @@ export const mobileConversationNotificationSchema = z.object({
   rootMessageId: z.uuid(),
   body: z.string(),
   author: mobileMessageAuthorSchema,
-  reason: z.enum(["mention", "thread_reply"]),
+  reason: z.enum(["mention", "thread_reply", "subscription"]),
   createdAt: z.iso.datetime(),
 });
 
@@ -1055,6 +1067,8 @@ export const mobileOperationSchemas = {
   listRunEvidence: { response: mobileRunEvidenceResponseSchema },
   createIssue: { request: mobileCreateIssueRequestSchema, response: mobileCreateIssueResponseSchema },
   updateIssue: { request: mobileUpdateIssueRequestSchema, response: mobileUpdateIssueResponseSchema },
+  putIssueSubscription: { response: mobileIssueSubscriptionResponseSchema },
+  deleteIssueSubscription: { response: mobileIssueSubscriptionResponseSchema },
   deleteIssue: { response: z.null() },
   updateIssuePreferences: { request: mobilePreferencesSchema, response: mobilePreferencesResponseSchema },
   addIssueDependency: { response: mobileDependencyResponseSchema },

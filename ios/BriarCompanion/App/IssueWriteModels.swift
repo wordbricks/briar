@@ -183,6 +183,11 @@ struct UpdateIssueResponse: Codable, Sendable {
     let assigneeUserId: String?
 }
 
+struct IssueSubscriptionResponse: Codable, Equatable, Sendable {
+    let runId: UUID
+    let subscribers: [IssueSubscriber]
+}
+
 struct TransferIssueRequest: Codable, Sendable {
     let targetProjectId: UUID
 }

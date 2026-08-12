@@ -42,6 +42,7 @@ struct InboxMessage: Identifiable, Equatable, Sendable {
     let requiresAttention: Bool
     let priority: Int?
     let structuredResult: StructuredRunResult?
+    var reason: String? = nil
     let rootMessageId: UUID?
     var conversationMessageId: UUID? = nil
     var channelMessageId: UUID? = nil
@@ -53,6 +54,7 @@ struct InboxMessage: Identifiable, Equatable, Sendable {
 
 struct InboxFeedResponse: Codable, Equatable, Sendable {
     let messages: [InboxFeedMessage]
+    var subscribedIssueIds: [UUID]? = nil
     let generatedAt: Date
 }
 
@@ -141,7 +143,11 @@ struct InboxFeedMessage: Codable, Equatable, Sendable {
         case .issue:
             statusLabel = runStatus?.displayName
         case .conversation, .channel:
-            statusLabel = reason == "mention" ? L10n.text("멘션") : L10n.text("답글")
+            switch reason {
+            case "mention": statusLabel = L10n.text("멘션")
+            case "subscription": statusLabel = L10n.text("구독 대화")
+            default: statusLabel = L10n.text("답글")
+            }
         case .session:
             statusLabel = runStatus?.displayName
         }
@@ -172,6 +178,7 @@ struct InboxFeedMessage: Codable, Equatable, Sendable {
             requiresAttention: requiresAttention ?? runStatus?.needsAttention ?? false,
             priority: priority,
             structuredResult: structuredResult,
+            reason: reason,
             rootMessageId: rootMessageId,
             conversationMessageId: kind == .conversation ? messageId : nil,
             channelMessageId: kind == .channel ? messageId : nil,
@@ -185,12 +192,22 @@ enum InboxMessageBuilder {
     static func build(
         snapshot: DashboardSnapshot?,
         sessions: [ProjectAgentSession],
-        project: ProjectsResponse.Project
+        project: ProjectsResponse.Project,
+        currentUserID: String? = nil
     ) -> [InboxMessage] {
         var messages: [InboxMessage] = []
 
         if let snapshot {
             for run in snapshot.runs where run.status.showsInInbox {
+                if let currentUserID, let subscribers = run.subscribers {
+                    guard let subscription = subscribers.first(where: {
+                        $0.userId == currentUserID
+                    }) else { continue }
+                    let lastEvent = run.lastEventAt.flatMap {
+                        ISO8601DateFormatter.mobileContract.date(from: $0)
+                    } ?? run.updatedAt
+                    guard lastEvent >= subscription.subscribedAt else { continue }
+                }
                 let stage = run.workflowStage ?? "none"
                 // Keep this formula aligned with desktop/web `useInbox` so
                 // account-synced read versions match across clients.
@@ -211,15 +228,21 @@ enum InboxMessageBuilder {
                     requiresAttention: run.status.needsAttention,
                     priority: run.priority,
                     structuredResult: run.structuredResult,
+                    reason: nil,
                     rootMessageId: nil
                 ))
             }
 
             for notification in snapshot.conversationNotifications ?? [] {
-                let issueKey = snapshot.runs
-                    .first { $0.id == notification.runId }?
-                    .runNumber
-                    .map { project.issueKey(runNumber: $0) }
+                let notificationRun = snapshot.runs.first { $0.id == notification.runId }
+                if let currentUserID, let subscribers = notificationRun?.subscribers {
+                    guard let subscription = subscribers.first(where: {
+                        $0.userId == currentUserID
+                    }), notification.createdAt >= subscription.subscribedAt else { continue }
+                }
+                let issueKey = notificationRun?.runNumber.map {
+                    project.issueKey(runNumber: $0)
+                }
                 messages.append(InboxMessage(
                     id: "conversation:\(notification.id.uuidString.lowercased())",
                     kind: .conversation,
@@ -233,10 +256,13 @@ enum InboxMessageBuilder {
                     authorName: notification.author.name,
                     statusLabel: notification.reason == "mention"
                         ? L10n.text("멘션")
-                        : L10n.text("답글"),
-                    requiresAttention: true,
+                        : notification.reason == "subscription"
+                            ? L10n.text("구독 대화")
+                            : L10n.text("답글"),
+                    requiresAttention: notification.reason != "subscription",
                     priority: nil,
                     structuredResult: nil,
+                    reason: notification.reason,
                     rootMessageId: notification.rootMessageId,
                     conversationMessageId: notification.id,
                     issueKey: issueKey
@@ -261,6 +287,7 @@ enum InboxMessageBuilder {
                     requiresAttention: true,
                     priority: nil,
                     structuredResult: nil,
+                    reason: notification.reason,
                     rootMessageId: notification.rootMessageId,
                     channelMessageId: notification.id,
                     channelName: notification.channelName
@@ -290,6 +317,7 @@ enum InboxMessageBuilder {
                 requiresAttention: session.requiresAttention,
                 priority: nil,
                 structuredResult: nil,
+                reason: nil,
                 rootMessageId: nil
             ))
         }
@@ -298,7 +326,10 @@ enum InboxMessageBuilder {
     }
 
     static func classify(_ message: InboxMessage) -> InboxCategory {
-        if message.kind == .conversation || message.kind == .channel {
+        if message.kind == .conversation {
+            return message.reason == "subscription" ? .activity : .actionRequired
+        }
+        if message.kind == .channel {
             return .actionRequired
         }
         if message.kind == .session {

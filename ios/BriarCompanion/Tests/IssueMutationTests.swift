@@ -187,6 +187,33 @@ final class IssueMutationTests: XCTestCase {
         XCTAssertEqual(body["fullAuto"] as? Bool, true)
     }
 
+    func testIssueSubscriptionUsesDedicatedPutAndDeleteEndpoint() async throws {
+        let recorder = MutationAPIRecorder()
+        let store = IssueMutationStore(
+            api: recorder,
+            projectID: Self.projectID,
+            token: "token"
+        )
+
+        let subscribed = try await store.setSubscription(
+            runID: Self.runID,
+            subscribed: true
+        )
+        XCTAssertEqual(subscribed.runId, Self.runID)
+        XCTAssertEqual(subscribed.subscribers.map(\.userId), ["fixture-user"])
+        XCTAssertEqual(await recorder.lastMethod(), "PUT")
+        XCTAssertEqual(
+            await recorder.lastPath(),
+            MobileAPIContract.Endpoint.runSubscription(
+                projectID: Self.projectID,
+                runID: Self.runID
+            )
+        )
+
+        _ = try await store.setSubscription(runID: Self.runID, subscribed: false)
+        XCTAssertEqual(await recorder.lastMethod(), "DELETE")
+    }
+
     func testDispatchRunRequestEncodesWorkerSelection() throws {
         let agentID = UUID(uuidString: "AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA")!
         let requestID = UUID(uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!
@@ -1219,6 +1246,7 @@ private actor MentionMessageAPIRecorder: MobileAPIClientProtocol {
 private actor MutationAPIRecorder: MobileAPIClientProtocol {
     private var count = 0
     private var paths: [String] = []
+    private var methods: [String] = []
     private var recordedRequestID: String?
     private var recordedRequestIDs: [String] = []
     private var recordedJSONBodyData: Data?
@@ -1234,6 +1262,8 @@ private actor MutationAPIRecorder: MobileAPIClientProtocol {
     func requestCount() -> Int { count }
 
     func lastPath() -> String? { paths.last }
+
+    func lastMethod() -> String? { methods.last }
 
     func lastRequestID() -> String? { recordedRequestID }
 
@@ -1254,6 +1284,7 @@ private actor MutationAPIRecorder: MobileAPIClientProtocol {
     ) async throws -> Response {
         count += 1
         paths.append(path)
+        methods.append(method)
         if let body {
             let data = try JSONEncoder.mobileContract.encode(TestAnyEncodable(body))
             recordedJSONBodyData = data
@@ -1276,7 +1307,9 @@ private actor MutationAPIRecorder: MobileAPIClientProtocol {
             throw MobileAPIError.invalidRequest
         }
         let payload: String
-        if path.hasSuffix("/issues") {
+        if path.hasSuffix("/subscription") {
+            payload = #"{"runId":"33333333-3333-4333-8333-333333333333","subscribers":[{"userId":"fixture-user","subscribedAt":"2026-08-12T01:00:00.000Z"}]}"#
+        } else if path.hasSuffix("/issues") {
             payload = #"{"runId":"33333333-3333-4333-8333-333333333333","sourceKey":"briar-issue:test","stage":"queued","status":"queued","attachments":[]}"#
         } else if path.hasSuffix("/status") {
             payload = #"{"runId":"33333333-3333-4333-8333-333333333333","outcome":"moved","status":"queued","workflowStage":null}"#

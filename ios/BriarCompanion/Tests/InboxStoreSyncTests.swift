@@ -207,6 +207,7 @@ final class InboxStoreSyncTests: XCTestCase {
                     requiresAttention: true
                 )
             ],
+            subscribedIssueIds: [secondRunID],
             generatedAt: Date(timeIntervalSince1970: 1_775_260_951)
         )
         let api = SelectionIndependentInboxAPI(response: response)
@@ -235,6 +236,9 @@ final class InboxStoreSyncTests: XCTestCase {
         XCTAssertEqual(secondMessage.targetId, secondRunID.uuidString.lowercased())
         XCTAssertEqual(secondMessage.statusLabel, DashboardRun.Status.blocked.displayName)
         XCTAssertTrue(secondMessage.isUnread)
+        XCTAssertFalse(store.messages.contains {
+            $0.targetId == Self.selectedRunID.uuidString.lowercased()
+        })
         XCTAssertTrue(store.feedReady)
         XCTAssertEqual(
             store.notificationBaselineID,
@@ -264,6 +268,9 @@ final class InboxStoreSyncTests: XCTestCase {
             generatedAt: occurredAt
         )
     }
+
+    private static let selectedRunID =
+        UUID(uuidString: "33333333-3333-4333-8333-333333333333")!
 
     private func isolatedDefaults() -> (UserDefaults, String) {
         let suiteName = "InboxStoreSyncTests.\(UUID().uuidString)"
