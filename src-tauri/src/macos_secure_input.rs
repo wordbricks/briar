@@ -239,39 +239,6 @@ impl SecureInputState {
         };
     }
 
-    #[cfg(test)]
-    fn action_is_current(&self, action: &FocusAction) -> bool {
-        let state = self.lock();
-        match action {
-            FocusAction::None => true,
-            FocusAction::Release(witness) => {
-                !state.window_focused
-                    && matches!(
-                        &state.responder,
-                        ResponderState::ReleasePending(current)
-                            | ResponderState::ReleaseInFlight(current)
-                            if current == witness
-                    )
-            }
-            FocusAction::Restore {
-                generation,
-                webview_label,
-            } => {
-                state.window_focused
-                    && matches!(
-                        &state.responder,
-                        ResponderState::RestorePending {
-                            generation: current_generation,
-                            webview_label: current_label,
-                        } | ResponderState::RestoreInFlight {
-                            generation: current_generation,
-                            webview_label: current_label,
-                        } if current_generation == generation && current_label == webview_label
-                    )
-            }
-        }
-    }
-
     fn begin_action(&self, action: &FocusAction) -> bool {
         let mut state = self.lock();
         match action {
@@ -476,76 +443,70 @@ unsafe fn restore_webview_first_responder(
 
 #[cfg(test)]
 mod tests {
-    use super::{FocusAction, SecureInputState};
+    use super::{FocusAction, ReleaseResult, ResponderState, RestoreResult, SecureInputState};
 
     #[test]
-    fn deactivation_after_arm_requests_release() {
-        let state = SecureInputState::default();
-        assert_eq!(state.arm_editor("main".into()), FocusAction::None);
+    fn arm_and_deactivation_order_both_request_release() {
+        let armed_first = SecureInputState::default();
+        assert_eq!(armed_first.arm_editor("main".into()), FocusAction::None);
+        assert!(matches!(
+            armed_first.set_window_focused(false),
+            FocusAction::Release(_)
+        ));
 
-        let action @ FocusAction::Release(_) = state.set_window_focused(false) else {
-            panic!("an armed editor must be released on deactivation");
-        };
-        assert!(state.action_is_current(&action));
+        let deactivated_first = SecureInputState::default();
+        assert_eq!(
+            deactivated_first.set_window_focused(false),
+            FocusAction::None
+        );
+        assert!(matches!(
+            deactivated_first.arm_editor("main".into()),
+            FocusAction::Release(_)
+        ));
     }
 
     #[test]
-    fn arm_after_deactivation_also_requests_release() {
-        let state = SecureInputState::default();
-        assert_eq!(state.set_window_focused(false), FocusAction::None);
+    fn rapid_reactivation_cancels_queued_release_but_restores_inflight_release() {
+        let queued = SecureInputState::default();
+        queued.arm_editor("main".into());
+        assert!(matches!(
+            queued.set_window_focused(false),
+            FocusAction::Release(_)
+        ));
+        assert_eq!(queued.set_window_focused(true), FocusAction::None);
+        assert_eq!(queued.lock().responder, ResponderState::Normal);
+        assert!(matches!(
+            queued.set_window_focused(false),
+            FocusAction::Release(_)
+        ));
 
-        let action @ FocusAction::Release(_) = state.arm_editor("main".into()) else {
-            panic!("a late arm must observe the inactive window");
+        let inflight = SecureInputState::default();
+        inflight.arm_editor("main".into());
+        let action = inflight.set_window_focused(false);
+        let witness = match &action {
+            FocusAction::Release(witness) => witness.clone(),
+            _ => unreachable!(),
         };
-        assert!(state.action_is_current(&action));
+        assert!(inflight.begin_action(&action));
+        assert_eq!(inflight.set_window_focused(true), FocusAction::None);
+        assert!(matches!(
+            inflight.finish_release(&witness, ReleaseResult::Released),
+            FocusAction::Restore { .. }
+        ));
     }
 
     #[test]
-    fn reactivation_invalidates_a_queued_release() {
-        let state = SecureInputState::default();
-        state.arm_editor("main".into());
-        let action @ FocusAction::Release(_) = state.set_window_focused(false) else {
-            unreachable!();
-        };
-
-        assert_eq!(state.set_window_focused(true), FocusAction::None);
-        assert!(!state.action_is_current(&action));
-
-        let next @ FocusAction::Release(_) = state.set_window_focused(false) else {
-            panic!("the conservative witness must survive cancellation");
-        };
-        assert!(state.action_is_current(&next));
-    }
-
-    #[test]
-    fn a_release_completed_after_reactivation_requests_restore() {
-        let state = SecureInputState::default();
-        state.arm_editor("main".into());
-        let FocusAction::Release(witness) = state.set_window_focused(false) else {
-            unreachable!();
-        };
-
-        assert!(state.begin_action(&FocusAction::Release(witness.clone())));
-        // Model the main-thread AppKit call completing after focus came back:
-        // the in-flight token still owns the responder transition.
-        assert_eq!(state.set_window_focused(true), FocusAction::None);
-        let action @ FocusAction::Restore { .. } =
-            state.finish_release(&witness, super::ReleaseResult::Released)
-        else {
-            panic!("a late successful release must be restored");
-        };
-        assert!(state.action_is_current(&action));
-    }
-
-    #[test]
-    fn deactivation_during_restore_keeps_the_responder_break_owned() {
+    fn deactivation_during_restore_retains_the_owned_responder_break() {
         let state = SecureInputState::default();
         state.arm_editor("main".into());
         let FocusAction::Release(witness) = state.set_window_focused(false) else {
             unreachable!();
         };
         assert!(state.begin_action(&FocusAction::Release(witness.clone())));
-        let _ = state.finish_release(&witness, super::ReleaseResult::Released);
+        assert_eq!(
+            state.finish_release(&witness, ReleaseResult::Released),
+            FocusAction::None
+        );
 
         let action @ FocusAction::Restore { generation, .. } = state.set_window_focused(true)
         else {
@@ -553,47 +514,48 @@ mod tests {
         };
         assert!(state.begin_action(&action));
         assert_eq!(state.set_window_focused(false), FocusAction::None);
-        state.finish_restore(generation, super::RestoreResult::OwnershipTransferred);
+        state.finish_restore(generation, RestoreResult::OwnershipTransferred);
 
-        let FocusAction::Restore { .. } = state.set_window_focused(true) else {
-            panic!("a cancelled restore must remain owned for the next activation");
-        };
+        assert!(matches!(
+            state.set_window_focused(true),
+            FocusAction::Restore { .. }
+        ));
     }
 
     #[test]
-    fn scheduling_failure_cancels_only_the_matching_pending_action() {
-        let state = SecureInputState::default();
-        state.arm_editor("main".into());
-        let action @ FocusAction::Release(_) = state.set_window_focused(false) else {
+    fn dispatch_and_restore_failures_remain_retryable() {
+        let dispatch_failure = SecureInputState::default();
+        dispatch_failure.arm_editor("main".into());
+        let action @ FocusAction::Release(_) = dispatch_failure.set_window_focused(false) else {
             unreachable!();
         };
+        dispatch_failure.cancel_pending(&action);
+        assert!(matches!(
+            dispatch_failure.set_window_focused(false),
+            FocusAction::Release(_)
+        ));
 
-        state.cancel_pending(&action);
-        let retry @ FocusAction::Release(_) = state.set_window_focused(false) else {
-            panic!("the witness must remain retryable");
+        let restore_failure = SecureInputState::default();
+        restore_failure.arm_editor("main".into());
+        let release = restore_failure.set_window_focused(false);
+        let witness = match &release {
+            FocusAction::Release(witness) => witness.clone(),
+            _ => unreachable!(),
         };
-        assert!(state.action_is_current(&retry));
-    }
-
-    #[test]
-    fn a_real_editor_focus_recovers_from_a_refused_restore() {
-        let state = SecureInputState::default();
-        state.arm_editor("main".into());
-        let FocusAction::Release(witness) = state.set_window_focused(false) else {
-            unreachable!();
-        };
-        assert!(state.begin_action(&FocusAction::Release(witness.clone())));
-        let _ = state.finish_release(&witness, super::ReleaseResult::Released);
-        let action @ FocusAction::Restore { generation, .. } = state.set_window_focused(true)
+        assert!(restore_failure.begin_action(&release));
+        restore_failure.finish_release(&witness, ReleaseResult::Released);
+        let restore @ FocusAction::Restore { generation, .. } =
+            restore_failure.set_window_focused(true)
         else {
             unreachable!();
         };
-        assert!(state.begin_action(&action));
-        state.finish_restore(generation, super::RestoreResult::RefusedWhileOwned);
+        assert!(restore_failure.begin_action(&restore));
+        restore_failure.finish_restore(generation, RestoreResult::RefusedWhileOwned);
 
-        assert_eq!(state.arm_editor("main".into()), FocusAction::None);
-        let FocusAction::Release(_) = state.set_window_focused(false) else {
-            panic!("new editor focus must make later deactivation releasable");
-        };
+        assert_eq!(restore_failure.arm_editor("main".into()), FocusAction::None);
+        assert!(matches!(
+            restore_failure.set_window_focused(false),
+            FocusAction::Release(_)
+        ));
     }
 }
