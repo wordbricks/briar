@@ -633,6 +633,17 @@ test("og:url and og:locale reflect the actual locale of the rendered page", asyn
   const en = await (await render()).text();
   const ko = await (await render({ path: "/ko" })).text();
 
+  for (const html of [en, ko]) {
+    assert.match(
+      html,
+      /<meta property="og:title" content="Delegate agent work\. Review the evidence\. Ship with confidence\."\s*\/>/,
+    );
+    assert.match(
+      html,
+      /<meta name="twitter:title" content="Delegate agent work\. Review the evidence\. Ship with confidence\."\s*\/>/,
+    );
+  }
+
   assert.match(en, /<meta property="og:url" content="http:\/\/localhost\/"\s*\/>/);
   assert.match(en, /<meta property="og:locale" content="en_US"\s*\/>/);
   assert.match(
