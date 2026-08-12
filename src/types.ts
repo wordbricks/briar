@@ -206,6 +206,31 @@ export type IssueProposedAction =
 export type IssueMessageSendResult = {
   message: IssueMessage;
   agentReply: Promise<IssueMessage> | null;
+  agentReplyJob?: IssueAgentReplyState | null;
+};
+
+export type IssueAgentReplyState = {
+  id: string;
+  triggerMessageId: string;
+  status: "queued" | "running" | "completed" | "failed";
+  workerId: string | null;
+  provider: AgentProvider | null;
+  error: string | null;
+  updatedAt: string;
+};
+
+export type IssueConversationSnapshot = {
+  cursor: number;
+  messages: IssueMessage[];
+  agentReplies: IssueAgentReplyState[];
+};
+
+export type IssueConversationDelta = {
+  cursor: number;
+  hasMore: boolean;
+  changed: boolean;
+  messages?: IssueMessage[];
+  agentReplies?: IssueAgentReplyState[];
 };
 
 export type IssueConversationNotification = {

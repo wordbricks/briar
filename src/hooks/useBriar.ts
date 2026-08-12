@@ -60,7 +60,6 @@ import {
   updateProjectIssueKeyPrefix as updateRemoteProjectIssueKeyPrefix,
   updateProjectSettings,
   updateCheckpointPolicy,
-  waitForIssueAgentReply,
   type DeviceClientId,
 } from "../lib/api";
 import {
@@ -2893,14 +2892,8 @@ export function useBriar(options: UseBriarOptions = {}) {
       const message = cacheMessage(created.message);
       return {
         message,
-        agentReply: created.agentReply
-          ? waitForIssueAgentReply(
-              token,
-              activeProjectId,
-              runId,
-              message.id,
-            ).then(cacheMessage)
-          : null,
+        agentReply: null,
+        agentReplyJob: created.agentReply,
       };
     },
     [activeProjectId, token],

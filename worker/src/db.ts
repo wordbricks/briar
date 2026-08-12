@@ -7597,6 +7597,25 @@ export async function getIssueAgentReplyJob(
     .first<IssueAgentReplyJobRow>();
 }
 
+export async function listIssueAgentReplyJobs(
+  db: D1Database,
+  projectId: string,
+  runId: string,
+) {
+  const result = await db
+    .prepare(
+      `select job.*
+       from briar_issue_agent_reply_jobs job
+       join briar_hunt_runs run
+         on run.id = job.run_id and run.project_id = job.project_id
+       where job.project_id = ? and job.run_id = ?
+       order by job.created_at, job.id`,
+    )
+    .bind(projectId, runId)
+    .all<IssueAgentReplyJobRow>();
+  return result.results;
+}
+
 export async function claimNextIssueAgentReply(
   db: D1Database,
   projectId: string,

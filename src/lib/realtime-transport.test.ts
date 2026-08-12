@@ -3,6 +3,7 @@ import {
   SseEventDecoder,
   SseRealtimeTransport,
   WebSocketRealtimeTransport,
+  type RealtimeNotification,
 } from "./realtime-transport";
 
 class FakeWebSocket {
@@ -62,7 +63,7 @@ describe("SseRealtimeTransport", () => {
       token: "secret-token",
       fetch: fetchMock,
     });
-    const notification = new Promise<{ topic: "channels"; cursor: number }>(
+    const notification = new Promise<RealtimeNotification>(
       (resolve) => transport.subscribe(resolve),
     );
 
@@ -91,7 +92,7 @@ describe("WebSocketRealtimeTransport", () => {
       fetch: fetchMock,
       createWebSocket: () => socket as unknown as WebSocket,
     });
-    const notification = new Promise<{ topic: "channels"; cursor: number }>(
+    const notification = new Promise<RealtimeNotification>(
       (resolve) => transport.subscribe(resolve),
     );
 
@@ -109,5 +110,37 @@ describe("WebSocketRealtimeTransport", () => {
       .toBe("Bearer secret-token");
     transport.stop();
     expect(socket.closeCode).toBe(1000);
+  });
+
+  it("emits project cursor notifications over the shared socket", async () => {
+    const socket = new FakeWebSocket();
+    const transport = new WebSocketRealtimeTransport({
+      url: "https://api.test/channel-events",
+      token: "secret-token",
+      fetch: async () => Response.json({
+        url: "wss://api.test/channel-events?ticket=signed",
+        expiresAt: "2026-08-12T00:00:00.000Z",
+      }),
+      createWebSocket: () => socket as unknown as WebSocket,
+    });
+    const notification = new Promise((resolve) => transport.subscribe(resolve));
+
+    transport.start();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    socket.emit("open", new Event("open"));
+    socket.emit("message", {
+      data: JSON.stringify({
+        topic: "project",
+        projectId: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+        cursor: 9,
+      }),
+    } as MessageEvent);
+
+    await expect(notification).resolves.toEqual({
+      topic: "project",
+      projectId: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+      cursor: 9,
+    });
+    transport.stop();
   });
 });

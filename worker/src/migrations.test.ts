@@ -389,6 +389,7 @@ describe("D1 migrations", () => {
     "0098_issue_subscriptions.sql",
     "0099_channel_incoming_webhooks.sql",
     "0100_channel_issue_regular_lifecycle.sql",
+    "0101_issue_conversation_realtime.sql",
   ])("keeps each trigger in a separate Wrangler statement: %s", async (name) => {
     const sql = await readFile(resolve("migrations", name), "utf8");
     const statements = unstable_splitSqlQuery(sql);

@@ -219,6 +219,7 @@ import {
   listOrganizationIssueSubscriptionRunIds,
   listIssueActionProposals,
   listIssueExecutionProposals,
+  listIssueAgentReplyJobs,
   listIssueAgentSkillExecutionProposals,
   listIssueMessages,
   listIssueReworkProposals,
@@ -495,7 +496,8 @@ import {
 import {
   legacyChannelRealtimeResponse,
   publishChannelRealtime,
-  subscribeToChannelRealtime,
+  publishProjectRealtime,
+  subscribeToOrganizationRealtime,
 } from "./channel-realtime";
 export { ChannelRealtimeHub } from "./channel-realtime";
 import {
@@ -606,6 +608,37 @@ function scheduleChannelRealtimePublish(
   else void publish;
 }
 
+function scheduleProjectRealtimePublish(
+  env: Env,
+  db: D1Database,
+  projectId: string,
+  context?: ExecutionContext,
+) {
+  if (!env.CHANNEL_REALTIME) return;
+  const publish = Promise.all([
+    db.prepare(
+      `select organization_id from briar_projects where id = ?`,
+    ).bind(projectId).first<{ organization_id: string }>(),
+    getDashboardSyncCursor(db, projectId),
+  ]).then(([project, cursor]) => {
+    if (!project) return;
+    return publishProjectRealtime(
+      env,
+      project.organization_id,
+      projectId,
+      cursor,
+    );
+  }).catch((error) => {
+    console.error(JSON.stringify({
+      message: "Project realtime publish failed",
+      projectId,
+      error: error instanceof Error ? error.message : String(error),
+    }));
+  });
+  if (context) context.waitUntil(publish);
+  else void publish;
+}
+
 function channelMutationOrganization(
   pathname: string,
   method: string,
@@ -615,6 +648,15 @@ function channelMutationOrganization(
   return pathname.match(
     /^\/organizations\/([0-9a-f-]+)\/channels(?:\/|$)/u,
   )?.[1] ?? null;
+}
+
+function projectMutationProject(
+  pathname: string,
+  method: string,
+  status: number,
+) {
+  if (status >= 400 || method === "GET" || method === "HEAD") return null;
+  return pathname.match(/^\/projects\/([0-9a-f-]+)(?:\/|$)/u)?.[1] ?? null;
 }
 const accountDeletionFreshAgeMs = 24 * 60 * 60 * 1_000;
 const organizationInvitationTtlMs = 7 * 24 * 60 * 60 * 1_000;
@@ -5785,6 +5827,53 @@ const listIssueMessagesWithArchive = async (
   );
 };
 
+const loadIssueConversationSnapshot = async (
+  db: D1Database,
+  archivesBucket: R2Bucket,
+  projectId: string,
+  runId: string,
+) => {
+  const [
+    messages,
+    attachments,
+    reworkProposals,
+    actionProposals,
+    executionProposals,
+    skillExecutionProposals,
+    agentReplies,
+  ] = await Promise.all([
+    listIssueMessagesWithArchive(db, archivesBucket, projectId, runId),
+    listIssueAttachments(db, projectId, runId),
+    listIssueReworkProposals(db, projectId, runId),
+    listIssueActionProposals(db, projectId, runId),
+    listIssueExecutionProposals(db, projectId, runId),
+    listIssueAgentSkillExecutionProposals(db, projectId, runId),
+    listIssueAgentReplyJobs(db, projectId, runId),
+  ]);
+  const proposalsByReply = new Map(
+    [...reworkProposals, ...actionProposals].map((proposal) => [
+      proposal.reply_message_id,
+      proposal,
+    ]),
+  );
+  return {
+    messages: messages.map((message) =>
+      issueMessageJson(
+        message,
+        attachments,
+        proposalsByReply.get(message.id) ?? null,
+        executionProposals.find(
+          (proposal) => proposal.reply_message_id === message.id,
+        ) ?? null,
+        skillExecutionProposals.find(
+          (proposal) => proposal.reply_message_id === message.id,
+        ) ?? null,
+      )
+    ),
+    agentReplies: agentReplies.map(issueAgentReplyJson),
+  };
+};
+
 const readLatestTranscriptForRunWithArchive = async (
   db: D1Database,
   archivesBucket: R2Bucket,
@@ -6897,7 +6986,7 @@ async function route(
         throw new HttpError(401, "Invalid or expired realtime ticket");
       }
       const cursor = await getChannelSyncCursor(db, organizationId);
-      return subscribeToChannelRealtime(env, organizationId, cursor);
+      return subscribeToOrganizationRealtime(env, organizationId, cursor);
     }
     // Rolling-upgrade compatibility: old SSE clients keep their authoritative
     // delta fallback but never pin the Durable Object or perform D1 reads here.
@@ -9896,6 +9985,58 @@ async function route(
   const issueMessagesMatch = pathname.match(
     /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/messages$/u,
   );
+  const issueMessagesDeltaMatch = pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/messages\/delta$/u,
+  );
+  if (issueMessagesDeltaMatch && request.method === "GET") {
+    const session = await requireSession(auth, request);
+    const project = await getProject(
+      db,
+      issueMessagesDeltaMatch[1],
+      session.user.id,
+    );
+    if (!project) throw new HttpError(404, "Project not found");
+    const run = await getHuntRunForProject(
+      db,
+      project.id,
+      issueMessagesDeltaMatch[2],
+    );
+    if (!run) throw new HttpError(404, "Run not found");
+    const rawCursor = new URL(request.url).searchParams.get("cursor");
+    if (!rawCursor || !/^\d+$/u.test(rawCursor)) {
+      throw new HttpError(400, "A non-negative conversation cursor is required");
+    }
+    const cursor = Number(rawCursor);
+    if (!Number.isSafeInteger(cursor)) {
+      throw new HttpError(400, "Conversation cursor is outside the safe range");
+    }
+    const page = await listDashboardChanges(db, project.id, cursor);
+    if (page.expired) {
+      return json(
+        {
+          code: "issue_conversation_cursor_expired",
+          message: "Conversation cursor expired; reload the full snapshot",
+        },
+        410,
+      );
+    }
+    const changed = page.changes.some(
+      (change) => change.entity_type === "notifications",
+    );
+    return json({
+      cursor: page.nextCursor,
+      hasMore: page.hasMore,
+      changed,
+      ...(changed
+        ? await loadIssueConversationSnapshot(
+            db,
+            env.ARCHIVES,
+            project.id,
+            run.id,
+          )
+        : {}),
+    });
+  }
   if (issueMessagesMatch && request.method === "GET") {
     const session = await requireSession(auth, request);
     const project = await getProject(
@@ -9910,41 +10051,15 @@ async function route(
       issueMessagesMatch[2],
     );
     if (!run) throw new HttpError(404, "Run not found");
-    const [
-      messages,
-      attachments,
-      reworkProposals,
-      actionProposals,
-      executionProposals,
-      skillExecutionProposals,
-    ] = await Promise.all([
-      listIssueMessagesWithArchive(db, env.ARCHIVES, project.id, run.id),
-      listIssueAttachments(db, project.id, run.id),
-      listIssueReworkProposals(db, project.id, run.id),
-      listIssueActionProposals(db, project.id, run.id),
-      listIssueExecutionProposals(db, project.id, run.id),
-      listIssueAgentSkillExecutionProposals(db, project.id, run.id),
-    ]);
-    const proposalsByReply = new Map(
-      [...reworkProposals, ...actionProposals].map((proposal) => [
-        proposal.reply_message_id,
-        proposal,
-      ]),
-    );
+    const cursor = await getDashboardSyncCursor(db, project.id);
     return json({
-      messages: messages.map((message) =>
-        issueMessageJson(
-          message,
-          attachments,
-          proposalsByReply.get(message.id) ?? null,
-          executionProposals.find(
-            (proposal) => proposal.reply_message_id === message.id,
-          ) ?? null,
-          skillExecutionProposals.find(
-            (proposal) => proposal.reply_message_id === message.id,
-          ) ?? null,
-        )
-      ),
+      cursor,
+      ...(await loadIssueConversationSnapshot(
+        db,
+        env.ARCHIVES,
+        project.id,
+        run.id,
+      )),
     });
   }
   if (issueMessagesMatch && request.method === "POST") {
@@ -12108,6 +12223,7 @@ async function route(
       ).toISOString(),
     });
     if (!job) return json({ work: null });
+    scheduleProjectRealtimePublish(env, db, input.projectId, context);
 
     const [run, events, attachments, messages, evidence, transcript] =
       await Promise.all([
@@ -13152,6 +13268,7 @@ async function route(
         },
       );
       if (!failed) throw new HttpError(409, "Reply claim is no longer active");
+      scheduleProjectRealtimePublish(env, db, input.projectId, context);
       return json({ agentReply: issueAgentReplyJson(failed) });
     }
     if (
@@ -13183,6 +13300,7 @@ async function route(
       },
     );
     if (!completed) throw new HttpError(409, "Reply claim is no longer active");
+    scheduleProjectRealtimePublish(env, db, input.projectId, context);
     const [
       messages,
       reworkProposals,
@@ -14433,6 +14551,14 @@ export default {
       );
       if (organizationId) {
         scheduleChannelRealtimePublish(env, env.DB, organizationId, ctx);
+      }
+      const projectId = projectMutationProject(
+        url.pathname,
+        request.method,
+        response.status,
+      );
+      if (projectId) {
+        scheduleProjectRealtimePublish(env, env.DB, projectId, ctx);
       }
       return response;
     } catch (error) {
