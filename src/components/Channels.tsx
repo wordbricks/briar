@@ -285,6 +285,9 @@ export function Channels({
   const [channelListReady, setChannelListReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [acceptingProposalId, setAcceptingProposalId] = useState<string | null>(
+    null,
+  );
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteMembers, setInviteMembers] = useState<OrganizationMember[]>([]);
   const [inviteAgents, setInviteAgents] = useState<ChannelAgentSummary[]>([]);
@@ -360,6 +363,7 @@ export function Channels({
       activeChannelIdRef.current = channelId;
       threadParentIdRef.current = parentMessageId;
       setBusy(false);
+      setAcceptingProposalId(null);
     },
     [],
   );
@@ -1091,6 +1095,7 @@ export function Channels({
         channelSurfaceIsCurrent(approvalContext);
       const approvalProposalVersion = proposalVersions.current.get(proposalId) ?? 0;
       setBusy(true);
+      setAcceptingProposalId(proposalId);
       setError(null);
       try {
         const result = await acceptChannelProposal(
@@ -1128,8 +1133,6 @@ export function Channels({
             if (!result.executionProposal) {
               await refreshProposalState(applyResult(message), proposalId);
             }
-          } else {
-            await openIssue(result.projectId, result.resultRunId, approvalContext);
           }
         } else {
           let latest = latestProposals.current.get(proposalId);
@@ -1147,8 +1150,6 @@ export function Channels({
               } else {
                 await refreshProposalState(message, proposalId);
               }
-            } else {
-              await openIssue(latest.projectId, latest.resultRunId, approvalContext);
             }
           } else if (
             latest?.status === "pending" &&
@@ -1165,8 +1166,6 @@ export function Channels({
               if (!result.executionProposal) {
                 await refreshProposalState(applyResult(message), proposalId);
               }
-            } else {
-              await openIssue(result.projectId, result.resultRunId, approvalContext);
             }
           }
         }
@@ -1177,6 +1176,7 @@ export function Channels({
       } finally {
         if (approvalContextIsCurrent()) {
           setBusy(false);
+          setAcceptingProposalId(null);
         }
       }
     },
@@ -1185,7 +1185,6 @@ export function Channels({
       activeChannelId,
       captureChannelSurface,
       channelSurfaceIsCurrent,
-      openIssue,
       organizationId,
       proposalProjects,
       recordProposalMessages,
@@ -1350,6 +1349,9 @@ export function Channels({
                         void toggleReaction(message, emoji)
                       }
                       busy={busy}
+                      acceptingProposal={
+                        acceptingProposalId === message.proposal?.id
+                      }
                       projects={projects}
                       selectedProjectId={
                         message.proposal
@@ -1458,6 +1460,9 @@ export function Channels({
                   void toggleReaction(message, emoji)
                 }
                 busy={busy}
+                acceptingProposal={
+                  acceptingProposalId === message.proposal?.id
+                }
                 projects={projects}
                 selectedProjectId={
                   message.proposal
@@ -1793,6 +1798,7 @@ function ChannelInviteDialog({
 }
 
 function MessageRow({
+  acceptingProposal,
   agents,
   channel,
   loadExecutionProposalContext,
@@ -1816,6 +1822,7 @@ function MessageRow({
   token,
   typingAgentNames,
 }: {
+  acceptingProposal: boolean;
   agents: ChannelAgentSummary[];
   channel: ChannelSummary;
   loadExecutionProposalContext: () => Promise<{
@@ -1968,6 +1975,7 @@ function MessageRow({
             ) : null}
             {issueProposal.status === "pending" ? (
               <button
+                aria-busy={acceptingProposal}
                 className="channel-proposal-approve-button"
                 disabled={
                   busy || Boolean(channel.archivedAt) ||
@@ -1976,7 +1984,14 @@ function MessageRow({
                 onClick={onAcceptProposal}
                 type="button"
               >
-                {t("channel.approveCreateIssue")}
+                {acceptingProposal ? (
+                  <>
+                    <LoaderCircle aria-hidden="true" className="spin" size={15} />
+                    {t("channel.creatingIssue")}
+                  </>
+                ) : (
+                  t("channel.approveCreateIssue")
+                )}
               </button>
             ) : issueProposal.projectId &&
               issueProposal.resultRunId &&

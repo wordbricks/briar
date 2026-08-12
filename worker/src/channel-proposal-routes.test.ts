@@ -933,6 +933,32 @@ describe("channel issue proposal approval route", () => {
     );
     const approvedSourceKey = runs.results[0].source_key;
     expect(approvedSourceKey).not.toContain(proposalId);
+    await expect(moveHuntRun(db, projectAId, {
+      runId: acceptedBody.resultRunId,
+      status: "queued",
+      workflowStage: null,
+      requestId: "71000000-0000-4000-8000-000000000002",
+      actor: `briar-app:${ownerId}`,
+      occurredAt: "2026-08-10T00:00:20.000Z",
+    })).rejects.toThrow(
+      "Channel-created issues require explicit execution approval before entering the queue",
+    );
+    const directTodoMove = await worker.fetch(new Request(
+      `https://briar.example/projects/${projectAId}/runs/${acceptedBody.resultRunId}/status`,
+      {
+        method: "PUT",
+        headers: {
+          authorization: `Bearer ${ownerToken}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          requestId: "72000000-0000-4000-8000-000000000002",
+          status: "queued",
+          workflowStage: null,
+        }),
+      },
+    ), env());
+    expect(directTodoMove.status).toBe(409);
     await expect(
       db.prepare(
         `select organization_id, channel_id, project_id, run_id,

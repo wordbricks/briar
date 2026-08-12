@@ -12443,6 +12443,15 @@ export async function moveHuntRun(
     };
   }
   if (
+    run.status === "backlog" &&
+    input.status === "queued" &&
+    await isChannelApprovedIssue(db, run)
+  ) {
+    throw new HuntTransitionError(
+      "Channel-created issues require explicit execution approval before entering the queue",
+    );
+  }
+  if (
     ["completed", "cancelled"].includes(run.status) &&
     !["completed", "cancelled"].includes(input.status) &&
     await isChannelApprovedIssue(db, run)
