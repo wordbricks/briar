@@ -23,6 +23,18 @@ export const changelogCopy = {
     backTop: "맨 위로 ↑",
     entries: [
       {
+        version: "1.2.114",
+        date: "2026년 8월 13일",
+        title: "Worker가 지원하는 모델로 바로 작업을 배정합니다",
+        summary:
+          "작업 배정 화면이 각 제공자가 실제로 지원한다고 보고한 모델 목록을 사용해 새 모델도 바로 선택하고 실행할 수 있습니다.",
+        items: [
+          "Worker 작업 배정 화면을 열면 Codex, Claude, Grok, OpenCode가 현재 지원하는 모델 목록을 불러와 제공자별 선택지에 반영합니다.",
+          "모델 목록은 앱 세션 동안 한 번만 요청해 설정과 작업 배정 화면이 같은 결과를 재사용하고, 조회가 실패하면 기본 모델 목록으로 안전하게 돌아갑니다.",
+          "서버는 제공자가 보고한 새 모델 ID를 작업 배정 요청에서 허용하면서도 저장된 이슈 실행 기본값에는 기존 검증 규칙을 유지합니다.",
+        ],
+      },
+      {
         version: "1.2.113",
         date: "2026년 8월 13일",
         title: "이슈 대화와 실행 결과를 더 빠르고 선명하게 확인합니다",
@@ -466,6 +478,18 @@ export const changelogCopy = {
     home: "Home",
     backTop: "Back to top ↑",
     entries: [
+      {
+        version: "1.2.114",
+        date: "August 13, 2026",
+        title: "Dispatch work with models supported by each provider",
+        summary:
+          "Worker dispatch now uses the models each provider actually reports, so newly supported models can be selected and run immediately.",
+        items: [
+          "Opening Assign Worker loads the current model catalog for Codex, Claude, Grok, and OpenCode and uses it for each provider's model picker.",
+          "The catalog is requested once per app session and shared by settings and dispatch, with the built-in model list retained as a safe fallback.",
+          "The server accepts provider-reported model IDs for dispatch while keeping the stricter validation rules for saved issue execution defaults.",
+        ],
+      },
       {
         version: "1.2.113",
         date: "August 13, 2026",
@@ -922,9 +946,9 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <h1>{changelog.title}</h1>
           <p>{changelog.description}</p>
         </div>
-        <a href="#v1-2-113" className="changelog-current">
+        <a href="#v1-2-114" className="changelog-current">
           <span>{changelog.current}</span>
-          <strong>v1.2.113</strong>
+          <strong>v1.2.114</strong>
           <i aria-hidden="true">↓</i>
         </a>
       </section>
@@ -949,7 +973,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   {index === 0 ? <span>{changelog.latest}</span> : null}
                   <time
                     dateTime={
-                      entry.version === "1.2.113"
+                      entry.version === "1.2.114"
                         ? "2026-08-13"
                         : entry.version === "1.2.112" ||
                             entry.version === "1.2.111" ||
