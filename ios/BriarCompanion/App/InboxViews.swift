@@ -131,7 +131,7 @@ struct InboxHomeView: View {
             candidates = [message.authorName, message.projectName, message.statusLabel]
         }
 
-        let values = candidates.compactMap { value in
+        let values: [String] = candidates.compactMap { value -> String? in
             guard let value else { return nil }
             let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
             return trimmed.isEmpty ? nil : trimmed
@@ -150,10 +150,10 @@ struct InboxHomeView: View {
             return "cpu.fill"
         }
         switch category {
-        case .urgent: "exclamationmark.triangle.fill"
-        case .actionRequired: "exclamationmark.circle.fill"
-        case .important: "bell.fill"
-        case .activity: "clock.fill"
+        case .urgent: return "exclamationmark.triangle.fill"
+        case .actionRequired: return "exclamationmark.circle.fill"
+        case .important: return "bell.fill"
+        case .activity: return "clock.fill"
         }
     }
 

@@ -571,3 +571,28 @@ Build `1` of version `1.2.106`
 (`39631998-ba22-470e-98aa-7d6738674485`) remains `VALID`, but main advanced
 through the Inbox session fix and the 1.2.107 release. Version `1.2.107 (1)` is
 therefore the final build handed off from the latest main commit.
+
+## 2026-08-12 — 1.2.111 (2)
+
+- App: Briar Companion (`app.briar.companion`)
+- Marketing version: `1.2.111`
+- App Store Connect build: `2`
+- App Store Connect build ID: `631b2583-6d79-4960-a3c8-3ee6871d3103`
+- Latest main commit: `1580b5a6`
+- Release source commit: `3032eaf67f098b2b6ae97185975ed9b1eac240de`
+- Implementation: native SwiftUI
+- Toolchain: Xcode 26.6, iOS 26.5 SDK
+- Minimum iOS version: 17.0
+- App Store Connect processing state: `VALID`
+- TestFlight state: `IN_BETA_TESTING`
+- Internal group: `wordbricks` (`hasAccessToAllBuilds=true`)
+- Automatic tester notification: enabled
+- IPA SHA-256: `fe8e9f8ffb19e14d7eed3fa4d84a29b61227f4d76c34d56946a3f770da55148b`
+
+This candidate includes the latest main Inbox full-screen UI change and the
+Swift 6 release-gate compatibility fix. The exact source commit passed the
+shared mobile contract, Swift compile, unit and UI tests, iPhone and iPad
+accessibility and layout tests, Production analyze and build checks, and the
+Tauri iOS simulator and Android ARM64 regression builds. Archive identity, App
+Store provisioning, distribution signature, production entitlements, and the
+exported IPA were verified before upload.
