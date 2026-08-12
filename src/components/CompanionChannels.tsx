@@ -8,6 +8,7 @@ import {
   MessageSquare,
   Plus,
   Send,
+  Webhook,
 } from "lucide-react";
 import {
   useCallback,
@@ -1372,6 +1373,7 @@ function MessageRow({
         <header>
           <strong>{message.author.name}</strong>
           {message.author.type === "agent" ? <Bot size={12} /> : null}
+          {message.author.type === "webhook" ? <Webhook size={12} /> : null}
           <time>
             {new Date(message.createdAt).toLocaleTimeString(localeTag, {
               hour: "numeric",
@@ -1544,6 +1546,8 @@ function MessageAvatar({ message }: { message: ChannelMessage }) {
     >
       {message.author.type === "agent" ? (
         <Bot size={18} />
+      ) : message.author.type === "webhook" ? (
+        <Webhook size={18} />
       ) : (
         message.author.name.trim().charAt(0).toUpperCase() || "?"
       )}

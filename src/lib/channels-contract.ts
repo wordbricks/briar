@@ -48,6 +48,7 @@ export const channelSlugSchema = z
 export const channelNameSchema = z.string().trim().min(1).max(100);
 export const channelTopicSchema = z.string().trim().max(500);
 export const channelMessageBodySchema = z.string().trim().min(1).max(10_000);
+export const channelWebhookNameSchema = z.string().trim().min(1).max(100);
 export const agentHandleSchema = channelSlugSchema;
 
 export const channelAgentSkillInputSchema = z
@@ -123,6 +124,17 @@ export const channelMessageInputSchema = z
   })
   .strict();
 
+export const channelWebhookInputSchema = z
+  .object({ name: channelWebhookNameSchema })
+  .strict();
+
+export const channelIncomingWebhookMessageSchema = z
+  .object({
+    text: channelMessageBodySchema,
+    eventId: z.string().trim().min(1).max(200).optional(),
+  })
+  .strict();
+
 export const organizationAgentInputSchema = z
   .object({
     name: z.string().trim().min(1).max(100),
@@ -176,6 +188,16 @@ export type ChannelMember = {
   createdAt: string;
 };
 
+export type ChannelWebhook = {
+  id: string;
+  channelId: string;
+  name: string;
+  active: boolean;
+  lastUsedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type ChannelAgentSkill = {
   id: string;
   agentId: string;
@@ -222,6 +244,11 @@ export type ChannelMessageAuthor =
       id: string | null;
       name: string;
       provider: ChannelAgentProvider | null;
+    }
+  | {
+      type: "webhook";
+      id: string | null;
+      name: string;
     };
 
 /** A plan document written by an Agent, stored on the channel message itself. */

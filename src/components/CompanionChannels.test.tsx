@@ -241,6 +241,37 @@ describe("CompanionChannels", () => {
     expect(names).toEqual(["Welcome", "Briar dev", "Sprout talk"]);
   });
 
+  it("renders incoming webhook messages with a distinct author icon", async () => {
+    loadChannel.mockResolvedValue({
+      channel: channel("c-common", "Welcome", null),
+      members: [],
+      agents: [],
+      messages: [{
+        ...message("m-webhook", "Production deployed"),
+        author: {
+          type: "webhook",
+          id: "77777777-7777-4777-8777-777777777777",
+          name: "Deploy notifier",
+        },
+      }],
+    });
+    await render();
+    const channelButton = [
+      ...container.querySelectorAll<HTMLButtonElement>(
+        ".companion-channel-group button",
+      ),
+    ].find((button) => button.textContent?.includes("Welcome"));
+    await act(async () => {
+      channelButton?.click();
+      await Promise.resolve();
+    });
+
+    expect(container.textContent).toContain("Deploy notifier");
+    expect(container.textContent).toContain("Production deployed");
+    expect(container.querySelector(".companion-channel-message .lucide-webhook"))
+      .not.toBeNull();
+  });
+
   it("opens a channel thread and unwinds each level through mobile back", async () => {
     loadChannel.mockResolvedValue({
       channel: channel("c-common", "Welcome", null),

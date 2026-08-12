@@ -12,6 +12,7 @@ import {
   claimProjectAgentScheduleRun,
   completeProjectAgentScheduleRun,
   completeIssueResultReview,
+  createChannelWebhook,
   createIssue,
   createIssueMessage,
   createOrganizationInvitation,
@@ -38,8 +39,11 @@ import {
   loadRunEvidence,
   loadRunEvidenceImage,
   loadRunEvents,
+  listChannelWebhooks,
   loadSession,
   removeIssueDependency,
+  revokeChannelWebhook,
+  rotateChannelWebhook,
   runProjectAgentTaskOnWorker,
   sendChannelMessage,
   reworkPausedHuntRun,
@@ -47,6 +51,7 @@ import {
   updateProjectAgent,
   updateProjectAgentSchedule,
   updateOrganizationMemberRole,
+  updateChannelWebhook,
   updateAccountProfile,
   updateIssue,
   updateIssueCheckpoints,
@@ -2258,6 +2263,56 @@ describe("API errors", () => {
 });
 
 describe("channel message API", () => {
+  it("uses the channel-scoped webhook management routes", async () => {
+    const webhook = {
+      id: "webhook-1",
+      channelId: "channel-1",
+      name: "Deploy notifier",
+      active: true,
+      lastUsedAt: null,
+      createdAt: "2026-08-01T00:00:00.000Z",
+      updatedAt: "2026-08-01T00:00:00.000Z",
+    };
+    const fetchMock = vi.fn(async (
+      _input: RequestInfo | URL,
+      _init?: RequestInit,
+    ) => new Response(JSON.stringify({
+      webhooks: [webhook],
+      webhook,
+      url: "https://example.com/hooks/channels/webhook-1/secret",
+    }), { headers: { "Content-Type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await listChannelWebhooks("token", "org-1", "channel-1");
+    await createChannelWebhook("token", "org-1", "channel-1", "Deploy notifier");
+    await updateChannelWebhook(
+      "token",
+      "org-1",
+      "channel-1",
+      "webhook-1",
+      "Release notifier",
+    );
+    await rotateChannelWebhook("token", "org-1", "channel-1", "webhook-1");
+    await revokeChannelWebhook("token", "org-1", "channel-1", "webhook-1");
+
+    const calls = fetchMock.mock.calls;
+    expect(calls[0]?.[0]).toContain(
+      "/organizations/org-1/channels/channel-1/webhooks",
+    );
+    expect(calls[1]?.[1]).toMatchObject({
+      method: "POST",
+      body: JSON.stringify({ name: "Deploy notifier" }),
+    });
+    expect(calls[2]?.[1]).toMatchObject({
+      method: "PATCH",
+      body: JSON.stringify({ name: "Release notifier" }),
+    });
+    expect(calls[3]?.[0]).toContain("/webhooks/webhook-1/rotate");
+    expect(calls[3]?.[1]).toMatchObject({ method: "POST" });
+    expect(calls[4]?.[0]).toContain("/webhooks/webhook-1");
+    expect(calls[4]?.[1]).toMatchObject({ method: "DELETE" });
+  });
+
   it("keeps attachment-only fields out of JSON channel messages", async () => {
     const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
       expect(JSON.parse(String(init?.body))).toEqual({
