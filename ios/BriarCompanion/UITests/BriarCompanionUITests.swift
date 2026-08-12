@@ -314,19 +314,12 @@ final class BriarCompanionUITests: XCTestCase {
 
         app.tabBars.buttons["Inbox"].tap()
         XCTAssertTrue(app.navigationBars["Inbox"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.descendants(matching: .any)["inbox-importance-filters"].exists)
-        for category in ["urgent", "action_required", "important", "activity"] {
-            XCTAssertTrue(
-                app.buttons["inbox-filter-\(category)"].exists,
-                "\(category) 필터 칩이 표시되어야 합니다."
-            )
-        }
-        // Turning off the activity filter hides routine updates, keeping attention rows.
-        app.buttons["inbox-filter-activity"].tap()
+        XCTAssertTrue(app.scrollViews["inbox-feed"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["inbox-mark-all-read"].exists)
         XCTAssertTrue(app.staticTexts["오프라인 복구 확인"].waitForExistence(timeout: 5))
         XCTAssertTrue(
-            app.staticTexts["공유 API 계약 검증"].waitForNonExistence(timeout: 5),
-            "최근 활동 메시지는 활동 필터를 끄면 사라져야 합니다."
+            app.staticTexts["공유 API 계약 검증"].waitForExistence(timeout: 5),
+            "모바일 인박스는 모든 중요도 메시지를 하나의 시간순 피드에 표시해야 합니다."
         )
         captureScreenshot(named: "companion-inbox")
 

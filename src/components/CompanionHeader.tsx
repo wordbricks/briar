@@ -1,6 +1,7 @@
 import {
   Building2,
   Check,
+  CheckCheck,
   LogOut,
   RefreshCw,
   Settings,
@@ -16,6 +17,7 @@ export function CompanionHeader({
   activeProjectId,
   loading,
   onLogout,
+  onMarkAllRead,
   onOrganizationChange,
   onProjectChange,
   onRefresh,
@@ -29,6 +31,7 @@ export function CompanionHeader({
   activeProjectId: string | null;
   loading: boolean;
   onLogout: () => void;
+  onMarkAllRead?: () => void;
   onOrganizationChange: (organizationId: string) => void;
   onProjectChange: (projectId: string) => void;
   onRefresh: () => void;
@@ -96,6 +99,15 @@ export function CompanionHeader({
       </div>
       <div className="companion-header-trailing">
         <div className="companion-header-actions">
+          {onMarkAllRead ? (
+            <button
+              aria-label={t("inbox.markAllRead")}
+              onClick={onMarkAllRead}
+              type="button"
+            >
+              <CheckCheck aria-hidden="true" size={19} />
+            </button>
+          ) : null}
           <button
             aria-label={t("dashboard.refresh")}
             disabled={loading}
