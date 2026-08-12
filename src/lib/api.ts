@@ -72,6 +72,7 @@ import type {
   OrganizationInvitationPreview,
   OrganizationMember,
   ProjectSettings,
+  ProjectUsageSummary,
   RunEvidence,
   RunEvidenceImage,
   SessionUser,
@@ -108,6 +109,13 @@ const projectSchema = z.object({
   organizationName: z.string(),
   role: z.enum(["owner", "admin", "member"]),
   createdAt: z.string(),
+});
+const projectUsageSummarySchema = z.object({
+  totalTokens: z.number().int().nonnegative(),
+  trackedDurationMs: z.number().int().nonnegative(),
+  observedRuns: z.number().int().nonnegative(),
+  reportedRuns: z.number().int().nonnegative(),
+  generatedAt: z.string(),
 });
 const projectAgentSchema = z.object({
   id: z.string().uuid(),
@@ -973,6 +981,19 @@ export async function loadAgentUsageReport(
       knownModels: 0,
     },
   };
+}
+
+export async function loadProjectUsageSummary(
+  token: string,
+  projectId: string,
+  days: UsageRangeDays = 30,
+  signal?: AbortSignal,
+): Promise<ProjectUsageSummary> {
+  return projectUsageSummarySchema.parse(await request<ProjectUsageSummary>(
+    `/projects/${encodeURIComponent(projectId)}/usage/summary?days=${days}`,
+    token,
+    { signal },
+  ));
 }
 
 export async function loadDashboardDelta(

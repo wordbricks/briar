@@ -519,6 +519,7 @@ export type OrganizationUsageRunRow = {
   started_at: string;
   updated_at: string;
   completed_at: string | null;
+  has_usage_ledger?: number;
 };
 
 export type RunExecutionAttemptRow = {
@@ -560,6 +561,12 @@ export type OrganizationUsageRecordRow = {
   total_tokens: number | null;
   observed_at: string;
   recorded_at: string;
+};
+
+export type ProjectUsageTotalRow = {
+  run_id: string;
+  total_tokens: number;
+  usage_records: number;
 };
 
 export type OrganizationCostRecordRow = {
@@ -6578,6 +6585,77 @@ export async function listOrganizationUsageRuns(
   return runs.results;
 }
 
+export async function listProjectUsageRuns(
+  db: D1Database,
+  projectId: string,
+  since: string,
+) {
+  const runs = await db
+    .prepare(
+      `select run.id, run.project_id, run.status, run.paused_at,
+              run.execution_metrics_json,
+              run.claimed_by, run.claimed_at, run.claim_attempts, run.worker_id,
+              run.preferred_agent_provider, run.preferred_agent_model,
+              run.requested_agent_provider, run.requested_agent_model,
+              coalesce(
+                run.requested_agent_provider,
+                run.preferred_agent_provider
+              ) as execution_provider,
+              case
+                when run.requested_agent_provider is not null
+                  then run.requested_agent_model
+                when run.preferred_agent_provider is not null
+                  then run.preferred_agent_model
+                else null
+              end as execution_model,
+              run.started_at, run.updated_at, run.completed_at,
+              exists (
+                select 1
+                from briar_run_execution_attempts ledger_attempt
+                join briar_run_usage_records ledger_usage
+                  on ledger_usage.execution_id = ledger_attempt.id
+                where ledger_attempt.run_id = run.id
+                  and ledger_attempt.project_id = run.project_id
+              ) as has_usage_ledger
+       from briar_hunt_runs run
+       where run.project_id = ?
+         and (
+           coalesce(run.completed_at, run.updated_at, run.started_at) >= ?
+           or exists (
+             select 1
+             from briar_run_execution_attempts attempt
+             join briar_run_usage_records usage
+               on usage.execution_id = attempt.id
+             where attempt.run_id = run.id
+               and attempt.project_id = run.project_id
+               and usage.observed_at >= ?
+           )
+         )
+         and (
+           run.execution_metrics_json is not null
+           or run.claimed_at is not null
+           or run.claimed_by is not null
+           or run.worker_id is not null
+           or run.claim_attempts > 0
+           or run.paused_at is not null
+           or run.status in (
+             'running', 'blocked', 'failed', 'completed', 'cancelled'
+           )
+           or exists (
+             select 1 from briar_run_execution_attempts attempt
+             where attempt.run_id = run.id
+               and attempt.project_id = run.project_id
+           )
+         )
+       order by coalesce(run.completed_at, run.updated_at, run.started_at),
+                run.id`,
+    )
+    .bind(projectId, since, since)
+    .all<OrganizationUsageRunRow>();
+
+  return runs.results;
+}
+
 export async function getRunExecutionAttempt(
   db: D1Database,
   executionId: string,
@@ -6732,6 +6810,33 @@ export async function listOrganizationUsageRecords(
     )
     .bind(organizationId, since)
     .all<OrganizationUsageRecordRow>();
+  return result.results;
+}
+
+export async function listProjectUsageTotals(
+  db: D1Database,
+  projectId: string,
+  since: string,
+) {
+  const result = await db
+    .prepare(
+      `select attempt.run_id,
+              sum(coalesce(
+                usage.total_tokens,
+                coalesce(usage.uncached_input_tokens, 0) +
+                coalesce(usage.cache_read_tokens, 0) +
+                coalesce(usage.cache_write_tokens, 0) +
+                coalesce(usage.output_tokens, 0)
+              )) as total_tokens,
+              count(*) as usage_records
+       from briar_run_execution_attempts attempt
+       join briar_run_usage_records usage on usage.execution_id = attempt.id
+       where attempt.project_id = ? and usage.observed_at >= ?
+       group by attempt.run_id
+       order by attempt.run_id`,
+    )
+    .bind(projectId, since)
+    .all<ProjectUsageTotalRow>();
   return result.results;
 }
 

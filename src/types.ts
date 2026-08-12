@@ -451,6 +451,8 @@ export type AgentUsageReport = {
   pricing: AgentUsagePricing;
 };
 
+export type { ProjectUsageSummary } from "./lib/project-usage-summary";
+
 export type IssueResultReview = {
   userId: string;
   name: string;
