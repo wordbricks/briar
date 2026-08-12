@@ -25,6 +25,7 @@ import {
   type LinearTeamSummary,
   type LinearWorkflowStateSummary,
 } from "../lib/linear-import";
+import { MacSecurePasswordInput } from "./MacSecurePasswordInput";
 import { SelectMenu } from "./SelectMenu";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,6 +47,7 @@ function localizeStageLabel(
 }
 
 export function LinearIssueImport({
+  active,
   projectId,
   workflow,
   repositoryConnected,
@@ -53,6 +55,8 @@ export function LinearIssueImport({
   onLoadStates,
   onImport,
 }: {
+  /** Whether the containing settings panel is currently visible. */
+  active: boolean;
   projectId: string;
   workflow: AutoHuntWorkflow | null;
   /** Briar board statuses exist only after a repository is connected. */
@@ -105,6 +109,8 @@ export function LinearIssueImport({
 
   const mappingComplete = isCompleteStatusMapping(states, statusMapping);
   const selectedCount = selectedTeamIds.length;
+  const apiKeyFieldAcceptsInput =
+    active && hasProjectStatuses && step === "apiKey" && !busy;
 
   const reset = () => {
     setStep("apiKey");
@@ -237,16 +243,19 @@ export function LinearIssueImport({
           <p>{t("settings.linearImportApiKeyHelp")}</p>
           <label>
             <span>{t("settings.linearImportApiKey")}</span>
-            <input
+            <MacSecurePasswordInput
+              autoCapitalize="none"
               autoComplete="off"
+              autoCorrect="off"
+              className="project-settings-linear-import-api-key"
               disabled={busy}
               onChange={(event) => setApiKey(event.currentTarget.value)}
               onKeyDown={(event) => {
                 if (event.key === "Enter") void connect();
               }}
               placeholder="lin_api_..."
+              secureInputEligible={apiKeyFieldAcceptsInput}
               spellCheck={false}
-              type="password"
               value={apiKey}
             />
           </label>

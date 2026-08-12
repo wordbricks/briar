@@ -1812,6 +1812,11 @@ export function App() {
           activeProjectId={briar.activeProjectId}
           loading={briar.loading}
           onLogout={() => void briar.logout()}
+          onMarkAllRead={
+            companionPage === "inbox" && inbox.unreadCount > 0
+              ? inbox.markAllRead
+              : undefined
+          }
           onOrganizationChange={(organizationId) => {
             briar.setActiveOrganizationId(organizationId);
             setCompanionPage("issues");

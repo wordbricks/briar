@@ -249,17 +249,13 @@ export function Inbox({
         aria-labelledby={companionMode ? undefined : "inbox-title"}
         aria-label={companionMode ? t("inbox.title") : undefined}
       >
-        {companionMode && markAllReadAction ? (
-          <div className="inbox-companion-actions">{markAllReadAction}</div>
-        ) : null}
-
         <section
           aria-label={t("inbox.messages")}
           className="inbox-panel rounded-none border-0 bg-card"
         >
-          <header className="inbox-filter-bar">
-            <div className="inbox-filter-controls">
-              {companionMode ? null : (
+          {companionMode ? null : (
+            <header className="inbox-filter-bar">
+              <div className="inbox-filter-controls">
                 <SelectMenu
                   className="inbox-project-filter"
                   label={t("inbox.projectFilter")}
@@ -268,37 +264,35 @@ export function Inbox({
                   size="small"
                   value={effectiveProjectId}
                 />
-              )}
-              <div
-                aria-label={t("inbox.filters")}
-                className="inbox-filters"
-                role="group"
-              >
-                {inboxFilters.map((category) => (
-                  <button
-                    aria-pressed={activeFilters.has(category)}
-                    className={cn("inbox-filter", category)}
-                    key={category}
-                    onClick={() => toggleFilter(category)}
-                    type="button"
-                  >
-                    <FilterIcon category={category} />
-                    <span>
-                      {t(`inbox.category.${category}` as MessageKey)}
-                    </span>
-                    <span className="inbox-filter-count">
-                      {categoryCounts[category]}
-                    </span>
-                  </button>
-                ))}
+                <div
+                  aria-label={t("inbox.filters")}
+                  className="inbox-filters"
+                  role="group"
+                >
+                  {inboxFilters.map((category) => (
+                    <button
+                      aria-pressed={activeFilters.has(category)}
+                      className={cn("inbox-filter", category)}
+                      key={category}
+                      onClick={() => toggleFilter(category)}
+                      type="button"
+                    >
+                      <FilterIcon category={category} />
+                      <span>
+                        {t(`inbox.category.${category}` as MessageKey)}
+                      </span>
+                      <span className="inbox-filter-count">
+                        {categoryCounts[category]}
+                      </span>
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
-            {companionMode ? null : (
               <Typography as="span" tone="muted" variant="caption">
                 {t("inbox.filteredCount", { count: filteredMessages.length })}
               </Typography>
-            )}
-          </header>
+            </header>
+          )}
 
           {messages.length === 0 ? (
             <EmptyState
@@ -319,6 +313,7 @@ export function Inbox({
               {visibleMessages.map((message) => (
                 <InboxMessageRow
                   category={classifyInboxMessage(message)}
+                  compact={companionMode}
                   key={message.id}
                   localeTag={localeTag}
                   message={message}
@@ -370,6 +365,7 @@ function FilterIcon({ category }: { category: InboxCategory }) {
 
 function InboxMessageRow({
   category,
+  compact,
   localeTag,
   message,
   onMarkRead,
@@ -377,6 +373,7 @@ function InboxMessageRow({
   t,
 }: {
   category: InboxCategory;
+  compact: boolean;
   localeTag: string;
   message: InboxMessageWithReadState;
   onMarkRead: (messageId: string) => void;
@@ -442,18 +439,34 @@ function InboxMessageRow({
             <span className="inbox-message-description">
               {messageSecondaryText(t, message)}
             </span>
+            {compact ? (
+              <>
+                <span aria-hidden="true" className="inbox-message-separator">
+                  ·
+                </span>
+                <time
+                  className="inbox-message-inline-time"
+                  dateTime={message.occurredAt}
+                  title={formatDate(message.occurredAt, localeTag)}
+                >
+                  {formatRelativeDate(message.occurredAt, localeTag)}
+                </time>
+              </>
+            ) : null}
           </small>
         </span>
-        {!showUnreadAction ? (
+        {!compact && !showUnreadAction ? (
           <ChevronRight className="inbox-message-chevron" size={15} />
         ) : null}
-        <time
-          className="inbox-message-time"
-          dateTime={message.occurredAt}
-          title={formatDate(message.occurredAt, localeTag)}
-        >
-          {formatRelativeDate(message.occurredAt, localeTag)}
-        </time>
+        {compact ? null : (
+          <time
+            className="inbox-message-time"
+            dateTime={message.occurredAt}
+            title={formatDate(message.occurredAt, localeTag)}
+          >
+            {formatRelativeDate(message.occurredAt, localeTag)}
+          </time>
+        )}
       </button>
       {showUnreadAction ? (
         <button

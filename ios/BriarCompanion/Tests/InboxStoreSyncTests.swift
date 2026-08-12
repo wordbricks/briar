@@ -228,7 +228,11 @@ final class InboxStoreSyncTests: XCTestCase {
         await store.refreshFeed()
         // A later selected-project refresh must merge into the organization
         // feed instead of replacing the unselected project's message.
-        store.update(snapshot: snapshot(revision: 2), sessions: [], project: project)
+        store.update(
+            snapshot: snapshot(revision: 2, subscribers: []),
+            sessions: [],
+            project: project
+        )
 
         let secondMessage = try XCTUnwrap(
             store.messages.first(where: { $0.projectId == secondProject.id })
@@ -246,7 +250,10 @@ final class InboxStoreSyncTests: XCTestCase {
         )
     }
 
-    private func snapshot(revision: Int) -> DashboardSnapshot {
+    private func snapshot(
+        revision: Int,
+        subscribers: [IssueSubscriber]? = nil
+    ) -> DashboardSnapshot {
         let occurredAt = Date(timeIntervalSince1970: 1_775_260_800 + Double(revision))
         let run = DashboardRun(
             id: UUID(uuidString: "33333333-3333-4333-8333-333333333333")!,
@@ -257,6 +264,7 @@ final class InboxStoreSyncTests: XCTestCase {
             status: .blocked,
             workflowStage: "implementing",
             priority: 1,
+            subscribers: subscribers,
             updatedAt: occurredAt,
             lastEventAt: ISO8601DateFormatter().string(from: occurredAt),
             eventCount: revision

@@ -4,6 +4,8 @@ mod auto_hunt_dispatch;
 mod host;
 #[cfg(target_os = "macos")]
 mod macos_inbox_notifications;
+#[cfg(target_os = "macos")]
+mod macos_secure_input;
 mod planned_update_recovery;
 #[cfg(desktop)]
 mod status_tray;
@@ -7267,6 +7269,17 @@ pub(crate) fn request_exit_confirmation(app: &AppHandle) {
     });
 }
 
+#[tauri::command]
+fn arm_macos_password_editor(webview: tauri::Webview) {
+    #[cfg(target_os = "macos")]
+    if webview.window().label() == "main" {
+        macos_secure_input::arm_password_editor(&webview);
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    let _ = webview;
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let builder = tauri::Builder::default()
@@ -7290,6 +7303,10 @@ pub fn run() {
         })
         .on_window_event(|window, event| {
             if window.label() == "main" {
+                #[cfg(target_os = "macos")]
+                if let tauri::WindowEvent::Focused(focused) = event {
+                    macos_secure_input::handle_focus_changed(window, *focused);
+                }
                 if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                     api.prevent_close();
                     request_exit_confirmation(window.app_handle());
@@ -7304,6 +7321,8 @@ pub fn run() {
                 .with_denylist(&["launch-intro"])
                 .build(),
         );
+    #[cfg(target_os = "macos")]
+    let builder = builder.manage(macos_secure_input::SecureInputState::default());
     let app = builder
         .setup(|_app| {
             #[cfg(target_os = "macos")]
@@ -7441,6 +7460,7 @@ pub fn run() {
             show_inbox_notification,
             request_inbox_notification_permission,
             drain_pending_inbox_notification_opens,
+            arm_macos_password_editor,
             sync_status_tray
         ])
         .build(tauri::generate_context!())
