@@ -169,6 +169,7 @@ describe("ProjectAgentSessionDetail", () => {
   it("merges readable worker progress into the chronological execution log", async () => {
     const container = await mount(session);
     const progress = container.querySelector(".auto-hunt-agent-messages");
+    const request = container.querySelector(".auto-hunt-session-request-card");
 
     expect(progress).not.toBeNull();
     expect(progress?.getAttribute("role")).toBe("log");
@@ -176,6 +177,10 @@ describe("ProjectAgentSessionDetail", () => {
       "원인을 확인하고 화면을 수정하고 있습니다.",
     );
     expect(progress?.textContent).not.toContain("[commentary]");
+    expect(progress?.textContent).not.toContain("대기 이슈를 처리해 줘");
+    expect(request?.textContent).toContain("에이전트 작업 요청");
+    expect(request?.textContent).toContain("대기 이슈를 처리해 줘");
+    expect(container.querySelector(".auto-hunt-message-avatar")).toBeNull();
     expect(
       container.querySelector(".auto-hunt-app-server-section"),
     ).not.toBeNull();
@@ -256,7 +261,7 @@ describe("ProjectAgentSessionDetail", () => {
     ).toBe("log");
   });
 
-  it("renders the session as a chat and sends a follow-up after the final message", async () => {
+  it("separates requests from the shared work log and sends a follow-up", async () => {
     const onFollowUp = vi.fn().mockResolvedValue(undefined);
     const container = await mount({
       ...session,
@@ -277,12 +282,15 @@ describe("ProjectAgentSessionDetail", () => {
     }, vi.fn(), undefined, onFollowUp);
 
     const messages = container.querySelectorAll(".auto-hunt-agent-message");
-    expect(messages).toHaveLength(3);
-    expect(messages[0]?.classList.contains("user")).toBe(true);
-    expect(messages[0]?.textContent).toContain("대기 이슈를 처리해 줘");
-    expect(messages[1]?.textContent).toContain("테스트 결과도 알려 줘");
-    expect(messages[2]?.classList.contains("agent")).toBe(true);
-    expect(messages[2]?.textContent).toContain("초기 작업을 완료했습니다.");
+    expect(messages).toHaveLength(1);
+    expect(messages[0]?.textContent).toContain("초기 작업을 완료했습니다.");
+    expect(messages[0]?.textContent).not.toContain("대기 이슈를 처리해 줘");
+    const requests = container.querySelectorAll(
+      ".auto-hunt-session-request-card",
+    );
+    expect(requests).toHaveLength(2);
+    expect(requests[0]?.textContent).toContain("대기 이슈를 처리해 줘");
+    expect(requests[1]?.textContent).toContain("테스트 결과도 알려 줘");
 
     const input = container.querySelector<HTMLTextAreaElement>(
       'textarea[aria-label="후속 메시지"]',
@@ -347,6 +355,7 @@ describe("ProjectAgentSessionDetail", () => {
     );
     expect(container.textContent).toContain("수행 로그");
     expect(container.textContent).toContain("워커가 수정과 검증을 완료했습니다.");
-    expect(container.textContent).toContain("최종 메시지");
+    expect(container.textContent).toContain("Codex");
+    expect(container.textContent).not.toContain("최종 메시지");
   });
 });
