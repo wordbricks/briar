@@ -23,6 +23,19 @@ export const changelogCopy = {
     backTop: "맨 위로 ↑",
     entries: [
       {
+        version: "1.2.111",
+        date: "2026년 8월 12일",
+        title: "채널 자동화와 프로젝트 운영 가시성을 강화합니다",
+        summary:
+          "외부 이벤트를 채널로 연결하고, 프로젝트 현황·승인 흐름·데스크탑 알림의 맥락을 더 분명하게 확인할 수 있습니다.",
+        items: [
+          "채널별 수신 웹훅을 만들고 이름을 바꾸거나 교체·폐기할 수 있으며, 비밀값은 한 번만 보여주고 중복 이벤트와 과도한 요청을 방지합니다.",
+          "프로젝트 홈에서 기간별 사용량과 실행 주체를 확인하고, 칸반 단계 열을 사용자별로 접거나 펼쳐 긴 작업 보드를 더 빠르게 살펴볼 수 있습니다.",
+          "채널에서 이슈 실행 승인을 처리할 때 원래 대화 맥락을 유지하고, 전송 후 스레드가 최신 답글 위치로 이동하도록 다듬었습니다.",
+          "macOS 알림을 클릭하면 해당 채널 메시지와 스레드로 바로 이동해 알림을 확인한 뒤 같은 맥락에서 작업을 이어갈 수 있습니다.",
+        ],
+      },
+      {
         version: "1.2.110",
         date: "2026년 8월 12일",
         title: "이슈를 구독하고 프로젝트 현황을 더 빠르게 확인합니다",
@@ -426,6 +439,19 @@ export const changelogCopy = {
     home: "Home",
     backTop: "Back to top ↑",
     entries: [
+      {
+        version: "1.2.111",
+        date: "August 12, 2026",
+        title: "Connect channel automation and see project health more clearly",
+        summary:
+          "Connect external events to channels while making project health, approval context, and desktop notification navigation easier to follow.",
+        items: [
+          "Create channel-scoped incoming webhooks, rename, rotate, or revoke them, while showing each secret only once and preventing duplicate events or excessive requests.",
+          "Review period-based usage and execution ownership in Project Home, and collapse or expand kanban stage columns per user to scan a large board faster.",
+          "Keep the original conversation context when approving issue execution from a channel, and move a thread to its newest reply after sending.",
+          "Open a macOS notification directly at the related channel message and thread so the work can continue in the same context.",
+        ],
+      },
       {
         version: "1.2.110",
         date: "August 12, 2026",
@@ -842,9 +868,9 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <h1>{changelog.title}</h1>
           <p>{changelog.description}</p>
         </div>
-        <a href="#v1-2-110" className="changelog-current">
+        <a href="#v1-2-111" className="changelog-current">
           <span>{changelog.current}</span>
-          <strong>v1.2.110</strong>
+          <strong>v1.2.111</strong>
           <i aria-hidden="true">↓</i>
         </a>
       </section>
@@ -869,6 +895,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   {index === 0 ? <span>{changelog.latest}</span> : null}
                   <time
                     dateTime={
+                      entry.version === "1.2.111" ||
                       entry.version === "1.2.110" ||
                       entry.version === "1.2.109" ||
                       entry.version === "1.2.108" ||
