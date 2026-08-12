@@ -26,3 +26,9 @@
 
 /window.svg
   Cache-Control: public, max-age=86400
+
+# Keep the LLM-facing product description readable as UTF-8 plain text.
+/llm.txt
+  Content-Type: text/plain; charset=utf-8
+  Cache-Control: public, max-age=3600
+  X-Content-Type-Options: nosniff
