@@ -7,14 +7,21 @@ const styles = readFileSync(
   "utf8",
 );
 
-const ruleBody = (selector: string) => {
-  const match = styles.match(
-    new RegExp(
-      `${selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*\\{([^}]*)\\}`,
+const ruleBodies = (selector: string) =>
+  Array.from(
+    styles.matchAll(
+      new RegExp(
+        `${selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*\\{([^}]*)\\}`,
+        "g",
+      ),
     ),
+    (match) => match[1] ?? "",
   );
-  expect(match, `expected CSS rule for ${selector}`).not.toBeNull();
-  return match?.[1] ?? "";
+
+const ruleBody = (selector: string) => {
+  const bodies = ruleBodies(selector);
+  expect(bodies, `expected CSS rule for ${selector}`).not.toHaveLength(0);
+  return bodies[0] ?? "";
 };
 
 describe("mention composer caret alignment", () => {
@@ -27,5 +34,18 @@ describe("mention composer caret alignment", () => {
     );
     expect(composerMention).toContain("font-weight:inherit");
     expect(composerMention).toContain("margin:-.06em -.36em");
+  });
+
+  it("uses the channel mirror to grow the textarea grid with wrapped content", () => {
+    expect(ruleBody(".channel-composer-field")).toContain("display: grid");
+
+    const mirrorRules = ruleBodies(
+      ".channel-composer-field > .mention-composer-mirror",
+    );
+    expect(mirrorRules.some((rule) => rule.includes("grid-area: 1 / 1")))
+      .toBe(true);
+    expect(mirrorRules.some((rule) => rule.includes("position: relative")))
+      .toBe(true);
+    expect(mirrorRules.some((rule) => rule.includes("inset: auto"))).toBe(true);
   });
 });
