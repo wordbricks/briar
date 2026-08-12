@@ -727,6 +727,87 @@ describe("HuntDashboard", () => {
     expect(markup).not.toContain("has-assignees");
   });
 
+  it("shows a rocket full-auto badge on the issue card next to worker avatars", () => {
+    const run = {
+      ...demoDashboard.runs[0],
+      fullAuto: true,
+      workerId: dashboardWorker.id,
+    };
+    const markup = renderToStaticMarkup(
+      <HuntDashboard
+        {...dashboardProps}
+        agents={[dashboardAgent]}
+        dashboard={{
+          ...demoDashboard,
+          runs: [run],
+          workers: [dashboardWorker],
+        }}
+        sessions={[dashboardAgentSession(run)]}
+      />,
+    );
+    const container = document.createElement("div");
+    container.innerHTML = markup;
+    const badges = container.querySelector(".kanban-card-assignee-badges");
+    const fullAutoBadge = badges?.querySelector(
+      ".kanban-card-full-auto-badge",
+    );
+
+    expect(markup).toContain(
+      "kanban-card violet has-assignees has-multiple-assignees has-three-assignees has-four-assignees",
+    );
+    expect(fullAutoBadge).not.toBeNull();
+    expect(fullAutoBadge?.getAttribute("aria-label")).toContain("Full Auto");
+    expect(fullAutoBadge?.querySelector("svg.lucide-rocket")).not.toBeNull();
+    expect(
+      badges?.querySelector(".kanban-card-worker-badge"),
+    ).not.toBeNull();
+    expect(
+      badges?.lastElementChild?.classList.contains("kanban-card-full-auto-badge"),
+    ).toBe(true);
+  });
+
+  it("shows only the full-auto rocket badge when assignment badges are hidden", () => {
+    const run = {
+      ...demoDashboard.runs[0],
+      fullAuto: true,
+      status: "completed" as const,
+      workflowStage: null,
+      workerId: dashboardWorker.id,
+    };
+    const markup = renderToStaticMarkup(
+      <HuntDashboard
+        {...dashboardProps}
+        dashboard={{
+          ...demoDashboard,
+          runs: [run],
+          workers: [dashboardWorker],
+        }}
+      />,
+    );
+    const container = document.createElement("div");
+    container.innerHTML = markup;
+
+    expect(markup).toContain("kanban-card emerald has-assignees");
+    expect(container.querySelector(".kanban-card-full-auto-badge")).not.toBeNull();
+    expect(container.querySelector(".kanban-card-worker-badge")).toBeNull();
+    expect(container.querySelector(".kanban-card-agent-badge")).toBeNull();
+  });
+
+  it("does not show a full-auto badge when full auto is off", () => {
+    const markup = renderToStaticMarkup(
+      <HuntDashboard
+        {...dashboardProps}
+        dashboard={{
+          ...demoDashboard,
+          runs: [{ ...demoDashboard.runs[0], fullAuto: false }],
+        }}
+      />,
+    );
+
+    expect(markup).not.toContain("kanban-card-full-auto-badge");
+    expect(markup).not.toContain("lucide-rocket");
+  });
+
   it("opens a linked pull request from the issue card icon", async () => {
     const pullRequestUrl =
       "https://github.com/example/repository/pull/42";
