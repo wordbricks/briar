@@ -38,6 +38,7 @@ type InboxFeedRun = Pick<
   | "workflow_stage"
   | "workflow_snapshot_json"
   | "priority"
+  | "subscriber_user_ids"
   | "structured_result_json"
   | "current_attempt"
   | "current_revision"
@@ -101,7 +102,7 @@ export type InboxFeedMessage = {
   body?: string;
   authorName?: string;
   issueKey?: string;
-  reason?: "mention" | "thread_reply";
+  reason?: "mention" | "thread_reply" | "subscription";
   channelId?: string;
   channelName?: string;
   agentName?: string | null;
@@ -214,6 +215,7 @@ function structuredResult(run: InboxFeedRun) {
 export function buildInboxFeedMessages(
   projectData: readonly InboxFeedProjectData[],
   channelNotifications: readonly InboxFeedChannelNotification[],
+  subscriberUserId: string,
 ): InboxFeedMessage[] {
   const messages: InboxFeedMessage[] = [];
   const parsedSessions: ParsedSession[] = [];
@@ -230,6 +232,18 @@ export function buildInboxFeedMessages(
     for (const run of runs) {
       const status = run.paused_at ? "paused" : run.status;
       if (!notifyingRunStatuses.has(status)) continue;
+      let subscriberUserIds: unknown = [];
+      try {
+        subscriberUserIds = JSON.parse(run.subscriber_user_ids ?? "[]");
+      } catch {
+        subscriberUserIds = [];
+      }
+      if (
+        !Array.isArray(subscriberUserIds) ||
+        !subscriberUserIds.includes(subscriberUserId)
+      ) {
+        continue;
+      }
       const stageLabel = workflowStageLabel(run);
       messages.push({
         id: `issue:${run.id}`,

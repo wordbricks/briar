@@ -36,6 +36,24 @@ final class IssueMutationStore: ObservableObject {
 
     func isActive(_ action: String) -> Bool { activeActions.contains(action) }
 
+    func setIssueSubscription(
+        runID: UUID,
+        subscribed: Bool
+    ) async throws -> IssueSubscriptionResponse {
+        try await perform("subscription-\(runID.uuidString.lowercased())") {
+            try await api.send(
+                MobileAPIContract.Endpoint.runSubscription(
+                    projectID: projectID,
+                    runID: runID
+                ),
+                method: subscribed ? "PUT" : "DELETE",
+                token: token,
+                body: nil,
+                as: IssueSubscriptionResponse.self
+            )
+        }
+    }
+
     func createIssue(
         draft: IssueDraft,
         attachments: [PendingIssueAttachment]

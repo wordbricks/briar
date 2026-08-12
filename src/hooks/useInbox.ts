@@ -84,7 +84,7 @@ export type InboxConversationMessage = {
   authorName: string;
   /** Human-readable project issue key used by reply notifications. */
   issueKey?: string;
-  reason: "mention" | "thread_reply";
+  reason: "mention" | "thread_reply" | "subscription";
 };
 
 export type InboxChannelMessage = {
@@ -162,6 +162,7 @@ export function buildCurrentInboxMessages(
   dashboard: DashboardPayload | null,
   sessions: AutoHuntSession[],
   projects: Project[],
+  userId: string | null = null,
 ): InboxMessage[] {
   const projectNames = new Map(
     projects.map((project) => [project.id, project.name]),
@@ -172,6 +173,14 @@ export function buildCurrentInboxMessages(
     const issueKeyPrefix = dashboard.project.issueKeyPrefix?.trim() || "AH";
     for (const run of dashboard.runs) {
       if (!inboxIssueNotifyingStatuses.has(run.status)) continue;
+      if (
+        userId &&
+        !(run.subscriberUserIds ?? (
+          run.assigneeUserId ? [run.assigneeUserId] : []
+        )).includes(userId)
+      ) {
+        continue;
+      }
       messages.push({
         id: `issue:${run.id}`,
         kind: "issue",
@@ -319,6 +328,28 @@ export function mergeInboxMessages(
         new Date(left.occurredAt).getTime();
       return occurredAtDifference || left.id.localeCompare(right.id);
     },
+  );
+}
+
+export function replaceOrganizationInboxMessages(
+  stored: InboxMessage[],
+  snapshot: InboxMessage[],
+  projects: Project[],
+  organizationId: string,
+) {
+  const organizationProjectIds = new Set(
+    projects
+      .filter((project) => project.organizationId === organizationId)
+      .map((project) => project.id),
+  );
+  return mergeInboxMessages(
+    stored.filter(
+      (message) =>
+        !organizationProjectIds.has(message.projectId) ||
+        (message.kind !== "issue" && message.kind !== "conversation"),
+    ),
+    snapshot,
+    projects,
   );
 }
 
@@ -546,7 +577,7 @@ export function useInbox(
 ) {
   const storageKey = `${storagePrefix}:${userId ?? "signed-out"}`;
   const currentMessages = useMemo(
-    () => buildCurrentInboxMessages(dashboard, sessions, projects),
+    () => buildCurrentInboxMessages(dashboard, sessions, projects, userId),
     [
       dashboard?.conversationNotifications,
       dashboard?.channelNotifications,
@@ -555,6 +586,7 @@ export function useInbox(
       dashboard?.runs,
       projects,
       sessions,
+      userId,
     ],
   );
   const [state, setState] = useState<InboxState>(() => ({
@@ -925,10 +957,11 @@ export function useInbox(
               // channel association when the canonical read version is equal.
               return stored?.version === message.version ? stored : message;
             });
-            const messages = mergeInboxMessages(
+            const messages = replaceOrganizationInboxMessages(
               current.messages,
               feedSnapshot,
               projects,
+              organizationId,
             );
             if (inboxMessageSnapshotsEqual(current.messages, messages)) {
               return current;

@@ -146,6 +146,7 @@ export const mobileDashboardRunSchema = z.object({
   detail: z.string().nullable().optional(),
   priority: z.number().int().min(1).max(4).nullable().optional(),
   assigneeUserId: z.string().nullable().optional(),
+  subscriberUserIds: z.array(z.string()).optional(),
   issueDescription: z.string().nullable().optional(),
   attachments: z.array(mobileIssueAttachmentSchema).optional(),
   prerequisites: z.array(z.object({
@@ -233,7 +234,7 @@ const mobileInboxConversationMessageSchema = mobileInboxMessageBaseSchema.extend
   body: z.string(),
   authorName: z.string(),
   issueKey: z.string().optional(),
-  reason: z.enum(["mention", "thread_reply"]),
+  reason: z.enum(["mention", "thread_reply", "subscription"]),
 });
 
 const mobileInboxChannelMessageSchema = mobileInboxMessageBaseSchema.extend({
@@ -871,6 +872,10 @@ export const mobileAgentReplyResponseSchema = z.object({
   agentReply: mobileAgentReplySchema,
   message: mobileIssueMessageSchema.nullable(),
 });
+export const mobileIssueSubscriptionResponseSchema = z.object({
+  runId: z.uuid(),
+  subscriberUserIds: z.array(z.string()),
+});
 export const mobileAcceptIssueReworkProposalResponseSchema = z.object({
   proposal: mobileIssueReworkProposalSchema,
   outcome: z.enum(["accepted", "already_accepted"]),
@@ -1052,6 +1057,8 @@ export const mobileOperationSchemas = {
   },
   listRunEvents: { response: mobileRunEventsResponseSchema },
   listIssueMessages: { response: mobileIssueMessagesResponseSchema },
+  subscribeIssue: { response: mobileIssueSubscriptionResponseSchema },
+  unsubscribeIssue: { response: mobileIssueSubscriptionResponseSchema },
   listRunEvidence: { response: mobileRunEvidenceResponseSchema },
   createIssue: { request: mobileCreateIssueRequestSchema, response: mobileCreateIssueResponseSchema },
   updateIssue: { request: mobileUpdateIssueRequestSchema, response: mobileUpdateIssueResponseSchema },

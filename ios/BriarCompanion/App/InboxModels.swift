@@ -185,12 +185,17 @@ enum InboxMessageBuilder {
     static func build(
         snapshot: DashboardSnapshot?,
         sessions: [ProjectAgentSession],
-        project: ProjectsResponse.Project
+        project: ProjectsResponse.Project,
+        userID: String? = nil
     ) -> [InboxMessage] {
         var messages: [InboxMessage] = []
 
         if let snapshot {
-            for run in snapshot.runs where run.status.showsInInbox {
+            for run in snapshot.runs where
+                run.status.showsInInbox &&
+                (userID.map { candidate in (
+                    run.subscriberUserIds ?? (run.assigneeUserId.map { [$0] } ?? [])
+                ).contains(candidate) } ?? true) {
                 let stage = run.workflowStage ?? "none"
                 // Keep this formula aligned with desktop/web `useInbox` so
                 // account-synced read versions match across clients.
@@ -233,7 +238,9 @@ enum InboxMessageBuilder {
                     authorName: notification.author.name,
                     statusLabel: notification.reason == "mention"
                         ? L10n.text("멘션")
-                        : L10n.text("답글"),
+                        : notification.reason == "thread_reply"
+                            ? L10n.text("답글")
+                            : L10n.text("메시지"),
                     requiresAttention: true,
                     priority: nil,
                     structuredResult: nil,

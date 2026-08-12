@@ -350,6 +350,24 @@
         ]
       }
     },
+    "subscribeIssue": {
+      "method": "PUT",
+      "path": "/projects/{projectId}/runs/{runId}/subscription",
+      "status": 200,
+      "response": {
+        "runId": "33333333-3333-4333-8333-333333333333",
+        "subscriberUserIds": ["fixture-user"]
+      }
+    },
+    "unsubscribeIssue": {
+      "method": "DELETE",
+      "path": "/projects/{projectId}/runs/{runId}/subscription",
+      "status": 200,
+      "response": {
+        "runId": "33333333-3333-4333-8333-333333333333",
+        "subscriberUserIds": []
+      }
+    },
     "listRunEvidence": {
       "method": "GET",
       "path": "/projects/{projectId}/runs/{runId}/evidence",

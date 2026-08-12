@@ -3,6 +3,7 @@ import {
   ArrowLeft,
   ArrowUp,
   BadgeCheck,
+  Bell,
   Bot,
   BrainCircuit,
   Check,
@@ -175,7 +176,7 @@ import {
   IssueExecutionApproval,
 } from "./IssueExecutionApproval";
 import { AgentSkillExecutionApproval } from "./AgentSkillExecutionApproval";
-import { loadDashboard } from "../lib/api";
+import { loadDashboard, setIssueSubscription } from "../lib/api";
 import { issueExecutionApprovalUnavailable } from "../lib/issue-execution-approval";
 import { mergeIssueMessages } from "../lib/issue-message-merge";
 import {
@@ -7556,7 +7557,14 @@ function IssueConversation({
   token: string | null;
 }) {
   const { localeTag, t } = useI18n();
+  const { toast } = useToast();
   const [messages, setMessages] = useState<IssueMessage[]>([]);
+  const [subscriberUserIds, setSubscriberUserIds] = useState<string[]>(
+    () => run.subscriberUserIds ?? (
+      run.assigneeUserId ? [run.assigneeUserId] : []
+    ),
+  );
+  const [subscriptionSaving, setSubscriptionSaving] = useState(false);
   const [activeReplyMessageId, setActiveReplyMessageId] = useState<
     string | null
   >(null);
@@ -7587,6 +7595,55 @@ function IssueConversation({
     executionProposalStateByIdRef.current.clear();
   }
   onLoadRef.current = onLoad;
+
+  useEffect(() => {
+    setSubscriberUserIds(
+      run.subscriberUserIds ?? (
+        run.assigneeUserId ? [run.assigneeUserId] : []
+      ),
+    );
+  }, [run.assigneeUserId, run.id, run.subscriberUserIds]);
+
+  const subscriberMembers = useMemo(
+    () => subscriberUserIds.flatMap((userId) => {
+      const member = mentionMembers.find(
+        (candidate) => candidate.userId === userId,
+      );
+      return member ? [member] : [];
+    }),
+    [mentionMembers, subscriberUserIds],
+  );
+  const subscribed = Boolean(
+    currentUserId && subscriberUserIds.includes(currentUserId),
+  );
+  const assigneeSubscribed = Boolean(
+    currentUserId && run.assigneeUserId === currentUserId,
+  );
+
+  const toggleSubscription = async () => {
+    if (
+      !token ||
+      !currentUserId ||
+      subscriptionSaving ||
+      assigneeSubscribed
+    ) {
+      return;
+    }
+    setSubscriptionSaving(true);
+    try {
+      const result = await setIssueSubscription(
+        token,
+        projectId,
+        run.id,
+        !subscribed,
+      );
+      setSubscriberUserIds(result.subscriberUserIds);
+    } catch {
+      toast(t("run.subscriptionFailed"), { tone: "error" });
+    } finally {
+      setSubscriptionSaving(false);
+    }
+  };
 
   useEffect(() => {
     mountedRef.current = true;
@@ -7999,11 +8056,58 @@ function IssueConversation({
   return (
     <section className="issue-conversation" aria-label={t("run.messages")}>
       <header className="issue-conversation-header">
-        <strong>
-          {t("run.messages")}
-          {!loading && <span>{messages.length}</span>}
-        </strong>
-        <small>{t("run.agentRepliesHere")}</small>
+        <div className="issue-conversation-heading">
+          <strong>
+            {t("run.messages")}
+            {!loading && <span>{messages.length}</span>}
+          </strong>
+          <small>{t("run.agentRepliesHere")}</small>
+        </div>
+        <div className="issue-subscription-actions">
+          {subscriberMembers.length > 0 ? (
+            <div
+              aria-label={t("run.subscriberCount", {
+                count: subscriberMembers.length,
+              })}
+              className="issue-subscriber-avatars"
+            >
+              {subscriberMembers.slice(0, 4).map((member) => (
+                <span key={member.userId} title={member.name}>
+                  <IssueAssigneeAvatar member={member} />
+                </span>
+              ))}
+              {subscriberMembers.length > 4 ? (
+                <i aria-hidden="true">+{subscriberMembers.length - 4}</i>
+              ) : null}
+            </div>
+          ) : null}
+          <button
+            aria-pressed={subscribed}
+            className="issue-subscribe-button"
+            disabled={
+              !token ||
+              !currentUserId ||
+              subscriptionSaving ||
+              assigneeSubscribed
+            }
+            onClick={() => void toggleSubscription()}
+            title={
+              assigneeSubscribed
+                ? t("run.assigneeSubscribed")
+                : subscribed
+                  ? t("run.subscribed")
+                  : t("run.subscribe")
+            }
+            type="button"
+          >
+            {subscriptionSaving ? (
+              <LoaderCircle className="spin" size={13} />
+            ) : (
+              <Bell fill={subscribed ? "currentColor" : "none"} size={13} />
+            )}
+            <span>{subscribed ? t("run.subscribed") : t("run.subscribe")}</span>
+          </button>
+        </div>
       </header>
       <div className="issue-message-list" ref={messageListRef}>
         {loading ? (

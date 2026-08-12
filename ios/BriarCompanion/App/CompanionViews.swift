@@ -752,6 +752,7 @@ struct RunDetailView: View {
     @State private var selectedMessagePhotos: [PhotosPickerItem] = []
     @State private var isLoadingMessagePhotos = false
     @State private var replyTo: IssueMessage?
+    @State private var subscriberUserIDs: [String]
     @State private var reviewCompleted = false
     @State private var linkCopied = false
     @State private var selectedTab: RunDetailTab
@@ -786,6 +787,21 @@ struct RunDetailView: View {
 
     private var issueMentionHandles: Set<String> {
         MessageMentions.issueHandles(members: members)
+    }
+
+    private var subscriberMembers: [OrganizationMember] {
+        subscriberUserIDs.compactMap { userID in
+            members.first { $0.userId == userID }
+        }
+    }
+
+    private var isSubscribed: Bool {
+        guard let currentUserID else { return false }
+        return subscriberUserIDs.contains(currentUserID)
+    }
+
+    private var assigneeSubscribed: Bool {
+        currentUserID != nil && run.assigneeUserId == currentUserID
     }
 
     private var transferDestinations: [ProjectsResponse.Project] {
@@ -857,6 +873,9 @@ struct RunDetailView: View {
         _localStatus = State(initialValue: run.status)
         _localWorkflowStage = State(initialValue: run.workflowStage)
         _dependencyIDs = State(initialValue: Set((run.prerequisites ?? []).map(\.id)))
+        _subscriberUserIDs = State(initialValue: run.subscriberUserIds ?? (
+            run.assigneeUserId.map { [$0] } ?? []
+        ))
         _preferences = State(initialValue: IssueExecutionPreferences(
             provider: run.preferredProvider,
             model: run.preferredModel,
@@ -1025,6 +1044,9 @@ struct RunDetailView: View {
             .onChange(of: run.workflowStage) { _, stage in localWorkflowStage = stage }
             .onChange(of: run.prerequisites) { _, prerequisites in
                 dependencyIDs = Set((prerequisites ?? []).map(\.id))
+            }
+            .onChange(of: run.subscriberUserIds) { _, userIDs in
+                subscriberUserIDs = userIDs ?? (run.assigneeUserId.map { [$0] } ?? [])
             }
             .onDisappear {
                 executionApprovalPresentation = nil
@@ -1425,18 +1447,75 @@ struct RunDetailView: View {
         }
     }
 
+    private func toggleSubscription() async {
+        guard currentUserID != nil, !assigneeSubscribed else { return }
+        do {
+            let response = try await mutations.setIssueSubscription(
+                runID: run.id,
+                subscribed: !isSubscribed
+            )
+            subscriberUserIDs = response.subscriberUserIds
+            actionError = nil
+            await refresh()
+        } catch {
+            actionError = L10n.text("구독 상태를 변경하지 못했습니다.", locale: locale)
+        }
+    }
+
     @ViewBuilder
     private var conversationTabContent: some View {
         detailLoadingContent
 
-        if detail.messages.isEmpty, !detail.loading, detail.errorMessage == nil {
-            Section {
+        Section {
+            if detail.messages.isEmpty, !detail.loading, detail.errorMessage == nil {
                 ContentUnavailableView(L10n.text("대화 없음", locale: locale), systemImage: "bubble.left.and.bubble.right")
-            }
-        } else if !detail.messages.isEmpty {
-            Section(L10n.text("대화", locale: locale)) {
+            } else if !detail.messages.isEmpty {
                 ForEach(detail.messages) { message in messageRow(message) }
             }
+        } header: {
+            HStack(spacing: 8) {
+                Text(L10n.text("대화", locale: locale))
+                Spacer(minLength: 6)
+                if !subscriberMembers.isEmpty {
+                    HStack(spacing: -7) {
+                        ForEach(Array(subscriberMembers.prefix(4))) { member in
+                            ProfileImageView(image: member.image, name: member.name, size: 24)
+                                .overlay(Circle().stroke(Color(uiColor: .systemGroupedBackground), lineWidth: 2))
+                                .accessibilityLabel(member.name)
+                        }
+                        if subscriberMembers.count > 4 {
+                            Text("+\(subscriberMembers.count - 4)")
+                                .font(.caption2.weight(.semibold))
+                                .frame(width: 24, height: 24)
+                                .background(.thinMaterial, in: Circle())
+                        }
+                    }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel(L10n.format("구독자 %d명", locale: locale, subscriberMembers.count))
+                }
+                Button {
+                    Task { await toggleSubscription() }
+                } label: {
+                    Label(
+                        L10n.text(isSubscribed ? "구독 중" : "구독", locale: locale),
+                        systemImage: isSubscribed ? "bell.fill" : "bell"
+                    )
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .disabled(
+                    currentUserID == nil ||
+                        assigneeSubscribed ||
+                        mutations.isActive("subscription-\(run.id.uuidString.lowercased())")
+                )
+                .accessibilityHint(
+                    assigneeSubscribed
+                        ? L10n.text("담당자는 자동으로 구독합니다.", locale: locale)
+                        : ""
+                )
+                .accessibilityIdentifier("issue-subscribe")
+            }
+            .textCase(nil)
         }
 
         Section(

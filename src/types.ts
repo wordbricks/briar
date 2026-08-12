@@ -215,7 +215,7 @@ export type IssueConversationNotification = {
   rootMessageId: string;
   body: string;
   author: IssueMessageAuthor;
-  reason: "mention" | "thread_reply";
+  reason: "mention" | "thread_reply" | "subscription";
   createdAt: string;
 };
 
@@ -291,6 +291,7 @@ export type HuntRun = {
   detail: string | null;
   priority: number | null;
   assigneeUserId?: string | null;
+  subscriberUserIds?: string[];
   repository: string;
   branch: string | null;
   commitSha: string | null;

@@ -109,6 +109,7 @@ const runSeeds: DemoRunSeed[] = [
     status: "running",
     workflowStage: "implementing",
     progress: 45,
+    subscriberUserIds: ["demo-user"],
     detail: "Codex가 이벤트 스트림 어댑터와 회귀 테스트를 작성하고 있습니다.",
     repository: "wordbricks/briar",
     branch: "feat/agent-event-stream",

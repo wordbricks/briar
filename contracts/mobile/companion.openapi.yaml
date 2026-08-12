@@ -439,6 +439,46 @@
         }
       }
     },
+    "/projects/{projectId}/runs/{runId}/subscription": {
+      "put": {
+        "operationId": "subscribeIssue",
+        "parameters": [
+          { "$ref": "#/components/parameters/ProjectId" },
+          { "$ref": "#/components/parameters/RunId" }
+        ],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Current issue subscribers after subscribing",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/IssueSubscriptionResponse" }
+              }
+            }
+          },
+          "404": { "$ref": "#/components/responses/Error" }
+        }
+      },
+      "delete": {
+        "operationId": "unsubscribeIssue",
+        "parameters": [
+          { "$ref": "#/components/parameters/ProjectId" },
+          { "$ref": "#/components/parameters/RunId" }
+        ],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Current issue subscribers after unsubscribing",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/IssueSubscriptionResponse" }
+              }
+            }
+          },
+          "404": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
     "/projects/{projectId}/runs/{runId}/evidence": {
       "get": {
         "operationId": "listRunEvidence",
@@ -1719,7 +1759,7 @@
           "issueKey": { "type": "string" },
           "reason": {
             "type": "string",
-            "enum": ["mention", "thread_reply"]
+            "enum": ["mention", "thread_reply", "subscription"]
           },
           "channelId": { "type": "string", "format": "uuid" },
           "channelName": { "type": "string" },
@@ -2251,6 +2291,10 @@
               "string",
               "null"
             ]
+          },
+          "subscriberUserIds": {
+            "type": "array",
+            "items": { "type": "string" }
           },
           "issueDescription": {
             "type": [
@@ -2809,7 +2853,8 @@
             "type": "string",
             "enum": [
               "mention",
-              "thread_reply"
+              "thread_reply",
+              "subscription"
             ]
           },
           "createdAt": {
@@ -3389,6 +3434,18 @@
                 "type": "null"
               }
             ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "IssueSubscriptionResponse": {
+        "type": "object",
+        "required": ["runId", "subscriberUserIds"],
+        "properties": {
+          "runId": { "type": "string", "format": "uuid" },
+          "subscriberUserIds": {
+            "type": "array",
+            "items": { "type": "string" }
           }
         },
         "additionalProperties": false

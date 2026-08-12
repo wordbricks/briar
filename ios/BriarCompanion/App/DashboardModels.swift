@@ -18,6 +18,7 @@ struct DashboardRun: Codable, Equatable, Identifiable, Sendable {
     let detail: String?
     let priority: Int?
     let assigneeUserId: String?
+    let subscriberUserIds: [String]?
     let issueDescription: String?
     let attachments: [IssueAttachment]?
     let prerequisites: [IssueDependencyReference]?
@@ -67,6 +68,7 @@ struct DashboardRun: Codable, Equatable, Identifiable, Sendable {
         detail: String? = nil,
         priority: Int? = nil,
         assigneeUserId: String? = nil,
+        subscriberUserIds: [String]? = nil,
         issueDescription: String? = nil,
         attachments: [IssueAttachment]? = nil,
         prerequisites: [IssueDependencyReference]? = nil,
@@ -115,6 +117,7 @@ struct DashboardRun: Codable, Equatable, Identifiable, Sendable {
         self.detail = detail
         self.priority = priority
         self.assigneeUserId = assigneeUserId
+        self.subscriberUserIds = subscriberUserIds
         self.issueDescription = issueDescription
         self.attachments = attachments
         self.prerequisites = prerequisites
@@ -429,6 +432,11 @@ struct RunEvent: Codable, Equatable, Identifiable, Sendable {
 
 struct IssueMessagesResponse: Codable, Equatable, Sendable {
     let messages: [IssueMessage]
+}
+
+struct IssueSubscriptionResponse: Codable, Equatable, Sendable {
+    let runId: UUID
+    let subscriberUserIds: [String]
 }
 
 struct IssueMessage: Codable, Equatable, Identifiable, Sendable {

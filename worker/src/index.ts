@@ -273,6 +273,7 @@ import {
   reserveIssueCreateProposalApproval,
   reserveIssueExecutionProposalApproval,
   rollbackNewAppIssue,
+  subscribeToIssue,
   startWorkflowStageLifecycle,
   releaseGithubDelivery,
   releaseSlackEvent,
@@ -294,6 +295,7 @@ import {
   updateHuntRunExecutionMetrics,
   updateIssueMessage,
   deleteIssueMessage,
+  unsubscribeFromIssue,
   updateSlackInstallationProject,
   upsertInboxReadStates,
   upsertProjectAgentSession,
@@ -5833,6 +5835,11 @@ function dashboardRunJson(
     detail: run.detail,
     priority: run.priority,
     assigneeUserId: run.assignee_user_id,
+    subscriberUserIds: run.subscriber_user_ids
+      ? parseJsonArray(run.subscriber_user_ids)
+      : run.assignee_user_id
+        ? [run.assignee_user_id]
+        : [],
     repository: run.repository,
     branch: run.branch,
     commitSha: run.commit_sha,
@@ -6100,7 +6107,11 @@ async function route(
           ),
         ]);
         return {
-          messages: buildInboxFeedMessages(projectData, channelNotifications),
+          messages: buildInboxFeedMessages(
+            projectData,
+            channelNotifications,
+            session.user.id,
+          ),
           generatedAt: new Date().toISOString(),
         };
       },
@@ -9500,6 +9511,43 @@ async function route(
       cursor,
       generatedAt: observedAt,
     });
+  }
+
+  const issueSubscriptionMatch = pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/subscription$/u,
+  );
+  if (
+    issueSubscriptionMatch &&
+    (request.method === "PUT" || request.method === "DELETE")
+  ) {
+    const session = await requireSession(auth, request);
+    const project = await getProject(
+      db,
+      issueSubscriptionMatch[1],
+      session.user.id,
+    );
+    if (!project) throw new HttpError(404, "Project not found");
+    const run = await getHuntRunForProject(
+      db,
+      project.id,
+      issueSubscriptionMatch[2],
+    );
+    if (!run) throw new HttpError(404, "Run not found");
+    const subscriberUserIds = request.method === "PUT"
+      ? await subscribeToIssue(
+          db,
+          project.id,
+          run.id,
+          session.user.id,
+          new Date().toISOString(),
+        )
+      : await unsubscribeFromIssue(
+          db,
+          project.id,
+          run.id,
+          session.user.id,
+        );
+    return json({ runId: run.id, subscriberUserIds });
   }
 
   const runEventsMatch = pathname.match(

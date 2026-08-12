@@ -433,6 +433,8 @@ export type HuntRunRow = {
   detail: string | null;
   priority: number | null;
   assignee_user_id: string | null;
+  /** Present on dashboard projections; direct run reads derive the assignee in JSON. */
+  subscriber_user_ids?: string;
   repository: string;
   branch: string | null;
   commit_sha: string | null;
@@ -919,7 +921,7 @@ export type FreshBacklogExecutionTargetRow = {
 export type IssueConversationNotificationRow = IssueMessageRow & {
   run_title: string;
   root_message_id: string;
-  notification_reason: "mention" | "thread_reply";
+  notification_reason: "mention" | "thread_reply" | "subscription";
 };
 
 export type ChannelConversationNotificationRow = {
@@ -6427,6 +6429,18 @@ export async function listDashboardRuns(db: D1Database, projectId: string) {
   const runs = await db
     .prepare(
       `select run.*,
+              coalesce((
+                select json_group_array(subscriber.user_id)
+                from (
+                  select subscription.user_id
+                  from briar_issue_subscriptions subscription
+                  where subscription.run_id = run.id
+                  union
+                  select run.assignee_user_id
+                  where run.assignee_user_id is not null
+                  order by user_id
+                ) subscriber
+              ), '[]') as subscriber_user_ids,
               run.event_count + coalesce((
                 select sum(archive.row_count)
                 from briar_log_archives archive
@@ -6456,6 +6470,18 @@ export async function listDashboardRunsByIds(
   const runs = await db
     .prepare(
       `select run.*,
+              coalesce((
+                select json_group_array(subscriber.user_id)
+                from (
+                  select subscription.user_id
+                  from briar_issue_subscriptions subscription
+                  where subscription.run_id = run.id
+                  union
+                  select run.assignee_user_id
+                  where run.assignee_user_id is not null
+                  order by user_id
+                ) subscriber
+              ), '[]') as subscriber_user_ids,
               run.event_count + coalesce((
                 select sum(archive.row_count)
                 from briar_log_archives archive
@@ -8976,6 +9002,73 @@ export async function getAgentSkillExecutionApprovalAudit(
     .first<AgentSkillExecutionApprovalAuditRow>();
 }
 
+export async function listIssueSubscriberUserIds(
+  db: D1Database,
+  projectId: string,
+  runId: string,
+) {
+  const result = await db
+    .prepare(
+      `select subscriber.user_id
+       from (
+         select subscription.user_id
+         from briar_issue_subscriptions subscription
+         join briar_hunt_runs run on run.id = subscription.run_id
+         where run.project_id = ? and run.id = ?
+         union
+         select run.assignee_user_id
+         from briar_hunt_runs run
+         where run.project_id = ? and run.id = ?
+           and run.assignee_user_id is not null
+       ) subscriber
+       order by subscriber.user_id`,
+    )
+    .bind(projectId, runId, projectId, runId)
+    .all<{ user_id: string }>();
+  return result.results.map((row) => row.user_id);
+}
+
+export async function subscribeToIssue(
+  db: D1Database,
+  projectId: string,
+  runId: string,
+  userId: string,
+  createdAt: string,
+) {
+  await db
+    .prepare(
+      `insert into briar_issue_subscriptions (run_id, user_id, created_at)
+       select run.id, ?, ?
+       from briar_hunt_runs run
+       where run.id = ? and run.project_id = ?
+       on conflict (run_id, user_id) do nothing`,
+    )
+    .bind(userId, createdAt, runId, projectId)
+    .run();
+  return listIssueSubscriberUserIds(db, projectId, runId);
+}
+
+export async function unsubscribeFromIssue(
+  db: D1Database,
+  projectId: string,
+  runId: string,
+  userId: string,
+) {
+  await db
+    .prepare(
+      `delete from briar_issue_subscriptions
+       where run_id = ? and user_id = ?
+         and exists (
+           select 1 from briar_hunt_runs run
+           where run.id = briar_issue_subscriptions.run_id
+             and run.project_id = ?
+         )`,
+    )
+    .bind(runId, userId, projectId)
+    .run();
+  return listIssueSubscriberUserIds(db, projectId, runId);
+}
+
 export async function acceptAgentSkillExecutionProposal(
   db: D1Database,
   input: {
@@ -9034,7 +9127,11 @@ export async function listIssueConversationNotifications(
               message.updated_at, run.title as run_title,
               coalesce(message.parent_message_id, message.id) as root_message_id,
               case when mention.user_id is not null
-                then 'mention' else 'thread_reply' end as notification_reason
+                then 'mention'
+                when message.parent_message_id is not null
+                  and root.author_user_id = ?
+                then 'thread_reply'
+                else 'subscription' end as notification_reason
        from briar_issue_messages message
        join briar_hunt_runs run
          on run.id = message.run_id and run.project_id = message.project_id
@@ -9048,16 +9145,18 @@ export async function listIssueConversationNotifications(
        where message.project_id = ?
          and (message.author_user_id is null or message.author_user_id != ?)
          and (
-           mention.user_id is not null
-           or (
-             message.parent_message_id is not null
-             and root.author_user_id = ?
+           run.assignee_user_id = ?
+           or exists (
+             select 1 from briar_issue_subscriptions subscription
+             where subscription.run_id = run.id
+               and subscription.user_id = ?
+               and subscription.created_at <= message.created_at
            )
          )
        order by message.created_at desc, message.id desc
        limit 500`,
     )
-    .bind(userId, projectId, userId, userId)
+    .bind(userId, userId, projectId, userId, userId, userId)
     .all<IssueConversationNotificationRow>();
   return result.results;
 }

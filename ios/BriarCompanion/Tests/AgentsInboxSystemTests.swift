@@ -778,6 +778,7 @@ final class AgentsInboxSystemTests: XCTestCase {
             title: "Needs help",
             status: .blocked,
             priority: 1,
+            subscriberUserIds: ["fixture-user"],
             structuredResult: StructuredRunResult(
                 summary: "Blocked",
                 outcome: "blocked",
@@ -795,6 +796,7 @@ final class AgentsInboxSystemTests: XCTestCase {
             title: "Done",
             status: .completed,
             priority: 3,
+            subscriberUserIds: ["fixture-user"],
             updatedAt: Date(timeIntervalSince1970: 1_700_000_050)
         )
         let running = DashboardRun(
@@ -874,6 +876,14 @@ final class AgentsInboxSystemTests: XCTestCase {
         XCTAssertEqual(messages.map(\.kind), [.channel, .conversation, .issue, .session, .issue])
         XCTAssertEqual(messages.map(\.title)[2], "Needs help")
         XCTAssertEqual(messages.map(\.title)[4], "Done")
+
+        let nonSubscriberMessages = InboxMessageBuilder.build(
+            snapshot: snapshot,
+            sessions: [session],
+            project: project,
+            userID: "other-user"
+        )
+        XCTAssertFalse(nonSubscriberMessages.contains { $0.kind == .issue })
 
         let blockedMessage = try XCTUnwrap(
             messages.first { $0.kind == .issue && $0.title == "Needs help" }

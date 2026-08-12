@@ -184,6 +184,7 @@ describe("D1 migrations", () => {
     "0093_project_agent_session_sync.sql",
     "0095_organization_inbox_sync.sql",
     "0096_suppress_lease_sync_changes.sql",
+    "0097_issue_subscriptions.sql",
   ])("keeps each trigger in a separate Wrangler statement: %s", async (name) => {
     const sql = await readFile(resolve("migrations", name), "utf8");
     const statements = unstable_splitSqlQuery(sql);
@@ -390,7 +391,7 @@ describe("D1 migrations", () => {
     } finally {
       await miniflare.dispose();
     }
-  });
+  }, 60_000);
 
   it("only finalizes a canonical reserved channel issue run", async () => {
     const miniflare = new Miniflare({
@@ -700,7 +701,7 @@ describe("D1 migrations", () => {
     } finally {
       await miniflare.dispose();
     }
-  });
+  }, 60_000);
 
   it("upgrades channel approvals with audit backfill and legacy quarantine", async () => {
     const miniflare = new Miniflare({

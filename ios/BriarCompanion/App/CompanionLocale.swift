@@ -89,6 +89,12 @@ enum L10n {
     }
 
     private static let english: [String: String] = [
+        "구독": "Subscribe",
+        "구독 중": "Subscribed",
+        "구독자 %d명": "%d subscribers",
+        "담당자는 자동으로 구독합니다.": "Assignees are subscribed automatically.",
+        "구독 상태를 변경하지 못했습니다.": "The subscription could not be updated.",
+        "메시지": "Message",
         "한국어": "Korean",
         "중국어": "Chinese",
         "Companion 설정": "Companion settings",
@@ -407,6 +413,12 @@ enum L10n {
     ]
 
     private static let chinese: [String: String] = [
+        "구독": "订阅",
+        "구독 중": "已订阅",
+        "구독자 %d명": "%d 位订阅者",
+        "담당자는 자동으로 구독합니다.": "负责人会自动订阅。",
+        "구독 상태를 변경하지 못했습니다.": "无法更新订阅状态。",
+        "메시지": "消息",
         "한국어": "韩语",
         "Companion 설정": "Companion 设置",
         "계정": "账户",

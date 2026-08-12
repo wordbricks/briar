@@ -9,6 +9,7 @@ import {
   isInboxMessageUnread,
   mergeInboxMessages,
   mergeInboxReadVersions,
+  replaceOrganizationInboxMessages,
 } from "./useInbox";
 
 const project = demoDashboard.project;
@@ -170,6 +171,88 @@ describe("Inbox messages", () => {
       "run-completed",
     ]);
     expect(messages.every((message) => message.kind === "issue")).toBe(true);
+  });
+
+  it("surfaces important issue states only for the signed-in subscriber", () => {
+    const baseRun = demoDashboard.runs[0];
+    const messages = buildCurrentInboxMessages(
+      {
+        ...demoDashboard,
+        runs: [
+          {
+            ...baseRun,
+            id: "subscribed-run",
+            status: "completed",
+            subscriberUserIds: ["current-user"],
+          },
+          {
+            ...baseRun,
+            id: "other-run",
+            status: "completed",
+            subscriberUserIds: ["other-user"],
+          },
+        ],
+      },
+      [],
+      [project],
+      "current-user",
+    );
+
+    expect(messages.map((message) => message.targetId)).toEqual([
+      "subscribed-run",
+    ]);
+  });
+
+  it("removes messages absent from an authoritative organization feed", () => {
+    const [stale] = buildCurrentInboxMessages(
+      {
+        ...demoDashboard,
+        runs: [{
+          ...demoDashboard.runs[0],
+          id: "unsubscribed-run",
+          status: "completed",
+        }],
+      },
+      [],
+      [project],
+    );
+
+    expect(
+      replaceOrganizationInboxMessages(
+        [stale],
+        [],
+        [project],
+        project.organizationId!,
+      ),
+    ).toEqual([]);
+  });
+
+  it("keeps non-issue Inbox history when reconciling subscription removals", () => {
+    const sessionMessage = {
+      id: "session:kept",
+      kind: "session" as const,
+      projectId: project.id,
+      projectName: project.name,
+      targetId: "kept",
+      title: "Completed session",
+      occurredAt: "2026-08-11T00:00:00.000Z",
+      version: "session:v1:completed:2026-08-11T00:00:00.000Z",
+      status: "completed" as const,
+      agentName: "Briar",
+      issueCount: 1,
+      summary: "Done",
+      error: null,
+      requiresAttention: false,
+    };
+
+    expect(
+      replaceOrganizationInboxMessages(
+        [sessionMessage],
+        [],
+        [project],
+        project.organizationId!,
+      ),
+    ).toEqual([sessionMessage]);
   });
 
   it("creates session messages only for completed and failed sessions", () => {

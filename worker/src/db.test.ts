@@ -65,6 +65,7 @@ import {
   listIssueResultReviews,
   listIssueResultReviewsByRunIds,
   listIssueReworkProposals,
+  listIssueSubscriberUserIds,
   updateIssueMessage,
   deleteIssueMessage,
   listInboxReadStates,
@@ -94,6 +95,7 @@ import {
   reworkHuntRun,
   recordHuntEvent,
   recordRunEvidence,
+  subscribeToIssue,
   resumeWorkflowCheckpoint,
   removeOrganizationMember,
   revokeOrganizationInvitation,
@@ -109,6 +111,7 @@ import {
   updateProjectIcon,
   updateProjectIssueKeyPrefix,
   updateIssue,
+  unsubscribeFromIssue,
   upsertInboxReadStates,
   upsertProjectAgentSession,
 } from "./db";
@@ -927,6 +930,13 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       db,
       await readFile(
         resolve("migrations/0093_project_agent_session_sync.sql"),
+        "utf8",
+      ),
+    );
+    await executeSql(
+      db,
+      await readFile(
+        resolve("migrations/0097_issue_subscriptions.sql"),
         "utf8",
       ),
     );
@@ -4084,7 +4094,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     expect(mentionAfter?.count).toBe(0);
   });
 
-  it("lists mentions and replies to a user's root messages for inbox delivery", async () => {
+  it("delivers issue messages only to subscribers and derives assignee subscriptions", async () => {
     await executeSql(
       db,
       `
@@ -4123,14 +4133,33 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       id: "22222222-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
       projectId,
       runId,
+      parentMessageId: null,
+      authorUserId: "conversation-member",
+      authorAgentProvider: null,
+      body: "A historical message should stay out of the new subscription.",
+      createdAt: atMinute(29.2),
+    });
+
+    expect(
+      await listIssueConversationNotifications(db, projectId, "owner"),
+    ).toEqual([]);
+
+    expect(
+      await subscribeToIssue(db, projectId, runId, "owner", atMinute(29.3)),
+    ).toEqual(["owner"]);
+
+    await createIssueMessage(db, {
+      id: "33333333-cccc-4ccc-8ccc-cccccccccccc",
+      projectId,
+      runId,
       parentMessageId: ownerRootId,
       authorUserId: "conversation-member",
       authorAgentProvider: null,
       body: "Replying to your thread.",
-      createdAt: atMinute(29.2),
+      createdAt: atMinute(29.4),
     });
     await createIssueMessage(db, {
-      id: "33333333-cccc-4ccc-8ccc-cccccccccccc",
+      id: "44444444-dddd-4ddd-8ddd-dddddddddddd",
       projectId,
       runId,
       parentMessageId: null,
@@ -4138,10 +4167,10 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       authorAgentProvider: null,
       body: "@owner please review this.",
       mentionedUserIds: ["owner"],
-      createdAt: atMinute(29.3),
+      createdAt: atMinute(29.5),
     });
     await createIssueMessage(db, {
-      id: "44444444-dddd-4ddd-8ddd-dddddddddddd",
+      id: "55555555-eeee-4eee-8eee-eeeeeeeeeeee",
       projectId,
       runId,
       parentMessageId: ownerRootId,
@@ -4149,7 +4178,17 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       authorAgentProvider: null,
       body: "My own reply should not notify me.",
       mentionedUserIds: ["owner"],
-      createdAt: atMinute(29.4),
+      createdAt: atMinute(29.6),
+    });
+    await createIssueMessage(db, {
+      id: "66666666-ffff-4fff-8fff-ffffffffffff",
+      projectId,
+      runId,
+      parentMessageId: null,
+      authorUserId: "conversation-member",
+      authorAgentProvider: null,
+      body: "A subscribed conversation update.",
+      createdAt: atMinute(29.7),
     });
 
     const notifications = await listIssueConversationNotifications(
@@ -4160,25 +4199,73 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     expect(notifications).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          id: "33333333-cccc-4ccc-8ccc-cccccccccccc",
+          id: "44444444-dddd-4ddd-8ddd-dddddddddddd",
           notification_reason: "mention",
-          root_message_id: "33333333-cccc-4ccc-8ccc-cccccccccccc",
+          root_message_id: "44444444-dddd-4ddd-8ddd-dddddddddddd",
         }),
         expect.objectContaining({
-          id: "22222222-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+          id: "33333333-cccc-4ccc-8ccc-cccccccccccc",
           notification_reason: "thread_reply",
           root_message_id: ownerRootId,
+        }),
+        expect.objectContaining({
+          id: "66666666-ffff-4fff-8fff-ffffffffffff",
+          notification_reason: "subscription",
         }),
       ]),
     );
     expect(
       notifications.some(
         (notification) =>
-          notification.id === "44444444-dddd-4ddd-8ddd-dddddddddddd",
+          notification.id === "22222222-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      ),
+    ).toBe(false);
+    expect(
+      notifications.some(
+        (notification) =>
+          notification.id === "55555555-eeee-4eee-8eee-eeeeeeeeeeee",
       ),
     ).toBe(false);
 
+    expect(
+      await unsubscribeFromIssue(db, projectId, runId, "owner"),
+    ).toEqual([]);
+    expect(
+      await listIssueConversationNotifications(db, projectId, "owner"),
+    ).toEqual([]);
+
+    await updateIssue(db, projectId, runId, {
+      title: "Inbox conversation run",
+      description: null,
+      priority: null,
+      assigneeUserId: "owner",
+      updatedAt: atMinute(29.7),
+    });
+    expect(await listIssueSubscriberUserIds(db, projectId, runId)).toEqual([
+      "owner",
+    ]);
+    expect(
+      await listIssueConversationNotifications(db, projectId, "owner"),
+    ).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: "66666666-ffff-4fff-8fff-ffffffffffff",
+        notification_reason: "subscription",
+      }),
+    ]));
+
+    expect(
+      await subscribeToIssue(
+        db,
+        projectId,
+        runId,
+        "conversation-member",
+        atMinute(29.8),
+      ),
+    ).toEqual(["conversation-member", "owner"]);
     await removeOrganizationMember(db, projectId, "conversation-member");
+    expect(await listIssueSubscriberUserIds(db, projectId, runId)).toEqual([
+      "owner",
+    ]);
   });
 
   it("lists visible channel mentions and replies to a user's root message", async () => {

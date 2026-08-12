@@ -106,6 +106,10 @@ enum MobileAPIContract {
             "/projects/\(projectID.uuidString.lowercased())/runs/\(runID.uuidString.lowercased())/messages"
         }
 
+        static func runSubscription(projectID: UUID, runID: UUID) -> String {
+            "\(run(projectID: projectID, runID: runID))/subscription"
+        }
+
         static func runEvidence(projectID: UUID, runID: UUID) -> String {
             "/projects/\(projectID.uuidString.lowercased())/runs/\(runID.uuidString.lowercased())/evidence"
         }

@@ -105,7 +105,8 @@ final class InboxStore: ObservableObject {
         let built = InboxMessageBuilder.build(
             snapshot: snapshot,
             sessions: sessions,
-            project: project
+            project: project,
+            userID: userID
         )
 
         mergeMessages(built)
@@ -210,7 +211,7 @@ final class InboxStore: ObservableObject {
                     }
                     return message
                 }
-                self.mergeMessages(feedMessages)
+                self.replaceMessages(feedMessages)
                 self.feedReady = true
             } catch is CancellationError {
                 return
@@ -249,7 +250,15 @@ final class InboxStore: ObservableObject {
         for message in incoming {
             merged[message.id] = message
         }
-        let nextMessages = merged.values
+        storeMessages(merged.values)
+    }
+
+    private func replaceMessages(_ incoming: [InboxMessage]) {
+        storeMessages(incoming)
+    }
+
+    private func storeMessages<S: Sequence>(_ incoming: S) where S.Element == InboxMessage {
+        let nextMessages = incoming
             .sorted {
                 $0.occurredAt == $1.occurredAt
                     ? $0.id < $1.id

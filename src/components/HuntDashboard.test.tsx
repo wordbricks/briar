@@ -3662,6 +3662,83 @@ describe("HuntDashboard", () => {
     container.remove();
   });
 
+  it("toggles issue subscriptions and shows subscriber avatars in the conversation header", async () => {
+    const currentUser = {
+      userId: "current-user",
+      name: "Current User",
+      email: "current@example.com",
+      image: null,
+      role: "member" as const,
+      createdAt: "2026-08-01T00:00:00.000Z",
+    };
+    const existingSubscriber = {
+      userId: "existing-user",
+      name: "Existing User",
+      email: "existing@example.com",
+      image: null,
+      role: "member" as const,
+      createdAt: "2026-08-01T00:00:00.000Z",
+    };
+    const setSubscription = vi.spyOn(api, "setIssueSubscription")
+      .mockResolvedValue({
+        runId: demoDashboard.runs[0].id,
+        subscriberUserIds: [existingSubscriber.userId, currentUser.userId],
+      });
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => root.render(
+      <RunPage
+        currentUserId={currentUser.userId}
+        error={null}
+        isRecovering={false}
+        isSidebarOpen
+        mentionMembers={[currentUser, existingSubscriber]}
+        onBack={() => undefined}
+        onCancel={async () => undefined}
+        onLoadAttachment={async () => new Blob()}
+        onLoadIssueMessages={async () => []}
+        onLoadRunEvidence={async () => []}
+        onMove={async () => undefined}
+        onRetry={async () => undefined}
+        onSendIssueMessage={async () => {
+          throw new Error("not implemented in this test");
+        }}
+        projectId={demoDashboard.project.id}
+        run={{
+          ...demoDashboard.runs[0],
+          subscriberUserIds: [existingSubscriber.userId],
+        }}
+        token="test-token"
+      />
+    ));
+
+    const subscribe = container.querySelector<HTMLButtonElement>(
+      ".issue-subscribe-button",
+    );
+    expect(subscribe?.getAttribute("aria-pressed")).toBe("false");
+    expect(container.querySelectorAll(".issue-subscriber-avatars > span"))
+      .toHaveLength(1);
+
+    await act(async () => subscribe?.click());
+
+    expect(setSubscription).toHaveBeenCalledWith(
+      "test-token",
+      demoDashboard.project.id,
+      demoDashboard.runs[0].id,
+      true,
+    );
+    expect(subscribe?.getAttribute("aria-pressed")).toBe("true");
+    expect(subscribe?.textContent).toContain("구독 중");
+    expect(container.querySelectorAll(".issue-subscriber-avatars > span"))
+      .toHaveLength(2);
+
+    await act(async () => root.unmount());
+    container.remove();
+    setSubscription.mockRestore();
+  });
+
   it("reloads execution proposals when the run execution snapshot changes", async () => {
     const conversationRun = demoDashboard.runs[1];
     const targetRun = {

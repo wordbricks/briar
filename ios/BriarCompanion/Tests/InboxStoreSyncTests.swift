@@ -162,6 +162,7 @@ final class InboxStoreSyncTests: XCTestCase {
             title: "Routine completion",
             status: .completed,
             priority: 3,
+            subscriberUserIds: ["user-a"],
             updatedAt: Date(timeIntervalSince1970: 1_775_260_900)
         )
         let activitySnapshot = DashboardSnapshot(
@@ -253,6 +254,7 @@ final class InboxStoreSyncTests: XCTestCase {
             status: .blocked,
             workflowStage: "implementing",
             priority: 1,
+            subscriberUserIds: ["user-a", "user-b"],
             updatedAt: occurredAt,
             lastEventAt: ISO8601DateFormatter().string(from: occurredAt),
             eventCount: revision

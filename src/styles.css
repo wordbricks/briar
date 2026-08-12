@@ -1739,7 +1739,20 @@ button.paused-review-state { width:100%; border:0; border-radius:8px; cursor:poi
 .issue-conversation-tab-panel { width:100%; min-width:0; min-height:0; height:100%; }
 .issue-conversation-tab-panel[hidden] { display:none; }
 .issue-conversation-header { min-height:46px; flex:0 0 46px; padding:0 18px; display:flex; align-items:center; justify-content:space-between; gap:10px; border-bottom:1px solid var(--border); }
-.issue-conversation-header strong { min-width:0; display:flex; align-items:center; gap:7px; color:var(--foreground); font-size:var(--text-sm); }.issue-conversation-header strong span { color:var(--muted-foreground); font:500 var(--text-2xs) "DM Mono",monospace; }.issue-conversation-header small { overflow:hidden; color:var(--muted-foreground); font-size:var(--text-2xs); text-overflow:ellipsis; white-space:nowrap; }
+.issue-conversation-heading { min-width:0; display:flex; align-items:center; gap:8px; }
+.issue-conversation-header strong { min-width:0; display:flex; align-items:center; gap:7px; color:var(--foreground); font-size:var(--text-sm); }.issue-conversation-header strong span { color:var(--muted-foreground); font:500 var(--text-2xs) "DM Mono",monospace; }.issue-conversation-heading > small { overflow:hidden; color:var(--muted-foreground); font-size:var(--text-2xs); text-overflow:ellipsis; white-space:nowrap; }
+.issue-subscription-actions { flex:0 0 auto; display:flex; align-items:center; gap:7px; }
+.issue-subscriber-avatars { display:flex; align-items:center; padding-left:4px; }
+.issue-subscriber-avatars > span { width:24px; height:24px; overflow:hidden; display:grid; place-items:center; border:2px solid var(--card); border-radius:50%; background:var(--card); box-shadow:0 1px 4px rgba(38,42,32,.14); }
+.issue-subscriber-avatars > span + span { margin-left:-7px; }
+.issue-subscriber-avatars > i { min-width:24px; height:24px; margin-left:-7px; display:grid; place-items:center; border:2px solid var(--card); border-radius:50%; color:var(--muted-foreground); background:var(--muted); font:600 var(--text-2xs) "DM Mono",monospace; font-style:normal; }
+.issue-subscriber-avatars .issue-assignee-avatar { font-size:9px; }
+.issue-subscribe-button { height:28px; padding:0 9px; display:inline-flex; align-items:center; justify-content:center; gap:5px; border:1px solid var(--border); border-radius:8px; color:var(--muted-foreground); background:var(--card); cursor:pointer; font-size:var(--text-2xs); font-weight:650; white-space:nowrap; }
+.issue-subscribe-button:hover:not(:disabled) { border-color:#c8bde8; color:#624da8; background:#f7f4ff; }
+.issue-subscribe-button[aria-pressed="true"] { border-color:#c8bde8; color:#624da8; background:#f1edfc; }
+.issue-subscribe-button:focus-visible { outline:2px solid var(--ring); outline-offset:2px; }
+.issue-subscribe-button:disabled { cursor:default; opacity:1; }
+@media (max-width:520px) { .issue-conversation-heading > small,.issue-subscribe-button > span { display:none; }.issue-subscribe-button { width:28px; padding:0; }.issue-conversation-header { padding:0 12px; } }
 .issue-message-list { min-width:0; min-height:0; flex:1; margin:0 8px; display:grid; align-content:start; overflow-x:hidden; overflow-y:auto; overscroll-behavior:contain; scrollbar-gutter:stable; scrollbar-width:thin; }
 .issue-message-list::before,.issue-message-list::after { content:""; height:10px; }
 .issue-message-list::after { height:12px; }

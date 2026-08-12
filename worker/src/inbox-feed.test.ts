@@ -6,6 +6,7 @@ import {
 import { mobileInboxFeedResponseSchema } from "./mobile-contract";
 
 const occurredAt = "2026-08-11T13:00:00.000Z";
+const subscriberUserId = "subscriber";
 
 function projectData(
   id: string,
@@ -25,6 +26,7 @@ function projectData(
       workflow_snapshot_json: "{}",
       priority: status === "blocked" ? 1 : 2,
       structured_result_json: null,
+      subscriber_user_ids: JSON.stringify([subscriberUserId]),
       current_attempt: 1,
       current_revision: 1,
       last_event_at: occurredAt,
@@ -62,7 +64,11 @@ describe("organization Inbox feed", () => {
       updated_at: "2026-08-11T13:01:00.000Z",
     }];
 
-    const messages = buildInboxFeedMessages([first, second], []);
+    const messages = buildInboxFeedMessages(
+      [first, second],
+      [],
+      subscriberUserId,
+    );
 
     expect(() => mobileInboxFeedResponseSchema.parse({
       messages,
@@ -105,7 +111,7 @@ describe("organization Inbox feed", () => {
       author_name: "Taylor",
       notification_reason: "mention",
       created_at: occurredAt,
-    }]);
+    }], subscriberUserId);
 
     expect(() => mobileInboxFeedResponseSchema.parse({
       messages,
@@ -137,7 +143,7 @@ describe("organization Inbox feed", () => {
       created_at: occurredAt,
     }];
 
-    const messages = buildInboxFeedMessages([second], []);
+    const messages = buildInboxFeedMessages([second], [], subscriberUserId);
 
     expect(() => mobileInboxFeedResponseSchema.parse({
       messages,
@@ -150,5 +156,18 @@ describe("organization Inbox feed", () => {
       issueKey: "BR-1",
       reason: "thread_reply",
     }));
+  });
+
+  it("omits important issue states when the member is not subscribed", () => {
+    const data = projectData(
+      "11111111-1111-4111-8111-111111111111",
+      "First project",
+      "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      "completed",
+    );
+
+    const messages = buildInboxFeedMessages([data], [], "other-user");
+
+    expect(messages).toEqual([]);
   });
 });

@@ -49,6 +49,7 @@ function dashboardAt(revision: number): DashboardPayload {
       currentRevision: revision,
       priority: 1,
       status: "completed",
+      subscriberUserIds: ["user-a", "user-b"],
       workflowStage: null,
       lastEventAt: occurredAt,
       updatedAt: occurredAt,
@@ -102,11 +103,7 @@ async function flushPromises() {
 describe("useInbox read-state synchronization", () => {
   beforeEach(() => {
     window.localStorage.clear();
-    mockedLoadInboxFeed.mockReset().mockResolvedValue({
-      state: { etag: 'W/"organization-inbox:org:0"' },
-      notModified: false,
-      messages: [],
-    });
+    mockedLoadInboxFeed.mockReset().mockRejectedValue(new Error("offline"));
     mockedLoadInboxReadStates.mockReset().mockResolvedValue({});
     mockedSaveInboxReadStates.mockReset().mockResolvedValue({});
     container = document.createElement("div");

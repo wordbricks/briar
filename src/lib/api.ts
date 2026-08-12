@@ -2163,6 +2163,19 @@ export async function loadIssueMessages(
   return result.messages;
 }
 
+export async function setIssueSubscription(
+  token: string,
+  projectId: string,
+  runId: string,
+  subscribed: boolean,
+) {
+  return request<{ runId: string; subscriberUserIds: string[] }>(
+    `/projects/${projectId}/runs/${runId}/subscription`,
+    token,
+    { method: subscribed ? "PUT" : "DELETE" },
+  );
+}
+
 export async function loadRunEvidence(
   token: string,
   projectId: string,

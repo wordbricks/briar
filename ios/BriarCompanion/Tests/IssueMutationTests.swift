@@ -187,6 +187,28 @@ final class IssueMutationTests: XCTestCase {
         XCTAssertEqual(body["fullAuto"] as? Bool, true)
     }
 
+    func testIssueSubscriptionUsesCanonicalRunEndpoint() async throws {
+        let recorder = MutationAPIRecorder()
+        let store = IssueMutationStore(
+            api: recorder,
+            projectID: Self.projectID,
+            token: "token"
+        )
+
+        let response = try await store.setIssueSubscription(
+            runID: Self.runID,
+            subscribed: true
+        )
+
+        XCTAssertEqual(response.runId, Self.runID)
+        XCTAssertEqual(response.subscriberUserIds, ["fixture-user"])
+        let path = await recorder.lastPath()
+        XCTAssertEqual(
+            path,
+            "/projects/\(Self.projectID.uuidString.lowercased())/runs/\(Self.runID.uuidString.lowercased())/subscription"
+        )
+    }
+
     func testDispatchRunRequestEncodesWorkerSelection() throws {
         let agentID = UUID(uuidString: "AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA")!
         let requestID = UUID(uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!
@@ -1278,6 +1300,8 @@ private actor MutationAPIRecorder: MobileAPIClientProtocol {
         let payload: String
         if path.hasSuffix("/issues") {
             payload = #"{"runId":"33333333-3333-4333-8333-333333333333","sourceKey":"briar-issue:test","stage":"queued","status":"queued","attachments":[]}"#
+        } else if path.hasSuffix("/subscription") {
+            payload = #"{"runId":"33333333-3333-4333-8333-333333333333","subscriberUserIds":["fixture-user"]}"#
         } else if path.hasSuffix("/status") {
             payload = #"{"runId":"33333333-3333-4333-8333-333333333333","outcome":"moved","status":"queued","workflowStage":null}"#
         } else if path.hasSuffix("/resume") {
