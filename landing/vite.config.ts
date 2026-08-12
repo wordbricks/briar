@@ -9,6 +9,17 @@ const SITE_CREATOR_PLACEHOLDER_DATABASE_ID =
 
 const { d1, r2 } = hostingConfig;
 
+// Cloudflare rejects a route when an earlier wildcard already covers it.
+// Keep every concrete page in routePaths for routing and the sitemap, while
+// reducing Worker-first rules to the shallowest public route roots.
+const workerRouteRoots = routePaths.filter((path) =>
+  path === "/" || !routePaths.some((candidate) =>
+    candidate !== "/" &&
+    candidate !== path &&
+    path.startsWith(`${candidate}/`)
+  )
+);
+
 // macOS Seatbelt blocks FSEvents, so Codex previews need polling for HMR.
 const isCodexSeatbeltSandbox = process.env.CODEX_SANDBOX === "seatbelt";
 
@@ -28,7 +39,7 @@ const localBindingConfig = {
         if (root !== "/") {
           return [root, `${root}/*`];
         }
-        return routePaths.flatMap((path) =>
+        return workerRouteRoots.flatMap((path) =>
           path === "/" ? [path] : [path, `${path}/*`],
         );
       }),

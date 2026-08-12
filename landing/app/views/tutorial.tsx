@@ -337,6 +337,7 @@ export default function TutorialView({ locale }: { locale: Locale }) {
           { href: "#run-auto-hunt", label: t.steps[2].nav },
           { href: "#review-result", label: t.steps[4].nav },
           { href: "#schedule-agents", label: t.steps[7].nav },
+          { href: localizedPath(locale, "/docs"), label: c.nav.docs },
         ]}
       />
 

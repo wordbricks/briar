@@ -21,6 +21,7 @@ export type SiteLink = {
 
 const standardNavigation = [
   { key: "tutorial", path: "/tutorial" },
+  { key: "docs", path: "/docs" },
   { key: "changelog", path: "/changelog" },
   { key: "blog", path: "/blog" },
   { key: "download", path: "/download" },
@@ -36,7 +37,9 @@ export function standardSiteNavigation(
 ): SiteLink[] {
   return standardNavigation.map(({ key, path }) => ({
     href: localizedPath(locale, path),
-    isCurrent: currentPath === path,
+    isCurrent:
+      currentPath === path ||
+      (path === "/docs" && currentPath.startsWith("/docs/")),
     label: copy.nav[key],
   }));
 }
