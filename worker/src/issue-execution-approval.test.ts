@@ -401,6 +401,7 @@ describe("conversational issue execution approval", () => {
 
   it("dispatches only after explicit approval and finalizes both audits atomically", async () => {
     const { runId, proposalId } = await seedIssueProposal();
+    const providerReportedModel = "gpt-provider-reported-model";
     expect(await getIssueExecutionProposal(db, projectAId, runId, proposalId))
       .toMatchObject({ status: "pending", dispatch_request_id: null });
     expect(await getHuntRunForProject(db, projectAId, runId)).toMatchObject({
@@ -421,7 +422,12 @@ describe("conversational issue execution approval", () => {
     expect(hiddenAuthority.status).toBe(400);
 
     const acceptedResponse = await worker.fetch(
-      acceptIssueRequest(runId, proposalId),
+      acceptIssueRequest(runId, proposalId, ownerToken, {
+        provider: "codex",
+        model: providerReportedModel,
+        effort: "high",
+        workerId: null,
+      }),
       env(),
     );
     expect(acceptedResponse.status).toBe(200);
@@ -434,7 +440,7 @@ describe("conversational issue execution approval", () => {
         type: "request_issue_execute",
         status: "accepted",
         requestedProvider: "codex",
-        requestedModel: "gpt-5.6-sol",
+        requestedModel: providerReportedModel,
         requestedEffort: "high",
         requestedWorkerId: null,
       },
@@ -450,7 +456,7 @@ describe("conversational issue execution approval", () => {
       status: "accepted",
       accepted_by_user_id: ownerId,
       requested_provider: "codex",
-      requested_model: "gpt-5.6-sol",
+      requested_model: providerReportedModel,
       requested_effort: "high",
     });
     expect(proposal?.dispatch_request_id).toEqual(expect.any(String));
@@ -477,7 +483,15 @@ describe("conversational issue execution approval", () => {
       "issue execution approval audit is immutable",
     );
 
-    const retry = await worker.fetch(acceptIssueRequest(runId, proposalId), env());
+    const retry = await worker.fetch(
+      acceptIssueRequest(runId, proposalId, ownerToken, {
+        provider: "codex",
+        model: providerReportedModel,
+        effort: "high",
+        workerId: null,
+      }),
+      env(),
+    );
     expect(retry.status).toBe(200);
     await expect(retry.json()).resolves.toMatchObject({
       outcome: "already_accepted",

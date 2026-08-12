@@ -3,8 +3,22 @@
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  defaultAgentProviderModelCatalog,
+  loadAgentProviderModels,
+} from "../lib/project-llm";
 import type { ExecutionWorker } from "../types";
 import { WorkerDispatchDialog } from "./WorkerDispatchDialog";
+
+vi.mock("../lib/project-llm", async (importOriginal) => {
+  const original = await importOriginal<typeof import("../lib/project-llm")>();
+  return {
+    ...original,
+    loadAgentProviderModels: vi.fn(async () =>
+      original.defaultAgentProviderModelCatalog
+    ),
+  };
+});
 
 const worker = (id: string, label: string): ExecutionWorker => ({
   id,
@@ -42,6 +56,10 @@ describe("WorkerDispatchDialog", () => {
         IS_REACT_ACT_ENVIRONMENT: boolean;
       }
     ).IS_REACT_ACT_ENVIRONMENT = true;
+    vi.mocked(loadAgentProviderModels).mockReset();
+    vi.mocked(loadAgentProviderModels).mockResolvedValue(
+      defaultAgentProviderModelCatalog,
+    );
   });
 
   afterEach(() => {
@@ -630,6 +648,65 @@ describe("WorkerDispatchDialog", () => {
         effort: "high",
       }),
     );
+
+    await act(async () => root.unmount());
+  });
+
+  it("uses the same provider model catalog as Supported models", async () => {
+    vi.mocked(loadAgentProviderModels).mockResolvedValue({
+      ...defaultAgentProviderModelCatalog,
+      grok: {
+        models: [
+          { id: "grok-cli-latest", label: "Grok CLI Latest", isDefault: true },
+          { id: "grok-cli-fast", label: "Grok CLI Fast" },
+        ],
+        error: null,
+      },
+    });
+    const grokWorker = {
+      ...worker("worker-grok-models", "Grok Mac"),
+      agentProvider: "grok" as const,
+      providers: ["grok"] as ExecutionWorker["providers"],
+    };
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <WorkerDispatchDialog
+          error={null}
+          isDispatching={false}
+          onOpenChange={vi.fn()}
+          onSubmit={vi.fn()}
+          open
+          run={null}
+          workers={[grokWorker]}
+        />,
+      );
+    });
+    await act(async () => {
+      document.body
+        .querySelector<HTMLButtonElement>('[aria-label="선호 모델"]')
+        ?.click();
+    });
+
+    expect(loadAgentProviderModels).toHaveBeenCalledOnce();
+    expect(
+      document.body.querySelector(
+        '.select-menu-option[data-value="grok-cli-latest"]',
+      )?.textContent,
+    ).toContain("Grok CLI Latest");
+    expect(
+      document.body.querySelector(
+        '.select-menu-option[data-value="grok-cli-fast"]',
+      )?.textContent,
+    ).toContain("Grok CLI Fast");
+    expect(
+      document.body.querySelector(
+        '.select-menu-option[data-value="grok-4.5"]',
+      ),
+    ).toBeNull();
 
     await act(async () => root.unmount());
   });

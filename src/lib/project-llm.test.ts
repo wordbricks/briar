@@ -10,6 +10,7 @@ vi.mock("@tauri-apps/api/event", () => ({ listen }));
 
 import {
   chatWithProjectLlm,
+  loadAgentProviderModels,
   loadAppProviderSettings,
   loadProjectLlmSettings,
   loadProjectSandboxSettings,
@@ -84,6 +85,25 @@ describe("project LLM gateway", () => {
     });
     expect(invoke.mock.calls[0]?.[1]).not.toHaveProperty("cwd");
     expect(invoke.mock.calls[0]?.[1]).not.toHaveProperty("workspaceRoot");
+  });
+
+  it("caches provider models for the app session until explicitly refreshed", async () => {
+    invoke.mockResolvedValue({
+      codex: { models: [{ id: "cached-model", label: "Cached model" }], error: null },
+      claude: { models: [], error: null },
+      grok: { models: [], error: null },
+      opencode: { models: [], error: null },
+    });
+
+    const first = await loadAgentProviderModels({ refresh: true });
+    const cached = await loadAgentProviderModels();
+
+    expect(first).toBe(cached);
+    expect(invoke).toHaveBeenCalledOnce();
+    expect(invoke).toHaveBeenCalledWith("load_agent_provider_models");
+
+    await loadAgentProviderModels({ refresh: true });
+    expect(invoke).toHaveBeenCalledTimes(2);
   });
 
   it("rolls provider message deltas into request-scoped progress updates", async () => {
