@@ -1,4 +1,10 @@
-import { Download, LoaderCircle, Monitor, Settings } from "lucide-react";
+import {
+  Download,
+  LoaderCircle,
+  Monitor,
+  RefreshCw,
+  Settings,
+} from "lucide-react";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { useI18n } from "../i18n";
 import {
@@ -68,12 +74,14 @@ type DeviceUpdateState = {
 
 export function WorkerStatusBar({
   onOpenSettings,
+  onRefresh,
   organizationId,
   token,
   userId,
   workers,
 }: {
   onOpenSettings: () => void;
+  onRefresh?: () => void | Promise<void>;
   organizationId?: string | null;
   token?: string | null;
   userId?: string | null;
@@ -81,6 +89,7 @@ export function WorkerStatusBar({
 }) {
   const { t } = useI18n();
   const [isOpen, setIsOpen] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [latestVersion, setLatestVersion] = useState<string | null>(null);
   const [canManage, setCanManage] = useState(false);
   const [deviceUpdates, setDeviceUpdates] = useState<
@@ -92,6 +101,7 @@ export function WorkerStatusBar({
   const [updateError, setUpdateError] = useState<string | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const refreshRequestRef = useRef<Promise<void> | null>(null);
   const popoverId = useId();
   const activeCount = activeWorkerCount(workers);
 
@@ -116,6 +126,22 @@ export function WorkerStatusBar({
       // Version display still works from dashboard workers; update controls stay hidden.
     }
   }, [organizationId, token]);
+
+  const refreshStatus = useCallback(() => {
+    if (refreshRequestRef.current) return refreshRequestRef.current;
+    setIsRefreshing(true);
+    const request = Promise.all([
+      onRefresh ? Promise.resolve(onRefresh()) : Promise.resolve(),
+      refreshUpdateMetadata(),
+    ])
+      .then(() => undefined)
+      .finally(() => {
+        setIsRefreshing(false);
+        refreshRequestRef.current = null;
+      });
+    refreshRequestRef.current = request;
+    return request;
+  }, [onRefresh, refreshUpdateMetadata]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -217,6 +243,23 @@ export function WorkerStatusBar({
                   total: workers.length,
                 })}
               </span>
+              <button
+                aria-busy={isRefreshing}
+                aria-label={t("worker.refresh")}
+                disabled={isRefreshing}
+                onClick={() => {
+                  void refreshStatus();
+                }}
+                title={t("worker.refresh")}
+                type="button"
+              >
+                <RefreshCw
+                  aria-hidden
+                  className={isRefreshing ? "spin" : undefined}
+                  size={14}
+                  strokeWidth={1.8}
+                />
+              </button>
               <button
                 aria-label={t("worker.openSettings")}
                 onClick={() => {
