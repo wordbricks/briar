@@ -95,6 +95,7 @@ import {
 import { isRepositoryConnectedForImport } from "./lib/linear-import";
 import { settingsAccountSelection } from "./lib/settings-account-selection";
 import { LITELLM_MAIN_PRICING_SOURCE } from "./lib/agent-usage-pricing";
+import { createCachedProjectUsageSummaryLoader } from "./lib/project-usage-summary";
 import {
   createChannel,
   dispatchHuntRun,
@@ -103,6 +104,7 @@ import {
   loadDashboard,
   loadStatusTrayRuns,
   loadProjectAgents,
+  loadProjectUsageSummary,
   runProjectAgentTaskOnWorker,
   retryHuntRun,
 } from "./lib/api";
@@ -238,6 +240,13 @@ export function App() {
       90,
     );
   }, [briar.activeOrganizationId, briar.token]);
+  const loadProjectHomeUsage = useMemo(
+    () => createCachedProjectUsageSummaryLoader(async (projectId) => {
+      if (!briar.token) return null;
+      return loadProjectUsageSummary(briar.token, projectId, 30);
+    }),
+    [briar.token],
+  );
   useEffect(() => {
     autoHunt.configureSync(
       briar.token,
@@ -681,7 +690,7 @@ export function App() {
     return () => {
       cancelled = true;
     };
-  }, [activePage, activeProject, briar.token, locale]);
+  }, [activeProject, briar.token, locale]);
   const rememberIssueAgent = useCallback((agent: ProjectAgent) => {
     setIssueAgents((current) => {
       const index = current.findIndex((candidate) => candidate.id === agent.id);
@@ -1419,7 +1428,7 @@ export function App() {
           <ProjectLobby
             dashboard={briar.dashboard}
             isSidebarOpen={isSidebarOpen}
-            onLoadUsageReport={loadUsageReport}
+            onLoadUsageSummary={loadProjectHomeUsage}
             onOpenAgents={() => navigateToPage("agents")}
             onOpenIssue={(runId) => {
               setRequestedSessionId(null);

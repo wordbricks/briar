@@ -17,17 +17,19 @@ import { MainContent, PageHeader } from "./layout";
 import { ProjectIcon } from "./ProjectIcon";
 import { useI18n } from "../i18n";
 import type { MessageKey } from "../i18n/messages";
-import {
-  aggregateAgentUsageOverview,
-  type AgentUsageOverviewRun,
-} from "../lib/agent-usage-overview";
 import { formatUsageDuration } from "../lib/agent-usage";
 import type { RepositoryReadiness } from "../lib/project-connection";
+import {
+  projectTrackedDuration as trackedDurationForRange,
+  summarizeProjectUsage,
+  type ProjectUsageSummaryRun,
+  type ProjectUsageSummaryLoadOptions,
+} from "../lib/project-usage-summary";
 import type {
-  AgentUsageReport,
   DashboardPayload,
   HuntRun,
   Project,
+  ProjectUsageSummary,
 } from "../types";
 
 const overviewDays = 30;
@@ -41,22 +43,11 @@ function formatCompact(value: number, locale: string) {
   }).format(value);
 }
 
-function runTimestamp(run: AgentUsageOverviewRun) {
-  return Date.parse(run.completedAt ?? run.updatedAt ?? run.startedAt);
-}
-
 export function projectTrackedDuration(
-  runs: readonly AgentUsageOverviewRun[],
+  runs: readonly ProjectUsageSummaryRun[],
   now: number,
 ) {
-  const start = new Date(now);
-  start.setHours(0, 0, 0, 0);
-  start.setDate(start.getDate() - (overviewDays - 1));
-  return runs.reduce((total, run) => {
-    const timestamp = runTimestamp(run);
-    if (!Number.isFinite(timestamp) || timestamp < start.getTime()) return total;
-    return total + (run.executionMetrics?.durationMs ?? 0);
-  }, 0);
+  return trackedDurationForRange(runs, overviewDays, now);
 }
 
 function statusLabel(run: HuntRun, t: ReturnType<typeof useI18n>["t"]) {
@@ -67,7 +58,7 @@ function statusLabel(run: HuntRun, t: ReturnType<typeof useI18n>["t"]) {
 export function ProjectLobby({
   dashboard,
   isSidebarOpen,
-  onLoadUsageReport,
+  onLoadUsageSummary,
   onOpenAgents,
   onOpenIssue,
   onOpenIssues,
@@ -78,7 +69,10 @@ export function ProjectLobby({
 }: {
   dashboard: DashboardPayload | null;
   isSidebarOpen: boolean;
-  onLoadUsageReport: () => Promise<AgentUsageReport>;
+  onLoadUsageSummary: (
+    projectId: string,
+    options?: ProjectUsageSummaryLoadOptions,
+  ) => Promise<ProjectUsageSummary | null>;
   onOpenAgents: () => void;
   onOpenIssue: (runId: string) => void;
   onOpenIssues: () => void;
@@ -88,26 +82,27 @@ export function ProjectLobby({
   readiness: RepositoryReadiness | null;
 }) {
   const { localeTag, t } = useI18n();
-  const [usageReport, setUsageReport] = useState<AgentUsageReport | null>(null);
+  const [usageSummary, setUsageSummary] =
+    useState<ProjectUsageSummary | null>(null);
   const [usageError, setUsageError] = useState<string | null>(null);
   const [usageLoading, setUsageLoading] = useState(false);
   const [now, setNow] = useState(Date.now);
 
-  const refreshUsage = useCallback(async () => {
+  const refreshUsage = useCallback(async (force = false) => {
     setUsageLoading(true);
     setUsageError(null);
     try {
-      setUsageReport(await onLoadUsageReport());
+      setUsageSummary(await onLoadUsageSummary(project.id, { force }));
       setNow(Date.now());
     } catch (cause) {
       setUsageError(cause instanceof Error ? cause.message : String(cause));
     } finally {
       setUsageLoading(false);
     }
-  }, [onLoadUsageReport]);
+  }, [onLoadUsageSummary, project.id]);
 
   useEffect(() => {
-    setUsageReport(null);
+    setUsageSummary(null);
     setUsageError(null);
     void refreshUsage();
   }, [project.id, refreshUsage]);
@@ -115,18 +110,16 @@ export function ProjectLobby({
   const dashboardRuns = dashboard?.project.id === project.id
     ? dashboard.runs
     : [];
-  const reportedProjectRuns = useMemo(
-    () => (usageReport?.runs ?? []).filter((run) => run.projectId === project.id),
-    [project.id, usageReport],
+  const dashboardUsage = useMemo(
+    () => summarizeProjectUsage(dashboardRuns, overviewDays, now),
+    [dashboardRuns, now],
   );
-  const usageRuns: AgentUsageOverviewRun[] = reportedProjectRuns.length > 0
-    ? reportedProjectRuns
-    : dashboardRuns;
-  const usage = useMemo(
-    () => aggregateAgentUsageOverview(usageRuns, overviewDays, now),
-    [now, usageRuns],
-  );
-  const trackedDuration = projectTrackedDuration(usageRuns, now);
+  const totalTokens = usageSummary?.totalTokens ??
+    dashboardUsage.totalTokens;
+  const observedRuns = usageSummary?.observedRuns ?? dashboardUsage.observedRuns;
+  const reportedRuns = usageSummary?.reportedRuns ?? dashboardUsage.reportedRuns;
+  const trackedDuration = usageSummary?.trackedDurationMs ??
+    projectTrackedDuration(dashboardRuns, now);
   const activeRuns = dashboardRuns.filter((run) => activeStatuses.has(run.status));
   const completedRuns = dashboardRuns.filter((run) => run.status === "completed");
   const attentionRuns = dashboardRuns.filter((run) =>
@@ -178,7 +171,7 @@ export function ProjectLobby({
               aria-label={t("lobby.refresh")}
               className="project-lobby-refresh"
               disabled={usageLoading}
-              onClick={() => void refreshUsage()}
+              onClick={() => void refreshUsage(true)}
               type="button"
             >
               <RefreshCw aria-hidden className={usageLoading ? "spinning" : ""} size={15} />
@@ -189,13 +182,13 @@ export function ProjectLobby({
           <section aria-label={t("lobby.metrics")} className="project-lobby-metrics">
             <article className="project-lobby-metric primary">
               <span><Sparkles aria-hidden size={16} />{t("lobby.tokens")}</span>
-              <strong>{formatCompact(usage.totals.totalTokens, localeTag)}</strong>
+              <strong>{formatCompact(totalTokens, localeTag)}</strong>
               <small>
-                {usageLoading && !usageReport
+                {usageLoading && !usageSummary
                   ? t("lobby.loadingUsage")
                   : t("lobby.tokenRuns", {
-                      count: usage.reportedRuns,
-                      total: usage.observedRuns,
+                      count: reportedRuns,
+                      total: observedRuns,
                     })}
               </small>
             </article>

@@ -86,6 +86,8 @@ import {
   listProjectAgentSessions,
   listProjectAgentScheduleRuns,
   listProjectAgentSchedules,
+  listProjectUsageTotals,
+  listProjectUsageRuns,
   listRunEvidence,
   listRunEvidenceImages,
   moveHuntRun,
@@ -870,6 +872,13 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     await executeSql(
       db,
       await readFile(
+        resolve("migrations/0097_project_usage_summary.sql"),
+        "utf8",
+      ),
+    );
+    await executeSql(
+      db,
+      await readFile(
         resolve("migrations/0088_organization_agent_context.sql"),
         "utf8",
       ),
@@ -1503,6 +1512,38 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         durationMs: 1_000,
       }))
       .run();
+    const executionId = "33333333-3333-4333-8333-333333333333";
+    await db
+      .prepare(
+        `insert into briar_run_execution_attempts (
+           id, organization_id, project_id, run_id, run_attempt,
+           claim_attempt, worker_id, claimed_by, claimed_at, recorded_at
+         ) values (?, ?, ?, 'usage-cap-001', 1, 1, 'worker-1', 'worker', ?, ?)`
+      )
+      .bind(
+        executionId,
+        projectId,
+        usageProject.id,
+        recentAt,
+        recentAt,
+      )
+      .run();
+    await db
+      .prepare(
+        `insert into briar_run_usage_records (
+           execution_id, usage_key, session_id, turn_id, scope_id,
+           agent_provider, model_provider, model, canonical_model,
+           model_source, source, uncached_input_tokens, cache_read_tokens,
+           cache_write_tokens, output_tokens, reasoning_output_tokens,
+           total_tokens, observed_at, recorded_at
+         ) values (
+           ?, 'usage-1', 'session-1', 'turn-1', 'turn-1',
+           'claude', 'anthropic', 'opus', null, 'providerReported',
+           'claude.result.usage', 10, 20, 2, 5, null, 37, ?, ?
+         )`,
+      )
+      .bind(executionId, recentAt, recentAt)
+      .run();
     const oldAt = atMinute(99);
     await db
       .prepare(
@@ -1622,6 +1663,42 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       execution_provider: "claude",
       execution_model: "opus",
     });
+
+    const projectRows = await listProjectUsageRuns(
+      db,
+      usageProject.id,
+      atMinute(100),
+    );
+    expect(projectRows).toHaveLength(206);
+    expect(projectRows.every((row) => row.project_id === usageProject.id))
+      .toBe(true);
+    expect(
+      projectRows.find((row) => row.id === "usage-cap-001"),
+    ).toMatchObject({ has_usage_ledger: 1 });
+    const projectTotals = await listProjectUsageTotals(
+      db,
+      usageProject.id,
+      atMinute(100),
+    );
+    expect(projectTotals).toHaveLength(1);
+    expect(projectTotals[0]).toMatchObject({
+      run_id: "usage-cap-001",
+      total_tokens: 37,
+      usage_records: 1,
+    });
+    const usagePlan = await db
+      .prepare(
+        `explain query plan
+         select attempt.run_id
+         from briar_run_execution_attempts attempt
+         join briar_run_usage_records usage on usage.execution_id = attempt.id
+         where attempt.project_id = ? and usage.observed_at >= ?`,
+      )
+      .bind(usageProject.id, atMinute(100))
+      .all<{ detail: string }>();
+    expect(usagePlan.results.map((row) => row.detail).join("\n")).toContain(
+      "briar_run_execution_attempts_project_idx",
+    );
   });
 
   it("synchronizes the newest project agent session snapshot", async () => {
