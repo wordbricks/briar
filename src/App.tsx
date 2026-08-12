@@ -1779,6 +1779,7 @@ export function App() {
               setIsSidebarOpen(true);
               navigateToPage("settings");
             }}
+            onRefresh={() => briar.refresh("snapshot")}
             organizationId={briar.activeOrganizationId}
             token={briar.token}
             userId={briar.user?.id ?? null}
