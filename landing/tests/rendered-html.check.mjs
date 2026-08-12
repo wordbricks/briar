@@ -443,6 +443,8 @@ test("server-renders the localized changelog from published releases", async () 
   assert.match(koreanHtml, /<html lang="ko"[\s>]/i);
   assert.match(koreanHtml, /Briar 변경 기록/);
   assert.match(koreanHtml, /현재 안정 버전/);
+  assert.match(koreanHtml, /데스크탑 설정과 채널 운영 도구를 강화합니다/);
+  assert.match(koreanHtml, /v1\.2\.112/);
   assert.match(koreanHtml, /이슈를 구독하고 프로젝트 현황을 더 빠르게 확인합니다/);
   assert.match(koreanHtml, /v1\.2\.110/);
   assert.match(koreanHtml, /에이전트 핸들을 직접 정하고 실시간 채널 연결을 복원합니다/);
@@ -492,6 +494,8 @@ test("server-renders the localized changelog from published releases", async () 
   const englishHtml = await englishResponse.text();
   assert.match(englishHtml, /<html lang="en"[\s>]/i);
   assert.match(englishHtml, /Briar changelog/);
+  assert.match(englishHtml, /Make desktop settings and channel operations easier to follow/);
+  assert.match(englishHtml, /v1\.2\.112/);
   assert.match(englishHtml, /Subscribe to issues and load project health faster/);
   assert.match(englishHtml, /v1\.2\.110/);
   assert.match(englishHtml, /Choose agent handles and restore realtime channel connections/);

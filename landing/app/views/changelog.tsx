@@ -23,6 +23,19 @@ export const changelogCopy = {
     backTop: "맨 위로 ↑",
     entries: [
       {
+        version: "1.2.112",
+        date: "2026년 8월 12일",
+        title: "데스크탑 설정과 채널 운영 도구를 강화합니다",
+        summary:
+          "macOS 설정·업데이트 흐름과 보안 입력 처리를 안정화하고, 채널 기록·Worker 상태·공개 문서를 확장했습니다.",
+        items: [
+          "macOS 앱 메뉴에서 설정과 업데이트 확인을 바로 열 수 있고, 새 버전이 있으면 메뉴 문구가 업데이트 동작으로 바뀝니다.",
+          "macOS 창이 포커스를 잃을 때 비밀번호 입력을 위한 보안 입력 상태를 정리해 다른 앱의 키 입력을 가로채지 않도록 했습니다.",
+          "Briar CLI와 Project Agent가 권한이 있는 채널의 과거 메시지와 스레드를 페이지 단위로 읽을 수 있고, 채널 접근 규칙을 Worker에서 검증합니다.",
+          "Worker 상태 새로고침, HTTPS 프로필 아바타, 이슈 생성자 보존과 공개 API·LLM 문서를 추가해 운영과 자동화 맥락을 더 분명하게 확인할 수 있습니다.",
+        ],
+      },
+      {
         version: "1.2.111",
         date: "2026년 8월 12일",
         title: "채널 자동화와 프로젝트 운영 가시성을 강화합니다",
@@ -439,6 +452,19 @@ export const changelogCopy = {
     home: "Home",
     backTop: "Back to top ↑",
     entries: [
+      {
+        version: "1.2.112",
+        date: "August 12, 2026",
+        title: "Make desktop settings and channel operations easier to follow",
+        summary:
+          "Stabilize macOS settings, update, and secure-input behavior while expanding channel history, Worker status, and public documentation.",
+        items: [
+          "Open Settings and update checks directly from the macOS app menu, with the update item changing its label when a new version is available.",
+          "Release password-editor secure input when the macOS window loses focus so keyboard capture does not remain active in another app.",
+          "Let Briar CLI and Project Agents page through authorized channel history and threads while the Worker enforces project-agent channel access.",
+          "Add Worker status refresh, HTTPS profile avatars, issue-creator attribution, and public API and LLM docs so operations and automation have clearer context.",
+        ],
+      },
       {
         version: "1.2.111",
         date: "August 12, 2026",
@@ -868,9 +894,9 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <h1>{changelog.title}</h1>
           <p>{changelog.description}</p>
         </div>
-        <a href="#v1-2-111" className="changelog-current">
+        <a href="#v1-2-112" className="changelog-current">
           <span>{changelog.current}</span>
-          <strong>v1.2.111</strong>
+          <strong>v1.2.112</strong>
           <i aria-hidden="true">↓</i>
         </a>
       </section>
@@ -895,6 +921,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   {index === 0 ? <span>{changelog.latest}</span> : null}
                   <time
                     dateTime={
+                      entry.version === "1.2.112" ||
                       entry.version === "1.2.111" ||
                       entry.version === "1.2.110" ||
                       entry.version === "1.2.109" ||
