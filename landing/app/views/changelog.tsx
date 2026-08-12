@@ -23,6 +23,19 @@ export const changelogCopy = {
     backTop: "맨 위로 ↑",
     entries: [
       {
+        version: "1.2.110",
+        date: "2026년 8월 12일",
+        title: "이슈를 구독하고 프로젝트 현황을 더 빠르게 확인합니다",
+        summary:
+          "관심 있는 이슈의 알림 범위를 직접 관리하고, 프로젝트 홈과 채널 작성기가 필요한 정보와 입력 내용에 맞춰 더 효율적으로 반응합니다.",
+        items: [
+          "이슈 대화에서 구독하거나 해제하고 현재 구독자 아바타를 확인할 수 있으며, 담당자는 중요한 변경을 놓치지 않도록 자동 구독됩니다.",
+          "이슈 상태와 대화 알림을 구독자에게만 Inbox와 시스템 알림으로 전달하고, 데스크탑·Android·iOS에서 같은 구독 상태를 사용합니다.",
+          "프로젝트 홈의 최근 30일 사용량을 D1에서 프로젝트 단위로 집계하고 캐시해 조직 전체 실행 기록을 반복해서 읽지 않습니다.",
+          "채널 입력창이 줄바꿈과 자동 줄바꿈에 맞춰 140px까지 자연스럽게 커지고, 그 이후에는 내부 스크롤을 유지합니다.",
+        ],
+      },
+      {
         version: "1.2.109",
         date: "2026년 8월 12일",
         title: "에이전트 핸들을 직접 정하고 실시간 채널 연결을 복원합니다",
@@ -413,6 +426,19 @@ export const changelogCopy = {
     home: "Home",
     backTop: "Back to top ↑",
     entries: [
+      {
+        version: "1.2.110",
+        date: "August 12, 2026",
+        title: "Subscribe to issues and load project health faster",
+        summary:
+          "Control which issues notify you while Project Home and the channel composer respond more efficiently to the data and text that matter.",
+        items: [
+          "Subscribe or unsubscribe from an issue conversation and see current subscriber avatars, while assignees remain subscribed so they cannot miss important changes.",
+          "Deliver issue status and conversation notifications only to subscribers across Inbox and system notifications, with the same subscription state on desktop, Android, and iOS.",
+          "Aggregate and cache the last 30 days of project usage in D1 so Project Home no longer scans organization-wide execution history on every load.",
+          "Grow the channel composer with explicit and automatic line wrapping up to 140px, then preserve internal scrolling for longer messages.",
+        ],
+      },
       {
         version: "1.2.109",
         date: "August 12, 2026",
@@ -816,9 +842,9 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <h1>{changelog.title}</h1>
           <p>{changelog.description}</p>
         </div>
-        <a href="#v1-2-109" className="changelog-current">
+        <a href="#v1-2-110" className="changelog-current">
           <span>{changelog.current}</span>
-          <strong>v1.2.109</strong>
+          <strong>v1.2.110</strong>
           <i aria-hidden="true">↓</i>
         </a>
       </section>
@@ -843,6 +869,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   {index === 0 ? <span>{changelog.latest}</span> : null}
                   <time
                     dateTime={
+                      entry.version === "1.2.110" ||
                       entry.version === "1.2.109" ||
                       entry.version === "1.2.108" ||
                       entry.version === "1.2.107" ||
