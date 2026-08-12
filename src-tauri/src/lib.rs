@@ -7084,6 +7084,55 @@ fn prepare_launch_intro(app: tauri::AppHandle) -> Result<(), String> {
 #[cfg(desktop)]
 pub(crate) const APP_QUIT_MENU_ID: &str = "app:quit";
 
+#[cfg(target_os = "macos")]
+const APP_MENU_ID: &str = "app:menu";
+#[cfg(target_os = "macos")]
+const APP_SETTINGS_MENU_ID: &str = "app:settings";
+#[cfg(target_os = "macos")]
+const APP_UPDATE_MENU_ID: &str = "app:update";
+#[cfg(target_os = "macos")]
+const APP_SETTINGS_MENU_EVENT: &str = "app-menu-settings";
+#[cfg(target_os = "macos")]
+const APP_UPDATE_MENU_EVENT: &str = "app-menu-update";
+
+#[cfg(target_os = "macos")]
+fn app_update_menu_label(update_available: bool) -> &'static str {
+    if update_available {
+        "Update Briar…"
+    } else {
+        "Check for Updates…"
+    }
+}
+
+#[tauri::command]
+fn sync_app_update_menu(app: tauri::AppHandle, update_available: bool) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        let menu = app
+            .menu()
+            .ok_or_else(|| "App menu is not installed".to_string())?;
+        let app_menu_kind = menu
+            .get(APP_MENU_ID)
+            .ok_or_else(|| "App submenu is not installed".to_string())?;
+        let app_menu = app_menu_kind
+            .as_submenu()
+            .ok_or_else(|| "App menu item is not a submenu".to_string())?;
+        let update_item_kind = app_menu
+            .get(APP_UPDATE_MENU_ID)
+            .ok_or_else(|| "App update menu item is not installed".to_string())?;
+        let update_item = update_item_kind
+            .as_menuitem()
+            .ok_or_else(|| "App update menu entry is not a regular item".to_string())?;
+        update_item
+            .set_text(app_update_menu_label(update_available))
+            .map_err(|error| format!("App update menu label failed: {error}"))?;
+    }
+    #[cfg(not(target_os = "macos"))]
+    let _ = (app, update_available);
+
+    Ok(())
+}
+
 /// Install the app-wide menu with a custom Quit item that asks for
 /// confirmation before exiting.
 ///
@@ -7118,6 +7167,26 @@ fn install_app_menu(app: &AppHandle) -> Result<(), String> {
         Some("CmdOrCtrl+Q"),
     )
     .map_err(|error| format!("App menu quit item failed: {error}"))?;
+
+    #[cfg(target_os = "macos")]
+    let settings = MenuItem::with_id(
+        app,
+        APP_SETTINGS_MENU_ID,
+        "Settings…",
+        true,
+        Some("CmdOrCtrl+Comma"),
+    )
+    .map_err(|error| format!("App menu settings item failed: {error}"))?;
+
+    #[cfg(target_os = "macos")]
+    let update = MenuItem::with_id(
+        app,
+        APP_UPDATE_MENU_ID,
+        app_update_menu_label(false),
+        true,
+        None::<&str>,
+    )
+    .map_err(|error| format!("App menu update item failed: {error}"))?;
 
     let window_menu = Submenu::with_id_and_items(
         app,
@@ -7155,13 +7224,18 @@ fn install_app_menu(app: &AppHandle) -> Result<(), String> {
         app,
         &[
             #[cfg(target_os = "macos")]
-            &Submenu::with_items(
+            &Submenu::with_id_and_items(
                 app,
+                APP_MENU_ID,
                 pkg_info.name.clone(),
                 true,
                 &[
                     &PredefinedMenuItem::about(app, None, Some(about_metadata))
                         .map_err(|error| format!("App menu about item failed: {error}"))?,
+                    &update,
+                    &PredefinedMenuItem::separator(app)
+                        .map_err(|error| format!("App menu separator failed: {error}"))?,
+                    &settings,
                     &PredefinedMenuItem::separator(app)
                         .map_err(|error| format!("App menu separator failed: {error}"))?,
                     &PredefinedMenuItem::services(app, None)
@@ -7299,6 +7373,18 @@ pub fn run() {
         .on_menu_event(|app, event| {
             if event.id() == APP_QUIT_MENU_ID {
                 request_exit_confirmation(app);
+            }
+            #[cfg(target_os = "macos")]
+            if event.id() == APP_SETTINGS_MENU_ID {
+                if let Some(main) = app.get_webview_window("main") {
+                    let _ = main.show();
+                    let _ = main.set_focus();
+                }
+                let _ = app.emit(APP_SETTINGS_MENU_EVENT, ());
+            }
+            #[cfg(target_os = "macos")]
+            if event.id() == APP_UPDATE_MENU_ID {
+                let _ = app.emit(APP_UPDATE_MENU_EVENT, ());
             }
         })
         .on_window_event(|window, event| {
@@ -7461,7 +7547,8 @@ pub fn run() {
             request_inbox_notification_permission,
             drain_pending_inbox_notification_opens,
             arm_macos_password_editor,
-            sync_status_tray
+            sync_status_tray,
+            sync_app_update_menu
         ])
         .build(tauri::generate_context!())
         .expect("error while building Briar");
@@ -7492,6 +7579,13 @@ mod tests {
     use super::*;
     use serde_json::json;
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn app_update_menu_label_reflects_availability() {
+        assert_eq!(app_update_menu_label(false), "Check for Updates…");
+        assert_eq!(app_update_menu_label(true), "Update Briar…");
+    }
 
     #[test]
     fn inbox_channel_notification_target_preserves_message_context() {
