@@ -862,6 +862,113 @@ describe("HuntDashboard", () => {
     container.remove();
   });
 
+  it("collapses and expands a kanban stage column per user and project", async () => {
+    window.localStorage.clear();
+    const userId = "user-collapse-1";
+    const projectId = demoDashboard.project.id;
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => root.render(
+      <HuntDashboard
+        {...dashboardProps}
+        currentUserId={userId}
+        dashboard={demoDashboard}
+      />,
+    ));
+
+    const collapseButton = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="분석 열 접기"]',
+    );
+    expect(collapseButton).not.toBeNull();
+    expect(
+      container.querySelector(
+        '[data-kanban-column-id="stage:analyzing"][data-kanban-column-collapsed="false"]',
+      ),
+    ).not.toBeNull();
+
+    await act(async () => collapseButton?.click());
+
+    const collapsedColumn = container.querySelector(
+      '[data-kanban-column-id="stage:analyzing"]',
+    );
+    expect(collapsedColumn?.getAttribute("data-kanban-column-collapsed")).toBe(
+      "true",
+    );
+    expect(
+      collapsedColumn?.closest(".kanban-column-shell")?.classList.contains(
+        "is-collapsed",
+      ),
+    ).toBe(true);
+    expect(collapsedColumn?.querySelector(".kanban-card")).toBeNull();
+    expect(
+      container.querySelector<HTMLButtonElement>(
+        'button[aria-label="분석 열 펼치기"]',
+      )?.getAttribute("aria-expanded"),
+    ).toBe("false");
+    expect(
+      JSON.parse(
+        window.localStorage.getItem(
+          `briar.settings.kanbanColumnCollapse.v1:${encodeURIComponent(userId)}:${encodeURIComponent(projectId)}`,
+        )!,
+      ),
+    ).toEqual(["stage:analyzing"]);
+
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>('button[aria-label="분석 열 펼치기"]')
+        ?.click();
+    });
+    expect(
+      container
+        .querySelector('[data-kanban-column-id="stage:analyzing"]')
+        ?.getAttribute("data-kanban-column-collapsed"),
+    ).toBe("false");
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("restores collapsed kanban columns from local storage for the same user", async () => {
+    window.localStorage.clear();
+    const userId = "user-collapse-restore";
+    const projectId = demoDashboard.project.id;
+    window.localStorage.setItem(
+      `briar.settings.kanbanColumnCollapse.v1:${encodeURIComponent(userId)}:${encodeURIComponent(projectId)}`,
+      JSON.stringify(["stage:implementing", "status:completed"]),
+    );
+
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => root.render(
+      <HuntDashboard
+        {...dashboardProps}
+        currentUserId={userId}
+        dashboard={demoDashboard}
+      />,
+    ));
+
+    expect(
+      container
+        .querySelector('[data-kanban-column-id="stage:implementing"]')
+        ?.getAttribute("data-kanban-column-collapsed"),
+    ).toBe("true");
+    expect(
+      container
+        .querySelector('[data-kanban-column-id="status:completed"]')
+        ?.getAttribute("data-kanban-column-collapsed"),
+    ).toBe("true");
+    expect(
+      container
+        .querySelector('[data-kanban-column-id="stage:analyzing"]')
+        ?.getAttribute("data-kanban-column-collapsed"),
+    ).toBe("false");
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
   it("switches between kanban and list views while preserving issue navigation", async () => {
     const container = document.createElement("div");
     const root = createRoot(container);

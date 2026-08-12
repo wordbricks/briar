@@ -156,6 +156,11 @@ import {
   saveConversationPaneWidth,
 } from "../lib/conversation-pane-width";
 import {
+  readKanbanCollapsedColumnIds,
+  toggleKanbanCollapsedColumnId,
+  writeKanbanCollapsedColumnIds,
+} from "../lib/kanban-column-collapse";
+import {
   agentReplyParentMessageId,
   issueMentionAtCaret,
   issueMentionHandle,
@@ -597,6 +602,7 @@ export function HuntDashboard({
   const [isSourceFilterOpen, setIsSourceFilterOpen] = useState(false);
   const sourceFilterRef = useRef<HTMLDivElement>(null);
   const [view, setView] = useState<DashboardView>("kanban");
+  const [collapsedColumnIds, setCollapsedColumnIds] = useState<string[]>([]);
   const [internalStatus, setInternalStatus] = useState<StatusFilter>("all");
   const status = companionMode && companionStatus
     ? companionStatus
@@ -911,6 +917,29 @@ export function HuntDashboard({
     if (!selected || !selectedInboxVersion) return;
     onIssueViewed?.(selected.id);
   }, [onIssueViewed, selected?.id, selectedInboxVersion]);
+
+  const projectId = dashboard?.project.id ?? null;
+  useEffect(() => {
+    setCollapsedColumnIds(
+      readKanbanCollapsedColumnIds(currentUserId, projectId),
+    );
+  }, [currentUserId, projectId]);
+
+  const collapsedColumnIdSet = useMemo(
+    () => new Set(collapsedColumnIds),
+    [collapsedColumnIds],
+  );
+
+  const toggleKanbanColumnCollapsed = useCallback(
+    (columnId: string) => {
+      setCollapsedColumnIds((current) => {
+        const next = toggleKanbanCollapsedColumnId(current, columnId);
+        writeKanbanCollapsedColumnIds(currentUserId, projectId, next);
+        return next;
+      });
+    },
+    [currentUserId, projectId],
+  );
 
   const kanbanColumns = useMemo<KanbanColumn[]>(() => {
     const workflow = dashboard?.settings.workflow;
@@ -1451,8 +1480,14 @@ export function HuntDashboard({
               <strong>{t("dashboard.emptyTitle")}</strong>
               <span>{t("dashboard.emptyDescription")}</span>
             </div>
-          ) : kanbanColumns.map((column) => (
-            <div className="kanban-column-shell" key={column.id}>
+          ) : kanbanColumns.map((column) => {
+            const isCollapsed =
+              !companionMode && collapsedColumnIdSet.has(column.id);
+            return (
+            <div
+              className={`kanban-column-shell${isCollapsed ? " is-collapsed" : ""}`}
+              key={column.id}
+            >
               {!companionMode && column.checkpointsBefore.length > 0 ? (
                 <span
                   aria-label={`${t("settings.workflowCheckpoints")}: ${column.checkpointsBefore.join(", ")}`}
@@ -1474,15 +1509,45 @@ export function HuntDashboard({
               ) : null}
               <section
                 aria-label={column.label}
-                className={`kanban-column ${column.tone}${dragOverColumnId === column.id ? " drag-over" : ""}${companionMode ? " companion-task-stream" : ""}`}
+                className={`kanban-column ${column.tone}${dragOverColumnId === column.id ? " drag-over" : ""}${companionMode ? " companion-task-stream" : ""}${isCollapsed ? " is-collapsed" : ""}`}
                 data-kanban-column-id={column.id}
+                data-kanban-column-collapsed={isCollapsed ? "true" : "false"}
               >
               {!companionMode ? (
                 <header>
                   <span><i aria-hidden="true" />{column.label}</span>
-                  <strong>{column.runs.length}</strong>
+                  <div className="kanban-column-header-actions">
+                    <strong>{column.runs.length}</strong>
+                    <button
+                      aria-expanded={!isCollapsed}
+                      aria-label={
+                        isCollapsed
+                          ? t("dashboard.expandColumn", { label: column.label })
+                          : t("dashboard.collapseColumn", {
+                              label: column.label,
+                            })
+                      }
+                      className="kanban-column-collapse"
+                      onClick={() => toggleKanbanColumnCollapsed(column.id)}
+                      title={
+                        isCollapsed
+                          ? t("dashboard.expandColumn", { label: column.label })
+                          : t("dashboard.collapseColumn", {
+                              label: column.label,
+                            })
+                      }
+                      type="button"
+                    >
+                      {isCollapsed ? (
+                        <ChevronRight aria-hidden="true" size={14} />
+                      ) : (
+                        <ChevronDown aria-hidden="true" size={14} />
+                      )}
+                    </button>
+                  </div>
                 </header>
               ) : null}
+              {isCollapsed ? null : (
               <div>
                 {column.runs.length ? column.runs.map((run) => (
                   <CompanionTaskSwipeAction
@@ -1675,9 +1740,11 @@ export function HuntDashboard({
                   </div>
                 )}
               </div>
+              )}
               </section>
             </div>
-          ))}
+            );
+          })}
         </div>}
       </div>
       {companionMode && (
