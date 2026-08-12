@@ -201,9 +201,11 @@ final class IssueMutationTests: XCTestCase {
         )
         XCTAssertEqual(subscribed.runId, Self.runID)
         XCTAssertEqual(subscribed.subscribers.map(\.userId), ["fixture-user"])
-        XCTAssertEqual(await recorder.lastMethod(), "PUT")
+        let subscribedMethod = await recorder.lastMethod()
+        XCTAssertEqual(subscribedMethod, "PUT")
+        let subscribedPath = await recorder.lastPath()
         XCTAssertEqual(
-            await recorder.lastPath(),
+            subscribedPath,
             MobileAPIContract.Endpoint.runSubscription(
                 projectID: Self.projectID,
                 runID: Self.runID
@@ -211,7 +213,8 @@ final class IssueMutationTests: XCTestCase {
         )
 
         _ = try await store.setSubscription(runID: Self.runID, subscribed: false)
-        XCTAssertEqual(await recorder.lastMethod(), "DELETE")
+        let unsubscribedMethod = await recorder.lastMethod()
+        XCTAssertEqual(unsubscribedMethod, "DELETE")
     }
 
     func testDispatchRunRequestEncodesWorkerSelection() throws {
