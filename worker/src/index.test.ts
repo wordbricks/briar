@@ -24,6 +24,7 @@ import worker, {
   organizationUpdateInputSchema,
   pausedRunReworkInputSchema,
   parseProjectSettingsInput,
+  projectUsageSummaryJson,
   projectIconInputSchema,
   projectIssueKeyPrefixInputSchema,
   projectAgentSessionInputSchema,
@@ -784,6 +785,51 @@ describe("Worker HTTP contract", () => {
         execution_metrics_json: "not-json",
       }).executionMetrics,
     ).toBeNull();
+  });
+
+  it("reduces project usage ledger totals to a home-page summary", () => {
+    const generatedAt = Date.parse("2026-08-12T12:00:00.000Z");
+    const summary = projectUsageSummaryJson([{
+      id: "11111111-1111-4111-8111-111111111111",
+      project_id: "22222222-2222-4222-8222-222222222222",
+      status: "completed",
+      paused_at: null,
+      execution_metrics_json: JSON.stringify({
+        inputTokens: 100,
+        outputTokens: 20,
+        cacheReadTokens: 80,
+        cacheWriteTokens: null,
+        reasoningOutputTokens: 5,
+        totalTokens: 120,
+        durationMs: 1_000,
+      }),
+      claimed_by: "worker",
+      claimed_at: "2026-08-10T00:00:00.000Z",
+      claim_attempts: 1,
+      worker_id: "worker-1",
+      preferred_agent_provider: null,
+      preferred_agent_model: null,
+      requested_agent_provider: "codex",
+      requested_agent_model: "gpt-5.6-sol",
+      execution_provider: "codex",
+      execution_model: "gpt-5.6-sol",
+      started_at: "2026-08-10T00:00:00.000Z",
+      updated_at: "2026-08-10T00:01:00.000Z",
+      completed_at: "2026-08-10T00:01:00.000Z",
+      has_usage_ledger: 1,
+    }], [{
+      run_id: "11111111-1111-4111-8111-111111111111",
+      total_tokens: 37,
+      usage_records: 2,
+    }], 30, generatedAt);
+
+    expect(summary).toEqual({
+      totalTokens: 37,
+      trackedDurationMs: 1_000,
+      observedRuns: 1,
+      reportedRuns: 1,
+      generatedAt: "2026-08-12T12:00:00.000Z",
+    });
   });
 
   it("accepts preferred provider and model on issue creation", async () => {

@@ -6,21 +6,18 @@ import { describe, expect, it, vi } from "vitest";
 
 import { I18nProvider } from "../i18n";
 import { demoDashboard, demoRepositoryReadiness } from "../lib/demo-data";
-import type { AgentUsageReport } from "../types";
+import type { ProjectUsageSummary } from "../types";
 import { ProjectLobby, projectTrackedDuration } from "./ProjectLobby";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean })
   .IS_REACT_ACT_ENVIRONMENT = true;
 
-const emptyUsageReport: AgentUsageReport = {
+const emptyUsageSummary: ProjectUsageSummary = {
   generatedAt: "2026-08-12T00:00:00.000Z",
-  pricing: {
-    status: "unavailable",
-    source: "https://example.com/prices.json",
-    fetchedAt: null,
-    knownModels: 0,
-  },
-  runs: [],
+  totalTokens: 0,
+  trackedDurationMs: 0,
+  observedRuns: 0,
+  reportedRuns: 0,
 };
 
 describe("ProjectLobby", () => {
@@ -59,7 +56,7 @@ describe("ProjectLobby", () => {
 
   it("shows repository, project metrics, shortcuts, and recent work", async () => {
     const onOpenIssues = vi.fn();
-    const onLoadUsageReport = vi.fn().mockResolvedValue(emptyUsageReport);
+    const onLoadUsageSummary = vi.fn().mockResolvedValue(emptyUsageSummary);
     const container = document.createElement("div");
     document.body.append(container);
     const root = createRoot(container);
@@ -70,7 +67,7 @@ describe("ProjectLobby", () => {
           <ProjectLobby
             dashboard={demoDashboard}
             isSidebarOpen
-            onLoadUsageReport={onLoadUsageReport}
+            onLoadUsageSummary={onLoadUsageSummary}
             onOpenAgents={() => undefined}
             onOpenIssue={() => undefined}
             onOpenIssues={onOpenIssues}
@@ -83,7 +80,11 @@ describe("ProjectLobby", () => {
       );
     });
 
-    expect(onLoadUsageReport).toHaveBeenCalledOnce();
+    expect(onLoadUsageSummary).toHaveBeenCalledOnce();
+    expect(onLoadUsageSummary).toHaveBeenCalledWith(
+      demoDashboard.project.id,
+      { force: false },
+    );
     expect(container.textContent).toContain("Project overview");
     expect(container.textContent).toContain("Tokens used");
     expect(container.textContent).toContain("Agent work time");

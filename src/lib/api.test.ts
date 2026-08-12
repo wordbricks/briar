@@ -34,6 +34,7 @@ import {
   loadProjectAgentSessionChanges,
   loadProjectAgentScheduleRuns,
   loadProjectAgents,
+  loadProjectUsageSummary,
   loadRunEvidence,
   loadRunEvidenceImage,
   loadRunEvents,
@@ -1467,6 +1468,27 @@ describe("API errors", () => {
         knownModels: 0,
       },
     });
+  });
+
+  it("loads a project-scoped usage summary for the home page", async () => {
+    const projectId = "22222222-2222-4222-8222-222222222222";
+    const summary = {
+      totalTokens: 1_234,
+      trackedDurationMs: 56_000,
+      observedRuns: 8,
+      reportedRuns: 7,
+      generatedAt: "2026-08-12T00:00:00.000Z",
+    };
+    const fetchMock = vi.fn(async () => Response.json(summary));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      loadProjectUsageSummary("token", projectId, 30),
+    ).resolves.toEqual(summary);
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining(`/projects/${projectId}/usage/summary?days=30`),
+      expect.objectContaining({ headers: expect.any(Headers) }),
+    );
   });
 
   it("loads and normalizes timeline events from the run detail endpoint", async () => {

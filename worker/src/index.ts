@@ -78,6 +78,10 @@ import {
   maxWorkerLogoDataUrlLength,
 } from "../../src/lib/worker-icon-validation";
 import {
+  projectUsageSummaryWindow,
+  summarizeProjectUsage,
+} from "../../src/lib/project-usage-summary";
+import {
   organizationAgentContextAgentsPageSchema,
   organizationAgentContextDescriptorSchema,
   organizationAgentContextIssuePullRequestsPageSchema,
@@ -234,6 +238,8 @@ import {
   listOrganizationUsageExecutionAttempts,
   listOrganizationUsageCostRecords,
   listOrganizationUsageRecords,
+  listProjectUsageTotals,
+  listProjectUsageRuns,
   listGithubConnectionRepositories,
   listOrganizationProjects,
   listOrganizationInboxProjects,
@@ -325,6 +331,7 @@ import {
   type OrganizationUsageRunRow,
   type OrganizationCostRecordRow,
   type OrganizationUsageRecordRow,
+  type ProjectUsageTotalRow,
   type RunExecutionAttemptRow,
   type OrganizationRole,
   type OrganizationRow,
@@ -5214,6 +5221,37 @@ export const organizationUsageRunJson = (
   estimatedCostRecords: ledger.estimatedCostRecords ?? [],
 });
 
+export function projectUsageSummaryJson(
+  runs: readonly OrganizationUsageRunRow[],
+  totals: readonly ProjectUsageTotalRow[],
+  days: 7 | 30 | 90,
+  generatedAt: number,
+) {
+  const totalsByRun = new Map(totals.map((total) => [total.run_id, total]));
+  const observedAt = new Date(generatedAt).toISOString();
+  return summarizeProjectUsage(
+    runs.map((run) => {
+      const total = totalsByRun.get(run.id);
+      return {
+        ...organizationUsageRunJson(run),
+        hasUsageLedger: Boolean(run.has_usage_ledger),
+        usageRecords: total?.usage_records
+          ? [{
+              uncachedInputTokens: null,
+              cacheReadTokens: null,
+              cacheWriteTokens: null,
+              outputTokens: null,
+              totalTokens: total.total_tokens,
+              observedAt,
+            }]
+          : [],
+      };
+    }),
+    days,
+    generatedAt,
+  );
+}
+
 const dashboardEventJson = (event: HuntEventRow) => ({
   id: event.id,
   attempt: event.attempt,
@@ -9232,6 +9270,31 @@ async function route(
       runs: runs.map(statusTrayRunJson),
       generatedAt: new Date().toISOString(),
     });
+  }
+
+  const projectUsageSummaryMatch = pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/usage\/summary$/u,
+  );
+  if (projectUsageSummaryMatch && request.method === "GET") {
+    const session = await requireSession(auth, request);
+    const project = await getProject(
+      db,
+      projectUsageSummaryMatch[1],
+      session.user.id,
+    );
+    if (!project) throw new HttpError(404, "Project not found");
+    const days = usageRangeDaysSchema.parse(
+      new URL(request.url).searchParams.get("days") ?? "30",
+    );
+    const generatedAt = Date.now();
+    const since = new Date(
+      projectUsageSummaryWindow(days, generatedAt).startAt,
+    ).toISOString();
+    const [runs, totals] = await Promise.all([
+      listProjectUsageRuns(db, project.id, since),
+      listProjectUsageTotals(db, project.id, since),
+    ]);
+    return json(projectUsageSummaryJson(runs, totals, days, generatedAt));
   }
 
   const dashboardDeltaMatch = pathname.match(
