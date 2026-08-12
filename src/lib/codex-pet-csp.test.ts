@@ -6,17 +6,32 @@ function readConfig(filename: string) {
   return JSON.parse(
     readFileSync(resolve("src-tauri", filename), "utf8"),
   ) as {
-    app: { security: { csp: string } };
+    app: { security: { csp: string; devCsp?: string } };
   };
 }
 
-describe("Codex Pet content security policy", () => {
+describe("Tauri content security policy", () => {
   it.each([
     ["iOS", "tauri.ios.conf.json"],
     ["Android", "tauri.android.conf.json"],
   ])("allows the official sprite repository on %s", (_, filename) => {
+    const csp = readConfig(filename).app.security.csp;
+    expect(csp).toContain("https://briar-api.wbai.workers.dev");
+    expect(csp).toContain("https://raw.githubusercontent.com");
+  });
+
+  it.each([
+    ["desktop", "tauri.conf.json"],
+    ["Android", "tauri.android.conf.json"],
+  ])("allows the realtime WebSocket origin on %s", (_, filename) => {
     expect(readConfig(filename).app.security.csp).toContain(
-      "connect-src 'self' ipc: http://ipc.localhost https://briar-api.wbai.workers.dev https://raw.githubusercontent.com",
+      "wss://briar-api.wbai.workers.dev",
+    );
+  });
+
+  it("allows the realtime WebSocket origin during desktop development", () => {
+    expect(readConfig("tauri.conf.json").app.security.devCsp).toContain(
+      "wss://briar-api.wbai.workers.dev",
     );
   });
 });
