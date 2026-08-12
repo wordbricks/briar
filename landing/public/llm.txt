@@ -1,0 +1,73 @@
+# Briar
+
+> The Agent Development Environment for operating coding agents from issue to PR.
+
+Briar is an open-source, cloud-coordinated, local-execution platform for running coding-agent work as an observable, reviewable workflow. It turns issues into structured runs, gives every run an isolated Git worktree, and keeps progress, evidence, conversations, and human approval in one place.
+
+## Getting Started
+
+GitHub: https://github.com/wordbricks/briar
+
+Download Briar for macOS Apple Silicon:
+
+https://briar-api.wbai.workers.dev/releases/latest/mac-aarch64.dmg
+
+Briar needs at least one supported coding-agent CLI installed and authenticated: Codex CLI, Claude Code, Grok CLI, or OpenCode CLI.
+
+1. Sign in and connect a local Git repository.
+2. Choose an agent provider and review the workflow Briar generates for the project.
+3. Create issues, set their priority, and move ready work into the queue.
+4. Ask a saved project agent to run Auto Hunt when you want queued issues processed.
+5. Follow each run, inspect its evidence, and approve or revise the result at review checkpoints.
+
+Briar is available as a macOS desktop app, a web app, and an Android companion. Repository source and local paths stay on the machine running the agent. The cloud service coordinates task state and Git metadata so people can monitor and review work across devices.
+
+## How It Works
+
+1. **Capture the work.** Collect issues, feedback, and errors in a shared backlog and queue.
+2. **Run the workflow.** Briar starts the selected coding agent in a fresh Git worktree and moves the task through repository-specific stages such as analysis, implementation, local QA, review, and release.
+3. **Review the evidence.** Follow progress, tool output, decisions, and verification results from the issue timeline. Approve, request changes, or continue the run from a checkpoint.
+4. **Close the loop.** Connect the validated result to its branch and pull request while keeping the full conversation and execution history attached to the issue.
+
+## Key Features
+
+- **Bring Your Own Coding Agent**: Use Codex, Claude, Grok, or OpenCode through the local CLIs and accounts you already have.
+- **Issue-to-PR Workflow**: Turn backlog items into structured runs with explicit stages, completion criteria, and review gates.
+- **Auto Hunt**: Process queued issues with saved project agents while preserving human control over priorities and approvals.
+- **Isolated Git Worktrees**: Start every claimed issue from the latest base branch in its own worktree so concurrent runs do not collide.
+- **Local Execution**: Run agents against repositories on your machine. Repository source and local paths are not uploaded to Briar.
+- **Evidence and Audit Trail**: Record progress, decisions, commands, verification results, retries, and conversations on the run.
+- **Human Checkpoints**: Pause for review, approve a result, request a revision, or stop work before it moves forward.
+- **Custom Workflows**: Define project-specific stages for analysis, implementation, local QA, review, and release.
+- **Shared Control Surfaces**: Create and follow work from the desktop app, web app, Android companion, or Slack.
+- **Integrations**: Connect GitHub for pull-request status, with optional Slack, Linear, and Velen integrations.
+
+## What Briar Is
+
+- An Agent Development Environment for coding-agent work
+- A shared issue backlog and execution queue
+- A local runtime with isolated worktrees for concurrent agent runs
+- A workflow engine with stages, evidence requirements, and human checkpoints
+- An observable system for progress, conversations, verification, and pull-request status
+- A cloud-coordinated control plane that keeps repository source local
+
+## What Changes With Briar
+
+Without Briar, coding-agent work is spread across terminal sessions and chat tabs. Context is easy to lose, concurrent changes can collide, status must be gathered manually, and review decisions are disconnected from the implementation history.
+
+With Briar, work starts from an issue, runs in an isolated worktree, advances through a defined workflow, and produces reviewable evidence. Progress and conversation stay attached to the task, while people retain control through priorities, checkpoints, revisions, and approvals.
+
+## Source Code
+
+The full source code is available on GitHub under the Apache License 2.0. You can browse the implementation, read the code directly, report issues, and contribute:
+
+https://github.com/wordbricks/briar
+
+## Links
+
+- Website: https://briar.wordbricks.ai
+- Web App: https://briar.wordbricks.ai/app/
+- Download: https://briar.wordbricks.ai/download
+- Tutorial: https://briar.wordbricks.ai/tutorial
+- GitHub: https://github.com/wordbricks/briar
+- Releases: https://github.com/wordbricks/briar/releases/latest
