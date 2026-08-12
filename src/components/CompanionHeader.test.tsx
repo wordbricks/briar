@@ -162,4 +162,36 @@ describe("CompanionHeader", () => {
     expect(onLogout).not.toHaveBeenCalled();
     await act(async () => root.unmount());
   });
+
+  it("places the mobile inbox read action in the header", async () => {
+    const container = document.createElement("div");
+    const root = createRoot(container);
+    const onMarkAllRead = vi.fn();
+
+    await act(async () => root.render(
+      <CompanionHeader
+        activeOrganizationId="organization-1"
+        activeProjectId="project-1"
+        loading={false}
+        onLogout={() => undefined}
+        onMarkAllRead={onMarkAllRead}
+        onOrganizationChange={() => undefined}
+        onProjectChange={() => undefined}
+        onRefresh={() => undefined}
+        onSettings={() => undefined}
+        organizations={organizations}
+        pageTitle="Inbox"
+        projects={projects}
+        user={user}
+      />,
+    ));
+
+    const markAllRead = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="모두 읽음"]',
+    );
+    await act(async () => markAllRead?.click());
+
+    expect(onMarkAllRead).toHaveBeenCalledOnce();
+    await act(async () => root.unmount());
+  });
 });

@@ -2291,6 +2291,12 @@
               "null"
             ]
           },
+          "createdByUserId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "subscribers": {
             "type": "array",
             "items": {

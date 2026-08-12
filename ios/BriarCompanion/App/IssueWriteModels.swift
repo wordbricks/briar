@@ -166,6 +166,7 @@ struct CreateIssueResponse: Codable, Sendable {
     let status: DashboardRun.Status
     let attachments: [IssueAttachment]
     let assigneeUserId: String?
+    let createdByUserId: String
 }
 
 struct UpdateIssueRequest: Codable, Sendable {

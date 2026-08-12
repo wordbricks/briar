@@ -896,6 +896,7 @@ export function ProjectSettings({
             hidden={activeSection !== "issue-import"}
           >
             <LinearIssueImport
+              active={activeSection === "issue-import"}
               onConnect={onConnectLinearImport}
               onImport={onImportLinearIssues}
               onLoadStates={onLoadLinearImportStates}

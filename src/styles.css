@@ -3455,6 +3455,7 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .inbox-message-project { flex:0 0 auto; color:#767871; font-weight:var(--font-weight-medium); }
 .inbox-message-separator { flex:0 0 auto; color:#b1b3ad; }
 .inbox-message-description { min-width:0; overflow:hidden; text-overflow:ellipsis; }
+.inbox-message-inline-time { flex:0 0 auto; color:#92948d; font:500 var(--text-2xs) "DM Mono",monospace; }
 .inbox-message-chevron { grid-column:3; grid-row:1; justify-self:end; color:#a4a69f; }
 .inbox-message-time { grid-column:3; grid-row:2; justify-self:end; padding-left:12px; color:#92948d; font:500 var(--text-2xs) "DM Mono",monospace; white-space:nowrap; }
 .inbox-mark-read { width:32px; height:32px; position:absolute; z-index:1; top:5px; right:9px; display:grid; place-items:center; border:0; border-radius:9px; color:#654eae; background:transparent; cursor:pointer; transition:background-color 140ms ease,color 140ms ease; }
@@ -4442,7 +4443,7 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .companion-no-runs { min-height: 150px; padding: 24px 16px; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 9px; color:var(--muted-foreground); text-align: center; }
 .companion-no-runs strong { color: #484944; font-size:var(--text-base); }
 .companion-no-runs span { max-width: 280px; font-size:var(--text-xs); line-height: 1.6; }
-.companion-shell .companion-inbox .inbox-scroll { min-height:100%; padding:12px max(16px,env(safe-area-inset-right)) calc(108px + env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left)); overflow:visible; }
+.companion-shell .companion-inbox .inbox-scroll { min-height:100%; padding:0 0 calc(108px + env(safe-area-inset-bottom)); overflow:visible; }
 .companion-shell .inbox-content { width:100%; }
 .companion-shell .inbox-companion-actions {
   min-height:40px;
@@ -4474,16 +4475,26 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .companion-shell .inbox-filter-controls { align-items:stretch; flex-direction:column; gap:8px; }
 .companion-shell .inbox-project-filter.select-menu { width:100%; flex-basis:auto; }
 .companion-shell .inbox-filter-bar > span { display:none; }
-.companion-shell .inbox-message,.companion-shell .inbox-message-open { min-height:66px; }
-.companion-shell .inbox-message-open { padding:9px 0; grid-template-columns:36px minmax(0,1fr) auto; column-gap:10px; }
+.companion-shell .inbox-list { gap:0; }
+.companion-shell .inbox-message,.companion-shell .inbox-message-open { min-height:76px; }
+.companion-shell .inbox-message { border-bottom:0; }
+.companion-shell .inbox-message-open { padding:10px max(16px,env(safe-area-inset-right)) 10px max(16px,env(safe-area-inset-left)); grid-template-columns:46px minmax(0,1fr); column-gap:12px; }
 .companion-shell .inbox-message.unread,.companion-shell .inbox-message.unread:hover { background:transparent; }
 .companion-shell .inbox-message-open:active { background:#f5f3fa; }
-.companion-shell .inbox-mark-read { top:4px; right:-8px; }
-.companion-shell .inbox-mark-read-dot { opacity:0; transform:scale(.8); }
-.companion-shell .inbox-mark-read-check { opacity:1; transform:scale(1); }
-.companion-shell .inbox-message-icon { width:36px; height:36px; border-radius:11px; }
-.companion-shell .inbox-message-copy strong { font-size:var(--text-xs); }
-.companion-shell .inbox-message-detail { font-size:var(--text-2xs); }
+.companion-shell .inbox-mark-read { width:22px; height:22px; top:45px; right:auto; left:max(46px,calc(env(safe-area-inset-left) + 30px)); border:2px solid var(--card); border-radius:50%; color:#fff; background:#49484d; }
+.companion-shell .inbox-mark-read:hover,.companion-shell .inbox-mark-read:focus-visible { background:#654eae; }
+.companion-shell .inbox-mark-read-dot { opacity:1; transform:scale(1); background:#fff; box-shadow:none; }
+.companion-shell .inbox-mark-read-check { color:#fff; opacity:0; transform:scale(.72); }
+.companion-shell .inbox-message:hover .inbox-mark-read-dot { opacity:1; transform:scale(1); }
+.companion-shell .inbox-message:hover .inbox-mark-read-check { opacity:0; transform:scale(.72); }
+.companion-shell .inbox-mark-read:hover .inbox-mark-read-dot,.companion-shell .inbox-mark-read:focus-visible .inbox-mark-read-dot { opacity:0; transform:scale(.7); }
+.companion-shell .inbox-mark-read:hover .inbox-mark-read-check,.companion-shell .inbox-mark-read:focus-visible .inbox-mark-read-check { opacity:1; transform:scale(1); }
+.companion-shell .inbox-message-icon { width:46px; height:46px; border-radius:50%; }
+.companion-shell .inbox-message-copy { gap:3px; }
+.companion-shell .inbox-message-copy strong { font-size:var(--text-sm); line-height:1.25; }
+.companion-shell .inbox-message-detail { min-width:0; font-size:var(--text-xs); }
+.companion-shell .inbox-message-project { max-width:32%; overflow:hidden; text-overflow:ellipsis; }
+.companion-shell .inbox-message-description { flex:1 1 auto; }
 .companion-shell .inbox-empty { min-height:260px; }
 .companion-shell .project-agents-heading {
   min-height:56px;

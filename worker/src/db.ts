@@ -433,6 +433,7 @@ export type HuntRunRow = {
   detail: string | null;
   priority: number | null;
   assignee_user_id: string | null;
+  created_by_user_id?: string | null;
   subscribers_json?: string;
   repository: string;
   branch: string | null;

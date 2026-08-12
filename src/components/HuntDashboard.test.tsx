@@ -2670,6 +2670,9 @@ describe("HuntDashboard", () => {
     expect(properties?.textContent).toContain("시도");
     expect(properties?.textContent).toContain("리비전");
     expect(
+      properties?.querySelector('[aria-label="등록자: Jay"]'),
+    ).not.toBeNull();
+    expect(
       properties?.querySelector('.run-priority-select [aria-label="우선순위"]'),
     ).not.toBeNull();
     expect(properties?.querySelectorAll(".run-property-copy small")).toHaveLength(0);

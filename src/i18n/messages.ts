@@ -1426,6 +1426,8 @@ export const ko = {
   "run.loadFailed": "불러오지 못함",
   "run.properties": "속성",
   "run.assignee": "담당자",
+  "run.creator": "등록자",
+  "run.creatorUnknown": "알 수 없음",
   "run.unassigned": "미지정",
   "run.agent": "에이전트",
   "run.currentAttempt": "현재 시도",
@@ -1809,6 +1811,8 @@ export type Messages = Record<MessageKey, string>;
 
 export const en: Messages = {
   ...ko,
+  "run.creator": "Creator",
+  "run.creatorUnknown": "Unknown",
   "channel.webhooks": "Incoming webhooks",
   "channel.webhooksTitle": "Incoming webhooks for #{name}",
   "channel.webhooksDescription": "Manage secret URLs that let external services post messages to this channel.",
@@ -2751,6 +2755,8 @@ export const en: Messages = {
 };
 export const zh: Messages = {
   ...en,
+  "run.creator": "创建者",
+  "run.creatorUnknown": "未知",
   "channel.webhooks": "传入 Webhook",
   "channel.webhooksTitle": "#{name} 的传入 Webhook",
   "channel.webhooksDescription": "管理供外部服务向此频道发送消息的密钥 URL。",

@@ -4,7 +4,6 @@ struct InboxHomeView: View {
     @ObservedObject var inbox: InboxStore
     @ObservedObject var navigation: CompanionNavigationModel
     @AppStorage("companion-locale") private var localeRaw = CompanionLocale.ko.rawValue
-    @State private var activeCategories: Set<InboxCategory> = Set(InboxCategory.allCases)
 
     let project: ProjectsResponse.Project
     let snapshot: DashboardSnapshot?
@@ -16,117 +15,51 @@ struct InboxHomeView: View {
         CompanionLocale(rawValue: localeRaw) ?? .ko
     }
 
-    private var filteredMessages: [InboxMessage] {
-        InboxMessageBuilder.filter(inbox.messages, to: activeCategories)
-    }
-
-    private func toggleCategory(_ category: InboxCategory) {
-        if activeCategories.contains(category) {
-            activeCategories.remove(category)
-        } else {
-            activeCategories.insert(category)
-        }
-    }
-
     var body: some View {
-        List {
-            if inbox.unreadCount > 0 {
-                Section {
-                    Button {
-                        inbox.markAllRead()
-                    } label: {
-                        Label(
-                            "\(L10n.text(.markAllRead, locale: locale)) (\(inbox.unreadCount))",
-                            systemImage: "checkmark.circle"
-                        )
-                    }
-                    .accessibilityIdentifier("inbox-mark-all-read")
-                }
-            }
-
+        Group {
             if inbox.messages.isEmpty {
                 ContentUnavailableView(
                     L10n.text(.inboxEmpty, locale: locale),
                     systemImage: "tray",
-                    description: Text(L10n.text("멘션, 이슈 변경, 완료된 세션이 이곳에 표시됩니다.", locale: locale))
+                    description: Text(
+                        L10n.text(
+                            "멘션, 이슈 변경, 완료된 세션이 이곳에 표시됩니다.",
+                            locale: locale
+                        )
+                    )
                 )
             } else {
-                // Importance filter: one toggle per urgency category, all on by default.
-                Section {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 8) {
-                            ForEach(InboxCategory.allCases) { category in
-                                filterChip(category)
-                            }
-                        }
-                        .padding(.vertical, 2)
-                    }
-                    .accessibilityIdentifier("inbox-importance-filters")
-                }
-
-                if filteredMessages.isEmpty {
-                    ContentUnavailableView(
-                        L10n.text("선택한 필터에 메시지가 없습니다.", locale: locale),
-                        systemImage: "line.3.horizontal.decrease.circle",
-                        description: Text(L10n.text("다른 필터를 선택해 메시지를 확인해 보세요.", locale: locale))
-                    )
-                } else {
-                    // Single chronological feed: newest first, no urgency sections.
-                    Section {
-                        ForEach(filteredMessages) { message in
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(inbox.messages) { message in
                             inboxRow(message)
                         }
                     }
+                    .padding(.bottom, 12)
                 }
+                .accessibilityIdentifier("inbox-feed")
             }
         }
         .navigationTitle("Inbox")
-        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarTitleDisplayMode(.large)
         .refreshable {
             await refresh()
             await inbox.refreshFeed()
             await inbox.refreshReadStates()
         }
         .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                if inbox.unreadCount > 0 {
-                    Text("\(inbox.unreadCount)")
-                        .font(.caption.weight(.semibold))
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Capsule().fill(Color.accentColor.opacity(0.15)))
-                        .accessibilityIdentifier("inbox-unread-badge")
+            if inbox.unreadCount > 0 {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        inbox.markAllRead()
+                    } label: {
+                        Image(systemName: "checkmark.circle")
+                    }
+                    .accessibilityLabel(L10n.text(.markAllRead, locale: locale))
+                    .accessibilityIdentifier("inbox-mark-all-read")
                 }
             }
         }
-    }
-
-    @ViewBuilder
-    private func filterChip(_ category: InboxCategory) -> some View {
-        let isActive = activeCategories.contains(category)
-        Button {
-            toggleCategory(category)
-        } label: {
-            HStack(spacing: 5) {
-                Text(category.title(locale: locale))
-                Text("\(inbox.messages(in: category).count)")
-                    .font(.caption2.weight(.semibold))
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 1)
-                    .background(
-                        Capsule().fill(isActive ? Color.accentColor.opacity(0.15) : Color(.secondarySystemFill))
-                    )
-            }
-            .font(.caption.weight(.semibold))
-            .padding(.horizontal, 11)
-            .padding(.vertical, 6)
-            .background(
-                Capsule().fill(isActive ? Color.accentColor.opacity(0.12) : Color(.tertiarySystemFill))
-            )
-            .foregroundStyle(isActive ? Color.accentColor : Color.secondary)
-        }
-        .buttonStyle(.plain)
-        .accessibilityIdentifier("inbox-filter-\(category.rawValue)")
     }
 
     @ViewBuilder
@@ -135,47 +68,102 @@ struct InboxHomeView: View {
             inbox.markRead(id: message.id)
             navigation.openInboxMessage(message)
         } label: {
-            HStack(alignment: .top, spacing: 10) {
-                Circle()
-                    .fill(showsUnreadIndicator(message) ? Color.accentColor : Color.clear)
-                    .frame(width: 8, height: 8)
-                    .padding(.top, 6)
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack {
-                        Text(message.title)
-                            .font(.headline)
-                            .foregroundStyle(.primary)
-                            .multilineTextAlignment(.leading)
-                        Spacer()
+            HStack(spacing: 12) {
+                inboxIcon(message)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(message.title)
+                        .font(.body.weight(showsUnreadIndicator(message) ? .semibold : .medium))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                        .multilineTextAlignment(.leading)
+
+                    HStack(spacing: 5) {
+                        Text(secondaryText(message))
+                            .lineLimit(1)
+                        Text("·")
+                            .accessibilityHidden(true)
                         Text(L10n.relativeDate(message.occurredAt, locale: locale))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: true, vertical: false)
                     }
-                    if let body = message.body, !body.isEmpty {
-                        Text(body)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(3)
-                            .multilineTextAlignment(.leading)
-                    }
-                    HStack {
-                        if let status = message.statusLabel {
-                            Text(status)
-                        }
-                        if let author = message.authorName {
-                            Text(author)
-                        }
-                        Spacer()
-                        Text(message.kind.rawValue)
-                    }
-                    .font(.caption)
+                    .font(.subheadline)
                     .foregroundStyle(.secondary)
                 }
             }
+            .frame(maxWidth: .infinity, minHeight: 72, alignment: .leading)
+            .padding(.horizontal, 16)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("inbox-message-\(message.id)")
+    }
+
+    @ViewBuilder
+    private func inboxIcon(_ message: InboxMessage) -> some View {
+        let category = InboxMessageBuilder.classify(message)
+
+        Image(systemName: categorySystemImage(category, kind: message.kind))
+            .font(.system(size: 19, weight: .semibold))
+            .foregroundStyle(categoryColor(category))
+            .frame(width: 46, height: 46)
+            .background(categoryColor(category).opacity(0.14), in: Circle())
+            .overlay(alignment: .bottomTrailing) {
+                if showsUnreadIndicator(message) {
+                    Circle()
+                        .fill(Color.accentColor)
+                        .frame(width: 11, height: 11)
+                        .overlay {
+                            Circle().stroke(Color(.systemBackground), lineWidth: 2)
+                        }
+                }
+            }
+            .accessibilityHidden(true)
+    }
+
+    private func secondaryText(_ message: InboxMessage) -> String {
+        let candidates: [String?]
+        switch message.kind {
+        case .conversation, .channel:
+            candidates = [message.authorName, message.body, message.projectName]
+        case .issue:
+            candidates = [message.projectName, message.authorName, message.statusLabel]
+        case .session:
+            candidates = [message.authorName, message.projectName, message.statusLabel]
+        }
+
+        let values: [String] = candidates.compactMap { value -> String? in
+            guard let value else { return nil }
+            let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed.isEmpty ? nil : trimmed
+        }
+        return values.prefix(2).joined(separator: " · ")
+    }
+
+    private func categorySystemImage(
+        _ category: InboxCategory,
+        kind: InboxMessageKind
+    ) -> String {
+        if kind == .conversation || kind == .channel {
+            return "message.fill"
+        }
+        if kind == .session {
+            return "cpu.fill"
+        }
+        switch category {
+        case .urgent: return "exclamationmark.triangle.fill"
+        case .actionRequired: return "exclamationmark.circle.fill"
+        case .important: return "bell.fill"
+        case .activity: return "clock.fill"
+        }
+    }
+
+    private func categoryColor(_ category: InboxCategory) -> Color {
+        switch category {
+        case .urgent: .red
+        case .actionRequired: .orange
+        case .important: .purple
+        case .activity: .secondary
+        }
     }
 
     private func showsUnreadIndicator(_ message: InboxMessage) -> Bool {

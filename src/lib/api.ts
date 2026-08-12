@@ -1582,6 +1582,7 @@ export async function createIssue(
       stage: "queued";
       status: "backlog" | "queued";
       assigneeUserId: string | null;
+      createdByUserId: string;
       attachments: IssueAttachment[];
     }>(`/projects/${projectId}/issues`, token, {
       method: "POST",
