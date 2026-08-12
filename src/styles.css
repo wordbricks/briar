@@ -6384,8 +6384,10 @@ button.issue-message-state { width:100%; cursor:pointer; }
   color: #a33f31;
   font-size: 12px;
 }
+.channel-composer-field { display: grid; }
 .channel-composer-field > textarea,
 .channel-composer-field > .mention-composer-mirror {
+  grid-area: 1 / 1;
   min-height: 24px;
   max-height: 140px;
   width: 100%;
@@ -6395,6 +6397,10 @@ button.issue-message-state { width:100%; cursor:pointer; }
   line-height: 1.45;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+.channel-composer-field > .mention-composer-mirror {
+  position: relative;
+  inset: auto;
 }
 .channel-composer-field > textarea { resize:none; border:0; outline:0; background:transparent; }
 .channel-composer textarea::placeholder { color: var(--muted-foreground, #9a948a); }
