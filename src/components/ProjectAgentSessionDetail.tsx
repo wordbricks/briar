@@ -1,6 +1,5 @@
 import {
   ArrowLeft,
-  Bot,
   Check,
   ChevronRight,
   CircleAlert,
@@ -10,11 +9,11 @@ import {
   OctagonX,
   Play,
   Send,
-  User,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { MainContent, PageHeader } from "@/components/layout";
+import { AgentWorkLog } from "@/components/AgentWorkLog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/toast";
@@ -113,78 +112,41 @@ export function ProjectAgentSessionDetail({
     () => agentMessagesFromAppServerEvents(executionEvents.events),
     [executionEvents.events],
   );
+  const activityProvider = executionEvents.events.find((event) => event.provider)
+    ?.provider ?? null;
   const executionLogEntries = useMemo(
     () => [
-      ...(session.request?.trim()
-        ? [{
-            id: "request:initial",
-            isComplete: true,
-            occurredAtMs: Date.parse(session.startedAt),
-            phase: t("agents.you"),
-            role: "user" as const,
-            status: "completed",
-            text: session.request.trim(),
-          }]
-        : []),
-      ...(session.followUps ?? []).map((followUp) => ({
-        id: `request:${followUp.id}`,
-        isComplete: true,
-        occurredAtMs: Date.parse(followUp.sentAt),
-        phase: t("agents.you"),
-        role: "user" as const,
-        status: "completed",
-        text: followUp.message,
-      })),
       ...session.dispatchEvents.map((dispatchEvent) => ({
         id: `dispatch:${dispatchEvent.dispatchGroupId}:${dispatchEvent.cursor}`,
         isComplete: dispatchEvent.status !== "running",
-        occurredAtMs: Date.parse(dispatchEvent.occurredAt),
-        phase: t("autoHunt.workerTimeline"),
-        role: "agent" as const,
-        status: dispatchEvent.status,
+        phase: "commentary",
+        startedAtMs: Date.parse(dispatchEvent.occurredAt),
         text: naturalLanguageFromAgentMessage(dispatchEvent.message),
+        updatedAtMs: Date.parse(dispatchEvent.occurredAt),
       })),
-      ...agentMessages.map((message) => ({
-        id: `message:${message.id}`,
-        isComplete: message.isComplete,
-        occurredAtMs: message.updatedAtMs,
-        phase: agentMessagePhase(t, message.phase),
-        role: "agent" as const,
-        status: message.isComplete ? "completed" : "running",
-        text: message.text
-          ? naturalLanguageFromAgentMessage(message.text)
-          : t("autoHunt.agentMessage.writing"),
-      })),
+      ...agentMessages,
       ...(agentMessages.length === 0 &&
           session.dispatchEvents.length === 0 &&
           (session.summary || session.error)
         ? [{
             id: "message:session-result",
             isComplete: true,
-            occurredAtMs: Date.parse(session.completedAt ?? session.startedAt),
-            phase: agentMessagePhase(t, "final_answer"),
-            role: "agent" as const,
-            status: session.error ? "failed" : "completed",
+            phase: "final_answer",
+            startedAtMs: Date.parse(session.completedAt ?? session.startedAt),
             text: session.error ?? session.summary ?? "",
+            updatedAtMs: Date.parse(session.completedAt ?? session.startedAt),
           }]
         : []),
-    ].sort((left, right) => left.occurredAtMs - right.occurredAtMs),
+    ].sort((left, right) => left.updatedAtMs - right.updatedAtMs),
     [
       agentMessages,
       session.dispatchEvents,
-      session.followUps,
       session.completedAt,
       session.error,
-      session.request,
       session.summary,
       session.startedAt,
-      t,
     ],
   );
-  const agentMessagesRef = useRef<HTMLDivElement>(null);
-  const stickToBottomRef = useRef(true);
-  const latestExecutionEntry =
-    executionLogEntries[executionLogEntries.length - 1];
   const { toast } = useToast();
   const [isStopping, setIsStopping] = useState(false);
   const [stopError, setStopError] = useState<string | null>(null);
@@ -192,22 +154,6 @@ export function ProjectAgentSessionDetail({
   const [followUp, setFollowUp] = useState("");
   const [isSendingFollowUp, setIsSendingFollowUp] = useState(false);
   const [followUpError, setFollowUpError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const messageList = agentMessagesRef.current;
-    if (!messageList || executionLogEntries.length === 0) return;
-    if (stickToBottomRef.current) {
-      messageList.scrollTop = messageList.scrollHeight;
-    }
-  }, [executionLogEntries.length, latestExecutionEntry?.text.length]);
-
-  const handleExecutionTimelineScroll = () => {
-    const messageList = agentMessagesRef.current;
-    if (!messageList) return;
-    stickToBottomRef.current =
-      messageList.scrollHeight - messageList.scrollTop - messageList.clientHeight
-      < 24;
-  };
 
   useEffect(() => {
     if (session.status !== "running") return;
@@ -266,10 +212,18 @@ export function ProjectAgentSessionDetail({
       `${t("agents.sessionId")}: ${session.id}`,
       `${t("run.started")}: ${formatDate(session.startedAt, localeTag)}`,
       "",
+      `${t("agents.sessionRequest")}:`,
+      session.request?.trim() || t("agents.sessionRequestEmpty"),
+      ...(session.followUps ?? []).flatMap((followUp) => [
+        "",
+        `${t("agents.followUpInput")}:`,
+        followUp.message,
+      ]),
+      "",
       `${t("agents.executionLog")}:`,
       ...executionLogEntries.flatMap((entry) => [
-        `[${formatEventTime(entry.occurredAtMs, localeTag)}] ${entry.phase}`,
-        entry.text,
+        `[${formatEventTime(entry.updatedAtMs, localeTag)}] ${agentMessagePhase(t, entry.phase)}`,
+        naturalLanguageFromAgentMessage(entry.text),
         "",
       ]),
       session.summary || session.error
@@ -407,6 +361,21 @@ export function ProjectAgentSessionDetail({
                 {stopError}
               </div>
             ) : null}
+            <div className="auto-hunt-session-request-list">
+              <article className="auto-hunt-session-request-card">
+                <span>{t("agents.sessionRequest")}</span>
+                <p>{session.request?.trim() || t("agents.sessionRequestEmpty")}</p>
+              </article>
+              {(session.followUps ?? []).map((followUp) => (
+                <article
+                  className="auto-hunt-session-request-card follow-up"
+                  key={followUp.id}
+                >
+                  <span>{t("agents.followUpInput")}</span>
+                  <p>{followUp.message}</p>
+                </article>
+              ))}
+            </div>
             <div className="auto-hunt-session-layout">
               <div className="auto-hunt-session-main-column">
                 <section className="auto-hunt-dialog-section auto-hunt-app-server-section">
@@ -442,44 +411,11 @@ export function ProjectAgentSessionDetail({
                       {t("autoHunt.eventsEmpty")}
                     </div>
                   ) : (
-                    <div
-                      aria-live="polite"
-                      className="auto-hunt-agent-messages auto-hunt-session-execution-timeline"
-                      onScroll={handleExecutionTimelineScroll}
-                      ref={agentMessagesRef}
-                      role="log"
-                    >
-                      {executionLogEntries.map((entry) => (
-                        <article
-                          className={`auto-hunt-agent-message ${entry.status} ${entry.role}`}
-                          key={entry.id}
-                        >
-                          <span
-                            aria-hidden="true"
-                            className="auto-hunt-message-avatar"
-                          >
-                            {entry.role === "user"
-                              ? <User size={15} />
-                              : <Bot size={15} />}
-                          </span>
-                          <header>
-                            <strong>{entry.phase}</strong>
-                            {!entry.isComplete ? (
-                              <small className="auto-hunt-message-streaming">
-                                <LoaderCircle className="spin" size={11} />
-                                {t("autoHunt.agentMessage.streaming")}
-                              </small>
-                            ) : null}
-                            <time
-                              dateTime={new Date(entry.occurredAtMs).toISOString()}
-                            >
-                              {formatEventTime(entry.occurredAtMs, localeTag)}
-                            </time>
-                          </header>
-                          <p>{entry.text}</p>
-                        </article>
-                      ))}
-                    </div>
+                    <AgentWorkLog
+                      activity={executionLogEntries}
+                      autoScroll
+                      provider={activityProvider}
+                    />
                   )}
                   {onFollowUp &&
                       session.sessionType === "task" &&

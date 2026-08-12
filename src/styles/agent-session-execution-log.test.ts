@@ -18,14 +18,12 @@ const ruleBody = (selector: string) => {
 };
 
 describe("agent session execution log layout", () => {
-  it("keeps each message at its content height inside the scrolling timeline", () => {
-    const timeline = ruleBody(".auto-hunt-session-execution-timeline");
-    expect(timeline).toContain("overflow-y:auto");
-    expect(timeline).toContain("flex-direction:column");
-
-    const message = ruleBody(
-      ".auto-hunt-session-execution-timeline .auto-hunt-agent-message",
+  it("uses the shared work log list as the scrolling session timeline", () => {
+    const timeline = ruleBody(
+      ".auto-hunt-session-main-column .auto-hunt-agent-messages",
     );
-    expect(message).toContain("flex:0 0 auto");
+    expect(timeline).toContain("flex:1");
+    expect(timeline).toContain("min-height:0");
+    expect(timeline).toContain("max-height:none");
   });
 });

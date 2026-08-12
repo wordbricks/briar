@@ -89,6 +89,7 @@ import remarkGfm from "remark-gfm";
 import { NativeSelect } from "./NativeSelect";
 import { SelectMenu } from "./SelectMenu";
 import { AgentProviderIcon } from "./AgentIcons";
+import { AgentWorkLog } from "./AgentWorkLog";
 import { WorkerIcon } from "./WorkerIcon";
 import {
   CompanionBottomNavigation,
@@ -104,7 +105,6 @@ import { useProjectAgentWorkerEvents } from "../hooks/useProjectAgentWorkerEvent
 import { useHorizontalPaneResize } from "../hooks/useHorizontalPaneResize";
 import {
   agentMessagesFromAppServerEvents,
-  naturalLanguageFromAgentMessage,
   type AutoHuntAgentMessage,
 } from "../lib/auto-hunt-agent";
 import { eventMeta, runMeta } from "../lib/stages";
@@ -7147,47 +7147,7 @@ function IssueAgentActivityPanel({
           {t("run.agentActivityEmpty")}
         </div>
       ) : (
-        <div
-          aria-live="polite"
-          className="auto-hunt-agent-messages"
-          role="log"
-        >
-          {activity.map((message) => (
-            <article
-              className={`auto-hunt-agent-message${message.isComplete ? "" : " running"}`}
-              key={message.id}
-            >
-              <header>
-                <span aria-hidden="true">
-                  {provider
-                    ? <AgentProviderIcon provider={provider} size={14} />
-                    : <Bot size={14} />}
-                </span>
-                <strong>
-                  {provider
-                    ? agentProviderLabels[provider]
-                    : message.phase === "final_answer" || message.phase === "final"
-                      ? t("autoHunt.agentMessage.final")
-                      : t("autoHunt.agentMessage.commentary")}
-                </strong>
-                {!message.isComplete ? (
-                  <small className="auto-hunt-message-streaming">
-                    <LoaderCircle className="spin" size={11} />
-                    {t("autoHunt.agentMessage.streaming")}
-                  </small>
-                ) : null}
-                <time dateTime={new Date(message.updatedAtMs).toISOString()}>
-                  {relativeTime(new Date(message.updatedAtMs).toISOString(), t)}
-                </time>
-              </header>
-              <p>
-                {message.text
-                  ? naturalLanguageFromAgentMessage(message.text)
-                  : t("autoHunt.agentMessage.writing")}
-              </p>
-            </article>
-          ))}
-        </div>
+        <AgentWorkLog activity={activity} provider={provider} />
       )}
     </div>
   );
