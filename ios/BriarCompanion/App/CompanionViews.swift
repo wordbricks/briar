@@ -1769,6 +1769,39 @@ struct RunDetailView: View {
                             )
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(.tint)
+                            if proposal.type == .create,
+                               let resultRunId = proposal.resultRunId,
+                               resultRunId != run.id {
+                                if allRuns.contains(where: { $0.id == resultRunId }) {
+                                    NavigationLink(value: resultRunId) {
+                                        Label(
+                                            L10n.text(.channelViewIssue, locale: locale),
+                                            systemImage: "arrow.right.circle"
+                                        )
+                                    }
+                                    .buttonStyle(.bordered)
+                                    .accessibilityIdentifier(
+                                        "open-issue-create-result-\(proposal.id.uuidString.lowercased())"
+                                    )
+                                } else {
+                                    Link(
+                                        destination: BriarShareLinks.issueShareURL(
+                                            projectID: projectID,
+                                            runID: resultRunId,
+                                            origin: BriarShareLinks.defaultOrigin
+                                        )
+                                    ) {
+                                        Label(
+                                            L10n.text(.channelViewIssue, locale: locale),
+                                            systemImage: "arrow.up.right.circle"
+                                        )
+                                    }
+                                    .buttonStyle(.bordered)
+                                    .accessibilityIdentifier(
+                                        "open-issue-create-result-\(proposal.id.uuidString.lowercased())"
+                                    )
+                                }
+                            }
                         } else {
                             Button {
                                 Task { await acceptIssueProposal(proposal) }

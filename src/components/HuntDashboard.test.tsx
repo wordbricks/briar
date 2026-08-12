@@ -5921,6 +5921,7 @@ describe("HuntDashboard", () => {
   });
 
   it("requires acceptance before an @briar-created issue is persisted", async () => {
+    const createdRunId = "30303030-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
     const message: IssueMessage = {
       id: "10101010-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
       runId: demoDashboard.runs[1].id,
@@ -5950,8 +5951,9 @@ describe("HuntDashboard", () => {
       ...message.proposedAction!,
       status: "accepted" as const,
       acceptedAt: "2026-08-06T01:01:00.000Z",
-      resultRunId: "30303030-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      resultRunId: createdRunId,
     }));
+    const onIssueOpen = vi.fn();
     const container = document.createElement("div");
     document.body.append(container);
     const root = createRoot(container);
@@ -5964,6 +5966,7 @@ describe("HuntDashboard", () => {
           onAcceptIssueAction={onAccept}
           onBack={() => undefined}
           onCancel={async () => undefined}
+          onDependencyOpen={onIssueOpen}
           onLoadAttachment={async () => new Blob()}
           onLoadIssueMessages={async () => [message]}
           onLoadRunEvidence={async () => []}
@@ -5995,6 +5998,15 @@ describe("HuntDashboard", () => {
     });
     expect(onAccept).toHaveBeenCalledWith(message.proposedAction);
     expect(container.textContent).toContain("새 이슈가 생성되었습니다.");
+    const viewButton = container.querySelector<HTMLButtonElement>(
+      ".issue-rework-proposal-view",
+    );
+    expect(viewButton?.textContent).toContain("이슈 보기");
+    expect(onIssueOpen).not.toHaveBeenCalled();
+    await act(async () => {
+      viewButton?.click();
+    });
+    expect(onIssueOpen).toHaveBeenCalledWith(createdRunId);
 
     await act(async () => root.unmount());
     container.remove();

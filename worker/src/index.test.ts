@@ -991,6 +991,17 @@ describe("Worker HTTP contract", () => {
       name: "Jay Kim",
       image: "data:image/webp;base64,aA==",
     });
+    expect(
+      accountProfileInputSchema.parse({
+        username: "jay_dev",
+        name: "Jay Kim",
+        image: "https://lh3.googleusercontent.com/a/example=s96-c",
+      }),
+    ).toEqual({
+      username: "jay_dev",
+      name: "Jay Kim",
+      image: "https://lh3.googleusercontent.com/a/example=s96-c",
+    });
     expect(() =>
       accountProfileInputSchema.parse({
         username: "has spaces",
@@ -1003,6 +1014,13 @@ describe("Worker HTTP contract", () => {
         username: "jay",
         name: "Jay",
         image: "data:image/svg+xml;base64,aA==",
+      }),
+    ).toThrow();
+    expect(() =>
+      accountProfileInputSchema.parse({
+        username: "jay",
+        name: "Jay",
+        image: "http://example.com/avatar.png",
       }),
     ).toThrow();
   });

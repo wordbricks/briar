@@ -1663,9 +1663,20 @@ export const accountProfileInputSchema = z.object({
     .regex(/^[a-z0-9_]+$/u),
   name: z.string().trim().min(1).max(100),
   image: z
-    .string()
-    .max(400_000)
-    .regex(/^data:image\/(?:jpeg|png|webp);base64,/u)
+    .union([
+      z
+        .string()
+        .max(400_000)
+        .regex(/^data:image\/(?:jpeg|png|webp);base64,/u),
+      z
+        .string()
+        .max(400_000)
+        .url()
+        .refine(
+          (value) => new URL(value).protocol === "https:",
+          "HTTPS URL required",
+        ),
+    ])
     .nullable(),
 });
 const inboxReadStateMaxEntries = 2_000;
