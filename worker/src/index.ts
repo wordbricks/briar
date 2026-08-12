@@ -462,6 +462,8 @@ import {
   getActiveOrganizationChannelReplyContextClaim,
   getChannelMessage,
   getChannelMessageAttachment,
+  getProjectAgentChannel,
+  getProjectOrganizationChannel,
   getIncomingChannelWebhook,
   getChannelSyncCursor,
   getClaimedChannelReply,
@@ -470,11 +472,13 @@ import {
   listChannelAgents,
   listChannelMembers,
   listChannelRootMessages,
+  listChannelMessagePage,
   listChannelThreadMessages,
   listChannelWebhooks,
   listChannels,
   loadChannelDelta,
   isChannelReactionEmoji,
+  isChannelRootMessage,
   removeChannelAgent,
   removeChannelMember,
   revokeChannelWebhook,
@@ -6926,6 +6930,66 @@ async function route(
     return json(
       await loadChannelDelta(db, organizationId, session.user.id, since),
     );
+  }
+
+  const projectChannelMessagesMatch = pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/channels\/([0-9a-f-]+)\/messages$/u,
+  );
+  if (projectChannelMessagesMatch && request.method === "GET") {
+    const requestedProjectId = projectChannelMessagesMatch[1];
+    const channelId = projectChannelMessagesMatch[2];
+    const authenticatedProjectId = await requireAgentProject(db, request);
+    if (authenticatedProjectId !== requestedProjectId) {
+      throw new HttpError(403, "Agent token is not valid for this project");
+    }
+
+    const channel = await getProjectAgentChannel(
+      db,
+      requestedProjectId,
+      channelId,
+    );
+    if (!channel) {
+      const organizationChannel = await getProjectOrganizationChannel(
+        db,
+        requestedProjectId,
+        channelId,
+      );
+      if (!organizationChannel) throw new HttpError(404, "Channel not found");
+      throw new HttpError(
+        403,
+        "No Project Agent for this project has access to the channel",
+      );
+    }
+
+    const searchParams = new URL(request.url).searchParams;
+    const query = z
+      .object({
+        limit: z.coerce.number().int().min(1).max(100).default(50),
+        cursor: z.string().uuid().nullable().default(null),
+        parentMessageId: z.string().uuid().nullable().default(null),
+      })
+      .strict()
+      .parse({
+        limit: searchParams.get("limit") ?? undefined,
+        cursor: searchParams.get("cursor"),
+        parentMessageId: searchParams.get("parentMessageId"),
+      });
+    if (
+      query.parentMessageId &&
+      !(await isChannelRootMessage(db, channel.id, query.parentMessageId))
+    ) {
+      throw new HttpError(404, "Thread parent message not found");
+    }
+    const page = await listChannelMessagePage(db, {
+      channelId: channel.id,
+      parentMessageId: query.parentMessageId,
+      cursor: query.cursor,
+      limit: query.limit,
+    });
+    if (!page) {
+      throw new HttpError(400, "Cursor does not belong to this message view");
+    }
+    return privateNoStoreJson({ channel: channelJson(channel), ...page });
   }
 
   const organizationChannelsMatch = pathname.match(
