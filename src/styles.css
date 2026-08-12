@@ -6320,7 +6320,7 @@ button.issue-message-state { width:100%; cursor:pointer; }
   display: flex;
   align-items: center;
   gap: 7px;
-  padding: 8px 28px 4px;
+  padding: 4px 0 0;
   color: var(--muted-foreground, #777168);
   font-size: 12px;
 }

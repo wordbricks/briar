@@ -270,6 +270,42 @@ describe("Channels", () => {
     expect(container.querySelector(".channel-composer-shell")).not.toBeNull();
   });
 
+  it("places the named Agent typing state inside its triggering message", async () => {
+    const trigger = message({ body: "@honey 안녕" });
+    await render([trigger]);
+    loadChannelDelta.mockResolvedValueOnce({
+      cursor: 8,
+      hasMore: false,
+      channels: [],
+      removedChannelIds: [],
+      messages: [],
+      removedMessageIds: [],
+      agentReplies: [{
+        id: "reply-1",
+        agentId: agent.agentId,
+        channelId: channel.id,
+        triggerMessageId: trigger.id,
+        parentMessageId: trigger.id,
+        replyMessageId: "agent-message-1",
+        status: "running",
+        attempts: 1,
+        error: null,
+        createdAt: "2026-08-01T01:00:01.000Z",
+        updatedAt: "2026-08-01T01:00:02.000Z",
+      }],
+    });
+
+    await act(async () => {
+      emitChannelChange(8);
+      await Promise.resolve();
+    });
+
+    const typing = container.querySelector(".channel-typing");
+    expect(typing?.textContent).toContain("Honey님이 답변을 작성하고 있습니다");
+    expect(typing?.closest(".channel-message")?.textContent)
+      .toContain("@honey 안녕");
+  });
+
   it("hides the persistent reply link when a message has no thread", async () => {
     const rootMessage = message({ id: "message-without-replies" });
     listChannelMessages.mockResolvedValue({ messages: [rootMessage] });
