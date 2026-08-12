@@ -901,7 +901,6 @@ export function HuntDashboard({
       ),
     ];
   }, [dashboard?.organizationProviders, dashboard?.workers]);
-
   useEffect(() => {
     setSelectedRunId(null);
   }, [issueListRequestKey]);

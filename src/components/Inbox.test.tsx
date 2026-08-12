@@ -421,7 +421,7 @@ describe("Inbox", () => {
     expect(container.textContent).toContain("채널 답글입니다.");
   });
 
-  it("companion mode shows a chronological feed with importance filters and no page title", async () => {
+  it("companion mode shows a full-width chronological feed without filter chrome", async () => {
     const messages = [
       issue("activity", "Routine dependency update", {
         occurredAt: "2026-07-28T12:00:00.000Z",
@@ -475,20 +475,16 @@ describe("Inbox", () => {
 
     expect(container.querySelector("#inbox-title")).toBeNull();
     expect(container.querySelector(".inbox-heading")).toBeNull();
-    // Mobile keeps the importance filter while hiding the project filter and count.
-    const filters = [...container.querySelectorAll(".inbox-filter")];
-    expect(filters).toHaveLength(4);
-    expect(
-      filters.map((filter) => filter.getAttribute("aria-pressed")),
-    ).toEqual(["true", "true", "true", "true"]);
+    expect(container.querySelector(".inbox-filter-bar")).toBeNull();
+    expect(container.querySelector(".inbox-filter")).toBeNull();
     expect(container.querySelector(".inbox-project-filter")).toBeNull();
-    expect(container.querySelector(".inbox-filter-bar > span")).toBeNull();
     expect(container.querySelector(".inbox-section")).toBeNull();
     expect(container.querySelectorAll(".inbox-message")).toHaveLength(3);
+    expect(container.querySelectorAll(".inbox-message-inline-time")).toHaveLength(3);
     expect(container.textContent).toContain("Routine dependency update");
     expect(container.textContent).toContain("Production is blocked");
     expect(container.textContent).toContain("Release scope decision");
-    expect(container.textContent).toContain("모두 읽음");
+    expect(container.textContent).not.toContain("모두 읽음");
 
     const titles = [...container.querySelectorAll(".inbox-message-copy > strong")].map(
       (node) => node.textContent,
@@ -501,7 +497,7 @@ describe("Inbox", () => {
     ]);
   });
 
-  it("companion mode filters the feed by importance", async () => {
+  it("companion mode keeps every category visible in the unified feed", async () => {
     const messages = [
       issue("activity", "Routine dependency update", {
         structuredResult: {
@@ -564,27 +560,10 @@ describe("Inbox", () => {
 
     expect(container.querySelectorAll(".inbox-message")).toHaveLength(4);
 
-    const activityFilter = [...container.querySelectorAll(".inbox-filter")].find(
-      (button) => button.textContent?.includes("최근 활동"),
-    );
-    await act(async () =>
-      (activityFilter as HTMLButtonElement | undefined)?.click(),
-    );
-
-    expect(activityFilter?.getAttribute("aria-pressed")).toBe("false");
-    expect(container.querySelectorAll(".inbox-message")).toHaveLength(3);
-    expect(container.textContent).not.toContain("Routine dependency update");
+    expect(container.querySelector(".inbox-filter-bar")).toBeNull();
+    expect(container.querySelectorAll(".inbox-message")).toHaveLength(4);
+    expect(container.textContent).toContain("Routine dependency update");
     expect(container.textContent).toContain("Production is blocked");
-    expect(container.textContent).toContain("Release scope decision");
-    expect(container.textContent).toContain("Milestone shipped");
-
-    const urgentFilter = [...container.querySelectorAll(".inbox-filter")].find(
-      (button) => button.textContent?.includes("긴급"),
-    );
-    await act(async () => (urgentFilter as HTMLButtonElement | undefined)?.click());
-
-    expect(container.querySelectorAll(".inbox-message")).toHaveLength(2);
-    expect(container.textContent).not.toContain("Production is blocked");
     expect(container.textContent).toContain("Release scope decision");
     expect(container.textContent).toContain("Milestone shipped");
   });

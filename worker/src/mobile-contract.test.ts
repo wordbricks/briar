@@ -280,6 +280,25 @@ describe("Companion mobile API contract", () => {
     expect(acceptedUpdate.proposal).not.toHaveProperty("executeAfterCreate");
   });
 
+  it("accepts webhook-authored channel messages as a distinct mobile author", () => {
+    const channelResponse = fixture.operations.listChannelMessages.response as {
+      messages: Array<Record<string, unknown>>;
+    };
+    const parsed = mobileChannelMessageSchema.parse({
+      ...channelResponse.messages[0],
+      author: {
+        type: "webhook",
+        id: "77777777-7777-4777-8777-777777777777",
+        name: "Deploy notifier",
+      },
+    });
+    expect(parsed.author).toEqual({
+      type: "webhook",
+      id: "77777777-7777-4777-8777-777777777777",
+      name: "Deploy notifier",
+    });
+  });
+
   it("requires explicit nullable execution choices and rejects hidden fields", () => {
     const request = {
       provider: "codex",

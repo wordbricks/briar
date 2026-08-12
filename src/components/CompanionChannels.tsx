@@ -8,6 +8,7 @@ import {
   MessageSquare,
   Plus,
   Send,
+  Webhook,
 } from "lucide-react";
 import {
   useCallback,
@@ -112,6 +113,23 @@ const mergeReplies = (
   return [...byId.values()];
 };
 
+const typingAgentNamesForMessage = (
+  replies: ChannelAgentReply[],
+  agents: ChannelAgentSummary[],
+  messageId: string,
+  fallbackName: string,
+) => [
+  ...new Set(
+    replies
+      .filter((reply) => reply.parentMessageId === messageId)
+      .map(
+        (reply) =>
+          agents.find((agent) => agent.agentId === reply.agentId)?.name ??
+          fallbackName,
+      ),
+  ),
+];
+
 type CompanionChannelsProps = {
   organizationId: string;
   activeProjectId: string | null;
@@ -161,6 +179,9 @@ export function CompanionChannels({
   const [threadParentId, setThreadParentId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [acceptingProposalId, setAcceptingProposalId] = useState<string | null>(
+    null,
+  );
   const [error, setError] = useState<string | null>(null);
   const [proposalProjects, setProposalProjects] = useState<
     Record<string, string>
@@ -170,6 +191,8 @@ export function CompanionChannels({
   const channelSurfaceGeneration = useRef(0);
   const channelIdRef = useRef(channel?.id ?? null);
   const threadParentIdRef = useRef(threadParentId);
+  const channelMessagesEndRef = useRef<HTMLDivElement | null>(null);
+  const threadMessagesEndRef = useRef<HTMLDivElement | null>(null);
   const proposalVersions = useRef(new Map<string, number>());
   const latestProposals = useRef(
     new Map<string, NonNullable<ChannelMessage["proposal"]>>(),
@@ -179,6 +202,16 @@ export function CompanionChannels({
   );
   channelIdRef.current = channel?.id ?? null;
   threadParentIdRef.current = threadParentId;
+
+  useEffect(() => {
+    if (!channel || threadParentId) return;
+    channelMessagesEndRef.current?.scrollIntoView?.({ block: "end" });
+  }, [channel, messages, replies.length, threadParentId]);
+
+  useEffect(() => {
+    if (!threadParentId) return;
+    threadMessagesEndRef.current?.scrollIntoView?.({ block: "end" });
+  }, [thread, threadParentId, replies.length]);
 
   const captureChannelSurface = useCallback(
     (): ChannelSurfaceContext => ({
@@ -203,6 +236,7 @@ export function CompanionChannels({
       channelIdRef.current = channelId;
       threadParentIdRef.current = parentMessageId;
       setBusy(false);
+      setAcceptingProposalId(null);
     },
     [],
   );
@@ -648,7 +682,9 @@ export function CompanionChannels({
   );
 
   const pendingReplies = replies.filter(
-    (item) => item.status === "queued" || item.status === "running",
+    (item) =>
+      item.channelId === channel?.id &&
+      (item.status === "queued" || item.status === "running"),
   );
 
   const openIssue = useCallback(
@@ -857,6 +893,7 @@ export function CompanionChannels({
         channelSurfaceIsCurrent(approvalContext);
       const approvalProposalVersion = proposalVersions.current.get(proposalId) ?? 0;
       setBusy(true);
+      setAcceptingProposalId(proposalId);
       setError(null);
       try {
         const result = await acceptChannelProposal(
@@ -894,8 +931,6 @@ export function CompanionChannels({
             if (!result.executionProposal) {
               await refreshProposalState(applyResult(item), proposalId);
             }
-          } else {
-            await openIssue(result.projectId, result.resultRunId, approvalContext);
           }
         } else {
           let latest = latestProposals.current.get(proposalId);
@@ -913,8 +948,6 @@ export function CompanionChannels({
               } else {
                 await refreshProposalState(item, proposalId);
               }
-            } else {
-              await openIssue(latest.projectId, latest.resultRunId, approvalContext);
             }
           } else if (
             latest?.status === "pending" &&
@@ -927,8 +960,6 @@ export function CompanionChannels({
               if (!result.executionProposal) {
                 await refreshProposalState(applyResult(item), proposalId);
               }
-            } else {
-              await openIssue(result.projectId, result.resultRunId, approvalContext);
             }
           }
         }
@@ -939,6 +970,7 @@ export function CompanionChannels({
       } finally {
         if (approvalContextIsCurrent()) {
           setBusy(false);
+          setAcceptingProposalId(null);
         }
       }
     },
@@ -946,7 +978,6 @@ export function CompanionChannels({
       channel,
       captureChannelSurface,
       channelSurfaceIsCurrent,
-      openIssue,
       organizationId,
       proposalProjects,
       recordProposalMessages,
@@ -1023,6 +1054,7 @@ export function CompanionChannels({
           {loading && !thread ? <Spinner /> : null}
           {(thread ?? []).map((item) => (
             <MessageRow
+              acceptingProposal={acceptingProposalId === item.proposal?.id}
               agents={agents}
               busy={busy}
               channel={channel}
@@ -1060,14 +1092,15 @@ export function CompanionChannels({
                 item.proposal ? proposalProjects[item.proposal.id] ?? null : null
               }
               token={token}
+              typingAgentNames={typingAgentNamesForMessage(
+                pendingReplies,
+                agents,
+                item.id,
+                t("channel.projectAgent"),
+              )}
             />
           ))}
-          {pendingReplies.length > 0 ? (
-            <div className="channel-typing companion-channel-typing">
-              <LoaderCircle className="spin" size={15} />
-              {t("channel.agentTyping")}
-            </div>
-          ) : null}
+          <div ref={threadMessagesEndRef} />
         </div>
         <CompanionChannelComposer
           agents={agents}
@@ -1092,6 +1125,7 @@ export function CompanionChannels({
           {loading && messages.length === 0 ? <Spinner /> : null}
           {messages.map((item) => (
             <MessageRow
+              acceptingProposal={acceptingProposalId === item.proposal?.id}
               agents={agents}
               busy={busy}
               channel={channel}
@@ -1131,19 +1165,20 @@ export function CompanionChannels({
               }
               showThreadSummary
               token={token}
+              typingAgentNames={typingAgentNamesForMessage(
+                pendingReplies,
+                agents,
+                item.id,
+                t("channel.projectAgent"),
+              )}
             />
           ))}
-          {pendingReplies.length > 0 ? (
-            <div className="channel-typing companion-channel-typing">
-              <LoaderCircle className="spin" size={15} />
-              {t("channel.agentTyping")}
-            </div>
-          ) : null}
           {!loading && messages.length === 0 ? (
             <p className="companion-channel-empty">
               {t("companion.channelsEmpty")}
             </p>
           ) : null}
+          <div ref={channelMessagesEndRef} />
         </div>
         <CompanionChannelComposer
           agents={agents}
@@ -1246,6 +1281,7 @@ function ChannelBar({
 }
 
 function MessageRow({
+  acceptingProposal,
   agents,
   busy,
   channel,
@@ -1267,7 +1303,9 @@ function MessageRow({
   selectedProjectId,
   showThreadSummary = false,
   token,
+  typingAgentNames,
 }: {
+  acceptingProposal: boolean;
   agents: ChannelAgentSummary[];
   busy: boolean;
   channel: ChannelSummary;
@@ -1302,6 +1340,7 @@ function MessageRow({
   selectedProjectId: string | null;
   showThreadSummary?: boolean;
   token: string;
+  typingAgentNames: string[];
 }) {
   const { localeTag, t } = useI18n();
   const issueProposal = message.proposal?.actionType === "request_issue_create"
@@ -1334,6 +1373,7 @@ function MessageRow({
         <header>
           <strong>{message.author.name}</strong>
           {message.author.type === "agent" ? <Bot size={12} /> : null}
+          {message.author.type === "webhook" ? <Webhook size={12} /> : null}
           <time>
             {new Date(message.createdAt).toLocaleTimeString(localeTag, {
               hour: "numeric",
@@ -1342,6 +1382,12 @@ function MessageRow({
           </time>
         </header>
         <ChannelMessageText agents={agents} members={members} message={message} />
+        {typingAgentNames.map((name) => (
+          <div className="channel-typing companion-channel-typing" key={name}>
+            <LoaderCircle className="spin" size={15} />
+            {t("channel.namedAgentTyping", { name })}
+          </div>
+        ))}
         <ChannelMessageImages
           attachments={message.attachments}
           interactive={!showThreadSummary}
@@ -1386,6 +1432,7 @@ function MessageRow({
             ) : null}
             {issueProposal.status === "pending" ? (
               <button
+                aria-busy={acceptingProposal}
                 className="channel-proposal-approve-button"
                 disabled={
                   busy || Boolean(channel.archivedAt) ||
@@ -1394,7 +1441,14 @@ function MessageRow({
                 onClick={onAcceptProposal}
                 type="button"
               >
-                {t("channel.approveCreateIssue")}
+                {acceptingProposal ? (
+                  <>
+                    <LoaderCircle aria-hidden="true" className="spin" size={15} />
+                    {t("channel.creatingIssue")}
+                  </>
+                ) : (
+                  t("channel.approveCreateIssue")
+                )}
               </button>
             ) : acceptedProjectId && acceptedRunId && onIssueOpen ? (
               <button
@@ -1492,6 +1546,8 @@ function MessageAvatar({ message }: { message: ChannelMessage }) {
     >
       {message.author.type === "agent" ? (
         <Bot size={18} />
+      ) : message.author.type === "webhook" ? (
+        <Webhook size={18} />
       ) : (
         message.author.name.trim().charAt(0).toUpperCase() || "?"
       )}

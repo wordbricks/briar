@@ -101,6 +101,10 @@ struct InboxNotificationTarget {
     project_id: String,
     target_id: String,
     kind: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    channel_message_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    root_message_id: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -7486,7 +7490,35 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn inbox_channel_notification_target_preserves_message_context() {
+        let target: InboxNotificationTarget = serde_json::from_value(json!({
+            "messageId": "channel:reply-1",
+            "projectId": "project-1",
+            "targetId": "channel-1",
+            "kind": "channel",
+            "channelMessageId": "reply-1",
+            "rootMessageId": "root-1"
+        }))
+        .expect("channel notification target");
+
+        assert_eq!(target.channel_message_id.as_deref(), Some("reply-1"));
+        assert_eq!(target.root_message_id.as_deref(), Some("root-1"));
+        assert_eq!(
+            serde_json::to_value(target).expect("serialized channel notification target"),
+            json!({
+                "messageId": "channel:reply-1",
+                "projectId": "project-1",
+                "targetId": "channel-1",
+                "kind": "channel",
+                "channelMessageId": "reply-1",
+                "rootMessageId": "root-1"
+            })
+        );
+    }
 
     #[test]
     fn parses_grok_model_catalog_and_default() {

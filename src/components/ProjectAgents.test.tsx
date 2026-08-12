@@ -389,14 +389,19 @@ describe("ProjectAgents", () => {
     );
   });
 
-  it("opens direct Worker execution from the play button in companion mode", async () => {
+  it.each([
+    { surface: "desktop", companionMode: false },
+    { surface: "mobile companion", companionMode: true },
+  ])("opens direct Worker execution from the play button on $surface", async ({
+    companionMode,
+  }) => {
     vi.mocked(runProjectAgent).mockClear();
     const onStartRemoteTask = vi.fn(async () => "remote-session");
     const onStartTaskSession = vi.fn();
     const container = await mount(
       <ProjectAgents
         {...projectAgentsProps}
-        companionMode
+        companionMode={companionMode}
         dashboard={dashboardWithWorker}
         onStartRemoteTask={onStartRemoteTask}
         onStartTaskSession={onStartTaskSession}

@@ -241,6 +241,37 @@ describe("CompanionChannels", () => {
     expect(names).toEqual(["Welcome", "Briar dev", "Sprout talk"]);
   });
 
+  it("renders incoming webhook messages with a distinct author icon", async () => {
+    loadChannel.mockResolvedValue({
+      channel: channel("c-common", "Welcome", null),
+      members: [],
+      agents: [],
+      messages: [{
+        ...message("m-webhook", "Production deployed"),
+        author: {
+          type: "webhook",
+          id: "77777777-7777-4777-8777-777777777777",
+          name: "Deploy notifier",
+        },
+      }],
+    });
+    await render();
+    const channelButton = [
+      ...container.querySelectorAll<HTMLButtonElement>(
+        ".companion-channel-group button",
+      ),
+    ].find((button) => button.textContent?.includes("Welcome"));
+    await act(async () => {
+      channelButton?.click();
+      await Promise.resolve();
+    });
+
+    expect(container.textContent).toContain("Deploy notifier");
+    expect(container.textContent).toContain("Production deployed");
+    expect(container.querySelector(".companion-channel-message .lucide-webhook"))
+      .not.toBeNull();
+  });
+
   it("opens a channel thread and unwinds each level through mobile back", async () => {
     loadChannel.mockResolvedValue({
       channel: channel("c-common", "Welcome", null),
@@ -514,8 +545,10 @@ describe("CompanionChannels", () => {
     await act(async () => {
       await Promise.resolve();
     });
-    expect(container.querySelector(".companion-channel-typing")?.textContent)
-      .toContain("An agent is writing a reply");
+    const typing = container.querySelector(".companion-channel-typing");
+    expect(typing?.textContent).toContain("Honey is writing a reply");
+    expect(typing?.closest(".companion-channel-message")?.textContent)
+      .toContain("Please investigate");
 
     await act(async () => {
       emitChannelChange(3);
@@ -769,7 +802,7 @@ describe("CompanionChannels", () => {
     expect(container.textContent).toContain("Thread");
   });
 
-  it("requires a project for common-channel proposals, accepts it, and opens the result", async () => {
+  it("requires a project for common-channel proposals and keeps the result in the channel", async () => {
     const proposal = message("m-proposal", "새 이슈를 제안합니다");
     proposal.author = {
       type: "agent",
@@ -798,11 +831,17 @@ describe("CompanionChannels", () => {
       agents: [],
       messages: [proposal],
     });
-    acceptChannelProposal.mockResolvedValue({
-      outcome: "already_accepted",
-      projectId: "project-2",
-      resultRunId: "run-2",
-    });
+    let resolveAcceptance!: (value: {
+      outcome: "already_accepted";
+      projectId: string;
+      resultRunId: string;
+    }) => void;
+    const pendingAcceptance = new Promise<{
+      outcome: "already_accepted";
+      projectId: string;
+      resultRunId: string;
+    }>((resolve) => { resolveAcceptance = resolve; });
+    acceptChannelProposal.mockReturnValue(pendingAcceptance);
     const onIssueOpen = vi.fn();
     await render(onIssueOpen);
 
@@ -831,8 +870,21 @@ describe("CompanionChannels", () => {
     expect(card!.textContent).toContain("Target project: Sprout");
     await act(async () => {
       accept.click();
+      await Promise.resolve();
     });
-    await act(async () => Promise.resolve());
+
+    expect(accept.textContent).toContain("Creating issue");
+    expect(accept.querySelector(".spin")).not.toBeNull();
+    expect(accept.getAttribute("aria-busy")).toBe("true");
+    expect(onIssueOpen).not.toHaveBeenCalled();
+    await act(async () => {
+      resolveAcceptance({
+        outcome: "already_accepted",
+        projectId: "project-2",
+        resultRunId: "run-2",
+      });
+      await pendingAcceptance;
+    });
 
     expect(acceptChannelProposal).toHaveBeenCalledWith(
       "token",
@@ -841,7 +893,8 @@ describe("CompanionChannels", () => {
       "proposal-1",
       "project-2",
     );
-    expect(onIssueOpen).toHaveBeenCalledWith("project-2", "run-2");
+    expect(onIssueOpen).not.toHaveBeenCalled();
+    expect(card!.textContent).toContain("View issue");
   });
 
   it("stays in the channel for a server-returned legacy execution follow-up", async () => {
@@ -1025,12 +1078,11 @@ describe("CompanionChannels", () => {
       await Promise.resolve();
     });
 
-    expect(onIssueOpen).toHaveBeenCalledTimes(1);
-    expect(onIssueOpen).toHaveBeenCalledWith("project-2", "run-new");
+    expect(onIssueOpen).not.toHaveBeenCalled();
     expect(container.textContent).toContain("Target project: Sprout");
   });
 
-  it("refreshes an intermediate reservation delta before opening the issue", async () => {
+  it("refreshes an intermediate reservation delta before showing the issue", async () => {
     vi.useFakeTimers();
     const selectedChannel = channel("c-current", "Briar dev", "project-1");
     const proposal = message("m-reserved-proposal", "이슈를 제안합니다");
@@ -1136,7 +1188,7 @@ describe("CompanionChannels", () => {
     });
 
     expect(loadChannel).toHaveBeenCalledTimes(2);
-    expect(onIssueOpen).toHaveBeenCalledWith("project-1", "run-reserved");
+    expect(onIssueOpen).not.toHaveBeenCalled();
     expect(container.textContent).toContain("View issue");
   });
 
@@ -1209,7 +1261,7 @@ describe("CompanionChannels", () => {
     ).toBe(false);
   });
 
-  it("drops a delayed issue-navigation failure after backing out", async () => {
+  it("does not navigate after approval before backing out", async () => {
     const selectedChannel = channel("c-current", "Briar dev", "project-1");
     const proposal = message("m-navigation-back", "이슈를 제안합니다");
     proposal.channelId = selectedChannel.id;
@@ -1228,11 +1280,7 @@ describe("CompanionChannels", () => {
       },
       resultRunId: null,
     };
-    let rejectNavigation!: (reason: Error) => void;
-    const pendingNavigation = new Promise<void>((_resolve, reject) => {
-      rejectNavigation = reject;
-    });
-    const onIssueOpen = vi.fn(() => pendingNavigation);
+    const onIssueOpen = vi.fn();
     loadChannel.mockResolvedValue({
       channel: selectedChannel,
       members: [],
@@ -1257,22 +1305,13 @@ describe("CompanionChannels", () => {
       )!.click();
       await Promise.resolve();
     });
-    expect(onIssueOpen).toHaveBeenCalledWith(
-      "project-1",
-      "run-navigation-back",
-    );
+    expect(onIssueOpen).not.toHaveBeenCalled();
     await act(async () => {
       container.querySelector<HTMLButtonElement>(
         ".companion-channel-bar-back",
       )!.click();
     });
-    await act(async () => {
-      rejectNavigation(new Error("stale mobile navigation failed"));
-      await pendingNavigation.catch(() => undefined);
-    });
-
     expect(container.querySelector(".companion-channel-error")).toBeNull();
-    expect(container.textContent).not.toContain("stale mobile navigation failed");
   });
 
   it("shows the complete proposal and disables approval in an archived channel", async () => {
@@ -1749,6 +1788,18 @@ describe("CompanionChannels", () => {
       await Promise.resolve();
     });
 
+    const threadScroller = container.querySelector(
+      ".companion-channel-messages",
+    );
+    expect(threadScroller).not.toBeNull();
+    const endSentinel = threadScroller?.lastElementChild as HTMLElement | null;
+    expect(endSentinel).not.toBeNull();
+    const scrollIntoView = vi.fn();
+    if (endSentinel) {
+      endSentinel.scrollIntoView = scrollIntoView;
+    }
+    scrollIntoView.mockClear();
+
     const input = container.querySelector<HTMLInputElement>(
       ".companion-channel-composer input",
     )!;
@@ -1764,6 +1815,7 @@ describe("CompanionChannels", () => {
       container
         .querySelector("form.companion-channel-composer")!
         .dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+      await Promise.resolve();
     });
 
     expect(sendChannelMessage).toHaveBeenCalledWith("token", "org-1", "c-common", {
@@ -1774,6 +1826,8 @@ describe("CompanionChannels", () => {
       attachments: [],
       attachmentReferences: [],
     });
+    expect(container.textContent).toContain("답글");
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: "end" });
   });
 
   it("opens @ candidates and sends a picked Agent as a structured mention", async () => {

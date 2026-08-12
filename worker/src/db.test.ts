@@ -947,6 +947,13 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       db,
       await readFile(resolve("migrations/0098_issue_subscriptions.sql"), "utf8"),
     );
+    await executeSql(
+      db,
+      await readFile(
+        resolve("migrations/0099_project_usage_analytics.sql"),
+        "utf8",
+      ),
+    );
   }, 30_000);
 
   afterAll(async () => {
@@ -1677,9 +1684,13 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       usageProject.id,
       atMinute(100),
     );
-    expect(projectRows).toHaveLength(206);
+    expect(projectRows).toHaveLength(208);
     expect(projectRows.every((row) => row.project_id === usageProject.id))
       .toBe(true);
+    expect(projectRows.some((row) => row.id === "usage-unclaimed")).toBe(true);
+    expect(
+      projectRows.some((row) => row.id === "usage-unclaimed-queued"),
+    ).toBe(true);
     expect(
       projectRows.find((row) => row.id === "usage-cap-001"),
     ).toMatchObject({ has_usage_ledger: 1 });

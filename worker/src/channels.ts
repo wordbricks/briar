@@ -10,6 +10,7 @@ import {
   type ChannelSkillExecutionProposal,
   type ChannelSummary,
   type ChannelVisibility,
+  type ChannelWebhook,
 } from "../../src/lib/channels-contract";
 import { isWorkerEmoji } from "../../src/lib/worker-icon-validation";
 import type { AgentSkillEffort, AgentSkillKind } from "./agent-skills";
@@ -44,6 +45,9 @@ export type ChannelMessageRow = {
   author_agent_id: string | null;
   author_agent_name: string | null;
   author_agent_provider: AgentProvider | null;
+  author_webhook_id: string | null;
+  author_webhook_name: string | null;
+  webhook_event_id: string | null;
   body: string;
   reply_count: number;
   last_reply_at: string | null;
@@ -100,9 +104,26 @@ type ChannelReplyAuthorRow = Pick<
   | "author_agent_id"
   | "author_agent_name"
   | "author_agent_provider"
+  | "author_webhook_id"
+  | "author_webhook_name"
 > & {
   parent_message_id: string;
   last_reply_at: string;
+};
+
+export type ChannelWebhookRow = {
+  id: string;
+  channel_id: string;
+  name: string;
+  last_used_at: string | null;
+  revoked_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type IncomingChannelWebhookRow = ChannelWebhookRow & {
+  organization_id: string;
+  channel_archived_at: string | null;
 };
 
 export type ChannelMessageAttachmentRow = {
@@ -228,7 +249,8 @@ const messageSelect = (
          message.author_user_id, author.name as author_name,
          author.email as author_email, author.image as author_image,
          message.author_agent_id, message.author_agent_name,
-         message.author_agent_provider, message.body,
+         message.author_agent_provider, message.author_webhook_id,
+         message.author_webhook_name, message.webhook_event_id, message.body,
          (select count(*) from briar_channel_messages reply
           where reply.parent_message_id = message.id) as reply_count,
          (select max(reply.created_at) from briar_channel_messages reply
@@ -449,9 +471,17 @@ const channelMessageAuthorJson = (
     | "author_agent_id"
     | "author_agent_name"
     | "author_agent_provider"
+    | "author_webhook_id"
+    | "author_webhook_name"
   >,
 ) =>
-  row.author_agent_name
+  row.author_webhook_name
+    ? {
+        type: "webhook" as const,
+        id: row.author_webhook_id,
+        name: row.author_webhook_name,
+      }
+    : row.author_agent_name
     ? {
         type: "agent" as const,
         id: row.author_agent_id,
@@ -919,6 +949,161 @@ export async function removeChannelAgent(
   return (result.meta.changes ?? 0) > 0;
 }
 
+export const channelWebhookJson = (row: ChannelWebhookRow): ChannelWebhook => ({
+  id: row.id,
+  channelId: row.channel_id,
+  name: row.name,
+  active: row.revoked_at === null,
+  lastUsedAt: row.last_used_at,
+  createdAt: row.created_at,
+  updatedAt: row.updated_at,
+});
+
+const channelWebhookSelect = `
+  select id, channel_id, name, last_used_at, revoked_at,
+         created_at, updated_at
+  from briar_channel_webhooks`;
+
+export async function listChannelWebhooks(db: D1Database, channelId: string) {
+  const rows = await db.prepare(
+    `${channelWebhookSelect}
+     where channel_id = ? order by revoked_at is not null, created_at, id`,
+  ).bind(channelId).all<ChannelWebhookRow>();
+  return rows.results;
+}
+
+export async function createChannelWebhook(
+  db: D1Database,
+  input: {
+    id: string;
+    channelId: string;
+    name: string;
+    secretHash: string;
+    createdByUserId: string;
+    createdAt: string;
+  },
+) {
+  return db.prepare(
+    `insert into briar_channel_webhooks (
+       id, channel_id, name, secret_hash, created_by_user_id,
+       created_at, updated_at
+     ) values (?, ?, ?, ?, ?, ?, ?)
+     returning id, channel_id, name, last_used_at, revoked_at,
+               created_at, updated_at`,
+  ).bind(
+    input.id,
+    input.channelId,
+    input.name,
+    input.secretHash,
+    input.createdByUserId,
+    input.createdAt,
+    input.createdAt,
+  ).first<ChannelWebhookRow>();
+}
+
+export async function updateChannelWebhook(
+  db: D1Database,
+  input: { channelId: string; webhookId: string; name: string; updatedAt: string },
+) {
+  return db.prepare(
+    `update briar_channel_webhooks set name = ?, updated_at = ?
+     where id = ? and channel_id = ? and revoked_at is null
+     returning id, channel_id, name, last_used_at, revoked_at,
+               created_at, updated_at`,
+  ).bind(
+    input.name,
+    input.updatedAt,
+    input.webhookId,
+    input.channelId,
+  ).first<ChannelWebhookRow>();
+}
+
+export async function rotateChannelWebhook(
+  db: D1Database,
+  input: {
+    channelId: string;
+    webhookId: string;
+    secretHash: string;
+    updatedAt: string;
+  },
+) {
+  return db.prepare(
+    `update briar_channel_webhooks
+     set secret_hash = ?, updated_at = ?
+     where id = ? and channel_id = ? and revoked_at is null
+     returning id, channel_id, name, last_used_at, revoked_at,
+               created_at, updated_at`,
+  ).bind(
+    input.secretHash,
+    input.updatedAt,
+    input.webhookId,
+    input.channelId,
+  ).first<ChannelWebhookRow>();
+}
+
+export async function revokeChannelWebhook(
+  db: D1Database,
+  input: { channelId: string; webhookId: string; revokedAt: string },
+) {
+  return db.prepare(
+    `update briar_channel_webhooks
+     set revoked_at = coalesce(revoked_at, ?), updated_at = ?
+     where id = ? and channel_id = ?
+     returning id, channel_id, name, last_used_at, revoked_at,
+               created_at, updated_at`,
+  ).bind(
+    input.revokedAt,
+    input.revokedAt,
+    input.webhookId,
+    input.channelId,
+  ).first<ChannelWebhookRow>();
+}
+
+export async function getIncomingChannelWebhook(
+  db: D1Database,
+  webhookId: string,
+  secretHash: string,
+) {
+  return db.prepare(
+    `select webhook.id, webhook.channel_id, webhook.name,
+            webhook.last_used_at, webhook.revoked_at, webhook.created_at,
+            webhook.updated_at, channel.organization_id,
+            channel.archived_at as channel_archived_at
+     from briar_channel_webhooks webhook
+     join briar_channels channel on channel.id = webhook.channel_id
+     where webhook.id = ? and webhook.secret_hash = ?
+       and webhook.revoked_at is null`,
+  ).bind(webhookId, secretHash).first<IncomingChannelWebhookRow>();
+}
+
+export async function consumeChannelWebhookRateLimit(
+  db: D1Database,
+  webhookId: string,
+  observedAt: string,
+  windowCutoff: string,
+) {
+  const row = await db.prepare(
+    `insert into briar_channel_webhook_rate_limits (
+       webhook_id, window_started_at, request_count
+     ) values (?, ?, 1)
+     on conflict (webhook_id) do update set
+       window_started_at = case
+         when window_started_at <= ? then excluded.window_started_at
+         else window_started_at end,
+       request_count = case
+         when window_started_at <= ? then 1 else request_count + 1 end
+     where window_started_at <= ? or request_count < 60
+     returning request_count`,
+  ).bind(
+    webhookId,
+    observedAt,
+    windowCutoff,
+    windowCutoff,
+    windowCutoff,
+  ).first<{ request_count: number }>();
+  return row !== null;
+}
+
 const channelMessageAttachmentJson = (
   row: ChannelMessageAttachmentRow,
 ): ChannelMessageAttachment => ({
@@ -982,7 +1167,8 @@ async function attachMessageRelations(
                   author.name as author_name, author.email as author_email,
                   author.image as author_image,
                   reply.author_agent_id, reply.author_agent_name,
-                  reply.author_agent_provider,
+                  reply.author_agent_provider, reply.author_webhook_id,
+                  reply.author_webhook_name,
                   max(reply.created_at) as last_reply_at
            from briar_channel_messages reply
            left join "user" author on author.id = reply.author_user_id
@@ -990,18 +1176,22 @@ async function attachMessageRelations(
            group by reply.parent_message_id, reply.author_user_id,
                     author.name, author.email, author.image,
                     reply.author_agent_id, reply.author_agent_name,
-                    reply.author_agent_provider
+                    reply.author_agent_provider, reply.author_webhook_id,
+                    reply.author_webhook_name
          ), ranked_reply_authors as (
            select *, row_number() over (
              partition by parent_message_id
              order by last_reply_at desc,
-                      coalesce(author_user_id, author_agent_id, author_agent_name)
+                      coalesce(author_user_id, author_agent_id,
+                               author_webhook_id, author_agent_name,
+                               author_webhook_name)
            ) as author_rank
            from reply_authors
          )
          select parent_message_id, author_user_id, author_name, author_email,
                 author_image, author_agent_id, author_agent_name,
-                author_agent_provider, last_reply_at
+                author_agent_provider, author_webhook_id,
+                author_webhook_name, last_reply_at
          from ranked_reply_authors
          where author_rank <= 3
          order by parent_message_id, author_rank`,
@@ -1157,6 +1347,9 @@ export async function createChannelMessage(
     authorAgentId: string | null;
     authorAgentName: string | null;
     authorAgentProvider: AgentProvider | null;
+    authorWebhookId?: string | null;
+    authorWebhookName?: string | null;
+    webhookEventId?: string | null;
     body: string;
     mentionedUserIds: string[];
     mentionedAgentIds: string[];
@@ -1169,9 +1362,10 @@ export async function createChannelMessage(
       .prepare(
         `insert into briar_channel_messages (
            id, channel_id, parent_message_id, author_user_id, author_agent_id,
-           author_agent_name, author_agent_provider, body, created_at, updated_at
+           author_agent_name, author_agent_provider, author_webhook_id,
+           author_webhook_name, webhook_event_id, body, created_at, updated_at
          )
-         select ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+         select ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
          where exists (select 1 from briar_channels where id = ?)
            and (
              ? is null
@@ -1190,6 +1384,9 @@ export async function createChannelMessage(
         input.authorAgentId,
         input.authorAgentName,
         input.authorAgentProvider,
+        input.authorWebhookId ?? null,
+        input.authorWebhookName ?? null,
+        input.webhookEventId ?? null,
         input.body,
         input.createdAt,
         input.createdAt,
@@ -1251,6 +1448,55 @@ export async function createChannelMessage(
   ];
   await db.batch(statements);
   return getChannelMessage(db, input.channelId, input.id);
+}
+
+export async function createIncomingChannelWebhookMessage(
+  db: D1Database,
+  input: {
+    id: string;
+    webhookId: string;
+    channelId: string;
+    webhookName: string;
+    eventId: string | null;
+    body: string;
+    createdAt: string;
+  },
+) {
+  const result = await db.prepare(
+    `insert into briar_channel_messages (
+       id, channel_id, parent_message_id, author_user_id, author_agent_id,
+       author_agent_name, author_agent_provider, author_webhook_id,
+       author_webhook_name, webhook_event_id, body, created_at, updated_at
+     ) values (?, ?, null, null, null, null, null, ?, ?, ?, ?, ?, ?)
+     on conflict (author_webhook_id, webhook_event_id) where
+       author_webhook_id is not null and webhook_event_id is not null
+     do nothing
+     returning id`,
+  ).bind(
+    input.id,
+    input.channelId,
+    input.webhookId,
+    input.webhookName,
+    input.eventId,
+    input.body,
+    input.createdAt,
+    input.createdAt,
+  ).first<{ id: string }>();
+  const messageId = result?.id ?? (input.eventId
+    ? (await db.prepare(
+        `select id from briar_channel_messages
+         where author_webhook_id = ? and webhook_event_id = ?`,
+      ).bind(input.webhookId, input.eventId).first<{ id: string }>())?.id
+    : null);
+  if (!messageId) return null;
+  await db.prepare(
+    `update briar_channel_webhooks set last_used_at = ?, updated_at = ?
+     where id = ?`,
+  ).bind(input.createdAt, input.createdAt, input.webhookId).run();
+  return {
+    message: await getChannelMessage(db, input.channelId, messageId),
+    created: Boolean(result),
+  };
 }
 
 export async function getChannelMessageAttachment(

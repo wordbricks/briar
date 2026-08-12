@@ -995,13 +995,6 @@ describe("channel issue proposal approval route", () => {
       );
     }
     await expect(db.prepare(
-      `update briar_hunt_runs
-       set status = 'queued', stage = 'queued', workflow_stage = null
-       where id = ?`,
-    ).bind(acceptedBody.resultRunId).run()).rejects.toThrow(
-      "channel-approved issue execution requires explicit dispatch",
-    );
-    await expect(db.prepare(
       `update briar_hunt_runs set context_json = '{"fullAuto":true}'
        where id = ?`,
     ).bind(acceptedBody.resultRunId).run()).rejects.toThrow(
@@ -1097,7 +1090,7 @@ describe("channel issue proposal approval route", () => {
        set status = 'running', stage = 'analyzing', workflow_stage = 'analyzing',
            completed_at = null where id = ?`,
     ).bind(cancelledBody.resultRunId).run()).rejects.toThrow(
-      "channel-approved issue execution requires explicit dispatch",
+      "approved issue terminal reactivation requires fresh execution approval",
     );
     await expect(db.prepare(
       `update briar_hunt_runs
@@ -1253,6 +1246,62 @@ describe("channel issue proposal approval route", () => {
       runId: acceptedBody.resultRunId,
       observedAt: "2026-08-10T00:01:50.000Z",
     })).resolves.toBe("transferred");
+  });
+
+  it("lets a member manage and execute a created channel issue normally", async () => {
+    const proposalId = await seedProposal(22);
+    const accepted = await worker.fetch(request(proposalId, projectAId), env());
+    expect(accepted.status).toBe(200);
+    const acceptedBody = await accepted.json<{ resultRunId: string }>();
+
+    const moveResponse = await worker.fetch(new Request(
+      `https://briar.example/projects/${projectAId}/runs/${acceptedBody.resultRunId}/status`,
+      {
+        method: "PUT",
+        headers: {
+          authorization: `Bearer ${ownerToken}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          requestId: "72000000-0000-4000-8000-000000000022",
+          status: "queued",
+          workflowStage: null,
+        }),
+      },
+    ), env());
+    expect(moveResponse.status).toBe(200);
+    await expect(moveResponse.json()).resolves.toMatchObject({
+      runId: acceptedBody.resultRunId,
+      outcome: "moved",
+      status: "queued",
+      workflowStage: null,
+    });
+
+    const dispatchResponse = await worker.fetch(new Request(
+      `https://briar.example/projects/${projectAId}/runs/${acceptedBody.resultRunId}/dispatch`,
+      {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${ownerToken}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          provider: "codex",
+          model: null,
+          effort: null,
+          persistPreferences: false,
+          workerId: null,
+          requestId: "73000000-0000-4000-8000-000000000022",
+        }),
+      },
+    ), env());
+    expect(dispatchResponse.status).toBe(200);
+    await expect(dispatchResponse.json()).resolves.toMatchObject({
+      runId: acceptedBody.resultRunId,
+      outcome: "dispatched",
+      provider: "codex",
+      requestedByUserId: ownerId,
+    });
   });
 
   it("allows the approved provider/model/effort dispatch and Worker lifecycle", async () => {

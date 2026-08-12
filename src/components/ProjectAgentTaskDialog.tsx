@@ -48,20 +48,20 @@ export function hasAvailableWorkerForAgentSkills(
 
 export function ProjectAgentTaskDialog({
   agent,
-  companionMode = false,
   dashboard,
   isOpen,
   isSubmitting,
   onOpenChange,
   onSubmit,
+  workerSelectionRequired = false,
 }: {
   agent: ProjectAgent | null;
-  companionMode?: boolean;
   dashboard: DashboardPayload | null;
   isOpen: boolean;
   isSubmitting: boolean;
   onOpenChange: (open: boolean) => void;
   onSubmit: (input: ProjectAgentTaskDialogSubmit) => void | Promise<void>;
+  workerSelectionRequired?: boolean;
 }) {
   const { t } = useI18n();
   const [selectedSkillId, setSelectedSkillId] = useState("");
@@ -90,7 +90,7 @@ export function ProjectAgentTaskDialog({
   }, [agent?.id, isOpen]);
 
   useEffect(() => {
-    if (!companionMode || !selectedSkill) {
+    if (!workerSelectionRequired || !selectedSkill) {
       setSelectedWorkerId("");
       return;
     }
@@ -99,7 +99,7 @@ export function ProjectAgentTaskDialog({
         ? current
         : availableWorkers[0]?.id ?? ""
     );
-  }, [availableWorkers, companionMode, selectedSkill]);
+  }, [availableWorkers, selectedSkill, workerSelectionRequired]);
 
   return (
     <Dialog
@@ -139,7 +139,7 @@ export function ProjectAgentTaskDialog({
           </p>
         ) : null}
 
-        {companionMode && selectedSkill ? (
+        {workerSelectionRequired && selectedSkill ? (
           <label className="project-agent-run-worker-select">
             <span>{t("agents.executionHost")}</span>
             <NativeSelect
@@ -156,7 +156,7 @@ export function ProjectAgentTaskDialog({
           </label>
         ) : null}
 
-        {companionMode && selectedSkill && availableWorkers.length === 0 ? (
+        {workerSelectionRequired && selectedSkill && availableWorkers.length === 0 ? (
           <p className="text-xs text-destructive" role="alert">
             {hasWorkerForAnySkill
               ? t("agents.selectedSkillWorkerUnavailable")
@@ -176,12 +176,12 @@ export function ProjectAgentTaskDialog({
               !message ||
               isSubmitting ||
               !dashboard ||
-              (companionMode && !selectedWorkerId)
+              (workerSelectionRequired && !selectedWorkerId)
             ) return;
             const submission = onSubmit({
               request: message,
               skill: selectedSkill,
-              workerId: companionMode ? selectedWorkerId : null,
+              workerId: workerSelectionRequired ? selectedWorkerId : null,
             });
             onOpenChange(false);
             void submission;
@@ -203,7 +203,7 @@ export function ProjectAgentTaskDialog({
               isSubmitting ||
               request.trim().length === 0 ||
               !dashboard ||
-              (companionMode && !selectedWorkerId)
+              (workerSelectionRequired && !selectedWorkerId)
             }
             form="project-agent-task-form"
             type="submit"

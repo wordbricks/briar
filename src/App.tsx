@@ -241,9 +241,9 @@ export function App() {
     );
   }, [briar.activeOrganizationId, briar.token]);
   const loadProjectHomeUsage = useMemo(
-    () => createCachedProjectUsageSummaryLoader(async (projectId) => {
+    () => createCachedProjectUsageSummaryLoader(async (projectId, period) => {
       if (!briar.token) return null;
-      return loadProjectUsageSummary(briar.token, projectId, 30);
+      return loadProjectUsageSummary(briar.token, projectId, period);
     }),
     [briar.token],
   );
@@ -1480,7 +1480,7 @@ export function App() {
               autoHunt.settleTaskSession(sessionId, settlement)}
             onStopSession={(sessionId) => autoHunt.stopSession(sessionId)}
             onStart={startAgentAutoHunt}
-            onStartRemoteTask={startProjectAgentTask}
+            onStartRemoteTask={briar.token ? startProjectAgentTask : undefined}
             onStartTaskSession={(agent, session) => {
               rememberIssueAgent(agent);
               autoHunt.startTaskSession(activeProject.id, agent.id, {
@@ -1812,6 +1812,11 @@ export function App() {
           activeProjectId={briar.activeProjectId}
           loading={briar.loading}
           onLogout={() => void briar.logout()}
+          onMarkAllRead={
+            companionPage === "inbox" && inbox.unreadCount > 0
+              ? inbox.markAllRead
+              : undefined
+          }
           onOrganizationChange={(organizationId) => {
             briar.setActiveOrganizationId(organizationId);
             setCompanionPage("issues");
@@ -1941,7 +1946,7 @@ export function App() {
                 autoHunt.settleTaskSession(sessionId, settlement)}
               onStopSession={(sessionId) => autoHunt.stopSession(sessionId)}
               onStart={startAgentAutoHunt}
-              onStartRemoteTask={startProjectAgentTask}
+              onStartRemoteTask={briar.token ? startProjectAgentTask : undefined}
               onStartTaskSession={(agent, session) => {
                 rememberIssueAgent(agent);
                 autoHunt.startTaskSession(activeProject.id, agent.id, {

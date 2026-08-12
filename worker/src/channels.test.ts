@@ -10,6 +10,8 @@ import {
   completeChannelReply,
   createChannel,
   createChannelMessage,
+  createChannelWebhook,
+  createIncomingChannelWebhookMessage,
   deleteChannel,
   enqueueChannelAgentReplies,
   failChannelReply,
@@ -22,12 +24,17 @@ import {
   getChannelMessage,
   getChannelMessageAttachment,
   getChannelSyncCursor,
+  getIncomingChannelWebhook,
   listChannelAgents,
   listChannelRootMessages,
   listChannelThreadMessages,
   listChannels,
+  listChannelWebhooks,
   loadChannelDelta,
+  consumeChannelWebhookRateLimit,
   renewChannelReplyLease,
+  revokeChannelWebhook,
+  rotateChannelWebhook,
   toggleChannelMessageReaction,
 } from "./channels";
 import { processArchiveCleanupQueue } from "./archive";
@@ -279,6 +286,150 @@ describe("organization channels", () => {
 
     const thread = await listChannelThreadMessages(db, channelId, rootId);
     expect(thread.map((message) => message.id)).toEqual([rootId, replyId]);
+  });
+
+  it("authenticates, rate limits, deduplicates, rotates, and revokes incoming webhooks", async () => {
+    const channelId = "e0000000-0000-4000-8000-000000000060";
+    const webhookId = "f0000000-0000-4000-8000-000000000060";
+    const firstSecret = "s".repeat(43);
+    const secondSecret = "t".repeat(43);
+    const firstSecretHash = sha256Hex(firstSecret);
+    const secondSecretHash = sha256Hex(secondSecret);
+    await createChannel(db, {
+      id: channelId,
+      organizationId,
+      slug: "incoming-webhooks",
+      name: "Incoming webhooks",
+      topic: null,
+      visibility: "public",
+      defaultProjectId: null,
+      createdByUserId: ownerId,
+      createdAt: at(56),
+    });
+    await createChannelWebhook(db, {
+      id: webhookId,
+      channelId,
+      name: "Deploy notifier",
+      secretHash: firstSecretHash,
+      createdByUserId: ownerId,
+      createdAt: at(57),
+    });
+
+    expect(await listChannelWebhooks(db, channelId)).toMatchObject([
+      { id: webhookId, name: "Deploy notifier", revoked_at: null },
+    ]);
+    expect(await getIncomingChannelWebhook(db, webhookId, firstSecretHash))
+      .toMatchObject({ id: webhookId, channel_id: channelId });
+    expect(await getIncomingChannelWebhook(db, webhookId, sha256Hex("wrong")))
+      .toBeNull();
+
+    for (let request = 0; request < 60; request += 1) {
+      await expect(consumeChannelWebhookRateLimit(
+        db,
+        webhookId,
+        at(57),
+        at(56),
+      )).resolves.toBe(true);
+    }
+    await expect(consumeChannelWebhookRateLimit(
+      db,
+      webhookId,
+      at(57),
+      at(56),
+    )).resolves.toBe(false);
+    await expect(consumeChannelWebhookRateLimit(
+      db,
+      webhookId,
+      at(59),
+      at(58),
+    )).resolves.toBe(true);
+
+    const webhookUrl =
+      `https://briar-api.example/hooks/channels/${webhookId}/${firstSecret}`;
+    const apiEnv = { DB: db } as unknown as Env;
+    const unsupported = await apiWorker.fetch(new Request(webhookUrl, {
+      method: "POST",
+      body: JSON.stringify({ text: "Production deployed" }),
+    }), apiEnv);
+    expect(unsupported.status).toBe(415);
+    const post = () => apiWorker.fetch(new Request(webhookUrl, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "idempotency-key": "route-deploy-42",
+      },
+      body: JSON.stringify({ text: "Production deployed through the API" }),
+    }), apiEnv);
+    const createdResponse = await post();
+    expect(createdResponse.status).toBe(201);
+    await expect(createdResponse.json()).resolves.toMatchObject({
+      duplicate: false,
+      message: {
+        body: "Production deployed through the API",
+        author: { type: "webhook", id: webhookId, name: "Deploy notifier" },
+      },
+    });
+    const duplicateResponse = await post();
+    expect(duplicateResponse.status).toBe(200);
+    await expect(duplicateResponse.json()).resolves.toMatchObject({
+      duplicate: true,
+      message: { body: "Production deployed through the API" },
+    });
+
+    const first = await createIncomingChannelWebhookMessage(db, {
+      id: "f1000000-0000-4000-8000-000000000060",
+      webhookId,
+      channelId,
+      webhookName: "Deploy notifier",
+      eventId: "deploy-42",
+      body: "Production deployed",
+      createdAt: at(59),
+    });
+    expect(first).toMatchObject({
+      created: true,
+      message: {
+        body: "Production deployed",
+        author: { type: "webhook", id: webhookId, name: "Deploy notifier" },
+      },
+    });
+    const duplicate = await createIncomingChannelWebhookMessage(db, {
+      id: "f2000000-0000-4000-8000-000000000060",
+      webhookId,
+      channelId,
+      webhookName: "Deploy notifier",
+      eventId: "deploy-42",
+      body: "This duplicate is ignored",
+      createdAt: at(60),
+    });
+    expect(duplicate).toMatchObject({
+      created: false,
+      message: { id: first?.message?.id, body: "Production deployed" },
+    });
+    await expect(db.prepare(
+      `select count(*) as count from briar_channel_agent_reply_jobs
+       where trigger_message_id = ?`,
+    ).bind(first?.message?.id).first()).resolves.toEqual({ count: 0 });
+
+    await rotateChannelWebhook(db, {
+      channelId,
+      webhookId,
+      secretHash: secondSecretHash,
+      updatedAt: at(61),
+    });
+    expect(await getIncomingChannelWebhook(db, webhookId, firstSecretHash))
+      .toBeNull();
+    expect(await getIncomingChannelWebhook(db, webhookId, secondSecretHash))
+      .not.toBeNull();
+
+    await revokeChannelWebhook(db, {
+      channelId,
+      webhookId,
+      revokedAt: at(62),
+    });
+    expect(await getIncomingChannelWebhook(db, webhookId, secondSecretHash))
+      .toBeNull();
+    expect((await listChannelRootMessages(db, channelId))[0]?.author)
+      .toEqual({ type: "webhook", id: webhookId, name: "Deploy notifier" });
   });
 
   it("rejects a thread reply that points at another channel's message", async () => {

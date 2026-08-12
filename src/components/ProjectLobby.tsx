@@ -1,5 +1,6 @@
 import {
   ArrowRight,
+  BarChart3,
   Bot,
   CheckCircle2,
   CircleAlert,
@@ -11,7 +12,7 @@ import {
   Settings,
   Sparkles,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { MainContent, PageHeader } from "./layout";
 import { ProjectIcon } from "./ProjectIcon";
@@ -22,6 +23,8 @@ import type { RepositoryReadiness } from "../lib/project-connection";
 import {
   projectTrackedDuration as trackedDurationForRange,
   summarizeProjectUsage,
+  type ProjectUsageBreakdownItem,
+  type ProjectUsagePeriod,
   type ProjectUsageSummaryRun,
   type ProjectUsageSummaryLoadOptions,
 } from "../lib/project-usage-summary";
@@ -32,7 +35,7 @@ import type {
   ProjectUsageSummary,
 } from "../types";
 
-const overviewDays = 30;
+const defaultPeriod: ProjectUsagePeriod = "day";
 const activeStatuses = new Set(["queued", "running", "paused"]);
 const attentionStatuses = new Set(["blocked", "failed"]);
 
@@ -47,7 +50,14 @@ export function projectTrackedDuration(
   runs: readonly ProjectUsageSummaryRun[],
   now: number,
 ) {
-  return trackedDurationForRange(runs, overviewDays, now);
+  return trackedDurationForRange(runs, defaultPeriod, now);
+}
+
+function breakdownLabel(
+  item: ProjectUsageBreakdownItem,
+  fallback: string,
+) {
+  return item.name?.trim() || item.id?.trim() || fallback;
 }
 
 function statusLabel(run: HuntRun, t: ReturnType<typeof useI18n>["t"]) {
@@ -71,6 +81,7 @@ export function ProjectLobby({
   isSidebarOpen: boolean;
   onLoadUsageSummary: (
     projectId: string,
+    period: ProjectUsagePeriod,
     options?: ProjectUsageSummaryLoadOptions,
   ) => Promise<ProjectUsageSummary | null>;
   onOpenAgents: () => void;
@@ -86,42 +97,54 @@ export function ProjectLobby({
     useState<ProjectUsageSummary | null>(null);
   const [usageError, setUsageError] = useState<string | null>(null);
   const [usageLoading, setUsageLoading] = useState(false);
+  const [period, setPeriod] = useState<ProjectUsagePeriod>(defaultPeriod);
   const [now, setNow] = useState(Date.now);
+  const usageRequest = useRef(0);
 
   const refreshUsage = useCallback(async (force = false) => {
+    const request = ++usageRequest.current;
     setUsageLoading(true);
     setUsageError(null);
     try {
-      setUsageSummary(await onLoadUsageSummary(project.id, { force }));
-      setNow(Date.now());
+      const summary = await onLoadUsageSummary(project.id, period, { force });
+      if (request === usageRequest.current) {
+        setUsageSummary(summary);
+        setNow(Date.now());
+      }
     } catch (cause) {
-      setUsageError(cause instanceof Error ? cause.message : String(cause));
+      if (request === usageRequest.current) {
+        setUsageError(cause instanceof Error ? cause.message : String(cause));
+      }
     } finally {
-      setUsageLoading(false);
+      if (request === usageRequest.current) setUsageLoading(false);
     }
-  }, [onLoadUsageSummary, project.id]);
+  }, [onLoadUsageSummary, period, project.id]);
 
   useEffect(() => {
     setUsageSummary(null);
     setUsageError(null);
     void refreshUsage();
-  }, [project.id, refreshUsage]);
+  }, [period, project.id, refreshUsage]);
 
   const dashboardRuns = dashboard?.project.id === project.id
     ? dashboard.runs
     : [];
   const dashboardUsage = useMemo(
-    () => summarizeProjectUsage(dashboardRuns, overviewDays, now),
-    [dashboardRuns, now],
+    () => summarizeProjectUsage(dashboardRuns, period, now),
+    [dashboardRuns, now, period],
   );
   const totalTokens = usageSummary?.totalTokens ??
     dashboardUsage.totalTokens;
   const observedRuns = usageSummary?.observedRuns ?? dashboardUsage.observedRuns;
   const reportedRuns = usageSummary?.reportedRuns ?? dashboardUsage.reportedRuns;
   const trackedDuration = usageSummary?.trackedDurationMs ??
-    projectTrackedDuration(dashboardRuns, now);
+    trackedDurationForRange(dashboardRuns, period, now);
+  const completedIssues = usageSummary?.completedIssues ??
+    dashboardUsage.completedIssues;
+  const timeline = usageSummary?.timeline ?? dashboardUsage.timeline;
+  const issueCreators = usageSummary?.issueCreators ?? dashboardUsage.issueCreators;
+  const agents = usageSummary?.agents ?? dashboardUsage.agents;
   const activeRuns = dashboardRuns.filter((run) => activeStatuses.has(run.status));
-  const completedRuns = dashboardRuns.filter((run) => run.status === "completed");
   const attentionRuns = dashboardRuns.filter((run) =>
     attentionStatuses.has(run.status)
   );
@@ -141,6 +164,45 @@ export function ProjectLobby({
     day: "numeric",
     month: "short",
   });
+  const analyticsDayFormatter = new Intl.DateTimeFormat(localeTag, {
+    day: "numeric",
+    month: "short",
+    timeZone: "UTC",
+  });
+  const analyticsMonthFormatter = new Intl.DateTimeFormat(localeTag, {
+    month: "short",
+    timeZone: "UTC",
+    year: "2-digit",
+  });
+  const maxIssues = Math.max(1, ...timeline.map((point) => point.completedIssues));
+  const maxTokens = Math.max(1, ...timeline.map((point) => point.totalTokens));
+  const periodLabel = t(`lobby.period.${period}` as MessageKey);
+  const bucketLabel = (startAt: string) => {
+    const timestamp = Date.parse(startAt);
+    return period === "month"
+      ? analyticsMonthFormatter.format(timestamp)
+      : analyticsDayFormatter.format(timestamp);
+  };
+  const renderBreakdown = (
+    items: readonly ProjectUsageBreakdownItem[],
+    fallback: string,
+  ) => {
+    const max = Math.max(1, ...items.map((item) => item.issues));
+    if (items.length === 0) {
+      return <p className="project-lobby-analytics-empty">{t("lobby.analyticsEmpty")}</p>;
+    }
+    return (
+      <ol className="project-lobby-breakdown-list">
+        {items.map((item, index) => (
+          <li key={`${item.id ?? item.name ?? "unknown"}-${index}`}>
+            <span>{breakdownLabel(item, fallback)}</span>
+            <strong>{t("lobby.issueCount", { count: item.issues })}</strong>
+            <i aria-hidden style={{ width: `${(item.issues / max) * 100}%` }} />
+          </li>
+        ))}
+      </ol>
+    );
+  };
 
   return (
     <MainContent id="project-lobby">
@@ -162,7 +224,7 @@ export function ProjectLobby({
             <div>
               <span className="project-lobby-kicker">
                 <Sparkles aria-hidden size={14} />
-                {t("lobby.period", { days: overviewDays })}
+                {periodLabel}
               </span>
               <h1>{t("lobby.title")}</h1>
               <p>{t("lobby.description", { project: project.name })}</p>
@@ -199,8 +261,8 @@ export function ProjectLobby({
             </article>
             <article className="project-lobby-metric">
               <span><CheckCircle2 aria-hidden size={16} />{t("lobby.completed")}</span>
-              <strong>{formatCompact(completedRuns.length, localeTag)}</strong>
-              <small>{t("lobby.completedHint")}</small>
+              <strong>{formatCompact(completedIssues, localeTag)}</strong>
+              <small>{t("lobby.completedHint", { period: periodLabel })}</small>
             </article>
             <article className="project-lobby-metric">
               <span><CircleAlert aria-hidden size={16} />{t("lobby.active")}</span>
@@ -219,6 +281,86 @@ export function ProjectLobby({
               <span title={usageError}>{usageError}</span>
             </p>
           ) : null}
+
+          <section className="project-lobby-analytics" aria-labelledby="project-analytics-title">
+            <header>
+              <div>
+                <span className="project-lobby-panel-icon"><BarChart3 aria-hidden size={18} /></span>
+                <div>
+                  <h2 id="project-analytics-title">{t("lobby.analyticsTitle")}</h2>
+                  <p>{t("lobby.analyticsDescription")}</p>
+                </div>
+              </div>
+              <div className="project-lobby-period-picker" aria-label={t("lobby.analyticsPeriod")}>
+                {(["day", "week", "month"] as const).map((value) => (
+                  <button
+                    aria-pressed={period === value}
+                    className={period === value ? "active" : ""}
+                    key={value}
+                    onClick={() => {
+                      usageRequest.current += 1;
+                      setUsageSummary(null);
+                      setPeriod(value);
+                    }}
+                    type="button"
+                  >
+                    {t(`lobby.periodOption.${value}` as MessageKey)}
+                  </button>
+                ))}
+              </div>
+            </header>
+            <div className="project-lobby-chart-wrap">
+              <div className="project-lobby-chart-legend" aria-hidden>
+                <span className="issues">{t("lobby.completedIssuesLegend")}</span>
+                <span className="tokens">{t("lobby.tokensLegend")}</span>
+              </div>
+              <div
+                aria-label={t("lobby.analyticsChartLabel", { period: periodLabel })}
+                className="project-lobby-chart"
+                role="list"
+                style={{ gridTemplateColumns: `repeat(${timeline.length}, minmax(34px, 1fr))` }}
+              >
+                {timeline.map((point) => {
+                  const label = bucketLabel(point.startAt);
+                  return (
+                    <div
+                      aria-label={t("lobby.analyticsPoint", {
+                        date: label,
+                        issues: point.completedIssues,
+                        tokens: formatCompact(point.totalTokens, localeTag),
+                      })}
+                      className="project-lobby-chart-column"
+                      key={point.startAt}
+                      role="listitem"
+                      title={t("lobby.analyticsPoint", {
+                        date: label,
+                        issues: point.completedIssues,
+                        tokens: formatCompact(point.totalTokens, localeTag),
+                      })}
+                    >
+                      <div className="project-lobby-chart-bars" aria-hidden>
+                        <i className="issues" style={{ height: `${(point.completedIssues / maxIssues) * 100}%` }} />
+                        <i className="tokens" style={{ height: `${(point.totalTokens / maxTokens) * 100}%` }} />
+                      </div>
+                      <span>{label}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="project-lobby-breakdowns">
+              <section>
+                <h3>{t("lobby.issueCreatorsTitle")}</h3>
+                <p>{t("lobby.issueCreatorsDescription")}</p>
+                {renderBreakdown(issueCreators, t("lobby.unknownCreator"))}
+              </section>
+              <section>
+                <h3>{t("lobby.agentsTitle")}</h3>
+                <p>{t("lobby.agentsDescription")}</p>
+                {renderBreakdown(agents, t("lobby.unknownAgent"))}
+              </section>
+            </div>
+          </section>
 
           <div className="project-lobby-grid">
             <section className="project-lobby-panel repository-panel">
