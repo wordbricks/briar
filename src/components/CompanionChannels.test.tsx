@@ -514,8 +514,10 @@ describe("CompanionChannels", () => {
     await act(async () => {
       await Promise.resolve();
     });
-    expect(container.querySelector(".companion-channel-typing")?.textContent)
-      .toContain("An agent is writing a reply");
+    const typing = container.querySelector(".companion-channel-typing");
+    expect(typing?.textContent).toContain("Honey is writing a reply");
+    expect(typing?.closest(".companion-channel-message")?.textContent)
+      .toContain("Please investigate");
 
     await act(async () => {
       emitChannelChange(3);

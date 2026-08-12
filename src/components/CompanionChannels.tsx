@@ -112,6 +112,23 @@ const mergeReplies = (
   return [...byId.values()];
 };
 
+const typingAgentNamesForMessage = (
+  replies: ChannelAgentReply[],
+  agents: ChannelAgentSummary[],
+  messageId: string,
+  fallbackName: string,
+) => [
+  ...new Set(
+    replies
+      .filter((reply) => reply.parentMessageId === messageId)
+      .map(
+        (reply) =>
+          agents.find((agent) => agent.agentId === reply.agentId)?.name ??
+          fallbackName,
+      ),
+  ),
+];
+
 type CompanionChannelsProps = {
   organizationId: string;
   activeProjectId: string | null;
@@ -648,7 +665,9 @@ export function CompanionChannels({
   );
 
   const pendingReplies = replies.filter(
-    (item) => item.status === "queued" || item.status === "running",
+    (item) =>
+      item.channelId === channel?.id &&
+      (item.status === "queued" || item.status === "running"),
   );
 
   const openIssue = useCallback(
@@ -1060,14 +1079,14 @@ export function CompanionChannels({
                 item.proposal ? proposalProjects[item.proposal.id] ?? null : null
               }
               token={token}
+              typingAgentNames={typingAgentNamesForMessage(
+                pendingReplies,
+                agents,
+                item.id,
+                t("channel.projectAgent"),
+              )}
             />
           ))}
-          {pendingReplies.length > 0 ? (
-            <div className="channel-typing companion-channel-typing">
-              <LoaderCircle className="spin" size={15} />
-              {t("channel.agentTyping")}
-            </div>
-          ) : null}
         </div>
         <CompanionChannelComposer
           agents={agents}
@@ -1131,14 +1150,14 @@ export function CompanionChannels({
               }
               showThreadSummary
               token={token}
+              typingAgentNames={typingAgentNamesForMessage(
+                pendingReplies,
+                agents,
+                item.id,
+                t("channel.projectAgent"),
+              )}
             />
           ))}
-          {pendingReplies.length > 0 ? (
-            <div className="channel-typing companion-channel-typing">
-              <LoaderCircle className="spin" size={15} />
-              {t("channel.agentTyping")}
-            </div>
-          ) : null}
           {!loading && messages.length === 0 ? (
             <p className="companion-channel-empty">
               {t("companion.channelsEmpty")}
@@ -1267,6 +1286,7 @@ function MessageRow({
   selectedProjectId,
   showThreadSummary = false,
   token,
+  typingAgentNames,
 }: {
   agents: ChannelAgentSummary[];
   busy: boolean;
@@ -1302,6 +1322,7 @@ function MessageRow({
   selectedProjectId: string | null;
   showThreadSummary?: boolean;
   token: string;
+  typingAgentNames: string[];
 }) {
   const { localeTag, t } = useI18n();
   const issueProposal = message.proposal?.actionType === "request_issue_create"
@@ -1342,6 +1363,12 @@ function MessageRow({
           </time>
         </header>
         <ChannelMessageText agents={agents} members={members} message={message} />
+        {typingAgentNames.map((name) => (
+          <div className="channel-typing companion-channel-typing" key={name}>
+            <LoaderCircle className="spin" size={15} />
+            {t("channel.namedAgentTyping", { name })}
+          </div>
+        ))}
         <ChannelMessageImages
           attachments={message.attachments}
           interactive={!showThreadSummary}
