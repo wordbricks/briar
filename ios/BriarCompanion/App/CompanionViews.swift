@@ -2419,6 +2419,11 @@ struct RunDetailView: View {
                     value: members.first { $0.userId == run.assigneeUserId }?.name
                         ?? L10n.text("미배정", locale: locale)
                 )
+                LabeledContent(
+                    L10n.text("등록자", locale: locale),
+                    value: members.first { $0.userId == run.createdByUserId }?.name
+                        ?? L10n.text("알 수 없음", locale: locale)
+                )
                 LabeledContent(L10n.text("실행 Worker", locale: locale), value: assignedWorkerLabel)
             }
         }

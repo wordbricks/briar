@@ -151,6 +151,7 @@ export const mobileDashboardRunSchema = z.object({
   detail: z.string().nullable().optional(),
   priority: z.number().int().min(1).max(4).nullable().optional(),
   assigneeUserId: z.string().nullable().optional(),
+  createdByUserId: z.string().nullable().optional(),
   subscribers: z.array(mobileIssueSubscriberSchema).optional(),
   issueDescription: z.string().nullable().optional(),
   attachments: z.array(mobileIssueAttachmentSchema).optional(),
@@ -781,6 +782,7 @@ export const mobileCreateIssueResponseSchema = z.object({
   stage: z.literal("queued"),
   status: z.enum(["backlog", "queued"]),
   assigneeUserId: z.string().nullable(),
+  createdByUserId: z.string(),
   attachments: z.array(mobileIssueAttachmentSchema),
 });
 export const mobileUpdateIssueRequestSchema = z

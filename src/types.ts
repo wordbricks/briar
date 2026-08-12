@@ -296,6 +296,7 @@ export type HuntRun = {
   detail: string | null;
   priority: number | null;
   assigneeUserId?: string | null;
+  createdByUserId?: string | null;
   subscribers?: IssueSubscriber[];
   repository: string;
   branch: string | null;
