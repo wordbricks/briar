@@ -112,6 +112,23 @@ import {
   MAX_CHANNEL_DELTA_PAGES_PER_SYNC,
 } from "../lib/channel-realtime";
 
+const typingAgentNamesForMessage = (
+  replies: ChannelAgentReply[],
+  agents: ChannelAgentSummary[],
+  messageId: string,
+  fallbackName: string,
+) => [
+  ...new Set(
+    replies
+      .filter((reply) => reply.parentMessageId === messageId)
+      .map(
+        (reply) =>
+          agents.find((agent) => agent.agentId === reply.agentId)?.name ??
+          fallbackName,
+      ),
+  ),
+];
+
 type ChannelsProps = {
   organizationId: string;
   token: string;
@@ -304,6 +321,7 @@ export function Channels({
     new Map<string, ReturnType<typeof loadDashboard>>(),
   );
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const threadMessagesEndRef = useRef<HTMLDivElement | null>(null);
   const activeChannelIdRef = useRef(activeChannelId);
   const threadParentIdRef = useRef(threadParentId);
   if (
@@ -756,6 +774,11 @@ export function Channels({
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView?.({ block: "end" });
   }, [messages, activeChannelId, replies.length]);
+
+  useEffect(() => {
+    if (!threadParentId) return;
+    threadMessagesEndRef.current?.scrollIntoView?.({ block: "end" });
+  }, [threadMessages, threadParentId]);
 
   const openThread = useCallback(
     async (parentId: string) => {
@@ -1334,6 +1357,12 @@ export function Channels({
                           : null
                       }
                       token={token}
+                      typingAgentNames={typingAgentNamesForMessage(
+                        pendingReplies,
+                        agents,
+                        message.id,
+                        t("channel.projectAgent"),
+                      )}
                     />
                   </div>
                 );
@@ -1343,12 +1372,6 @@ export function Channels({
                 <p className="channel-empty-hint muted">{t("channel.emptyHint")}</p>
               ) : null}
 
-              {pendingReplies.length > 0 ? (
-                <div className="channel-typing">
-                  <LoaderCircle className="spin" size={15} />{" "}
-                  {t("channel.agentTyping")}
-                </div>
-              ) : null}
               <div ref={messagesEndRef} />
             </div>
 
@@ -1442,8 +1465,15 @@ export function Channels({
                     : null
                 }
                 token={token}
+                typingAgentNames={typingAgentNamesForMessage(
+                  pendingReplies,
+                  agents,
+                  message.id,
+                  t("channel.projectAgent"),
+                )}
               />
             ))}
+            <div ref={threadMessagesEndRef} />
           </div>
           <Composer
             agents={agents}
@@ -1784,6 +1814,7 @@ function MessageRow({
   projects,
   selectedProjectId,
   token,
+  typingAgentNames,
 }: {
   agents: ChannelAgentSummary[];
   channel: ChannelSummary;
@@ -1819,6 +1850,7 @@ function MessageRow({
   projects: readonly Pick<Project, "id" | "name" | "organizationId">[];
   selectedProjectId: string | null;
   token: string;
+  typingAgentNames: string[];
 }) {
   const { t } = useI18n();
   const [reacting, setReacting] = useState(false);
@@ -1882,6 +1914,12 @@ function MessageRow({
           </time>
         </header>
         <ChannelMessageText agents={agents} members={members} message={message} />
+        {typingAgentNames.map((name) => (
+          <div className="channel-typing" key={name}>
+            <LoaderCircle className="spin" size={15} />
+            {t("channel.namedAgentTyping", { name })}
+          </div>
+        ))}
         <ChannelMessageImages attachments={message.attachments} token={token} />
 
         {message.document ? (

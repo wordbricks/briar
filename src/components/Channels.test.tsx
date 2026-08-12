@@ -270,6 +270,42 @@ describe("Channels", () => {
     expect(container.querySelector(".channel-composer-shell")).not.toBeNull();
   });
 
+  it("places the named Agent typing state inside its triggering message", async () => {
+    const trigger = message({ body: "@honey 안녕" });
+    await render([trigger]);
+    loadChannelDelta.mockResolvedValueOnce({
+      cursor: 8,
+      hasMore: false,
+      channels: [],
+      removedChannelIds: [],
+      messages: [],
+      removedMessageIds: [],
+      agentReplies: [{
+        id: "reply-1",
+        agentId: agent.agentId,
+        channelId: channel.id,
+        triggerMessageId: trigger.id,
+        parentMessageId: trigger.id,
+        replyMessageId: "agent-message-1",
+        status: "running",
+        attempts: 1,
+        error: null,
+        createdAt: "2026-08-01T01:00:01.000Z",
+        updatedAt: "2026-08-01T01:00:02.000Z",
+      }],
+    });
+
+    await act(async () => {
+      emitChannelChange(8);
+      await Promise.resolve();
+    });
+
+    const typing = container.querySelector(".channel-typing");
+    expect(typing?.textContent).toContain("Honey님이 답변을 작성하고 있습니다");
+    expect(typing?.closest(".channel-message")?.textContent)
+      .toContain("@honey 안녕");
+  });
+
   it("hides the persistent reply link when a message has no thread", async () => {
     const rootMessage = message({ id: "message-without-replies" });
     listChannelMessages.mockResolvedValue({ messages: [rootMessage] });
@@ -2195,6 +2231,79 @@ describe("Channels", () => {
     const card = container.querySelector(".channel-document-card");
     expect(card?.textContent).toContain("Onboarding plan");
     expect(card?.textContent).toContain("조직 문서");
+  });
+
+  it("scrolls the thread panel to the bottom when a thread reply is sent", async () => {
+    const rootMessage = message({
+      id: "message-root",
+      replyCount: 1,
+      parentMessageId: null,
+    });
+    const existingReply = message({
+      id: "message-reply-1",
+      parentMessageId: "message-root",
+      body: "Earlier reply",
+    });
+    const sentReply = message({
+      id: "message-reply-2",
+      parentMessageId: "message-root",
+      body: "Newest reply",
+    });
+    listChannelMessages.mockResolvedValue({
+      messages: [rootMessage, existingReply],
+    });
+    sendChannelMessage.mockResolvedValue({
+      message: sentReply,
+      agentReplies: [],
+    });
+    await render([rootMessage]);
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(
+        ".conversation-reply-summary",
+      )?.click();
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    const threadPanel = container.querySelector(".channel-thread");
+    expect(threadPanel).not.toBeNull();
+    const threadScroller = threadPanel?.querySelector(".channel-messages");
+    expect(threadScroller).not.toBeNull();
+    const endSentinel = threadScroller?.lastElementChild as HTMLElement | null;
+    expect(endSentinel).not.toBeNull();
+    const scrollIntoView = vi.fn();
+    if (endSentinel) {
+      endSentinel.scrollIntoView = scrollIntoView;
+    }
+    scrollIntoView.mockClear();
+
+    const threadComposer = threadPanel?.querySelector<HTMLTextAreaElement>(
+      "form.channel-composer textarea",
+    );
+    expect(threadComposer).not.toBeNull();
+    await typeInto(threadComposer!, "Newest reply");
+    await act(async () => {
+      threadPanel
+        ?.querySelector("form.channel-composer")
+        ?.dispatchEvent(
+          new Event("submit", { bubbles: true, cancelable: true }),
+        );
+      await Promise.resolve();
+    });
+
+    expect(sendChannelMessage).toHaveBeenCalledWith(
+      "token",
+      "org-1",
+      "channel-1",
+      expect.objectContaining({
+        body: "Newest reply",
+        parentMessageId: "message-root",
+      }),
+    );
+    expect(threadPanel?.textContent).toContain("Newest reply");
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: "end" });
   });
 
   it("resizes the thread panel with the separator", async () => {
