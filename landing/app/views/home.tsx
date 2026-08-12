@@ -25,7 +25,7 @@ function ProductStage({ c }: { c: LandingCopy }) {
         playsInline
         preload="auto"
       >
-        <source src="/briar-x-demo-20s.mp4" type="video/mp4" />
+        <source src="/briar-issue-to-complete-demo.mp4" type="video/mp4" />
       </video>
     </div>
   );
