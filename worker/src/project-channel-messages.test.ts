@@ -205,6 +205,7 @@ describe("Project Agent channel message history", () => {
   it("paginates roots with stable timestamp and ID boundaries", async () => {
     const firstResponse = await get(projectId, channelId, "?limit=2");
     expect(firstResponse.status).toBe(200);
+    expect(firstResponse.headers.get("Cache-Control")).toBe("private, no-store");
     const first = await firstResponse.json<{
       messages: Array<{ id: string; document: unknown; attachments: unknown[] }>;
       nextCursor: string | null;

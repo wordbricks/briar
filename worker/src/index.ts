@@ -6978,7 +6978,7 @@ async function route(
     if (!page) {
       throw new HttpError(400, "Cursor does not belong to this message view");
     }
-    return json({ channel: channelJson(channel), ...page });
+    return privateNoStoreJson({ channel: channelJson(channel), ...page });
   }
 
   const organizationChannelsMatch = pathname.match(
