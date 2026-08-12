@@ -33,6 +33,7 @@ import {
   Play,
   Plus,
   RefreshCw,
+  Rocket,
   RotateCcw,
   Send,
   Search,
@@ -3229,9 +3230,11 @@ function KanbanCard({
       activeAgent?.provider ??
       null
     : null;
+  const showFullAutoBadge = Boolean(run.fullAuto);
   const assignmentBadgeCount = hideAssignmentBadges
-    ? 0
-    : [activeAgent, assignedProvider, assignedWorker].filter(Boolean).length;
+    ? Number(showFullAutoBadge)
+    : [activeAgent, assignedProvider, assignedWorker, showFullAutoBadge || null]
+        .filter(Boolean).length;
   return (
     <IssueContextMenu
       availableProviders={availableProviders}
@@ -3257,7 +3260,7 @@ function KanbanCard({
       <div
         aria-label={t("run.details", { title: run.title })}
         aria-disabled={isMoving}
-        className={`kanban-card ${meta.tone}${isMoving ? " moving" : ""}${isDragging ? " dragging" : ""}${assignmentBadgeCount > 0 ? " has-assignees" : ""}${assignmentBadgeCount > 1 ? " has-multiple-assignees" : ""}${assignmentBadgeCount > 2 ? " has-three-assignees" : ""}`}
+        className={`kanban-card ${meta.tone}${isMoving ? " moving" : ""}${isDragging ? " dragging" : ""}${assignmentBadgeCount > 0 ? " has-assignees" : ""}${assignmentBadgeCount > 1 ? " has-multiple-assignees" : ""}${assignmentBadgeCount > 2 ? " has-three-assignees" : ""}${assignmentBadgeCount > 3 ? " has-four-assignees" : ""}`}
         draggable={false}
         onClick={onOpen}
         onKeyDown={(event) => {
@@ -3274,7 +3277,7 @@ function KanbanCard({
       >
         {assignmentBadgeCount > 0 && (
           <span className="kanban-card-assignee-badges">
-            {activeAgent && (
+            {!hideAssignmentBadges && activeAgent && (
               <span
                 aria-label={t("run.assigned", { agent: activeAgent.name })}
                 className="kanban-card-agent-badge"
@@ -3287,7 +3290,7 @@ function KanbanCard({
                 />
               </span>
             )}
-            {assignedProvider && (
+            {!hideAssignmentBadges && assignedProvider && (
               <span
                 aria-label={`${t("run.metricsProvider")}: ${agentProviderLabels[assignedProvider]}`}
                 className={`kanban-card-provider-badge ${assignedProvider}`}
@@ -3296,7 +3299,7 @@ function KanbanCard({
                 <AgentProviderIcon provider={assignedProvider} size={13} />
               </span>
             )}
-            {assignedWorker && (
+            {!hideAssignmentBadges && assignedWorker && (
               <span
                 aria-label={t("run.workerAssigned", {
                   worker: assignedWorker.label,
@@ -3311,6 +3314,15 @@ function KanbanCard({
                   icon={assignedWorker.icon}
                   size={20}
                 />
+              </span>
+            )}
+            {showFullAutoBadge && (
+              <span
+                aria-label={`${t("issue.fullAuto")}: ${t("issue.fullAutoDescription")}`}
+                className="kanban-card-full-auto-badge"
+                title={t("issue.fullAutoDescription")}
+              >
+                <Rocket aria-hidden="true" size={12} strokeWidth={2.2} />
               </span>
             )}
           </span>

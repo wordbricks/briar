@@ -583,6 +583,9 @@ struct RunRow: View {
             if let workerLabel {
                 RunWorkerIconView(worker: worker, label: workerLabel)
             }
+            if run.fullAuto == true {
+                FullAutoModeBadge()
+            }
         }
         .fixedSize(horizontal: true, vertical: false)
     }
@@ -625,6 +628,20 @@ private struct RunWorkerIconView: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(L10n.format("실행 Worker %@", label))
         .help(label)
+    }
+}
+
+private struct FullAutoModeBadge: View {
+    var body: some View {
+        Image(systemName: "rocket.fill")
+            .font(.system(size: 10, weight: .semibold))
+            .foregroundStyle(Color.orange)
+            .frame(width: 20, height: 20)
+            .background(Color.orange.opacity(0.12))
+            .clipShape(Circle())
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(L10n.text("Full Auto"))
+            .help(L10n.text("모든 체크포인트를 건너뛰고 중단 없이 처리합니다."))
     }
 }
 

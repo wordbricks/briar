@@ -1150,9 +1150,12 @@ body { overflow: hidden; font-synthesis: none; }
 .kanban-card-provider-badge { position:relative; right:auto; bottom:auto; z-index:auto; width:22px; height:22px; color:var(--foreground); border:1px solid var(--border); box-shadow:none; }
 .kanban-card-provider-badge.grok img { width:13px; height:13px; }
 .kanban-card-worker-badge .worker-icon { border:0; border-radius:50%; }
+.kanban-card-full-auto-badge { color:#c45a12; background:#fff4e8; }
+.kanban-card-full-auto-badge svg { display:block; }
 .kanban-card.has-assignees .kanban-card-kicker { padding-right:22px; }
 .kanban-card.has-multiple-assignees .kanban-card-kicker { padding-right:39px; }
 .kanban-card.has-three-assignees .kanban-card-kicker { padding-right:56px; }
+.kanban-card.has-four-assignees .kanban-card-kicker { padding-right:73px; }
 .issue-assignee-avatar { width:100%; height:100%; display:block; object-fit:cover; border-radius:inherit; }
 .issue-assignee-avatar.fallback { display:grid; place-items:center; color:#fff; background:#7662b7; font-size:13px; font-weight:700; }
 .kanban-card-badges > i.kanban-assignee { width:22px; min-width:22px; height:22px; min-height:22px; padding:0; overflow:hidden; justify-content:center; box-sizing:border-box; }
@@ -4300,6 +4303,7 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .companion-shell .kanban-card.has-assignees .kanban-card-copy { padding-right: 24px; }
 .companion-shell .kanban-card.has-multiple-assignees .kanban-card-copy { padding-right: 41px; }
 .companion-shell .kanban-card.has-three-assignees .kanban-card-copy { padding-right: 58px; }
+.companion-shell .kanban-card.has-four-assignees .kanban-card-copy { padding-right: 75px; }
 .companion-shell .kanban-card-copy > strong { overflow:hidden; display:-webkit-box; overflow-wrap:anywhere; font-size:var(--text-xs); line-height: 1.4; -webkit-box-orient:vertical; -webkit-line-clamp: 2; }
 .companion-shell .kanban-card-copy > span { display: none; }
 .companion-shell .kanban-card-badges { margin-top: 0; gap: 7px; }

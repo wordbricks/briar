@@ -40,6 +40,7 @@ struct DashboardRun: Codable, Equatable, Identifiable, Sendable {
     let preferredProvider: AgentProvider?
     let preferredModel: String?
     let preferredEffort: ModelEffort?
+    let fullAuto: Bool?
     let dispatchedAt: Date?
     let requestedProvider: AgentProvider?
     let requestedModel: String?
@@ -91,6 +92,7 @@ struct DashboardRun: Codable, Equatable, Identifiable, Sendable {
         preferredProvider: AgentProvider? = nil,
         preferredModel: String? = nil,
         preferredEffort: ModelEffort? = nil,
+        fullAuto: Bool? = nil,
         dispatchedAt: Date? = nil,
         requestedProvider: AgentProvider? = nil,
         requestedModel: String? = nil,
@@ -141,6 +143,7 @@ struct DashboardRun: Codable, Equatable, Identifiable, Sendable {
         self.preferredProvider = preferredProvider
         self.preferredModel = preferredModel
         self.preferredEffort = preferredEffort
+        self.fullAuto = fullAuto
         self.dispatchedAt = dispatchedAt
         self.requestedProvider = requestedProvider
         self.requestedModel = requestedModel
