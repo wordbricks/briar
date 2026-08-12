@@ -6012,6 +6012,7 @@ export function RunPage({
                       executionWorkers={executionWorkers}
                       onDelete={onDeleteIssueMessage}
                       onEdit={onEditIssueMessage}
+                      onIssueOpen={onDependencyOpen}
                       onLoadAttachment={onLoadAttachment}
                       onLoad={onLoadIssueMessages}
                       onSend={onSendIssueMessage}
@@ -6052,6 +6053,7 @@ export function RunPage({
                     executionWorkers={executionWorkers}
                     onDelete={onDeleteIssueMessage}
                     onEdit={onEditIssueMessage}
+                    onIssueOpen={onDependencyOpen}
                     onLoadAttachment={onLoadAttachment}
                     onLoad={onLoadIssueMessages}
                     onSend={onSendIssueMessage}
@@ -7617,6 +7619,7 @@ function IssueConversation({
   onAcceptSkillExecution,
   onDelete,
   onEdit,
+  onIssueOpen,
   onLoadAttachment,
   onLoad,
   onSend,
@@ -7646,6 +7649,7 @@ function IssueConversation({
     body: string;
     mentionedUserIds?: string[];
   }) => Promise<IssueMessage>;
+  onIssueOpen?: (runId: string) => void;
   onLoadAttachment: (attachment: IssueAttachment) => Promise<Blob>;
   onLoad: () => Promise<IssueMessage[]>;
   onSend: (input: {
@@ -8263,6 +8267,7 @@ function IssueConversation({
                           onAcceptIssueExecution(message.executionProposal!, input)
                       : undefined
                   }
+                  onIssueOpen={onIssueOpen}
                   onAcceptSkillExecution={
                     onAcceptSkillExecution && message.skillExecutionProposal
                       ? (input) =>
@@ -8429,6 +8434,7 @@ function IssueMessageItem({
   executionWorkers,
   onDelete,
   onEdit,
+  onIssueOpen,
   onLoadAttachment,
   onReply,
   parentMessage = null,
@@ -8458,6 +8464,7 @@ function IssueMessageItem({
   onSkillExecutionProposalAccepted: (
     proposal: AgentSkillExecutionProposal,
   ) => void;
+  onIssueOpen?: (runId: string) => void;
   loadSkillExecutionContext: () => Promise<{
     workers: ExecutionWorker[];
     policy?: ProjectExecutionWorkerPolicy;
@@ -8613,16 +8620,30 @@ function IssueMessageItem({
               </div>
             )}
             {proposal.status === "accepted" ? (
-              <div className="issue-rework-proposal-accepted">
-                <BadgeCheck aria-hidden="true" size={15} />
-                {proposal.type === "request_issue_rework"
-                  ? t("run.reworkProposalAccepted", {
-                      revision: proposal.appliedRevision ?? "",
-                    })
-                  : proposal.type === "request_issue_create"
-                    ? t("run.issueCreateProposalAccepted")
-                    : t("run.issueUpdateProposalAccepted")}
-              </div>
+              <>
+                <div className="issue-rework-proposal-accepted">
+                  <BadgeCheck aria-hidden="true" size={15} />
+                  {proposal.type === "request_issue_rework"
+                    ? t("run.reworkProposalAccepted", {
+                        revision: proposal.appliedRevision ?? "",
+                      })
+                    : proposal.type === "request_issue_create"
+                      ? t("run.issueCreateProposalAccepted")
+                      : t("run.issueUpdateProposalAccepted")}
+                </div>
+                {proposal.type === "request_issue_create" &&
+                proposal.resultRunId &&
+                onIssueOpen ? (
+                  <button
+                    className="issue-rework-proposal-view"
+                    onClick={() => onIssueOpen(proposal.resultRunId!)}
+                    type="button"
+                  >
+                    <ChevronRight aria-hidden="true" size={15} />
+                    {t("channel.viewIssue")}
+                  </button>
+                ) : null}
+              </>
             ) : onAcceptIssueAction ? (
               <button
                 className="issue-rework-proposal-accept"
@@ -8667,6 +8688,7 @@ function IssueMessageItem({
               return onAcceptIssueExecution(input);
             }}
             onAccepted={onExecutionProposalAccepted}
+            onIssueOpen={onIssueOpen}
             proposal={message.executionProposal}
             surfaceKey={`${executionRun?.id ?? message.executionProposal.runId}:${message.id}`}
           />
