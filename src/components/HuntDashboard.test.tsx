@@ -2515,7 +2515,7 @@ describe("HuntDashboard", () => {
     container.remove();
   });
 
-  it("opens execution approval when a channel issue moves from backlog to todo", async () => {
+  it("uses the regular status and execution flows for a created channel issue", async () => {
     const channelRun: HuntRun = {
       ...demoDashboard.runs[0],
       status: "backlog",
@@ -2550,8 +2550,34 @@ describe("HuntDashboard", () => {
     ).find((option) => option.textContent?.includes("대기"));
     await act(async () => todoOption?.click());
 
-    expect(onProcessIssueNow).toHaveBeenCalledWith(channelRun);
-    expect(onMoveRun).not.toHaveBeenCalled();
+    expect(onMoveRun).toHaveBeenCalledWith(channelRun.id, {
+      status: "queued",
+      workflowStage: null,
+    });
+    expect(onProcessIssueNow).not.toHaveBeenCalled();
+
+    const queuedChannelRun: HuntRun = {
+      ...channelRun,
+      status: "queued",
+    };
+    await act(async () => {
+      root.render(
+        <HuntDashboard
+          {...dashboardProps}
+          dashboard={{ ...demoDashboard, runs: [queuedChannelRun] }}
+          onMoveRun={onMoveRun}
+          onProcessIssueNow={onProcessIssueNow}
+          requestedRunId={queuedChannelRun.id}
+        />,
+      );
+      await Promise.resolve();
+    });
+    const processNow = container.querySelector<HTMLButtonElement>(
+      ".run-page-titlebar-actions .run-page-process-now",
+    );
+    expect(processNow?.disabled).toBe(false);
+    await act(async () => processNow?.click());
+    expect(onProcessIssueNow).toHaveBeenCalledWith(queuedChannelRun);
 
     await act(async () => root.unmount());
     container.remove();
