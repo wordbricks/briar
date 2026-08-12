@@ -1521,20 +1521,27 @@ describe("API errors", () => {
   it("loads a project-scoped usage summary for the home page", async () => {
     const projectId = "22222222-2222-4222-8222-222222222222";
     const summary = {
+      period: "week",
+      rangeStart: "2026-05-25T00:00:00.000Z",
+      rangeEnd: "2026-08-17T00:00:00.000Z",
       totalTokens: 1_234,
       trackedDurationMs: 56_000,
       observedRuns: 8,
       reportedRuns: 7,
+      completedIssues: 6,
+      timeline: [],
+      issueCreators: [],
+      agents: [],
       generatedAt: "2026-08-12T00:00:00.000Z",
     };
     const fetchMock = vi.fn(async () => Response.json(summary));
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(
-      loadProjectUsageSummary("token", projectId, 30),
+      loadProjectUsageSummary("token", projectId, "week"),
     ).resolves.toEqual(summary);
     expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringContaining(`/projects/${projectId}/usage/summary?days=30`),
+      expect.stringContaining(`/projects/${projectId}/usage/summary?period=week`),
       expect.objectContaining({ headers: expect.any(Headers) }),
     );
   });

@@ -241,9 +241,9 @@ export function App() {
     );
   }, [briar.activeOrganizationId, briar.token]);
   const loadProjectHomeUsage = useMemo(
-    () => createCachedProjectUsageSummaryLoader(async (projectId) => {
+    () => createCachedProjectUsageSummaryLoader(async (projectId, period) => {
       if (!briar.token) return null;
-      return loadProjectUsageSummary(briar.token, projectId, 30);
+      return loadProjectUsageSummary(briar.token, projectId, period);
     }),
     [briar.token],
   );

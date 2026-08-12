@@ -521,6 +521,11 @@ export type OrganizationUsageRunRow = {
   updated_at: string;
   completed_at: string | null;
   has_usage_ledger?: number;
+  source_created_at?: string | null;
+  created_by_user_id?: string | null;
+  created_by_name?: string | null;
+  agent_id?: string | null;
+  agent_name?: string | null;
 };
 
 export type RunExecutionAttemptRow = {
@@ -568,6 +573,7 @@ export type ProjectUsageTotalRow = {
   run_id: string;
   total_tokens: number;
   usage_records: number;
+  observed_at: string;
 };
 
 export type OrganizationCostRecordRow = {
@@ -6641,6 +6647,10 @@ export async function listProjectUsageRuns(
                 else null
               end as execution_model,
               run.started_at, run.updated_at, run.completed_at,
+              run.source_created_at, run.created_by_user_id,
+              creator.name as created_by_name,
+              run.agent_id,
+              coalesce(agent.name, worker.label, run.claimed_by) as agent_name,
               exists (
                 select 1
                 from briar_run_execution_attempts ledger_attempt
@@ -6650,8 +6660,13 @@ export async function listProjectUsageRuns(
                   and ledger_attempt.project_id = run.project_id
               ) as has_usage_ledger
        from briar_hunt_runs run
+       left join "user" creator on creator.id = run.created_by_user_id
+       left join briar_project_agents agent on agent.id = run.agent_id
+       left join briar_execution_workers worker on worker.id = run.worker_id
        where run.project_id = ?
          and (
+           coalesce(run.source_created_at, run.started_at) >= ?
+           or
            coalesce(run.completed_at, run.updated_at, run.started_at) >= ?
            or exists (
              select 1
@@ -6663,26 +6678,10 @@ export async function listProjectUsageRuns(
                and usage.observed_at >= ?
            )
          )
-         and (
-           run.execution_metrics_json is not null
-           or run.claimed_at is not null
-           or run.claimed_by is not null
-           or run.worker_id is not null
-           or run.claim_attempts > 0
-           or run.paused_at is not null
-           or run.status in (
-             'running', 'blocked', 'failed', 'completed', 'cancelled'
-           )
-           or exists (
-             select 1 from briar_run_execution_attempts attempt
-             where attempt.run_id = run.id
-               and attempt.project_id = run.project_id
-           )
-         )
        order by coalesce(run.completed_at, run.updated_at, run.started_at),
                 run.id`,
     )
-    .bind(projectId, since, since)
+    .bind(projectId, since, since, since)
     .all<OrganizationUsageRunRow>();
 
   return runs.results;
@@ -6860,12 +6859,14 @@ export async function listProjectUsageTotals(
                 coalesce(usage.cache_write_tokens, 0) +
                 coalesce(usage.output_tokens, 0)
               )) as total_tokens,
-              count(*) as usage_records
+              count(*) as usage_records,
+              substr(usage.observed_at, 1, 10) || 'T00:00:00.000Z'
+                as observed_at
        from briar_run_execution_attempts attempt
        join briar_run_usage_records usage on usage.execution_id = attempt.id
        where attempt.project_id = ? and usage.observed_at >= ?
-       group by attempt.run_id
-       order by attempt.run_id`,
+       group by attempt.run_id, substr(usage.observed_at, 1, 10)
+       order by observed_at, attempt.run_id`,
     )
     .bind(projectId, since)
     .all<ProjectUsageTotalRow>();
@@ -10412,7 +10413,7 @@ export async function recordHuntEvent(
            id, project_id, source, source_key, title, stage, status,
            workflow_stage, workflow_snapshot_json, issue_checkpoints_json,
            detail, priority,
-           assignee_user_id,
+           assignee_user_id, created_by_user_id,
            repository, branch, commit_sha, tracker_provider,
            tracker_issue_id, tracker_issue_identifier, tracker_issue_url,
            tracker_issue_state, issue_description, result_summary,
@@ -10422,7 +10423,7 @@ export async function recordHuntEvent(
            production_qa_detail, context_json, started_at, completed_at,
             last_event_at, created_at, updated_at,
             preferred_agent_provider, preferred_agent_model, preferred_agent_effort
-         ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          on conflict(project_id, source, source_key) do nothing`,
       )
       .bind(
@@ -10439,6 +10440,7 @@ export async function recordHuntEvent(
         normalizedInput.detail,
         normalizedInput.priority,
         normalizedInput.assigneeUserId ?? null,
+        normalizedInput.createdByUserId ?? null,
         normalizedInput.repository,
         normalizedInput.branch,
         normalizedInput.commitSha,

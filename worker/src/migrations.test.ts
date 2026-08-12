@@ -404,6 +404,9 @@ describe("D1 migrations", () => {
       await applyD1Migrations(db, {
         through: "0090_channel_issue_approval.sql",
       });
+      await applyD1Migrations(db, {
+        files: ["0099_project_usage_analytics.sql"],
+      });
       const ownerId = "channel-canonical-owner";
       const approverId = "channel-canonical-approver";
       const organizationId = "81000000-0000-4000-8000-000000000001";
@@ -712,6 +715,9 @@ describe("D1 migrations", () => {
     try {
       const db = (await miniflare.getD1Database("DB")) as unknown as D1Database;
       await applyD1Migrations(db, { through: "0089_channel_agent_delegation.sql" });
+      await applyD1Migrations(db, {
+        files: ["0099_project_usage_analytics.sql"],
+      });
       const userId = "channel-upgrade-owner";
       const approverId = "channel-upgrade-approver";
       const organizationId = "91000000-0000-4000-8000-000000000001";

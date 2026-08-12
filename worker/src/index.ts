@@ -80,6 +80,7 @@ import {
 import {
   projectUsageSummaryWindow,
   summarizeProjectUsage,
+  type ProjectUsagePeriod,
 } from "../../src/lib/project-usage-summary";
 import {
   organizationAgentContextAgentsPageSchema,
@@ -667,6 +668,8 @@ export const usageRangeDaysSchema = z.preprocess(
       : value,
   z.union([z.literal(7), z.literal(30), z.literal(90)]),
 );
+
+export const projectUsagePeriodSchema = z.enum(["day", "week", "month"]);
 
 export const organizationUsageQuerySince = (
   days: 7 | 30 | 90,
@@ -5249,30 +5252,37 @@ export const organizationUsageRunJson = (
 export function projectUsageSummaryJson(
   runs: readonly OrganizationUsageRunRow[],
   totals: readonly ProjectUsageTotalRow[],
-  days: 7 | 30 | 90,
+  period: ProjectUsagePeriod,
   generatedAt: number,
 ) {
-  const totalsByRun = new Map(totals.map((total) => [total.run_id, total]));
-  const observedAt = new Date(generatedAt).toISOString();
+  const totalsByRun = new Map<string, ProjectUsageTotalRow[]>();
+  for (const total of totals) {
+    const entries = totalsByRun.get(total.run_id) ?? [];
+    entries.push(total);
+    totalsByRun.set(total.run_id, entries);
+  }
   return summarizeProjectUsage(
     runs.map((run) => {
-      const total = totalsByRun.get(run.id);
+      const runTotals = totalsByRun.get(run.id) ?? [];
       return {
         ...organizationUsageRunJson(run),
+        sourceCreatedAt: run.source_created_at,
+        createdByUserId: run.created_by_user_id,
+        createdByName: run.created_by_name,
+        agentId: run.agent_id,
+        agentName: run.agent_name,
         hasUsageLedger: Boolean(run.has_usage_ledger),
-        usageRecords: total?.usage_records
-          ? [{
+        usageRecords: runTotals.map((total) => ({
               uncachedInputTokens: null,
               cacheReadTokens: null,
               cacheWriteTokens: null,
               outputTokens: null,
               totalTokens: total.total_tokens,
-              observedAt,
-            }]
-          : [],
+              observedAt: total.observed_at,
+            })),
       };
     }),
-    days,
+    period,
     generatedAt,
   );
 }
@@ -9329,18 +9339,18 @@ async function route(
       session.user.id,
     );
     if (!project) throw new HttpError(404, "Project not found");
-    const days = usageRangeDaysSchema.parse(
-      new URL(request.url).searchParams.get("days") ?? "30",
+    const period = projectUsagePeriodSchema.parse(
+      new URL(request.url).searchParams.get("period") ?? "day",
     );
     const generatedAt = Date.now();
     const since = new Date(
-      projectUsageSummaryWindow(days, generatedAt).startAt,
+      projectUsageSummaryWindow(period, generatedAt).startAt,
     ).toISOString();
     const [runs, totals] = await Promise.all([
       listProjectUsageRuns(db, project.id, since),
       listProjectUsageTotals(db, project.id, since),
     ]);
-    return json(projectUsageSummaryJson(runs, totals, days, generatedAt));
+    return json(projectUsageSummaryJson(runs, totals, period, generatedAt));
   }
 
   const dashboardDeltaMatch = pathname.match(
