@@ -175,6 +175,7 @@ describe("detached execution workers", () => {
         "0079_agent_skills.sql",
         "0084_run_usage_ledger.sql",
         "0085_run_cost_ledger.sql",
+        "0099_project_usage_analytics.sql",
       ],
     });
     await executeD1Sql(
