@@ -3823,7 +3823,7 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .project-agent-runtime .project-agent-calendar-color { width:7px; height:7px; flex:0 0 auto; border:1px solid rgba(0,0,0,.08); border-radius:50%; }
 .project-agent-card-open > section { padding:18px 20px 22px; flex:1; }
 .project-agent-card-open > section small { color:var(--muted-foreground); font-size:var(--text-xs); font-weight:600; letter-spacing:.045em; text-transform:uppercase; }
-.project-agent-card-open > section p { margin:9px 0 0; color:var(--foreground); font-size:var(--text-md); line-height:1.55; overflow-wrap:anywhere; }
+.project-agent-card-responsibility { margin:9px 0 0; overflow:hidden; display:-webkit-box; color:var(--foreground); font-size:var(--text-md); line-height:1.55; overflow-wrap:anywhere; -webkit-box-orient:vertical; -webkit-line-clamp:6; }
 .project-agent-card-skills { margin-top:17px; display:grid; gap:8px; }
 .project-agent-card-skills ul { margin:0; padding:0; display:flex; flex-wrap:wrap; gap:6px; list-style:none; }
 .project-agent-card-skills li { min-height:24px; max-width:100%; padding:3px 8px; overflow:hidden; border:1px solid var(--border); border-radius:999px; color:var(--muted-foreground); background:var(--muted); font-size:var(--text-2xs); font-weight:600; text-overflow:ellipsis; white-space:nowrap; }
