@@ -122,6 +122,9 @@ describe("ChannelMessageText", () => {
         "- first item",
         "- second item",
         "",
+        "1. first ordered item",
+        "2. second ordered item",
+        "",
         "> quoted content stays visually distinct",
         "",
         "| Name | Detail |",
@@ -159,6 +162,9 @@ describe("ChannelMessageText", () => {
     );
     expect(markdown?.querySelector("ul > li")?.textContent).toBe(
       "first item",
+    );
+    expect(markdown?.querySelector("ol > li")?.textContent).toBe(
+      "first ordered item",
     );
     expect(markdown?.querySelector("blockquote")?.textContent).toContain(
       "visually distinct",

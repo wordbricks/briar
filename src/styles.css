@@ -6876,8 +6876,8 @@ button.issue-message-state { width:100%; cursor:pointer; }
   white-space:pre;
   overflow-wrap:normal;
 }
-.channel-message-text ul { margin:.65em 0; padding-left:1.65em; }
-.channel-message-text ol { margin:.65em 0; padding-left:1.65em; }
+.channel-message-text ul { margin:.65em 0; padding-left:1.65em; list-style:disc; }
+.channel-message-text ol { margin:.65em 0; padding-left:1.65em; list-style:decimal; }
 .channel-message-text li + li { margin-top:.28em; }
 .channel-message-text li > p { margin:.25em 0; }
 .channel-message-text li::marker { color:var(--muted-foreground); }
