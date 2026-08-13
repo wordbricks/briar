@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 
+import { Buffer } from "node:buffer";
 import { existsSync } from "node:fs";
 import {
   chmod,
@@ -68,7 +69,10 @@ import {
   assertDetachedProviderTurnSucceeded,
   runDetachedProviderTurn,
 } from "./detached-provider-turn";
-import { TranscriptBatcher } from "./transcript-batcher";
+import {
+  TranscriptBatcher,
+  type TranscriptBatchEvent,
+} from "./transcript-batcher";
 import {
   HttpRequestError,
   uploadExecutionMetricsWithCostCompatibility,
@@ -459,6 +463,14 @@ async function request<T>(
   }
   return body as T;
 }
+
+const serializeTranscriptRequest = (
+  envelope: Record<string, unknown>,
+  events: TranscriptBatchEvent[],
+) => JSON.stringify({ ...envelope, events });
+
+const isTranscriptPayloadTooLarge = (error: unknown) =>
+  error instanceof HttpRequestError && error.status === 413;
 
 async function openBrowser(url: string) {
   const command =
@@ -2485,21 +2497,27 @@ async function runClaimedIssueInRuntime(
   const usageCollector = createAgentExecutionUsageCollector(provider, {
     configuredModel: execution.model,
   });
+  const transcriptEnvelope = {
+    projectId: project.id,
+    sessionId,
+    runId: issue.runId,
+    ...(issue.executionId ? { executionId: issue.executionId } : {}),
+    workerId: activeProject.executionWorker?.workerId,
+    agentProvider: provider,
+  };
   const transcriptBatcher = new TranscriptBatcher({
     send: async (events) => {
       await request(config.apiUrl, "/transcripts", workerToken, {
         method: "POST",
-        body: JSON.stringify({
-          projectId: project.id,
-          sessionId,
-          runId: issue.runId,
-          ...(issue.executionId ? { executionId: issue.executionId } : {}),
-          workerId: activeProject.executionWorker?.workerId,
-          agentProvider: provider,
-          events,
-        }),
+        body: serializeTranscriptRequest(transcriptEnvelope, events),
       });
     },
+    measureBytes: (events) =>
+      Buffer.byteLength(
+        serializeTranscriptRequest(transcriptEnvelope, events),
+        "utf8",
+      ),
+    isPayloadTooLarge: isTranscriptPayloadTooLarge,
     onError: (error) => {
       console.error(
         `transcript upload failed for ${issue.sourceKey}: ${
@@ -2914,19 +2932,32 @@ async function runClaimedIssueReply(
       skillExecutionTarget: issue.skillExecutionTarget,
     });
     let sequence = 0;
+    const transcriptEnvelope = {
+      projectId: project.id,
+      sessionId: `reply-${issue.workId}`,
+      runId: issue.runId,
+      workerId: registered.workerId,
+      agentProvider: provider,
+    };
     const transcriptBatcher = new TranscriptBatcher({
       send: async (events) => {
         await request(config.apiUrl, "/transcripts", workerToken, {
           method: "POST",
-          body: JSON.stringify({
-            projectId: project.id,
-            sessionId: `reply-${issue.workId}`,
-            runId: issue.runId,
-            workerId: registered.workerId,
-            agentProvider: provider,
-            events,
-          }),
+          body: serializeTranscriptRequest(transcriptEnvelope, events),
         });
+      },
+      measureBytes: (events) =>
+        Buffer.byteLength(
+          serializeTranscriptRequest(transcriptEnvelope, events),
+          "utf8",
+        ),
+      isPayloadTooLarge: isTranscriptPayloadTooLarge,
+      onError: (error) => {
+        console.error(
+          `transcript upload failed for reply ${issue.workId}: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
       },
     });
     const turn = await (async () => {
