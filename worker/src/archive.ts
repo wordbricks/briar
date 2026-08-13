@@ -8,7 +8,7 @@ import type {
   RunEvidenceRow,
 } from "./db";
 import { upsertProjectAgentSessionSummary } from "./db";
-import type { TranscriptDirection, TranscriptSessionRow } from "./workers";
+import type { TranscriptSessionRow } from "./workers";
 import type {
   AgentTranscriptSegmentRow,
   AgentWorkLogEntryRow,
@@ -91,7 +91,7 @@ export const archivePolicies = [
     kind: "agent_transcript",
     hotRetentionDays: 30,
     longRetentionDays: 1_095,
-    description: "Detached agent transcript sessions and payloads",
+    description: "Detached agent work logs and raw transcript segments",
   },
   {
     kind: "issue_messages",
@@ -144,14 +144,6 @@ export type ExecutionAuditArchiveRow = {
   occurred_at: string;
 };
 
-export type TranscriptEventArchiveRow = {
-  session_id: string;
-  sequence: number;
-  direction: TranscriptDirection;
-  payload_json: string;
-  recorded_at: string;
-};
-
 export type AgentWorkLogEntryArchiveRow = AgentWorkLogEntryRow;
 export type AgentTranscriptSegmentArchiveRow = AgentTranscriptSegmentRow;
 
@@ -161,7 +153,6 @@ type ArchiveRecordType =
   | "run_evidence_image"
   | "execution_audit"
   | "transcript_session"
-  | "transcript_event"
   | "worklog_entry"
   | "transcript_segment"
   | "issue_message"
@@ -212,7 +203,6 @@ const archiveLineSchema = z.object({
     "run_evidence_image",
     "execution_audit",
     "transcript_session",
-    "transcript_event",
     "worklog_entry",
     "transcript_segment",
     "issue_message",
@@ -330,15 +320,6 @@ const transcriptSessionSchema: z.ZodType<TranscriptSessionRow> = z.object({
   last_event_at: z.string(),
   event_count: z.number(),
   byte_count: z.number(),
-  worklog_projection_version: z.number().default(0),
-});
-
-const transcriptEventSchema: z.ZodType<TranscriptEventArchiveRow> = z.object({
-  session_id: z.string(),
-  sequence: z.number(),
-  direction: z.enum(["client", "server"]),
-  payload_json: z.string(),
-  recorded_at: z.string(),
 });
 
 const workLogEntrySchema: z.ZodType<AgentWorkLogEntryArchiveRow> = z.object({
@@ -625,6 +606,10 @@ const transcriptCandidate = async (
        from briar_agent_transcript_sessions session
        left join briar_hunt_runs run on run.id = session.run_id
        where session.last_event_at <= ?
+         and exists (
+           select 1 from briar_agent_transcript_segments segment
+           where segment.session_id = session.session_id
+         )
          and (
            session.run_id is null
            or (
@@ -637,15 +622,6 @@ const transcriptCandidate = async (
     .bind(cutoff)
     .first<TranscriptSessionRow>();
   if (!session) return null;
-  const result = await db
-    .prepare(
-      `select session_id, sequence, direction, payload_json, recorded_at
-       from briar_agent_transcripts where session_id = ?
-       order by sequence`,
-    )
-    .bind(session.session_id)
-    .all<TranscriptEventArchiveRow>();
-  const events = result.results ?? [];
   const workLog = await db
     .prepare(
       `select * from briar_agent_worklog_entries
@@ -669,7 +645,6 @@ const transcriptCandidate = async (
     kind: "agent_transcript",
     records: [
       { recordType: "transcript_session", data: session },
-      ...events.map((data) => ({ recordType: "transcript_event" as const, data })),
       ...workLogEntries.map((data) => ({
         recordType: "worklog_entry" as const,
         data,
@@ -679,7 +654,7 @@ const transcriptCandidate = async (
         data,
       })),
     ],
-    rowCount: events.length + workLogEntries.length + transcriptSegments.length + 1,
+    rowCount: workLogEntries.length + transcriptSegments.length + 1,
     periodStart: session.started_at,
     periodEnd: session.last_event_at,
     relatedObjectKeys: transcriptSegments.map((segment) => segment.object_key),
@@ -1411,49 +1386,13 @@ export async function listArchivedExecutionAuditEvents(
   return records.map((record) => executionAuditSchema.parse(record.data));
 }
 
-export async function readArchivedTranscript(
-  db: D1Database,
-  bucket: ArchiveBucket,
-  projectId: string,
-  sessionId: string,
-) {
-  const metadata = await listArchiveMetadata(db, projectId, {
-    kind: "agent_transcript",
-    scopeId: sessionId,
-  });
-  const records: ArchiveRecord[] = [];
-  for (const archive of metadata) {
-    if (
-      archive.run_id &&
-      !(await runCurrentlyBelongsToProject(db, projectId, archive.run_id))
-    ) {
-      continue;
-    }
-    records.push(...await readArchiveObject(bucket, archive));
-  }
-  const transcript = archivedTranscriptFromRecords(records);
-  if (!transcript?.session.run_id) return transcript;
-  const currentRun = await db
-    .prepare(
-      `select 1 as current
-       from briar_hunt_runs where id = ? and project_id = ?`,
-    )
-    .bind(transcript.session.run_id, projectId)
-    .first<{ current: number }>();
-  return currentRun ? transcript : null;
-}
-
-const archivedTranscriptFromRecords = (records: ArchiveRecord[]) => {
+const archivedWorkLogFromRecords = (records: ArchiveRecord[]) => {
   const sessionRecord = records.find(
     (record) => record.recordType === "transcript_session",
   );
   if (!sessionRecord) return null;
   return {
     session: transcriptSessionSchema.parse(sessionRecord.data),
-    events: records
-      .filter((record) => record.recordType === "transcript_event")
-      .map((record) => transcriptEventSchema.parse(record.data))
-      .sort((left, right) => left.sequence - right.sequence),
     entries: records
       .filter((record) => record.recordType === "worklog_entry")
       .map((record) => workLogEntrySchema.parse(record.data))
@@ -1479,45 +1418,31 @@ export async function readArchivedWorkLog(
   projectId: string,
   sessionId: string,
 ) {
-  const transcript = await readArchivedTranscript(
+  const metadata = await listArchiveMetadata(db, projectId, {
+    kind: "agent_transcript",
+    scopeId: sessionId,
+  });
+  const records: ArchiveRecord[] = [];
+  for (const archive of metadata) {
+    if (
+      archive.run_id &&
+      !(await runCurrentlyBelongsToProject(db, projectId, archive.run_id))
+    ) {
+      continue;
+    }
+    records.push(...await readArchiveObject(bucket, archive));
+  }
+  const workLog = archivedWorkLogFromRecords(records);
+  if (!workLog?.session.run_id) return workLog;
+  const current = await runCurrentlyBelongsToProject(
     db,
-    bucket,
     projectId,
-    sessionId,
+    workLog.session.run_id,
   );
-  return transcript &&
-      (transcript.entries.length > 0 || transcript.segments.length > 0)
-    ? {
-        session: transcript.session,
-        entries: transcript.entries,
-        segments: transcript.segments,
-      }
-    : null;
+  return current ? workLog : null;
 }
 
 export async function readLatestArchivedWorkLogForRun(
-  db: D1Database,
-  bucket: ArchiveBucket,
-  projectId: string,
-  runId: string,
-) {
-  const transcript = await readLatestArchivedTranscriptForRun(
-    db,
-    bucket,
-    projectId,
-    runId,
-  );
-  return transcript &&
-      (transcript.entries.length > 0 || transcript.segments.length > 0)
-    ? {
-        session: transcript.session,
-        entries: transcript.entries,
-        segments: transcript.segments,
-      }
-    : null;
-}
-
-export async function readLatestArchivedTranscriptForRun(
   db: D1Database,
   bucket: ArchiveBucket,
   projectId: string,
@@ -1535,7 +1460,7 @@ export async function readLatestArchivedTranscriptForRun(
     .bind(projectId, runId)
     .first<ArchiveMetadataRow>();
   return metadata
-    ? archivedTranscriptFromRecords(await readArchiveObject(bucket, metadata))
+    ? archivedWorkLogFromRecords(await readArchiveObject(bucket, metadata))
     : null;
 }
 
@@ -2083,14 +2008,26 @@ export async function collectStorageMetrics(
             where run.project_id = ?) as run_events,
            (select count(*) from briar_run_evidence where project_id = ?) as run_evidence,
            (select count(*) from briar_execution_audit_events where project_id = ?) as execution_audit,
-           (select count(*) from briar_agent_transcripts transcript
+           ((select count(*) from briar_agent_worklog_entries entry
             join briar_agent_transcript_sessions session
-              on session.session_id = transcript.session_id
-            where session.project_id = ?) as agent_transcript,
+              on session.session_id = entry.session_id
+            where session.project_id = ?) +
+            (select count(*) from briar_agent_transcript_segments segment
+             join briar_agent_transcript_sessions session
+               on session.session_id = segment.session_id
+             where session.project_id = ?)) as agent_transcript,
            (select count(*) from briar_issue_messages where project_id = ?) as issue_messages,
            (select count(*) from briar_project_agent_sessions where project_id = ?) as project_agent_sessions`,
       )
-      .bind(projectId, projectId, projectId, projectId, projectId, projectId)
+      .bind(
+        projectId,
+        projectId,
+        projectId,
+        projectId,
+        projectId,
+        projectId,
+        projectId,
+      )
       .first<Record<ArchiveKind, number>>(),
     db
       .prepare(

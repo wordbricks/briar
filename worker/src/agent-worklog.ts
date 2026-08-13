@@ -279,19 +279,11 @@ async function storeRawSegment(
       .prepare(
         `update briar_agent_transcript_sessions
          set event_count = coalesce((
-               select count(*)
-               from briar_agent_transcripts
-               where session_id = ?
-             ), 0) + coalesce((
                select sum(event_count)
                from briar_agent_transcript_segments
                where session_id = ?
              ), 0),
              byte_count = coalesce((
-               select sum(length(cast(payload_json as blob)))
-               from briar_agent_transcripts
-               where session_id = ?
-             ), 0) + coalesce((
                select sum(uncompressed_bytes)
                from briar_agent_transcript_segments
                where session_id = ?
@@ -300,8 +292,6 @@ async function storeRawSegment(
          where session_id = ?`,
       )
       .bind(
-        sessionId,
-        sessionId,
         sessionId,
         sessionId,
         recordedAt,
@@ -632,56 +622,6 @@ async function projectWorkLog(
   return changed.size;
 }
 
-async function backfillLegacyWorkLog(
-  db: D1Database,
-  sessionId: string,
-  observedAt: string,
-) {
-  const session = await db
-    .prepare(
-      `select worklog_projection_version
-       from briar_agent_transcript_sessions where session_id = ?`,
-    )
-    .bind(sessionId)
-    .first<{ worklog_projection_version: number }>();
-  if (!session || session.worklog_projection_version >= 1) return 0;
-  const legacy = await db
-    .prepare(
-      `select sequence, direction, payload_json
-       from briar_agent_transcripts
-       where session_id = ? order by sequence`,
-    )
-    .bind(sessionId)
-    .all<{
-      sequence: number;
-      direction: TranscriptDirection;
-      payload_json: string;
-    }>();
-  const events = (legacy.results ?? []).map((event) => ({
-    sequence: event.sequence,
-    direction: event.direction,
-    payload: JSON.parse(event.payload_json) as unknown,
-  }));
-  let projected = 0;
-  for (let offset = 0; offset < events.length; offset += 200) {
-    projected += await projectWorkLog(
-      db,
-      sessionId,
-      events.slice(offset, offset + 200),
-      observedAt,
-    );
-  }
-  await db
-    .prepare(
-      `update briar_agent_transcript_sessions
-       set worklog_projection_version = 1
-       where session_id = ? and worklog_projection_version = 0`,
-    )
-    .bind(sessionId)
-    .run();
-  return projected;
-}
-
 export async function ingestAgentTranscript(
   db: D1Database,
   bucket: R2Bucket,
@@ -697,11 +637,6 @@ export async function ingestAgentTranscript(
 ) {
   validateEvents(input.events);
   await ensureTranscriptSession(db, projectId, input);
-  const backfilled = await backfillLegacyWorkLog(
-    db,
-    input.sessionId,
-    input.observedAt,
-  );
   const segment = await storeRawSegment(
     db,
     bucket,
@@ -721,7 +656,7 @@ export async function ingestAgentTranscript(
     stored: segment.stored ? input.events.length : 0,
     storedBytes: segment.stored ? segment.row.uncompressed_bytes : 0,
     compressedBytes: segment.stored ? segment.row.compressed_bytes : 0,
-    projected: backfilled + projected,
+    projected,
     pruned: [] as string[],
   };
 }

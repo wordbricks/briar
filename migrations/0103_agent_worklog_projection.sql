@@ -1,9 +1,18 @@
 -- Keep the user-visible work log small and queryable while raw provider
 -- transcripts move to compressed immutable R2 segments.
 
-alter table briar_agent_transcript_sessions
-  add column worklog_projection_version integer not null default 0
-  check (worklog_projection_version between 0 and 1);
+-- This is an intentional cutover: old D1 transcript rows and archive objects
+-- are not imported into the new work-log format. Queue old R2 objects for
+-- deletion before dropping their metadata and D1 session rows.
+insert or ignore into briar_archive_cleanup_queue (
+  bucket, object_key, project_id, run_id, queued_at
+)
+select 'archives', object_key, project_id, run_id, datetime('now')
+from briar_log_archives
+where archive_kind = 'agent_transcript';
+
+delete from briar_log_archives where archive_kind = 'agent_transcript';
+delete from briar_agent_transcript_sessions;
 
 create table briar_agent_worklog_entries (
   session_id text not null

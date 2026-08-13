@@ -6,10 +6,7 @@ import {
   listAgentTranscriptSegments,
   readAgentWorkLog,
 } from "./agent-worklog";
-import {
-  appendAgentTranscript,
-  MAX_TRANSCRIPT_PAYLOAD_BYTES,
-} from "./workers";
+import { MAX_TRANSCRIPT_PAYLOAD_BYTES } from "./workers";
 import { applyD1Migrations, executeD1Sql } from "./test-helpers/d1";
 
 const projectId = "11111111-1111-4111-8111-111111111111";
@@ -272,17 +269,21 @@ describe("provider-independent agent work log", () => {
     });
   });
 
-  it("backfills a legacy D1 session once when execution crosses deployment", async () => {
-    await appendAgentTranscript(db, projectId, {
-      sessionId: "legacy-cross-deploy",
-      runId: null,
-      workerId: null,
-      agentProvider: "opencode",
-      observedAt,
-      events: [{
-        sequence: 1,
-        direction: "server",
-        payload: {
+  it("ignores legacy D1 events when execution crosses deployment", async () => {
+    await db.batch([
+      db.prepare(
+        `insert into briar_agent_transcript_sessions (
+           session_id, project_id, run_id, worker_id, agent_provider,
+           started_at, last_event_at, event_count, byte_count
+         ) values (?, ?, null, null, 'opencode', ?, ?, 1, 16)`,
+      ).bind("legacy-cross-deploy", projectId, observedAt, observedAt),
+      db.prepare(
+        `insert into briar_agent_transcripts (
+           session_id, sequence, direction, payload_json, recorded_at
+         ) values (?, 1, 'server', ?, ?)`,
+      ).bind(
+        "legacy-cross-deploy",
+        JSON.stringify({
           type: "event",
           event: {
             type: "messageCompleted",
@@ -290,9 +291,10 @@ describe("provider-independent agent work log", () => {
             phase: "final",
             text: "Before deploy",
           },
-        },
-      }],
-    });
+        }),
+        observedAt,
+      ),
+    ]);
     await ingestAgentTranscript(db, bucket, projectId, {
       sessionId: "legacy-cross-deploy",
       runId: null,
@@ -302,7 +304,15 @@ describe("provider-independent agent work log", () => {
       events: [{
         sequence: 2,
         direction: "server",
-        payload: { type: "provider-noise", value: "after deploy" },
+        payload: {
+          type: "event",
+          event: {
+            type: "messageCompleted",
+            id: "new-answer",
+            phase: "final",
+            text: "After deploy",
+          },
+        },
       }],
     });
 
@@ -313,14 +323,11 @@ describe("provider-independent agent work log", () => {
     );
     expect(workLog?.entries).toEqual([
       expect.objectContaining({
-        entry_id: "legacy-answer",
-        body: "Before deploy",
+        entry_id: "new-answer",
+        body: "After deploy",
         status: "completed",
       }),
     ]);
-    expect(workLog?.session).toMatchObject({
-      event_count: 2,
-      worklog_projection_version: 1,
-    });
+    expect(workLog?.session.event_count).toBe(1);
   });
 });

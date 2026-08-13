@@ -24,9 +24,8 @@ import {
   listArchiveObjectsForDeletion,
   maxArchiveUncompressedBytes,
   processArchiveCleanupQueue,
-  readArchivedTranscript,
   readArchivedWorkLog,
-  readLatestArchivedTranscriptForRun,
+  readLatestArchivedWorkLogForRun,
 } from "./archive";
 import { applyD1Migrations, executeD1Sql } from "./test-helpers/d1";
 
@@ -297,14 +296,8 @@ describe("D1 to R2 log archives", () => {
          last_event_at, event_count, byte_count
        ) values (
          'session-archive', '${projectId}', '${runId}', 'codex',
-         '${oldTime}', '${oldTime}', 2, 32
+         '${oldTime}', '${oldTime}', 0, 0
        );
-       insert into briar_agent_transcripts (
-         session_id, sequence, direction, payload_json, recorded_at
-       ) values ('session-archive', 1, 'client', '{"type":"prompt"}', '${oldTime}');
-       insert into briar_agent_transcripts (
-         session_id, sequence, direction, payload_json, recorded_at
-       ) values ('session-archive', 2, 'server', '{"type":"result"}', '${oldTime}');
        insert into briar_issue_messages (
          id, project_id, run_id, parent_message_id, author_user_id,
          body, created_at, updated_at
@@ -382,7 +375,7 @@ describe("D1 to R2 log archives", () => {
       ),
       db.prepare(
         `update briar_agent_transcript_sessions
-         set event_count = 3, worklog_projection_version = 1
+         set event_count = 1
          where session_id = ?`,
       ).bind("session-archive"),
     ]);
@@ -442,9 +435,6 @@ describe("D1 to R2 log archives", () => {
       await listArchivedExecutionAuditEvents(db, bucket, projectId),
     ).toHaveLength(2);
     expect(await listArchivedIssueMessages(db, bucket, projectId, runId)).toHaveLength(2);
-    expect(
-      (await readArchivedTranscript(db, bucket, projectId, "session-archive"))?.events,
-    ).toHaveLength(2);
     const archivedWorkLog = await readArchivedWorkLog(
       db,
       bucket,
@@ -461,7 +451,7 @@ describe("D1 to R2 log archives", () => {
     expect(await bucket.head(archivedWorkLog!.segments[0]!.object_key))
       .not.toBeNull();
     expect(
-      (await readLatestArchivedTranscriptForRun(db, bucket, projectId, runId))
+      (await readLatestArchivedWorkLogForRun(db, bucket, projectId, runId))
         ?.session.session_id,
     ).toBe("session-archive");
     expect(await listArchivedProjectAgentSessions(db, bucket, projectId)).toHaveLength(1);

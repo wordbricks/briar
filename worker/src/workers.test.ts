@@ -21,7 +21,6 @@ import {
   type HuntEventInput,
 } from "./db";
 import {
-  appendAgentTranscript,
   authenticateExecutionWorker,
   bindExecutionWorkerProject,
   countExecutionWorkerDeviceSessions,
@@ -40,15 +39,11 @@ import {
   listOrganizationExecutionWorkers,
   pendingExecutionWorkerUpdate,
   MAX_CLAIM_ATTEMPTS,
-  MAX_TRANSCRIPT_PAYLOAD_BYTES,
   reapStalledHuntRuns,
-  readAgentTranscript,
-  readLatestAgentTranscriptForRun,
   recordWorkerHeartbeat,
   registerExecutionWorker,
   requestExecutionWorkerUpdate,
   renewHuntRunLease,
-  TranscriptLimitError,
   unbindExecutionWorker,
   updateExecutionWorkerConcurrency,
   updateExecutionWorkerIcon,
@@ -2734,104 +2729,6 @@ describe("detached execution workers", () => {
     ]);
   });
 
-  it("stores a transcript and reads it back in order", async () => {
-    const result = await appendAgentTranscript(db, projectId, {
-      sessionId: "session-1",
-      runId: null,
-      workerId: null,
-      agentProvider: "codex",
-      observedAt: atMinute(2),
-      events: [
-        { sequence: 1, direction: "client", payload: { type: "run" } },
-        { sequence: 2, direction: "server", payload: { type: "messageDelta" } },
-        { sequence: 3, direction: "server", payload: { type: "result" } },
-      ],
-    });
-    expect(result.stored).toBe(3);
-
-    const transcript = await readAgentTranscript(db, projectId, "session-1");
-    expect(transcript?.session.event_count).toBe(3);
-    expect(transcript?.events.map((event) => event.sequence)).toEqual([1, 2, 3]);
-    expect(JSON.parse(transcript!.events[0].payload_json)).toEqual({ type: "run" });
-
-    const tail = await readAgentTranscript(db, projectId, "session-1", {
-      afterSequence: 1,
-    });
-    expect(tail?.events.map((event) => event.sequence)).toEqual([2, 3]);
-    const boundedTail = await readAgentTranscript(db, projectId, "session-1", {
-      limit: 2,
-      tail: true,
-    });
-    expect(boundedTail?.events.map((event) => event.sequence)).toEqual([2, 3]);
-    expect(await readAgentTranscript(db, projectId, "session-missing")).toBeNull();
-  });
-
-  it("reads the newest hot transcript session for a run", async () => {
-    const runId = await recordHuntEvent(
-      db,
-      projectId,
-      queuedEvent("latest-hot-transcript", 1),
-    );
-    await appendAgentTranscript(db, projectId, {
-      sessionId: "attempt-old",
-      runId,
-      workerId: null,
-      agentProvider: "codex",
-      observedAt: atMinute(2),
-      events: [{ sequence: 1, direction: "server", payload: { attempt: 1 } }],
-    });
-    await appendAgentTranscript(db, projectId, {
-      sessionId: "attempt-new",
-      runId,
-      workerId: null,
-      agentProvider: "codex",
-      observedAt: atMinute(3),
-      events: [
-        { sequence: 1, direction: "server", payload: { attempt: 2 } },
-        { sequence: 2, direction: "server", payload: { result: true } },
-      ],
-    });
-
-    const latest = await readLatestAgentTranscriptForRun(
-      db,
-      projectId,
-      runId,
-      { limit: 1, tail: true },
-    );
-    expect(latest?.session.session_id).toBe("attempt-new");
-    expect(latest?.events.map((event) => event.sequence)).toEqual([2]);
-
-    const sessionToken = "latest-hot-transcript-session-token";
-    await db
-      .prepare(
-        `insert into "session" (
-           id, expiresAt, token, createdAt, updatedAt, userId
-         ) values (?, '2099-01-01T00:00:00.000Z', ?, ?, ?, 'owner')`,
-      )
-      .bind("latest-hot-transcript-session", sessionToken, atMinute(1), atMinute(1))
-      .run();
-    const response = await apiWorker.fetch(
-      new Request(
-        `https://briar-api.example/projects/${projectId}/sessions/detached-${runId}/transcript`,
-        { headers: { authorization: `Bearer ${sessionToken}` } },
-      ),
-      {
-        DB: db,
-        BETTER_AUTH_SECRET: "latest-transcript-secret-latest-transcript-secret",
-        GOOGLE_CLIENT_ID: "google-client-test",
-        GOOGLE_CLIENT_SECRET: "google-secret-test",
-      } as unknown as Env,
-    );
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({
-      session: { sessionId: "attempt-new", runId },
-      events: [
-        { sequence: 1, message: { attempt: 2 } },
-        { sequence: 2, message: { result: true } },
-      ],
-    });
-  });
-
   it("serves the compact projection and authenticated raw transcript", async () => {
     const sessionToken = "worklog-transcript-session-token";
     await db
@@ -2927,114 +2824,45 @@ describe("detached execution workers", () => {
     expect(decompressed).toContain("Raw thought");
   });
 
-  it("charges a retried batch only once", async () => {
-    const payloads = [
-      { type: "run" },
-      { text: "한글 transcript" },
-      { result: true },
-    ];
-    const batch = {
-      sessionId: "session-retry",
-      runId: null,
-      workerId: null,
-      agentProvider: "codex" as const,
-      observedAt: atMinute(2),
-      events: payloads.map((payload, index) => ({
-        sequence: index + 1,
-        direction: "client" as const,
-        payload,
-      })),
-    };
-    const initial = await appendAgentTranscript(db, projectId, batch);
-    const retry = await appendAgentTranscript(db, projectId, batch);
-    expect(initial).toMatchObject({
-      stored: 3,
-      storedBytes: payloads.reduce(
-        (total, payload) =>
-          total + new TextEncoder().encode(JSON.stringify(payload)).byteLength,
-        0,
-      ),
-    });
-    expect(retry.stored).toBe(0);
-    const transcript = await readAgentTranscript(db, projectId, "session-retry");
-    expect(transcript?.session.event_count).toBe(3);
-    expect(transcript?.events).toHaveLength(3);
+  it("does not expose legacy D1 transcript rows", async () => {
+    const sessionToken = "legacy-transcript-session-token";
+    await db.batch([
+      db.prepare(
+        `insert into "session" (
+           id, expiresAt, token, createdAt, updatedAt, userId
+         ) values (?, '2099-01-01T00:00:00.000Z', ?, ?, ?, 'owner')`,
+      ).bind("legacy-transcript-session", sessionToken, atMinute(1), atMinute(1)),
+      db.prepare(
+        `insert into briar_agent_transcript_sessions (
+           session_id, project_id, run_id, worker_id, agent_provider,
+           started_at, last_event_at, event_count, byte_count
+         ) values ('legacy-only', ?, null, null, 'codex', ?, ?, 1, 16)`,
+      ).bind(projectId, atMinute(1), atMinute(1)),
+      db.prepare(
+        `insert into briar_agent_transcripts (
+           session_id, sequence, direction, payload_json, recorded_at
+         ) values ('legacy-only', 1, 'server', '{"type":"result"}', ?)`,
+      ).bind(atMinute(1)),
+    ]);
+    const env = {
+      DB: db,
+      ARCHIVES: archives,
+      BETTER_AUTH_SECRET: "legacy-transcript-secret-legacy-transcript-secret",
+      GOOGLE_CLIENT_ID: "google-client-test",
+      GOOGLE_CLIENT_SECRET: "google-secret-test",
+    } as unknown as Env;
+    const headers = { authorization: `Bearer ${sessionToken}` };
+
+    for (const suffix of ["transcript", "raw-transcript"]) {
+      const response = await apiWorker.fetch(
+        new Request(
+          `https://briar-api.example/projects/${projectId}/sessions/legacy-only/${suffix}`,
+          { headers },
+        ),
+        env,
+      );
+      expect(response.status).toBe(404);
+    }
   });
 
-  it("rejects oversized and malformed transcript events", async () => {
-    const oversized = "x".repeat(MAX_TRANSCRIPT_PAYLOAD_BYTES + 1);
-    await expect(
-      appendAgentTranscript(db, projectId, {
-        sessionId: "session-big",
-        runId: null,
-        workerId: null,
-        agentProvider: "codex",
-        observedAt: atMinute(2),
-        events: [{ sequence: 1, direction: "server", payload: { text: oversized } }],
-      }),
-    ).rejects.toBeInstanceOf(TranscriptLimitError);
-
-    await expect(
-      appendAgentTranscript(db, projectId, {
-        sessionId: "session-bad-sequence",
-        runId: null,
-        workerId: null,
-        agentProvider: "codex",
-        observedAt: atMinute(2),
-        events: [{ sequence: 0, direction: "server", payload: {} }],
-      }),
-    ).rejects.toBeInstanceOf(TranscriptLimitError);
-
-    await expect(
-      appendAgentTranscript(db, projectId, {
-        sessionId: "session-empty",
-        runId: null,
-        workerId: null,
-        agentProvider: "codex",
-        observedAt: atMinute(2),
-        events: [],
-      }),
-    ).rejects.toBeInstanceOf(TranscriptLimitError);
-  });
-
-  it(
-    "retains old sessions until the verified archive job removes them",
-    async () => {
-      // Exceed the former automatic-pruning threshold to guard against
-      // reintroducing history loss before R2 archive verification.
-      const retainedSessionCount = 53;
-      for (let index = 0; index < retainedSessionCount; index += 1) {
-        await appendAgentTranscript(db, projectId, {
-          sessionId: `session-${String(index).padStart(3, "0")}`,
-          runId: null,
-          workerId: null,
-          agentProvider: "codex",
-          observedAt: atMinute(index + 1),
-          events: [{ sequence: 1, direction: "client", payload: { index } }],
-        });
-      }
-
-      const remaining = await db
-        .prepare(
-          `select count(*) as sessions from briar_agent_transcript_sessions where project_id = ?`,
-        )
-        .bind(projectId)
-        .first<{ sessions: number }>();
-      expect(remaining?.sessions).toBe(retainedSessionCount);
-
-      // Overflow no longer destroys history before R2 verification.
-      expect(await readAgentTranscript(db, projectId, "session-000")).not.toBeNull();
-      expect(
-        await readAgentTranscript(db, projectId, "session-052"),
-      ).not.toBeNull();
-      const orphans = await db
-        .prepare(
-          `select count(*) as events from briar_agent_transcripts where session_id = ?`,
-        )
-        .bind("session-000")
-        .first<{ events: number }>();
-      expect(orphans?.events).toBe(1);
-    },
-    20_000,
-  );
 });

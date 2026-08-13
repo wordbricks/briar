@@ -119,9 +119,7 @@ import {
   listArchivedRunEvidence,
   listArchivedRunEvents,
   processArchiveCleanupQueue,
-  readArchivedTranscript,
   readArchivedWorkLog,
-  readLatestArchivedTranscriptForRun,
   readLatestArchivedWorkLogForRun,
 } from "./archive";
 import {
@@ -417,8 +415,6 @@ import {
   MAX_TRANSCRIPT_EVENTS_PER_REQUEST,
   WORKER_STALE_AFTER_MS,
   reapStalledHuntRuns,
-  readAgentTranscript,
-  readLatestAgentTranscriptForRun,
   recordWorkerHeartbeat,
   registerExecutionWorker,
   requestExecutionWorkerUpdate,
@@ -5811,29 +5807,6 @@ const issueAgentReplyJson = (job: IssueAgentReplyJobRow) => ({
   updatedAt: job.updated_at,
 });
 
-const issueReplyTranscriptPayload = (value: unknown) => {
-  if (!value || typeof value !== "object") return null;
-  const payload = value as Record<string, unknown>;
-  if (payload.type === "result" || payload.type === "error") return payload;
-  const normalized =
-    payload.event && typeof payload.event === "object"
-      ? (payload.event as Record<string, unknown>)
-      : null;
-  if (
-    payload.type === "event" &&
-    normalized?.type === "messageCompleted"
-  ) {
-    return payload;
-  }
-  const item =
-    payload.item && typeof payload.item === "object"
-      ? (payload.item as Record<string, unknown>)
-      : null;
-  return payload.type === "item.completed" && item?.type === "agent_message"
-    ? payload
-    : null;
-};
-
 const issueConversationNotificationJson = (
   notification: IssueConversationNotificationRow,
 ) => ({
@@ -5938,36 +5911,25 @@ const loadIssueConversationSnapshot = async (
   };
 };
 
-const readLatestTranscriptForRunWithArchive = async (
+const readLatestWorkLogForRunWithArchive = async (
   db: D1Database,
   archivesBucket: R2Bucket,
   projectId: string,
   runId: string,
-  options: { afterSequence?: number; limit?: number; tail?: boolean } = {},
+  limit = 200,
 ) => {
-  const hot = await readLatestAgentTranscriptForRun(
-    db,
-    projectId,
-    runId,
-    options,
-  );
-  if (hot) return hot;
-  const archived = await readLatestArchivedTranscriptForRun(
-    db,
-    archivesBucket,
-    projectId,
-    runId,
-  );
-  if (!archived) return null;
-  const afterSequence = options.afterSequence ?? 0;
-  const filtered = archived.events.filter(
-    (event) => event.sequence > afterSequence,
-  );
-  const limit = Math.min(options.limit ?? 1_000, 5_000);
-  return {
-    ...archived,
-    events: options.tail ? filtered.slice(-limit) : filtered.slice(0, limit),
-  };
+  const hot = await readLatestAgentWorkLogForRun(db, projectId, runId);
+  const workLog = hot && hot.entries.length > 0
+    ? hot
+    : await readLatestArchivedWorkLogForRun(
+        db,
+        archivesBucket,
+        projectId,
+        runId,
+      );
+  return workLog
+    ? { ...workLog, entries: workLog.entries.slice(-Math.min(limit, 1_000)) }
+    : null;
 };
 
 const removeOrphanedIssueAttachments = async (
@@ -12197,16 +12159,10 @@ async function route(
   if (transcriptMatch && request.method === "GET") {
     const projectId = transcriptMatch[1];
     await requireProjectAccess(auth, db, request, projectId);
-    const afterSequence = Number.parseInt(
-      new URL(request.url).searchParams.get("afterSequence") ?? "0",
-      10,
-    );
     const requestedSessionId = transcriptMatch[2];
     const detachedRunId = requestedSessionId.startsWith("detached-")
       ? z.string().uuid().safeParse(requestedSessionId.slice("detached-".length))
       : null;
-    const normalizedAfterSequence =
-      Number.isFinite(afterSequence) && afterSequence > 0 ? afterSequence : 0;
     const hotWorkLog = detachedRunId?.success
       ? await readLatestAgentWorkLogForRun(db, projectId, detachedRunId.data)
       : await readAgentWorkLog(db, projectId, requestedSessionId);
@@ -12225,85 +12181,30 @@ async function route(
             projectId,
             requestedSessionId,
           );
-    if (workLog && workLog.entries.length > 0) {
-      return json({
-        session: {
-          sessionId: workLog.session.session_id,
-          runId: workLog.session.run_id,
-          workerId: workLog.session.worker_id,
-          agentProvider: workLog.session.agent_provider,
-          startedAt: workLog.session.started_at,
-          lastEventAt: workLog.session.last_event_at,
-          eventCount: workLog.entries.length,
-          projection: "worklog",
-        },
-        // Work-log entries are a bounded snapshot. Returning the full set on
-        // each live poll lets an upsert replace a writing entry in-place
-        // without persisting or replaying provider token deltas.
-        events: workLog.entries.map((entry) => ({
-          sequence: entry.sequence,
-          direction: "server" as const,
-          message: {
-            type: "event",
-            event: workLogEntryTranscriptEvent(entry),
-          },
-          recordedAt: entry.updated_at,
-        })),
-      });
+    if (!workLog || workLog.entries.length === 0) {
+      throw new HttpError(404, "Transcript not found");
     }
-    const hotTranscript = detachedRunId?.success
-      ? await readLatestAgentTranscriptForRun(
-          db,
-          projectId,
-          detachedRunId.data,
-          { afterSequence: normalizedAfterSequence },
-        )
-      : await readAgentTranscript(db, projectId, requestedSessionId, {
-          afterSequence: normalizedAfterSequence,
-        });
-    const archivedTranscript = hotTranscript
-      ? null
-      : detachedRunId?.success
-        ? await readLatestArchivedTranscriptForRun(
-            db,
-            env.ARCHIVES,
-            projectId,
-            detachedRunId.data,
-          )
-        : await readArchivedTranscript(
-            db,
-            env.ARCHIVES,
-            projectId,
-            requestedSessionId,
-          );
-    const transcript =
-      hotTranscript ??
-      (archivedTranscript
-        ? {
-            ...archivedTranscript,
-            events: archivedTranscript.events.filter(
-              (event) =>
-                event.sequence >
-                normalizedAfterSequence,
-            ),
-          }
-        : null);
-    if (!transcript) throw new HttpError(404, "Transcript not found");
     return json({
       session: {
-        sessionId: transcript.session.session_id,
-        runId: transcript.session.run_id,
-        workerId: transcript.session.worker_id,
-        agentProvider: transcript.session.agent_provider,
-        startedAt: transcript.session.started_at,
-        lastEventAt: transcript.session.last_event_at,
-        eventCount: transcript.session.event_count,
+        sessionId: workLog.session.session_id,
+        runId: workLog.session.run_id,
+        workerId: workLog.session.worker_id,
+        agentProvider: workLog.session.agent_provider,
+        startedAt: workLog.session.started_at,
+        lastEventAt: workLog.session.last_event_at,
+        eventCount: workLog.entries.length,
+        projection: "worklog",
       },
-      events: transcript.events.map((event) => ({
-        sequence: event.sequence,
-        direction: event.direction,
-        message: JSON.parse(event.payload_json),
-        recordedAt: event.recorded_at,
+      // Work-log entries are a bounded snapshot. Returning the full set on
+      // each live poll lets an upsert replace a writing entry in-place.
+      events: workLog.entries.map((entry) => ({
+        sequence: entry.sequence,
+        direction: "server" as const,
+        message: {
+          type: "event",
+          event: workLogEntryTranscriptEvent(entry),
+        },
+        recordedAt: entry.updated_at,
       })),
     });
   }
@@ -12398,7 +12299,9 @@ async function route(
           projectId,
           workLog.session.session_id,
         );
-    if (!segments) throw new HttpError(404, "Transcript not found");
+    if (!segments || segments.length === 0) {
+      throw new HttpError(404, "Transcript not found");
+    }
     return json({
       sessionId: workLog.session.session_id,
       runId: workLog.session.run_id,
@@ -12543,12 +12446,12 @@ async function route(
           job.run_id,
         ),
         listRunEvidence(db, input.projectId, job.run_id),
-        readLatestTranscriptForRunWithArchive(
+        readLatestWorkLogForRunWithArchive(
           db,
           env.ARCHIVES,
           input.projectId,
           job.run_id,
-          { limit: 200, tail: true },
+          200,
         ),
       ]);
     if (!run || !job.agent_provider) {
@@ -12681,18 +12584,18 @@ async function route(
           },
           messages: claimConversationJson(messages, attachments),
           agentTranscript:
-            transcript?.events.flatMap((event) => {
-              const payload = issueReplyTranscriptPayload(
-                JSON.parse(event.payload_json),
-              );
-              return payload
-                ? [{
-                    sequence: event.sequence,
-                    message: payload,
-                    recordedAt: event.recorded_at,
-                  }]
-                : [];
-            }) ?? [],
+            transcript?.entries
+              .filter((entry) =>
+                entry.entry_type === "message" && entry.status !== "writing"
+              )
+              .map((entry) => ({
+                sequence: entry.sequence,
+                message: {
+                  type: "event",
+                  event: workLogEntryTranscriptEvent(entry),
+                },
+                recordedAt: entry.updated_at,
+              })) ?? [],
           evidence: (evidence ?? []).map((item) => ({
             stage: item.workflow_stage,
             type: item.evidence_type,
