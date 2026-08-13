@@ -33,6 +33,58 @@ type MenuPosition = {
 
 const defaultMenuZIndex = 120;
 
+function hasActiveCssValue(value: string | undefined) {
+  return Boolean(value && value !== "none" && value !== "normal");
+}
+
+function createsFixedContainingBlock(element: HTMLElement) {
+  const style = window.getComputedStyle(element);
+  const contain = new Set((style.contain ?? "").split(/\s+/));
+  const willChange = new Set(
+    (style.willChange ?? "")
+      .split(",")
+      .map((property) => property.trim()),
+  );
+
+  return (
+    hasActiveCssValue(style.transform) ||
+    hasActiveCssValue(style.translate) ||
+    hasActiveCssValue(style.rotate) ||
+    hasActiveCssValue(style.scale) ||
+    hasActiveCssValue(style.perspective) ||
+    hasActiveCssValue(style.filter) ||
+    hasActiveCssValue(style.backdropFilter) ||
+    hasActiveCssValue(style.getPropertyValue("-webkit-backdrop-filter")) ||
+    hasActiveCssValue(style.containerType) ||
+    style.contentVisibility === "auto" ||
+    contain.has("layout") ||
+    contain.has("paint") ||
+    contain.has("strict") ||
+    contain.has("content") ||
+    [
+      "transform",
+      "translate",
+      "rotate",
+      "scale",
+      "perspective",
+      "filter",
+      "backdrop-filter",
+      "contain",
+    ].some((property) => willChange.has(property))
+  );
+}
+
+function getFixedContainingBlock(element: HTMLElement) {
+  let ancestor: HTMLElement | null = element;
+
+  while (ancestor) {
+    if (createsFixedContainingBlock(ancestor)) return ancestor;
+    ancestor = ancestor.parentElement;
+  }
+
+  return null;
+}
+
 function getMenuZIndex(trigger: HTMLElement) {
   let zIndex = defaultMenuZIndex;
   let ancestor = trigger.parentElement;
@@ -155,23 +207,23 @@ export function SelectMenu({
     );
     // Radix modal dialogs trap focus and pointer interaction inside their
     // content. Keep the menu in that DOM boundary instead of portaling it to
-    // document.body, then translate viewport coordinates into the dialog's
-    // transformed coordinate space.
+    // document.body. A fixed-position descendant only uses local coordinates
+    // when an ancestor actually establishes a fixed containing block; custom
+    // dialogs such as Create Agent continue to use viewport coordinates.
     const portalContainer =
       trigger.closest<HTMLElement>('[role="dialog"]') ?? document.body;
-    const portalRect = portalContainer === document.body
-      ? null
-      : portalContainer.getBoundingClientRect();
+    const containingBlock = getFixedContainingBlock(portalContainer);
+    const containingBlockRect = containingBlock?.getBoundingClientRect() ?? null;
 
     setMenuPosition({
       ...(placeAbove
         ? {
-            bottom: portalRect
-              ? portalRect.bottom - rect.top + gap
+            bottom: containingBlockRect
+              ? containingBlockRect.bottom - rect.top + gap
               : window.innerHeight - rect.top + gap,
           }
-        : { top: rect.bottom + gap - (portalRect?.top ?? 0) }),
-      left: viewportLeft - (portalRect?.left ?? 0),
+        : { top: rect.bottom + gap - (containingBlockRect?.top ?? 0) }),
+      left: viewportLeft - (containingBlockRect?.left ?? 0),
       maxHeight: availableHeight,
       portalContainer,
       width,
