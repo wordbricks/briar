@@ -37,15 +37,15 @@ const defaultProjectAgentCopyByLocale: Record<
 > = {
   ko: {
     name: "개발자 에이전트",
-    responsibility: "대기 중인 모든 이슈를 처리합니다.",
+    responsibility: "프로젝트의 개발과 코드 관련 작업을 책임집니다.",
   },
   en: {
     name: "Developer agent",
-    responsibility: "Process every queued issue.",
+    responsibility: "Owns the project's development and code-related work.",
   },
   zh: {
     name: "开发者智能体",
-    responsibility: "处理所有排队中的问题。",
+    responsibility: "负责项目的开发和代码相关工作。",
   },
 };
 
@@ -55,15 +55,15 @@ const defaultProjectAgentSkillCopyByLocale: Record<
 > = {
   ko: {
     name: "이슈 처리",
-    instructions: "대기 중인 모든 이슈를 처리합니다.",
+    instructions: "프로젝트의 개발과 코드 관련 작업을 책임집니다.",
   },
   en: {
     name: "Issue processing",
-    instructions: "Process every queued issue.",
+    instructions: "Owns the project's development and code-related work.",
   },
   zh: {
     name: "问题处理",
-    instructions: "处理所有排队中的问题。",
+    instructions: "负责项目的开发和代码相关工作。",
   },
 };
 

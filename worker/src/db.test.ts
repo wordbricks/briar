@@ -1951,11 +1951,11 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       expect.objectContaining({
         name: "개발자 에이전트",
         handle: expect.stringMatching(/^agent-[a-f0-9]{32}$/u),
-        responsibility: "대기 중인 모든 이슈를 처리합니다.",
+        responsibility: "프로젝트의 개발과 코드 관련 작업을 책임집니다.",
         skills: [
           expect.objectContaining({
             name: "이슈 처리",
-            instructions: "대기 중인 모든 이슈를 처리합니다.",
+            instructions: "프로젝트의 개발과 코드 관련 작업을 책임집니다.",
             kind: "issue_processing",
             is_default: 0,
           }),

@@ -127,7 +127,7 @@ describe("ProjectAgents", () => {
     expect(container.textContent).toContain("Sentry 오류 탐지 에이전트");
     expect(container.textContent).toContain("Feedback 분석 에이전트");
     expect(container.textContent).toContain(
-      "대기 중인 모든 이슈를 처리합니다.",
+      "프로젝트의 개발과 코드 관련 작업을 책임집니다.",
     );
     const createCard = container.querySelector<HTMLButtonElement>(
       ".project-agent-create-card",
@@ -308,7 +308,7 @@ describe("ProjectAgents", () => {
         ?.click();
     });
     expect(document.querySelector<HTMLTextAreaElement>("textarea")?.value).toBe(
-      "대기 중인 모든 이슈를 처리합니다.",
+      "프로젝트의 개발과 코드 관련 작업을 책임집니다.",
     );
     await act(async () => {
       document
@@ -324,13 +324,13 @@ describe("ProjectAgents", () => {
     expect(startedAgent.id).toBe("demo-agent-auto-hunt");
     expect(startedSession).toMatchObject({
       sessionId: expect.any(String),
-      request: "대기 중인 모든 이슈를 처리합니다.",
+      request: "프로젝트의 개발과 코드 관련 작업을 책임집니다.",
       startedAt: expect.any(String),
     });
     expect(runProjectAgent).toHaveBeenCalledWith(
       expect.objectContaining({
         agent: expect.objectContaining({ id: "demo-agent-auto-hunt" }),
-        message: "대기 중인 모든 이슈를 처리합니다.",
+        message: "프로젝트의 개발과 코드 관련 작업을 책임집니다.",
         sessionId: startedSession.sessionId,
       }),
     );
@@ -460,7 +460,7 @@ describe("ProjectAgents", () => {
     expect(onStartRemoteTask).toHaveBeenCalledWith(
       expect.objectContaining({ id: "demo-agent-auto-hunt" }),
       {
-        request: "대기 중인 모든 이슈를 처리합니다.",
+        request: "프로젝트의 개발과 코드 관련 작업을 책임집니다.",
         skillId: "demo-skill-issue-processing",
         workerId: "worker-1",
       },
@@ -577,7 +577,7 @@ describe("ProjectAgents", () => {
     expect(settingsPage?.textContent).not.toContain("프로젝트 실행 기본값");
     expect(name?.value).toBe("개발자 에이전트");
     expect(responsibility?.value).toBe(
-      "대기 중인 모든 이슈를 처리합니다.",
+      "프로젝트의 개발과 코드 관련 작업을 책임집니다.",
     );
 
     await act(async () => {
@@ -779,7 +779,7 @@ describe("ProjectAgents", () => {
         )
         ?.click();
     });
-    expect(taskInput?.value).toBe("대기 중인 모든 이슈를 처리합니다.");
+    expect(taskInput?.value).toBe("프로젝트의 개발과 코드 관련 작업을 책임집니다.");
     expect(taskInput?.disabled).toBe(false);
     await act(async () => {
       container
