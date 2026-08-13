@@ -48,6 +48,7 @@ export type ChannelMessageRow = {
   author_agent_id: string | null;
   author_agent_name: string | null;
   author_agent_provider: AgentProvider | null;
+  author_agent_image: string | null;
   author_webhook_id: string | null;
   author_webhook_name: string | null;
   webhook_event_id: string | null;
@@ -107,6 +108,7 @@ type ChannelReplyAuthorRow = Pick<
   | "author_agent_id"
   | "author_agent_name"
   | "author_agent_provider"
+  | "author_agent_image"
   | "author_webhook_id"
   | "author_webhook_name"
 > & {
@@ -268,7 +270,8 @@ const messageSelect = (
          message.author_user_id, author.name as author_name,
          author.email as author_email, author.image as author_image,
          message.author_agent_id, message.author_agent_name,
-         message.author_agent_provider, message.author_webhook_id,
+         message.author_agent_provider, agent.avatar as author_agent_image,
+         message.author_webhook_id,
          message.author_webhook_name, message.webhook_event_id, message.body,
          (select count(*) from briar_channel_messages reply
           where reply.parent_message_id = message.id) as reply_count,
@@ -361,6 +364,8 @@ const messageSelect = (
          message.created_at
   from briar_channel_messages message
   left join "user" author on author.id = message.author_user_id
+  left join briar_project_agents agent
+    on agent.id = message.author_agent_id
   left join briar_channel_message_documents document
     on document.message_id = message.id
   left join briar_channel_action_proposals proposal
@@ -498,6 +503,7 @@ const channelMessageAuthorJson = (
     | "author_agent_id"
     | "author_agent_name"
     | "author_agent_provider"
+    | "author_agent_image"
     | "author_webhook_id"
     | "author_webhook_name"
   >,
@@ -514,6 +520,7 @@ const channelMessageAuthorJson = (
         id: row.author_agent_id,
         name: row.author_agent_name,
         provider: row.author_agent_provider,
+        image: row.author_agent_image,
       }
     : {
         type: "user" as const,
@@ -1266,16 +1273,21 @@ async function attachMessageRelations(
                   author.name as author_name, author.email as author_email,
                   author.image as author_image,
                   reply.author_agent_id, reply.author_agent_name,
-                  reply.author_agent_provider, reply.author_webhook_id,
+                  reply.author_agent_provider,
+                  agent.avatar as author_agent_image,
+                  reply.author_webhook_id,
                   reply.author_webhook_name,
                   max(reply.created_at) as last_reply_at
            from briar_channel_messages reply
            left join "user" author on author.id = reply.author_user_id
+           left join briar_project_agents agent
+             on agent.id = reply.author_agent_id
            where reply.parent_message_id in (${placeholders})
            group by reply.parent_message_id, reply.author_user_id,
                     author.name, author.email, author.image,
                     reply.author_agent_id, reply.author_agent_name,
-                    reply.author_agent_provider, reply.author_webhook_id,
+                    reply.author_agent_provider, agent.avatar,
+                    reply.author_webhook_id,
                     reply.author_webhook_name
          ), ranked_reply_authors as (
            select *, row_number() over (
@@ -1289,7 +1301,8 @@ async function attachMessageRelations(
          )
          select parent_message_id, author_user_id, author_name, author_email,
                 author_image, author_agent_id, author_agent_name,
-                author_agent_provider, author_webhook_id,
+                author_agent_provider, author_agent_image,
+                author_webhook_id,
                 author_webhook_name, last_reply_at
          from ranked_reply_authors
          where author_rank <= 3

@@ -415,7 +415,7 @@ describe("Channels", () => {
       resultSessionId: "session-skill",
     };
     const item = message({
-      author: { type: "agent", id: "agent-1", name: "Honey", provider: "claude" },
+      author: { type: "agent", id: "agent-1", name: "Honey", provider: "claude", image: null },
       skillExecutionProposal: pending,
     });
     loadDashboard.mockResolvedValue({
@@ -548,6 +548,7 @@ describe("Channels", () => {
           id: "agent-1",
           name: "Honey",
           provider: "codex",
+          image: "https://example.com/honey.png",
         },
       ],
     });
@@ -562,7 +563,8 @@ describe("Channels", () => {
     expect(summary?.querySelectorAll(".conversation-reply-avatar")).toHaveLength(3);
     expect(summary?.querySelector(".conversation-reply-avatar img")?.getAttribute("src"))
       .toBe("https://example.com/mina.png");
-    expect(summary?.querySelector(".conversation-reply-avatar.agent")).not.toBeNull();
+    expect(summary?.querySelector(".conversation-reply-avatar.agent img")?.getAttribute("src"))
+      .toBe("https://example.com/honey.png");
 
     await act(async () => summary?.click());
     expect(listChannelMessages).toHaveBeenCalledWith(
@@ -571,6 +573,29 @@ describe("Channels", () => {
       channel.id,
       rootMessage.id,
     );
+  });
+
+  it("renders the Agent's configured avatar on its channel messages", async () => {
+    const item = message({
+      id: "message-agent-avatar",
+      author: {
+        type: "agent",
+        id: "agent-1",
+        name: "Honey",
+        provider: "claude",
+        image: "data:image/png;base64,cHJvamVjdC1hdmF0YXI=",
+      },
+    });
+    await render([item]);
+
+    const avatar = container.querySelector<HTMLImageElement>(
+      ".channel-message-avatar img",
+    );
+    expect(avatar?.getAttribute("src")).toBe(
+      "data:image/png;base64,cHJvamVjdC1hdmF0YXI=",
+    );
+    expect(container.querySelector(".channel-message-avatar-fallback.agent"))
+      .toBeNull();
   });
 
   it("shows hover quick reactions and toggles an existing reaction chip", async () => {
@@ -1097,7 +1122,7 @@ describe("Channels", () => {
       messages: [
         message({
           id: "message-4",
-          author: { type: "agent", id: "agent-1", name: "Honey", provider: "claude" },
+          author: { type: "agent", id: "agent-1", name: "Honey", provider: "claude", image: null },
           proposal: {
             id: "proposal-1",
             actionType: "request_issue_create",
@@ -1235,7 +1260,7 @@ describe("Channels", () => {
     };
     const initial = message({
       id: "message-create-execute",
-      author: { type: "agent", id: "agent-1", name: "Honey", provider: "claude" },
+      author: { type: "agent", id: "agent-1", name: "Honey", provider: "claude", image: null },
       proposal: createProposal,
       executionProposal: null,
     });
@@ -1383,7 +1408,7 @@ describe("Channels", () => {
     vi.useFakeTimers();
     const pendingProposal = message({
       id: "message-delayed-approval",
-      author: { type: "agent", id: "agent-1", name: "Honey", provider: "claude" },
+      author: { type: "agent", id: "agent-1", name: "Honey", provider: "claude", image: null },
       proposal: {
         id: "proposal-delayed-approval",
         actionType: "request_issue_create",
@@ -1486,7 +1511,7 @@ describe("Channels", () => {
     vi.useFakeTimers();
     const pendingProposal = message({
       id: "message-unchanged-approval",
-      author: { type: "agent", id: "agent-1", name: "Honey", provider: "claude" },
+      author: { type: "agent", id: "agent-1", name: "Honey", provider: "claude", image: null },
       proposal: {
         id: "proposal-unchanged-approval",
         actionType: "request_issue_create",
@@ -1578,7 +1603,7 @@ describe("Channels", () => {
     vi.useFakeTimers();
     const pendingProposal = message({
       id: "message-reservation-approval",
-      author: { type: "agent", id: "agent-1", name: "Honey", provider: "claude" },
+      author: { type: "agent", id: "agent-1", name: "Honey", provider: "claude", image: null },
       proposal: {
         id: "proposal-reservation-approval",
         actionType: "request_issue_create",
@@ -2113,7 +2138,7 @@ describe("Channels", () => {
     const finalClause = "Final clause that must remain visible before approval.";
     const proposalMessage = message({
       id: "message-archived-proposal",
-      author: { type: "agent", id: "agent-1", name: "Honey", provider: "claude" },
+      author: { type: "agent", id: "agent-1", name: "Honey", provider: "claude", image: null },
       proposal: {
         id: "proposal-archived",
         actionType: "request_issue_create",
@@ -2192,6 +2217,7 @@ describe("Channels", () => {
         id: "agent-1",
         name: "Honey",
         provider: "claude",
+        image: null,
       },
       proposal: {
         id: "proposal-project-choice",

@@ -542,6 +542,7 @@ export const mobileChannelMessageSchema = z.object({
       id: z.uuid().nullable(),
       name: z.string(),
       provider: z.string().nullable(),
+      image: z.string().nullable(),
     }),
     z.object({
       type: z.literal("webhook"),
