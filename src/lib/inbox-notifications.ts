@@ -105,12 +105,8 @@ export function isInboxRunDetailTarget(
   return target.kind === "issue" || target.kind === "conversation";
 }
 
-/**
- * Channel targets navigate to the Channels page (thread context), not the
- * issue/session detail panel. Companion and OS notification clicks already
- * use this path; desktop inbox open must too.
- */
-export function isInboxChannelNavigationTarget(
+/** Channel targets retain the channel message and thread context. */
+export function isInboxChannelTarget(
   target: InboxNotificationTarget,
 ): target is InboxNotificationTarget & {
   kind: "channel";

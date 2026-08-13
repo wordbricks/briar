@@ -84,6 +84,11 @@ enum BriarShareLinks {
     }
 }
 
+struct CompanionIssueNavigationRoute: Hashable {
+    let runID: UUID
+    let initialTab: RunDetailTab?
+}
+
 @MainActor
 final class CompanionNavigationModel: ObservableObject {
     enum Tab: Hashable {
@@ -95,6 +100,7 @@ final class CompanionNavigationModel: ObservableObject {
 
     @Published var selectedTab: Tab = .tasks
     @Published var pendingIssueID: UUID?
+    @Published var pendingIssueDetailTab: RunDetailTab?
     @Published var pendingSessionID: String?
     @Published var pendingProjectID: UUID?
     @Published var pathIssueToken = 0
@@ -112,8 +118,12 @@ final class CompanionNavigationModel: ObservableObject {
         stage(target)
     }
 
-    private func stage(_ target: BriarLinkTarget) {
+    private func stage(
+        _ target: BriarLinkTarget,
+        issueDetailTab: RunDetailTab? = nil
+    ) {
         pendingProjectID = target.projectID
+        pendingIssueDetailTab = issueDetailTab
         switch target {
         case let .issue(_, runID):
             pendingIssueID = runID
@@ -157,9 +167,18 @@ final class CompanionNavigationModel: ObservableObject {
 
     func openInboxMessage(_ message: InboxMessage) {
         switch message.kind {
-        case .issue, .conversation:
+        case .issue:
             if let runID = UUID(uuidString: message.targetId) {
                 open(.issue(projectID: message.projectId, runID: runID))
+            }
+        case .conversation:
+            if let runID = UUID(uuidString: message.targetId) {
+                issuePreparationRevision &+= 1
+                preparingIssue = false
+                stage(
+                    .issue(projectID: message.projectId, runID: runID),
+                    issueDetailTab: .conversation
+                )
             }
         case .session:
             open(.session(projectID: message.projectId, sessionID: message.targetId))
@@ -170,6 +189,7 @@ final class CompanionNavigationModel: ObservableObject {
             issuePreparationRevision &+= 1
             preparingIssue = false
             pendingIssueID = nil
+            pendingIssueDetailTab = nil
             pendingSessionID = nil
             pendingProjectID = message.projectId
             pendingChannelID = channelID
@@ -183,9 +203,29 @@ final class CompanionNavigationModel: ObservableObject {
     func consumePendingIssue() -> UUID? {
         defer {
             pendingIssueID = nil
+            pendingIssueDetailTab = nil
             pendingProjectID = nil
         }
         return pendingIssueID
+    }
+
+    func consumePendingIssueNavigation(
+        projectID: UUID,
+        runID: UUID,
+        pathToken: Int
+    ) -> CompanionIssueNavigationRoute? {
+        guard
+            pendingProjectID == projectID,
+            pendingIssueID == runID,
+            pathIssueToken == pathToken,
+            selectedTab == .tasks
+        else { return nil }
+        let route = CompanionIssueNavigationRoute(
+            runID: runID,
+            initialTab: pendingIssueDetailTab
+        )
+        _ = consumePendingIssue()
+        return route
     }
 
     func consumePendingIssue(
@@ -207,6 +247,7 @@ final class CompanionNavigationModel: ObservableObject {
         preparingIssue = false
         guard pendingIssueID != nil else { return }
         pendingIssueID = nil
+        pendingIssueDetailTab = nil
         pendingProjectID = nil
     }
 

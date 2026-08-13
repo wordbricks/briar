@@ -213,6 +213,8 @@ describe("Channels", () => {
     requestedMessage?: { channelId: string; messageId: string; rootMessageId: string },
     onRequestedMessageOpen?: () => void,
     onCreateAgent?: () => void,
+    inboxDetail = false,
+    onInboxDetailClose?: () => void,
   ) => {
     listChannels.mockResolvedValue({ channels: [channel], cursor: 7 });
     loadChannel.mockResolvedValue({
@@ -243,9 +245,11 @@ describe("Channels", () => {
           activeChannelId="channel-1"
           channels={[channel]}
           currentUserId="user-1"
+          inboxDetail={inboxDetail}
           onChannelSelect={() => undefined}
           onChannelsChange={() => undefined}
           onCreateAgent={onCreateAgent}
+          onInboxDetailClose={onInboxDetailClose}
           organizationId="org-1"
           requestedMessage={requestedMessage}
           token="token"
@@ -814,6 +818,63 @@ describe("Channels", () => {
       rootMessage.id,
     );
     expect(container.textContent).toContain("Requested reply");
+  });
+
+  it("shows only a requested thread in inbox detail mode", async () => {
+    const rootMessage = message({ id: "message-root", replyCount: 1 });
+    const reply = message({
+      id: "message-reply",
+      parentMessageId: rootMessage.id,
+      body: "Requested reply",
+    });
+    listChannelMessages.mockResolvedValue({ messages: [rootMessage, reply] });
+    const onClosed = vi.fn();
+
+    await render(
+      [rootMessage],
+      {
+        channelId: channel.id,
+        messageId: reply.id,
+        rootMessageId: rootMessage.id,
+      },
+      undefined,
+      undefined,
+      true,
+      onClosed,
+    );
+
+    expect(container.querySelector(".channels-inbox-thread-only")).not.toBeNull();
+    expect(container.querySelector(".channel-main")).toBeNull();
+    expect(container.querySelector(".channel-thread-resizer")).toBeNull();
+    expect(container.querySelector(".channel-thread")).not.toBeNull();
+    expect(container.textContent).toContain("Requested reply");
+
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>('button[aria-label="스레드 닫기"]')
+        ?.click();
+    });
+    expect(onClosed).toHaveBeenCalledOnce();
+  });
+
+  it("keeps the channel visible for a root message in inbox detail mode", async () => {
+    const rootMessage = message({ id: "message-root" });
+
+    await render(
+      [rootMessage],
+      {
+        channelId: channel.id,
+        messageId: rootMessage.id,
+        rootMessageId: rootMessage.id,
+      },
+      undefined,
+      undefined,
+      true,
+    );
+
+    expect(container.querySelector(".channel-main")).not.toBeNull();
+    expect(container.querySelector(".channel-thread")).toBeNull();
+    expect(container.textContent).toContain("Hello team");
   });
 
   it("sends the picked Agent as a structured mention rather than parsing the text", async () => {

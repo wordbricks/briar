@@ -7,7 +7,7 @@ import {
   inboxNotificationContent,
   inboxNotificationLabelKey,
   inboxNotificationTarget,
-  isInboxChannelNavigationTarget,
+  isInboxChannelTarget,
   isInboxRunDetailTarget,
   listenForMacInboxNotificationClicks,
   listenForInboxNotificationClicks,
@@ -131,7 +131,7 @@ describe("inbox notification navigation", () => {
     });
   });
 
-  it("routes channel targets to the channel page instead of the run detail panel", () => {
+  it("identifies channel targets separately from run detail targets", () => {
     const channelTarget = inboxNotificationTarget({
       id: "channel:message-1",
       kind: "channel",
@@ -172,13 +172,13 @@ describe("inbox notification navigation", () => {
       kind: "session" as const,
     };
 
-    expect(isInboxChannelNavigationTarget(channelTarget)).toBe(true);
+    expect(isInboxChannelTarget(channelTarget)).toBe(true);
     expect(isInboxRunDetailTarget(channelTarget)).toBe(false);
-    expect(isInboxChannelNavigationTarget(issueTarget)).toBe(false);
+    expect(isInboxChannelTarget(issueTarget)).toBe(false);
     expect(isInboxRunDetailTarget(issueTarget)).toBe(true);
-    expect(isInboxChannelNavigationTarget(conversationTarget)).toBe(false);
+    expect(isInboxChannelTarget(conversationTarget)).toBe(false);
     expect(isInboxRunDetailTarget(conversationTarget)).toBe(true);
-    expect(isInboxChannelNavigationTarget(sessionTarget)).toBe(false);
+    expect(isInboxChannelTarget(sessionTarget)).toBe(false);
     expect(isInboxRunDetailTarget(sessionTarget)).toBe(false);
   });
 

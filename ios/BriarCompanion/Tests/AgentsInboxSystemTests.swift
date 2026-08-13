@@ -894,6 +894,18 @@ final class AgentsInboxSystemTests: XCTestCase {
                 body: "@you please look\nSecond line\nThird line"
             )
         )
+        let issueNavigation = CompanionNavigationModel()
+        issueNavigation.openInboxMessage(mention)
+        XCTAssertEqual(issueNavigation.selectedTab, .tasks)
+        XCTAssertEqual(issueNavigation.pendingIssueID, blocked.id)
+        XCTAssertEqual(issueNavigation.pendingIssueDetailTab, .conversation)
+        let issueRoute = issueNavigation.consumePendingIssueNavigation(
+            projectID: project.id,
+            runID: blocked.id,
+            pathToken: issueNavigation.pathIssueToken
+        )
+        XCTAssertEqual(issueRoute?.runID, blocked.id)
+        XCTAssertEqual(issueRoute?.initialTab, .conversation)
         let channelReply = try XCTUnwrap(messages.first { $0.kind == .channel })
         XCTAssertEqual(InboxMessageBuilder.classify(channelReply), .actionRequired)
         XCTAssertEqual(
