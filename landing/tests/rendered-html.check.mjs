@@ -443,6 +443,8 @@ test("server-renders the localized changelog from published releases", async () 
   assert.match(koreanHtml, /<html lang="ko"[\s>]/i);
   assert.match(koreanHtml, /Briar 변경 기록/);
   assert.match(koreanHtml, /현재 안정 버전/);
+  assert.match(koreanHtml, /긴 에이전트 작업 기록을 더 안정적으로 보존합니다/);
+  assert.match(koreanHtml, /v1\.2\.116/);
   assert.match(koreanHtml, /작업 보드와 대화, 모델 선택을 더 선명하게 다듬었습니다/);
   assert.match(koreanHtml, /v1\.2\.115/);
   assert.match(koreanHtml, /Worker가 지원하는 모델로 바로 작업을 배정합니다/);
@@ -500,6 +502,8 @@ test("server-renders the localized changelog from published releases", async () 
   const englishHtml = await englishResponse.text();
   assert.match(englishHtml, /<html lang="en"[\s>]/i);
   assert.match(englishHtml, /Briar changelog/);
+  assert.match(englishHtml, /Preserve long agent work logs more reliably/);
+  assert.match(englishHtml, /v1\.2\.116/);
   assert.match(englishHtml, /Navigate work, conversations, and model choices more clearly/);
   assert.match(englishHtml, /v1\.2\.115/);
   assert.match(englishHtml, /Dispatch work with models supported by each provider/);
