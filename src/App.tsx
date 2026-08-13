@@ -146,18 +146,15 @@ import {
 } from "./lib/planned-update-recovery";
 import { installKeybindingShortcuts } from "./lib/keybindings";
 import { listenForAppMenuSettings } from "./lib/app-menu";
+import {
+  issueNavigationLocation,
+  pageFromNavigationLocation,
+  runIdFromNavigationLocation,
+  type ActivePage,
+  type AppNavigationLocation,
+} from "./lib/app-navigation";
 import { useI18n } from "./i18n";
 import type { HuntRun, ProjectAgent, StatusTrayRun } from "./types";
-
-type ActivePage =
-  | "lobby"
-  | "issues"
-  | "agents"
-  | "channels"
-  | "schedule"
-  | "inbox"
-  | "organization-create"
-  | "settings";
 
 type AgentAutoHuntOptions = {
   coordinatorConversationId?: string | null;
@@ -514,14 +511,28 @@ export function App() {
     setDeferredProjectOnboardingUserId,
   ] = useState<string | null>(null);
   const {
-    current: activePage,
+    current: activeNavigationLocation,
     canGoBack,
     canGoForward,
     goBack,
     goForward,
-    navigate: navigateToPage,
-    reset: resetNavigation,
-  } = useNavigationHistory<ActivePage>("lobby");
+    navigate: navigateToLocation,
+    reset: resetNavigationLocation,
+  } = useNavigationHistory<AppNavigationLocation>("lobby");
+  const activePage = pageFromNavigationLocation(activeNavigationLocation);
+  const selectedRunId = runIdFromNavigationLocation(activeNavigationLocation);
+  const navigateToPage = useCallback(
+    (page: ActivePage) => navigateToLocation(page),
+    [navigateToLocation],
+  );
+  const navigateToIssue = useCallback(
+    (runId: string) => navigateToLocation(issueNavigationLocation(runId)),
+    [navigateToLocation],
+  );
+  const resetNavigation = useCallback(
+    (page: ActivePage) => resetNavigationLocation(page),
+    [resetNavigationLocation],
+  );
   const createOrganizationChannel = useCallback(
     async (name: string) => {
       if (!briar.activeOrganizationId || !briar.token) {
@@ -624,7 +635,7 @@ export function App() {
       setRequestedRunId(pendingBriarLink.runId);
       setCompanionPage("issues");
       setCompanionStatus("all");
-      navigateToPage("issues");
+      navigateToIssue(pendingBriarLink.runId);
     } else {
       setRequestedRunInitialTab(null);
       setRequestedRunId(null);
@@ -639,6 +650,7 @@ export function App() {
     briar.projects,
     briar.setActiveProjectId,
     briar.user,
+    navigateToIssue,
     navigateToPage,
     pendingBriarLink,
   ]);
@@ -671,7 +683,7 @@ export function App() {
         setCompanionStatus("all");
         setCompanionPage("issues");
       } else {
-        navigateToPage("issues");
+        navigateToIssue(pendingInboxNotificationTarget.targetId);
       }
     } else if (pendingInboxNotificationTarget.kind === "channel") {
       const { channelMessageId, rootMessageId } = pendingInboxNotificationTarget;
@@ -704,6 +716,7 @@ export function App() {
     briar.user,
     inbox.markRead,
     markOrganizationChannelRead,
+    navigateToIssue,
     navigateToPage,
     pendingInboxNotificationTarget,
   ]);
@@ -1197,7 +1210,7 @@ export function App() {
           setInboxDetailTarget(null);
           setRequestedSessionId(null);
           setRequestedRunId(inboxDetailRun.id);
-          navigateToPage("issues");
+          navigateToIssue(inboxDetailRun.id);
         }}
         onProcessNow={() => {
           setInboxDetailTarget(null);
@@ -1279,10 +1292,9 @@ export function App() {
         onIssueCreated={async (projectId, runId) => {
           await briar.ensureProjectSelected(projectId);
           setRequestedRunId(runId);
-          setIssueListRequestKey((key) => key + 1);
           setRequestedChannelMessage(null);
           setInboxDetailTarget(null);
-          navigateToPage("issues");
+          navigateToIssue(runId);
         }}
         onSkillSessionAccepted={autoHunt.adoptRemoteSession}
         organizationId={briar.activeOrganizationId}
@@ -1753,7 +1765,7 @@ export function App() {
             onOpenIssue={(runId) => {
               setRequestedSessionId(null);
               setRequestedRunId(runId);
-              navigateToPage("issues");
+              navigateToIssue(runId);
             }}
             onOpenIssues={() => {
               setRequestedRunId(null);
@@ -1793,7 +1805,7 @@ export function App() {
             onIssueOpen={(runId) => {
               setRequestedSessionId(null);
               setRequestedRunId(runId);
-              navigateToPage("issues");
+              navigateToIssue(runId);
             }}
             onRequestedSessionOpen={() => setRequestedSessionId(null)}
             onSettleTaskSession={(sessionId, settlement) =>
@@ -1846,8 +1858,7 @@ export function App() {
             onIssueCreated={async (projectId, runId) => {
               await briar.ensureProjectSelected(projectId);
               setRequestedRunId(runId);
-              setIssueListRequestKey((key) => key + 1);
-              navigateToPage("issues");
+              navigateToIssue(runId);
             }}
           />
 
@@ -1866,6 +1877,7 @@ export function App() {
             recoveringRunId={briar.recoveringRunId}
             recoveryError={briar.recoveryError}
             requestedRunId={requestedRunId}
+            selectedRunId={selectedRunId}
             issueListRequestKey={issueListRequestKey}
             isSidebarOpen={isSidebarOpen}
             onAddProject={briar.startProjectCreation}
@@ -1875,6 +1887,10 @@ export function App() {
               setIsIssueDialogOpen(isOpen);
             }}
             onIssueViewed={markInboxIssueRead}
+            onSelectedRunChange={(runId) => {
+              if (runId) navigateToIssue(runId);
+              else navigateToPage("issues");
+            }}
             onDeleteIssue={briar.deleteIssue}
             onTransferIssue={briar.transferIssue}
             onAddIssueDependency={briar.addIssueDependency}

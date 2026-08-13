@@ -3320,6 +3320,50 @@ describe("HuntDashboard", () => {
     container.remove();
   });
 
+  it("reports issue list and detail transitions when selection is controlled", async () => {
+    const run = demoDashboard.runs[0];
+    const dashboard = { ...demoDashboard, runs: [run] };
+    const onSelectedRunChange = vi.fn();
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => root.render(
+      <HuntDashboard
+        {...dashboardProps}
+        dashboard={dashboard}
+        onSelectedRunChange={onSelectedRunChange}
+        selectedRunId={null}
+      />,
+    ));
+    await act(async () =>
+      container.querySelector<HTMLButtonElement>(".kanban-card")?.click(),
+    );
+
+    expect(onSelectedRunChange).toHaveBeenLastCalledWith(run.id);
+    expect(container.querySelector(".run-page-shell")).toBeNull();
+
+    await act(async () => root.render(
+      <HuntDashboard
+        {...dashboardProps}
+        dashboard={dashboard}
+        onSelectedRunChange={onSelectedRunChange}
+        selectedRunId={run.id}
+      />,
+    ));
+    expect(container.querySelector(".run-page-shell")).not.toBeNull();
+
+    await act(async () =>
+      container
+        .querySelector<HTMLButtonElement>(".run-page-shell .topbar button")
+        ?.click(),
+    );
+    expect(onSelectedRunChange).toHaveBeenLastCalledWith(null);
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
   it("offers full-page navigation when issue details are shown in a side panel", async () => {
     const onOpenFullPage = vi.fn();
     const container = document.createElement("div");
