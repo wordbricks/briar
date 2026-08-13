@@ -1289,6 +1289,118 @@ describe("organization channels", () => {
     });
   });
 
+  it("stores reply images on the completed agent message", async () => {
+    const channelId = "e0000000-0000-4000-8000-000000000070";
+    await createChannel(db, {
+      id: channelId,
+      organizationId,
+      slug: "reply-images",
+      name: "Reply images",
+      topic: null,
+      visibility: "public",
+      defaultProjectId: null,
+      createdByUserId: ownerId,
+      createdAt: at(70),
+    });
+    const agent = await createOrganizationAgent(db, {
+      id: "aa000000-0000-4000-8000-000000000070",
+      organizationId,
+      name: "Screenshoter",
+      provider: "claude",
+      model: null,
+      responsibility: "Show captured screens",
+      effort: null,
+      createdAt: at(70),
+    });
+    await addChannelAgent(db, {
+      channelId,
+      agentId: agent!.id,
+      addedByUserId: ownerId,
+      createdAt: at(70),
+    });
+    const triggerId = "f0000000-0000-4000-8000-000000000070";
+    await createChannelMessage(db, {
+      id: triggerId,
+      channelId,
+      parentMessageId: null,
+      authorUserId: ownerId,
+      authorAgentId: null,
+      authorAgentName: null,
+      authorAgentProvider: null,
+      body: "@screenshoter show the modal",
+      mentionedUserIds: [],
+      mentionedAgentIds: [agent!.id],
+      createdAt: at(71),
+    });
+    await enqueueChannelAgentReplies(db, {
+      organizationId,
+      channelId,
+      triggerMessageId: triggerId,
+      parentMessageId: triggerId,
+      agents: [{ id: agent!.id, projectId: null, provider: "claude" }],
+      createdAt: at(71),
+    });
+    await db.prepare(
+      `update briar_execution_workers
+       set capabilities_json = ?, last_heartbeat_at = ? where id = ?`,
+    ).bind(
+      JSON.stringify({
+        providerHealth: { claude: { healthy: true } },
+        organizationAgentContext: { protocol: 1 },
+      }),
+      at(72),
+      otherWorkerId,
+    ).run();
+    const claimed = await claimNextChannelAgentReply(db, organizationId, {
+      deviceId,
+      workerId: otherWorkerId,
+      providers: ["claude"],
+      supportsOrganizationAgentContext: true,
+      claimTokenHash: "7".repeat(64),
+      claimedAt: at(72),
+      leaseExpiresAt: at(82),
+    });
+    expect(claimed).not.toBeNull();
+    const attachmentId = "fa000000-0000-4000-8000-000000000070";
+    const objectKey =
+      `channel-attachments/${organizationId}/${channelId}/${claimed!.reply_message_id}/${attachmentId}`;
+    const completed = await completeChannelReply(db, claimed!, {
+      jobId: claimed!.id,
+      deviceId,
+      workerId: otherWorkerId,
+      claimTokenHash: "7".repeat(64),
+      body: "Here is the captured screen.",
+      document: null,
+      issueProposal: null,
+      executionProposal: null,
+      agentName: "Screenshoter",
+      agentProvider: "claude",
+      completedAt: at(73),
+      attachments: [{
+        id: attachmentId,
+        organization_id: organizationId,
+        object_key: objectKey,
+        filename: "screenshot.png",
+        content_type: "image/png",
+        byte_size: 4,
+      }],
+    });
+    expect(completed).toMatchObject({ status: "completed" });
+    const reply = await getChannelMessage(
+      db,
+      channelId,
+      claimed!.reply_message_id,
+    );
+    expect(reply?.attachments).toEqual([{
+      id: attachmentId,
+      filename: "screenshot.png",
+      contentType: "image/png",
+      byteSize: 4,
+      url:
+        `/organizations/${organizationId}/channels/${channelId}/messages/${claimed!.reply_message_id}/attachments/${attachmentId}`,
+    }]);
+  });
+
   it("keeps a project Agent reply unclaimable until the device is bound to that project", async () => {
     const channelId = "e0000000-0000-4000-8000-000000000005";
     await createChannel(db, {
