@@ -413,6 +413,7 @@ import {
   isExecutionWorkerAllowedForProject,
   MAX_WORKER_CONCURRENT_SESSIONS,
   MAX_TRANSCRIPT_EVENTS_PER_REQUEST,
+  MAX_TRANSCRIPT_HTTP_BODY_BYTES,
   WORKER_STALE_AFTER_MS,
   reapStalledHuntRuns,
   recordWorkerHeartbeat,
@@ -2944,6 +2945,12 @@ async function readJson(
   } catch {
     throw new HttpError(400, "Invalid JSON");
   }
+}
+
+export async function readTranscriptRequest(request: Request) {
+  return transcriptSchema.parse(
+    await readJson(request, MAX_TRANSCRIPT_HTTP_BODY_BYTES),
+  );
 }
 
 const sha256 = async (value: string) => {
@@ -12018,7 +12025,7 @@ async function route(
   }
 
   if (pathname === "/transcripts" && request.method === "POST") {
-    const input = transcriptSchema.parse(await readJson(request));
+    const input = await readTranscriptRequest(request);
     const recordedAt = new Date().toISOString();
     let authenticatedWorkerId: string | null = null;
     let authenticatedExecutionAttempt: RunExecutionAttemptRow | null = null;

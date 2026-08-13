@@ -34,6 +34,7 @@ import worker, {
   readChannelReplyCompleteRequest,
   readIssueRequest,
   readRunEvidenceRequest,
+  readTranscriptRequest,
   resolveChannelProposalTargetProjectId,
   responseWithPostCommitCleanup,
   runEvidenceInputSchema,
@@ -1346,6 +1347,50 @@ describe("Worker HTTP contract", () => {
     expect(parsed.images).toHaveLength(1);
     expect(parsed.images[0]?.name).toBe("dashboard.png");
     expect(parsed.images[0]?.type).toBe("image/png");
+  });
+
+  it("accepts transcript batches above the generic JSON body limit", async () => {
+    const payload = {
+      sessionId: "large-transcript-session",
+      agentProvider: "codex" as const,
+      events: Array.from({ length: 20 }, (_, index) => ({
+        sequence: index + 1,
+        direction: "server" as const,
+        payload: { text: "x".repeat(16 * 1024) },
+      })),
+    };
+    const body = JSON.stringify(payload);
+    expect(new TextEncoder().encode(body).byteLength).toBeGreaterThan(262_144);
+
+    await expect(readTranscriptRequest(new Request(
+      "https://briar-api.example/transcripts",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body,
+      },
+    ))).resolves.toEqual(payload);
+  });
+
+  it("keeps the transcript-specific JSON body limit bounded", async () => {
+    const body = JSON.stringify({
+      sessionId: "oversized-transcript-session",
+      agentProvider: "codex",
+      events: Array.from({ length: 70 }, (_, index) => ({
+        sequence: index + 1,
+        direction: "server",
+        payload: { text: "x".repeat(16 * 1024) },
+      })),
+    });
+
+    await expect(readTranscriptRequest(new Request(
+      "https://briar-api.example/transcripts",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body,
+      },
+    ))).rejects.toThrow("Request body too large");
   });
 
   it("parses channel reply images from multipart Worker complete requests", async () => {
