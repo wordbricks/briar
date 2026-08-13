@@ -49,9 +49,11 @@ describe("channel message markdown presentation", () => {
     const unorderedList = ruleBody(".channel-message-text ul");
     expect(unorderedList).toContain("margin:.65em0");
     expect(unorderedList).toContain("padding-left:1.65em");
+    expect(unorderedList).toContain("list-style:disc");
 
     const orderedList = ruleBody(".channel-message-text ol");
     expect(orderedList).toContain("padding-left:1.65em");
+    expect(orderedList).toContain("list-style:decimal");
 
     const quote = ruleBody(".channel-message-text blockquote");
     expect(quote).toContain("border-left:3pxsolidvar(--accent-foreground)");

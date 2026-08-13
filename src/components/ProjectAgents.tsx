@@ -551,7 +551,12 @@ export function ProjectAgents({
                         </div>
                         <section>
                           <small>{t("agents.responsibility")}</small>
-                          <p>{agent.responsibility}</p>
+                          <p
+                            className="project-agent-card-responsibility"
+                            title={agent.responsibility}
+                          >
+                            {agent.responsibility}
+                          </p>
                           <div className="project-agent-card-skills">
                             <small>{t("agents.skills")}</small>
                             <ul>
