@@ -633,3 +633,60 @@ all alternate app icons were verified before upload.
 The prior final handoff, `1.2.111 (2)`, remains `VALID`, but main advanced
 through the 1.2.117 release and the release-gate fixes. Version `1.2.117 (1)` is
 therefore the final build handed off from the latest main commit.
+
+## 2026-08-13 — 1.2.118 (2)
+
+- App: Briar Companion (`app.briar.companion`)
+- Marketing version: `1.2.118`
+- App Store Connect build: `2`
+- App Store Connect build ID: `b35283b6-76de-44c3-b010-821d9fd685b2`
+- Latest main commit: `4e83ec80`
+- Release source commit: `4e83ec80dfe49c22e8d02a1757414871319dccbf`
+- Implementation: native SwiftUI
+- Toolchain: Xcode 26.6, iOS 26.5 SDK
+- Minimum iOS version: 17.0
+- App Store Connect processing state: `VALID`
+- TestFlight state: `IN_BETA_TESTING`
+- Internal group: `wordbricks` (`hasAccessToAllBuilds=true`)
+- Automatic tester notification: enabled
+- IPA SHA-256: `1d826f1569950beec0cf7ebc187a7d9679b484028ca8972cfdfb6fdfdd817001`
+
+This release includes the latest main project badges in Inbox icons. The exact
+source commit passed the shared mobile contract, Swift unit and 13 iPhone UI
+tests, iPad accessibility and layout testing, Production analyze and build
+checks, session/download/log security checks, and the Tauri iOS simulator and
+Android ARM64 regression builds. Archive identity, App Store provisioning,
+distribution signature, production entitlements, and the exported IPA were
+verified before upload.
+
+Build `1` of version `1.2.118`
+(`6c2136ff-fbbf-4c40-a0c5-5179fb40a0be`) remains `VALID`, but main advanced
+through PR #1001 while that candidate was being released. Build `2` above also
+remains `VALID`, but main advanced through PRs #1002 and #1003 before the final
+candidate below was released.
+
+## 2026-08-13 — 1.2.118 (3)
+
+- App: Briar Companion (`app.briar.companion`)
+- Marketing version: `1.2.118`
+- App Store Connect build: `3`
+- App Store Connect build ID: `9a34f8e4-7c69-4477-b489-d4efa3565d11`
+- Latest main commit: `24c8590a`
+- Release source commit: `24c8590a172b266d57626d280a322c21a09c6ae1`
+- Implementation: native SwiftUI
+- Toolchain: Xcode 26.6, iOS 26.5 SDK
+- Minimum iOS version: 17.0
+- App Store Connect processing state: `VALID`
+- TestFlight state: `IN_BETA_TESTING`
+- Internal group: `wordbricks` (`hasAccessToAllBuilds=true`)
+- Automatic tester notification: enabled
+- IPA SHA-256: `efb5a46bf088ece96814e27e4dfb70ea1cb44d81412b1c2b28b28d07d0d54ba2`
+
+This is the final internal TestFlight handoff from the latest main commit. It
+includes the latest mobile channel header, composer, and mention-chip updates
+from PRs #1002 and #1003. The exact source commit passed the shared mobile
+contract, Swift unit and 13 iPhone UI tests, iPad accessibility and layout
+testing, Production analyze and build checks, session/download/log security
+checks, and the Tauri iOS simulator and Android ARM64 regression builds.
+Archive identity, App Store provisioning, distribution signature, production
+entitlements, and the exported IPA were verified before upload.
