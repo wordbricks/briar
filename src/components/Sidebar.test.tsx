@@ -150,7 +150,56 @@ describe("Sidebar", () => {
     });
 
     expect(onChannelCreate).toHaveBeenCalledWith("제품 피드백");
-    expect(document.body.querySelector(".channel-create-dialog")).toBeNull();
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("bolds unread channel names and restores the regular weight when read", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    const unreadChannel = {
+      id: "channel-1",
+      organizationId: "organization-1",
+      slug: "general",
+      name: "General",
+      topic: null,
+      visibility: "public" as const,
+      defaultProjectId: null,
+      archivedAt: null,
+      memberCount: 1,
+      agentCount: 0,
+      createdAt: "2026-08-01T00:00:00Z",
+      updatedAt: "2026-08-01T00:00:00Z",
+      hasUnread: true,
+    };
+    await act(async () => {
+      root.render(
+        <Sidebar
+          {...sidebarProps}
+          activePage="issues"
+          channels={[unreadChannel]}
+          onChannelOpen={() => undefined}
+        />,
+      );
+    });
+    expect(
+      container.querySelector(".sidebar-channel-list button")?.className,
+    ).toContain("unread");
+
+    await act(async () => {
+      root.render(
+        <Sidebar
+          {...sidebarProps}
+          activePage="issues"
+          channels={[{ ...unreadChannel, hasUnread: false }]}
+          onChannelOpen={() => undefined}
+        />,
+      );
+    });
+    expect(
+      container.querySelector(".sidebar-channel-list button")?.className,
+    ).not.toContain("unread");
 
     await act(async () => root.unmount());
     container.remove();

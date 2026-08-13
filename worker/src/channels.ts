@@ -32,6 +32,9 @@ export type ChannelRow = {
   agent_count: number;
   created_at: string;
   updated_at: string;
+  last_message_at: string | null;
+  last_read_at: string | null;
+  last_unread_message_at: string | null;
 };
 
 export type ChannelMessageRow = {
@@ -217,7 +220,7 @@ const liveChannelReplyRuntime = (job: string) => `coalesce((
   )
 ), 0) = 1`;
 
-const channelSelect = `
+const channelSelectColumns = `
   select channel.id, channel.organization_id, channel.slug, channel.name,
          channel.topic, channel.visibility, channel.default_project_id,
          channel.archived_at,
@@ -225,7 +228,23 @@ const channelSelect = `
           where member.channel_id = channel.id) as member_count,
          (select count(*) from briar_channel_agents agent
           where agent.channel_id = channel.id) as agent_count,
-         channel.created_at, channel.updated_at
+         channel.created_at, channel.updated_at,
+         (select max(message.created_at) from briar_channel_messages message
+          where message.channel_id = channel.id) as last_message_at`;
+
+const channelSelect = `${channelSelectColumns},
+         null as last_read_at,
+         null as last_unread_message_at
+  from briar_channels channel`;
+
+const channelSelectForUser = `${channelSelectColumns},
+         (select read_state.last_read_at from briar_channel_read_states read_state
+          where read_state.channel_id = channel.id and read_state.user_id = ?)
+           as last_read_at,
+         (select max(message.created_at) from briar_channel_messages message
+          where message.channel_id = channel.id
+            and ifnull(message.author_user_id, '') != ?)
+           as last_unread_message_at
   from briar_channels channel`;
 
 /**
@@ -430,6 +449,11 @@ const channelSkillExecutionProposalJson = (
     }
   : null;
 
+const channelHasUnreadFromRow = (row: ChannelRow) => Boolean(
+  row.last_unread_message_at &&
+    (!row.last_read_at || row.last_unread_message_at > row.last_read_at),
+);
+
 export const channelJson = (row: ChannelRow): ChannelSummary => ({
   id: row.id,
   organizationId: row.organization_id,
@@ -443,6 +467,9 @@ export const channelJson = (row: ChannelRow): ChannelSummary => ({
   agentCount: row.agent_count,
   createdAt: row.created_at,
   updatedAt: row.updated_at,
+  lastMessageAt: row.last_message_at,
+  lastReadAt: row.last_read_at,
+  hasUnread: channelHasUnreadFromRow(row),
 });
 
 export const channelReplyJson = (
@@ -596,11 +623,11 @@ export async function listChannels(
 ) {
   const rows = await db
     .prepare(
-      `${channelSelect}
+      `${channelSelectForUser}
        where channel.organization_id = ? and ${visibleToUser}
        order by channel.archived_at is not null, channel.name, channel.id`,
     )
-    .bind(organizationId, userId)
+    .bind(userId, userId, organizationId, userId)
     .all<ChannelRow>();
   return rows.results;
 }
@@ -613,11 +640,36 @@ export async function getChannel(
 ) {
   return db
     .prepare(
-      `${channelSelect}
+      `${channelSelectForUser}
        where channel.organization_id = ? and channel.id = ? and ${visibleToUser}`,
     )
-    .bind(organizationId, channelId, userId)
+    .bind(userId, userId, organizationId, channelId, userId)
     .first<ChannelRow>();
+}
+
+export async function markChannelRead(
+  db: D1Database,
+  input: {
+    userId: string;
+    channelId: string;
+    lastReadAt: string;
+  },
+) {
+  await db
+    .prepare(
+      `insert into briar_channel_read_states (
+         user_id, channel_id, last_read_at, updated_at
+       ) values (?, ?, ?, ?)
+       on conflict(user_id, channel_id) do update set
+         last_read_at = case
+           when excluded.last_read_at > briar_channel_read_states.last_read_at
+           then excluded.last_read_at
+           else briar_channel_read_states.last_read_at
+         end,
+         updated_at = excluded.updated_at`,
+    )
+    .bind(input.userId, input.channelId, input.lastReadAt, input.lastReadAt)
+    .run();
 }
 
 /** Worker-plane lookup: a claimed job already proves the channel is reachable. */
@@ -3476,6 +3528,7 @@ export async function loadChannelDelta(
     if (change.entity_type === "message") {
       if (change.operation === "delete") removedMessageIds.push(change.entity_id);
       else messageIds.add(change.entity_id);
+      channelIds.add(change.channel_id);
     } else if (change.entity_type === "reply_job") {
       replyJobIds.add(change.entity_id);
     } else if (change.entity_type === "proposal") {
@@ -3507,10 +3560,10 @@ export async function loadChannelDelta(
     ? (
         await db
           .prepare(
-            `${channelSelect} where channel.organization_id = ?
+            `${channelSelectForUser} where channel.organization_id = ?
              and channel.id in (${[...channelIds].map(() => "?").join(", ")})`,
           )
-          .bind(organizationId, ...channelIds)
+          .bind(userId, userId, organizationId, ...channelIds)
           .all<ChannelRow>()
       ).results
     : [];

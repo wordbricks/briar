@@ -16,6 +16,7 @@ import { requestMobileNavigationBack } from "../lib/mobile-navigation";
 
 const listChannels = vi.fn();
 const loadChannel = vi.fn();
+const markChannelRead = vi.fn().mockResolvedValue({ channel: {} });
 const loadChannelDelta = vi.fn();
 const listChannelMessages = vi.fn();
 const sendChannelMessage = vi.fn();
@@ -31,6 +32,7 @@ const channelRealtime = vi.hoisted(() => ({
 vi.mock("../lib/api", () => ({
   listChannels: (...args: unknown[]) => listChannels(...args),
   loadChannel: (...args: unknown[]) => loadChannel(...args),
+  markChannelRead: (...args: unknown[]) => markChannelRead(...args),
   loadChannelDelta: (...args: unknown[]) => loadChannelDelta(...args),
   listChannelMessages: (...args: unknown[]) => listChannelMessages(...args),
   sendChannelMessage: (...args: unknown[]) => sendChannelMessage(...args),
