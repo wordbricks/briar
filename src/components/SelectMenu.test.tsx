@@ -220,6 +220,49 @@ describe("SelectMenu", () => {
     container.remove();
   });
 
+  it("keeps the portaled listbox inside a modal dialog", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <div role="dialog">
+          <SelectMenu
+            id="dialog-model-select"
+            label="Model"
+            onValueChange={() => undefined}
+            options={Array.from({ length: 40 }, (_, index) => ({
+              label: `Model ${index + 1}`,
+              value: `provider/model-${index + 1}`,
+            }))}
+            searchPlaceholder="Search models"
+            searchable
+            value="provider/model-1"
+          />
+        </div>,
+      );
+    });
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>("#dialog-model-select")?.click();
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+    });
+
+    const dialog = container.querySelector<HTMLElement>('[role="dialog"]');
+    const listbox = dialog?.querySelector<HTMLElement>(
+      "#dialog-model-select-listbox",
+    );
+    expect(listbox).not.toBeNull();
+    expect(listbox?.querySelectorAll('[role="option"]')).toHaveLength(40);
+    expect(document.activeElement).toBe(
+      dialog?.querySelector('input[aria-label="Search models"]'),
+    );
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
   it("filters searchable options by label, value, and description", async () => {
     const container = document.createElement("div");
     document.body.append(container);
