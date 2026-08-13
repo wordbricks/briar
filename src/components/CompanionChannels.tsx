@@ -71,6 +71,7 @@ import {
   ChannelMessageImages,
 } from "./ChannelImages";
 import { ChannelMentionMenu } from "./ChannelMentionMenu";
+import { ChannelTypingState } from "./ChannelTypingState";
 import { MentionComposerField } from "./MentionComposerField";
 import { ChannelMessageText } from "./ChannelMessageText";
 import { ChannelMessageReactions } from "./ChannelMessageReactions";
@@ -136,6 +137,26 @@ const typingAgentNamesForMessage = (
       ),
   ),
 ];
+
+const typingAgentNamesForMessages = (
+  replies: ChannelAgentReply[],
+  agents: ChannelAgentSummary[],
+  messageIds: readonly string[],
+  fallbackName: string,
+) => {
+  const messageIdSet = new Set(messageIds);
+  return [
+    ...new Set(
+      replies
+        .filter((reply) => messageIdSet.has(reply.parentMessageId))
+        .map(
+          (reply) =>
+            agents.find((agent) => agent.agentId === reply.agentId)?.name ??
+            fallbackName,
+        ),
+    ),
+  ];
+};
 
 type CompanionChannelsProps = {
   organizationId: string;
@@ -722,6 +743,14 @@ export function CompanionChannels({
       item.channelId === channel?.id &&
       (item.status === "queued" || item.status === "running"),
   );
+  const threadTypingAgentNames = threadParentId
+    ? typingAgentNamesForMessages(
+        pendingReplies,
+        agents,
+        [threadParentId, ...(thread ?? []).map((message) => message.id)],
+        t("channel.projectAgent"),
+      )
+    : [];
 
   const openIssue = useCallback(
     async (
@@ -1134,10 +1163,15 @@ export function CompanionChannels({
                 item.id,
                 t("channel.projectAgent"),
               )}
+              showTypingState={false}
             />
           ))}
           <div ref={threadMessagesEndRef} />
         </div>
+        <ChannelTypingState
+          agentNames={threadTypingAgentNames}
+          className="companion-channel-thread-typing"
+        />
         <CompanionChannelComposer
           agents={agents}
           busy={busy}
@@ -1344,6 +1378,7 @@ function MessageRow({
   showThreadSummary = false,
   token,
   typingAgentNames,
+  showTypingState = true,
 }: {
   acceptingProposal: boolean;
   agents: ChannelAgentSummary[];
@@ -1381,6 +1416,7 @@ function MessageRow({
   showThreadSummary?: boolean;
   token: string;
   typingAgentNames: string[];
+  showTypingState?: boolean;
 }) {
   const { localeTag, t } = useI18n();
   const issueProposal = message.proposal?.actionType === "request_issue_create"
@@ -1422,12 +1458,12 @@ function MessageRow({
           </time>
         </header>
         <ChannelMessageText agents={agents} members={members} message={message} />
-        {typingAgentNames.map((name) => (
-          <div className="channel-typing companion-channel-typing" key={name}>
-            <LoaderCircle className="spin" size={15} />
-            {t("channel.namedAgentTyping", { name })}
-          </div>
-        ))}
+        {showTypingState ? (
+          <ChannelTypingState
+            agentNames={typingAgentNames}
+            className="companion-channel-typing"
+          />
+        ) : null}
         <ChannelMessageImages
           attachments={message.attachments}
           interactive={!showThreadSummary}
