@@ -175,6 +175,9 @@ struct ChannelMessagesView: View {
         )
         .navigationTitle(currentChannel.name)
         .navigationBarTitleDisplayMode(.inline)
+        .channelNavigationSubtitle(
+            channelParticipationLabel(channel: currentChannel, locale: locale)
+        )
         .toolbar {
             ToolbarItem(placement: .principal) {
                 ChannelNavigationTitle(channel: currentChannel, locale: locale)
@@ -215,41 +218,72 @@ struct ChannelMessagesView: View {
     }
 }
 
+private func channelParticipationLabel(
+    channel: ChannelSummary,
+    locale: CompanionLocale
+) -> String {
+    let members = String(
+        format: L10n.text(.channelMembers, locale: locale),
+        channel.memberCount
+    )
+    let agents = String(
+        format: L10n.text(.channelAgents, locale: locale),
+        channel.agentCount
+    )
+    return "\(members) • \(agents)"
+}
+
+private extension View {
+    @ViewBuilder
+    func channelNavigationSubtitle(_ subtitle: String) -> some View {
+        if #available(iOS 26.0, *) {
+            navigationSubtitle(subtitle)
+        } else {
+            self
+        }
+    }
+}
+
 private struct ChannelNavigationTitle: View {
     let channel: ChannelSummary
     let locale: CompanionLocale
 
-    private var memberLabel: String {
-        String(
-            format: L10n.text(.channelMembers, locale: locale),
-            channel.memberCount
-        )
-    }
-
-    private var agentLabel: String {
-        String(
-            format: L10n.text(.channelAgents, locale: locale),
-            channel.agentCount
-        )
-    }
-
     var body: some View {
-        HStack(spacing: 7) {
+        HStack(spacing: 10) {
             Image(systemName: channel.visibility == .restricted ? "lock.fill" : "number")
-                .foregroundStyle(.secondary)
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(.primary)
+                .frame(width: 26)
 
-            VStack(alignment: .leading, spacing: 0) {
+            if #available(iOS 26.0, *) {
                 Text(channel.name)
-                    .font(.headline)
+                    .font(.subheadline.weight(.bold))
                     .lineLimit(1)
-                Text("\(memberLabel) • \(agentLabel)")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
+            } else {
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(channel.name)
+                        .font(.subheadline.weight(.bold))
+                        .lineLimit(1)
+                    Text(channelParticipationLabel(channel: channel, locale: locale))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.78)
+                }
             }
         }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 3)
+        .background(.regularMaterial, in: Capsule())
+        .overlay {
+            Capsule()
+                .stroke(Color.primary.opacity(0.08), lineWidth: 0.5)
+        }
+        .shadow(color: .black.opacity(0.08), radius: 10, y: 4)
         .accessibilityElement(children: .combine)
+        .accessibilityLabel(
+            "\(channel.name), \(channelParticipationLabel(channel: channel, locale: locale))"
+        )
         .accessibilityIdentifier("channel-header-identity")
     }
 }
@@ -1478,11 +1512,13 @@ private struct ChannelComposer: View {
                     preferredItemEncoding: .compatible
                 ) {
                     Image(systemName: "plus")
-                        .font(.body.weight(.medium))
+                        .font(.title3.weight(.regular))
+                        .foregroundStyle(.primary)
+                        .frame(width: 40, height: 40)
+                        .background(Color.secondary.opacity(0.11), in: Circle())
+                        .contentShape(Circle())
                 }
-                .buttonStyle(.bordered)
-                .buttonBorderShape(.circle)
-                .controlSize(.regular)
+                .buttonStyle(.plain)
                 .disabled(
                     isLoadingPhotos || sending ||
                         attachments.count >= PendingIssueAttachment.maximumCount
@@ -1490,8 +1526,10 @@ private struct ChannelComposer: View {
                 .accessibilityLabel(L10n.text("이미지 첨부"))
                 .accessibilityIdentifier("channel-composer-attach")
                 TextField(placeholder, text: $draft, axis: .vertical)
-                    .textFieldStyle(.roundedBorder)
+                    .textFieldStyle(.plain)
+                    .font(.body)
                     .lineLimit(1...4)
+                    .padding(.vertical, 10)
                     .disabled(sending)
                     .accessibilityIdentifier("channel-composer-field")
                     .onChange(of: draft) { _, body in
@@ -1509,21 +1547,36 @@ private struct ChannelComposer: View {
                         Task { await send(body, selected, selectedAttachments) }
                     } label: {
                         if sending {
-                            ProgressView().controlSize(.small)
+                            ProgressView()
+                                .controlSize(.small)
+                                .tint(.white)
+                                .frame(width: 40, height: 40)
+                                .background(.tint, in: Circle())
                         } else {
                             Image(systemName: "arrow.up")
                                 .font(.body.weight(.bold))
+                                .foregroundStyle(.white)
+                                .frame(width: 40, height: 40)
+                                .background(.tint, in: Circle())
                         }
                     }
-                    .buttonStyle(.borderedProminent)
-                    .buttonBorderShape(.circle)
-                    .controlSize(.regular)
+                    .buttonStyle(.plain)
                     .disabled(sending)
                     .accessibilityIdentifier("channel-composer-send")
                 }
             }
+            .padding(6)
+            .background(
+                .regularMaterial,
+                in: RoundedRectangle(cornerRadius: 27, style: .continuous)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 27, style: .continuous)
+                    .stroke(Color.primary.opacity(0.08), lineWidth: 0.5)
+            }
+            .shadow(color: .black.opacity(0.1), radius: 14, y: 5)
             .padding(.horizontal, 12)
-            .padding(.vertical, 8)
+            .padding(.vertical, 10)
         }
         .onChange(of: selectedPhotos) { _, items in
             guard !items.isEmpty else { return }
