@@ -27,7 +27,6 @@ import {
   type AgentProviderModelCatalog,
   type ModelEffort,
 } from "../lib/project-llm";
-import { agentProviderPolicies } from "../lib/agent-provider-contract";
 import type {
   ExecutionWorker,
   HuntRun,
@@ -35,7 +34,6 @@ import type {
 } from "../types";
 import { NativeSelect } from "./NativeSelect";
 import { WorkerIcon } from "./WorkerIcon";
-import { Input } from "./ui/input";
 
 export function WorkerDispatchDialog({
   didDispatchSuccessfully = false,
@@ -116,6 +114,7 @@ export function WorkerDispatchDialog({
       ...providerModels[provider].models.map((candidate) => ({
         value: candidate.id,
         label: candidate.label,
+        description: candidate.label === candidate.id ? undefined : candidate.id,
       })),
     ],
     [provider, providerModels, t],
@@ -276,34 +275,24 @@ export function WorkerDispatchDialog({
           </label>
           <label>
             <span><BrainCircuit size={15} />{t("issue.preferredModel")}</span>
-            {agentProviderPolicies[provider].allowUnlistedModels ? (
-              <Input
-                aria-label={t("issue.preferredModel")}
-                maxLength={100}
-                onChange={(event) => {
-                  selectionDirtyRef.current = true;
-                  setModel(event.currentTarget.value);
-                }}
-                placeholder={t("settings.providerDefaultModel")}
-                value={model}
-              />
-            ) : (
-              <NativeSelect
-                label={t("issue.preferredModel")}
-                onValueChange={(value) => {
-                  selectionDirtyRef.current = true;
-                  setModel(value);
-                  if (!value) setEffort("");
-                }}
-                options={[
-                  ...(!selectedModelKnown && model
-                    ? [{ label: model, value: model }]
-                    : []),
-                  ...modelOptions,
-                ]}
-                value={model}
-              />
-            )}
+            <NativeSelect
+              label={t("issue.preferredModel")}
+              onValueChange={(value) => {
+                selectionDirtyRef.current = true;
+                setModel(value);
+                if (!value) setEffort("");
+              }}
+              options={[
+                ...(!selectedModelKnown && model
+                  ? [{ label: model, value: model }]
+                  : []),
+                ...modelOptions,
+              ]}
+              searchable={provider === "opencode"}
+              searchEmptyMessage={t("issue.noModelsFound")}
+              searchPlaceholder={t("issue.searchModels")}
+              value={model}
+            />
           </label>
           <label>
             <span><BrainCircuit size={15} />{t("settings.effort")}</span>

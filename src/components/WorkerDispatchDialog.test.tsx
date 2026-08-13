@@ -40,15 +40,6 @@ const worker = (id: string, label: string): ExecutionWorker => ({
   createdAt: "2026-07-29T00:00:00Z",
 });
 
-function changeInput(input: HTMLInputElement, value: string) {
-  const valueSetter = Object.getOwnPropertyDescriptor(
-    HTMLInputElement.prototype,
-    "value",
-  )?.set;
-  valueSetter?.call(input, value);
-  input.dispatchEvent(new Event("input", { bubbles: true }));
-}
-
 describe("WorkerDispatchDialog", () => {
   beforeEach(() => {
     (
@@ -380,7 +371,20 @@ describe("WorkerDispatchDialog", () => {
     await act(async () => root.unmount());
   });
 
-  it("keeps an OpenCode custom model editable and submits its exact value", async () => {
+  it("searches OpenCode supported models and defaults to the provider model", async () => {
+    vi.mocked(loadAgentProviderModels).mockResolvedValue({
+      ...defaultAgentProviderModelCatalog,
+      opencode: {
+        models: [
+          { id: "openai/gpt-5.6", label: "GPT-5.6" },
+          {
+            id: "anthropic/claude-opus-4-6",
+            label: "Claude Opus 4.6",
+          },
+        ],
+        error: null,
+      },
+    });
     const openCodeWorker = {
       ...worker("worker-opencode", "OpenCode Mac"),
       agentProvider: "opencode" as const,
@@ -395,41 +399,62 @@ describe("WorkerDispatchDialog", () => {
       root.render(
         <WorkerDispatchDialog
           error={null}
-          intent="approve_execution"
           isDispatching={false}
           onOpenChange={vi.fn()}
           onSubmit={onSubmit}
           open
-          run={{
-            id: "run-opencode",
-            title: "Custom OpenCode model",
-            preferredProvider: "opencode",
-            preferredModel: "openai/original-model",
-            preferredEffort: "high",
-          } as never}
+          run={null}
           workers={[openCodeWorker]}
         />,
       );
     });
 
-    const modelInput = document.body.querySelector<HTMLInputElement>(
-      'input[aria-label="선호 모델"]',
+    const modelSelect = document.body.querySelector<HTMLButtonElement>(
+      '[aria-label="선호 모델"]',
     )!;
-    expect(modelInput.value).toBe("openai/original-model");
+    expect(modelSelect.textContent).toContain("프로바이더 기본 모델");
     await act(async () => {
-      changeInput(modelInput, "anthropic/claude-opus-custom");
+      modelSelect.click();
+      await new Promise((resolve) => requestAnimationFrame(resolve));
     });
-    expect(modelInput.value).toBe("anthropic/claude-opus-custom");
+    const search = document.body.querySelector<HTMLInputElement>(
+      'input[aria-label="모델 검색"]',
+    )!;
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        "value",
+      )?.set;
+      setter?.call(search, "anthropic");
+      search.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    expect(
+      document.body.querySelector(
+        '.select-menu-option[data-value="anthropic/claude-opus-4-6"]',
+      ),
+    ).not.toBeNull();
+    expect(
+      document.body.querySelector(
+        '.select-menu-option[data-value="openai/gpt-5.6"]',
+      ),
+    ).toBeNull();
+    await act(async () => {
+      document.body
+        .querySelector<HTMLButtonElement>(
+          '.select-menu-option[data-value="anthropic/claude-opus-4-6"]',
+        )
+        ?.click();
+    });
 
-    const approve = Array.from(
+    const dispatch = Array.from(
       document.body.querySelectorAll<HTMLButtonElement>("button"),
-    ).find((button) => button.textContent?.includes("승인하고 실행"));
-    await act(async () => approve?.click());
+    ).find((button) => button.textContent?.includes("실행 배정"));
+    await act(async () => dispatch?.click());
 
     expect(onSubmit).toHaveBeenCalledWith({
       provider: "opencode",
-      model: "anthropic/claude-opus-custom",
-      effort: "high",
+      model: "anthropic/claude-opus-4-6",
+      effort: null,
       workerId: null,
     });
     await act(async () => root.unmount());

@@ -3,12 +3,26 @@
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  defaultAgentProviderModelCatalog,
+  loadAgentProviderModels,
+} from "../lib/project-llm";
 import type { ExecutionWorker, HuntRun } from "../types";
 import {
   IssueExecutionApproval,
   type ExecutionApprovalContext,
   type ExecutionProposalView,
 } from "./IssueExecutionApproval";
+
+vi.mock("../lib/project-llm", async (importOriginal) => {
+  const original = await importOriginal<typeof import("../lib/project-llm")>();
+  return {
+    ...original,
+    loadAgentProviderModels: vi.fn(async () =>
+      original.defaultAgentProviderModelCatalog
+    ),
+  };
+});
 
 const worker: ExecutionWorker = {
   id: "worker-1",
@@ -71,15 +85,6 @@ const remotelyAcceptedProposal: ExecutionProposalView = {
   requestedProvider: "codex",
 };
 
-function changeInput(input: HTMLInputElement, value: string) {
-  const valueSetter = Object.getOwnPropertyDescriptor(
-    HTMLInputElement.prototype,
-    "value",
-  )?.set;
-  valueSetter?.call(input, value);
-  input.dispatchEvent(new Event("input", { bubbles: true }));
-}
-
 describe("IssueExecutionApproval", () => {
   let container: HTMLDivElement;
   let root: ReturnType<typeof createRoot>;
@@ -88,6 +93,14 @@ describe("IssueExecutionApproval", () => {
     (
       globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }
     ).IS_REACT_ACT_ENVIRONMENT = true;
+    vi.mocked(loadAgentProviderModels).mockReset();
+    vi.mocked(loadAgentProviderModels).mockResolvedValue({
+      ...defaultAgentProviderModelCatalog,
+      opencode: {
+        models: [{ id: "openai/custom-agent", label: "Custom Agent" }],
+        error: null,
+      },
+    });
     container = document.createElement("div");
     document.body.append(container);
     root = createRoot(container);
@@ -442,10 +455,18 @@ describe("IssueExecutionApproval", () => {
         )
         ?.click();
     });
-    const modelInput = document.body.querySelector<HTMLInputElement>(
-      'input[aria-label="선호 모델"]',
-    )!;
-    await act(async () => changeInput(modelInput, "openai/custom-agent"));
+    await act(async () => {
+      document.body
+        .querySelector<HTMLButtonElement>('[aria-label="선호 모델"]')
+        ?.click();
+    });
+    await act(async () => {
+      document.body
+        .querySelector<HTMLButtonElement>(
+          '.select-menu-option[data-value="openai/custom-agent"]',
+        )
+        ?.click();
+    });
     await act(async () => {
       document.body
         .querySelector<HTMLButtonElement>('[aria-label="Effort"]')
@@ -484,20 +505,20 @@ describe("IssueExecutionApproval", () => {
       )?.textContent,
     ).toContain("OpenCode");
     expect(
-      document.body.querySelector<HTMLInputElement>(
-        'input[aria-label="선호 모델"]',
-      )?.value,
-    ).toBe("openai/custom-agent");
+      document.body.querySelector<HTMLButtonElement>(
+        '[aria-label="선호 모델"]',
+      )?.textContent,
+    ).toContain("Custom Agent");
     expect(workerCard.getAttribute("aria-pressed")).toBe("true");
     expect(onAccept).toHaveBeenCalledTimes(1);
 
     await act(async () => rejectFirstAccept(new Error("일시적인 승인 충돌")));
     expect(document.body.textContent).toContain("일시적인 승인 충돌");
     expect(
-      document.body.querySelector<HTMLInputElement>(
-        'input[aria-label="선호 모델"]',
-      )?.value,
-    ).toBe("openai/custom-agent");
+      document.body.querySelector<HTMLButtonElement>(
+        '[aria-label="선호 모델"]',
+      )?.textContent,
+    ).toContain("Custom Agent");
     expect(workerCard.getAttribute("aria-pressed")).toBe("true");
 
     const retry = Array.from(

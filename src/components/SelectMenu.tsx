@@ -1,4 +1,4 @@
-import { Check, ChevronDown } from "lucide-react";
+import { Check, ChevronDown, Search } from "lucide-react";
 import {
   useCallback,
   useEffect,
@@ -61,6 +61,9 @@ export function SelectMenu({
   onValueChange,
   options,
   placeholder,
+  searchEmptyMessage = "No results found.",
+  searchPlaceholder = "Search options",
+  searchable = false,
   size = "medium",
   title,
   value,
@@ -75,6 +78,9 @@ export function SelectMenu({
   onValueChange: (value: string) => void;
   options: SelectMenuOption[];
   placeholder?: string;
+  searchEmptyMessage?: string;
+  searchPlaceholder?: string;
+  searchable?: boolean;
   size?: "small" | "medium" | "large";
   title?: string;
   value: string;
@@ -83,16 +89,29 @@ export function SelectMenu({
   const controlId = id ?? `select-menu-${generatedId}`;
   const listboxId = `${controlId}-listbox`;
   const [isOpen, setIsOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const [menuPosition, setMenuPosition] = useState<MenuPosition | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
   const optionRefs = useRef(new Map<string, HTMLButtonElement>());
   const initialFocusRef = useRef<string | null>(null);
   const selectedOption = options.find((option) => option.value === value);
+  const filteredOptions = useMemo(() => {
+    const query = searchQuery.trim().toLocaleLowerCase();
+    if (!searchable || !query) return options;
+    return options.filter((option) =>
+      [option.label, option.value, option.description]
+        .filter(Boolean)
+        .some((candidate) =>
+          candidate!.toLocaleLowerCase().includes(query)
+        )
+    );
+  }, [options, searchQuery, searchable]);
   const enabledOptions = useMemo(
-    () => options.filter((option) => !option.disabled),
-    [options],
+    () => filteredOptions.filter((option) => !option.disabled),
+    [filteredOptions],
   );
 
   const focusOption = useCallback((optionValue: string) => {
@@ -101,6 +120,7 @@ export function SelectMenu({
 
   const closeMenu = useCallback((returnFocus = false) => {
     setIsOpen(false);
+    setSearchQuery("");
     if (returnFocus) {
       window.requestAnimationFrame(() => triggerRef.current?.focus());
     }
@@ -113,9 +133,9 @@ export function SelectMenu({
     const rect = trigger.getBoundingClientRect();
     const viewportPadding = 10;
     const gap = 7;
-    const estimatedRows = options.reduce(
+    const estimatedRows = filteredOptions.reduce(
       (height, option) => height + (option.description ? 52 : 40),
-      14,
+      searchable ? 66 : 14,
     );
     const desiredHeight = Math.min(estimatedRows, 320);
     const spaceBelow = window.innerHeight - rect.bottom - gap - viewportPadding;
@@ -142,13 +162,17 @@ export function SelectMenu({
       width,
       zIndex: getMenuZIndex(trigger),
     });
-  }, [align, options]);
+  }, [align, filteredOptions, searchable]);
 
   useLayoutEffect(() => {
     if (!isOpen) return;
     updateMenuPosition();
 
     const frame = window.requestAnimationFrame(() => {
+      if (searchable) {
+        searchInputRef.current?.focus();
+        return;
+      }
       const target = initialFocusRef.current ??
         (selectedOption && !selectedOption.disabled
           ? selectedOption.value
@@ -167,6 +191,7 @@ export function SelectMenu({
     enabledOptions,
     focusOption,
     isOpen,
+    searchable,
     selectedOption,
     updateMenuPosition,
   ]);
@@ -267,6 +292,19 @@ export function SelectMenu({
     }
   };
 
+  const onSearchKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      const option = event.key === "ArrowDown"
+        ? enabledOptions[0]
+        : enabledOptions.at(-1);
+      if (option) focusOption(option.value);
+    } else if (event.key === "Escape") {
+      event.preventDefault();
+      closeMenu(true);
+    }
+  };
+
   const menuStyle = menuPosition
     ? ({
         "--select-menu-max-height": `${menuPosition.maxHeight}px`,
@@ -332,15 +370,32 @@ export function SelectMenu({
       {isOpen && menuPosition
         ? createPortal(
             <div
-              aria-label={label}
               className={`select-menu-popover select-menu-popover-${size}`}
-              id={listboxId}
               ref={menuRef}
-              role="listbox"
               style={menuStyle}
             >
-              <div className="select-menu-options">
-                {options.map((option) => (
+              {searchable ? (
+                <label className="select-menu-search">
+                  <Search aria-hidden="true" size={15} strokeWidth={1.9} />
+                  <input
+                    aria-label={searchPlaceholder}
+                    autoComplete="off"
+                    onChange={(event) => setSearchQuery(event.currentTarget.value)}
+                    onKeyDown={onSearchKeyDown}
+                    placeholder={searchPlaceholder}
+                    ref={searchInputRef}
+                    type="search"
+                    value={searchQuery}
+                  />
+                </label>
+              ) : null}
+              <div
+                aria-label={label}
+                className="select-menu-options"
+                id={listboxId}
+                role="listbox"
+              >
+                {filteredOptions.map((option) => (
                   <button
                     aria-disabled={option.disabled || undefined}
                     aria-selected={option.value === value}
@@ -376,6 +431,9 @@ export function SelectMenu({
                     />
                   </button>
                 ))}
+                {filteredOptions.length === 0 ? (
+                  <p className="select-menu-empty">{searchEmptyMessage}</p>
+                ) : null}
               </div>
             </div>,
             document.body,

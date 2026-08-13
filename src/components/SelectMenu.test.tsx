@@ -212,7 +212,73 @@ describe("SelectMenu", () => {
 
     const listbox =
       document.querySelector<HTMLDivElement>("#modal-select-listbox");
-    expect(listbox?.style.zIndex).toBe("1002");
+    expect(
+      listbox?.closest<HTMLDivElement>(".select-menu-popover")?.style.zIndex,
+    ).toBe("1002");
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("filters searchable options by label, value, and description", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    const onValueChange = vi.fn();
+
+    await act(async () => {
+      root.render(
+        <SelectMenu
+          id="model-select"
+          label="Model"
+          onValueChange={onValueChange}
+          options={[
+            { label: "Provider default model", value: "" },
+            {
+              description: "anthropic/claude-opus-4-6",
+              label: "Claude Opus",
+              value: "anthropic/claude-opus-4-6",
+            },
+            { label: "GPT", value: "openai/gpt-5.6" },
+          ]}
+          searchEmptyMessage="No matching models"
+          searchPlaceholder="Search models"
+          searchable
+          value=""
+        />,
+      );
+    });
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>("#model-select")?.click();
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+    });
+    const search = document.querySelector<HTMLInputElement>(
+      'input[aria-label="Search models"]',
+    )!;
+    expect(document.activeElement).toBe(search);
+
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        "value",
+      )?.set;
+      setter?.call(search, "anthropic");
+      search.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    expect(document.querySelector('[data-value="anthropic/claude-opus-4-6"]'))
+      .not.toBeNull();
+    expect(document.querySelector('[data-value="openai/gpt-5.6"]')).toBeNull();
+
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        "value",
+      )?.set;
+      setter?.call(search, "missing");
+      search.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    expect(document.body.textContent).toContain("No matching models");
 
     await act(async () => root.unmount());
     container.remove();
