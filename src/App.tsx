@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { CSSProperties } from "react";
+import { Inbox as InboxIcon } from "lucide-react";
 import { AgentUsageStatusBar } from "./components/AgentUsageStatusBar";
 import { WorkerStatusBar } from "./components/WorkerStatusBar";
 import { AppVersionStatus } from "./components/AppVersionStatus";
@@ -43,6 +45,7 @@ import {
   useInboxNotificationClicks,
   useInboxNotifications,
 } from "./hooks/useInboxNotifications";
+import { useHorizontalPaneResize } from "./hooks/useHorizontalPaneResize";
 import {
   useMobileBackHandler,
   useMobileNavigationGestures,
@@ -63,6 +66,14 @@ import {
   loadOrganizationInvitationToken,
 } from "./lib/organization-invitation";
 import { syncAppBadgeCount } from "./lib/app-badge";
+import {
+  clampInboxPaneWidth,
+  inboxPaneWidthDefault,
+  inboxPaneWidthMax,
+  inboxPaneWidthMin,
+  loadInboxPaneWidth,
+  saveInboxPaneWidth,
+} from "./lib/inbox-pane-width";
 import { DASHBOARD_POLL_INTERVAL_MS } from "./lib/dashboard-polling";
 import { featureFlags } from "./lib/feature-flags";
 import {
@@ -408,6 +419,19 @@ export function App() {
   );
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const {
+    containerRef: inboxLayoutRef,
+    effectiveWidth: inboxDetailPaneWidth,
+    isResizing: isResizingInbox,
+    separatorProps: inboxResizeProps,
+  } = useHorizontalPaneResize({
+    clamp: clampInboxPaneWidth,
+    defaultWidth: inboxPaneWidthDefault,
+    load: loadInboxPaneWidth,
+    max: inboxPaneWidthMax,
+    min: inboxPaneWidthMin,
+    save: saveInboxPaneWidth,
+  });
   useEffect(
     () =>
       installKeybindingShortcuts((id) => {
@@ -1031,6 +1055,136 @@ export function App() {
     />
   );
 
+  const inboxDetailContent = inboxDetailTarget ? (
+    inboxDetailRun ? (
+      <RunPage
+        availableProviders={
+          briar.dashboard?.organizationProviders?.length
+            ? briar.dashboard.organizationProviders
+            : [
+                ...new Set(
+                  (briar.dashboard?.workers ?? []).flatMap(
+                    (worker) => worker.providers ?? [],
+                  ),
+                ),
+              ]
+        }
+        availableRuns={briar.dashboard?.runs ?? []}
+        error={briar.recoveryError}
+        isDeletingIssue={briar.deletingIssueId === inboxDetailRun.id}
+        isProcessing={processingIssueIds.has(inboxDetailRun.id)}
+        isRecovering={briar.recoveringRunId === inboxDetailRun.id}
+        isSidebarOpen
+        issueKeyPrefix={briar.dashboard?.project.issueKeyPrefix}
+        isUpdatingIssue={briar.updatingIssueId === inboxDetailRun.id}
+        mentionMembers={briar.dashboard?.members ?? []}
+        currentUserId={briar.user?.id ?? null}
+        onAddDependency={(prerequisiteRunId) =>
+          briar.addIssueDependency(inboxDetailRun.id, prerequisiteRunId)}
+        onAcceptIssueAction={(proposal) =>
+          briar.acceptConversationIssueAction(inboxDetailRun.id, proposal)}
+        onAcceptIssueExecution={(proposal, input) =>
+          briar.acceptConversationIssueExecution(
+            inboxDetailRun.id,
+            proposal,
+            input,
+          )}
+        executionPolicy={briar.dashboard?.executionPolicy}
+        executionWorkers={briar.dashboard?.workers ?? []}
+        onBack={() => setInboxDetailTarget(null)}
+        onCancel={() => briar.cancelRun(inboxDetailRun.id)}
+        onDelete={async () => {
+          await briar.deleteIssue(inboxDetailRun.id);
+          setInboxDetailTarget(null);
+        }}
+        onDependencyOpen={(runId) =>
+          setInboxDetailTarget((current) =>
+            current ? { ...current, targetId: runId } : current,
+          )}
+        onLoadAttachment={briar.readIssueAttachment}
+        onLoadIssueMessages={() => briar.readIssueMessages(inboxDetailRun.id)}
+        onLoadRunEvents={() => briar.readRunEvents(inboxDetailRun.id)}
+        onLoadRunEvidence={() => briar.readRunEvidence(inboxDetailRun.id)}
+        onLoadRunEvidenceImage={briar.readRunEvidenceImage}
+        onCompleteResultReview={() =>
+          briar.completeResultReview(inboxDetailRun.id)}
+        onMove={(placement) => briar.moveRun(inboxDetailRun.id, placement)}
+        onOpenFullPage={() => {
+          setInboxDetailTarget(null);
+          setRequestedSessionId(null);
+          setRequestedRunId(inboxDetailRun.id);
+          navigateToPage("issues");
+        }}
+        onProcessNow={() => {
+          setInboxDetailTarget(null);
+          processIssueNow(inboxDetailRun);
+        }}
+        onRemoveDependency={(prerequisiteRunId) =>
+          briar.removeIssueDependency(inboxDetailRun.id, prerequisiteRunId)}
+        onRetry={() => briar.retryRun(inboxDetailRun.id)}
+        onRework={(input) => briar.reworkRun(inboxDetailRun.id, input)}
+        onResume={() => briar.resumeRun(inboxDetailRun.id)}
+        onSendIssueMessage={(input) =>
+          sendIssueMessage(inboxDetailRun.id, input)}
+        onUpdateIssue={(input) => briar.editIssue(inboxDetailRun.id, input)}
+        onUpdateIssueSubscription={(subscribed) =>
+          briar.editIssueSubscription(inboxDetailRun.id, subscribed)}
+        onUpdateIssueCheckpoints={(checkpoints) =>
+          briar.editIssueCheckpoints(inboxDetailRun.id, checkpoints)}
+        onUpdateIssuePreferences={(input) =>
+          briar.editIssueExecutionPreferences(inboxDetailRun.id, input)}
+        performedAgentName={
+          issueAgents.find((agent) => agent.id === inboxDetailRun.agentId)
+            ?.name ?? null
+        }
+        onAcceptSkillExecution={(proposal, input) =>
+          briar.acceptConversationSkillExecution(
+            inboxDetailRun.id,
+            proposal,
+            input,
+          )}
+        organizationId={
+          briar.projects.find(
+            (project) => project.id === inboxDetailTarget.projectId,
+          )?.organizationId ?? null
+        }
+        projectId={inboxDetailTarget.projectId}
+        run={inboxDetailRun}
+        token={briar.token}
+      />
+    ) : inboxDetailSession ? (
+      <ProjectAgentSessionDetail
+        isSidebarOpen
+        issueKeyPrefix={
+          briar.projects.find(
+            (project) => project.id === inboxDetailSession.projectId,
+          )?.issueKeyPrefix
+        }
+        onBack={() => setInboxDetailTarget(null)}
+        onIssueOpen={(runId) =>
+          setInboxDetailTarget((current) =>
+            current
+              ? { ...current, kind: "issue", targetId: runId }
+              : current,
+          )}
+        onStop={() => autoHunt.stopSession(inboxDetailSession.id)}
+        session={inboxDetailSession}
+        token={briar.token}
+      />
+    ) : isInboxDetailLoading ? (
+      <div className="inbox-detail-loading" role="status">
+        {t("inbox.detailLoading")}
+      </div>
+    ) : (
+      <div className="inbox-detail-unavailable" role="alert">
+        <strong>{t("run.loadFailed")}</strong>
+        <button onClick={() => setInboxDetailTarget(null)} type="button">
+          {t("common.close")}
+        </button>
+      </div>
+    )
+  ) : null;
+
   let content: React.ReactNode;
 
   if (briar.restoringSession) {
@@ -1343,28 +1497,61 @@ export function App() {
             userId={briar.user.id}
           />
         ) : activePage === "inbox" ? (
-          <Inbox
-            isSidebarOpen={isSidebarOpen}
-            messages={inbox.messages}
-            onMarkAllRead={inbox.markAllRead}
-            onMarkRead={inbox.markRead}
-            onOpen={(message) => {
-              const target = inboxNotificationTarget(message);
-              // Channel replies are not issues; open the channel thread instead
-              // of the inbox detail panel (which only loads runs/sessions).
-              if (isInboxChannelNavigationTarget(target)) {
-                setPendingInboxNotificationTarget(target);
-                return;
+          <div
+            className={`inbox-layout${isResizingInbox ? " is-resizing-inbox" : ""}`}
+            ref={inboxLayoutRef}
+            style={
+              {
+                "--inbox-detail-pane-width": `${inboxDetailPaneWidth}%`,
+              } as CSSProperties
+            }
+          >
+            <Inbox
+              isSidebarOpen={isSidebarOpen}
+              messages={inbox.messages}
+              onMarkAllRead={inbox.markAllRead}
+              onMarkRead={inbox.markRead}
+              onOpen={(message) => {
+                const target = inboxNotificationTarget(message);
+                // Channel replies are not issues; open the channel thread instead
+                // of the inbox detail pane (which only loads runs/sessions).
+                if (isInboxChannelNavigationTarget(target)) {
+                  setPendingInboxNotificationTarget(target);
+                  return;
+                }
+                inbox.markRead(message.id);
+                if (target.projectId !== briar.activeProjectId) {
+                  briar.setActiveProjectId(target.projectId);
+                }
+                setInboxDetailTarget(target);
+              }}
+              projects={activeOrganizationProjects}
+              unreadCount={inbox.unreadCount}
+            />
+            <div
+              aria-label={t("inbox.resizeDetailPane")}
+              aria-orientation="vertical"
+              aria-valuemax={inboxPaneWidthMax}
+              aria-valuemin={inboxPaneWidthMin}
+              aria-valuenow={inboxDetailPaneWidth}
+              className="inbox-pane-resizer"
+              role="separator"
+              tabIndex={0}
+              {...inboxResizeProps}
+            />
+            <InboxDetailPanel
+              label={
+                inboxDetailTarget ? inboxDetailLabel : t("inbox.messages")
               }
-              inbox.markRead(message.id);
-              if (target.projectId !== briar.activeProjectId) {
-                briar.setActiveProjectId(target.projectId);
-              }
-              setInboxDetailTarget(target);
-            }}
-            projects={activeOrganizationProjects}
-            unreadCount={inbox.unreadCount}
-          />
+            >
+              {inboxDetailContent ?? (
+                <div className="inbox-detail-empty" role="status">
+                  <InboxIcon aria-hidden="true" size={56} strokeWidth={1.2} />
+                  <p>{t("inbox.noNotificationSelected")}</p>
+                </div>
+              )}
+            </InboxDetailPanel>
+          </div>
         ) : activePage === "settings" &&
           settingsTarget.scope === "project" &&
           activeProject ? (
@@ -1595,172 +1782,6 @@ export function App() {
             token={briar.token}
           />
           )}
-          {inboxDetailTarget ? (
-            <InboxDetailPanel
-              label={inboxDetailLabel}
-              onClose={() => setInboxDetailTarget(null)}
-            >
-              {inboxDetailRun ? (
-                <RunPage
-                  availableProviders={
-                    briar.dashboard?.organizationProviders?.length
-                      ? briar.dashboard.organizationProviders
-                      : [
-                          ...new Set(
-                            (briar.dashboard?.workers ?? []).flatMap(
-                              (worker) => worker.providers ?? [],
-                            ),
-                          ),
-                        ]
-                  }
-                  availableRuns={briar.dashboard?.runs ?? []}
-                  error={briar.recoveryError}
-                  isDeletingIssue={
-                    briar.deletingIssueId === inboxDetailRun.id
-                  }
-                  isProcessing={processingIssueIds.has(inboxDetailRun.id)}
-                  isRecovering={briar.recoveringRunId === inboxDetailRun.id}
-                  isSidebarOpen
-                  issueKeyPrefix={briar.dashboard?.project.issueKeyPrefix}
-                  isUpdatingIssue={
-                    briar.updatingIssueId === inboxDetailRun.id
-                  }
-                  mentionMembers={briar.dashboard?.members ?? []}
-                  currentUserId={briar.user?.id ?? null}
-                  onAddDependency={(prerequisiteRunId) =>
-                    briar.addIssueDependency(
-                      inboxDetailRun.id,
-                      prerequisiteRunId,
-                    )}
-                  onAcceptIssueAction={(proposal) =>
-                    briar.acceptConversationIssueAction(
-                      inboxDetailRun.id,
-                      proposal,
-                    )}
-                  onAcceptIssueExecution={(proposal, input) =>
-                    briar.acceptConversationIssueExecution(
-                      inboxDetailRun.id,
-                      proposal,
-                      input,
-                    )}
-                  executionPolicy={briar.dashboard?.executionPolicy}
-                  executionWorkers={briar.dashboard?.workers ?? []}
-                  onBack={() => setInboxDetailTarget(null)}
-                  onCancel={() => briar.cancelRun(inboxDetailRun.id)}
-                  onDelete={async () => {
-                    await briar.deleteIssue(inboxDetailRun.id);
-                    setInboxDetailTarget(null);
-                  }}
-                  onDependencyOpen={(runId) =>
-                    setInboxDetailTarget((current) =>
-                      current ? { ...current, targetId: runId } : current
-                    )}
-                  onLoadAttachment={briar.readIssueAttachment}
-                  onLoadIssueMessages={() =>
-                    briar.readIssueMessages(inboxDetailRun.id)}
-                  onLoadRunEvents={() =>
-                    briar.readRunEvents(inboxDetailRun.id)}
-                  onLoadRunEvidence={() =>
-                    briar.readRunEvidence(inboxDetailRun.id)}
-                  onLoadRunEvidenceImage={briar.readRunEvidenceImage}
-                  onCompleteResultReview={() =>
-                    briar.completeResultReview(inboxDetailRun.id)}
-                  onMove={(placement) =>
-                    briar.moveRun(inboxDetailRun.id, placement)}
-                  onOpenFullPage={() => {
-                    setInboxDetailTarget(null);
-                    setRequestedSessionId(null);
-                    setRequestedRunId(inboxDetailRun.id);
-                    navigateToPage("issues");
-                  }}
-                  onProcessNow={() => {
-                    setInboxDetailTarget(null);
-                    processIssueNow(inboxDetailRun);
-                  }}
-                  onRemoveDependency={(prerequisiteRunId) =>
-                    briar.removeIssueDependency(
-                      inboxDetailRun.id,
-                      prerequisiteRunId,
-                    )}
-                  onRetry={() => briar.retryRun(inboxDetailRun.id)}
-                  onRework={(input) =>
-                    briar.reworkRun(inboxDetailRun.id, input)}
-                  onResume={() => briar.resumeRun(inboxDetailRun.id)}
-                  onSendIssueMessage={(input) =>
-                    sendIssueMessage(inboxDetailRun.id, input)}
-                  onUpdateIssue={(input) =>
-                    briar.editIssue(inboxDetailRun.id, input)}
-                  onUpdateIssueSubscription={(subscribed) =>
-                    briar.editIssueSubscription(
-                      inboxDetailRun.id,
-                      subscribed,
-                    )}
-                  onUpdateIssueCheckpoints={(checkpoints) =>
-                    briar.editIssueCheckpoints(
-                      inboxDetailRun.id,
-                      checkpoints,
-                    )}
-                  onUpdateIssuePreferences={(input) =>
-                    briar.editIssueExecutionPreferences(
-                      inboxDetailRun.id,
-                      input,
-                    )}
-                  performedAgentName={
-                    issueAgents.find(
-                      (agent) => agent.id === inboxDetailRun.agentId,
-                    )?.name ?? null
-                  }
-                  onAcceptSkillExecution={(proposal, input) =>
-                    briar.acceptConversationSkillExecution(
-                      inboxDetailRun.id,
-                      proposal,
-                      input,
-                    )}
-                  organizationId={
-                    briar.projects.find(
-                      (project) => project.id === inboxDetailTarget.projectId,
-                    )?.organizationId ?? null
-                  }
-                  projectId={inboxDetailTarget.projectId}
-                  run={inboxDetailRun}
-                  token={briar.token}
-                />
-              ) : inboxDetailSession ? (
-                <ProjectAgentSessionDetail
-                  isSidebarOpen
-                  issueKeyPrefix={
-                    briar.projects.find(
-                      (project) => project.id === inboxDetailSession.projectId,
-                    )?.issueKeyPrefix
-                  }
-                  onBack={() => setInboxDetailTarget(null)}
-                  onIssueOpen={(runId) =>
-                    setInboxDetailTarget((current) =>
-                      current
-                        ? { ...current, kind: "issue", targetId: runId }
-                        : current
-                    )}
-                  onStop={() => autoHunt.stopSession(inboxDetailSession.id)}
-                  session={inboxDetailSession}
-                  token={briar.token}
-                />
-              ) : isInboxDetailLoading ? (
-                <div className="inbox-detail-loading" role="status">
-                  {t("inbox.detailLoading")}
-                </div>
-              ) : (
-                <div className="inbox-detail-unavailable" role="alert">
-                  <strong>{t("run.loadFailed")}</strong>
-                  <button
-                    onClick={() => setInboxDetailTarget(null)}
-                    type="button"
-                  >
-                    {t("common.close")}
-                  </button>
-                </div>
-              )}
-            </InboxDetailPanel>
-          ) : null}
         </div>
         <div className="app-status-bar">
           <AgentUsageStatusBar

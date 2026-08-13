@@ -23,39 +23,18 @@ describe("InboxDetailPanel", () => {
     vi.restoreAllMocks();
   });
 
-  it("renders details in an accessible modal side panel", async () => {
+  it("renders details in the inline right-hand pane", async () => {
     await act(async () =>
       root.render(
-        <InboxDetailPanel label="Issue details" onClose={vi.fn()}>
+        <InboxDetailPanel label="Issue details">
           <p>Finished issue</p>
         </InboxDetailPanel>,
       ),
     );
 
-    const dialog = document.body.querySelector(".inbox-detail-drawer");
-    expect(dialog?.getAttribute("role")).toBe("dialog");
-    expect(dialog?.getAttribute("aria-modal")).toBe("true");
-    expect(dialog?.getAttribute("aria-label")).toBeNull();
-    expect(dialog?.textContent).toContain("Issue details");
-    expect(dialog?.textContent).toContain("Finished issue");
-  });
-
-  it("closes with Escape", async () => {
-    const onClose = vi.fn();
-    await act(async () =>
-      root.render(
-        <InboxDetailPanel label="Issue details" onClose={onClose}>
-          <p>Finished issue</p>
-        </InboxDetailPanel>,
-      ),
-    );
-
-    await act(async () => {
-      document.dispatchEvent(
-        new KeyboardEvent("keydown", { bubbles: true, key: "Escape" }),
-      );
-    });
-
-    expect(onClose).toHaveBeenCalledTimes(1);
+    const pane = container.querySelector(".inbox-detail-pane");
+    expect(pane?.getAttribute("aria-label")).toBe("Issue details");
+    expect(pane?.textContent).toContain("Finished issue");
+    expect(document.body.querySelector("[aria-modal='true']")).toBeNull();
   });
 });
