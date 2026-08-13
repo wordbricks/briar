@@ -525,6 +525,7 @@ export function HuntDashboard({
   onCompanionHomeOpen,
   onCompanionStatusChange,
   onIssueViewed,
+  onSelectedRunChange,
   onRequestedRunOpen,
   onSendIssueMessage,
   onEditIssueMessage = async () => {
@@ -533,6 +534,7 @@ export function HuntDashboard({
   onDeleteIssueMessage = async () => undefined,
   requestedRunId = null,
   requestedRunInitialTab = null,
+  selectedRunId: controlledSelectedRunId,
   issueListRequestKey = 0,
   processingIssueIds = new Set<string>(),
   sessions = [],
@@ -622,6 +624,7 @@ export function HuntDashboard({
   onCompanionHomeOpen?: () => void;
   onCompanionStatusChange?: (status: CompanionStatusFilter) => void;
   onIssueViewed?: (runId: string) => void;
+  onSelectedRunChange?: (runId: string | null) => void;
   onRequestedRunOpen?: () => void;
   onSendIssueMessage: (
     runId: string,
@@ -644,6 +647,7 @@ export function HuntDashboard({
   onDeleteIssueMessage?: (runId: string, messageId: string) => Promise<unknown>;
   requestedRunId?: string | null;
   requestedRunInitialTab?: IssueDetailTab | null;
+  selectedRunId?: string | null;
   issueListRequestKey?: number;
   processingIssueIds?: ReadonlySet<string>;
   sessions?: AutoHuntSession[];
@@ -666,7 +670,21 @@ export function HuntDashboard({
   const setStatus = companionMode && onCompanionStatusChange
     ? onCompanionStatusChange
     : setInternalStatus;
-  const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
+  const [internalSelectedRunId, setInternalSelectedRunId] =
+    useState<string | null>(null);
+  const selectedRunId =
+    controlledSelectedRunId === undefined
+      ? internalSelectedRunId
+      : controlledSelectedRunId;
+  const setSelectedRunId = useCallback(
+    (runId: string | null) => {
+      if (controlledSelectedRunId === undefined) {
+        setInternalSelectedRunId(runId);
+      }
+      onSelectedRunChange?.(runId);
+    },
+    [controlledSelectedRunId, onSelectedRunChange],
+  );
   const [selectedRunInitialTab, setSelectedRunInitialTab] =
     useState<IssueDetailTab | null>(null);
   const [internalIsIssueDialogOpen, setInternalIsIssueDialogOpen] =

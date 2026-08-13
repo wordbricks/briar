@@ -3,6 +3,7 @@ import {
   createNavigationHistory,
   reduceNavigationHistory,
 } from "./useNavigationHistory";
+import { issueNavigationLocation } from "../lib/app-navigation";
 
 describe("navigation history", () => {
   it("moves backward and forward through visited destinations", () => {
@@ -55,5 +56,28 @@ describe("navigation history", () => {
     });
 
     expect(history).toBe(initial);
+  });
+
+  it("restores the issue list and each previously viewed issue", () => {
+    let history = createNavigationHistory("issues");
+    const firstIssue = issueNavigationLocation("run-a");
+    const secondIssue = issueNavigationLocation("run-b");
+    history = reduceNavigationHistory(history, {
+      type: "navigate",
+      value: firstIssue,
+    });
+    history = reduceNavigationHistory(history, {
+      type: "navigate",
+      value: secondIssue,
+    });
+
+    history = reduceNavigationHistory(history, { type: "back" });
+    expect(history.entries[history.index]).toBe(firstIssue);
+
+    history = reduceNavigationHistory(history, { type: "back" });
+    expect(history.entries[history.index]).toBe("issues");
+
+    history = reduceNavigationHistory(history, { type: "forward" });
+    expect(history.entries[history.index]).toBe(firstIssue);
   });
 });
