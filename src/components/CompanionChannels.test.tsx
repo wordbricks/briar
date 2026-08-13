@@ -547,10 +547,14 @@ describe("CompanionChannels", () => {
     await act(async () => {
       await Promise.resolve();
     });
-    const typing = container.querySelector(".companion-channel-typing");
+    const typing = container.querySelector(".companion-channel-thread-typing");
     expect(typing?.textContent).toContain("Honey is writing a reply");
-    expect(typing?.closest(".companion-channel-message")?.textContent)
-      .toContain("Please investigate");
+    expect(typing?.closest(".companion-channel-message")).toBeNull();
+    expect(
+      typing?.nextElementSibling?.classList.contains(
+        "companion-channel-composer",
+      ),
+    ).toBe(true);
 
     await act(async () => {
       emitChannelChange(3);

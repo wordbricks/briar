@@ -1313,7 +1313,7 @@ private actor MutationAPIRecorder: MobileAPIClientProtocol {
         if path.hasSuffix("/subscription") {
             payload = #"{"runId":"33333333-3333-4333-8333-333333333333","subscribers":[{"userId":"fixture-user","subscribedAt":"2026-08-12T01:00:00.000Z"}]}"#
         } else if path.hasSuffix("/issues") {
-            payload = #"{"runId":"33333333-3333-4333-8333-333333333333","sourceKey":"briar-issue:test","stage":"queued","status":"queued","attachments":[]}"#
+            payload = #"{"runId":"33333333-3333-4333-8333-333333333333","sourceKey":"briar-issue:test","stage":"queued","status":"queued","attachments":[],"createdByUserId":"fixture-user"}"#
         } else if path.hasSuffix("/status") {
             payload = #"{"runId":"33333333-3333-4333-8333-333333333333","outcome":"moved","status":"queued","workflowStage":null}"#
         } else if path.hasSuffix("/resume") {

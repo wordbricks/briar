@@ -596,3 +596,40 @@ accessibility and layout tests, Production analyze and build checks, and the
 Tauri iOS simulator and Android ARM64 regression builds. Archive identity, App
 Store provisioning, distribution signature, production entitlements, and the
 exported IPA were verified before upload.
+
+## 2026-08-13 — 1.2.117 (1)
+
+- App: Briar Companion (`app.briar.companion`)
+- Marketing version: `1.2.117`
+- App Store Connect build: `1`
+- App Store Connect build ID: `5a9075c4-7b9e-4287-960c-ed7dd0db173a`
+- Latest main commit: `78204df5`
+- Release source commit: `78204df5feab06182a31c3f5170aeb655cbf5cbf`
+- Implementation: native SwiftUI
+- Toolchain: Xcode 26.6, iOS 26.5 SDK
+- Minimum iOS version: 17.0
+- App Store Connect processing state: `VALID`
+- TestFlight state: `IN_BETA_TESTING`
+- Internal group: `wordbricks` (`hasAccessToAllBuilds=true`)
+- Automatic tester notification: enabled
+- IPA SHA-256: `c68544865bc4abe9a9578d495c7cd53e9ee3df9e69d093e23b7aa81ea9f41e06`
+
+This release includes the default Developer agent responsibility for owning
+development work, Inbox channel alerts opening in the detail panel, corrected
+mobile Inbox conversation navigation, improved channel Markdown readability,
+agent avatars, channel mention pills, the simplified project sidebar, and the
+latest thread typing and Codex token-usage fixes.
+
+The latest-main release gate exposed a misplaced SwiftUI Agents toolbar and
+incomplete issue-creation fixtures. They were corrected and merged in PR #989
+before the archive was created. The exact merged source passed 1,890 app and
+Worker tests, D1 migration, Rust, and security sign-off, plus the shared mobile
+contract, Swift unit and 13 iPhone UI tests, iPad accessibility and layout
+testing, Production analyze and build checks, the Tauri iOS simulator bundle,
+and the Android ARM64 APK build. Archive identity, App Store provisioning,
+distribution signature, production entitlements, exported IPA signature, and
+all alternate app icons were verified before upload.
+
+The prior final handoff, `1.2.111 (2)`, remains `VALID`, but main advanced
+through the 1.2.117 release and the release-gate fixes. Version `1.2.117 (1)` is
+therefore the final build handed off from the latest main commit.

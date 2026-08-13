@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct AgentsHomeView: View {
+struct AgentsHomeView<ToolbarContentType: ToolbarContent>: View {
     @ObservedObject var agents: AgentsStore
     @ObservedObject var navigation: CompanionNavigationModel
     let project: ProjectsResponse.Project
@@ -8,6 +8,7 @@ struct AgentsHomeView: View {
     let api: any MobileAPIClientProtocol
     let snapshot: DashboardSnapshot?
     let refreshDashboard: () async -> Void
+    @ToolbarContentBuilder let toolbarContent: () -> ToolbarContentType
 
     @State private var path = NavigationPath()
 
@@ -81,6 +82,7 @@ struct AgentsHomeView: View {
             }
             .navigationTitle("Agents")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar { toolbarContent() }
             .navigationDestination(for: AgentRoute.self) { route in
                 switch route {
                 case let .agent(id):

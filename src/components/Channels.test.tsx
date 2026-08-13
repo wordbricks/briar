@@ -321,6 +321,56 @@ describe("Channels", () => {
       .toContain("@Honey 안녕");
   });
 
+  it("places the named Agent typing state above the thread composer", async () => {
+    const trigger = message({
+      id: "thread-root",
+      body: "@honey 스레드에서 답해줘",
+      replyCount: 1,
+    });
+    listChannelMessages.mockResolvedValue({ messages: [trigger] });
+    await render([trigger]);
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(
+        ".conversation-reply-summary",
+      )?.click();
+      await Promise.resolve();
+    });
+
+    loadChannelDelta.mockResolvedValueOnce({
+      cursor: 8,
+      hasMore: false,
+      channels: [],
+      removedChannelIds: [],
+      messages: [],
+      removedMessageIds: [],
+      agentReplies: [{
+        id: "reply-thread-1",
+        agentId: agent.agentId,
+        channelId: channel.id,
+        triggerMessageId: trigger.id,
+        parentMessageId: trigger.id,
+        replyMessageId: "agent-message-thread-1",
+        status: "running",
+        attempts: 1,
+        error: null,
+        createdAt: "2026-08-01T01:00:01.000Z",
+        updatedAt: "2026-08-01T01:00:02.000Z",
+      }],
+    });
+    await act(async () => {
+      emitChannelChange(8);
+      await Promise.resolve();
+    });
+
+    const typing = container.querySelector(".channel-thread-typing");
+    expect(typing?.textContent).toContain("Honey님이 답변을 작성하고 있습니다");
+    expect(typing?.closest(".channel-message")).toBeNull();
+    expect(typing?.nextElementSibling?.classList.contains("channel-composer"))
+      .toBe(true);
+    expect(container.querySelector(".channel-main .channel-typing")).toBeNull();
+  });
+
   it("renders webhook authors and opens channel webhook management", async () => {
     listChannelWebhooks.mockResolvedValue({
       webhooks: [{

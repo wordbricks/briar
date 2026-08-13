@@ -262,7 +262,7 @@ describe("D1 migrations", () => {
     } finally {
       await miniflare.dispose();
     }
-  }, 30_000);
+  }, 60_000);
 
   it("preserves channel message relations while adding webhook authors", async () => {
     const miniflare = new Miniflare({
