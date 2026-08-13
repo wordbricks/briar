@@ -951,6 +951,8 @@ describe("detached Agent runner", () => {
     expect(projectPrompt).toContain("snapshot.executionTargets");
     expect(projectPrompt).toContain("exact server-supplied target");
     expect(projectPrompt).toContain('"executionProposal":{"projectId"');
+    expect(projectPrompt).toContain("workspace-relative path in attachments");
+    expect(projectPrompt).toContain('"attachments":["screenshot.png"]');
   });
 
   it("extracts final replies from every detached provider event shape", () => {

@@ -35,7 +35,6 @@ import {
   modelEfforts,
 } from "../src/lib/agent-provider-contract";
 import { validateEvidenceImages } from "../src/lib/evidence-images";
-import { channelReplyCompletionSchema } from "../src/lib/channels-contract";
 import {
   organizationAgentContextCapability,
   organizationAgentContextDescriptorSchema,
@@ -117,6 +116,11 @@ import {
   sameApiEnvironment,
   selectProjectForApi,
 } from "./config-environment";
+import {
+  channelReplyCompleteRequestBody,
+  collectChannelReplyAttachments,
+  parseChannelReplyAgentResult,
+} from "./channel-reply-attachments";
 import {
   channelReplyImageDirectory,
   cleanupChannelReplyImages,
@@ -3135,7 +3139,9 @@ async function runClaimedChannelReply(
     let conversationId: string | null = null;
     let lookupRounds = 0;
     let turnPrompt = prompt;
-    let result: z.infer<typeof channelReplyCompletionSchema> | null = null;
+    let result: ReturnType<typeof parseChannelReplyAgentResult>["result"] | null =
+      null;
+    let attachmentPaths: string[] = [];
     while (!result) {
       const turn = await runDetachedProviderTurn({
         agent,
@@ -3169,7 +3175,9 @@ async function runClaimedChannelReply(
         parsed,
       );
       if (!lookup.success) {
-        result = channelReplyCompletionSchema.parse(parsed);
+        const parsedResult = parseChannelReplyAgentResult(parsed);
+        result = parsedResult.result;
+        attachmentPaths = parsedResult.attachmentPaths;
         break;
       }
       if (!organizationContext) {
@@ -3210,9 +3218,12 @@ async function runClaimedChannelReply(
         "Channel reply Agent Skill execution target is not authorized",
       );
     }
-    // Private context must be gone before the durable reply is marked complete.
-    // A cleanup failure leaves the claim retryable instead of silently
-    // succeeding with organization data on disk.
+    // Read reply images before the disposable workspace disappears. Private
+    // inbound context must still be gone before the durable reply completes.
+    const replyImages = await collectChannelReplyAttachments({
+      workspacePath,
+      paths: attachmentPaths,
+    });
     await cleanupContext();
     await request(
       config.apiUrl,
@@ -3220,11 +3231,12 @@ async function runClaimedChannelReply(
       workerToken,
       {
         method: "POST",
-        body: JSON.stringify({
+        body: channelReplyCompleteRequestBody({
           organizationId: reply.organizationId,
           workerId: registered.workerId,
           claimToken: reply.claimToken,
           result,
+          attachments: replyImages,
         }),
       },
     );

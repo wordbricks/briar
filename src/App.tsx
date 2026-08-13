@@ -111,6 +111,7 @@ import {
   createChannel,
   dispatchHuntRun,
   listChannels,
+  markChannelRead,
   loadAgentUsageReport,
   loadDashboard,
   loadStatusTrayRuns,
@@ -120,6 +121,15 @@ import {
   retryHuntRun,
 } from "./lib/api";
 import type { ChannelSummary } from "./lib/channels-contract";
+import {
+  channelHasUnread,
+  laterTimestamp,
+  markChannelCatalogRead,
+} from "./lib/channel-unread";
+import {
+  CHANNEL_REALTIME_FALLBACK_MS,
+  createChannelRealtimeTransport,
+} from "./lib/channel-realtime";
 import { dispatchAutoHuntToWorkers } from "./lib/auto-hunt-worker-dispatch";
 import { demoProjectAgents } from "./lib/demo-project-agents";
 import { executeProjectAgentTask } from "./lib/project-agent-execution";
@@ -232,6 +242,55 @@ export function App() {
       cancelled = true;
     };
   }, [briar.activeOrganizationId, briar.token]);
+  useEffect(() => {
+    const organizationId = briar.activeOrganizationId;
+    const token = briar.token;
+    if (!organizationId || !token) return;
+
+    let cancelled = false;
+    const transport = createChannelRealtimeTransport(token, organizationId);
+    const refresh = () => {
+      void listChannels(token, organizationId)
+        .then((result) => {
+          if (!cancelled) setOrganizationChannels(result.channels);
+        })
+        .catch(() => {
+          // Keep the last catalog. The Channels view reports request errors.
+        });
+    };
+    const unsubscribe = transport.subscribe(() => {
+      refresh();
+    });
+    transport.start();
+    const interval = window.setInterval(refresh, CHANNEL_REALTIME_FALLBACK_MS);
+    return () => {
+      cancelled = true;
+      unsubscribe();
+      transport.stop();
+      window.clearInterval(interval);
+    };
+  }, [briar.activeOrganizationId, briar.token]);
+  const markOrganizationChannelRead = useCallback(
+    (channelId: string) => {
+      const token = briar.token;
+      const organizationId = briar.activeOrganizationId;
+      if (!token || !organizationId) return;
+      const channel = organizationChannels.find((item) => item.id === channelId);
+      if (!channel || !channelHasUnread(channel)) return;
+      const lastReadAt = laterTimestamp(
+        channel.lastMessageAt,
+        new Date().toISOString(),
+      );
+      setOrganizationChannels((current) =>
+        markChannelCatalogRead(current, channelId, lastReadAt),
+      );
+      void markChannelRead(token, organizationId, channelId, { lastReadAt })
+        .catch(() => {
+          // The next catalog snapshot restores unread if the write failed.
+        });
+    },
+    [briar.activeOrganizationId, briar.token, organizationChannels],
+  );
   const [statusTrayRuns, setStatusTrayRuns] = useState<StatusTrayRun[]>([]);
   const loadUsageReport = useCallback(async () => {
     if (!briar.token || !briar.activeOrganizationId) {
@@ -479,9 +538,15 @@ export function App() {
         ].sort((left, right) => left.name.localeCompare(right.name)),
       );
       setActiveChannelId(result.channel.id);
+      markOrganizationChannelRead(result.channel.id);
       navigateToPage("channels");
     },
-    [briar.activeOrganizationId, briar.token, navigateToPage],
+    [
+      briar.activeOrganizationId,
+      briar.token,
+      markOrganizationChannelRead,
+      navigateToPage,
+    ],
   );
   const [pendingBriarLink, setPendingBriarLink] =
     useState<BriarLinkTarget | null>(null);
@@ -609,6 +674,7 @@ export function App() {
         rootMessageId,
       });
       setActiveChannelId(pendingInboxNotificationTarget.targetId);
+      markOrganizationChannelRead(pendingInboxNotificationTarget.targetId);
       if (briar.companionMode) setCompanionPage("home");
       else navigateToPage("channels");
     } else {
@@ -625,6 +691,7 @@ export function App() {
     briar.setActiveProjectId,
     briar.user,
     inbox.markRead,
+    markOrganizationChannelRead,
     navigateToPage,
     pendingInboxNotificationTarget,
   ]);
@@ -1335,6 +1402,7 @@ export function App() {
               briar.activeOrganizationId
                 ? (channelId) => {
                     setActiveChannelId(channelId);
+                    markOrganizationChannelRead(channelId);
                     navigateToPage("channels");
                   }
                 : undefined

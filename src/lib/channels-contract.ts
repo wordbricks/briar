@@ -177,7 +177,16 @@ export type ChannelSummary = {
   agentCount: number;
   createdAt: string;
   updatedAt: string;
+  lastMessageAt?: string | null;
+  lastReadAt?: string | null;
+  hasUnread?: boolean;
 };
+
+export const channelReadInputSchema = z
+  .object({
+    lastReadAt: z.string().datetime({ offset: true }).optional(),
+  })
+  .strict();
 
 export type ChannelMember = {
   userId: string;

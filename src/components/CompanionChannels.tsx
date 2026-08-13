@@ -25,6 +25,7 @@ import {
   listChannels,
   loadChannel,
   loadChannelDelta,
+  markChannelRead,
   loadDashboard,
   sendChannelMessage,
   toggleChannelMessageReaction,
@@ -41,6 +42,12 @@ import type {
   ChannelMessage,
   ChannelSummary,
 } from "../lib/channels-contract";
+import {
+  channelHasUnread,
+  laterTimestamp,
+  markChannelCatalogRead,
+  markChannelSummaryRead,
+} from "../lib/channel-unread";
 import type {
   AgentSkillExecutionApprovalInput,
   AgentSkillExecutionProposal,
@@ -318,11 +325,31 @@ export function CompanionChannels({
     [activeProjectId, channels, projects, t],
   );
 
+  const markSelectedChannelRead = useCallback(
+    (summary: ChannelSummary) => {
+      if (!channelHasUnread(summary)) return summary;
+      const lastReadAt = laterTimestamp(
+        summary.lastMessageAt,
+        new Date().toISOString(),
+      );
+      const next = markChannelSummaryRead(summary, lastReadAt);
+      setChannels((current) =>
+        markChannelCatalogRead(current, summary.id, lastReadAt),
+      );
+      void markChannelRead(token, organizationId, summary.id, { lastReadAt })
+        .catch(() => {
+          // The next catalog snapshot restores unread if the write failed.
+        });
+      return next;
+    },
+    [organizationId, token],
+  );
+
   const openChannel = useCallback(
     async (summary: ChannelSummary) => {
       invalidateChannelSurface(summary.id, null);
       const selectionVersion = ++channelSelectionVersion.current;
-      setChannel(summary);
+      setChannel(markSelectedChannelRead(summary));
       setThread(null);
       setThreadParentId(null);
       setMessages([]);
@@ -334,7 +361,7 @@ export function CompanionChannels({
       try {
         const result = await loadChannel(token, organizationId, summary.id);
         if (selectionVersion !== channelSelectionVersion.current) return;
-        setChannel(result.channel);
+        setChannel(markSelectedChannelRead(result.channel));
         recordProposalMessages(result.messages);
         setMessages((current) =>
           mergeChannelMessageSnapshot(current, result.messages));
@@ -350,7 +377,13 @@ export function CompanionChannels({
         }
       }
     },
-    [invalidateChannelSurface, organizationId, recordProposalMessages, token],
+    [
+      invalidateChannelSurface,
+      markSelectedChannelRead,
+      organizationId,
+      recordProposalMessages,
+      token,
+    ],
   );
 
   useEffect(() => {
@@ -414,7 +447,9 @@ export function CompanionChannels({
             const selectedSummary = delta.channels.find(
               (item) => item.id === selectedChannelId,
             );
-            if (selectedSummary) setChannel(selectedSummary);
+            if (selectedSummary) {
+              setChannel(markSelectedChannelRead(selectedSummary));
+            }
 
             const selectedMessages = delta.messages.filter(
               (item) => item.channelId === selectedChannelId,
@@ -502,6 +537,7 @@ export function CompanionChannels({
     channel?.id,
     invalidateChannelSurface,
     loading,
+    markSelectedChannelRead,
     organizationId,
     recordProposalMessages,
     t,
@@ -1201,7 +1237,11 @@ export function CompanionChannels({
           <ul>
             {group.channels.map((item) => (
               <li key={item.id}>
-                <button onClick={() => void openChannel(item)} type="button">
+                <button
+                  className={channelHasUnread(item) ? "unread" : undefined}
+                  onClick={() => void openChannel(item)}
+                  type="button"
+                >
                   {item.visibility === "private" ? (
                     <Lock size={15} />
                   ) : (
