@@ -31,6 +31,7 @@ import {
   listChannels,
   listChannelWebhooks,
   loadChannelDelta,
+  markChannelRead,
   consumeChannelWebhookRateLimit,
   renewChannelReplyLease,
   revokeChannelWebhook,
@@ -214,6 +215,78 @@ describe("organization channels", () => {
     expect(
       (await listChannels(db, organizationId, outsiderId)).map((row) => row.id),
     ).toContain(channelId);
+  });
+
+  it("marks a channel unread for others until the member reads it", async () => {
+    const channelId = "e0000000-0000-4000-8000-0000000000b1";
+    await createChannel(db, {
+      id: channelId,
+      organizationId,
+      slug: "alerts",
+      name: "Alerts",
+      topic: null,
+      visibility: "public",
+      defaultProjectId: null,
+      createdByUserId: ownerId,
+      createdAt: at(70),
+    });
+    const before = await loadChannelDelta(db, organizationId, outsiderId, 0);
+    await createChannelMessage(db, {
+      id: "f0000000-0000-4000-8000-0000000000b1",
+      channelId,
+      parentMessageId: null,
+      authorUserId: ownerId,
+      authorAgentId: null,
+      authorAgentName: null,
+      authorAgentProvider: null,
+      body: "Standup in five",
+      mentionedUserIds: [],
+      mentionedAgentIds: [],
+      createdAt: at(71),
+    });
+
+    const listed = await listChannels(db, organizationId, outsiderId);
+    expect(listed.find((row) => row.id === channelId)).toMatchObject({
+      last_message_at: at(71),
+      last_unread_message_at: at(71),
+      last_read_at: null,
+    });
+    expect(
+      listed.find((row) => row.id === channelId),
+    ).toEqual(expect.objectContaining({ last_unread_message_at: at(71) }));
+
+    const ownerListed = await listChannels(db, organizationId, ownerId);
+    expect(ownerListed.find((row) => row.id === channelId)?.last_unread_message_at)
+      .toBeNull();
+
+    const delta = await loadChannelDelta(
+      db,
+      organizationId,
+      outsiderId,
+      before.cursor,
+    );
+    expect(delta.channels.find((channel) => channel.id === channelId)).toMatchObject({
+      hasUnread: true,
+      lastMessageAt: at(71),
+      lastReadAt: null,
+    });
+
+    await markChannelRead(db, {
+      userId: outsiderId,
+      channelId,
+      lastReadAt: at(72),
+    });
+    const afterRead = await listChannels(db, organizationId, outsiderId);
+    expect(afterRead.find((row) => row.id === channelId)).toMatchObject({
+      last_read_at: at(72),
+      last_unread_message_at: at(71),
+    });
+    expect(afterRead.find((row) => row.id === channelId)?.last_unread_message_at)
+      .toBe(at(71));
+    expect(
+      (afterRead.find((row) => row.id === channelId)?.last_read_at ?? "")
+        > (afterRead.find((row) => row.id === channelId)?.last_unread_message_at ?? ""),
+    ).toBe(true);
   });
 
   it("threads messages and returns the structured mentions that were stored", async () => {
