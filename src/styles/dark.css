@@ -115,6 +115,24 @@
   background: var(--muted);
 }
 
+.dark .kanban-hidden-column {
+  border-color: var(--border);
+  color: var(--foreground);
+  background: var(--card);
+}
+
+.dark .kanban-hidden-columns-toggle,
+.dark .kanban-column-menu {
+  color: var(--muted-foreground);
+}
+
+.dark .kanban-hidden-columns-toggle:hover,
+.dark .kanban-column-menu:hover,
+.dark .kanban-column-menu[data-state="open"] {
+  color: var(--foreground);
+  background: var(--secondary);
+}
+
 .dark .kanban-checkpoint-marker > strong {
   border-color: var(--background);
 }

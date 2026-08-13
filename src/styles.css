@@ -1175,6 +1175,28 @@ body { overflow: hidden; font-synthesis: none; }
 .kanban-card-worker-badge .worker-icon { border:0; border-radius:50%; }
 .kanban-card-full-auto-badge { color:#c45a12; background:#fff4e8; }
 .kanban-card-full-auto-badge svg { display:block; }
+.kanban-column-menu { width:22px; height:22px; margin:0; padding:0; display:inline-grid; place-items:center; border:0; border-radius:6px; color:#7a7c75; background:transparent; cursor:pointer; transition:background-color .12s ease,color .12s ease; }
+.kanban-column-menu:hover,.kanban-column-menu[data-state="open"] { color:#4d4f49; background:rgba(82,83,77,.08); }
+.kanban-column-menu:focus-visible { outline:2px solid #8068ce; outline-offset:1px; }
+.kanban-hidden-columns { width:280px; min-width:280px; flex:0 0 280px; height:100%; min-height:0; display:flex; flex-direction:column; gap:8px; padding:4px 2px 0; }
+.kanban-hidden-columns-toggle { width:100%; min-height:28px; margin:0; padding:0 6px; display:flex; align-items:center; gap:6px; border:0; border-radius:7px; color:#73756e; background:transparent; cursor:pointer; font-size:var(--text-xs); font-weight:600; text-align:left; }
+.kanban-hidden-columns-toggle:hover { color:#4d4f49; background:rgba(82,83,77,.06); }
+.kanban-hidden-columns-toggle:focus-visible { outline:2px solid #8068ce; outline-offset:1px; }
+.kanban-hidden-columns-toggle svg { flex:0 0 auto; }
+.kanban-hidden-column-list { margin:0; padding:0; display:flex; flex-direction:column; gap:8px; list-style:none; overflow-y:auto; }
+.kanban-hidden-column { min-height:44px; padding:0 10px 0 12px; display:flex; align-items:center; gap:8px; border:1px solid #e5e6e0; border-radius:11px; background:#fff; box-shadow:0 1px 2px rgba(38,42,32,.04); }
+.kanban-hidden-column > span { min-width:0; display:flex; align-items:center; gap:8px; overflow:hidden; color:#2f312c; font-size:var(--text-xs); font-weight:600; text-overflow:ellipsis; white-space:nowrap; }
+.kanban-hidden-column > span i { width:10px; height:10px; flex:0 0 10px; border:2px solid #a5a7a0; border-radius:50%; }
+.kanban-hidden-column.violet > span i { border-color:#8167d6; background:#eee9ff; }
+.kanban-hidden-column.indigo > span i,.kanban-hidden-column.blue > span i { border-color:#58a0d1; background:#e8f4ff; }
+.kanban-hidden-column.amber > span i,.kanban-hidden-column.orange > span i { border-color:#d79a41; background:#fff3d9; }
+.kanban-hidden-column.rose > span i,.kanban-hidden-column.red > span i { border-color:#d65f72; background:#fff0f2; }
+.kanban-hidden-column.emerald > span i { border-color:#43a47f; background:#e8f7f1; }
+.kanban-hidden-column > strong { margin-left:auto; min-width:20px; color:#979991; font:500 var(--text-2xs) "DM Mono",monospace; text-align:right; }
+.kanban-hidden-column .kanban-column-menu { flex:0 0 auto; }
+@media (max-width:760px) {
+  .kanban-hidden-columns { width:auto; min-width:0; flex:0 0 auto; height:auto; }
+}
 .kanban-card.has-assignees .kanban-card-kicker { padding-right:22px; }
 .kanban-card.has-multiple-assignees .kanban-card-kicker { padding-right:39px; }
 .kanban-card.has-three-assignees .kanban-card-kicker { padding-right:56px; }
