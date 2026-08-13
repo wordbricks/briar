@@ -23,6 +23,21 @@ export const changelogCopy = {
     backTop: "맨 위로 ↑",
     entries: [
       {
+        version: "1.2.117",
+        date: "2026년 8월 13일",
+        title: "채널과 Inbox를 더 읽기 쉽고 정확하게 연결합니다",
+        summary:
+          "채널 메시지 표현과 Inbox 이동을 다듬고, Developer 에이전트의 역할과 긴 작업 기록·제공자 사용량 처리를 더 명확하고 안정적으로 만듭니다.",
+        items: [
+          "프로젝트 사이드바의 중복 Home 항목을 없애고 프로젝트 이름 자체가 홈을 열고 현재 위치를 표시하도록 단순화했습니다.",
+          "채널 메시지에 설정된 에이전트 아바타를 데스크탑·모바일·iOS에서 표시하고, 멘션 간격과 링크·인라인 코드·코드 블록·목록·인용·표의 Markdown 가독성을 개선했습니다.",
+          "데스크탑 Inbox의 채널 알림은 오른쪽 상세 패널에서 원문 또는 정확한 스레드를 열고, 모바일과 iOS의 이슈 대화 알림은 올바른 대화 탭으로 이동하면서 메시지 식별자와 읽음 상태를 보존합니다.",
+          "작업 기록 요청 전체 크기를 정확히 측정하고 HTTP 413 응답 시 배치를 순서대로 나눠 재전송하며, 선택적 기록 전송 실패가 에이전트 실행 자체를 실패시키지 않도록 했습니다.",
+          "OpenCode 무료 사용량 소진을 메타데이터가 부족한 경우에도 감지하고, Worker가 제공자의 사용량 소진 상태와 최대 사용률을 받아 등록 차단 여부를 정확히 판단합니다.",
+          "새 프로젝트의 기본 Developer 에이전트가 개발 계획에 그치지 않고 구현·검증·전달까지 직접 소유하도록 책임 문구를 갱신하며, 기존 기본값을 사용하던 에이전트에도 같은 변경을 적용합니다.",
+        ],
+      },
+      {
         version: "1.2.116",
         date: "2026년 8월 13일",
         title: "긴 에이전트 작업 기록을 더 안정적으로 보존합니다",
@@ -506,6 +521,21 @@ export const changelogCopy = {
     home: "Home",
     backTop: "Back to top ↑",
     entries: [
+      {
+        version: "1.2.117",
+        date: "August 13, 2026",
+        title: "Connect channels and Inbox more clearly and precisely",
+        summary:
+          "Refine channel presentation and Inbox navigation while clarifying the Developer agent's role and making long work logs and provider usage handling more resilient.",
+        items: [
+          "Remove the duplicate Home child from the project sidebar so the project name itself opens home and reflects the active location.",
+          "Show configured agent avatars in channel messages across desktop, mobile, and iOS, and improve mention spacing plus Markdown readability for links, inline code, code blocks, lists, quotes, and tables.",
+          "Open desktop Inbox channel alerts in the right detail pane at the correct root message or thread, and route mobile and iOS issue-conversation alerts to the proper conversation tab while preserving message identifiers and read state.",
+          "Measure the complete serialized work-log request, split and resend HTTP 413 batches in order, and keep optional transcript telemetry failures from failing the agent run itself.",
+          "Detect exhausted OpenCode free usage even when action metadata is absent, and let the Worker accept provider exhaustion state and maximum usage percentage when deciding whether registration is blocked.",
+          "Update the default Developer agent responsibility to own implementation, validation, and delivery—not only planning—and migrate agents that still use the previous default wording.",
+        ],
+      },
       {
         version: "1.2.116",
         date: "August 13, 2026",
@@ -1002,9 +1032,9 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <h1>{changelog.title}</h1>
           <p>{changelog.description}</p>
         </div>
-        <a href="#v1-2-116" className="changelog-current">
+        <a href="#v1-2-117" className="changelog-current">
           <span>{changelog.current}</span>
-          <strong>v1.2.116</strong>
+          <strong>v1.2.117</strong>
           <i aria-hidden="true">↓</i>
         </a>
       </section>
@@ -1029,6 +1059,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   {index === 0 ? <span>{changelog.latest}</span> : null}
                   <time
                     dateTime={
+                      entry.version === "1.2.117" ||
                       entry.version === "1.2.116" ||
                       entry.version === "1.2.115" ||
                       entry.version === "1.2.114"
