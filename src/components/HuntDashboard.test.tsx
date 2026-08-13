@@ -2168,7 +2168,7 @@ describe("HuntDashboard", () => {
         ?.click();
     });
     await act(async () => {
-      document
+      container
         .querySelector<HTMLButtonElement>(
           '[role="option"][data-value="user-1"]',
         )

@@ -420,6 +420,8 @@ describe("WorkerDispatchDialog", () => {
     const search = document.body.querySelector<HTMLInputElement>(
       'input[aria-label="모델 검색"]',
     )!;
+    expect(search.closest('[role="dialog"]')).not.toBeNull();
+    expect(document.activeElement).toBe(search);
     await act(async () => {
       const setter = Object.getOwnPropertyDescriptor(
         HTMLInputElement.prototype,

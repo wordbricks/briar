@@ -25,6 +25,7 @@ type MenuPosition = {
   bottom?: number;
   left: number;
   maxHeight: number;
+  portalContainer: HTMLElement;
   top?: number;
   width: number;
   zIndex: number;
@@ -144,7 +145,7 @@ export function SelectMenu({
     const desiredWidth = Math.max(rect.width, options.some((option) => option.description) ? 250 : 210);
     const width = Math.min(desiredWidth, window.innerWidth - viewportPadding * 2);
     const preferredLeft = align === "end" ? rect.right - width : rect.left;
-    const left = Math.min(
+    const viewportLeft = Math.min(
       Math.max(viewportPadding, preferredLeft),
       window.innerWidth - width - viewportPadding,
     );
@@ -152,13 +153,27 @@ export function SelectMenu({
       96,
       Math.min(320, placeAbove ? spaceAbove : spaceBelow),
     );
+    // Radix modal dialogs trap focus and pointer interaction inside their
+    // content. Keep the menu in that DOM boundary instead of portaling it to
+    // document.body, then translate viewport coordinates into the dialog's
+    // transformed coordinate space.
+    const portalContainer =
+      trigger.closest<HTMLElement>('[role="dialog"]') ?? document.body;
+    const portalRect = portalContainer === document.body
+      ? null
+      : portalContainer.getBoundingClientRect();
 
     setMenuPosition({
       ...(placeAbove
-        ? { bottom: window.innerHeight - rect.top + gap }
-        : { top: rect.bottom + gap }),
-      left,
+        ? {
+            bottom: portalRect
+              ? portalRect.bottom - rect.top + gap
+              : window.innerHeight - rect.top + gap,
+          }
+        : { top: rect.bottom + gap - (portalRect?.top ?? 0) }),
+      left: viewportLeft - (portalRect?.left ?? 0),
       maxHeight: availableHeight,
+      portalContainer,
       width,
       zIndex: getMenuZIndex(trigger),
     });
@@ -436,7 +451,7 @@ export function SelectMenu({
                 ) : null}
               </div>
             </div>,
-            document.body,
+            menuPosition.portalContainer,
           )
         : null}
     </div>
