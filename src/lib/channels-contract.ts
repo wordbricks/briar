@@ -136,7 +136,7 @@ export const organizationAgentInputSchema = z
     model: z.string().trim().min(1).max(100).nullable().default(null),
     responsibility: z.string().trim().min(1).max(2000),
     effort: z.enum(channelAgentEfforts).nullable().default(null),
-    skills: z.array(channelAgentSkillInputSchema).min(1).max(50).optional(),
+    skills: z.array(channelAgentSkillInputSchema).max(50).optional(),
   })
   .strict();
 
