@@ -28,12 +28,14 @@ describe("mention composer caret alignment", () => {
   it("keeps mirrored mention text at the native control's font weight", () => {
     const messageMention = ruleBody(".conversation-mention-button");
     expect(messageMention).toContain("font-weight:650");
+    expect(messageMention).toContain("margin:0 .18em 0 0");
 
     const composerMention = ruleBody(
       ".mention-composer-mirror .conversation-mention-button",
     );
     expect(composerMention).toContain("font-weight:inherit");
-    expect(composerMention).toContain("margin:-.06em -.36em");
+    expect(composerMention).toContain("padding:.06em .12em .06em .36em");
+    expect(composerMention).toContain("margin:-.06em -.12em -.06em -.36em");
   });
 
   it("uses the channel mirror to grow the textarea grid with wrapped content", () => {

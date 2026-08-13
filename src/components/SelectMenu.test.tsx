@@ -220,7 +220,7 @@ describe("SelectMenu", () => {
     container.remove();
   });
 
-  it("keeps the portaled listbox inside a modal dialog", async () => {
+  it("keeps viewport coordinates inside an untransformed modal dialog", async () => {
     const container = document.createElement("div");
     document.body.append(container);
     const root = createRoot(container);
@@ -244,20 +244,108 @@ describe("SelectMenu", () => {
       );
     });
 
+    const dialog = container.querySelector<HTMLElement>('[role="dialog"]')!;
+    const trigger = container.querySelector<HTMLButtonElement>(
+      "#dialog-model-select",
+    )!;
+    vi.spyOn(dialog, "getBoundingClientRect").mockReturnValue({
+      bottom: 680,
+      height: 600,
+      left: 400,
+      right: 970,
+      top: 80,
+      width: 570,
+      x: 400,
+      y: 80,
+      toJSON: () => ({}),
+    });
+    vi.spyOn(trigger, "getBoundingClientRect").mockReturnValue({
+      bottom: 242,
+      height: 42,
+      left: 460,
+      right: 760,
+      top: 200,
+      width: 300,
+      x: 460,
+      y: 200,
+      toJSON: () => ({}),
+    });
+
     await act(async () => {
-      container.querySelector<HTMLButtonElement>("#dialog-model-select")?.click();
+      trigger.click();
       await new Promise((resolve) => requestAnimationFrame(resolve));
     });
 
-    const dialog = container.querySelector<HTMLElement>('[role="dialog"]');
     const listbox = dialog?.querySelector<HTMLElement>(
       "#dialog-model-select-listbox",
     );
+    const popover = listbox?.closest<HTMLElement>(".select-menu-popover");
     expect(listbox).not.toBeNull();
     expect(listbox?.querySelectorAll('[role="option"]')).toHaveLength(40);
+    expect(popover?.style.left).toBe("460px");
+    expect(popover?.style.top).toBe("249px");
     expect(document.activeElement).toBe(
       dialog?.querySelector('input[aria-label="Search models"]'),
     );
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("translates viewport coordinates for a transformed modal dialog", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <div role="dialog" style={{ transform: "translate(-50%, -50%)" }}>
+          <SelectMenu
+            id="transformed-dialog-select"
+            label="Provider"
+            onValueChange={() => undefined}
+            options={[
+              { label: "Codex", value: "codex" },
+              { label: "Claude", value: "claude" },
+            ]}
+            value="codex"
+          />
+        </div>,
+      );
+    });
+
+    const dialog = container.querySelector<HTMLElement>('[role="dialog"]')!;
+    const trigger = container.querySelector<HTMLButtonElement>(
+      "#transformed-dialog-select",
+    )!;
+    vi.spyOn(dialog, "getBoundingClientRect").mockReturnValue({
+      bottom: 680,
+      height: 600,
+      left: 400,
+      right: 970,
+      top: 80,
+      width: 570,
+      x: 400,
+      y: 80,
+      toJSON: () => ({}),
+    });
+    vi.spyOn(trigger, "getBoundingClientRect").mockReturnValue({
+      bottom: 242,
+      height: 42,
+      left: 460,
+      right: 760,
+      top: 200,
+      width: 300,
+      x: 460,
+      y: 200,
+      toJSON: () => ({}),
+    });
+
+    await act(async () => trigger.click());
+
+    const popover = dialog.querySelector<HTMLElement>(".select-menu-popover");
+    expect(popover?.style.left).toBe("60px");
+    expect(popover?.style.top).toBe("169px");
 
     await act(async () => root.unmount());
     container.remove();

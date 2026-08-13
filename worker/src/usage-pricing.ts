@@ -204,6 +204,13 @@ export function estimateRunExecutionCost(input: {
   loadedPricing: LoadedAgentUsagePricing;
   fallback: RunUsagePricingFallback | null;
 }): AgentExecutionCostEstimate {
+  const providerReportedModels = [...new Set(
+    input.usageRecords.flatMap((record) => {
+      if (record.model_source !== "providerReported") return [];
+      const model = record.model?.trim() || record.canonical_model?.trim();
+      return model ? [model] : [];
+    }),
+  )];
   const records: readonly RunUsagePricingInput[] =
     input.usageRecords.length > 0
       ? input.usageRecords
@@ -218,6 +225,7 @@ export function estimateRunExecutionCost(input: {
     reason,
     usageRecords: records.length,
     pricedUsageRecords: 0,
+    providerReportedModels,
     estimatedUsdTicks: null,
     pricedUsdTicks: 0,
     models: [],
@@ -302,6 +310,7 @@ export function estimateRunExecutionCost(input: {
           : "usageUnavailable",
     usageRecords: records.length,
     pricedUsageRecords,
+    providerReportedModels,
     estimatedUsdTicks: complete ? pricedUsdTicks : null,
     pricedUsdTicks,
     models: [...models.values()].sort((left, right) =>
