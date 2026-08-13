@@ -1903,7 +1903,7 @@ button.conversation-reply-summary:focus-visible { outline:2px solid var(--ring);
 .issue-message-body > :last-child { margin-bottom:0; }
 .issue-message-body p { margin:0; white-space:pre-wrap; overflow-wrap:anywhere; }
 .issue-message-body a { overflow-wrap:anywhere; }
-.conversation-mention-button { appearance:none; display:inline; margin:0; padding:.06em .36em; border:0; border-radius:.38em; color:inherit; background:var(--secondary); font:inherit; font-weight:650; line-height:inherit; text-align:inherit; vertical-align:baseline; cursor:pointer; box-decoration-break:clone; -webkit-box-decoration-break:clone; }
+.conversation-mention-button { appearance:none; display:inline; margin:0 .36em 0 0; padding:.06em .36em; border:0; border-radius:.38em; color:inherit; background:var(--secondary); font:inherit; font-weight:650; line-height:inherit; text-align:inherit; vertical-align:baseline; cursor:pointer; box-decoration-break:clone; -webkit-box-decoration-break:clone; }
 .conversation-mention-button:hover { color:var(--foreground); background:color-mix(in srgb,var(--secondary) 76%,var(--foreground) 12%); }
 .conversation-mention-button:focus-visible { outline:2px solid var(--ring); outline-offset:1px; }
 .mention-composer-field { min-width:0; position:relative; }
