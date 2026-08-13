@@ -2463,11 +2463,13 @@ const providerHealthSchema = z.record(
       authenticated: z.boolean(),
       healthy: z.boolean(),
       reason: z.string().trim().max(64).nullable().optional(),
+      usageExhausted: z.boolean().optional(),
+      maxUsedPercent: z.number().min(0).max(100).nullable().optional(),
     })
     .strict(),
 );
 
-const workerRegisterSchema = z
+export const workerRegisterSchema = z
   .object({
     label: z.string().trim().min(1).max(100),
     deviceIdentity: z.string().regex(/^briar_device_[0-9a-f]{64}$/u),

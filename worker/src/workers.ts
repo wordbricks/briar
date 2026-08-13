@@ -37,6 +37,8 @@ export type ProviderHealth = {
   authenticated: boolean;
   healthy: boolean;
   reason?: string | null;
+  usageExhausted?: boolean;
+  maxUsedPercent?: number | null;
 };
 export type ProviderHealthMap = Partial<Record<AgentProvider, ProviderHealth>>;
 export type TranscriptDirection = "client" | "server";
