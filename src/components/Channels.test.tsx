@@ -13,6 +13,7 @@ import type { OrganizationMember } from "../types";
 
 const listChannels = vi.fn();
 const loadChannel = vi.fn();
+const markChannelRead = vi.fn().mockResolvedValue({ channel: {} });
 const loadChannelDelta = vi.fn();
 const sendChannelMessage = vi.fn();
 const acceptChannelProposal = vi.fn();
@@ -39,6 +40,7 @@ const channelRealtime = vi.hoisted(() => ({
 vi.mock("../lib/api", () => ({
   listChannels: (...args: unknown[]) => listChannels(...args),
   loadChannel: (...args: unknown[]) => loadChannel(...args),
+  markChannelRead: (...args: unknown[]) => markChannelRead(...args),
   loadChannelDelta: (...args: unknown[]) => loadChannelDelta(...args),
   sendChannelMessage: (...args: unknown[]) => sendChannelMessage(...args),
   acceptChannelProposal: (...args: unknown[]) => acceptChannelProposal(...args),
