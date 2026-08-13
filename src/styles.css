@@ -3598,7 +3598,7 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .inbox-pane-resizer:hover::before,.inbox-pane-resizer:focus-visible::before,.inbox-layout.is-resizing-inbox .inbox-pane-resizer::before { opacity:1; background:#a997df; box-shadow:0 0 0 1px rgba(128,104,206,.08); }
 .inbox-pane-resizer:hover::after,.inbox-pane-resizer:focus-visible::after,.inbox-layout.is-resizing-inbox .inbox-pane-resizer::after { opacity:1; border-color:#a997df; background:#f1edfc; }
 .inbox-detail-pane { min-width:0; min-height:0; height:100%; overflow:hidden; border-left:1px solid var(--border); background:var(--card); }
-.inbox-detail-pane > .main-content { width:100%; min-width:0; height:100%; }
+.inbox-detail-pane > .main-content { width:100%; min-width:0; min-height:0; height:100%; overflow:hidden; }
 .inbox-detail-pane .run-page-shell > .topbar { padding-right:18px; padding-left:18px; }
 .inbox-detail-empty { width:100%; height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:18px; color:#969791; background:var(--card); }
 .inbox-detail-empty > svg { color:#a8aaa4; }
