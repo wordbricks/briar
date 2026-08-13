@@ -512,9 +512,7 @@ describe("D1 migrations", () => {
     }
   });
 
-  it("advances one organization Inbox revision for every feed source", {
-    timeout: 60_000,
-  }, async () => {
+  it("advances one organization Inbox revision for every feed source", async () => {
     const miniflare = new Miniflare({
       modules: true,
       script: "export default { fetch() { return new Response('ok') } }",
@@ -602,11 +600,9 @@ describe("D1 migrations", () => {
     } finally {
       await miniflare.dispose();
     }
-  }, 30_000);
+  }, 60_000);
 
-  it("only finalizes a canonical reserved channel issue run", {
-    timeout: 60_000,
-  }, async () => {
+  it("only finalizes a canonical reserved channel issue run", async () => {
     const miniflare = new Miniflare({
       modules: true,
       script: "export default { fetch() { return new Response('ok') } }",
@@ -920,7 +916,7 @@ describe("D1 migrations", () => {
     } finally {
       await miniflare.dispose();
     }
-  }, 30_000);
+  }, 60_000);
 
   it("upgrades channel approvals with audit backfill and legacy quarantine", async () => {
     const miniflare = new Miniflare({
