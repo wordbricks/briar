@@ -10,7 +10,6 @@ import {
   Check,
   Ellipsis,
   Hash,
-  Home,
   Inbox,
   LogOut,
   Plus,
@@ -707,7 +706,12 @@ export function Sidebar({
                       )}
                     </button>
                     <button
-                      className="sidebar-project-heading"
+                      aria-current={
+                        isActive && activePage === "lobby" ? "page" : undefined
+                      }
+                      className={`sidebar-project-heading${
+                        isActive && activePage === "lobby" ? " active" : ""
+                      }`}
                       onClick={() => selectProject(project.id)}
                       type="button"
                     >
@@ -771,22 +775,6 @@ export function Sidebar({
                     className="sidebar-project-views"
                     id={`project-views-${project.id}`}
                   >
-                    <a
-                      aria-current={
-                        isActive && activePage === "lobby" ? "page" : undefined
-                      }
-                      className={`sidebar-project-view${
-                        isActive && activePage === "lobby" ? " active" : ""
-                      }`}
-                      href="#project-lobby"
-                      onClick={(event) => {
-                        event.preventDefault();
-                        openProjectPage(onLobbyOpen);
-                      }}
-                    >
-                      <Home size={14} strokeWidth={1.7} />
-                      <span>{t("sidebar.overview")}</span>
-                    </a>
                     <div className="sidebar-project-view-row">
                       <a
                         aria-current={

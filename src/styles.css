@@ -584,6 +584,7 @@ body { overflow: hidden; font-synthesis: none; }
 .sidebar-project-toggle:focus-visible { outline:2px solid #8b70dd; outline-offset:-1px; }
 .sidebar-project-heading { width: 100%; height: 34px; padding: 0 6px 0 4px; display: grid; grid-template-columns: 18px minmax(0,1fr) 8px; align-items: center; gap: 8px; border: 0; border-radius: 8px; color: #50514c; background: transparent; text-align: left; cursor: pointer; }
 .sidebar-project-heading:hover { color:var(--foreground); background: rgba(44,45,41,.055); }
+.sidebar-project-heading.active { color:var(--foreground); background: rgba(48,49,45,.085); }
 .sidebar-project-heading > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size:var(--text-sm); font-weight:600; }
 .sidebar-project-heading > svg { color: #6f706a; }
 .sidebar-project-heading > i { width: 7px; height: 7px; justify-self: center; border-radius: 50%; background: #21be68; box-shadow: 0 0 0 2px rgba(33,190,104,.09); }
