@@ -163,6 +163,11 @@ import {
   writeKanbanCollapsedColumnIds,
 } from "../lib/kanban-column-collapse";
 import {
+  readKanbanHiddenColumnIds,
+  toggleKanbanHiddenColumnId,
+  writeKanbanHiddenColumnIds,
+} from "../lib/kanban-column-hide";
+import {
   agentReplyParentMessageId,
   issueMentionAtCaret,
   issueMentionHandle,
@@ -644,6 +649,8 @@ export function HuntDashboard({
   const sourceFilterRef = useRef<HTMLDivElement>(null);
   const [view, setView] = useState<DashboardView>("kanban");
   const [collapsedColumnIds, setCollapsedColumnIds] = useState<string[]>([]);
+  const [hiddenColumnIds, setHiddenColumnIds] = useState<string[]>([]);
+  const [hiddenColumnsExpanded, setHiddenColumnsExpanded] = useState(true);
   const [internalStatus, setInternalStatus] = useState<StatusFilter>("all");
   const status = companionMode && companionStatus
     ? companionStatus
@@ -963,11 +970,18 @@ export function HuntDashboard({
     setCollapsedColumnIds(
       readKanbanCollapsedColumnIds(currentUserId, projectId),
     );
+    setHiddenColumnIds(
+      readKanbanHiddenColumnIds(currentUserId, projectId),
+    );
   }, [currentUserId, projectId]);
 
   const collapsedColumnIdSet = useMemo(
     () => new Set(collapsedColumnIds),
     [collapsedColumnIds],
+  );
+  const hiddenColumnIdSet = useMemo(
+    () => new Set(hiddenColumnIds),
+    [hiddenColumnIds],
   );
 
   const toggleKanbanColumnCollapsed = useCallback(
@@ -975,6 +989,17 @@ export function HuntDashboard({
       setCollapsedColumnIds((current) => {
         const next = toggleKanbanCollapsedColumnId(current, columnId);
         writeKanbanCollapsedColumnIds(currentUserId, projectId, next);
+        return next;
+      });
+    },
+    [currentUserId, projectId],
+  );
+
+  const toggleKanbanColumnHidden = useCallback(
+    (columnId: string) => {
+      setHiddenColumnIds((current) => {
+        const next = toggleKanbanHiddenColumnId(current, columnId);
+        writeKanbanHiddenColumnIds(currentUserId, projectId, next);
         return next;
       });
     },
@@ -1116,6 +1141,20 @@ export function HuntDashboard({
     status,
     t,
   ]);
+  const visibleKanbanColumns = useMemo(
+    () =>
+      companionMode
+        ? kanbanColumns
+        : kanbanColumns.filter((column) => !hiddenColumnIdSet.has(column.id)),
+    [companionMode, hiddenColumnIdSet, kanbanColumns],
+  );
+  const hiddenKanbanColumns = useMemo(
+    () =>
+      companionMode
+        ? []
+        : kanbanColumns.filter((column) => hiddenColumnIdSet.has(column.id)),
+    [companionMode, hiddenColumnIdSet, kanbanColumns],
+  );
   const createIssueDialog = isIssueDialogOpen ? (
     <CreateIssueDialog
       availableProviders={availableProviders}
@@ -1521,7 +1560,8 @@ export function HuntDashboard({
               <strong>{t("dashboard.emptyTitle")}</strong>
               <span>{t("dashboard.emptyDescription")}</span>
             </div>
-          ) : kanbanColumns.map((column) => {
+          ) : <>
+            {visibleKanbanColumns.map((column) => {
             const isCollapsed =
               !companionMode && collapsedColumnIdSet.has(column.id);
             return (
@@ -1585,6 +1625,10 @@ export function HuntDashboard({
                         <ChevronDown aria-hidden="true" size={14} />
                       )}
                     </button>
+                    <KanbanColumnMenu
+                      label={column.label}
+                      onHide={() => toggleKanbanColumnHidden(column.id)}
+                    />
                   </div>
                 </header>
               ) : null}
@@ -1786,6 +1830,55 @@ export function HuntDashboard({
             </div>
             );
           })}
+            {hiddenKanbanColumns.length > 0 ? (
+              <aside
+                aria-label={t("dashboard.hiddenColumns")}
+                className={`kanban-hidden-columns${hiddenColumnsExpanded ? "" : " is-collapsed"}`}
+                data-kanban-hidden-columns=""
+              >
+                <button
+                  aria-expanded={hiddenColumnsExpanded}
+                  aria-label={
+                    hiddenColumnsExpanded
+                      ? t("dashboard.collapseHiddenColumns")
+                      : t("dashboard.expandHiddenColumns")
+                  }
+                  className="kanban-hidden-columns-toggle"
+                  onClick={() => setHiddenColumnsExpanded((current) => !current)}
+                  type="button"
+                >
+                  {hiddenColumnsExpanded ? (
+                    <ChevronDown aria-hidden="true" size={14} />
+                  ) : (
+                    <ChevronRight aria-hidden="true" size={14} />
+                  )}
+                  <span>{t("dashboard.hiddenColumns")}</span>
+                </button>
+                {hiddenColumnsExpanded ? (
+                  <ul className="kanban-hidden-column-list">
+                    {hiddenKanbanColumns.map((column) => (
+                      <li
+                        className={`kanban-hidden-column ${column.tone}`}
+                        data-kanban-hidden-column-id={column.id}
+                        key={column.id}
+                      >
+                        <span>
+                          <i aria-hidden="true" />
+                          {column.label}
+                        </span>
+                        <strong>{column.runs.length}</strong>
+                        <KanbanColumnMenu
+                          hidden
+                          label={column.label}
+                          onShow={() => toggleKanbanColumnHidden(column.id)}
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+              </aside>
+            ) : null}
+          </>}
         </div>}
       </div>
       {companionMode && (
@@ -6710,6 +6803,60 @@ export function RunPage({
         </DialogContent>
       </Dialog>
     </MainContent>
+  );
+}
+
+function KanbanColumnMenu({
+  hidden = false,
+  label,
+  onHide,
+  onShow,
+}: {
+  hidden?: boolean;
+  label: string;
+  onHide?: () => void;
+  onShow?: () => void;
+}) {
+  const { t } = useI18n();
+  return (
+    <DropdownMenu.Root>
+      <DropdownMenu.Trigger asChild>
+        <button
+          aria-label={
+            hidden
+              ? t("dashboard.hiddenColumnMenu", { label })
+              : t("dashboard.columnMenu", { label })
+          }
+          className="kanban-column-menu"
+          type="button"
+        >
+          <MoreHorizontal aria-hidden="true" size={14} />
+        </button>
+      </DropdownMenu.Trigger>
+      <DropdownMenu.Portal>
+        <DropdownMenu.Content
+          align="end"
+          className="run-page-actions-menu"
+          sideOffset={6}
+        >
+          {hidden ? (
+            <DropdownMenu.Item
+              className="run-page-actions-item"
+              onSelect={onShow}
+            >
+              {t("dashboard.showColumn")}
+            </DropdownMenu.Item>
+          ) : (
+            <DropdownMenu.Item
+              className="run-page-actions-item"
+              onSelect={onHide}
+            >
+              {t("dashboard.hideColumn")}
+            </DropdownMenu.Item>
+          )}
+        </DropdownMenu.Content>
+      </DropdownMenu.Portal>
+    </DropdownMenu.Root>
   );
 }
 
