@@ -480,6 +480,7 @@ import {
   listChannelWebhooks,
   listChannels,
   loadChannelDelta,
+  markChannelRead,
   isChannelReactionEmoji,
   isChannelRootMessage,
   removeChannelAgent,
@@ -529,6 +530,7 @@ import {
 import {
   agentHandleSchema,
   channelInputSchema,
+  channelReadInputSchema,
   channelIssueProposalPayloadSchema,
   channelExecutionProposalAcceptInputSchema,
   channelMemberInputSchema,
@@ -7150,6 +7152,34 @@ async function route(
     }
     if (!channel) throw new HttpError(500, "Channel was not created");
     return json({ channel: channelJson(channel) }, 201);
+  }
+
+  const organizationChannelReadMatch = pathname.match(
+    /^\/organizations\/([0-9a-f-]+)\/channels\/([0-9a-f-]+)\/read$/u,
+  );
+  if (organizationChannelReadMatch && request.method === "PUT") {
+    const session = await requireSession(auth, request);
+    const channel = await requireChannelAccess(
+      db,
+      organizationChannelReadMatch[1],
+      organizationChannelReadMatch[2],
+      session.user.id,
+    );
+    const input = channelReadInputSchema.parse(await readJson(request));
+    const lastReadAt = input.lastReadAt ?? new Date().toISOString();
+    await markChannelRead(db, {
+      userId: session.user.id,
+      channelId: channel.id,
+      lastReadAt,
+    });
+    const updated = await getChannel(
+      db,
+      organizationChannelReadMatch[1],
+      channel.id,
+      session.user.id,
+    );
+    if (!updated) throw new HttpError(404, "Channel not found");
+    return json({ channel: channelJson(updated) });
   }
 
   const organizationChannelMatch = pathname.match(

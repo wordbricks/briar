@@ -30,6 +30,7 @@ import { featureFlags } from "../lib/feature-flags";
 import { isProjectConnectedLocally } from "../lib/local-project-connection";
 import type { RepositoryReadiness } from "../lib/project-connection";
 import type { ChannelSummary } from "../lib/channels-contract";
+import { channelHasUnread } from "../lib/channel-unread";
 import type {
   Organization,
   Project,
@@ -608,18 +609,17 @@ export function Sidebar({
 
             {areChannelsExpanded ? (
               <div className="sidebar-channel-list" id="sidebar-channel-list">
-                {(channels ?? []).map((channel) => (
+                {(channels ?? []).map((channel) => {
+                  const isActive =
+                    activePage === "channels" && channel.id === activeChannelId;
+                  const unread = !isActive && channelHasUnread(channel);
+                  return (
                   <button
-                    aria-current={
-                      activePage === "channels" && channel.id === activeChannelId
-                        ? "page"
-                        : undefined
-                    }
-                    className={
-                      activePage === "channels" && channel.id === activeChannelId
-                        ? "active"
-                        : ""
-                    }
+                    aria-current={isActive ? "page" : undefined}
+                    className={[
+                      isActive ? "active" : "",
+                      unread ? "unread" : "",
+                    ].filter(Boolean).join(" ")}
                     key={channel.id}
                     onClick={() => onChannelOpen(channel.id)}
                     type="button"
@@ -631,7 +631,8 @@ export function Sidebar({
                     )}
                     <span>{channel.name}</span>
                   </button>
-                ))}
+                  );
+                })}
                 {!channelsLoading && (channels ?? []).length === 0 ? (
                   <p>{t("sidebar.noChannels")}</p>
                 ) : null}

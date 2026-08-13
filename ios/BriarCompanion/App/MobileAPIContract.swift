@@ -60,6 +60,10 @@ enum MobileAPIContract {
             "\(channels(organizationID: organizationID))/\(channelID.uuidString.lowercased())"
         }
 
+        static func channelRead(organizationID: UUID, channelID: UUID) -> String {
+            "\(channel(organizationID: organizationID, channelID: channelID))/read"
+        }
+
         static func channelMessages(
             organizationID: UUID,
             channelID: UUID,

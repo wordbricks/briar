@@ -14,11 +14,22 @@ struct ChannelSummary: Codable, Hashable, Identifiable, Sendable {
     let agentCount: Int
     let createdAt: Date
     let updatedAt: Date
+    var lastMessageAt: Date? = nil
+    var lastReadAt: Date? = nil
+    var hasUnread: Bool? = nil
 
     enum Visibility: String, Codable, Hashable, Sendable {
         case org = "public"
         case restricted = "private"
     }
+}
+
+struct ChannelReadRequest: Encodable, Sendable {
+    var lastReadAt: Date?
+}
+
+struct ChannelReadResponse: Decodable, Sendable {
+    let channel: ChannelSummary
 }
 
 struct ChannelMessageAttachment: Codable, Hashable, Identifiable, Sendable {

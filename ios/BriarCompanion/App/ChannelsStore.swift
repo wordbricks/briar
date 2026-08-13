@@ -203,6 +203,7 @@ final class ChannelsStore: ObservableObject {
                 focusedChannelID == channelID
             else { return }
             upsertChannel(response.channel)
+            await markChannelRead(channelID)
             invalidateExecutionProposals(
                 forMessageIDs: previousMessageIDs.subtracting(Set(response.messages.map(\.id)))
             )
@@ -1290,6 +1291,10 @@ final class ChannelsStore: ObservableObject {
             }
         }
         channels = nextChannels
+        if let focusedChannelID,
+           nextChannels.contains(where: { $0.id == focusedChannelID && $0.hasUnread == true }) {
+            Task { await markChannelRead(focusedChannelID) }
+        }
 
         if let focusedChannelID,
            delta.channels.contains(where: {
@@ -1364,6 +1369,31 @@ final class ChannelsStore: ObservableObject {
             channels[index] = updated
         } else {
             channels.append(updated)
+        }
+    }
+
+    private func markChannelRead(_ channelID: UUID) async {
+        guard let organizationID, let token else { return }
+        if let index = channels.firstIndex(where: { $0.id == channelID }) {
+            var updated = channels[index]
+            updated.hasUnread = false
+            updated.lastReadAt = Date()
+            channels[index] = updated
+        }
+        do {
+            let response: ChannelReadResponse = try await api.send(
+                MobileAPIContract.Endpoint.channelRead(
+                    organizationID: organizationID,
+                    channelID: channelID
+                ),
+                method: "PUT",
+                token: token,
+                body: ChannelReadRequest(lastReadAt: Date()),
+                as: ChannelReadResponse.self
+            )
+            upsertChannel(response.channel)
+        } catch {
+            // The next catalog snapshot restores unread if the write failed.
         }
     }
 
