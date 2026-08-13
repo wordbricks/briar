@@ -286,6 +286,79 @@ const normalizedTokenUsage = (
   };
 };
 
+type CodexTokenUsageSnapshot = {
+  last: AgentExecutionTokenUsage;
+  total: AgentExecutionTokenUsage | null;
+};
+
+const codexTokenUsageSnapshotFromPayload = (
+  payload: unknown,
+): CodexTokenUsageSnapshot | null => {
+  const message = runnerPayload(payload);
+  if (
+    !message ||
+    nonEmptyString(message.method) !== "thread/tokenUsage/updated"
+  ) {
+    return null;
+  }
+  const params = asRecord(message.params);
+  const snapshot = asRecord(params?.tokenUsage);
+  const rawLast = asRecord(snapshot?.last);
+  const last = rawLast ? normalizedTokenUsage("codex", rawLast) : null;
+  if (!last) return null;
+  const rawTotal = asRecord(snapshot?.total);
+  return {
+    last,
+    total: rawTotal ? normalizedTokenUsage("codex", rawTotal) : null,
+  };
+};
+
+const tokenCountDifference = (
+  total: number | null,
+  baseline: number | null,
+  fallback: number | null | undefined = null,
+) =>
+  total !== null && baseline !== null && total >= baseline
+    ? total - baseline
+    : (fallback ?? null);
+
+const tokenUsageDifference = (
+  total: AgentExecutionTokenUsage,
+  baseline: AgentExecutionTokenUsage,
+  fallback?: AgentExecutionTokenUsage,
+): AgentExecutionTokenUsage => ({
+  inputTokens: tokenCountDifference(
+    total.inputTokens,
+    baseline.inputTokens,
+    fallback?.inputTokens,
+  ),
+  outputTokens: tokenCountDifference(
+    total.outputTokens,
+    baseline.outputTokens,
+    fallback?.outputTokens,
+  ),
+  cacheReadTokens: tokenCountDifference(
+    total.cacheReadTokens,
+    baseline.cacheReadTokens,
+    fallback?.cacheReadTokens,
+  ),
+  cacheWriteTokens: tokenCountDifference(
+    total.cacheWriteTokens,
+    baseline.cacheWriteTokens,
+    fallback?.cacheWriteTokens,
+  ),
+  reasoningOutputTokens: tokenCountDifference(
+    total.reasoningOutputTokens,
+    baseline.reasoningOutputTokens,
+    fallback?.reasoningOutputTokens,
+  ),
+  totalTokens: tokenCountDifference(
+    total.totalTokens,
+    baseline.totalTokens,
+    fallback?.totalTokens,
+  ),
+});
+
 const dedupeKey = (...parts: Array<string | null>) =>
   parts.every((part) => part !== null) ? parts.join(":") : null;
 
@@ -518,9 +591,7 @@ export function codexExecutionUsageObservationsFromPayload(
   }
 
   if (method === "thread/tokenUsage/updated") {
-    const tokenUsageSnapshot = asRecord(params?.tokenUsage);
-    const usage = asRecord(tokenUsageSnapshot?.last);
-    const tokenUsage = usage ? normalizedTokenUsage("codex", usage) : null;
+    const tokenUsage = codexTokenUsageSnapshotFromPayload(payload)?.last ?? null;
     return tokenUsage
       ? [
           {
@@ -1644,6 +1715,7 @@ export function createAgentExecutionUsageCollector(
   let claudeQueryHasCumulativeUsage = false;
   const openCodeFallbackKeyByMessage = new Map<string, string>();
   const openCodeMessagesWithSteps = new Set<string>();
+  const codexTurnUsageBaselines = new Map<string, AgentExecutionTokenUsage>();
   const grokUsageGroups = new Map<
     string,
     { rank: number; keys: Set<string> }
@@ -1920,6 +1992,8 @@ export function createAgentExecutionUsageCollector(
 
   const observe = (payload: unknown, observedAt = new Date().toISOString()) => {
     const normalizedObservedAt = observedAtSchema.parse(observedAt);
+    const codexTokenUsageSnapshot =
+      provider === "codex" ? codexTokenUsageSnapshotFromPayload(payload) : null;
     const observations = agentExecutionUsageObservationsFromPayload(
       provider,
       payload,
@@ -2028,7 +2102,7 @@ export function createAgentExecutionUsageCollector(
             scopedModelKey(observation.provider, observation.scopeId),
           )
         : undefined;
-      const enriched: AgentExecutionTokenObservation = {
+      let enriched: AgentExecutionTokenObservation = {
         ...observation,
         model: observation.model ?? scopedModel?.model ?? currentModel,
         canonicalModel:
@@ -2046,6 +2120,39 @@ export function createAgentExecutionUsageCollector(
         sessionId: observation.sessionId ?? scopedModel?.sessionId ?? null,
         turnId: observation.turnId ?? scopedModel?.turnId ?? null,
       };
+      if (
+        enriched.provider === "codex" &&
+        enriched.source === "codex.threadTokenUsage" &&
+        enriched.turnId &&
+        codexTokenUsageSnapshot?.total
+      ) {
+        const baselineKey = JSON.stringify([
+          enriched.sessionId,
+          enriched.turnId,
+        ]);
+        let baseline = codexTurnUsageBaselines.get(baselineKey);
+        if (!baseline) {
+          // App Server's `total` is cumulative for the whole thread while
+          // `last` is only the most recent model call. Their difference on
+          // the first snapshot is the thread usage from before this turn.
+          baseline = tokenUsageDifference(
+            codexTokenUsageSnapshot.total,
+            codexTokenUsageSnapshot.last,
+          );
+          codexTurnUsageBaselines.set(baselineKey, baseline);
+        }
+        enriched = {
+          ...enriched,
+          // Subtract the stable pre-turn baseline from each later cumulative
+          // snapshot. Fall back bucket-by-bucket when a provider omits or
+          // resets a cumulative counter.
+          tokenUsage: tokenUsageDifference(
+            codexTokenUsageSnapshot.total,
+            baseline,
+            codexTokenUsageSnapshot.last,
+          ),
+        };
+      }
       if (observation.model) currentModel = observation.model;
       if (observation.modelSource !== "unknown") {
         currentModelSource = observation.modelSource;

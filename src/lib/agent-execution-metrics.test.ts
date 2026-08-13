@@ -772,6 +772,196 @@ describe("agent execution metrics", () => {
     ]);
   });
 
+  it("aggregates every Codex model call in a turn from cumulative snapshots", () => {
+    const collector = createAgentExecutionUsageCollector("codex", {
+      configuredModel: "gpt-5.6-luna",
+    });
+    const usageUpdate = (
+      last: Record<string, number>,
+      total: Record<string, number>,
+    ) => ({
+      method: "thread/tokenUsage/updated",
+      params: {
+        threadId: "thread-1",
+        turnId: "turn-1",
+        tokenUsage: { last, total },
+      },
+    });
+
+    collector.observe(
+      usageUpdate(
+        {
+          inputTokens: 16_949,
+          cachedInputTokens: 9_984,
+          cacheWriteInputTokens: 0,
+          outputTokens: 299,
+          reasoningOutputTokens: 117,
+          totalTokens: 17_248,
+        },
+        {
+          inputTokens: 16_949,
+          cachedInputTokens: 9_984,
+          cacheWriteInputTokens: 0,
+          outputTokens: 299,
+          reasoningOutputTokens: 117,
+          totalTokens: 17_248,
+        },
+      ),
+    );
+    collector.observe(
+      usageUpdate(
+        {
+          inputTokens: 77_229,
+          cachedInputTokens: 9_984,
+          cacheWriteInputTokens: 0,
+          outputTokens: 689,
+          reasoningOutputTokens: 500,
+          totalTokens: 77_918,
+        },
+        {
+          inputTokens: 52_785_669,
+          cachedInputTokens: 51_757_312,
+          cacheWriteInputTokens: 0,
+          outputTokens: 86_388,
+          reasoningOutputTokens: 34_004,
+          totalTokens: 52_872_057,
+        },
+      ),
+    );
+
+    expect(collector.finish()).toEqual([
+      expect.objectContaining({
+        dedupeKey: "codex:turn:turn-1:usage",
+        tokenUsage: {
+          inputTokens: 52_785_669,
+          outputTokens: 86_388,
+          cacheReadTokens: 51_757_312,
+          cacheWriteTokens: 0,
+          reasoningOutputTokens: 34_004,
+          totalTokens: 52_872_057,
+        },
+      }),
+    ]);
+  });
+
+  it("subtracts prior thread usage across resumed and consecutive Codex turns", () => {
+    const collector = createAgentExecutionUsageCollector("codex");
+    const observeUsage = (
+      turnId: string,
+      last: Record<string, number>,
+      total: Record<string, number>,
+    ) =>
+      collector.observe({
+        method: "thread/tokenUsage/updated",
+        params: {
+          threadId: "resumed-thread",
+          turnId,
+          tokenUsage: { last, total },
+        },
+      });
+
+    observeUsage(
+      "turn-1",
+      {
+        inputTokens: 100,
+        cachedInputTokens: 80,
+        outputTokens: 10,
+        reasoningOutputTokens: 3,
+        totalTokens: 110,
+      },
+      {
+        inputTokens: 1_100,
+        cachedInputTokens: 880,
+        outputTokens: 110,
+        reasoningOutputTokens: 23,
+        totalTokens: 1_210,
+      },
+    );
+    observeUsage(
+      "turn-1",
+      {
+        inputTokens: 300,
+        cachedInputTokens: 220,
+        outputTokens: 40,
+        reasoningOutputTokens: 12,
+        totalTokens: 340,
+      },
+      {
+        inputTokens: 1_400,
+        cachedInputTokens: 1_100,
+        outputTokens: 150,
+        reasoningOutputTokens: 35,
+        totalTokens: 1_550,
+      },
+    );
+    observeUsage(
+      "turn-2",
+      {
+        inputTokens: 200,
+        cachedInputTokens: 150,
+        outputTokens: 20,
+        reasoningOutputTokens: 5,
+        totalTokens: 220,
+      },
+      {
+        inputTokens: 1_600,
+        cachedInputTokens: 1_250,
+        outputTokens: 170,
+        reasoningOutputTokens: 40,
+        totalTokens: 1_770,
+      },
+    );
+    observeUsage(
+      "turn-2",
+      {
+        inputTokens: 300,
+        cachedInputTokens: 250,
+        outputTokens: 40,
+        reasoningOutputTokens: 15,
+        totalTokens: 340,
+      },
+      {
+        inputTokens: 1_900,
+        cachedInputTokens: 1_500,
+        outputTokens: 210,
+        reasoningOutputTokens: 55,
+        totalTokens: 2_110,
+      },
+    );
+
+    const observations = collector.finish();
+    expect(observations).toEqual([
+      expect.objectContaining({
+        turnId: "turn-1",
+        tokenUsage: expect.objectContaining({
+          inputTokens: 400,
+          cacheReadTokens: 300,
+          outputTokens: 50,
+          reasoningOutputTokens: 15,
+          totalTokens: 450,
+        }),
+      }),
+      expect.objectContaining({
+        turnId: "turn-2",
+        tokenUsage: expect.objectContaining({
+          inputTokens: 500,
+          cacheReadTokens: 400,
+          outputTokens: 60,
+          reasoningOutputTokens: 20,
+          totalTokens: 560,
+        }),
+      }),
+    ]);
+    expect(agentExecutionTokenUsageFromObservations(observations)).toEqual({
+      inputTokens: 900,
+      outputTokens: 110,
+      cacheReadTokens: 700,
+      cacheWriteTokens: null,
+      reasoningOutputTokens: 35,
+      totalTokens: 1_010,
+    });
+  });
+
   it("returns ledger-ready Codex records with disjoint input and a stable timestamp", () => {
     const collector = createAgentExecutionUsageCollector("codex", {
       configuredModel: "gpt-5.6-sol",
