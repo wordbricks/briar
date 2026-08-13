@@ -104,7 +104,7 @@ describe("Agent Skill normalization", () => {
     kind: "custom" as const,
   };
 
-  it("creates a compatibility Skill only when the roster is omitted", () => {
+  it("can still normalize a legacy omitted roster with a compatibility Skill", () => {
     expect(
       normalizedAgentSkillRows(
         "agent-1",
@@ -122,15 +122,15 @@ describe("Agent Skill normalization", () => {
     ]);
   });
 
-  it("rejects an explicitly empty roster", () => {
-    expect(() =>
+  it("keeps an explicitly empty roster empty", () => {
+    expect(
       normalizedAgentSkillRows(
         "agent-1",
         [],
         fallback,
         "2026-08-10T00:00:00.000Z",
-      )
-    ).toThrow("An Agent must have at least one Skill");
+      ),
+    ).toEqual([]);
   });
 });
 

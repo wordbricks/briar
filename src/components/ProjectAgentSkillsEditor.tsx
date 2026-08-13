@@ -45,7 +45,6 @@ export function projectAgentSkillsValid(
     skill.name.trim().normalize("NFKC").toLocaleLowerCase(),
   );
   return (
-    skills.length > 0 &&
     new Set(names).size === names.length &&
     skills.every(
       (skill) => skill.name.trim() && skill.instructions.trim(),
@@ -101,7 +100,6 @@ export function ProjectAgentSkillsEditor({
   };
 
   const removeSkill = (index: number) => {
-    if (skills.length <= 1) return;
     const next = skills.filter((_, candidateIndex) => candidateIndex !== index);
     onChange(positioned(next));
   };
@@ -176,14 +174,9 @@ export function ProjectAgentSkillsEditor({
                       aria-label={t("agents.deleteSkill", {
                         name: skill.name.trim() || t("agents.untitledSkill"),
                       })}
-                      disabled={disabled || skills.length <= 1}
+                      disabled={disabled}
                       onClick={() => removeSkill(index)}
                       size="icon-sm"
-                      title={
-                        skills.length <= 1
-                          ? t("agents.keepOneSkill")
-                          : undefined
-                      }
                       type="button"
                       variant="ghost"
                     >

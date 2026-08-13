@@ -117,7 +117,7 @@ export async function createOrganizationAgent(
 ) {
   const skillRows = normalizedAgentSkillRows(
     input.id,
-    input.skills,
+    input.skills ?? [],
     {
       name: input.name,
       instructions: input.responsibility,

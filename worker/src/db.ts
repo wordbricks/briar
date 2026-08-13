@@ -29,7 +29,6 @@ import type {
 import {
   defaultProjectAgentCalendarColor,
   defaultProjectAgentCopy,
-  defaultProjectAgentSkillCopy,
   projectAgentSkill,
   type ProjectAgentLocale,
 } from "../../src/lib/project-agent";
@@ -4271,7 +4270,6 @@ export async function createProject(
   };
   const locale = input.locale ?? "en";
   const defaultAgentCopy = defaultProjectAgentCopy(locale);
-  const defaultSkillCopy = defaultProjectAgentSkillCopy(locale);
   const defaultAgent: ProjectAgentRow = {
     id: crypto.randomUUID(),
     organization_id: input.organizationId,
@@ -4292,27 +4290,6 @@ export async function createProject(
     created_at: createdAt,
     updated_at: createdAt,
   };
-  const [defaultSkill] = normalizedAgentSkillRows(
-    defaultAgent.id,
-    [{
-      name: defaultSkillCopy.name,
-      instructions: defaultSkillCopy.instructions,
-      provider: defaultAgent.provider,
-      model: defaultAgent.model,
-      effort: defaultAgent.effort,
-      kind: "issue_processing",
-      position: 0,
-    }],
-    {
-      name: defaultSkillCopy.name,
-      instructions: defaultSkillCopy.instructions,
-      provider: defaultAgent.provider,
-      model: defaultAgent.model,
-      effort: defaultAgent.effort,
-      kind: "issue_processing",
-    },
-    createdAt,
-  );
   const initialWorkflow = cloneAutoHuntWorkflow();
   await db.batch([
         db
@@ -4366,7 +4343,6 @@ export async function createProject(
             defaultAgent.created_at,
             defaultAgent.updated_at,
           ),
-        insertAgentSkillStatement(db, defaultSkill),
       ]);
   return project;
 }
@@ -5499,7 +5475,7 @@ export async function createProjectAgent(
   agent.organization_id = organization.organization_id;
   const skillRows = normalizedAgentSkillRows(
     agent.id,
-    input.skills,
+    input.skills ?? [],
     {
       name: input.name,
       instructions: input.responsibility,
