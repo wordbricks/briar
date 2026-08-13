@@ -1,4 +1,6 @@
 export const ko = {
+  "inbox.noNotificationSelected": "선택된 알림 없음",
+  "inbox.resizeDetailPane": "받은 편지함 상세 패널 크기 조절",
   "app.developmentBadge": "개발 앱",
   "app.version": "앱 버전 {version}",
   "statusTray.running": "실행 중",
@@ -1831,6 +1833,8 @@ export type Messages = Record<MessageKey, string>;
 
 export const en: Messages = {
   ...ko,
+  "inbox.noNotificationSelected": "No notification selected",
+  "inbox.resizeDetailPane": "Resize inbox detail panel",
   "run.creator": "Creator",
   "run.creatorUnknown": "Unknown",
   "channel.webhooks": "Incoming webhooks",
@@ -2774,6 +2778,8 @@ export const en: Messages = {
 };
 export const zh: Messages = {
   ...en,
+  "inbox.noNotificationSelected": "未选择通知",
+  "inbox.resizeDetailPane": "调整收件箱详情面板大小",
   "run.creator": "创建者",
   "run.creatorUnknown": "未知",
   "channel.webhooks": "传入 Webhook",

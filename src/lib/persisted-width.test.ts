@@ -17,6 +17,14 @@ import {
   loadConversationPaneWidth,
   saveConversationPaneWidth,
 } from "./conversation-pane-width";
+import {
+  clampInboxPaneWidth,
+  inboxPaneWidthMax,
+  inboxPaneWidthMin,
+  inboxPaneWidthStorageKey,
+  loadInboxPaneWidth,
+  saveInboxPaneWidth,
+} from "./inbox-pane-width";
 
 const adapters = [
   {
@@ -36,6 +44,15 @@ const adapters = [
     clamp: clampConversationPaneWidth,
     load: loadConversationPaneWidth,
     save: saveConversationPaneWidth,
+  },
+  {
+    name: "inbox pane width",
+    min: inboxPaneWidthMin,
+    max: inboxPaneWidthMax,
+    storageKey: inboxPaneWidthStorageKey,
+    clamp: clampInboxPaneWidth,
+    load: loadInboxPaneWidth,
+    save: saveInboxPaneWidth,
   },
 ] as const;
 
