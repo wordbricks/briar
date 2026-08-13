@@ -24,6 +24,10 @@
   color: var(--sidebar-foreground);
 }
 
+.dark .sidebar-channel-list button.unread {
+  color: var(--sidebar-accent-foreground);
+}
+
 .dark .sidebar-brand:hover,
 .dark .sidebar-brand[aria-expanded="true"],
 .dark .sidebar-primary-nav a:hover,

@@ -401,6 +401,8 @@ body { overflow: hidden; font-synthesis: none; }
 .sidebar-channel-list button { width:100%; height:32px; padding:0 10px 0 36px; display:flex; align-items:center; gap:8px; border:0; border-radius:8px; color:#676863; background:transparent; text-align:left; cursor:pointer; font:500 var(--text-xs)/1 inherit; }
 .sidebar-channel-list button:hover { color:var(--foreground); background:rgba(44,45,41,.055); }
 .sidebar-channel-list button.active { color:var(--foreground); background:rgba(48,49,45,.085); font-weight:600; }
+.sidebar-channel-list button.unread { color:var(--foreground); font-weight:700; }
+.sidebar-channel-list button.unread > span { font-weight:700; }
 .sidebar-channel-list button svg { flex:0 0 auto; color:var(--muted-foreground); }
 .sidebar-channel-list > p { margin:3px 10px 4px 36px; color:var(--muted-foreground); font-size:var(--text-2xs); line-height:1.45; }
 .sidebar-channel-context-menu { min-width:174px; z-index:80; padding:5px; border:1px solid var(--border); border-radius:11px; color:var(--popover-foreground); background:color-mix(in srgb,var(--popover) 98%,transparent); box-shadow:0 16px 45px rgba(0,0,0,.22); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); animation:sidebar-menu-in .12s cubic-bezier(.2,.8,.2,1); }
@@ -6765,6 +6767,8 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .companion-channel-group ul { margin: 0; list-style: none; padding: 0; }
 .companion-channel-group li + li { border-top: 1px solid var(--border, #e7e2d9); }
 .companion-channel-group button { display: flex; width: 100%; align-items: center; gap: 9px; border: 0; background: transparent; padding: 13px 16px; color: inherit; font: inherit; font-size: 15px; text-align: left; }
+.companion-channel-group button.unread { font-weight: 700; }
+.companion-channel-group button.unread span { font-weight: 700; }
 .companion-channel-group button span { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .companion-channel-agent-count { display: inline-flex; align-items: center; gap: 3px; border-radius: 999px; background: #ece7dd; padding: 1px 7px; color: var(--muted-foreground, #777168); font-size: 11px; font-style: normal; }
 

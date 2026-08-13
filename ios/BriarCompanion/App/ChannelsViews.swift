@@ -117,7 +117,9 @@ private struct ChannelRow: View {
             Image(systemName: channel.visibility == .restricted ? "lock" : "number")
                 .foregroundStyle(.secondary)
                 .font(.footnote)
-            Text(channel.name).lineLimit(1)
+            Text(channel.name)
+                .fontWeight(channel.hasUnread == true ? .semibold : .regular)
+                .lineLimit(1)
             Spacer(minLength: 8)
             if channel.agentCount > 0 {
                 Label("\(channel.agentCount)", systemImage: "cpu")

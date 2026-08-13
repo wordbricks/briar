@@ -47,6 +47,7 @@ import {
   listOrganizationAgents,
   loadChannel,
   loadChannelDelta,
+  markChannelRead,
   loadDashboard,
   loadOrganizationMembers,
   sendChannelMessage,
@@ -76,6 +77,11 @@ import type {
   ChannelSummary,
   ChannelWebhook,
 } from "../lib/channels-contract";
+import {
+  channelHasUnread,
+  laterTimestamp,
+  markChannelCatalogRead,
+} from "../lib/channel-unread";
 import type { MentionTarget } from "../lib/channel-mentions";
 import {
   mergeChannelMessages,
@@ -282,6 +288,28 @@ export function Channels({
   onCreateAgent,
 }: ChannelsProps) {
   const { t, localeTag } = useI18n();
+  useEffect(() => {
+    if (!activeChannelId) return;
+    const channel = channels.find((item) => item.id === activeChannelId);
+    if (!channel || !channelHasUnread(channel)) return;
+    const lastReadAt = laterTimestamp(
+      channel.lastMessageAt,
+      new Date().toISOString(),
+    );
+    onChannelsChange((current) =>
+      markChannelCatalogRead(current, activeChannelId, lastReadAt),
+    );
+    void markChannelRead(token, organizationId, activeChannelId, { lastReadAt })
+      .catch(() => {
+        // The next catalog snapshot restores unread if the write failed.
+      });
+  }, [
+    activeChannelId,
+    channels,
+    onChannelsChange,
+    organizationId,
+    token,
+  ]);
   const [members, setMembers] = useState<ChannelMember[]>([]);
   const [agents, setAgents] = useState<ChannelAgentSummary[]>([]);
   const [messages, setMessages] = useState<ChannelMessage[]>([]);
