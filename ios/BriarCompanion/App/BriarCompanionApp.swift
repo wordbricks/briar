@@ -284,7 +284,7 @@ private actor UITestAPIClient: MobileAPIClientProtocol {
             """##
         } else if path.hasSuffix("/issues") && method == "POST" {
             issueStatus = .queued
-            payload = #"{"runId":"77777777-7777-4777-8777-777777777777","sourceKey":"briar-issue:ui-test","stage":"queued","status":"queued","attachments":[]}"#
+            payload = #"{"runId":"77777777-7777-4777-8777-777777777777","sourceKey":"briar-issue:ui-test","stage":"queued","status":"queued","attachments":[],"createdByUserId":"fixture-user"}"#
         } else if path.hasSuffix("/dispatch") && method == "POST" {
             issueStatus = .running
             payload = #"{"runId":"77777777-7777-4777-8777-777777777777","agentId":null,"provider":"codex","model":null,"effort":null,"requestedWorkerId":null,"requestedByUserId":"fixture-user","dispatchMode":"any","dispatchedAt":"2026-08-02T01:01:00Z","outcome":"dispatched"}"#
