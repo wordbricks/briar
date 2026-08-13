@@ -13,22 +13,22 @@ describe("default project agent copy", () => {
   it("uses the requested Korean responsibility", () => {
     expect(defaultProjectAgentCopy("ko")).toEqual({
       name: "개발자 에이전트",
-      responsibility: "대기 중인 모든 이슈를 처리합니다.",
+      responsibility: "프로젝트의 개발과 코드 관련 작업을 책임집니다.",
     });
     expect(defaultProjectAgentSkillCopy("ko")).toEqual({
       name: "이슈 처리",
-      instructions: "대기 중인 모든 이슈를 처리합니다.",
+      instructions: "프로젝트의 개발과 코드 관련 작업을 책임집니다.",
     });
   });
 
   it("localizes English and Chinese project agents", () => {
     expect(defaultProjectAgentCopy("en")).toEqual({
       name: "Developer agent",
-      responsibility: "Process every queued issue.",
+      responsibility: "Owns the project's development and code-related work.",
     });
     expect(defaultProjectAgentCopy("zh")).toEqual({
       name: "开发者智能体",
-      responsibility: "处理所有排队中的问题。",
+      responsibility: "负责项目的开发和代码相关工作。",
     });
   });
 
@@ -77,7 +77,7 @@ describe("project agent skills", () => {
   it("creates the same repository workflow contract for every agent", () => {
     const skill = projectAgentSkill(defaultProjectAgentCopy("en"));
 
-    expect(skill).toContain("Process every queued issue.");
+    expect(skill).toContain("Owns the project's development and code-related work.");
     expect(skill).toContain("attached project workflow");
     expect(skill).not.toContain("briar queue claim");
   });

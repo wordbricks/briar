@@ -3439,6 +3439,178 @@ describe("D1 migrations", () => {
     }
   });
 
+  it("rewrites the default Developer Agent responsibility to own development work", async () => {
+    const miniflare = new Miniflare({
+      modules: true,
+      script: "export default { fetch() { return new Response('ok') } }",
+      d1Databases: { DB: "briar-default-agent-responsibility-migration-test" },
+    });
+    try {
+      const db = (await miniflare.getD1Database("DB")) as unknown as D1Database;
+      await db.prepare(
+        `create table briar_project_agents (
+           id text primary key not null,
+           name text not null,
+           responsibility text not null,
+           provider text not null,
+           model text,
+           effort text,
+           skill_markdown text not null,
+           created_at text not null,
+           updated_at text not null
+         )`,
+      ).run();
+      await db.prepare(
+        `create table briar_agent_skills (
+           id text primary key not null,
+           agent_id text not null
+             references briar_project_agents (id) on delete cascade,
+           name text not null,
+           instructions text not null default '',
+           provider text not null,
+           model text,
+           effort text,
+           kind text not null default 'custom',
+           is_default integer not null default 0,
+           position integer not null default 0,
+           created_at text not null,
+           updated_at text not null
+         )`,
+      ).run();
+
+      const agents = [
+        ["dev-en", "Developer agent", "Process every queued issue."],
+        ["dev-ko", "개발자 에이전트", "대기 중인 모든 이슈를 처리합니다."],
+        ["dev-zh", "开发者智能体", "处理所有排队中的问题。"],
+        ["customized", "Developer agent", "Ship the mobile release."],
+        ["legacy-name", "Issue processing agent", "Process every queued issue."],
+      ] as const;
+      for (const [id, name, responsibility] of agents) {
+        await db.prepare(
+          `insert into briar_project_agents (
+             id, name, responsibility, provider, model, effort,
+             skill_markdown, created_at, updated_at
+           ) values (?, ?, ?, 'codex', null, null, ?, ?, ?)`,
+        ).bind(
+          id,
+          name,
+          responsibility,
+          `# ${name}\n\n## Responsibility\n\n${responsibility}\n`,
+          "2026-08-01T00:00:00.000Z",
+          "2026-08-01T00:00:00.000Z",
+        ).run();
+      }
+
+      const skills = [
+        ["skill-en", "dev-en", "issue_processing", "Process every queued issue."],
+        ["skill-ko", "dev-ko", "issue_processing", "대기 중인 모든 이슈를 처리합니다."],
+        ["skill-zh", "dev-zh", "issue_processing", "处理所有排队中的问题。"],
+        ["skill-custom-kind", "dev-en", "custom", "Process every queued issue."],
+        ["skill-customized", "customized", "issue_processing", "Ship the mobile release."],
+      ] as const;
+      for (const [id, agentId, kind, instructions] of skills) {
+        await db.prepare(
+          `insert into briar_agent_skills (
+             id, agent_id, name, instructions, provider, model, effort,
+             kind, is_default, position, created_at, updated_at
+           ) values (?, ?, ?, ?, 'codex', null, null, ?, 1, 0, ?, ?)`,
+        ).bind(
+          id,
+          agentId,
+          id,
+          instructions,
+          kind,
+          "2026-08-01T00:00:00.000Z",
+          "2026-08-01T00:00:00.000Z",
+        ).run();
+      }
+
+      const sql = await readFile(
+        resolve("migrations", "0104_default_developer_agent_responsibility.sql"),
+        "utf8",
+      );
+      await executeD1Sql(db, sql);
+
+      const agentResults = await db.prepare(
+        `select id, name, responsibility, skill_markdown from briar_project_agents
+         order by id`,
+      ).all<{
+        id: string;
+        name: string;
+        responsibility: string;
+        skill_markdown: string;
+      }>();
+      expect(agentResults.results).toEqual([
+        expect.objectContaining({
+          id: "customized",
+          name: "Developer agent",
+          responsibility: "Ship the mobile release.",
+          skill_markdown: expect.stringContaining("Ship the mobile release."),
+        }),
+        expect.objectContaining({
+          id: "dev-en",
+          responsibility: "Owns the project's development and code-related work.",
+          skill_markdown: expect.stringContaining(
+            "Owns the project's development and code-related work.",
+          ),
+        }),
+        expect.objectContaining({
+          id: "dev-ko",
+          responsibility: "프로젝트의 개발과 코드 관련 작업을 책임집니다.",
+          skill_markdown: expect.stringContaining(
+            "프로젝트의 개발과 코드 관련 작업을 책임집니다.",
+          ),
+        }),
+        expect.objectContaining({
+          id: "dev-zh",
+          responsibility: "负责项目的开发和代码相关工作。",
+          skill_markdown: expect.stringContaining(
+            "负责项目的开发和代码相关工作。",
+          ),
+        }),
+        expect.objectContaining({
+          id: "legacy-name",
+          name: "Issue processing agent",
+          responsibility: "Process every queued issue.",
+          skill_markdown: expect.stringContaining("Process every queued issue."),
+        }),
+      ]);
+
+      const skillResults = await db.prepare(
+        `select id, kind, instructions from briar_agent_skills order by id`,
+      ).all<{ id: string; kind: string; instructions: string }>();
+      expect(skillResults.results).toEqual([
+        expect.objectContaining({
+          id: "skill-custom-kind",
+          kind: "custom",
+          instructions: "Process every queued issue.",
+        }),
+        expect.objectContaining({
+          id: "skill-customized",
+          kind: "issue_processing",
+          instructions: "Ship the mobile release.",
+        }),
+        expect.objectContaining({
+          id: "skill-en",
+          kind: "issue_processing",
+          instructions: "Owns the project's development and code-related work.",
+        }),
+        expect.objectContaining({
+          id: "skill-ko",
+          kind: "issue_processing",
+          instructions: "프로젝트의 개발과 코드 관련 작업을 책임집니다.",
+        }),
+        expect.objectContaining({
+          id: "skill-zh",
+          kind: "issue_processing",
+          instructions: "负责项目的开发和代码相关工作。",
+        }),
+      ]);
+    } finally {
+      await miniflare.dispose();
+    }
+  });
+
   it("backfills claimable work before retiring implicit Skill selection", async () => {
     const miniflare = new Miniflare({
       modules: true,

@@ -66,7 +66,7 @@ export const tutorialCopy = {
         description:
           "에이전트에서 이슈 처리 에이전트의 작업 실행을 열면 대기 중인 이슈를 찾아 워크플로에 따라 분석, 구현, 검증하도록 실행할 수 있습니다. 에이전트는 각 이슈를 독립된 작업으로 처리하고 진행 상태를 보드에 기록합니다.",
         bullets: [
-          "요청에 “대기 중인 모든 이슈를 처리합니다.”가 들어 있는지 확인하고 작업 실행을 누릅니다.",
+          "요청에 “프로젝트의 개발과 코드 관련 작업을 책임집니다.”가 들어 있는지 확인하고 작업 실행을 누릅니다.",
           "실행이 시작되면 대기 중인 이슈가 워크플로 단계로 이동하고 필요한 검증까지 이어집니다.",
         ],
         image: "/tutorial/07-run-auto-hunt.webp",
@@ -219,7 +219,7 @@ export const tutorialCopy = {
         description:
           "Open Run Task for the issue processing agent in Agents to find queued issues and move each one through analysis, implementation, and validation. Briar keeps every issue isolated and records its progress on the board.",
         bullets: [
-          "Confirm the request says “Process every queued issue.”, then choose Run Task.",
+          "Confirm the request says “Owns the project's development and code-related work.”, then choose Run Task.",
           "Once the run starts, queued issues move through the workflow and continue into the required checks.",
         ],
         image: "/tutorial/07-run-auto-hunt.webp",

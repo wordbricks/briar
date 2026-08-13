@@ -883,14 +883,14 @@
             "codexPet": null,
             "provider": "codex",
             "model": "gpt-5.4",
-            "responsibility": "Process every queued issue.",
-            "skill": "# Issue processing agent\n\n## Responsibility\n\nProcess every queued issue.",
+            "responsibility": "Owns the project's development and code-related work.",
+            "skill": "# Issue processing agent\n\n## Responsibility\n\nOwns the project's development and code-related work.",
             "skills": [
               {
                 "id": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
                 "agentId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
                 "name": "Issue processing",
-                "instructions": "Process every queued issue.",
+                "instructions": "Owns the project's development and code-related work.",
                 "provider": "codex",
                 "model": "gpt-5.4",
                 "effort": "high",
