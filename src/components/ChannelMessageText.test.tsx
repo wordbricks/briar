@@ -108,6 +108,68 @@ describe("ChannelMessageText", () => {
     expect(buttons[1].type).toBe("button");
   });
 
+  it("renders the markdown elements covered by shared channel styles", async () => {
+    const markdownMessage = {
+      ...message,
+      body: [
+        "[Read the documentation](https://example.com/docs)",
+        "",
+        "Use `inline code` when naming a command.",
+        "",
+        "```ts",
+        "const longLine = 'keeps code blocks horizontally scrollable';",
+        "```",
+        "",
+        "- first item",
+        "- second item",
+        "",
+        "> quoted content stays visually distinct",
+        "",
+        "| Name | Detail |",
+        "| --- | --- |",
+        "| item | value |",
+      ].join("\n"),
+    };
+
+    await act(async () => {
+      root.render(
+        <I18nProvider>
+          <ChannelMessageText
+            agents={[agent]}
+            members={[member]}
+            message={markdownMessage}
+          />
+        </I18nProvider>,
+      );
+    });
+
+    const markdown = container.querySelector<HTMLElement>(
+      ".channel-message-text",
+    );
+    expect(markdown).not.toBeNull();
+    expect(
+      markdown?.querySelector<HTMLAnchorElement>(
+        'a[href="https://example.com/docs"]',
+      )?.textContent,
+    ).toBe("Read the documentation");
+    expect(markdown?.querySelector("p > code")?.textContent).toBe(
+      "inline code",
+    );
+    expect(markdown?.querySelector("pre > code")?.textContent).toContain(
+      "keeps code blocks horizontally scrollable",
+    );
+    expect(markdown?.querySelector("ul > li")?.textContent).toBe(
+      "first item",
+    );
+    expect(markdown?.querySelector("blockquote")?.textContent).toContain(
+      "visually distinct",
+    );
+    expect(
+      markdown?.querySelector(".channel-message-table-wrap table th")
+        ?.textContent,
+    ).toBe("Name");
+  });
+
   it("shows the Agent's runtime and responsibility on its profile", async () => {
     await act(async () => {
       root.render(

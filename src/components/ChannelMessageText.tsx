@@ -95,6 +95,11 @@ export function ChannelMessageText({
                 </a>
               );
             },
+            table: ({ children, node: _node, ...props }) => (
+              <div className="channel-message-table-wrap">
+                <table {...props}>{children}</table>
+              </div>
+            ),
           }}
           remarkPlugins={remarkPlugins}
           skipHtml

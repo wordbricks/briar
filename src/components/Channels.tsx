@@ -249,7 +249,9 @@ const channelReplyParticipants = (
     .map((author) => ({
       id: channelAuthorId(author),
       name: author.name,
-      image: author.type === "user" ? author.image : null,
+      image: author.type === "user" || author.type === "agent"
+        ? author.image
+        : null,
       isAgent: author.type !== "user",
     }));
 
@@ -2207,7 +2209,9 @@ function MessageRow({
     message.author.type === "user" && message.author.id === currentUserId;
   const displayName = isSelf ? t("channel.you") : message.author.name;
   const image =
-    message.author.type === "user" ? message.author.image : null;
+    message.author.type === "user" || message.author.type === "agent"
+      ? message.author.image
+      : null;
   const issueProposal = message.proposal?.actionType === "request_issue_create"
     ? message.proposal
     : null;

@@ -253,6 +253,8 @@ export type ChannelMessageAuthor =
       id: string | null;
       name: string;
       provider: ChannelAgentProvider | null;
+      /** The Agent's configured avatar image, resolved from the live roster. */
+      image: string | null;
     }
   | {
       type: "webhook";

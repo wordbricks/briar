@@ -361,6 +361,85 @@ describe("organization channels", () => {
     expect(thread.map((message) => message.id)).toEqual([rootId, replyId]);
   });
 
+  it("resolves the Agent's configured avatar onto channel message authors", async () => {
+    const channelId = "e0000000-0000-4000-8000-000000000090";
+    await createChannel(db, {
+      id: channelId,
+      organizationId,
+      slug: "avatar-room",
+      name: "Avatar room",
+      topic: null,
+      visibility: "public",
+      defaultProjectId: null,
+      createdByUserId: ownerId,
+      createdAt: at(80),
+    });
+    const agentId = "aa000000-0000-4000-8000-000000000090";
+    const avatar = "data:image/png;base64,cHJvamVjdC1hdmF0YXI=";
+    await db
+      .prepare(
+        `insert into briar_project_agents (
+           id, organization_id, project_id, handle, name, avatar, provider,
+           responsibility, created_at, updated_at
+         ) values (?, ?, null, 'avatar-bot', 'Avatar Bot', ?, 'claude',
+                   'Research', ?, ?)`,
+      )
+      .bind(agentId, organizationId, avatar, at(80), at(80))
+      .run();
+    await addChannelAgent(db, {
+      channelId,
+      agentId,
+      addedByUserId: ownerId,
+      createdAt: at(80),
+    });
+    const rootId = "f0000000-0000-4000-8000-000000000090";
+    await createChannelMessage(db, {
+      id: rootId,
+      channelId,
+      parentMessageId: null,
+      authorUserId: null,
+      authorAgentId: agentId,
+      authorAgentName: "Avatar Bot",
+      authorAgentProvider: "claude",
+      body: "Hello from the avatar room",
+      mentionedUserIds: [],
+      mentionedAgentIds: [],
+      createdAt: at(81),
+    });
+    const replyId = "f0000000-0000-4000-8000-000000000091";
+    await createChannelMessage(db, {
+      id: replyId,
+      channelId,
+      parentMessageId: rootId,
+      authorUserId: outsiderId,
+      authorAgentId: null,
+      authorAgentName: null,
+      authorAgentProvider: null,
+      body: "Nice to meet you",
+      mentionedUserIds: [],
+      mentionedAgentIds: [],
+      createdAt: at(82),
+    });
+
+    const roots = await listChannelRootMessages(db, channelId);
+    expect(roots[0]?.author).toMatchObject({
+      type: "agent",
+      id: agentId,
+      name: "Avatar Bot",
+      provider: "claude",
+      image: avatar,
+    });
+    expect(roots[0]?.replyAuthors).toEqual([
+      expect.objectContaining({ type: "user", id: outsiderId, image: null }),
+    ]);
+
+    const delta = await loadChannelDelta(db, organizationId, ownerId, 0);
+    expect(delta.messages.find((message) => message.id === rootId)).toMatchObject({
+      author: expect.objectContaining({ image: avatar }),
+      replyAuthors: [expect.objectContaining({ id: outsiderId })],
+    });
+  });
+
   it("authenticates, rate limits, deduplicates, rotates, and revokes incoming webhooks", async () => {
     const channelId = "e0000000-0000-4000-8000-000000000060";
     const webhookId = "f0000000-0000-4000-8000-000000000060";

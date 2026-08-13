@@ -1569,12 +1569,16 @@ function MessageRow({
 }
 
 function MessageAvatar({ message }: { message: ChannelMessage }) {
-  if (message.author.type === "user" && message.author.image) {
+  const image =
+    message.author.type === "user" || message.author.type === "agent"
+      ? message.author.image
+      : null;
+  if (image) {
     return (
       <img
         alt=""
         className="companion-channel-avatar"
-        src={message.author.image}
+        src={image}
       />
     );
   }

@@ -94,30 +94,13 @@ struct CompanionShellView: View {
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar { companionToolbar(showsProjectMenu: true) }
                 .navigationDestination(for: UUID.self) { runID in
-                    if let run = snapshot?.runs.first(where: { $0.id == runID }) {
-                        RunDetailView(
-                            run: run,
-                            projectID: project.id,
-                            issueKeyPrefix: project.effectiveIssueKeyPrefix,
-                            token: token,
-                            api: api,
-                            projects: projects,
-                            allRuns: snapshot?.runs ?? [],
-                            workers: snapshot?.workers ?? [],
-                            providers: snapshot?.organizationProviders ?? [],
-                            members: snapshot?.members ?? [],
-                            currentUserID: user?.id,
-                            refresh: refresh,
-                            onSkillSessionMaterialized: { agents.materialize($0) },
-                            onSkillSessionOpen: { projectID, sessionID in
-                                navigation.open(
-                                    .session(projectID: projectID, sessionID: sessionID)
-                                )
-                            }
-                        )
-                    } else {
-                        ContentUnavailableView(L10n.text("이슈를 찾을 수 없음"), systemImage: "checklist")
-                    }
+                    issueDetailDestination(runID: runID)
+                }
+                .navigationDestination(for: CompanionIssueNavigationRoute.self) { route in
+                    issueDetailDestination(
+                        runID: route.runID,
+                        initialTab: route.initialTab
+                    )
                 }
             }
             .tabItem { Label(L10n.text("Tasks", locale: companionLocale), systemImage: "checklist") }
@@ -202,6 +185,38 @@ struct CompanionShellView: View {
         }
     }
 
+    @ViewBuilder
+    private func issueDetailDestination(
+        runID: UUID,
+        initialTab: RunDetailTab? = nil
+    ) -> some View {
+        if let run = snapshot?.runs.first(where: { $0.id == runID }) {
+            RunDetailView(
+                run: run,
+                projectID: project.id,
+                issueKeyPrefix: project.effectiveIssueKeyPrefix,
+                token: token,
+                api: api,
+                projects: projects,
+                allRuns: snapshot?.runs ?? [],
+                workers: snapshot?.workers ?? [],
+                providers: snapshot?.organizationProviders ?? [],
+                members: snapshot?.members ?? [],
+                currentUserID: user?.id,
+                initialTab: initialTab,
+                refresh: refresh,
+                onSkillSessionMaterialized: { agents.materialize($0) },
+                onSkillSessionOpen: { projectID, sessionID in
+                    navigation.open(
+                        .session(projectID: projectID, sessionID: sessionID)
+                    )
+                }
+            )
+        } else {
+            ContentUnavailableView(L10n.text("이슈를 찾을 수 없음"), systemImage: "checklist")
+        }
+    }
+
     @MainActor
     private func resolvePendingIssue(forceRefresh: Bool) async {
         guard
@@ -221,12 +236,12 @@ struct CompanionShellView: View {
             available = await ensureIssueAvailable(project.id, runID)
         }
         guard available else { return }
-        guard let resolvedRunID = navigation.consumePendingIssue(
+        guard let route = navigation.consumePendingIssueNavigation(
             projectID: project.id,
             runID: runID,
             pathToken: pathToken
         ) else { return }
-        taskPath.append(resolvedRunID)
+        taskPath.append(route)
     }
 
     @MainActor
@@ -699,7 +714,7 @@ struct OfflineStateView: View {
     }
 }
 
-private enum RunDetailTab: String, CaseIterable, Identifiable {
+enum RunDetailTab: String, CaseIterable, Identifiable, Hashable {
     case issue
     case control
     case conversation
@@ -843,6 +858,7 @@ struct RunDetailView: View {
         providers: [AgentProvider] = [],
         members: [OrganizationMember] = [],
         currentUserID: String? = nil,
+        initialTab: RunDetailTab? = nil,
         refresh: @escaping () async -> Void = {},
         onSkillSessionMaterialized: @escaping SkillSessionMaterializedHandler = { _ in },
         onSkillSessionOpen: @escaping SkillSessionOpenHandler = { _, _ in }
@@ -889,7 +905,8 @@ struct RunDetailView: View {
         })?.id)
         // Match shared React RunPage: completed/paused open on Result.
         _selectedTab = State(
-            initialValue: run.status.prefersResultDetailTab ? .result : .issue
+            initialValue: initialTab ??
+                (run.status.prefersResultDetailTab ? .result : .issue)
         )
     }
 

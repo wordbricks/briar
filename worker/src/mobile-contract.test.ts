@@ -299,6 +299,41 @@ describe("Companion mobile API contract", () => {
     });
   });
 
+  it("carries the Agent's configured avatar on channel message authors", () => {
+    const channelResponse = fixture.operations.listChannelMessages.response as {
+      messages: Array<Record<string, unknown>>;
+    };
+    const avatar = "data:image/png;base64,cHJvamVjdC1hdmF0YXI=";
+    const parsed = mobileChannelMessageSchema.parse({
+      ...channelResponse.messages[0],
+      author: {
+        type: "agent",
+        id: "66666666-6666-4666-8666-666666666666",
+        name: "Honey",
+        provider: "claude",
+        image: avatar,
+      },
+    });
+    expect(parsed.author).toEqual({
+      type: "agent",
+      id: "66666666-6666-4666-8666-666666666666",
+      name: "Honey",
+      provider: "claude",
+      image: avatar,
+    });
+    expect(
+      mobileChannelMessageSchema.safeParse({
+        ...channelResponse.messages[0],
+        author: {
+          type: "agent",
+          id: "66666666-6666-4666-8666-666666666666",
+          name: "Honey",
+          provider: "claude",
+        },
+      }).success,
+    ).toBe(false);
+  });
+
   it("requires explicit nullable execution choices and rejects hidden fields", () => {
     const request = {
       provider: "codex",

@@ -413,6 +413,7 @@ import {
   isExecutionWorkerAllowedForProject,
   MAX_WORKER_CONCURRENT_SESSIONS,
   MAX_TRANSCRIPT_EVENTS_PER_REQUEST,
+  MAX_TRANSCRIPT_HTTP_BODY_BYTES,
   WORKER_STALE_AFTER_MS,
   reapStalledHuntRuns,
   recordWorkerHeartbeat,
@@ -2462,11 +2463,13 @@ const providerHealthSchema = z.record(
       authenticated: z.boolean(),
       healthy: z.boolean(),
       reason: z.string().trim().max(64).nullable().optional(),
+      usageExhausted: z.boolean().optional(),
+      maxUsedPercent: z.number().min(0).max(100).nullable().optional(),
     })
     .strict(),
 );
 
-const workerRegisterSchema = z
+export const workerRegisterSchema = z
   .object({
     label: z.string().trim().min(1).max(100),
     deviceIdentity: z.string().regex(/^briar_device_[0-9a-f]{64}$/u),
@@ -2944,6 +2947,12 @@ async function readJson(
   } catch {
     throw new HttpError(400, "Invalid JSON");
   }
+}
+
+export async function readTranscriptRequest(request: Request) {
+  return transcriptSchema.parse(
+    await readJson(request, MAX_TRANSCRIPT_HTTP_BODY_BYTES),
+  );
 }
 
 const sha256 = async (value: string) => {
@@ -12018,7 +12027,7 @@ async function route(
   }
 
   if (pathname === "/transcripts" && request.method === "POST") {
-    const input = transcriptSchema.parse(await readJson(request));
+    const input = await readTranscriptRequest(request);
     const recordedAt = new Date().toISOString();
     let authenticatedWorkerId: string | null = null;
     let authenticatedExecutionAttempt: RunExecutionAttemptRow | null = null;

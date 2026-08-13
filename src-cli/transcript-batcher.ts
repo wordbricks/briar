@@ -7,6 +7,8 @@ export type TranscriptBatchEvent = {
 type TranscriptBatcherOptions = {
   send: (events: TranscriptBatchEvent[]) => Promise<void>;
   onError?: (error: unknown) => void;
+  isPayloadTooLarge?: (error: unknown) => boolean;
+  measureBytes?: (events: TranscriptBatchEvent[]) => number;
   maxEvents?: number;
   maxBytes?: number;
   flushIntervalMs?: number;
@@ -53,12 +55,16 @@ export class TranscriptBatcher {
   }
 
   async enqueue(event: TranscriptBatchEvent): Promise<void> {
-    const eventBytes = Buffer.byteLength(JSON.stringify(event), "utf8");
-    if (this.events.length > 0 && this.bytes + eventBytes > this.maxBytes) {
+    const candidate = [...this.events, event];
+    const candidateBytes = this.measureBytes(candidate);
+    if (
+      this.events.length > 0 &&
+      (candidate.length > this.maxEvents || candidateBytes > this.maxBytes)
+    ) {
       await this.flush();
     }
     this.events.push(event);
-    this.bytes += eventBytes;
+    this.bytes = this.measureBytes(this.events);
     if (this.events.length >= this.maxEvents || this.bytes >= this.maxBytes) {
       await this.flush();
       return;
@@ -72,7 +78,7 @@ export class TranscriptBatcher {
       const batch = this.events;
       this.events = [];
       this.bytes = 0;
-      this.sendChain = this.sendChain.then(() => this.sendWithRetry(batch));
+      this.sendChain = this.sendChain.then(() => this.deliver(batch));
     }
     await this.sendChain;
   }
@@ -81,10 +87,32 @@ export class TranscriptBatcher {
     if (this.timer !== null) return;
     this.timer = setTimeout(() => {
       this.timer = null;
-      // The next explicit enqueue/flush observes the rejected send chain.
-      // Avoid an unhandled rejection from the timer itself.
+      // Keep timer callbacks from creating unhandled rejections.
       void this.flush().catch(() => {});
     }, this.flushIntervalMs);
+  }
+
+  private measureBytes(events: TranscriptBatchEvent[]) {
+    return this.options.measureBytes?.(events) ??
+      Buffer.byteLength(JSON.stringify(events), "utf8");
+  }
+
+  private async deliver(batch: TranscriptBatchEvent[]): Promise<void> {
+    try {
+      await this.sendWithRetry(batch);
+    } catch (error) {
+      if (this.options.isPayloadTooLarge?.(error) && batch.length > 1) {
+        const midpoint = Math.ceil(batch.length / 2);
+        await this.deliver(batch.slice(0, midpoint));
+        await this.deliver(batch.slice(midpoint));
+        return;
+      }
+      try {
+        this.options.onError?.(error);
+      } catch {
+        // Transcript telemetry is optional. Error reporting must not fail work.
+      }
+    }
   }
 
   private async sendWithRetry(batch: TranscriptBatchEvent[]) {
@@ -95,6 +123,7 @@ export class TranscriptBatcher {
         return;
       } catch (error) {
         lastError = error;
+        if (this.options.isPayloadTooLarge?.(error)) throw error;
         if (attempt < this.maxSendAttempts && this.retryDelayMs > 0) {
           await new Promise((resolve) =>
             setTimeout(resolve, this.retryDelayMs * attempt)
@@ -102,7 +131,6 @@ export class TranscriptBatcher {
         }
       }
     }
-    this.options.onError?.(lastError);
     throw lastError;
   }
 
