@@ -23,6 +23,21 @@ export const changelogCopy = {
     backTop: "맨 위로 ↑",
     entries: [
       {
+        version: "1.2.119",
+        date: "2026년 8월 14일",
+        title: "대화 화면과 에이전트 설정을 더 선명하게 다듬습니다",
+        summary:
+          "이슈와 채널 대화를 더 자연스럽게 읽고 작성하며, Inbox·에이전트 설정·실행 비용 표시를 안정적으로 개선했습니다.",
+        items: [
+          "iOS 이슈 대화를 날짜 구분선, 아바타, 작성자와 시간이 있는 채널형 타임라인으로 바꾸고, 키보드가 열려도 바로 쓸 수 있는 하단 고정 작성창과 Markdown·답글·멘션·이미지 첨부를 유지합니다.",
+          "iOS와 Android 공용 채널 화면의 헤더를 참여 정보가 보이는 캡슐 스타일로 정리하고, 첨부·입력·전송을 하나의 연속형 작성창에 배치하며 투명도 감소와 고대비 환경도 지원합니다.",
+          "Inbox에서 채널 스레드 답글을 열어도 사이드바와 헤더, 작성창이 화면 안에 남고 요청한 답글만 상세 패널의 대화 스크롤 영역 중앙으로 이동합니다.",
+          "프로젝트 에이전트는 스킬 없이도 만들고 마지막 스킬까지 삭제할 수 있으며, 실행이 필요한 시점에는 스킬 추가 안내를 표시하고 긴 책임 설명은 여섯 줄로 정돈합니다.",
+          "기본 모델로 실행한 작업도 제공자가 실제 사용한 모델과 예상 비용을 표시하고, Grok 빌드 변형은 호환되는 기본 모델 가격에 연결합니다.",
+          "에이전트 생성 모달의 제공자·모델·Effort 메뉴 위치, 채널 목록 마커와 멘션 간격을 바로잡고, Inbox 알림 아이콘에 프로젝트 배지를 추가했습니다.",
+        ],
+      },
+      {
         version: "1.2.118",
         date: "2026년 8월 13일",
         title: "에이전트 이름과 작업 화면을 더 자연스럽게 연결합니다",
@@ -536,6 +551,21 @@ export const changelogCopy = {
     home: "Home",
     backTop: "Back to top ↑",
     entries: [
+      {
+        version: "1.2.119",
+        date: "August 14, 2026",
+        title: "Make conversations and agent settings clearer",
+        summary:
+          "Read and compose issue and channel conversations more naturally, with more reliable Inbox, agent settings, and run-cost presentation.",
+        items: [
+          "Turn native iOS issue conversations into a channel-style timeline with date separators, avatars, authors, and timestamps, while keeping a keyboard-ready bottom composer plus Markdown, replies, mentions, and image attachments.",
+          "Refresh the shared iOS and Android channel header with participant context and a capsule treatment, combine attachment, text, and send controls into one continuous composer, and support reduced-transparency and high-contrast environments.",
+          "Keep the sidebar, headers, and composer visible when opening a channel thread reply from Inbox, centering only the requested reply inside the detail pane's conversation scroller.",
+          "Create project agents without skills and remove the final skill safely, show guidance when execution needs a skill, and clamp long responsibility descriptions to six readable lines.",
+          "Show the provider's actual model and estimated cost for provider-default runs, mapping Grok build variants to compatible base-model pricing.",
+          "Correct Provider, Model, and Effort menu placement in the Create Agent modal, restore channel list markers and mention spacing, and add project badges to Inbox notification icons.",
+        ],
+      },
       {
         version: "1.2.118",
         date: "August 13, 2026",
@@ -1062,9 +1092,9 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <h1>{changelog.title}</h1>
           <p>{changelog.description}</p>
         </div>
-        <a href="#v1-2-118" className="changelog-current">
+        <a href="#v1-2-119" className="changelog-current">
           <span>{changelog.current}</span>
-          <strong>v1.2.118</strong>
+          <strong>v1.2.119</strong>
           <i aria-hidden="true">↓</i>
         </a>
       </section>
@@ -1089,7 +1119,9 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   {index === 0 ? <span>{changelog.latest}</span> : null}
                   <time
                     dateTime={
-                      entry.version === "1.2.118" ||
+                      entry.version === "1.2.119"
+                        ? "2026-08-14"
+                        : entry.version === "1.2.118" ||
                       entry.version === "1.2.117" ||
                       entry.version === "1.2.116" ||
                       entry.version === "1.2.115" ||
