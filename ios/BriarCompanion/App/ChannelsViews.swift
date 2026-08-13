@@ -1,4 +1,3 @@
-import PhotosUI
 import SwiftUI
 
 typealias ChannelIssueOpenHandler = (
@@ -400,10 +399,13 @@ private struct ChannelConversationView: View {
                 .accessibilityElement(children: .contain)
                 .accessibilityIdentifier("channel-error-banner")
             }
-            ScrollView {
-                LazyVStack(spacing: 0) {
-                    ForEach(messages) { message in
-                        ChannelMessageRow(
+            ConversationTimeline(
+                messages: messages,
+                locale: locale,
+                accessibilityIdentifier: "channel-message-timeline",
+                timestamp: \.createdAt
+            ) { message in
+                ChannelMessageRow(
                             acceptingProposalID: channels.acceptingProposalID,
                             approvingExecutionProposalID: channels.approvingExecutionProposalID,
                             preparingExecutionProposalID: channels.preparingExecutionProposalID,
@@ -495,9 +497,7 @@ private struct ChannelConversationView: View {
                             providers: providers,
                             workers: workers,
                             showsThreadSummary: showsThreadSummary
-                        )
-                    }
-                }
+                )
             }
             ChannelComposer(
                 draft: $draft,
@@ -507,6 +507,7 @@ private struct ChannelConversationView: View {
                     format: L10n.text(.channelMessagePlaceholder, locale: locale),
                     channel.name
                 ),
+                locale: locale,
                 send: { body, mentions, attachments in
                     await channels.send(
                         channelID: channel.id,
@@ -586,36 +587,24 @@ private struct ChannelMessageRow: View {
     }
 
     var body: some View {
-        HStack(alignment: .top, spacing: 11) {
-            ProfileImageView(
-                image: (message.author.type == .user || message.author.type == .agent)
-                    ? message.author.image
+        ConversationMessageLayout(
+            authorImage: (message.author.type == .user || message.author.type == .agent)
+                ? message.author.image
+                : nil,
+            profileName: message.author.type == .user ? message.author.name : nil,
+            authorName: message.author.name,
+            authorSystemImage: authorSystemImage,
+            authorAccessorySystemImage: message.author.type == .agent
+                ? "cpu"
+                : message.author.type == .webhook
+                    ? "point.3.connected.trianglepath.dotted"
                     : nil,
-                name: message.author.type == .user ? message.author.name : nil,
-                systemImage: authorSystemImage,
-                size: 40
-            )
-            VStack(alignment: .leading, spacing: 3) {
-                HStack(alignment: .firstTextBaseline, spacing: 7) {
-                    Text(message.author.name)
-                        .font(.subheadline.weight(.bold))
-                        .lineLimit(1)
-                    if message.author.type == .agent {
-                        Image(systemName: "cpu")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                    } else if message.author.type == .webhook {
-                        Image(systemName: "point.3.connected.trianglepath.dotted")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                    }
-                    Text(message.createdAt, style: .time)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                MentionText(text: messageBodyWithoutAttachments, handles: mentionHandles)
-                    .font(.body)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+            timestamp: message.createdAt,
+            accessibilityIdentifier: "channel-message-\(message.id.uuidString.lowercased())"
+        ) {
+            MentionText(text: messageBodyWithoutAttachments, handles: mentionHandles)
+                .font(.body)
+                .frame(maxWidth: .infinity, alignment: .leading)
                 if !message.attachments.isEmpty {
                     LazyVGrid(
                         columns: Array(
@@ -747,13 +736,8 @@ private struct ChannelMessageRow: View {
                         .padding(.top, 4)
                     }
                     .buttonStyle(.plain)
-                }
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 11)
-        .contentShape(Rectangle())
-        .accessibilityIdentifier("channel-message-\(message.id.uuidString.lowercased())")
     }
 
     private var lastReplyText: String? {
@@ -1412,225 +1396,35 @@ private struct ChannelComposer: View {
     @Binding var draft: String
     @State private var mentions: [ChannelMentionTarget] = []
     @State private var attachments: [PendingIssueAttachment] = []
-    @State private var selectedPhotos: [PhotosPickerItem] = []
-    @State private var isLoadingPhotos = false
-    @State private var attachmentError: String?
     let sending: Bool
     let candidates: [ChannelMentionTarget]
     let placeholder: String
+    let locale: CompanionLocale
     let send: (String, [ChannelMentionTarget], [PendingIssueAttachment]) async -> Void
 
-    private var suggestions: [ChannelMentionTarget] {
-        Array(ChannelMentions.suggestions(in: draft, candidates: candidates).prefix(6))
-    }
-
     var body: some View {
-        VStack(spacing: 0) {
-            if !suggestions.isEmpty {
-                ScrollView {
-                    LazyVStack(spacing: 2) {
-                        ForEach(suggestions) { target in
-                            Button {
-                                draft = ChannelMentions.insert(target, into: draft)
-                                if !mentions.contains(where: { $0.id == target.id }) {
-                                    mentions.append(target)
-                                }
-                            } label: {
-                                HStack(spacing: 10) {
-                                    ProfileImageView(
-                                        image: target.image,
-                                        name: target.label,
-                                        systemImage: target.kind == .agent ? "cpu" : "person.fill",
-                                        size: 36
-                                    )
-                                    VStack(alignment: .leading, spacing: 1) {
-                                        Text(target.label)
-                                            .font(.subheadline.weight(.semibold))
-                                            .lineLimit(1)
-                                        Text("@\(target.handle)")
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
-                                            .lineLimit(1)
-                                    }
-                                    Spacer(minLength: 8)
-                                    Text(target.detail)
-                                        .font(.caption2)
-                                        .foregroundStyle(.secondary)
-                                        .lineLimit(1)
-                                }
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 6)
-                                .contentShape(Rectangle())
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityIdentifier("channel-mention-\(target.id)")
-                        }
-                    }
-                    .padding(5)
-                }
-                .frame(maxHeight: 250)
-                .background(.background)
-                .clipShape(RoundedRectangle(cornerRadius: 14))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 14)
-                        .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
-                }
-                .shadow(color: .black.opacity(0.12), radius: 12, y: 5)
-                .padding(.horizontal, 12)
-                .padding(.bottom, 8)
-                .accessibilityIdentifier("channel-mention-menu")
+        ConversationComposer(
+            draft: $draft,
+            mentions: $mentions,
+            attachments: $attachments,
+            sending: sending,
+            candidates: candidates,
+            placeholder: placeholder,
+            replyLabel: nil,
+            allowsImagePaste: false,
+            locale: locale,
+            accessibility: ConversationComposerAccessibility(
+                attachment: "channel-composer-attach",
+                field: "channel-composer-field",
+                send: "channel-composer-send",
+                mentionMenu: "channel-mention-menu",
+                mentionItemPrefix: "channel-mention"
+            ),
+            cancelReply: nil,
+            send: { body, mentions, attachments in
+                await send(body, mentions, attachments)
+                return true
             }
-            if !attachments.isEmpty {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        ForEach(attachments) { attachment in
-                            ChannelAttachmentDraft(attachment: attachment) {
-                                attachments.removeAll { $0.id == attachment.id }
-                                attachmentError = nil
-                            }
-                        }
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.bottom, 8)
-                }
-            }
-            if let attachmentError {
-                Text(attachmentError)
-                    .font(.caption)
-                    .foregroundStyle(.red)
-                    .padding(.horizontal, 12)
-                    .padding(.bottom, 6)
-            }
-            HStack(spacing: 8) {
-                PhotosPicker(
-                    selection: $selectedPhotos,
-                    maxSelectionCount: max(
-                        1,
-                        PendingIssueAttachment.maximumCount - attachments.count
-                    ),
-                    matching: PhotoAttachmentImportPolicy.imagesOnly.pickerFilter,
-                    preferredItemEncoding: .compatible
-                ) {
-                    Image(systemName: "plus")
-                        .font(.title3.weight(.regular))
-                        .foregroundStyle(.primary)
-                        .frame(width: 40, height: 40)
-                        .background(Color.secondary.opacity(0.11), in: Circle())
-                        .contentShape(Circle())
-                }
-                .buttonStyle(.plain)
-                .disabled(
-                    isLoadingPhotos || sending ||
-                        attachments.count >= PendingIssueAttachment.maximumCount
-                )
-                .accessibilityLabel(L10n.text("이미지 첨부"))
-                .accessibilityIdentifier("channel-composer-attach")
-                TextField(placeholder, text: $draft, axis: .vertical)
-                    .textFieldStyle(.plain)
-                    .font(.body)
-                    .lineLimit(1...4)
-                    .padding(.vertical, 10)
-                    .disabled(sending)
-                    .accessibilityIdentifier("channel-composer-field")
-                    .onChange(of: draft) { _, body in
-                        mentions = ChannelMentions.retained(in: body, mentions: mentions)
-                    }
-                if !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
-                    !attachments.isEmpty {
-                    Button {
-                        let body = draft
-                        let selected = ChannelMentions.retained(in: body, mentions: mentions)
-                        draft = ""
-                        mentions = []
-                        let selectedAttachments = attachments
-                        attachments = []
-                        Task { await send(body, selected, selectedAttachments) }
-                    } label: {
-                        if sending {
-                            ProgressView()
-                                .controlSize(.small)
-                                .tint(.white)
-                                .frame(width: 40, height: 40)
-                                .background(.tint, in: Circle())
-                        } else {
-                            Image(systemName: "arrow.up")
-                                .font(.body.weight(.bold))
-                                .foregroundStyle(.white)
-                                .frame(width: 40, height: 40)
-                                .background(.tint, in: Circle())
-                        }
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(sending)
-                    .accessibilityIdentifier("channel-composer-send")
-                }
-            }
-            .padding(6)
-            .background(
-                .regularMaterial,
-                in: RoundedRectangle(cornerRadius: 27, style: .continuous)
-            )
-            .overlay {
-                RoundedRectangle(cornerRadius: 27, style: .continuous)
-                    .stroke(Color.primary.opacity(0.08), lineWidth: 0.5)
-            }
-            .shadow(color: .black.opacity(0.1), radius: 14, y: 5)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-        }
-        .onChange(of: selectedPhotos) { _, items in
-            guard !items.isEmpty else { return }
-            Task { await importPhotos(items) }
-        }
-    }
-
-    @MainActor
-    private func importPhotos(_ items: [PhotosPickerItem]) async {
-        isLoadingPhotos = true
-        defer {
-            isLoadingPhotos = false
-            selectedPhotos = []
-        }
-        do {
-            attachments = try await PhotoAttachmentImporter.importItems(
-                items,
-                appendingTo: attachments,
-                policy: .imagesOnly
-            )
-            attachmentError = nil
-        } catch {
-            attachmentError = error.localizedDescription
-        }
-    }
-}
-
-private struct ChannelAttachmentDraft: View {
-    let attachment: PendingIssueAttachment
-    let onRemove: () -> Void
-
-    var body: some View {
-        HStack(spacing: 6) {
-            if let image = UIImage(data: attachment.data) {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: 34, height: 34)
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
-            } else {
-                Image(systemName: "photo")
-                    .frame(width: 34, height: 34)
-                    .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 6))
-            }
-            Text(attachment.filename).lineLimit(1).font(.caption)
-            Button(role: .destructive, action: onRemove) {
-                Image(systemName: "xmark.circle.fill")
-                    .foregroundStyle(.secondary)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(L10n.text("첨부 삭제"))
-        }
-        .padding(.vertical, 5)
-        .padding(.horizontal, 8)
-        .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
+        )
     }
 }

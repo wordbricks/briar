@@ -404,8 +404,13 @@ final class BriarCompanionUITests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any)["run-detail"].waitForExistence(timeout: 5))
         app.buttons["대화"].tap()
         let message = app.textFields["issue-message-field"]
-        for _ in 0..<8 where !message.exists { app.swipeUp() }
         XCTAssertTrue(message.waitForExistence(timeout: 5))
+        XCTAssertTrue(message.isHittable, "이슈 대화 입력창은 스크롤 없이 화면 하단에 고정되어야 합니다.")
+        XCTAssertGreaterThan(
+            message.frame.midY,
+            app.windows.firstMatch.frame.midY,
+            "이슈 대화 입력창은 화면의 하반부에 표시되어야 합니다."
+        )
         message.tap()
         message.typeText("모바일에서 확인했습니다")
         app.buttons["issue-message-send"].tap()
