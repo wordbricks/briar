@@ -532,6 +532,7 @@ export function HuntDashboard({
   },
   onDeleteIssueMessage = async () => undefined,
   requestedRunId = null,
+  requestedRunInitialTab = null,
   issueListRequestKey = 0,
   processingIssueIds = new Set<string>(),
   sessions = [],
@@ -642,6 +643,7 @@ export function HuntDashboard({
   ) => Promise<IssueMessage>;
   onDeleteIssueMessage?: (runId: string, messageId: string) => Promise<unknown>;
   requestedRunId?: string | null;
+  requestedRunInitialTab?: IssueDetailTab | null;
   issueListRequestKey?: number;
   processingIssueIds?: ReadonlySet<string>;
   sessions?: AutoHuntSession[];
@@ -665,6 +667,8 @@ export function HuntDashboard({
     ? onCompanionStatusChange
     : setInternalStatus;
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
+  const [selectedRunInitialTab, setSelectedRunInitialTab] =
+    useState<IssueDetailTab | null>(null);
   const [internalIsIssueDialogOpen, setInternalIsIssueDialogOpen] =
     useState(false);
   const isIssueDialogOpen =
@@ -704,6 +708,7 @@ export function HuntDashboard({
         return true;
       }
       if (selectedRunId) {
+        setSelectedRunInitialTab(null);
         setSelectedRunId(null);
         return true;
       }
@@ -966,15 +971,17 @@ export function HuntDashboard({
     ];
   }, [dashboard?.organizationProviders, dashboard?.workers]);
   useEffect(() => {
+    setSelectedRunInitialTab(null);
     setSelectedRunId(null);
   }, [issueListRequestKey]);
 
   useEffect(() => {
     if (!requestedRunId) return;
     if (!runs.some((run) => run.id === requestedRunId)) return;
+    setSelectedRunInitialTab(requestedRunInitialTab);
     setSelectedRunId(requestedRunId);
     onRequestedRunOpen?.();
-  }, [onRequestedRunOpen, requestedRunId, runs]);
+  }, [onRequestedRunOpen, requestedRunId, requestedRunInitialTab, runs]);
 
   useEffect(() => {
     if (!selected || !selectedInboxVersion) return;
@@ -1248,6 +1255,7 @@ export function HuntDashboard({
             null
           }
           companionMode={companionMode}
+          initialDetailTab={selectedRunInitialTab ?? undefined}
           issueKeyPrefix={dashboard?.project.issueKeyPrefix}
           currentUserId={currentUserId}
           error={displayedError}
@@ -1256,16 +1264,21 @@ export function HuntDashboard({
           isRecovering={recoveringRunId === selected.id}
           isUpdatingIssue={updatingIssueId === selected.id}
           isSidebarOpen={isSidebarOpen}
-          onBack={() => setSelectedRunId(null)}
+          onBack={() => {
+            setSelectedRunInitialTab(null);
+            setSelectedRunId(null);
+          }}
           onCancel={() => onCancelRun(selected.id)}
           onDelete={async () => {
             await onDeleteIssue(selected.id);
+            setSelectedRunInitialTab(null);
             setSelectedRunId(null);
           }}
           onTransfer={
             onTransferIssue
               ? async (targetProjectId) => {
                   await onTransferIssue(selected.id, targetProjectId);
+                  setSelectedRunInitialTab(null);
                   setSelectedRunId(null);
                 }
               : undefined
@@ -1291,7 +1304,10 @@ export function HuntDashboard({
             ? (prerequisiteRunId) =>
                 onRemoveIssueDependency(selected.id, prerequisiteRunId)
             : undefined}
-          onDependencyOpen={setSelectedRunId}
+          onDependencyOpen={(runId) => {
+            setSelectedRunInitialTab(null);
+            setSelectedRunId(runId);
+          }}
           onLoadAttachment={onLoadAttachment}
           onLoadIssueMessages={() => onLoadIssueMessages(selected.id)}
           onLoadRunEvents={() => onLoadRunEvents(selected.id)}
@@ -1541,7 +1557,10 @@ export function HuntDashboard({
             onMove={(run, placement) =>
               onMoveRun(run.id, placement).catch(() => undefined)
             }
-            onOpen={(runId) => setSelectedRunId(runId)}
+            onOpen={(runId) => {
+              setSelectedRunInitialTab(null);
+              setSelectedRunId(runId);
+            }}
             onProcessIssueNow={onProcessIssueNow}
             onPriorityChange={(run, priority) =>
               onUpdateIssue(run.id, {
@@ -1804,6 +1823,7 @@ export function HuntDashboard({
                         suppressCardClickRef.current = false;
                         return;
                       }
+                      setSelectedRunInitialTab(null);
                       setSelectedRunId(run.id);
                     }}
                     onProcessNow={
@@ -2067,6 +2087,7 @@ export function HuntDashboard({
                   .then(() => {
                     setTransferringRunFromMenuId(null);
                     if (selectedRunId === transferringRunFromMenu.id) {
+                      setSelectedRunInitialTab(null);
                       setSelectedRunId(null);
                     }
                   })
@@ -4257,6 +4278,7 @@ export function RunPage({
   executionPolicy,
   executionWorkers = [],
   executionCostEstimate: providedExecutionCostEstimate = null,
+  initialDetailTab,
   isDeletingIssue = false,
   isProcessing = false,
   isRecovering,
@@ -4315,6 +4337,7 @@ export function RunPage({
   executionPolicy?: ProjectExecutionWorkerPolicy;
   executionWorkers?: ExecutionWorker[];
   executionCostEstimate?: AgentExecutionCostEstimate | null;
+  initialDetailTab?: IssueDetailTab;
   isDeletingIssue?: boolean;
   isProcessing?: boolean;
   isRecovering: boolean;
@@ -4491,7 +4514,7 @@ export function RunPage({
   });
   inlineUpdateIssueRef.current = onUpdateIssue;
   const [activeDetailTab, setActiveDetailTab] = useState<IssueDetailTab>(() =>
-    defaultIssueDetailTab(run.status),
+    initialDetailTab ?? defaultIssueDetailTab(run.status),
   );
   const hasWorkerExecution = Boolean(run.workerId);
   const workerExecutionIsLive = ![
@@ -4559,7 +4582,7 @@ export function RunPage({
   );
   const detailTabsId = useId();
   useEffect(() => {
-    setActiveDetailTab(defaultIssueDetailTab(run.status));
+    setActiveDetailTab(initialDetailTab ?? defaultIssueDetailTab(run.status));
     setIsPropertiesOpen(false);
     setRunEvents([]);
     setIsCompletingResultReview(false);
@@ -4570,7 +4593,7 @@ export function RunPage({
     setReworkFeedback("");
     setReworkError(null);
     setIsSubmittingRework(false);
-  }, [run.id, run.status]);
+  }, [initialDetailTab, run.id, run.status]);
   useEffect(() => {
     inlineSaveSequenceRef.current += 1;
     if (inlineSaveTimerRef.current) {
