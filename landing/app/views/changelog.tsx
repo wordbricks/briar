@@ -23,6 +23,21 @@ export const changelogCopy = {
     backTop: "맨 위로 ↑",
     entries: [
       {
+        version: "1.2.118",
+        date: "2026년 8월 13일",
+        title: "에이전트 이름과 작업 화면을 더 자연스럽게 연결합니다",
+        summary:
+          "채널 멘션을 실제 에이전트 이름으로 통일하고, 이슈 탐색·Inbox·모델 선택·사용량 집계를 더 정확하게 다듬었습니다.",
+        items: [
+          "채널에서 별도 핸들 대신 공백과 비라틴 문자를 포함한 정확한 에이전트 이름으로 멘션하며, 구조화된 에이전트 ID로 라우팅하고 중복 이름은 잘못된 프로필에 연결하지 않습니다.",
+          "⌘[와 ⌘]이 이슈 목록과 방문한 이슈 상세를 순서대로 오가고, Inbox 오른쪽 이슈 패널의 긴 결과와 대화는 패널 안에서 정상적으로 스크롤됩니다.",
+          "Process now 등 모달 안의 모델 메뉴가 모달 경계 안에서 열려 긴 OpenCode 모델 목록을 검색하고 스크롤할 수 있습니다.",
+          "열린 채널 스레드에서 에이전트 답변 상태를 작성창 위에 표시하고, 다른 메시지의 진행 상태는 기존 위치에 유지합니다.",
+          "Codex의 한 턴에 포함된 모든 모델 호출 사용량을 누적 스냅샷에서 계산해 재개된 대화를 중복 집계하지 않으면서 토큰과 예상 비용을 정확히 기록합니다.",
+          "네이티브 iOS Agents 화면에 프로젝트·계정 도구 모음을 연결하고 최신 TestFlight 빌드의 모바일 릴리즈 검증을 완료했습니다.",
+        ],
+      },
+      {
         version: "1.2.117",
         date: "2026년 8월 13일",
         title: "채널과 Inbox를 더 읽기 쉽고 정확하게 연결합니다",
@@ -521,6 +536,21 @@ export const changelogCopy = {
     home: "Home",
     backTop: "Back to top ↑",
     entries: [
+      {
+        version: "1.2.118",
+        date: "August 13, 2026",
+        title: "Connect agent names and work screens more naturally",
+        summary:
+          "Use real agent names for channel mentions and make issue navigation, Inbox, model selection, and usage accounting more precise.",
+        items: [
+          "Mention agents by their exact names—including spaces and non-Latin characters—instead of separate handles, route with structured agent IDs, and avoid linking duplicate names to the wrong profile.",
+          "Use ⌘[ and ⌘] to move through the issue list and visited issue details in order, while long results and conversations scroll correctly inside the Inbox detail pane.",
+          "Keep model menus inside their modal boundary so long OpenCode catalogs can be searched and scrolled from Process now and other dialogs.",
+          "Show the active agent reply state above the open channel thread composer while preserving inline status for other messages.",
+          "Aggregate every Codex model call in a turn from cumulative snapshots, avoiding double counting across resumed conversations while recording tokens and estimated cost accurately.",
+          "Connect the project and account toolbar to the native iOS Agents screen and complete mobile release validation for the latest TestFlight build.",
+        ],
+      },
       {
         version: "1.2.117",
         date: "August 13, 2026",
@@ -1032,9 +1062,9 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <h1>{changelog.title}</h1>
           <p>{changelog.description}</p>
         </div>
-        <a href="#v1-2-117" className="changelog-current">
+        <a href="#v1-2-118" className="changelog-current">
           <span>{changelog.current}</span>
-          <strong>v1.2.117</strong>
+          <strong>v1.2.118</strong>
           <i aria-hidden="true">↓</i>
         </a>
       </section>
@@ -1059,6 +1089,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   {index === 0 ? <span>{changelog.latest}</span> : null}
                   <time
                     dateTime={
+                      entry.version === "1.2.118" ||
                       entry.version === "1.2.117" ||
                       entry.version === "1.2.116" ||
                       entry.version === "1.2.115" ||
