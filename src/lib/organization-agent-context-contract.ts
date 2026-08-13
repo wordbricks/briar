@@ -205,7 +205,6 @@ export const organizationAgentContextAgentSkillSchema = z
 export const organizationAgentContextProjectAgentSchema = z
   .object({
     id: organizationAgentContextIdSchema,
-    handle: z.string().min(1).max(63).nullable(),
     name: z.string().min(1).max(100),
     provider: z.enum(agentProviders),
     model: z.string().min(1).max(100).nullable(),

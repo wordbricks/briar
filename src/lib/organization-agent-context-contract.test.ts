@@ -154,7 +154,6 @@ describe("organization Agent context contract", () => {
         total: 1,
         items: [{
           id: "agent-1",
-          handle: "builder",
           name: "Builder",
           provider: "codex",
           model: null,

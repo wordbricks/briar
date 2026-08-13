@@ -26,7 +26,6 @@ const { OrganizationAgentsSettings } = await import(
 
 const organizationAgent = {
   agentId: "agent-1",
-  handle: "honey",
   name: "Honey",
   provider: "codex" as const,
   model: null,
@@ -54,7 +53,6 @@ const organizationAgent = {
 const projectAgent = {
   ...organizationAgent,
   agentId: "agent-project",
-  handle: "builder",
   name: "Builder",
   projectId: "project-1",
 };
@@ -116,7 +114,7 @@ describe("OrganizationAgentsSettings", () => {
     await render();
 
     expect(container.textContent).toContain("Honey");
-    expect(container.textContent).toContain("@honey");
+    expect(container.textContent).not.toContain("@honey");
     expect(container.textContent).not.toContain("Builder");
     expect(container.textContent).not.toContain("스케줄");
   });
@@ -199,7 +197,7 @@ describe("OrganizationAgentsSettings", () => {
     ).toContain("스킬 저장에 실패했습니다.");
   });
 
-  it("auto-generates an editable handle and creates an agent", async () => {
+  it("creates an agent using its name as the mention identity", async () => {
     listOrganizationAgents.mockResolvedValue({ agents: [], canManage: true });
     createOrganizationAgent.mockResolvedValue({
       agent: { ...organizationAgent, agentId: "agent-new" },
@@ -215,19 +213,13 @@ describe("OrganizationAgentsSettings", () => {
     const name = document.querySelector<HTMLInputElement>(
       "#organization-agent-name",
     )!;
-    const handle = document.querySelector<HTMLInputElement>(
-      "#organization-agent-handle",
-    )!;
     const responsibility = document.querySelector<HTMLTextAreaElement>(
       "#organization-agent-responsibility",
     )!;
 
     await act(async () => setInputValue(name, "Honey Bee"));
-    expect(handle.value).toBe("honey-bee");
-
-    await act(async () => setInputValue(handle, "planner"));
     await act(async () => setInputValue(name, "Honey Planner"));
-    expect(handle.value).toBe("planner");
+    expect(document.querySelector("#organization-agent-handle")).toBeNull();
 
     await act(async () =>
       setInputValue(responsibility, "채널에서 기획 질문에 답합니다."),
@@ -245,7 +237,6 @@ describe("OrganizationAgentsSettings", () => {
       "organization-1",
       expect.objectContaining({
         name: "Honey Planner",
-        handle: "planner",
         provider: "codex",
         model: null,
         effort: null,
@@ -254,7 +245,7 @@ describe("OrganizationAgentsSettings", () => {
     );
   });
 
-  it("explains the generated fallback for names without Latin characters", async () => {
+  it("accepts non-Latin Agent names without generating a handle", async () => {
     listOrganizationAgents.mockResolvedValue({ agents: [], canManage: true });
     await render();
 
@@ -272,8 +263,6 @@ describe("OrganizationAgentsSettings", () => {
       ),
     );
 
-    expect(document.body.textContent).toContain(
-      "라틴 문자가 없는 이름은 저장할 때 고유 ID 기반 핸들이 자동으로 지정됩니다.",
-    );
+    expect(document.querySelector("#organization-agent-handle")).toBeNull();
   });
 });

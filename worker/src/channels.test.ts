@@ -1007,7 +1007,7 @@ describe("organization channels", () => {
       createdAt: at(8),
     });
     expect(agent?.skills).toHaveLength(2);
-    expect(agent).toMatchObject({ handle: "honey", project_id: null });
+    expect(agent).toMatchObject({ name: "Honey", project_id: null });
     await addChannelAgent(db, {
       channelId,
       agentId: agent!.id,
@@ -1024,7 +1024,7 @@ describe("organization channels", () => {
       authorAgentId: null,
       authorAgentName: null,
       authorAgentProvider: null,
-      body: "@honey write the plan",
+      body: "@Honey write the plan",
       mentionedUserIds: [],
       mentionedAgentIds: [agent!.id],
       createdAt: at(9),
@@ -1497,9 +1497,9 @@ describe("organization channels", () => {
     await db
       .prepare(
         `insert into briar_project_agents (
-           id, organization_id, project_id, handle, name, avatar, provider,
+           id, organization_id, project_id, name, avatar, provider,
            responsibility, created_at, updated_at
-         ) values (?, ?, ?, 'bumble', 'Bumble', ?, 'claude', 'Research', ?, ?)`,
+         ) values (?, ?, ?, 'Bumble', ?, 'claude', 'Research', ?, ?)`,
       )
       .bind(
         agentId,
@@ -1916,7 +1916,7 @@ describe("organization channels", () => {
     expect(again).toHaveLength(2);
   });
 
-  it("gives handles a numeric suffix instead of colliding", async () => {
+  it("allows Agents with the same display name because routing uses Agent IDs", async () => {
     const duplicate = await createOrganizationAgent(db, {
       id: "aa000000-0000-4000-8000-000000000006",
       organizationId,
@@ -1927,9 +1927,8 @@ describe("organization channels", () => {
       effort: null,
       createdAt: at(23),
     });
-    expect(duplicate?.handle).toBe("honey-2");
+    expect(duplicate?.name).toBe("Honey");
 
-    // The same handle is free again in a different organization.
     const elsewhere = await createOrganizationAgent(db, {
       id: "aa000000-0000-4000-8000-000000000007",
       organizationId: otherOrganizationId,
@@ -1940,7 +1939,7 @@ describe("organization channels", () => {
       effort: null,
       createdAt: at(23),
     });
-    expect(elsewhere?.handle).toBe("honey");
+    expect(elsewhere?.name).toBe("Honey");
     expect(
       (await listOrganizationAgents(db, otherOrganizationId)).map(
         (row) => row.id,
@@ -1948,66 +1947,7 @@ describe("organization channels", () => {
     ).toEqual([elsewhere!.id]);
   });
 
-  it("rechecks truncated suffixes for 60 to 63 character handles", async () => {
-    let sequence = 30;
-    for (const [offset, length] of [60, 61, 62, 63].entries()) {
-      const character = String.fromCharCode("a".charCodeAt(0) + offset);
-      const desired = character.repeat(length);
-      const agents: Awaited<ReturnType<typeof createOrganizationAgent>>[] = [];
-      for (let index = 0; index < 3; index += 1) {
-        sequence += 1;
-        agents.push(await createOrganizationAgent(db, {
-          id: `aa000000-0000-4000-8000-${String(sequence).padStart(12, "0")}`,
-          organizationId,
-          name: desired,
-          handle: desired,
-          provider: "claude",
-          model: null,
-          responsibility: `Long handle ${length}-${index + 1}`,
-          effort: null,
-          createdAt: at(23),
-        }));
-      }
-
-      expect(agents.map((agent) => agent?.handle)).toEqual([
-        desired,
-        `${character.repeat(Math.min(length, 61))}-2`,
-        `${character.repeat(Math.min(length, 61))}-3`,
-      ]);
-    }
-  }, 30_000);
-
-  it("recovers when concurrent agents initially select the same handle", async () => {
-    const agents = await Promise.all([
-      createOrganizationAgent(db, {
-        id: "aa000000-0000-4000-8000-000000000050",
-        organizationId,
-        name: "Concurrent Honey",
-        provider: "claude",
-        model: null,
-        responsibility: "Concurrent writer one",
-        effort: null,
-        createdAt: at(23),
-      }),
-      createOrganizationAgent(db, {
-        id: "aa000000-0000-4000-8000-000000000051",
-        organizationId,
-        name: "Concurrent Honey",
-        provider: "claude",
-        model: null,
-        responsibility: "Concurrent writer two",
-        effort: null,
-        createdAt: at(23),
-      }),
-    ]);
-
-    expect(agents.map((agent) => agent?.handle).sort()).toEqual([
-      "concurrent-honey",
-      "concurrent-honey-2",
-    ]);
-  });
-
-  it("falls back to an id-derived handle when a name has no handle characters", async () => {
+  it("preserves a non-Latin Agent Name without generating another identity", async () => {
     const agent = await createOrganizationAgent(db, {
       id: "aa000000-0000-4000-8000-000000000008",
       organizationId,
@@ -2018,7 +1958,7 @@ describe("organization channels", () => {
       effort: null,
       createdAt: at(24),
     });
-    expect(agent?.handle).toBe("agent-aa000000000040008000000000000008");
+    expect(agent?.name).toBe("꿀벌");
   });
 
   it("excludes changes in channels the member cannot see from the delta", async () => {
@@ -2079,7 +2019,7 @@ describe("organization channels", () => {
       db,
       "e0000000-0000-4000-8000-000000000004",
     );
-    expect(agents.map((agent) => agent.handle)).toEqual(["honey"]);
+    expect(agents.map((agent) => agent.name)).toEqual(["Honey"]);
   });
 
   it("toggles emoji reactions and refreshes them through channel deltas", async () => {

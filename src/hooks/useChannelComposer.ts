@@ -79,7 +79,7 @@ export function useChannelComposer<T extends ComposerInput>({
       ...agents.map((agent) => ({
         type: "agent" as const,
         id: agent.agentId,
-        handle: mentionHandle(agent.handle?.trim() || agent.name),
+        handle: agent.name,
         label: agent.name,
         detail: agent.projectId
           ? t("channel.projectAgent")

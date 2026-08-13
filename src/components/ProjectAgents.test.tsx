@@ -155,7 +155,6 @@ describe("ProjectAgents", () => {
     const runtimeAgent: ProjectAgent = {
       id: "agent-runtime",
       projectId: project.id,
-      handle: "release-developer",
       name: "Release developer",
       avatar: null,
       codexPet: null,
@@ -540,7 +539,6 @@ describe("ProjectAgents", () => {
 
     expect(onCreate).toHaveBeenCalledWith({
       name: "Jay 이슈 처리 에이전트",
-      handle: "jay",
       provider: "codex",
       model: null,
       effort: null,

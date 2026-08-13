@@ -1159,7 +1159,6 @@
         "agents": [
           {
             "agentId": "66666666-6666-4666-8666-666666666666",
-            "handle": "honey",
             "name": "Honey",
             "provider": "claude",
             "model": null,
@@ -1173,7 +1172,7 @@
             "id": "44444444-4444-4444-8444-444444444444",
             "channelId": "33333333-3333-4333-8333-333333333333",
             "parentMessageId": null,
-            "body": "@honey 온보딩 개편 계획서를 정리해줘",
+            "body": "@Honey 온보딩 개편 계획서를 정리해줘",
             "author": {
               "type": "user",
               "id": "user-fixture-1",
@@ -1205,7 +1204,7 @@
             "id": "44444444-4444-4444-8444-444444444444",
             "channelId": "33333333-3333-4333-8333-333333333333",
             "parentMessageId": null,
-            "body": "@honey 온보딩 개편 계획서를 정리해줘",
+            "body": "@Honey 온보딩 개편 계획서를 정리해줘",
             "author": {
               "type": "user",
               "id": "user-fixture-1",
@@ -1277,7 +1276,7 @@
       "path": "/organizations/{organizationId}/channels/{channelId}/messages",
       "status": 200,
       "request": {
-        "body": "@honey 온보딩 개편 계획서를 정리해줘",
+        "body": "@Honey 온보딩 개편 계획서를 정리해줘",
         "parentMessageId": null,
         "mentionedUserIds": [],
         "mentionedAgentIds": [
@@ -1289,7 +1288,7 @@
           "id": "44444444-4444-4444-8444-444444444444",
           "channelId": "33333333-3333-4333-8333-333333333333",
           "parentMessageId": null,
-          "body": "@honey 온보딩 개편 계획서를 정리해줘",
+          "body": "@Honey 온보딩 개편 계획서를 정리해줘",
           "author": {
             "type": "user",
             "id": "user-fixture-1",
@@ -1486,7 +1485,7 @@
           "id": "44444444-4444-4444-8444-444444444444",
           "channelId": "33333333-3333-4333-8333-333333333333",
           "parentMessageId": null,
-          "body": "@honey 온보딩 개편 계획서를 정리해줘",
+          "body": "@Honey 온보딩 개편 계획서를 정리해줘",
           "author": {
             "type": "user",
             "id": "user-fixture-1",

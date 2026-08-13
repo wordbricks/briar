@@ -299,9 +299,9 @@ beforeAll(async () => {
   await db.batch([
     db.prepare(
       `insert into briar_project_agents (
-         id, organization_id, project_id, handle, name, provider, model,
+         id, organization_id, project_id, name, provider, model,
          responsibility, effort, created_at, updated_at
-       ) values (?, ?, ?, 'context-agent', 'Context Agent', 'codex',
+       ) values (?, ?, ?, 'Context Agent', 'codex',
                  'gpt-5.6-sol', 'Read the connected project.', 'high', ?, ?)`,
     ).bind(
       agentId,
@@ -493,7 +493,7 @@ describe("Organization Agent context pages", () => {
     });
     expect(page.items[0]).toMatchObject({
       id: agentId,
-      handle: "context-agent",
+      name: "Context Agent",
       skills: [{ id: skillId, name: "Inspect" }],
     });
 

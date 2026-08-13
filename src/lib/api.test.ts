@@ -1720,7 +1720,6 @@ describe("API errors", () => {
             agent: {
               id: "11111111-1111-4111-8111-111111111111",
               projectId: "22222222-2222-4222-8222-222222222222",
-              handle: input.handle,
               name: "Feedback 분석 에이전트",
               provider: input.provider,
               model: input.model,
@@ -1741,7 +1740,6 @@ describe("API errors", () => {
       "22222222-2222-4222-8222-222222222222",
       {
         name: "Feedback 분석 에이전트",
-        handle: "feedback-agent",
         provider: "grok",
         model: "grok-4.5",
         responsibility: "피드백을 분석해 액션 아이템 이슈를 만듭니다.",
@@ -1750,7 +1748,6 @@ describe("API errors", () => {
     );
 
     expect(agent).toMatchObject({
-      handle: "feedback-agent",
       provider: "grok",
       model: "grok-4.5",
       responsibility: "피드백을 분석해 액션 아이템 이슈를 만듭니다.",
@@ -2198,7 +2195,6 @@ describe("API errors", () => {
         "11111111-1111-4111-8111-111111111111",
         {
           name: "Release agent",
-          handle: "release-agent",
           avatar: "data:image/webp;base64,aA==",
           codexPet: {
             slug: "firefly--lingxiaotian",
@@ -2227,7 +2223,6 @@ describe("API errors", () => {
       ),
     ).resolves.toMatchObject({
       name: "Release agent",
-      handle: "release-agent",
       avatar: "data:image/webp;base64,aA==",
       codexPet: expect.objectContaining({
         slug: "firefly--lingxiaotian",

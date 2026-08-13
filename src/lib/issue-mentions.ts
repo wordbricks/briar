@@ -11,8 +11,6 @@ type IssueMentionTree = IssueMentionNode & {
 
 export const issueMentionUrlPrefix = "briar-mention://";
 
-const mentionPattern =
-  /(^|[^\p{L}\p{N}_.-])(@[\p{L}\p{N}_-](?:[\p{L}\p{N}_.-]*[\p{L}\p{N}_-])?)(?=$|[^\p{L}\p{N}_-])/gu;
 const nonTextualNodeTypes = new Set([
   "code",
   "definition",
@@ -42,13 +40,25 @@ export function issueMentionHandleFromUrl(
   }
 }
 
+function escapeRegularExpression(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+}
+
 function splitTextNode(node: IssueMentionNode, handles: Set<string>) {
   if (typeof node.value !== "string") return [node];
 
   const children: IssueMentionNode[] = [];
   let cursor = 0;
   let changed = false;
-  const matcher = new RegExp(mentionPattern.source, mentionPattern.flags);
+  const alternatives = [...handles]
+    .sort((left, right) => right.length - left.length)
+    .map(escapeRegularExpression)
+    .join("|");
+  if (!alternatives) return [node];
+  const matcher = new RegExp(
+    `(^|[^\\p{L}\\p{N}_.-])(@(?:${alternatives}))(?=$|[^\\p{L}\\p{N}_.-]|\\.(?=$|\\s))`,
+    "giu",
+  );
 
   for (const match of node.value.matchAll(matcher)) {
     const mention = match[2];

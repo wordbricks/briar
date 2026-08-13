@@ -3,10 +3,6 @@ import SwiftUI
 
 /// Shared @mention linkify and issue-conversation candidate helpers for native iOS.
 enum MessageMentions {
-    /// Matches a whole @handle at a word boundary, same rule as web `issue-mentions`.
-    private static let tokenPattern =
-        "(^|[^\\p{L}\\p{N}_.-])(@[\\p{L}\\p{N}_-](?:[\\p{L}\\p{N}_.-]*[\\p{L}\\p{N}_-])?)(?=$|[^\\p{L}\\p{N}_-])"
-
     struct Segment: Equatable, Sendable {
         enum Kind: Equatable, Sendable {
             case text
@@ -24,8 +20,17 @@ enum MessageMentions {
                 .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
                 .filter { !$0.isEmpty }
         )
+        let alternatives = normalized
+            .sorted { $0.count > $1.count }
+            .map(NSRegularExpression.escapedPattern(for:))
+            .joined(separator: "|")
+        let tokenPattern =
+            "(^|[^\\p{L}\\p{N}_.-])(@(?:\(alternatives)))(?=$|[^\\p{L}\\p{N}_.-]|\\.(?=$|\\s))"
         guard !body.isEmpty, !normalized.isEmpty,
-              let expression = try? NSRegularExpression(pattern: tokenPattern)
+              let expression = try? NSRegularExpression(
+                pattern: tokenPattern,
+                options: .caseInsensitive
+              )
         else {
             return body.isEmpty ? [] : [Segment(kind: .text, value: body)]
         }
@@ -75,7 +80,7 @@ enum MessageMentions {
             if case let .mention(handle) = segment.kind {
                 part.foregroundColor = Color(red: 37 / 255, green: 99 / 255, blue: 235 / 255)
                 part.underlineStyle = .single
-                part.link = URL(string: "briar-mention://\(handle)")
+                part.link = mentionURL(handle)
             }
             result.append(part)
         }
@@ -92,7 +97,7 @@ enum MessageMentions {
                 let escaped = segment.value
                     .replacingOccurrences(of: "[", with: "\\[")
                     .replacingOccurrences(of: "]", with: "\\]")
-                return "[\(escaped)](briar-mention://\(handle))"
+                return "[\(escaped)](\(mentionURL(handle)?.absoluteString ?? "briar-mention://mention"))"
             }
         }.joined()
     }
@@ -115,11 +120,14 @@ enum MessageMentions {
             )
         }
         for agent in agents where agentIds.contains(agent.agentId) {
-            let preferred = agent.handle?.trimmingCharacters(in: .whitespacesAndNewlines)
-            let raw = preferred.flatMap { $0.isEmpty ? nil : $0 } ?? agent.name
-            handles.insert(ChannelMentions.normalizedHandle(raw))
+            handles.insert(agent.name)
         }
         return handles
+    }
+
+    private static func mentionURL(_ value: String) -> URL? {
+        let encoded = value.addingPercentEncoding(withAllowedCharacters: .urlHostAllowed) ?? "mention"
+        return URL(string: "briar-mention://\(encoded)")
     }
 
     /// Issue conversation linkifies known organization members plus the Briar agent.

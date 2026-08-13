@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { channelSlugFromName, handleFromName } from "./channels-contract";
+import { channelSlugFromName } from "./channels-contract";
 import {
   mentionAtCaret,
   mentionHandle,
@@ -31,12 +31,14 @@ describe("mentionAtCaret", () => {
     expect(mentionAtCaret("hey @", 5)).toMatchObject({ query: "" });
   });
 
-  it("ignores an address-like token that is not a mention", () => {
-    expect(mentionAtCaret("mail me at jay@example", 22)).toBeNull();
+  it("keeps spaces in an Agent Name query", () => {
+    expect(mentionAtCaret("ask @Honey B", 12)).toMatchObject({
+      query: "Honey B",
+    });
   });
 
-  it("ignores a completed mention the caret has moved past", () => {
-    expect(mentionAtCaret("@honey hello", 12)).toBeNull();
+  it("ignores an address-like token that is not a mention", () => {
+    expect(mentionAtCaret("mail me at jay@example", 22)).toBeNull();
   });
 
   it("rejects a caret outside the body", () => {
@@ -70,20 +72,13 @@ describe("retainedMentions", () => {
     ).toEqual(["a.b"]);
     expect(retainedMentions("@axb hello", [target("a.b")])).toEqual([]);
   });
-});
 
-describe("handleFromName", () => {
-  it("slugifies a Latin name", () => {
-    expect(handleFromName("Honey Bee")).toBe("honey-bee");
-  });
-
-  it("returns an empty handle for a name with no handle characters", () => {
-    // Callers must fall back to a generated handle rather than store this.
-    expect(handleFromName("꿀벌")).toBe("");
-  });
-
-  it("trims separators produced by punctuation", () => {
-    expect(handleFromName("  Bumble!! ")).toBe("bumble");
+  it("keeps an Agent Name with spaces and non-Latin characters", () => {
+    expect(
+      retainedMentions("@기획 도우미 확인", [target("기획 도우미")]).map(
+        (mention) => mention.handle,
+      ),
+    ).toEqual(["기획 도우미"]);
   });
 });
 

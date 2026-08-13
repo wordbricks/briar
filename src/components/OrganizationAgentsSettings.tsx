@@ -1,5 +1,5 @@
 import { Bot, LoaderCircle, Pencil, Plus, Trash2 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { SettingsAlert, SettingsPageHeader } from "@/components/settings";
 import { Badge } from "@/components/ui/badge";
@@ -24,7 +24,6 @@ import {
   updateOrganizationAgent,
 } from "../lib/api";
 import {
-  handleFromName,
   type ChannelAgentProvider,
   type ChannelAgentSummary,
 } from "../lib/channels-contract";
@@ -99,7 +98,6 @@ export function OrganizationAgentsSettings({
 
   const createAgent = async (input: {
     name: string;
-    handle?: string;
     provider: ChannelAgentProvider;
     model: string | null;
     effort: ModelEffort | null;
@@ -166,7 +164,6 @@ export function OrganizationAgentsSettings({
         editingAgent.agentId,
         {
           name: editingAgent.name,
-          handle: editingAgent.handle ?? undefined,
           provider: editingAgent.provider,
           model: editingAgent.model,
           effort: editingAgent.effort,
@@ -268,9 +265,6 @@ export function OrganizationAgentsSettings({
                   <Typography as="h2" variant="bodyLg">
                     {agent.name}
                   </Typography>
-                  {agent.handle ? (
-                    <Badge variant="secondary">@{agent.handle}</Badge>
-                  ) : null}
                 </div>
                 <Typography className="mt-3 whitespace-pre-wrap" variant="bodySm">
                   {agent.responsibility}
@@ -452,7 +446,6 @@ function OrganizationAgentCreateDialog({
   onClose: () => void;
   onCreate: (input: {
     name: string;
-    handle?: string;
     provider: ChannelAgentProvider;
     model: string | null;
     effort: ModelEffort | null;
@@ -462,8 +455,6 @@ function OrganizationAgentCreateDialog({
   const { t } = useI18n();
   const providerModels = useAgentProviderModels(isOpen);
   const [name, setName] = useState("");
-  const [handle, setHandle] = useState("");
-  const [isHandleCustomized, setIsHandleCustomized] = useState(false);
   const [provider, setProvider] =
     useState<ChannelAgentProvider>("codex");
   const [model, setModel] = useState("");
@@ -471,13 +462,9 @@ function OrganizationAgentCreateDialog({
   const [responsibility, setResponsibility] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const generatedHandle = useMemo(() => handleFromName(name), [name]);
-
   useEffect(() => {
     if (!isOpen) {
       setName("");
-      setHandle("");
-      setIsHandleCustomized(false);
       setProvider("codex");
       setModel("");
       setEffort(null);
@@ -489,7 +476,6 @@ function OrganizationAgentCreateDialog({
   const canSubmit =
     name.trim().length > 0 &&
     responsibility.trim().length > 0 &&
-    (!handle || /^[a-z0-9]+(?:-[a-z0-9]+)*$/u.test(handle)) &&
     !isSubmitting;
 
   return (
@@ -519,7 +505,6 @@ function OrganizationAgentCreateDialog({
             setError(null);
             void onCreate({
               name: name.trim(),
-              handle: handle || undefined,
               provider,
               model: model || null,
               effort,
@@ -539,48 +524,11 @@ function OrganizationAgentCreateDialog({
               autoFocus
               id="organization-agent-name"
               maxLength={100}
-              onChange={(event) => {
-                const nextName = event.target.value;
-                setName(nextName);
-                if (!isHandleCustomized) setHandle(handleFromName(nextName));
-              }}
+              onChange={(event) => setName(event.target.value)}
               placeholder={t("organization.agentsNamePlaceholder")}
               required
               value={name}
             />
-          </div>
-
-          <div className="grid gap-2">
-            <Label htmlFor="organization-agent-handle">
-              {t("organization.agentsHandle")}
-            </Label>
-            <div className="flex items-center rounded-md border border-input bg-background shadow-xs focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/20">
-              <span className="pl-3 text-muted-foreground">@</span>
-              <Input
-                aria-describedby="organization-agent-handle-help"
-                className="border-0 pl-0.5 shadow-none focus-visible:ring-0"
-                id="organization-agent-handle"
-                maxLength={63}
-                onChange={(event) => {
-                  setIsHandleCustomized(true);
-                  setHandle(event.target.value.toLowerCase());
-                }}
-                pattern="[a-z0-9]+(-[a-z0-9]+)*"
-                placeholder={
-                  generatedHandle || t("organization.agentsHandleGenerated")
-                }
-                value={handle}
-              />
-            </div>
-            <Typography
-              id="organization-agent-handle-help"
-              tone="muted"
-              variant="caption"
-            >
-              {name.trim() && !generatedHandle && !handle
-                ? t("organization.agentsHandleFallback")
-                : t("organization.agentsHandleHint")}
-            </Typography>
           </div>
 
           <div className="grid gap-4 md:grid-cols-3">
