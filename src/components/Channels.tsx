@@ -156,6 +156,8 @@ type ChannelsProps = {
   onIssueCreated?: (projectId: string, runId: string) => void | Promise<void>;
   onSkillSessionAccepted?: (session: AutoHuntSession) => void;
   onCreateAgent?: () => void;
+  inboxDetail?: boolean;
+  onInboxDetailClose?: () => void;
   requestedMessage?: {
     channelId: string;
     messageId: string;
@@ -285,6 +287,8 @@ export function Channels({
   onSkillSessionAccepted,
   requestedMessage,
   onRequestedMessageOpen,
+  inboxDetail = false,
+  onInboxDetailClose,
   onCreateAgent,
 }: ChannelsProps) {
   const { t, localeTag } = useI18n();
@@ -435,6 +439,11 @@ export function Channels({
   const activeChannel = useMemo(
     () => channels.find((channel) => channel.id === activeChannelId) ?? null,
     [channels, activeChannelId],
+  );
+  const showRequestedThreadOnly = Boolean(
+    inboxDetail &&
+      requestedMessage &&
+      requestedMessage.rootMessageId !== requestedMessage.messageId,
   );
 
   const recordProposalMessages = useCallback((incoming: ChannelMessage[]) => {
@@ -1363,7 +1372,9 @@ export function Channels({
 
   return (
     <div
-      className={`channels${isResizingThread ? " is-resizing-thread" : ""}`}
+      className={`channels${isResizingThread ? " is-resizing-thread" : ""}${
+        showRequestedThreadOnly ? " channels-inbox-thread-only" : ""
+      }`}
       ref={channelsRef}
       style={
         threadWidth === null
@@ -1373,7 +1384,8 @@ export function Channels({
             } as CSSProperties)
       }
     >
-      <section className="channel-main">
+      {!showRequestedThreadOnly ? (
+        <section className="channel-main">
         {activeChannel ? (
           <>
             <header className="channel-header">
@@ -1524,21 +1536,24 @@ export function Channels({
         ) : (
           <p className="muted channel-empty">{t("channel.selectPrompt")}</p>
         )}
-      </section>
+        </section>
+      ) : null}
 
       {threadParentId && activeChannel ? (
         <>
-          <div
-            aria-label={t("channel.resizeThread")}
-            aria-orientation="vertical"
-            aria-valuemax={channelThreadWidthMax}
-            aria-valuemin={channelThreadWidthMin}
-            aria-valuenow={effectiveThreadWidth}
-            className="channel-thread-resizer"
-            role="separator"
-            tabIndex={0}
-            {...threadResizeProps}
-          />
+          {showRequestedThreadOnly ? null : (
+            <div
+              aria-label={t("channel.resizeThread")}
+              aria-orientation="vertical"
+              aria-valuemax={channelThreadWidthMax}
+              aria-valuemin={channelThreadWidthMin}
+              aria-valuenow={effectiveThreadWidth}
+              className="channel-thread-resizer"
+              role="separator"
+              tabIndex={0}
+              {...threadResizeProps}
+            />
+          )}
           <aside className="channel-thread">
           <header>
             <span>
@@ -1547,6 +1562,10 @@ export function Channels({
             <button
               aria-label={t("channel.closeThread")}
               onClick={() => {
+                if (showRequestedThreadOnly) {
+                  onInboxDetailClose?.();
+                  return;
+                }
                 invalidateChannelSurface(activeChannel.id, null);
                 setThreadParentId(null);
               }}
@@ -1632,6 +1651,12 @@ export function Channels({
           />
           </aside>
         </>
+      ) : null}
+
+      {showRequestedThreadOnly && !(threadParentId && activeChannel) ? (
+        <div className="inbox-detail-loading" role="status">
+          {t("inbox.detailLoading")}
+        </div>
       ) : null}
 
       {inviteOpen && activeChannel ? (
