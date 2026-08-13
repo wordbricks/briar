@@ -3,10 +3,24 @@
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  defaultAgentProviderModelCatalog,
+  loadAgentProviderModels,
+} from "../lib/project-llm";
 import { CreateIssueDialog } from "./HuntDashboard";
 import type { CreateIssueInput } from "../types";
 import { createIssueDraftStorageKey } from "../lib/create-issue-draft";
 import { demoDashboard } from "../lib/demo-data";
+
+vi.mock("../lib/project-llm", async (importOriginal) => {
+  const original = await importOriginal<typeof import("../lib/project-llm")>();
+  return {
+    ...original,
+    loadAgentProviderModels: vi.fn(async () =>
+      original.defaultAgentProviderModelCatalog
+    ),
+  };
+});
 
 const projects = [
   {
@@ -35,6 +49,10 @@ describe("CreateIssueDialog attachments", () => {
     window.localStorage.clear();
     URL.createObjectURL = vi.fn(() => "blob:clipboard-preview");
     URL.revokeObjectURL = vi.fn();
+    vi.mocked(loadAgentProviderModels).mockReset();
+    vi.mocked(loadAgentProviderModels).mockResolvedValue(
+      defaultAgentProviderModelCatalog,
+    );
   });
 
   afterEach(() => {
@@ -1070,5 +1088,55 @@ describe("CreateIssueDialog attachments", () => {
 
     await act(async () => root.unmount());
     style.remove();
+  });
+
+  it("uses the cached Supported models catalog for issue creation", async () => {
+    vi.mocked(loadAgentProviderModels).mockResolvedValue({
+      ...defaultAgentProviderModelCatalog,
+      opencode: {
+        models: [
+          { id: "openai/gpt-5.6", label: "GPT 5.6" },
+          { id: "anthropic/claude-sonnet-4", label: "Claude Sonnet 4" },
+        ],
+        error: null,
+      },
+    });
+    const root = createRoot(container);
+    await act(async () => root.render(
+      <CreateIssueDialog
+        {...projectProps}
+        availableProviders={["opencode"]}
+        isSubmitting={false}
+        onClose={() => undefined}
+        onCreate={async () => undefined}
+      />,
+    ));
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(
+        ".issue-provider-select .select-menu-trigger",
+      )?.click();
+    });
+    await act(async () => {
+      document.querySelector<HTMLButtonElement>(
+        '[role="option"][data-value="opencode"]',
+      )?.click();
+      await Promise.resolve();
+    });
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(
+        ".issue-model-select .select-menu-trigger",
+      )?.click();
+    });
+
+    expect(document.body.textContent).toContain("GPT 5.6");
+    expect(document.body.textContent).toContain("openai/gpt-5.6");
+    expect(document.body.textContent).toContain("Claude Sonnet 4");
+    expect(document.querySelector<HTMLInputElement>(
+      ".select-menu-search input",
+    )).not.toBeNull();
+    expect(loadAgentProviderModels).toHaveBeenCalledOnce();
+
+    await act(async () => root.unmount());
   });
 });
