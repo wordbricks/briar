@@ -50,7 +50,7 @@ describe("TranscriptBatcher", () => {
       .toEqual([[1, 2], [3]]);
   });
 
-  it("serializes sends and continues after an optional upload fails", async () => {
+  it("retries transient failures without reordering batches", async () => {
     const attempts: number[][] = [];
     const errors: unknown[] = [];
     const batcher = new TranscriptBatcher({
@@ -60,12 +60,29 @@ describe("TranscriptBatcher", () => {
       },
       onError: (error) => errors.push(error),
       maxEvents: 1,
+      retryDelayMs: 0,
     });
 
     await batcher.enqueue(event(1));
     await batcher.enqueue(event(2));
 
-    expect(attempts).toEqual([[1], [2]]);
+    expect(attempts).toEqual([[1], [1], [2]]);
+    expect(errors).toHaveLength(0);
+  });
+
+  it("surfaces a transcript upload after bounded retries", async () => {
+    const errors: unknown[] = [];
+    const batcher = new TranscriptBatcher({
+      send: async () => {
+        throw new Error("offline");
+      },
+      onError: (error) => errors.push(error),
+      maxEvents: 1,
+      maxSendAttempts: 2,
+      retryDelayMs: 0,
+    });
+
+    await expect(batcher.enqueue(event(1))).rejects.toThrow("offline");
     expect(errors).toHaveLength(1);
   });
 });

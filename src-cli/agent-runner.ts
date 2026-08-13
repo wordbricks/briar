@@ -974,18 +974,12 @@ export function detachedPayloadDirection(
 }
 
 /**
- * Provider runners already accumulate streaming deltas and emit the complete,
- * bounded text in their completed event. Keep deltas ephemeral so one visible
- * message or activity consumes one durable transcript event instead of hundreds.
+ * Every bounded provider payload is retained in compressed R2 segments. The
+ * Worker projects normalized events into a small D1 work log, so retaining raw
+ * deltas no longer creates one database row per token or tool update.
  */
-export function shouldPersistDetachedTranscriptPayload(payload: unknown) {
-  if (!payload || typeof payload !== "object") return true;
-  const record = payload as Record<string, unknown>;
-  const event =
-    record.type === "event" && record.event && typeof record.event === "object"
-      ? (record.event as Record<string, unknown>)
-      : record;
-  return event.type !== "messageDelta" && event.type !== "activityDelta";
+export function shouldPersistDetachedTranscriptPayload(_payload: unknown) {
+  return true;
 }
 
 export function createDetachedTranscriptSequencer(claimAttempt: number) {

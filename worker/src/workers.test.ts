@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { Miniflare } from "miniflare";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import apiWorker from "./index";
+import { ingestAgentTranscript } from "./agent-worklog";
 import {
   claimNextIssueAgentReply,
   claimNextQueuedHuntRun,
@@ -102,11 +103,14 @@ describe("detached execution workers", () => {
     modules: true,
     script: "export default { fetch() { return new Response('ok') } }",
     d1Databases: { DB: "briar-workers-test" },
+    r2Buckets: ["ARCHIVES"],
   });
   let db: D1Database;
+  let archives: R2Bucket;
 
   beforeAll(async () => {
     db = (await miniflare.getD1Database("DB")) as unknown as D1Database;
+    archives = (await miniflare.getR2Bucket("ARCHIVES")) as unknown as R2Bucket;
     await applyD1Migrations(db, {
       files: [
         "0001_briar.sql",
@@ -176,6 +180,7 @@ describe("detached execution workers", () => {
         "0084_run_usage_ledger.sql",
         "0085_run_cost_ledger.sql",
         "0099_project_usage_analytics.sql",
+        "0103_agent_worklog_projection.sql",
       ],
     });
     await executeD1Sql(
@@ -357,6 +362,7 @@ describe("detached execution workers", () => {
     );
     const env = {
       DB: db,
+      ARCHIVES: archives,
       BETTER_AUTH_SECRET: "readiness-audit-test-secret-readiness-audit-test-secret",
       GOOGLE_CLIENT_ID: "google-client-test",
       GOOGLE_CLIENT_SECRET: "google-secret-test",
@@ -2418,6 +2424,7 @@ describe("detached execution workers", () => {
 
     const env = {
       DB: db,
+      ARCHIVES: archives,
       BETTER_AUTH_SECRET: "usage-ledger-test-secret-usage-ledger-test-secret",
       GOOGLE_CLIENT_ID: "google-client-test",
       GOOGLE_CLIENT_SECRET: "google-secret-test",
@@ -2823,6 +2830,101 @@ describe("detached execution workers", () => {
         { sequence: 2, message: { result: true } },
       ],
     });
+  });
+
+  it("serves the compact projection and authenticated raw transcript", async () => {
+    const sessionToken = "worklog-transcript-session-token";
+    await db
+      .prepare(
+        `insert into "session" (
+           id, expiresAt, token, createdAt, updatedAt, userId
+         ) values (?, '2099-01-01T00:00:00.000Z', ?, ?, ?, 'owner')`,
+      )
+      .bind("worklog-transcript-session", sessionToken, atMinute(1), atMinute(1))
+      .run();
+    await ingestAgentTranscript(db, archives, projectId, {
+      sessionId: "projected-session",
+      runId: null,
+      workerId: null,
+      agentProvider: "grok",
+      observedAt: atMinute(2),
+      events: [
+        {
+          sequence: 1,
+          direction: "server",
+          payload: {
+            type: "event",
+            event: {
+              type: "messageCompleted",
+              id: "assistant-1",
+              phase: "final",
+              text: "Projected answer",
+            },
+          },
+        },
+        {
+          sequence: 2,
+          direction: "server",
+          payload: {
+            type: "event",
+            raw: { sessionUpdate: "agent_thought_chunk", text: "Raw thought" },
+          },
+        },
+      ],
+    });
+    const env = {
+      DB: db,
+      ARCHIVES: archives,
+      BETTER_AUTH_SECRET: "worklog-transcript-secret-worklog-transcript-secret",
+      GOOGLE_CLIENT_ID: "google-client-test",
+      GOOGLE_CLIENT_SECRET: "google-secret-test",
+    } as unknown as Env;
+    const headers = { authorization: `Bearer ${sessionToken}` };
+    const projected = await apiWorker.fetch(
+      new Request(
+        `https://briar-api.example/projects/${projectId}/sessions/projected-session/transcript`,
+        { headers },
+      ),
+      env,
+    );
+    expect(projected.status).toBe(200);
+    await expect(projected.json()).resolves.toMatchObject({
+      session: { sessionId: "projected-session", projection: "worklog" },
+      events: [{
+        sequence: 1,
+        message: {
+          type: "event",
+          event: { type: "messageCompleted", text: "Projected answer" },
+        },
+      }],
+    });
+
+    const manifest = await apiWorker.fetch(
+      new Request(
+        `https://briar-api.example/projects/${projectId}/sessions/projected-session/raw-transcript`,
+        { headers },
+      ),
+      env,
+    );
+    expect(manifest.status).toBe(200);
+    const raw = await manifest.json<{
+      eventCount: number;
+      segments: Array<{ url: string }>;
+    }>();
+    expect(raw.eventCount).toBe(2);
+    expect(raw.segments).toHaveLength(1);
+
+    const segment = await apiWorker.fetch(
+      new Request(`https://briar-api.example${raw.segments[0]!.url}`, { headers }),
+      env,
+    );
+    expect(segment.status).toBe(200);
+    expect(segment.headers.get("content-type")).toBe("application/gzip");
+    const decompressed = await new Response(
+      segment.body!.pipeThrough(new DecompressionStream("gzip")),
+    ).text();
+    expect(decompressed).toContain('"sequence":1');
+    expect(decompressed).toContain("Raw thought");
   });
 
   it("charges a retried batch only once", async () => {

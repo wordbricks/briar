@@ -120,7 +120,9 @@ import {
   listArchivedRunEvents,
   processArchiveCleanupQueue,
   readArchivedTranscript,
+  readArchivedWorkLog,
   readLatestArchivedTranscriptForRun,
+  readLatestArchivedWorkLogForRun,
 } from "./archive";
 import {
   acceptOrganizationInvitation,
@@ -387,7 +389,6 @@ import {
   parsePlacementKey,
 } from "../../src/lib/linear-import";
 import {
-  appendAgentTranscript,
   availableExecutionWorkerForAgentSkill,
   auditExecutionEvent,
   authenticateExecutionWorker,
@@ -431,6 +432,15 @@ import {
   updateExecutionWorkerLabel,
   updateProjectExecutionWorkerPolicy,
 } from "./workers";
+import {
+  ingestAgentTranscript,
+  listAgentTranscriptSegments,
+  readAgentWorkLog,
+  readLatestAgentWorkLogForRun,
+  readRawTranscriptSegment,
+  workLogEntryTranscriptEvent,
+  type AgentTranscriptSegmentRow,
+} from "./agent-worklog";
 import { readLatestVersion, serveRelease } from "./releases";
 import {
   compareSemanticVersions,
@@ -12143,7 +12153,7 @@ async function route(
           recordedAt,
         })
       : 0;
-    const result = await appendAgentTranscript(db, projectId, {
+    const result = await ingestAgentTranscript(db, env.ARCHIVES, projectId, {
       sessionId: input.sessionId,
       runId: input.runId ?? null,
       workerId: authenticatedWorkerId ?? input.workerId ?? null,
@@ -12197,6 +12207,50 @@ async function route(
       : null;
     const normalizedAfterSequence =
       Number.isFinite(afterSequence) && afterSequence > 0 ? afterSequence : 0;
+    const hotWorkLog = detachedRunId?.success
+      ? await readLatestAgentWorkLogForRun(db, projectId, detachedRunId.data)
+      : await readAgentWorkLog(db, projectId, requestedSessionId);
+    const workLog = hotWorkLog && hotWorkLog.entries.length > 0
+      ? hotWorkLog
+      : detachedRunId?.success
+        ? await readLatestArchivedWorkLogForRun(
+            db,
+            env.ARCHIVES,
+            projectId,
+            detachedRunId.data,
+          )
+        : await readArchivedWorkLog(
+            db,
+            env.ARCHIVES,
+            projectId,
+            requestedSessionId,
+          );
+    if (workLog && workLog.entries.length > 0) {
+      return json({
+        session: {
+          sessionId: workLog.session.session_id,
+          runId: workLog.session.run_id,
+          workerId: workLog.session.worker_id,
+          agentProvider: workLog.session.agent_provider,
+          startedAt: workLog.session.started_at,
+          lastEventAt: workLog.session.last_event_at,
+          eventCount: workLog.entries.length,
+          projection: "worklog",
+        },
+        // Work-log entries are a bounded snapshot. Returning the full set on
+        // each live poll lets an upsert replace a writing entry in-place
+        // without persisting or replaying provider token deltas.
+        events: workLog.entries.map((entry) => ({
+          sequence: entry.sequence,
+          direction: "server" as const,
+          message: {
+            type: "event",
+            event: workLogEntryTranscriptEvent(entry),
+          },
+          recordedAt: entry.updated_at,
+        })),
+      });
+    }
     const hotTranscript = detachedRunId?.success
       ? await readLatestAgentTranscriptForRun(
           db,
@@ -12250,6 +12304,128 @@ async function route(
         direction: event.direction,
         message: JSON.parse(event.payload_json),
         recordedAt: event.recorded_at,
+      })),
+    });
+  }
+
+  const rawTranscriptSegmentMatch = pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/sessions\/([A-Za-z0-9_-]+)\/raw-transcript\/(\d+)-(\d+)$/u,
+  );
+  const rawTranscriptMatch = pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/sessions\/([A-Za-z0-9_-]+)\/raw-transcript$/u,
+  );
+  if (
+    rawTranscriptSegmentMatch && request.method === "GET"
+  ) {
+    const projectId = rawTranscriptSegmentMatch[1];
+    await requireProjectAccess(auth, db, request, projectId);
+    const requestedSessionId = rawTranscriptSegmentMatch[2];
+    const detachedRunId = requestedSessionId.startsWith("detached-")
+      ? z.string().uuid().safeParse(requestedSessionId.slice("detached-".length))
+      : null;
+    const hotWorkLog = detachedRunId?.success
+      ? await readLatestAgentWorkLogForRun(db, projectId, detachedRunId.data)
+      : await readAgentWorkLog(db, projectId, requestedSessionId);
+    const workLog = hotWorkLog ?? (detachedRunId?.success
+      ? await readLatestArchivedWorkLogForRun(
+          db,
+          env.ARCHIVES,
+          projectId,
+          detachedRunId.data,
+        )
+      : await readArchivedWorkLog(
+          db,
+          env.ARCHIVES,
+          projectId,
+          requestedSessionId,
+        ));
+    if (!workLog) throw new HttpError(404, "Transcript not found");
+    const segments = "segments" in workLog
+      ? workLog.segments as AgentTranscriptSegmentRow[]
+      : await listAgentTranscriptSegments(
+          db,
+          projectId,
+          workLog.session.session_id,
+        );
+    const firstSequence = Number(rawTranscriptSegmentMatch[3]);
+    const lastSequence = Number(rawTranscriptSegmentMatch[4]);
+    const segment = segments?.find((candidate) =>
+      candidate.first_sequence === firstSequence &&
+      candidate.last_sequence === lastSequence
+    );
+    if (!segment) throw new HttpError(404, "Transcript segment not found");
+    const object = await readRawTranscriptSegment(env.ARCHIVES, segment);
+    if (!object) throw new HttpError(404, "Transcript segment not found");
+    return new Response(object.body, {
+      headers: {
+        "Content-Type": "application/gzip",
+        "Content-Disposition": contentDisposition(object.filename).replace(
+          /^inline;/u,
+          "attachment;",
+        ),
+        "Cache-Control": "private, no-store",
+      },
+    });
+  }
+  if (rawTranscriptMatch && request.method === "GET") {
+    const projectId = rawTranscriptMatch[1];
+    await requireProjectAccess(auth, db, request, projectId);
+    const requestedSessionId = rawTranscriptMatch[2];
+    const detachedRunId = requestedSessionId.startsWith("detached-")
+      ? z.string().uuid().safeParse(requestedSessionId.slice("detached-".length))
+      : null;
+    const hotWorkLog = detachedRunId?.success
+      ? await readLatestAgentWorkLogForRun(db, projectId, detachedRunId.data)
+      : await readAgentWorkLog(db, projectId, requestedSessionId);
+    const workLog = hotWorkLog ?? (detachedRunId?.success
+      ? await readLatestArchivedWorkLogForRun(
+          db,
+          env.ARCHIVES,
+          projectId,
+          detachedRunId.data,
+        )
+      : await readArchivedWorkLog(
+          db,
+          env.ARCHIVES,
+          projectId,
+          requestedSessionId,
+        ));
+    if (!workLog) throw new HttpError(404, "Transcript not found");
+    const segments = "segments" in workLog
+      ? workLog.segments as AgentTranscriptSegmentRow[]
+      : await listAgentTranscriptSegments(
+          db,
+          projectId,
+          workLog.session.session_id,
+        );
+    if (!segments) throw new HttpError(404, "Transcript not found");
+    return json({
+      sessionId: workLog.session.session_id,
+      runId: workLog.session.run_id,
+      agentProvider: workLog.session.agent_provider,
+      eventCount: segments.reduce(
+        (total, segment) => total + segment.event_count,
+        0,
+      ),
+      uncompressedBytes: segments.reduce(
+        (total, segment) => total + segment.uncompressed_bytes,
+        0,
+      ),
+      compressedBytes: segments.reduce(
+        (total, segment) => total + segment.compressed_bytes,
+        0,
+      ),
+      segments: segments.map((segment) => ({
+        firstSequence: segment.first_sequence,
+        lastSequence: segment.last_sequence,
+        eventCount: segment.event_count,
+        uncompressedBytes: segment.uncompressed_bytes,
+        compressedBytes: segment.compressed_bytes,
+        sha256: segment.sha256,
+        recordedAt: segment.recorded_at,
+        url:
+          `/projects/${projectId}/sessions/${requestedSessionId}/raw-transcript/` +
+          `${segment.first_sequence}-${segment.last_sequence}`,
       })),
     });
   }

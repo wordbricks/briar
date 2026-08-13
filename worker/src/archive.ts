@@ -9,6 +9,10 @@ import type {
 } from "./db";
 import { upsertProjectAgentSessionSummary } from "./db";
 import type { TranscriptDirection, TranscriptSessionRow } from "./workers";
+import type {
+  AgentTranscriptSegmentRow,
+  AgentWorkLogEntryRow,
+} from "./agent-worklog";
 
 export const archiveFormatVersion = 1;
 export const defaultArchiveRowLimit = 500;
@@ -148,6 +152,9 @@ export type TranscriptEventArchiveRow = {
   recorded_at: string;
 };
 
+export type AgentWorkLogEntryArchiveRow = AgentWorkLogEntryRow;
+export type AgentTranscriptSegmentArchiveRow = AgentTranscriptSegmentRow;
+
 type ArchiveRecordType =
   | "hunt_event"
   | "run_evidence"
@@ -155,6 +162,8 @@ type ArchiveRecordType =
   | "execution_audit"
   | "transcript_session"
   | "transcript_event"
+  | "worklog_entry"
+  | "transcript_segment"
   | "issue_message"
   | "project_agent_session";
 
@@ -204,6 +213,8 @@ const archiveLineSchema = z.object({
     "execution_audit",
     "transcript_session",
     "transcript_event",
+    "worklog_entry",
+    "transcript_segment",
     "issue_message",
     "project_agent_session",
   ]),
@@ -319,6 +330,7 @@ const transcriptSessionSchema: z.ZodType<TranscriptSessionRow> = z.object({
   last_event_at: z.string(),
   event_count: z.number(),
   byte_count: z.number(),
+  worklog_projection_version: z.number().default(0),
 });
 
 const transcriptEventSchema: z.ZodType<TranscriptEventArchiveRow> = z.object({
@@ -328,6 +340,43 @@ const transcriptEventSchema: z.ZodType<TranscriptEventArchiveRow> = z.object({
   payload_json: z.string(),
   recorded_at: z.string(),
 });
+
+const workLogEntrySchema: z.ZodType<AgentWorkLogEntryArchiveRow> = z.object({
+  session_id: z.string(),
+  entry_id: z.string(),
+  sequence: z.number(),
+  updated_sequence: z.number(),
+  entry_type: z.enum(["message", "activity"]),
+  activity_kind: z
+    .enum(["command", "fileChange", "webSearch", "tool"])
+    .nullable(),
+  phase: nullableString,
+  title: nullableString,
+  body: z.string(),
+  status: z.enum([
+    "writing",
+    "completed",
+    "failed",
+    "cancelled",
+    "interrupted",
+  ]),
+  started_at: z.string(),
+  updated_at: z.string(),
+  completed_at: nullableString,
+});
+
+const transcriptSegmentSchema: z.ZodType<AgentTranscriptSegmentArchiveRow> =
+  z.object({
+    session_id: z.string(),
+    first_sequence: z.number(),
+    last_sequence: z.number(),
+    object_key: z.string(),
+    event_count: z.number(),
+    uncompressed_bytes: z.number(),
+    compressed_bytes: z.number(),
+    sha256: z.string(),
+    recorded_at: z.string(),
+  });
 
 const executionAuditSchema: z.ZodType<ExecutionAuditArchiveRow> = z.object({
   id: z.string(),
@@ -597,6 +646,22 @@ const transcriptCandidate = async (
     .bind(session.session_id)
     .all<TranscriptEventArchiveRow>();
   const events = result.results ?? [];
+  const workLog = await db
+    .prepare(
+      `select * from briar_agent_worklog_entries
+       where session_id = ? order by sequence, entry_id`,
+    )
+    .bind(session.session_id)
+    .all<AgentWorkLogEntryArchiveRow>();
+  const segments = await db
+    .prepare(
+      `select * from briar_agent_transcript_segments
+       where session_id = ? order by first_sequence, last_sequence`,
+    )
+    .bind(session.session_id)
+    .all<AgentTranscriptSegmentArchiveRow>();
+  const workLogEntries = workLog.results ?? [];
+  const transcriptSegments = segments.results ?? [];
   return {
     projectId: session.project_id,
     runId: session.run_id,
@@ -605,11 +670,19 @@ const transcriptCandidate = async (
     records: [
       { recordType: "transcript_session", data: session },
       ...events.map((data) => ({ recordType: "transcript_event" as const, data })),
+      ...workLogEntries.map((data) => ({
+        recordType: "worklog_entry" as const,
+        data,
+      })),
+      ...transcriptSegments.map((data) => ({
+        recordType: "transcript_segment" as const,
+        data,
+      })),
     ],
-    rowCount: events.length + 1,
+    rowCount: events.length + workLogEntries.length + transcriptSegments.length + 1,
     periodStart: session.started_at,
     periodEnd: session.last_event_at,
-    relatedObjectKeys: [],
+    relatedObjectKeys: transcriptSegments.map((segment) => segment.object_key),
   };
 };
 
@@ -1381,8 +1454,68 @@ const archivedTranscriptFromRecords = (records: ArchiveRecord[]) => {
       .filter((record) => record.recordType === "transcript_event")
       .map((record) => transcriptEventSchema.parse(record.data))
       .sort((left, right) => left.sequence - right.sequence),
+    entries: records
+      .filter((record) => record.recordType === "worklog_entry")
+      .map((record) => workLogEntrySchema.parse(record.data))
+      .sort(
+        (left, right) =>
+          left.sequence - right.sequence ||
+          left.entry_id.localeCompare(right.entry_id),
+      ),
+    segments: records
+      .filter((record) => record.recordType === "transcript_segment")
+      .map((record) => transcriptSegmentSchema.parse(record.data))
+      .sort(
+        (left, right) =>
+          left.first_sequence - right.first_sequence ||
+          left.last_sequence - right.last_sequence,
+      ),
   };
 };
+
+export async function readArchivedWorkLog(
+  db: D1Database,
+  bucket: ArchiveBucket,
+  projectId: string,
+  sessionId: string,
+) {
+  const transcript = await readArchivedTranscript(
+    db,
+    bucket,
+    projectId,
+    sessionId,
+  );
+  return transcript &&
+      (transcript.entries.length > 0 || transcript.segments.length > 0)
+    ? {
+        session: transcript.session,
+        entries: transcript.entries,
+        segments: transcript.segments,
+      }
+    : null;
+}
+
+export async function readLatestArchivedWorkLogForRun(
+  db: D1Database,
+  bucket: ArchiveBucket,
+  projectId: string,
+  runId: string,
+) {
+  const transcript = await readLatestArchivedTranscriptForRun(
+    db,
+    bucket,
+    projectId,
+    runId,
+  );
+  return transcript &&
+      (transcript.entries.length > 0 || transcript.segments.length > 0)
+    ? {
+        session: transcript.session,
+        entries: transcript.entries,
+        segments: transcript.segments,
+      }
+    : null;
+}
 
 export async function readLatestArchivedTranscriptForRun(
   db: D1Database,

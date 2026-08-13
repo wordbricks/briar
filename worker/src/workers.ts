@@ -266,6 +266,7 @@ export type TranscriptSessionRow = {
   last_event_at: string;
   event_count: number;
   byte_count: number;
+  worklog_projection_version: number;
 };
 
 export type TranscriptEventInput = {
