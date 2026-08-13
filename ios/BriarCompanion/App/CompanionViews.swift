@@ -1,6 +1,4 @@
-import PhotosUI
 import SwiftUI
-import UIKit
 
 func issueProposalAcceptanceSystemImage(
     for type: IssueProposedAction.ActionType
@@ -781,8 +779,6 @@ struct RunDetailView: View {
     @State private var messageText = ""
     @State private var messageMentions: [ChannelMentionTarget] = []
     @State private var messageAttachments: [PendingIssueAttachment] = []
-    @State private var selectedMessagePhotos: [PhotosPickerItem] = []
-    @State private var isLoadingMessagePhotos = false
     @State private var replyTo: IssueMessage?
     @State private var reviewCompleted = false
     @State private var linkCopied = false
@@ -809,12 +805,6 @@ struct RunDetailView: View {
 
     private var issueMentionCandidates: [ChannelMentionTarget] {
         MessageMentions.issueCandidates(members: members, currentUserId: currentUserID)
-    }
-
-    private var issueMentionSuggestions: [ChannelMentionTarget] {
-        Array(
-            ChannelMentions.suggestions(in: messageText, candidates: issueMentionCandidates).prefix(6)
-        )
     }
 
     private var issueMentionHandles: Set<String> {
@@ -911,7 +901,14 @@ struct RunDetailView: View {
     }
 
     var body: some View {
-        lifecycleContent
+        ZStack(alignment: .topLeading) {
+            lifecycleContent
+            Color.clear
+                .frame(width: 1, height: 1)
+                .accessibilityElement()
+                .accessibilityLabel(L10n.text("이슈 상세", locale: locale))
+                .accessibilityIdentifier("run-detail")
+        }
         .sheet(item: $previewFile) { file in
             QuickLookPreview(fileURL: file.url)
                 .ignoresSafeArea()
@@ -1002,7 +999,6 @@ struct RunDetailView: View {
                 }
             )
         }
-        .accessibilityIdentifier("run-detail")
     }
 
     private var lifecycleContent: some View {
@@ -1115,8 +1111,12 @@ struct RunDetailView: View {
             .background(Color(uiColor: .systemGroupedBackground))
             .accessibilityIdentifier("run-detail-tabs")
 
-            List { selectedTabContent }
-            .accessibilityIdentifier("run-detail-\(selectedTab.rawValue)-panel")
+            if selectedTab == .conversation {
+                conversationTabContent
+            } else {
+                List { selectedTabContent }
+                    .accessibilityIdentifier("run-detail-\(selectedTab.rawValue)-panel")
+            }
         }
     }
 
@@ -1125,7 +1125,7 @@ struct RunDetailView: View {
         switch selectedTab {
         case .issue: issueTabContent
         case .control: controlTabContent
-        case .conversation: conversationTabContent
+        case .conversation: EmptyView()
         case .result: resultTabContent
         case .logs: logsTabContent
         case .status: statusTabContent
@@ -1464,204 +1464,147 @@ struct RunDetailView: View {
         }
     }
 
-    @ViewBuilder
     private var conversationTabContent: some View {
-        detailLoadingContent
+        VStack(spacing: 0) {
+            conversationHeader
+            Divider()
 
-        if !detail.loading, detail.errorMessage == nil {
-            Section {
-                if detail.messages.isEmpty {
-                    ContentUnavailableView(
-                        L10n.text("대화 없음", locale: locale),
-                        systemImage: "bubble.left.and.bubble.right"
+            if detail.loading {
+                ProgressView(L10n.text("상세 기록을 불러오는 중…", locale: locale))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if let error = detail.errorMessage {
+                ContentUnavailableView {
+                    Label(L10n.text("대화를 불러오지 못했습니다.", locale: locale), systemImage: "wifi.exclamationmark")
+                } description: {
+                    Text(error)
+                } actions: {
+                    Button(L10n.text("상세 다시 시도", locale: locale)) {
+                        Task { await detail.load() }
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if detail.messages.isEmpty {
+                ContentUnavailableView(
+                    L10n.text("대화 없음", locale: locale),
+                    systemImage: "bubble.left.and.bubble.right",
+                    description: Text(
+                        L10n.text("이 이슈에 첫 메시지를 남겨보세요.", locale: locale)
                     )
-                } else {
-                    ForEach(detail.messages) { message in messageRow(message) }
-                }
-            } header: {
-                HStack(spacing: 8) {
-                    Text(L10n.text("대화", locale: locale))
-                    Spacer(minLength: 8)
-                    if !subscriberMembers.isEmpty {
-                        HStack(spacing: -6) {
-                            ForEach(Array(subscriberMembers.prefix(4)), id: \.userId) { member in
-                                ProfileImageView(
-                                    image: member.image,
-                                    name: member.name,
-                                    systemImage: "person.fill",
-                                    size: 24
-                                )
-                                .overlay(Circle().stroke(Color(.systemBackground), lineWidth: 2))
-                            }
-                        }
-                        .accessibilityLabel(
-                            L10n.format("구독 멤버 %d명", locale: locale, subscriberMembers.count)
-                        )
-                    }
-                    if currentUserID != nil {
-                        Button {
-                            Task { await toggleSubscription() }
-                        } label: {
-                            Label(
-                                isSubscribed
-                                    ? L10n.text("구독 중", locale: locale)
-                                    : L10n.text("구독", locale: locale),
-                                systemImage: isSubscribed ? "bell.fill" : "bell"
-                            )
-                            .font(.caption.weight(.semibold))
-                        }
-                        .buttonStyle(.borderless)
-                        .disabled(
-                            mutations.isActive("subscription-\(run.id)") ||
-                                (isSubscribed && assigneeSubscriptionRequired)
-                        )
-                        .accessibilityIdentifier("issue-subscribe-button")
-                        .help(
-                            assigneeSubscriptionRequired
-                                ? L10n.text("담당자는 이 이슈를 항상 구독합니다.", locale: locale)
-                                : isSubscribed
-                                    ? L10n.text("구독 해제", locale: locale)
-                                    : L10n.text("구독", locale: locale)
-                        )
-                    }
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                ConversationTimeline(
+                    messages: detail.messages,
+                    locale: locale,
+                    accessibilityIdentifier: "issue-message-timeline",
+                    timestamp: \.createdAt
+                ) { message in
+                    messageRow(message)
                 }
             }
-        }
 
-        Section(
-            replyTo == nil
-                ? L10n.text("메시지 보내기", locale: locale)
-                : L10n.format("%@에게 답글", locale: locale, replyTo?.author.name ?? "")
-        ) {
-            if !issueMentionSuggestions.isEmpty {
-                ForEach(issueMentionSuggestions) { target in
-                    Button {
-                        messageText = ChannelMentions.insert(target, into: messageText)
-                        if !messageMentions.contains(where: { $0.id == target.id }) {
-                            messageMentions.append(target)
-                        }
-                    } label: {
-                        HStack(spacing: 10) {
-                            ProfileImageView(
-                                image: target.image,
-                                name: target.label,
-                                systemImage: target.kind == .agent ? "cpu" : "person.fill",
-                                size: 32
-                            )
-                            VStack(alignment: .leading, spacing: 1) {
-                                Text(target.label)
-                                    .font(.subheadline.weight(.semibold))
-                                    .lineLimit(1)
-                                Text("@\(target.handle)")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                    .lineLimit(1)
-                            }
-                            Spacer(minLength: 8)
-                            Text(target.detail)
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
-                        }
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityIdentifier("issue-mention-\(target.id)")
-                }
-                .accessibilityIdentifier("issue-mention-menu")
+            if let actionError {
+                Label(actionError, systemImage: "exclamationmark.triangle")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 6)
             }
-            TextField(L10n.text("메시지 또는 @Briar 질문", locale: locale), text: $messageText, axis: .vertical)
-                .lineLimit(2...6)
-                .accessibilityIdentifier("issue-message-field")
-                .onChange(of: messageText) { _, body in
-                    messageMentions = ChannelMentions.retained(in: body, mentions: messageMentions)
-                }
-            ForEach(messageAttachments) { attachment in
-                HStack {
-                    if let image = UIImage(data: attachment.data) {
-                        Image(uiImage: image)
-                            .resizable()
-                            .scaledToFill()
-                            .frame(width: 44, height: 44)
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                    }
-                    Text(attachment.filename).lineLimit(1)
-                    Spacer()
-                    Button(role: .destructive) {
-                        messageAttachments.removeAll { $0.id == attachment.id }
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                    }
-                    .buttonStyle(.plain)
-                }
+
+            ConversationComposer(
+                draft: $messageText,
+                mentions: $messageMentions,
+                attachments: $messageAttachments,
+                sending: mutations.isActive("message-\(run.id)"),
+                candidates: issueMentionCandidates,
+                placeholder: L10n.text("메시지 또는 @Briar 질문", locale: locale),
+                replyLabel: replyTo.map {
+                    L10n.format("%@에게 답글", locale: locale, $0.author.name)
+                },
+                allowsImagePaste: true,
+                locale: locale,
+                accessibility: ConversationComposerAccessibility(
+                    attachment: "issue-message-attach",
+                    field: "issue-message-field",
+                    send: "issue-message-send",
+                    mentionMenu: "issue-mention-menu",
+                    mentionItemPrefix: "issue-mention"
+                ),
+                cancelReply: { replyTo = nil },
+                send: sendMessage
+            )
+        }
+        .background(Color(uiColor: .systemBackground))
+    }
+
+    private var conversationHeader: some View {
+        HStack(spacing: 8) {
+            Text(L10n.text("대화", locale: locale))
+                .font(.subheadline.weight(.bold))
+            if !detail.loading {
+                Text("\(detail.messages.count)")
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.secondary)
             }
-            HStack {
-                if replyTo != nil {
-                    Button(L10n.text("답글 취소", locale: locale)) { replyTo = nil }
-                        .buttonStyle(.borderless)
+            Spacer(minLength: 8)
+            if !subscriberMembers.isEmpty {
+                HStack(spacing: -6) {
+                    ForEach(Array(subscriberMembers.prefix(4)), id: \.userId) { member in
+                        ProfileImageView(
+                            image: member.image,
+                            name: member.name,
+                            systemImage: "person.fill",
+                            size: 24
+                        )
+                        .overlay(Circle().stroke(Color(.systemBackground), lineWidth: 2))
+                    }
                 }
-                PhotosPicker(
-                    selection: $selectedMessagePhotos,
-                    maxSelectionCount: max(
-                        1,
-                        PendingIssueAttachment.maximumCount - messageAttachments.count
-                    ),
-                    matching: PhotoAttachmentImportPolicy.imagesOnly.pickerFilter,
-                    preferredItemEncoding: .compatible
-                ) {
-                    Label(L10n.text("갤러리", locale: locale), systemImage: "photo.on.rectangle")
+                .accessibilityLabel(
+                    L10n.format("구독 멤버 %d명", locale: locale, subscriberMembers.count)
+                )
+            }
+            if currentUserID != nil {
+                Button {
+                    Task { await toggleSubscription() }
+                } label: {
+                    Label(
+                        isSubscribed
+                            ? L10n.text("구독 중", locale: locale)
+                            : L10n.text("구독", locale: locale),
+                        systemImage: isSubscribed ? "bell.fill" : "bell"
+                    )
+                    .font(.caption.weight(.semibold))
                 }
                 .buttonStyle(.borderless)
                 .disabled(
-                    isLoadingMessagePhotos ||
-                        messageAttachments.count >= PendingIssueAttachment.maximumCount
+                    mutations.isActive("subscription-\(run.id)") ||
+                        (isSubscribed && assigneeSubscriptionRequired)
                 )
-                Button {
-                    pasteMessageImage()
-                } label: {
-                    Label(L10n.text("붙여넣기", locale: locale), systemImage: "doc.on.clipboard")
-                }
-                .buttonStyle(.borderless)
-                Spacer()
-                Button {
-                    Task { await sendMessage() }
-                } label: {
-                    Image(systemName: "paperplane.fill")
-                }
-                    .buttonStyle(.borderedProminent)
-                    .buttonBorderShape(.circle)
-                    .disabled(
-                        (messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-                            messageAttachments.isEmpty) ||
-                            mutations.isActive("message-\(run.id)")
-                    )
-                    .accessibilityLabel(L10n.text("보내기", locale: locale))
-                    .accessibilityIdentifier("issue-message-send")
+                .accessibilityIdentifier("issue-subscribe-button")
+                .help(
+                    assigneeSubscriptionRequired
+                        ? L10n.text("담당자는 이 이슈를 항상 구독합니다.", locale: locale)
+                        : isSubscribed
+                            ? L10n.text("구독 해제", locale: locale)
+                            : L10n.text("구독", locale: locale)
+                )
             }
         }
-        .onChange(of: selectedMessagePhotos) { _, items in
-            guard !items.isEmpty else { return }
-            Task { await importMessagePhotos(items) }
-        }
+        .padding(.horizontal, 16)
+        .frame(height: 44)
     }
 
     private func messageRow(_ message: IssueMessage) -> some View {
-        HStack(alignment: .top, spacing: 10) {
-            ProfileImageView(
-                image: message.author.image,
-                name: message.author.name,
-                systemImage: message.author.provider == nil ? "person.fill" : "cpu",
-                size: 34,
-                cornerRadius: 9
-            )
-            VStack(alignment: .leading, spacing: 5) {
-                HStack {
-                    Text(message.author.name).font(.headline)
-                    Spacer()
-                    Text(L10n.relativeDate(message.createdAt, locale: locale))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
+        ConversationMessageLayout(
+            authorImage: message.author.image,
+            profileName: message.author.provider == nil ? message.author.name : nil,
+            authorName: message.author.name,
+            authorSystemImage: message.author.provider == nil ? "person.fill" : "cpu",
+            authorAccessorySystemImage: message.author.provider == nil ? nil : "cpu",
+            timestamp: message.createdAt,
+            accessibilityIdentifier: "issue-message-\(message.id.uuidString.lowercased())"
+        ) {
                 if let parent = detail.messages.first(where: { $0.id == message.parentMessageId }) {
                     HStack(alignment: .top, spacing: 6) {
                         Image(systemName: "arrowshape.turn.up.left")
@@ -1857,8 +1800,10 @@ struct RunDetailView: View {
                 if let proposal = message.skillExecutionProposal {
                     issueSkillExecutionProposalCard(proposal)
                 }
-                Button(L10n.text("답글", locale: locale)) { replyTo = message }.font(.caption)
-            }
+                Button(L10n.text("답글", locale: locale)) { replyTo = message }
+                    .font(.caption)
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.tint)
         }
     }
 
@@ -2723,89 +2668,47 @@ struct RunDetailView: View {
         }
     }
 
-    private func sendMessage() async {
-        let retainedMentions = ChannelMentions.retained(in: messageText, mentions: messageMentions)
-        let mentionedUserIds = retainedMentions.compactMap {
+    private func sendMessage(
+        body: String,
+        mentions: [ChannelMentionTarget],
+        attachments: [PendingIssueAttachment]
+    ) async -> Bool {
+        let mentionedUserIds = mentions.compactMap {
             $0.kind == .user ? $0.recipientId : nil
         }
         do {
             let sent = try await mutations.sendMessage(
                 runID: run.id,
-                body: messageText,
+                body: body,
                 parentMessageID: replyTo?.id,
                 mentionedUserIds: mentionedUserIds,
-                attachments: messageAttachments
+                attachments: attachments
             )
             detail.appendMessages(sent)
-            messageText = ""
-            messageMentions = []
-            messageAttachments = []
             replyTo = nil
             actionError = nil
             await refresh()
+            return true
         } catch {
             actionError = error.localizedDescription
             if case IssueMutationError.agentReplyTimedOut = error {
-                messageText = ""
-                messageMentions = []
-                messageAttachments = []
                 replyTo = nil
                 await detail.load()
                 await refresh()
+                return true
             } else if case IssueMutationError.agentReplyPollingFailed = error {
-                messageText = ""
-                messageMentions = []
-                messageAttachments = []
                 replyTo = nil
                 await detail.load()
                 await refresh()
+                return true
             } else if case IssueMutationError.agentReplyFailed = error {
-                messageText = ""
-                messageMentions = []
-                messageAttachments = []
                 replyTo = nil
                 await detail.load()
                 await refresh()
+                return true
             }
+            return false
         }
-    }
-
-    @MainActor
-    private func importMessagePhotos(_ items: [PhotosPickerItem]) async {
-        isLoadingMessagePhotos = true
-        defer {
-            isLoadingMessagePhotos = false
-            selectedMessagePhotos = []
-        }
-        do {
-            messageAttachments = try await PhotoAttachmentImporter.importItems(
-                items,
-                appendingTo: messageAttachments,
-                policy: .imagesOnly
-            )
-            actionError = nil
-        } catch {
-            actionError = error.localizedDescription
-        }
-    }
-
-    private func pasteMessageImage() {
-        guard let image = UIPasteboard.general.image,
-              let data = image.pngData() else {
-            actionError = L10n.text("클립보드에 붙여넣을 수 있는 이미지가 없습니다.", locale: locale)
-            return
-        }
-        let next = messageAttachments + [PendingIssueAttachment(
-            filename: "pasted-image-\(UUID().uuidString).png",
-            contentType: "image/png",
-            data: data
-        )]
-        if let message = PendingIssueAttachment.validationMessage(for: next) {
-            actionError = message
-            return
-        }
-        messageAttachments = next
-        actionError = nil
     }
 
     private func conversationMessageText(_ body: String) -> String {
