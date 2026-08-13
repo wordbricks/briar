@@ -16,10 +16,12 @@ export function AgentWorkLog({
   activity,
   autoScroll = false,
   provider,
+  terminal = false,
 }: {
   activity: AutoHuntAgentMessage[];
   autoScroll?: boolean;
   provider: AgentProvider | null;
+  terminal?: boolean;
 }) {
   const { t } = useI18n();
   const logRef = useRef<HTMLDivElement | null>(null);
@@ -48,41 +50,44 @@ export function AgentWorkLog({
       ref={logRef}
       role="log"
     >
-      {activity.map((message) => (
-        <article
-          className={`auto-hunt-agent-message${message.isComplete ? "" : " running"}`}
-          key={message.id}
-        >
-          <header>
-            <span aria-hidden="true">
-              {provider
-                ? <AgentProviderIcon provider={provider} size={14} />
-                : <Bot size={14} />}
-            </span>
-            <strong>
-              {provider
-                ? agentProviderLabels[provider]
-                : message.phase === "final_answer" || message.phase === "final"
-                  ? t("autoHunt.agentMessage.final")
-                  : t("autoHunt.agentMessage.commentary")}
-            </strong>
-            {!message.isComplete ? (
-              <small className="auto-hunt-message-streaming">
-                <LoaderCircle className="spin" size={11} />
-                {t("autoHunt.agentMessage.streaming")}
-              </small>
-            ) : null}
-            <time dateTime={new Date(message.updatedAtMs).toISOString()}>
-              {relativeTime(message.updatedAtMs, t)}
-            </time>
-          </header>
-          <p>
-            {message.text
-              ? naturalLanguageFromAgentMessage(message.text)
-              : t("autoHunt.agentMessage.writing")}
-          </p>
-        </article>
-      ))}
+      {activity.map((message) => {
+        const isComplete = message.isComplete || terminal;
+        return (
+          <article
+            className={`auto-hunt-agent-message${isComplete ? "" : " running"}`}
+            key={message.id}
+          >
+            <header>
+              <span aria-hidden="true">
+                {provider
+                  ? <AgentProviderIcon provider={provider} size={14} />
+                  : <Bot size={14} />}
+              </span>
+              <strong>
+                {provider
+                  ? agentProviderLabels[provider]
+                  : message.phase === "final_answer" || message.phase === "final"
+                    ? t("autoHunt.agentMessage.final")
+                    : t("autoHunt.agentMessage.commentary")}
+              </strong>
+              {!isComplete ? (
+                <small className="auto-hunt-message-streaming">
+                  <LoaderCircle className="spin" size={11} />
+                  {t("autoHunt.agentMessage.streaming")}
+                </small>
+              ) : null}
+              <time dateTime={new Date(message.updatedAtMs).toISOString()}>
+                {relativeTime(message.updatedAtMs, t)}
+              </time>
+            </header>
+            <p>
+              {message.text
+                ? naturalLanguageFromAgentMessage(message.text)
+                : t("autoHunt.agentMessage.writing")}
+            </p>
+          </article>
+        );
+      })}
     </div>
   );
 }

@@ -10,6 +10,8 @@ type TranscriptBatcherOptions = {
   maxEvents?: number;
   maxBytes?: number;
   flushIntervalMs?: number;
+  maxSendAttempts?: number;
+  retryDelayMs?: number;
 };
 
 export const TRANSCRIPT_BATCH_MAX_EVENTS = 100;
@@ -25,6 +27,8 @@ export class TranscriptBatcher {
   private readonly maxEvents: number;
   private readonly maxBytes: number;
   private readonly flushIntervalMs: number;
+  private readonly maxSendAttempts: number;
+  private readonly retryDelayMs: number;
   private events: TranscriptBatchEvent[] = [];
   private bytes = 0;
   private timer: ReturnType<typeof setTimeout> | null = null;
@@ -35,10 +39,14 @@ export class TranscriptBatcher {
     this.maxBytes = options.maxBytes ?? TRANSCRIPT_BATCH_MAX_BYTES;
     this.flushIntervalMs =
       options.flushIntervalMs ?? TRANSCRIPT_BATCH_FLUSH_INTERVAL_MS;
+    this.maxSendAttempts = options.maxSendAttempts ?? 3;
+    this.retryDelayMs = options.retryDelayMs ?? 100;
     if (
       this.maxEvents < 1 ||
       this.maxBytes < 1 ||
-      this.flushIntervalMs < 1
+      this.flushIntervalMs < 1 ||
+      this.maxSendAttempts < 1 ||
+      this.retryDelayMs < 0
     ) {
       throw new Error("Transcript batch thresholds must be positive");
     }
@@ -64,11 +72,7 @@ export class TranscriptBatcher {
       const batch = this.events;
       this.events = [];
       this.bytes = 0;
-      this.sendChain = this.sendChain
-        .then(() => this.options.send(batch))
-        .catch((error) => {
-          this.options.onError?.(error);
-        });
+      this.sendChain = this.sendChain.then(() => this.sendWithRetry(batch));
     }
     await this.sendChain;
   }
@@ -77,8 +81,29 @@ export class TranscriptBatcher {
     if (this.timer !== null) return;
     this.timer = setTimeout(() => {
       this.timer = null;
-      void this.flush();
+      // The next explicit enqueue/flush observes the rejected send chain.
+      // Avoid an unhandled rejection from the timer itself.
+      void this.flush().catch(() => {});
     }, this.flushIntervalMs);
+  }
+
+  private async sendWithRetry(batch: TranscriptBatchEvent[]) {
+    let lastError: unknown = null;
+    for (let attempt = 1; attempt <= this.maxSendAttempts; attempt += 1) {
+      try {
+        await this.options.send(batch);
+        return;
+      } catch (error) {
+        lastError = error;
+        if (attempt < this.maxSendAttempts && this.retryDelayMs > 0) {
+          await new Promise((resolve) =>
+            setTimeout(resolve, this.retryDelayMs * attempt)
+          );
+        }
+      }
+    }
+    this.options.onError?.(lastError);
+    throw lastError;
   }
 
   private clearTimer() {

@@ -1130,6 +1130,7 @@ export type ProjectAgentTranscript = {
     startedAt: string;
     lastEventAt: string;
     eventCount: number;
+    projection?: "worklog";
   };
   events: Array<{
     sequence: number;
@@ -1149,6 +1150,52 @@ export async function loadProjectAgentTranscript(
     `/projects/${projectId}/sessions/${encodeURIComponent(sessionId)}/transcript?afterSequence=${afterSequence}`,
     token,
   );
+}
+
+export type ProjectAgentRawTranscriptManifest = {
+  sessionId: string;
+  runId: string | null;
+  agentProvider: AgentProvider;
+  eventCount: number;
+  uncompressedBytes: number;
+  compressedBytes: number;
+  segments: Array<{
+    firstSequence: number;
+    lastSequence: number;
+    eventCount: number;
+    uncompressedBytes: number;
+    compressedBytes: number;
+    sha256: string;
+    recordedAt: string;
+    url: string;
+  }>;
+};
+
+export async function loadProjectAgentRawTranscriptManifest(
+  token: string,
+  projectId: string,
+  sessionId: string,
+): Promise<ProjectAgentRawTranscriptManifest> {
+  return request<ProjectAgentRawTranscriptManifest>(
+    `/projects/${projectId}/sessions/${encodeURIComponent(sessionId)}/raw-transcript`,
+    token,
+  );
+}
+
+export async function loadProjectAgentRawTranscriptSegment(
+  token: string,
+  segmentUrl: string,
+) {
+  if (!apiUrl || !segmentUrl.startsWith("/")) {
+    throw new Error("Transcript segment URL is invalid");
+  }
+  const response = await fetch(`${apiUrl}${segmentUrl}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) {
+    throw new Error(`Transcript segment could not be loaded (${response.status})`);
+  }
+  return response.blob();
 }
 
 export async function createProject(

@@ -7515,7 +7515,11 @@ function IssueAgentActivityPanel({
           {t("run.agentActivityEmpty")}
         </div>
       ) : (
-        <AgentWorkLog activity={activity} provider={provider} />
+        <AgentWorkLog
+          activity={activity}
+          provider={provider}
+          terminal={!isLive}
+        />
       )}
     </div>
   );
