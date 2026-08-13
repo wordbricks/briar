@@ -127,6 +127,10 @@ import {
   createChannelRealtimeTransport,
   MAX_CHANNEL_DELTA_PAGES_PER_SYNC,
 } from "../lib/channel-realtime";
+import {
+  scrollContainerToEnd,
+  scrollElementToCenter,
+} from "../lib/scroll-container";
 
 const typingAgentNamesForMessage = (
   replies: ChannelAgentReply[],
@@ -393,8 +397,8 @@ export function Channels({
   const executionHistoryDashboards = useRef(
     new Map<string, ReturnType<typeof loadDashboard>>(),
   );
-  const messagesEndRef = useRef<HTMLDivElement | null>(null);
-  const threadMessagesEndRef = useRef<HTMLDivElement | null>(null);
+  const messagesScrollRef = useRef<HTMLDivElement | null>(null);
+  const threadMessagesScrollRef = useRef<HTMLDivElement | null>(null);
   const activeChannelIdRef = useRef(activeChannelId);
   const threadParentIdRef = useRef(threadParentId);
   if (
@@ -727,9 +731,19 @@ export function Channels({
         }
         if (target) {
           window.requestAnimationFrame(() => {
-            document
-              .querySelector(`[data-channel-message-id="${target.messageId}"]`)
-              ?.scrollIntoView?.({ block: "center" });
+            const messageScroller =
+              target.rootMessageId === target.messageId
+                ? messagesScrollRef.current
+                : threadMessagesScrollRef.current;
+            const requestedMessageElement = [
+              ...(messageScroller?.querySelectorAll<HTMLElement>(
+                "[data-channel-message-id]",
+              ) ?? []),
+            ].find(
+              (element) =>
+                element.dataset.channelMessageId === target.messageId,
+            ) ?? null;
+            scrollElementToCenter(messageScroller, requestedMessageElement);
             onRequestedMessageOpen?.();
           });
         }
@@ -939,12 +953,12 @@ export function Channels({
   }, [activeChannelId, channels, onChannelSelect]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView?.({ block: "end" });
+    scrollContainerToEnd(messagesScrollRef.current);
   }, [messages, activeChannelId, replies.length]);
 
   useEffect(() => {
     if (!threadParentId) return;
-    threadMessagesEndRef.current?.scrollIntoView?.({ block: "end" });
+    scrollContainerToEnd(threadMessagesScrollRef.current);
   }, [threadMessages, threadParentId]);
 
   const openThread = useCallback(
@@ -1468,7 +1482,7 @@ export function Channels({
 
             {error ? <div className="channel-error">{error}</div> : null}
 
-            <div className="channel-messages">
+            <div className="channel-messages" ref={messagesScrollRef}>
               <ChannelWelcome
                 channel={activeChannel}
                 onCreateAgent={onCreateAgent}
@@ -1550,7 +1564,6 @@ export function Channels({
                 <p className="channel-empty-hint muted">{t("channel.emptyHint")}</p>
               ) : null}
 
-              <div ref={messagesEndRef} />
             </div>
 
             <Composer
@@ -1605,7 +1618,7 @@ export function Channels({
               <X size={15} />
             </button>
           </header>
-          <div className="channel-messages">
+          <div className="channel-messages" ref={threadMessagesScrollRef}>
             {threadMessages.map((message) => (
               <MessageRow
                 agents={agents}
@@ -1662,7 +1675,6 @@ export function Channels({
                 showTypingState={false}
               />
             ))}
-            <div ref={threadMessagesEndRef} />
           </div>
           <ChannelTypingState
             agentNames={threadTypingAgentNames}

@@ -877,32 +877,56 @@ describe("Channels", () => {
     });
     listChannelMessages.mockResolvedValue({ messages: [rootMessage, reply] });
     const onClosed = vi.fn();
-
-    await render(
-      [rootMessage],
-      {
-        channelId: channel.id,
-        messageId: reply.id,
-        rootMessageId: rootMessage.id,
-      },
-      undefined,
-      undefined,
-      true,
-      onClosed,
+    const originalScrollIntoView = Object.getOwnPropertyDescriptor(
+      HTMLElement.prototype,
+      "scrollIntoView",
     );
-
-    expect(container.querySelector(".channels-inbox-thread-only")).not.toBeNull();
-    expect(container.querySelector(".channel-main")).toBeNull();
-    expect(container.querySelector(".channel-thread-resizer")).toBeNull();
-    expect(container.querySelector(".channel-thread")).not.toBeNull();
-    expect(container.textContent).toContain("Requested reply");
-
-    await act(async () => {
-      container
-        .querySelector<HTMLButtonElement>('button[aria-label="스레드 닫기"]')
-        ?.click();
+    const scrollIntoView = vi.fn();
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+      configurable: true,
+      value: scrollIntoView,
     });
-    expect(onClosed).toHaveBeenCalledOnce();
+
+    try {
+      await render(
+        [rootMessage],
+        {
+          channelId: channel.id,
+          messageId: reply.id,
+          rootMessageId: rootMessage.id,
+        },
+        undefined,
+        undefined,
+        true,
+        onClosed,
+      );
+
+      expect(
+        container.querySelector(".channels-inbox-thread-only"),
+      ).not.toBeNull();
+      expect(container.querySelector(".channel-main")).toBeNull();
+      expect(container.querySelector(".channel-thread-resizer")).toBeNull();
+      expect(container.querySelector(".channel-thread")).not.toBeNull();
+      expect(container.textContent).toContain("Requested reply");
+      expect(scrollIntoView).not.toHaveBeenCalled();
+
+      await act(async () => {
+        container
+          .querySelector<HTMLButtonElement>('button[aria-label="스레드 닫기"]')
+          ?.click();
+      });
+      expect(onClosed).toHaveBeenCalledOnce();
+    } finally {
+      if (originalScrollIntoView) {
+        Object.defineProperty(
+          HTMLElement.prototype,
+          "scrollIntoView",
+          originalScrollIntoView,
+        );
+      } else {
+        delete (HTMLElement.prototype as Partial<HTMLElement>).scrollIntoView;
+      }
+    }
   });
 
   it("keeps the channel visible for a root message in inbox detail mode", async () => {
@@ -2467,13 +2491,19 @@ describe("Channels", () => {
     expect(threadPanel).not.toBeNull();
     const threadScroller = threadPanel?.querySelector(".channel-messages");
     expect(threadScroller).not.toBeNull();
-    const endSentinel = threadScroller?.lastElementChild as HTMLElement | null;
-    expect(endSentinel).not.toBeNull();
-    const scrollIntoView = vi.fn();
-    if (endSentinel) {
-      endSentinel.scrollIntoView = scrollIntoView;
-    }
-    scrollIntoView.mockClear();
+    Object.defineProperty(threadScroller!, "scrollHeight", {
+      configurable: true,
+      value: 640,
+    });
+    Object.defineProperty(threadScroller!, "clientHeight", {
+      configurable: true,
+      value: 200,
+    });
+    Object.defineProperty(threadScroller!, "scrollTop", {
+      configurable: true,
+      value: 0,
+      writable: true,
+    });
 
     const threadComposer = threadPanel?.querySelector<HTMLTextAreaElement>(
       "form.channel-composer textarea",
@@ -2499,7 +2529,7 @@ describe("Channels", () => {
       }),
     );
     expect(threadPanel?.textContent).toContain("Newest reply");
-    expect(scrollIntoView).toHaveBeenCalledWith({ block: "end" });
+    expect(threadScroller?.scrollTop).toBe(440);
   });
 
   it("resizes the thread panel with the separator", async () => {

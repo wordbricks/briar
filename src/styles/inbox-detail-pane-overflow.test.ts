@@ -18,6 +18,13 @@ const ruleBody = (selector: string) => {
 };
 
 describe("inbox issue detail pane overflow containment", () => {
+  it("constrains the detail pane to the inbox layout instead of content height", () => {
+    const inboxLayout = ruleBody(".inbox-layout");
+
+    expect(inboxLayout).toContain("min-height:0");
+    expect(inboxLayout).toContain("grid-template-rows:minmax(0,1fr)");
+  });
+
   it("lets the nested issue page shrink so its result and conversation panes can scroll", () => {
     const detailPage = ruleBody(".inbox-detail-pane > .main-content");
 
