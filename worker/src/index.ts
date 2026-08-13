@@ -1416,6 +1416,44 @@ export async function readRunEvidenceRequest(request: Request) {
   return { input: runEvidenceInputSchema.parse(input), images };
 }
 
+export async function readChannelReplyCompleteRequest(request: Request) {
+  const form = await readBoundedMultipartForm(
+    request,
+    maxIssueMultipartBytes,
+    "Channel reply images exceed the 25MB total limit",
+  );
+  if (!form) {
+    return {
+      input: channelReplyCompleteInputSchema.parse(await readJson(request)),
+      attachments: [] as File[],
+    };
+  }
+  const payload = form.get("complete");
+  if (typeof payload !== "string") {
+    throw new HttpError(400, "Multipart channel reply JSON is required");
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(payload);
+  } catch {
+    throw new HttpError(400, "Invalid multipart channel reply JSON");
+  }
+  const attachments = readMultipartFiles(
+    form,
+    "attachments",
+    "Channel reply attachments must be files",
+    validateIssueAttachments,
+  );
+  if (attachments.some((attachment) => !attachment.type.startsWith("image/"))) {
+    throw new HttpError(400, "Channel reply attachments must be images");
+  }
+  const input = channelReplyCompleteInputSchema.parse(parsed);
+  if (input.error && attachments.length > 0) {
+    throw new HttpError(400, "A failed reply cannot include images");
+  }
+  return { input, attachments };
+}
+
 const projectInputSchema = z.object({
   name: z.string().trim().min(1).max(100),
   organizationId: z.string().uuid().optional(),
@@ -13057,7 +13095,9 @@ async function route(
       return json({ leaseExpiresAt: renewed.lease_expires_at });
     }
 
-    const input = channelReplyCompleteInputSchema.parse(await readJson(request));
+    const { input, attachments } = await readChannelReplyCompleteRequest(
+      request,
+    );
     const principal = await requireWorkerOrganization(
       db,
       request,
@@ -13222,22 +13262,73 @@ async function route(
         throw new HttpError(400, "Target project is outside this organization");
       }
     }
-    const completed = await completeChannelReply(db, job, {
-      jobId: job.id,
-      deviceId: principal.deviceId,
-      workerId: input.workerId,
-      claimTokenHash,
-      body: result.body,
-      document,
-      issueProposal,
-      executionProposal,
-      skillExecutionProposal: Boolean(result.skillExecutionProposal),
-      delegation,
-      agentName: agent.name,
-      agentProvider: job.agent_provider ?? agent.provider,
-      completedAt: observedAt,
+    const storedAttachments = prepareStoredAttachments(attachments, () => {
+      const id = crypto.randomUUID();
+      return {
+        id,
+        organization_id: job.organization_id,
+        object_key:
+          `channel-attachments/${job.organization_id}/${job.channel_id}/${job.reply_message_id}/${id}`,
+      };
     });
-    if (!completed) throw new HttpError(409, "Reply claim is no longer active");
+    const uploadedKeys: string[] = [];
+    const discardUploadedReplyImages = async () => {
+      if (uploadedKeys.length === 0) return;
+      try {
+        await attachmentsBucket.delete(uploadedKeys);
+      } catch (cleanupError) {
+        console.error(JSON.stringify({
+          message: "Failed channel reply image cleanup",
+          organizationId: job.organization_id,
+          channelId: job.channel_id,
+          messageId: job.reply_message_id,
+          attachmentCount: uploadedKeys.length,
+          error:
+            cleanupError instanceof Error
+              ? cleanupError.message
+              : String(cleanupError),
+        }));
+      }
+    };
+    let completed: Awaited<ReturnType<typeof completeChannelReply>> = null;
+    try {
+      await uploadStoredAttachments(
+        attachmentsBucket,
+        storedAttachments,
+        uploadedKeys,
+        (attachment) => ({
+          attachmentId: attachment.id,
+          channelId: job.channel_id,
+          messageId: job.reply_message_id,
+          organizationId: job.organization_id,
+        }),
+      );
+      completed = await completeChannelReply(db, job, {
+        jobId: job.id,
+        deviceId: principal.deviceId,
+        workerId: input.workerId,
+        claimTokenHash,
+        body: result.body,
+        document,
+        issueProposal,
+        executionProposal,
+        skillExecutionProposal: Boolean(result.skillExecutionProposal),
+        delegation,
+        agentName: agent.name,
+        agentProvider: job.agent_provider ?? agent.provider,
+        completedAt: observedAt,
+        attachments: storedAttachments.map(({ file: _file, ...attachment }) =>
+          attachment
+        ),
+      });
+    } catch (error) {
+      await discardUploadedReplyImages();
+      throw error;
+    }
+    if (!completed) {
+      await discardUploadedReplyImages();
+      throw new HttpError(409, "Reply claim is no longer active");
+    }
     scheduleChannelRealtimePublish(env, db, input.organizationId, context);
     return json({
       agentReply: channelReplyJson(completed),

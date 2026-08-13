@@ -2350,6 +2350,7 @@ export type ChannelReplyCompletionInput = {
   agentName: string;
   agentProvider: AgentProvider;
   completedAt: string;
+  attachments?: ChannelMessageAttachmentInput[];
 };
 
 /**
@@ -2637,6 +2638,44 @@ export async function completeChannelReply(
         input.completedAt,
       ),
   ];
+  for (const attachment of input.attachments ?? []) {
+    statements.push(
+      db
+        .prepare(
+          `insert into briar_channel_message_attachments (
+             id, organization_id, channel_id, message_id, object_key,
+             filename, content_type, byte_size, created_at
+           )
+           select ?, ?, ?, ?, ?, ?, ?, ?, ?
+           from briar_channel_agent_reply_jobs claim
+           where claim.id = ? and claim.claimed_device_id = ?
+             and claim.claimed_worker_id = ? and claim.claim_token_hash = ?
+             and claim.status = 'completed' and claim.completed_at = ?
+             and exists (
+               select 1 from briar_channel_messages
+               where id = ? and channel_id = ?
+             )`,
+        )
+        .bind(
+          attachment.id,
+          attachment.organization_id,
+          job.channel_id,
+          job.reply_message_id,
+          attachment.object_key,
+          attachment.filename,
+          attachment.content_type,
+          attachment.byte_size,
+          input.completedAt,
+          input.jobId,
+          input.deviceId,
+          input.workerId,
+          input.claimTokenHash,
+          input.completedAt,
+          job.reply_message_id,
+          job.channel_id,
+        ),
+    );
+  }
   if (input.document) {
     statements.push(
       db

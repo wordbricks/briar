@@ -31,6 +31,7 @@ import worker, {
   projectAgentInputSchema,
   projectAgentScheduleInputSchema,
   projectAgentScheduleRunCompletionSchema,
+  readChannelReplyCompleteRequest,
   readIssueRequest,
   readRunEvidenceRequest,
   resolveChannelProposalTargetProjectId,
@@ -1345,6 +1346,88 @@ describe("Worker HTTP contract", () => {
     expect(parsed.images).toHaveLength(1);
     expect(parsed.images[0]?.name).toBe("dashboard.png");
     expect(parsed.images[0]?.type).toBe("image/png");
+  });
+
+  it("parses channel reply images from multipart Worker complete requests", async () => {
+    const complete = {
+      organizationId: "11111111-1111-4111-8111-111111111111",
+      workerId: "worker-1",
+      claimToken: "briar_channel_claim_secret",
+      result: {
+        body: "Here is the captured screen.",
+        document: null,
+        issueProposal: null,
+      },
+    };
+    const form = new FormData();
+    form.append("complete", JSON.stringify(complete));
+    form.append(
+      "attachments",
+      new File([new Uint8Array([137, 80, 78, 71])], "screenshot.png", {
+        type: "image/png",
+      }),
+    );
+
+    const parsed = await readChannelReplyCompleteRequest(
+      new Request("https://briar-api.example/channel-reply-claims/job/complete", {
+        method: "POST",
+        headers: { "Content-Length": "2048" },
+        body: form,
+      }),
+    );
+
+    expect(parsed.input).toMatchObject({
+      organizationId: complete.organizationId,
+      workerId: "worker-1",
+      result: { body: "Here is the captured screen." },
+    });
+    expect(parsed.attachments).toHaveLength(1);
+    expect(parsed.attachments[0]).toMatchObject({
+      name: "screenshot.png",
+      type: "image/png",
+    });
+  });
+
+  it("keeps JSON channel reply completion compatible when no image is attached", async () => {
+    const parsed = await readChannelReplyCompleteRequest(
+      new Request("https://briar-api.example/channel-reply-claims/job/complete", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          organizationId: "11111111-1111-4111-8111-111111111111",
+          workerId: "worker-1",
+          claimToken: "briar_channel_claim_secret",
+          result: { body: "Answer", document: null, issueProposal: null },
+        }),
+      }),
+    );
+    expect(parsed.attachments).toEqual([]);
+    expect(parsed.input.result).toMatchObject({ body: "Answer" });
+  });
+
+  it("rejects a failed channel reply that also includes images", async () => {
+    const form = new FormData();
+    form.append("complete", JSON.stringify({
+      organizationId: "11111111-1111-4111-8111-111111111111",
+      workerId: "worker-1",
+      claimToken: "briar_channel_claim_secret",
+      error: "provider unavailable",
+    }));
+    form.append(
+      "attachments",
+      new File([new Uint8Array([137, 80, 78, 71])], "screenshot.png", {
+        type: "image/png",
+      }),
+    );
+    await expect(
+      readChannelReplyCompleteRequest(
+        new Request("https://briar-api.example/channel-reply-claims/job/complete", {
+          method: "POST",
+          headers: { "Content-Length": "2048" },
+          body: form,
+        }),
+      ),
+    ).rejects.toThrow("cannot include images");
   });
 
   it("requires an explicit earlier stage and reason for run rework", () => {
