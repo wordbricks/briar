@@ -4978,18 +4978,26 @@ export function RunPage({
     performedAgentProvider ??
     activityProvider ??
     null;
-  const executionModel =
+  const configuredExecutionModel =
     run.preferredProvider != null
       ? run.preferredModel ?? null
       : run.requestedProvider != null
         ? run.requestedModel ?? null
         : performedAgentModel ?? null;
+  const executionModels = configuredExecutionModel
+    ? [configuredExecutionModel]
+    : executionCostEstimate?.providerReportedModels ?? [];
+  const executionModelText = executionProvider
+    ? executionModels
+        .map((model) =>
+          agentModelDisplayName(providerModels, executionProvider, model),
+        )
+        .join(" · ")
+    : "";
   const executionWorker = assignedWorker ?? null;
   const executionIdentityParts = [
     executionProvider ? agentProviderLabels[executionProvider] : null,
-    executionProvider && executionModel
-      ? agentModelDisplayName(providerModels, executionProvider, executionModel)
-      : null,
+    executionModelText || null,
     executionWorker?.label ?? null,
   ].filter((part): part is string => Boolean(part));
   const executionIdentityText = executionIdentityParts.join(" · ");
@@ -5024,11 +5032,11 @@ export function RunPage({
           </dd>
         </div>
       ) : null}
-      {executionProvider && executionModel ? (
+      {executionProvider && executionModelText ? (
         <div>
           <dt>{t("run.metricsModel")}</dt>
-          <dd title={executionModel}>
-            {agentModelDisplayName(providerModels, executionProvider, executionModel)}
+          <dd title={executionModels.join(" · ")}>
+            {executionModelText}
           </dd>
         </div>
       ) : null}

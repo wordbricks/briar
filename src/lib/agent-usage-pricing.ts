@@ -47,6 +47,8 @@ export type AgentExecutionCostEstimate = {
     | null;
   usageRecords: number;
   pricedUsageRecords: number;
+  /** Actual model IDs observed in provider-reported usage rows. */
+  providerReportedModels: string[];
   estimatedUsdTicks: number | null;
   pricedUsdTicks: number;
   models: AgentExecutionCostEstimateModel[];
@@ -219,6 +221,13 @@ export function lookupAgentUsageModelRate(
         "$1grok-$2-$3",
       );
       if (xaiVersionAlias !== model) models.push(xaiVersionAlias);
+      for (const candidate of [model, xaiVersionAlias]) {
+        const baseBuildModel = candidate.replace(
+          /(^|\/)(grok-\d+(?:[.-]\d+)+)-build$/u,
+          "$1$2",
+        );
+        if (baseBuildModel !== candidate) models.push(baseBuildModel);
+      }
     }
   }
   const compatible = (entry: AgentUsageModelRateEntry) =>
