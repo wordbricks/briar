@@ -954,6 +954,13 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         "utf8",
       ),
     );
+    await executeSql(
+      db,
+      await readFile(
+        resolve("migrations/0102_auto_issue_subscriptions.sql"),
+        "utf8",
+      ),
+    );
   }, 30_000);
 
   afterAll(async () => {
@@ -4218,21 +4225,31 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     expect(mentionAfter?.count).toBe(0);
   });
 
-  it("lists mentions and replies to a user's root messages for inbox delivery", async () => {
+  it("automatically subscribes creators, conversation participants, and mentioned members", async () => {
     await executeSql(
       db,
       `
       insert into user (id, name, email, emailVerified, createdAt, updatedAt)
-      values (
-        'conversation-member', 'Conversation Member',
-        'conversation@example.com', 1, '${atMinute(0)}', '${atMinute(0)}'
-      );
+      values
+        (
+          'conversation-member', 'Conversation Member',
+          'conversation@example.com', 1, '${atMinute(0)}', '${atMinute(0)}'
+        ),
+        (
+          'mentioned-member', 'Mentioned Member',
+          'mentioned@example.com', 1, '${atMinute(0)}', '${atMinute(0)}'
+        );
       insert into briar_organization_members (
         organization_id, user_id, role, created_at, updated_at
-      ) values (
-        '${projectId}', 'conversation-member', 'member',
-        '${atMinute(0)}', '${atMinute(0)}'
-      );`,
+      ) values
+        (
+          '${projectId}', 'conversation-member', 'member',
+          '${atMinute(0)}', '${atMinute(0)}'
+        ),
+        (
+          '${projectId}', 'mentioned-member', 'member',
+          '${atMinute(0)}', '${atMinute(0)}'
+        );`,
     );
     const runId = await recordHuntEvent(
       db,
@@ -4241,8 +4258,16 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         sourceKey: "inbox-conversation-run",
         eventKey: "inbox-conversation-run:queued",
         assigneeUserId: "owner",
+        createdByUserId: "conversation-member",
       }),
     );
+    await expect(listIssueSubscriptions(db, projectId, runId)).resolves.toEqual([
+      expect.objectContaining({
+        user_id: "conversation-member",
+        created_at: atMinute(29),
+      }),
+      expect.objectContaining({ user_id: "owner" }),
+    ]);
     const ownerRootId = "11111111-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
     await createIssueMessage(db, {
       id: ownerRootId,
@@ -4271,8 +4296,8 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       parentMessageId: null,
       authorUserId: "conversation-member",
       authorAgentProvider: null,
-      body: "@owner please review this.",
-      mentionedUserIds: ["owner"],
+      body: "@owner and @mentioned-member please review this.",
+      mentionedUserIds: ["owner", "mentioned-member"],
       createdAt: atMinute(29.3),
     });
     await createIssueMessage(db, {
@@ -4326,11 +4351,43 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
           notification.id === "44444444-dddd-4ddd-8ddd-dddddddddddd",
       ),
     ).toBe(false);
+    const participantNotifications = await listIssueConversationNotifications(
+      db,
+      projectId,
+      "conversation-member",
+    );
+    expect(participantNotifications).toEqual([
+      expect.objectContaining({
+        id: "44444444-dddd-4ddd-8ddd-dddddddddddd",
+        notification_reason: "subscription",
+      }),
+      expect.objectContaining({
+        id: ownerRootId,
+        notification_reason: "subscription",
+      }),
+    ]);
     await expect(
-      listIssueConversationNotifications(db, projectId, "conversation-member"),
-    ).resolves.toEqual([]);
+      listIssueConversationNotifications(db, projectId, "mentioned-member"),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        id: "55555555-eeee-4eee-8eee-eeeeeeeeeeee",
+        notification_reason: "subscription",
+      }),
+      expect.objectContaining({
+        id: "44444444-dddd-4ddd-8ddd-dddddddddddd",
+        notification_reason: "subscription",
+      }),
+      expect.objectContaining({
+        id: "33333333-cccc-4ccc-8ccc-cccccccccccc",
+        notification_reason: "mention",
+      }),
+    ]);
+    expect(
+      (await listIssueSubscriptions(db, projectId, runId)).map((row) => row.user_id),
+    ).toEqual(["conversation-member", "owner", "mentioned-member"]);
 
     await removeOrganizationMember(db, projectId, "conversation-member");
+    await removeOrganizationMember(db, projectId, "mentioned-member");
   });
 
   it("keeps assignees subscribed and supports manual subscription changes", async () => {
