@@ -42,6 +42,7 @@ import worker, {
   transcriptSchema,
   usageRangeDaysSchema,
   workflowStageLifecycleInputSchema,
+  workerRegisterSchema,
   workerSettingsSchema,
   type ScheduledTaskDependencies,
 } from "./index";
@@ -1121,6 +1122,59 @@ describe("Worker HTTP contract", () => {
       }),
     ).toThrow(/one emoji/u);
     expect(workerSettingsSchema.parse({ icon: null })).toEqual({ icon: null });
+  });
+
+  it("accepts Worker provider usage health during registration", () => {
+    expect(
+      workerRegisterSchema.parse({
+        label: "janet",
+        deviceIdentity: `briar_device_${"a".repeat(64)}`,
+        agentProvider: "codex",
+        providers: ["codex", "claude"],
+        providerHealth: {
+          codex: {
+            installed: true,
+            authenticated: true,
+            healthy: true,
+            reason: null,
+            usageExhausted: false,
+            maxUsedPercent: 3,
+          },
+          claude: {
+            installed: true,
+            authenticated: true,
+            healthy: true,
+            reason: null,
+            usageExhausted: false,
+            maxUsedPercent: null,
+          },
+          grok: {
+            installed: true,
+            authenticated: true,
+            healthy: false,
+            reason: "usage_exhausted",
+            usageExhausted: true,
+            maxUsedPercent: 100,
+          },
+          opencode: {
+            installed: true,
+            authenticated: true,
+            healthy: true,
+            reason: null,
+            usageExhausted: false,
+            maxUsedPercent: null,
+          },
+        },
+        versions: { briar: "1.2.116" },
+      }),
+    ).toMatchObject({
+      providerHealth: {
+        codex: { usageExhausted: false, maxUsedPercent: 3 },
+        claude: { usageExhausted: false, maxUsedPercent: null },
+        grok: { usageExhausted: true, maxUsedPercent: 100 },
+        opencode: { usageExhausted: false, maxUsedPercent: null },
+      },
+    });
   });
 
   it("requires an actionable structured handoff for blocked work", () => {
