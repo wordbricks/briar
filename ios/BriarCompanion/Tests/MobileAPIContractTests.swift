@@ -637,7 +637,7 @@ final class MobileAPIContractTests: XCTestCase {
         XCTAssertEqual(acceptedExecution.dispatch.dispatchMode, "any")
         XCTAssertEqual(channels.channels.count, 2)
         XCTAssertEqual(channels.cursor, 12)
-        XCTAssertEqual(channel.messages.first?.body, "@honey 온보딩 개편 계획서를 정리해줘")
+        XCTAssertEqual(channel.messages.first?.body, "@Honey 온보딩 개편 계획서를 정리해줘")
         XCTAssertEqual(
             channel.messages.first?.mentionedAgentIds,
             [UUID(uuidString: "66666666-6666-4666-8666-666666666666")!]

@@ -913,7 +913,7 @@ export async function removeChannelMember(
 export async function listChannelAgents(db: D1Database, channelId: string) {
   const rows = await db
     .prepare(
-      `select agent.id, agent.organization_id, agent.project_id, agent.handle,
+      `select agent.id, agent.organization_id, agent.project_id,
               project.name as project_name, agent.name, agent.avatar,
               agent.provider, agent.model, agent.responsibility,
               agent.effort, agent.created_at, agent.updated_at
@@ -934,7 +934,6 @@ export async function listChannelAgents(db: D1Database, channelId: string) {
       organization_id: string;
       project_id: string | null;
       project_name: string | null;
-      handle: string | null;
       name: string;
       avatar: string | null;
       provider: AgentProvider;

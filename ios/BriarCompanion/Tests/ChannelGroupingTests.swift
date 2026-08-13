@@ -163,7 +163,6 @@ final class ChannelGroupingTests: XCTestCase {
     func testMentionCandidatesAppearForAtSignAndInsertASelectedAgent() {
         let agent = ChannelAgentSummary(
             agentId: UUID(uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!,
-            handle: "honey",
             name: "Honey",
             provider: "claude",
             model: nil,
@@ -177,16 +176,15 @@ final class ChannelGroupingTests: XCTestCase {
             currentUserId: "user-1"
         )
 
-        XCTAssertEqual(candidates.map(\.handle), ["honey"])
-        XCTAssertEqual(ChannelMentions.suggestions(in: "@h", candidates: candidates).map(\.handle), ["honey"])
-        XCTAssertEqual(ChannelMentions.suggestions(in: "@", candidates: candidates).map(\.handle), ["honey"])
-        XCTAssertEqual(ChannelMentions.insert(candidates[0], into: "확인 @hon"), "확인 @honey ")
+        XCTAssertEqual(candidates.map(\.handle), ["Honey"])
+        XCTAssertEqual(ChannelMentions.suggestions(in: "@h", candidates: candidates).map(\.handle), ["Honey"])
+        XCTAssertEqual(ChannelMentions.suggestions(in: "@", candidates: candidates).map(\.handle), ["Honey"])
+        XCTAssertEqual(ChannelMentions.insert(candidates[0], into: "확인 @hon"), "확인 @Honey ")
     }
 
     func testAtSignSuggestsEveryChannelRosterMember() {
         let agent = ChannelAgentSummary(
             agentId: UUID(uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!,
-            handle: "honey",
             name: "Honey",
             provider: "claude",
             model: nil,
@@ -235,7 +233,7 @@ final class ChannelGroupingTests: XCTestCase {
 
     func testChannelMessageRequestEncodesStructuredMentionRecipients() throws {
         let request = CreateChannelMessageRequest(
-            body: "@honey @sam 확인",
+            body: "@Honey @sam 확인",
             parentMessageId: nil,
             mentionedUserIds: ["user-2"],
             mentionedAgentIds: [UUID(uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!]
@@ -286,8 +284,8 @@ final class ChannelGroupingTests: XCTestCase {
 
     func testMessageMentionsLinkOnlyKnownHandles() {
         let segments = MessageMentions.segments(
-            "@honey please ask @typed and @sam.",
-            handles: ["honey", "sam"]
+            "@Honey please ask @typed and @sam.",
+            handles: ["Honey", "sam"]
         )
         let mentions = segments.compactMap { segment -> String? in
             if case let .mention(handle) = segment.kind { return handle }
@@ -296,8 +294,8 @@ final class ChannelGroupingTests: XCTestCase {
 
         XCTAssertEqual(mentions, ["honey", "sam"])
         XCTAssertEqual(
-            MessageMentions.markdownWithLinks("@honey 확인", handles: ["honey"]),
-            "[@honey](briar-mention://honey) 확인"
+            MessageMentions.markdownWithLinks("@Honey 확인", handles: ["Honey"]),
+            "[@Honey](briar-mention://honey) 확인"
         )
         XCTAssertEqual(
             MessageMentions.markdownWithLinks("@typed 확인", handles: ["honey"]),
@@ -333,7 +331,6 @@ final class ChannelGroupingTests: XCTestCase {
     func testChannelMentionHandlesResolveFromStructuredRecipients() {
         let agent = ChannelAgentSummary(
             agentId: UUID(uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!,
-            handle: "honey",
             name: "Honey",
             provider: "claude",
             model: nil,
@@ -357,7 +354,7 @@ final class ChannelGroupingTests: XCTestCase {
             agents: [agent]
         )
 
-        XCTAssertEqual(handles, Set(["honey", "sam"]))
+        XCTAssertEqual(handles, Set(["Honey", "sam"]))
     }
 
     func testChannelMessageDecodesAttachmentsAndDefaultsToEmpty() throws {

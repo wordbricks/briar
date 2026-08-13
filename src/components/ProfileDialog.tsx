@@ -1,4 +1,4 @@
-import { AtSign, Bot, CalendarDays, Mail, ShieldCheck } from "lucide-react";
+import { Bot, CalendarDays, Mail, ShieldCheck } from "lucide-react";
 import { useI18n } from "../i18n";
 import type {
   ChannelAgentSummary,
@@ -6,7 +6,6 @@ import type {
   ChannelAgentSkill,
   ChannelMember,
 } from "../lib/channels-contract";
-import { mentionHandle } from "../lib/channel-mentions";
 import {
   Dialog,
   DialogContent,
@@ -30,7 +29,6 @@ export type ProfileTarget =
       type: "agent";
       id: string;
       name: string;
-      handle: string | null;
       provider: ChannelAgentProvider | null;
       model: string | null;
       responsibility: string | null;
@@ -41,13 +39,11 @@ export type ProfileTarget =
 
 export function profileTargetForChannelAgent(
   agent: ChannelAgentSummary,
-  handle = mentionHandle(agent.handle?.trim() || agent.name),
 ): ProfileTarget {
   return {
     type: "agent",
     id: agent.agentId,
     name: agent.name,
-    handle,
     provider: agent.provider,
     model: agent.model,
     responsibility: agent.responsibility,
@@ -131,13 +127,6 @@ export function ProfileDialog({
                   <dd>
                     <a href={`mailto:${profile.email}`}>{profile.email}</a>
                   </dd>
-                </div>
-              ) : profile.handle ? (
-                <div>
-                  <dt>
-                    <AtSign aria-hidden="true" size={16} /> {t("profile.handle")}
-                  </dt>
-                  <dd>@{profile.handle}</dd>
                 </div>
               ) : null}
               <div>

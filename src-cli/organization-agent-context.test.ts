@@ -42,7 +42,6 @@ const projectItem = (id: string, name: string) => ({
 
 const agentItem = (id: string) => ({
   id,
-  handle: "builder",
   name: "Builder",
   provider: "codex",
   model: null,

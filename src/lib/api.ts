@@ -145,7 +145,6 @@ const projectUsageSummarySchema = z.object({
 const projectAgentSchema = z.object({
   id: z.string().uuid(),
   projectId: z.string().uuid(),
-  handle: z.string().min(1).max(63).nullable().default(null),
   name: z.string(),
   avatar: z
     .string()
@@ -2058,7 +2057,6 @@ export async function createOrganizationAgent(
   organizationId: string,
   input: {
     name: string;
-    handle?: string;
     provider: AgentProvider;
     model: string | null;
     responsibility: string;
@@ -2079,7 +2077,6 @@ export async function updateOrganizationAgent(
   agentId: string,
   input: {
     name: string;
-    handle?: string;
     provider: AgentProvider;
     model: string | null;
     responsibility: string;

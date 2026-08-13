@@ -586,7 +586,6 @@ describe("Sidebar", () => {
             {
               id: "agent-1",
               projectId: "project-1",
-              handle: "design-agent",
               name: "Design agent",
               avatar: "data:image/png;base64,avatar",
               codexPet: null,

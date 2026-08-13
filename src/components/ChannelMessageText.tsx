@@ -32,22 +32,29 @@ export function ChannelMessageText({
   const [profile, setProfile] = useState<ProfileTarget | null>(null);
   const profilesByHandle = useMemo(() => {
     const profiles = new Map<string, ProfileTarget>();
+    const ambiguousHandles = new Set<string>();
     const mentionedAgentIds = new Set(message.mentionedAgentIds);
     const mentionedUserIds = new Set(message.mentionedUserIds);
+    const addProfile = (handle: string, target: ProfileTarget) => {
+      const key = handle.toLowerCase();
+      if (ambiguousHandles.has(key)) return;
+      if (profiles.has(key)) {
+        profiles.delete(key);
+        ambiguousHandles.add(key);
+        return;
+      }
+      profiles.set(key, target);
+    };
 
     for (const agent of agents) {
       if (!mentionedAgentIds.has(agent.agentId)) continue;
-      const handle = mentionHandle(agent.handle?.trim() || agent.name);
-      profiles.set(
-        handle.toLowerCase(),
-        profileTargetForChannelAgent(agent, handle),
-      );
+      const handle = agent.name;
+      addProfile(handle, profileTargetForChannelAgent(agent));
     }
     for (const member of members) {
       if (!mentionedUserIds.has(member.userId)) continue;
       const handle = mentionHandle(member.email.split("@")[0] || member.userId);
-      if (profiles.has(handle.toLowerCase())) continue;
-      profiles.set(handle.toLowerCase(), profileTargetForChannelMember(member));
+      addProfile(handle, profileTargetForChannelMember(member));
     }
     return profiles;
   }, [agents, members, message.mentionedAgentIds, message.mentionedUserIds]);

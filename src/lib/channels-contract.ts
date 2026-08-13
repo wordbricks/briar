@@ -49,7 +49,6 @@ export const channelNameSchema = z.string().trim().min(1).max(100);
 export const channelTopicSchema = z.string().trim().max(500);
 export const channelMessageBodySchema = z.string().trim().min(1).max(10_000);
 export const channelWebhookNameSchema = z.string().trim().min(1).max(100);
-export const agentHandleSchema = channelSlugSchema;
 
 export const channelAgentSkillInputSchema = z
   .object({
@@ -72,13 +71,8 @@ export type ChannelAgentSkillInput = z.output<
   typeof channelAgentSkillInputSchema
 >;
 
-/**
- * Handles never carry meaning beyond identity, so anything outside the handle
- * alphabet collapses to a separator. Names written in a non-Latin script leave
- * nothing behind, which is why callers must fall back to a generated handle
- * rather than trusting this to always produce one.
- */
-export function handleFromName(name: string) {
+/** Converts a channel name into the restricted alphabet used by URL slugs. */
+function handleFromName(name: string) {
   return name
     .normalize("NFKD")
     .toLowerCase()
@@ -138,7 +132,6 @@ export const channelIncomingWebhookMessageSchema = z
 export const organizationAgentInputSchema = z
   .object({
     name: z.string().trim().min(1).max(100),
-    handle: agentHandleSchema.optional(),
     provider: z.enum(channelAgentProviders),
     model: z.string().trim().min(1).max(100).nullable().default(null),
     responsibility: z.string().trim().min(1).max(2000),
@@ -218,7 +211,6 @@ export type ChannelAgentSkill = {
  */
 export type ChannelAgentSummary = {
   agentId: string;
-  handle: string | null;
   name: string;
   avatar: string | null;
   provider: ChannelAgentProvider;

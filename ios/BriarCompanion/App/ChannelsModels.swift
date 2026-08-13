@@ -453,7 +453,6 @@ struct ChannelMember: Codable, Equatable, Identifiable, Sendable {
 
 struct ChannelAgentSummary: Codable, Equatable, Identifiable, Sendable {
     let agentId: UUID
-    let handle: String?
     let name: String
     let provider: String
     let model: String?
@@ -487,12 +486,10 @@ enum ChannelMentions {
         currentUserId: String?
     ) -> [ChannelMentionTarget] {
         let agentTargets = agents.map { agent in
-            let preferredHandle = agent.handle?.trimmingCharacters(in: .whitespacesAndNewlines)
-            let handle = preferredHandle.flatMap { $0.isEmpty ? nil : $0 } ?? agent.name
             return ChannelMentionTarget(
                 kind: .agent,
                 recipientId: agent.agentId.uuidString,
-                handle: normalizedHandle(handle),
+                handle: agent.name,
                 label: agent.name,
                 detail: "Agent",
                 image: nil
@@ -553,7 +550,7 @@ enum ChannelMentions {
 
     private static func query(in body: String) -> Query? {
         guard let expression = try? NSRegularExpression(
-            pattern: "(^|[^\\p{L}\\p{N}_.-])@([\\p{L}\\p{N}_.-]*)$"
+            pattern: "(^|[^\\p{L}\\p{N}_.-])@([^@\\r\\n]*)$"
         ) else { return nil }
         let fullRange = NSRange(body.startIndex..<body.endIndex, in: body)
         guard let match = expression.firstMatch(in: body, range: fullRange),

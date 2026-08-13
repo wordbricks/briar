@@ -586,7 +586,6 @@ export type Project = {
 export type ProjectAgent = {
   id: string;
   projectId: string;
-  handle: string | null;
   name: string;
   avatar: string | null;
   codexPet: ProjectAgentCodexPet | null;
@@ -632,7 +631,6 @@ export type ProjectAgentSkillInput = Pick<
 
 export type CreateProjectAgentInput = {
   name: string | null;
-  handle?: string;
   avatar?: string | null;
   codexPet?: ProjectAgentCodexPet | null;
   provider: AgentProvider;

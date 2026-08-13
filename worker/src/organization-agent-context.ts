@@ -271,7 +271,6 @@ const projectAgentContextJson = (
   snapshotAt: string,
 ) => ({
   id: agent.id,
-  handle: agent.handle,
   name: agent.name,
   provider: agent.provider,
   model: agent.model,
@@ -427,7 +426,7 @@ export async function listOrganizationAgentContextAgentsPage(
     ).first<{ count: number }>(),
     db.prepare(
       `select agent.id, agent.organization_id, agent.project_id,
-              project.name as project_name, agent.handle, agent.name,
+              project.name as project_name, agent.name,
               null as avatar, agent.provider, agent.model,
               agent.responsibility, null as skill_markdown, agent.effort,
               agent.created_at, agent.updated_at
@@ -1193,7 +1192,7 @@ async function organizationAgentContextAgentSummaries(
       input.snapshotAt,
     ).first<{ count: number }>(),
     db.prepare(
-      `select agent.id, agent.handle, agent.name, agent.provider, agent.model,
+      `select agent.id, agent.name, agent.provider, agent.model,
               agent.effort, agent.responsibility, agent.created_at,
               agent.updated_at
        from briar_project_agents agent
@@ -1214,7 +1213,6 @@ async function organizationAgentContextAgentSummaries(
       limit + 1,
     ).all<{
       id: string;
-      handle: string | null;
       name: string;
       provider: string;
       model: string | null;
@@ -1251,7 +1249,6 @@ async function organizationAgentContextAgentSummaries(
   }
   const items = rows.map((row) => ({
     id: row.id,
-    handle: row.handle,
     name: row.name,
     provider: row.provider,
     model: row.model,
@@ -1296,7 +1293,7 @@ async function organizationAgentContextAgentDetails(
 ) {
   const result = await db.prepare(
     `select agent.id, agent.organization_id, agent.project_id,
-            project.name as project_name, agent.handle, agent.name,
+            project.name as project_name, agent.name,
             null as avatar, agent.provider, agent.model,
             agent.responsibility, null as skill_markdown, agent.effort,
             agent.created_at, agent.updated_at

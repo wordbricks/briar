@@ -113,7 +113,6 @@ const channel: ChannelSummary = {
 
 const agent: ChannelAgentSummary = {
   agentId: "agent-1",
-  handle: "honey",
   name: "Honey",
   avatar: null,
   provider: "claude",
@@ -146,7 +145,6 @@ const organizationMember: OrganizationMember = {
 
 const availableAgent: ChannelAgentSummary = {
   agentId: "agent-2",
-  handle: "reviewer",
   name: "Reviewer",
   avatar: "data:image/png;base64,cHJvamVjdC1hdmF0YXI=",
   provider: "codex",
@@ -282,7 +280,7 @@ describe("Channels", () => {
   });
 
   it("places the named Agent typing state inside its triggering message", async () => {
-    const trigger = message({ body: "@honey 안녕" });
+    const trigger = message({ body: "@Honey 안녕" });
     await render([trigger]);
     loadChannelDelta.mockResolvedValueOnce({
       cursor: 8,
@@ -314,7 +312,7 @@ describe("Channels", () => {
     const typing = container.querySelector(".channel-typing");
     expect(typing?.textContent).toContain("Honey님이 답변을 작성하고 있습니다");
     expect(typing?.closest(".channel-message")?.textContent)
-      .toContain("@honey 안녕");
+      .toContain("@Honey 안녕");
   });
 
   it("renders webhook authors and opens channel webhook management", async () => {
@@ -792,7 +790,7 @@ describe("Channels", () => {
   it("sends the picked Agent as a structured mention rather than parsing the text", async () => {
     await render([message()]);
     sendChannelMessage.mockResolvedValue({
-      message: message({ id: "message-2", body: "@honey draft it" }),
+      message: message({ id: "message-2", body: "@Honey draft it" }),
       agentReplies: [],
     });
 
@@ -802,15 +800,15 @@ describe("Channels", () => {
       ...container.querySelectorAll<HTMLButtonElement>(
         ".channel-mention-menu button",
       ),
-    ].find((button) => button.textContent?.includes("@honey"));
+    ].find((button) => button.textContent?.includes("@Honey"));
     expect(suggestion).toBeDefined();
     await act(async () => {
       suggestion!.click();
     });
     const composerMention = container.querySelector<HTMLButtonElement>(
-      ".channel-composer-field .conversation-mention-button[data-mention-handle='honey']",
+      ".channel-composer-field .conversation-mention-button[data-mention-handle='Honey']",
     );
-    expect(composerMention?.textContent).toBe("@honey");
+    expect(composerMention?.textContent).toBe("@Honey");
     await act(async () => composerMention?.click());
     expect(
       document.body.querySelector<HTMLElement>(".profile-dialog")?.textContent,
@@ -864,7 +862,7 @@ describe("Channels", () => {
     });
 
     const textarea = container.querySelector("textarea")!;
-    await typeInto(textarea, "@honey are you there");
+    await typeInto(textarea, "@Honey are you there");
     expect(
       container.querySelector(".channel-composer-field .conversation-mention-button"),
     ).toBeNull();

@@ -1911,7 +1911,6 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     await expect(listProjectAgents(db, projectId)).resolves.toEqual([
       expect.objectContaining({
         project_id: projectId,
-        handle: expect.stringMatching(/^agent-[a-f0-9]{32}$/u),
         name: "Developer agent",
         avatar: null,
         provider: "codex",
@@ -1943,7 +1942,6 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     await expect(listProjectAgents(db, localizedProject.id)).resolves.toEqual([
       expect.objectContaining({
         name: "개발자 에이전트",
-        handle: expect.stringMatching(/^agent-[a-f0-9]{32}$/u),
         responsibility: "대기 중인 모든 이슈를 처리합니다.",
         skills: [
           expect.objectContaining({
@@ -2119,7 +2117,6 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
   it("creates and lists custom agents scoped to a project", async () => {
     const agent = await createProjectAgent(db, projectId, {
       name: "Sentry 오류 탐지 에이전트",
-      handle: "sentry-watcher",
       provider: "claude",
       model: "opus",
       effort: null,
@@ -2130,7 +2127,6 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
 
     expect(agent).toMatchObject({
       project_id: projectId,
-      handle: "sentry-watcher",
       name: "Sentry 오류 탐지 에이전트",
       provider: "claude",
       model: "opus",
@@ -2150,10 +2146,9 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     ).resolves.toEqual([]);
   });
 
-  it("suffixes duplicate project agent handles within the organization", async () => {
+  it("allows duplicate project agent names because Agent IDs route mentions", async () => {
     const first = await createProjectAgent(db, projectId, {
-      name: "Release one",
-      handle: "release-agent",
+      name: "Release agent",
       provider: "codex",
       model: null,
       effort: null,
@@ -2161,8 +2156,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       calendarColor: "#8b5cf6",
     });
     const second = await createProjectAgent(db, projectId, {
-      name: "Release two",
-      handle: "release-agent",
+      name: "Release agent",
       provider: "codex",
       model: null,
       effort: null,
@@ -2170,8 +2164,9 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       calendarColor: "#0f9f76",
     });
 
-    expect(first.handle).toBe("release-agent");
-    expect(second.handle).toBe("release-agent-2");
+    expect(first.name).toBe("Release agent");
+    expect(second.name).toBe("Release agent");
+    expect(first.id).not.toBe(second.id);
   });
 
   it("deletes an agent only within its project and cascades its schedules", async () => {
@@ -2601,7 +2596,6 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     expect(updated).toMatchObject({
       id: current.id,
       project_id: projectId,
-      handle: current.handle,
       name: "Release coordinator",
       avatar,
       avatar_pet_json: codexPet.json,
@@ -2645,37 +2639,6 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         },
       ),
     ).resolves.toBeNull();
-  });
-
-  it("updates a project agent handle and resolves organization collisions", async () => {
-    const first = await createProjectAgent(db, projectId, {
-      name: "First mention target",
-      handle: "mention-target",
-      provider: "codex",
-      model: null,
-      effort: null,
-      responsibility: "Own the first mention target.",
-      calendarColor: "#8b5cf6",
-    });
-    const second = await createProjectAgent(db, projectId, {
-      name: "Second mention target",
-      handle: "second-target",
-      provider: "codex",
-      model: null,
-      effort: null,
-      responsibility: "Own the second mention target.",
-      calendarColor: "#0f9f76",
-    });
-
-    await expect(updateProjectAgent(db, projectId, second.id, {
-      name: second.name,
-      handle: first.handle!,
-      provider: second.provider,
-      model: second.model,
-      effort: second.effort,
-      responsibility: second.responsibility,
-      calendarColor: second.calendar_color,
-    })).resolves.toMatchObject({ handle: "mention-target-2" });
   });
 
   it("preserves retained Skill job references across name swaps", async () => {
@@ -3499,14 +3462,13 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     const objectKey = `project-agent-spritesheets/${organization.id}/race.webp`;
     await db.prepare(
       `insert into briar_project_agents (
-         id, organization_id, project_id, handle, name, provider, model,
+         id, organization_id, project_id, name, provider, model,
          responsibility, created_at, updated_at, calendar_color,
          skill_markdown, avatar_spritesheet_object_key
-       ) values (?, ?, null, ?, ?, 'codex', null, ?, ?, ?, '#3275d5', '', ?)`,
+       ) values (?, ?, null, ?, 'codex', null, ?, ?, ?, '#3275d5', '', ?)`,
     ).bind(
       "account-deletion-race-agent",
       organization.id,
-      "account-deletion-race-agent",
       "Race Agent",
       "Proves cleanup is not queued when deletion is blocked.",
       atMinute(0),
@@ -3589,14 +3551,13 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     await db.batch([
       db.prepare(
         `insert into briar_project_agents (
-           id, organization_id, project_id, handle, name, provider, model,
+           id, organization_id, project_id, name, provider, model,
            responsibility, created_at, updated_at, calendar_color,
            skill_markdown, avatar_spritesheet_object_key
-         ) values (?, ?, null, ?, ?, 'codex', null, ?, ?, ?, '#3275d5', '', ?)`,
+         ) values (?, ?, null, ?, 'codex', null, ?, ?, ?, '#3275d5', '', ?)`,
       ).bind(
         agentId,
         organization.id,
-        "account-deletion-outbox-agent",
         "Outbox Agent",
         "Organization-scoped cleanup fixture.",
         atMinute(0),

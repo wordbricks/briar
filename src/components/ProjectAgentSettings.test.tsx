@@ -21,7 +21,6 @@ describe("ProjectAgentSettings", () => {
     const agent = {
       id: "agent-1",
       projectId: "project-1",
-      handle: "issue-processing-agent",
       name: "Issue processing agent",
       avatar: null,
       codexPet: null,
@@ -98,10 +97,7 @@ describe("ProjectAgentSettings", () => {
         "#project-agent-settings-name",
       )?.value,
     ).toBe("Issue processing agent");
-    const handleInput = container.querySelector<HTMLInputElement>(
-      "#project-agent-settings-handle",
-    );
-    expect(handleInput?.value).toBe("issue-processing-agent");
+    expect(container.querySelector("#project-agent-settings-handle")).toBeNull();
     expect(
       container.querySelector('input[aria-label="이미지 업로드"]'),
     ).not.toBeNull();
@@ -162,13 +158,6 @@ describe("ProjectAgentSettings", () => {
         ?.click();
     });
     await act(async () => {
-      if (handleInput) {
-        Object.getOwnPropertyDescriptor(
-          HTMLInputElement.prototype,
-          "value",
-        )?.set?.call(handleInput, "release-agent");
-        handleInput.dispatchEvent(new Event("input", { bubbles: true }));
-      }
       container
         .querySelector<HTMLFormElement>("form.project-agent-settings-card")
         ?.dispatchEvent(
@@ -178,7 +167,6 @@ describe("ProjectAgentSettings", () => {
     });
     expect(onSave).toHaveBeenCalledWith(
       expect.objectContaining({
-        handle: "release-agent",
         provider: "claude",
         model: "opus",
         effort: "high",
@@ -212,7 +200,6 @@ describe("ProjectAgentSettings", () => {
     const agent = {
       id: "agent-1",
       projectId: "project-1",
-      handle: "issue-processing-agent",
       name: "Issue processing agent",
       avatar: null,
       codexPet: null,

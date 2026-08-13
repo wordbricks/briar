@@ -11,7 +11,7 @@ export function mentionAtCaret(
   if (!Number.isInteger(caret) || caret < 0 || caret > body.length) return null;
   const match = body
     .slice(0, caret)
-    .match(/(^|[^\p{L}\p{N}_.-])@([\p{L}\p{N}_.-]*)$/u);
+    .match(/(^|[^\p{L}\p{N}_.-])@([^@\r\n]*)$/u);
   if (!match) return null;
   return {
     start: caret - match[2].length - 1,

@@ -8249,7 +8249,6 @@ function IssueConversation({
       type: "agent",
       id: "briar",
       name: "Briar",
-      handle: "briar",
       provider: null,
       model: null,
       responsibility: t("profile.briarResponsibility"),

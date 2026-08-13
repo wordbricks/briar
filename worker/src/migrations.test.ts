@@ -3193,6 +3193,55 @@ describe("D1 migrations", () => {
     );
   });
 
+  it("retires legacy Agent handles without losing Agent records", async () => {
+    const miniflare = new Miniflare({
+      modules: true,
+      script: "export default { fetch() { return new Response('ok') } }",
+      d1Databases: { DB: "briar-remove-agent-handles-migration-test" },
+    });
+    try {
+      const db = (await miniflare.getD1Database("DB")) as unknown as D1Database;
+      await applyD1Migrations(db, {
+        through: "0101_issue_conversation_realtime.sql",
+      });
+      await db.prepare(
+        `insert into briar_organizations (id, name, handle, created_at, updated_at)
+         values ('org-1', 'Example', 'example', '2026-08-13', '2026-08-13')`,
+      ).run();
+      await createOrganizationAgent(db, {
+        id: "agent-1",
+        organizationId: "org-1",
+        name: "기획 도우미",
+        provider: "codex",
+        model: null,
+        responsibility: "제품 기획을 돕습니다.",
+        effort: null,
+        createdAt: "2026-08-13",
+      });
+      await db.prepare(
+        `update briar_project_agents set handle = 'planning-helper'
+         where id = 'agent-1'`,
+      ).run();
+
+      await applyD1Migrations(db, {
+        files: ["0102_remove_agent_handles.sql"],
+      });
+
+      await expect(
+        db.prepare(
+          `select id, name, handle from briar_project_agents where id = 'agent-1'`,
+        ).first(),
+      ).resolves.toEqual({ id: "agent-1", name: "기획 도우미", handle: null });
+      const indexes = await db.prepare(
+        `pragma index_list(briar_project_agents)`,
+      ).all<{ name: string }>();
+      expect(indexes.results.map((index) => index.name))
+        .not.toContain("briar_project_agents_handle_idx");
+    } finally {
+      await miniflare.dispose();
+    }
+  }, 30_000);
+
   it("migrates every localized default Agent to a Developer Agent with an issue Skill", async () => {
     const miniflare = new Miniflare({
       modules: true,

@@ -23,8 +23,7 @@ const member: ChannelMember = {
 
 const agent: ChannelAgentSummary = {
   agentId: "agent-1",
-  handle: "honey",
-  name: "Honey",
+  name: "Honey Bee",
   avatar: null,
   provider: "claude",
   model: "sonnet",
@@ -47,7 +46,7 @@ const message: ChannelMessage = {
     email: "jay@example.com",
     image: null,
   },
-  body: "@member please ask @honey; @typed is plain text.",
+  body: "@member please ask @Honey Bee; @typed is plain text.",
   mentionedUserIds: [member.userId],
   mentionedAgentIds: [agent.agentId],
   attachments: [],
@@ -93,7 +92,7 @@ describe("ChannelMessageText", () => {
     );
     expect([...buttons].map((button) => button.textContent)).toEqual([
       "@member",
-      "@honey",
+      "@Honey Bee",
     ]);
     expect(container.textContent).toContain("@typed is plain text");
 
@@ -108,6 +107,29 @@ describe("ChannelMessageText", () => {
     expect(buttons[1].type).toBe("button");
   });
 
+  it("leaves duplicate Agent Names unlinked instead of opening the wrong profile", async () => {
+    const duplicate = { ...agent, agentId: "agent-2", responsibility: "Research" };
+    await act(async () => {
+      root.render(
+        <I18nProvider>
+          <ChannelMessageText
+            agents={[agent, duplicate]}
+            members={[]}
+            message={{
+              ...message,
+              body: "@Honey Bee please compare notes",
+              mentionedUserIds: [],
+              mentionedAgentIds: [agent.agentId, duplicate.agentId],
+            }}
+          />
+        </I18nProvider>,
+      );
+    });
+
+    expect(container.textContent).toContain("@Honey Bee");
+    expect(container.querySelector("button.channel-mention-button")).toBeNull();
+  });
+
   it("shows the Agent's runtime and responsibility on its profile", async () => {
     await act(async () => {
       root.render(
@@ -118,7 +140,6 @@ describe("ChannelMessageText", () => {
               type: "agent",
               id: agent.agentId,
               name: agent.name,
-              handle: agent.handle,
               provider: agent.provider,
               model: agent.model,
               responsibility: agent.responsibility,
