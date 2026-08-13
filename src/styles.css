@@ -1403,6 +1403,29 @@ body { overflow: hidden; font-synthesis: none; }
   font-size: 16px;
   line-height: 1;
 }
+.app-toast-copy {
+  width: 26px;
+  height: 26px;
+  flex: 0 0 26px;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--border) 82%, #d88c98);
+  border-radius: 7px;
+  color: #a93f51;
+  background: color-mix(in srgb, var(--card) 84%, #fff1f3);
+  cursor: pointer;
+}
+.app-toast-copy:hover {
+  border-color: color-mix(in srgb, var(--border) 56%, #c45466);
+  color: #8f2f40;
+  background: color-mix(in srgb, var(--card) 70%, #ffe2e7);
+}
+.app-toast-copy:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 1px;
+}
 .app-toast-dismiss:hover {
   color: var(--foreground);
   background: color-mix(in srgb, var(--muted) 70%, transparent);

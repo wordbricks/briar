@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { briarApiUrl, briarWebAppOrigin } from "./api-config";
 export { briarApiUrl } from "./api-config";
+import { captureErrorDiagnostics } from "./error-diagnostics";
 import { structuredAgentResultSchema } from "./agent-result";
 import { validateIssueAttachments } from "./issue-attachments";
 import {
@@ -412,13 +413,26 @@ async function request<T>(
     headers.set("Content-Type", "application/json");
   }
   if (token) headers.set("Authorization", `Bearer ${token}`);
-  const response = await fetch(`${apiUrl}${path}`, {
-    ...init,
-    headers,
-  });
+  const method = (init?.method ?? "GET").toUpperCase();
+  const startedAt = performance.now();
+  let response: Response;
+  try {
+    response = await fetch(`${apiUrl}${path}`, {
+      ...init,
+      headers,
+    });
+  } catch (caught) {
+    captureErrorDiagnostics(caught, {
+      durationMs: performance.now() - startedAt,
+      method,
+      path,
+      scope: "api_request",
+    });
+    throw caught;
+  }
   if (!response.ok) {
     const body = await response.json().catch(() => null);
-    throw new ApiError(
+    const error = new ApiError(
       response.status,
       body?.message ??
         body?.error_description ??
@@ -427,9 +441,29 @@ async function request<T>(
       body?.code,
       Array.isArray(body?.issues) ? body.issues : undefined,
     );
+    captureErrorDiagnostics(error, {
+      code: error.code,
+      durationMs: performance.now() - startedAt,
+      method,
+      path,
+      scope: "api_request",
+      status: response.status,
+    });
+    throw error;
   }
   if (response.status === 204) return undefined as T;
-  return response.json() as Promise<T>;
+  try {
+    return await response.json() as T;
+  } catch (caught) {
+    captureErrorDiagnostics(caught, {
+      durationMs: performance.now() - startedAt,
+      method,
+      path,
+      scope: "api_response_parse",
+      status: response.status,
+    });
+    throw caught;
+  }
 }
 
 export type DeviceAuthorization = {

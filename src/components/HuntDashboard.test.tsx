@@ -2674,6 +2674,14 @@ describe("HuntDashboard", () => {
       document.body.querySelector('[data-testid="app-toast"].error')?.textContent,
     ).toContain("상태 이동에 실패했습니다.");
 
+    await act(async () => {
+      container.querySelector<HTMLElement>(".kanban-card")?.click();
+    });
+    expect(container.querySelector(".run-page")).not.toBeNull();
+    expect(
+      document.body.querySelectorAll('[data-testid="app-toast"].error'),
+    ).toHaveLength(1);
+
     await act(async () => root.unmount());
     container.remove();
   });

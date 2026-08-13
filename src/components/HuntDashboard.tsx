@@ -104,6 +104,10 @@ import { useIssueDialogAttachments } from "../hooks/useIssueDialogAttachments";
 import { useProjectAgentWorkerEvents } from "../hooks/useProjectAgentWorkerEvents";
 import { useHorizontalPaneResize } from "../hooks/useHorizontalPaneResize";
 import {
+  errorDiagnosticOccurrenceKey,
+  errorDiagnosticsForMessage,
+} from "../lib/error-diagnostics";
+import {
   agentMessagesFromAppServerEvents,
   type AutoHuntAgentMessage,
 } from "../lib/auto-hunt-agent";
@@ -833,10 +837,20 @@ export function HuntDashboard({
   const issuesLoading = dashboard === null && !noProject && !error && !recoveryError;
   const selected = runs.find((run) => run.id === selectedRunId) ?? null;
   const displayedError = error ?? recoveryError;
+  const lastDisplayedErrorRef = useRef<string | null>(null);
   useEffect(() => {
-    if (selected || !displayedError) return;
-    toast(displayedError, { tone: "error" });
-  }, [displayedError, selected, toast]);
+    if (!displayedError) {
+      lastDisplayedErrorRef.current = null;
+      return;
+    }
+    if (lastDisplayedErrorRef.current === displayedError) return;
+    lastDisplayedErrorRef.current = displayedError;
+    toast(displayedError, {
+      dedupeKey: errorDiagnosticOccurrenceKey(displayedError) ?? undefined,
+      details: errorDiagnosticsForMessage(displayedError),
+      tone: "error",
+    });
+  }, [displayedError, toast]);
   const selectedInboxVersion = selected
     ? [
         inboxIssueMessageVersion(selected),
@@ -1237,6 +1251,7 @@ export function HuntDashboard({
           issueKeyPrefix={dashboard?.project.issueKeyPrefix}
           currentUserId={currentUserId}
           error={displayedError}
+          showErrorToast={false}
           isDeletingIssue={deletingIssueId === selected.id}
           isRecovering={recoveringRunId === selected.id}
           isUpdatingIssue={updatingIssueId === selected.id}
@@ -4288,6 +4303,7 @@ export function RunPage({
   performedAgentModel = null,
   projectId = "",
   run,
+  showErrorToast = true,
   token = null,
 }: {
   assignedWorker?: ExecutionWorker | null;
@@ -4367,6 +4383,7 @@ export function RunPage({
   performedAgentModel?: string | null;
   projectId?: string;
   run: HuntRun;
+  showErrorToast?: boolean;
   token?: string | null;
 }) {
   const { locale, localeTag, t } = useI18n();
@@ -4399,10 +4416,20 @@ export function RunPage({
     (member) => member.userId === run.createdByUserId,
   ) ?? null;
   const { toast } = useToast();
+  const lastErrorToastRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!error) return;
-    toast(error, { tone: "error" });
-  }, [error, toast]);
+    if (!showErrorToast || !error) {
+      lastErrorToastRef.current = null;
+      return;
+    }
+    if (lastErrorToastRef.current === error) return;
+    lastErrorToastRef.current = error;
+    toast(error, {
+      dedupeKey: errorDiagnosticOccurrenceKey(error) ?? undefined,
+      details: errorDiagnosticsForMessage(error),
+      tone: "error",
+    });
+  }, [error, showErrorToast, toast]);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
