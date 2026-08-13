@@ -614,23 +614,23 @@ export function Sidebar({
                     activePage === "channels" && channel.id === activeChannelId;
                   const unread = !isActive && channelHasUnread(channel);
                   return (
-                  <button
-                    aria-current={isActive ? "page" : undefined}
-                    className={[
-                      isActive ? "active" : "",
-                      unread ? "unread" : "",
-                    ].filter(Boolean).join(" ")}
-                    key={channel.id}
-                    onClick={() => onChannelOpen(channel.id)}
-                    type="button"
-                  >
-                    {channel.visibility === "private" ? (
-                      <Lock aria-hidden="true" size={14} strokeWidth={1.7} />
-                    ) : (
-                      <Hash aria-hidden="true" size={14} strokeWidth={1.7} />
-                    )}
-                    <span>{channel.name}</span>
-                  </button>
+                    <button
+                      aria-current={isActive ? "page" : undefined}
+                      className={[
+                        isActive ? "active" : "",
+                        unread ? "unread" : "",
+                      ].filter(Boolean).join(" ")}
+                      key={channel.id}
+                      onClick={() => onChannelOpen(channel.id)}
+                      type="button"
+                    >
+                      {channel.visibility === "private" ? (
+                        <Lock aria-hidden="true" size={14} strokeWidth={1.7} />
+                      ) : (
+                        <Hash aria-hidden="true" size={14} strokeWidth={1.7} />
+                      )}
+                      <span>{channel.name}</span>
+                    </button>
                   );
                 })}
                 {!channelsLoading && (channels ?? []).length === 0 ? (

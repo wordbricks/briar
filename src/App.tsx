@@ -264,21 +264,21 @@ export function App() {
       const token = briar.token;
       const organizationId = briar.activeOrganizationId;
       if (!token || !organizationId) return;
-      setOrganizationChannels((current) => {
-        const channel = current.find((item) => item.id === channelId);
-        if (!channel || !channelHasUnread(channel)) return current;
-        const lastReadAt = laterTimestamp(
-          channel.lastMessageAt,
-          new Date().toISOString(),
-        );
-        void markChannelRead(token, organizationId, channelId, { lastReadAt })
-          .catch(() => {
-            // The next catalog snapshot restores unread if the write failed.
-          });
-        return markChannelCatalogRead(current, channelId, lastReadAt);
-      });
+      const channel = organizationChannels.find((item) => item.id === channelId);
+      if (!channel || !channelHasUnread(channel)) return;
+      const lastReadAt = laterTimestamp(
+        channel.lastMessageAt,
+        new Date().toISOString(),
+      );
+      setOrganizationChannels((current) =>
+        markChannelCatalogRead(current, channelId, lastReadAt),
+      );
+      void markChannelRead(token, organizationId, channelId, { lastReadAt })
+        .catch(() => {
+          // The next catalog snapshot restores unread if the write failed.
+        });
     },
-    [briar.activeOrganizationId, briar.token],
+    [briar.activeOrganizationId, briar.token, organizationChannels],
   );
   const [statusTrayRuns, setStatusTrayRuns] = useState<StatusTrayRun[]>([]);
   const loadUsageReport = useCallback(async () => {
