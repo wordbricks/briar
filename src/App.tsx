@@ -85,7 +85,7 @@ import {
 import type { MessageKey } from "./i18n/messages";
 import {
   inboxNotificationTarget,
-  isInboxChannelNavigationTarget,
+  isInboxChannelTarget,
   isInboxRunDetailTarget,
   type InboxNotificationTarget,
 } from "./lib/inbox-notifications";
@@ -738,7 +738,10 @@ export function App() {
         (session) => session.id === requestedSessionId,
       ) ?? null
     : null;
-  // Channel targets open the Channels page, not the issue/session detail panel.
+  const inboxDetailChannelId =
+    inboxDetailTarget?.kind === "channel"
+      ? inboxDetailTarget.targetId
+      : null;
   const inboxDetailRun =
     inboxDetailTarget && isInboxRunDetailTarget(inboxDetailTarget)
       ? briar.dashboard?.runs.find(
@@ -751,11 +754,13 @@ export function App() {
           (session) => session.id === inboxDetailTarget.targetId,
         ) ?? null
       : null;
-  const inboxDetailLabel = inboxDetailRun?.title ?? (inboxDetailTarget
-    ? inbox.messages.find(
-        (message) => message.id === inboxDetailTarget.messageId,
-      )?.title ?? t("inbox.messages")
-    : t("inbox.messages"));
+  const inboxDetailLabel =
+    inboxDetailRun?.title ??
+    (inboxDetailTarget
+      ? inbox.messages.find(
+          (message) => message.id === inboxDetailTarget.messageId,
+        )?.title ?? t("inbox.messages")
+      : t("inbox.messages"));
   const isInboxDetailLoading = Boolean(
     inboxDetailTarget &&
       isInboxRunDetailTarget(inboxDetailTarget) &&
@@ -1250,6 +1255,41 @@ export function App() {
         session={inboxDetailSession}
         token={briar.token}
       />
+    ) : inboxDetailChannelId && briar.activeOrganizationId && briar.token ? (
+      <Channels
+        activeChannelId={inboxDetailChannelId}
+        channels={organizationChannels}
+        currentUserId={briar.user?.id ?? null}
+        inboxDetail
+        onChannelSelect={setActiveChannelId}
+        onChannelsChange={setOrganizationChannels}
+        onInboxDetailClose={() => {
+          setRequestedChannelMessage(null);
+          setInboxDetailTarget(null);
+        }}
+        onCreateAgent={() => {
+          setSettingsTarget({
+            scope: "organization",
+            organizationId: briar.activeOrganizationId!,
+            section: "agents",
+          });
+          setIsSidebarOpen(true);
+          navigateToPage("settings");
+        }}
+        onIssueCreated={async (projectId, runId) => {
+          await briar.ensureProjectSelected(projectId);
+          setRequestedRunId(runId);
+          setIssueListRequestKey((key) => key + 1);
+          setRequestedChannelMessage(null);
+          setInboxDetailTarget(null);
+          navigateToPage("issues");
+        }}
+        onSkillSessionAccepted={autoHunt.adoptRemoteSession}
+        organizationId={briar.activeOrganizationId}
+        projects={activeOrganizationProjects}
+        requestedMessage={requestedChannelMessage}
+        token={briar.token}
+      />
     ) : isInboxDetailLoading ? (
       <div className="inbox-detail-loading" role="status">
         {t("inbox.detailLoading")}
@@ -1593,15 +1633,22 @@ export function App() {
               onMarkRead={inbox.markRead}
               onOpen={(message) => {
                 const target = inboxNotificationTarget(message);
-                // Channel replies are not issues; open the channel thread instead
-                // of the inbox detail pane (which only loads runs/sessions).
-                if (isInboxChannelNavigationTarget(target)) {
-                  setPendingInboxNotificationTarget(target);
-                  return;
-                }
                 inbox.markRead(message.id);
                 if (target.projectId !== briar.activeProjectId) {
                   briar.setActiveProjectId(target.projectId);
+                }
+                if (isInboxChannelTarget(target)) {
+                  setRequestedRunId(null);
+                  setRequestedSessionId(null);
+                  setRequestedChannelMessage({
+                    channelId: target.targetId,
+                    messageId: target.channelMessageId,
+                    rootMessageId: target.rootMessageId,
+                  });
+                  setActiveChannelId(target.targetId);
+                  markOrganizationChannelRead(target.targetId);
+                } else {
+                  setRequestedChannelMessage(null);
                 }
                 setInboxDetailTarget(target);
               }}

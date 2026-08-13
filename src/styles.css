@@ -5779,6 +5779,9 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .channels:has(.channel-thread) {
   grid-template-columns: minmax(0, 1fr) var(--channel-thread-resizer-width, 6px) minmax(320px, var(--channel-thread-width, 42%));
 }
+.channels.channels-inbox-thread-only { display: flex; }
+.channels.channels-inbox-thread-only .channel-thread { width: 100%; min-width: 0; border-left: 0; }
+.channels.channels-inbox-thread-only .channel-thread-resizer { display: none; }
 .channels.is-resizing-thread { cursor: col-resize; user-select: none; }
 
 .channel-thread-resizer {
