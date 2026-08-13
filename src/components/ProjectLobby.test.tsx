@@ -31,6 +31,25 @@ const emptyUsageSummary: ProjectUsageSummary = {
   agents: [],
 };
 
+const scaledUsageSummary: ProjectUsageSummary = {
+  period: "day",
+  rangeStart: "2026-07-30T00:00:00.000Z",
+  rangeEnd: "2026-08-13T00:00:00.000Z",
+  generatedAt: "2026-08-12T00:00:00.000Z",
+  totalTokens: 1_500_000,
+  trackedDurationMs: 120_000,
+  observedRuns: 4,
+  reportedRuns: 4,
+  completedIssues: 8,
+  timeline: Array.from({ length: 14 }, (_, index) => ({
+    startAt: new Date(Date.UTC(2026, 6, 30 + index)).toISOString(),
+    completedIssues: index === 10 ? 8 : index === 5 ? 3 : 0,
+    totalTokens: index === 10 ? 1_500_000 : index === 5 ? 250_000 : 0,
+  })),
+  issueCreators: [{ id: "user-1", name: "Ada", issues: 5 }],
+  agents: [{ id: "agent-1", name: "Builder", issues: 8 }],
+};
+
 describe("ProjectLobby", () => {
   it("summarizes only execution time inside the daily analytics window", () => {
     const now = Date.parse("2026-08-12T12:00:00.000Z");
@@ -125,6 +144,61 @@ describe("ProjectLobby", () => {
         ?.click();
     });
     expect(onOpenIssues).toHaveBeenCalledOnce();
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("shows compact vertical scale values for issues and tokens", async () => {
+    const onLoadUsageSummary = vi.fn().mockResolvedValue(scaledUsageSummary);
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <I18nProvider>
+          <ProjectLobby
+            dashboard={demoDashboard}
+            isSidebarOpen
+            onLoadUsageSummary={onLoadUsageSummary}
+            onOpenAgents={() => undefined}
+            onOpenIssue={() => undefined}
+            onOpenIssues={() => undefined}
+            onOpenRepository={() => undefined}
+            onOpenSettings={() => undefined}
+            project={demoDashboard.project}
+            readiness={demoRepositoryReadiness}
+          />
+        </I18nProvider>,
+      );
+    });
+
+    const issueTicks = Array.from(
+      container.querySelectorAll(".project-lobby-chart-y-axis.issues span"),
+      (tick) => tick.textContent,
+    );
+    const tokenTicks = Array.from(
+      container.querySelectorAll(".project-lobby-chart-y-axis.tokens span"),
+      (tick) => tick.textContent,
+    );
+
+    // Issue count scale (max 8 → nice step 2): 0,2,4,6,8
+    expect(issueTicks).toEqual(["0", "2", "4", "6", "8"]);
+    // Token scale (max 1.5M → nice 2M) with compact labels
+    expect(tokenTicks[0]).toBe("0");
+    expect(tokenTicks.at(-1)).toMatch(/2(\.0)?\s?M/i);
+    expect(tokenTicks.some((tick) => /1(\.0)?\s?M/i.test(tick ?? ""))).toBe(
+      true,
+    );
+    expect(
+      container.querySelectorAll(".project-lobby-chart-y-axis.issues span")
+        .length,
+    ).toBeGreaterThanOrEqual(2);
+    expect(
+      container.querySelectorAll(".project-lobby-chart-y-axis.tokens span")
+        .length,
+    ).toBeGreaterThanOrEqual(2);
 
     await act(async () => root.unmount());
     container.remove();

@@ -976,11 +976,16 @@ body { overflow: hidden; font-synthesis: none; }
 .project-lobby-period-picker button:hover { color:var(--foreground); }
 .project-lobby-period-picker button.active { color:var(--foreground); background:var(--card); box-shadow:var(--shadow-xs); }
 .project-lobby-chart-wrap { padding:20px 20px 13px; overflow-x:auto; }
-.project-lobby-chart-legend { min-width:680px; display:flex; justify-content:flex-end; gap:17px; color:var(--muted-foreground); font-size:var(--text-2xs); }
+.project-lobby-chart-legend { min-width:768px; padding:0 48px 0 40px; display:flex; justify-content:flex-end; gap:17px; color:var(--muted-foreground); font-size:var(--text-2xs); }
 .project-lobby-chart-legend span { display:flex; align-items:center; gap:6px; }
 .project-lobby-chart-legend span::before { width:8px; height:8px; border-radius:3px; background:#8068ce; content:""; }
 .project-lobby-chart-legend span.tokens::before { background:#55b994; }
-.project-lobby-chart { min-width:680px; height:210px; margin-top:12px; display:grid; grid-template-columns:repeat(12,minmax(34px,1fr)); align-items:stretch; gap:7px; border-bottom:1px solid var(--border); background:repeating-linear-gradient(to bottom,transparent 0,transparent 49px,color-mix(in srgb,var(--border) 65%,transparent) 50px); }
+.project-lobby-chart-body { min-width:768px; margin-top:12px; display:grid; grid-template-columns:40px minmax(0,1fr) 48px; align-items:start; gap:0 6px; }
+.project-lobby-chart-y-axis { position:relative; height:168px; margin-top:8px; color:var(--muted-foreground); font:500 10px/1 "DM Mono",ui-monospace,monospace; user-select:none; }
+.project-lobby-chart-y-axis span { position:absolute; right:0; transform:translateY(50%); white-space:nowrap; }
+.project-lobby-chart-y-axis.issues span { color:#8068ce; }
+.project-lobby-chart-y-axis.tokens span { left:0; right:auto; color:#3d9d7b; }
+.project-lobby-chart { min-width:0; height:210px; display:grid; grid-template-columns:repeat(12,minmax(34px,1fr)); align-items:stretch; gap:7px; border-bottom:1px solid var(--border); background:repeating-linear-gradient(to bottom,transparent 0,transparent 41px,color-mix(in srgb,var(--border) 65%,transparent) 42px); background-size:100% 168px; background-position:0 8px; background-repeat:no-repeat; }
 .project-lobby-chart-column { min-width:0; display:grid; grid-template-rows:176px 33px; align-items:end; }
 .project-lobby-chart-bars { height:168px; display:flex; align-items:flex-end; justify-content:center; gap:3px; }
 .project-lobby-chart-bars i { width:min(12px,42%); border-radius:4px 4px 1px 1px; background:#8068ce; }

@@ -46,6 +46,43 @@ function formatCompact(value: number, locale: string) {
   }).format(value);
 }
 
+/** Compact labels for chart axes (1k, 1M) so scale is readable at a glance. */
+function formatAxisValue(value: number, locale: string) {
+  return new Intl.NumberFormat(locale, {
+    maximumFractionDigits: value >= 1_000 ? 1 : 0,
+    notation: value >= 1_000 ? "compact" : "standard",
+  }).format(value);
+}
+
+/** Round a max up to 1/2/5 × 10^n so axis ticks stay clean. */
+function niceScaleMaximum(value: number) {
+  if (value <= 0) return 1;
+  const exponent = Math.floor(Math.log10(value));
+  const magnitude = 10 ** exponent;
+  const normalized = value / magnitude;
+  const rounded =
+    normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10;
+  return rounded * magnitude;
+}
+
+/** Integer-friendly top for issue counts (small whole numbers). */
+function niceCountMaximum(value: number) {
+  if (value <= 0) return 1;
+  const step = Math.max(1, Math.ceil(value / 4));
+  return step * Math.ceil(value / step);
+}
+
+function chartTickValues(maximum: number, integerTicks: boolean) {
+  if (maximum <= 0) return [0];
+  // Small maxima collapse poorly with fractional ratios (e.g. 0/0.25/0.5 → "0","0","1").
+  if (integerTicks || maximum <= 4) {
+    const step = Math.max(1, Math.ceil(maximum / 4));
+    const count = Math.max(1, Math.round(maximum / step));
+    return Array.from({ length: count + 1 }, (_, index) => index * step);
+  }
+  return [0, 0.25, 0.5, 0.75, 1].map((ratio) => ratio * maximum);
+}
+
 export function projectTrackedDuration(
   runs: readonly ProjectUsageSummaryRun[],
   now: number,
@@ -174,8 +211,18 @@ export function ProjectLobby({
     timeZone: "UTC",
     year: "2-digit",
   });
-  const maxIssues = Math.max(1, ...timeline.map((point) => point.completedIssues));
-  const maxTokens = Math.max(1, ...timeline.map((point) => point.totalTokens));
+  const maxIssuesRaw = Math.max(
+    0,
+    ...timeline.map((point) => point.completedIssues),
+  );
+  const maxTokensRaw = Math.max(
+    0,
+    ...timeline.map((point) => point.totalTokens),
+  );
+  const maxIssues = niceCountMaximum(maxIssuesRaw);
+  const maxTokens = niceScaleMaximum(maxTokensRaw);
+  const issueTicks = chartTickValues(maxIssues, true);
+  const tokenTicks = chartTickValues(maxTokens, false);
   const periodLabel = t(`lobby.period.${period}` as MessageKey);
   const bucketLabel = (startAt: string) => {
     const timestamp = Date.parse(startAt);
@@ -314,38 +361,82 @@ export function ProjectLobby({
                 <span className="issues">{t("lobby.completedIssuesLegend")}</span>
                 <span className="tokens">{t("lobby.tokensLegend")}</span>
               </div>
-              <div
-                aria-label={t("lobby.analyticsChartLabel", { period: periodLabel })}
-                className="project-lobby-chart"
-                role="list"
-                style={{ gridTemplateColumns: `repeat(${timeline.length}, minmax(34px, 1fr))` }}
-              >
-                {timeline.map((point) => {
-                  const label = bucketLabel(point.startAt);
-                  return (
-                    <div
-                      aria-label={t("lobby.analyticsPoint", {
-                        date: label,
-                        issues: point.completedIssues,
-                        tokens: formatCompact(point.totalTokens, localeTag),
-                      })}
-                      className="project-lobby-chart-column"
-                      key={point.startAt}
-                      role="listitem"
-                      title={t("lobby.analyticsPoint", {
-                        date: label,
-                        issues: point.completedIssues,
-                        tokens: formatCompact(point.totalTokens, localeTag),
-                      })}
+              <div className="project-lobby-chart-body">
+                <div
+                  aria-hidden
+                  className="project-lobby-chart-y-axis issues"
+                >
+                  {issueTicks.map((value) => (
+                    <span
+                      key={`issues-${value}`}
+                      style={{
+                        bottom: `${(value / maxIssues) * 100}%`,
+                      }}
                     >
-                      <div className="project-lobby-chart-bars" aria-hidden>
-                        <i className="issues" style={{ height: `${(point.completedIssues / maxIssues) * 100}%` }} />
-                        <i className="tokens" style={{ height: `${(point.totalTokens / maxTokens) * 100}%` }} />
+                      {formatAxisValue(value, localeTag)}
+                    </span>
+                  ))}
+                </div>
+                <div
+                  aria-label={t("lobby.analyticsChartLabel", { period: periodLabel })}
+                  className="project-lobby-chart"
+                  role="list"
+                  style={{
+                    gridTemplateColumns: `repeat(${Math.max(timeline.length, 1)}, minmax(34px, 1fr))`,
+                  }}
+                >
+                  {timeline.map((point) => {
+                    const label = bucketLabel(point.startAt);
+                    return (
+                      <div
+                        aria-label={t("lobby.analyticsPoint", {
+                          date: label,
+                          issues: point.completedIssues,
+                          tokens: formatCompact(point.totalTokens, localeTag),
+                        })}
+                        className="project-lobby-chart-column"
+                        key={point.startAt}
+                        role="listitem"
+                        title={t("lobby.analyticsPoint", {
+                          date: label,
+                          issues: point.completedIssues,
+                          tokens: formatCompact(point.totalTokens, localeTag),
+                        })}
+                      >
+                        <div className="project-lobby-chart-bars" aria-hidden>
+                          <i
+                            className="issues"
+                            style={{
+                              height: `${(point.completedIssues / maxIssues) * 100}%`,
+                            }}
+                          />
+                          <i
+                            className="tokens"
+                            style={{
+                              height: `${(point.totalTokens / maxTokens) * 100}%`,
+                            }}
+                          />
+                        </div>
+                        <span>{label}</span>
                       </div>
-                      <span>{label}</span>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
+                <div
+                  aria-hidden
+                  className="project-lobby-chart-y-axis tokens"
+                >
+                  {tokenTicks.map((value) => (
+                    <span
+                      key={`tokens-${value}`}
+                      style={{
+                        bottom: `${(value / maxTokens) * 100}%`,
+                      }}
+                    >
+                      {formatAxisValue(value, localeTag)}
+                    </span>
+                  ))}
+                </div>
               </div>
             </div>
             <div className="project-lobby-breakdowns">
