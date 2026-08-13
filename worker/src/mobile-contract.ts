@@ -502,6 +502,9 @@ export const mobileChannelSummarySchema = z.object({
   agentCount: z.number().int().nonnegative(),
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
+  lastMessageAt: z.iso.datetime().nullable().optional(),
+  lastReadAt: z.iso.datetime().nullable().optional(),
+  hasUnread: z.boolean().optional(),
 });
 
 export const mobileChannelIssueProposalPayloadSchema = z.object({

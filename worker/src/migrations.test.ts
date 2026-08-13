@@ -161,6 +161,9 @@ describe("D1 migrations", () => {
       await applyD1Migrations(db, {
         through: "0096_suppress_lease_sync_changes.sql",
       });
+      await applyD1Migrations(db, {
+        files: ["0102_channel_read_states.sql"],
+      });
       const now = "2026-08-12T00:00:00.000Z";
       const userId = "webhook-migration-owner";
       const organizationId = "71000000-0000-4000-8000-000000000001";
@@ -611,7 +614,10 @@ describe("D1 migrations", () => {
         through: "0090_channel_issue_approval.sql",
       });
       await applyD1Migrations(db, {
-        files: ["0099_project_usage_analytics.sql"],
+        files: [
+          "0099_project_usage_analytics.sql",
+          "0102_channel_read_states.sql",
+        ],
       });
       const ownerId = "channel-canonical-owner";
       const approverId = "channel-canonical-approver";
@@ -922,7 +928,10 @@ describe("D1 migrations", () => {
       const db = (await miniflare.getD1Database("DB")) as unknown as D1Database;
       await applyD1Migrations(db, { through: "0089_channel_agent_delegation.sql" });
       await applyD1Migrations(db, {
-        files: ["0099_project_usage_analytics.sql"],
+        files: [
+          "0099_project_usage_analytics.sql",
+          "0102_channel_read_states.sql",
+        ],
       });
       const userId = "channel-upgrade-owner";
       const approverId = "channel-upgrade-approver";

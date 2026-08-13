@@ -1678,6 +1678,19 @@ export async function loadChannel(
   }>(`/organizations/${organizationId}/channels/${channelId}`, token);
 }
 
+export async function markChannelRead(
+  token: string,
+  organizationId: string,
+  channelId: string,
+  input: { lastReadAt?: string } = {},
+) {
+  return request<{ channel: ChannelSummary }>(
+    `/organizations/${organizationId}/channels/${channelId}/read`,
+    token,
+    { method: "PUT", body: JSON.stringify(input) },
+  );
+}
+
 export async function updateChannel(
   token: string,
   organizationId: string,
