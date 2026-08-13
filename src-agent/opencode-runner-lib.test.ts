@@ -94,6 +94,31 @@ describe("OpenCode runner helpers", () => {
     });
   });
 
+  it("detects a free-tier retry without structured action metadata", () => {
+    expect(
+      openCodeBlockedRetry(
+        {
+          type: "session.status",
+          properties: {
+            sessionID: "session-1",
+            status: {
+              type: "retry",
+              attempt: 8,
+              message: "Free usage exceeded, subscribe to Go https://opencode.ai/go",
+              next: 1_786_593_780_337,
+            },
+          },
+        },
+        "session-1",
+      ),
+    ).toEqual({
+      reason: "free_tier_limit",
+      provider: "opencode",
+      message: "Free usage exceeded, subscribe to Go https://opencode.ai/go",
+      nextRetryAt: "2026-08-13T04:03:00.337Z",
+    });
+  });
+
   it("ignores retry states that are not free-tier blockers", () => {
     const state = {
       type: "session.status",
@@ -107,6 +132,18 @@ describe("OpenCode runner helpers", () => {
     };
     expect(openCodeBlockedRetry(state, "session-1")).toBeNull();
     expect(openCodeBlockedRetry(state, "another-session")).toBeNull();
+    expect(
+      openCodeBlockedRetry(
+        {
+          type: "session.status",
+          properties: {
+            sessionID: "session-1",
+            status: { type: "retry", message: "Rate limit exceeded" },
+          },
+        },
+        "session-1",
+      ),
+    ).toBeNull();
   });
 
   it.each([502, 503, 504] as const)(
