@@ -111,6 +111,28 @@ describe("agent usage pricing", () => {
     ).toBe("canonical-model");
   });
 
+  it("matches xAI build variants to the provider-compatible base model", () => {
+    const table = parseAgentUsageModelRates({
+      "xai/grok-4.5": rates(2e-6, 10e-6, "xai"),
+      "xai/grok-4.5-latest": rates(3e-6, 12e-6, "xai"),
+    });
+
+    expect(
+      lookupAgentUsageModelRate(table, {
+        model: "grok-4.5-build",
+        canonicalModel: null,
+        modelProvider: "xai",
+      })?.pricingKey,
+    ).toBe("xai/grok-4.5");
+    expect(
+      lookupAgentUsageModelRate(table, {
+        model: "grok-4.5-preview",
+        canonicalModel: null,
+        modelProvider: "xai",
+      }),
+    ).toBeNull();
+  });
+
   it("prices token buckets once and requires input/output detail", () => {
     expect(
       priceAgentExecutionUsage(

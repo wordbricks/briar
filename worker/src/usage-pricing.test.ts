@@ -313,6 +313,78 @@ describe("worker usage pricing", () => {
     ]);
   });
 
+  it("retains the provider-reported model while pricing an xAI build variant", () => {
+    const table = parseAgentUsageModelRates({
+      "xai/grok-4.5": {
+        litellm_provider: "xai",
+        input_cost_per_token: 2e-6,
+        output_cost_per_token: 10e-6,
+      },
+    });
+    const estimate = estimateRunExecutionCost({
+      usageRecords: [
+        usageRow({
+          agent_provider: "grok",
+          model_provider: "xai",
+          model: "grok-4.5-build",
+        }),
+      ],
+      loadedPricing: {
+        table,
+        pricing: {
+          status: "live",
+          source: "pricing-source",
+          fetchedAt: "2026-08-13T00:00:00.000Z",
+          knownModels: 1,
+        },
+      },
+      fallback: null,
+    });
+
+    expect(estimate).toMatchObject({
+      status: "estimated",
+      providerReportedModels: ["grok-4.5-build"],
+      models: [
+        {
+          model: "grok-4.5-build",
+          pricingKey: "xai/grok-4.5",
+        },
+      ],
+    });
+  });
+
+  it("retains the provider-reported model when pricing is unavailable", () => {
+    expect(
+      estimateRunExecutionCost({
+        usageRecords: [
+          usageRow({
+            model: "provider-default-model",
+            model_source: "providerReported",
+          }),
+          usageRow({
+            usage_key: "usage-b",
+            model: "configured-model",
+            model_source: "configuredFallback",
+          }),
+        ],
+        loadedPricing: {
+          table: null,
+          pricing: {
+            status: "unavailable",
+            source: "pricing-source",
+            fetchedAt: null,
+            knownModels: 0,
+          },
+        },
+        fallback: null,
+      }),
+    ).toMatchObject({
+      status: "unavailable",
+      reason: "pricingUnavailable",
+      providerReportedModels: ["provider-default-model"],
+    });
+  });
+
   it("uses the execution summary for pre-ledger runs and marks partial coverage", () => {
     const table = parseAgentUsageModelRates(pricingDocument);
     const loadedPricing = {
