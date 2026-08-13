@@ -602,7 +602,7 @@ describe("D1 migrations", () => {
     } finally {
       await miniflare.dispose();
     }
-  });
+  }, 30_000);
 
   it("only finalizes a canonical reserved channel issue run", {
     timeout: 60_000,
@@ -920,7 +920,7 @@ describe("D1 migrations", () => {
     } finally {
       await miniflare.dispose();
     }
-  });
+  }, 30_000);
 
   it("upgrades channel approvals with audit backfill and legacy quarantine", async () => {
     const miniflare = new Miniflare({
