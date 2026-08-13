@@ -9,6 +9,9 @@ export function NativeSelect({
   onValueChange,
   options,
   placeholder,
+  searchEmptyMessage,
+  searchPlaceholder,
+  searchable,
   value,
 }: {
   className?: string;
@@ -17,6 +20,9 @@ export function NativeSelect({
   onValueChange: (value: string) => void;
   options: NativeSelectOption[];
   placeholder?: string;
+  searchEmptyMessage?: string;
+  searchPlaceholder?: string;
+  searchable?: boolean;
   value: string;
 }) {
   return (
@@ -27,6 +33,9 @@ export function NativeSelect({
       onValueChange={onValueChange}
       options={options}
       placeholder={placeholder}
+      searchEmptyMessage={searchEmptyMessage}
+      searchPlaceholder={searchPlaceholder}
+      searchable={searchable}
       size="large"
       value={value}
     />
