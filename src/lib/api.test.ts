@@ -64,10 +64,31 @@ import {
 } from "./api";
 import { cloneAutoHuntWorkflow } from "./auto-hunt-contract";
 import { demoDashboard, demoRunEvents } from "./demo-data";
+import {
+  errorDiagnosticOccurrenceKey,
+  errorDiagnosticsForMessage,
+} from "./error-diagnostics";
 import type { AgentSkillExecutionProposal } from "../types";
 
 afterEach(() => {
   vi.unstubAllGlobals();
+});
+
+describe("API error diagnostics", () => {
+  it("records request context for a transport failure", async () => {
+    const error = new TypeError("diagnostic-api-load-failed");
+    vi.stubGlobal("fetch", vi.fn(async () => {
+      throw error;
+    }));
+
+    await expect(loadDashboard("token", "project-1")).rejects.toBe(error);
+
+    expect(errorDiagnosticOccurrenceKey(error.message)).not.toBeNull();
+    const details = errorDiagnosticsForMessage(error.message);
+    expect(details).toContain("Scope: api_request");
+    expect(details).toContain("Request method: GET");
+    expect(details).toContain("Request path: /projects/<redacted>/dashboard");
+  });
 });
 
 describe("Project settings", () => {
