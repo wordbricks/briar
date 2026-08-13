@@ -6520,6 +6520,7 @@ describe("HuntDashboard", () => {
           reason: null,
           usageRecords: 1,
           pricedUsageRecords: 1,
+          providerReportedModels: ["grok-4.5"],
           estimatedUsdTicks: 1_345_000,
           pricedUsdTicks: 1_345_000,
           models: [
@@ -6649,6 +6650,22 @@ describe("HuntDashboard", () => {
           throw new Error("not implemented in this test");
         }}
         run={completedRun}
+        executionCostEstimate={{
+          pricing: {
+            status: "unavailable",
+            source: "https://example.com/pricing.json",
+            fetchedAt: null,
+            knownModels: 0,
+          },
+          status: "unavailable",
+          reason: "pricingUnavailable",
+          usageRecords: 1,
+          pricedUsageRecords: 0,
+          providerReportedModels: ["claude-provider-default"],
+          estimatedUsdTicks: null,
+          pricedUsdTicks: 0,
+          models: [],
+        }}
       />,
     );
 
@@ -6658,6 +6675,80 @@ describe("HuntDashboard", () => {
     expect(markup).toContain("Claude Opus");
     expect(markup).not.toContain("Grok");
     expect(markup).not.toContain("grok-4.5");
+    expect(markup).not.toContain("claude-provider-default");
+  });
+
+  it("shows the provider-reported model for a provider-default run", () => {
+    const completedRun = {
+      ...demoDashboard.runs[0],
+      status: "completed" as const,
+      resultSummary: "프로바이더 기본 모델 실행을 검증합니다.",
+      executionMetrics: {
+        inputTokens: 10,
+        outputTokens: 5,
+        cacheReadTokens: null,
+        cacheWriteTokens: null,
+        reasoningOutputTokens: null,
+        totalTokens: 15,
+        durationMs: 12_000,
+      },
+      preferredProvider: null,
+      preferredModel: null,
+      requestedProvider: "grok" as const,
+      requestedModel: null,
+    };
+    const markup = renderToStaticMarkup(
+      <RunPage
+        isSidebarOpen
+        error={null}
+        isRecovering={false}
+        onBack={() => undefined}
+        onCancel={async () => undefined}
+        onLoadAttachment={async () => new Blob()}
+        onLoadIssueMessages={async () => []}
+        onLoadRunEvidence={async () => []}
+        onMove={async () => undefined}
+        onRetry={async () => undefined}
+        onSendIssueMessage={async () => {
+          throw new Error("not implemented in this test");
+        }}
+        run={completedRun}
+        executionCostEstimate={{
+          pricing: {
+            status: "live",
+            source: "https://example.com/pricing.json",
+            fetchedAt: "2026-08-13T00:00:00.000Z",
+            knownModels: 1,
+          },
+          status: "estimated",
+          reason: null,
+          usageRecords: 1,
+          pricedUsageRecords: 1,
+          providerReportedModels: ["grok-4.5-build"],
+          estimatedUsdTicks: 200_000,
+          pricedUsdTicks: 200_000,
+          models: [
+            {
+              pricingKey: "xai/grok-4.5",
+              modelProvider: "xai",
+              model: "grok-4.5-build",
+              inputCostPerToken: 2e-6,
+              outputCostPerToken: 10e-6,
+              cacheReadCostPerToken: 2e-6,
+              cacheWriteCostPerToken: 2e-6,
+              estimatedUsdTicks: 200_000,
+            },
+          ],
+        }}
+      />,
+    );
+
+    expect(markup).toContain("프로바이더");
+    expect(markup).toContain("Grok");
+    expect(markup).toContain("모델");
+    expect(markup).toContain("grok-4.5-build");
+    expect(markup).toContain("$2.00 / 100만 토큰");
+    expect(markup).toContain("$10.00 / 100만 토큰");
   });
 
   it("shows result reviewers in the result and properties panels and records the current member", async () => {
