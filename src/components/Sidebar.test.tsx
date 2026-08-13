@@ -222,8 +222,8 @@ describe("Sidebar", () => {
     expect(markup).toContain('aria-haspopup="menu"');
     expect(markup).toContain('aria-label="계정 메뉴"');
     expect(markup).toContain("이슈");
-    expect(markup).toContain("홈");
-    expect(markup).toContain('href="#project-lobby"');
+    expect(markup).not.toContain("홈");
+    expect(markup).not.toContain('href="#project-lobby"');
     expect(markup).toContain('class="sidebar-issue-add"');
     expect(markup).toContain('aria-label="이슈 만들기"');
     expect(markup).toContain("에이전트");
@@ -284,7 +284,7 @@ describe("Sidebar", () => {
     expect(container.querySelector("#project-views-project-2")).not.toBeNull();
     expect(
       container.querySelectorAll(".sidebar-project-view").length,
-    ).toBeGreaterThanOrEqual(8);
+    ).toBe(6);
 
     const collapseBriar = container.querySelector<HTMLButtonElement>(
       '[aria-label="Briar 프로젝트 접기"]',
@@ -302,6 +302,68 @@ describe("Sidebar", () => {
 
     await act(async () => root.unmount());
     container.remove();
+  });
+
+  it("opens the project home page when the project name is clicked", async () => {
+    const onProjectChange = vi.fn();
+    const onLobbyOpen = vi.fn();
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(
+        <Sidebar
+          {...sidebarProps}
+          activePage="issues"
+          activeProjectId="project-1"
+          onLobbyOpen={onLobbyOpen}
+          onProjectChange={onProjectChange}
+          projects={[
+            ...sidebarProps.projects,
+            {
+              id: "project-2",
+              name: "Console",
+              organizationId: "organization-1",
+              organizationName: "Briar",
+              role: "member",
+              createdAt: "2026-07-23T00:00:00Z",
+            },
+          ]}
+        />,
+      );
+    });
+
+    const headings = Array.from(
+      container.querySelectorAll<HTMLButtonElement>(".sidebar-project-heading"),
+    );
+    const briarHeading = headings.find((button) =>
+      button.textContent?.includes("Briar"),
+    );
+    const consoleHeading = headings.find((button) =>
+      button.textContent?.includes("Console"),
+    );
+
+    await act(async () => briarHeading?.click());
+    expect(onProjectChange).not.toHaveBeenCalled();
+    expect(onLobbyOpen).toHaveBeenCalledOnce();
+
+    await act(async () => consoleHeading?.click());
+    expect(onProjectChange).toHaveBeenCalledWith("project-2");
+    expect(onLobbyOpen).toHaveBeenCalledTimes(2);
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("marks the project name as the current page on the home view", () => {
+    const markup = renderToStaticMarkup(
+      <Sidebar {...sidebarProps} activePage="lobby" />,
+    );
+
+    expect(markup).toContain('class="sidebar-project-heading active"');
+    expect(markup).toContain('aria-current="page"');
+    expect(markup).not.toContain("홈");
+    expect(markup).not.toContain('href="#project-lobby"');
   });
 
   it("selects a project and keeps it expanded when opening a child view", async () => {

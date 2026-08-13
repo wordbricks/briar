@@ -415,6 +415,7 @@ export function ProjectAgentSessionDetail({
                       activity={executionLogEntries}
                       autoScroll
                       provider={activityProvider}
+                      terminal={session.status !== "running"}
                     />
                   )}
                   {onFollowUp &&

@@ -52,7 +52,7 @@ import type { DashboardPayload, Project, ProjectSettings as ProjectSettingsData 
 import { useI18n } from "../i18n";
 import {
   agentEfforts,
-  agentModels,
+  agentModelOptions,
   agentProviderLabels,
   agentProviders,
   defaultAppProviderSettings,
@@ -68,6 +68,7 @@ import {
   type ApprovalPolicy,
   type ModelEffort,
 } from "../lib/project-llm";
+import { useAgentProviderModels } from "../hooks/useAgentProviderModels";
 import type { AutoHuntHealth, VelenInspection } from "../lib/project-connection";
 import type {
   LinearImportConnectResult,
@@ -166,6 +167,7 @@ export function ProjectSettings({
   velen: VelenInspection | null;
 }) {
   const { localeTag, t } = useI18n();
+  const providerModels = useAgentProviderModels();
   const [activeSection, setActiveSection] =
     useState<ProjectSettingsSection>(initialSection ?? "general");
   const [isConfirming, setIsConfirming] = useState(false);
@@ -258,11 +260,13 @@ export function ProjectSettings({
     runtimeModel !== savedRuntime.model ||
     runtimeEffort !== savedRuntime.effort ||
     approvalPolicy !== savedRuntime.approvalPolicy;
-  const runtimeModels = agentModels[runtimeProvider];
-  const runtimeEfforts = agentEfforts[runtimeProvider];
-  const selectedRuntimeModelKnown = runtimeModels.some(
-    (option) => option.value === (runtimeModel ?? ""),
+  const runtimeModels = agentModelOptions(
+    providerModels,
+    runtimeProvider,
+    t("settings.providerDefaultModel"),
+    runtimeModel,
   );
+  const runtimeEfforts = agentEfforts[runtimeProvider];
 
   useEffect(() => {
     let cancelled = false;
@@ -957,17 +961,10 @@ export function ProjectSettings({
                   id="project-runtime-model"
                   label={t("settings.model")}
                   onValueChange={(value) => setRuntimeModel(value || null)}
-                  options={[
-                    ...(!selectedRuntimeModelKnown && runtimeModel
-                      ? [{ label: runtimeModel, value: runtimeModel }]
-                      : []),
-                    ...runtimeModels.map((option) => ({
-                      label: option.value
-                        ? option.label
-                        : t("settings.providerDefaultModel"),
-                      value: option.value,
-                    })),
-                  ]}
+                  options={runtimeModels}
+                  searchEmptyMessage={t("issue.noModelsFound")}
+                  searchPlaceholder={t("issue.searchModels")}
+                  searchable={runtimeProvider === "opencode"}
                   size="small"
                   value={runtimeModel ?? ""}
                 />

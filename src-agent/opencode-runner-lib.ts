@@ -370,9 +370,15 @@ export function openCodeBlockedRetry(
   const retry = status as Record<string, unknown>;
   if (retry.type !== "retry") return null;
   const action = retry.action;
-  if (!action || typeof action !== "object") return null;
-  const blocker = action as Record<string, unknown>;
-  if (blocker.reason !== "free_tier_limit") return null;
+  const blocker = action && typeof action === "object"
+    ? action as Record<string, unknown>
+    : null;
+  const retryMessage = typeof retry.message === "string"
+    ? retry.message.trim()
+    : "";
+  const isFreeTierLimit = blocker?.reason === "free_tier_limit" ||
+    /\bfree usage exceeded\b/iu.test(retryMessage);
+  if (!isFreeTierLimit) return null;
 
   const next = retry.next;
   const nextRetryDate =
@@ -380,14 +386,14 @@ export function openCodeBlockedRetry(
   return {
     reason: "free_tier_limit",
     provider:
-      typeof blocker.provider === "string" && blocker.provider.trim()
+      typeof blocker?.provider === "string" && blocker.provider.trim()
         ? blocker.provider.trim()
         : "opencode",
     message:
-      typeof blocker.message === "string" && blocker.message.trim()
+      typeof blocker?.message === "string" && blocker.message.trim()
         ? blocker.message.trim()
-        : typeof retry.message === "string" && retry.message.trim()
-          ? retry.message.trim()
+        : retryMessage
+          ? retryMessage
           : "OpenCode free usage limit reached.",
     nextRetryAt:
       nextRetryDate && !Number.isNaN(nextRetryDate.getTime())

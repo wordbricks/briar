@@ -554,7 +554,9 @@ private struct ChannelMessageRow: View {
     var body: some View {
         HStack(alignment: .top, spacing: 11) {
             ProfileImageView(
-                image: message.author.type == .user ? message.author.image : nil,
+                image: (message.author.type == .user || message.author.type == .agent)
+                    ? message.author.image
+                    : nil,
                 name: message.author.type == .user ? message.author.name : nil,
                 systemImage: authorSystemImage,
                 size: 40

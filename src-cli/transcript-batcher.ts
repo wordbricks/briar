@@ -7,9 +7,13 @@ export type TranscriptBatchEvent = {
 type TranscriptBatcherOptions = {
   send: (events: TranscriptBatchEvent[]) => Promise<void>;
   onError?: (error: unknown) => void;
+  isPayloadTooLarge?: (error: unknown) => boolean;
+  measureBytes?: (events: TranscriptBatchEvent[]) => number;
   maxEvents?: number;
   maxBytes?: number;
   flushIntervalMs?: number;
+  maxSendAttempts?: number;
+  retryDelayMs?: number;
 };
 
 export const TRANSCRIPT_BATCH_MAX_EVENTS = 100;
@@ -25,6 +29,8 @@ export class TranscriptBatcher {
   private readonly maxEvents: number;
   private readonly maxBytes: number;
   private readonly flushIntervalMs: number;
+  private readonly maxSendAttempts: number;
+  private readonly retryDelayMs: number;
   private events: TranscriptBatchEvent[] = [];
   private bytes = 0;
   private timer: ReturnType<typeof setTimeout> | null = null;
@@ -35,22 +41,30 @@ export class TranscriptBatcher {
     this.maxBytes = options.maxBytes ?? TRANSCRIPT_BATCH_MAX_BYTES;
     this.flushIntervalMs =
       options.flushIntervalMs ?? TRANSCRIPT_BATCH_FLUSH_INTERVAL_MS;
+    this.maxSendAttempts = options.maxSendAttempts ?? 3;
+    this.retryDelayMs = options.retryDelayMs ?? 100;
     if (
       this.maxEvents < 1 ||
       this.maxBytes < 1 ||
-      this.flushIntervalMs < 1
+      this.flushIntervalMs < 1 ||
+      this.maxSendAttempts < 1 ||
+      this.retryDelayMs < 0
     ) {
       throw new Error("Transcript batch thresholds must be positive");
     }
   }
 
   async enqueue(event: TranscriptBatchEvent): Promise<void> {
-    const eventBytes = Buffer.byteLength(JSON.stringify(event), "utf8");
-    if (this.events.length > 0 && this.bytes + eventBytes > this.maxBytes) {
+    const candidate = [...this.events, event];
+    const candidateBytes = this.measureBytes(candidate);
+    if (
+      this.events.length > 0 &&
+      (candidate.length > this.maxEvents || candidateBytes > this.maxBytes)
+    ) {
       await this.flush();
     }
     this.events.push(event);
-    this.bytes += eventBytes;
+    this.bytes = this.measureBytes(this.events);
     if (this.events.length >= this.maxEvents || this.bytes >= this.maxBytes) {
       await this.flush();
       return;
@@ -64,11 +78,7 @@ export class TranscriptBatcher {
       const batch = this.events;
       this.events = [];
       this.bytes = 0;
-      this.sendChain = this.sendChain
-        .then(() => this.options.send(batch))
-        .catch((error) => {
-          this.options.onError?.(error);
-        });
+      this.sendChain = this.sendChain.then(() => this.deliver(batch));
     }
     await this.sendChain;
   }
@@ -77,8 +87,51 @@ export class TranscriptBatcher {
     if (this.timer !== null) return;
     this.timer = setTimeout(() => {
       this.timer = null;
-      void this.flush();
+      // Keep timer callbacks from creating unhandled rejections.
+      void this.flush().catch(() => {});
     }, this.flushIntervalMs);
+  }
+
+  private measureBytes(events: TranscriptBatchEvent[]) {
+    return this.options.measureBytes?.(events) ??
+      Buffer.byteLength(JSON.stringify(events), "utf8");
+  }
+
+  private async deliver(batch: TranscriptBatchEvent[]): Promise<void> {
+    try {
+      await this.sendWithRetry(batch);
+    } catch (error) {
+      if (this.options.isPayloadTooLarge?.(error) && batch.length > 1) {
+        const midpoint = Math.ceil(batch.length / 2);
+        await this.deliver(batch.slice(0, midpoint));
+        await this.deliver(batch.slice(midpoint));
+        return;
+      }
+      try {
+        this.options.onError?.(error);
+      } catch {
+        // Transcript telemetry is optional. Error reporting must not fail work.
+      }
+    }
+  }
+
+  private async sendWithRetry(batch: TranscriptBatchEvent[]) {
+    let lastError: unknown = null;
+    for (let attempt = 1; attempt <= this.maxSendAttempts; attempt += 1) {
+      try {
+        await this.options.send(batch);
+        return;
+      } catch (error) {
+        lastError = error;
+        if (this.options.isPayloadTooLarge?.(error)) throw error;
+        if (attempt < this.maxSendAttempts && this.retryDelayMs > 0) {
+          await new Promise((resolve) =>
+            setTimeout(resolve, this.retryDelayMs * attempt)
+          );
+        }
+      }
+    }
+    throw lastError;
   }
 
   private clearTimer() {

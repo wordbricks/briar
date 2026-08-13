@@ -24,8 +24,8 @@ import {
   listArchiveObjectsForDeletion,
   maxArchiveUncompressedBytes,
   processArchiveCleanupQueue,
-  readArchivedTranscript,
-  readLatestArchivedTranscriptForRun,
+  readArchivedWorkLog,
+  readLatestArchivedWorkLogForRun,
 } from "./archive";
 import { applyD1Migrations, executeD1Sql } from "./test-helpers/d1";
 
@@ -296,14 +296,8 @@ describe("D1 to R2 log archives", () => {
          last_event_at, event_count, byte_count
        ) values (
          'session-archive', '${projectId}', '${runId}', 'codex',
-         '${oldTime}', '${oldTime}', 2, 32
+         '${oldTime}', '${oldTime}', 0, 0
        );
-       insert into briar_agent_transcripts (
-         session_id, sequence, direction, payload_json, recorded_at
-       ) values ('session-archive', 1, 'client', '{"type":"prompt"}', '${oldTime}');
-       insert into briar_agent_transcripts (
-         session_id, sequence, direction, payload_json, recorded_at
-       ) values ('session-archive', 2, 'server', '{"type":"result"}', '${oldTime}');
        insert into briar_issue_messages (
          id, project_id, run_id, parent_message_id, author_user_id,
          body, created_at, updated_at
@@ -326,6 +320,65 @@ describe("D1 to R2 log archives", () => {
          '{"summary":"done"}', '${oldTime}', '${oldTime}', '${oldTime}'
        );`,
     );
+    const rawTranscript =
+      '{"sequence":3,"direction":"server","payload":{"raw":"thought"}}\n';
+    const rawTranscriptBytes = new TextEncoder().encode(rawTranscript);
+    const compressedRawTranscript = await new Response(
+      new Blob([rawTranscriptBytes]).stream().pipeThrough(
+        new CompressionStream("gzip"),
+      ),
+    ).arrayBuffer();
+    const hexDigest = (digest: ArrayBuffer) =>
+      [...new Uint8Array(digest)]
+        .map((byte) => byte.toString(16).padStart(2, "0"))
+        .join("");
+    const rawTranscriptSha256 = hexDigest(await crypto.subtle.digest(
+      "SHA-256",
+      rawTranscriptBytes.slice().buffer as ArrayBuffer,
+    ));
+    const compressedRawTranscriptSha256 = hexDigest(await crypto.subtle.digest(
+      "SHA-256",
+      compressedRawTranscript,
+    ));
+    const rawTranscriptKey =
+      `raw-transcripts/${projectId}/session-archive/` +
+      "000000000003-000000000003-" + rawTranscriptSha256 + ".jsonl.gz";
+    await bucket.put(rawTranscriptKey, compressedRawTranscript, {
+      httpMetadata: {
+        contentType: "application/x-ndjson",
+        contentEncoding: "gzip",
+      },
+      customMetadata: { sessionId: "session-archive" },
+      sha256: compressedRawTranscriptSha256,
+      storageClass: "Standard",
+    });
+    await db.batch([
+      db.prepare(
+        `insert into briar_agent_worklog_entries (
+           session_id, entry_id, sequence, updated_sequence, entry_type,
+           phase, body, status, started_at, updated_at, completed_at
+         ) values (?, 'archive-answer', 2, 2, 'message', 'final',
+                   'Archived answer', 'completed', ?, ?, ?)`,
+      ).bind("session-archive", oldTime, oldTime, oldTime),
+      db.prepare(
+        `insert into briar_agent_transcript_segments (
+           session_id, first_sequence, last_sequence, object_key, event_count,
+           uncompressed_bytes, compressed_bytes, sha256, recorded_at
+         ) values (?, 3, 3, ?, 1, ?, ?, ?, ?)`,
+      ).bind(
+        "session-archive",
+        rawTranscriptKey,
+        rawTranscriptBytes.byteLength,
+        compressedRawTranscript.byteLength,
+        rawTranscriptSha256,
+        oldTime,
+      ),
+      db.prepare(
+        `update briar_agent_transcript_sessions
+         set event_count = 1
+         where session_id = ?`,
+      ).bind("session-archive"),
+    ]);
   }, 60_000);
 
   afterAll(async () => {
@@ -382,11 +435,23 @@ describe("D1 to R2 log archives", () => {
       await listArchivedExecutionAuditEvents(db, bucket, projectId),
     ).toHaveLength(2);
     expect(await listArchivedIssueMessages(db, bucket, projectId, runId)).toHaveLength(2);
+    const archivedWorkLog = await readArchivedWorkLog(
+      db,
+      bucket,
+      projectId,
+      "session-archive",
+    );
+    expect(archivedWorkLog?.entries).toEqual([
+      expect.objectContaining({
+        entry_id: "archive-answer",
+        body: "Archived answer",
+      }),
+    ]);
+    expect(archivedWorkLog?.segments).toHaveLength(1);
+    expect(await bucket.head(archivedWorkLog!.segments[0]!.object_key))
+      .not.toBeNull();
     expect(
-      (await readArchivedTranscript(db, bucket, projectId, "session-archive"))?.events,
-    ).toHaveLength(2);
-    expect(
-      (await readLatestArchivedTranscriptForRun(db, bucket, projectId, runId))
+      (await readLatestArchivedWorkLogForRun(db, bucket, projectId, runId))
         ?.session.session_id,
     ).toBe("session-archive");
     expect(await listArchivedProjectAgentSessions(db, bucket, projectId)).toHaveLength(1);

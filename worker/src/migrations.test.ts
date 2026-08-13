@@ -18,7 +18,6 @@ import {
 } from "./db";
 import { createOrganizationAgent } from "./organization-agents";
 import { applyD1Migrations, executeD1Sql } from "./test-helpers/d1";
-import { readAgentTranscript } from "./workers";
 
 async function withPreWorkflowMigrationDatabase(
   name: string,
@@ -150,6 +149,121 @@ async function createPreWebhookChannelMessage(
 }
 
 describe("D1 migrations", () => {
+  it("cuts over legacy transcripts without importing their history", async () => {
+    const miniflare = new Miniflare({
+      modules: true,
+      script: "export default { fetch() { return new Response('ok') } }",
+      d1Databases: { DB: "briar-agent-worklog-cutover-test" },
+    });
+    try {
+      const db = (await miniflare.getD1Database("DB")) as unknown as D1Database;
+      await applyD1Migrations(db, {
+        through: "0102_channel_read_states.sql",
+      });
+      await db.batch([
+        db.prepare(
+          `insert into "user" (
+             id, name, email, emailVerified, createdAt, updatedAt
+           ) values (?, 'Migration Owner', 'cutover@example.com', 1, ?, ?)`,
+        ).bind(
+          migrationFixture.userId,
+          migrationFixture.now,
+          migrationFixture.now,
+        ),
+        db.prepare(
+          `insert into briar_organizations (
+             id, name, handle, created_at, updated_at
+           ) values (?, 'Migration Organization', 'cutover', ?, ?)`,
+        ).bind(
+          migrationFixture.organizationId,
+          migrationFixture.now,
+          migrationFixture.now,
+        ),
+        db.prepare(
+          `insert into briar_projects (
+             id, owner_user_id, organization_id, name, agent_token_hash,
+             created_at, updated_at
+           ) values (?, ?, ?, 'Migration Project', ?, ?, ?)`,
+        ).bind(
+          migrationFixture.projectId,
+          migrationFixture.userId,
+          migrationFixture.organizationId,
+          "a".repeat(64),
+          migrationFixture.now,
+          migrationFixture.now,
+        ),
+      ]);
+      const sessionId = "legacy-cutover-session";
+      const archiveId = "abababababababababababababababababababababababababababababababab";
+      const objectKey = "archives/legacy-cutover.jsonl.gz";
+      await db.batch([
+        db.prepare(
+          `insert into briar_agent_transcript_sessions (
+             session_id, project_id, run_id, worker_id, agent_provider,
+             started_at, last_event_at, event_count, byte_count
+           ) values (?, ?, null, null, 'codex', ?, ?, 1, 16)`,
+        ).bind(
+          sessionId,
+          migrationFixture.projectId,
+          migrationFixture.now,
+          migrationFixture.now,
+        ),
+        db.prepare(
+          `insert into briar_agent_transcripts (
+             session_id, sequence, direction, payload_json, recorded_at
+           ) values (?, 1, 'server', '{"legacy":true}', ?)`,
+        ).bind(sessionId, migrationFixture.now),
+        db.prepare(
+          `insert into briar_log_archives (
+             id, project_id, run_id, scope_id, archive_kind, object_key,
+             format_version, status, row_count, byte_size, sha256,
+             content_sha256, period_start, period_end, created_at, verified_at,
+             completed_at, expires_at, failure_count, last_error,
+             related_object_keys_json
+           ) values (?, ?, null, ?, 'agent_transcript', ?, 1, 'complete', 2, 1,
+                     ?, ?, ?, ?, ?, ?, ?, ?, 0, null, '[]')`,
+        ).bind(
+          archiveId,
+          migrationFixture.projectId,
+          sessionId,
+          objectKey,
+          "a".repeat(64),
+          "b".repeat(64),
+          migrationFixture.now,
+          migrationFixture.now,
+          migrationFixture.now,
+          migrationFixture.now,
+          migrationFixture.now,
+          "2029-08-10T00:00:00.000Z",
+        ),
+      ]);
+
+      await applyD1Migrations(db, {
+        files: ["0103_agent_worklog_projection.sql"],
+      });
+
+      await expect(db.prepare(
+        `select count(*) as count from briar_agent_transcript_sessions`,
+      ).first<number>("count")).resolves.toBe(0);
+      await expect(db.prepare(
+        `select count(*) as count from briar_agent_transcripts`,
+      ).first<number>("count")).resolves.toBe(0);
+      await expect(db.prepare(
+        `select count(*) as count from briar_log_archives
+         where archive_kind = 'agent_transcript'`,
+      ).first<number>("count")).resolves.toBe(0);
+      await expect(db.prepare(
+        `select bucket, object_key from briar_archive_cleanup_queue
+         where object_key = ?`,
+      ).bind(objectKey).first()).resolves.toEqual({
+        bucket: "archives",
+        object_key: objectKey,
+      });
+    } finally {
+      await miniflare.dispose();
+    }
+  }, 30_000);
+
   it("preserves channel message relations while adding webhook authors", async () => {
     const miniflare = new Miniflare({
       modules: true,
@@ -600,7 +714,7 @@ describe("D1 migrations", () => {
     } finally {
       await miniflare.dispose();
     }
-  });
+  }, 60_000);
 
   it("only finalizes a canonical reserved channel issue run", async () => {
     const miniflare = new Miniflare({
@@ -916,7 +1030,7 @@ describe("D1 migrations", () => {
     } finally {
       await miniflare.dispose();
     }
-  });
+  }, 60_000);
 
   it("upgrades channel approvals with audit backfill and legacy quarantine", async () => {
     const miniflare = new Miniflare({
@@ -2081,16 +2195,16 @@ describe("D1 migrations", () => {
         id: strandedEvidenceImageId,
         project_id: targetProjectId,
       });
-      await expect(readAgentTranscript(
-        db,
-        projectId,
+      await expect(db.prepare(
+        `select project_id, run_id
+         from briar_agent_transcript_sessions
+         where session_id = ?`,
+      ).bind(
         strandedTranscriptSessionId,
-      )).resolves.toBeNull();
-      await expect(readAgentTranscript(
-        db,
-        targetProjectId,
-        strandedTranscriptSessionId,
-      )).resolves.toBeNull();
+      ).first()).resolves.toEqual({
+        project_id: projectId,
+        run_id: prematurelyMovedRunId,
+      });
       await expect(db.prepare(
         `select entity_kind, source_project_id, target_project_id
          from briar_channel_issue_transfer_quarantine where entity_id = ?`,

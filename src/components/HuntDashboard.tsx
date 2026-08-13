@@ -104,6 +104,10 @@ import { useIssueDialogAttachments } from "../hooks/useIssueDialogAttachments";
 import { useProjectAgentWorkerEvents } from "../hooks/useProjectAgentWorkerEvents";
 import { useHorizontalPaneResize } from "../hooks/useHorizontalPaneResize";
 import {
+  errorDiagnosticOccurrenceKey,
+  errorDiagnosticsForMessage,
+} from "../lib/error-diagnostics";
+import {
   agentMessagesFromAppServerEvents,
   type AutoHuntAgentMessage,
 } from "../lib/auto-hunt-agent";
@@ -162,6 +166,11 @@ import {
   toggleKanbanCollapsedColumnId,
   writeKanbanCollapsedColumnIds,
 } from "../lib/kanban-column-collapse";
+import {
+  readKanbanHiddenColumnIds,
+  toggleKanbanHiddenColumnId,
+  writeKanbanHiddenColumnIds,
+} from "../lib/kanban-column-hide";
 import {
   agentReplyParentMessageId,
   issueMentionAtCaret,
@@ -232,12 +241,14 @@ import type {
 } from "../types";
 import {
   agentEfforts,
-  agentModels,
+  agentModelDisplayName,
+  agentModelOptions,
   agentProviderLabels,
   agentProviders,
   type AgentProvider,
   type ModelEffort,
 } from "../lib/project-llm";
+import { useAgentProviderModels } from "../hooks/useAgentProviderModels";
 import { useI18n } from "../i18n";
 import type { MessageKey } from "../i18n/messages";
 
@@ -644,6 +655,8 @@ export function HuntDashboard({
   const sourceFilterRef = useRef<HTMLDivElement>(null);
   const [view, setView] = useState<DashboardView>("kanban");
   const [collapsedColumnIds, setCollapsedColumnIds] = useState<string[]>([]);
+  const [hiddenColumnIds, setHiddenColumnIds] = useState<string[]>([]);
+  const [hiddenColumnsExpanded, setHiddenColumnsExpanded] = useState(true);
   const [internalStatus, setInternalStatus] = useState<StatusFilter>("all");
   const status = companionMode && companionStatus
     ? companionStatus
@@ -824,10 +837,20 @@ export function HuntDashboard({
   const issuesLoading = dashboard === null && !noProject && !error && !recoveryError;
   const selected = runs.find((run) => run.id === selectedRunId) ?? null;
   const displayedError = error ?? recoveryError;
+  const lastDisplayedErrorRef = useRef<string | null>(null);
   useEffect(() => {
-    if (selected || !displayedError) return;
-    toast(displayedError, { tone: "error" });
-  }, [displayedError, selected, toast]);
+    if (!displayedError) {
+      lastDisplayedErrorRef.current = null;
+      return;
+    }
+    if (lastDisplayedErrorRef.current === displayedError) return;
+    lastDisplayedErrorRef.current = displayedError;
+    toast(displayedError, {
+      dedupeKey: errorDiagnosticOccurrenceKey(displayedError) ?? undefined,
+      details: errorDiagnosticsForMessage(displayedError),
+      tone: "error",
+    });
+  }, [displayedError, toast]);
   const selectedInboxVersion = selected
     ? [
         inboxIssueMessageVersion(selected),
@@ -963,11 +986,18 @@ export function HuntDashboard({
     setCollapsedColumnIds(
       readKanbanCollapsedColumnIds(currentUserId, projectId),
     );
+    setHiddenColumnIds(
+      readKanbanHiddenColumnIds(currentUserId, projectId),
+    );
   }, [currentUserId, projectId]);
 
   const collapsedColumnIdSet = useMemo(
     () => new Set(collapsedColumnIds),
     [collapsedColumnIds],
+  );
+  const hiddenColumnIdSet = useMemo(
+    () => new Set(hiddenColumnIds),
+    [hiddenColumnIds],
   );
 
   const toggleKanbanColumnCollapsed = useCallback(
@@ -975,6 +1005,17 @@ export function HuntDashboard({
       setCollapsedColumnIds((current) => {
         const next = toggleKanbanCollapsedColumnId(current, columnId);
         writeKanbanCollapsedColumnIds(currentUserId, projectId, next);
+        return next;
+      });
+    },
+    [currentUserId, projectId],
+  );
+
+  const toggleKanbanColumnHidden = useCallback(
+    (columnId: string) => {
+      setHiddenColumnIds((current) => {
+        const next = toggleKanbanHiddenColumnId(current, columnId);
+        writeKanbanHiddenColumnIds(currentUserId, projectId, next);
         return next;
       });
     },
@@ -1116,6 +1157,20 @@ export function HuntDashboard({
     status,
     t,
   ]);
+  const visibleKanbanColumns = useMemo(
+    () =>
+      companionMode
+        ? kanbanColumns
+        : kanbanColumns.filter((column) => !hiddenColumnIdSet.has(column.id)),
+    [companionMode, hiddenColumnIdSet, kanbanColumns],
+  );
+  const hiddenKanbanColumns = useMemo(
+    () =>
+      companionMode
+        ? []
+        : kanbanColumns.filter((column) => hiddenColumnIdSet.has(column.id)),
+    [companionMode, hiddenColumnIdSet, kanbanColumns],
+  );
   const createIssueDialog = isIssueDialogOpen ? (
     <CreateIssueDialog
       availableProviders={availableProviders}
@@ -1196,6 +1251,7 @@ export function HuntDashboard({
           issueKeyPrefix={dashboard?.project.issueKeyPrefix}
           currentUserId={currentUserId}
           error={displayedError}
+          showErrorToast={false}
           isDeletingIssue={deletingIssueId === selected.id}
           isRecovering={recoveringRunId === selected.id}
           isUpdatingIssue={updatingIssueId === selected.id}
@@ -1521,7 +1577,8 @@ export function HuntDashboard({
               <strong>{t("dashboard.emptyTitle")}</strong>
               <span>{t("dashboard.emptyDescription")}</span>
             </div>
-          ) : kanbanColumns.map((column) => {
+          ) : <>
+            {visibleKanbanColumns.map((column) => {
             const isCollapsed =
               !companionMode && collapsedColumnIdSet.has(column.id);
             return (
@@ -1585,6 +1642,10 @@ export function HuntDashboard({
                         <ChevronDown aria-hidden="true" size={14} />
                       )}
                     </button>
+                    <KanbanColumnMenu
+                      label={column.label}
+                      onHide={() => toggleKanbanColumnHidden(column.id)}
+                    />
                   </div>
                 </header>
               ) : null}
@@ -1786,6 +1847,55 @@ export function HuntDashboard({
             </div>
             );
           })}
+            {hiddenKanbanColumns.length > 0 ? (
+              <aside
+                aria-label={t("dashboard.hiddenColumns")}
+                className={`kanban-hidden-columns${hiddenColumnsExpanded ? "" : " is-collapsed"}`}
+                data-kanban-hidden-columns=""
+              >
+                <button
+                  aria-expanded={hiddenColumnsExpanded}
+                  aria-label={
+                    hiddenColumnsExpanded
+                      ? t("dashboard.collapseHiddenColumns")
+                      : t("dashboard.expandHiddenColumns")
+                  }
+                  className="kanban-hidden-columns-toggle"
+                  onClick={() => setHiddenColumnsExpanded((current) => !current)}
+                  type="button"
+                >
+                  {hiddenColumnsExpanded ? (
+                    <ChevronDown aria-hidden="true" size={14} />
+                  ) : (
+                    <ChevronRight aria-hidden="true" size={14} />
+                  )}
+                  <span>{t("dashboard.hiddenColumns")}</span>
+                </button>
+                {hiddenColumnsExpanded ? (
+                  <ul className="kanban-hidden-column-list">
+                    {hiddenKanbanColumns.map((column) => (
+                      <li
+                        className={`kanban-hidden-column ${column.tone}`}
+                        data-kanban-hidden-column-id={column.id}
+                        key={column.id}
+                      >
+                        <span>
+                          <i aria-hidden="true" />
+                          {column.label}
+                        </span>
+                        <strong>{column.runs.length}</strong>
+                        <KanbanColumnMenu
+                          hidden
+                          label={column.label}
+                          onShow={() => toggleKanbanColumnHidden(column.id)}
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+              </aside>
+            ) : null}
+          </>}
         </div>}
       </div>
       {companionMode && (
@@ -2452,6 +2562,7 @@ export function CreateIssueDialog({
   workflowProjectId?: string;
 }) {
   const { locale, t } = useI18n();
+  const providerModels = useAgentProviderModels();
   const [initialDraft] = useState(() => {
     const draft = loadCreateIssueDraft();
     return draft && projects.some((project) => project.id === draft.projectId)
@@ -2825,20 +2936,18 @@ export function CreateIssueDialog({
               disabled={!preferredProvider}
               label={t("issue.preferredModel")}
               onValueChange={setPreferredModel}
-              options={
-                preferredProvider &&
-                preferredProvider in agentModels
-                  ? agentModels[preferredProvider as AgentProvider].map(
-                      (option) => ({
-                        ...option,
-                        label: option.value
-                          ? option.label
-                          : t("settings.providerDefaultModel"),
-                      }),
-                    )
-                  : []
-              }
+              options={preferredProvider
+                ? agentModelOptions(
+                    providerModels,
+                    preferredProvider as AgentProvider,
+                    t("settings.providerDefaultModel"),
+                    preferredModel,
+                  )
+                : []}
               placeholder={t("issue.selectProviderFirst")}
+              searchEmptyMessage={t("issue.noModelsFound")}
+              searchPlaceholder={t("issue.searchModels")}
+              searchable={preferredProvider === "opencode"}
               value={preferredModel}
             />
             <NativeSelect
@@ -3456,13 +3565,6 @@ function pullRequestDisplayName(url: string, index: number) {
   return index === 0 ? "PR" : `PR ${index + 1}`;
 }
 
-function modelDisplayName(provider: AgentProvider, model: string) {
-  return (
-    agentModels[provider].find((option) => option.value === model)?.label ??
-    model
-  );
-}
-
 function IssueContextMenu({
   availableProviders,
   children,
@@ -3495,6 +3597,7 @@ function IssueContextMenu({
   isProcessing: boolean;
 }) {
   const { t } = useI18n();
+  const providerModels = useAgentProviderModels();
   const statusOptions = [
     { label: t("status.backlog"), value: "status:backlog" },
     { label: t("status.queued"), value: "status:queued" },
@@ -3529,11 +3632,19 @@ function IssueContextMenu({
     : t("issue.agentDefault");
   const currentModelLabel = run.preferredProvider
     ? run.preferredModel
-      ? `${modelDisplayName(run.preferredProvider, run.preferredModel)}${
+      ? `${agentModelDisplayName(providerModels, run.preferredProvider, run.preferredModel)}${
           run.preferredEffort ? ` · ${run.preferredEffort}` : ""
         }`
       : t("settings.providerDefaultModel")
     : t("run.notSet");
+  const currentProviderModelOptions = run.preferredProvider
+    ? agentModelOptions(
+        providerModels,
+        run.preferredProvider,
+        t("settings.providerDefaultModel"),
+        run.preferredModel,
+      )
+    : [];
   const issueCheckpoints = run.issueCheckpoints ?? [];
   const inheritedBoundaries = inheritedCheckpointBoundaries(
     run.workflow,
@@ -3846,7 +3957,7 @@ function IssueContextMenu({
                     {t("settings.model")}
                   </ContextMenu.Label>
                   <ContextMenu.RadioGroup value={run.preferredModel ?? ""}>
-                    {agentModels[run.preferredProvider].map((option) => (
+                    {currentProviderModelOptions.map((option) => (
                       <ContextMenu.RadioItem
                         className="issue-context-item issue-context-choice"
                         key={option.value || "default"}
@@ -4192,6 +4303,7 @@ export function RunPage({
   performedAgentModel = null,
   projectId = "",
   run,
+  showErrorToast = true,
   token = null,
 }: {
   assignedWorker?: ExecutionWorker | null;
@@ -4271,9 +4383,11 @@ export function RunPage({
   performedAgentModel?: string | null;
   projectId?: string;
   run: HuntRun;
+  showErrorToast?: boolean;
   token?: string | null;
 }) {
   const { locale, localeTag, t } = useI18n();
+  const providerModels = useAgentProviderModels();
   const meta = runMeta(run.status, run.workflowStage, run.workflow);
   const label = localizeStatus(t, run.status, run.workflowStage, meta.label);
   const needsAttention = ["paused", "blocked", "failed"].includes(run.status);
@@ -4302,10 +4416,20 @@ export function RunPage({
     (member) => member.userId === run.createdByUserId,
   ) ?? null;
   const { toast } = useToast();
+  const lastErrorToastRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!error) return;
-    toast(error, { tone: "error" });
-  }, [error, toast]);
+    if (!showErrorToast || !error) {
+      lastErrorToastRef.current = null;
+      return;
+    }
+    if (lastErrorToastRef.current === error) return;
+    lastErrorToastRef.current = error;
+    toast(error, {
+      dedupeKey: errorDiagnosticOccurrenceKey(error) ?? undefined,
+      details: errorDiagnosticsForMessage(error),
+      tone: "error",
+    });
+  }, [error, showErrorToast, toast]);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -4823,7 +4947,7 @@ export function RunPage({
   const executionIdentityParts = [
     executionProvider ? agentProviderLabels[executionProvider] : null,
     executionProvider && executionModel
-      ? modelDisplayName(executionProvider, executionModel)
+      ? agentModelDisplayName(providerModels, executionProvider, executionModel)
       : null,
     executionWorker?.label ?? null,
   ].filter((part): part is string => Boolean(part));
@@ -4863,7 +4987,7 @@ export function RunPage({
         <div>
           <dt>{t("run.metricsModel")}</dt>
           <dd title={executionModel}>
-            {modelDisplayName(executionProvider, executionModel)}
+            {agentModelDisplayName(providerModels, executionProvider, executionModel)}
           </dd>
         </div>
       ) : null}
@@ -6365,17 +6489,18 @@ export function RunPage({
                         }}
                         options={
                           run.preferredProvider
-                            ? agentModels[run.preferredProvider].map(
-                                (option) => ({
-                                  ...option,
-                                  label: option.value
-                                    ? option.label
-                                    : t("settings.providerDefaultModel"),
-                                }),
+                            ? agentModelOptions(
+                                providerModels,
+                                run.preferredProvider,
+                                t("settings.providerDefaultModel"),
+                                run.preferredModel,
                               )
                             : []
                         }
                         placeholder={t("issue.selectProviderFirst")}
+                        searchEmptyMessage={t("issue.noModelsFound")}
+                        searchPlaceholder={t("issue.searchModels")}
+                        searchable={run.preferredProvider === "opencode"}
                         size="small"
                         value={run.preferredModel ?? ""}
                       />
@@ -6710,6 +6835,60 @@ export function RunPage({
         </DialogContent>
       </Dialog>
     </MainContent>
+  );
+}
+
+function KanbanColumnMenu({
+  hidden = false,
+  label,
+  onHide,
+  onShow,
+}: {
+  hidden?: boolean;
+  label: string;
+  onHide?: () => void;
+  onShow?: () => void;
+}) {
+  const { t } = useI18n();
+  return (
+    <DropdownMenu.Root>
+      <DropdownMenu.Trigger asChild>
+        <button
+          aria-label={
+            hidden
+              ? t("dashboard.hiddenColumnMenu", { label })
+              : t("dashboard.columnMenu", { label })
+          }
+          className="kanban-column-menu"
+          type="button"
+        >
+          <MoreHorizontal aria-hidden="true" size={14} />
+        </button>
+      </DropdownMenu.Trigger>
+      <DropdownMenu.Portal>
+        <DropdownMenu.Content
+          align="end"
+          className="run-page-actions-menu"
+          sideOffset={6}
+        >
+          {hidden ? (
+            <DropdownMenu.Item
+              className="run-page-actions-item"
+              onSelect={onShow}
+            >
+              {t("dashboard.showColumn")}
+            </DropdownMenu.Item>
+          ) : (
+            <DropdownMenu.Item
+              className="run-page-actions-item"
+              onSelect={onHide}
+            >
+              {t("dashboard.hideColumn")}
+            </DropdownMenu.Item>
+          )}
+        </DropdownMenu.Content>
+      </DropdownMenu.Portal>
+    </DropdownMenu.Root>
   );
 }
 
@@ -7336,7 +7515,11 @@ function IssueAgentActivityPanel({
           {t("run.agentActivityEmpty")}
         </div>
       ) : (
-        <AgentWorkLog activity={activity} provider={provider} />
+        <AgentWorkLog
+          activity={activity}
+          provider={provider}
+          terminal={!isLive}
+        />
       )}
     </div>
   );

@@ -9,6 +9,7 @@ vi.mock("@tauri-apps/api/core", () => ({ invoke }));
 vi.mock("@tauri-apps/api/event", () => ({ listen }));
 
 import {
+  agentModelOptions,
   chatWithProjectLlm,
   loadAgentProviderModels,
   loadAppProviderSettings,
@@ -104,6 +105,26 @@ describe("project LLM gateway", () => {
 
     await loadAgentProviderModels({ refresh: true });
     expect(invoke).toHaveBeenCalledTimes(2);
+  });
+
+  it("builds model options from Supported models and preserves a saved model", () => {
+    const catalog = {
+      codex: {
+        models: [{ id: "gpt-5.6", label: "GPT 5.6" }],
+        error: null,
+      },
+      claude: { models: [], error: null },
+      grok: { models: [], error: null },
+      opencode: { models: [], error: null },
+    };
+
+    expect(
+      agentModelOptions(catalog, "codex", "Provider default", "legacy-model"),
+    ).toEqual([
+      { value: "legacy-model", label: "legacy-model" },
+      { value: "", label: "Provider default" },
+      { value: "gpt-5.6", label: "GPT 5.6", description: "gpt-5.6" },
+    ]);
   });
 
   it("rolls provider message deltas into request-scoped progress updates", async () => {

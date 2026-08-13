@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 
+import { Buffer } from "node:buffer";
 import { existsSync } from "node:fs";
 import {
   chmod,
@@ -35,7 +36,6 @@ import {
   modelEfforts,
 } from "../src/lib/agent-provider-contract";
 import { validateEvidenceImages } from "../src/lib/evidence-images";
-import { channelReplyCompletionSchema } from "../src/lib/channels-contract";
 import {
   organizationAgentContextCapability,
   organizationAgentContextDescriptorSchema,
@@ -69,7 +69,10 @@ import {
   assertDetachedProviderTurnSucceeded,
   runDetachedProviderTurn,
 } from "./detached-provider-turn";
-import { TranscriptBatcher } from "./transcript-batcher";
+import {
+  TranscriptBatcher,
+  type TranscriptBatchEvent,
+} from "./transcript-batcher";
 import {
   HttpRequestError,
   uploadExecutionMetricsWithCostCompatibility,
@@ -117,6 +120,11 @@ import {
   sameApiEnvironment,
   selectProjectForApi,
 } from "./config-environment";
+import {
+  channelReplyCompleteRequestBody,
+  collectChannelReplyAttachments,
+  parseChannelReplyAgentResult,
+} from "./channel-reply-attachments";
 import {
   channelReplyImageDirectory,
   cleanupChannelReplyImages,
@@ -455,6 +463,14 @@ async function request<T>(
   }
   return body as T;
 }
+
+const serializeTranscriptRequest = (
+  envelope: Record<string, unknown>,
+  events: TranscriptBatchEvent[],
+) => JSON.stringify({ ...envelope, events });
+
+const isTranscriptPayloadTooLarge = (error: unknown) =>
+  error instanceof HttpRequestError && error.status === 413;
 
 async function openBrowser(url: string) {
   const command =
@@ -2481,21 +2497,27 @@ async function runClaimedIssueInRuntime(
   const usageCollector = createAgentExecutionUsageCollector(provider, {
     configuredModel: execution.model,
   });
+  const transcriptEnvelope = {
+    projectId: project.id,
+    sessionId,
+    runId: issue.runId,
+    ...(issue.executionId ? { executionId: issue.executionId } : {}),
+    workerId: activeProject.executionWorker?.workerId,
+    agentProvider: provider,
+  };
   const transcriptBatcher = new TranscriptBatcher({
     send: async (events) => {
       await request(config.apiUrl, "/transcripts", workerToken, {
         method: "POST",
-        body: JSON.stringify({
-          projectId: project.id,
-          sessionId,
-          runId: issue.runId,
-          ...(issue.executionId ? { executionId: issue.executionId } : {}),
-          workerId: activeProject.executionWorker?.workerId,
-          agentProvider: provider,
-          events,
-        }),
+        body: serializeTranscriptRequest(transcriptEnvelope, events),
       });
     },
+    measureBytes: (events) =>
+      Buffer.byteLength(
+        serializeTranscriptRequest(transcriptEnvelope, events),
+        "utf8",
+      ),
+    isPayloadTooLarge: isTranscriptPayloadTooLarge,
     onError: (error) => {
       console.error(
         `transcript upload failed for ${issue.sourceKey}: ${
@@ -2910,19 +2932,32 @@ async function runClaimedIssueReply(
       skillExecutionTarget: issue.skillExecutionTarget,
     });
     let sequence = 0;
+    const transcriptEnvelope = {
+      projectId: project.id,
+      sessionId: `reply-${issue.workId}`,
+      runId: issue.runId,
+      workerId: registered.workerId,
+      agentProvider: provider,
+    };
     const transcriptBatcher = new TranscriptBatcher({
       send: async (events) => {
         await request(config.apiUrl, "/transcripts", workerToken, {
           method: "POST",
-          body: JSON.stringify({
-            projectId: project.id,
-            sessionId: `reply-${issue.workId}`,
-            runId: issue.runId,
-            workerId: registered.workerId,
-            agentProvider: provider,
-            events,
-          }),
+          body: serializeTranscriptRequest(transcriptEnvelope, events),
         });
+      },
+      measureBytes: (events) =>
+        Buffer.byteLength(
+          serializeTranscriptRequest(transcriptEnvelope, events),
+          "utf8",
+        ),
+      isPayloadTooLarge: isTranscriptPayloadTooLarge,
+      onError: (error) => {
+        console.error(
+          `transcript upload failed for reply ${issue.workId}: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
       },
     });
     const turn = await (async () => {
@@ -3135,7 +3170,9 @@ async function runClaimedChannelReply(
     let conversationId: string | null = null;
     let lookupRounds = 0;
     let turnPrompt = prompt;
-    let result: z.infer<typeof channelReplyCompletionSchema> | null = null;
+    let result: ReturnType<typeof parseChannelReplyAgentResult>["result"] | null =
+      null;
+    let attachmentPaths: string[] = [];
     while (!result) {
       const turn = await runDetachedProviderTurn({
         agent,
@@ -3169,7 +3206,9 @@ async function runClaimedChannelReply(
         parsed,
       );
       if (!lookup.success) {
-        result = channelReplyCompletionSchema.parse(parsed);
+        const parsedResult = parseChannelReplyAgentResult(parsed);
+        result = parsedResult.result;
+        attachmentPaths = parsedResult.attachmentPaths;
         break;
       }
       if (!organizationContext) {
@@ -3210,9 +3249,12 @@ async function runClaimedChannelReply(
         "Channel reply Agent Skill execution target is not authorized",
       );
     }
-    // Private context must be gone before the durable reply is marked complete.
-    // A cleanup failure leaves the claim retryable instead of silently
-    // succeeding with organization data on disk.
+    // Read reply images before the disposable workspace disappears. Private
+    // inbound context must still be gone before the durable reply completes.
+    const replyImages = await collectChannelReplyAttachments({
+      workspacePath,
+      paths: attachmentPaths,
+    });
     await cleanupContext();
     await request(
       config.apiUrl,
@@ -3220,11 +3262,12 @@ async function runClaimedChannelReply(
       workerToken,
       {
         method: "POST",
-        body: JSON.stringify({
+        body: channelReplyCompleteRequestBody({
           organizationId: reply.organizationId,
           workerId: registered.workerId,
           claimToken: reply.claimToken,
           result,
+          attachments: replyImages,
         }),
       },
     );

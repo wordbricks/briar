@@ -1095,7 +1095,8 @@
               "type": "agent",
               "id": "66666666-6666-4666-8666-666666666666",
               "name": "Honey",
-              "provider": "claude"
+              "provider": "claude",
+              "image": null
             },
             "mentionedUserIds": [],
             "mentionedAgentIds": [],
@@ -1240,7 +1241,8 @@
               "type": "agent",
               "id": "66666666-6666-4666-8666-666666666666",
               "name": "Honey",
-              "provider": "claude"
+              "provider": "claude",
+              "image": null
             },
             "mentionedUserIds": [],
             "mentionedAgentIds": [],

@@ -3,7 +3,13 @@
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { DEFAULT_TOAST_DURATION_MS, ToastProvider, useToast } from "./toast";
+import {
+  DEFAULT_ERROR_TOAST_DURATION_MS,
+  DEFAULT_TOAST_DURATION_MS,
+  ToastProvider,
+  type ToastOptions,
+  useToast,
+} from "./toast";
 
 const mounted: Array<{
   container: HTMLDivElement;
@@ -34,16 +40,22 @@ afterEach(async () => {
   });
 });
 
-function Probe({ message }: { message: string }) {
+function Probe({ message, options }: { message: string; options?: ToastOptions }) {
   const { toast } = useToast();
   return (
-    <button onClick={() => toast(message, { tone: "success" })} type="button">
+    <button
+      onClick={() => toast(message, options ?? { tone: "success" })}
+      type="button"
+    >
       show
     </button>
   );
 }
 
-async function mountProbe(message = "링크가 복사되었습니다") {
+async function mountProbe(
+  message = "링크가 복사되었습니다",
+  options?: ToastOptions,
+) {
   const container = document.createElement("div");
   document.body.append(container);
   const root = createRoot(container);
@@ -51,7 +63,7 @@ async function mountProbe(message = "링크가 복사되었습니다") {
   await act(async () => {
     root.render(
       <ToastProvider>
-        <Probe message={message} />
+        <Probe message={message} options={options} />
       </ToastProvider>,
     );
   });
@@ -74,5 +86,64 @@ describe("ToastProvider", () => {
     });
 
     expect(document.body.querySelector('[data-testid="app-toast"]')).toBeNull();
+  });
+
+  it("keeps error toasts visible longer and copies diagnostic details", async () => {
+    const writeText = vi.fn(async () => undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+    const details = [
+      "Briar error diagnostics",
+      "Request method: GET",
+      "Request path: /projects/project-1/dashboard",
+    ].join("\n");
+    const container = await mountProbe("Load failed", {
+      details,
+      tone: "error",
+    });
+    await act(async () => {
+      container.querySelector("button")?.click();
+    });
+
+    const copyButton = document.body.querySelector<HTMLButtonElement>(
+      'button[aria-label="Copy error details"]',
+    );
+    expect(copyButton).not.toBeNull();
+    await act(async () => {
+      copyButton?.click();
+    });
+    expect(writeText).toHaveBeenCalledWith(details);
+    expect(
+      document.body.querySelector('button[aria-label="Error details copied"]'),
+    ).not.toBeNull();
+
+    await act(async () => {
+      vi.advanceTimersByTime(DEFAULT_TOAST_DURATION_MS);
+    });
+    expect(document.body.querySelector('[data-testid="app-toast"]')).not.toBeNull();
+
+    await act(async () => {
+      vi.advanceTimersByTime(
+        DEFAULT_ERROR_TOAST_DURATION_MS - DEFAULT_TOAST_DURATION_MS,
+      );
+    });
+    expect(document.body.querySelector('[data-testid="app-toast"]')).toBeNull();
+  });
+
+  it("shows each diagnostic occurrence only once", async () => {
+    const container = await mountProbe("Load failed", {
+      dedupeKey: "error:1",
+      tone: "error",
+    });
+    await act(async () => {
+      container.querySelector("button")?.click();
+      container.querySelector("button")?.click();
+    });
+
+    expect(
+      document.body.querySelectorAll('[data-testid="app-toast"].error'),
+    ).toHaveLength(1);
   });
 });

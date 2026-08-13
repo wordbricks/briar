@@ -192,6 +192,20 @@ describe("ProjectAgentSessionDetail", () => {
     expect(container.textContent).toContain("산출물");
   });
 
+  it("does not leave a writing indicator on a terminal session", async () => {
+    const container = await mount({
+      ...session,
+      status: "completed",
+      completedAt: "2026-07-29T11:02:00.000Z",
+    });
+
+    expect(container.querySelector(".auto-hunt-message-streaming")).toBeNull();
+    expect(container.querySelector(".auto-hunt-agent-message.running")).toBeNull();
+    expect(container.textContent).toContain(
+      "원인을 확인하고 화면을 수정하고 있습니다.",
+    );
+  });
+
   it("exports the visible session request and execution log", async () => {
     const createObjectURL = vi.fn(() => "blob:session-log");
     const revokeObjectURL = vi.fn();

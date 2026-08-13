@@ -499,6 +499,7 @@ describe("CompanionChannels", () => {
               id: "agent-1",
               name: "Honey",
               provider: "claude",
+              image: null,
             },
           },
           {
@@ -587,6 +588,7 @@ describe("CompanionChannels", () => {
             id: "agent-1",
             name: "Honey",
             provider: "claude",
+            image: null,
           },
         },
       ],
@@ -810,6 +812,7 @@ describe("CompanionChannels", () => {
       id: "agent-1",
       name: "Honey",
       provider: "claude",
+      image: null,
     };
     proposal.proposal = {
       id: "proposal-1",
@@ -907,6 +910,7 @@ describe("CompanionChannels", () => {
       id: "agent-1",
       name: "Honey",
       provider: "codex",
+      image: null,
     };
     initial.proposal = {
       id: "proposal-create-execute",
@@ -998,6 +1002,7 @@ describe("CompanionChannels", () => {
       id: "agent-1",
       name: "Honey",
       provider: "claude",
+      image: null,
     };
     proposal.proposal = {
       id: "proposal-delayed",
@@ -1093,6 +1098,7 @@ describe("CompanionChannels", () => {
       id: "agent-1",
       name: "Honey",
       provider: "claude",
+      image: null,
     };
     proposal.proposal = {
       id: "proposal-reserved",
@@ -1327,6 +1333,7 @@ describe("CompanionChannels", () => {
       id: "agent-1",
       name: "Honey",
       provider: "claude",
+      image: null,
     };
     proposal.proposal = {
       id: "proposal-archived",
@@ -1410,6 +1417,7 @@ describe("CompanionChannels", () => {
       id: "agent-1",
       name: "Honey",
       provider: "codex",
+      image: null,
     };
     item.executionProposal = {
       id: "execution-companion",
@@ -1507,6 +1515,7 @@ describe("CompanionChannels", () => {
       id: "agent-1",
       name: "Honey",
       provider: "codex",
+      image: null,
     };
     const pending = {
       id: "skill-companion",
@@ -1750,6 +1759,45 @@ describe("CompanionChannels", () => {
       container.querySelector<HTMLInputElement>(".companion-channel-composer input")
         ?.placeholder,
     ).toBe("Message channel");
+  });
+
+  it("renders the Agent's configured avatar on its channel messages", async () => {
+    const item = message("m-1", "Agent report");
+    item.author = {
+      type: "agent",
+      id: "agent-1",
+      name: "Honey",
+      provider: "claude",
+      image: "data:image/png;base64,cHJvamVjdC1hdmF0YXI=",
+    };
+    loadChannel.mockResolvedValue({
+      channel: channel("c-common", "Welcome", null),
+      members: [],
+      agents: [],
+      messages: [item],
+    });
+    await render();
+
+    await act(async () => {
+      [
+        ...container.querySelectorAll<HTMLButtonElement>(
+          ".companion-channel-group button",
+        ),
+      ]
+        .find((button) => button.textContent?.includes("Welcome"))!
+        .click();
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(container.querySelector(".companion-channel-detail")).not.toBeNull();
+    const avatar = container.querySelector<HTMLImageElement>(
+      "img.companion-channel-avatar",
+    );
+    expect(avatar?.getAttribute("src")).toBe(
+      "data:image/png;base64,cHJvamVjdC1hdmF0YXI=",
+    );
   });
 
   it("posts a thread reply against the opened message", async () => {

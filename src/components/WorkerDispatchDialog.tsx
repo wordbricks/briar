@@ -20,13 +20,12 @@ import { useI18n } from "../i18n";
 import type { MessageKey } from "../i18n/messages";
 import {
   agentEfforts,
+  agentModelOptions,
   agentProviders,
-  defaultAgentProviderModelCatalog,
-  loadAgentProviderModels,
   type AgentProvider,
-  type AgentProviderModelCatalog,
   type ModelEffort,
 } from "../lib/project-llm";
+import { useAgentProviderModels } from "../hooks/useAgentProviderModels";
 import type {
   ExecutionWorker,
   HuntRun,
@@ -70,9 +69,7 @@ export function WorkerDispatchDialog({
   const [model, setModel] = useState("");
   const [effort, setEffort] = useState("");
   const [workerId, setWorkerId] = useState("");
-  const [providerModels, setProviderModels] = useState<AgentProviderModelCatalog>(
-    defaultAgentProviderModelCatalog,
-  );
+  const providerModels = useAgentProviderModels(open);
   const selectionSessionRef = useRef<string | null>(null);
   const selectionDirtyRef = useRef(false);
   const initializingProviderRef = useRef<AgentProvider | null>(null);
@@ -109,14 +106,12 @@ export function WorkerDispatchDialog({
     [policyWorkers, provider],
   );
   const modelOptions = useMemo(
-    () => [
-      { value: "", label: t("settings.providerDefaultModel") },
-      ...providerModels[provider].models.map((candidate) => ({
-        value: candidate.id,
-        label: candidate.label,
-        description: candidate.label === candidate.id ? undefined : candidate.id,
-      })),
-    ],
+    () =>
+      agentModelOptions(
+        providerModels,
+        provider,
+        t("settings.providerDefaultModel"),
+      ),
     [provider, providerModels, t],
   );
   const selectedModelKnown = modelOptions.some(
@@ -124,21 +119,6 @@ export function WorkerDispatchDialog({
   );
   const normalizedModel = model.trim();
   const selectionSessionKey = run?.id ?? "__without-run__";
-
-  useEffect(() => {
-    if (!open) return;
-    let cancelled = false;
-    void loadAgentProviderModels()
-      .then((models) => {
-        if (!cancelled) setProviderModels(models);
-      })
-      .catch(() => {
-        if (!cancelled) setProviderModels(defaultAgentProviderModelCatalog);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [open]);
 
   useEffect(() => {
     if (!open) {

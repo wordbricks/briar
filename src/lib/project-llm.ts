@@ -84,6 +84,36 @@ export const defaultAgentProviderModelCatalog: AgentProviderModelCatalog =
     ]),
   ) as AgentProviderModelCatalog;
 
+export function agentModelOptions(
+  catalog: AgentProviderModelCatalog,
+  provider: AgentProvider,
+  providerDefaultLabel: string,
+  selectedModel?: string | null,
+) {
+  const options = [
+    { value: "", label: providerDefaultLabel },
+    ...catalog[provider].models.map((model) => ({
+      value: model.id,
+      label: model.label,
+      description: model.label === model.id ? undefined : model.id,
+    })),
+  ];
+  return selectedModel && !options.some((option) => option.value === selectedModel)
+    ? [{ value: selectedModel, label: selectedModel }, ...options]
+    : options;
+}
+
+export function agentModelDisplayName(
+  catalog: AgentProviderModelCatalog,
+  provider: AgentProvider,
+  model: string,
+) {
+  return (
+    catalog[provider].models.find((candidate) => candidate.id === model)?.label ??
+    model
+  );
+}
+
 let agentProviderModelsRequest: Promise<AgentProviderModelCatalog> | null = null;
 
 export type ProjectLlmSettings = {

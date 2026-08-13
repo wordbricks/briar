@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { briarApiUrl, briarWebAppOrigin } from "./api-config";
 export { briarApiUrl } from "./api-config";
+import { captureErrorDiagnostics } from "./error-diagnostics";
 import { structuredAgentResultSchema } from "./agent-result";
 import { validateIssueAttachments } from "./issue-attachments";
 import {
@@ -411,13 +412,26 @@ async function request<T>(
     headers.set("Content-Type", "application/json");
   }
   if (token) headers.set("Authorization", `Bearer ${token}`);
-  const response = await fetch(`${apiUrl}${path}`, {
-    ...init,
-    headers,
-  });
+  const method = (init?.method ?? "GET").toUpperCase();
+  const startedAt = performance.now();
+  let response: Response;
+  try {
+    response = await fetch(`${apiUrl}${path}`, {
+      ...init,
+      headers,
+    });
+  } catch (caught) {
+    captureErrorDiagnostics(caught, {
+      durationMs: performance.now() - startedAt,
+      method,
+      path,
+      scope: "api_request",
+    });
+    throw caught;
+  }
   if (!response.ok) {
     const body = await response.json().catch(() => null);
-    throw new ApiError(
+    const error = new ApiError(
       response.status,
       body?.message ??
         body?.error_description ??
@@ -426,9 +440,29 @@ async function request<T>(
       body?.code,
       Array.isArray(body?.issues) ? body.issues : undefined,
     );
+    captureErrorDiagnostics(error, {
+      code: error.code,
+      durationMs: performance.now() - startedAt,
+      method,
+      path,
+      scope: "api_request",
+      status: response.status,
+    });
+    throw error;
   }
   if (response.status === 204) return undefined as T;
-  return response.json() as Promise<T>;
+  try {
+    return await response.json() as T;
+  } catch (caught) {
+    captureErrorDiagnostics(caught, {
+      durationMs: performance.now() - startedAt,
+      method,
+      path,
+      scope: "api_response_parse",
+      status: response.status,
+    });
+    throw caught;
+  }
 }
 
 export type DeviceAuthorization = {
@@ -1095,6 +1129,7 @@ export type ProjectAgentTranscript = {
     startedAt: string;
     lastEventAt: string;
     eventCount: number;
+    projection?: "worklog";
   };
   events: Array<{
     sequence: number;
@@ -1114,6 +1149,52 @@ export async function loadProjectAgentTranscript(
     `/projects/${projectId}/sessions/${encodeURIComponent(sessionId)}/transcript?afterSequence=${afterSequence}`,
     token,
   );
+}
+
+export type ProjectAgentRawTranscriptManifest = {
+  sessionId: string;
+  runId: string | null;
+  agentProvider: AgentProvider;
+  eventCount: number;
+  uncompressedBytes: number;
+  compressedBytes: number;
+  segments: Array<{
+    firstSequence: number;
+    lastSequence: number;
+    eventCount: number;
+    uncompressedBytes: number;
+    compressedBytes: number;
+    sha256: string;
+    recordedAt: string;
+    url: string;
+  }>;
+};
+
+export async function loadProjectAgentRawTranscriptManifest(
+  token: string,
+  projectId: string,
+  sessionId: string,
+): Promise<ProjectAgentRawTranscriptManifest> {
+  return request<ProjectAgentRawTranscriptManifest>(
+    `/projects/${projectId}/sessions/${encodeURIComponent(sessionId)}/raw-transcript`,
+    token,
+  );
+}
+
+export async function loadProjectAgentRawTranscriptSegment(
+  token: string,
+  segmentUrl: string,
+) {
+  if (!apiUrl || !segmentUrl.startsWith("/")) {
+    throw new Error("Transcript segment URL is invalid");
+  }
+  const response = await fetch(`${apiUrl}${segmentUrl}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) {
+    throw new Error(`Transcript segment could not be loaded (${response.status})`);
+  }
+  return response.blob();
 }
 
 export async function createProject(

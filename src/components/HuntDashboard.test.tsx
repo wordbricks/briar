@@ -1049,6 +1049,125 @@ describe("HuntDashboard", () => {
     container.remove();
   });
 
+  it("hides a kanban column into the hidden list and can show it again", async () => {
+    window.localStorage.clear();
+    const userId = "user-hide-1";
+    const projectId = demoDashboard.project.id;
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => root.render(
+      <HuntDashboard
+        {...dashboardProps}
+        currentUserId={userId}
+        dashboard={demoDashboard}
+      />,
+    ));
+
+    const hideTrigger = container.querySelector<HTMLButtonElement>(
+      '[aria-label="분석 열 메뉴"]',
+    );
+    expect(hideTrigger).not.toBeNull();
+    expect(
+      container.querySelector('[data-kanban-column-id="stage:analyzing"]'),
+    ).not.toBeNull();
+    expect(container.querySelector("[data-kanban-hidden-columns]")).toBeNull();
+
+    await act(async () => {
+      hideTrigger?.dispatchEvent(
+        new MouseEvent("pointerdown", { bubbles: true, button: 0 }),
+      );
+    });
+    const hideItem = Array.from(
+      document.body.querySelectorAll<HTMLElement>('[role="menuitem"]'),
+    ).find((item) => item.textContent?.includes("열 숨기기"));
+    expect(hideItem).not.toBeUndefined();
+    await act(async () => hideItem?.click());
+
+    expect(
+      container.querySelector('[data-kanban-column-id="stage:analyzing"]'),
+    ).toBeNull();
+    expect(
+      container.querySelector('[data-kanban-hidden-column-id="stage:analyzing"]'),
+    ).not.toBeNull();
+    expect(
+      container.querySelector("[data-kanban-hidden-columns]")?.textContent,
+    ).toContain("숨긴 열");
+    expect(
+      JSON.parse(
+        window.localStorage.getItem(
+          `briar.settings.kanbanColumnHide.v1:${encodeURIComponent(userId)}:${encodeURIComponent(projectId)}`,
+        )!,
+      ),
+    ).toEqual(["stage:analyzing"]);
+
+    const showTrigger = container.querySelector<HTMLButtonElement>(
+      '[aria-label="분석 숨긴 열 메뉴"]',
+    );
+    await act(async () => {
+      showTrigger?.dispatchEvent(
+        new MouseEvent("pointerdown", { bubbles: true, button: 0 }),
+      );
+    });
+    const showItem = Array.from(
+      document.body.querySelectorAll<HTMLElement>('[role="menuitem"]'),
+    ).find((item) => item.textContent?.includes("열 표시"));
+    expect(showItem).not.toBeUndefined();
+    await act(async () => showItem?.click());
+
+    expect(
+      container.querySelector('[data-kanban-column-id="stage:analyzing"]'),
+    ).not.toBeNull();
+    expect(container.querySelector("[data-kanban-hidden-columns]")).toBeNull();
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("restores hidden kanban columns from local storage for the same user", async () => {
+    window.localStorage.clear();
+    const userId = "user-hide-restore";
+    const projectId = demoDashboard.project.id;
+    window.localStorage.setItem(
+      `briar.settings.kanbanColumnHide.v1:${encodeURIComponent(userId)}:${encodeURIComponent(projectId)}`,
+      JSON.stringify(["stage:implementing", "status:completed"]),
+    );
+
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => root.render(
+      <HuntDashboard
+        {...dashboardProps}
+        currentUserId={userId}
+        dashboard={demoDashboard}
+      />,
+    ));
+
+    expect(
+      container.querySelector('[data-kanban-column-id="stage:implementing"]'),
+    ).toBeNull();
+    expect(
+      container.querySelector('[data-kanban-column-id="status:completed"]'),
+    ).toBeNull();
+    expect(
+      container.querySelector(
+        '[data-kanban-hidden-column-id="stage:implementing"]',
+      ),
+    ).not.toBeNull();
+    expect(
+      container.querySelector(
+        '[data-kanban-hidden-column-id="status:completed"]',
+      ),
+    ).not.toBeNull();
+    expect(
+      container.querySelector('[data-kanban-column-id="stage:analyzing"]'),
+    ).not.toBeNull();
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
   it("switches between kanban and list views while preserving issue navigation", async () => {
     const container = document.createElement("div");
     const root = createRoot(container);
@@ -2553,6 +2672,14 @@ describe("HuntDashboard", () => {
     expect(
       document.body.querySelector('[data-testid="app-toast"].error')?.textContent,
     ).toContain("상태 이동에 실패했습니다.");
+
+    await act(async () => {
+      container.querySelector<HTMLElement>(".kanban-card")?.click();
+    });
+    expect(container.querySelector(".run-page")).not.toBeNull();
+    expect(
+      document.body.querySelectorAll('[data-testid="app-toast"].error'),
+    ).toHaveLength(1);
 
     await act(async () => root.unmount());
     container.remove();

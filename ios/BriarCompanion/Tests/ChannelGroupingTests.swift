@@ -160,6 +160,39 @@ final class ChannelGroupingTests: XCTestCase {
         XCTAssertNotNil(message.lastReplyAt)
     }
 
+    func testDecodesAgentChannelMessageAuthorAvatar() throws {
+        let json = """
+        {
+          "id": "aaaaaaaa-0000-4000-8000-000000000001",
+          "channelId": "bbbbbbbb-0000-4000-8000-000000000001",
+          "parentMessageId": null,
+          "body": "Agent report",
+          "author": {
+            "type": "agent",
+            "id": "66666666-6666-4666-8666-666666666666",
+            "name": "Honey",
+            "provider": "claude",
+            "image": "data:image/png;base64,cHJvamVjdC1hdmF0YXI="
+          },
+          "replyCount": 0,
+          "lastReplyAt": null,
+          "document": null,
+          "createdAt": "2026-08-01T01:00:00Z"
+        }
+        """
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+
+        let message = try decoder.decode(ChannelMessage.self, from: Data(json.utf8))
+
+        XCTAssertEqual(message.author.type, .agent)
+        XCTAssertEqual(
+            message.author.image,
+            "data:image/png;base64,cHJvamVjdC1hdmF0YXI="
+        )
+        XCTAssertEqual(message.author.provider, "claude")
+    }
+
     func testMentionCandidatesAppearForAtSignAndInsertASelectedAgent() {
         let agent = ChannelAgentSummary(
             agentId: UUID(uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!,

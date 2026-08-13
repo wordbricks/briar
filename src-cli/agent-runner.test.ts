@@ -951,6 +951,8 @@ describe("detached Agent runner", () => {
     expect(projectPrompt).toContain("snapshot.executionTargets");
     expect(projectPrompt).toContain("exact server-supplied target");
     expect(projectPrompt).toContain('"executionProposal":{"projectId"');
+    expect(projectPrompt).toContain("workspace-relative path in attachments");
+    expect(projectPrompt).toContain('"attachments":["screenshot.png"]');
   });
 
   it("extracts final replies from every detached provider event shape", () => {
@@ -1042,33 +1044,33 @@ describe("detached Agent runner", () => {
     });
   });
 
-  it("keeps streaming message and activity deltas ephemeral", () => {
+  it("retains bounded raw and normalized deltas for the R2 archive", () => {
     expect(
       shouldPersistDetachedTranscriptPayload({
         type: "event",
         event: { type: "messageDelta", id: "message-1", delta: "hello" },
       }),
-    ).toBe(false);
+    ).toBe(true);
     expect(
       shouldPersistDetachedTranscriptPayload({
         type: "messageDelta",
         id: "message-1",
         delta: "hello",
       }),
-    ).toBe(false);
+    ).toBe(true);
     expect(
       shouldPersistDetachedTranscriptPayload({
         type: "event",
         event: { type: "activityDelta", id: "command-1", delta: "output" },
       }),
-    ).toBe(false);
+    ).toBe(true);
     expect(
       shouldPersistDetachedTranscriptPayload({
         type: "activityDelta",
         id: "command-1",
         delta: "output",
       }),
-    ).toBe(false);
+    ).toBe(true);
     expect(
       shouldPersistDetachedTranscriptPayload({
         type: "event",
@@ -1111,15 +1113,13 @@ describe("detached Agent runner", () => {
     });
   });
 
-  it("assigns transcript sequences only to persisted payloads", () => {
+  it("assigns every archived payload a stable transcript sequence", () => {
     const sequencer = createDetachedTranscriptSequencer(1);
     const delta = {
       type: "event",
       event: { type: "messageDelta", id: "message-1", delta: "x" },
     };
-    for (let index = 0; index < 20_000; index += 1) {
-      expect(sequencer.nextForPayload(delta)).toBeNull();
-    }
+    expect(sequencer.nextForPayload(delta)).toBe(1);
 
     expect(
       sequencer.nextForPayload({
@@ -1130,8 +1130,8 @@ describe("detached Agent runner", () => {
           text: "done",
         },
       }),
-    ).toBe(1);
-    expect(sequencer.next()).toBe(2);
+    ).toBe(2);
+    expect(sequencer.next()).toBe(3);
   });
 
   it("retries an ambiguous success completion without sending a failure", async () => {

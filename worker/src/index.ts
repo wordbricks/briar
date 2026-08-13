@@ -119,8 +119,8 @@ import {
   listArchivedRunEvidence,
   listArchivedRunEvents,
   processArchiveCleanupQueue,
-  readArchivedTranscript,
-  readLatestArchivedTranscriptForRun,
+  readArchivedWorkLog,
+  readLatestArchivedWorkLogForRun,
 } from "./archive";
 import {
   acceptOrganizationInvitation,
@@ -387,7 +387,6 @@ import {
   parsePlacementKey,
 } from "../../src/lib/linear-import";
 import {
-  appendAgentTranscript,
   availableExecutionWorkerForAgentSkill,
   auditExecutionEvent,
   authenticateExecutionWorker,
@@ -414,10 +413,9 @@ import {
   isExecutionWorkerAllowedForProject,
   MAX_WORKER_CONCURRENT_SESSIONS,
   MAX_TRANSCRIPT_EVENTS_PER_REQUEST,
+  MAX_TRANSCRIPT_HTTP_BODY_BYTES,
   WORKER_STALE_AFTER_MS,
   reapStalledHuntRuns,
-  readAgentTranscript,
-  readLatestAgentTranscriptForRun,
   recordWorkerHeartbeat,
   registerExecutionWorker,
   requestExecutionWorkerUpdate,
@@ -431,6 +429,15 @@ import {
   updateExecutionWorkerLabel,
   updateProjectExecutionWorkerPolicy,
 } from "./workers";
+import {
+  ingestAgentTranscript,
+  listAgentTranscriptSegments,
+  readAgentWorkLog,
+  readLatestAgentWorkLogForRun,
+  readRawTranscriptSegment,
+  workLogEntryTranscriptEvent,
+  type AgentTranscriptSegmentRow,
+} from "./agent-worklog";
 import { readLatestVersion, serveRelease } from "./releases";
 import {
   compareSemanticVersions,
@@ -1414,6 +1421,44 @@ export async function readRunEvidenceRequest(request: Request) {
     validateEvidenceImages,
   );
   return { input: runEvidenceInputSchema.parse(input), images };
+}
+
+export async function readChannelReplyCompleteRequest(request: Request) {
+  const form = await readBoundedMultipartForm(
+    request,
+    maxIssueMultipartBytes,
+    "Channel reply images exceed the 25MB total limit",
+  );
+  if (!form) {
+    return {
+      input: channelReplyCompleteInputSchema.parse(await readJson(request)),
+      attachments: [] as File[],
+    };
+  }
+  const payload = form.get("complete");
+  if (typeof payload !== "string") {
+    throw new HttpError(400, "Multipart channel reply JSON is required");
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(payload);
+  } catch {
+    throw new HttpError(400, "Invalid multipart channel reply JSON");
+  }
+  const attachments = readMultipartFiles(
+    form,
+    "attachments",
+    "Channel reply attachments must be files",
+    validateIssueAttachments,
+  );
+  if (attachments.some((attachment) => !attachment.type.startsWith("image/"))) {
+    throw new HttpError(400, "Channel reply attachments must be images");
+  }
+  const input = channelReplyCompleteInputSchema.parse(parsed);
+  if (input.error && attachments.length > 0) {
+    throw new HttpError(400, "A failed reply cannot include images");
+  }
+  return { input, attachments };
 }
 
 const projectInputSchema = z.object({
@@ -2415,11 +2460,13 @@ const providerHealthSchema = z.record(
       authenticated: z.boolean(),
       healthy: z.boolean(),
       reason: z.string().trim().max(64).nullable().optional(),
+      usageExhausted: z.boolean().optional(),
+      maxUsedPercent: z.number().min(0).max(100).nullable().optional(),
     })
     .strict(),
 );
 
-const workerRegisterSchema = z
+export const workerRegisterSchema = z
   .object({
     label: z.string().trim().min(1).max(100),
     deviceIdentity: z.string().regex(/^briar_device_[0-9a-f]{64}$/u),
@@ -2897,6 +2944,12 @@ async function readJson(
   } catch {
     throw new HttpError(400, "Invalid JSON");
   }
+}
+
+export async function readTranscriptRequest(request: Request) {
+  return transcriptSchema.parse(
+    await readJson(request, MAX_TRANSCRIPT_HTTP_BODY_BYTES),
+  );
 }
 
 const sha256 = async (value: string) => {
@@ -5759,29 +5812,6 @@ const issueAgentReplyJson = (job: IssueAgentReplyJobRow) => ({
   updatedAt: job.updated_at,
 });
 
-const issueReplyTranscriptPayload = (value: unknown) => {
-  if (!value || typeof value !== "object") return null;
-  const payload = value as Record<string, unknown>;
-  if (payload.type === "result" || payload.type === "error") return payload;
-  const normalized =
-    payload.event && typeof payload.event === "object"
-      ? (payload.event as Record<string, unknown>)
-      : null;
-  if (
-    payload.type === "event" &&
-    normalized?.type === "messageCompleted"
-  ) {
-    return payload;
-  }
-  const item =
-    payload.item && typeof payload.item === "object"
-      ? (payload.item as Record<string, unknown>)
-      : null;
-  return payload.type === "item.completed" && item?.type === "agent_message"
-    ? payload
-    : null;
-};
-
 const issueConversationNotificationJson = (
   notification: IssueConversationNotificationRow,
 ) => ({
@@ -5886,36 +5916,25 @@ const loadIssueConversationSnapshot = async (
   };
 };
 
-const readLatestTranscriptForRunWithArchive = async (
+const readLatestWorkLogForRunWithArchive = async (
   db: D1Database,
   archivesBucket: R2Bucket,
   projectId: string,
   runId: string,
-  options: { afterSequence?: number; limit?: number; tail?: boolean } = {},
+  limit = 200,
 ) => {
-  const hot = await readLatestAgentTranscriptForRun(
-    db,
-    projectId,
-    runId,
-    options,
-  );
-  if (hot) return hot;
-  const archived = await readLatestArchivedTranscriptForRun(
-    db,
-    archivesBucket,
-    projectId,
-    runId,
-  );
-  if (!archived) return null;
-  const afterSequence = options.afterSequence ?? 0;
-  const filtered = archived.events.filter(
-    (event) => event.sequence > afterSequence,
-  );
-  const limit = Math.min(options.limit ?? 1_000, 5_000);
-  return {
-    ...archived,
-    events: options.tail ? filtered.slice(-limit) : filtered.slice(0, limit),
-  };
+  const hot = await readLatestAgentWorkLogForRun(db, projectId, runId);
+  const workLog = hot && hot.entries.length > 0
+    ? hot
+    : await readLatestArchivedWorkLogForRun(
+        db,
+        archivesBucket,
+        projectId,
+        runId,
+      );
+  return workLog
+    ? { ...workLog, entries: workLog.entries.slice(-Math.min(limit, 1_000)) }
+    : null;
 };
 
 const removeOrphanedIssueAttachments = async (
@@ -12000,7 +12019,7 @@ async function route(
   }
 
   if (pathname === "/transcripts" && request.method === "POST") {
-    const input = transcriptSchema.parse(await readJson(request));
+    const input = await readTranscriptRequest(request);
     const recordedAt = new Date().toISOString();
     let authenticatedWorkerId: string | null = null;
     let authenticatedExecutionAttempt: RunExecutionAttemptRow | null = null;
@@ -12097,7 +12116,7 @@ async function route(
           recordedAt,
         })
       : 0;
-    const result = await appendAgentTranscript(db, projectId, {
+    const result = await ingestAgentTranscript(db, env.ARCHIVES, projectId, {
       sessionId: input.sessionId,
       runId: input.runId ?? null,
       workerId: authenticatedWorkerId ?? input.workerId ?? null,
@@ -12141,69 +12160,176 @@ async function route(
   if (transcriptMatch && request.method === "GET") {
     const projectId = transcriptMatch[1];
     await requireProjectAccess(auth, db, request, projectId);
-    const afterSequence = Number.parseInt(
-      new URL(request.url).searchParams.get("afterSequence") ?? "0",
-      10,
-    );
     const requestedSessionId = transcriptMatch[2];
     const detachedRunId = requestedSessionId.startsWith("detached-")
       ? z.string().uuid().safeParse(requestedSessionId.slice("detached-".length))
       : null;
-    const normalizedAfterSequence =
-      Number.isFinite(afterSequence) && afterSequence > 0 ? afterSequence : 0;
-    const hotTranscript = detachedRunId?.success
-      ? await readLatestAgentTranscriptForRun(
-          db,
-          projectId,
-          detachedRunId.data,
-          { afterSequence: normalizedAfterSequence },
-        )
-      : await readAgentTranscript(db, projectId, requestedSessionId, {
-          afterSequence: normalizedAfterSequence,
-        });
-    const archivedTranscript = hotTranscript
-      ? null
+    const hotWorkLog = detachedRunId?.success
+      ? await readLatestAgentWorkLogForRun(db, projectId, detachedRunId.data)
+      : await readAgentWorkLog(db, projectId, requestedSessionId);
+    const workLog = hotWorkLog && hotWorkLog.entries.length > 0
+      ? hotWorkLog
       : detachedRunId?.success
-        ? await readLatestArchivedTranscriptForRun(
+        ? await readLatestArchivedWorkLogForRun(
             db,
             env.ARCHIVES,
             projectId,
             detachedRunId.data,
           )
-        : await readArchivedTranscript(
+        : await readArchivedWorkLog(
             db,
             env.ARCHIVES,
             projectId,
             requestedSessionId,
           );
-    const transcript =
-      hotTranscript ??
-      (archivedTranscript
-        ? {
-            ...archivedTranscript,
-            events: archivedTranscript.events.filter(
-              (event) =>
-                event.sequence >
-                normalizedAfterSequence,
-            ),
-          }
-        : null);
-    if (!transcript) throw new HttpError(404, "Transcript not found");
+    if (!workLog || workLog.entries.length === 0) {
+      throw new HttpError(404, "Transcript not found");
+    }
     return json({
       session: {
-        sessionId: transcript.session.session_id,
-        runId: transcript.session.run_id,
-        workerId: transcript.session.worker_id,
-        agentProvider: transcript.session.agent_provider,
-        startedAt: transcript.session.started_at,
-        lastEventAt: transcript.session.last_event_at,
-        eventCount: transcript.session.event_count,
+        sessionId: workLog.session.session_id,
+        runId: workLog.session.run_id,
+        workerId: workLog.session.worker_id,
+        agentProvider: workLog.session.agent_provider,
+        startedAt: workLog.session.started_at,
+        lastEventAt: workLog.session.last_event_at,
+        eventCount: workLog.entries.length,
+        projection: "worklog",
       },
-      events: transcript.events.map((event) => ({
-        sequence: event.sequence,
-        direction: event.direction,
-        message: JSON.parse(event.payload_json),
-        recordedAt: event.recorded_at,
+      // Work-log entries are a bounded snapshot. Returning the full set on
+      // each live poll lets an upsert replace a writing entry in-place.
+      events: workLog.entries.map((entry) => ({
+        sequence: entry.sequence,
+        direction: "server" as const,
+        message: {
+          type: "event",
+          event: workLogEntryTranscriptEvent(entry),
+        },
+        recordedAt: entry.updated_at,
+      })),
+    });
+  }
+
+  const rawTranscriptSegmentMatch = pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/sessions\/([A-Za-z0-9_-]+)\/raw-transcript\/(\d+)-(\d+)$/u,
+  );
+  const rawTranscriptMatch = pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/sessions\/([A-Za-z0-9_-]+)\/raw-transcript$/u,
+  );
+  if (
+    rawTranscriptSegmentMatch && request.method === "GET"
+  ) {
+    const projectId = rawTranscriptSegmentMatch[1];
+    await requireProjectAccess(auth, db, request, projectId);
+    const requestedSessionId = rawTranscriptSegmentMatch[2];
+    const detachedRunId = requestedSessionId.startsWith("detached-")
+      ? z.string().uuid().safeParse(requestedSessionId.slice("detached-".length))
+      : null;
+    const hotWorkLog = detachedRunId?.success
+      ? await readLatestAgentWorkLogForRun(db, projectId, detachedRunId.data)
+      : await readAgentWorkLog(db, projectId, requestedSessionId);
+    const workLog = hotWorkLog ?? (detachedRunId?.success
+      ? await readLatestArchivedWorkLogForRun(
+          db,
+          env.ARCHIVES,
+          projectId,
+          detachedRunId.data,
+        )
+      : await readArchivedWorkLog(
+          db,
+          env.ARCHIVES,
+          projectId,
+          requestedSessionId,
+        ));
+    if (!workLog) throw new HttpError(404, "Transcript not found");
+    const segments = "segments" in workLog
+      ? workLog.segments as AgentTranscriptSegmentRow[]
+      : await listAgentTranscriptSegments(
+          db,
+          projectId,
+          workLog.session.session_id,
+        );
+    const firstSequence = Number(rawTranscriptSegmentMatch[3]);
+    const lastSequence = Number(rawTranscriptSegmentMatch[4]);
+    const segment = segments?.find((candidate) =>
+      candidate.first_sequence === firstSequence &&
+      candidate.last_sequence === lastSequence
+    );
+    if (!segment) throw new HttpError(404, "Transcript segment not found");
+    const object = await readRawTranscriptSegment(env.ARCHIVES, segment);
+    if (!object) throw new HttpError(404, "Transcript segment not found");
+    return new Response(object.body, {
+      headers: {
+        "Content-Type": "application/gzip",
+        "Content-Disposition": contentDisposition(object.filename).replace(
+          /^inline;/u,
+          "attachment;",
+        ),
+        "Cache-Control": "private, no-store",
+      },
+    });
+  }
+  if (rawTranscriptMatch && request.method === "GET") {
+    const projectId = rawTranscriptMatch[1];
+    await requireProjectAccess(auth, db, request, projectId);
+    const requestedSessionId = rawTranscriptMatch[2];
+    const detachedRunId = requestedSessionId.startsWith("detached-")
+      ? z.string().uuid().safeParse(requestedSessionId.slice("detached-".length))
+      : null;
+    const hotWorkLog = detachedRunId?.success
+      ? await readLatestAgentWorkLogForRun(db, projectId, detachedRunId.data)
+      : await readAgentWorkLog(db, projectId, requestedSessionId);
+    const workLog = hotWorkLog ?? (detachedRunId?.success
+      ? await readLatestArchivedWorkLogForRun(
+          db,
+          env.ARCHIVES,
+          projectId,
+          detachedRunId.data,
+        )
+      : await readArchivedWorkLog(
+          db,
+          env.ARCHIVES,
+          projectId,
+          requestedSessionId,
+        ));
+    if (!workLog) throw new HttpError(404, "Transcript not found");
+    const segments = "segments" in workLog
+      ? workLog.segments as AgentTranscriptSegmentRow[]
+      : await listAgentTranscriptSegments(
+          db,
+          projectId,
+          workLog.session.session_id,
+        );
+    if (!segments || segments.length === 0) {
+      throw new HttpError(404, "Transcript not found");
+    }
+    return json({
+      sessionId: workLog.session.session_id,
+      runId: workLog.session.run_id,
+      agentProvider: workLog.session.agent_provider,
+      eventCount: segments.reduce(
+        (total, segment) => total + segment.event_count,
+        0,
+      ),
+      uncompressedBytes: segments.reduce(
+        (total, segment) => total + segment.uncompressed_bytes,
+        0,
+      ),
+      compressedBytes: segments.reduce(
+        (total, segment) => total + segment.compressed_bytes,
+        0,
+      ),
+      segments: segments.map((segment) => ({
+        firstSequence: segment.first_sequence,
+        lastSequence: segment.last_sequence,
+        eventCount: segment.event_count,
+        uncompressedBytes: segment.uncompressed_bytes,
+        compressedBytes: segment.compressed_bytes,
+        sha256: segment.sha256,
+        recordedAt: segment.recorded_at,
+        url:
+          `/projects/${projectId}/sessions/${requestedSessionId}/raw-transcript/` +
+          `${segment.first_sequence}-${segment.last_sequence}`,
       })),
     });
   }
@@ -12321,12 +12447,12 @@ async function route(
           job.run_id,
         ),
         listRunEvidence(db, input.projectId, job.run_id),
-        readLatestTranscriptForRunWithArchive(
+        readLatestWorkLogForRunWithArchive(
           db,
           env.ARCHIVES,
           input.projectId,
           job.run_id,
-          { limit: 200, tail: true },
+          200,
         ),
       ]);
     if (!run || !job.agent_provider) {
@@ -12459,18 +12585,18 @@ async function route(
           },
           messages: claimConversationJson(messages, attachments),
           agentTranscript:
-            transcript?.events.flatMap((event) => {
-              const payload = issueReplyTranscriptPayload(
-                JSON.parse(event.payload_json),
-              );
-              return payload
-                ? [{
-                    sequence: event.sequence,
-                    message: payload,
-                    recordedAt: event.recorded_at,
-                  }]
-                : [];
-            }) ?? [],
+            transcript?.entries
+              .filter((entry) =>
+                entry.entry_type === "message" && entry.status !== "writing"
+              )
+              .map((entry) => ({
+                sequence: entry.sequence,
+                message: {
+                  type: "event",
+                  event: workLogEntryTranscriptEvent(entry),
+                },
+                recordedAt: entry.updated_at,
+              })) ?? [],
           evidence: (evidence ?? []).map((item) => ({
             stage: item.workflow_stage,
             type: item.evidence_type,
@@ -13078,7 +13204,9 @@ async function route(
       return json({ leaseExpiresAt: renewed.lease_expires_at });
     }
 
-    const input = channelReplyCompleteInputSchema.parse(await readJson(request));
+    const { input, attachments } = await readChannelReplyCompleteRequest(
+      request,
+    );
     const principal = await requireWorkerOrganization(
       db,
       request,
@@ -13243,22 +13371,73 @@ async function route(
         throw new HttpError(400, "Target project is outside this organization");
       }
     }
-    const completed = await completeChannelReply(db, job, {
-      jobId: job.id,
-      deviceId: principal.deviceId,
-      workerId: input.workerId,
-      claimTokenHash,
-      body: result.body,
-      document,
-      issueProposal,
-      executionProposal,
-      skillExecutionProposal: Boolean(result.skillExecutionProposal),
-      delegation,
-      agentName: agent.name,
-      agentProvider: job.agent_provider ?? agent.provider,
-      completedAt: observedAt,
+    const storedAttachments = prepareStoredAttachments(attachments, () => {
+      const id = crypto.randomUUID();
+      return {
+        id,
+        organization_id: job.organization_id,
+        object_key:
+          `channel-attachments/${job.organization_id}/${job.channel_id}/${job.reply_message_id}/${id}`,
+      };
     });
-    if (!completed) throw new HttpError(409, "Reply claim is no longer active");
+    const uploadedKeys: string[] = [];
+    const discardUploadedReplyImages = async () => {
+      if (uploadedKeys.length === 0) return;
+      try {
+        await attachmentsBucket.delete(uploadedKeys);
+      } catch (cleanupError) {
+        console.error(JSON.stringify({
+          message: "Failed channel reply image cleanup",
+          organizationId: job.organization_id,
+          channelId: job.channel_id,
+          messageId: job.reply_message_id,
+          attachmentCount: uploadedKeys.length,
+          error:
+            cleanupError instanceof Error
+              ? cleanupError.message
+              : String(cleanupError),
+        }));
+      }
+    };
+    let completed: Awaited<ReturnType<typeof completeChannelReply>> = null;
+    try {
+      await uploadStoredAttachments(
+        attachmentsBucket,
+        storedAttachments,
+        uploadedKeys,
+        (attachment) => ({
+          attachmentId: attachment.id,
+          channelId: job.channel_id,
+          messageId: job.reply_message_id,
+          organizationId: job.organization_id,
+        }),
+      );
+      completed = await completeChannelReply(db, job, {
+        jobId: job.id,
+        deviceId: principal.deviceId,
+        workerId: input.workerId,
+        claimTokenHash,
+        body: result.body,
+        document,
+        issueProposal,
+        executionProposal,
+        skillExecutionProposal: Boolean(result.skillExecutionProposal),
+        delegation,
+        agentName: agent.name,
+        agentProvider: job.agent_provider ?? agent.provider,
+        completedAt: observedAt,
+        attachments: storedAttachments.map(({ file: _file, ...attachment }) =>
+          attachment
+        ),
+      });
+    } catch (error) {
+      await discardUploadedReplyImages();
+      throw error;
+    }
+    if (!completed) {
+      await discardUploadedReplyImages();
+      throw new HttpError(409, "Reply claim is no longer active");
+    }
     scheduleChannelRealtimePublish(env, db, input.organizationId, context);
     return json({
       agentReply: channelReplyJson(completed),
