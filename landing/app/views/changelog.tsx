@@ -23,6 +23,21 @@ export const changelogCopy = {
     backTop: "맨 위로 ↑",
     entries: [
       {
+        version: "1.2.115",
+        date: "2026년 8월 13일",
+        title: "작업 보드와 대화, 모델 선택을 더 선명하게 다듬었습니다",
+        summary:
+          "읽지 않은 대화와 Inbox를 빠르게 살피고, 칸반 열·모델 선택·에이전트 이미지 답변과 오류 진단을 더 정확하게 다룹니다.",
+        items: [
+          "데스크탑·모바일·iOS에서 읽지 않은 채널 이름을 굵게 표시하고 읽음 상태를 동기화하며, 이슈 생성자와 대화 참여자, 멘션된 조직 구성원을 자동으로 구독합니다.",
+          "데스크탑 Inbox를 크기 조절이 가능한 목록·상세 분할 화면으로 바꾸고, 필요 없는 칸반 열은 오른쪽 숨김 목록으로 옮겼다가 다시 복원할 수 있습니다.",
+          "이슈·프로젝트·조직·에이전트 설정의 모델 선택기가 제공자의 지원 모델 카탈로그를 함께 사용하며, OpenCode 검색과 기존 기본값·레거시 모델을 그대로 보존합니다.",
+          "채널 에이전트가 작업 공간의 스크린샷과 이미지를 안전한 경로·크기 제한 안에서 답변에 첨부할 수 있습니다.",
+          "Work 분석 차트에 완료 이슈와 토큰을 위한 양쪽 Y축 눈금을 추가하고, 로딩 스피너가 원의 중심에서 정확히 회전하도록 다듬었습니다.",
+          "반복 오류 토스트를 한 항목으로 모으고, 민감한 값을 제거한 시각·앱 버전·요청·상태·환경·스택 진단 정보를 복사할 수 있습니다.",
+        ],
+      },
+      {
         version: "1.2.114",
         date: "2026년 8월 13일",
         title: "Worker가 지원하는 모델로 바로 작업을 배정합니다",
@@ -478,6 +493,21 @@ export const changelogCopy = {
     home: "Home",
     backTop: "Back to top ↑",
     entries: [
+      {
+        version: "1.2.115",
+        date: "August 13, 2026",
+        title: "Navigate work, conversations, and model choices more clearly",
+        summary:
+          "Scan unread conversations and Inbox faster while handling kanban columns, model selection, agent image replies, and error diagnostics more precisely.",
+        items: [
+          "Bold unread channel names and synchronize read state across desktop, mobile, and iOS, while automatically subscribing issue creators, conversation participants, and mentioned organization members.",
+          "Split desktop Inbox into resizable list and detail panes, and move unneeded kanban columns into a right-side Hidden columns list that can restore them later.",
+          "Use one provider-supported model catalog across issue, project, organization, and agent settings, with searchable OpenCode choices and preserved defaults and legacy models.",
+          "Let Channel Agents attach workspace screenshots and images to replies within safe path and attachment limits.",
+          "Add separate Y-axis scales for completed issues and tokens in Work analytics, and keep loading spinners centered on their circle origin.",
+          "Deduplicate repeated error toasts and copy a sanitized diagnostic report with time, app version, request, status, environment, and stack details.",
+        ],
+      },
       {
         version: "1.2.114",
         date: "August 13, 2026",
@@ -946,9 +976,9 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <h1>{changelog.title}</h1>
           <p>{changelog.description}</p>
         </div>
-        <a href="#v1-2-114" className="changelog-current">
+        <a href="#v1-2-115" className="changelog-current">
           <span>{changelog.current}</span>
-          <strong>v1.2.114</strong>
+          <strong>v1.2.115</strong>
           <i aria-hidden="true">↓</i>
         </a>
       </section>
@@ -973,6 +1003,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   {index === 0 ? <span>{changelog.latest}</span> : null}
                   <time
                     dateTime={
+                      entry.version === "1.2.115" ||
                       entry.version === "1.2.114"
                         ? "2026-08-13"
                         : entry.version === "1.2.112" ||
