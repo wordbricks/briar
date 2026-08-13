@@ -3489,6 +3489,33 @@ describe("HuntDashboard", () => {
     container.remove();
   });
 
+  it("opens the requested issue conversation in the conversation tab", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => root.render(
+      <HuntDashboard
+        {...dashboardProps}
+        companionMode
+        dashboard={demoDashboard}
+        requestedRunId={demoDashboard.runs[0].id}
+        requestedRunInitialTab="conversation"
+      />,
+    ));
+
+    const conversationTab = Array.from(
+      container.querySelectorAll<HTMLButtonElement>('[role="tab"]'),
+    ).find((tab) => tab.textContent === "대화");
+    const conversationPanel = container.querySelector<HTMLElement>(
+      ".issue-conversation-tab-panel",
+    );
+    expect(conversationTab?.getAttribute("aria-selected")).toBe("true");
+    expect(conversationPanel?.hidden).toBe(false);
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
   it("shows durable Worker provider output in the issue work log tab", async () => {
     const run: HuntRun = {
       ...demoDashboard.runs[0],

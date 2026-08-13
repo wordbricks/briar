@@ -104,6 +104,7 @@ import {
   type BriarLinkTarget,
 } from "./lib/issue-links";
 import { isRepositoryConnectedForImport } from "./lib/linear-import";
+import type { IssueDetailTab } from "./lib/issue-detail-tab";
 import { settingsAccountSelection } from "./lib/settings-account-selection";
 import { LITELLM_MAIN_PRICING_SOURCE } from "./lib/agent-usage-pricing";
 import { createCachedProjectUsageSummaryLoader } from "./lib/project-usage-summary";
@@ -556,6 +557,8 @@ export function App() {
     useState<InboxNotificationTarget | null>(null);
   useInboxNotificationClicks(setPendingInboxNotificationTarget);
   const [requestedRunId, setRequestedRunId] = useState<string | null>(null);
+  const [requestedRunInitialTab, setRequestedRunInitialTab] =
+    useState<IssueDetailTab | null>(null);
   const [requestedChannelMessage, setRequestedChannelMessage] = useState<{
     channelId: string;
     messageId: string;
@@ -617,11 +620,13 @@ export function App() {
     }
     if (pendingBriarLink.kind === "issue") {
       setRequestedSessionId(null);
+      setRequestedRunInitialTab(null);
       setRequestedRunId(pendingBriarLink.runId);
       setCompanionPage("issues");
       setCompanionStatus("all");
       navigateToPage("issues");
     } else {
+      setRequestedRunInitialTab(null);
       setRequestedRunId(null);
       setRequestedSessionId(pendingBriarLink.sessionId);
       setCompanionPage("agents");
@@ -656,6 +661,11 @@ export function App() {
       pendingInboxNotificationTarget.kind === "conversation"
     ) {
       setRequestedSessionId(null);
+      setRequestedRunInitialTab(
+        pendingInboxNotificationTarget.kind === "conversation"
+          ? "conversation"
+          : null,
+      );
       setRequestedRunId(pendingInboxNotificationTarget.targetId);
       if (briar.companionMode) {
         setCompanionStatus("all");
@@ -666,6 +676,7 @@ export function App() {
     } else if (pendingInboxNotificationTarget.kind === "channel") {
       const { channelMessageId, rootMessageId } = pendingInboxNotificationTarget;
       if (!channelMessageId || !rootMessageId) return;
+      setRequestedRunInitialTab(null);
       setRequestedRunId(null);
       setRequestedSessionId(null);
       setRequestedChannelMessage({
@@ -678,6 +689,7 @@ export function App() {
       if (briar.companionMode) setCompanionPage("home");
       else navigateToPage("channels");
     } else {
+      setRequestedRunInitialTab(null);
       setRequestedRunId(null);
       setRequestedSessionId(pendingInboxNotificationTarget.targetId);
       if (!briar.companionMode) navigateToPage("agents");
@@ -1840,7 +1852,10 @@ export function App() {
             onCancelRun={briar.cancelRun}
             onUnassignRun={(runId) => briar.unassignRun(activeProject?.id ?? "", runId)}
             onResumeRun={briar.resumeRun}
-            onRequestedRunOpen={() => setRequestedRunId(null)}
+            onRequestedRunOpen={() => {
+              setRequestedRunId(null);
+              setRequestedRunInitialTab(null);
+            }}
             onSendIssueMessage={sendIssueMessage}
             onEditIssueMessage={briar.updateIssueMessage}
             onDeleteIssueMessage={briar.removeIssueMessage}
@@ -2090,6 +2105,7 @@ export function App() {
             recoveringRunId={briar.recoveringRunId}
             recoveryError={briar.recoveryError}
             requestedRunId={requestedRunId}
+            requestedRunInitialTab={requestedRunInitialTab}
             isSidebarOpen
             onCompanionAgentsOpen={() => setCompanionPage("agents")}
             onCompanionInboxOpen={() => setCompanionPage("inbox")}
@@ -2123,7 +2139,10 @@ export function App() {
             onCompleteResultReview={briar.completeResultReview}
             onMoveRun={briar.moveRun}
             onProcessIssueNow={processIssueNow}
-            onRequestedRunOpen={() => setRequestedRunId(null)}
+            onRequestedRunOpen={() => {
+              setRequestedRunId(null);
+              setRequestedRunInitialTab(null);
+            }}
             onRetryRun={briar.retryRun}
             onReworkRun={briar.reworkRun}
             onCancelRun={briar.cancelRun}
