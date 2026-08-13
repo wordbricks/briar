@@ -66,9 +66,6 @@ export function normalizedAgentSkillRows(
   fallback: AgentSkillFallback,
   observedAt: string,
 ): AgentSkillRow[] {
-  if (input && input.length === 0) {
-    throw new Error("An Agent must have at least one Skill");
-  }
   const requested = input ?? [{
     ...fallback,
     kind: fallback.kind ?? "custom",
@@ -187,10 +184,26 @@ export async function assertAgentSkillReplacementAllowed(
   agentId: string,
   skills: readonly AgentSkillRow[],
 ) {
-  if (skills.length === 0) {
-    throw new Error("An Agent must have at least one Skill");
-  }
   const retainedSkillIds = skills.map((skill) => skill.id);
+  if (retainedSkillIds.length === 0) {
+    const blocked = await db
+      .prepare(
+        `select skill.name
+         from briar_agent_skills skill
+         where skill.agent_id = ?
+           and (${activeAgentSkillJobPredicate("skill")})
+         order by skill.position, skill.created_at, skill.id
+         limit 1`,
+      )
+      .bind(agentId)
+      .first<{ name: string }>();
+    if (blocked) {
+      throw new AgentSkillConflictError(
+        `Agent Skill "${blocked.name}" cannot be deleted while queued or running work still references it`,
+      );
+    }
+    return;
+  }
   const placeholders = retainedSkillIds.map(() => "?").join(", ");
   const blocked = await db
     .prepare(
@@ -299,15 +312,37 @@ export function replaceAgentSkillStatements(
   agentId: string,
   skills: readonly AgentSkillRow[],
 ): D1PreparedStatement[] {
-  if (skills.length === 0) {
-    throw new Error("An Agent must have at least one Skill");
-  }
   if (skills.some((skill) => skill.agent_id !== agentId)) {
     throw new Error("Agent Skill rows must belong to the Agent being updated");
   }
   const ids = skills.map((skill) => skill.id);
   if (new Set(ids).size !== ids.length) {
     throw new Error("Agent Skill IDs must be unique within an Agent");
+  }
+  if (ids.length === 0) {
+    return [
+      // Preserve the active-work deletion guard inside the same atomic batch
+      // as the roster replacement so a new reference cannot race the preflight.
+      db
+        .prepare(
+          `insert into briar_agent_skills (
+             id, agent_id, name, instructions, provider, model, effort, kind,
+             is_default, position, created_at, updated_at
+           )
+           select skill.id, skill.agent_id, skill.name, skill.instructions,
+                  skill.provider, skill.model, skill.effort, skill.kind,
+                  skill.is_default, skill.position, skill.created_at,
+                  skill.updated_at
+           from briar_agent_skills skill
+           where skill.agent_id = ?
+             and (${activeAgentSkillJobPredicate("skill")})
+           limit 1`,
+        )
+        .bind(agentId),
+      db
+        .prepare(`delete from briar_agent_skills where agent_id = ?`)
+        .bind(agentId),
+    ];
   }
   const placeholders = ids.map(() => "?").join(", ");
   return [

@@ -203,6 +203,43 @@ describe("ProjectAgents", () => {
     );
   });
 
+  it("exposes the full responsibility text for hover while rendering the clamped list copy", async () => {
+    const longResponsibility = Array.from({ length: 12 }, (_, index) =>
+      `Line ${index + 1}: craft high-engagement tweets with minimal fluff and strong hooks.`,
+    ).join(" ");
+    const longAgent: ProjectAgent = {
+      id: "agent-long-responsibility",
+      projectId: project.id,
+      name: "Nikita",
+      avatar: null,
+      codexPet: null,
+      provider: "grok",
+      model: "grok-4.6",
+      effort: null,
+      responsibility: longResponsibility,
+      skill: "# Nikita",
+      skills: [],
+      calendarColor: "#ad3e00",
+      createdAt: "2026-08-01T00:00:00.000Z",
+      updatedAt: "2026-08-01T00:00:00.000Z",
+    };
+    loadProjectAgents.mockResolvedValue([longAgent]);
+
+    const container = await mount(
+      <ProjectAgents {...projectAgentsProps} token="token" />,
+    );
+    await act(async () => Promise.resolve());
+
+    const responsibility = container.querySelector<HTMLParagraphElement>(
+      ".project-agent-card-responsibility",
+    );
+    expect(responsibility?.textContent).toBe(longResponsibility);
+    expect(responsibility?.getAttribute("title")).toBe(longResponsibility);
+    expect(responsibility?.className).toContain(
+      "project-agent-card-responsibility",
+    );
+  });
+
   it("shows only the agent with an active session as running", async () => {
     const runningSession: AutoHuntSession = {
       id: "running-session",

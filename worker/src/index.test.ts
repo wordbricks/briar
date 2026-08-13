@@ -305,16 +305,15 @@ describe("Worker HTTP contract", () => {
     ).toThrow("can no longer be verified");
   });
 
-  it("allows legacy Agent writes to omit Skills but rejects an empty roster", () => {
+  it("allows Agent writes to omit Skills or provide an empty roster", () => {
     const input = {
       provider: "codex" as const,
       responsibility: "Handle project work.",
     };
 
     expect(projectAgentInputSchema.parse(input).skills).toBeUndefined();
-    expect(
-      projectAgentInputSchema.safeParse({ ...input, skills: [] }).success,
-    ).toBe(false);
+    expect(projectAgentInputSchema.parse({ ...input, skills: [] }).skills)
+      .toEqual([]);
   });
 
   it("routes minute and six-hour scheduled work separately", async () => {

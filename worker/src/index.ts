@@ -1509,7 +1509,7 @@ export const projectAgentInputSchema = z
     model: z.string().trim().min(1).max(100).nullable().optional(),
     effort: z.enum(modelEfforts).nullable().optional(),
     responsibility: z.string().trim().min(1).max(2_000),
-    skills: z.array(channelAgentSkillInputSchema).min(1).max(50).optional(),
+    skills: z.array(channelAgentSkillInputSchema).max(50).optional(),
     calendarColor: z
       .string()
       .trim()
@@ -6932,7 +6932,7 @@ async function route(
       model: input.model,
       responsibility: input.responsibility,
       effort: input.effort,
-      skills: input.skills,
+      skills: input.skills ?? [],
       createdAt: new Date().toISOString(),
     });
     if (!agent) throw new HttpError(500, "Agent was not created");
@@ -9163,7 +9163,7 @@ async function route(
       model: input.model ?? null,
       effort: input.effort ?? null,
       responsibility: input.responsibility,
-      skills: input.skills,
+      skills: input.skills ?? [],
       calendarColor: input.calendarColor,
     });
     return json({ agent: projectAgentJson(agent) }, 201);

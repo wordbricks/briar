@@ -551,7 +551,12 @@ export function ProjectAgents({
                         </div>
                         <section>
                           <small>{t("agents.responsibility")}</small>
-                          <p>{agent.responsibility}</p>
+                          <p
+                            className="project-agent-card-responsibility"
+                            title={agent.responsibility}
+                          >
+                            {agent.responsibility}
+                          </p>
                           <div className="project-agent-card-skills">
                             <small>{t("agents.skills")}</small>
                             <ul>
@@ -913,17 +918,6 @@ function localProjectAgent(
 ): ProjectAgent {
   const id = crypto.randomUUID();
   const name = input.name ?? `${agentProviderLabels[input.provider]} Agent`;
-  const initialSkills: ProjectAgentSkillInput[] = [
-    {
-      name,
-      instructions: input.responsibility,
-      provider: input.provider,
-      model: input.model,
-      effort: input.effort ?? null,
-      kind: "custom",
-      position: 0,
-    },
-  ];
   return {
     id,
     projectId,
@@ -937,7 +931,7 @@ function localProjectAgent(
     skill: projectAgentSkill({ name, responsibility: input.responsibility }),
     skills: localProjectAgentSkills(
       id,
-      input.skills?.length ? input.skills : initialSkills,
+      input.skills ?? [],
       createdAt,
       [],
     ),

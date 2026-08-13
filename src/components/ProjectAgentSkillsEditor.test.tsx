@@ -6,6 +6,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import {
   ProjectAgentSkillsEditor,
   projectAgentSkillInputs,
+  projectAgentSkillsValid,
 } from "./ProjectAgentSkillsEditor";
 
 beforeAll(() => {
@@ -30,6 +31,10 @@ afterEach(async () => {
 });
 
 describe("ProjectAgentSkillsEditor", () => {
+  it("accepts an empty Skill roster", () => {
+    expect(projectAgentSkillsValid([])).toBe(true);
+  });
+
   it("serializes only fields accepted by the Skill input contract", () => {
     const persistedSkill = {
       id: "skill-1",
@@ -116,5 +121,43 @@ describe("ProjectAgentSkillsEditor", () => {
     );
     expect(container.textContent).not.toContain("기본 스킬");
     expect(container.textContent).not.toContain("기본으로 설정");
+  });
+
+  it("allows the final Skill to be deleted", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    mounted.push({ container, root });
+    const onChange = vi.fn();
+
+    await act(async () => {
+      root.render(
+        <ProjectAgentSkillsEditor
+          defaultEffort={null}
+          defaultModel={null}
+          defaultProvider="codex"
+          onChange={onChange}
+          skills={[
+            {
+              id: "skill-1",
+              name: "임시 스킬",
+              instructions: "삭제할 수 있습니다.",
+              provider: "codex",
+              model: null,
+              effort: null,
+              kind: "custom",
+              position: 0,
+            },
+          ]}
+        />,
+      );
+    });
+
+    const deleteButton = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="임시 스킬 스킬 삭제"]',
+    );
+    expect(deleteButton?.disabled).toBe(false);
+    await act(async () => deleteButton?.click());
+    expect(onChange).toHaveBeenCalledWith([]);
   });
 });

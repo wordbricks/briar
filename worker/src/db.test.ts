@@ -1937,7 +1937,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     ]);
   });
 
-  it("localizes the default Developer Agent and Issue processing Skill", async () => {
+  it("localizes the default Developer Agent without creating a Skill", async () => {
     const localizedProject = await createProject(db, {
       ownerUserId: "owner",
       organizationId: projectId,
@@ -1950,14 +1950,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       expect.objectContaining({
         name: "개발자 에이전트",
         responsibility: "프로젝트의 개발과 코드 관련 작업을 책임집니다.",
-        skills: [
-          expect.objectContaining({
-            name: "이슈 처리",
-            instructions: "프로젝트의 개발과 코드 관련 작업을 책임집니다.",
-            kind: "issue_processing",
-            is_default: 0,
-          }),
-        ],
+        skills: [],
       }),
     ]);
 
@@ -2648,6 +2641,40 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     ).resolves.toBeNull();
   });
 
+  it("allows a project agent to delete its final Skill", async () => {
+    const agent = await createProjectAgent(db, projectId, {
+      name: "Responsibility-only agent",
+      provider: "codex",
+      model: null,
+      effort: null,
+      responsibility: "Operates only within its saved responsibility.",
+      skills: [
+        {
+          name: "Temporary skill",
+          instructions: "This Skill will be removed.",
+          provider: "codex",
+          model: null,
+          effort: null,
+          kind: "custom",
+          position: 0,
+        },
+      ],
+      calendarColor: "#3275d5",
+    });
+
+    await expect(
+      updateProjectAgent(db, projectId, agent.id, {
+        name: agent.name,
+        provider: agent.provider,
+        model: agent.model,
+        effort: agent.effort,
+        responsibility: agent.responsibility,
+        skills: [],
+        calendarColor: agent.calendar_color,
+      }),
+    ).resolves.toMatchObject({ id: agent.id, skills: [] });
+  });
+
   it("preserves retained Skill job references across name swaps", async () => {
     const agent = await createProjectAgent(db, projectId, {
       name: "Durable skill agent",
@@ -2716,6 +2743,17 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
               position: 0,
             },
           ],
+          calendarColor: agent.calendar_color,
+        }),
+      ).rejects.toThrow("cannot be deleted while queued or running work");
+      await expect(
+        updateProjectAgent(db, projectId, agent.id, {
+          name: "Must not delete every active Skill",
+          provider: agent.provider,
+          model: agent.model,
+          effort: agent.effort,
+          responsibility: agent.responsibility,
+          skills: [],
           calendarColor: agent.calendar_color,
         }),
       ).rejects.toThrow("cannot be deleted while queued or running work");
@@ -2939,6 +2977,17 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       model: null,
       effort: null,
       responsibility: "Run with the original Skill settings.",
+      skills: [
+        {
+          name: "Legacy settings",
+          instructions: "Run with the original Skill settings.",
+          provider: "codex",
+          model: null,
+          effort: null,
+          kind: "custom",
+          position: 0,
+        },
+      ],
       calendarColor: "#3275d5",
     });
 
@@ -2981,6 +3030,17 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       model: null,
       effort: null,
       responsibility: "Must remain unchanged after a conflicting update.",
+      skills: [
+        {
+          name: "Owned Skill",
+          instructions: "Must remain attached to the collision target.",
+          provider: "codex",
+          model: null,
+          effort: null,
+          kind: "custom",
+          position: 0,
+        },
+      ],
       calendarColor: "#3275d5",
     });
 
