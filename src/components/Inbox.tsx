@@ -29,6 +29,7 @@ import { useI18n } from "../i18n";
 import type { MessageKey } from "../i18n/messages";
 import { autoHuntWorkflowStageCatalog } from "../lib/auto-hunt-contract";
 import type { Project } from "../types";
+import { ProjectIcon } from "./ProjectIcon";
 import {
   classifyInboxMessage,
   type InboxCategory,
@@ -107,6 +108,10 @@ export function Inbox({
   const [selectedProjectId, setSelectedProjectId] = useState("all");
   const [visibleCount, setVisibleCount] = useState(INBOX_PAGE_SIZE);
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const projectsById = useMemo(
+    () => new Map(projects.map((project) => [project.id, project])),
+    [projects],
+  );
   const projectOptions = useMemo(
     () => [
       { label: t("inbox.allProjects"), value: "all" },
@@ -319,6 +324,7 @@ export function Inbox({
                   message={message}
                   onMarkRead={onMarkRead}
                   onOpen={onOpen}
+                  project={projectsById.get(message.projectId)}
                   t={t}
                 />
               ))}
@@ -370,6 +376,7 @@ function InboxMessageRow({
   message,
   onMarkRead,
   onOpen,
+  project,
   t,
 }: {
   category: InboxCategory;
@@ -378,6 +385,7 @@ function InboxMessageRow({
   message: InboxMessageWithReadState;
   onMarkRead: (messageId: string) => void;
   onOpen: (message: InboxMessageWithReadState) => void;
+  project: Project | undefined;
   t: (key: MessageKey, values?: Record<string, string | number>) => string;
 }) {
   const showUnreadAction = message.isUnread && category !== "activity";
@@ -424,6 +432,18 @@ function InboxMessageRow({
           ) : (
             <Clock3 size={17} />
           )}
+          {project ? (
+            <span
+              aria-hidden="true"
+              className="inbox-message-project-icon"
+              data-project-id={project.id}
+            >
+              <ProjectIcon
+                className="inbox-message-project-icon-image"
+                project={project}
+              />
+            </span>
+          ) : null}
         </span>
         <span className="inbox-message-copy">
           <Typography as="strong" className="truncate" variant="bodySm">
