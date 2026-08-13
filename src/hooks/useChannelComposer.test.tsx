@@ -21,7 +21,6 @@ type OnSend = (
 const agents: ChannelAgentSummary[] = [
   {
     agentId: "project-agent",
-    handle: "builder",
     name: "Builder",
     avatar: null,
     provider: "codex",
@@ -35,7 +34,6 @@ const agents: ChannelAgentSummary[] = [
   },
   {
     agentId: "organization-agent",
-    handle: "helper",
     name: "Helper",
     avatar: null,
     provider: "claude",
@@ -171,11 +169,11 @@ describe("useChannelComposer", () => {
     await act(async () => input.dispatchEvent(
       new KeyboardEvent("keydown", { bubbles: true, key: "Enter" }),
     ));
-    expect(input.value).toBe("@helper ");
+    expect(input.value).toBe("@Helper ");
 
     await act(async () => container.querySelector("form")?.requestSubmit());
     expect(onSend).toHaveBeenCalledWith(
-      "@helper",
+      "@Helper",
       [expect.objectContaining({ id: "organization-agent", type: "agent" })],
       [],
       [],

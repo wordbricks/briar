@@ -46,7 +46,6 @@ afterEach(async () => {
 const agent: ProjectAgent = {
   id: "agent-1",
   projectId: "project-1",
-  handle: "codex-pet-agent",
   name: "Codex Pet agent",
   avatar: "data:image/png;base64,avatar",
   codexPet: {

@@ -80,9 +80,9 @@ describe("Project Agent channel message history", () => {
       ),
       db.prepare(
         `insert into briar_project_agents (
-           id, organization_id, project_id, handle, name, provider,
+           id, organization_id, project_id, name, provider,
            responsibility, created_at, updated_at
-         ) values (?, ?, ?, 'history-agent', 'History Agent', 'codex',
+         ) values (?, ?, ?, 'History Agent', 'codex',
                    'Read authorized history', ?, ?)`,
       ).bind(agentId, organizationId, projectId, at(0), at(0)),
     ]);

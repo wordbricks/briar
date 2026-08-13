@@ -75,6 +75,24 @@ describe("issue conversation mentions", () => {
     ]);
   });
 
+  it("links a known Agent Name containing spaces and non-Latin text", () => {
+    const transform = remarkIssueMentions(["기획 도우미"])();
+    const tree = {
+      type: "root",
+      children: [{
+        type: "paragraph",
+        children: [{ type: "text", value: "@기획 도우미 확인" }],
+      }],
+    } as Parameters<typeof transform>[0];
+
+    transform(tree);
+
+    expect(tree.children?.[0]?.children?.[0]).toMatchObject({
+      type: "link",
+      children: [{ type: "text", value: "@기획 도우미" }],
+    });
+  });
+
   it("recognizes only the internal mention URL scheme", () => {
     expect(isIssueMentionUrl(issueMentionUrl("member"))).toBe(true);
     expect(isIssueMentionUrl("https://example.com")).toBe(false);

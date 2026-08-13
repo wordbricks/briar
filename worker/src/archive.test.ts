@@ -1082,9 +1082,9 @@ describe("D1 to R2 log archives", () => {
     await db
       .prepare(
         `insert into briar_project_agents (
-           id, organization_id, project_id, handle, name, provider,
+           id, organization_id, project_id, name, provider,
            responsibility, avatar_spritesheet_object_key, created_at, updated_at
-         ) values (?, ?, null, 'cleanup-reference-agent', 'Cleanup reference',
+         ) values (?, ?, null, 'Cleanup reference',
                    'codex', 'Protect shared sprite metadata', ?, ?, ?)`,
       )
       .bind(agentId, projectId, objectKey, oldTime, oldTime)

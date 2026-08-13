@@ -156,7 +156,6 @@ const member: ChannelMember = {
 
 const agent: ChannelAgentSummary = {
   agentId: "agent-1",
-  handle: "honey",
   name: "Honey",
   avatar: null,
   provider: "claude",
@@ -1888,7 +1887,7 @@ describe("CompanionChannels", () => {
       messages: [],
     });
     sendChannelMessage.mockResolvedValue({
-      message: message("m-2", "@honey 확인해 줘"),
+      message: message("m-2", "@Honey 확인해 줘"),
       agentReplies: [],
     });
     await render();
@@ -1926,15 +1925,15 @@ describe("CompanionChannels", () => {
     expect(honey?.textContent).not.toContain("조직 에이전트");
     await act(async () => honey!.click());
     const composerMention = container.querySelector<HTMLButtonElement>(
-      ".companion-channel-composer-field .conversation-mention-button[data-mention-handle='honey']",
+      ".companion-channel-composer-field .conversation-mention-button[data-mention-handle='Honey']",
     );
-    expect(composerMention?.textContent).toBe("@honey");
+    expect(composerMention?.textContent).toBe("@Honey");
     await act(async () => composerMention?.click());
     expect(
       document.body.querySelector<HTMLElement>(".profile-dialog")?.textContent,
     ).toContain("Honey");
 
-    setter.call(input, "@honey 확인해 줘");
+    setter.call(input, "@Honey 확인해 줘");
     input.selectionStart = input.value.length;
     input.selectionEnd = input.value.length;
     await act(async () => input.dispatchEvent(new Event("input", { bubbles: true })));
@@ -1945,7 +1944,7 @@ describe("CompanionChannels", () => {
     });
 
     expect(sendChannelMessage).toHaveBeenCalledWith("token", "org-1", "c-common", {
-      body: "@honey 확인해 줘",
+      body: "@Honey 확인해 줘",
       parentMessageId: null,
       mentionedAgentIds: ["agent-1"],
       mentionedUserIds: [],

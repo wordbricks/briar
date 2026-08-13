@@ -535,7 +535,6 @@ import {
   OrganizationAgentContextPageTooLargeError,
 } from "./organization-agent-context";
 import {
-  agentHandleSchema,
   channelInputSchema,
   channelReadInputSchema,
   channelIssueProposalPayloadSchema,
@@ -552,7 +551,6 @@ import {
   channelSlugFromName,
   channelUpdateInputSchema,
   channelWebhookInputSchema,
-  handleFromName,
   organizationAgentInputSchema,
   channelAgentSkillInputSchema,
 } from "../../src/lib/channels-contract";
@@ -1492,7 +1490,6 @@ export const projectIssueKeyPrefixInputSchema = z
 export const projectAgentInputSchema = z
   .object({
     name: z.string().trim().min(1).max(100).nullable().optional(),
-    handle: agentHandleSchema.optional(),
     avatar: z
       .string()
       .max(400_000)
@@ -3676,7 +3673,6 @@ const projectAgentJson = (row: ProjectAgentRow) => {
   return {
     id: row.id,
     projectId: row.project_id,
-    handle: row.handle,
     name: row.name,
     avatar: row.avatar,
     codexPet: row.avatar_pet_json
@@ -6932,7 +6928,6 @@ async function route(
       id: crypto.randomUUID(),
       organizationId,
       name: input.name,
-      handle: input.handle ?? handleFromName(input.name) ?? undefined,
       provider: input.provider,
       model: input.model,
       responsibility: input.responsibility,
@@ -6959,7 +6954,6 @@ async function route(
       organizationId,
       agentId: organizationAgentMatch[2],
       name: input.name,
-      handle: input.handle,
       provider: input.provider,
       model: input.model,
       responsibility: input.responsibility,
@@ -9164,7 +9158,6 @@ async function route(
     const providerName = agentProviderLabels[input.provider];
     const agent = await createProjectAgent(db, project.id, {
       name: input.name ?? `${providerName} Agent`,
-      handle: input.handle,
       avatar: input.avatar ?? null,
       provider: input.provider,
       model: input.model ?? null,
@@ -9420,7 +9413,6 @@ async function route(
         projectAgentMatch[2],
         {
           name: input.name ?? `${providerName} Agent`,
-          handle: input.handle,
           avatar: input.avatar,
           codexPet: nextCodexPet,
           provider: input.provider,
@@ -12890,7 +12882,6 @@ async function route(
             agent: {
               id: agent.id,
               name: agent.name,
-              handle: agent.handle,
               responsibility: agent.responsibility,
               skill: legacyAgentSkillInstructions(
                 activeSkill,
