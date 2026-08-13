@@ -237,12 +237,14 @@ import type {
 } from "../types";
 import {
   agentEfforts,
-  agentModels,
+  agentModelDisplayName,
+  agentModelOptions,
   agentProviderLabels,
   agentProviders,
   type AgentProvider,
   type ModelEffort,
 } from "../lib/project-llm";
+import { useAgentProviderModels } from "../hooks/useAgentProviderModels";
 import { useI18n } from "../i18n";
 import type { MessageKey } from "../i18n/messages";
 
@@ -2545,6 +2547,7 @@ export function CreateIssueDialog({
   workflowProjectId?: string;
 }) {
   const { locale, t } = useI18n();
+  const providerModels = useAgentProviderModels();
   const [initialDraft] = useState(() => {
     const draft = loadCreateIssueDraft();
     return draft && projects.some((project) => project.id === draft.projectId)
@@ -2918,20 +2921,18 @@ export function CreateIssueDialog({
               disabled={!preferredProvider}
               label={t("issue.preferredModel")}
               onValueChange={setPreferredModel}
-              options={
-                preferredProvider &&
-                preferredProvider in agentModels
-                  ? agentModels[preferredProvider as AgentProvider].map(
-                      (option) => ({
-                        ...option,
-                        label: option.value
-                          ? option.label
-                          : t("settings.providerDefaultModel"),
-                      }),
-                    )
-                  : []
-              }
+              options={preferredProvider
+                ? agentModelOptions(
+                    providerModels,
+                    preferredProvider as AgentProvider,
+                    t("settings.providerDefaultModel"),
+                    preferredModel,
+                  )
+                : []}
               placeholder={t("issue.selectProviderFirst")}
+              searchEmptyMessage={t("issue.noModelsFound")}
+              searchPlaceholder={t("issue.searchModels")}
+              searchable={preferredProvider === "opencode"}
               value={preferredModel}
             />
             <NativeSelect
@@ -3549,13 +3550,6 @@ function pullRequestDisplayName(url: string, index: number) {
   return index === 0 ? "PR" : `PR ${index + 1}`;
 }
 
-function modelDisplayName(provider: AgentProvider, model: string) {
-  return (
-    agentModels[provider].find((option) => option.value === model)?.label ??
-    model
-  );
-}
-
 function IssueContextMenu({
   availableProviders,
   children,
@@ -3588,6 +3582,7 @@ function IssueContextMenu({
   isProcessing: boolean;
 }) {
   const { t } = useI18n();
+  const providerModels = useAgentProviderModels();
   const statusOptions = [
     { label: t("status.backlog"), value: "status:backlog" },
     { label: t("status.queued"), value: "status:queued" },
@@ -3622,11 +3617,19 @@ function IssueContextMenu({
     : t("issue.agentDefault");
   const currentModelLabel = run.preferredProvider
     ? run.preferredModel
-      ? `${modelDisplayName(run.preferredProvider, run.preferredModel)}${
+      ? `${agentModelDisplayName(providerModels, run.preferredProvider, run.preferredModel)}${
           run.preferredEffort ? ` · ${run.preferredEffort}` : ""
         }`
       : t("settings.providerDefaultModel")
     : t("run.notSet");
+  const currentProviderModelOptions = run.preferredProvider
+    ? agentModelOptions(
+        providerModels,
+        run.preferredProvider,
+        t("settings.providerDefaultModel"),
+        run.preferredModel,
+      )
+    : [];
   const issueCheckpoints = run.issueCheckpoints ?? [];
   const inheritedBoundaries = inheritedCheckpointBoundaries(
     run.workflow,
@@ -3939,7 +3942,7 @@ function IssueContextMenu({
                     {t("settings.model")}
                   </ContextMenu.Label>
                   <ContextMenu.RadioGroup value={run.preferredModel ?? ""}>
-                    {agentModels[run.preferredProvider].map((option) => (
+                    {currentProviderModelOptions.map((option) => (
                       <ContextMenu.RadioItem
                         className="issue-context-item issue-context-choice"
                         key={option.value || "default"}
@@ -4367,6 +4370,7 @@ export function RunPage({
   token?: string | null;
 }) {
   const { locale, localeTag, t } = useI18n();
+  const providerModels = useAgentProviderModels();
   const meta = runMeta(run.status, run.workflowStage, run.workflow);
   const label = localizeStatus(t, run.status, run.workflowStage, meta.label);
   const needsAttention = ["paused", "blocked", "failed"].includes(run.status);
@@ -4916,7 +4920,7 @@ export function RunPage({
   const executionIdentityParts = [
     executionProvider ? agentProviderLabels[executionProvider] : null,
     executionProvider && executionModel
-      ? modelDisplayName(executionProvider, executionModel)
+      ? agentModelDisplayName(providerModels, executionProvider, executionModel)
       : null,
     executionWorker?.label ?? null,
   ].filter((part): part is string => Boolean(part));
@@ -4956,7 +4960,7 @@ export function RunPage({
         <div>
           <dt>{t("run.metricsModel")}</dt>
           <dd title={executionModel}>
-            {modelDisplayName(executionProvider, executionModel)}
+            {agentModelDisplayName(providerModels, executionProvider, executionModel)}
           </dd>
         </div>
       ) : null}
@@ -6458,17 +6462,18 @@ export function RunPage({
                         }}
                         options={
                           run.preferredProvider
-                            ? agentModels[run.preferredProvider].map(
-                                (option) => ({
-                                  ...option,
-                                  label: option.value
-                                    ? option.label
-                                    : t("settings.providerDefaultModel"),
-                                }),
+                            ? agentModelOptions(
+                                providerModels,
+                                run.preferredProvider,
+                                t("settings.providerDefaultModel"),
+                                run.preferredModel,
                               )
                             : []
                         }
                         placeholder={t("issue.selectProviderFirst")}
+                        searchEmptyMessage={t("issue.noModelsFound")}
+                        searchPlaceholder={t("issue.searchModels")}
+                        searchable={run.preferredProvider === "opencode"}
                         size="small"
                         value={run.preferredModel ?? ""}
                       />

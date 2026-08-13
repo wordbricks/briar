@@ -28,10 +28,12 @@ import {
 } from "../lib/api";
 import {
   agentEfforts,
-  agentModels,
+  agentModelDisplayName,
+  agentModelOptions,
   agentProviderLabels,
   agentProviders,
   type AgentProvider,
+  type AgentProviderModelCatalog,
   type ModelEffort,
 } from "../lib/project-llm";
 import { demoProjectAgents } from "../lib/demo-project-agents";
@@ -49,6 +51,7 @@ import {
 import { runProjectAgent } from "../lib/project-llm";
 import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
 import { useMobileBackHandler } from "../hooks/useMobileNavigation";
+import { useAgentProviderModels } from "../hooks/useAgentProviderModels";
 import type {
   CreateProjectAgentInput,
   DashboardPayload,
@@ -122,6 +125,7 @@ export function ProjectAgents({
 }) {
   const { locale, localeTag, t } = useI18n();
   const { toast } = useToast();
+  const providerModels = useAgentProviderModels();
   const [agents, setAgents] = useState<ProjectAgent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -532,6 +536,7 @@ export function ProjectAgents({
                           </span>
                           <span>
                             {modelLabel(
+                              providerModels,
                               agent,
                               t("agents.providerDefaultModel"),
                             )}
@@ -673,14 +678,12 @@ export function ProjectAgents({
   );
 }
 function modelLabel(
+  providerModels: AgentProviderModelCatalog,
   agent: Pick<ProjectAgent, "provider" | "model">,
   providerDefault: string,
 ) {
   if (!agent.model) return providerDefault;
-  return (
-    agentModels[agent.provider].find((model) => model.value === agent.model)
-      ?.label ?? agent.model
-  );
+  return agentModelDisplayName(providerModels, agent.provider, agent.model);
 }
 
 export function ProjectAgentDialog({
@@ -695,6 +698,7 @@ export function ProjectAgentDialog({
   onSubmit: (input: CreateProjectAgentInput) => Promise<void>;
 }) {
   const { t } = useI18n();
+  const providerModels = useAgentProviderModels();
   const [name, setName] = useState(agent?.name ?? "");
   const [handle, setHandle] = useState(
     agent?.handle ?? handleFromName(agent?.name ?? ""),
@@ -835,13 +839,15 @@ export function ProjectAgentDialog({
               <NativeSelect
                 label={t("agents.model")}
                 onValueChange={setModel}
-                options={agentModels[provider].map((option) => ({
-                  ...option,
-                  label:
-                    option.value === ""
-                      ? t("agents.providerDefaultModel")
-                      : option.label,
-                }))}
+                options={agentModelOptions(
+                  providerModels,
+                  provider,
+                  t("agents.providerDefaultModel"),
+                  model,
+                )}
+                searchEmptyMessage={t("issue.noModelsFound")}
+                searchPlaceholder={t("issue.searchModels")}
+                searchable={provider === "opencode"}
                 value={model}
               />
             </label>

@@ -13,12 +13,13 @@ import { useState } from "react";
 import { useI18n } from "../i18n";
 import {
   agentEfforts,
-  agentModels,
+  agentModelOptions,
   agentProviderLabels,
   agentProviders,
   type AgentProvider,
   type ModelEffort,
 } from "../lib/project-llm";
+import { useAgentProviderModels } from "../hooks/useAgentProviderModels";
 import {
   projectAgentAvatarAccept,
   projectAgentAvatarFromFile,
@@ -71,6 +72,7 @@ export function ProjectAgentSettings({
 }) {
   const { t } = useI18n();
   const { toast } = useToast();
+  const providerModels = useAgentProviderModels();
   const [name, setName] = useState(agent.name);
   const [handle, setHandle] = useState(
     agent.handle ?? handleFromName(agent.name),
@@ -114,8 +116,11 @@ export function ProjectAgentSettings({
     responsibility !== savedProfile.responsibility ||
     JSON.stringify(skills) !== JSON.stringify(savedProfile.skills) ||
     calendarColor !== savedProfile.calendarColor;
-  const selectedModelKnown = agentModels[provider].some(
-    (option) => option.value === model,
+  const modelOptions = agentModelOptions(
+    providerModels,
+    provider,
+    t("agents.providerDefaultModel"),
+    model,
   );
   const handleValid =
     !handle || /^[a-z0-9]+(?:-[a-z0-9]+)*$/u.test(handle);
@@ -433,18 +438,10 @@ export function ProjectAgentSettings({
                       disabled={profileSaving}
                       label={t("agents.model")}
                       onValueChange={setModel}
-                      options={[
-                        ...(!selectedModelKnown && model
-                          ? [{ label: model, value: model }]
-                          : []),
-                        ...agentModels[provider].map((option) => ({
-                          ...option,
-                          label:
-                            option.value === ""
-                              ? t("agents.providerDefaultModel")
-                              : option.label,
-                        })),
-                      ]}
+                      options={modelOptions}
+                      searchEmptyMessage={t("issue.noModelsFound")}
+                      searchPlaceholder={t("issue.searchModels")}
+                      searchable={provider === "opencode"}
                       value={model}
                     />
                   </div>

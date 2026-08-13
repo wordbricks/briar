@@ -8,12 +8,13 @@ import { Typography } from "@/components/ui/typography";
 import { useI18n } from "../i18n";
 import {
   agentEfforts,
-  agentModels,
+  agentModelOptions,
   agentProviderLabels,
   agentProviders,
   type AgentProvider,
   type ModelEffort,
 } from "../lib/project-llm";
+import { useAgentProviderModels } from "../hooks/useAgentProviderModels";
 import type { ProjectAgentSkillInput } from "../types";
 import { NativeSelect } from "./NativeSelect";
 
@@ -68,6 +69,7 @@ export function ProjectAgentSkillsEditor({
   skills: ProjectAgentSkillInput[];
 }) {
   const { t } = useI18n();
+  const providerModels = useAgentProviderModels();
 
   const updateSkill = (
     index: number,
@@ -146,8 +148,11 @@ export function ProjectAgentSkillsEditor({
       ) : (
         <div className="project-agent-skill-list">
           {skills.map((skill, index) => {
-            const selectedModelKnown = agentModels[skill.provider].some(
-              (option) => option.value === (skill.model ?? ""),
+            const modelOptions = agentModelOptions(
+              providerModels,
+              skill.provider,
+              t("agents.providerDefaultModel"),
+              skill.model,
             );
             const accessibleSkillName =
               skill.name.trim() || t("agents.untitledSkill");
@@ -255,18 +260,10 @@ export function ProjectAgentSkillsEditor({
                         onValueChange={(value) =>
                           updateSkill(index, { model: value || null })
                         }
-                        options={[
-                          ...(!selectedModelKnown && skill.model
-                            ? [{ label: skill.model, value: skill.model }]
-                            : []),
-                          ...agentModels[skill.provider].map((option) => ({
-                            ...option,
-                            label:
-                              option.value === ""
-                                ? t("agents.providerDefaultModel")
-                                : option.label,
-                          })),
-                        ]}
+                        options={modelOptions}
+                        searchEmptyMessage={t("issue.noModelsFound")}
+                        searchPlaceholder={t("issue.searchModels")}
+                        searchable={skill.provider === "opencode"}
                         value={skill.model ?? ""}
                       />
                     </div>

@@ -30,9 +30,10 @@ import {
 } from "../lib/channels-contract";
 import {
   agentEfforts,
-  agentModels,
+  agentModelOptions,
   type ModelEffort,
 } from "../lib/project-llm";
+import { useAgentProviderModels } from "../hooks/useAgentProviderModels";
 import {
   agentProviderLabels,
   agentProviders,
@@ -459,6 +460,7 @@ function OrganizationAgentCreateDialog({
   }) => Promise<void>;
 }) {
   const { t } = useI18n();
+  const providerModels = useAgentProviderModels(isOpen);
   const [name, setName] = useState("");
   const [handle, setHandle] = useState("");
   const [isHandleCustomized, setIsHandleCustomized] = useState(false);
@@ -603,13 +605,14 @@ function OrganizationAgentCreateDialog({
               <NativeSelect
                 label={t("agents.model")}
                 onValueChange={setModel}
-                options={agentModels[provider].map((option) => ({
-                  ...option,
-                  label:
-                    option.value === ""
-                      ? t("agents.providerDefaultModel")
-                      : option.label,
-                }))}
+                options={agentModelOptions(
+                  providerModels,
+                  provider,
+                  t("agents.providerDefaultModel"),
+                )}
+                searchEmptyMessage={t("issue.noModelsFound")}
+                searchPlaceholder={t("issue.searchModels")}
+                searchable={provider === "opencode"}
                 value={model}
               />
             </div>
