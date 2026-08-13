@@ -14,8 +14,18 @@ import {
 } from "./Inbox";
 
 const projects: Project[] = [
-  { id: "project-1", name: "Briar", createdAt: "2026-07-01T00:00:00.000Z" },
-  { id: "project-2", name: "Sprout", createdAt: "2026-07-02T00:00:00.000Z" },
+  {
+    id: "project-1",
+    name: "Briar",
+    icon: "data:image/webp;base64,briar-icon",
+    createdAt: "2026-07-01T00:00:00.000Z",
+  },
+  {
+    id: "project-2",
+    name: "Sprout",
+    icon: "data:image/webp;base64,sprout-icon",
+    createdAt: "2026-07-02T00:00:00.000Z",
+  },
 ];
 
 const issue = (
@@ -189,6 +199,54 @@ describe("Inbox", () => {
       row?.querySelector<HTMLButtonElement>(".inbox-message-open")?.click();
     });
     expect(onOpen).toHaveBeenCalledWith(message);
+  });
+
+  it("overlays each message icon with its matching project icon", async () => {
+    const messages = [
+      issue("briar-icon", "Briar update", {
+        priority: 1,
+        status: "failed",
+      }),
+      issue("sprout-icon", "Sprout update", {
+        projectId: "project-2",
+        projectName: "Sprout",
+        priority: 1,
+        status: "failed",
+      }),
+    ];
+
+    await act(async () =>
+      root.render(
+        <I18nProvider>
+          <Inbox
+            isSidebarOpen
+            messages={messages}
+            onMarkAllRead={vi.fn()}
+            onMarkRead={vi.fn()}
+            onOpen={vi.fn()}
+            projects={projects}
+            unreadCount={2}
+          />
+        </I18nProvider>,
+      ),
+    );
+
+    const projectIcons = [
+      ...container.querySelectorAll<HTMLElement>(
+        ".inbox-message-project-icon",
+      ),
+    ];
+    expect(projectIcons).toHaveLength(2);
+    expect(projectIcons.map((icon) => icon.dataset.projectId)).toEqual([
+      "project-1",
+      "project-2",
+    ]);
+    expect(
+      projectIcons[0]?.querySelector("img")?.getAttribute("src"),
+    ).toBe(projects[0]?.icon);
+    expect(
+      projectIcons[1]?.querySelector("img")?.getAttribute("src"),
+    ).toBe(projects[1]?.icon);
   });
 
   it("renders configured labels for custom workflow stages", async () => {

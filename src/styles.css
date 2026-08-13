@@ -3562,7 +3562,11 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .inbox-message-open:active { transform:scale(.997); }
 .inbox-message.unread { background:#fbfaff; }
 .inbox-message.unread:hover { background:#f7f4ff; }
-.inbox-message-icon { width:36px; height:36px; grid-column:1; grid-row:1 / 3; display:grid; place-items:center; border-radius:10px; color:#5e49a7; background:#eee9ff; }
+.inbox-message-icon { width:36px; height:36px; position:relative; grid-column:1; grid-row:1 / 3; display:grid; place-items:center; border-radius:10px; color:#5e49a7; background:#eee9ff; }
+.inbox-message-project-icon { width:17px; height:17px; position:absolute; z-index:1; right:-5px; bottom:-5px; display:grid; place-items:center; overflow:hidden; border:2px solid var(--card); border-radius:50%; color:var(--muted-foreground); background:var(--card); box-shadow:0 1px 3px rgba(31,32,28,.18); pointer-events:none; }
+.inbox-message-project-icon > img,.inbox-message-project-icon > svg { width:100%; height:100%; }
+.inbox-message-project-icon > img { border-radius:50%; object-fit:contain; }
+.inbox-message-project-icon > svg { padding:2px; color:var(--muted-foreground); }
 .inbox-message-icon.issue.completed { color:#298067; background:#e5f5ef; }
 .inbox-message-icon.issue.failed,.inbox-message-icon.issue.blocked,.inbox-message-icon.session.failed { color:#aa4153; background:#ffeaee; }
 .inbox-message-icon.issue.cancelled { color:var(--muted-foreground); background:#ecece8; }
@@ -4614,6 +4618,8 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .companion-shell .inbox-mark-read:hover .inbox-mark-read-dot,.companion-shell .inbox-mark-read:focus-visible .inbox-mark-read-dot { opacity:0; transform:scale(.7); }
 .companion-shell .inbox-mark-read:hover .inbox-mark-read-check,.companion-shell .inbox-mark-read:focus-visible .inbox-mark-read-check { opacity:1; transform:scale(1); }
 .companion-shell .inbox-message-icon { width:46px; height:46px; border-radius:50%; }
+.companion-shell .inbox-message-project-icon { right:-2px; bottom:-2px; }
+.companion-shell .inbox-mark-read { left:max(22px,calc(env(safe-area-inset-left) + 14px)); }
 .companion-shell .inbox-message-copy { gap:3px; }
 .companion-shell .inbox-message-copy strong { font-size:var(--text-sm); line-height:1.25; }
 .companion-shell .inbox-message-detail { min-width:0; font-size:var(--text-xs); }
