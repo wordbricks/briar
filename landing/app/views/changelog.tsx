@@ -23,6 +23,19 @@ export const changelogCopy = {
     backTop: "맨 위로 ↑",
     entries: [
       {
+        version: "1.2.121",
+        date: "2026년 8월 14일",
+        title: "Antigravity를 연결하고 워크플로 생성을 더 깔끔하게 보여줍니다",
+        summary:
+          "Google Antigravity를 새로운 에이전트 제공자로 추가하고, 워크플로 생성 중 내부 데이터 대신 이해하기 쉬운 진행 상태를 표시합니다.",
+        items: [
+          "초기 설정과 앱 설정에서 Google Antigravity CLI를 설치·로그인·활성화하고, 실제 지원 모델과 Effort를 불러와 이슈·프로젝트·조직 에이전트와 Worker 작업에 선택할 수 있습니다.",
+          "Antigravity 실행기를 데스크탑과 Briar CLI에 함께 번들링해 새 작업과 이어지는 대화, 도구 활동, 첨부 파일, 승인·샌드박스·네트워크 정책을 기존 제공자와 같은 실행 흐름으로 처리합니다.",
+          "Antigravity의 인증·상태·사용량 소진을 감지하고 실행 모델과 토큰·예상 비용을 Google 가격 정보에 연결해 설정과 사용량 화면에서 확인할 수 있습니다.",
+          "워크플로 생성과 도구 분석의 마지막 단계에서 completion·execution·stages 같은 내부 JSON을 노출하지 않고, 분석 결과를 정리하고 있다는 로컬라이즈된 진행 문구를 표시합니다.",
+        ],
+      },
+      {
         version: "1.2.120",
         date: "2026년 8월 14일",
         title: "실시간 대화와 에이전트 실행을 더 정확하게 연결합니다",
@@ -567,6 +580,19 @@ export const changelogCopy = {
     home: "Home",
     backTop: "Back to top ↑",
     entries: [
+      {
+        version: "1.2.121",
+        date: "August 14, 2026",
+        title: "Connect Antigravity and clarify workflow creation",
+        summary:
+          "Add Google Antigravity as an agent provider and replace internal workflow-generation data with a clear, human-readable progress state.",
+        items: [
+          "Install, sign in to, and enable the Google Antigravity CLI from onboarding or App Settings, discover its live models and effort levels, and select it for issues, project and organization agents, and Worker dispatches.",
+          "Bundle the Antigravity runner with desktop and the Briar CLI so new and resumed conversations, tool activity, attachments, approvals, sandboxing, and network policy use the same execution flow as other providers.",
+          "Detect Antigravity authentication, health, and exhausted usage, then connect its actual model, token usage, and estimated cost to Google pricing in settings and usage views.",
+          "Show a localized progress message while workflow creation and tool analysis finalize instead of exposing internal completion, execution, stages, and version JSON.",
+        ],
+      },
       {
         version: "1.2.120",
         date: "August 14, 2026",
@@ -1124,9 +1150,9 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <h1>{changelog.title}</h1>
           <p>{changelog.description}</p>
         </div>
-        <a href="#v1-2-120" className="changelog-current">
+        <a href="#v1-2-121" className="changelog-current">
           <span>{changelog.current}</span>
-          <strong>v1.2.120</strong>
+          <strong>v1.2.121</strong>
           <i aria-hidden="true">↓</i>
         </a>
       </section>
@@ -1151,6 +1177,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   {index === 0 ? <span>{changelog.latest}</span> : null}
                   <time
                     dateTime={
+                      entry.version === "1.2.121" ||
                       entry.version === "1.2.120" ||
                       entry.version === "1.2.119"
                         ? "2026-08-14"
