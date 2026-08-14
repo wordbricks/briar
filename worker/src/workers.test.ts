@@ -347,6 +347,12 @@ describe("detached execution workers", () => {
           allowCustomModels: false,
           error: null,
         },
+        agy: {
+          models: [],
+          defaultEfforts: [],
+          allowCustomModels: false,
+          error: null,
+        },
         opencode: {
           models: [],
           defaultEfforts: [],
@@ -671,6 +677,7 @@ describe("detached execution workers", () => {
             allowCustomModels: false,
             error: null,
           },
+          agy: { models: [], defaultEfforts: [], allowCustomModels: false, error: null },
           opencode: { models: [], defaultEfforts: [], allowCustomModels: true, error: null },
         },
       },
