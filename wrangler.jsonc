@@ -72,11 +72,19 @@
       {
         "name": "CHANNEL_REALTIME",
         "class_name": "ChannelRealtimeHub"
+      },
+      {
+        "name": "CHANNEL_ACTIVITY_REALTIME",
+        "class_name": "ChannelActivityHub"
       }
     ]
   },
   "exports": {
     "ChannelRealtimeHub": {
+      "type": "durable-object",
+      "storage": "sqlite"
+    },
+    "ChannelActivityHub": {
       "type": "durable-object",
       "storage": "sqlite"
     }

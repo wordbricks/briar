@@ -1759,6 +1759,7 @@ export async function loadChannel(
     members: ChannelMember[];
     agents: ChannelAgentSummary[];
     messages: ChannelMessage[];
+    agentReplies?: ChannelAgentReply[];
     nextCursor?: string | null;
   }>(`/organizations/${organizationId}/channels/${channelId}${query}`, token, {
     signal: options.signal,

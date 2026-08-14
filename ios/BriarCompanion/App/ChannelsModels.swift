@@ -344,8 +344,54 @@ struct ChannelsResponse: Codable, Sendable {
     let cursor: Int?
 }
 
-/// Incremental organization channel changes. Reply-job metadata is deliberately
-/// omitted: native clients only need the resulting message/channel projections.
+struct ChannelAgentReply: Codable, Equatable, Identifiable, Sendable {
+    let id: UUID
+    let agentId: UUID
+    let channelId: UUID
+    let triggerMessageId: UUID
+    let parentMessageId: UUID
+    let replyMessageId: UUID
+    let status: Status
+    let attempts: Int
+    let error: String?
+    let createdAt: Date
+    let updatedAt: Date
+
+    enum Status: String, Codable, Sendable {
+        case queued
+        case running
+        case completed
+        case failed
+    }
+}
+
+struct ChannelAgentActivity: Codable, Equatable, Sendable {
+    let id: String
+    let kind: Kind
+    let headline: String
+
+    enum Kind: String, Codable, Sendable {
+        case command
+        case fileChange
+        case webSearch
+        case tool
+    }
+}
+
+struct ChannelAgentActivityFrame: Codable, Equatable, Sendable {
+    let version: Int
+    let replyJobId: UUID
+    let attempt: Int
+    let sequence: Int
+    let agentId: UUID
+    let channelId: UUID
+    let triggerMessageId: UUID
+    let parentMessageId: UUID
+    let activity: ChannelAgentActivity?
+    let sentAt: Date
+    let expiresAt: Date
+}
+
 struct ChannelDeltaResponse: Codable, Equatable, Sendable {
     let cursor: Int
     let hasMore: Bool
@@ -353,6 +399,7 @@ struct ChannelDeltaResponse: Codable, Equatable, Sendable {
     let removedChannelIds: [UUID]
     let messages: [ChannelMessage]
     let removedMessageIds: [UUID]
+    var agentReplies: [ChannelAgentReply]? = nil
 }
 
 struct ChannelDetailResponse: Codable, Sendable {
@@ -360,6 +407,7 @@ struct ChannelDetailResponse: Codable, Sendable {
     let members: [ChannelMember]
     let agents: [ChannelAgentSummary]
     let messages: [ChannelMessage]
+    var agentReplies: [ChannelAgentReply]? = nil
     var nextCursor: UUID? = nil
 }
 

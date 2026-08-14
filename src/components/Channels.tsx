@@ -145,6 +145,11 @@ import {
   type DesktopChannelDisplaySource,
 } from "../lib/channel-performance";
 import { currentExecutionWorkerDeviceId } from "../lib/execution-worker-device";
+import { useChannelAgentActivity } from "../hooks/use-channel-agent-activity";
+import type {
+  ChannelAgentActivityDescriptor,
+  ChannelAgentActivityFrame,
+} from "../lib/channel-agent-activity";
 
 const typingAgentNamesForMessage = (
   replies: ChannelAgentReply[],
@@ -181,6 +186,23 @@ const typingAgentNamesForMessages = (
         ),
     ),
   ];
+};
+
+const activityByAgentNameForReplies = (
+  replies: ChannelAgentReply[],
+  agents: ChannelAgentSummary[],
+  activity: ReadonlyMap<string, ChannelAgentActivityFrame>,
+  fallbackName: string,
+) => {
+  const result: Record<string, ChannelAgentActivityDescriptor> = {};
+  for (const reply of replies) {
+    const frame = activity.get(reply.id);
+    if (!frame?.activity || frame.attempt !== reply.attempts) continue;
+    const name = agents.find((agent) => agent.agentId === reply.agentId)?.name ??
+      fallbackName;
+    result[name] = frame.activity;
+  }
+  return result;
 };
 
 type ChannelsProps = {
@@ -385,6 +407,11 @@ export function Channels({
   const [channelLoading, setChannelLoading] = useState(false);
   const [loadingEarlierMessages, setLoadingEarlierMessages] = useState(false);
   const [replies, setReplies] = useState<ChannelAgentReply[]>([]);
+  const liveActivity = useChannelAgentActivity(
+    token,
+    organizationId,
+    activeChannelId,
+  );
   const [threadParentId, setThreadParentId] = useState<string | null>(null);
   const [threadMessages, setThreadMessages] = useState<ChannelMessage[]>([]);
   const [proposalProjects, setProposalProjects] = useState<
@@ -797,6 +824,7 @@ export function Channels({
     setProposalProjects({});
     setThreadParentId(null);
     setThreadMessages([]);
+    setReplies([]);
     setError(null);
   }, [activeChannelId, channelListReady]);
 
@@ -825,6 +853,7 @@ export function Channels({
         );
         setMembers(result.members);
         setAgents(result.agents);
+        setReplies(result.agentReplies ?? []);
         recordProposalMessages(result.messages);
         const nextCursor = cached && cached.messages.length > result.messages.length
           ? cached.nextCursor
@@ -1763,14 +1792,26 @@ export function Channels({
       reply.channelId === activeChannelId &&
       (reply.status === "queued" || reply.status === "running"),
   );
+  const threadMessageIds = threadParentId
+    ? new Set([threadParentId, ...threadMessages.map((message) => message.id)])
+    : new Set<string>();
+  const threadPendingReplies = pendingReplies.filter((reply) =>
+    threadMessageIds.has(reply.parentMessageId)
+  );
   const threadTypingAgentNames = threadParentId
     ? typingAgentNamesForMessages(
-        pendingReplies,
+        threadPendingReplies,
         agents,
-        [threadParentId, ...threadMessages.map((message) => message.id)],
+        [...threadMessageIds],
         t("channel.projectAgent"),
       )
     : [];
+  const threadActivityByAgentName = activityByAgentNameForReplies(
+    threadPendingReplies,
+    agents,
+    liveActivity,
+    t("channel.projectAgent"),
+  );
 
   const memberCount = Math.max(activeChannel?.memberCount ?? 0, members.length);
 
@@ -1924,6 +1965,14 @@ export function Channels({
                         message.id,
                         t("channel.projectAgent"),
                       )}
+                      typingActivityByAgentName={activityByAgentNameForReplies(
+                        pendingReplies.filter((reply) =>
+                          reply.parentMessageId === message.id
+                        ),
+                        agents,
+                        liveActivity,
+                        t("channel.projectAgent"),
+                      )}
                       showTypingState={message.id !== threadParentId}
                     />
                     )}
@@ -2045,12 +2094,21 @@ export function Channels({
                   message.id,
                   t("channel.projectAgent"),
                 )}
+                typingActivityByAgentName={activityByAgentNameForReplies(
+                  pendingReplies.filter((reply) =>
+                    reply.parentMessageId === message.id
+                  ),
+                  agents,
+                  liveActivity,
+                  t("channel.projectAgent"),
+                )}
                 showTypingState={false}
               />
             ))}
           </div>
           <ChannelTypingState
             agentNames={threadTypingAgentNames}
+            activityByAgentName={threadActivityByAgentName}
             className="channel-thread-typing"
           />
           <Composer
@@ -2740,6 +2798,7 @@ const MessageRow = memo(function MessageRow({
   selectedProjectId,
   token,
   typingAgentNames,
+  typingActivityByAgentName,
   showTypingState = true,
 }: {
   acceptingProposal: boolean;
@@ -2778,6 +2837,7 @@ const MessageRow = memo(function MessageRow({
   selectedProjectId: string | null;
   token: string;
   typingAgentNames: string[];
+  typingActivityByAgentName: Readonly<Record<string, ChannelAgentActivityDescriptor>>;
   showTypingState?: boolean;
 }) {
   const { t } = useI18n();
@@ -2867,7 +2927,10 @@ const MessageRow = memo(function MessageRow({
         </header>
         <ChannelMessageText agents={agents} members={members} message={message} />
         {showTypingState ? (
-          <ChannelTypingState agentNames={typingAgentNames} />
+          <ChannelTypingState
+            agentNames={typingAgentNames}
+            activityByAgentName={typingActivityByAgentName}
+          />
         ) : null}
         <ChannelMessageImages attachments={message.attachments} token={token} />
 
@@ -3027,6 +3090,8 @@ const MessageRow = memo(function MessageRow({
   previous.selectedProjectId === next.selectedProjectId &&
   previous.showTypingState === next.showTypingState &&
   previous.token === next.token &&
+  JSON.stringify(previous.typingActivityByAgentName) ===
+    JSON.stringify(next.typingActivityByAgentName) &&
   previous.typingAgentNames.length === next.typingAgentNames.length &&
   previous.typingAgentNames.every(
     (name, index) => name === next.typingAgentNames[index],

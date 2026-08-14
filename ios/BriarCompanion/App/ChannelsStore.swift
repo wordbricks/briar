@@ -117,11 +117,19 @@ final class ChannelsStore: ObservableObject {
         var id: UUID { proposalID }
     }
 
+    struct AgentTypingStatus: Identifiable, Equatable, Sendable {
+        let id: UUID
+        let agentName: String
+        let activity: ChannelAgentActivity?
+    }
+
     @Published private(set) var channels: [ChannelSummary] = []
     @Published private(set) var messages: [ChannelMessage] = []
     @Published private(set) var thread: [ChannelMessage] = []
     @Published private(set) var members: [ChannelMember] = []
     @Published private(set) var agents: [ChannelAgentSummary] = []
+    @Published private(set) var agentReplies: [ChannelAgentReply] = []
+    @Published private(set) var activityFrames: [UUID: ChannelAgentActivityFrame] = [:]
     @Published private(set) var hasEarlierMessages = false
     @Published private(set) var loadingEarlierMessages = false
     @Published private(set) var loading = false
@@ -162,6 +170,8 @@ final class ChannelsStore: ObservableObject {
     private var changesRefreshRequested = false
     private var pollingTask: Task<Void, Never>?
     private var realtimeTask: Task<Void, Never>?
+    private var activityTask: Task<Void, Never>?
+    private var activityExpiryTask: Task<Void, Never>?
 
     init(
         api: any MobileAPIClientProtocol,
@@ -191,6 +201,10 @@ final class ChannelsStore: ObservableObject {
         pollingTask = nil
         realtimeTask?.cancel()
         realtimeTask = nil
+        activityTask?.cancel()
+        activityTask = nil
+        activityExpiryTask?.cancel()
+        activityExpiryTask = nil
         self.organizationID = organizationID
         self.token = token
         syncCursor = nil
@@ -209,6 +223,8 @@ final class ChannelsStore: ObservableObject {
         thread = []
         members = []
         agents = []
+        agentReplies = []
+        activityFrames = [:]
         hasEarlierMessages = false
         loadingEarlierMessages = false
         loading = false
@@ -279,6 +295,8 @@ final class ChannelsStore: ObservableObject {
         let expectedLoadRevision = authoritativeLoadRevision
         focusedChannelID = channelID
         focusedThreadParentID = nil
+        activityFrames = [:]
+        startActivitySynchronization()
         conversationLoadInFlight = true
         updateLoadingState()
         messages = []
@@ -288,6 +306,7 @@ final class ChannelsStore: ObservableObject {
         thread = []
         members = []
         agents = []
+        agentReplies = []
         defer {
             if expectedGeneration == generation,
                expectedLoadRevision == authoritativeLoadRevision,
@@ -325,6 +344,7 @@ final class ChannelsStore: ObservableObject {
             hasEarlierMessages = response.nextCursor != nil
             members = response.members
             agents = response.agents
+            agentReplies = response.agentReplies ?? []
             errorMessage = nil
         } catch {
             guard
@@ -346,6 +366,12 @@ final class ChannelsStore: ObservableObject {
         authoritativeLoadRevision &+= 1
         invalidateProposalAcceptancePresentation()
         focusedChannelID = nil
+        activityTask?.cancel()
+        activityTask = nil
+        activityExpiryTask?.cancel()
+        activityExpiryTask = nil
+        activityFrames = [:]
+        agentReplies = []
         nextMessageCursor = nil
         hasEarlierMessages = false
         loadingEarlierMessages = false
@@ -612,6 +638,7 @@ final class ChannelsStore: ObservableObject {
         isForeground = true
         guard organizationID != nil, token != nil else { return }
         startSynchronization()
+        startActivitySynchronization()
     }
 
     func applicationDidEnterBackground() {
@@ -621,6 +648,10 @@ final class ChannelsStore: ObservableObject {
         pollingTask = nil
         realtimeTask?.cancel()
         realtimeTask = nil
+        activityTask?.cancel()
+        activityTask = nil
+        activityExpiryTask?.cancel()
+        activityExpiryTask = nil
     }
 
     private var authoritativeLoadInFlight: Bool {
@@ -1541,6 +1572,11 @@ final class ChannelsStore: ObservableObject {
     }
 
     private func apply(_ delta: ChannelDeltaResponse) {
+        if let incomingReplies = delta.agentReplies {
+            var byID = Dictionary(uniqueKeysWithValues: agentReplies.map { ($0.id, $0) })
+            for reply in incomingReplies { byID[reply.id] = reply }
+            agentReplies = Array(byID.values)
+        }
         let removedChannelIDs = Set(delta.removedChannelIds)
         var nextChannels = channels.filter { !removedChannelIDs.contains($0.id) }
         for updated in delta.channels {
@@ -1572,6 +1608,12 @@ final class ChannelsStore: ObservableObject {
             thread = []
             members = []
             agents = []
+            agentReplies = []
+            activityFrames = [:]
+            activityTask?.cancel()
+            activityTask = nil
+            activityExpiryTask?.cancel()
+            activityExpiryTask = nil
             return
         }
 
@@ -1675,6 +1717,116 @@ final class ChannelsStore: ObservableObject {
                 return left.createdAt < right.createdAt
             }
             return left.id.uuidString < right.id.uuidString
+        }
+    }
+
+    func typingStatuses(messageIDs: Set<UUID>) -> [AgentTypingStatus] {
+        let now = Date()
+        var byAgentID: [UUID: AgentTypingStatus] = [:]
+        for reply in agentReplies where
+            reply.channelId == focusedChannelID &&
+            (reply.status == .queued || reply.status == .running) &&
+            messageIDs.contains(reply.parentMessageId) {
+            let name = agents.first(where: { $0.agentId == reply.agentId })?.name ?? "Agent"
+            let frame = activityFrames[reply.id]
+            let liveActivity = frame?.attempt == reply.attempts &&
+                    (frame?.expiresAt ?? .distantPast) > now
+                ? frame?.activity
+                : nil
+            byAgentID[reply.agentId] = AgentTypingStatus(
+                id: reply.id,
+                agentName: name,
+                activity: liveActivity
+            )
+        }
+        return Array(byAgentID.values).sorted { $0.agentName < $1.agentName }
+    }
+
+    private func startActivitySynchronization() {
+        activityTask?.cancel()
+        activityTask = nil
+        guard managesRealtime,
+              let realtime,
+              let organizationID,
+              let channelID = focusedChannelID,
+              let token,
+              isForeground
+        else { return }
+        let expectedGeneration = generation
+        activityTask = Task { [weak self] in
+            var reconnectAttempt = 0
+            while !Task.isCancelled {
+                guard let self,
+                      expectedGeneration == self.generation,
+                      self.focusedChannelID == channelID,
+                      self.isForeground
+                else { return }
+                do {
+                    let events = realtime.channelActivityEvents(
+                        MobileAPIContract.Endpoint.channelActivityEvents(
+                            organizationID: organizationID,
+                            channelID: channelID
+                        ),
+                        token: token
+                    )
+                    for try await frame in events {
+                        guard !Task.isCancelled,
+                              expectedGeneration == self.generation,
+                              self.focusedChannelID == channelID,
+                              self.isForeground,
+                              frame.version == 1,
+                              frame.channelId == channelID
+                        else { return }
+                        reconnectAttempt = 0
+                        self.applyActivityFrame(frame)
+                    }
+                } catch is CancellationError {
+                    return
+                } catch {
+                    // Durable reply state keeps the generic typing fallback while
+                    // this best-effort activity socket reconnects.
+                }
+                reconnectAttempt = min(reconnectAttempt + 1, 5)
+                do {
+                    try await Task.sleep(for: .seconds(1 << reconnectAttempt))
+                } catch {
+                    return
+                }
+            }
+        }
+    }
+
+    private func applyActivityFrame(_ frame: ChannelAgentActivityFrame) {
+        if let previous = activityFrames[frame.replyJobId],
+           previous.attempt > frame.attempt ||
+            (previous.attempt == frame.attempt && previous.sequence >= frame.sequence) {
+            return
+        }
+        // Keep null activity as a short-lived high-water tombstone so a delayed
+        // lower-sequence publish cannot restore stale UI after completion.
+        if frame.expiresAt > Date() {
+            activityFrames[frame.replyJobId] = frame
+        } else {
+            activityFrames.removeValue(forKey: frame.replyJobId)
+        }
+        scheduleActivityExpiry()
+    }
+
+    private func scheduleActivityExpiry() {
+        activityExpiryTask?.cancel()
+        activityExpiryTask = nil
+        guard let expiresAt = activityFrames.values.map(\.expiresAt).min() else { return }
+        let delay = max(0, expiresAt.timeIntervalSinceNow)
+        activityExpiryTask = Task { [weak self] in
+            do {
+                try await Task.sleep(for: .milliseconds(Int64(delay * 1_000) + 1))
+            } catch {
+                return
+            }
+            guard let self, !Task.isCancelled else { return }
+            let now = Date()
+            self.activityFrames = self.activityFrames.filter { $0.value.expiresAt > now }
+            self.scheduleActivityExpiry()
         }
     }
 

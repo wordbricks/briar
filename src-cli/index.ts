@@ -74,6 +74,10 @@ import {
   type TranscriptBatchEvent,
 } from "./transcript-batcher";
 import {
+  ChannelActivityPublisher,
+  type ChannelActivityCredential,
+} from "./channel-activity-publisher";
+import {
   HttpRequestError,
   uploadExecutionMetricsWithCostCompatibility,
 } from "./execution-metrics-upload";
@@ -2143,6 +2147,11 @@ const claimedChannelDelegationSchema = z.object({
   request: z.string().trim().min(1).max(10_000),
 }).strict();
 
+const channelActivityCredentialSchema = z.object({
+  token: z.string().min(1),
+  expiresAt: z.string().datetime({ offset: true }),
+}).strict();
+
 const claimedChannelReplySchema = z.object({
   workType: z.literal("channelReply"),
   workId: z.string().uuid(),
@@ -2176,6 +2185,7 @@ const claimedChannelReplySchema = z.object({
   claimToken: z.string().startsWith("briar_channel_claim_"),
   claimedAt: z.string().datetime({ offset: true }),
   leaseExpiresAt: z.string().datetime({ offset: true }),
+  activity: channelActivityCredentialSchema.nullable().optional().default(null),
   organizationContext:
     organizationAgentContextDescriptorSchema.nullable().optional(),
   delegation: claimedChannelDelegationSchema.nullable().default(null),
@@ -2279,6 +2289,11 @@ const claimedChannelReplySchema = z.object({
 }));
 
 type ClaimedChannelReply = z.infer<typeof claimedChannelReplySchema>;
+
+const activeChannelActivityPublishers = new Map<
+  string,
+  ChannelActivityPublisher
+>();
 
 function detachedAgentWithActiveSkill(
   agent: z.infer<typeof detachedAgentClaimSchema>,
@@ -3092,6 +3107,35 @@ async function runClaimedChannelReply(
   let organizationContextCleaned = false;
   let imagesCleaned = false;
   let workspaceCleaned = false;
+  let lastActivityErrorAt = Number.NEGATIVE_INFINITY;
+  const activityPublisher = new ChannelActivityPublisher({
+    credential: reply.activity,
+    send: async (credential, input) => {
+      await request(
+        config.apiUrl,
+        `/channel-reply-claims/${reply.workId}/activity`,
+        null,
+        {
+          method: "POST",
+          headers: {
+            "X-Briar-Channel-Activity-Token": credential.token,
+          },
+          body: JSON.stringify(input),
+        },
+      );
+    },
+    onError: (error) => {
+      const now = Date.now();
+      if (now - lastActivityErrorAt < 60_000) return;
+      lastActivityErrorAt = now;
+      console.error(
+        `channel activity publish failed for ${reply.workId}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    },
+  });
+  activeChannelActivityPublishers.set(reply.workId, activityPublisher);
   const cleanupContext = () =>
     cleanupChannelReplyResources([
       ...(reply.scope.kind === "organization"
@@ -3205,6 +3249,9 @@ async function runClaimedChannelReply(
           BRIAR_PROJECT_ID: project.id,
         },
         signal,
+        onPayload: (payload) => {
+          activityPublisher.observePayload(payload);
+        },
       });
       assertDetachedProviderTurnSucceeded(turn);
       if (!turn.resultText) {
@@ -3281,6 +3328,10 @@ async function runClaimedChannelReply(
       },
     );
   } finally {
+    activityPublisher.stop();
+    if (activeChannelActivityPublishers.get(reply.workId) === activityPublisher) {
+      activeChannelActivityPublishers.delete(reply.workId);
+    }
     await cleanupContext();
   }
 }
@@ -3675,7 +3726,10 @@ async function workerCommand() {
         }
         if (issue.workType === "channelReply") {
           const reply = claimedChannelReplySchema.parse(issue);
-          await request(
+          const renewed = await request<{
+            leaseExpiresAt: string;
+            activity?: ChannelActivityCredential | null;
+          }>(
             config.apiUrl,
             `/channel-reply-claims/${reply.workId}/lease`,
             workerToken,
@@ -3687,6 +3741,9 @@ async function workerCommand() {
                 claimToken: reply.claimToken,
               }),
             },
+          );
+          activeChannelActivityPublishers.get(reply.workId)?.updateCredential(
+            renewed.activity ?? null,
           );
           return;
         }

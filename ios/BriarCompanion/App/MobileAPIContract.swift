@@ -56,6 +56,10 @@ enum MobileAPIContract {
             "/organizations/\(organizationID.uuidString.lowercased())/channel-events?cursor=\(cursor)"
         }
 
+        static func channelActivityEvents(organizationID: UUID, channelID: UUID) -> String {
+            "\(channel(organizationID: organizationID, channelID: channelID))/agent-activity-events"
+        }
+
         static func channel(
             organizationID: UUID,
             channelID: UUID,
@@ -460,6 +464,20 @@ protocol MobileRealtimeClientProtocol: Sendable {
         _ path: String,
         token: String
     ) -> AsyncThrowingStream<ChannelRealtimeNotification, Error>
+
+    func channelActivityEvents(
+        _ path: String,
+        token: String
+    ) -> AsyncThrowingStream<ChannelAgentActivityFrame, Error>
+}
+
+extension MobileRealtimeClientProtocol {
+    func channelActivityEvents(
+        _ path: String,
+        token: String
+    ) -> AsyncThrowingStream<ChannelAgentActivityFrame, Error> {
+        AsyncThrowingStream { continuation in continuation.finish() }
+    }
 }
 
 extension MobileAPIClientProtocol {
@@ -670,6 +688,21 @@ struct MobileAPIClient: MobileAPIClientProtocol, MobileRealtimeClientProtocol, S
         _ path: String,
         token: String
     ) -> AsyncThrowingStream<ChannelRealtimeNotification, Error> {
+        webSocketEvents(path, token: token, as: ChannelRealtimeNotification.self)
+    }
+
+    func channelActivityEvents(
+        _ path: String,
+        token: String
+    ) -> AsyncThrowingStream<ChannelAgentActivityFrame, Error> {
+        webSocketEvents(path, token: token, as: ChannelAgentActivityFrame.self)
+    }
+
+    private func webSocketEvents<Event: Decodable & Sendable>(
+        _ path: String,
+        token: String,
+        as eventType: Event.Type
+    ) -> AsyncThrowingStream<Event, Error> {
         AsyncThrowingStream { continuation in
             let task = Task {
                 do {
@@ -703,7 +736,7 @@ struct MobileAPIClient: MobileAPIClientProtocol, MobileRealtimeClientProtocol, S
                             }
                             continuation.yield(
                                 try JSONDecoder.mobileContract.decode(
-                                    ChannelRealtimeNotification.self,
+                                    eventType,
                                     from: data
                                 )
                             )
