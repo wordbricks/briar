@@ -90,6 +90,7 @@ import { NativeSelect } from "./NativeSelect";
 import { SelectMenu } from "./SelectMenu";
 import { AgentProviderIcon } from "./AgentIcons";
 import { AgentWorkLog } from "./AgentWorkLog";
+import { ImageLightbox } from "./ImageLightbox";
 import { WorkerIcon } from "./WorkerIcon";
 import {
   CompanionBottomNavigation,
@@ -7958,41 +7959,35 @@ function RunEvidenceImagePreview({
   onLoadImage: (image: RunEvidenceImage) => Promise<Blob>;
 }) {
   const { t } = useI18n();
-  const [previewOpen, setPreviewOpen] = useState(false);
   const loadImage = useCallback(() => onLoadImage(image), [image, onLoadImage]);
   const { failed, source } = useObjectUrl(loadImage);
 
   return (
-    <>
-      <figure className="run-evidence-image">
+    <figure className="run-evidence-image">
+      {source ? (
+        <ImageLightbox
+          alt={image.filename}
+          className="run-evidence-image-trigger"
+          filename={image.filename}
+          loading="eager"
+          source={source}
+        />
+      ) : (
         <button
           aria-label={t("run.enlargeScreenshot", { name: image.filename })}
           className="run-evidence-image-trigger"
-          disabled={!source}
-          onClick={() => setPreviewOpen(true)}
+          disabled
           type="button"
         >
-          {source ? <img alt={image.filename} src={source} /> : null}
-          {!source && !failed ? <LoaderCircle className="spin" size={20} /> : null}
+          {!failed ? <LoaderCircle className="spin" size={20} /> : null}
           {failed ? <CircleAlert size={20} /> : null}
         </button>
-        <figcaption>
-          <span>{image.filename}</span>
-          {failed ? <small>{t("run.loadFailed")}</small> : null}
-        </figcaption>
-      </figure>
-      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
-        <DialogContent
-          aria-describedby={undefined}
-          className="run-evidence-image-dialog"
-        >
-          <DialogTitle className="run-evidence-image-dialog-title">
-            {image.filename}
-          </DialogTitle>
-          {source ? <img alt={image.filename} src={source} /> : null}
-        </DialogContent>
-      </Dialog>
-    </>
+      )}
+      <figcaption>
+        <span>{image.filename}</span>
+        {failed ? <small>{t("run.loadFailed")}</small> : null}
+      </figcaption>
+    </figure>
   );
 }
 
@@ -9866,7 +9861,7 @@ function IssueMarkdownImage({
   const { failed, source } = useObjectUrl(loadImage);
 
   if (!reference) {
-    return src ? <img alt={alt} loading="lazy" src={src} /> : null;
+    return src ? <ImageLightbox alt={alt} source={src} /> : null;
   }
   if (!attachment || failed) {
     return (
@@ -9884,7 +9879,13 @@ function IssueMarkdownImage({
       </span>
     );
   }
-  return <img alt={alt || attachment.filename} loading="lazy" src={source} />;
+  return (
+    <ImageLightbox
+      alt={alt || attachment.filename}
+      filename={attachment.filename}
+      source={source}
+    />
+  );
 }
 
 function IssueAttachmentGallery({
@@ -9931,7 +9932,14 @@ function IssueAttachmentPreview({
   return (
     <article className="run-attachment">
       <div className="run-attachment-media">
-        {source && isImage && <img alt={attachment.filename} src={source} />}
+        {source && isImage && (
+          <ImageLightbox
+            alt={attachment.filename}
+            filename={attachment.filename}
+            loading="eager"
+            source={source}
+          />
+        )}
         {source && !isImage && <video controls preload="metadata" src={source} />}
         {!source && !failed && (isImage ? <ImageIcon size={22} /> : <Video size={22} />)}
         {failed && <CircleAlert size={20} />}

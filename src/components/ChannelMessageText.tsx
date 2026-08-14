@@ -19,6 +19,7 @@ import {
   profileTargetForChannelMember,
   type ProfileTarget,
 } from "./ProfileDialog";
+import { ImageLightbox } from "./ImageLightbox";
 
 export function ChannelMessageText({
   agents,
@@ -102,6 +103,8 @@ export function ChannelMessageText({
                 </a>
               );
             },
+            img: ({ alt, src }) =>
+              src ? <ImageLightbox alt={alt ?? ""} source={src} /> : null,
             table: ({ children, node: _node, ...props }) => (
               <div className="channel-message-table-wrap">
                 <table {...props}>{children}</table>

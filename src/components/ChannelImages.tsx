@@ -4,6 +4,7 @@ import { useObjectUrl } from "../hooks/useObjectUrl";
 import type { ChannelMessageAttachment } from "../lib/channels-contract";
 import { loadChannelMessageAttachment } from "../lib/api";
 import { issueAttachmentMarkdown } from "../lib/issue-markdown";
+import { ImageLightbox } from "./ImageLightbox";
 
 export type DraftChannelImage = { file: File; reference: string };
 
@@ -131,12 +132,16 @@ function ChannelMessageImage({
       </span>
     );
   }
-  const image = <img alt={attachment.filename} loading="lazy" src={source} />;
   return interactive ? (
-    <a href={source} target="_blank" rel="noreferrer">
-      {image}
-    </a>
+    <ImageLightbox
+      alt={attachment.filename}
+      className="channel-message-image-trigger"
+      filename={attachment.filename}
+      source={source}
+    />
   ) : (
-    <span className="channel-message-image-static">{image}</span>
+    <span className="channel-message-image-static">
+      <img alt={attachment.filename} loading="lazy" src={source} />
+    </span>
   );
 }
