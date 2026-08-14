@@ -166,6 +166,8 @@ type CompanionChannelsProps = {
   token: string;
   onIssueOpen?: (projectId: string, runId: string) => void | Promise<void>;
   onSkillSessionAccepted?: (session: AutoHuntSession) => void;
+  channelInboxSyncSignal?: string;
+  onViewingChannelChange?: (channelId: string | null) => void;
   requestedMessage?: {
     channelId: string;
     messageId: string;
@@ -193,6 +195,8 @@ export function CompanionChannels({
   token,
   onIssueOpen,
   onSkillSessionAccepted,
+  channelInboxSyncSignal,
+  onViewingChannelChange,
   requestedMessage,
   onRequestedMessageOpen,
 }: CompanionChannelsProps) {
@@ -230,6 +234,11 @@ export function CompanionChannels({
   );
   channelIdRef.current = channel?.id ?? null;
   threadParentIdRef.current = threadParentId;
+
+  useEffect(() => {
+    onViewingChannelChange?.(channel?.id ?? null);
+    return () => onViewingChannelChange?.(null);
+  }, [channel?.id, onViewingChannelChange]);
 
   useEffect(() => {
     if (!channel || threadParentId) return;
@@ -546,6 +555,9 @@ export function CompanionChannels({
       CHANNEL_REALTIME_FALLBACK_MS,
     );
     updateVisibility();
+    if (channelInboxSyncSignal !== undefined && !document.hidden) {
+      void sync();
+    }
     return () => {
       stopped = true;
       unsubscribe();
@@ -556,6 +568,7 @@ export function CompanionChannels({
     };
   }, [
     channel?.id,
+    channelInboxSyncSignal,
     invalidateChannelSurface,
     loading,
     markSelectedChannelRead,

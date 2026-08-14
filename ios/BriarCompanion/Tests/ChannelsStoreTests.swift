@@ -405,9 +405,10 @@ final class ChannelsStoreTests: XCTestCase {
         XCTAssertTrue(store.loading)
         await firstDelta.value
         await fullLoad.value
-        XCTAssertEqual(store.messages.first?.replyCount, 0)
-
-        await store.refreshChanges()
+        await waitForRequests(api, path: deltaPath, count: 2)
+        for _ in 0..<100 where store.messages.first?.replyCount != 1 {
+            try? await Task.sleep(for: .milliseconds(10))
+        }
         let deltaRequestCount = await api.requestCount(for: deltaPath)
         XCTAssertEqual(deltaRequestCount, 2)
         XCTAssertEqual(store.messages.first?.replyCount, 1)
