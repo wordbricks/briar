@@ -62,6 +62,9 @@ describe("LoadingState", () => {
     expect(status?.dataset.variant).toBe("Drive");
     expect(status?.textContent).toContain("Churning");
     expect(status?.textContent).toContain("0.0s");
+    expect(
+      status?.querySelector(".tabular-nums")?.getAttribute("aria-hidden"),
+    ).toBe("true");
 
     const pixels = [
       ...(status?.querySelectorAll<HTMLElement>(".loading-state-pixel") ?? []),

@@ -103,7 +103,10 @@ export function LoadingState({
       >
         {label ?? t("loading.churning")}
       </span>
-      <span className="font-mono text-sm text-ink-3 tabular-nums">
+      <span
+        aria-hidden="true"
+        className="font-mono text-sm text-ink-3 tabular-nums"
+      >
         {elapsed}
       </span>
     </div>
