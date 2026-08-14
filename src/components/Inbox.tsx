@@ -527,6 +527,9 @@ function InboxChannelAuthorAvatar({
   name: string;
 }) {
   const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    setFailed(false);
+  }, [image]);
   const initial = name.trim().charAt(0).toUpperCase() || "?";
   if (image && !failed) {
     return (
