@@ -143,4 +143,31 @@ describe("WebSocketRealtimeTransport", () => {
     });
     transport.stop();
   });
+
+  it("emits Inbox version notifications over the shared socket", async () => {
+    const socket = new FakeWebSocket();
+    const transport = new WebSocketRealtimeTransport({
+      url: "https://api.test/channel-events",
+      token: "secret-token",
+      fetch: async () => Response.json({
+        url: "wss://api.test/channel-events?ticket=signed",
+        expiresAt: "2026-08-12T00:00:00.000Z",
+      }),
+      createWebSocket: () => socket as unknown as WebSocket,
+    });
+    const notification = new Promise((resolve) => transport.subscribe(resolve));
+
+    transport.start();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    socket.emit("open", new Event("open"));
+    socket.emit("message", {
+      data: JSON.stringify({ topic: "inbox", version: 17 }),
+    } as MessageEvent);
+
+    await expect(notification).resolves.toEqual({
+      topic: "inbox",
+      version: 17,
+    });
+    transport.stop();
+  });
 });

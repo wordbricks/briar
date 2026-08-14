@@ -5,6 +5,8 @@ import {
 } from "./realtime-transport";
 
 export const CHANNEL_REALTIME_FALLBACK_MS = 60_000;
+export const INBOX_REALTIME_FALLBACK_MS = 60_000;
+export const INBOX_REALTIME_DEBOUNCE_MS = 300;
 export const MAX_CHANNEL_DELTA_PAGES_PER_SYNC = 20;
 export const MAX_PROJECT_DELTA_PAGES_PER_SYNC = 20;
 
@@ -65,6 +67,13 @@ export function createChannelRealtimeTransport(
 }
 
 export function createProjectRealtimeTransport(
+  token: string,
+  organizationId: string,
+) {
+  return createChannelRealtimeTransport(token, organizationId);
+}
+
+export function createInboxRealtimeTransport(
   token: string,
   organizationId: string,
 ) {

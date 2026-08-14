@@ -4,6 +4,10 @@ export type OrganizationRealtimeNotification =
       cursor: number;
     }
   | {
+      topic: "inbox";
+      version: number;
+    }
+  | {
       topic: "project";
       projectId: string;
       cursor: number;
@@ -20,10 +24,10 @@ function parseCursor(value: string | null) {
 }
 
 /**
- * Organization-scoped fan-out for channel and project cursor notifications.
+ * Organization-scoped fan-out for channel, Inbox, and project notifications.
  *
- * D1's channel and project change logs stay authoritative. The Durable Object
- * owns only hibernatable sockets and persists each topic's last cursor as an
+ * D1's change logs and Inbox revision stay authoritative. The Durable Object
+ * owns only hibernatable sockets and persists each topic's last version as an
  * attachment, so no in-memory controller or timer keeps it billable while idle.
  */
 export class ChannelRealtimeHub {
@@ -38,17 +42,23 @@ export class ChannelRealtimeHub {
       if (request.headers.get("Upgrade")?.toLowerCase() !== "websocket") {
         return new Response("Expected WebSocket", { status: 426 });
       }
-      return this.subscribe(parseCursor(url.searchParams.get("cursor")) ?? 0);
+      return this.subscribe({
+        channels: parseCursor(url.searchParams.get("cursor")) ?? 0,
+        inbox: parseCursor(url.searchParams.get("inboxVersion")) ?? 0,
+      });
     }
     if (url.pathname === "/notify" && request.method === "POST") {
       const notification = await request.json<OrganizationRealtimeNotification>();
-      if (
-        (notification.topic !== "channels" &&
-          (notification.topic !== "project" ||
-            !/^[0-9a-f-]+$/iu.test(notification.projectId))) ||
-        !Number.isSafeInteger(notification.cursor) ||
-        notification.cursor < 0
-      ) {
+      const valid = notification.topic === "channels"
+        ? Number.isSafeInteger(notification.cursor) && notification.cursor >= 0
+        : notification.topic === "inbox"
+          ? Number.isSafeInteger(notification.version) &&
+            notification.version >= 0
+          : notification.topic === "project" &&
+            /^[0-9a-f-]+$/iu.test(notification.projectId) &&
+            Number.isSafeInteger(notification.cursor) &&
+            notification.cursor >= 0;
+      if (!valid) {
         return new Response("Invalid realtime notification", { status: 400 });
       }
       this.publish(notification);
@@ -57,16 +67,17 @@ export class ChannelRealtimeHub {
     return new Response("Not found", { status: 404 });
   }
 
-  private subscribe(cursor: number) {
+  private subscribe(cursors: { channels: number; inbox: number }) {
     const pair = new WebSocketPair();
     const [client, server] = Object.values(pair);
     this.state.acceptWebSocket(server);
     server.serializeAttachment(
       {
-        cursors: { channels: cursor },
+        cursors,
       } satisfies OrganizationRealtimeSocketAttachment,
     );
-    server.send(JSON.stringify({ topic: "channels", cursor }));
+    server.send(JSON.stringify({ topic: "channels", cursor: cursors.channels }));
+    server.send(JSON.stringify({ topic: "inbox", version: cursors.inbox }));
     return new Response(null, {
       status: 101,
       webSocket: client,
@@ -77,7 +88,12 @@ export class ChannelRealtimeHub {
     const payload = JSON.stringify(notification);
     const cursorKey = notification.topic === "channels"
       ? "channels"
-      : `project:${notification.projectId}`;
+      : notification.topic === "inbox"
+        ? "inbox"
+        : `project:${notification.projectId}`;
+    const nextVersion = notification.topic === "inbox"
+      ? notification.version
+      : notification.cursor;
     for (const client of this.state.getWebSockets()) {
       const attachment = client.deserializeAttachment() as
         | OrganizationRealtimeSocketAttachment
@@ -86,11 +102,11 @@ export class ChannelRealtimeHub {
       const cursors = attachment && "cursors" in attachment
         ? attachment.cursors
         : { channels: attachment?.cursor ?? -1 };
-      if ((cursors[cursorKey] ?? -1) >= notification.cursor) continue;
+      if ((cursors[cursorKey] ?? -1) >= nextVersion) continue;
       try {
         client.send(payload);
         client.serializeAttachment({
-          cursors: { ...cursors, [cursorKey]: notification.cursor },
+          cursors: { ...cursors, [cursorKey]: nextVersion },
         } satisfies OrganizationRealtimeSocketAttachment);
       } catch {
         client.close(1011, "Realtime delivery failed");
@@ -133,13 +149,30 @@ export function legacyChannelRealtimeResponse() {
 export async function subscribeToOrganizationRealtime(
   env: Env,
   organizationId: string,
-  cursor: number,
+  cursors: { channels: number; inbox: number },
 ) {
   const hub = env.CHANNEL_REALTIME.getByName(organizationId);
   return hub.fetch(
-    `https://channel-realtime.internal/subscribe?cursor=${cursor}`,
+    `https://channel-realtime.internal/subscribe?cursor=${cursors.channels}` +
+      `&inboxVersion=${cursors.inbox}`,
     { headers: { Upgrade: "websocket" } },
   );
+}
+
+export async function publishInboxRealtime(
+  env: Env,
+  organizationId: string,
+  version: number,
+) {
+  const hub = env.CHANNEL_REALTIME.getByName(organizationId);
+  const response = await hub.fetch("https://channel-realtime.internal/notify", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ topic: "inbox", version }),
+  });
+  if (!response.ok) {
+    throw new Error(`Inbox realtime notification failed (${response.status})`);
+  }
 }
 
 export async function publishChannelRealtime(

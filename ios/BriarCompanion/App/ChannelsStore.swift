@@ -1,5 +1,98 @@
 import Foundation
 
+/// Owns the single organization WebSocket used by every native surface.
+/// Domain stores remain authoritative through their regular snapshot/delta APIs;
+/// this store only fans out small cursor/version invalidations.
+@MainActor
+final class OrganizationRealtimeStore: ObservableObject {
+    @Published private(set) var latestNotification: ChannelRealtimeNotification?
+    @Published private(set) var notificationSequence = 0
+
+    private let realtime: (any MobileRealtimeClientProtocol)?
+    private var organizationID: UUID?
+    private var token: String?
+    private var generation = 0
+    private var isForeground = true
+    private var task: Task<Void, Never>?
+
+    init(api: any MobileAPIClientProtocol) {
+        realtime = api as? any MobileRealtimeClientProtocol
+    }
+
+    func select(organizationID: UUID?, token: String?) {
+        guard self.organizationID != organizationID || self.token != token else { return }
+        generation &+= 1
+        task?.cancel()
+        task = nil
+        self.organizationID = organizationID
+        self.token = token
+        latestNotification = nil
+        guard isForeground else { return }
+        start()
+    }
+
+    func applicationDidBecomeActive() {
+        guard !isForeground else { return }
+        isForeground = true
+        start()
+    }
+
+    func applicationDidEnterBackground() {
+        isForeground = false
+        generation &+= 1
+        task?.cancel()
+        task = nil
+    }
+
+    private func start() {
+        guard task == nil,
+              let realtime,
+              let organizationID,
+              let token,
+              isForeground
+        else { return }
+        let expectedGeneration = generation
+        task = Task { [weak self] in
+            var reconnectAttempt = 0
+            while !Task.isCancelled {
+                guard let self,
+                      expectedGeneration == self.generation,
+                      self.isForeground
+                else { return }
+                do {
+                    let events = realtime.realtimeEvents(
+                        MobileAPIContract.Endpoint.channelEvents(
+                            organizationID: organizationID,
+                            cursor: 0
+                        ),
+                        token: token
+                    )
+                    for try await event in events {
+                        guard !Task.isCancelled,
+                              expectedGeneration == self.generation,
+                              self.isForeground
+                        else { return }
+                        reconnectAttempt = 0
+                        self.latestNotification = event
+                        self.notificationSequence &+= 1
+                    }
+                } catch is CancellationError {
+                    return
+                } catch {
+                    // Snapshot/delta fallback remains authoritative while the
+                    // shared notification socket reconnects.
+                }
+                reconnectAttempt = min(reconnectAttempt + 1, 5)
+                do {
+                    try await Task.sleep(for: .seconds(1 << reconnectAttempt))
+                } catch {
+                    return
+                }
+            }
+        }
+    }
+}
+
 @MainActor
 final class ChannelsStore: ObservableObject {
     static let messagePageSize = 20
@@ -42,6 +135,7 @@ final class ChannelsStore: ObservableObject {
 
     private let api: any MobileAPIClientProtocol
     private let realtime: (any MobileRealtimeClientProtocol)?
+    private let managesRealtime: Bool
     private let attachmentReference: @Sendable () -> String
     private let pollInterval: Duration
     private let maxDeltaPagesPerRefresh: Int
@@ -72,6 +166,7 @@ final class ChannelsStore: ObservableObject {
     init(
         api: any MobileAPIClientProtocol,
         realtime: (any MobileRealtimeClientProtocol)? = nil,
+        managesRealtime: Bool = true,
         pollInterval: Duration = .seconds(60),
         maxDeltaPagesPerRefresh: Int = 20,
         attachmentReference: @escaping @Sendable () -> String = {
@@ -80,6 +175,7 @@ final class ChannelsStore: ObservableObject {
     ) {
         self.api = api
         self.realtime = realtime ?? (api as? any MobileRealtimeClientProtocol)
+        self.managesRealtime = managesRealtime
         self.pollInterval = pollInterval
         self.maxDeltaPagesPerRefresh = min(max(maxDeltaPagesPerRefresh, 1), 20)
         self.attachmentReference = attachmentReference
@@ -1616,7 +1712,11 @@ final class ChannelsStore: ObservableObject {
             }
         }
 
-        guard let realtime, let organizationID, let token else {
+        guard managesRealtime,
+              let realtime,
+              let organizationID,
+              let token
+        else {
             realtimeTask = nil
             return
         }
@@ -1645,7 +1745,8 @@ final class ChannelsStore: ObservableObject {
                         else { return }
                         reconnectAttempt = 0
                         if event.topic == "channels",
-                           event.cursor > (self.syncCursor ?? -1) {
+                           let cursor = event.cursor,
+                           cursor > (self.syncCursor ?? -1) {
                             await self.refreshChanges()
                         }
                     }
@@ -1663,6 +1764,17 @@ final class ChannelsStore: ObservableObject {
                 }
             }
         }
+    }
+
+    func receiveRealtimeNotification(
+        _ notification: ChannelRealtimeNotification
+    ) async {
+        guard notification.topic == "channels",
+              let cursor = notification.cursor,
+              cursor > (syncCursor ?? -1),
+              isForeground
+        else { return }
+        await refreshChanges()
     }
 
     func groups(

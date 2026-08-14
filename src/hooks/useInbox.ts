@@ -20,6 +20,11 @@ import {
   type InboxFeedSyncState,
 } from "../lib/api";
 import { startDashboardPolling } from "../lib/dashboard-polling";
+import {
+  INBOX_REALTIME_DEBOUNCE_MS,
+  INBOX_REALTIME_FALLBACK_MS,
+} from "../lib/channel-realtime";
+import type { RealtimeTransport } from "../lib/realtime-transport";
 
 const storagePrefix = "briar.inbox.v1";
 const builtInWorkflowStageIds = new Set<string>(
@@ -579,6 +584,7 @@ export function useInbox(
   sessions: AutoHuntSession[],
   projects: Project[],
   token: string | null = null,
+  realtime: RealtimeTransport | null = null,
 ) {
   const storageKey = `${storagePrefix}:${userId ?? "signed-out"}`;
   const currentMessages = useMemo(
@@ -931,6 +937,8 @@ export function useInbox(
     let disposed = false;
     let refreshInFlight = false;
     let refreshRequested = false;
+    let latestRealtimeVersion = -1;
+    let realtimeDebounce: number | null = null;
 
     const refresh = async () => {
       if (refreshInFlight) {
@@ -1001,13 +1009,49 @@ export function useInbox(
       }
     };
 
-    const stopPolling = startDashboardPolling(() => void refresh());
+    const unsubscribe = realtime?.subscribe((notification) => {
+      if (
+        notification.topic !== "inbox" ||
+        notification.version <= latestRealtimeVersion
+      ) {
+        return;
+      }
+      latestRealtimeVersion = notification.version;
+      if (realtimeDebounce !== null) {
+        window.clearTimeout(realtimeDebounce);
+      }
+      realtimeDebounce = window.setTimeout(() => {
+        realtimeDebounce = null;
+        if (!document.hidden) void refresh();
+      }, INBOX_REALTIME_DEBOUNCE_MS);
+    });
+    const updateRealtimeVisibility = () => {
+      if (!realtime) return;
+      if (document.hidden) realtime.stop();
+      else realtime.start();
+    };
+    document.addEventListener("visibilitychange", updateRealtimeVisibility);
+    updateRealtimeVisibility();
+    const stopPolling = startDashboardPolling(
+      () => void refresh(),
+      undefined,
+      realtime ? INBOX_REALTIME_FALLBACK_MS : undefined,
+    );
     return () => {
       disposed = true;
       abort.abort();
       stopPolling();
+      unsubscribe?.();
+      realtime?.stop();
+      document.removeEventListener(
+        "visibilitychange",
+        updateRealtimeVisibility,
+      );
+      if (realtimeDebounce !== null) {
+        window.clearTimeout(realtimeDebounce);
+      }
     };
-  }, [organizationId, projects, storageKey, token, userId]);
+  }, [organizationId, projects, realtime, storageKey, token, userId]);
 
   const messages = useMemo<InboxMessageWithReadState[]>(
     () =>

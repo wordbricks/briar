@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   createChannelRealtimeTransport,
+  createInboxRealtimeTransport,
   createProjectRealtimeTransport,
 } from "./channel-realtime";
 
@@ -14,7 +15,7 @@ afterEach(() => {
 });
 
 describe("organization realtime transport", () => {
-  it("shares one physical socket across channel and project consumers", async () => {
+  it("shares one physical socket across channel, project, and Inbox consumers", async () => {
     const sockets: FakeWebSocket[] = [];
     const fetchMock = vi.fn(async () => Response.json({
       url: "wss://api.test/channel-events?ticket=signed",
@@ -30,8 +31,10 @@ describe("organization realtime transport", () => {
 
     const channel = createChannelRealtimeTransport("token", "organization-1");
     const project = createProjectRealtimeTransport("token", "organization-1");
+    const inbox = createInboxRealtimeTransport("token", "organization-1");
     channel.start();
     project.start();
+    inbox.start();
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     expect(fetchMock).toHaveBeenCalledOnce();
@@ -39,6 +42,8 @@ describe("organization realtime transport", () => {
     channel.stop();
     expect(sockets[0]?.close).not.toHaveBeenCalled();
     project.stop();
+    expect(sockets[0]?.close).not.toHaveBeenCalled();
+    inbox.stop();
     expect(sockets[0]?.close).toHaveBeenCalledWith(
       1000,
       "Realtime transport stopped",

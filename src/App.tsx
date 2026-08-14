@@ -130,6 +130,7 @@ import {
 import {
   CHANNEL_REALTIME_FALLBACK_MS,
   createChannelRealtimeTransport,
+  createInboxRealtimeTransport,
 } from "./lib/channel-realtime";
 import { dispatchAutoHuntToWorkers } from "./lib/auto-hunt-worker-dispatch";
 import { demoProjectAgents } from "./lib/demo-project-agents";
@@ -257,15 +258,23 @@ export function App() {
           // Keep the last catalog. The Channels view reports request errors.
         });
     };
-    const unsubscribe = transport.subscribe(() => {
-      refresh();
+    const unsubscribe = transport.subscribe((notification) => {
+      if (notification.topic === "channels") refresh();
     });
-    transport.start();
-    const interval = window.setInterval(refresh, CHANNEL_REALTIME_FALLBACK_MS);
+    const updateVisibility = () => {
+      if (document.hidden) transport.stop();
+      else transport.start();
+    };
+    document.addEventListener("visibilitychange", updateVisibility);
+    updateVisibility();
+    const interval = window.setInterval(() => {
+      if (!document.hidden) refresh();
+    }, CHANNEL_REALTIME_FALLBACK_MS);
     return () => {
       cancelled = true;
       unsubscribe();
       transport.stop();
+      document.removeEventListener("visibilitychange", updateVisibility);
       window.clearInterval(interval);
     };
   }, [briar.activeOrganizationId, briar.token]);
@@ -330,6 +339,16 @@ export function App() {
       briar.dashboard.runs,
     );
   }, [autoHunt.reconcileWorkerDispatches, briar.dashboard]);
+  const inboxRealtime = useMemo(
+    () =>
+      briar.token && briar.activeOrganizationId && briar.user?.id
+        ? createInboxRealtimeTransport(
+            briar.token,
+            briar.activeOrganizationId,
+          )
+        : null,
+    [briar.activeOrganizationId, briar.token, briar.user?.id],
+  );
   const inbox = useInbox(
     briar.user?.id ?? null,
     briar.activeOrganizationId,
@@ -337,6 +356,7 @@ export function App() {
     autoHunt.sessions,
     briar.projects,
     briar.token,
+    inboxRealtime,
   );
   const markInboxIssueRead = useCallback(
     (runId: string) => inbox.markIssueRead(runId),

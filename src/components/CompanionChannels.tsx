@@ -623,7 +623,12 @@ export function CompanionChannels({
     };
 
     const unsubscribe = transport.subscribe((notification) => {
-      if (notification.cursor > cursor.current) void sync();
+      if (
+        notification.topic === "channels" &&
+        notification.cursor > cursor.current
+      ) {
+        void sync();
+      }
     });
     const updateVisibility = () => {
       if (document.hidden) transport.stop();

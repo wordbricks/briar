@@ -7,6 +7,7 @@ struct CompanionRootView: View {
     @StateObject private var session: SessionStore
     @StateObject private var companion: CompanionStore
     @StateObject private var dashboard: DashboardStore
+    @StateObject private var realtime: OrganizationRealtimeStore
     @StateObject private var channels: ChannelsStore
     @StateObject private var agents: AgentsStore
     @StateObject private var inbox: InboxStore
@@ -39,9 +40,16 @@ struct CompanionRootView: View {
         _session = StateObject(wrappedValue: session)
         _companion = StateObject(wrappedValue: CompanionStore(api: api))
         _dashboard = StateObject(wrappedValue: DashboardStore(api: api))
-        _channels = StateObject(wrappedValue: ChannelsStore(api: api))
+        _realtime = StateObject(
+            wrappedValue: OrganizationRealtimeStore(api: api)
+        )
+        _channels = StateObject(
+            wrappedValue: ChannelsStore(api: api, managesRealtime: false)
+        )
         _agents = StateObject(wrappedValue: AgentsStore(api: api))
-        _inbox = StateObject(wrappedValue: InboxStore(api: api))
+        _inbox = StateObject(
+            wrappedValue: InboxStore(api: api, pollInterval: .seconds(60))
+        )
         _notifications = StateObject(wrappedValue: LocalNotificationService())
         authorization = DeviceAuthorizationService(api: api)
         self.presenter = presenter
@@ -121,6 +129,7 @@ struct CompanionRootView: View {
             guard let token = session.token else {
                 companion.clear()
                 dashboard.select(projectID: nil, token: nil)
+                realtime.select(organizationID: nil, token: nil)
                 channels.select(organizationID: nil, token: nil)
                 agents.select(projectID: nil, token: nil, locale: locale.rawValue)
                 inbox.configure(token: nil, userID: nil)
@@ -210,15 +219,24 @@ struct CompanionRootView: View {
                 )
             }
         }
+        .onChange(of: realtime.notificationSequence) { _, _ in
+            guard let notification = realtime.latestNotification else { return }
+            inbox.receiveRealtimeNotification(notification)
+            Task {
+                await channels.receiveRealtimeNotification(notification)
+            }
+        }
         .onChange(of: scenePhase) { _, phase in
             switch phase {
             case .active:
                 dashboard.applicationDidBecomeActive()
+                realtime.applicationDidBecomeActive()
                 channels.applicationDidBecomeActive()
                 agents.applicationDidBecomeActive()
                 inbox.applicationDidBecomeActive()
             case .background:
                 dashboard.applicationDidEnterBackground()
+                realtime.applicationDidEnterBackground()
                 channels.applicationDidEnterBackground()
                 agents.applicationDidEnterBackground()
                 inbox.applicationDidEnterBackground()
@@ -263,6 +281,7 @@ struct CompanionRootView: View {
             companion.projects.first(where: { $0.id == id })?.organizationId
         }
         dashboard.select(projectID: projectID, token: token)
+        realtime.select(organizationID: organizationID, token: token)
         // Channels follow the selected project's organization, not the project.
         channels.select(
             organizationID: projectID.flatMap { id in
