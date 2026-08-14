@@ -586,6 +586,8 @@ struct CliConfig {
 struct StoredExecutionWorker {
     worker_id: String,
     device_id: String,
+    #[serde(default)]
+    organization_id: Option<String>,
     label: String,
     max_concurrent_sessions: u32,
 }
@@ -4539,6 +4541,14 @@ fn inspect_execution_workers(
 }
 
 #[tauri::command]
+fn current_execution_worker_device_id(
+    app: AppHandle,
+    organization_id: String,
+) -> Result<Option<String>, String> {
+    current_execution_worker_device_id_at(&cli_config_path(&app)?, &organization_id)
+}
+
+#[tauri::command]
 fn sync_execution_worker_labels(app: AppHandle) -> Result<serde_json::Value, String> {
     let resource_directory = app
         .path()
@@ -4616,6 +4626,31 @@ fn inspect_execution_workers_at(
             })
         })
         .collect()
+}
+
+fn current_execution_worker_device_id_at(
+    config_path: &Path,
+    organization_id: &str,
+) -> Result<Option<String>, String> {
+    let config = read_cli_config(config_path)?;
+    let mut device_ids = config
+        .projects
+        .iter()
+        .filter_map(|project| project.extra.get("executionWorker"))
+        .filter(|value| !value.is_null())
+        .map(|value| {
+            serde_json::from_value::<StoredExecutionWorker>(value.clone())
+                .map_err(|error| format!("Worker 로컬 설정이 손상되었습니다: {error}"))
+        })
+        .collect::<Result<Vec<_>, _>>()?
+        .into_iter()
+        .filter(|worker| worker.organization_id.as_deref() == Some(organization_id))
+        .map(|worker| worker.device_id)
+        .collect::<BTreeSet<_>>();
+    if device_ids.len() > 1 {
+        return Err("같은 조직의 로컬 Worker device ID가 서로 다릅니다.".to_string());
+    }
+    Ok(device_ids.pop_first())
 }
 
 fn sync_auto_hunt_assets(resource_directory: &Path, home: &Path) -> Result<bool, String> {
@@ -7976,6 +8011,7 @@ pub fn run() {
             refresh_execution_worker_runtime,
             sync_execution_worker_labels,
             inspect_execution_workers,
+            current_execution_worker_device_id,
             show_inbox_notification,
             request_inbox_notification_permission,
             drain_pending_inbox_notification_opens,
@@ -9975,6 +10011,71 @@ branch refs/heads/briar/second-11111111
         assert_eq!(
             fs::read_to_string(&config_path).expect("config should remain readable"),
             contents
+        );
+    }
+
+    #[test]
+    fn resolves_the_registered_worker_device_for_the_requested_organization() {
+        let config_path = test_config_path("current-worker-device");
+        fs::write(
+            &config_path,
+            serde_json::json!({
+                "apiUrl": "https://briar.example.com",
+                "projects": [
+                    {
+                        "id": "project-1",
+                        "repositoryPath": "/repo/one",
+                        "agentToken": "briar_agent_one",
+                        "executionWorker": {
+                            "workerId": "worker-1",
+                            "deviceId": "device-local",
+                            "organizationId": "organization-1",
+                            "label": "Dev Mac",
+                            "maxConcurrentSessions": 3,
+                            "token": "briar_worker_secret"
+                        }
+                    },
+                    {
+                        "id": "project-2",
+                        "repositoryPath": "/repo/two",
+                        "agentToken": "briar_agent_two",
+                        "executionWorker": {
+                            "workerId": "worker-2",
+                            "deviceId": "device-local",
+                            "organizationId": "organization-1",
+                            "label": "Dev Mac",
+                            "maxConcurrentSessions": 3,
+                            "token": "briar_worker_secret"
+                        }
+                    },
+                    {
+                        "id": "project-3",
+                        "repositoryPath": "/repo/three",
+                        "agentToken": "briar_agent_three",
+                        "executionWorker": {
+                            "workerId": "worker-3",
+                            "deviceId": "device-other-org",
+                            "organizationId": "organization-2",
+                            "label": "Dev Mac",
+                            "maxConcurrentSessions": 3,
+                            "token": "briar_worker_other"
+                        }
+                    }
+                ]
+            })
+            .to_string(),
+        )
+        .expect("config should be written");
+
+        assert_eq!(
+            current_execution_worker_device_id_at(&config_path, "organization-1")
+                .expect("device should resolve"),
+            Some("device-local".to_string())
+        );
+        assert_eq!(
+            current_execution_worker_device_id_at(&config_path, "missing-organization")
+                .expect("an unregistered organization is valid"),
+            None
         );
     }
 

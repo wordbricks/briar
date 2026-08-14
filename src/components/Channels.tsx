@@ -142,6 +142,7 @@ import {
   recordDesktopChannelHeader,
   type DesktopChannelDisplaySource,
 } from "../lib/channel-performance";
+import { currentExecutionWorkerDeviceId } from "../lib/execution-worker-device";
 
 const typingAgentNamesForMessage = (
   replies: ChannelAgentReply[],
@@ -1334,6 +1335,12 @@ export function Channels({
       setBusy(true);
       setError(null);
       try {
+        const hasAgentMention = mentions.some(
+          (mention) => mention.type === "agent",
+        );
+        const preferredDeviceId = hasAgentMention
+          ? await currentExecutionWorkerDeviceId(organizationId)
+          : null;
         const result = await sendChannelMessage(token, organizationId, activeChannelId, {
           body: body.trim(),
           parentMessageId,
@@ -1343,6 +1350,7 @@ export function Channels({
           mentionedAgentIds: mentions
             .filter((mention) => mention.type === "agent")
             .map((mention) => mention.id),
+          ...(preferredDeviceId ? { preferredDeviceId } : {}),
           attachments,
           attachmentReferences,
         });
