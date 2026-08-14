@@ -360,10 +360,12 @@ struct ChannelDetailResponse: Codable, Sendable {
     let members: [ChannelMember]
     let agents: [ChannelAgentSummary]
     let messages: [ChannelMessage]
+    var nextCursor: UUID? = nil
 }
 
 struct ChannelMessagesResponse: Codable, Sendable {
     let messages: [ChannelMessage]
+    var nextCursor: UUID? = nil
 }
 
 struct CreateChannelMessageRequest: Codable, Sendable {

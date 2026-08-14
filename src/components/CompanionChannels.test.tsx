@@ -221,11 +221,18 @@ describe("CompanionChannels", () => {
     container = document.createElement("div");
     document.body.append(container);
     root = createRoot(container);
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+      configurable: true,
+      value: vi.fn(),
+      writable: true,
+    });
   });
 
   afterEach(() => {
     act(() => root.unmount());
     container.remove();
+    Reflect.deleteProperty(HTMLElement.prototype, "scrollIntoView");
+    vi.restoreAllMocks();
     vi.useRealTimers();
   });
 
@@ -242,6 +249,75 @@ describe("CompanionChannels", () => {
       ...container.querySelectorAll(".companion-channel-group button span"),
     ].map((node) => node.textContent);
     expect(names).toEqual(["Welcome", "Briar dev", "Sprout talk"]);
+  });
+
+  it("loads the newest twenty messages and prepends an earlier page at the top", async () => {
+    const newest = Array.from({ length: 20 }, (_, index) =>
+      message(`m-${index + 6}`, `Message ${index + 6}`));
+    loadChannel.mockResolvedValue({
+      channel: channel("c-common", "Welcome", null),
+      members: [],
+      agents: [],
+      messages: newest,
+      nextCursor: "m-6",
+    });
+    listChannelMessages.mockResolvedValue({
+      messages: [message("m-1", "Earlier message")],
+      nextCursor: null,
+    });
+    await render();
+
+    const channelButton = [
+      ...container.querySelectorAll<HTMLButtonElement>(
+        ".companion-channel-group button",
+      ),
+    ].find((button) => button.textContent?.includes("Welcome"));
+    await act(async () => {
+      channelButton?.click();
+      await Promise.resolve();
+    });
+
+    expect(loadChannel).toHaveBeenCalledWith(
+      "token",
+      "org-1",
+      "c-common",
+      { messageLimit: 20 },
+    );
+    expect(HTMLElement.prototype.scrollIntoView).toHaveBeenCalledWith({
+      block: "end",
+    });
+    const scroller = container.querySelector<HTMLDivElement>(
+      ".companion-channel-messages",
+    )!;
+    let scrollHeight = 1_000;
+    Object.defineProperty(scroller, "scrollHeight", {
+      configurable: true,
+      get: () => scrollHeight,
+    });
+    Object.defineProperty(scroller, "clientHeight", {
+      configurable: true,
+      value: 500,
+    });
+    scroller.scrollTop = 16;
+    vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
+      scrollHeight = 1_200;
+      callback(0);
+      return 1;
+    });
+    await act(async () => {
+      scroller.dispatchEvent(new Event("scroll", { bubbles: true }));
+      await Promise.resolve();
+    });
+
+    expect(listChannelMessages).toHaveBeenCalledWith(
+      "token",
+      "org-1",
+      "c-common",
+      undefined,
+      { limit: 20, cursor: "m-6" },
+    );
+    expect(container.textContent).toContain("Earlier message");
+    expect(scroller.scrollTop).toBe(216);
   });
 
   it("renders incoming webhook messages with a distinct author icon", async () => {
@@ -299,7 +375,12 @@ describe("CompanionChannels", () => {
       await Promise.resolve();
     });
 
-    expect(loadChannel).toHaveBeenCalledWith("token", "org-1", "c-common");
+    expect(loadChannel).toHaveBeenCalledWith(
+      "token",
+      "org-1",
+      "c-common",
+      { messageLimit: 20 },
+    );
     expect(container.textContent).toContain("Hello team");
     expect(
       container.querySelector(".companion-channel-bar-identity")?.textContent,
@@ -326,6 +407,8 @@ describe("CompanionChannels", () => {
     );
     expect(container.textContent).toContain("On it");
     expect(container.textContent).toContain("Thread");
+    const scrollIntoView = vi.mocked(HTMLElement.prototype.scrollIntoView);
+    scrollIntoView.mockClear();
 
     let handled = false;
     await act(async () => {
@@ -336,6 +419,7 @@ describe("CompanionChannels", () => {
     expect(
       container.querySelector(".companion-channel-bar-identity")?.textContent,
     ).toBe("WelcomeMembers 2 • Agents 1");
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: "end" });
 
     await act(async () => {
       handled = requestMobileNavigationBack();
@@ -787,7 +871,8 @@ describe("CompanionChannels", () => {
       channel: channel("c-common", "Welcome", null),
       members: [],
       agents: [],
-      messages: [rootMessage],
+      messages: [message("m-latest", "Latest message")],
+      nextCursor: "m-latest",
     });
     listChannelMessages.mockResolvedValue({ messages: [rootMessage, reply] });
 
@@ -803,12 +888,19 @@ describe("CompanionChannels", () => {
     await vi.waitFor(() => {
       expect(container.textContent).toContain("Requested reply");
     });
+    expect(loadChannel).toHaveBeenCalledWith(
+      "token",
+      "org-1",
+      "c-common",
+      { messageLimit: 20 },
+    );
     expect(listChannelMessages).toHaveBeenCalledWith(
       "token",
       "org-1",
       "c-common",
       rootMessage.id,
     );
+    expect(listChannelMessages).toHaveBeenCalledTimes(1);
     expect(container.textContent).toContain("Thread");
   });
 

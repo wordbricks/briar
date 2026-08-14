@@ -13,6 +13,7 @@ import {
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -182,6 +183,8 @@ type ChannelSurfaceContext = {
   threadParentId: string | null;
 };
 
+const mobileChannelMessagePageSize = 20;
+
 /**
  * Home on mobile is a channel list, then a channel's root messages, then one
  * message's thread. Each level replaces the previous one rather than opening a
@@ -209,6 +212,10 @@ export function CompanionChannels({
   const [replies, setReplies] = useState<ChannelAgentReply[]>([]);
   const [thread, setThread] = useState<ChannelMessage[] | null>(null);
   const [threadParentId, setThreadParentId] = useState<string | null>(null);
+  const [messageNextCursor, setMessageNextCursor] = useState<string | null>(
+    null,
+  );
+  const [loadingEarlierMessages, setLoadingEarlierMessages] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [acceptingProposalId, setAcceptingProposalId] = useState<string | null>(
@@ -223,8 +230,11 @@ export function CompanionChannels({
   const channelSurfaceGeneration = useRef(0);
   const channelIdRef = useRef(channel?.id ?? null);
   const threadParentIdRef = useRef(threadParentId);
+  const channelMessagesScrollRef = useRef<HTMLDivElement | null>(null);
   const channelMessagesEndRef = useRef<HTMLDivElement | null>(null);
   const threadMessagesEndRef = useRef<HTMLDivElement | null>(null);
+  const loadingEarlierMessagesRef = useRef(false);
+  const shouldScrollChannelToEnd = useRef(false);
   const proposalVersions = useRef(new Map<string, number>());
   const latestProposals = useRef(
     new Map<string, NonNullable<ChannelMessage["proposal"]>>(),
@@ -240,10 +250,11 @@ export function CompanionChannels({
     return () => onViewingChannelChange?.(null);
   }, [channel?.id, onViewingChannelChange]);
 
-  useEffect(() => {
-    if (!channel || threadParentId) return;
+  useLayoutEffect(() => {
+    if (!channel || threadParentId || !shouldScrollChannelToEnd.current) return;
     channelMessagesEndRef.current?.scrollIntoView?.({ block: "end" });
-  }, [channel, messages, replies.length, threadParentId]);
+    shouldScrollChannelToEnd.current = false;
+  }, [channel, messages, threadParentId]);
 
   useEffect(() => {
     if (!threadParentId) return;
@@ -319,6 +330,9 @@ export function CompanionChannels({
     setChannels([]);
     setChannel(null);
     setMessages([]);
+    setMessageNextCursor(null);
+    setLoadingEarlierMessages(false);
+    loadingEarlierMessagesRef.current = false;
     setMembers([]);
     setAgents([]);
     setReplies([]);
@@ -383,18 +397,25 @@ export function CompanionChannels({
       setThread(null);
       setThreadParentId(null);
       setMessages([]);
+      setMessageNextCursor(null);
+      setLoadingEarlierMessages(false);
+      loadingEarlierMessagesRef.current = false;
       setMembers([]);
       setAgents([]);
       setReplies([]);
       setError(null);
       setLoading(true);
       try {
-        const result = await loadChannel(token, organizationId, summary.id);
+        const result = await loadChannel(token, organizationId, summary.id, {
+          messageLimit: mobileChannelMessagePageSize,
+        });
         if (selectionVersion !== channelSelectionVersion.current) return;
         setChannel(markSelectedChannelRead(result.channel));
         recordProposalMessages(result.messages);
+        shouldScrollChannelToEnd.current = true;
         setMessages((current) =>
           mergeChannelMessageSnapshot(current, result.messages));
+        setMessageNextCursor(result.nextCursor ?? null);
         setMembers(result.members);
         setAgents(result.agents);
       } catch (cause) {
@@ -415,6 +436,57 @@ export function CompanionChannels({
       token,
     ],
   );
+
+  const loadEarlierChannelMessages = useCallback(async () => {
+    if (
+      !channel ||
+      threadParentId ||
+      !messageNextCursor ||
+      loadingEarlierMessagesRef.current
+    ) return;
+    const context = captureChannelSurface();
+    const scroller = channelMessagesScrollRef.current;
+    const previousScrollHeight = scroller?.scrollHeight ?? 0;
+    const previousScrollTop = scroller?.scrollTop ?? 0;
+    loadingEarlierMessagesRef.current = true;
+    setLoadingEarlierMessages(true);
+    try {
+      const result = await listChannelMessages(
+        token,
+        organizationId,
+        channel.id,
+        undefined,
+        {
+          limit: mobileChannelMessagePageSize,
+          cursor: messageNextCursor,
+        },
+      );
+      if (!channelSurfaceIsCurrent(context)) return;
+      recordProposalMessages(result.messages);
+      setMessages((current) =>
+        mergeChannelMessages(current, result.messages, []));
+      setMessageNextCursor(result.nextCursor ?? null);
+      window.requestAnimationFrame(() => {
+        if (!channelSurfaceIsCurrent(context) || !scroller) return;
+        scroller.scrollTop = previousScrollTop +
+          (scroller.scrollHeight - previousScrollHeight);
+      });
+    } catch (cause) {
+      if (channelSurfaceIsCurrent(context)) setError(message(cause));
+    } finally {
+      loadingEarlierMessagesRef.current = false;
+      if (channelSurfaceIsCurrent(context)) setLoadingEarlierMessages(false);
+    }
+  }, [
+    captureChannelSurface,
+    channel,
+    channelSurfaceIsCurrent,
+    messageNextCursor,
+    organizationId,
+    recordProposalMessages,
+    threadParentId,
+    token,
+  ]);
 
   useEffect(() => {
     const selectedChannelId = channel?.id;
@@ -466,6 +538,7 @@ export function CompanionChannels({
               invalidateChannelSurface(null, null);
               setChannel(null);
               setMessages([]);
+              setMessageNextCursor(null);
               setMembers([]);
               setAgents([]);
               setReplies([]);
@@ -485,6 +558,15 @@ export function CompanionChannels({
               (item) => item.channelId === selectedChannelId,
             );
             recordProposalMessages(selectedMessages);
+            if (
+              selectedMessages.some((item) => item.parentMessageId === null) &&
+              channelMessagesScrollRef.current &&
+              channelMessagesScrollRef.current.scrollHeight -
+                  channelMessagesScrollRef.current.scrollTop -
+                  channelMessagesScrollRef.current.clientHeight <= 80
+            ) {
+              shouldScrollChannelToEnd.current = true;
+            }
             setMessages((current) =>
               mergeChannelMessages(
                 current,
@@ -635,11 +717,19 @@ export function CompanionChannels({
     const selectionVersion = ++channelSelectionVersion.current;
     let cancelled = false;
     setReplies([]);
+    setThread(null);
+    setThreadParentId(null);
+    setMessageNextCursor(null);
+    setLoadingEarlierMessages(false);
+    loadingEarlierMessagesRef.current = false;
+    shouldScrollChannelToEnd.current = false;
     setError(null);
     setLoading(true);
     void (async () => {
       try {
-        const result = await loadChannel(token, organizationId, summary.id);
+        const result = await loadChannel(token, organizationId, summary.id, {
+          messageLimit: mobileChannelMessagePageSize,
+        });
         if (
           cancelled ||
           selectionVersion !== channelSelectionVersion.current
@@ -648,15 +738,44 @@ export function CompanionChannels({
         recordProposalMessages(result.messages);
         setMessages((current) =>
           mergeChannelMessageSnapshot(current, result.messages));
+        setMessageNextCursor(result.nextCursor ?? null);
         setMembers(result.members);
         setAgents(result.agents);
-        if (requestedMessage.rootMessageId !== requestedMessage.messageId) {
-          const threadResult = await listChannelMessages(
+        let requestedThread: Awaited<ReturnType<typeof listChannelMessages>> | null =
+          null;
+        if (
+          !result.messages.some(
+            (item) => item.id === requestedMessage.rootMessageId,
+          )
+        ) {
+          requestedThread = await listChannelMessages(
             token,
             organizationId,
             summary.id,
             requestedMessage.rootMessageId,
           );
+          if (
+            cancelled ||
+            selectionVersion !== channelSelectionVersion.current
+          ) return;
+          const requestedRoot = requestedThread.messages.find(
+            (item) =>
+              item.id === requestedMessage.rootMessageId &&
+              item.parentMessageId === null,
+          );
+          if (requestedRoot) {
+            recordProposalMessages([requestedRoot]);
+            setMessages((current) =>
+              mergeChannelMessages(current, [requestedRoot], []));
+          }
+        }
+        if (requestedMessage.rootMessageId !== requestedMessage.messageId) {
+          const threadResult = requestedThread ?? await listChannelMessages(
+              token,
+              organizationId,
+              summary.id,
+              requestedMessage.rootMessageId,
+            );
           if (
             cancelled ||
             selectionVersion !== channelSelectionVersion.current
@@ -739,6 +858,7 @@ export function CompanionChannels({
             mergeChannelMessages(current ?? [], [result.message], []),
           );
         } else {
+          shouldScrollChannelToEnd.current = true;
           setMessages((current) =>
             mergeChannelMessages(current, [result.message], []));
         }
@@ -1096,6 +1216,7 @@ export function CompanionChannels({
     if (!channel || !threadParentId) return false;
     channelSelectionVersion.current += 1;
     invalidateChannelSurface(channel.id, null);
+    shouldScrollChannelToEnd.current = true;
     setThreadParentId(null);
     setThread(null);
     setLoading(false);
@@ -1109,6 +1230,9 @@ export function CompanionChannels({
     invalidateChannelSurface(null, null);
     setChannel(null);
     setMessages([]);
+    setMessageNextCursor(null);
+    setLoadingEarlierMessages(false);
+    loadingEarlierMessagesRef.current = false;
     setReplies([]);
     setLoading(false);
     setError(null);
@@ -1204,7 +1328,16 @@ export function CompanionChannels({
           channel={channel}
         />
         {error ? <p className="companion-channel-error">{error}</p> : null}
-        <div className="companion-channel-messages">
+        <div
+          className="companion-channel-messages"
+          onScroll={(event) => {
+            if (event.currentTarget.scrollTop <= 32) {
+              void loadEarlierChannelMessages();
+            }
+          }}
+          ref={channelMessagesScrollRef}
+        >
+          {loadingEarlierMessages ? <Spinner /> : null}
           {loading && messages.length === 0 ? <Spinner /> : null}
           {messages.map((item) => (
             <MessageRow

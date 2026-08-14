@@ -39,6 +39,9 @@ where Message.ID: Hashable {
     let locale: CompanionLocale
     let accessibilityIdentifier: String
     let timestamp: (Message) -> Date
+    let hasEarlierMessages: Bool
+    let loadingEarlierMessages: Bool
+    let onLoadEarlier: (() async -> Void)?
     let row: (Message) -> RowContent
 
     init(
@@ -46,12 +49,18 @@ where Message.ID: Hashable {
         locale: CompanionLocale,
         accessibilityIdentifier: String,
         timestamp: @escaping (Message) -> Date,
+        hasEarlierMessages: Bool = false,
+        loadingEarlierMessages: Bool = false,
+        onLoadEarlier: (() async -> Void)? = nil,
         @ViewBuilder row: @escaping (Message) -> RowContent
     ) {
         self.messages = messages
         self.locale = locale
         self.accessibilityIdentifier = accessibilityIdentifier
         self.timestamp = timestamp
+        self.hasEarlierMessages = hasEarlierMessages
+        self.loadingEarlierMessages = loadingEarlierMessages
+        self.onLoadEarlier = onLoadEarlier
         self.row = row
     }
 
@@ -61,6 +70,19 @@ where Message.ID: Hashable {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(spacing: 0) {
+                    if loadingEarlierMessages {
+                        ProgressView()
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
+                            .accessibilityIdentifier("conversation-earlier-messages-loading")
+                    } else if hasEarlierMessages {
+                        Color.clear
+                            .frame(height: 1)
+                            .onAppear {
+                                Task { await onLoadEarlier?() }
+                            }
+                            .accessibilityIdentifier("conversation-earlier-messages-trigger")
+                    }
                     ForEach(Array(messages.indices), id: \.self) { index in
                         if ConversationDatePresentation.startsNewDay(
                             at: index,
@@ -84,6 +106,10 @@ where Message.ID: Hashable {
                 withAnimation(.easeOut(duration: 0.2)) {
                     proxy.scrollTo(current, anchor: .bottom)
                 }
+            }
+            .onChange(of: messages.first?.id) { previous, current in
+                guard let previous, previous != current else { return }
+                proxy.scrollTo(previous, anchor: .top)
             }
         }
         .accessibilityIdentifier(accessibilityIdentifier)

@@ -403,7 +403,13 @@ private struct ChannelConversationView: View {
                 messages: messages,
                 locale: locale,
                 accessibilityIdentifier: "channel-message-timeline",
-                timestamp: \.createdAt
+                timestamp: \.createdAt,
+                hasEarlierMessages: parentMessageID == nil && channels.hasEarlierMessages,
+                loadingEarlierMessages:
+                    parentMessageID == nil && channels.loadingEarlierMessages,
+                onLoadEarlier: parentMessageID == nil
+                    ? { await channels.loadEarlierMessages(channelID: channel.id) }
+                    : nil
             ) { message in
                 ChannelMessageRow(
                             acceptingProposalID: channels.acceptingProposalID,

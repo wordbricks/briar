@@ -254,7 +254,10 @@ struct CompanionShellView: View {
         homePath = NavigationPath()
         homePath.append(channel)
         await channels.openChannel(target.channelID)
-        guard let root = channels.messages.first(where: { $0.id == target.rootMessageID }) else {
+        guard let root = await channels.loadRootMessageForNavigation(
+            channelID: target.channelID,
+            messageID: target.rootMessageID
+        ) else {
             return
         }
         homePath.append(root)
