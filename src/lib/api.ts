@@ -1749,7 +1749,7 @@ export async function loadChannel(
   token: string,
   organizationId: string,
   channelId: string,
-  options: { messageLimit?: number } = {},
+  options: { messageLimit?: number; signal?: AbortSignal } = {},
 ) {
   const query = options.messageLimit
     ? `?limit=${encodeURIComponent(String(options.messageLimit))}`
@@ -1760,7 +1760,9 @@ export async function loadChannel(
     agents: ChannelAgentSummary[];
     messages: ChannelMessage[];
     nextCursor?: string | null;
-  }>(`/organizations/${organizationId}/channels/${channelId}${query}`, token);
+  }>(`/organizations/${organizationId}/channels/${channelId}${query}`, token, {
+    signal: options.signal,
+  });
 }
 
 export async function markChannelRead(
@@ -1800,7 +1802,7 @@ export async function listChannelMessages(
   organizationId: string,
   channelId: string,
   parentMessageId?: string,
-  page: { limit?: number; cursor?: string } = {},
+  page: { limit?: number; cursor?: string; signal?: AbortSignal } = {},
 ) {
   const params = new URLSearchParams();
   if (parentMessageId) params.set("parentMessageId", parentMessageId);
@@ -1810,6 +1812,7 @@ export async function listChannelMessages(
   return request<{ messages: ChannelMessage[]; nextCursor?: string | null }>(
     `/organizations/${organizationId}/channels/${channelId}/messages${query}`,
     token,
+    { signal: page.signal },
   );
 }
 

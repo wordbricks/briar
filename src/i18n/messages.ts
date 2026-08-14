@@ -120,6 +120,7 @@ export const ko = {
   "channel.create": "채널 만들기",
   "channel.creating": "만드는 중…",
   "channel.selectPrompt": "채널을 선택하세요.",
+  "channel.loadingMessages": "메시지를 불러오는 중…",
   "channel.emptyHint": "첫 메시지를 남겨보세요.",
   "channel.agentTyping": "에이전트가 답변을 작성하고 있습니다…",
   "channel.namedAgentTyping": "{name}님이 답변을 작성하고 있습니다…",
@@ -1827,6 +1828,7 @@ export type Messages = Record<MessageKey, string>;
 
 export const en: Messages = {
   ...ko,
+  "channel.loadingMessages": "Loading messages…",
   "inbox.noNotificationSelected": "No notification selected",
   "inbox.resizeDetailPane": "Resize inbox detail panel",
   "image.enlarge": "Enlarge {name}",
@@ -2771,6 +2773,7 @@ export const en: Messages = {
 };
 export const zh: Messages = {
   ...en,
+  "channel.loadingMessages": "正在加载消息…",
   "inbox.noNotificationSelected": "未选择通知",
   "inbox.resizeDetailPane": "调整收件箱详情面板大小",
   "image.enlarge": "放大{name}",

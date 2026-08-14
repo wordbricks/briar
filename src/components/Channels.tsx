@@ -25,11 +25,15 @@ import {
   useCallback,
   useEffect,
   useId,
+  useLayoutEffect,
+  memo,
   useMemo,
   useRef,
   useState,
   type CSSProperties,
   type Dispatch,
+  type ReactNode,
+  type RefObject,
   type SetStateAction,
 } from "react";
 import { useI18n } from "../i18n";
@@ -132,6 +136,11 @@ import {
   scrollContainerToEnd,
   scrollElementToCenter,
 } from "../lib/scroll-container";
+import {
+  recordDesktopChannelFirstMessage,
+  recordDesktopChannelHeader,
+  type DesktopChannelDisplaySource,
+} from "../lib/channel-performance";
 
 const typingAgentNamesForMessage = (
   replies: ChannelAgentReply[],
@@ -177,6 +186,7 @@ type ChannelsProps = {
   channels: ChannelSummary[];
   projects?: readonly Pick<Project, "id" | "name" | "organizationId">[];
   activeChannelId: string | null;
+  channelCatalogCursor?: number | null;
   onChannelSelect: (channelId: string | null) => void;
   onChannelsChange: Dispatch<SetStateAction<ChannelSummary[]>>;
   channelInboxSyncSignal?: string;
@@ -193,6 +203,19 @@ type ChannelsProps = {
   } | null;
   onRequestedMessageOpen?: () => void;
 };
+
+type CachedDesktopChannel = {
+  channel: ChannelSummary;
+  members: ChannelMember[];
+  agents: ChannelAgentSummary[];
+  messages: ChannelMessage[];
+  nextCursor: string | null;
+};
+
+const desktopChannelMessagePageSize = 20;
+const desktopChannelVirtualizationThreshold = 40;
+const desktopChannelEstimatedMessageHeight = 112;
+const desktopChannelVirtualOverscan = 6;
 
 type ChannelInviteCandidate =
   | { type: "user"; id: string; member: OrganizationMember }
@@ -311,6 +334,7 @@ export function Channels({
   channels,
   projects = [],
   activeChannelId,
+  channelCatalogCursor,
   onChannelSelect,
   onChannelsChange,
   channelInboxSyncSignal,
@@ -353,6 +377,9 @@ export function Channels({
   const [members, setMembers] = useState<ChannelMember[]>([]);
   const [agents, setAgents] = useState<ChannelAgentSummary[]>([]);
   const [messages, setMessages] = useState<ChannelMessage[]>([]);
+  const [messageNextCursor, setMessageNextCursor] = useState<string | null>(null);
+  const [channelLoading, setChannelLoading] = useState(false);
+  const [loadingEarlierMessages, setLoadingEarlierMessages] = useState(false);
   const [replies, setReplies] = useState<ChannelAgentReply[]>([]);
   const [threadParentId, setThreadParentId] = useState<string | null>(null);
   const [threadMessages, setThreadMessages] = useState<ChannelMessage[]>([]);
@@ -409,6 +436,13 @@ export function Channels({
   const messagesScrollRef = useRef<HTMLDivElement | null>(null);
   const threadMessagesScrollRef = useRef<HTMLDivElement | null>(null);
   const activeChannelIdRef = useRef(activeChannelId);
+  const channelCache = useRef(new Map<string, CachedDesktopChannel>());
+  const channelLoadAbortController = useRef<AbortController | null>(null);
+  const preparedChannelId = useRef<string | null>(null);
+  const loadingEarlierMessagesRef = useRef(false);
+  const shouldScrollChannelToEnd = useRef(false);
+  const suppressEarlierLoadOnNextScroll = useRef(false);
+  const displaySource = useRef<DesktopChannelDisplaySource>("network");
   const threadParentIdRef = useRef(threadParentId);
   if (
     renderedChannelSurface.current.channelId !== activeChannelId ||
@@ -447,6 +481,23 @@ export function Channels({
       threadParentIdRef.current = parentMessageId;
       setBusy(false);
       setAcceptingProposalId(null);
+    },
+    [],
+  );
+
+  const updateRootMessages = useCallback(
+    (update: (current: ChannelMessage[]) => ChannelMessage[]) => {
+      setMessages((current) => {
+        const next = update(current);
+        const channelId = activeChannelIdRef.current;
+        if (channelId) {
+          const cached = channelCache.current.get(channelId);
+          if (cached) {
+            channelCache.current.set(channelId, { ...cached, messages: next });
+          }
+        }
+        return next;
+      });
     },
     [],
   );
@@ -612,9 +663,19 @@ export function Channels({
           token,
           organizationId,
           activeChannelId,
+          { messageLimit: 1 },
         );
         setMembers(refreshed.members);
         setAgents(refreshed.agents);
+        const cached = channelCache.current.get(activeChannelId);
+        if (cached) {
+          channelCache.current.set(activeChannelId, {
+            ...cached,
+            channel: refreshed.channel,
+            members: refreshed.members,
+            agents: refreshed.agents,
+          });
+        }
         onChannelsChange((current) =>
           current.map((channel) =>
             channel.id === refreshed.channel.id ? refreshed.channel : channel,
@@ -668,6 +729,11 @@ export function Channels({
   );
 
   useEffect(() => {
+    if (channelCatalogCursor !== undefined) {
+      cursor.current = channelCatalogCursor ?? 0;
+      setChannelListReady(channelCatalogCursor !== null);
+      return;
+    }
     let cancelled = false;
     cursor.current = 0;
     setChannelListReady(false);
@@ -695,17 +761,56 @@ export function Channels({
     return () => {
       cancelled = true;
     };
-  }, [onChannelSelect, onChannelsChange, organizationId, token]);
+  }, [
+    channelCatalogCursor,
+    onChannelSelect,
+    onChannelsChange,
+    organizationId,
+    token,
+  ]);
+
+  useEffect(() => {
+    channelCache.current.clear();
+    preparedChannelId.current = null;
+  }, [organizationId, token]);
+
+  useLayoutEffect(() => {
+    if (!activeChannelId || !channelListReady) return;
+    recordDesktopChannelHeader(activeChannelId);
+    if (preparedChannelId.current === activeChannelId) return;
+    preparedChannelId.current = activeChannelId;
+    channelLoadAbortController.current?.abort();
+    const cached = channelCache.current.get(activeChannelId) ?? null;
+    displaySource.current = cached ? "cache" : "network";
+    shouldScrollChannelToEnd.current = true;
+    setMembers(cached?.members ?? []);
+    setAgents(cached?.agents ?? []);
+    setMessages(cached?.messages ?? []);
+    setMessageNextCursor(cached?.nextCursor ?? null);
+    setChannelLoading(!cached);
+    setLoadingEarlierMessages(false);
+    loadingEarlierMessagesRef.current = false;
+    setProposalProjects({});
+    setThreadParentId(null);
+    setThreadMessages([]);
+    setError(null);
+  }, [activeChannelId, channelListReady]);
 
   useEffect(() => {
     if (!activeChannelId || !channelListReady) return;
     let cancelled = false;
+    const abortController = new AbortController();
+    channelLoadAbortController.current?.abort();
+    channelLoadAbortController.current = abortController;
     const loadVersion = ++channelDataVersion.current;
     authoritativeLoadVersion.current = loadVersion;
-    setProposalProjects({});
     void (async () => {
       try {
-        const result = await loadChannel(token, organizationId, activeChannelId);
+        const cached = channelCache.current.get(activeChannelId) ?? null;
+        const result = await loadChannel(token, organizationId, activeChannelId, {
+          messageLimit: desktopChannelMessagePageSize,
+          signal: abortController.signal,
+        });
         if (cancelled || loadVersion !== channelDataVersion.current) return;
         onChannelsChange((current) =>
           current.some((channel) => channel.id === result.channel.id)
@@ -717,8 +822,27 @@ export function Channels({
         setMembers(result.members);
         setAgents(result.agents);
         recordProposalMessages(result.messages);
-        setMessages((current) =>
-          mergeChannelMessageSnapshot(current, result.messages));
+        const nextCursor = cached && cached.messages.length > result.messages.length
+          ? cached.nextCursor
+          : result.nextCursor ?? null;
+        if (!cached) {
+          displaySource.current = result.messages.length > 0 ? "network" : "empty";
+        }
+        setMessages((current) => {
+          const nextMessages = cached
+            ? mergeChannelMessages(current, result.messages, [])
+            : result.messages;
+          channelCache.current.set(activeChannelId, {
+            channel: result.channel,
+            members: result.members,
+            agents: result.agents,
+            messages: nextMessages,
+            nextCursor,
+          });
+          return nextMessages;
+        });
+        setMessageNextCursor(nextCursor);
+        shouldScrollChannelToEnd.current = true;
         const target = requestedMessage?.channelId === activeChannelId
           ? requestedMessage
           : null;
@@ -728,6 +852,7 @@ export function Channels({
             organizationId,
             activeChannelId,
             target.rootMessageId,
+            { signal: abortController.signal },
           );
           if (cancelled || loadVersion !== channelDataVersion.current) return;
           recordProposalMessages(threadResult.messages);
@@ -737,6 +862,34 @@ export function Channels({
         } else {
           setThreadParentId(null);
           setThreadMessages([]);
+          if (
+            target &&
+            !result.messages.some((message) => message.id === target.messageId)
+          ) {
+            const requestedRoot = await listChannelMessages(
+              token,
+              organizationId,
+              activeChannelId,
+              target.rootMessageId,
+              { signal: abortController.signal },
+            );
+            if (cancelled || loadVersion !== channelDataVersion.current) return;
+            const roots = requestedRoot.messages.filter(
+              (message) => message.parentMessageId === null,
+            );
+            recordProposalMessages(roots);
+            setMessages((current) => {
+              const next = mergeChannelMessages(current, roots, []);
+              const cachedChannel = channelCache.current.get(activeChannelId);
+              if (cachedChannel) {
+                channelCache.current.set(activeChannelId, {
+                  ...cachedChannel,
+                  messages: next,
+                });
+              }
+              return next;
+            });
+          }
         }
         if (target) {
           window.requestAnimationFrame(() => {
@@ -744,23 +897,50 @@ export function Channels({
               target.rootMessageId === target.messageId
                 ? messagesScrollRef.current
                 : threadMessagesScrollRef.current;
-            const requestedMessageElement = [
+            const findTarget = () => [
               ...(messageScroller?.querySelectorAll<HTMLElement>(
                 "[data-channel-message-id]",
               ) ?? []),
             ].find(
-              (element) =>
-                element.dataset.channelMessageId === target.messageId,
+              (element) => element.dataset.channelMessageId === target.messageId,
             ) ?? null;
+            const requestedMessageElement = findTarget();
+            if (
+              !requestedMessageElement &&
+              target.rootMessageId === target.messageId &&
+              messageScroller
+            ) {
+              const targetIndex = channelCache.current
+                .get(activeChannelId)
+                ?.messages.findIndex((message) => message.id === target.messageId) ?? -1;
+              if (targetIndex >= 0) {
+                messageScroller.scrollTop = targetIndex *
+                  desktopChannelEstimatedMessageHeight;
+                suppressEarlierLoadOnNextScroll.current = true;
+                messageScroller.dispatchEvent(new Event("scroll"));
+                window.requestAnimationFrame(() => {
+                  scrollElementToCenter(messageScroller, findTarget());
+                  onRequestedMessageOpen?.();
+                });
+                return;
+              }
+            }
             scrollElementToCenter(messageScroller, requestedMessageElement);
             onRequestedMessageOpen?.();
           });
         }
       } catch (cause) {
-        if (!cancelled && loadVersion === channelDataVersion.current) {
+        if (
+          !abortController.signal.aborted &&
+          !cancelled &&
+          loadVersion === channelDataVersion.current
+        ) {
           setError(errorMessage(cause));
         }
       } finally {
+        if (!cancelled && loadVersion === channelDataVersion.current) {
+          setChannelLoading(false);
+        }
         if (authoritativeLoadVersion.current === loadVersion) {
           authoritativeLoadVersion.current = null;
         }
@@ -768,11 +948,15 @@ export function Channels({
     })();
     return () => {
       cancelled = true;
+      abortController.abort();
       if (loadVersion === channelDataVersion.current) {
         channelDataVersion.current += 1;
       }
       if (authoritativeLoadVersion.current === loadVersion) {
         authoritativeLoadVersion.current = null;
+      }
+      if (channelLoadAbortController.current === abortController) {
+        channelLoadAbortController.current = null;
       }
     };
   }, [
@@ -883,15 +1067,35 @@ export function Channels({
             );
             if (relevant.length || delta.removedMessageIds.length) {
               recordProposalMessages(relevant);
-              setMessages((current) =>
-                mergeChannelMessages(
-                  current,
-                  relevant.filter(
-                    (message) => message.parentMessageId === null,
-                  ),
-                  delta.removedMessageIds,
-                ),
+              const rootUpdates = relevant.filter(
+                (message) => message.parentMessageId === null,
               );
+              const scroller = messagesScrollRef.current;
+              if (
+                rootUpdates.length > 0 &&
+                scroller &&
+                scroller.scrollHeight - scroller.scrollTop -
+                    scroller.clientHeight <= 80
+              ) {
+                shouldScrollChannelToEnd.current = true;
+              }
+              setMessages((current) => {
+                const next = mergeChannelMessages(
+                  current,
+                  rootUpdates,
+                  delta.removedMessageIds,
+                );
+                if (activeChannelId) {
+                  const cached = channelCache.current.get(activeChannelId);
+                  if (cached) {
+                    channelCache.current.set(activeChannelId, {
+                      ...cached,
+                      messages: next,
+                    });
+                  }
+                }
+                return next;
+              });
               setThreadParentId((parentId) => {
                 if (parentId) {
                   const threadUpdates = relevant.filter(
@@ -981,9 +1185,89 @@ export function Channels({
     }
   }, [activeChannelId, channels, onChannelSelect]);
 
-  useEffect(() => {
-    scrollContainerToEnd(messagesScrollRef.current);
-  }, [messages, activeChannelId, replies.length]);
+  const loadEarlierChannelMessages = useCallback(async () => {
+    if (
+      !activeChannelId ||
+      threadParentIdRef.current ||
+      !messageNextCursor ||
+      loadingEarlierMessagesRef.current
+    ) return;
+    const context = captureChannelSurface();
+    const scroller = messagesScrollRef.current;
+    const previousScrollHeight = scroller?.scrollHeight ?? 0;
+    const previousScrollTop = scroller?.scrollTop ?? 0;
+    const abortController = new AbortController();
+    channelLoadAbortController.current?.abort();
+    channelLoadAbortController.current = abortController;
+    loadingEarlierMessagesRef.current = true;
+    setLoadingEarlierMessages(true);
+    try {
+      const result = await listChannelMessages(
+        token,
+        organizationId,
+        activeChannelId,
+        undefined,
+        {
+          limit: desktopChannelMessagePageSize,
+          cursor: messageNextCursor,
+          signal: abortController.signal,
+        },
+      );
+      if (!channelSurfaceIsCurrent(context)) return;
+      recordProposalMessages(result.messages);
+      setMessages((current) => {
+        const next = mergeChannelMessages(current, result.messages, []);
+        const cached = channelCache.current.get(activeChannelId);
+        if (cached) {
+          channelCache.current.set(activeChannelId, {
+            ...cached,
+            messages: next,
+            nextCursor: result.nextCursor ?? null,
+          });
+        }
+        return next;
+      });
+      setMessageNextCursor(result.nextCursor ?? null);
+      window.requestAnimationFrame(() => {
+        if (!channelSurfaceIsCurrent(context) || !scroller) return;
+        scroller.scrollTop = previousScrollTop +
+          (scroller.scrollHeight - previousScrollHeight);
+        suppressEarlierLoadOnNextScroll.current = true;
+        scroller.dispatchEvent(new Event("scroll"));
+      });
+    } catch (cause) {
+      if (!abortController.signal.aborted && channelSurfaceIsCurrent(context)) {
+        setError(errorMessage(cause));
+      }
+    } finally {
+      if (channelLoadAbortController.current === abortController) {
+        channelLoadAbortController.current = null;
+      }
+      loadingEarlierMessagesRef.current = false;
+      if (channelSurfaceIsCurrent(context)) setLoadingEarlierMessages(false);
+    }
+  }, [
+    activeChannelId,
+    captureChannelSurface,
+    channelSurfaceIsCurrent,
+    messageNextCursor,
+    organizationId,
+    recordProposalMessages,
+    token,
+  ]);
+
+  useLayoutEffect(() => {
+    if (!activeChannelId || channelLoading) return;
+    const cached = channelCache.current.get(activeChannelId);
+    if (!cached) return;
+    if (shouldScrollChannelToEnd.current) {
+      scrollContainerToEnd(messagesScrollRef.current);
+      suppressEarlierLoadOnNextScroll.current = true;
+      messagesScrollRef.current?.dispatchEvent(new Event("scroll"));
+      shouldScrollChannelToEnd.current = false;
+    }
+    recordDesktopChannelFirstMessage(activeChannelId, displaySource.current);
+  }, [activeChannelId, channelLoading, messages]);
 
   useEffect(() => {
     if (!threadParentId) return;
@@ -996,6 +1280,9 @@ export function Channels({
       invalidateChannelSurface(activeChannelId, parentId);
       const loadVersion = ++channelDataVersion.current;
       authoritativeLoadVersion.current = loadVersion;
+      const abortController = new AbortController();
+      channelLoadAbortController.current?.abort();
+      channelLoadAbortController.current = abortController;
       setThreadParentId(parentId);
       try {
         const result = await listChannelMessages(
@@ -1003,18 +1290,25 @@ export function Channels({
           organizationId,
           activeChannelId,
           parentId,
+          { signal: abortController.signal },
         );
         if (loadVersion !== channelDataVersion.current) return;
         recordProposalMessages(result.messages);
         setThreadMessages((current) =>
           mergeChannelMessageSnapshot(current, result.messages));
       } catch (cause) {
-        if (loadVersion === channelDataVersion.current) {
+        if (
+          !abortController.signal.aborted &&
+          loadVersion === channelDataVersion.current
+        ) {
           setError(errorMessage(cause));
         }
       } finally {
         if (authoritativeLoadVersion.current === loadVersion) {
           authoritativeLoadVersion.current = null;
+        }
+        if (channelLoadAbortController.current === abortController) {
+          channelLoadAbortController.current = null;
         }
       }
     },
@@ -1036,6 +1330,7 @@ export function Channels({
       attachmentReferences: string[],
     ) => {
       if (!activeChannelId || !body.trim()) return;
+      const sendContext = captureChannelSurface();
       setBusy(true);
       setError(null);
       try {
@@ -1051,6 +1346,7 @@ export function Channels({
           attachments,
           attachmentReferences,
         });
+        if (!channelSurfaceIsCurrent(sendContext)) return;
         setReplies((current) => [...current, ...result.agentReplies]);
         const failed = result.agentReplies.find(
           (reply) => reply.status === "failed",
@@ -1066,13 +1362,12 @@ export function Channels({
           );
         }
         if (parentMessageId) {
-          setMessages((current) =>
+          updateRootMessages((current) =>
             current.map((message) =>
               message.id === parentMessageId
                 ? appendChannelReplySummary(message, result.message)
                 : message,
-            ),
-          );
+            ));
           setThreadMessages((current) =>
             mergeChannelMessages(
               current.map((message) =>
@@ -1085,16 +1380,25 @@ export function Channels({
             ),
           );
         } else {
-          setMessages((current) =>
+          shouldScrollChannelToEnd.current = true;
+          updateRootMessages((current) =>
             mergeChannelMessages(current, [result.message], []));
         }
       } catch (cause) {
-        setError(errorMessage(cause));
+        if (channelSurfaceIsCurrent(sendContext)) setError(errorMessage(cause));
       } finally {
-        setBusy(false);
+        if (channelSurfaceIsCurrent(sendContext)) setBusy(false);
       }
     },
-    [activeChannelId, organizationId, t, token],
+    [
+      activeChannelId,
+      captureChannelSurface,
+      channelSurfaceIsCurrent,
+      organizationId,
+      t,
+      token,
+      updateRootMessages,
+    ],
   );
 
   const openIssue = useCallback(
@@ -1195,10 +1499,10 @@ export function Channels({
         message.executionProposal?.id === proposal.id
           ? { ...message, executionProposal: proposal }
           : message;
-      setMessages((current) => current.map(apply));
+      updateRootMessages((current) => current.map(apply));
       setThreadMessages((current) => current.map(apply));
     },
-    [],
+    [updateRootMessages],
   );
 
   const acceptSkillExecutionProposal = useCallback(
@@ -1235,10 +1539,10 @@ export function Channels({
         message.skillExecutionProposal?.id === proposal.id
           ? { ...message, skillExecutionProposal: proposal }
           : message;
-      setMessages((current) => current.map(apply));
+      updateRootMessages((current) => current.map(apply));
       setThreadMessages((current) => current.map(apply));
     },
-    [],
+    [updateRootMessages],
   );
 
   const refreshProposalState = useCallback(
@@ -1261,15 +1565,17 @@ export function Channels({
           setThreadMessages((current) =>
             mergeChannelMessageSnapshot(current, result.messages));
         } else {
-          const result = await loadChannel(token, organizationId, activeChannelId);
+          const result = await loadChannel(token, organizationId, activeChannelId, {
+            messageLimit: desktopChannelMessagePageSize,
+          });
           if (loadVersion !== channelDataVersion.current) {
             return latestProposals.current.get(proposalId) ?? null;
           }
           recordProposalMessages(result.messages);
           setMembers(result.members);
           setAgents(result.agents);
-          setMessages((current) =>
-            mergeChannelMessageSnapshot(current, result.messages));
+          updateRootMessages((current) =>
+            mergeChannelMessages(current, result.messages, []));
           onChannelsChange((current) =>
             current.map((item) =>
               item.id === result.channel.id ? result.channel : item,
@@ -1289,6 +1595,7 @@ export function Channels({
       organizationId,
       recordProposalMessages,
       token,
+      updateRootMessages,
     ],
   );
 
@@ -1345,7 +1652,7 @@ export function Channels({
           (proposalVersions.current.get(proposalId) ?? 0) ===
             approvalProposalVersion
         ) {
-          setMessages((current) => current.map(applyResult));
+          updateRootMessages((current) => current.map(applyResult));
           setThreadMessages((current) => current.map(applyResult));
           recordProposalMessages([applyResult(message)]);
           if (hasExecutionFollowUp) {
@@ -1363,7 +1670,7 @@ export function Channels({
           if (latest?.status === "accepted" && latest.projectId && latest.resultRunId) {
             if (hasExecutionFollowUp) {
               if (result.executionProposal) {
-                setMessages((current) => current.map(applyResult));
+                updateRootMessages((current) => current.map(applyResult));
                 setThreadMessages((current) => current.map(applyResult));
                 recordProposalMessages([applyResult(message)]);
               } else {
@@ -1378,7 +1685,7 @@ export function Channels({
             // transaction's accepted delta. The post-response refresh proves
             // it is still that exact reservation, so the successful response
             // is safe to apply without overwriting a reopen or transfer.
-            setMessages((current) => current.map(applyResult));
+            updateRootMessages((current) => current.map(applyResult));
             setThreadMessages((current) => current.map(applyResult));
             recordProposalMessages([applyResult(message)]);
             if (hasExecutionFollowUp) {
@@ -1409,6 +1716,7 @@ export function Channels({
       recordProposalMessages,
       refreshProposalState,
       token,
+      updateRootMessages,
     ],
   );
 
@@ -1429,7 +1737,7 @@ export function Channels({
           candidate.id === result.message.id
             ? { ...candidate, reactions: result.message.reactions }
             : candidate;
-        setMessages((current) => current.map(applyReactions));
+        updateRootMessages((current) => current.map(applyReactions));
         setThreadMessages((current) => current.map(applyReactions));
       } catch (cause) {
         setError(errorMessage(cause));
@@ -1437,7 +1745,7 @@ export function Channels({
         setBusy(false);
       }
     },
-    [activeChannelId, organizationId, token],
+    [activeChannelId, organizationId, token, updateRootMessages],
   );
 
   const pendingReplies = replies.filter(
@@ -1455,7 +1763,6 @@ export function Channels({
     : [];
 
   const memberCount = Math.max(activeChannel?.memberCount ?? 0, members.length);
-  let lastDay: string | null = null;
 
   return (
     <div
@@ -1524,27 +1831,38 @@ export function Channels({
 
             {error ? <div className="channel-error">{error}</div> : null}
 
-            <div className="channel-messages" ref={messagesScrollRef}>
-              <ChannelWelcome
-                channel={activeChannel}
-                onCreateAgent={onCreateAgent}
-                onAddPeople={openInvite}
-              />
-
-              {messages.map((message) => {
-                const currentDay = dayKey(message.createdAt, localeTag);
-                const showDay = currentDay !== lastDay;
-                lastDay = currentDay;
-                return (
-                  <div key={message.id} className="channel-message-block">
-                    {showDay ? (
-                      <div className="channel-day-separator">
-                        <span>
-                          {formatDayLabel(message.createdAt, localeTag, t)}
-                        </span>
-                      </div>
-                    ) : null}
-                    <MessageRow
+            <div
+              className="channel-messages"
+              onScroll={(event) => {
+                if (suppressEarlierLoadOnNextScroll.current) {
+                  suppressEarlierLoadOnNextScroll.current = false;
+                  return;
+                }
+                if (event.currentTarget.scrollTop <= 80) {
+                  void loadEarlierChannelMessages();
+                }
+              }}
+              ref={messagesScrollRef}
+            >
+              {channelLoading ? (
+                <ChannelMessageSkeleton label={t("channel.loadingMessages")} />
+              ) : (
+                <>
+                  <ChannelWelcome
+                    channel={activeChannel}
+                    onCreateAgent={onCreateAgent}
+                    onAddPeople={openInvite}
+                  />
+                  {loadingEarlierMessages ? (
+                    <div className="channel-message-page-loader" role="status">
+                      <LoaderCircle aria-hidden="true" className="spin" size={15} />
+                    </div>
+                  ) : null}
+                  <VirtualizedChannelMessageList
+                    localeTag={localeTag}
+                    messages={messages}
+                    renderMessage={(message) => (
+                      <MessageRow
                       agents={agents}
                       channel={activeChannel}
                       message={message}
@@ -1598,19 +1916,22 @@ export function Channels({
                       )}
                       showTypingState={message.id !== threadParentId}
                     />
-                  </div>
-                );
-              })}
-
-              {messages.length === 0 ? (
-                <p className="channel-empty-hint muted">{t("channel.emptyHint")}</p>
-              ) : null}
-
+                    )}
+                    scrollerRef={messagesScrollRef}
+                    t={t}
+                  />
+                  {messages.length === 0 ? (
+                    <p className="channel-empty-hint muted">
+                      {t("channel.emptyHint")}
+                    </p>
+                  ) : null}
+                </>
+              )}
             </div>
 
             <Composer
               agents={agents}
-              busy={busy}
+              busy={busy || channelLoading}
               members={members}
               currentUserId={currentUserId}
               channelName={activeChannel.name}
@@ -1781,6 +2102,163 @@ export function Channels({
           onRename={renameWebhook}
           onRevoke={revokeWebhook}
           onRotate={rotateWebhook}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function ChannelMessageSkeleton({ label }: { label: string }) {
+  return (
+    <div aria-busy="true" aria-label={label} className="channel-message-skeleton">
+      {[0, 1, 2, 3, 4].map((index) => (
+        <div className="channel-message-skeleton-row" key={index}>
+          <span className="channel-message-skeleton-avatar" />
+          <span className="channel-message-skeleton-copy">
+            <span />
+            <span />
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function VirtualizedChannelMessageList({
+  localeTag,
+  messages,
+  renderMessage,
+  scrollerRef,
+  t,
+}: {
+  localeTag: string;
+  messages: ChannelMessage[];
+  renderMessage: (message: ChannelMessage) => ReactNode;
+  scrollerRef: RefObject<HTMLDivElement | null>;
+  t: Translate;
+}) {
+  const listRef = useRef<HTMLDivElement | null>(null);
+  const heights = useRef(new Map<string, number>());
+  const [measurementVersion, setMeasurementVersion] = useState(0);
+  const [viewport, setViewport] = useState({ height: 800, top: 0 });
+
+  useLayoutEffect(() => {
+    const scroller = scrollerRef.current;
+    if (!scroller) return;
+    const update = () => {
+      const listTop = listRef.current
+        ? listRef.current.getBoundingClientRect().top -
+          scroller.getBoundingClientRect().top + scroller.scrollTop
+        : 0;
+      setViewport({
+        height: scroller.clientHeight || 800,
+        top: Math.max(0, scroller.scrollTop - listTop),
+      });
+    };
+    update();
+    scroller.addEventListener("scroll", update, { passive: true });
+    const resizeObserver = typeof ResizeObserver === "undefined"
+      ? null
+      : new ResizeObserver(update);
+    resizeObserver?.observe(scroller);
+    return () => {
+      scroller.removeEventListener("scroll", update);
+      resizeObserver?.disconnect();
+    };
+  }, [messages.length, scrollerRef]);
+
+  const offsets = useMemo(() => {
+    const values = [0];
+    for (const message of messages) {
+      values.push(
+        values.at(-1)! +
+          (heights.current.get(message.id) ?? desktopChannelEstimatedMessageHeight),
+      );
+    }
+    return values;
+  }, [measurementVersion, messages]);
+  const totalHeight = offsets.at(-1) ?? 0;
+  let start = 0;
+  let end = messages.length;
+  if (messages.length > desktopChannelVirtualizationThreshold) {
+    const visibleTop = Math.max(
+      0,
+      viewport.top - desktopChannelVirtualOverscan *
+        desktopChannelEstimatedMessageHeight,
+    );
+    const visibleBottom = viewport.top + viewport.height +
+      desktopChannelVirtualOverscan * desktopChannelEstimatedMessageHeight;
+    while (start < messages.length && offsets[start + 1]! < visibleTop) start += 1;
+    end = start;
+    while (end < messages.length && offsets[end]! <= visibleBottom) end += 1;
+  }
+
+  useLayoutEffect(() => {
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver((entries) => {
+      let changed = false;
+      for (const entry of entries) {
+        const id = (entry.target as HTMLElement).dataset.channelVirtualMessageId;
+        if (!id) continue;
+        const borderBox = entry.borderBoxSize;
+        const borderBoxHeight = Array.isArray(borderBox)
+          ? borderBox[0]?.blockSize
+          : (borderBox as unknown as ResizeObserverSize | undefined)?.blockSize;
+        const height = borderBoxHeight ?? entry.contentRect.height;
+        if (height <= 0 || Math.abs((heights.current.get(id) ?? 0) - height) < 1) {
+          continue;
+        }
+        heights.current.set(id, height);
+        changed = true;
+      }
+      if (changed) setMeasurementVersion((version) => version + 1);
+    });
+    const rows = listRef.current?.querySelectorAll<HTMLElement>(
+      "[data-channel-virtual-message-id]",
+    ) ?? [];
+    for (const row of rows) observer.observe(row);
+    return () => observer.disconnect();
+  }, [end, start]);
+
+  return (
+    <div
+      className="channel-message-virtual-list"
+      data-virtualized={messages.length > desktopChannelVirtualizationThreshold}
+      ref={listRef}
+    >
+      {start > 0 ? (
+        <div
+          aria-hidden="true"
+          className="channel-message-virtual-spacer"
+          style={{ height: offsets[start] }}
+        />
+      ) : null}
+      {messages.slice(start, end).map((message, relativeIndex) => {
+        const index = start + relativeIndex;
+        const currentDay = dayKey(message.createdAt, localeTag);
+        const previousDay = index > 0
+          ? dayKey(messages[index - 1]!.createdAt, localeTag)
+          : null;
+        return (
+          <div
+            className="channel-message-block"
+            data-channel-virtual-message-id={message.id}
+            key={message.id}
+          >
+            {currentDay !== previousDay ? (
+              <div className="channel-day-separator">
+                <span>{formatDayLabel(message.createdAt, localeTag, t)}</span>
+              </div>
+            ) : null}
+            {renderMessage(message)}
+          </div>
+        );
+      })}
+      {end < messages.length ? (
+        <div
+          aria-hidden="true"
+          className="channel-message-virtual-spacer"
+          style={{ height: Math.max(0, totalHeight - offsets[end]!) }}
         />
       ) : null}
     </div>
@@ -2228,7 +2706,7 @@ function ChannelInviteDialog({
   );
 }
 
-function MessageRow({
+const MessageRow = memo(function MessageRow({
   acceptingProposal,
   agents,
   channel,
@@ -2513,7 +2991,23 @@ function MessageRow({
       </div>
     </article>
   );
-}
+}, (previous, next) =>
+  previous.acceptingProposal === next.acceptingProposal &&
+  previous.agents === next.agents &&
+  previous.busy === next.busy &&
+  previous.channel === next.channel &&
+  previous.currentUserId === next.currentUserId &&
+  previous.localeTag === next.localeTag &&
+  previous.members === next.members &&
+  previous.message === next.message &&
+  previous.projects === next.projects &&
+  previous.selectedProjectId === next.selectedProjectId &&
+  previous.showTypingState === next.showTypingState &&
+  previous.token === next.token &&
+  previous.typingAgentNames.length === next.typingAgentNames.length &&
+  previous.typingAgentNames.every(
+    (name, index) => name === next.typingAgentNames[index],
+  ));
 
 function Composer({
   agents,
