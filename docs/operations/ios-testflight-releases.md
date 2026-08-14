@@ -721,3 +721,32 @@ Version `1.2.118 (4)` (`64684398-ee1b-40b5-a7fa-2f5f66a53d14`) was uploaded
 and remains `VALID`, but main advanced to version 1.2.119 while it was being
 processed. Version `1.2.119 (1)` is therefore the final build handed off from
 the latest main commit.
+
+## 2026-08-14 — 1.2.121 (1)
+
+- App: Briar Companion (`app.briar.companion`)
+- Marketing version: `1.2.121`
+- App Store Connect build: `1`
+- App Store Connect build ID: `d231cf9e-b2a1-4536-a417-3f74d9e17fcd`
+- Latest main commit: `2ba01537`
+- Release source commit: `ef3c64343f39cb2996cef31b3b09c14460e76e21`
+- Implementation: native SwiftUI
+- Toolchain: Xcode 26.6, iOS 26.5 SDK
+- Minimum iOS version: 17.0
+- App Store Connect processing state: `VALID`
+- TestFlight state: `IN_BETA_TESTING`
+- Internal group: `wordbricks` (`hasAccessToAllBuilds=true`)
+- Automatic tester notification: enabled
+- IPA SHA-256: `6bcc4aa536ce131b0581a7c3dea9d14f109eb79e59e4f9d01ee621083ef5eb42`
+
+The candidate was archived and uploaded from `ef3c6434`, the latest main
+commit when the release gate started. Main later advanced through PR #1023
+(`2ba01537`) while App Store Connect processed the upload; that PR changes only
+the web Inbox filter UI and does not change the iOS or Android sources. The
+exact release source passed the shared mobile contract, Swift unit and 13
+iPhone UI tests, iPad accessibility and largest Dynamic Type layout testing,
+Production analyze and build checks, session/download/log security checks, and
+the Tauri iOS simulator and Android ARM64 regression builds. Archive identity,
+App Store provisioning, distribution signature, production entitlements
+(`get-task-allow=0`), exported IPA verification, and alternate app icons were
+verified before upload.
