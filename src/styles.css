@@ -3541,12 +3541,12 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .inbox-project-filter.select-menu { width:176px; flex:0 0 176px; }
 .inbox-project-filter.select-menu .select-menu-trigger { height:32px; border-color:#e1e2dd; border-radius:9px; color:#5e605a; background:#fafaf8; }
 .inbox-project-filter.select-menu .select-menu-trigger:hover:not(:disabled) { border-color:#d3d0dc; background:#f7f6fa; }
-.inbox-filters { min-width:0; flex:1; display:flex; align-items:center; gap:6px; overflow-x:auto; scrollbar-width:none; }
+.inbox-filters { min-width:0; flex:1; display:flex; align-items:center; gap:6px; padding:4px 4px 0 0; overflow-x:auto; scrollbar-width:none; }
 .inbox-filters::-webkit-scrollbar { display:none; }
-.inbox-filter { height:32px; padding:0 9px; display:inline-flex; align-items:center; gap:6px; flex:0 0 auto; border:1px solid #e1e2dd; border-radius:9px; color:#74766f; background:#fafaf8; cursor:pointer; font-size:var(--text-2xs); font-weight:var(--font-weight-semibold); transition:transform 100ms ease-out,border-color 140ms ease,background-color 140ms ease,color 140ms ease; }
+.inbox-filter { width:32px; height:32px; padding:0; position:relative; display:inline-flex; align-items:center; justify-content:center; flex:0 0 auto; border:1px solid #e1e2dd; border-radius:9px; color:#74766f; background:#fafaf8; cursor:pointer; transition:transform 100ms ease-out,border-color 140ms ease,background-color 140ms ease,color 140ms ease; }
 .inbox-filter:hover { border-color:#d3d0dc; color:#555750; background:#f7f6fa; }
 .inbox-filter:active { transform:scale(.97); }
-.inbox-filter-count { min-width:18px; height:18px; padding:0 5px; display:inline-flex; align-items:center; justify-content:center; border-radius:999px; color:#8c8e87; background:#ecece8; font:600 var(--text-2xs) "DM Mono",monospace; }
+.inbox-filter-count { min-width:14px; height:14px; padding:0 3px; position:absolute; top:-4px; right:-4px; display:inline-flex; align-items:center; justify-content:center; border-radius:999px; color:#8c8e87; background:#ecece8; box-shadow:0 0 0 1.5px var(--card); font:600 var(--text-2xs) "DM Mono",monospace; line-height:1; }
 .inbox-filter[aria-pressed="true"].urgent { border-color:#f0c8d0; color:#9f3146; background:#fff1f4; }
 .inbox-filter[aria-pressed="true"].urgent .inbox-filter-count { color:#9f3146; background:#ffdce3; }
 .inbox-filter[aria-pressed="true"].action_required { border-color:#ead5a9; color:#885710; background:#fff8e9; }

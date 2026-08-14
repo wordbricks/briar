@@ -274,23 +274,27 @@ export function Inbox({
                   className="inbox-filters"
                   role="group"
                 >
-                  {inboxFilters.map((category) => (
-                    <button
-                      aria-pressed={activeFilters.has(category)}
-                      className={cn("inbox-filter", category)}
-                      key={category}
-                      onClick={() => toggleFilter(category)}
-                      type="button"
-                    >
-                      <FilterIcon category={category} />
-                      <span>
-                        {t(`inbox.category.${category}` as MessageKey)}
-                      </span>
-                      <span className="inbox-filter-count">
-                        {categoryCounts[category]}
-                      </span>
-                    </button>
-                  ))}
+                  {inboxFilters.map((category) => {
+                    const label = t(
+                      `inbox.category.${category}` as MessageKey,
+                    );
+                    return (
+                      <button
+                        aria-label={label}
+                        aria-pressed={activeFilters.has(category)}
+                        className={cn("inbox-filter", category)}
+                        key={category}
+                        onClick={() => toggleFilter(category)}
+                        title={label}
+                        type="button"
+                      >
+                        <FilterIcon category={category} />
+                        <span className="inbox-filter-count">
+                          {categoryCounts[category]}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
               <Typography as="span" tone="muted" variant="caption">
