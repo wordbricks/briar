@@ -84,6 +84,7 @@ import {
 import {
   createWorkerDeviceIdentity,
   defaultWorkerLabel,
+  issueWorkerSessionDirectory,
   interruptibleSleep,
   restartInstalledServices,
   runWorkerLoop,
@@ -1848,6 +1849,8 @@ async function recoverRun(action: "retry" | "cancel") {
     { method: "POST", body: JSON.stringify(input) },
   );
   if (project.activeClaim?.runId === runId) {
+    // The server released this claim while queueing the new revision. Make the
+    // current provider turn stop instead of continuing with a stale token.
     config.projects = config.projects.map((candidate) =>
       candidate.id === project.id
         ? { ...candidate, activeClaim: undefined }
@@ -1878,7 +1881,7 @@ async function reworkRun() {
   z.string().uuid().parse(runId);
   const result = await request<{
     runId: string;
-    outcome: string;
+    outcome: "reworked" | "already_reworked";
     attempt: number;
     revision: number;
     workflowStage: string;
@@ -1888,6 +1891,14 @@ async function reworkRun() {
     executionToken(project),
     { method: "POST", body: JSON.stringify(input) },
   );
+  if (project.activeClaim?.runId === runId) {
+    config.projects = config.projects.map((candidate) =>
+      candidate.id === project.id
+        ? { ...candidate, activeClaim: undefined }
+        : candidate
+    );
+    await saveConfig(config);
+  }
   console.log(JSON.stringify(result));
 }
 
@@ -2338,11 +2349,7 @@ async function runClaimedIssue(
   workerToken: string,
   signal: AbortSignal,
 ) {
-  const runtimeDirectory = join(
-    configDirectory,
-    "worker-sessions",
-    issue.runId,
-  );
+  const runtimeDirectory = issueWorkerSessionDirectory(configDirectory, issue);
   const runtimeConfig = structuredClone(config);
   runtimeConfig.projects = runtimeConfig.projects.map((candidate) =>
     candidate.id === project.id
