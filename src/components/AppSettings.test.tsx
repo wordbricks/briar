@@ -155,6 +155,16 @@ describe("AppSettings", () => {
         allowCustomModels: false,
         error: null,
       },
+      agy: {
+        models: [{
+          id: "gemini-3.7-flash-high",
+          label: "Gemini 3.7 Flash (High)",
+          efforts: [{ id: "high", label: "high" }],
+        }],
+        defaultEfforts: [{ id: "low", label: "low" }, { id: "medium", label: "medium" }, { id: "high", label: "high" }],
+        allowCustomModels: false,
+        error: null,
+      },
       opencode: {
         models: [],
         defaultEfforts: [],
