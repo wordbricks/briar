@@ -315,7 +315,7 @@ describe("ProjectSettings", () => {
           "#project-runtime-provider-listbox .select-menu-option",
         ),
       ).map((option) => option.dataset.value),
-    ).toEqual(["codex", "claude", "grok", "opencode"]);
+    ).toEqual(["codex", "claude", "grok", "agy", "opencode"]);
     await act(async () => {
       document
         .querySelector<HTMLButtonElement>(

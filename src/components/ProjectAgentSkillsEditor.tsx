@@ -256,7 +256,7 @@ export function ProjectAgentSkillsEditor({
                         options={modelOptions}
                         searchEmptyMessage={t("issue.noModelsFound")}
                         searchPlaceholder={t("issue.searchModels")}
-                        searchable={skill.provider === "opencode"}
+                        searchable={skill.provider === "opencode" || skill.provider === "agy"}
                         value={skill.model ?? ""}
                       />
                     </div>

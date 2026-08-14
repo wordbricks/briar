@@ -964,7 +964,7 @@ export function ProjectSettings({
                   options={runtimeModels}
                   searchEmptyMessage={t("issue.noModelsFound")}
                   searchPlaceholder={t("issue.searchModels")}
-                  searchable={runtimeProvider === "opencode"}
+                  searchable={runtimeProvider === "opencode" || runtimeProvider === "agy"}
                   size="small"
                   value={runtimeModel ?? ""}
                 />

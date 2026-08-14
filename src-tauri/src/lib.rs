@@ -437,6 +437,7 @@ struct OnboardingPrerequisites {
     codex: OnboardingPrerequisiteStatus,
     claude: OnboardingPrerequisiteStatus,
     grok: OnboardingPrerequisiteStatus,
+    agy: OnboardingPrerequisiteStatus,
     opencode: OnboardingPrerequisiteStatus,
 }
 
@@ -460,6 +461,7 @@ struct AgentProviderModelCatalog {
     codex: AgentProviderModelCatalogEntry,
     claude: AgentProviderModelCatalogEntry,
     grok: AgentProviderModelCatalogEntry,
+    agy: AgentProviderModelCatalogEntry,
     opencode: AgentProviderModelCatalogEntry,
 }
 
@@ -790,6 +792,8 @@ struct AppProviderSettings {
     #[serde(default = "enabled_by_default")]
     grok: bool,
     #[serde(default = "enabled_by_default")]
+    agy: bool,
+    #[serde(default = "enabled_by_default")]
     opencode: bool,
 }
 
@@ -799,6 +803,7 @@ impl Default for AppProviderSettings {
             codex: true,
             claude: true,
             grok: true,
+            agy: true,
             opencode: true,
         }
     }
@@ -810,12 +815,13 @@ impl AppProviderSettings {
             agent::AgentProviderKind::Codex => self.codex,
             agent::AgentProviderKind::Claude => self.claude,
             agent::AgentProviderKind::Grok => self.grok,
+            agent::AgentProviderKind::Agy => self.agy,
             agent::AgentProviderKind::Opencode => self.opencode,
         }
     }
 
     fn any_enabled(self) -> bool {
-        self.codex || self.claude || self.grok || self.opencode
+        self.codex || self.claude || self.grok || self.agy || self.opencode
     }
 }
 
@@ -1171,6 +1177,8 @@ fn inspect_onboarding_prerequisites_sync(home: &Path) -> OnboardingPrerequisites
     let claude_binary = agent::claude_binary(home, &execution_path);
     let mut claude = inspect_cli(claude_binary.clone());
     let mut grok = inspect_cli(agent::grok_binary(home, &execution_path));
+    let agy_binary = agent::agy_binary(home, &execution_path);
+    let mut agy = inspect_cli(agy_binary.clone());
     let mut opencode = inspect_cli(agent::opencode_binary(home, &execution_path));
     codex.authenticated = codex.installed && agent_usage::codex_locally_authenticated(home);
     claude.authenticated = claude.installed
@@ -1178,6 +1186,10 @@ fn inspect_onboarding_prerequisites_sync(home: &Path) -> OnboardingPrerequisites
             agent_usage::claude_locally_authenticated(home, binary, &execution_path)
         });
     grok.authenticated = grok.installed && agent_usage::grok_locally_authenticated(home);
+    agy.authenticated = agy.installed
+        && agy_binary.as_deref().is_ok_and(|binary| {
+            agent_usage::agy_locally_authenticated(home, binary, &execution_path)
+        });
     // OpenCode delegates authentication to its configured model providers. A
     // healthy installed CLI is enough to launch; the server reports any
     // provider-specific authentication error during the request.
@@ -1187,6 +1199,7 @@ fn inspect_onboarding_prerequisites_sync(home: &Path) -> OnboardingPrerequisites
         codex,
         claude,
         grok,
+        agy,
         opencode,
     }
 }
@@ -1267,6 +1280,95 @@ fn parse_opencode_models(output: &str) -> Vec<AgentProviderModel> {
         .collect()
 }
 
+fn parse_agy_models(output: &str) -> Vec<AgentProviderModel> {
+    fn collect(value: &serde_json::Value, output: &mut Vec<AgentProviderModel>) {
+        match value {
+            serde_json::Value::Array(values) => {
+                for value in values {
+                    if let Some(id) = value.as_str().map(str::trim).filter(|id| !id.is_empty()) {
+                        output.push(AgentProviderModel {
+                            id: id.to_string(),
+                            label: id.to_string(),
+                            is_default: false,
+                        });
+                    } else {
+                        collect(value, output);
+                    }
+                }
+            }
+            serde_json::Value::Object(object) => {
+                let id = object
+                    .get("id")
+                    .or_else(|| object.get("model_id"))
+                    .or_else(|| object.get("modelId"))
+                    .and_then(serde_json::Value::as_str);
+                if let Some(id) = id.map(str::trim).filter(|id| !id.is_empty()) {
+                    let label = object
+                        .get("display_name")
+                        .or_else(|| object.get("displayName"))
+                        .or_else(|| object.get("label"))
+                        .or_else(|| object.get("name"))
+                        .and_then(serde_json::Value::as_str)
+                        .map(str::trim)
+                        .filter(|label| !label.is_empty())
+                        .unwrap_or(id);
+                    output.push(AgentProviderModel {
+                        id: id.to_string(),
+                        label: label.to_string(),
+                        is_default: object
+                            .get("is_default")
+                            .or_else(|| object.get("isDefault"))
+                            .and_then(serde_json::Value::as_bool)
+                            .unwrap_or(false),
+                    });
+                    return;
+                }
+                for value in object.values() {
+                    collect(value, output);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    let Ok(value) = serde_json::from_str::<serde_json::Value>(output) else {
+        return Vec::new();
+    };
+    let mut models = Vec::new();
+    collect(&value, &mut models);
+    models.sort_by(|left, right| left.id.cmp(&right.id));
+    models.dedup_by(|left, right| left.id == right.id);
+    models.truncate(500);
+    models
+}
+
+fn command_agy_models(
+    home: &Path,
+    binary: Result<PathBuf, String>,
+) -> Result<Vec<AgentProviderModel>, String> {
+    let binary = binary?;
+    let output = Command::new(binary)
+        .args(["--output-format", "json", "models"])
+        .env("PATH", cli_execution_path(home)?)
+        .env("HOME", home)
+        .env_remove("AGY_ADC_AUTH")
+        .env_remove("GEMINI_API_KEY")
+        .env_remove("GOOGLE_API_KEY")
+        .env_remove("GOOGLE_APPLICATION_CREDENTIALS")
+        .output()
+        .map_err(|error| format!("Antigravity 지원 모델 목록을 가져오지 못했습니다: {error}"))?;
+    if !output.status.success() {
+        let message = [output.stderr.as_slice(), output.stdout.as_slice()]
+            .into_iter()
+            .map(String::from_utf8_lossy)
+            .map(|value| value.trim().to_string())
+            .find(|value| !value.is_empty())
+            .unwrap_or_else(|| "Antigravity 지원 모델 목록 명령이 실패했습니다.".to_string());
+        return Err(message);
+    }
+    Ok(parse_agy_models(&String::from_utf8_lossy(&output.stdout)))
+}
+
 fn command_provider_models(
     home: &Path,
     binary: Result<PathBuf, String>,
@@ -1317,6 +1419,7 @@ fn load_agent_provider_models_sync(home: &Path) -> AgentProviderModelCatalog {
         agent::grok_binary(home, &execution_path),
         parse_grok_models,
     );
+    let agy = command_agy_models(home, agent::agy_binary(home, &execution_path));
     let opencode = command_provider_models(
         home,
         agent::opencode_binary(home, &execution_path),
@@ -1326,6 +1429,7 @@ fn load_agent_provider_models_sync(home: &Path) -> AgentProviderModelCatalog {
         codex: provider_model_entry("codex", codex),
         claude: provider_model_entry("claude", claude),
         grok: provider_model_entry("grok", grok),
+        agy: provider_model_entry("agy", agy),
         opencode: provider_model_entry("opencode", opencode),
     }
 }
@@ -1338,6 +1442,7 @@ fn connected_agent_provider(
         (agent::AgentProviderKind::Codex, &prerequisites.codex),
         (agent::AgentProviderKind::Claude, &prerequisites.claude),
         (agent::AgentProviderKind::Grok, &prerequisites.grok),
+        (agent::AgentProviderKind::Agy, &prerequisites.agy),
         (agent::AgentProviderKind::Opencode, &prerequisites.opencode),
     ]
     .into_iter()
@@ -1346,7 +1451,7 @@ fn connected_agent_provider(
             .then_some(provider)
     })
     .ok_or_else(|| {
-        "연결된 LLM 프로바이더가 없습니다. 앱 설정에서 Codex, Claude, Grok 또는 OpenCode를 연결한 뒤 다시 시도하세요."
+        "연결된 LLM 프로바이더가 없습니다. 앱 설정에서 Codex, Claude, Grok, Antigravity 또는 OpenCode를 연결한 뒤 다시 시도하세요."
             .to_string()
     })
 }
@@ -1363,6 +1468,7 @@ fn provider_login_binary_and_args(
             vec!["auth", "login", "--claudeai"],
         )),
         "grok" => Ok((agent::grok_binary(home, &execution_path)?, vec!["login"])),
+        "agy" => Ok((agent::agy_binary(home, &execution_path)?, vec![])),
         "opencode" => Ok((
             agent::opencode_binary(home, &execution_path)?,
             vec!["auth", "login"],
@@ -1737,6 +1843,32 @@ fn install_grok_cli(home: &Path) -> Result<(), String> {
     Err(format!("Grok CLI를 설치하지 못했습니다: {message}"))
 }
 
+fn install_agy_cli(home: &Path) -> Result<(), String> {
+    let execution_path = cli_execution_path(home)?;
+    let shell = which::which_in("bash", Some(&execution_path), home)
+        .or_else(|_| which::which_in("sh", Some(&execution_path), home))
+        .map_err(|_| "Antigravity 설치에 필요한 shell을 찾지 못했습니다.".to_string())?;
+    let output = Command::new(shell)
+        .env("PATH", &execution_path)
+        .env("HOME", home)
+        .args([
+            "-c",
+            "curl -fsSL https://antigravity.google/cli/install.sh | bash",
+        ])
+        .output()
+        .map_err(|error| format!("Antigravity CLI 설치 명령을 실행하지 못했습니다: {error}"))?;
+    if output.status.success() {
+        return Ok(());
+    }
+    let message = [output.stderr.as_slice(), output.stdout.as_slice()]
+        .into_iter()
+        .map(String::from_utf8_lossy)
+        .map(|value| value.trim().to_string())
+        .find(|value| !value.is_empty())
+        .unwrap_or_else(|| "unknown error".to_string());
+    Err(format!("Antigravity CLI를 설치하지 못했습니다: {message}"))
+}
+
 #[tauri::command]
 async fn install_onboarding_prerequisite(
     app: tauri::AppHandle,
@@ -1749,6 +1881,7 @@ async fn install_onboarding_prerequisite(
             "codex" => install_cli_package(&home, "@openai/codex")?,
             "claude" => install_cli_package(&home, "@anthropic-ai/claude-code")?,
             "grok" => install_grok_cli(&home)?,
+            "agy" => install_agy_cli(&home)?,
             "opencode" => install_cli_package(&home, "opencode-ai")?,
             _ => return Err("지원하지 않는 필수 도구입니다.".to_string()),
         }
@@ -1758,6 +1891,7 @@ async fn install_onboarding_prerequisite(
             "codex" => prerequisites.codex.installed,
             "claude" => prerequisites.claude.installed,
             "grok" => prerequisites.grok.installed,
+            "agy" => prerequisites.agy.installed,
             "opencode" => prerequisites.opencode.installed,
             _ => false,
         };
@@ -3916,6 +4050,10 @@ fn install_auto_hunt_assets(resource_directory: &Path, home: &Path) -> Result<()
             home.join(".codex").join("skills").join(skill_name),
             home.join(".claude").join("skills").join(skill_name),
             home.join(".grok").join("skills").join(skill_name),
+            home.join(".gemini")
+                .join("config")
+                .join("skills")
+                .join(skill_name),
             home.join(".config")
                 .join("opencode")
                 .join("skills")
@@ -3948,6 +4086,11 @@ fn install_auto_hunt_assets(resource_directory: &Path, home: &Path) -> Result<()
         "agent/grok-runner.js",
         "dist-agent/grok-runner.js",
     );
+    let agy_runner_source = bundled_path(
+        resource_directory,
+        "agent/agy-runner.js",
+        "dist-agent/agy-runner.js",
+    );
     let opencode_runner_source = bundled_path(
         resource_directory,
         "agent/opencode-runner.js",
@@ -3959,6 +4102,7 @@ fn install_auto_hunt_assets(resource_directory: &Path, home: &Path) -> Result<()
     if !codex_runner_source.is_file()
         || !claude_runner_source.is_file()
         || !grok_runner_source.is_file()
+        || !agy_runner_source.is_file()
         || !opencode_runner_source.is_file()
     {
         return Err("Briar Agent runner 번들을 찾지 못했습니다.".to_string());
@@ -3980,6 +4124,8 @@ fn install_auto_hunt_assets(resource_directory: &Path, home: &Path) -> Result<()
     .map_err(|error| format!("Claude runner를 설치하지 못했습니다: {error}"))?;
     fs::copy(grok_runner_source, agent_directory.join("grok-runner.js"))
         .map_err(|error| format!("Grok runner를 설치하지 못했습니다: {error}"))?;
+    fs::copy(agy_runner_source, agent_directory.join("agy-runner.js"))
+        .map_err(|error| format!("Antigravity runner를 설치하지 못했습니다: {error}"))?;
     fs::copy(
         opencode_runner_source,
         agent_directory.join("opencode-runner.js"),
@@ -4023,6 +4169,7 @@ fn auto_hunt_assets_are_current(resource_directory: &Path, home: &Path) -> bool 
         && cli_directory.join("agent/codex-runner.js").is_file()
         && cli_directory.join("agent/claude-runner.js").is_file()
         && cli_directory.join("agent/grok-runner.js").is_file()
+        && cli_directory.join("agent/agy-runner.js").is_file()
         && cli_directory.join("agent/opencode-runner.js").is_file()
         && read_trimmed_file(&cli_directory.join("VERSION")).as_deref()
             == Some(env!("CARGO_PKG_VERSION"));
@@ -4039,6 +4186,10 @@ fn auto_hunt_assets_are_current(resource_directory: &Path, home: &Path) -> bool 
             home.join(".codex").join("skills").join(skill_name),
             home.join(".claude").join("skills").join(skill_name),
             home.join(".grok").join("skills").join(skill_name),
+            home.join(".gemini")
+                .join("config")
+                .join("skills")
+                .join(skill_name),
             home.join(".config")
                 .join("opencode")
                 .join("skills")
@@ -4479,6 +4630,7 @@ fn auto_hunt_health_sync_with(
         agent::AgentProviderKind::Codex => ".codex",
         agent::AgentProviderKind::Claude => ".claude",
         agent::AgentProviderKind::Grok => ".grok",
+        agent::AgentProviderKind::Agy => ".gemini/config",
         agent::AgentProviderKind::Opencode => ".config/opencode",
     };
     let skill_path = execution_home
@@ -4637,6 +4789,11 @@ async fn project_llm_chat(
         "agent/grok-runner.js",
         "dist-agent/grok-runner.js",
     );
+    let agy_runner = bundled_path(
+        &resource_directory,
+        "agent/agy-runner.js",
+        "dist-agent/agy-runner.js",
+    );
     let opencode_runner = bundled_path(
         &resource_directory,
         "agent/opencode-runner.js",
@@ -4756,6 +4913,7 @@ async fn project_llm_chat(
             agent::AgentRunnerBundles {
                 claude: &claude_runner,
                 grok: &grok_runner,
+                agy: &agy_runner,
                 opencode: &opencode_runner,
             },
         )?;
@@ -4884,6 +5042,11 @@ async fn run_project_agent(
         "agent/grok-runner.js",
         "dist-agent/grok-runner.js",
     );
+    let agy_runner = bundled_path(
+        &resource_directory,
+        "agent/agy-runner.js",
+        "dist-agent/agy-runner.js",
+    );
     let opencode_runner = bundled_path(
         &resource_directory,
         "agent/opencode-runner.js",
@@ -4934,6 +5097,7 @@ async fn run_project_agent(
             agent::AgentRunnerBundles {
                 claude: &claude_runner,
                 grok: &grok_runner,
+                agy: &agy_runner,
                 opencode: &opencode_runner,
             },
         )?;
@@ -5745,6 +5909,11 @@ async fn start_project_auto_hunt(
         "agent/grok-runner.js",
         "dist-agent/grok-runner.js",
     );
+    let agy_runner = bundled_path(
+        &resource_directory,
+        "agent/agy-runner.js",
+        "dist-agent/agy-runner.js",
+    );
     let opencode_runner = bundled_path(
         &resource_directory,
         "agent/opencode-runner.js",
@@ -5791,6 +5960,7 @@ async fn start_project_auto_hunt(
             agent::AgentRunnerBundles {
                 claude: &claude_runner,
                 grok: &grok_runner,
+                agy: &agy_runner,
                 opencode: &opencode_runner,
             },
         )?;
@@ -7647,6 +7817,28 @@ mod tests {
         );
     }
 
+    #[test]
+    fn parses_measured_antigravity_model_catalog() {
+        let models = parse_agy_models(
+            r#"{"conversation_id":"","status":"SUCCESS","command":{"name":"models","data":{"models":[{"id":"gemini-3.7-flash-high","label":"Gemini 3.7 Flash (High)"},{"id":"gemini-3.7-flash-low","label":"Gemini 3.7 Flash (Low)"}]}}}"#,
+        );
+        assert_eq!(
+            models,
+            vec![
+                AgentProviderModel {
+                    id: "gemini-3.7-flash-high".to_string(),
+                    label: "Gemini 3.7 Flash (High)".to_string(),
+                    is_default: false,
+                },
+                AgentProviderModel {
+                    id: "gemini-3.7-flash-low".to_string(),
+                    label: "Gemini 3.7 Flash (Low)".to_string(),
+                    is_default: false,
+                },
+            ]
+        );
+    }
+
     fn provider_prerequisite(installed: bool, authenticated: bool) -> OnboardingPrerequisiteStatus {
         OnboardingPrerequisiteStatus {
             installed,
@@ -7666,6 +7858,7 @@ mod tests {
             codex: provider_prerequisite(codex.0, codex.1),
             claude: provider_prerequisite(claude.0, claude.1),
             grok: provider_prerequisite(grok.0, grok.1),
+            agy: provider_prerequisite(false, false),
             opencode: provider_prerequisite(opencode.0, opencode.1),
         }
     }
@@ -7694,6 +7887,7 @@ mod tests {
                     codex: false,
                     claude: true,
                     grok: true,
+                    agy: true,
                     opencode: true,
                 },
             )
@@ -8874,6 +9068,7 @@ branch refs/heads/briar/second-11111111
                 codex: false,
                 claude: true,
                 grok: true,
+                agy: true,
                 opencode: true,
             },
         )
@@ -8933,6 +9128,7 @@ branch refs/heads/briar/second-11111111
         assert!(defaults.codex);
         assert!(defaults.claude);
         assert!(defaults.grok);
+        assert!(defaults.agy);
         assert!(defaults.opencode);
 
         update_app_provider_settings_at(
@@ -8941,6 +9137,7 @@ branch refs/heads/briar/second-11111111
                 codex: true,
                 claude: false,
                 grok: false,
+                agy: false,
                 opencode: false,
             },
         )
@@ -8950,6 +9147,7 @@ branch refs/heads/briar/second-11111111
         assert!(saved.agent_providers.codex);
         assert!(!saved.agent_providers.claude);
         assert!(!saved.agent_providers.grok);
+        assert!(!saved.agent_providers.agy);
         assert!(!saved.agent_providers.opencode);
 
         fs::remove_dir_all(

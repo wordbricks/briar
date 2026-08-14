@@ -27,6 +27,7 @@ export const defaultAppProviderSettings: AppProviderSettings = {
   codex: true,
   claude: true,
   grok: true,
+  agy: true,
   opencode: true,
 };
 
@@ -55,6 +56,7 @@ export const agentEfforts: Record<AgentProvider, readonly ModelEffort[]> = {
   codex: agentProviderPolicies.codex.efforts,
   claude: agentProviderPolicies.claude.efforts,
   grok: agentProviderPolicies.grok.efforts,
+  agy: agentProviderPolicies.agy.efforts,
   opencode: agentProviderPolicies.opencode.efforts,
 };
 

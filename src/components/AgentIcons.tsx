@@ -81,7 +81,31 @@ export function OpenCodeIcon({ size = 14, className, style }: AgentIconProps) {
   );
 }
 
-export type AgentProviderIconId = "claude" | "codex" | "grok" | "opencode";
+export function AntigravityIcon({ size = 14, className, style }: AgentIconProps) {
+  return (
+    <svg
+      aria-hidden
+      className={className}
+      height={size}
+      style={style}
+      viewBox="0 0 24 24"
+      width={size}
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path d="M12 1.5c.65 5.7 4.8 9.85 10.5 10.5-5.7.65-9.85 4.8-10.5 10.5C11.35 16.8 7.2 12.65 1.5 12 7.2 11.35 11.35 7.2 12 1.5Z" fill="#4285F4" />
+      <path d="M18.1 1.8c.22 2.08 1.72 3.58 3.8 3.8-2.08.22-3.58 1.72-3.8 3.8-.22-2.08-1.72-3.58-3.8-3.8 2.08-.22 3.58-1.72 3.8-3.8Z" fill="#EA4335" />
+      <path d="M5.7 15.2c.17 1.62 1.38 2.83 3 3-1.62.17-2.83 1.38-3 3-.17-1.62-1.38-2.83-3-3 1.62-.17 2.83-1.38 3-3Z" fill="#FBBC04" />
+      <path d="M18.2 15.3c.18 1.56 1.34 2.72 2.9 2.9-1.56.18-2.72 1.34-2.9 2.9-.18-1.56-1.34-2.72-2.9-2.9 1.56-.18 2.72-1.34 2.9-2.9Z" fill="#34A853" />
+    </svg>
+  );
+}
+
+export type AgentProviderIconId =
+  | "claude"
+  | "codex"
+  | "grok"
+  | "agy"
+  | "opencode";
 
 export function AgentProviderIcon({
   provider,
@@ -102,6 +126,9 @@ export function AgentProviderIcon({
   }
   if (provider === "opencode") {
     return <OpenCodeIcon className={className} size={size} style={style} />;
+  }
+  if (provider === "agy") {
+    return <AntigravityIcon className={className} size={size} style={style} />;
   }
   return <CodexIcon className={className} size={size} style={style} />;
 }

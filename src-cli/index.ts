@@ -299,9 +299,10 @@ const configSchema = z
         codex: z.boolean().default(true),
         claude: z.boolean().default(true),
         grok: z.boolean().default(true),
+        agy: z.boolean().default(true),
         opencode: z.boolean().default(true),
       })
-      .default({ codex: true, claude: true, grok: true, opencode: true }),
+      .default({ codex: true, claude: true, grok: true, agy: true, opencode: true }),
     appSettings: z
       .object({
         preventSleepWhileRunning: z.boolean().default(false),
@@ -364,7 +365,7 @@ async function loadConfig(): Promise<Config> {
     ) {
       return {
         apiUrl: defaultApiUrl,
-        agentProviders: { codex: true, claude: true, grok: true, opencode: true },
+        agentProviders: { codex: true, claude: true, grok: true, agy: true, opencode: true },
         appSettings: {
           preventSleepWhileRunning: false,
           browserAutomationProvider: "ego-browser",

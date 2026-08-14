@@ -573,7 +573,7 @@ fn decode_conversation_id<'a>(
 mod tests {
     use super::*;
     use crate::{
-        agent::{claude, grok, opencode},
+        agent::{agy, claude, grok, opencode},
         host::CommandOutput,
     };
     use std::fs;
@@ -603,8 +603,8 @@ mod tests {
         }
     }
 
-    fn provider_configs() -> [SidecarProviderConfig; 3] {
-        [claude::CONFIG, grok::CONFIG, opencode::CONFIG]
+    fn provider_configs() -> [SidecarProviderConfig; 4] {
+        [claude::CONFIG, grok::CONFIG, agy::CONFIG, opencode::CONFIG]
     }
 
     #[test]
@@ -646,7 +646,7 @@ mod tests {
             assert_eq!(raw["networkAccess"], true);
             assert_eq!(raw[config.executable.request_key], "/provider/bin");
 
-            for key in ["claudeBinary", "grokBinary", "opencodeBinary"] {
+            for key in ["claudeBinary", "grokBinary", "agyBinary", "opencodeBinary"] {
                 assert_eq!(
                     raw.get(key).is_some(),
                     key == config.executable.request_key,
@@ -734,6 +734,14 @@ mod tests {
         assert_eq!(
             grok::CONFIG.missing_bun_error,
             "Grok runner 실행에 필요한 Bun을 로컬 환경에서 찾지 못했습니다."
+        );
+        assert_eq!(
+            agy::CONFIG.executable.missing_error,
+            "Google Antigravity CLI가 필요합니다. `agy`를 설치하고 로그인한 뒤 다시 시도하세요."
+        );
+        assert_eq!(
+            agy::CONFIG.missing_bun_error,
+            "Antigravity runner 실행에 필요한 Bun을 로컬 환경에서 찾지 못했습니다."
         );
         assert_eq!(
             opencode::CONFIG.executable.missing_error,

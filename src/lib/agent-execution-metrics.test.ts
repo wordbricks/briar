@@ -8,6 +8,7 @@ import {
   agentExecutionUsageObservationsFromPayload,
   agentExecutionUsageRecordSchema,
   agentExecutionUsageRecordsFromObservations,
+  agyExecutionUsageObservationsFromPayload,
   claudeExecutionCostObservationsFromPayload,
   claudeExecutionUsageObservationsFromPayload,
   codexExecutionUsageObservationsFromPayload,
@@ -20,6 +21,80 @@ import {
 } from "./agent-execution-metrics";
 
 describe("agent execution metrics", () => {
+  it("normalizes measured Antigravity model and result usage events", () => {
+    expect(
+      agyExecutionUsageObservationsFromPayload({
+        type: "event",
+        raw: {
+          event: "init",
+          conversation_id: "conversation-1",
+          init: { model: "gemini-3.7-flash-low" },
+        },
+      }),
+    ).toMatchObject([
+      {
+        kind: "model",
+        provider: "agy",
+        model: "gemini-3.7-flash-low",
+        modelProvider: "google",
+        sessionId: "conversation-1",
+      },
+    ]);
+    const resultPayload = {
+      type: "event",
+      raw: {
+        event: "result",
+        result: {
+          conversation_id: "conversation-1",
+          usage: {
+            input_tokens: 16_575,
+            output_tokens: 59,
+            thinking_tokens: 48,
+            cache_read_tokens: 10,
+            total_tokens: 16_634,
+          },
+        },
+      },
+    };
+    expect(
+      agyExecutionUsageObservationsFromPayload(resultPayload),
+    ).toMatchObject([
+      {
+        kind: "delta",
+        provider: "agy",
+        modelProvider: "google",
+        sessionId: "conversation-1",
+        tokenUsage: {
+          inputTokens: 16_575,
+          outputTokens: 59,
+          reasoningOutputTokens: 48,
+          cacheReadTokens: 10,
+          totalTokens: 16_634,
+        },
+      },
+    ]);
+
+    const collector = createAgentExecutionUsageCollector("agy");
+    collector.observe({
+      type: "event",
+      raw: {
+        event: "init",
+        conversation_id: "conversation-1",
+        init: { model: "gemini-3.7-flash-low" },
+      },
+    });
+    collector.observe(resultPayload);
+    collector.observe(resultPayload);
+    expect(collector.finish()).toMatchObject([
+      {
+        provider: "agy",
+        model: "gemini-3.7-flash-low",
+        modelProvider: "google",
+        tokenUsage: { totalTokens: 16_634 },
+      },
+    ]);
+  });
+
   it("normalizes Codex turn usage without double-counting cached input", () => {
     expect(
       agentExecutionTokenUsageFromPayload("codex", {
@@ -2276,7 +2351,7 @@ describe("agent execution metrics", () => {
     ).toEqual([]);
   });
 
-  it("does not guess OpenCode or Grok usage through another provider adapter", () => {
+  it("does not guess provider usage through another provider adapter", () => {
     const lookalikePayload = {
       usage: { input_tokens: 10, output_tokens: 5 },
     };
@@ -2285,6 +2360,9 @@ describe("agent execution metrics", () => {
     ).toEqual([]);
     expect(
       agentExecutionUsageObservationsFromPayload("grok", lookalikePayload),
+    ).toEqual([]);
+    expect(
+      agentExecutionUsageObservationsFromPayload("agy", lookalikePayload),
     ).toEqual([]);
   });
 

@@ -5784,7 +5784,11 @@ const issueMessageJson = (
             ? "Codex"
             : message.author_agent_provider === "grok"
               ? "Grok"
-              : "Claude"
+              : message.author_agent_provider === "agy"
+                ? "Antigravity"
+                : message.author_agent_provider === "opencode"
+                  ? "OpenCode"
+                  : "Claude"
         }`
       : (message.author_name ?? "알 수 없는 사용자"),
     image: message.author_agent_provider ? null : message.author_image,

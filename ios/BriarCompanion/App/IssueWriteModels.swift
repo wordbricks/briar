@@ -5,17 +5,18 @@ enum AgentProvider: String, Codable, CaseIterable, Hashable, Identifiable, Senda
     case codex
     case claude
     case grok
+    case agy
     case opencode
 
     var id: String { rawValue }
-    var displayName: String { rawValue.capitalized }
+    var displayName: String { self == .agy ? "Antigravity" : rawValue.capitalized }
 
     var models: [String] {
         switch self {
         case .codex: ["gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"]
         case .claude: ["sonnet", "opus", "haiku", "fable"]
         case .grok: ["grok-4.5", "grok-build"]
-        case .opencode: []
+        case .agy, .opencode: []
         }
     }
 
@@ -23,7 +24,7 @@ enum AgentProvider: String, Codable, CaseIterable, Hashable, Identifiable, Senda
         switch self {
         case .codex: ModelEffort.allCases
         case .claude: ModelEffort.allCases.filter { $0 != .ultra }
-        case .grok, .opencode: [.low, .medium, .high]
+        case .grok, .agy, .opencode: [.low, .medium, .high]
         }
     }
 }
@@ -208,7 +209,9 @@ struct IssueExecutionPreferences: Codable, Equatable, Sendable {
     var isValid: Bool {
         guard let provider else { return model == nil && effort == nil }
         guard let model else { return effort == nil }
-        guard provider == .opencode || provider.models.contains(model) else { return false }
+        guard provider == .opencode || provider == .agy || provider.models.contains(model) else {
+            return false
+        }
         return effort.map(provider.efforts.contains) ?? true
     }
 

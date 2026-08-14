@@ -65,7 +65,13 @@ import {
   type AgentUsageProvider,
   type AgentUsageSnapshot,
 } from "../lib/agent-usage";
-import { ClaudeIcon, CodexIcon, GrokIcon, OpenCodeIcon } from "./AgentIcons";
+import {
+  AntigravityIcon,
+  ClaudeIcon,
+  CodexIcon,
+  GrokIcon,
+  OpenCodeIcon,
+} from "./AgentIcons";
 import { AgentUsageSettings } from "./AgentUsageSettings";
 import { AppearanceSettings } from "./AppearanceSettings";
 import { InboxNotificationSettings } from "./InboxNotificationSettings";
@@ -800,6 +806,93 @@ export function AppSettings({
                         {t("appSettings.install")}
                       </Button>
                     ) : providerSaving === "grok" ? (
+                      <LoaderCircle
+                        aria-label={t("common.saving")}
+                        className="spin"
+                        size={16}
+                      />
+                    ) : null
+                  }
+                />
+                <ProviderRow
+                  available={Boolean(
+                    providerStatuses?.agy.installed &&
+                      providerStatuses.agy.authenticated,
+                  )}
+                  description={providerDescription({
+                    authenticated: providerStatuses?.agy.authenticated,
+                    enabled: providerSettings?.agy ?? false,
+                    installed: providerStatuses?.agy.installed,
+                    loading: providersLoading && !providerStatuses,
+                    providerName: "Google Antigravity CLI",
+                    t,
+                  })}
+                  disabled={
+                    providerSaving !== null || providerInstalling !== null
+                  }
+                  details={
+                    <ProviderDetails
+                      authenticated={providerStatuses?.agy.authenticated}
+                      installed={providerStatuses?.agy.installed}
+                      loading={providersLoading && !providerStatuses}
+                      loginOpening={providerLoginOpening === "agy"}
+                      models={providerModels.agy}
+                      onLogin={() => void openProviderLogin("agy")}
+                      providerName="Antigravity"
+                    />
+                  }
+                  detailsId="provider-agy-details"
+                  detailsLabel={t("appSettings.toggleProviderDetails", {
+                    provider: "Antigravity",
+                  })}
+                  enabled={providerSettings?.agy ?? false}
+                  expanded={expandedProvider === "agy"}
+                  icon={
+                    <ProviderIcon tone="agy">
+                      <AntigravityIcon size={19} />
+                    </ProviderIcon>
+                  }
+                  name="Antigravity"
+                  onExpandedChange={(expanded) =>
+                    setExpandedProvider(expanded ? "agy" : null)
+                  }
+                  onToggle={(enabled) => void toggleProvider("agy", enabled)}
+                  title={
+                    <>
+                      Antigravity
+                      {providerStatuses?.agy.version ? (
+                        <code>{providerStatuses.agy.version}</code>
+                      ) : null}
+                    </>
+                  }
+                  trailing={
+                    providerInstalling === "agy" ? (
+                      <Button
+                        aria-label={t("appSettings.installingProvider", {
+                          provider: "Antigravity",
+                        })}
+                        disabled
+                        size="sm"
+                        type="button"
+                        variant="outline"
+                      >
+                        <LoaderCircle className="spin" />
+                        {t("appSettings.installing")}
+                      </Button>
+                    ) : providerStatuses?.agy.installed === false ? (
+                      <Button
+                        aria-label={t("appSettings.installProvider", {
+                          provider: "Antigravity",
+                        })}
+                        onClick={() => void installProvider("agy")}
+                        size="sm"
+                        type="button"
+                        variant="outline"
+                      >
+                        <Download />
+                        {t("appSettings.install")}
+                      </Button>
+                    ) : providerSaving === "agy" ? (
                       <LoaderCircle
                         aria-label={t("common.saving")}
                         className="spin"

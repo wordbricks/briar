@@ -1604,11 +1604,12 @@ describe("detached execution workers", () => {
     await recordWorkerHeartbeat(db, projectId, {
       workerId: registered.worker.id,
       capabilities: {
-        providers: ["codex", "claude", "grok", "opencode"],
+        providers: ["codex", "claude", "grok", "agy", "opencode"],
         providerHealth: {
           codex: { installed: true, authenticated: true, healthy: true },
           claude: { installed: true, authenticated: true, healthy: true },
           grok: { installed: true, authenticated: true, healthy: true },
+          agy: { installed: true, authenticated: true, healthy: true },
           opencode: { installed: true, authenticated: true, healthy: true },
         },
         worktrees: true,
@@ -1652,7 +1653,7 @@ describe("detached execution workers", () => {
       claimedAt: atMinute(4),
       leaseExpiresAt: leaseExpiryFrom(atMinute(4)),
       workerId: registered.worker.id,
-      agentProviders: ["codex", "claude", "grok", "opencode"],
+      agentProviders: ["codex", "claude", "grok", "agy", "opencode"],
       detachedOnly: true,
     });
     expect(claimed).toMatchObject({
@@ -1670,6 +1671,7 @@ describe("detached execution workers", () => {
       "codex",
       "claude",
       "grok",
+      "agy",
       "opencode",
     ]);
   });

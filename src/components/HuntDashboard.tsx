@@ -2986,7 +2986,7 @@ export function CreateIssueDialog({
               placeholder={t("issue.selectProviderFirst")}
               searchEmptyMessage={t("issue.noModelsFound")}
               searchPlaceholder={t("issue.searchModels")}
-              searchable={preferredProvider === "opencode"}
+              searchable={preferredProvider === "opencode" || preferredProvider === "agy"}
               value={preferredModel}
             />
             <NativeSelect
@@ -6559,7 +6559,7 @@ export function RunPage({
                         placeholder={t("issue.selectProviderFirst")}
                         searchEmptyMessage={t("issue.noModelsFound")}
                         searchPlaceholder={t("issue.searchModels")}
-                        searchable={run.preferredProvider === "opencode"}
+                        searchable={run.preferredProvider === "opencode" || run.preferredProvider === "agy"}
                         size="small"
                         value={run.preferredModel ?? ""}
                       />

@@ -462,6 +462,8 @@ final class IssueMutationTests: XCTestCase {
             [.low, .medium, .high, .xhigh, .max]
         )
         XCTAssertEqual(AgentProvider.grok.efforts, [.low, .medium, .high])
+        XCTAssertEqual(AgentProvider.agy.efforts, [.low, .medium, .high])
+        XCTAssertEqual(AgentProvider.agy.displayName, "Antigravity")
         XCTAssertEqual(AgentProvider.opencode.efforts, [.low, .medium, .high])
         XCTAssertFalse(IssueExecutionPreferences(
             provider: .claude,

@@ -10,11 +10,12 @@ import {
 
 describe("agent provider contract", () => {
   it("defines every provider label and policy from the shared roster", () => {
-    expect(agentProviders).toEqual(["codex", "claude", "grok", "opencode"]);
+    expect(agentProviders).toEqual(["codex", "claude", "grok", "agy", "opencode"]);
     expect(agentProviderLabels).toEqual({
       codex: "Codex",
       claude: "Claude",
       grok: "Grok",
+      agy: "Antigravity",
       opencode: "OpenCode",
     });
     expect(Object.keys(agentProviderPolicies)).toEqual(agentProviders);
@@ -25,6 +26,7 @@ describe("agent provider contract", () => {
     expect(agentProviderAllowsModel("codex", "not-a-codex-model")).toBe(false);
     expect(agentProviderAllowsModel("claude", "sonnet")).toBe(true);
     expect(agentProviderAllowsModel("grok", "grok-4.5")).toBe(true);
+    expect(agentProviderAllowsModel("agy", "gemini-3.7-flash")).toBe(true);
     expect(agentProviderAllowsModel("opencode", "vendor/custom-model")).toBe(
       true,
     );
@@ -35,6 +37,7 @@ describe("agent provider contract", () => {
     expect(agentProviderAllowsEffort("codex", "ultra")).toBe(true);
     expect(agentProviderAllowsEffort("claude", "ultra")).toBe(false);
     expect(agentProviderAllowsEffort("grok", "xhigh")).toBe(false);
+    expect(agentProviderAllowsEffort("agy", "high")).toBe(true);
     expect(agentProviderAllowsEffort("opencode", "high")).toBe(true);
   });
 });

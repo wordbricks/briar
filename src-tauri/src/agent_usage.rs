@@ -188,6 +188,10 @@ pub(crate) fn claude_locally_authenticated(
         .args(["auth", "status"])
         .env("HOME", home)
         .env("PATH", execution_path)
+        .env_remove("AGY_ADC_AUTH")
+        .env_remove("GEMINI_API_KEY")
+        .env_remove("GOOGLE_API_KEY")
+        .env_remove("GOOGLE_APPLICATION_CREDENTIALS")
         .output()
         .ok()
         .is_some_and(|output| parse_claude_auth_status(&output.stdout))
@@ -199,6 +203,20 @@ pub(crate) fn grok_locally_authenticated(home: &Path) -> bool {
             .expires_at
             .is_none_or(|expires_at| expires_at > now_millis() + GROK_TOKEN_SKEW_MILLIS)
     })
+}
+
+pub(crate) fn agy_locally_authenticated(
+    home: &Path,
+    binary: &Path,
+    execution_path: &OsStr,
+) -> bool {
+    Command::new(binary)
+        .args(["--output-format", "json", "models"])
+        .env("HOME", home)
+        .env("PATH", execution_path)
+        .output()
+        .ok()
+        .is_some_and(|output| output.status.success())
 }
 
 fn load_codex(home: &Path) -> ProviderUsage {

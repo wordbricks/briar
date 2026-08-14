@@ -7662,6 +7662,7 @@ export async function claimNextIssueAgentReply(
              when preferred_provider = 'codex' and ? = 1 then 'codex'
              when preferred_provider = 'claude' and ? = 1 then 'claude'
              when preferred_provider = 'grok' and ? = 1 then 'grok'
+             when preferred_provider = 'agy' and ? = 1 then 'agy'
              when preferred_provider = 'opencode' and ? = 1 then 'opencode'
              else ?
            end,
@@ -7733,6 +7734,7 @@ export async function claimNextIssueAgentReply(
       input.agentProviders.includes("codex") ? 1 : 0,
       input.agentProviders.includes("claude") ? 1 : 0,
       input.agentProviders.includes("grok") ? 1 : 0,
+      input.agentProviders.includes("agy") ? 1 : 0,
       input.agentProviders.includes("opencode") ? 1 : 0,
       input.agentProvider,
       input.claimTokenHash,
@@ -9789,6 +9791,26 @@ export async function claimNextQueuedHuntRun(
                    where agent.id = briar_hunt_runs.agent_id
                      and agent.project_id = briar_hunt_runs.project_id
                  )
+               ) = 'agy'
+             )
+             or (
+               ? = 1
+               and coalesce(
+                 requested_agent_provider,
+                 preferred_agent_provider,
+                 (
+                   select skill.provider
+                   from briar_agent_skills skill
+                   where skill.agent_id = briar_hunt_runs.agent_id
+                     and skill.kind = 'issue_processing'
+                   order by skill.position, skill.created_at, skill.id
+                   limit 1
+                 ),
+                 (
+                   select agent.provider from briar_project_agents agent
+                   where agent.id = briar_hunt_runs.agent_id
+                     and agent.project_id = briar_hunt_runs.project_id
+                 )
                ) = 'opencode'
              )
            )
@@ -9852,6 +9874,7 @@ export async function claimNextQueuedHuntRun(
       allowedProviders?.includes("codex") ? 1 : 0,
       allowedProviders?.includes("claude") ? 1 : 0,
       allowedProviders?.includes("grok") ? 1 : 0,
+      allowedProviders?.includes("agy") ? 1 : 0,
       allowedProviders?.includes("opencode") ? 1 : 0,
       input.workerDeviceId ?? null,
       input.workerDeviceId ?? null,

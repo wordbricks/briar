@@ -3,6 +3,7 @@
 //! Backends keep their native transport and protocol handling private while
 //! exposing the small project-scoped execution contract Briar needs.
 
+mod agy;
 mod claude;
 mod codex;
 mod grok;
@@ -32,6 +33,7 @@ pub(crate) enum AgentProviderKind {
     Codex,
     Claude,
     Grok,
+    Agy,
     Opencode,
 }
 
@@ -58,6 +60,13 @@ impl AgentProviderKind {
         {
             return Some(Self::Opencode);
         }
+        let agy_prefix = format!("briar:agy:{project_id}:");
+        if conversation_id
+            .strip_prefix(&agy_prefix)
+            .is_some_and(|id| !id.is_empty())
+        {
+            return Some(Self::Agy);
+        }
         let codex_prefix = format!("briar:{project_id}:");
         conversation_id
             .strip_prefix(&codex_prefix)
@@ -70,6 +79,7 @@ impl AgentProviderKind {
             Self::Codex => "Codex",
             Self::Claude => "Claude",
             Self::Grok => "Grok",
+            Self::Agy => "Antigravity",
             Self::Opencode => "OpenCode",
         }
     }
@@ -391,6 +401,7 @@ pub(crate) enum AgentBackendHandle {
     Codex(CodexBackend),
     Claude(sidecar::SidecarBackend),
     Grok(sidecar::SidecarBackend),
+    Agy(sidecar::SidecarBackend),
     Opencode(sidecar::SidecarBackend),
 }
 
@@ -408,7 +419,10 @@ impl AgentBackend for AgentBackendHandle {
             Self::Codex(backend) => {
                 backend.run(project_id, workspace_root, execution, request, approve)
             }
-            Self::Claude(backend) | Self::Grok(backend) | Self::Opencode(backend) => {
+            Self::Claude(backend)
+            | Self::Grok(backend)
+            | Self::Agy(backend)
+            | Self::Opencode(backend) => {
                 backend.run(project_id, workspace_root, execution, request, approve)
             }
         }
@@ -418,6 +432,7 @@ impl AgentBackend for AgentBackendHandle {
 pub(crate) struct AgentRunnerBundles<'a> {
     pub(crate) claude: &'a Path,
     pub(crate) grok: &'a Path,
+    pub(crate) agy: &'a Path,
     pub(crate) opencode: &'a Path,
 }
 
@@ -435,6 +450,10 @@ pub(crate) fn discover_backend(
         AgentProviderKind::Grok => {
             sidecar::SidecarBackend::discover(runner, runners.grok, grok::CONFIG)
                 .map(AgentBackendHandle::Grok)
+        }
+        AgentProviderKind::Agy => {
+            sidecar::SidecarBackend::discover(runner, runners.agy, agy::CONFIG)
+                .map(AgentBackendHandle::Agy)
         }
         AgentProviderKind::Opencode => {
             sidecar::SidecarBackend::discover(runner, runners.opencode, opencode::CONFIG)
@@ -483,6 +502,10 @@ pub(crate) fn claude_binary(home: &Path, execution_path: &OsStr) -> Result<PathB
 
 pub(crate) fn grok_binary(home: &Path, execution_path: &OsStr) -> Result<PathBuf, String> {
     sidecar::provider_binary(grok::CONFIG, home, execution_path)
+}
+
+pub(crate) fn agy_binary(home: &Path, execution_path: &OsStr) -> Result<PathBuf, String> {
+    sidecar::provider_binary(agy::CONFIG, home, execution_path)
 }
 
 pub(crate) fn opencode_binary(home: &Path, execution_path: &OsStr) -> Result<PathBuf, String> {
@@ -568,6 +591,10 @@ mod tests {
         assert_eq!(
             AgentProviderKind::for_conversation_id("project-1", "briar:grok:project-1:session-1"),
             Some(AgentProviderKind::Grok)
+        );
+        assert_eq!(
+            AgentProviderKind::for_conversation_id("project-1", "briar:agy:project-1:session-1"),
+            Some(AgentProviderKind::Agy)
         );
         assert_eq!(
             AgentProviderKind::for_conversation_id(

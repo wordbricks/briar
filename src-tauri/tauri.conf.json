@@ -61,6 +61,7 @@
       "../dist-agent/codex-runner.js": "agent/codex-runner.js",
       "../dist-agent/claude-runner.js": "agent/claude-runner.js",
       "../dist-agent/grok-runner.js": "agent/grok-runner.js",
+      "../dist-agent/agy-runner.js": "agent/agy-runner.js",
       "../dist-agent/opencode-runner.js": "agent/opencode-runner.js",
       "../scripts/briar-launcher": "cli/briar",
       "../skills/briar-workflow/": "skills/briar-workflow/",

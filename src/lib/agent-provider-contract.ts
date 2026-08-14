@@ -2,6 +2,7 @@ export const agentProviders = [
   "codex",
   "claude",
   "grok",
+  "agy",
   "opencode",
 ] as const;
 export type AgentProvider = (typeof agentProviders)[number];
@@ -64,6 +65,12 @@ export const agentProviderPolicies: Record<AgentProvider, AgentProviderPolicy> =
     ],
     efforts: limitedEfforts,
     allowUnlistedModels: false,
+  },
+  agy: {
+    label: "Antigravity",
+    models: [],
+    efforts: limitedEfforts,
+    allowUnlistedModels: true,
   },
   opencode: {
     label: "OpenCode",

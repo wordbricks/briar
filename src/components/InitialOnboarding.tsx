@@ -18,12 +18,25 @@ import {
   type OnboardingPrerequisites,
   type PrerequisiteId,
 } from "../lib/initial-onboarding";
-import { ClaudeIcon, CodexIcon, GrokIcon, OpenCodeIcon } from "./AgentIcons";
+import {
+  AntigravityIcon,
+  ClaudeIcon,
+  CodexIcon,
+  GrokIcon,
+  OpenCodeIcon,
+} from "./AgentIcons";
 import { LoginScreen } from "./LoginScreen";
 
 type Step = "welcome" | "prerequisites" | "login";
 
-const prerequisiteIds: PrerequisiteId[] = ["git", "codex", "claude", "grok", "opencode"];
+const prerequisiteIds: PrerequisiteId[] = [
+  "git",
+  "codex",
+  "claude",
+  "grok",
+  "agy",
+  "opencode",
+];
 
 export function InitialOnboarding({
   error: loginError,
@@ -202,6 +215,8 @@ export function InitialOnboarding({
                             <ClaudeIcon size={20} />
                           ) : id === "grok" ? (
                             <GrokIcon size={20} />
+                          ) : id === "agy" ? (
+                            <AntigravityIcon size={20} />
                           ) : id === "opencode" ? (
                             <OpenCodeIcon size={20} />
                           ) : null}

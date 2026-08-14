@@ -53,6 +53,7 @@ export type AgentExecutionModelObservation =
     source:
       | "claude.init"
       | "claude.assistant"
+      | "agy.init"
       | "codex.config"
       | "codex.modelDefault"
       | "codex.thread"
@@ -78,6 +79,7 @@ export type AgentExecutionTokenObservation =
       | "claude.assistant.usage"
       | "claude.result.modelUsage"
       | "claude.result.usage"
+      | "agy.result.usage"
       | "codex.threadTokenUsage"
       | "codex.turnUsage"
       | "opencode.step.usage"
@@ -232,7 +234,7 @@ const runnerPayload = (payload: unknown) => {
 };
 
 const normalizedTokenUsage = (
-  provider: "codex" | "claude",
+  provider: "codex" | "claude" | "agy",
   usage: Record<string, unknown>,
 ): AgentExecutionTokenUsage | null => {
   const inputTokens = tokenValue(usage, "input_tokens", "inputTokens");
@@ -243,6 +245,7 @@ const normalizedTokenUsage = (
     "cachedInputTokens",
     "cache_read_input_tokens",
     "cacheReadInputTokens",
+    "cache_read_tokens",
     "cacheReadTokens",
   );
   const cacheWriteTokens = tokenValue(
@@ -257,6 +260,8 @@ const normalizedTokenUsage = (
     usage,
     "reasoning_output_tokens",
     "reasoningOutputTokens",
+    "thinking_tokens",
+    "thinkingTokens",
   );
   const explicitTotal = tokenValue(usage, "total_tokens", "totalTokens");
   if (
@@ -498,6 +503,62 @@ export function claudeExecutionUsageObservationsFromPayload(
           scopeId: resultScopeId,
           ...identity,
           dedupeKey: dedupeKey("claude", "session", resultScopeId, "usage"),
+        },
+      ]
+    : [];
+}
+
+export function agyExecutionUsageObservationsFromPayload(
+  payload: unknown,
+): AgentExecutionUsageObservation[] {
+  const message = runnerPayload(payload);
+  if (!message) return [];
+  const event = nonEmptyString(message.event) ?? nonEmptyString(message.type);
+  if (event === "init") {
+    const init = asRecord(message.init);
+    const sessionId = nonEmptyString(message.conversation_id);
+    const model = nonEmptyString(init?.model);
+    return model
+      ? [
+          {
+            kind: "model",
+            provider: "agy",
+            model,
+            canonicalModel: null,
+            modelProvider: "google",
+            modelSource: "providerReported",
+            source: "agy.init",
+            scopeId: sessionId,
+            sessionId,
+            turnId: null,
+            dedupeKey: dedupeKey("agy", "session", sessionId, "model"),
+          },
+        ]
+      : [];
+  }
+  if (event !== "result") return [];
+  const result = asRecord(message.result);
+  const sessionId = nonEmptyString(result?.conversation_id);
+  const usage = asRecord(result?.usage);
+  const tokenUsage = usage ? normalizedTokenUsage("agy", usage) : null;
+  return tokenUsage
+    ? [
+        {
+          kind: "delta",
+          provider: "agy",
+          model: null,
+          canonicalModel: null,
+          modelProvider: "google",
+          modelSource: "unknown",
+          tokenUsage,
+          source: "agy.result.usage",
+          scopeId: sessionId,
+          sessionId,
+          turnId: null,
+          // A runner may attach the same raw result to multiple normalized
+          // terminal events. The collector is scoped to one Briar attempt, so
+          // the session result key safely collapses those copies.
+          dedupeKey: dedupeKey("agy", "session", sessionId, "result", "usage"),
         },
       ]
     : [];
@@ -1211,10 +1272,16 @@ export function agentExecutionUsageObservationsFromPayload(
   if (provider === "codex") {
     return codexExecutionUsageObservationsFromPayload(payload);
   }
+  if (provider === "agy") {
+    return agyExecutionUsageObservationsFromPayload(payload);
+  }
   if (provider === "opencode") {
     return openCodeExecutionUsageObservationsFromPayload(payload);
   }
-  return grokExecutionUsageObservationsFromPayload(payload);
+  if (provider === "grok") {
+    return grokExecutionUsageObservationsFromPayload(payload);
+  }
+  return [];
 }
 
 export function claudeExecutionCostObservationsFromPayload(
@@ -2273,8 +2340,8 @@ export function createAgentExecutionUsageCollector(
 
 /**
  * Convert normalized provider observations into the immutable ingestion
- * contract. Codex and Grok include cached input in inputTokens, while Claude
- * and OpenCode report cache reads and writes as separate buckets.
+ * contract. Codex, Grok, and Antigravity include cached input in inputTokens,
+ * while Claude and OpenCode report cache reads and writes as separate buckets.
  */
 export function agentExecutionUsageRecordsFromObservations(
   observations: AgentExecutionCollectedTokenObservation[],
@@ -2284,7 +2351,9 @@ export function agentExecutionUsageRecordsFromObservations(
     const uncachedInputTokens =
       usage.inputTokens === null
         ? null
-        : observation.provider === "codex" || observation.provider === "grok"
+        : observation.provider === "codex" ||
+            observation.provider === "grok" ||
+            observation.provider === "agy"
           ? Math.max(
               0,
               usage.inputTokens -

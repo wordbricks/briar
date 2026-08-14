@@ -67,6 +67,19 @@ const commandResult = (binary: string, args: string[]) =>
     timeout: 10_000,
   });
 
+const agyCommandResult = (binary: string, args: string[]) => {
+  const env = { ...process.env };
+  for (const key of [
+    "AGY_ADC_AUTH",
+    "GEMINI_API_KEY",
+    "GOOGLE_API_KEY",
+    "GOOGLE_APPLICATION_CREDENTIALS",
+  ]) {
+    delete env[key];
+  }
+  return spawnSync(binary, args, { encoding: "utf8", env, timeout: 10_000 });
+};
+
 const codexAuthenticated = (binary: string) => {
   const result = commandResult(binary, ["login", "status"]);
   return result.status === 0 && !result.error;
@@ -84,6 +97,11 @@ export const parseClaudeAuthStatus = (stdout: string) => {
 export const claudeAuthenticated = async (binary: string) => {
   const result = commandResult(binary, ["auth", "status"]);
   return parseClaudeAuthStatus(result.stdout);
+};
+
+export const agyAuthenticated = async (binary: string) => {
+  const result = agyCommandResult(binary, ["--output-format", "json", "models"]);
+  return result.status === 0 && !result.error;
 };
 
 const validGrokSession = (value: unknown, now: number) => {
@@ -129,6 +147,9 @@ const defaultDependencies: ProviderHealthDependencies = {
     if (provider === "opencode") {
       // OpenCode delegates credentials to its configured model providers.
       return true;
+    }
+    if (provider === "agy") {
+      return agyAuthenticated(binary);
     }
     return grokAuthenticated(home, now);
   },

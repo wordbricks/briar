@@ -13,7 +13,7 @@ import {
   type WorkerProviderHealthMap,
 } from "./provider-health";
 
-const enabled = { codex: true, claude: true, grok: true, opencode: true };
+const enabled = { codex: true, claude: true, grok: true, agy: true, opencode: true };
 
 describe("inspectWorkerProviderHealth", () => {
   it("uses Claude's loggedIn response even when its CLI exit code is unreliable", async () => {
@@ -80,6 +80,12 @@ describe("inspectWorkerProviderHealth", () => {
         healthy: false,
         reason: "not_installed",
       },
+      agy: {
+        installed: true,
+        authenticated: false,
+        healthy: false,
+        reason: "not_authenticated",
+      },
       opencode: {
         installed: true,
         authenticated: false,
@@ -112,6 +118,7 @@ describe("inspectWorkerProviderHealth", () => {
     expect(healthyWorkerProviders(health)).toEqual([
       "claude",
       "grok",
+      "agy",
       "opencode",
     ]);
     expect(usage).toHaveBeenCalled();
@@ -138,6 +145,7 @@ describe("inspectWorkerProviderHealth", () => {
       "codex",
       "claude",
       "grok",
+      "agy",
       "opencode",
     ]);
   });
@@ -150,7 +158,7 @@ describe("inspectWorkerProviderHealth", () => {
       error: null,
     }));
     const health = await inspectWorkerProviderHealth(
-      { codex: false, claude: true, grok: false, opencode: false },
+      { codex: false, claude: true, grok: false, agy: false, opencode: false },
       {
         which: (provider) => `/usr/local/bin/${provider}`,
         authenticated,
@@ -169,6 +177,7 @@ describe("inspectWorkerProviderHealth", () => {
     expect(healthyWorkerProviders(health)).toEqual(["claude"]);
     expect(health.codex.reason).toBe("disabled");
     expect(health.grok.reason).toBe("disabled");
+    expect(health.agy.reason).toBe("disabled");
     expect(health.opencode.reason).toBe("disabled");
   });
 
@@ -191,6 +200,12 @@ describe("inspectWorkerProviderHealth", () => {
         authenticated: false,
         healthy: false,
         reason: "not_installed",
+      },
+      agy: {
+        installed: false,
+        authenticated: false,
+        healthy: false,
+        reason: "disabled",
       },
       opencode: {
         installed: false,
