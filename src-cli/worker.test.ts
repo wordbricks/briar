@@ -1,3 +1,4 @@
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_MAX_ERROR_DELAY_MS,
@@ -6,6 +7,7 @@ import {
   defaultWorkerLabel,
   errorDelayMs,
   idleDelayWithBackoffMs,
+  issueWorkerSessionDirectory,
   leaseRenewDelayMs,
   launchdPlist,
   runWorkerLoop,
@@ -209,6 +211,74 @@ describe("briar worker loop", () => {
 
     expect(result.processed).toBe(3);
     expect(observedMaximum).toBe(2);
+  });
+
+  it("serializes repeated claims for one issue run without overlapping worktree mutations", async () => {
+    const sharedRunId = "run-shared";
+    const claims = [
+      { ...issue("shared-r1"), runId: sharedRunId, executionId: "execution-1" },
+      { ...issue("shared-r2"), runId: sharedRunId, executionId: "execution-2" },
+      { ...issue("other"), executionId: "execution-3" },
+      { ...issue("unexpected"), executionId: "execution-4" },
+    ];
+    let claimCount = 0;
+    let releaseFirst = () => {};
+    let sharedInFlight = 0;
+    let maximumSharedInFlight = 0;
+    const ranExecutionIds: string[] = [];
+    const renewalSignals = new WeakSet<AbortSignal>();
+    const test = harness(
+      [],
+      {
+        claim: async () => {
+          const claimed = claims.shift() ?? null;
+          if (claimed) claimCount += 1;
+          return claimed;
+        },
+        heartbeat: async () => {
+          if (claimCount === 2) releaseFirst();
+        },
+        runIssue: async (claimed) => {
+          ranExecutionIds.push(claimed.executionId!);
+          if (claimed.runId !== sharedRunId) return;
+          sharedInFlight += 1;
+          maximumSharedInFlight = Math.max(
+            maximumSharedInFlight,
+            sharedInFlight,
+          );
+          if (claimed.executionId === "execution-1") {
+            await new Promise<void>((resolve) => {
+              releaseFirst = resolve;
+            });
+          }
+          sharedInFlight -= 1;
+        },
+        sleep: async (_milliseconds, signal) => {
+          if (!signal || signal.aborted) return;
+          if (!renewalSignals.has(signal)) {
+            renewalSignals.add(signal);
+            return;
+          }
+          await new Promise<void>((resolve) =>
+            signal.addEventListener("abort", () => resolve(), { once: true })
+          );
+        },
+      },
+    );
+
+    const result = await runWorkerLoop(test.dependencies, {
+      maxIssues: 3,
+      maxConcurrentSessions: 2,
+    });
+
+    expect(result).toMatchObject({ processed: 3, failures: 0 });
+    expect(maximumSharedInFlight).toBe(1);
+    expect(ranExecutionIds).toHaveLength(3);
+    expect(ranExecutionIds).not.toContain("execution-4");
+    expect(test.renewals).toEqual(expect.arrayContaining([
+      "shared-r1",
+      "shared-r2",
+    ]));
   });
 
   it("adopts a device concurrency change from heartbeat", async () => {
@@ -416,6 +486,35 @@ describe("briar worker loop", () => {
 });
 
 describe("worker identity", () => {
+  it("isolates issue runtime directories by execution identity", () => {
+    const configDirectory = join("/private", "briar-config");
+    const first = issueWorkerSessionDirectory(configDirectory, {
+      runId: "run-42",
+      executionId: "execution-1",
+      claimAttempts: 1,
+    });
+    const second = issueWorkerSessionDirectory(configDirectory, {
+      runId: "run-42",
+      executionId: "execution-2",
+      claimAttempts: 2,
+    });
+
+    expect(first).toBe(
+      join(configDirectory, "worker-sessions", "run-42--execution-1"),
+    );
+    expect(second).toBe(
+      join(configDirectory, "worker-sessions", "run-42--execution-2"),
+    );
+    expect(first).not.toBe(second);
+    expect(first).not.toBe(join(configDirectory, "worker-sessions", "run-42"));
+    expect(issueWorkerSessionDirectory(configDirectory, {
+      runId: "run-42",
+      claimAttempts: 3,
+    })).toBe(
+      join(configDirectory, "worker-sessions", "run-42--claim-3"),
+    );
+  });
+
   it("creates an opaque random device identity for local persistence", () => {
     expect(createWorkerDeviceIdentity(() => "a".repeat(64))).toBe(
       `briar_device_${"a".repeat(64)}`,

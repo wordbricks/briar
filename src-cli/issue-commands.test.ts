@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer, type Server } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -204,6 +204,52 @@ describe("issue CLI commands", () => {
     expect(result.exitCode).toBe(1);
     expect(result.stderr).toContain("Dependency would create a cycle");
     expect(result.stdout).toBe("");
+  });
+
+  it("releases the isolated active claim after rework queues a new revision", async () => {
+    const apiUrl = await startServer((request) => {
+      expect(request.url).toBe(`${apiUrl}/runs/${dependentRunId}/rework`);
+      expect(request.authorization).toBe("Bearer briar_agent_test");
+      expect(request.body).toMatchObject({
+        workflowStage: "implementing",
+        reason: "Fix the review finding",
+      });
+      return {
+        status: 200,
+        body: {
+          runId: dependentRunId,
+          outcome: "reworked",
+          attempt: 1,
+          revision: 2,
+          workflowStage: "implementing",
+        },
+      };
+    });
+    const directory = await cliConfig(apiUrl);
+    const configPath = join(directory, "config.json");
+    const config = JSON.parse(await readFile(configPath, "utf8"));
+    config.projects[0].activeClaim = {
+      runId: dependentRunId,
+      sourceKey: "briar-issue:test",
+      token: "briar_claim_test",
+      leaseExpiresAt: new Date(Date.now() + 15 * 60_000).toISOString(),
+    };
+    await writeFile(configPath, `${JSON.stringify(config)}\n`);
+
+    const result = await runCli(directory, [
+      "run", "rework",
+      "--run", dependentRunId,
+      "--to", "implementing",
+      "--reason", "Fix the review finding",
+    ]);
+
+    expect(result).toMatchObject({ exitCode: 0, stderr: "" });
+    expect(JSON.parse(result.stdout)).toMatchObject({
+      outcome: "reworked",
+      revision: 2,
+    });
+    const saved = JSON.parse(await readFile(configPath, "utf8"));
+    expect(saved.projects[0].activeClaim).toBeUndefined();
   });
 
   it("rejects invalid issue input before sending a request", async () => {
