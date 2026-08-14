@@ -149,6 +149,41 @@ async function createPreWebhookChannelMessage(
 }
 
 describe("D1 migrations", () => {
+  it("adds a nullable preferred Worker device to channel reply jobs", async () => {
+    const miniflare = new Miniflare({
+      modules: true,
+      script: "export default { fetch() { return new Response('ok') } }",
+      d1Databases: { DB: "briar-channel-preferred-device-migration-test" },
+    });
+    try {
+      const db = (await miniflare.getD1Database("DB")) as unknown as D1Database;
+      await applyD1Migrations(db);
+      const columns = await db.prepare(
+        `pragma table_info('briar_channel_agent_reply_jobs')`,
+      ).all<{ name: string; notnull: number }>();
+      expect(columns.results).toContainEqual(expect.objectContaining({
+        name: "preferred_device_id",
+        notnull: 0,
+      }));
+      const indexes = await db.prepare(
+        `pragma index_list('briar_channel_agent_reply_jobs')`,
+      ).all<{ name: string }>();
+      expect(indexes.results.map((index) => index.name)).toContain(
+        "briar_channel_agent_reply_jobs_preferred_device_idx",
+      );
+      const foreignKeys = await db.prepare(
+        `pragma foreign_key_list('briar_channel_agent_reply_jobs')`,
+      ).all<{ from: string; table: string; on_delete: string }>();
+      expect(foreignKeys.results).toContainEqual(expect.objectContaining({
+        from: "preferred_device_id",
+        table: "briar_execution_worker_devices",
+        on_delete: "SET NULL",
+      }));
+    } finally {
+      await miniflare.dispose();
+    }
+  }, 60_000);
+
   it("cuts over legacy transcripts without importing their history", async () => {
     const miniflare = new Miniflare({
       modules: true,

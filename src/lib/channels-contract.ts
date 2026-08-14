@@ -118,6 +118,7 @@ export const channelMessageInputSchema = z
     parentMessageId: z.string().uuid().nullable().default(null),
     mentionedUserIds: z.array(z.string().min(1).max(64)).max(20).default([]),
     mentionedAgentIds: z.array(z.string().uuid()).max(8).default([]),
+    preferredDeviceId: z.string().uuid().nullable().default(null),
   })
   .strict();
 
