@@ -23,6 +23,8 @@ export {
 } from "./dialog";
 export { Input } from "./input";
 export { Label } from "./label";
+export { LoadingState } from "./loading-state";
+export type { LoadingStateVariant } from "./loading-state";
 export { Separator } from "./separator";
 export { Skeleton } from "./skeleton";
 export { Switch } from "./switch";

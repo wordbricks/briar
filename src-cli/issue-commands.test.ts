@@ -33,7 +33,13 @@ async function cliConfig(apiUrl: string) {
 
 async function runCli(configDirectory: string, command: string[]) {
   const environment = { ...process.env };
-  for (const name of ["BRIAR_API_URL", "BRIAR_CONFIG_HOME", "BRIAR_PROJECT_ID"]) {
+  for (const name of [
+    "BRIAR_API_URL",
+    "BRIAR_CONFIG_HOME",
+    "BRIAR_PROJECT_ID",
+    "BRIAR_WORKER_TOKEN",
+    "BRIAR_AGENT_TOKEN",
+  ]) {
     delete environment[name];
   }
   const child = spawn("bun", ["run", "src-cli/index.ts", ...command], {

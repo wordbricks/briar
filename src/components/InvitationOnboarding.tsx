@@ -8,6 +8,7 @@ import {
 import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { LoadingState } from "@/components/ui/loading-state";
 import { Typography } from "@/components/ui/typography";
 import { useI18n } from "../i18n";
 import { isApiErrorStatus, loadOrganizationInvitation } from "../lib/api";
@@ -84,7 +85,7 @@ export function InvitationOnboarding({
         <Logo />
         {loadingInvitation ? (
           <div className="grid min-h-56 place-items-center" role="status">
-            <LoaderCircle className="spin text-primary" size={24} />
+            <LoadingState />
           </div>
         ) : invitation ? (
           <>
