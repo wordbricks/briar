@@ -643,6 +643,8 @@ final class MobileAPIContractTests: XCTestCase {
             [UUID(uuidString: "66666666-6666-4666-8666-666666666666")!]
         )
         XCTAssertEqual(channelMessages.messages.last?.proposal?.status, .pending)
+        XCTAssertNil(channel.nextCursor)
+        XCTAssertNil(channelMessages.nextCursor)
         XCTAssertEqual(
             channelMessages.messages.last?.proposal?.payload?.issue?.title,
             "온보딩 개편"
@@ -715,6 +717,24 @@ final class MobileAPIContractTests: XCTestCase {
                 cursor: 12
             ),
             "/organizations/22222222-2222-4222-8222-222222222222/channel-changes?since=12"
+        )
+        XCTAssertEqual(
+            MobileAPIContract.Endpoint.channel(
+                organizationID: organizationID,
+                channelID: channelID,
+                messageLimit: 20
+            ),
+            "/organizations/22222222-2222-4222-8222-222222222222/channels/33333333-3333-4333-8333-333333333333?limit=20"
+        )
+        let messageCursor = UUID(uuidString: "44444444-4444-4444-8444-444444444444")!
+        XCTAssertEqual(
+            MobileAPIContract.Endpoint.channelMessages(
+                organizationID: organizationID,
+                channelID: channelID,
+                cursor: messageCursor,
+                limit: 20
+            ),
+            "/organizations/22222222-2222-4222-8222-222222222222/channels/33333333-3333-4333-8333-333333333333/messages?limit=20&cursor=44444444-4444-4444-8444-444444444444"
         )
         XCTAssertEqual(
             MobileAPIContract.Endpoint.acceptChannelProposal(

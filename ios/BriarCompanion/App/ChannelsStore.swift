@@ -2,6 +2,8 @@ import Foundation
 
 @MainActor
 final class ChannelsStore: ObservableObject {
+    static let messagePageSize = 20
+
     struct FocusContext: Equatable, Sendable {
         let revision: Int
         let channelID: UUID
@@ -27,6 +29,8 @@ final class ChannelsStore: ObservableObject {
     @Published private(set) var thread: [ChannelMessage] = []
     @Published private(set) var members: [ChannelMember] = []
     @Published private(set) var agents: [ChannelAgentSummary] = []
+    @Published private(set) var hasEarlierMessages = false
+    @Published private(set) var loadingEarlierMessages = false
     @Published private(set) var loading = false
     @Published private(set) var sending = false
     @Published private(set) var acceptingProposalID: UUID?
@@ -46,6 +50,7 @@ final class ChannelsStore: ObservableObject {
     private var syncCursor: Int?
     private var focusedChannelID: UUID?
     private var focusedThreadParentID: UUID?
+    private var nextMessageCursor: UUID?
     private var generation = 0
     private var catalogLoadRevision = 0
     private var authoritativeLoadRevision = 0
@@ -102,11 +107,14 @@ final class ChannelsStore: ObservableObject {
         skillExecutionProposalIDsByMessage = [:]
         focusedChannelID = nil
         focusedThreadParentID = nil
+        nextMessageCursor = nil
         channels = []
         messages = []
         thread = []
         members = []
         agents = []
+        hasEarlierMessages = false
+        loadingEarlierMessages = false
         loading = false
         catalogRefreshInFlight = false
         conversationLoadInFlight = false
@@ -178,6 +186,9 @@ final class ChannelsStore: ObservableObject {
         conversationLoadInFlight = true
         updateLoadingState()
         messages = []
+        nextMessageCursor = nil
+        hasEarlierMessages = false
+        loadingEarlierMessages = false
         thread = []
         members = []
         agents = []
@@ -195,7 +206,8 @@ final class ChannelsStore: ObservableObject {
             let response: ChannelDetailResponse = try await api.get(
                 MobileAPIContract.Endpoint.channel(
                     organizationID: organizationID,
-                    channelID: channelID
+                    channelID: channelID,
+                    messageLimit: Self.messagePageSize
                 ),
                 token: token,
                 as: ChannelDetailResponse.self
@@ -213,6 +225,8 @@ final class ChannelsStore: ObservableObject {
             )
             recordProposalMessages(response.messages)
             messages = response.messages
+            nextMessageCursor = response.nextCursor
+            hasEarlierMessages = response.nextCursor != nil
             members = response.members
             agents = response.agents
             errorMessage = nil
@@ -236,8 +250,135 @@ final class ChannelsStore: ObservableObject {
         authoritativeLoadRevision &+= 1
         invalidateProposalAcceptancePresentation()
         focusedChannelID = nil
+        nextMessageCursor = nil
+        hasEarlierMessages = false
+        loadingEarlierMessages = false
         conversationLoadInFlight = false
         updateLoadingState()
+    }
+
+    func loadEarlierMessages(channelID: UUID) async {
+        guard
+            let organizationID,
+            let token,
+            let cursor = nextMessageCursor,
+            focusedChannelID == channelID,
+            focusedThreadParentID == nil,
+            !loadingEarlierMessages
+        else { return }
+        let expectedGeneration = generation
+        let expectedLoadRevision = authoritativeLoadRevision
+        loadingEarlierMessages = true
+        defer {
+            if expectedGeneration == generation,
+               expectedLoadRevision == authoritativeLoadRevision,
+               focusedChannelID == channelID,
+               focusedThreadParentID == nil {
+                loadingEarlierMessages = false
+            }
+        }
+        do {
+            let response: ChannelMessagesResponse = try await api.get(
+                MobileAPIContract.Endpoint.channelMessages(
+                    organizationID: organizationID,
+                    channelID: channelID,
+                    cursor: cursor,
+                    limit: Self.messagePageSize
+                ),
+                token: token,
+                as: ChannelMessagesResponse.self
+            )
+            guard
+                !Task.isCancelled,
+                expectedGeneration == generation,
+                expectedLoadRevision == authoritativeLoadRevision,
+                focusedChannelID == channelID,
+                focusedThreadParentID == nil
+            else { return }
+            let stabilizedMessages = preservingLocallyAcceptedExecutionProposals(
+                in: response.messages
+            )
+            recordProposalMessages(stabilizedMessages)
+            messages = Self.mergeMessages(
+                messages,
+                updates: stabilizedMessages,
+                removing: []
+            )
+            nextMessageCursor = response.nextCursor
+            hasEarlierMessages = response.nextCursor != nil
+            errorMessage = nil
+        } catch {
+            guard
+                !Task.isCancelled,
+                expectedGeneration == generation,
+                expectedLoadRevision == authoritativeLoadRevision,
+                focusedChannelID == channelID,
+                focusedThreadParentID == nil
+            else { return }
+            errorMessage = CompanionStore.message(for: error)
+        }
+    }
+
+    /// A notification may point to a root older than the initial page. Fetch
+    /// that root through the thread endpoint without expanding every page in
+    /// between, then merge it into the channel so navigation can open it.
+    func loadRootMessageForNavigation(
+        channelID: UUID,
+        messageID: UUID
+    ) async -> ChannelMessage? {
+        if let message = messages.first(where: { $0.id == messageID }) {
+            return message
+        }
+        guard
+            let organizationID,
+            let token,
+            focusedChannelID == channelID,
+            focusedThreadParentID == nil
+        else { return nil }
+        let expectedGeneration = generation
+        let expectedLoadRevision = authoritativeLoadRevision
+        do {
+            let response: ChannelMessagesResponse = try await api.get(
+                MobileAPIContract.Endpoint.channelMessages(
+                    organizationID: organizationID,
+                    channelID: channelID,
+                    parentMessageID: messageID
+                ),
+                token: token,
+                as: ChannelMessagesResponse.self
+            )
+            guard
+                !Task.isCancelled,
+                expectedGeneration == generation,
+                expectedLoadRevision == authoritativeLoadRevision,
+                focusedChannelID == channelID,
+                focusedThreadParentID == nil,
+                let root = response.messages.first(where: {
+                    $0.id == messageID && $0.parentMessageId == nil
+                })
+            else { return nil }
+            guard let stabilizedRoot = preservingLocallyAcceptedExecutionProposals(
+                in: [root]
+            ).first else { return nil }
+            recordProposalMessages([stabilizedRoot])
+            messages = Self.mergeMessages(
+                messages,
+                updates: [stabilizedRoot],
+                removing: []
+            )
+            errorMessage = nil
+            return stabilizedRoot
+        } catch {
+            guard
+                !Task.isCancelled,
+                expectedGeneration == generation,
+                expectedLoadRevision == authoritativeLoadRevision,
+                focusedChannelID == channelID,
+                focusedThreadParentID == nil
+            else { return nil }
+            errorMessage = CompanionStore.message(for: error)
+            return nil
+        }
     }
 
     /// Invalidates delayed thread loads and proposal responses when an
