@@ -912,6 +912,25 @@ final class AgentsInboxSystemTests: XCTestCase {
             InboxNotificationPresentationBuilder.content(for: channelReply),
             InboxNotificationPresentation(title: "Taylor in #product", body: "Thread reply")
         )
+        let channelID = try XCTUnwrap(UUID(uuidString: channelReply.targetId))
+        XCTAssertFalse(
+            LocalNotificationService.shouldDeliver(
+                channelReply,
+                viewingChannelID: channelID
+            )
+        )
+        XCTAssertTrue(
+            LocalNotificationService.shouldDeliver(
+                channelReply,
+                viewingChannelID: UUID()
+            )
+        )
+        XCTAssertTrue(
+            LocalNotificationService.shouldDeliver(
+                blockedMessage,
+                viewingChannelID: channelID
+            )
+        )
         let navigation = CompanionNavigationModel()
         navigation.openInboxMessage(channelReply)
         XCTAssertEqual(navigation.selectedTab, .home)

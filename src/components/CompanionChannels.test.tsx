@@ -177,6 +177,7 @@ describe("CompanionChannels", () => {
     requestedMessage?: { channelId: string; messageId: string; rootMessageId: string },
     onRequestedMessageOpen?: () => void,
     onSkillSessionAccepted?: (session: AutoHuntSession) => void,
+    channelInboxSyncSignal?: string,
   ) => {
     await act(async () => {
       root.render(
@@ -184,6 +185,7 @@ describe("CompanionChannels", () => {
           <CompanionChannels
             activeProjectId="project-1"
             currentUserId="user-1"
+            channelInboxSyncSignal={channelInboxSyncSignal}
             organizationId="org-1"
             projects={[
               { id: "project-1", name: "Briar" },
@@ -546,6 +548,8 @@ describe("CompanionChannels", () => {
     });
     await act(async () => {
       await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
     });
     const typing = container.querySelector(".companion-channel-thread-typing");
     expect(typing?.textContent).toContain("Honey is writing a reply");
@@ -597,7 +601,7 @@ describe("CompanionChannels", () => {
         },
       ],
     });
-    await render();
+    await render(undefined, undefined, undefined, undefined, "baseline");
     await act(async () => {
       [
         ...container.querySelectorAll<HTMLButtonElement>(
@@ -619,9 +623,8 @@ describe("CompanionChannels", () => {
         messages: [initial],
       });
       await Promise.resolve();
-    });
-    await act(async () => {
-      emitChannelChange(2);
+      await Promise.resolve();
+      await Promise.resolve();
       await Promise.resolve();
     });
     expect(loadChannelDelta).toHaveBeenCalledWith(

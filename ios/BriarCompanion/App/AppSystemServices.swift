@@ -200,7 +200,11 @@ final class LocalNotificationService: ObservableObject {
         preferences.save()
     }
 
-    func process(messages: [InboxMessage], baselineID: String = "local") async {
+    func process(
+        messages: [InboxMessage],
+        baselineID: String = "local",
+        viewingChannelID: UUID? = nil
+    ) async {
         let currentIDs = Set(messages.map(\.id))
         guard self.baselineID == baselineID else {
             self.baselineID = baselineID
@@ -222,12 +226,25 @@ final class LocalNotificationService: ObservableObject {
         let newcomers = messages.filter { message in
             message.isUnread &&
                 !knownIDs.contains(message.id) &&
-                enabled.contains(InboxMessageBuilder.classify(message))
+                enabled.contains(InboxMessageBuilder.classify(message)) &&
+                Self.shouldDeliver(message, viewingChannelID: viewingChannelID)
         }
         for message in newcomers.prefix(5) {
             await schedule(message)
         }
         knownIDs = currentIDs
+    }
+
+    static func shouldDeliver(
+        _ message: InboxMessage,
+        viewingChannelID: UUID?
+    ) -> Bool {
+        guard
+            message.kind == .channel,
+            let viewingChannelID,
+            let notificationChannelID = UUID(uuidString: message.targetId)
+        else { return true }
+        return notificationChannelID != viewingChannelID
     }
 
     private func schedule(_ message: InboxMessage) async {

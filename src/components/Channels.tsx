@@ -178,8 +178,10 @@ type ChannelsProps = {
   activeChannelId: string | null;
   onChannelSelect: (channelId: string | null) => void;
   onChannelsChange: Dispatch<SetStateAction<ChannelSummary[]>>;
+  channelInboxSyncSignal?: string;
   onIssueCreated?: (projectId: string, runId: string) => void | Promise<void>;
   onSkillSessionAccepted?: (session: AutoHuntSession) => void;
+  onViewingChannelChange?: (channelId: string | null) => void;
   onCreateAgent?: () => void;
   inboxDetail?: boolean;
   onInboxDetailClose?: () => void;
@@ -310,8 +312,10 @@ export function Channels({
   activeChannelId,
   onChannelSelect,
   onChannelsChange,
+  channelInboxSyncSignal,
   onIssueCreated,
   onSkillSessionAccepted,
+  onViewingChannelChange,
   requestedMessage,
   onRequestedMessageOpen,
   inboxDetail = false,
@@ -319,6 +323,10 @@ export function Channels({
   onCreateAgent,
 }: ChannelsProps) {
   const { t, localeTag } = useI18n();
+  useEffect(() => {
+    onViewingChannelChange?.(activeChannelId);
+    return () => onViewingChannelChange?.(null);
+  }, [activeChannelId, onViewingChannelChange]);
   useEffect(() => {
     if (!activeChannelId) return;
     const channel = channels.find((item) => item.id === activeChannelId);
@@ -924,6 +932,9 @@ export function Channels({
       CHANNEL_REALTIME_FALLBACK_MS,
     );
     updateVisibility();
+    if (channelInboxSyncSignal !== undefined && !document.hidden) {
+      void sync();
+    }
     return () => {
       stopped = true;
       unsubscribe();
@@ -935,6 +946,7 @@ export function Channels({
     };
   }, [
     activeChannelId,
+    channelInboxSyncSignal,
     channelListReady,
     onChannelsChange,
     organizationId,

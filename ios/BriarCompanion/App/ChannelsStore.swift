@@ -60,6 +60,7 @@ final class ChannelsStore: ObservableObject {
     private var latestSkillExecutionProposals: [UUID: AgentSkillExecutionProposal] = [:]
     private var skillExecutionProposalIDsByMessage: [UUID: UUID] = [:]
     private var isForeground = true
+    private var changesRefreshRequested = false
     private var pollingTask: Task<Void, Never>?
     private var realtimeTask: Task<Void, Never>?
 
@@ -115,6 +116,7 @@ final class ChannelsStore: ObservableObject {
         approvingSkillExecutionProposalID = nil
         preparingSkillExecutionProposalID = nil
         errorMessage = nil
+        changesRefreshRequested = false
         guard organizationID != nil, token != nil else { return }
         if isForeground { startSynchronization() }
     }
@@ -131,6 +133,7 @@ final class ChannelsStore: ObservableObject {
                expectedCatalogRevision == catalogLoadRevision {
                 catalogRefreshInFlight = false
                 updateLoadingState()
+                scheduleRequestedChangesRefreshIfNeeded()
             }
         }
         do {
@@ -185,6 +188,7 @@ final class ChannelsStore: ObservableObject {
                focusedThreadParentID == nil {
                 conversationLoadInFlight = false
                 updateLoadingState()
+                scheduleRequestedChangesRefreshIfNeeded()
             }
         }
         do {
@@ -272,6 +276,7 @@ final class ChannelsStore: ObservableObject {
                focusedThreadParentID == parentMessageID {
                 conversationLoadInFlight = false
                 updateLoadingState()
+                scheduleRequestedChangesRefreshIfNeeded()
             }
         }
         do {
@@ -319,7 +324,11 @@ final class ChannelsStore: ObservableObject {
         // Do not advance the organization cursor while an authoritative
         // channel/thread snapshot is loading. A slower snapshot could otherwise
         // overwrite this delta and make the skipped reply unrecoverable.
-        guard !authoritativeLoadInFlight else { return }
+        guard !authoritativeLoadInFlight else {
+            changesRefreshRequested = true
+            return
+        }
+        changesRefreshRequested = false
         guard syncCursor != nil else {
             await refresh()
             return
@@ -341,9 +350,12 @@ final class ChannelsStore: ObservableObject {
                     expectedGeneration == generation,
                     self.organizationID == organizationID,
                     self.token == token,
-                    !authoritativeLoadInFlight,
                     syncCursor == requestedCursor
                 else { return }
+                guard !authoritativeLoadInFlight else {
+                    changesRefreshRequested = true
+                    return
+                }
                 guard response.cursor >= requestedCursor else {
                     throw MobileAPIError.invalidResponse
                 }
@@ -367,6 +379,7 @@ final class ChannelsStore: ObservableObject {
 
     func applicationDidEnterBackground() {
         isForeground = false
+        changesRefreshRequested = false
         pollingTask?.cancel()
         pollingTask = nil
         realtimeTask?.cancel()
@@ -381,6 +394,16 @@ final class ChannelsStore: ObservableObject {
         loading = conversationLoadInFlight ||
             (catalogRefreshInFlight && channels.isEmpty)
     }
+
+    private func scheduleRequestedChangesRefreshIfNeeded() {
+        guard changesRefreshRequested, !authoritativeLoadInFlight else { return }
+        changesRefreshRequested = false
+        Task { [weak self] in
+            await self?.refreshChanges()
+        }
+    }
+
+    var viewingChannelID: UUID? { focusedChannelID }
 
     /// A nil `parentMessageID` posts to the channel; otherwise into that thread.
     func send(

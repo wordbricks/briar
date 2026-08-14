@@ -4,6 +4,7 @@ import type { InboxMessageWithReadState } from "./useInbox";
 import {
   findChangedInboxMessages,
   inboxNotificationVersion,
+  shouldSuppressInboxNotification,
 } from "./useInboxNotifications";
 
 const message = (
@@ -71,5 +72,39 @@ describe("inbox notification change detection", () => {
         }],
       ),
     ).toEqual([]);
+  });
+
+  it("suppresses only the channel notification visible in the focused app", () => {
+    const channelMessage: InboxMessageWithReadState = {
+      id: "channel:message-1",
+      kind: "channel",
+      isUnread: true,
+      occurredAt: "2026-08-14T00:00:00.000Z",
+      projectId: "project-1",
+      projectName: "Briar",
+      targetId: "channel-1",
+      channelId: "channel-1",
+      channelName: "product",
+      messageId: "message-1",
+      rootMessageId: "message-1",
+      title: "product",
+      version: "message-1",
+      body: "Please review",
+      authorName: "Nikita",
+      reason: "mention",
+    };
+
+    expect(
+      shouldSuppressInboxNotification(channelMessage, "channel-1", true),
+    ).toBe(true);
+    expect(
+      shouldSuppressInboxNotification(channelMessage, "channel-2", true),
+    ).toBe(false);
+    expect(
+      shouldSuppressInboxNotification(channelMessage, "channel-1", false),
+    ).toBe(false);
+    expect(
+      shouldSuppressInboxNotification(message("issue-1", "v1"), "channel-1", true),
+    ).toBe(false);
   });
 });

@@ -179,9 +179,16 @@ struct CompanionRootView: View {
             guard !messages.isEmpty else { return }
             let baselineID = inbox.notificationBaselineID
             Task {
+                let viewingChannelID = scenePhase == .active
+                    ? channels.viewingChannelID
+                    : nil
+                if viewingChannelID != nil {
+                    await channels.refreshChanges()
+                }
                 await notifications.process(
                     messages: messages,
-                    baselineID: baselineID
+                    baselineID: baselineID,
+                    viewingChannelID: viewingChannelID
                 )
             }
         }
@@ -190,9 +197,16 @@ struct CompanionRootView: View {
             let baselineID = inbox.notificationBaselineID
             let messages = inbox.messages
             Task {
+                let viewingChannelID = scenePhase == .active
+                    ? channels.viewingChannelID
+                    : nil
+                if viewingChannelID != nil {
+                    await channels.refreshChanges()
+                }
                 await notifications.process(
                     messages: messages,
-                    baselineID: baselineID
+                    baselineID: baselineID,
+                    viewingChannelID: viewingChannelID
                 )
             }
         }
