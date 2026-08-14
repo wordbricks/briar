@@ -860,11 +860,10 @@ export function Channels({
           setThreadParentId(target.rootMessageId);
           setThreadMessages((current) =>
             mergeChannelMessageSnapshot(current, threadResult.messages));
-        } else {
+        } else if (target) {
           setThreadParentId(null);
           setThreadMessages([]);
           if (
-            target &&
             !result.messages.some((message) => message.id === target.messageId)
           ) {
             const requestedRoot = await listChannelMessages(

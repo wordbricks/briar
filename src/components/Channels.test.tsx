@@ -224,6 +224,7 @@ describe("Channels", () => {
     onCreateAgent?: () => void,
     inboxDetail = false,
     onInboxDetailClose?: () => void,
+    consumeRequestedMessage = false,
   ) => {
     listChannels.mockResolvedValue({ channels: [channel], cursor: 7 });
     loadChannel.mockResolvedValue({
@@ -248,8 +249,9 @@ describe("Channels", () => {
     });
     setChannelMember.mockResolvedValue({ members: [member] });
     setChannelAgent.mockResolvedValue({ agents: [agent] });
-    await act(async () => {
-      root.render(
+    const RequestedMessageConsumer = () => {
+      const [pendingRequest, setPendingRequest] = useState(requestedMessage);
+      return (
         <Channels
           activeChannelId="channel-1"
           channels={[channel]}
@@ -260,11 +262,17 @@ describe("Channels", () => {
           onCreateAgent={onCreateAgent}
           onInboxDetailClose={onInboxDetailClose}
           organizationId="org-1"
-          requestedMessage={requestedMessage}
+          requestedMessage={pendingRequest}
           token="token"
-          onRequestedMessageOpen={onRequestedMessageOpen}
-        />,
+          onRequestedMessageOpen={() => {
+            onRequestedMessageOpen?.();
+            if (consumeRequestedMessage) setPendingRequest(undefined);
+          }}
+        />
       );
+    };
+    await act(async () => {
+      root.render(<RequestedMessageConsumer />);
     });
     await act(async () => {
       await Promise.resolve();
@@ -1336,6 +1344,55 @@ describe("Channels", () => {
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
     expect(container.textContent).toContain("Requested reply");
+  });
+
+  it("keeps a requested reply thread open after its parent consumes the request", async () => {
+    const rootMessage = message({ id: "message-root", replyCount: 1 });
+    const reply = message({
+      id: "message-reply",
+      parentMessageId: rootMessage.id,
+      body: "Requested reply",
+    });
+    listChannelMessages.mockResolvedValue({ messages: [rootMessage, reply] });
+    const onOpened = vi.fn();
+    const requestAnimationFrame = vi.spyOn(window, "requestAnimationFrame")
+      .mockImplementation((callback) => {
+        callback(0);
+        return 1;
+      });
+
+    try {
+      await render(
+        [rootMessage],
+        {
+          channelId: channel.id,
+          messageId: reply.id,
+          rootMessageId: rootMessage.id,
+        },
+        onOpened,
+        undefined,
+        false,
+        undefined,
+        true,
+      );
+      await act(async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      expect(onOpened).toHaveBeenCalledOnce();
+      expect(container.querySelector(".channel-thread")).not.toBeNull();
+      expect(container.textContent).toContain("Requested reply");
+
+      await act(async () => {
+        container
+          .querySelector<HTMLButtonElement>('button[aria-label="스레드 닫기"]')
+          ?.click();
+      });
+      expect(container.querySelector(".channel-thread")).toBeNull();
+    } finally {
+      requestAnimationFrame.mockRestore();
+    }
   });
 
   it("shows only a requested thread in inbox detail mode", async () => {
