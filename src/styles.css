@@ -379,11 +379,7 @@ body { overflow: hidden; font-synthesis: none; }
 .sidebar-organization-menu button > svg:last-child { color:#765bd0; }
 .sidebar-organization-list-logo { width:16px; height:16px; border-radius:4px; object-fit:cover; }
 .sidebar-organization-menu-group { display:grid; gap:1px; }
-.sidebar-organization-menu-group:not(.organization-list) > button { grid-template-columns:minmax(0,1fr) 16px; }
-.sidebar-organization-menu-group:not(.organization-list) > button > svg:last-child { color:var(--muted-foreground); }
 .sidebar-organization-menu-separator { height:1px; margin:6px -7px; background:var(--border); }
-.sidebar-organization-menu-back { grid-template-columns:18px minmax(0,1fr) !important; color:var(--foreground) !important; font-weight:600; }
-.sidebar-organization-menu-back > svg { color:var(--muted-foreground) !important; }
 .sidebar-organization-add { grid-template-columns:18px minmax(0,1fr) !important; font-weight:600; }
 .sidebar-organization-add > svg { color:#765bd0 !important; }
 .sidebar-primary-nav { padding: 3px 10px 16px; display: grid; gap: 2px; }
