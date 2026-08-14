@@ -212,6 +212,7 @@ export function App() {
     ChannelSummary[]
   >([]);
   const [activeChannelId, setActiveChannelId] = useState<string | null>(null);
+  const [viewingChannelId, setViewingChannelId] = useState<string | null>(null);
   const [channelsLoading, setChannelsLoading] = useState(false);
   useEffect(() => {
     const organizationId = briar.activeOrganizationId;
@@ -341,11 +342,21 @@ export function App() {
     (runId: string) => inbox.markIssueRead(runId),
     [inbox.markIssueRead],
   );
+  const channelInboxSyncSignal = useMemo(
+    () =>
+      inbox.messages
+        .filter((message) => message.kind === "channel")
+        .map((message) => `${message.id}:${message.version}`)
+        .sort()
+        .join("\n"),
+    [inbox.messages],
+  );
   useInboxNotifications(
     briar.user?.id ?? null,
     briar.activeOrganizationId,
     inbox.messages,
     inbox.notificationBaselineId,
+    viewingChannelId,
   );
   useEffect(() => {
     void syncAppBadgeCount(inbox.unreadCount).catch(() => {
@@ -1271,6 +1282,7 @@ export function App() {
     ) : inboxDetailChannelId && briar.activeOrganizationId && briar.token ? (
       <Channels
         activeChannelId={inboxDetailChannelId}
+        channelInboxSyncSignal={channelInboxSyncSignal}
         channels={organizationChannels}
         currentUserId={briar.user?.id ?? null}
         inboxDetail
@@ -1297,6 +1309,7 @@ export function App() {
           navigateToIssue(runId);
         }}
         onSkillSessionAccepted={autoHunt.adoptRemoteSession}
+        onViewingChannelChange={setViewingChannelId}
         organizationId={briar.activeOrganizationId}
         projects={activeOrganizationProjects}
         requestedMessage={requestedChannelMessage}
@@ -1836,12 +1849,14 @@ export function App() {
           briar.token ? (
           <Channels
             activeChannelId={activeChannelId}
+            channelInboxSyncSignal={channelInboxSyncSignal}
             channels={organizationChannels}
             projects={activeOrganizationProjects}
             currentUserId={briar.user?.id ?? null}
             onChannelSelect={setActiveChannelId}
             onChannelsChange={setOrganizationChannels}
             onSkillSessionAccepted={autoHunt.adoptRemoteSession}
+            onViewingChannelChange={setViewingChannelId}
             organizationId={briar.activeOrganizationId}
             token={briar.token}
             requestedMessage={requestedChannelMessage}
@@ -2055,10 +2070,12 @@ export function App() {
           <>
             <CompanionChannels
               activeProjectId={activeProject?.id ?? null}
+              channelInboxSyncSignal={channelInboxSyncSignal}
               currentUserId={briar.user?.id ?? null}
               organizationId={briar.activeOrganizationId}
               projects={activeOrganizationProjects}
               onSkillSessionAccepted={autoHunt.adoptRemoteSession}
+              onViewingChannelChange={setViewingChannelId}
               token={briar.token}
               requestedMessage={requestedChannelMessage}
               onRequestedMessageOpen={clearRequestedChannelMessage}

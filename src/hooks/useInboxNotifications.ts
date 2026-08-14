@@ -37,11 +37,27 @@ export function inboxNotificationVersion(message: InboxMessageWithReadState) {
     : message.version;
 }
 
+export function shouldSuppressInboxNotification(
+  message: InboxMessageWithReadState,
+  viewingChannelId: string | null,
+  appIsFocused: boolean,
+) {
+  return appIsFocused &&
+    message.kind === "channel" &&
+    message.channelId === viewingChannelId;
+}
+
+const appIsFocused = () =>
+  typeof document !== "undefined" &&
+  document.visibilityState === "visible" &&
+  document.hasFocus();
+
 export function useInboxNotifications(
   userId: string | null,
   organizationId: string | null,
   messages: InboxMessageWithReadState[],
   baselineId = "local",
+  viewingChannelId: string | null = null,
 ) {
   const { t } = useI18n();
   const baselineRef = useRef<NotificationBaseline | null>(null);
@@ -75,6 +91,13 @@ export function useInboxNotifications(
 
     const preferences = readInboxNotificationPreferences();
     for (const message of changedMessages) {
+      if (
+        shouldSuppressInboxNotification(
+          message,
+          viewingChannelId,
+          appIsFocused(),
+        )
+      ) continue;
       const category = classifyInboxMessage(message);
       if (!preferences[category]) continue;
       void sendInboxNotification(
@@ -84,7 +107,7 @@ export function useInboxNotifications(
         console.error("Failed to send inbox notification", error);
       });
     }
-  }, [baselineId, messages, organizationId, t, userId]);
+  }, [baselineId, messages, organizationId, t, userId, viewingChannelId]);
 }
 
 export function useInboxNotificationClicks(

@@ -285,6 +285,75 @@ describe("Channels", () => {
     expect(container.querySelector(".channel-composer-shell")).not.toBeNull();
   });
 
+  it("uses Inbox channel changes as a delta recovery signal", async () => {
+    vi.useFakeTimers();
+    const channelList = [channel];
+    const recovered = message({
+      id: "message-recovered",
+      body: "Recovered before the notification is shown",
+    });
+    listChannels.mockResolvedValue({ channels: channelList, cursor: 7 });
+    loadChannel.mockResolvedValue({
+      channel,
+      members: [member],
+      agents: [agent],
+      messages: [],
+    });
+    loadChannelDelta
+      .mockResolvedValueOnce({
+        cursor: 7,
+        hasMore: false,
+        channels: [],
+        removedChannelIds: [],
+        messages: [],
+        removedMessageIds: [],
+        agentReplies: [],
+      })
+      .mockResolvedValueOnce({
+        cursor: 8,
+        hasMore: false,
+        channels: [],
+        removedChannelIds: [],
+        messages: [recovered],
+        removedMessageIds: [],
+        agentReplies: [],
+      });
+    const props = {
+      activeChannelId: channel.id,
+      channels: channelList,
+      currentUserId: "user-1",
+      onChannelSelect: vi.fn(),
+      onChannelsChange: vi.fn(),
+      organizationId: "org-1",
+      token: "token",
+    };
+
+    await act(async () => {
+      root.render(
+        <Channels {...props} channelInboxSyncSignal="baseline" />,
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300);
+    });
+    expect(loadChannelDelta).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      root.render(
+        <Channels {...props} channelInboxSyncSignal="channel:message-recovered" />,
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(loadChannelDelta).toHaveBeenCalledTimes(2);
+    expect(container.textContent).toContain(
+      "Recovered before the notification is shown",
+    );
+  });
+
   it("places the named Agent typing state inside its triggering message", async () => {
     const trigger = message({ body: "@Honey 안녕" });
     await render([trigger]);
