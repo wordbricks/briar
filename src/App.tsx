@@ -32,6 +32,7 @@ import { ProjectSchedule } from "./components/ProjectSchedule";
 import { ProjectRepositorySetupDialog } from "./components/ProjectRepositorySetupDialog";
 import { ProjectSettings } from "./components/ProjectSettings";
 import { SessionLoadingScreen } from "./components/SessionLoadingScreen";
+import { LoadingState } from "./components/ui/loading-state";
 import { Sidebar } from "./components/Sidebar";
 import {
   UnifiedSettingsSidebar,
@@ -1337,7 +1338,7 @@ export function App() {
       />
     ) : isInboxDetailLoading ? (
       <div className="inbox-detail-loading" role="status">
-        {t("inbox.detailLoading")}
+        <LoadingState label={t("inbox.detailLoading")} />
       </div>
     ) : (
       <div className="inbox-detail-unavailable" role="alert">

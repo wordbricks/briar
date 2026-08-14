@@ -32,6 +32,7 @@ import {
   type Dispatch,
   type SetStateAction,
 } from "react";
+import { LoadingState } from "@/components/ui/loading-state";
 import { useI18n } from "../i18n";
 import { useChannelComposer } from "../hooks/useChannelComposer";
 import { useHorizontalPaneResize } from "../hooks/useHorizontalPaneResize";
@@ -1746,7 +1747,7 @@ export function Channels({
 
       {showRequestedThreadOnly && !(threadParentId && activeChannel) ? (
         <div className="inbox-detail-loading" role="status">
-          {t("inbox.detailLoading")}
+          <LoadingState label={t("inbox.detailLoading")} />
         </div>
       ) : null}
 

@@ -124,6 +124,7 @@
     Keep ink/line/surface/etc. stable for the large legacy stylesheet.
   */
   --ink: var(--foreground);
+  --ink-3: var(--muted-foreground);
   --faint: #a0a29a;
   --line: var(--border);
   --surface: var(--card);
@@ -181,6 +182,7 @@
   --sidebar-accent-foreground: #f2f2ef;
 
   --ink: var(--foreground);
+  --ink-3: var(--muted-foreground);
   --faint: #9b9ba3;
   --line: var(--border);
   --surface: var(--card);

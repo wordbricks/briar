@@ -143,6 +143,7 @@ describe("HuntDashboard", () => {
     expect(markup).toContain('class="issues-loading-overlay"');
     expect(markup).toContain('role="status"');
     expect(markup).toContain('aria-busy="true"');
+    expect(markup).toContain('data-testid="loading-state"');
     expect(markup).toContain("이슈를 불러오는 중입니다…");
   });
 
