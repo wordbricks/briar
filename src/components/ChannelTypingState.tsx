@@ -1,11 +1,14 @@
 import { LoaderCircle } from "lucide-react";
 import { useI18n } from "../i18n";
+import type { ChannelAgentActivityDescriptor } from "../lib/channel-agent-activity";
 
 export function ChannelTypingState({
   agentNames,
+  activityByAgentName,
   className,
 }: {
   agentNames: readonly string[];
+  activityByAgentName?: Readonly<Record<string, ChannelAgentActivityDescriptor>>;
   className?: string;
 }) {
   const { t } = useI18n();
@@ -19,7 +22,9 @@ export function ChannelTypingState({
       role="status"
     >
       <LoaderCircle className="spin" size={15} />
-      {t("channel.namedAgentTyping", { name })}
+      {activityByAgentName?.[name]
+        ? `${name} · ${activityByAgentName[name].headline}`
+        : t("channel.namedAgentTyping", { name })}
     </div>
   ));
 }

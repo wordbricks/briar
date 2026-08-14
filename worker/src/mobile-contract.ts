@@ -626,6 +626,7 @@ export const mobileChannelDetailResponseSchema = z.object({
     createdAt: z.iso.datetime(),
   })),
   messages: z.array(mobileChannelMessageSchema),
+  agentReplies: z.array(z.lazy(() => mobileChannelAgentReplySchema)).default([]),
   nextCursor: z.uuid().nullable(),
 });
 

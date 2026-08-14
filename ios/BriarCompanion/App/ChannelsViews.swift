@@ -376,6 +376,12 @@ private struct ChannelConversationView: View {
         )
     }
 
+    private var typingStatuses: [ChannelsStore.AgentTypingStatus] {
+        var messageIDs = Set(messages.map(\.id))
+        if let parentMessageID { messageIDs.insert(parentMessageID) }
+        return channels.typingStatuses(messageIDs: messageIDs)
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             if let errorMessage = channels.errorMessage {
@@ -504,6 +510,31 @@ private struct ChannelConversationView: View {
                             workers: workers,
                             showsThreadSummary: showsThreadSummary
                 )
+            }
+            if !typingStatuses.isEmpty {
+                VStack(alignment: .leading, spacing: 6) {
+                    ForEach(typingStatuses) { status in
+                        HStack(spacing: 8) {
+                            ProgressView()
+                                .controlSize(.small)
+                            Text(
+                                status.activity.map {
+                                    "\(status.agentName) · \($0.headline)"
+                                } ?? String(
+                                    format: L10n.text(.channelAgentTyping, locale: locale),
+                                    status.agentName
+                                )
+                            )
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                        }
+                        .accessibilityElement(children: .combine)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
             }
             ChannelComposer(
                 draft: $draft,

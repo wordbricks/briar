@@ -1918,6 +1918,21 @@ export async function listChannelAgentReplies(
   return rows.results;
 }
 
+export async function listActiveChannelAgentReplies(
+  db: D1Database,
+  channelId: string,
+) {
+  const rows = await db
+    .prepare(
+      `select * from briar_channel_agent_reply_jobs
+       where channel_id = ? and status in ('queued', 'running')
+       order by created_at, id`,
+    )
+    .bind(channelId)
+    .all<ChannelReplyJobRow>();
+  return rows.results;
+}
+
 export async function getChannelAgentReplyJob(
   db: D1Database,
   organizationId: string,

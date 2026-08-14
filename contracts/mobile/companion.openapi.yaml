@@ -1268,6 +1268,42 @@
         }
       }
     },
+    "/organizations/{organizationId}/channels/{channelId}/agent-activity-events": {
+      "post": {
+        "operationId": "createChannelActivityTicket",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OrganizationId"
+          },
+          {
+            "$ref": "#/components/parameters/ChannelId"
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Short-lived WebSocket ticket for channel-scoped Agent activity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChannelRealtimeTicketResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
     "/organizations/{organizationId}/channels/{channelId}": {
       "get": {
         "operationId": "getChannel",
@@ -4383,6 +4419,120 @@
         },
         "additionalProperties": true
       },
+      "ChannelRealtimeTicketResponse": {
+        "type": "object",
+        "required": [
+          "url",
+          "expiresAt"
+        ],
+        "properties": {
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ChannelAgentActivity": {
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "headline"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "command",
+              "fileChange",
+              "webSearch",
+              "tool"
+            ]
+          },
+          "headline": {
+            "type": "string",
+            "maxLength": 240
+          }
+        },
+        "additionalProperties": false
+      },
+      "ChannelAgentActivityFrame": {
+        "type": "object",
+        "required": [
+          "version",
+          "replyJobId",
+          "attempt",
+          "sequence",
+          "agentId",
+          "channelId",
+          "triggerMessageId",
+          "parentMessageId",
+          "activity",
+          "sentAt",
+          "expiresAt"
+        ],
+        "properties": {
+          "version": {
+            "type": "integer",
+            "enum": [1]
+          },
+          "replyJobId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "attempt": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "sequence": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "agentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "channelId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "triggerMessageId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "parentMessageId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "activity": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ChannelAgentActivity"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sentAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
       "ChannelAgentReply": {
         "type": "object",
         "required": [
@@ -4514,6 +4664,7 @@
           "members",
           "agents",
           "messages",
+          "agentReplies",
           "nextCursor"
         ],
         "properties": {
@@ -4538,6 +4689,12 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/ChannelMessage"
+            }
+          },
+          "agentReplies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChannelAgentReply"
             }
           },
           "nextCursor": {

@@ -67,7 +67,12 @@ import { maxIssueAttachmentCount } from "../lib/issue-attachments";
 import { useI18n } from "../i18n";
 import { useChannelComposer } from "../hooks/useChannelComposer";
 import { useMobileBackHandler } from "../hooks/useMobileNavigation";
+import { useChannelAgentActivity } from "../hooks/use-channel-agent-activity";
 import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
+import type {
+  ChannelAgentActivityDescriptor,
+  ChannelAgentActivityFrame,
+} from "../lib/channel-agent-activity";
 import {
   ChannelDraftImages,
   ChannelMessageImages,
@@ -160,6 +165,23 @@ const typingAgentNamesForMessages = (
   ];
 };
 
+const activityByAgentNameForReplies = (
+  replies: ChannelAgentReply[],
+  agents: ChannelAgentSummary[],
+  activity: ReadonlyMap<string, ChannelAgentActivityFrame>,
+  fallbackName: string,
+) => {
+  const result: Record<string, ChannelAgentActivityDescriptor> = {};
+  for (const reply of replies) {
+    const frame = activity.get(reply.id);
+    if (!frame?.activity || frame.attempt !== reply.attempts) continue;
+    const name = agents.find((agent) => agent.agentId === reply.agentId)?.name ??
+      fallbackName;
+    result[name] = frame.activity;
+  }
+  return result;
+};
+
 type CompanionChannelsProps = {
   organizationId: string;
   activeProjectId: string | null;
@@ -211,6 +233,11 @@ export function CompanionChannels({
   const [members, setMembers] = useState<ChannelMember[]>([]);
   const [agents, setAgents] = useState<ChannelAgentSummary[]>([]);
   const [replies, setReplies] = useState<ChannelAgentReply[]>([]);
+  const liveActivity = useChannelAgentActivity(
+    token,
+    organizationId,
+    channel?.id ?? null,
+  );
   const [thread, setThread] = useState<ChannelMessage[] | null>(null);
   const [threadParentId, setThreadParentId] = useState<string | null>(null);
   const [messageNextCursor, setMessageNextCursor] = useState<string | null>(
@@ -419,6 +446,7 @@ export function CompanionChannels({
         setMessageNextCursor(result.nextCursor ?? null);
         setMembers(result.members);
         setAgents(result.agents);
+        setReplies(result.agentReplies ?? []);
       } catch (cause) {
         if (selectionVersion === channelSelectionVersion.current) {
           setError(message(cause));
@@ -898,14 +926,26 @@ export function CompanionChannels({
       item.channelId === channel?.id &&
       (item.status === "queued" || item.status === "running"),
   );
+  const threadMessageIds = threadParentId
+    ? new Set([threadParentId, ...(thread ?? []).map((message) => message.id)])
+    : new Set<string>();
+  const threadPendingReplies = pendingReplies.filter((reply) =>
+    threadMessageIds.has(reply.parentMessageId)
+  );
   const threadTypingAgentNames = threadParentId
     ? typingAgentNamesForMessages(
-        pendingReplies,
+        threadPendingReplies,
         agents,
-        [threadParentId, ...(thread ?? []).map((message) => message.id)],
+        [...threadMessageIds],
         t("channel.projectAgent"),
       )
     : [];
+  const threadActivityByAgentName = activityByAgentNameForReplies(
+    threadPendingReplies,
+    agents,
+    liveActivity,
+    t("channel.projectAgent"),
+  );
 
   const openIssue = useCallback(
     async (
@@ -1322,6 +1362,14 @@ export function CompanionChannels({
                 item.id,
                 t("channel.projectAgent"),
               )}
+              typingActivityByAgentName={activityByAgentNameForReplies(
+                pendingReplies.filter((reply) =>
+                  reply.parentMessageId === item.id
+                ),
+                agents,
+                liveActivity,
+                t("channel.projectAgent"),
+              )}
               showTypingState={false}
             />
           ))}
@@ -1329,6 +1377,7 @@ export function CompanionChannels({
         </div>
         <ChannelTypingState
           agentNames={threadTypingAgentNames}
+          activityByAgentName={threadActivityByAgentName}
           className="companion-channel-thread-typing"
         />
         <CompanionChannelComposer
@@ -1407,6 +1456,14 @@ export function CompanionChannels({
                 pendingReplies,
                 agents,
                 item.id,
+                t("channel.projectAgent"),
+              )}
+              typingActivityByAgentName={activityByAgentNameForReplies(
+                pendingReplies.filter((reply) =>
+                  reply.parentMessageId === item.id
+                ),
+                agents,
+                liveActivity,
                 t("channel.projectAgent"),
               )}
             />
@@ -1546,6 +1603,7 @@ function MessageRow({
   showThreadSummary = false,
   token,
   typingAgentNames,
+  typingActivityByAgentName,
   showTypingState = true,
 }: {
   acceptingProposal: boolean;
@@ -1584,6 +1642,7 @@ function MessageRow({
   showThreadSummary?: boolean;
   token: string;
   typingAgentNames: string[];
+  typingActivityByAgentName: Readonly<Record<string, ChannelAgentActivityDescriptor>>;
   showTypingState?: boolean;
 }) {
   const { localeTag, t } = useI18n();
@@ -1629,6 +1688,7 @@ function MessageRow({
         {showTypingState ? (
           <ChannelTypingState
             agentNames={typingAgentNames}
+            activityByAgentName={typingActivityByAgentName}
             className="companion-channel-typing"
           />
         ) : null}

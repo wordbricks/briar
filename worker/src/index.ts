@@ -66,6 +66,12 @@ import {
   shouldBriarReply,
 } from "../../src/lib/issue-reply-decision";
 import {
+  CHANNEL_AGENT_ACTIVITY_STALE_MS,
+  CHANNEL_AGENT_ACTIVITY_VERSION,
+  channelAgentActivityPublishInputSchema,
+  type ChannelAgentActivityFrame,
+} from "../../src/lib/channel-agent-activity";
+import {
   issueTitleAbsoluteMaxLength,
   issueTitleOverLimitMessage,
   issueTitleTooLongMessageKo,
@@ -483,6 +489,7 @@ import {
   getClaimedChannelReply,
   getOrganizationProject,
   listChannelAgentReplies,
+  listActiveChannelAgentReplies,
   listChannelAgents,
   listChannelMembers,
   listChannelRootMessages,
@@ -506,6 +513,7 @@ import {
   updateChannel,
   updateChannelWebhook,
   consumeChannelWebhookRateLimit,
+  type ChannelReplyJobRow,
 } from "./channels";
 import {
   legacyChannelRealtimeResponse,
@@ -515,6 +523,18 @@ import {
   subscribeToOrganizationRealtime,
 } from "./channel-realtime";
 export { ChannelRealtimeHub } from "./channel-realtime";
+import {
+  disconnectChannelActivitySubscribers,
+  publishChannelActivity,
+  subscribeToChannelActivity,
+} from "./channel-activity-realtime";
+export { ChannelActivityHub } from "./channel-activity-realtime";
+import {
+  createChannelActivityPublishToken,
+  createChannelActivitySocketTicket,
+  verifyChannelActivityPublishToken,
+  verifyChannelActivitySocketTicket,
+} from "./channel-activity-ticket";
 import {
   createChannelRealtimeTicket,
   verifyChannelRealtimeTicket,
@@ -665,6 +685,119 @@ function scheduleChannelRealtimePublish(
   if (context) context.waitUntil(publish);
   else void publish;
   scheduleInboxRealtimeFlush(env, db, context);
+}
+
+type ChannelActivityReplyIdentity = Pick<
+  ChannelReplyJobRow,
+  | "id"
+  | "organization_id"
+  | "channel_id"
+  | "agent_id"
+  | "trigger_message_id"
+  | "parent_message_id"
+  | "attempts"
+  | "lease_expires_at"
+>;
+
+async function channelActivityCredential(
+  env: Env,
+  job: ChannelActivityReplyIdentity,
+  input: { workerId: string; deviceId: string },
+) {
+  if (!job.lease_expires_at) {
+    throw new HttpError(409, "Reply claim has no active lease");
+  }
+  const expiresAt = Date.parse(job.lease_expires_at);
+  if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
+    throw new HttpError(409, "Reply claim lease has expired");
+  }
+  const credential = await createChannelActivityPublishToken(
+    env.BETTER_AUTH_SECRET,
+    {
+      organizationId: job.organization_id,
+      channelId: job.channel_id,
+      replyJobId: job.id,
+      agentId: job.agent_id,
+      triggerMessageId: job.trigger_message_id,
+      parentMessageId: job.parent_message_id,
+      attempt: job.attempts,
+      workerId: input.workerId,
+      deviceId: input.deviceId,
+      expiresAt,
+    },
+  );
+  return {
+    token: credential.token,
+    expiresAt: new Date(credential.expiresAt).toISOString(),
+  };
+}
+
+function channelActivityFrame(
+  job: Omit<ChannelActivityReplyIdentity, "lease_expires_at">,
+  input: Pick<ChannelAgentActivityFrame, "sequence" | "activity">,
+  now = Date.now(),
+): ChannelAgentActivityFrame {
+  return {
+    version: CHANNEL_AGENT_ACTIVITY_VERSION,
+    replyJobId: job.id,
+    attempt: job.attempts,
+    sequence: input.sequence,
+    agentId: job.agent_id,
+    channelId: job.channel_id,
+    triggerMessageId: job.trigger_message_id,
+    parentMessageId: job.parent_message_id,
+    activity: input.activity,
+    sentAt: new Date(now).toISOString(),
+    expiresAt: new Date(now + CHANNEL_AGENT_ACTIVITY_STALE_MS).toISOString(),
+  };
+}
+
+function scheduleChannelActivityClear(
+  env: Env,
+  job: ChannelActivityReplyIdentity,
+  context?: ExecutionContext,
+) {
+  if (!env.CHANNEL_ACTIVITY_REALTIME) return;
+  const frame = channelActivityFrame(job, {
+    sequence: Number.MAX_SAFE_INTEGER,
+    activity: null,
+  });
+  const publish = publishChannelActivity(env, job.organization_id, frame).catch(
+    (error) => {
+      console.error(JSON.stringify({
+        message: "Channel activity clear failed",
+        organizationId: job.organization_id,
+        channelId: job.channel_id,
+        replyJobId: job.id,
+        error: error instanceof Error ? error.message : String(error),
+      }));
+    },
+  );
+  if (context) context.waitUntil(publish);
+  else void publish;
+}
+
+function scheduleChannelActivityDisconnect(
+  env: Env,
+  organizationId: string,
+  channelId: string,
+  context?: ExecutionContext,
+) {
+  if (!env.CHANNEL_ACTIVITY_REALTIME) return;
+  const disconnect = disconnectChannelActivitySubscribers(
+    env,
+    organizationId,
+    channelId,
+  ).catch((error) => {
+    console.error(JSON.stringify({
+      message: "Channel activity disconnect failed",
+      organizationId,
+      channelId,
+      error: error instanceof Error ? error.message : String(error),
+    }));
+  });
+  if (context) context.waitUntil(disconnect);
+  else void disconnect;
 }
 
 function scheduleProjectRealtimePublish(
@@ -7067,6 +7200,49 @@ async function route(
     });
   }
 
+  const channelActivityEventsMatch = pathname.match(
+    /^\/organizations\/([0-9a-f-]+)\/channels\/([0-9a-f-]+)\/agent-activity-events$/u,
+  );
+  if (channelActivityEventsMatch && request.method === "POST") {
+    const session = await requireSession(auth, request);
+    const [organizationId, channelId] = channelActivityEventsMatch.slice(1);
+    await requireChannelAccess(db, organizationId, channelId, session.user.id);
+    const issued = await createChannelActivitySocketTicket(
+      env.BETTER_AUTH_SECRET,
+      { organizationId, channelId, userId: session.user.id },
+    );
+    const socketUrl = new URL(request.url);
+    socketUrl.protocol = socketUrl.protocol === "https:" ? "wss:" : "ws:";
+    socketUrl.search = "";
+    socketUrl.searchParams.set("ticket", issued.ticket);
+    return privateNoStoreJson({
+      url: socketUrl.toString(),
+      expiresAt: issued.expiresAt,
+    });
+  }
+  if (channelActivityEventsMatch && request.method === "GET") {
+    if (request.headers.get("Upgrade")?.toLowerCase() !== "websocket") {
+      throw new HttpError(426, "WebSocket transport required");
+    }
+    const [organizationId, channelId] = channelActivityEventsMatch.slice(1);
+    const ticket = new URL(request.url).searchParams.get("ticket") ?? "";
+    const verified = await verifyChannelActivitySocketTicket(
+      env.BETTER_AUTH_SECRET,
+      ticket,
+      organizationId,
+      channelId,
+    );
+    if (!verified) {
+      throw new HttpError(401, "Invalid or expired activity ticket");
+    }
+    return subscribeToChannelActivity(env, {
+      organizationId,
+      channelId,
+      userId: verified.userId,
+      authorizationExpiresAt: verified.authorizationExpiresAt,
+    });
+  }
+
   const channelChangesMatch = pathname.match(
     /^\/organizations\/([0-9a-f-]+)\/channel-changes$/u,
   );
@@ -7246,7 +7422,7 @@ async function route(
     const messageLimit = rawMessageLimit === null
       ? null
       : z.coerce.number().int().min(1).max(100).parse(rawMessageLimit);
-    const [members, channelAgents, messagePage] = await Promise.all([
+    const [members, channelAgents, messagePage, activeReplies] = await Promise.all([
       listChannelMembers(db, channel.id),
       listChannelAgents(db, channel.id),
       messageLimit === null
@@ -7260,6 +7436,7 @@ async function route(
             cursor: null,
             limit: messageLimit,
           }),
+      listActiveChannelAgentReplies(db, channel.id),
     ]);
     const agents = await hydrateAgentSkills(db, channelAgents);
     return json({
@@ -7267,6 +7444,7 @@ async function route(
       members,
       agents: agents.map(organizationAgentJson),
       messages: messagePage?.messages ?? [],
+      agentReplies: activeReplies.map(channelReplyJson),
       nextCursor: messagePage?.nextCursor ?? null,
     });
   }
@@ -7295,6 +7473,12 @@ async function route(
       updatedAt: new Date().toISOString(),
     });
     if (!channel) throw new HttpError(404, "Channel not found");
+    scheduleChannelActivityDisconnect(
+      env,
+      organizationChannelMatch[1],
+      organizationChannelMatch[2],
+      context,
+    );
     return json({ channel: channelJson(channel) });
   }
   if (organizationChannelMatch && request.method === "DELETE") {
@@ -7313,6 +7497,12 @@ async function route(
       observedAt,
     );
     if (!deleted) throw new HttpError(404, "Channel not found");
+    scheduleChannelActivityDisconnect(
+      env,
+      organizationId,
+      organizationChannelMatch[2],
+      context,
+    );
     return responseWithPostCommitCleanup(json({ deleted: true }), {
       context,
       operation: "channel_delete",
@@ -7365,6 +7555,12 @@ async function route(
       session.user.id,
     );
     await removeChannelMember(db, channel.id, channelMemberMatch[3]);
+    scheduleChannelActivityDisconnect(
+      env,
+      channelMemberMatch[1],
+      channel.id,
+      context,
+    );
     return json({ members: await listChannelMembers(db, channel.id) });
   }
 
@@ -12943,6 +13139,12 @@ async function route(
               : []
           )
         : [];
+      const activity = env.CHANNEL_ACTIVITY_REALTIME
+        ? await channelActivityCredential(env, job, {
+            workerId: binding.id,
+            deviceId: principal.deviceId,
+          })
+        : null;
       return json({
         work: {
           workType: "channelReply",
@@ -12998,6 +13200,7 @@ async function route(
           claimToken,
           claimedAt: job.claimed_at,
           leaseExpiresAt: job.lease_expires_at,
+          activity,
           organizationContext: agent.project_id === null
             ? organizationAgentContextDescriptorSchema.parse({
                 schemaVersion: 1,
@@ -13315,6 +13518,38 @@ async function route(
     return attachmentResponse(attachment, object, object.body);
   }
 
+  const channelReplyActivityMatch = pathname.match(
+    /^\/channel-reply-claims\/([0-9a-f-]+)\/activity$/u,
+  );
+  if (channelReplyActivityMatch && request.method === "POST") {
+    const token = request.headers.get("X-Briar-Channel-Activity-Token") ?? "";
+    const verified = await verifyChannelActivityPublishToken(
+      env.BETTER_AUTH_SECRET,
+      token,
+      channelReplyActivityMatch[1],
+    );
+    if (!verified) {
+      throw new HttpError(401, "Invalid or expired activity token");
+    }
+    const input = channelAgentActivityPublishInputSchema.parse(
+      await readJson(request),
+    );
+    const frame = channelActivityFrame(
+      {
+        id: verified.replyJobId,
+        organization_id: verified.organizationId,
+        channel_id: verified.channelId,
+        agent_id: verified.agentId,
+        trigger_message_id: verified.triggerMessageId,
+        parent_message_id: verified.parentMessageId,
+        attempts: verified.attempt,
+      },
+      input,
+    );
+    await publishChannelActivity(env, verified.organizationId, frame);
+    return new Response(null, { status: 204 });
+  }
+
   const channelReplyClaimMatch = pathname.match(
     /^\/channel-reply-claims\/([0-9a-f-]+)\/(lease|complete)$/u,
   );
@@ -13336,7 +13571,13 @@ async function route(
         leaseExpiresAt: leaseExpiryFrom(observedAt),
       });
       if (!renewed) throw new HttpError(409, "Reply claim is no longer active");
-      return json({ leaseExpiresAt: renewed.lease_expires_at });
+      const activity = env.CHANNEL_ACTIVITY_REALTIME
+        ? await channelActivityCredential(env, renewed, {
+            workerId: input.workerId,
+            deviceId: principal.deviceId,
+          })
+        : null;
+      return json({ leaseExpiresAt: renewed.lease_expires_at, activity });
     }
 
     const { input, attachments } = await readChannelReplyCompleteRequest(
@@ -13370,6 +13611,7 @@ async function route(
       });
       if (!failed) throw new HttpError(409, "Reply claim is no longer active");
       scheduleChannelRealtimePublish(env, db, input.organizationId, context);
+      scheduleChannelActivityClear(env, failed, context);
       return json({ agentReply: channelReplyJson(failed) });
     }
     const agent = await getOrganizationAgent(
@@ -13574,6 +13816,7 @@ async function route(
       throw new HttpError(409, "Reply claim is no longer active");
     }
     scheduleChannelRealtimePublish(env, db, input.organizationId, context);
+    scheduleChannelActivityClear(env, completed, context);
     return json({
       agentReply: channelReplyJson(completed),
       message: await getChannelMessage(

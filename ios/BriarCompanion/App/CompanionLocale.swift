@@ -696,6 +696,7 @@ enum L10n {
         case channelLastReply
         case channelReact
         case channelMessagePlaceholder
+        case channelAgentTyping
         case channelHome
         case channelIssueProposal
         case channelIssueProposalAccepted
@@ -743,6 +744,7 @@ enum L10n {
             case .channelLastReply: "마지막 답글 %@"
             case .channelReact: "React"
             case .channelMessagePlaceholder: "#%@에 메시지 보내기"
+            case .channelAgentTyping: "%@님이 답변을 작성하고 있습니다…"
             case .channelHome: "홈"
             case .channelIssueProposal: "이슈 생성 제안"
             case .channelIssueProposalAccepted: "승인되어 이슈가 생성되었습니다."
@@ -793,6 +795,7 @@ enum L10n {
             case .channelLastReply: "last reply %@"
             case .channelReact: "React"
             case .channelMessagePlaceholder: "Message #%@"
+            case .channelAgentTyping: "%@ is writing a reply…"
             case .channelHome: "Home"
             case .channelIssueProposal: "Issue proposal"
             case .channelIssueProposalAccepted: "Accepted — the issue was created."
@@ -843,6 +846,7 @@ enum L10n {
             case .channelLastReply: "最后回复于%@"
             case .channelReact: "React"
             case .channelMessagePlaceholder: "发送消息到 #%@"
+            case .channelAgentTyping: "%@ 正在撰写回复…"
             case .channelHome: "主页"
             case .channelIssueProposal: "创建问题建议"
             case .channelIssueProposalAccepted: "已批准并创建问题。"
