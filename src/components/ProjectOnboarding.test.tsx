@@ -220,6 +220,15 @@ describe("ProjectOnboarding", () => {
     expect(providerProgress?.textContent).toContain("검증 명령을 확인하고 있습니다.");
     expect(providerProgress?.textContent).not.toContain("저장소 구조를 분석하고 있습니다.");
 
+    await act(async () => reportProgress?.({
+      provider: "codex",
+      messageId: "message-3",
+      phase: "final_answer",
+      message: '{"completion":{"requiredStages":[]},"version":2}',
+    }));
+    expect(providerProgress?.textContent).toContain("분석 결과를 정리하고 있습니다…");
+    expect(providerProgress?.textContent).not.toContain('"completion"');
+
     await act(async () => resolveConnection?.({
       repositoryPath: readiness.repositoryPath,
       workflow: generatedWorkflow,
@@ -480,6 +489,15 @@ describe("ProjectOnboarding", () => {
     expect(providerProgress?.textContent).not.toContain(
       "패키지 매니저와 테스트 도구를 확인하고 있습니다.",
     );
+
+    await act(async () => reportProgress?.({
+      provider: "claude",
+      messageId: "tools-message-3",
+      phase: "final",
+      message: '{"requirements":[]}',
+    }));
+    expect(providerProgress?.textContent).toContain("분석 결과를 정리하고 있습니다…");
+    expect(providerProgress?.textContent).not.toContain('"requirements"');
 
     await act(async () => resolveAnalysis?.({
       workflow: generatedWorkflow,
