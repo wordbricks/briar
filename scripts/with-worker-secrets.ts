@@ -1,6 +1,7 @@
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { applyRemoteD1Migrations } from "./apply-remote-d1-migrations";
 
 const REQUIRED_SECRETS = [
   "BETTER_AUTH_SECRET",
@@ -72,14 +73,9 @@ async function runWrangler(args: string[]): Promise<number> {
 export async function runWorkerDeploy(
   secretsPath: string,
   runner: (args: string[]) => Promise<number> = runWrangler,
+  migrate: () => Promise<number> = applyRemoteD1Migrations,
 ): Promise<number> {
-  const migrationExitCode = await runner([
-    "d1",
-    "migrations",
-    "apply",
-    "briar-db",
-    "--remote",
-  ]);
+  const migrationExitCode = await migrate();
   if (migrationExitCode !== 0) return migrationExitCode;
   return runner(["deploy", "--secrets-file", secretsPath]);
 }
