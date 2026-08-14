@@ -41,7 +41,7 @@
     "skills:generate": "bun run scripts/generate-skill-guides.ts",
     "skills:check": "bun run scripts/generate-skill-guides.ts --check",
     "d1:migrate:local": "wrangler d1 migrations apply briar-db --local",
-    "d1:migrate:remote": "wrangler d1 migrations apply briar-db --remote",
+    "d1:migrate:remote": "bun run scripts/apply-remote-d1-migrations.ts",
     "audit:dependencies": "bash scripts/audit-dependencies.sh",
     "audit:rust": "bash scripts/audit-rust-dependencies.sh",
     "secrets:verify-encrypted": "bun run scripts/verify-encrypted-env.ts",
