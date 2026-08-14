@@ -1134,6 +1134,26 @@ describe("Channels", () => {
       .toBeNull();
   });
 
+  it("renders an Agent's provider badge as an accessible provider icon", async () => {
+    const item = message({
+      id: "message-agent-provider",
+      author: {
+        type: "agent",
+        id: "agent-1",
+        name: "Honey",
+        provider: "claude",
+        image: null,
+      },
+    });
+    await render([item]);
+
+    const badge = container.querySelector<HTMLElement>(".channel-agent-badge");
+    expect(badge?.querySelector("svg")).not.toBeNull();
+    expect(badge?.textContent?.trim()).toBe("");
+    expect(badge?.getAttribute("aria-label")).toBe("Claude");
+    expect(badge?.getAttribute("title")).toBe("Claude");
+  });
+
   it("shows hover quick reactions and toggles an existing reaction chip", async () => {
     const reacted = message({
       id: "message-reacted",

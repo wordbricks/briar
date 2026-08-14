@@ -6585,6 +6585,8 @@ button.issue-message-state { width:100%; cursor:pointer; }
   padding: 1px 5px;
   font-size: 10px;
 }
+.channel-agent-badge svg,
+.channel-agent-badge img { display: block; }
 .channel-document-card,
 .channel-proposal-card {
   display: flex;
