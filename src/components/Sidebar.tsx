@@ -4,7 +4,6 @@ import {
   Building2,
   CalendarDays,
   ChevronDown,
-  ChevronLeft,
   ChevronRight,
   ChevronUp,
   Check,
@@ -62,7 +61,6 @@ export function Sidebar({
   onCreateIssue,
   onAddOrganization,
   onOrganizationChange,
-  onOrganizationSettings,
   onProjectChange,
   onProjectReadinessOpen,
   onProjectSettings,
@@ -107,10 +105,6 @@ export function Sidebar({
   onCreateIssue: (projectId: string) => void;
   onAddOrganization: () => void;
   onOrganizationChange: (organizationId: string) => void;
-  onOrganizationSettings: (
-    organizationId: string,
-    section?: "members",
-  ) => void;
   onProjectChange: (projectId: string) => void;
   onProjectReadinessOpen: (projectId: string) => void;
   onProjectSettings: (projectId: string) => void;
@@ -133,9 +127,6 @@ export function Sidebar({
     null,
   );
   const [isCreatingChannel, setIsCreatingChannel] = useState(false);
-  const [organizationMenuView, setOrganizationMenuView] = useState<
-    "actions" | "organizations"
-  >("actions");
   const organizationMenuRef = useRef<HTMLDivElement | null>(null);
   // Projects start expanded; only explicitly collapsed IDs are stored.
   const [collapsedProjectIds, setCollapsedProjectIds] = useState<Set<string>>(
@@ -183,27 +174,21 @@ export function Sidebar({
   useEffect(() => {
     if (!isOrganizationMenuOpen) return;
     const focusTarget =
-      organizationMenuView === "organizations"
-        ? organizationMenuRef.current?.querySelector<HTMLButtonElement>(
-            '[aria-checked="true"]',
-          )
-        : organizationMenuRef.current?.querySelector<HTMLButtonElement>(
-            ".sidebar-organization-menu [role='menuitem']",
-          );
+      organizationMenuRef.current?.querySelector<HTMLButtonElement>(
+        '[role="menuitemradio"][aria-checked="true"]',
+      ) ??
+      organizationMenuRef.current?.querySelector<HTMLButtonElement>(
+        ".sidebar-organization-menu [role='menuitem']",
+      );
     focusTarget?.focus();
 
     const closeOnOutsidePress = (event: PointerEvent) => {
       if (!organizationMenuRef.current?.contains(event.target as Node)) {
         setIsOrganizationMenuOpen(false);
-        setOrganizationMenuView("actions");
       }
     };
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
-      if (organizationMenuView === "organizations") {
-        setOrganizationMenuView("actions");
-        return;
-      }
       setIsOrganizationMenuOpen(false);
       organizationMenuRef.current
         ?.querySelector<HTMLButtonElement>(".sidebar-brand")
@@ -216,7 +201,7 @@ export function Sidebar({
       document.removeEventListener("pointerdown", closeOnOutsidePress);
       document.removeEventListener("keydown", closeOnEscape);
     };
-  }, [isOrganizationMenuOpen, organizationMenuView]);
+  }, [isOrganizationMenuOpen]);
 
   useEffect(() => {
     if (!openProjectMenuId) return;
@@ -371,10 +356,7 @@ export function Sidebar({
             setOpenProjectMenuId(null);
             setIsAccountMenuOpen(false);
             setIsLanguageMenuOpen(false);
-            setIsOrganizationMenuOpen((open) => {
-              if (open) setOrganizationMenuView("actions");
-              return !open;
-            });
+            setIsOrganizationMenuOpen((open) => !open);
           }}
           type="button"
         >
@@ -414,129 +396,54 @@ export function Sidebar({
             }}
             role="menu"
           >
-            {organizationMenuView === "actions" ? (
-              <>
-                <div className="sidebar-organization-menu-group" role="group">
-                  <button
-                    onClick={() => {
-                      if (!activeOrganization) return;
-                      setIsOrganizationMenuOpen(false);
-                      onOrganizationSettings(activeOrganization.id);
-                    }}
-                    role="menuitem"
-                    type="button"
-                  >
-                    <span>{t("sidebar.organizationSettings")}</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      if (!activeOrganization) return;
-                      setIsOrganizationMenuOpen(false);
-                      onOrganizationSettings(activeOrganization.id, "members");
-                    }}
-                    role="menuitem"
-                    type="button"
-                  >
-                    <span>{t("sidebar.manageMembers")}</span>
-                  </button>
-                </div>
-                <div
-                  className="sidebar-organization-menu-separator"
-                  role="separator"
-                />
-                <div className="sidebar-organization-menu-group" role="group">
-                  <button
-                    onClick={() => setOrganizationMenuView("organizations")}
-                    role="menuitem"
-                    type="button"
-                  >
-                    <span>{t("sidebar.switchOrganization")}</span>
-                    <ChevronRight
-                      aria-hidden="true"
-                      size={15}
-                      strokeWidth={1.8}
-                    />
-                  </button>
-                  <button
-                    onClick={() => {
-                      setIsOrganizationMenuOpen(false);
-                      setOrganizationMenuView("actions");
-                      onLogout();
-                    }}
-                    role="menuitem"
-                    type="button"
-                  >
-                    <span>{t("account.logout")}</span>
-                  </button>
-                </div>
-              </>
-            ) : (
-              <>
+            <div
+              aria-label={t("sidebar.organizationList")}
+              className="sidebar-organization-menu-group organization-list"
+              role="group"
+            >
+              {organizations.map((organization) => (
                 <button
-                  className="sidebar-organization-menu-back"
-                  onClick={() => setOrganizationMenuView("actions")}
-                  role="menuitem"
-                  type="button"
-                >
-                  <ChevronLeft aria-hidden="true" size={15} strokeWidth={1.8} />
-                  <span>{t("sidebar.switchOrganization")}</span>
-                </button>
-                <div
-                  className="sidebar-organization-menu-separator"
-                  role="separator"
-                />
-                <div
-                  aria-label={t("sidebar.organizationList")}
-                  className="sidebar-organization-menu-group organization-list"
-                  role="group"
-                >
-                  {organizations.map((organization) => (
-                    <button
-                      aria-checked={organization.id === activeOrganization?.id}
-                      key={organization.id}
-                      onClick={() => {
-                        onOrganizationChange(organization.id);
-                        setIsOrganizationMenuOpen(false);
-                        setOrganizationMenuView("actions");
-                      }}
-                      role="menuitemradio"
-                      type="button"
-                    >
-                      {organization.logo ? (
-                        <img
-                          alt=""
-                          className="sidebar-organization-list-logo"
-                          src={organization.logo}
-                        />
-                      ) : (
-                        <Building2 aria-hidden="true" size={15} strokeWidth={1.7} />
-                      )}
-                      <span>{organization.name}</span>
-                      {organization.id === activeOrganization?.id ? (
-                        <Check aria-hidden="true" size={15} strokeWidth={1.8} />
-                      ) : null}
-                    </button>
-                  ))}
-                </div>
-                <div
-                  className="sidebar-organization-menu-separator"
-                  role="separator"
-                />
-                <button
-                  className="sidebar-organization-add"
+                  aria-checked={organization.id === activeOrganization?.id}
+                  key={organization.id}
                   onClick={() => {
+                    onOrganizationChange(organization.id);
                     setIsOrganizationMenuOpen(false);
-                    setOrganizationMenuView("actions");
-                    onAddOrganization();
                   }}
-                  role="menuitem"
+                  role="menuitemradio"
                   type="button"
                 >
-                  <Plus aria-hidden="true" size={15} strokeWidth={1.7} />
-                  <span>{t("sidebar.addOrganization")}</span>
+                  {organization.logo ? (
+                    <img
+                      alt=""
+                      className="sidebar-organization-list-logo"
+                      src={organization.logo}
+                    />
+                  ) : (
+                    <Building2 aria-hidden="true" size={15} strokeWidth={1.7} />
+                  )}
+                  <span>{organization.name}</span>
+                  {organization.id === activeOrganization?.id ? (
+                    <Check aria-hidden="true" size={15} strokeWidth={1.8} />
+                  ) : null}
                 </button>
-              </>
-            )}
+              ))}
+            </div>
+            <div
+              className="sidebar-organization-menu-separator"
+              role="separator"
+            />
+            <button
+              className="sidebar-organization-add"
+              onClick={() => {
+                setIsOrganizationMenuOpen(false);
+                onAddOrganization();
+              }}
+              role="menuitem"
+              type="button"
+            >
+              <Plus aria-hidden="true" size={15} strokeWidth={1.7} />
+              <span>{t("sidebar.addOrganization")}</span>
+            </button>
           </div>
         )}
       </div>

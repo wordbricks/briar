@@ -1521,15 +1521,6 @@ export function App() {
               setRequestedSessionId(null);
               resetNavigation("lobby");
             }}
-            onOrganizationSettings={(organizationId, section) => {
-              setSettingsTarget({
-                scope: "organization",
-                organizationId,
-                section: section ?? "general",
-              });
-              setIsSidebarOpen(true);
-              navigateToPage("settings");
-            }}
             onProjectChange={(projectId) => {
               briar.setActiveProjectId(projectId);
               setRequestedRunId(null);
