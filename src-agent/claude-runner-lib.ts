@@ -29,7 +29,7 @@ export type ClaudeRunnerRequest = {
   instructions?: string | null;
   outputSchema?: Record<string, unknown> | boolean | null;
   model?: string | null;
-  effort?: "low" | "medium" | "high" | "xhigh" | "max" | null;
+  effort?: string | null;
   approvalPolicy: "untrusted" | "on-request" | "never";
   sandboxMode: "readOnly" | "workspaceWrite" | "dangerFullAccess";
   networkAccess: boolean;
@@ -150,7 +150,9 @@ export function claudeOptions(
       : {}),
     ...(request.conversationId ? { resume: request.conversationId } : {}),
     ...(request.model?.trim() ? { model: request.model.trim() } : {}),
-    ...(request.effort ? { effort: request.effort } : {}),
+    ...(request.effort
+      ? { effort: request.effort as Options["effort"] }
+      : {}),
     pathToClaudeCodeExecutable: request.claudeBinary,
     systemPrompt: {
       type: "preset",

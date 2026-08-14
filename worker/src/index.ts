@@ -27,11 +27,11 @@ import {
   agentExecutionUsageRecordSchema,
 } from "../../src/lib/agent-execution-metrics";
 import {
-  agentProviderAllowsEffort,
-  agentProviderAllowsModel,
   agentProviderLabels,
+  agentProviderCapabilityCatalogSchema,
+  mergeAgentProviderCapabilityCatalogs,
   agentProviders,
-  modelEfforts,
+  modelEffortSchema,
   type AgentProvider,
 } from "../../src/lib/agent-provider-contract";
 import {
@@ -1507,7 +1507,7 @@ export const projectAgentInputSchema = z
       .optional(),
     provider: z.enum(agentProviders),
     model: z.string().trim().min(1).max(100).nullable().optional(),
-    effort: z.enum(modelEfforts).nullable().optional(),
+    effort: modelEffortSchema.nullable().optional(),
     responsibility: z.string().trim().min(1).max(2_000),
     skills: z.array(channelAgentSkillInputSchema).max(50).optional(),
     calendarColor: z
@@ -1854,7 +1854,7 @@ const issueInputBaseSchema = z
     status: z.enum(["backlog", "queued"]).default("queued"),
     preferredProvider: z.enum(agentProviders).nullable().optional(),
     preferredModel: z.string().trim().min(1).max(100).nullable().optional(),
-    preferredEffort: z.enum(modelEfforts).nullable().optional(),
+    preferredEffort: modelEffortSchema.nullable().optional(),
     fullAuto: z.boolean().default(false),
     checkpoints: z.array(workflowCheckpointSchema).max(100).default([]),
   })
@@ -1879,32 +1879,6 @@ const issueInputSchema = issueInputBaseSchema.superRefine((input, context) => {
       message: "A model is required for an effort preference",
     });
   }
-  if (
-    input.preferredProvider &&
-    input.preferredModel &&
-    !agentProviderAllowsModel(input.preferredProvider, input.preferredModel)
-  ) {
-    context.addIssue({
-      code: "custom",
-      message: `${input.preferredModel} is not available from ${input.preferredProvider}`,
-    });
-  }
-  if (
-    input.preferredProvider &&
-    input.preferredEffort &&
-    !agentProviderAllowsEffort(
-      input.preferredProvider,
-      input.preferredEffort,
-    )
-  ) {
-    context.addIssue({
-      code: "custom",
-      message:
-        input.preferredProvider === "claude"
-          ? "Claude does not support ultra effort"
-          : `${input.preferredProvider} supports low, medium, or high effort`,
-    });
-  }
 });
 
 export const issueUpdateInputSchema = issueInputBaseSchema
@@ -1920,8 +1894,6 @@ export const issueUpdateInputSchema = issueInputBaseSchema
     priority: true,
   })
   .strict();
-
-const modelEffortSchema = z.enum(modelEfforts);
 
 function executionPreferencesSchema({
   allowProviderReportedModels = false,
@@ -1948,30 +1920,7 @@ function executionPreferencesSchema({
           message: "A model is required for an effort preference",
         });
       }
-      if (
-        input.provider &&
-        input.model &&
-        !allowProviderReportedModels &&
-        !agentProviderAllowsModel(input.provider, input.model)
-      ) {
-        context.addIssue({
-          code: "custom",
-          message: `${input.model} is not available from ${input.provider}`,
-        });
-      }
-      if (
-        input.provider &&
-        input.effort &&
-        !agentProviderAllowsEffort(input.provider, input.effort)
-      ) {
-        context.addIssue({
-          code: "custom",
-          message:
-            input.provider === "claude"
-              ? "Claude does not support ultra effort"
-              : `${input.provider} supports low, medium, or high effort`,
-        });
-      }
+      void allowProviderReportedModels;
     });
 }
 
@@ -2476,6 +2425,7 @@ export const workerRegisterSchema = z
       .max(4)
       .optional(),
     providerHealth: providerHealthSchema.optional(),
+    providerCapabilities: agentProviderCapabilityCatalogSchema.optional(),
     maxConcurrentSessions: z
       .number()
       .int()
@@ -2491,6 +2441,7 @@ const workerBindSchema = workerRegisterSchema.pick({
   agentProvider: true,
   providers: true,
   providerHealth: true,
+  providerCapabilities: true,
   versions: true,
 });
 
@@ -2557,7 +2508,12 @@ const workerHeartbeatSchema = z
     acceptingWork: z.boolean().optional(),
     readinessState: z.enum(["ready", "busy", "needs_attention"]).optional(),
     readinessDetail: z.string().trim().max(500).nullable().optional(),
-    capabilities: z.record(z.string().max(64), z.unknown()).optional(),
+    capabilities: z
+      .object({
+        providerCapabilities: agentProviderCapabilityCatalogSchema.optional(),
+      })
+      .catchall(z.unknown())
+      .optional(),
   })
   .strict();
 
@@ -11757,6 +11713,7 @@ async function route(
       agentProvider: input.agentProvider,
       providers: input.providers,
       providerHealth: input.providerHealth,
+      providerCapabilities: input.providerCapabilities,
       maxConcurrentSessions: input.maxConcurrentSessions,
       versions: input.versions,
       observedAt,
@@ -11792,6 +11749,7 @@ async function route(
       agentProvider: input.agentProvider,
       providers: input.providers,
       providerHealth: input.providerHealth,
+      providerCapabilities: input.providerCapabilities,
       versions: input.versions,
       observedAt,
     });
@@ -12139,6 +12097,29 @@ async function route(
   const projectWorkersMatch = pathname.match(
     /^\/projects\/([0-9a-f-]+)\/workers$/u,
   );
+  const projectAgentCapabilitiesMatch = pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/agent-capabilities$/u,
+  );
+  if (projectAgentCapabilitiesMatch && request.method === "GET") {
+    const projectId = projectAgentCapabilitiesMatch[1];
+    await requireProjectAccess(auth, db, request, projectId);
+    const observedAt = new Date().toISOString();
+    const workers = await listExecutionWorkers(db, projectId, observedAt);
+    const catalogs = workers.flatMap((worker) => {
+      if (worker.state !== "online") return [];
+      const capabilities = parseJsonObject(worker.capabilities_json) as
+        | Record<string, unknown>
+        | null;
+      const raw = capabilities?.providerCapabilities;
+      const parsed = agentProviderCapabilityCatalogSchema.safeParse(raw);
+      return parsed.success ? [parsed.data] : [];
+    });
+    return json({
+      capabilities: mergeAgentProviderCapabilityCatalogs(catalogs),
+      workerCount: catalogs.length,
+      observedAt,
+    });
+  }
   if (projectWorkersMatch && request.method === "GET") {
     const projectId = projectWorkersMatch[1];
     await requireProjectAccess(auth, db, request, projectId);

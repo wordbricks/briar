@@ -16,7 +16,7 @@ import {
 } from "./project-agent";
 import {
   agentProviders,
-  modelEfforts,
+  modelEffortSchema,
   type AgentProvider,
   type ModelEffort,
 } from "./agent-provider-contract";
@@ -166,7 +166,7 @@ const projectAgentSchema = z.object({
     .default(null),
   provider: z.enum(agentProviders),
   model: z.string().nullable(),
-  effort: z.enum(modelEfforts).nullable().default(null),
+  effort: modelEffortSchema.nullable().default(null),
   responsibility: z.string(),
   skill: z.string(),
   skills: z
@@ -178,7 +178,7 @@ const projectAgentSchema = z.object({
         instructions: z.string(),
         provider: z.enum(agentProviders),
         model: z.string().nullable(),
-        effort: z.enum(modelEfforts).nullable().default(null),
+        effort: modelEffortSchema.nullable().default(null),
         kind: z.enum(["issue_processing", "custom"]),
         position: z.number().int().nonnegative(),
         createdAt: z.string(),

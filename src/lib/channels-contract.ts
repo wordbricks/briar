@@ -1,7 +1,7 @@
 import { z } from "zod";
 import {
   agentProviders,
-  modelEfforts,
+  modelEffortSchema,
   type AgentProvider,
   type ModelEffort,
 } from "./agent-provider-contract";
@@ -9,7 +9,6 @@ import {
 export const channelAgentProviders = agentProviders;
 export type ChannelAgentProvider = AgentProvider;
 
-export const channelAgentEfforts = modelEfforts;
 export type ChannelAgentEffort = ModelEffort;
 
 export const channelAgentSkillKinds = [
@@ -57,7 +56,7 @@ export const channelAgentSkillInputSchema = z
     instructions: z.string().trim().max(10_000).default(""),
     provider: z.enum(channelAgentProviders),
     model: z.string().trim().min(1).max(100).nullable().default(null),
-    effort: z.enum(channelAgentEfforts).nullable().default(null),
+    effort: modelEffortSchema.nullable().default(null),
     kind: z.enum(channelAgentSkillKinds).default("custom"),
     // Accepted only so clients from before Skill selection was explicit can
     // roll forward without a hard API failure. It has no runtime meaning.
@@ -135,7 +134,7 @@ export const organizationAgentInputSchema = z
     provider: z.enum(channelAgentProviders),
     model: z.string().trim().min(1).max(100).nullable().default(null),
     responsibility: z.string().trim().min(1).max(2000),
-    effort: z.enum(channelAgentEfforts).nullable().default(null),
+    effort: modelEffortSchema.nullable().default(null),
     skills: z.array(channelAgentSkillInputSchema).max(50).optional(),
   })
   .strict();
@@ -152,7 +151,7 @@ export const channelExecutionProposalAcceptInputSchema = z
   .object({
     provider: z.enum(channelAgentProviders),
     model: z.string().trim().min(1).max(100).nullable(),
-    effort: z.enum(channelAgentEfforts).nullable(),
+    effort: modelEffortSchema.nullable(),
     workerId: z.string().trim().min(1).max(128).nullable(),
   })
   .strict();

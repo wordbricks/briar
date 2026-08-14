@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Typography } from "@/components/ui/typography";
 import { useI18n } from "../i18n";
 import {
-  agentEfforts,
+  agentEffortOptions,
   agentModelOptions,
   agentProviderLabels,
   agentProviders,
@@ -251,7 +251,10 @@ export function ProjectAgentSkillsEditor({
                         disabled={disabled}
                         label={`${accessibleSkillName} · ${t("agents.model")}`}
                         onValueChange={(value) =>
-                          updateSkill(index, { model: value || null })
+                          updateSkill(index, {
+                            model: value || null,
+                            effort: null,
+                          })
                         }
                         options={modelOptions}
                         searchEmptyMessage={t("issue.noModelsFound")}
@@ -275,10 +278,12 @@ export function ProjectAgentSkillsEditor({
                             label: t("agents.providerDefaultEffort"),
                             value: "",
                           },
-                          ...agentEfforts[skill.provider].map((effort) => ({
-                            label: effort,
-                            value: effort,
-                          })),
+                          ...agentEffortOptions(
+                            providerModels,
+                            skill.provider,
+                            skill.model,
+                            skill.effort,
+                          ),
                         ]}
                         value={skill.effort ?? ""}
                       />

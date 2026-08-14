@@ -48,9 +48,29 @@ describe("WorkerDispatchDialog", () => {
       }
     ).IS_REACT_ACT_ENVIRONMENT = true;
     vi.mocked(loadAgentProviderModels).mockReset();
-    vi.mocked(loadAgentProviderModels).mockResolvedValue(
-      defaultAgentProviderModelCatalog,
-    );
+    vi.mocked(loadAgentProviderModels).mockResolvedValue({
+      ...defaultAgentProviderModelCatalog,
+      codex: {
+        models: [{
+          id: "gpt-5.6-sol",
+          label: "GPT-5.6 Sol",
+          efforts: [{ id: "high", label: "high" }],
+        }],
+        defaultEfforts: [],
+        allowCustomModels: false,
+        error: null,
+      },
+      claude: {
+        models: [{
+          id: "opus",
+          label: "Claude Opus",
+          efforts: [{ id: "high", label: "high" }],
+        }],
+        defaultEfforts: [],
+        allowCustomModels: true,
+        error: null,
+      },
+    });
   });
 
   afterEach(() => {
@@ -514,7 +534,7 @@ describe("WorkerDispatchDialog", () => {
     expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
       provider: "codex",
       model: "gpt-5.6-sol",
-      effort: "high",
+      effort: null,
     }));
     await act(async () => root.unmount());
   });

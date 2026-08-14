@@ -446,12 +446,25 @@ struct AgentProviderModel {
     id: String,
     label: String,
     is_default: bool,
+    default_effort_id: Option<String>,
+    efforts: Vec<AgentProviderEffort>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct AgentProviderEffort {
+    id: String,
+    label: String,
+    description: Option<String>,
+    is_default: bool,
 }
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct AgentProviderModelCatalogEntry {
     models: Vec<AgentProviderModel>,
+    default_efforts: Vec<AgentProviderEffort>,
+    allow_custom_models: bool,
     error: Option<String>,
 }
 
@@ -1191,47 +1204,28 @@ fn inspect_onboarding_prerequisites_sync(home: &Path) -> OnboardingPrerequisites
     }
 }
 
-fn bundled_agent_provider_models(provider: &str) -> Vec<AgentProviderModel> {
-    let models: &[(&str, &str)] = match provider {
-        "codex" => &[
-            ("gpt-5.6-sol", "GPT-5.6 Sol"),
-            ("gpt-5.6-terra", "GPT-5.6 Terra"),
-            ("gpt-5.6-luna", "GPT-5.6 Luna"),
-        ],
-        "claude" => &[
-            ("sonnet", "Claude Sonnet"),
-            ("opus", "Claude Opus"),
-            ("haiku", "Claude Haiku"),
-            ("fable", "Claude Fable"),
-        ],
-        "grok" => &[("grok-4.5", "Grok 4.5"), ("grok-build", "Grok Build")],
-        _ => &[],
-    };
-    models
-        .iter()
-        .map(|(id, label)| AgentProviderModel {
-            id: (*id).to_string(),
-            label: (*label).to_string(),
-            is_default: false,
-        })
-        .collect()
-}
-
 fn provider_model_entry(
-    provider: &str,
     result: Result<Vec<AgentProviderModel>, String>,
+    default_efforts: Vec<AgentProviderEffort>,
+    allow_custom_models: bool,
 ) -> AgentProviderModelCatalogEntry {
     match result {
-        Ok(models) if !models.is_empty() => AgentProviderModelCatalogEntry {
+        Ok(models) if !models.is_empty() || allow_custom_models => AgentProviderModelCatalogEntry {
             models,
+            default_efforts,
+            allow_custom_models,
             error: None,
         },
         Ok(_) => AgentProviderModelCatalogEntry {
-            models: bundled_agent_provider_models(provider),
+            models: Vec::new(),
+            default_efforts,
+            allow_custom_models,
             error: Some("CLI가 지원 모델을 반환하지 않았습니다.".to_string()),
         },
         Err(error) => AgentProviderModelCatalogEntry {
-            models: bundled_agent_provider_models(provider),
+            models: Vec::new(),
+            default_efforts,
+            allow_custom_models,
             error: Some(error),
         },
     }
@@ -1241,40 +1235,239 @@ fn parse_grok_models(output: &str) -> Vec<AgentProviderModel> {
     output
         .lines()
         .filter_map(|line| {
-            let value = line.trim().strip_prefix("* ")?.trim();
+            let line = line.trim();
+            let value = line
+                .strip_prefix("* ")
+                .or_else(|| line.strip_prefix("- "))?
+                .trim();
             let id = value.strip_suffix(" (default)").unwrap_or(value).trim();
             (!id.is_empty()).then(|| AgentProviderModel {
                 id: id.to_string(),
                 label: id.to_string(),
                 is_default: value.ends_with(" (default)"),
+                default_effort_id: None,
+                efforts: Vec::new(),
             })
         })
         .take(500)
         .collect()
 }
 
-fn parse_opencode_models(output: &str) -> Vec<AgentProviderModel> {
-    output
-        .lines()
+fn parse_opencode_models_verbose(output: &str) -> Vec<AgentProviderModel> {
+    let mut models = Vec::new();
+    let mut lines = output.lines().peekable();
+    while let Some(line) = lines.next() {
+        let id = line.trim();
+        if id.is_empty() || id.chars().any(char::is_whitespace) {
+            continue;
+        }
+        if lines.peek().is_none_or(|line| line.trim() != "{") {
+            continue;
+        }
+        let mut json = String::new();
+        for line in lines.by_ref() {
+            json.push_str(line);
+            json.push('\n');
+            if line == "}" {
+                break;
+            }
+        }
+        let Ok(value) = serde_json::from_str::<serde_json::Value>(&json) else {
+            continue;
+        };
+        let label = value
+            .get("name")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or(id);
+        let efforts = value
+            .get("variants")
+            .and_then(serde_json::Value::as_object)
+            .into_iter()
+            .flat_map(|variants| variants.keys())
+            .take(20)
+            .map(|effort| AgentProviderEffort {
+                id: effort.clone(),
+                label: effort.clone(),
+                description: None,
+                is_default: false,
+            })
+            .collect();
+        models.push(AgentProviderModel {
+            id: id.to_string(),
+            label: label.to_string(),
+            is_default: false,
+            default_effort_id: None,
+            efforts,
+        });
+        if models.len() >= 500 {
+            break;
+        }
+    }
+    models
+}
+
+fn parse_claude_efforts(output: &str) -> Vec<AgentProviderEffort> {
+    let Some(line) = output.lines().find(|line| line.contains("--effort")) else {
+        return Vec::new();
+    };
+    let Some(values) = line
+        .rsplit_once('(')
+        .and_then(|(_, rest)| rest.split_once(')').map(|(values, _)| values))
+    else {
+        return Vec::new();
+    };
+    values
+        .split(',')
         .map(str::trim)
-        .filter(|line| !line.is_empty() && !line.chars().any(char::is_whitespace))
-        .map(|id| AgentProviderModel {
+        .filter(|value| !value.is_empty() && value.len() <= 50)
+        .take(20)
+        .map(|value| AgentProviderEffort {
+            id: value.to_string(),
+            label: value.to_string(),
+            description: None,
+            is_default: false,
+        })
+        .collect()
+}
+
+fn parse_claude_models(output: &str) -> Vec<AgentProviderModel> {
+    let mut in_model_help = false;
+    let mut block = String::new();
+    for line in output.lines() {
+        if line.contains("--model <model>") {
+            in_model_help = true;
+        } else if in_model_help && line.trim_start().starts_with('-') {
+            break;
+        }
+        if in_model_help {
+            block.push_str(line);
+            block.push(' ');
+        }
+    }
+    let mut models = Vec::new();
+    for (index, value) in block.split('\'').enumerate() {
+        if index % 2 == 0 {
+            continue;
+        }
+        let id = value.trim();
+        if id.is_empty()
+            || id.len() > 100
+            || !id
+                .chars()
+                .all(|character| character.is_ascii_alphanumeric() || "._-/".contains(character))
+            || models
+                .iter()
+                .any(|model: &AgentProviderModel| model.id == id)
+        {
+            continue;
+        }
+        models.push(AgentProviderModel {
             id: id.to_string(),
             label: id.to_string(),
             is_default: false,
+            default_effort_id: None,
+            efforts: Vec::new(),
+        });
+        if models.len() >= 500 {
+            break;
+        }
+    }
+    models
+}
+
+fn grok_cached_models(home: &Path) -> Result<Vec<AgentProviderModel>, String> {
+    let path = home.join(".grok/models_cache.json");
+    let contents = fs::read_to_string(&path)
+        .map_err(|error| format!("Grok 모델 캐시를 읽지 못했습니다: {error}"))?;
+    let value: serde_json::Value = serde_json::from_str(&contents)
+        .map_err(|error| format!("Grok 모델 캐시가 올바르지 않습니다: {error}"))?;
+    let models = value
+        .get("models")
+        .and_then(serde_json::Value::as_object)
+        .ok_or_else(|| "Grok 모델 캐시에 models가 없습니다.".to_string())?;
+    Ok(models
+        .iter()
+        .filter_map(|(key, value)| {
+            let info = value.get("info").unwrap_or(value);
+            if info.get("hidden").and_then(serde_json::Value::as_bool) == Some(true)
+                || info
+                    .get("supported_in_api")
+                    .and_then(serde_json::Value::as_bool)
+                    == Some(false)
+            {
+                return None;
+            }
+            let id = info
+                .get("id")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or(key);
+            if id.is_empty() || id.len() > 100 {
+                return None;
+            }
+            let label = info
+                .get("name")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or(id);
+            let mut efforts = info
+                .get("reasoning_efforts")
+                .and_then(serde_json::Value::as_array)
+                .into_iter()
+                .flatten()
+                .filter_map(|effort| {
+                    let id = effort.get("id").or_else(|| effort.get("value"))?.as_str()?;
+                    Some(AgentProviderEffort {
+                        id: id.to_string(),
+                        label: effort
+                            .get("label")
+                            .and_then(serde_json::Value::as_str)
+                            .unwrap_or(id)
+                            .to_string(),
+                        description: effort
+                            .get("description")
+                            .and_then(serde_json::Value::as_str)
+                            .map(str::to_string),
+                        is_default: effort
+                            .get("default")
+                            .and_then(serde_json::Value::as_bool)
+                            .unwrap_or(false),
+                    })
+                })
+                .take(20)
+                .collect::<Vec<_>>();
+            let default_effort_id = info
+                .get("reasoning_effort")
+                .and_then(serde_json::Value::as_str)
+                .map(str::to_string)
+                .or_else(|| {
+                    efforts
+                        .iter()
+                        .find(|effort| effort.is_default)
+                        .map(|effort| effort.id.clone())
+                });
+            for effort in &mut efforts {
+                effort.is_default = default_effort_id.as_deref() == Some(effort.id.as_str());
+            }
+            Some(AgentProviderModel {
+                id: id.to_string(),
+                label: label.to_string(),
+                is_default: false,
+                default_effort_id,
+                efforts,
+            })
         })
         .take(500)
-        .collect()
+        .collect())
 }
 
 fn command_provider_models(
     home: &Path,
     binary: Result<PathBuf, String>,
+    args: &[&str],
     parser: fn(&str) -> Vec<AgentProviderModel>,
 ) -> Result<Vec<AgentProviderModel>, String> {
     let binary = binary?;
     let output = Command::new(binary)
-        .arg("models")
+        .args(args)
         .env("PATH", cli_execution_path(home)?)
         .env("HOME", home)
         .output()
@@ -1290,6 +1483,18 @@ fn command_provider_models(
     Ok(parser(&String::from_utf8_lossy(&output.stdout)))
 }
 
+fn command_help(home: &Path, binary: Result<PathBuf, String>) -> Result<String, String> {
+    let output = Command::new(binary?)
+        .arg("--help")
+        .env("PATH", cli_execution_path(home)?)
+        .env("HOME", home)
+        .output()
+        .map_err(|error| format!("CLI capability를 가져오지 못했습니다: {error}"))?;
+    let mut text = String::from_utf8_lossy(&output.stdout).into_owned();
+    text.push_str(&String::from_utf8_lossy(&output.stderr));
+    Ok(text)
+}
+
 fn load_agent_provider_models_sync(home: &Path) -> AgentProviderModelCatalog {
     let execution_path = cli_execution_path(home).unwrap_or_default();
     let runner: Arc<dyn host::CommandRunner> = Arc::new(host::LocalRunner::new(
@@ -1303,30 +1508,66 @@ fn load_agent_provider_models_sync(home: &Path) -> AgentProviderModelCatalog {
         agent::codex_models(runner, binary, home).map(|models| {
             models
                 .into_iter()
-                .map(|(id, label, is_default)| AgentProviderModel {
-                    id,
-                    label,
-                    is_default,
-                })
+                .map(
+                    |(id, label, is_default, default_effort_id, efforts)| AgentProviderModel {
+                        id,
+                        label,
+                        is_default,
+                        default_effort_id,
+                        efforts: efforts
+                            .into_iter()
+                            .map(|(id, label, description, is_default)| AgentProviderEffort {
+                                id,
+                                label,
+                                description,
+                                is_default,
+                            })
+                            .collect(),
+                    },
+                )
                 .collect()
         })
     });
-    let claude = Ok(bundled_agent_provider_models("claude"));
-    let grok = command_provider_models(
+    let claude_help = command_help(home, agent::claude_binary(home, &execution_path));
+    let claude_efforts = claude_help
+        .as_ref()
+        .map(|output| parse_claude_efforts(output))
+        .unwrap_or_default();
+    let claude = claude_help.map(|output| parse_claude_models(&output));
+    let grok_cli = command_provider_models(
         home,
         agent::grok_binary(home, &execution_path),
+        &["models"],
         parse_grok_models,
     );
+    let grok = grok_cached_models(home)
+        .map(|mut cached| {
+            if let Ok(reported) = &grok_cli {
+                for model in &mut cached {
+                    model.is_default = reported
+                        .iter()
+                        .any(|candidate| candidate.id == model.id && candidate.is_default);
+                }
+                for model in reported {
+                    if !cached.iter().any(|candidate| candidate.id == model.id) {
+                        cached.push(model.clone());
+                    }
+                }
+            }
+            cached
+        })
+        .or(grok_cli);
     let opencode = command_provider_models(
         home,
         agent::opencode_binary(home, &execution_path),
-        parse_opencode_models,
+        &["models", "--verbose"],
+        parse_opencode_models_verbose,
     );
     AgentProviderModelCatalog {
-        codex: provider_model_entry("codex", codex),
-        claude: provider_model_entry("claude", claude),
-        grok: provider_model_entry("grok", grok),
-        opencode: provider_model_entry("opencode", opencode),
+        codex: provider_model_entry(codex, Vec::new(), false),
+        claude: provider_model_entry(claude, claude_efforts, true),
+        grok: provider_model_entry(grok, Vec::new(), false),
+        opencode: provider_model_entry(opencode, Vec::new(), true),
     }
 }
 
@@ -3656,20 +3897,6 @@ fn update_project_llm_settings_at(
     {
         return Err("모델 ID는 공백 없이 128자 이하여야 합니다.".to_string());
     }
-    if settings.provider == agent::AgentProviderKind::Claude
-        && settings.effort == Some(agent::ModelEffort::Ultra)
-    {
-        return Err("Claude는 ultra effort를 지원하지 않습니다.".to_string());
-    }
-    if settings.provider == agent::AgentProviderKind::Grok
-        && matches!(
-            settings.effort,
-            Some(agent::ModelEffort::Ultra | agent::ModelEffort::Xhigh | agent::ModelEffort::Max)
-        )
-    {
-        // Grok maps these to high server-side; keep the stricter client message for clarity.
-        return Err("Grok effort는 low, medium, high만 지원합니다.".to_string());
-    }
     let contents = fs::read_to_string(config_path)
         .map_err(|error| format!("Briar 로컬 설정을 읽지 못했습니다: {error}"))?;
     let mut config = serde_json::from_str::<CliConfig>(&contents)
@@ -4941,9 +5168,12 @@ async fn run_project_agent(
             .agent_model
             .clone()
             .filter(|value| !value.trim().is_empty());
-        let effort = request.agent_effort.or((provider == settings.provider)
-            .then_some(settings.effort)
-            .flatten());
+        let effort = request
+            .agent_effort
+            .clone()
+            .or((provider == settings.provider)
+                .then_some(settings.effort.clone())
+                .flatten());
         let approve = |method: &str, params: &serde_json::Value| {
             let provider_name = provider.display_name();
             approval_app
@@ -5799,7 +6029,7 @@ async fn start_project_auto_hunt(
             .clone()
             .filter(|value| !value.trim().is_empty());
         let effort = (provider == settings.provider)
-            .then_some(settings.effort)
+            .then_some(settings.effort.clone())
             .flatten();
         let requested_count = request.issues.len();
         let mut workers = Vec::new();
@@ -6013,7 +6243,7 @@ async fn start_project_auto_hunt(
                 agent::AutoHuntExecution {
                     approval_policy: settings.approval_policy,
                     model: model.clone(),
-                    effort,
+                    effort: effort.clone(),
                     event_sink: worker_event_sink,
                     environment: cli_environment.environment().to_vec(),
                     // The worker starts inside its final worktree. Codex grants
@@ -7617,20 +7847,24 @@ mod tests {
     #[test]
     fn parses_grok_model_catalog_and_default() {
         let models = parse_grok_models(
-            "You are logged in.\n\nAvailable models:\n  * grok-4.5 (default)\n  * grok-build\n",
+            "You are logged in.\n\nAvailable models:\n  * grok-4.6 (default)\n  - grok-4.5\n",
         );
         assert_eq!(
             models,
             vec![
                 AgentProviderModel {
-                    id: "grok-4.5".to_string(),
-                    label: "grok-4.5".to_string(),
+                    id: "grok-4.6".to_string(),
+                    label: "grok-4.6".to_string(),
                     is_default: true,
+                    default_effort_id: None,
+                    efforts: Vec::new(),
                 },
                 AgentProviderModel {
-                    id: "grok-build".to_string(),
-                    label: "grok-build".to_string(),
+                    id: "grok-4.5".to_string(),
+                    label: "grok-4.5".to_string(),
                     is_default: false,
+                    default_effort_id: None,
+                    efforts: Vec::new(),
                 },
             ]
         );
@@ -7638,12 +7872,31 @@ mod tests {
 
     #[test]
     fn parses_opencode_model_catalog_one_slug_per_line() {
-        let models = parse_opencode_models(
-            "openai/gpt-5.6-sol\ninvalid model label\nanthropic/claude-sonnet-4-6\n",
+        let models = parse_opencode_models_verbose(
+            "openai/gpt-5.6-sol\n{\n  \"name\": \"GPT 5.6 Sol\",\n  \"variants\": {\"high\": {}}\n}\nanthropic/claude-sonnet-4-6\n{\n  \"name\": \"Claude Sonnet 4.6\",\n  \"variants\": {}\n}\n",
         );
         assert_eq!(
             models.into_iter().map(|model| model.id).collect::<Vec<_>>(),
             vec!["openai/gpt-5.6-sol", "anthropic/claude-sonnet-4-6"]
+        );
+    }
+
+    #[test]
+    fn parses_claude_models_and_efforts_from_help() {
+        let help = "  --effort <level>  Effort (low, medium, high, xhigh, max)\n  --model <model>  Alias (e.g. 'fable', 'opus', or 'sonnet') or 'claude-fable-5'.\n  --name <name>  Session name\n";
+        assert_eq!(
+            parse_claude_models(help)
+                .into_iter()
+                .map(|model| model.id)
+                .collect::<Vec<_>>(),
+            vec!["fable", "opus", "sonnet", "claude-fable-5"]
+        );
+        assert_eq!(
+            parse_claude_efforts(help)
+                .into_iter()
+                .map(|effort| effort.id)
+                .collect::<Vec<_>>(),
+            vec!["low", "medium", "high", "xhigh", "max"]
         );
     }
 
@@ -8219,7 +8472,7 @@ branch refs/heads/briar/second-11111111
             true,
             agent::ApprovalPolicy::OnRequest,
             Some("model".to_string()),
-            Some(agent::ModelEffort::High),
+            Some(agent::ModelEffort::new("high")),
             None,
         );
 
@@ -8227,7 +8480,7 @@ branch refs/heads/briar/second-11111111
         assert_eq!(execution.sandbox_mode, agent::SandboxMode::DangerFullAccess);
         assert!(execution.network_access);
         assert_eq!(execution.model.as_deref(), Some("model"));
-        assert_eq!(execution.effort, Some(agent::ModelEffort::High));
+        assert_eq!(execution.effort, Some(agent::ModelEffort::new("high")));
     }
 
     #[test]
@@ -8898,7 +9151,7 @@ branch refs/heads/briar/second-11111111
             agent::ProjectLlmSettings {
                 provider: agent::AgentProviderKind::Claude,
                 model: Some("sonnet".to_string()),
-                effort: Some(agent::ModelEffort::High),
+                effort: Some(agent::ModelEffort::new("high")),
                 approval_policy: agent::ApprovalPolicy::OnRequest,
             },
         )

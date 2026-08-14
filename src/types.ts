@@ -15,7 +15,11 @@ import type {
 } from "./lib/agent-execution-metrics";
 import type { ProjectAgentCodexPet } from "./lib/codex-pets";
 import type { AgentSkillExecutionProposal } from "./lib/channels-contract";
-import type { AgentProvider, ModelEffort } from "./lib/project-llm";
+import type {
+  AgentProvider,
+  AgentProviderModelCatalog,
+  ModelEffort,
+} from "./lib/project-llm";
 import type {
   ProjectAgentScheduleIntervalUnit,
   ProjectAgentScheduleNotificationLevel,
@@ -515,7 +519,9 @@ export type ExecutionWorker = {
     | "disabled";
   acceptingWork: boolean;
   readinessDetail: string | null;
-  capabilities: Record<string, unknown>;
+  capabilities: Record<string, unknown> & {
+    providerCapabilities?: AgentProviderModelCatalog;
+  };
   maxConcurrentSessions: number;
   activeSessions: number;
   availableSessions: number;

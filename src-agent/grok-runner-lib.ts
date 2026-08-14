@@ -38,7 +38,7 @@ export type GrokRunnerRequest = {
   instructions?: string | null;
   outputSchema?: Record<string, unknown> | boolean | null;
   model?: string | null;
-  effort?: "low" | "medium" | "high" | "xhigh" | "max" | "ultra" | null;
+  effort?: string | null;
   approvalPolicy: "untrusted" | "on-request" | "never";
   sandboxMode: "readOnly" | "workspaceWrite" | "dangerFullAccess";
   networkAccess: boolean;
@@ -489,8 +489,6 @@ export function mapEffortToGrok(
   effort: GrokRunnerRequest["effort"],
 ): string | undefined {
   if (!effort) return undefined;
-  if (effort === "ultra" || effort === "xhigh") return "high";
-  if (effort === "max") return "high";
   return effort;
 }
 

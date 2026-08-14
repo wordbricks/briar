@@ -21,7 +21,7 @@ export type CodexRunnerRequest = {
   instructions?: string | null;
   outputSchema?: Record<string, unknown> | boolean | null;
   model?: string | null;
-  effort?: "low" | "medium" | "high" | "xhigh" | "max" | "ultra" | null;
+  effort?: string | null;
   approvalPolicy: "untrusted" | "on-request" | "never";
   sandboxMode: "readOnly" | "workspaceWrite" | "dangerFullAccess";
   networkAccess: boolean;

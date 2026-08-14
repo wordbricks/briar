@@ -27,7 +27,7 @@ import {
   updateProjectAgent,
 } from "../lib/api";
 import {
-  agentEfforts,
+  agentEffortOptions,
   agentModelDisplayName,
   agentModelOptions,
   agentProviderLabels,
@@ -809,7 +809,10 @@ export function ProjectAgentDialog({
               </span>
               <NativeSelect
                 label={t("agents.model")}
-                onValueChange={setModel}
+                onValueChange={(value) => {
+                  setModel(value);
+                  setEffort(null);
+                }}
                 options={agentModelOptions(
                   providerModels,
                   provider,
@@ -836,10 +839,7 @@ export function ProjectAgentDialog({
                     label: t("agents.providerDefaultEffort"),
                     value: "",
                   },
-                  ...agentEfforts[provider].map((candidate) => ({
-                    label: candidate,
-                    value: candidate,
-                  })),
+                  ...agentEffortOptions(providerModels, provider, model, effort),
                 ]}
                 value={effort ?? ""}
               />

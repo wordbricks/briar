@@ -97,7 +97,13 @@ describe("IssueExecutionApproval", () => {
     vi.mocked(loadAgentProviderModels).mockResolvedValue({
       ...defaultAgentProviderModelCatalog,
       opencode: {
-        models: [{ id: "openai/custom-agent", label: "Custom Agent" }],
+        models: [{
+          id: "openai/custom-agent",
+          label: "Custom Agent",
+          efforts: [{ id: "high", label: "high" }],
+        }],
+        defaultEfforts: [],
+        allowCustomModels: true,
         error: null,
       },
     });
