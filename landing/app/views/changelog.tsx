@@ -23,6 +23,19 @@ export const changelogCopy = {
     backTop: "맨 위로 ↑",
     entries: [
       {
+        version: "1.2.123",
+        date: "2026년 8월 14일",
+        title: "이미지 확인과 Inbox·로딩 경험을 더 선명하게 다듬습니다",
+        summary:
+          "이미지를 크게 보고 내려받을 수 있게 하고, Inbox 발신자와 긴 로딩 상태를 더 분명하게 보여주며 새 데모 영상을 반영했습니다.",
+        items: [
+          "채널 이미지와 이슈 본문·첨부 파일·실행 증빙 스크린샷을 누르면 큰 라이트박스로 열고, 원래 파일 이름을 유지한 채 바로 내려받을 수 있습니다.",
+          "Inbox의 채널 알림에 임의의 프로젝트 아이콘 대신 실제 보낸 사람의 아바타를 데스크탑·Android·네이티브 iOS에서 표시하고, 이미지가 없거나 불러오지 못하면 이름 첫 글자로 안전하게 대체합니다.",
+          "Inbox 상세, 이슈 목록, 실행 증빙과 초대 확인처럼 오래 걸릴 수 있는 화면의 원형 스피너를 3×3 픽셀 웨이브와 진행 시간으로 바꾸고, 모션 감소와 스크린 리더 환경에서도 안정적으로 안내합니다.",
+          "랜딩페이지의 이슈 시작부터 완료까지 데모 영상을 최신 제품 흐름을 담은 새 녹화본으로 교체했습니다.",
+        ],
+      },
+      {
         version: "1.2.122",
         date: "2026년 8월 14일",
         title: "채널 실행 상태와 조직·Inbox 탐색을 더 분명하게 다듬습니다",
@@ -593,6 +606,19 @@ export const changelogCopy = {
     home: "Home",
     backTop: "Back to top ↑",
     entries: [
+      {
+        version: "1.2.123",
+        date: "August 14, 2026",
+        title: "Make images, Inbox senders, and loading progress clearer",
+        summary:
+          "Open and download images more easily, identify channel senders in Inbox, make longer waits clearer, and refresh the landing demo.",
+        items: [
+          "Open channel images, issue Markdown and attachments, and run evidence screenshots in a larger lightbox, then download them while preserving the original filename.",
+          "Show the actual sender avatar on channel Inbox rows across desktop, Android, and native iOS instead of an arbitrary project icon, with a safe initial fallback when an image is missing or fails to load.",
+          "Replace circular spinners on potentially longer Inbox, issue, evidence, and invitation loads with a 3×3 pixel wavefront, clear label, and elapsed time while keeping reduced-motion and screen-reader announcements stable.",
+          "Replace the landing page's issue-to-completion demo with a new recording that reflects the current product flow.",
+        ],
+      },
       {
         version: "1.2.122",
         date: "August 14, 2026",
@@ -1176,9 +1202,9 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <h1>{changelog.title}</h1>
           <p>{changelog.description}</p>
         </div>
-        <a href="#v1-2-122" className="changelog-current">
+        <a href="#v1-2-123" className="changelog-current">
           <span>{changelog.current}</span>
-          <strong>v1.2.122</strong>
+          <strong>v1.2.123</strong>
           <i aria-hidden="true">↓</i>
         </a>
       </section>
@@ -1203,6 +1229,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   {index === 0 ? <span>{changelog.latest}</span> : null}
                   <time
                     dateTime={
+                      entry.version === "1.2.123" ||
                       entry.version === "1.2.122" ||
                       entry.version === "1.2.121" ||
                       entry.version === "1.2.120" ||
