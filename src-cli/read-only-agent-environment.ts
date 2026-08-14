@@ -55,6 +55,7 @@ const providerPrefixes: Record<AgentProvider, string[]> = {
   codex: ["OPENAI_"],
   claude: ["ANTHROPIC_", "AWS_", "GOOGLE_", "VERTEX_"],
   grok: [],
+  agy: [],
   opencode: [
     "OPENAI_",
     "ANTHROPIC_",
@@ -80,6 +81,7 @@ const providerEnvironmentKeys: Record<AgentProvider, Set<string>> = {
   codex: new Set(["CODEX_ACCESS_TOKEN"]),
   claude: new Set(["CLAUDE_CODE_OAUTH_TOKEN"]),
   grok: new Set(["XAI_API_KEY"]),
+  agy: new Set(),
   opencode: new Set(),
 };
 
@@ -399,6 +401,51 @@ async function prepareOpenCodeEnvironment(
   };
 }
 
+async function prepareAgyEnvironment(
+  allowed: NodeJS.ProcessEnv,
+  environment: NodeJS.ProcessEnv,
+) {
+  const isolatedRoot = await mkdtemp(join(tmpdir(), "briar-agy-read-only-"));
+  const sourceHome = environment.HOME?.trim() || homedir();
+  const sourceGeminiHome = join(sourceHome, ".gemini");
+  const targetGeminiHome = join(isolatedRoot, ".gemini");
+  const targetAgyCache = join(targetGeminiHome, "antigravity-cli", "cache");
+  const targetConfig = join(targetGeminiHome, "config");
+  try {
+    await Promise.all([
+      mkdir(targetAgyCache, { recursive: true, mode: 0o700 }),
+      mkdir(targetConfig, { recursive: true, mode: 0o700 }),
+    ]);
+    for (const relativePath of [
+      "google_accounts.json",
+      "oauth_creds.json",
+      "installation_id",
+      "antigravity-cli/installation_id",
+      "antigravity-cli/cache/default_project_id.txt",
+      "config/config.json",
+    ]) {
+      await copyOptionalCredential(
+        join(sourceGeminiHome, relativePath),
+        join(targetGeminiHome, relativePath),
+      );
+    }
+  } catch (error) {
+    await rm(isolatedRoot, { recursive: true, force: true });
+    throw error;
+  }
+  return {
+    environment: {
+      ...allowed,
+      HOME: isolatedRoot,
+      USERPROFILE: isolatedRoot,
+      TMPDIR: isolatedRoot,
+      TMP: isolatedRoot,
+      TEMP: isolatedRoot,
+    },
+    cleanup: () => rm(isolatedRoot, { recursive: true, force: true }),
+  };
+}
+
 /**
  * Codex config can contain a legacy sandbox_mode that overrides a narrower
  * permission profile. Start read-only turns with an ephemeral config home that
@@ -433,6 +480,9 @@ export async function prepareReadOnlyAgentEnvironment(
       environment,
       input.workspaceRoot,
     );
+  }
+  if (provider === "agy") {
+    return prepareAgyEnvironment(allowed, environment);
   }
   return prepareOpenCodeEnvironment(allowed, environment);
 }

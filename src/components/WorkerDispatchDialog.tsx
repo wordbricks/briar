@@ -268,7 +268,7 @@ export function WorkerDispatchDialog({
                   : []),
                 ...modelOptions,
               ]}
-              searchable={provider === "opencode"}
+              searchable={provider === "opencode" || provider === "agy"}
               searchEmptyMessage={t("issue.noModelsFound")}
               searchPlaceholder={t("issue.searchModels")}
               value={model}

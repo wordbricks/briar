@@ -189,6 +189,7 @@ body { overflow: hidden; font-synthesis: none; }
 .usage-overview-provider-mark.codex { color:var(--usage-codex-color); }
 .usage-overview-provider-mark.grok { color:#7765b5; }
 .usage-overview-provider-mark.opencode { color:#4f8a70; }
+.usage-overview-provider-mark.agy { color:#4285f4; }
 .usage-overview-provider-mark.unknown { color:var(--usage-unknown-color); }
 .usage-overview-provider-shares > div > i { height:5px; margin-top:9px; display:block; overflow:hidden; border-radius:999px; background:var(--secondary); }
 .usage-overview-provider-shares > div > i > b { height:100%; display:block; border-radius:inherit; background:var(--usage-provider-color); }

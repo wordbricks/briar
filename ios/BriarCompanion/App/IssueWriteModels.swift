@@ -5,10 +5,11 @@ enum AgentProvider: String, Codable, CaseIterable, Hashable, Identifiable, Senda
     case codex
     case claude
     case grok
+    case agy
     case opencode
 
     var id: String { rawValue }
-    var displayName: String { rawValue.capitalized }
+    var displayName: String { self == .agy ? "Antigravity" : rawValue.capitalized }
 
 }
 

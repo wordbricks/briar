@@ -4,6 +4,7 @@ export const agentProviders = [
   "codex",
   "claude",
   "grok",
+  "agy",
   "opencode",
 ] as const;
 export type AgentProvider = (typeof agentProviders)[number];
@@ -73,15 +74,21 @@ export const agentProviderCapabilitySchema = z
   })
   .strict();
 
-export const agentProviderCapabilityCatalogSchema = z.record(
-  z.enum(agentProviders),
-  agentProviderCapabilitySchema,
-);
+export const agentProviderCapabilityCatalogSchema = z
+  .partialRecord(z.enum(agentProviders), agentProviderCapabilitySchema)
+  .transform((value): AgentProviderCapabilityCatalog => {
+    const catalog = emptyAgentProviderCapabilityCatalog();
+    for (const provider of agentProviders) {
+      if (value[provider]) catalog[provider] = value[provider];
+    }
+    return catalog;
+  });
 
 export const agentProviderLabels: Record<AgentProvider, string> = {
   codex: "Codex",
   claude: "Claude",
   grok: "Grok",
+  agy: "Antigravity",
   opencode: "OpenCode",
 };
 

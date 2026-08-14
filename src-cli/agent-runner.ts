@@ -905,7 +905,9 @@ export function detachedProviderRequest(input: {
           ? { claudeBinary: input.agentBinary }
           : input.agent.provider === "grok"
             ? { grokBinary: input.agentBinary }
-            : { opencodeBinary: input.agentBinary }),
+            : input.agent.provider === "agy"
+              ? { agyBinary: input.agentBinary }
+              : { opencodeBinary: input.agentBinary }),
     },
   };
 }

@@ -11,11 +11,12 @@ import {
 
 describe("agent provider contract", () => {
   it("keeps only the provider roster and labels static", () => {
-    expect(agentProviders).toEqual(["codex", "claude", "grok", "opencode"]);
+    expect(agentProviders).toEqual(["codex", "claude", "grok", "agy", "opencode"]);
     expect(agentProviderLabels).toEqual({
       codex: "Codex",
       claude: "Claude",
       grok: "Grok",
+      agy: "Antigravity",
       opencode: "OpenCode",
     });
     expect(emptyAgentProviderCapabilityCatalog().grok.models).toEqual([]);
@@ -30,6 +31,19 @@ describe("agent provider contract", () => {
     }];
     expect(agentProviderCapabilityCatalogSchema.parse(catalog)).toEqual(catalog);
     expect(modelEffortSchema.parse("future-effort")).toBe("future-effort");
+  });
+
+  it("fills newly added providers for capability catalogs from older workers", () => {
+    const legacy = emptyAgentProviderCapabilityCatalog();
+    delete (legacy as Partial<typeof legacy>).agy;
+    const parsed = agentProviderCapabilityCatalogSchema.parse(legacy);
+    expect(parsed.agy).toEqual({
+      models: [],
+      defaultEfforts: [],
+      allowCustomModels: false,
+      error: null,
+    });
+    expect(parsed.codex).toEqual(legacy.codex);
   });
 
   it("checks an explicit selection against the reporting worker", () => {

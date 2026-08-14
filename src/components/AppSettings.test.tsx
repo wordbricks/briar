@@ -102,6 +102,11 @@ const providerStatuses: OnboardingPrerequisites = {
     version: "0.2.112",
     authenticated: true,
   },
+  agy: {
+    installed: true,
+    version: "1.1.13",
+    authenticated: true,
+  },
   opencode: {
     installed: true,
     version: "1.18.11",
@@ -147,6 +152,16 @@ describe("AppSettings", () => {
       grok: {
         models: [],
         defaultEfforts: [],
+        allowCustomModels: false,
+        error: null,
+      },
+      agy: {
+        models: [{
+          id: "gemini-3.7-flash-high",
+          label: "Gemini 3.7 Flash (High)",
+          efforts: [{ id: "high", label: "high" }],
+        }],
+        defaultEfforts: [{ id: "low", label: "low" }, { id: "medium", label: "medium" }, { id: "high", label: "high" }],
         allowCustomModels: false,
         error: null,
       },
@@ -486,6 +501,7 @@ describe("AppSettings", () => {
       codex: true,
       claude: true,
       grok: true,
+      agy: true,
       opencode: true,
     });
     vi.mocked(updateAppProviderSettings).mockImplementation(
@@ -563,6 +579,7 @@ describe("AppSettings", () => {
       codex: true,
       claude: false,
       grok: true,
+      agy: true,
       opencode: true,
     });
     expect(switchState("Claude enabled")).toMatch(/unchecked|false/);
@@ -602,6 +619,7 @@ describe("AppSettings", () => {
       codex: true,
       claude: true,
       grok: true,
+      agy: true,
       opencode: true,
     });
     const container = document.createElement("div");
@@ -661,6 +679,7 @@ describe("AppSettings", () => {
       codex: true,
       claude: true,
       grok: true,
+      agy: true,
       opencode: true,
     });
     const container = document.createElement("div");

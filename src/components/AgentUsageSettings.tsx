@@ -48,6 +48,7 @@ const providerColors: Record<UsageAttribution, string> = {
   claude: "#d97757",
   codex: "var(--usage-codex-color)",
   grok: "#7765b5",
+  agy: "#4285f4",
   opencode: "#4f8a70",
   unknown: "var(--usage-unknown-color)",
 };
@@ -58,6 +59,7 @@ type BreakdownMode = "model" | "day";
 function providerName(provider: UsageAttribution) {
   if (provider === "claude") return "Claude";
   if (provider === "grok") return "Grok";
+  if (provider === "agy") return "Antigravity";
   if (provider === "opencode") return "OpenCode";
   if (provider === "unknown") return null;
   return "Codex";

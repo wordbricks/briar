@@ -165,6 +165,7 @@ const fallbackModelProvider = (
   if (provider === "codex") return "openai";
   if (provider === "claude") return "anthropic";
   if (provider === "grok") return "xai";
+  if (provider === "agy") return "google";
   return null;
 };
 

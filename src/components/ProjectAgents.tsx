@@ -821,7 +821,7 @@ export function ProjectAgentDialog({
                 )}
                 searchEmptyMessage={t("issue.noModelsFound")}
                 searchPlaceholder={t("issue.searchModels")}
-                searchable={provider === "opencode"}
+                searchable={provider === "opencode" || provider === "agy"}
                 value={model}
               />
             </label>

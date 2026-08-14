@@ -405,7 +405,7 @@ export function ProjectAgentSettings({
                       options={modelOptions}
                       searchEmptyMessage={t("issue.noModelsFound")}
                       searchPlaceholder={t("issue.searchModels")}
-                      searchable={provider === "opencode"}
+                      searchable={provider === "opencode" || provider === "agy"}
                       value={model}
                     />
                   </div>

@@ -253,4 +253,48 @@ describe("read-only Agent environment", () => {
       await rm(root, { recursive: true, force: true });
     }
   });
+
+  it("isolates Antigravity state while preserving Google subscription OAuth", async () => {
+    const sourceHome = await mkdtemp(join(tmpdir(), "briar-agy-source-"));
+    await Promise.all([
+      mkdir(join(sourceHome, ".gemini", "config"), { recursive: true }),
+      mkdir(join(sourceHome, ".gemini", "antigravity-cli", "cache"), {
+        recursive: true,
+      }),
+    ]);
+    await writeFile(
+      join(sourceHome, ".gemini", "oauth_creds.json"),
+      '{"access_token":"subscription-oauth"}',
+    );
+    await writeFile(
+      join(sourceHome, ".gemini", "settings.json"),
+      '{"unsafeHook":true}',
+    );
+
+    const prepared = await prepareReadOnlyAgentEnvironment("agy", {
+      workspaceRoot: join(sourceHome, "repo"),
+      environment: {
+        HOME: sourceHome,
+        AGY_ADC_AUTH: "1",
+        GEMINI_API_KEY: "must-not-leak",
+        BRIAR_WORKER_TOKEN: "must-not-leak",
+      },
+    });
+    const isolatedRoot = prepared.environment.HOME!;
+    try {
+      expect(isolatedRoot).not.toBe(sourceHome);
+      expect(prepared.environment.AGY_ADC_AUTH).toBeUndefined();
+      expect(prepared.environment.GEMINI_API_KEY).toBeUndefined();
+      expect(prepared.environment.BRIAR_WORKER_TOKEN).toBeUndefined();
+      expect(
+        await readFile(join(isolatedRoot, ".gemini", "oauth_creds.json"), "utf8"),
+      ).toBe('{"access_token":"subscription-oauth"}');
+      await expect(
+        access(join(isolatedRoot, ".gemini", "settings.json")),
+      ).rejects.toMatchObject({ code: "ENOENT" });
+    } finally {
+      await prepared.cleanup();
+      await rm(sourceHome, { recursive: true, force: true });
+    }
+  });
 });

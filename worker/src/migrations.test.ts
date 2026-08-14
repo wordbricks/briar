@@ -110,7 +110,7 @@ async function createPreWebhookChannelMessage(
     authorUserId: string | null;
     authorAgentId: string | null;
     authorAgentName: string | null;
-    authorAgentProvider: "codex" | "claude" | "grok" | "opencode" | null;
+    authorAgentProvider: "codex" | "claude" | "grok" | "agy" | "opencode" | null;
     body: string;
     mentionedUserIds: string[];
     mentionedAgentIds: string[];
@@ -508,6 +508,7 @@ describe("D1 migrations", () => {
     "0100_channel_issue_regular_lifecycle.sql",
     "0101_issue_conversation_realtime.sql",
     "0102_auto_issue_subscriptions.sql",
+    "0106_agent_provider_agy.sql",
     "0105_organization_inbox_realtime.sql",
   ])("keeps each trigger in a separate Wrangler statement: %s", async (name) => {
     const sql = await readFile(resolve("migrations", name), "utf8");
@@ -3285,6 +3286,7 @@ describe("D1 migrations", () => {
     "0071_organization_agents.sql",
     "0072_organization_ideas.sql",
     "0073_organization_channels.sql",
+    "0106_agent_provider_agy.sql",
   ])(
     "uses D1 transaction-safe foreign-key deferral for table rebuilds: %s",
     async (name) => {

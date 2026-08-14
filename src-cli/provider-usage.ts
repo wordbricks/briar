@@ -648,7 +648,8 @@ const defaultProbe: ProviderUsageProbeDependencies["probe"] = async (
   if (provider === "grok") {
     return probeGrokUsage(home, now, timeoutMs);
   }
-  // OpenCode has no first-class quota surface in Briar yet.
+  // Antigravity and OpenCode have no stable first-class quota surface in
+  // Briar yet. Unknown usage deliberately fails open.
   return unknownUsage(null);
 };
 

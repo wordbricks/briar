@@ -26,6 +26,7 @@ export const defaultAppProviderSettings: AppProviderSettings = {
   codex: true,
   claude: true,
   grok: true,
+  agy: true,
   opencode: true,
 };
 

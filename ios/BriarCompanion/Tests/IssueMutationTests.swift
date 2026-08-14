@@ -456,6 +456,7 @@ final class IssueMutationTests: XCTestCase {
     }
 
     func testConversationApprovalUsesProviderEffortAndWorkerPolicyLimits() {
+        XCTAssertEqual(AgentProvider.agy.displayName, "Antigravity")
         XCTAssertTrue(IssueExecutionPreferences(
             provider: .claude,
             model: "sonnet",

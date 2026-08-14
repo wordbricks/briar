@@ -139,6 +139,7 @@ const providerPointKeys: UsageAttribution[] = [
   "codex",
   "claude",
   "grok",
+  "agy",
   "opencode",
   "unknown",
 ];

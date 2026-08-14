@@ -80,6 +80,12 @@ const providerCapabilities = {
     allowCustomModels: false,
     error: null,
   },
+  agy: {
+    models: [],
+    defaultEfforts: [],
+    allowCustomModels: false,
+    error: null,
+  },
   opencode: {
     models: [],
     defaultEfforts: [],
