@@ -552,7 +552,7 @@ describe("Grok runner", () => {
   it("maps models and efforts for Grok", () => {
     expect(resolveGrokModelId("  grok-4.5  ")).toBe("grok-4.5");
     expect(resolveGrokModelId("")).toBeUndefined();
-    expect(mapEffortToGrok("ultra")).toBe("high");
+    expect(mapEffortToGrok("ultra")).toBe("ultra");
     expect(mapEffortToGrok("medium")).toBe("medium");
   });
 });

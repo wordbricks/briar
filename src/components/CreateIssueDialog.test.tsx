@@ -50,9 +50,19 @@ describe("CreateIssueDialog attachments", () => {
     URL.createObjectURL = vi.fn(() => "blob:clipboard-preview");
     URL.revokeObjectURL = vi.fn();
     vi.mocked(loadAgentProviderModels).mockReset();
-    vi.mocked(loadAgentProviderModels).mockResolvedValue(
-      defaultAgentProviderModelCatalog,
-    );
+    vi.mocked(loadAgentProviderModels).mockResolvedValue({
+      ...defaultAgentProviderModelCatalog,
+      claude: {
+        models: [{
+          id: "sonnet",
+          label: "Claude Sonnet",
+          efforts: [{ id: "xhigh", label: "xhigh" }],
+        }],
+        defaultEfforts: [],
+        allowCustomModels: true,
+        error: null,
+      },
+    });
   });
 
   afterEach(() => {

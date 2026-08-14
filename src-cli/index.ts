@@ -33,7 +33,7 @@ import {
 } from "../src/lib/agent-execution-metrics";
 import {
   agentProviders,
-  modelEfforts,
+  modelEffortSchema,
 } from "../src/lib/agent-provider-contract";
 import { validateEvidenceImages } from "../src/lib/evidence-images";
 import {
@@ -144,6 +144,7 @@ import {
   inspectWorkerProviderHealth,
   providerHealthReadinessDetail,
 } from "./provider-health";
+import { discoverWorkerProviderCapabilities } from "./provider-capabilities";
 import {
   configureBrowserSkillGuide,
   getSkillGuide,
@@ -2021,7 +2022,7 @@ const workerBindingSchema = workerRegistrationSchema.omit({
 
 const detachedAgentProviderSchema = z.enum(agentProviders);
 
-const detachedAgentEffortSchema = z.enum(modelEfforts);
+const detachedAgentEffortSchema = modelEffortSchema;
 
 const detachedAgentSkillSchema = z.object({
   id: z.string().min(1),
@@ -3319,6 +3320,10 @@ async function workerRegisterCommand() {
   const providerHealth = await inspectWorkerProviderHealth(
     config.agentProviders,
   );
+  const providerCapabilities = await discoverWorkerProviderCapabilities(
+    config.agentProviders,
+    { refresh: true },
+  );
   const providers = healthyWorkerProviders(providerHealth);
   const provider = providers.includes(configuredProvider)
     ? configuredProvider
@@ -3342,6 +3347,7 @@ async function workerRegisterCommand() {
               agentProvider: provider,
               providers,
               providerHealth,
+              providerCapabilities,
               versions: { briar: cliVersion },
             }),
           },
@@ -3374,6 +3380,7 @@ async function workerRegisterCommand() {
           agentProvider: provider,
           providers,
           providerHealth,
+          providerCapabilities,
           ...(Number.isInteger(requestedMaxSessions) &&
           requestedMaxSessions > 0
             ? { maxConcurrentSessions: requestedMaxSessions }
@@ -3559,6 +3566,9 @@ async function workerCommand() {
     const providerHealth = await inspectWorkerProviderHealth(
       config.agentProviders,
     );
+    const providerCapabilities = await discoverWorkerProviderCapabilities(
+      config.agentProviders,
+    );
     const heartbeat = await request<{
       updateDirective?: WorkerUpdateDirective | null;
     }>(
@@ -3575,6 +3585,7 @@ async function workerCommand() {
           capabilities: {
             providers: healthyWorkerProviders(providerHealth),
             providerHealth,
+            providerCapabilities,
             worktrees: true,
             remoteUpdates: {
               supported: supportsRemoteWorkerUpdates(platform()),
@@ -3721,6 +3732,9 @@ async function workerCommand() {
         const providerHealth = await inspectWorkerProviderHealth(
           config.agentProviders,
         );
+        const providerCapabilities = await discoverWorkerProviderCapabilities(
+          config.agentProviders,
+        );
         const providers = healthyWorkerProviders(providerHealth);
         const hasHealthyProvider = providers.length > 0;
         // Shared project workflow tools must be ready on this worker machine.
@@ -3766,6 +3780,7 @@ async function workerCommand() {
               capabilities: {
                 providers,
                 providerHealth,
+                providerCapabilities,
                 worktrees: worktreesEnabled(project),
                 remoteUpdates: {
                   supported: supportsRemoteWorkerUpdates(platform()),
@@ -3846,6 +3861,7 @@ async function workerCommand() {
                     capabilities: {
                       providers,
                       providerHealth,
+                      providerCapabilities,
                       worktrees: worktreesEnabled(project),
                       remoteUpdates: {
                         supported: supportsRemoteWorkerUpdates(platform()),

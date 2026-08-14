@@ -16,8 +16,11 @@ import {
   isSemanticVersion,
 } from "../../src/lib/semantic-version";
 import {
+  agentProviderCapabilityCatalogSchema,
+  agentProviderSupportsSelection,
   agentProviders,
   type AgentProvider,
+  type AgentProviderCapabilityCatalog,
   type ModelEffort,
 } from "../../src/lib/agent-provider-contract";
 import {
@@ -330,6 +333,33 @@ export function executionWorkerProviders(
   return [];
 }
 
+export function executionWorkerSupportsSelection(
+  worker: Pick<ExecutionWorkerRow, "agent_provider" | "capabilities_json">,
+  provider: AgentProvider,
+  model: string | null,
+  effort: string | null,
+) {
+  if (!executionWorkerProviders(worker).includes(provider)) return false;
+  // Provider defaults remain compatible with older workers. Any explicit
+  // model/effort must be confirmed by the reporting worker.
+  if (!model && !effort) return true;
+  try {
+    const capabilities = JSON.parse(worker.capabilities_json) as {
+      providerCapabilities?: unknown;
+    };
+    const parsed = agentProviderCapabilityCatalogSchema.safeParse(
+      capabilities.providerCapabilities,
+    );
+    return parsed.success && agentProviderSupportsSelection(
+      parsed.data[provider],
+      model,
+      effort,
+    );
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Organization Agent jobs expose claim-scoped organization data. Only Workers
  * that explicitly advertise this exact protocol version may receive them.
@@ -408,6 +438,7 @@ export async function registerExecutionWorker(
     agentProvider: AgentProvider;
     providers?: AgentProvider[];
     providerHealth?: ProviderHealthMap;
+    providerCapabilities?: AgentProviderCapabilityCatalog;
     versions: Record<string, string>;
     maxConcurrentSessions?: number;
     observedAt: string;
@@ -446,6 +477,7 @@ export async function registerExecutionWorker(
   const capabilities = JSON.stringify({
     providers: input.providers ?? [],
     providerHealth: input.providerHealth ?? {},
+    providerCapabilities: input.providerCapabilities,
   });
   await db
     .prepare(
@@ -567,6 +599,7 @@ export async function bindExecutionWorkerProject(
     agentProvider: AgentProvider;
     providers?: AgentProvider[];
     providerHealth?: ProviderHealthMap;
+    providerCapabilities?: AgentProviderCapabilityCatalog;
     versions: Record<string, string>;
     observedAt: string;
   },
@@ -627,6 +660,7 @@ export async function bindExecutionWorkerProject(
       JSON.stringify({
         providers: input.providers ?? [],
         providerHealth: input.providerHealth ?? {},
+        providerCapabilities: input.providerCapabilities,
       }),
       input.observedAt,
       input.observedAt,
@@ -666,6 +700,20 @@ export async function recordWorkerHeartbeat(
   if (!binding) {
     throw new WorkerConflictError("Worker is not registered for this project");
   }
+  let nextCapabilities = input.capabilities;
+  if (nextCapabilities && nextCapabilities.providerCapabilities === undefined) {
+    try {
+      const previous = JSON.parse(binding.capabilities_json) as Record<string, unknown>;
+      if (previous.providerCapabilities !== undefined) {
+        nextCapabilities = {
+          ...nextCapabilities,
+          providerCapabilities: previous.providerCapabilities,
+        };
+      }
+    } catch {
+      // A malformed legacy payload has no capability state worth preserving.
+    }
+  }
   await db.batch([
     db
       .prepare(
@@ -698,7 +746,7 @@ export async function recordWorkerHeartbeat(
         input.readinessState ?? null,
         input.readinessDetail === undefined ? null : 1,
         input.readinessDetail ?? null,
-        input.capabilities ? JSON.stringify(input.capabilities) : null,
+        nextCapabilities ? JSON.stringify(nextCapabilities) : null,
         input.workerId,
         projectId,
       ),
@@ -1751,9 +1799,11 @@ export async function dispatchHuntRun(
     ) {
       throw new WorkerConflictError("Worker is not ready to accept work");
     }
-    if (!executionWorkerProviders(worker).includes(provider)) {
+    if (!executionWorkerSupportsSelection(worker, provider, model, effort)) {
       throw new WorkerConflictError(
-        `Worker does not support the ${provider} provider`,
+        model || effort
+          ? `Worker does not support ${provider}${model ? ` model ${model}` : ""}${effort ? ` with ${effort} effort` : ""}`
+          : `Worker does not support the ${provider} provider`,
       );
     }
     if (
@@ -1766,7 +1816,7 @@ export async function dispatchHuntRun(
   } else {
     const eligible = await db
       .prepare(
-        `select worker.id
+        `select worker.id, worker.agent_provider, worker.capabilities_json
          from briar_execution_workers worker
          join briar_execution_worker_devices device on device.id = worker.device_id
          where worker.project_id = ? and device.organization_id = ?
@@ -1793,11 +1843,13 @@ export async function dispatchHuntRun(
                  and allowed.worker_id = worker.id
              )
            )
-         limit 1`,
+         limit 100`,
       )
       .bind(projectId, organizationId, provider)
-      .first<{ id: string }>();
-    if (!eligible) {
+      .all<Pick<ExecutionWorkerRow, "id" | "agent_provider" | "capabilities_json">>();
+    if (!eligible.results.some((worker) =>
+      executionWorkerSupportsSelection(worker, provider, model, effort)
+    )) {
       throw new WorkerConflictError(
         `No worker is configured for the ${provider} provider`,
       );

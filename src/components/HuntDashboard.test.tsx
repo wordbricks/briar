@@ -6612,7 +6612,7 @@ describe("HuntDashboard", () => {
     );
 
     expect(markup).toContain('class="run-execution-identity"');
-    expect(markup).toContain("Codex · GPT-5.6 Sol · Lemon Worker");
+    expect(markup).toContain("Codex · gpt-5.6-sol · Lemon Worker");
     expect(
       (markup.match(/class="run-execution-identity"/g) ?? []).length,
     ).toBe(1);
@@ -6677,7 +6677,7 @@ describe("HuntDashboard", () => {
     expect(markup).toContain("프로바이더");
     expect(markup).toContain("Claude");
     expect(markup).toContain("모델");
-    expect(markup).toContain("Claude Opus");
+    expect(markup).toContain("opus");
     expect(markup).not.toContain("Grok");
     expect(markup).not.toContain("grok-4.5");
     expect(markup).not.toContain("claude-provider-default");

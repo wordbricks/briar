@@ -1,7 +1,8 @@
 import { z } from "zod";
 import {
+  agentProviderCapabilityCatalogSchema,
   agentProviders,
-  modelEfforts,
+  modelEffortSchema,
 } from "../../src/lib/agent-provider-contract";
 import {
   issueTitleAbsoluteMaxLength,
@@ -11,7 +12,7 @@ import {
 export const mobileClientIds = ["briar-mobile", "briar-android"] as const;
 export const mobileClientIdSchema = z.enum(mobileClientIds);
 const mobileProviderSchema = z.enum(agentProviders);
-const mobileEffortSchema = z.enum(modelEfforts);
+const mobileEffortSchema = modelEffortSchema;
 
 export const mobileHealthResponseSchema = z.object({
   ok: z.literal(true),
@@ -289,6 +290,12 @@ export const mobileDashboardWorkerSchema = z.object({
   ]).nullable().optional(),
   agentProvider: mobileProviderSchema.optional(),
   providers: z.array(mobileProviderSchema).optional(),
+  capabilities: z
+    .object({
+      providerCapabilities: agentProviderCapabilityCatalogSchema.optional(),
+    })
+    .catchall(z.unknown())
+    .optional(),
   readiness: z.string(),
   acceptingWork: z.boolean(),
   readinessDetail: z.string().nullable(),

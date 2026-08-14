@@ -60,7 +60,7 @@ describe("OpenCode runner helpers", () => {
   });
 
   it("maps unsupported high effort aliases to OpenCode's high variant", () => {
-    expect(mapEffortToOpenCode("ultra")).toBe("high");
+    expect(mapEffortToOpenCode("ultra")).toBe("ultra");
     expect(mapEffortToOpenCode("medium")).toBe("medium");
   });
 
