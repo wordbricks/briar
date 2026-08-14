@@ -19,7 +19,7 @@
 | 의존성·실행 설정 | 제공 | 제공 | 제공 | 선행 이슈 DAG와 provider/model/effort 설정을 dashboard 및 공통 쓰기 API로 사용 |
 | 실행·복구·검수 제어 | 제공 | 제공 | 제공 | 상태 이동, 즉시 실행, Worker 선택·재할당, retry/cancel, 결과 review를 공유한다. `paused` run은 표시된 checkpoint key·attempt·revision과 동일 requestId로만 resume하며 stale 409는 새 snapshot을 불러온다. |
 | 아이디어 문서·대화·이슈 계획 | 제공 | 제공 | 제공 | D1 아이디어 계약, 온라인 실행 워커, 모바일 대화/문서 전환 UI를 공유 |
-| 알림 및 딥 링크 | 제공 | 제공 | 제공 | `briar-companion` 딥링크와 Universal Link(`/open/issues`, `/open/sessions`), Inbox 분류·읽음, polling 로컬 알림, app badge |
+| 알림 및 딥 링크 | 제공 | 제공 | 제공 | `briar-companion` 딥링크와 Universal Link(`/open/issues`, `/open/sessions`), Inbox 분류·읽음, 조직 공유 WebSocket 알림과 60초 복구 polling, app badge |
 | Agent·Session 목록/상세 | 제공 | 제공 | 제공 | `GET /projects/{id}/agents`, `GET /projects/{id}/agent-sessions` 원격 snapshot 동기화 |
 | 대체 앱 아이콘 | 제공 | 제공 | 제공 | purple/gray/pink/green alternate icons |
 | 공유·클립보드 링크 | 제공 | 제공 | 제공 | Share Sheet와 이슈/세션 HTTPS 링크 복사 |

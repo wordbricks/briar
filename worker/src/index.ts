@@ -248,6 +248,7 @@ import {
   listGithubConnectionRepositories,
   listOrganizationProjects,
   listOrganizationInboxProjects,
+  listOrganizationInboxRealtimeOutbox,
   listOrganizations,
   listProjects,
   listProjectAgents,
@@ -308,6 +309,7 @@ import {
   unsubscribeIssue,
   deleteIssueMessage,
   updateSlackInstallationProject,
+  acknowledgeOrganizationInboxRealtimeOutbox,
   upsertInboxReadStates,
   upsertProjectAgentSession,
   upsertSlackInstallation,
@@ -506,6 +508,7 @@ import {
 import {
   legacyChannelRealtimeResponse,
   publishChannelRealtime,
+  publishInboxRealtime,
   publishProjectRealtime,
   subscribeToOrganizationRealtime,
 } from "./channel-realtime";
@@ -597,6 +600,49 @@ const corsHeaders = {
   "Access-Control-Expose-Headers": "ETag",
 };
 
+export async function flushOrganizationInboxRealtimeOutbox(
+  env: Env,
+  db: D1Database,
+) {
+  if (!env.CHANNEL_REALTIME) return;
+  const pending = await listOrganizationInboxRealtimeOutbox(db);
+  for (const row of pending) {
+    try {
+      await publishInboxRealtime(env, row.organization_id, row.version);
+      await acknowledgeOrganizationInboxRealtimeOutbox(
+        db,
+        row.organization_id,
+        row.version,
+      );
+    } catch (error) {
+      // Keep the transactional outbox row for the next mutation, scheduled
+      // sweep, or client fallback refresh.
+      console.error(JSON.stringify({
+        message: "Inbox realtime publish failed",
+        organizationId: row.organization_id,
+        version: row.version,
+        error: error instanceof Error ? error.message : String(error),
+      }));
+    }
+  }
+}
+
+function scheduleInboxRealtimeFlush(
+  env: Env,
+  db: D1Database,
+  context?: ExecutionContext,
+) {
+  if (!env.CHANNEL_REALTIME) return;
+  const flush = flushOrganizationInboxRealtimeOutbox(env, db).catch((error) => {
+    console.error(JSON.stringify({
+      message: "Inbox realtime outbox flush failed",
+      error: error instanceof Error ? error.message : String(error),
+    }));
+  });
+  if (context) context.waitUntil(flush);
+  else void flush;
+}
+
 function scheduleChannelRealtimePublish(
   env: Env,
   db: D1Database,
@@ -615,6 +661,7 @@ function scheduleChannelRealtimePublish(
     });
   if (context) context.waitUntil(publish);
   else void publish;
+  scheduleInboxRealtimeFlush(env, db, context);
 }
 
 function scheduleProjectRealtimePublish(
@@ -646,6 +693,7 @@ function scheduleProjectRealtimePublish(
   });
   if (context) context.waitUntil(publish);
   else void publish;
+  scheduleInboxRealtimeFlush(env, db, context);
 }
 
 function channelMutationOrganization(
@@ -4342,7 +4390,14 @@ async function handleSlackEventRequest(
     return json({ challenge: payload.challenge });
   }
   if (isSlackEventCallback(payload)) {
-    const processing = processSlackAppMention(env, payload);
+    const processing = processSlackAppMention(env, payload).finally(() =>
+      flushOrganizationInboxRealtimeOutbox(env, env.DB).catch((error) => {
+        console.error(JSON.stringify({
+          message: "Inbox realtime flush after Slack event failed",
+          error: error instanceof Error ? error.message : String(error),
+        }));
+      })
+    );
     if (ctx) ctx.waitUntil(processing);
     else await processing;
   }
@@ -4898,6 +4953,13 @@ async function handleSlackInteractionRequest(
     submission,
     project,
     token,
+  ).finally(() =>
+    flushOrganizationInboxRealtimeOutbox(env, env.DB).catch((error) => {
+      console.error(JSON.stringify({
+        message: "Inbox realtime flush after Slack submission failed",
+        error: error instanceof Error ? error.message : String(error),
+      }));
+    })
   );
   if (ctx) ctx.waitUntil(processing);
   else await processing;
@@ -6970,8 +7032,14 @@ async function route(
       ) {
         throw new HttpError(401, "Invalid or expired realtime ticket");
       }
-      const cursor = await getChannelSyncCursor(db, organizationId);
-      return subscribeToOrganizationRealtime(env, organizationId, cursor);
+      const [channels, inbox] = await Promise.all([
+        getChannelSyncCursor(db, organizationId),
+        getOrganizationInboxSyncVersion(db, organizationId),
+      ]);
+      return subscribeToOrganizationRealtime(env, organizationId, {
+        channels,
+        inbox,
+      });
     }
     // Rolling-upgrade compatibility: old SSE clients keep their authoritative
     // delta fallback but never pin the Durable Object or perform D1 reads here.
@@ -14437,6 +14505,7 @@ export async function handleScheduledTask(
     ctx.waitUntil((async () => {
       try {
         const github = await dependencies.reconcileGithubMergedRuns(env.DB);
+        await flushOrganizationInboxRealtimeOutbox(env, env.DB);
         console.log(JSON.stringify({
           message: "GitHub merge reconciliation completed",
           observedAt,
@@ -14502,6 +14571,7 @@ export async function handleScheduledTask(
         dependencies.processSlackRevocationQueue(env.DB, env, observedAt),
         dependencies.reconcileGithubMergedRuns(env.DB),
       ]);
+      await flushOrganizationInboxRealtimeOutbox(env, env.DB);
       if (dashboardChangePruneFailed) {
         throw dashboardChangePruneError;
       }
@@ -14646,7 +14716,9 @@ export default {
     }
     if (url.pathname === "/github/webhooks" && request.method === "POST") {
       try {
-        return await handleGithubWebhookRequest(request, env);
+        const response = await handleGithubWebhookRequest(request, env);
+        scheduleInboxRealtimeFlush(env, env.DB, ctx);
+        return response;
       } catch (error) {
         if (error instanceof HttpError) {
           return json({ message: error.message }, error.status);
@@ -14802,6 +14874,14 @@ export default {
       );
       if (projectId) {
         scheduleProjectRealtimePublish(env, env.DB, projectId, ctx);
+      }
+      if (
+        !organizationId &&
+        !projectId &&
+        request.method !== "GET" &&
+        request.method !== "HEAD"
+      ) {
+        scheduleInboxRealtimeFlush(env, env.DB, ctx);
       }
       return response;
     } catch (error) {

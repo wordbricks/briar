@@ -419,7 +419,21 @@ struct ConditionalGETResponse<Value: Sendable>: Sendable {
 
 struct ChannelRealtimeNotification: Codable, Equatable, Sendable {
     let topic: String
-    let cursor: Int
+    let cursor: Int?
+    let projectId: String?
+    let version: Int?
+
+    init(
+        topic: String,
+        cursor: Int? = nil,
+        projectId: String? = nil,
+        version: Int? = nil
+    ) {
+        self.topic = topic
+        self.cursor = cursor
+        self.projectId = projectId
+        self.version = version
+    }
 }
 
 struct ChannelRealtimeTicketResponse: Codable, Equatable, Sendable {

@@ -54,6 +54,13 @@ final class MobileAPIContractTests: XCTestCase {
             ),
             ChannelRealtimeNotification(topic: "channels", cursor: 42)
         )
+        XCTAssertEqual(
+            try JSONDecoder.mobileContract.decode(
+                ChannelRealtimeNotification.self,
+                from: Data(#"{"topic":"inbox","version":43}"#.utf8)
+            ),
+            ChannelRealtimeNotification(topic: "inbox", version: 43)
+        )
     }
 
     func testChannelIssueProposalPayloadIsDetailedAndBackwardCompatible() throws {

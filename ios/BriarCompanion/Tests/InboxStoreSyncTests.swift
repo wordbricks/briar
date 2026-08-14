@@ -250,6 +250,46 @@ final class InboxStoreSyncTests: XCTestCase {
         )
     }
 
+    func testRealtimeInboxVersionsCoalesceIntoOneConditionalRefresh() async throws {
+        let response = InboxFeedResponse(
+            messages: [],
+            subscribedIssueIds: [],
+            generatedAt: Date(timeIntervalSince1970: 1_775_260_951)
+        )
+        let api = SelectionIndependentInboxAPI(response: response)
+        let (defaults, suiteName) = isolatedDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let store = InboxStore(
+            defaults: defaults,
+            api: api,
+            pollInterval: .seconds(3_600)
+        )
+
+        store.configure(
+            token: "token-a",
+            userID: "user-a",
+            organizationID: project.organizationId
+        )
+        for _ in 0..<100 {
+            if await api.inboxRequestCount() >= 1 { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        let initialRequestCount = await api.inboxRequestCount()
+        XCTAssertEqual(initialRequestCount, 1)
+
+        store.receiveRealtimeNotification(
+            ChannelRealtimeNotification(topic: "inbox", version: 4)
+        )
+        store.receiveRealtimeNotification(
+            ChannelRealtimeNotification(topic: "inbox", version: 5)
+        )
+        try await Task.sleep(for: .milliseconds(400))
+
+        let refreshedRequestCount = await api.inboxRequestCount()
+        XCTAssertEqual(refreshedRequestCount, 2)
+        store.applicationDidEnterBackground()
+    }
+
     private func snapshot(
         revision: Int,
         subscribers: [IssueSubscriber]? = nil
@@ -307,6 +347,7 @@ final class InboxStoreSyncTests: XCTestCase {
 
 private actor SelectionIndependentInboxAPI: MobileAPIClientProtocol {
     let response: InboxFeedResponse
+    private var inboxRequests = 0
 
     init(response: InboxFeedResponse) {
         self.response = response
@@ -325,12 +366,15 @@ private actor SelectionIndependentInboxAPI: MobileAPIClientProtocol {
                 InboxReadStatesResponse(readVersions: [:])
             )
         } else if path.hasSuffix("/inbox"), method == "GET" {
+            inboxRequests += 1
             data = try JSONEncoder.mobileContract.encode(response)
         } else {
             throw MobileAPIError.invalidRequest
         }
         return try JSONDecoder.mobileContract.decode(responseType, from: data)
     }
+
+    func inboxRequestCount() -> Int { inboxRequests }
 }
 
 private actor InboxReadStateAPI: MobileAPIClientProtocol {
