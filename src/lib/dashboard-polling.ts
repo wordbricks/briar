@@ -27,6 +27,7 @@ const browserPollingEnvironment: DashboardPollingEnvironment = {
 export function startDashboardPolling(
   refresh: (reason: DashboardRefreshReason) => void,
   environment = browserPollingEnvironment,
+  intervalMs = DASHBOARD_POLL_INTERVAL_MS,
 ) {
   let intervalId: number | null = null;
 
@@ -43,7 +44,7 @@ export function startDashboardPolling(
     if (!environment.isVisible()) return;
     refresh(started ? "resume" : "poll");
     started = true;
-    intervalId = environment.setInterval(poll, DASHBOARD_POLL_INTERVAL_MS);
+    intervalId = environment.setInterval(poll, intervalMs);
   };
 
   const reconnect = () => {

@@ -16,11 +16,13 @@ final class InboxStore: ObservableObject {
     private var syncTask: Task<Void, Never>?
     private var feedRefreshTask: Task<Void, Never>?
     private var feedPollingTask: Task<Void, Never>?
+    private var realtimeRefreshTask: Task<Void, Never>?
     private var feedETag: String?
     private var accountGeneration: UInt64 = 0
     private var feedGeneration: UInt64 = 0
     private var syncRequestGeneration: UInt64 = 0
     private var remoteMutationGeneration: UInt64 = 0
+    private var latestRealtimeVersion = -1
     private var token: String?
     private var userID: String?
     private var organizationID: UUID?
@@ -72,9 +74,12 @@ final class InboxStore: ObservableObject {
         feedGeneration &+= 1
         feedRefreshTask?.cancel()
         feedPollingTask?.cancel()
+        realtimeRefreshTask?.cancel()
         feedRefreshTask = nil
         feedPollingTask = nil
+        realtimeRefreshTask = nil
         feedETag = nil
+        latestRealtimeVersion = -1
         self.organizationID = organizationID
         feedReady = false
         let accountScope = self.userID ?? "signed-out"
@@ -159,6 +164,8 @@ final class InboxStore: ObservableObject {
     func applicationDidEnterBackground() {
         feedPollingTask?.cancel()
         feedPollingTask = nil
+        realtimeRefreshTask?.cancel()
+        realtimeRefreshTask = nil
     }
 
     func refreshReadStates() async {
@@ -233,6 +240,34 @@ final class InboxStore: ObservableObject {
         await task.value
         if expectedGeneration == feedGeneration {
             feedRefreshTask = nil
+        }
+    }
+
+    func receiveRealtimeNotification(
+        _ notification: ChannelRealtimeNotification
+    ) {
+        guard notification.topic == "inbox",
+              let version = notification.version,
+              version > latestRealtimeVersion,
+              organizationID != nil
+        else { return }
+        latestRealtimeVersion = version
+        realtimeRefreshTask?.cancel()
+        let expectedGeneration = feedGeneration
+        realtimeRefreshTask = Task { [weak self] in
+            do {
+                try await Task.sleep(for: .milliseconds(300))
+            } catch {
+                return
+            }
+            guard let self,
+                  expectedGeneration == self.feedGeneration,
+                  !Task.isCancelled
+            else { return }
+            await self.refreshFeed()
+            if expectedGeneration == self.feedGeneration {
+                self.realtimeRefreshTask = nil
+            }
         }
     }
 

@@ -19,7 +19,7 @@ import { Button } from "@/components/ui/button";
 import { useI18n } from "../i18n";
 import type { MessageKey } from "../i18n/messages";
 import {
-  agentEfforts,
+  agentEffortOptions,
   agentModelOptions,
   agentProviders,
   type AgentProvider,
@@ -260,7 +260,7 @@ export function WorkerDispatchDialog({
               onValueChange={(value) => {
                 selectionDirtyRef.current = true;
                 setModel(value);
-                if (!value) setEffort("");
+                setEffort("");
               }}
               options={[
                 ...(!selectedModelKnown && model
@@ -288,10 +288,12 @@ export function WorkerDispatchDialog({
                   label: t("settings.providerDefaultEffort"),
                   value: "",
                 },
-                ...agentEfforts[provider].map((candidate) => ({
-                  label: candidate,
-                  value: candidate,
-                })),
+                ...agentEffortOptions(
+                  providerModels,
+                  provider,
+                  normalizedModel,
+                  effort,
+                ),
               ]}
               value={effort}
             />

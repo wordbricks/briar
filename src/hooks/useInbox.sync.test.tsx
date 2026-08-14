@@ -11,6 +11,10 @@ import {
   saveInboxReadStates,
 } from "../lib/api";
 import { useInbox } from "./useInbox";
+import type {
+  RealtimeNotification,
+  RealtimeTransport,
+} from "../lib/realtime-transport";
 
 vi.mock("../lib/api", () => ({
   loadInboxFeed: vi.fn(),
@@ -67,6 +71,7 @@ function dashboardAt(revision: number): DashboardPayload {
 type HarnessProps = {
   dashboard: DashboardPayload;
   projects?: Project[];
+  realtime?: RealtimeTransport | null;
   token: string;
   userId: string;
 };
@@ -75,7 +80,13 @@ let inbox: ReturnType<typeof useInbox>;
 let root: Root;
 let container: HTMLDivElement;
 
-function Harness({ dashboard, projects: providedProjects, token, userId }: HarnessProps) {
+function Harness({
+  dashboard,
+  projects: providedProjects,
+  realtime = null,
+  token,
+  userId,
+}: HarnessProps) {
   const sessions = useMemo(() => [], []);
   const projects = useMemo(
     () => providedProjects ?? [dashboard.project],
@@ -88,8 +99,26 @@ function Harness({ dashboard, projects: providedProjects, token, userId }: Harne
     sessions,
     projects,
     token,
+    realtime,
   );
   return null;
+}
+
+class FakeRealtimeTransport implements RealtimeTransport {
+  private readonly listeners = new Set<
+    (notification: RealtimeNotification) => void
+  >();
+  start = vi.fn();
+  stop = vi.fn();
+
+  subscribe(listener: (notification: RealtimeNotification) => void) {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+
+  emit(notification: RealtimeNotification) {
+    for (const listener of this.listeners) listener(notification);
+  }
 }
 
 async function renderHarness(props: HarnessProps) {
@@ -171,6 +200,40 @@ describe("useInbox read-state synchronization", () => {
     expect(inbox.notificationBaselineId).toBe(
       `user-a:${dashboard.project.organizationId}`,
     );
+  });
+
+  it("coalesces shared WebSocket Inbox versions into one conditional refresh", async () => {
+    vi.useFakeTimers();
+    const realtime = new FakeRealtimeTransport();
+    try {
+      await renderHarness({
+        dashboard: dashboardAt(1),
+        realtime,
+        token: "token-a",
+        userId: "user-a",
+      });
+      await flushPromises();
+      expect(mockedLoadInboxFeed).toHaveBeenCalledTimes(1);
+      expect(realtime.start).toHaveBeenCalledOnce();
+
+      realtime.emit({ topic: "inbox", version: 4 });
+      realtime.emit({ topic: "inbox", version: 5 });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(300);
+      });
+      await flushPromises();
+
+      expect(mockedLoadInboxFeed).toHaveBeenCalledTimes(2);
+
+      realtime.emit({ topic: "channels", cursor: 10 });
+      realtime.emit({ topic: "inbox", version: 5 });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(300);
+      });
+      expect(mockedLoadInboxFeed).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("keeps the selected-project fallback when the organization feed is offline", async () => {

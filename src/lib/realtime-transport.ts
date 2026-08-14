@@ -4,6 +4,10 @@ export type RealtimeNotification =
       cursor: number;
     }
   | {
+      topic: "inbox";
+      version: number;
+    }
+  | {
       topic: "project";
       projectId: string;
       cursor: number;
@@ -85,20 +89,32 @@ export class SseEventDecoder {
 const realtimeNotification = (value: unknown): RealtimeNotification | null => {
   if (!value || typeof value !== "object") return null;
   const candidate = value as Partial<RealtimeNotification>;
-  if (!Number.isSafeInteger(candidate.cursor) || (candidate.cursor ?? -1) < 0) {
-    return null;
-  }
   if (candidate.topic === "channels") {
-    return { topic: "channels", cursor: candidate.cursor! };
+    const cursor = (value as { cursor?: unknown }).cursor;
+    return Number.isSafeInteger(cursor) && (cursor as number) >= 0
+      ? { topic: "channels", cursor: cursor as number }
+      : null;
   }
-  const project = value as { topic?: unknown; projectId?: unknown };
+  if (candidate.topic === "inbox") {
+    const version = (value as { version?: unknown }).version;
+    return Number.isSafeInteger(version) && (version as number) >= 0
+      ? { topic: "inbox", version: version as number }
+      : null;
+  }
+  const project = value as {
+    topic?: unknown;
+    projectId?: unknown;
+    cursor?: unknown;
+  };
   return project.topic === "project" &&
       typeof project.projectId === "string" &&
-      /^[0-9a-f-]+$/iu.test(project.projectId)
+      /^[0-9a-f-]+$/iu.test(project.projectId) &&
+      Number.isSafeInteger(project.cursor) &&
+      (project.cursor as number) >= 0
     ? {
         topic: "project",
         projectId: project.projectId,
-        cursor: candidate.cursor!,
+        cursor: project.cursor as number,
       }
     : null;
 };
@@ -176,7 +192,7 @@ export class SseRealtimeTransport implements RealtimeTransport {
       await this.consume(response.body, generation);
     } catch (error) {
       if (abortController.signal.aborted) return;
-      console.warn("Channel realtime stream disconnected", error);
+      console.warn("Organization realtime stream disconnected", error);
     } finally {
       if (this.abortController === abortController) {
         this.abortController = null;
@@ -335,7 +351,7 @@ export class WebSocketRealtimeTransport implements RealtimeTransport {
         finish();
       });
     } catch (error) {
-      console.warn("Channel realtime socket disconnected", error);
+      console.warn("Organization realtime socket disconnected", error);
       if (this.active && generation === this.generation) {
         this.scheduleReconnect(generation);
       }

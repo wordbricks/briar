@@ -1,7 +1,102 @@
 import Foundation
 
+/// Owns the single organization WebSocket used by every native surface.
+/// Domain stores remain authoritative through their regular snapshot/delta APIs;
+/// this store only fans out small cursor/version invalidations.
+@MainActor
+final class OrganizationRealtimeStore: ObservableObject {
+    @Published private(set) var latestNotification: ChannelRealtimeNotification?
+    @Published private(set) var notificationSequence = 0
+
+    private let realtime: (any MobileRealtimeClientProtocol)?
+    private var organizationID: UUID?
+    private var token: String?
+    private var generation = 0
+    private var isForeground = true
+    private var task: Task<Void, Never>?
+
+    init(api: any MobileAPIClientProtocol) {
+        realtime = api as? any MobileRealtimeClientProtocol
+    }
+
+    func select(organizationID: UUID?, token: String?) {
+        guard self.organizationID != organizationID || self.token != token else { return }
+        generation &+= 1
+        task?.cancel()
+        task = nil
+        self.organizationID = organizationID
+        self.token = token
+        latestNotification = nil
+        guard isForeground else { return }
+        start()
+    }
+
+    func applicationDidBecomeActive() {
+        guard !isForeground else { return }
+        isForeground = true
+        start()
+    }
+
+    func applicationDidEnterBackground() {
+        isForeground = false
+        generation &+= 1
+        task?.cancel()
+        task = nil
+    }
+
+    private func start() {
+        guard task == nil,
+              let realtime,
+              let organizationID,
+              let token,
+              isForeground
+        else { return }
+        let expectedGeneration = generation
+        task = Task { [weak self] in
+            var reconnectAttempt = 0
+            while !Task.isCancelled {
+                guard let self,
+                      expectedGeneration == self.generation,
+                      self.isForeground
+                else { return }
+                do {
+                    let events = realtime.realtimeEvents(
+                        MobileAPIContract.Endpoint.channelEvents(
+                            organizationID: organizationID,
+                            cursor: 0
+                        ),
+                        token: token
+                    )
+                    for try await event in events {
+                        guard !Task.isCancelled,
+                              expectedGeneration == self.generation,
+                              self.isForeground
+                        else { return }
+                        reconnectAttempt = 0
+                        self.latestNotification = event
+                        self.notificationSequence &+= 1
+                    }
+                } catch is CancellationError {
+                    return
+                } catch {
+                    // Snapshot/delta fallback remains authoritative while the
+                    // shared notification socket reconnects.
+                }
+                reconnectAttempt = min(reconnectAttempt + 1, 5)
+                do {
+                    try await Task.sleep(for: .seconds(1 << reconnectAttempt))
+                } catch {
+                    return
+                }
+            }
+        }
+    }
+}
+
 @MainActor
 final class ChannelsStore: ObservableObject {
+    static let messagePageSize = 20
+
     struct FocusContext: Equatable, Sendable {
         let revision: Int
         let channelID: UUID
@@ -27,6 +122,8 @@ final class ChannelsStore: ObservableObject {
     @Published private(set) var thread: [ChannelMessage] = []
     @Published private(set) var members: [ChannelMember] = []
     @Published private(set) var agents: [ChannelAgentSummary] = []
+    @Published private(set) var hasEarlierMessages = false
+    @Published private(set) var loadingEarlierMessages = false
     @Published private(set) var loading = false
     @Published private(set) var sending = false
     @Published private(set) var acceptingProposalID: UUID?
@@ -38,6 +135,7 @@ final class ChannelsStore: ObservableObject {
 
     private let api: any MobileAPIClientProtocol
     private let realtime: (any MobileRealtimeClientProtocol)?
+    private let managesRealtime: Bool
     private let attachmentReference: @Sendable () -> String
     private let pollInterval: Duration
     private let maxDeltaPagesPerRefresh: Int
@@ -46,6 +144,7 @@ final class ChannelsStore: ObservableObject {
     private var syncCursor: Int?
     private var focusedChannelID: UUID?
     private var focusedThreadParentID: UUID?
+    private var nextMessageCursor: UUID?
     private var generation = 0
     private var catalogLoadRevision = 0
     private var authoritativeLoadRevision = 0
@@ -67,6 +166,7 @@ final class ChannelsStore: ObservableObject {
     init(
         api: any MobileAPIClientProtocol,
         realtime: (any MobileRealtimeClientProtocol)? = nil,
+        managesRealtime: Bool = true,
         pollInterval: Duration = .seconds(60),
         maxDeltaPagesPerRefresh: Int = 20,
         attachmentReference: @escaping @Sendable () -> String = {
@@ -75,6 +175,7 @@ final class ChannelsStore: ObservableObject {
     ) {
         self.api = api
         self.realtime = realtime ?? (api as? any MobileRealtimeClientProtocol)
+        self.managesRealtime = managesRealtime
         self.pollInterval = pollInterval
         self.maxDeltaPagesPerRefresh = min(max(maxDeltaPagesPerRefresh, 1), 20)
         self.attachmentReference = attachmentReference
@@ -102,11 +203,14 @@ final class ChannelsStore: ObservableObject {
         skillExecutionProposalIDsByMessage = [:]
         focusedChannelID = nil
         focusedThreadParentID = nil
+        nextMessageCursor = nil
         channels = []
         messages = []
         thread = []
         members = []
         agents = []
+        hasEarlierMessages = false
+        loadingEarlierMessages = false
         loading = false
         catalogRefreshInFlight = false
         conversationLoadInFlight = false
@@ -178,6 +282,9 @@ final class ChannelsStore: ObservableObject {
         conversationLoadInFlight = true
         updateLoadingState()
         messages = []
+        nextMessageCursor = nil
+        hasEarlierMessages = false
+        loadingEarlierMessages = false
         thread = []
         members = []
         agents = []
@@ -195,7 +302,8 @@ final class ChannelsStore: ObservableObject {
             let response: ChannelDetailResponse = try await api.get(
                 MobileAPIContract.Endpoint.channel(
                     organizationID: organizationID,
-                    channelID: channelID
+                    channelID: channelID,
+                    messageLimit: Self.messagePageSize
                 ),
                 token: token,
                 as: ChannelDetailResponse.self
@@ -213,6 +321,8 @@ final class ChannelsStore: ObservableObject {
             )
             recordProposalMessages(response.messages)
             messages = response.messages
+            nextMessageCursor = response.nextCursor
+            hasEarlierMessages = response.nextCursor != nil
             members = response.members
             agents = response.agents
             errorMessage = nil
@@ -236,8 +346,135 @@ final class ChannelsStore: ObservableObject {
         authoritativeLoadRevision &+= 1
         invalidateProposalAcceptancePresentation()
         focusedChannelID = nil
+        nextMessageCursor = nil
+        hasEarlierMessages = false
+        loadingEarlierMessages = false
         conversationLoadInFlight = false
         updateLoadingState()
+    }
+
+    func loadEarlierMessages(channelID: UUID) async {
+        guard
+            let organizationID,
+            let token,
+            let cursor = nextMessageCursor,
+            focusedChannelID == channelID,
+            focusedThreadParentID == nil,
+            !loadingEarlierMessages
+        else { return }
+        let expectedGeneration = generation
+        let expectedLoadRevision = authoritativeLoadRevision
+        loadingEarlierMessages = true
+        defer {
+            if expectedGeneration == generation,
+               expectedLoadRevision == authoritativeLoadRevision,
+               focusedChannelID == channelID,
+               focusedThreadParentID == nil {
+                loadingEarlierMessages = false
+            }
+        }
+        do {
+            let response: ChannelMessagesResponse = try await api.get(
+                MobileAPIContract.Endpoint.channelMessages(
+                    organizationID: organizationID,
+                    channelID: channelID,
+                    cursor: cursor,
+                    limit: Self.messagePageSize
+                ),
+                token: token,
+                as: ChannelMessagesResponse.self
+            )
+            guard
+                !Task.isCancelled,
+                expectedGeneration == generation,
+                expectedLoadRevision == authoritativeLoadRevision,
+                focusedChannelID == channelID,
+                focusedThreadParentID == nil
+            else { return }
+            let stabilizedMessages = preservingLocallyAcceptedExecutionProposals(
+                in: response.messages
+            )
+            recordProposalMessages(stabilizedMessages)
+            messages = Self.mergeMessages(
+                messages,
+                updates: stabilizedMessages,
+                removing: []
+            )
+            nextMessageCursor = response.nextCursor
+            hasEarlierMessages = response.nextCursor != nil
+            errorMessage = nil
+        } catch {
+            guard
+                !Task.isCancelled,
+                expectedGeneration == generation,
+                expectedLoadRevision == authoritativeLoadRevision,
+                focusedChannelID == channelID,
+                focusedThreadParentID == nil
+            else { return }
+            errorMessage = CompanionStore.message(for: error)
+        }
+    }
+
+    /// A notification may point to a root older than the initial page. Fetch
+    /// that root through the thread endpoint without expanding every page in
+    /// between, then merge it into the channel so navigation can open it.
+    func loadRootMessageForNavigation(
+        channelID: UUID,
+        messageID: UUID
+    ) async -> ChannelMessage? {
+        if let message = messages.first(where: { $0.id == messageID }) {
+            return message
+        }
+        guard
+            let organizationID,
+            let token,
+            focusedChannelID == channelID,
+            focusedThreadParentID == nil
+        else { return nil }
+        let expectedGeneration = generation
+        let expectedLoadRevision = authoritativeLoadRevision
+        do {
+            let response: ChannelMessagesResponse = try await api.get(
+                MobileAPIContract.Endpoint.channelMessages(
+                    organizationID: organizationID,
+                    channelID: channelID,
+                    parentMessageID: messageID
+                ),
+                token: token,
+                as: ChannelMessagesResponse.self
+            )
+            guard
+                !Task.isCancelled,
+                expectedGeneration == generation,
+                expectedLoadRevision == authoritativeLoadRevision,
+                focusedChannelID == channelID,
+                focusedThreadParentID == nil,
+                let root = response.messages.first(where: {
+                    $0.id == messageID && $0.parentMessageId == nil
+                })
+            else { return nil }
+            guard let stabilizedRoot = preservingLocallyAcceptedExecutionProposals(
+                in: [root]
+            ).first else { return nil }
+            recordProposalMessages([stabilizedRoot])
+            messages = Self.mergeMessages(
+                messages,
+                updates: [stabilizedRoot],
+                removing: []
+            )
+            errorMessage = nil
+            return stabilizedRoot
+        } catch {
+            guard
+                !Task.isCancelled,
+                expectedGeneration == generation,
+                expectedLoadRevision == authoritativeLoadRevision,
+                focusedChannelID == channelID,
+                focusedThreadParentID == nil
+            else { return nil }
+            errorMessage = CompanionStore.message(for: error)
+            return nil
+        }
     }
 
     /// Invalidates delayed thread loads and proposal responses when an
@@ -1475,7 +1712,11 @@ final class ChannelsStore: ObservableObject {
             }
         }
 
-        guard let realtime, let organizationID, let token else {
+        guard managesRealtime,
+              let realtime,
+              let organizationID,
+              let token
+        else {
             realtimeTask = nil
             return
         }
@@ -1504,7 +1745,8 @@ final class ChannelsStore: ObservableObject {
                         else { return }
                         reconnectAttempt = 0
                         if event.topic == "channels",
-                           event.cursor > (self.syncCursor ?? -1) {
+                           let cursor = event.cursor,
+                           cursor > (self.syncCursor ?? -1) {
                             await self.refreshChanges()
                         }
                     }
@@ -1522,6 +1764,17 @@ final class ChannelsStore: ObservableObject {
                 }
             }
         }
+    }
+
+    func receiveRealtimeNotification(
+        _ notification: ChannelRealtimeNotification
+    ) async {
+        guard notification.topic == "channels",
+              let cursor = notification.cursor,
+              cursor > (syncCursor ?? -1),
+              isForeground
+        else { return }
+        await refreshChanges()
     }
 
     func groups(

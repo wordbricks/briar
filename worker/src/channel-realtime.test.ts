@@ -85,6 +85,34 @@ describe("ChannelRealtimeHub", () => {
     });
   });
 
+  it("tracks the Inbox revision independently from channel cursors", async () => {
+    const socket = new FakeSocket(42);
+    const hub = new ChannelRealtimeHub(
+      {
+        getWebSockets: () => [socket],
+      } as unknown as DurableObjectState,
+      {} as Env,
+    );
+
+    await hub.fetch(new Request("https://realtime.test/notify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ topic: "inbox", version: 7 }),
+    }));
+
+    expect(socket.sent).toEqual(['{"topic":"inbox","version":7}']);
+    expect(socket.attachment).toEqual({
+      cursors: { channels: 42, inbox: 7 },
+    });
+
+    await hub.fetch(new Request("https://realtime.test/notify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ topic: "inbox", version: 6 }),
+    }));
+    expect(socket.sent).toHaveLength(1);
+  });
+
   it("does not create a long-lived stream for legacy subscribers", async () => {
     const response = legacyChannelRealtimeResponse();
     expect(response.status).toBe(426);

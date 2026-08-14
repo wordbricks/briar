@@ -163,9 +163,9 @@ describe("workflow v2 D1 persistence and transitions", () => {
         // 0099 rebuilds channel messages and restores the guards from the
         // deliberately excluded 0091 and 0092 migrations.
         "0099_channel_incoming_webhooks.sql",
-        // 0105 snapshots the fully migrated provider-constrained schema and
+        // 0106 snapshots the fully migrated provider-constrained schema and
         // therefore depends on the deliberately excluded approval tables.
-        "0105_agent_provider_agy.sql",
+        "0106_agent_provider_agy.sql",
       ],
     });
 

@@ -240,7 +240,7 @@ import type {
   UpdateIssueInput,
 } from "../types";
 import {
-  agentEfforts,
+  agentEffortOptions,
   agentModelDisplayName,
   agentModelOptions,
   agentProviderLabels,
@@ -2974,7 +2974,10 @@ export function CreateIssueDialog({
               className="issue-model-select"
               disabled={!preferredProvider}
               label={t("issue.preferredModel")}
-              onValueChange={setPreferredModel}
+              onValueChange={(value) => {
+                setPreferredModel(value);
+                setPreferredEffort("");
+              }}
               options={preferredProvider
                 ? agentModelOptions(
                     providerModels,
@@ -2995,14 +2998,14 @@ export function CreateIssueDialog({
               label={t("settings.effort")}
               onValueChange={setPreferredEffort}
               options={
-                preferredProvider && preferredProvider in agentEfforts
+                preferredProvider
                   ? [
                       { label: t("settings.providerDefaultEffort"), value: "" },
-                      ...agentEfforts[preferredProvider as AgentProvider].map(
-                        (effort) => ({
-                          label: effort,
-                          value: effort,
-                        }),
+                      ...agentEffortOptions(
+                        providerModels,
+                        preferredProvider as AgentProvider,
+                        preferredModel,
+                        preferredEffort,
                       ),
                     ]
                   : []
@@ -4039,7 +4042,12 @@ function IssueContextMenu({
                       >
                         {[
                           null,
-                          ...agentEfforts[run.preferredProvider],
+                          ...agentEffortOptions(
+                            providerModels,
+                            run.preferredProvider,
+                            run.preferredModel,
+                            run.preferredEffort,
+                          ).map((option) => option.value),
                         ].map((effort) => (
                           <ContextMenu.RadioItem
                             className="issue-context-item issue-context-choice"
@@ -6597,11 +6605,11 @@ export function RunPage({
                             value: "",
                           },
                           ...(run.preferredProvider
-                            ? agentEfforts[run.preferredProvider].map(
-                                (effort) => ({
-                                  label: effort,
-                                  value: effort,
-                                }),
+                            ? agentEffortOptions(
+                                providerModels,
+                                run.preferredProvider,
+                                run.preferredModel,
+                                run.preferredEffort,
                               )
                             : []),
                         ]}

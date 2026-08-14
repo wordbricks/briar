@@ -1,15 +1,16 @@
 import { describe, expect, it } from "vitest";
 import {
-  agentProviderAllowsEffort,
-  agentProviderAllowsModel,
+  agentProviderCapabilityCatalogSchema,
   agentProviderLabels,
-  agentProviderPolicies,
+  agentProviderSupportsSelection,
   agentProviders,
-  modelEfforts,
+  emptyAgentProviderCapabilityCatalog,
+  mergeAgentProviderCapabilityCatalogs,
+  modelEffortSchema,
 } from "./agent-provider-contract";
 
 describe("agent provider contract", () => {
-  it("defines every provider label and policy from the shared roster", () => {
+  it("keeps only the provider roster and labels static", () => {
     expect(agentProviders).toEqual(["codex", "claude", "grok", "agy", "opencode"]);
     expect(agentProviderLabels).toEqual({
       codex: "Codex",
@@ -18,26 +19,56 @@ describe("agent provider contract", () => {
       agy: "Antigravity",
       opencode: "OpenCode",
     });
-    expect(Object.keys(agentProviderPolicies)).toEqual(agentProviders);
+    expect(emptyAgentProviderCapabilityCatalog().grok.models).toEqual([]);
   });
 
-  it("keeps catalog validation strict except for OpenCode models", () => {
-    expect(agentProviderAllowsModel("codex", "gpt-5.6-sol")).toBe(true);
-    expect(agentProviderAllowsModel("codex", "not-a-codex-model")).toBe(false);
-    expect(agentProviderAllowsModel("claude", "sonnet")).toBe(true);
-    expect(agentProviderAllowsModel("grok", "grok-4.5")).toBe(true);
-    expect(agentProviderAllowsModel("agy", "gemini-3.7-flash")).toBe(true);
-    expect(agentProviderAllowsModel("opencode", "vendor/custom-model")).toBe(
-      true,
-    );
+  it("accepts provider-owned model and effort identifiers structurally", () => {
+    const catalog = emptyAgentProviderCapabilityCatalog();
+    catalog.grok.models = [{
+      id: "grok-4.6",
+      label: "Grok 4.6",
+      efforts: [{ id: "xhigh", label: "Extra high" }],
+    }];
+    expect(agentProviderCapabilityCatalogSchema.parse(catalog)).toEqual(catalog);
+    expect(modelEffortSchema.parse("future-effort")).toBe("future-effort");
   });
 
-  it("shares provider-specific effort limits", () => {
-    expect(agentProviderPolicies.codex.efforts).toEqual(modelEfforts);
-    expect(agentProviderAllowsEffort("codex", "ultra")).toBe(true);
-    expect(agentProviderAllowsEffort("claude", "ultra")).toBe(false);
-    expect(agentProviderAllowsEffort("grok", "xhigh")).toBe(false);
-    expect(agentProviderAllowsEffort("agy", "high")).toBe(true);
-    expect(agentProviderAllowsEffort("opencode", "high")).toBe(true);
+  it("checks an explicit selection against the reporting worker", () => {
+    const capability = {
+      models: [{
+        id: "grok-4.6",
+        label: "Grok 4.6",
+        efforts: [{ id: "xhigh", label: "xhigh" }],
+      }],
+      defaultEfforts: [],
+      allowCustomModels: false,
+      error: null,
+    };
+    expect(agentProviderSupportsSelection(capability, "grok-4.6", "xhigh")).toBe(true);
+    expect(agentProviderSupportsSelection(capability, "grok-4.5", "high")).toBe(false);
+  });
+
+  it("checks an effort for the provider default against the reported default model", () => {
+    const capability = {
+      models: [{
+        id: "grok-4.6",
+        label: "Grok 4.6",
+        isDefault: true,
+        efforts: [{ id: "xhigh", label: "xhigh" }],
+      }],
+      defaultEfforts: [],
+      allowCustomModels: false,
+      error: null,
+    };
+    expect(agentProviderSupportsSelection(capability, null, "xhigh")).toBe(true);
+    expect(agentProviderSupportsSelection(capability, null, "high")).toBe(false);
+  });
+
+  it("merges model-specific efforts reported by multiple workers", () => {
+    const first = emptyAgentProviderCapabilityCatalog();
+    const second = emptyAgentProviderCapabilityCatalog();
+    first.codex.models = [{ id: "gpt-next", label: "GPT Next", efforts: [{ id: "high", label: "high" }] }];
+    second.codex.models = [{ id: "gpt-next", label: "GPT Next", efforts: [{ id: "max", label: "max" }] }];
+    expect(mergeAgentProviderCapabilityCatalogs([first, second]).codex.models[0]?.efforts?.map((item) => item.id)).toEqual(["high", "max"]);
   });
 });

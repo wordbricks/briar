@@ -51,7 +51,7 @@ import { Typography } from "@/components/ui/typography";
 import type { DashboardPayload, Project, ProjectSettings as ProjectSettingsData } from "../types";
 import { useI18n } from "../i18n";
 import {
-  agentEfforts,
+  agentEffortOptions,
   agentModelOptions,
   agentProviderLabels,
   agentProviders,
@@ -266,7 +266,12 @@ export function ProjectSettings({
     t("settings.providerDefaultModel"),
     runtimeModel,
   );
-  const runtimeEfforts = agentEfforts[runtimeProvider];
+  const runtimeEfforts = agentEffortOptions(
+    providerModels,
+    runtimeProvider,
+    runtimeModel,
+    runtimeEffort,
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -960,7 +965,10 @@ export function ProjectSettings({
                   disabled={runtimeLoading || runtimeSaving}
                   id="project-runtime-model"
                   label={t("settings.model")}
-                  onValueChange={(value) => setRuntimeModel(value || null)}
+                  onValueChange={(value) => {
+                    setRuntimeModel(value || null);
+                    setRuntimeEffort(null);
+                  }}
                   options={runtimeModels}
                   searchEmptyMessage={t("issue.noModelsFound")}
                   searchPlaceholder={t("issue.searchModels")}
@@ -984,10 +992,7 @@ export function ProjectSettings({
                       label: t("settings.providerDefaultEffort"),
                       value: "",
                     },
-                    ...runtimeEfforts.map((candidate) => ({
-                      label: candidate,
-                      value: candidate,
-                    })),
+                    ...runtimeEfforts,
                   ]}
                   size="small"
                   value={runtimeEffort ?? ""}

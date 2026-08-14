@@ -943,7 +943,7 @@ describe("Worker HTTP contract", () => {
     await expect(readIssueRequest(issueRequest())).rejects.toThrow();
   });
 
-  it("rejects a preferred model that the provider does not offer", async () => {
+  it("accepts provider-owned models without a server release", async () => {
     const issueRequest = () =>
       new Request(
         "https://briar-api.example/projects/22222222-2222-4222-8222-222222222222/issues",
@@ -961,7 +961,9 @@ describe("Worker HTTP contract", () => {
           }),
         },
       );
-    await expect(readIssueRequest(issueRequest())).rejects.toThrow();
+    await expect(readIssueRequest(issueRequest())).resolves.toMatchObject({
+      input: { preferredProvider: "codex", preferredModel: "sonnet" },
+    });
   });
 
   it("requires an email confirmation for account deletion", () => {
@@ -1074,7 +1076,7 @@ describe("Worker HTTP contract", () => {
     ).toThrow();
   });
 
-  it("validates provider-specific issue model effort preferences", () => {
+  it("validates structural issue model effort preferences", () => {
     expect(
       issueExecutionPreferencesSchema.parse({
         provider: "codex",
@@ -1093,13 +1095,13 @@ describe("Worker HTTP contract", () => {
         effort: null,
       }),
     ).toThrow(/provider is required/iu);
-    expect(() =>
+    expect(
       issueExecutionPreferencesSchema.parse({
         provider: "grok",
-        model: "grok-4.5",
+        model: "grok-4.6",
         effort: "xhigh",
       }),
-    ).toThrow(/Grok supports/iu);
+    ).toEqual({ provider: "grok", model: "grok-4.6", effort: "xhigh" });
   });
 
   it("accepts one Worker emoji or image and rejects invalid icon text", () => {

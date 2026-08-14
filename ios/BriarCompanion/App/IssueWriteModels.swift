@@ -11,38 +11,96 @@ enum AgentProvider: String, Codable, CaseIterable, Hashable, Identifiable, Senda
     var id: String { rawValue }
     var displayName: String { self == .agy ? "Antigravity" : rawValue.capitalized }
 
-    var models: [String] {
-        switch self {
-        case .codex: ["gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"]
-        case .claude: ["sonnet", "opus", "haiku", "fable"]
-        case .grok: ["grok-4.5", "grok-build"]
-        case .agy, .opencode: []
-        }
-    }
-
-    var efforts: [ModelEffort] {
-        switch self {
-        case .codex: ModelEffort.allCases
-        case .claude: ModelEffort.allCases.filter { $0 != .ultra }
-        case .grok, .agy, .opencode: [.low, .medium, .high]
-        }
-    }
 }
 
-enum ModelEffort: String, Codable, CaseIterable, Hashable, Identifiable, Sendable {
-    case low
-    case medium
-    case high
-    case xhigh
-    case max
-    case ultra
-
+struct ModelEffort: RawRepresentable, Codable, Hashable, Identifiable, Sendable {
+    let rawValue: String
+    init(rawValue: String) { self.rawValue = rawValue }
     var id: String { rawValue }
 
-    /// Conversational execution approvals intentionally expose the bounded
-    /// effort contract accepted by both approval endpoints. Ordinary manual
-    /// dispatch continues to support provider-specific max/ultra values.
-    static let conversationalApprovalCases: [ModelEffort] = ModelEffort.allCases
+    // Value conveniences for persisted fixtures. These do not define the UI
+    // capability list; selectors use the reporting Worker's catalog.
+    static let low = Self(rawValue: "low")
+    static let medium = Self(rawValue: "medium")
+    static let high = Self(rawValue: "high")
+    static let xhigh = Self(rawValue: "xhigh")
+    static let max = Self(rawValue: "max")
+    static let ultra = Self(rawValue: "ultra")
+}
+
+struct AgentEffortCapability: Codable, Equatable, Identifiable, Sendable {
+    let id: String
+    let label: String
+    let description: String?
+    let isDefault: Bool?
+}
+
+struct AgentModelCapability: Codable, Equatable, Identifiable, Sendable {
+    let id: String
+    let label: String
+    let isDefault: Bool?
+    let defaultEffortId: String?
+    let efforts: [AgentEffortCapability]
+}
+
+struct AgentProviderCapability: Codable, Equatable, Sendable {
+    let models: [AgentModelCapability]
+    let defaultEfforts: [AgentEffortCapability]
+    let allowCustomModels: Bool
+    let error: String?
+}
+
+struct AgentProviderCapabilityCatalog: Equatable, Sendable {
+    private var entries: [String: AgentProviderCapability]
+
+    init(workers: [DashboardWorker]) {
+        entries = [:]
+        for worker in workers where worker.readiness != "offline" {
+            for (provider, capability) in worker.capabilities?.providerCapabilities ?? [:] {
+                guard var existing = entries[provider] else {
+                    entries[provider] = capability
+                    continue
+                }
+                var models = Dictionary(uniqueKeysWithValues: existing.models.map { ($0.id, $0) })
+                for model in capability.models {
+                    guard let saved = models[model.id] else {
+                        models[model.id] = model
+                        continue
+                    }
+                    var efforts = Dictionary(uniqueKeysWithValues: saved.efforts.map { ($0.id, $0) })
+                    model.efforts.forEach { efforts[$0.id] = $0 }
+                    models[model.id] = AgentModelCapability(
+                        id: saved.id,
+                        label: saved.label,
+                        isDefault: (saved.isDefault ?? false) || (model.isDefault ?? false),
+                        defaultEffortId: saved.defaultEffortId ?? model.defaultEffortId,
+                        efforts: Array(efforts.values)
+                    )
+                }
+                var defaults = Dictionary(uniqueKeysWithValues: existing.defaultEfforts.map { ($0.id, $0) })
+                capability.defaultEfforts.forEach { defaults[$0.id] = $0 }
+                existing = AgentProviderCapability(
+                    models: Array(models.values),
+                    defaultEfforts: Array(defaults.values),
+                    allowCustomModels: existing.allowCustomModels || capability.allowCustomModels,
+                    error: existing.error == nil || capability.error == nil ? nil : existing.error
+                )
+                entries[provider] = existing
+            }
+        }
+    }
+
+    func models(for provider: AgentProvider?) -> [AgentModelCapability] {
+        guard let provider else { return [] }
+        return entries[provider.rawValue]?.models ?? []
+    }
+
+    func efforts(for provider: AgentProvider?, model: String?) -> [AgentEffortCapability] {
+        guard let provider, let entry = entries[provider.rawValue] else { return [] }
+        let selected = model.flatMap { id in entry.models.first(where: { $0.id == id }) }
+            ?? entry.models.first(where: { $0.isDefault == true })
+        return selected?.efforts.isEmpty == false ? selected!.efforts : entry.defaultEfforts
+    }
 }
 
 struct IssueDependencyReference: Codable, Equatable, Identifiable, Sendable {
@@ -123,8 +181,8 @@ struct PendingIssueAttachment: Identifiable, Equatable, Sendable {
 struct IssueDraft: Codable, Equatable, Sendable {
     /// Default create-issue priority matches the desktop/web create dialog (P2).
     static let defaultPriority: Int = 2
-    /// Default preferred-execution effort matches the desktop/web create dialog (high).
-    static let defaultEffort: ModelEffort? = .high
+    /// Let the selected provider/model choose its current default effort.
+    static let defaultEffort: ModelEffort? = nil
 
     var title = ""
     var description = ""
@@ -207,21 +265,13 @@ struct IssueExecutionPreferences: Codable, Equatable, Sendable {
     var effort: ModelEffort?
 
     var isValid: Bool {
-        guard let provider else { return model == nil && effort == nil }
+        guard provider != nil else { return model == nil && effort == nil }
         guard let model else { return effort == nil }
-        guard provider == .opencode || provider == .agy || provider.models.contains(model) else {
-            return false
-        }
-        return effort.map(provider.efforts.contains) ?? true
+        return !model.isEmpty
     }
 
     var isValidForConversationApproval: Bool {
-        guard provider != nil, isValid else { return false }
-        return effort.map(Self.conversationalEffortsContain) ?? true
-    }
-
-    private static func conversationalEffortsContain(_ effort: ModelEffort) -> Bool {
-        ModelEffort.conversationalApprovalCases.contains(effort)
+        provider != nil && isValid
     }
 }
 

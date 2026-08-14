@@ -12,7 +12,7 @@ import {
 import { useState } from "react";
 import { useI18n } from "../i18n";
 import {
-  agentEfforts,
+  agentEffortOptions,
   agentModelOptions,
   agentProviderLabels,
   agentProviders,
@@ -398,7 +398,10 @@ export function ProjectAgentSettings({
                     <NativeSelect
                       disabled={profileSaving}
                       label={t("agents.model")}
-                      onValueChange={setModel}
+                      onValueChange={(value) => {
+                        setModel(value);
+                        setEffort(null);
+                      }}
                       options={modelOptions}
                       searchEmptyMessage={t("issue.noModelsFound")}
                       searchPlaceholder={t("issue.searchModels")}
@@ -421,10 +424,12 @@ export function ProjectAgentSettings({
                           label: t("agents.providerDefaultEffort"),
                           value: "",
                         },
-                        ...agentEfforts[provider].map((candidate) => ({
-                          label: candidate,
-                          value: candidate,
-                        })),
+                        ...agentEffortOptions(
+                          providerModels,
+                          provider,
+                          model,
+                          effort,
+                        ),
                       ]}
                       value={effort ?? ""}
                     />

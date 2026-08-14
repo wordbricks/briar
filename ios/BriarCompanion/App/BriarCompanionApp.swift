@@ -274,9 +274,11 @@ private actor UITestAPIClient: MobileAPIClientProtocol {
             payload = ##"""
             {"channels":[{"id":"cccccccc-cccc-4ccc-8ccc-cccccccccccc","organizationId":"22222222-2222-4222-8222-222222222222","slug":"design","name":"design","topic":"Mobile product design","visibility":"public","defaultProjectId":"11111111-1111-4111-8111-111111111111","archivedAt":null,"memberCount":4,"agentCount":3,"createdAt":"2026-08-02T01:00:00Z","updatedAt":"2026-08-02T01:00:00Z"}]}
             """##
-        } else if path.hasSuffix("/channels/cccccccc-cccc-4ccc-8ccc-cccccccccccc") && method == "GET" {
+        } else if path.hasSuffix(
+            "/channels/cccccccc-cccc-4ccc-8ccc-cccccccccccc?limit=20"
+        ) && method == "GET" {
             payload = ##"""
-            {"channel":{"id":"cccccccc-cccc-4ccc-8ccc-cccccccccccc","organizationId":"22222222-2222-4222-8222-222222222222","slug":"design","name":"design","topic":"Mobile product design","visibility":"public","defaultProjectId":"11111111-1111-4111-8111-111111111111","archivedAt":null,"memberCount":4,"agentCount":3,"createdAt":"2026-08-02T01:00:00Z","updatedAt":"2026-08-02T01:00:00Z"},"members":[],"agents":[],"messages":[{"id":"dddddddd-dddd-4ddd-8ddd-dddddddddddd","channelId":"cccccccc-cccc-4ccc-8ccc-cccccccccccc","parentMessageId":null,"body":"상단 헤더 디자인을 함께 확인해 주세요.","author":{"type":"user","name":"Briar User","image":null,"provider":null},"mentionedUserIds":[],"mentionedAgentIds":[],"replyCount":0,"lastReplyAt":null,"document":null,"proposal":null,"createdAt":"2026-08-02T01:02:00Z"}]}
+            {"channel":{"id":"cccccccc-cccc-4ccc-8ccc-cccccccccccc","organizationId":"22222222-2222-4222-8222-222222222222","slug":"design","name":"design","topic":"Mobile product design","visibility":"public","defaultProjectId":"11111111-1111-4111-8111-111111111111","archivedAt":null,"memberCount":4,"agentCount":3,"createdAt":"2026-08-02T01:00:00Z","updatedAt":"2026-08-02T01:00:00Z"},"members":[],"agents":[],"messages":[{"id":"dddddddd-dddd-4ddd-8ddd-dddddddddddd","channelId":"cccccccc-cccc-4ccc-8ccc-cccccccccccc","parentMessageId":null,"body":"상단 헤더 디자인을 함께 확인해 주세요.","author":{"type":"user","name":"Briar User","image":null,"provider":null},"mentionedUserIds":[],"mentionedAgentIds":[],"replyCount":0,"lastReplyAt":null,"document":null,"proposal":null,"createdAt":"2026-08-02T01:02:00Z"}],"nextCursor":null}
             """##
         } else if path.contains("/channels/cccccccc-cccc-4ccc-8ccc-cccccccccccc/messages?parentMessageId=dddddddd-dddd-4ddd-8ddd-dddddddddddd") && method == "GET" {
             payload = ##"""

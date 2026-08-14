@@ -6,6 +6,43 @@ import { beforeAll, describe, expect, it, vi } from "vitest";
 import { ProjectAgentSettings } from "./ProjectAgentSettings";
 import { ToastProvider } from "./ui/toast";
 
+vi.mock("../hooks/useAgentProviderModels", () => ({
+  useAgentProviderModels: () => ({
+    codex: {
+      models: [{
+        id: "gpt-5.6-sol",
+        label: "GPT-5.6 Sol",
+        efforts: [{ id: "high", label: "High" }],
+      }],
+      defaultEfforts: [],
+      allowCustomModels: false,
+      error: null,
+    },
+    claude: {
+      models: [{
+        id: "opus",
+        label: "Claude Opus",
+        efforts: [{ id: "high", label: "High" }],
+      }],
+      defaultEfforts: [],
+      allowCustomModels: true,
+      error: null,
+    },
+    grok: {
+      models: [],
+      defaultEfforts: [],
+      allowCustomModels: false,
+      error: null,
+    },
+    opencode: {
+      models: [],
+      defaultEfforts: [],
+      allowCustomModels: true,
+      error: null,
+    },
+  }),
+}));
+
 beforeAll(() => {
   (
     globalThis as typeof globalThis & {

@@ -1,17 +1,16 @@
 import type { StructuredAgentResult } from "./agent-result";
 import {
-  agentProviderPolicies,
+  emptyAgentProviderCapabilityCatalog,
   agentProviders,
-  modelEfforts,
   type AgentProvider,
+  type AgentProviderCapabilityCatalog,
+  type AgentModelCapability,
   type ModelEffort,
 } from "./agent-provider-contract";
 
 export {
   agentProviderLabels,
-  agentProviderPolicies,
   agentProviders,
-  modelEfforts,
   type AgentProvider,
   type ModelEffort,
 } from "./agent-provider-contract";
@@ -36,55 +35,13 @@ export type AgentModelOption = {
   label: string;
 };
 
-export type AgentProviderModel = {
-  id: string;
-  label: string;
-  isDefault?: boolean;
-};
-
-export type AgentProviderModelCatalogEntry = {
-  models: AgentProviderModel[];
-  error: string | null;
-};
-
-export type AgentProviderModelCatalog = Record<
-  AgentProvider,
-  AgentProviderModelCatalogEntry
->;
-
-export const agentEfforts: Record<AgentProvider, readonly ModelEffort[]> = {
-  codex: agentProviderPolicies.codex.efforts,
-  claude: agentProviderPolicies.claude.efforts,
-  grok: agentProviderPolicies.grok.efforts,
-  agy: agentProviderPolicies.agy.efforts,
-  opencode: agentProviderPolicies.opencode.efforts,
-};
-
-export const agentModels = Object.fromEntries(
-  agentProviders.map((provider) => [
-    provider,
-    [
-      { value: "", label: "Provider default" },
-      ...agentProviderPolicies[provider].models.map((model) => ({
-        value: model.id,
-        label: model.label,
-      })),
-    ],
-  ]),
-) as Record<AgentProvider, AgentModelOption[]>;
+export type AgentProviderModel = AgentModelCapability;
+export type AgentProviderModelCatalogEntry =
+  AgentProviderCapabilityCatalog[AgentProvider];
+export type AgentProviderModelCatalog = AgentProviderCapabilityCatalog;
 
 export const defaultAgentProviderModelCatalog: AgentProviderModelCatalog =
-  Object.fromEntries(
-    agentProviders.map((provider) => [
-      provider,
-      {
-        models: agentModels[provider]
-          .filter((model) => model.value)
-          .map((model) => ({ id: model.value, label: model.label })),
-        error: null,
-      },
-    ]),
-  ) as AgentProviderModelCatalog;
+  emptyAgentProviderCapabilityCatalog();
 
 export function agentModelOptions(
   catalog: AgentProviderModelCatalog,
@@ -114,6 +71,29 @@ export function agentModelDisplayName(
     catalog[provider].models.find((candidate) => candidate.id === model)?.label ??
     model
   );
+}
+
+export function agentEffortOptions(
+  catalog: AgentProviderModelCatalog,
+  provider: AgentProvider,
+  model?: string | null,
+  selectedEffort?: string | null,
+) {
+  const entry = catalog[provider];
+  const reportedModel = model
+    ? entry.models.find((candidate) => candidate.id === model)
+    : entry.models.find((candidate) => candidate.isDefault);
+  const efforts = reportedModel?.efforts?.length
+    ? reportedModel.efforts
+    : (entry.defaultEfforts ?? []);
+  const options = efforts.map((effort) => ({
+    value: effort.id,
+    label: effort.label,
+    description: effort.description ?? undefined,
+  }));
+  return selectedEffort && !options.some((option) => option.value === selectedEffort)
+    ? [{ value: selectedEffort, label: selectedEffort }, ...options]
+    : options;
 }
 
 let agentProviderModelsRequest: Promise<AgentProviderModelCatalog> | null = null;

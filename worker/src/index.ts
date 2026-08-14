@@ -27,11 +27,11 @@ import {
   agentExecutionUsageRecordSchema,
 } from "../../src/lib/agent-execution-metrics";
 import {
-  agentProviderAllowsEffort,
-  agentProviderAllowsModel,
   agentProviderLabels,
+  agentProviderCapabilityCatalogSchema,
+  mergeAgentProviderCapabilityCatalogs,
   agentProviders,
-  modelEfforts,
+  modelEffortSchema,
   type AgentProvider,
 } from "../../src/lib/agent-provider-contract";
 import {
@@ -248,6 +248,7 @@ import {
   listGithubConnectionRepositories,
   listOrganizationProjects,
   listOrganizationInboxProjects,
+  listOrganizationInboxRealtimeOutbox,
   listOrganizations,
   listProjects,
   listProjectAgents,
@@ -308,6 +309,7 @@ import {
   unsubscribeIssue,
   deleteIssueMessage,
   updateSlackInstallationProject,
+  acknowledgeOrganizationInboxRealtimeOutbox,
   upsertInboxReadStates,
   upsertProjectAgentSession,
   upsertSlackInstallation,
@@ -506,6 +508,7 @@ import {
 import {
   legacyChannelRealtimeResponse,
   publishChannelRealtime,
+  publishInboxRealtime,
   publishProjectRealtime,
   subscribeToOrganizationRealtime,
 } from "./channel-realtime";
@@ -597,6 +600,49 @@ const corsHeaders = {
   "Access-Control-Expose-Headers": "ETag",
 };
 
+export async function flushOrganizationInboxRealtimeOutbox(
+  env: Env,
+  db: D1Database,
+) {
+  if (!env.CHANNEL_REALTIME) return;
+  const pending = await listOrganizationInboxRealtimeOutbox(db);
+  for (const row of pending) {
+    try {
+      await publishInboxRealtime(env, row.organization_id, row.version);
+      await acknowledgeOrganizationInboxRealtimeOutbox(
+        db,
+        row.organization_id,
+        row.version,
+      );
+    } catch (error) {
+      // Keep the transactional outbox row for the next mutation, scheduled
+      // sweep, or client fallback refresh.
+      console.error(JSON.stringify({
+        message: "Inbox realtime publish failed",
+        organizationId: row.organization_id,
+        version: row.version,
+        error: error instanceof Error ? error.message : String(error),
+      }));
+    }
+  }
+}
+
+function scheduleInboxRealtimeFlush(
+  env: Env,
+  db: D1Database,
+  context?: ExecutionContext,
+) {
+  if (!env.CHANNEL_REALTIME) return;
+  const flush = flushOrganizationInboxRealtimeOutbox(env, db).catch((error) => {
+    console.error(JSON.stringify({
+      message: "Inbox realtime outbox flush failed",
+      error: error instanceof Error ? error.message : String(error),
+    }));
+  });
+  if (context) context.waitUntil(flush);
+  else void flush;
+}
+
 function scheduleChannelRealtimePublish(
   env: Env,
   db: D1Database,
@@ -615,6 +661,7 @@ function scheduleChannelRealtimePublish(
     });
   if (context) context.waitUntil(publish);
   else void publish;
+  scheduleInboxRealtimeFlush(env, db, context);
 }
 
 function scheduleProjectRealtimePublish(
@@ -646,6 +693,7 @@ function scheduleProjectRealtimePublish(
   });
   if (context) context.waitUntil(publish);
   else void publish;
+  scheduleInboxRealtimeFlush(env, db, context);
 }
 
 function channelMutationOrganization(
@@ -1507,7 +1555,7 @@ export const projectAgentInputSchema = z
       .optional(),
     provider: z.enum(agentProviders),
     model: z.string().trim().min(1).max(100).nullable().optional(),
-    effort: z.enum(modelEfforts).nullable().optional(),
+    effort: modelEffortSchema.nullable().optional(),
     responsibility: z.string().trim().min(1).max(2_000),
     skills: z.array(channelAgentSkillInputSchema).max(50).optional(),
     calendarColor: z
@@ -1854,7 +1902,7 @@ const issueInputBaseSchema = z
     status: z.enum(["backlog", "queued"]).default("queued"),
     preferredProvider: z.enum(agentProviders).nullable().optional(),
     preferredModel: z.string().trim().min(1).max(100).nullable().optional(),
-    preferredEffort: z.enum(modelEfforts).nullable().optional(),
+    preferredEffort: modelEffortSchema.nullable().optional(),
     fullAuto: z.boolean().default(false),
     checkpoints: z.array(workflowCheckpointSchema).max(100).default([]),
   })
@@ -1879,32 +1927,6 @@ const issueInputSchema = issueInputBaseSchema.superRefine((input, context) => {
       message: "A model is required for an effort preference",
     });
   }
-  if (
-    input.preferredProvider &&
-    input.preferredModel &&
-    !agentProviderAllowsModel(input.preferredProvider, input.preferredModel)
-  ) {
-    context.addIssue({
-      code: "custom",
-      message: `${input.preferredModel} is not available from ${input.preferredProvider}`,
-    });
-  }
-  if (
-    input.preferredProvider &&
-    input.preferredEffort &&
-    !agentProviderAllowsEffort(
-      input.preferredProvider,
-      input.preferredEffort,
-    )
-  ) {
-    context.addIssue({
-      code: "custom",
-      message:
-        input.preferredProvider === "claude"
-          ? "Claude does not support ultra effort"
-          : `${input.preferredProvider} supports low, medium, or high effort`,
-    });
-  }
 });
 
 export const issueUpdateInputSchema = issueInputBaseSchema
@@ -1920,8 +1942,6 @@ export const issueUpdateInputSchema = issueInputBaseSchema
     priority: true,
   })
   .strict();
-
-const modelEffortSchema = z.enum(modelEfforts);
 
 function executionPreferencesSchema({
   allowProviderReportedModels = false,
@@ -1948,30 +1968,7 @@ function executionPreferencesSchema({
           message: "A model is required for an effort preference",
         });
       }
-      if (
-        input.provider &&
-        input.model &&
-        !allowProviderReportedModels &&
-        !agentProviderAllowsModel(input.provider, input.model)
-      ) {
-        context.addIssue({
-          code: "custom",
-          message: `${input.model} is not available from ${input.provider}`,
-        });
-      }
-      if (
-        input.provider &&
-        input.effort &&
-        !agentProviderAllowsEffort(input.provider, input.effort)
-      ) {
-        context.addIssue({
-          code: "custom",
-          message:
-            input.provider === "claude"
-              ? "Claude does not support ultra effort"
-              : `${input.provider} supports low, medium, or high effort`,
-        });
-      }
+      void allowProviderReportedModels;
     });
 }
 
@@ -2476,6 +2473,7 @@ export const workerRegisterSchema = z
       .max(4)
       .optional(),
     providerHealth: providerHealthSchema.optional(),
+    providerCapabilities: agentProviderCapabilityCatalogSchema.optional(),
     maxConcurrentSessions: z
       .number()
       .int()
@@ -2491,6 +2489,7 @@ const workerBindSchema = workerRegisterSchema.pick({
   agentProvider: true,
   providers: true,
   providerHealth: true,
+  providerCapabilities: true,
   versions: true,
 });
 
@@ -2557,7 +2556,12 @@ const workerHeartbeatSchema = z
     acceptingWork: z.boolean().optional(),
     readinessState: z.enum(["ready", "busy", "needs_attention"]).optional(),
     readinessDetail: z.string().trim().max(500).nullable().optional(),
-    capabilities: z.record(z.string().max(64), z.unknown()).optional(),
+    capabilities: z
+      .object({
+        providerCapabilities: agentProviderCapabilityCatalogSchema.optional(),
+      })
+      .catchall(z.unknown())
+      .optional(),
   })
   .strict();
 
@@ -4386,7 +4390,14 @@ async function handleSlackEventRequest(
     return json({ challenge: payload.challenge });
   }
   if (isSlackEventCallback(payload)) {
-    const processing = processSlackAppMention(env, payload);
+    const processing = processSlackAppMention(env, payload).finally(() =>
+      flushOrganizationInboxRealtimeOutbox(env, env.DB).catch((error) => {
+        console.error(JSON.stringify({
+          message: "Inbox realtime flush after Slack event failed",
+          error: error instanceof Error ? error.message : String(error),
+        }));
+      })
+    );
     if (ctx) ctx.waitUntil(processing);
     else await processing;
   }
@@ -4942,6 +4953,13 @@ async function handleSlackInteractionRequest(
     submission,
     project,
     token,
+  ).finally(() =>
+    flushOrganizationInboxRealtimeOutbox(env, env.DB).catch((error) => {
+      console.error(JSON.stringify({
+        message: "Inbox realtime flush after Slack submission failed",
+        error: error instanceof Error ? error.message : String(error),
+      }));
+    })
   );
   if (ctx) ctx.waitUntil(processing);
   else await processing;
@@ -7018,8 +7036,14 @@ async function route(
       ) {
         throw new HttpError(401, "Invalid or expired realtime ticket");
       }
-      const cursor = await getChannelSyncCursor(db, organizationId);
-      return subscribeToOrganizationRealtime(env, organizationId, cursor);
+      const [channels, inbox] = await Promise.all([
+        getChannelSyncCursor(db, organizationId),
+        getOrganizationInboxSyncVersion(db, organizationId),
+      ]);
+      return subscribeToOrganizationRealtime(env, organizationId, {
+        channels,
+        inbox,
+      });
     }
     // Rolling-upgrade compatibility: old SSE clients keep their authoritative
     // delta fallback but never pin the Durable Object or perform D1 reads here.
@@ -7210,17 +7234,32 @@ async function route(
       organizationChannelMatch[2],
       session.user.id,
     );
-    const [members, channelAgents, messages] = await Promise.all([
+    const rawMessageLimit = new URL(request.url).searchParams.get("limit");
+    const messageLimit = rawMessageLimit === null
+      ? null
+      : z.coerce.number().int().min(1).max(100).parse(rawMessageLimit);
+    const [members, channelAgents, messagePage] = await Promise.all([
       listChannelMembers(db, channel.id),
       listChannelAgents(db, channel.id),
-      listChannelRootMessages(db, channel.id),
+      messageLimit === null
+        ? listChannelRootMessages(db, channel.id).then((messages) => ({
+            messages,
+            nextCursor: null,
+          }))
+        : listChannelMessagePage(db, {
+            channelId: channel.id,
+            parentMessageId: null,
+            cursor: null,
+            limit: messageLimit,
+          }),
     ]);
     const agents = await hydrateAgentSkills(db, channelAgents);
     return json({
       channel: channelJson(channel),
       members,
       agents: agents.map(organizationAgentJson),
-      messages,
+      messages: messagePage?.messages ?? [],
+      nextCursor: messagePage?.nextCursor ?? null,
     });
   }
   if (organizationChannelMatch && request.method === "PATCH") {
@@ -7508,13 +7547,38 @@ async function route(
       channelMessagesMatch[2],
       session.user.id,
     );
-    const parentMessageId = new URL(request.url).searchParams.get(
-      "parentMessageId",
-    );
+    const searchParams = new URL(request.url).searchParams;
+    const parentMessageId = searchParams.get("parentMessageId");
+    const paginated = searchParams.has("limit") || searchParams.has("cursor");
+    if (paginated) {
+      const query = z
+        .object({
+          limit: z.coerce.number().int().min(1).max(100).default(20),
+          cursor: z.string().uuid().nullable().default(null),
+          parentMessageId: z.string().uuid().nullable().default(null),
+        })
+        .strict()
+        .parse({
+          limit: searchParams.get("limit") ?? undefined,
+          cursor: searchParams.get("cursor"),
+          parentMessageId,
+        });
+      const page = await listChannelMessagePage(db, {
+        channelId: channel.id,
+        parentMessageId: query.parentMessageId,
+        cursor: query.cursor,
+        limit: query.limit,
+      });
+      if (!page) {
+        throw new HttpError(400, "Cursor does not belong to this message view");
+      }
+      return json(page);
+    }
     return json({
       messages: parentMessageId
         ? await listChannelThreadMessages(db, channel.id, parentMessageId)
         : await listChannelRootMessages(db, channel.id),
+      nextCursor: null,
     });
   }
   if (channelMessagesMatch && request.method === "POST") {
@@ -11761,6 +11825,7 @@ async function route(
       agentProvider: input.agentProvider,
       providers: input.providers,
       providerHealth: input.providerHealth,
+      providerCapabilities: input.providerCapabilities,
       maxConcurrentSessions: input.maxConcurrentSessions,
       versions: input.versions,
       observedAt,
@@ -11796,6 +11861,7 @@ async function route(
       agentProvider: input.agentProvider,
       providers: input.providers,
       providerHealth: input.providerHealth,
+      providerCapabilities: input.providerCapabilities,
       versions: input.versions,
       observedAt,
     });
@@ -12143,6 +12209,29 @@ async function route(
   const projectWorkersMatch = pathname.match(
     /^\/projects\/([0-9a-f-]+)\/workers$/u,
   );
+  const projectAgentCapabilitiesMatch = pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/agent-capabilities$/u,
+  );
+  if (projectAgentCapabilitiesMatch && request.method === "GET") {
+    const projectId = projectAgentCapabilitiesMatch[1];
+    await requireProjectAccess(auth, db, request, projectId);
+    const observedAt = new Date().toISOString();
+    const workers = await listExecutionWorkers(db, projectId, observedAt);
+    const catalogs = workers.flatMap((worker) => {
+      if (worker.state !== "online") return [];
+      const capabilities = parseJsonObject(worker.capabilities_json) as
+        | Record<string, unknown>
+        | null;
+      const raw = capabilities?.providerCapabilities;
+      const parsed = agentProviderCapabilityCatalogSchema.safeParse(raw);
+      return parsed.success ? [parsed.data] : [];
+    });
+    return json({
+      capabilities: mergeAgentProviderCapabilityCatalogs(catalogs),
+      workerCount: catalogs.length,
+      observedAt,
+    });
+  }
   if (projectWorkersMatch && request.method === "GET") {
     const projectId = projectWorkersMatch[1];
     await requireProjectAccess(auth, db, request, projectId);
@@ -14460,6 +14549,7 @@ export async function handleScheduledTask(
     ctx.waitUntil((async () => {
       try {
         const github = await dependencies.reconcileGithubMergedRuns(env.DB);
+        await flushOrganizationInboxRealtimeOutbox(env, env.DB);
         console.log(JSON.stringify({
           message: "GitHub merge reconciliation completed",
           observedAt,
@@ -14525,6 +14615,7 @@ export async function handleScheduledTask(
         dependencies.processSlackRevocationQueue(env.DB, env, observedAt),
         dependencies.reconcileGithubMergedRuns(env.DB),
       ]);
+      await flushOrganizationInboxRealtimeOutbox(env, env.DB);
       if (dashboardChangePruneFailed) {
         throw dashboardChangePruneError;
       }
@@ -14669,7 +14760,9 @@ export default {
     }
     if (url.pathname === "/github/webhooks" && request.method === "POST") {
       try {
-        return await handleGithubWebhookRequest(request, env);
+        const response = await handleGithubWebhookRequest(request, env);
+        scheduleInboxRealtimeFlush(env, env.DB, ctx);
+        return response;
       } catch (error) {
         if (error instanceof HttpError) {
           return json({ message: error.message }, error.status);
@@ -14825,6 +14918,14 @@ export default {
       );
       if (projectId) {
         scheduleProjectRealtimePublish(env, env.DB, projectId, ctx);
+      }
+      if (
+        !organizationId &&
+        !projectId &&
+        request.method !== "GET" &&
+        request.method !== "HEAD"
+      ) {
+        scheduleInboxRealtimeFlush(env, env.DB, ctx);
       }
       return response;
     } catch (error) {

@@ -15,6 +15,7 @@ struct CreateIssueSheet: View {
     @ObservedObject var mutations: IssueMutationStore
     let members: [OrganizationMember]
     let providers: [AgentProvider]
+    let capabilities: AgentProviderCapabilityCatalog
     let persistence: IssueDraftPersistence
     let refresh: () async -> Void
 
@@ -22,12 +23,14 @@ struct CreateIssueSheet: View {
         mutations: IssueMutationStore,
         members: [OrganizationMember] = [],
         providers: [AgentProvider] = [],
+        capabilities: AgentProviderCapabilityCatalog = AgentProviderCapabilityCatalog(workers: []),
         persistence: IssueDraftPersistence = IssueDraftPersistence(),
         refresh: @escaping () async -> Void
     ) {
         self.mutations = mutations
         self.members = members
         self.providers = providers.isEmpty ? AgentProvider.allCases : providers
+        self.capabilities = capabilities
         self.persistence = persistence
         self.refresh = refresh
         _draft = State(initialValue: persistence.load())
@@ -43,7 +46,8 @@ struct CreateIssueSheet: View {
                         provider: $draft.preferredProvider,
                         model: $draft.preferredModel,
                         effort: $draft.preferredEffort,
-                        providers: providers
+                        providers: providers,
+                        capabilities: capabilities
                     )
                 }
                 if let errorMessage {
@@ -290,9 +294,10 @@ private struct PreferredExecutionPicker: View {
     @Binding var model: String?
     @Binding var effort: ModelEffort?
     let providers: [AgentProvider]
+    let capabilities: AgentProviderCapabilityCatalog
 
-    private var availableModels: [String] {
-        provider?.models ?? []
+    private var availableModels: [AgentModelCapability] {
+        capabilities.models(for: provider)
     }
 
     var body: some View {
@@ -306,16 +311,16 @@ private struct PreferredExecutionPicker: View {
         .accessibilityIdentifier("create-issue-provider")
         Picker(L10n.text("모델"), selection: $model) {
             Text(L10n.text("기본값")).tag(String?.none)
-            ForEach(availableModels, id: \.self) { model in
-                Text(model).tag(String?.some(model))
+            ForEach(availableModels) { model in
+                Text(model.label).tag(String?.some(model.id))
             }
         }
         .disabled(provider == nil)
         .accessibilityIdentifier("create-issue-model")
         Picker(L10n.text("Effort"), selection: $effort) {
             Text(L10n.text("기본값")).tag(ModelEffort?.none)
-            ForEach(provider?.efforts ?? []) { effort in
-                Text(effort.rawValue).tag(ModelEffort?.some(effort))
+            ForEach(capabilities.efforts(for: provider, model: model)) { effort in
+                Text(effort.label).tag(ModelEffort?.some(ModelEffort(rawValue: effort.id)))
             }
         }
         .disabled(model == nil)
@@ -415,17 +420,15 @@ struct ExecutionConfigurationFields: View {
     let providers: [AgentProvider]
     let workers: [DashboardWorker]
     let policy: ProjectExecutionWorkerPolicy?
-    let effortOptions: [ModelEffort]?
+    let capabilities: AgentProviderCapabilityCatalog
     let locale: CompanionLocale
 
     private var availableProviders: [AgentProvider] {
         providers
     }
 
-    private var visibleEfforts: [ModelEffort] {
-        let supported = preferences.provider?.efforts ?? []
-        guard let effortOptions else { return supported }
-        return effortOptions.filter(supported.contains)
+    private var visibleEfforts: [AgentEffortCapability] {
+        capabilities.efforts(for: preferences.provider, model: preferences.model)
     }
 
     var body: some View {
@@ -439,8 +442,8 @@ struct ExecutionConfigurationFields: View {
 
             Picker(L10n.text("모델", locale: locale), selection: $preferences.model) {
                 Text(L10n.text("기본값", locale: locale)).tag(String?.none)
-                ForEach(preferences.provider?.models ?? [], id: \.self) {
-                    Text($0).tag(String?.some($0))
+                ForEach(capabilities.models(for: preferences.provider)) {
+                    Text($0.label).tag(String?.some($0.id))
                 }
             }
             .accessibilityIdentifier("execution-approval-model")
@@ -448,7 +451,7 @@ struct ExecutionConfigurationFields: View {
             Picker(L10n.text("Effort", locale: locale), selection: $preferences.effort) {
                 Text(L10n.text("기본값", locale: locale)).tag(ModelEffort?.none)
                 ForEach(visibleEfforts) {
-                    Text($0.rawValue).tag(ModelEffort?.some($0))
+                    Text($0.label).tag(ModelEffort?.some(ModelEffort(rawValue: $0.id)))
                 }
             }
             .disabled(preferences.model == nil)
@@ -477,7 +480,8 @@ struct ExecutionConfigurationFields: View {
             if model == nil { preferences.effort = nil }
         }
         .onChange(of: preferences.effort) { _, effort in
-            if let effort, !visibleEfforts.contains(effort) {
+            if let effort,
+               !visibleEfforts.contains(where: { $0.id == effort.rawValue }) {
                 preferences.effort = nil
             }
         }
@@ -594,7 +598,7 @@ struct ExecutionProposalApprovalSheet: View {
                     providers: providers,
                     workers: workers,
                     policy: policy,
-                    effortOptions: ModelEffort.conversationalApprovalCases,
+                    capabilities: AgentProviderCapabilityCatalog(workers: workers),
                     locale: locale
                 )
 
@@ -894,7 +898,7 @@ struct DispatchIssueSheet: View {
                     providers: providers,
                     workers: workers,
                     policy: nil,
-                    effortOptions: nil,
+                    capabilities: AgentProviderCapabilityCatalog(workers: workers),
                     locale: .current
                 )
                 if let errorMessage { Text(errorMessage).foregroundStyle(.red) }

@@ -111,10 +111,10 @@ final class IssueMutationTests: XCTestCase {
         XCTAssertEqual(restored.preferredModel, "sonnet")
     }
 
-    func testIssueDraftDefaultsEffortToHigh() {
+    func testIssueDraftDefaultsToProviderEffort() {
         let draft = IssueDraft()
         XCTAssertEqual(draft.preferredEffort, IssueDraft.defaultEffort)
-        XCTAssertEqual(draft.preferredEffort, .high)
+        XCTAssertNil(draft.preferredEffort)
         XCTAssertTrue(draft.isEmpty)
     }
 
@@ -456,19 +456,11 @@ final class IssueMutationTests: XCTestCase {
     }
 
     func testConversationApprovalUsesProviderEffortAndWorkerPolicyLimits() {
-        XCTAssertEqual(AgentProvider.codex.efforts, ModelEffort.allCases)
-        XCTAssertEqual(
-            AgentProvider.claude.efforts,
-            [.low, .medium, .high, .xhigh, .max]
-        )
-        XCTAssertEqual(AgentProvider.grok.efforts, [.low, .medium, .high])
-        XCTAssertEqual(AgentProvider.agy.efforts, [.low, .medium, .high])
         XCTAssertEqual(AgentProvider.agy.displayName, "Antigravity")
-        XCTAssertEqual(AgentProvider.opencode.efforts, [.low, .medium, .high])
-        XCTAssertFalse(IssueExecutionPreferences(
+        XCTAssertTrue(IssueExecutionPreferences(
             provider: .claude,
             model: "sonnet",
-            effort: .ultra
+            effort: ModelEffort(rawValue: "future-effort")
         ).isValidForConversationApproval)
 
         let allowed = DashboardWorker(

@@ -199,27 +199,18 @@ impl ApprovalPolicy {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, serde::Deserialize, serde::Serialize)]
-#[serde(rename_all = "lowercase")]
-pub(crate) enum ModelEffort {
-    Low,
-    Medium,
-    High,
-    Xhigh,
-    Max,
-    Ultra,
-}
+#[derive(Clone, Debug, PartialEq, serde::Deserialize, serde::Serialize)]
+#[serde(transparent)]
+pub(crate) struct ModelEffort(String);
 
 impl ModelEffort {
-    fn as_str(self) -> &'static str {
-        match self {
-            Self::Low => "low",
-            Self::Medium => "medium",
-            Self::High => "high",
-            Self::Xhigh => "xhigh",
-            Self::Max => "max",
-            Self::Ultra => "ultra",
-        }
+    #[cfg(test)]
+    pub(crate) fn new(value: impl Into<String>) -> Self {
+        Self(value.into())
+    }
+
+    fn as_str(&self) -> &str {
+        &self.0
     }
 }
 
@@ -492,7 +483,7 @@ pub(crate) fn codex_models(
     runner: Arc<dyn CommandRunner>,
     binary: &str,
     workspace: &Path,
-) -> Result<Vec<(String, String, bool)>, String> {
+) -> Result<Vec<codex::ModelListEntry>, String> {
     codex::list_models(runner, binary, workspace)
 }
 

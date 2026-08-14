@@ -132,6 +132,10 @@ function OnboardingProviderProgress({
   progressMessageRef: RefObject<HTMLParagraphElement | null>;
 }) {
   const { t } = useI18n();
+  const message =
+    progress?.phase === "final" || progress?.phase === "final_answer"
+      ? t("onboarding.workflowProviderFinalizing")
+      : progress?.message ?? t("onboarding.workflowProviderWaiting");
 
   return (
     <div
@@ -146,9 +150,7 @@ function OnboardingProviderProgress({
           ? agentProviderLabels[progress.provider]
           : t("onboarding.workflowProviderProgress")}
       </span>
-      <p ref={progressMessageRef}>
-        {progress?.message ?? t("onboarding.workflowProviderWaiting")}
-      </p>
+      <p ref={progressMessageRef}>{message}</p>
     </div>
   );
 }

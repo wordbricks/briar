@@ -755,11 +755,14 @@ pub(crate) fn chat(
     })
 }
 
+pub(crate) type ModelEffortEntry = (String, String, Option<String>, bool);
+pub(crate) type ModelListEntry = (String, String, bool, Option<String>, Vec<ModelEffortEntry>);
+
 pub(crate) fn list_models(
     runner: Arc<dyn CommandRunner>,
     binary: &str,
     workspace: &Path,
-) -> Result<Vec<(String, String, bool)>, String> {
+) -> Result<Vec<ModelListEntry>, String> {
     let mut connection = CodexConnection::start(runner, binary, workspace, false, &[], &[], None)?;
     connection.send(&initialize_request())?;
     connection.read_response(INITIALIZE_REQUEST_ID)?;
@@ -794,7 +797,32 @@ pub(crate) fn list_models(
                 .get("isDefault")
                 .and_then(Value::as_bool)
                 .unwrap_or(false);
-            models.push((id.to_string(), label.to_string(), is_default));
+            let default_effort = model
+                .get("defaultReasoningEffort")
+                .and_then(Value::as_str)
+                .map(str::to_string);
+            let efforts = model
+                .get("supportedReasoningEfforts")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+                .filter_map(|effort| {
+                    let id = effort.get("reasoningEffort")?.as_str()?.to_string();
+                    let description = effort
+                        .get("description")
+                        .and_then(Value::as_str)
+                        .map(str::to_string);
+                    let is_default_effort = default_effort.as_deref() == Some(id.as_str());
+                    Some((id.clone(), id, description, is_default_effort))
+                })
+                .collect();
+            models.push((
+                id.to_string(),
+                label.to_string(),
+                is_default,
+                default_effort,
+                efforts,
+            ));
         }
         cursor = result
             .get("nextCursor")
@@ -2719,7 +2747,7 @@ mod tests {
             AutoHuntExecution {
                 approval_policy: ApprovalPolicy::OnRequest,
                 model: Some("gpt-5.6-sol".to_string()),
-                effort: Some(ModelEffort::High),
+                effort: Some(ModelEffort::new("high")),
                 event_sink: Arc::new(|_| Ok(())),
                 environment: vec![("BRIAR_CLI".to_string(), "/tmp/briar".to_string())],
                 workspace_write_roots: vec!["/tmp/worktrees".to_string()],
@@ -2776,7 +2804,7 @@ mod tests {
                 sandbox_mode: SandboxMode::WorkspaceWrite,
                 network_access: true,
                 model: Some("gpt-5.6-sol".to_string()),
-                effort: Some(ModelEffort::High),
+                effort: Some(ModelEffort::new("high")),
                 event_sink: None,
                 environment: Vec::new(),
                 workspace_write_roots: Vec::new(),
@@ -2824,7 +2852,7 @@ mod tests {
                 sandbox_mode: SandboxMode::WorkspaceWrite,
                 network_access: true,
                 model: Some("gpt-5.6-sol".to_string()),
-                effort: Some(ModelEffort::High),
+                effort: Some(ModelEffort::new("high")),
                 event_sink: None,
                 environment: Vec::new(),
                 workspace_write_roots: Vec::new(),
@@ -2878,7 +2906,7 @@ mod tests {
                 sandbox_mode: SandboxMode::WorkspaceWrite,
                 network_access: true,
                 model: Some("gpt-5.6-sol".to_string()),
-                effort: Some(ModelEffort::High),
+                effort: Some(ModelEffort::new("high")),
                 event_sink: None,
                 environment: Vec::new(),
                 workspace_write_roots: Vec::new(),
@@ -2918,7 +2946,7 @@ mod tests {
                 sandbox_mode: SandboxMode::WorkspaceWrite,
                 network_access: true,
                 model: Some("gpt-5.6-sol".to_string()),
-                effort: Some(ModelEffort::High),
+                effort: Some(ModelEffort::new("high")),
                 event_sink: None,
                 environment: Vec::new(),
                 workspace_write_roots: Vec::new(),
@@ -2963,7 +2991,7 @@ mod tests {
                 sandbox_mode: SandboxMode::WorkspaceWrite,
                 network_access: true,
                 model: Some("gpt-5.6-sol".to_string()),
-                effort: Some(ModelEffort::High),
+                effort: Some(ModelEffort::new("high")),
                 event_sink: None,
                 environment: Vec::new(),
                 workspace_write_roots: Vec::new(),
@@ -3038,7 +3066,7 @@ mod tests {
             Some(json!({ "type": "object" })),
             ApprovalPolicy::Never,
             Some("gpt-5.6-sol"),
-            Some(ModelEffort::High),
+            Some(ModelEffort::new("high")),
         );
         assert_eq!(request["method"], "turn/start");
         assert_eq!(request["params"]["threadId"], "thread-1");
@@ -3129,7 +3157,7 @@ printf '%s\n' '{"method":"turn/completed","params":{"threadId":"thread-1","turn"
                 sandbox_mode: SandboxMode::ReadOnly,
                 network_access: false,
                 model: Some("gpt-5.6-sol".to_string()),
-                effort: Some(ModelEffort::High),
+                effort: Some(ModelEffort::new("high")),
                 event_sink: Some(Arc::new(move |event| {
                     sink_events
                         .lock()

@@ -98,4 +98,21 @@ describe("dashboard polling", () => {
 
     stop();
   });
+
+  it("supports a low-frequency fallback for realtime consumers", () => {
+    const refresh = vi.fn();
+    const harness = pollingHarness(true);
+
+    const stop = startDashboardPolling(
+      refresh,
+      harness.environment,
+      60_000,
+    );
+
+    expect(harness.setInterval).toHaveBeenCalledWith(
+      expect.any(Function),
+      60_000,
+    );
+    stop();
+  });
 });

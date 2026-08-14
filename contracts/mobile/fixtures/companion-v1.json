@@ -1192,7 +1192,8 @@
             "createdAt": "2026-08-06T00:03:00.000Z",
             "reactions": []
           }
-        ]
+        ],
+        "nextCursor": null
       }
     },
     "listChannelMessages": {
@@ -1269,7 +1270,8 @@
             "createdAt": "2026-08-06T00:04:00.000Z",
             "reactions": []
           }
-        ]
+        ],
+        "nextCursor": null
       }
     },
     "createChannelMessage": {

@@ -28,7 +28,7 @@ import {
   type ChannelAgentSummary,
 } from "../lib/channels-contract";
 import {
-  agentEfforts,
+  agentEffortOptions,
   agentModelOptions,
   type ModelEffort,
 } from "../lib/project-llm";
@@ -552,7 +552,10 @@ function OrganizationAgentCreateDialog({
               <Label>{t("agents.model")}</Label>
               <NativeSelect
                 label={t("agents.model")}
-                onValueChange={setModel}
+                onValueChange={(value) => {
+                  setModel(value);
+                  setEffort(null);
+                }}
                 options={agentModelOptions(
                   providerModels,
                   provider,
@@ -573,10 +576,7 @@ function OrganizationAgentCreateDialog({
                 }
                 options={[
                   { label: t("agents.providerDefaultEffort"), value: "" },
-                  ...agentEfforts[provider].map((candidate) => ({
-                    label: candidate,
-                    value: candidate,
-                  })),
+                  ...agentEffortOptions(providerModels, provider, model, effort),
                 ]}
                 value={effort ?? ""}
               />
