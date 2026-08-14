@@ -84,6 +84,7 @@ export function useChannelComposer<T extends ComposerInput>({
         detail: agent.projectId
           ? t("channel.projectAgent")
           : t("channel.orgAgent"),
+        image: agent.avatar,
       })),
       ...members.map((member) => ({
         type: "user" as const,

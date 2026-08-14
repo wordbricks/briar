@@ -610,6 +610,7 @@ export const mobileChannelDetailResponseSchema = z.object({
   agents: z.array(z.object({
     agentId: z.uuid(),
     name: z.string(),
+    avatar: z.string().nullable(),
     provider: mobileProviderSchema,
     model: z.string().nullable(),
     projectId: z.uuid().nullable(),

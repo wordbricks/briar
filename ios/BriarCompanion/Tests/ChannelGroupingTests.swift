@@ -197,6 +197,7 @@ final class ChannelGroupingTests: XCTestCase {
         let agent = ChannelAgentSummary(
             agentId: UUID(uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!,
             name: "Honey",
+            avatar: "data:image/png;base64,cHJvamVjdC1hdmF0YXI=",
             provider: "claude",
             model: nil,
             projectId: nil,
@@ -210,6 +211,7 @@ final class ChannelGroupingTests: XCTestCase {
         )
 
         XCTAssertEqual(candidates.map(\.handle), ["Honey"])
+        XCTAssertEqual(candidates.map(\.image), [agent.avatar])
         XCTAssertEqual(ChannelMentions.suggestions(in: "@h", candidates: candidates).map(\.handle), ["Honey"])
         XCTAssertEqual(ChannelMentions.suggestions(in: "@", candidates: candidates).map(\.handle), ["Honey"])
         XCTAssertEqual(ChannelMentions.insert(candidates[0], into: "확인 @hon"), "확인 @Honey ")
@@ -219,6 +221,7 @@ final class ChannelGroupingTests: XCTestCase {
         let agent = ChannelAgentSummary(
             agentId: UUID(uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!,
             name: "Honey",
+            avatar: nil,
             provider: "claude",
             model: nil,
             projectId: nil,
@@ -365,6 +368,7 @@ final class ChannelGroupingTests: XCTestCase {
         let agent = ChannelAgentSummary(
             agentId: UUID(uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!,
             name: "Honey",
+            avatar: nil,
             provider: "claude",
             model: nil,
             projectId: nil,
