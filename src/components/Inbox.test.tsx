@@ -135,6 +135,16 @@ describe("Inbox", () => {
     expect(
       filters.map((filter) => filter.getAttribute("aria-pressed")),
     ).toEqual(["true", "true", "true", "false"]);
+    expect(
+      filters.map((filter) => filter.getAttribute("aria-label")),
+    ).toEqual(["긴급 1", "확인 필요 1", "중요 변경 1", "최근 활동 1"]);
+    expect(
+      filters.map((filter) => filter.getAttribute("title")),
+    ).toEqual(["긴급", "확인 필요", "중요 변경", "최근 활동"]);
+    expect(container.textContent).not.toContain("긴급");
+    expect(container.textContent).not.toContain("확인 필요");
+    expect(container.textContent).not.toContain("중요 변경");
+    expect(container.textContent).not.toContain("최근 활동");
     expect(container.textContent).toContain("Production is blocked");
     expect(container.textContent).toContain("다음 행동: Choose the release scope.");
     expect(container.textContent).not.toContain("Routine dependency update");
@@ -142,9 +152,7 @@ describe("Inbox", () => {
     expect(container.querySelectorAll(".inbox-message")).toHaveLength(3);
     expect(container.querySelector(".inbox-section")).toBeNull();
 
-    const activityFilter = filters.find((button) =>
-      button.textContent?.includes("최근 활동"),
-    );
+    const activityFilter = container.querySelector(".inbox-filter.activity");
     await act(async () =>
       (activityFilter as HTMLButtonElement | undefined)?.click(),
     );
@@ -272,9 +280,7 @@ describe("Inbox", () => {
       ),
     );
 
-    const activityFilter = [...container.querySelectorAll(".inbox-filter")].find(
-      (button) => button.textContent?.includes("최근 활동"),
-    );
+    const activityFilter = container.querySelector(".inbox-filter.activity");
     await act(async () =>
       (activityFilter as HTMLButtonElement | undefined)?.click(),
     );
@@ -773,9 +779,9 @@ describe("Inbox", () => {
     });
     expect(scroll?.getAttribute("data-visible-count")).toBe("100");
 
-    const urgentFilter = [...container.querySelectorAll(".inbox-filter")].find(
-      (button) => button.textContent?.includes("긴급"),
-    ) as HTMLButtonElement | undefined;
+    const urgentFilter = container.querySelector<HTMLButtonElement>(
+      ".inbox-filter.urgent",
+    );
     await act(async () => urgentFilter?.click());
 
     expect(scroll?.getAttribute("data-visible-count")).toBe("50");
