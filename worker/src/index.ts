@@ -404,6 +404,7 @@ import {
   executionWorkerDeviceForBinding,
   executionWorkerProviders,
   executionWorkerSupportsOrganizationAgentContext,
+  hasAvailableChannelReplyWorker,
   leaseExpiryFrom,
   listExecutionAuditEvents,
   listExecutionWorkers,
@@ -551,6 +552,7 @@ import {
   channelReplyClaimInputSchema,
   channelReplyCompleteInputSchema,
   channelReplyLeaseInputSchema,
+  channelReplyNoAvailableWorkerError,
   channelSlugFromName,
   channelUpdateInputSchema,
   channelWebhookInputSchema,
@@ -7629,10 +7631,27 @@ async function route(
         storedAttachments.map((attachment) => attachment.id),
       ) ?? rawInput.body,
     };
-    const invokedAgents = mentionedAgents.map((agent) => {
-      const activeSkill = agentSkillForMessage(agent.skills, input.body);
-      return { agent, activeSkill };
-    });
+    const invokedAgents = await Promise.all(
+      mentionedAgents.map(async (agent) => {
+        const activeSkill = agentSkillForMessage(agent.skills, input.body);
+        const runtime = activeSkill ?? agent;
+        const hasAvailableWorker = await hasAvailableChannelReplyWorker(db, {
+          organizationId,
+          projectId: agent.project_id,
+          provider: runtime.provider,
+          model: runtime.model,
+          effort: runtime.effort,
+          observedAt: createdAt,
+        });
+        const unavailableReason: typeof channelReplyNoAvailableWorkerError | null =
+          hasAvailableWorker ? null : channelReplyNoAvailableWorkerError;
+        return {
+          agent,
+          activeSkill,
+          unavailableReason,
+        };
+      }),
+    );
     const uploadedKeys: string[] = [];
     let message = null;
     try {
@@ -7689,11 +7708,12 @@ async function route(
       channelId: channel.id,
       triggerMessageId: message.id,
       parentMessageId: agentReplyParentMessageId(message),
-      agents: invokedAgents.map(({ agent, activeSkill }) => ({
+      agents: invokedAgents.map(({ agent, activeSkill, unavailableReason }) => ({
         id: agent.id,
         projectId: agent.project_id,
         skillId: activeSkill?.id ?? null,
         provider: activeSkill?.provider ?? agent.provider,
+        unavailableReason,
       })),
       createdAt,
     });

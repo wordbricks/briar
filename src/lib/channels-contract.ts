@@ -37,6 +37,10 @@ export type ChannelReplyStatus = (typeof channelReplyStatuses)[number];
 export const channelReplyClaimTokenHeader =
   "X-Briar-Channel-Claim-Token";
 
+/** Stable server error used when an Agent mention has no runnable Worker. */
+export const channelReplyNoAvailableWorkerError =
+  "No available Worker can run this Agent.";
+
 export const channelSlugSchema = z
   .string()
   .trim()

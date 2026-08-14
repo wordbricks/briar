@@ -9,6 +9,7 @@ import type {
   ChannelMessage,
   ChannelSummary,
 } from "../lib/channels-contract";
+import { channelReplyNoAvailableWorkerError } from "../lib/channels-contract";
 import type { OrganizationMember } from "../types";
 
 const listChannels = vi.fn();
@@ -1061,6 +1062,46 @@ describe("Channels", () => {
         mentionedAgentIds: ["agent-1"],
         mentionedUserIds: [],
       }),
+    );
+  });
+
+  it("explains immediately when an Agent mention has no available Worker", async () => {
+    await render([message()]);
+    sendChannelMessage.mockResolvedValue({
+      message: message({ id: "message-no-worker", body: "@Honey help" }),
+      agentReplies: [{
+        id: "reply-no-worker",
+        agentId: agent.agentId,
+        channelId: channel.id,
+        triggerMessageId: "message-no-worker",
+        parentMessageId: "message-no-worker",
+        replyMessageId: "agent-message-no-worker",
+        status: "failed",
+        attempts: 0,
+        error: channelReplyNoAvailableWorkerError,
+        createdAt: "2026-08-01T01:00:01.000Z",
+        updatedAt: "2026-08-01T01:00:01.000Z",
+      }],
+    });
+
+    const textarea = container.querySelector("textarea")!;
+    await typeInto(textarea, "@hon");
+    const suggestion = [
+      ...container.querySelectorAll<HTMLButtonElement>(
+        ".channel-mention-menu button",
+      ),
+    ].find((button) => button.textContent?.includes("@Honey"));
+    await act(async () => suggestion!.click());
+    await typeInto(textarea, `${textarea.value}help`);
+    await act(async () => {
+      container
+        .querySelector("form.channel-composer")!
+        .dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+      await Promise.resolve();
+    });
+
+    expect(container.querySelector(".channel-error")?.textContent).toContain(
+      "이 Agent를 실행할 수 있는 사용 가능한 Worker가 없습니다.",
     );
   });
 

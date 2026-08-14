@@ -1,7 +1,10 @@
 import { createHash } from "node:crypto";
 import { Miniflare } from "miniflare";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { channelReplyClaimTokenHeader } from "../../src/lib/channels-contract";
+import {
+  channelReplyClaimTokenHeader,
+  channelReplyNoAvailableWorkerError,
+} from "../../src/lib/channels-contract";
 import apiWorker from "./index";
 import {
   addChannelAgent,
@@ -1970,6 +1973,72 @@ describe("organization channels", () => {
       createdAt: at(22),
     });
     expect(again).toHaveLength(2);
+  });
+
+  it("persists an unavailable Worker as an immediate failed reply", async () => {
+    const channelId = "e0000000-0000-4000-8000-000000000099";
+    const triggerId = "f0000000-0000-4000-8000-000000000099";
+    const agent = await createOrganizationAgent(db, {
+      id: "aa000000-0000-4000-8000-000000000099",
+      organizationId,
+      name: "Unavailable",
+      provider: "claude",
+      model: null,
+      responsibility: "Reply when a Worker is online",
+      effort: null,
+      createdAt: at(40),
+    });
+    await createChannel(db, {
+      id: channelId,
+      organizationId,
+      slug: "unavailable-worker",
+      name: "Unavailable Worker",
+      topic: null,
+      visibility: "public",
+      defaultProjectId: null,
+      createdByUserId: ownerId,
+      createdAt: at(40),
+    });
+    await addChannelAgent(db, {
+      channelId,
+      agentId: agent!.id,
+      addedByUserId: ownerId,
+      createdAt: at(40),
+    });
+    await createChannelMessage(db, {
+      id: triggerId,
+      channelId,
+      parentMessageId: null,
+      authorUserId: ownerId,
+      authorAgentId: null,
+      authorAgentName: null,
+      authorAgentProvider: null,
+      body: "@unavailable help",
+      mentionedUserIds: [],
+      mentionedAgentIds: [agent!.id],
+      createdAt: at(41),
+    });
+
+    const [reply] = await enqueueChannelAgentReplies(db, {
+      organizationId,
+      channelId,
+      triggerMessageId: triggerId,
+      parentMessageId: triggerId,
+      agents: [{
+        id: agent!.id,
+        projectId: null,
+        provider: "claude",
+        unavailableReason: channelReplyNoAvailableWorkerError,
+      }],
+      createdAt: at(41),
+    });
+
+    expect(reply).toMatchObject({
+      status: "failed",
+      attempts: 0,
+      error: channelReplyNoAvailableWorkerError,
+      completed_at: at(41),
+    });
   });
 
   it("allows Agents with the same display name because routing uses Agent IDs", async () => {
