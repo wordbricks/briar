@@ -23,6 +23,19 @@ export const changelogCopy = {
     backTop: "맨 위로 ↑",
     entries: [
       {
+        version: "1.2.122",
+        date: "2026년 8월 14일",
+        title: "채널 실행 상태와 조직·Inbox 탐색을 더 분명하게 다듬습니다",
+        summary:
+          "실행 가능한 Worker가 없을 때 즉시 알리고, 조직과 Inbox 탐색을 간결하게 만들며 Antigravity 브랜딩을 정돈했습니다.",
+        items: [
+          "채널에서 에이전트를 멘션하면 온라인·준비·작업 수락 상태와 제공자·모델·Effort 호환성을 먼저 확인하고, 실행할 수 있는 Worker가 없으면 데스크탑과 Companion에 이해하기 쉬운 오류를 즉시 표시합니다.",
+          "사이드바에서 조직 이름을 누르면 중간 단계 없이 조직 목록과 현재 선택 상태, 새 조직 추가 동작을 바로 보여줘 조직 전환을 더 빠르게 처리합니다.",
+          "Inbox 분류 필터를 개수 배지가 붙은 접근 가능한 아이콘 버튼으로 정리해 프로젝트 선택기 옆에서도 이름이 잘리지 않고 필요한 알림을 빠르게 좁힐 수 있습니다.",
+          "Antigravity가 앱 전체의 에이전트 선택기와 상태 화면에서 번들된 제공자 이미지로 일관되게 표시됩니다.",
+        ],
+      },
+      {
         version: "1.2.121",
         date: "2026년 8월 14일",
         title: "Antigravity를 연결하고 워크플로 생성을 더 깔끔하게 보여줍니다",
@@ -580,6 +593,19 @@ export const changelogCopy = {
     home: "Home",
     backTop: "Back to top ↑",
     entries: [
+      {
+        version: "1.2.122",
+        date: "August 14, 2026",
+        title: "Clarify channel execution and streamline organization and Inbox navigation",
+        summary:
+          "Report unavailable Workers immediately, simplify organization and Inbox navigation, and refine Antigravity branding.",
+        items: [
+          "When an agent is mentioned in a channel, first verify an online, ready, work-accepting Worker with compatible provider, model, and effort capabilities; show a clear error immediately in desktop and Companion when none can run it.",
+          "Open the organization list, current selection, and add-organization action directly from the sidebar organization name so switching organizations takes fewer steps.",
+          "Replace labeled Inbox category filters with accessible icon buttons and count badges so filters remain readable beside the project selector without truncation.",
+          "Use the bundled Antigravity provider artwork consistently across agent pickers and status surfaces.",
+        ],
+      },
       {
         version: "1.2.121",
         date: "August 14, 2026",
@@ -1150,9 +1176,9 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <h1>{changelog.title}</h1>
           <p>{changelog.description}</p>
         </div>
-        <a href="#v1-2-121" className="changelog-current">
+        <a href="#v1-2-122" className="changelog-current">
           <span>{changelog.current}</span>
-          <strong>v1.2.121</strong>
+          <strong>v1.2.122</strong>
           <i aria-hidden="true">↓</i>
         </a>
       </section>
@@ -1177,6 +1203,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   {index === 0 ? <span>{changelog.latest}</span> : null}
                   <time
                     dateTime={
+                      entry.version === "1.2.122" ||
                       entry.version === "1.2.121" ||
                       entry.version === "1.2.120" ||
                       entry.version === "1.2.119"
