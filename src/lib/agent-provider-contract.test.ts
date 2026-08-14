@@ -33,6 +33,19 @@ describe("agent provider contract", () => {
     expect(modelEffortSchema.parse("future-effort")).toBe("future-effort");
   });
 
+  it("fills newly added providers for capability catalogs from older workers", () => {
+    const legacy = emptyAgentProviderCapabilityCatalog();
+    delete (legacy as Partial<typeof legacy>).agy;
+    const parsed = agentProviderCapabilityCatalogSchema.parse(legacy);
+    expect(parsed.agy).toEqual({
+      models: [],
+      defaultEfforts: [],
+      allowCustomModels: false,
+      error: null,
+    });
+    expect(parsed.codex).toEqual(legacy.codex);
+  });
+
   it("checks an explicit selection against the reporting worker", () => {
     const capability = {
       models: [{
