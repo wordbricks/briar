@@ -252,6 +252,7 @@ const mobileInboxChannelMessageSchema = mobileInboxMessageBaseSchema.extend({
   rootMessageId: z.uuid(),
   body: z.string(),
   authorName: z.string(),
+  authorImage: z.string().nullable().optional(),
   reason: z.enum(["mention", "thread_reply"]),
 });
 

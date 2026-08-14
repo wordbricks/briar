@@ -104,6 +104,7 @@ describe("organization Inbox feed", () => {
       root_message_id: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
       body: "Please review this.",
       author_name: "Taylor",
+      author_image: "https://example.com/taylor.png",
       notification_reason: "mention",
       created_at: occurredAt,
     }]);
@@ -118,6 +119,7 @@ describe("organization Inbox feed", () => {
       id: "channel:cccccccc-cccc-4ccc-8ccc-cccccccccccc",
       projectId: first.project.id,
       targetId: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+      authorImage: "https://example.com/taylor.png",
     }));
   });
 

@@ -826,7 +826,12 @@ final class AgentsInboxSystemTests: XCTestCase {
                     channelName: "product",
                     rootMessageId: UUID(uuidString: "88888888-8888-4888-8888-888888888888")!,
                     body: "Thread reply",
-                    author: IssueMessage.Author(id: "u2", name: "Taylor", image: nil, provider: nil),
+                    author: IssueMessage.Author(
+                        id: "u2",
+                        name: "Taylor",
+                        image: "https://example.com/taylor.png",
+                        provider: nil
+                    ),
                     reason: "thread_reply",
                     createdAt: Date(timeIntervalSince1970: 1_700_000_125)
                 ),
@@ -908,6 +913,8 @@ final class AgentsInboxSystemTests: XCTestCase {
         XCTAssertEqual(issueRoute?.initialTab, .conversation)
         let channelReply = try XCTUnwrap(messages.first { $0.kind == .channel })
         XCTAssertEqual(InboxMessageBuilder.classify(channelReply), .actionRequired)
+        XCTAssertEqual(channelReply.authorName, "Taylor")
+        XCTAssertEqual(channelReply.authorImage, "https://example.com/taylor.png")
         XCTAssertEqual(
             InboxNotificationPresentationBuilder.content(for: channelReply),
             InboxNotificationPresentation(title: "Taylor in #product", body: "Thread reply")

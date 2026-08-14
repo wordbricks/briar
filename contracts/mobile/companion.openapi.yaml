@@ -1787,6 +1787,7 @@
           "rootMessageId": { "type": "string", "format": "uuid" },
           "body": { "type": "string" },
           "authorName": { "type": "string" },
+          "authorImage": { "type": ["string", "null"] },
           "issueKey": { "type": "string" },
           "reason": {
             "type": "string",

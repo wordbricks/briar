@@ -460,6 +460,7 @@ describe("Inbox", () => {
       version: "reply",
       body: "채널 답글입니다.",
       authorName: "Member",
+      authorImage: "https://example.com/member.png",
       reason: "thread_reply",
       isUnread: true,
     };
@@ -483,6 +484,55 @@ describe("Inbox", () => {
     expect(container.textContent).toContain("Member님이 회원님의 스레드에 답글을 남겼습니다.");
     expect(container.textContent).toContain("#product");
     expect(container.textContent).toContain("채널 답글입니다.");
+    expect(container.querySelector(".inbox-message-project-icon")).toBeNull();
+    expect(
+      container
+        .querySelector(".inbox-message-author-avatar")
+        ?.getAttribute("src"),
+    ).toBe("https://example.com/member.png");
+  });
+
+  it("falls back to the sender initial when a channel row has no avatar", async () => {
+    const message: InboxMessageWithReadState = {
+      id: "channel:mention",
+      kind: "channel",
+      projectId: "project-1",
+      projectName: "Briar",
+      targetId: "channel-1",
+      channelId: "channel-1",
+      channelName: "product",
+      messageId: "mention",
+      rootMessageId: "mention",
+      title: "product",
+      occurredAt: "2026-07-28T07:48:00.000Z",
+      version: "mention",
+      body: "@owner 확인해 주세요.",
+      authorName: "Taylor",
+      authorImage: null,
+      reason: "mention",
+      isUnread: true,
+    };
+
+    await act(async () =>
+      root.render(
+        <I18nProvider>
+          <Inbox
+            isSidebarOpen
+            messages={[message]}
+            onMarkAllRead={vi.fn()}
+            onMarkRead={vi.fn()}
+            onOpen={vi.fn()}
+            projects={projects}
+            unreadCount={1}
+          />
+        </I18nProvider>,
+      ),
+    );
+
+    expect(container.querySelector(".inbox-message-project-icon")).toBeNull();
+    expect(
+      container.querySelector(".inbox-message-author-fallback")?.textContent,
+    ).toBe("T");
   });
 
   it("companion mode shows a full-width chronological feed without filter chrome", async () => {
