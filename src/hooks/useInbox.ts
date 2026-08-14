@@ -115,6 +115,8 @@ export type InboxChannelMessage = {
   version: string;
   body: string;
   authorName: string;
+  /** Sender photo URL or data URL. Absent on older stored messages. */
+  authorImage?: string | null;
   reason: "mention" | "thread_reply";
 };
 
@@ -281,6 +283,7 @@ export function buildCurrentInboxMessages(
         version: notification.id,
         body: notification.body,
         authorName: notification.author.name,
+        authorImage: notification.author.image,
         reason: notification.reason,
       });
     }
@@ -414,10 +417,25 @@ function inboxMessageSnapshotsEqual(
         message.rootMessageId === candidate.rootMessageId &&
         message.body === candidate.body &&
         message.authorName === candidate.authorName &&
+        (message.authorImage ?? null) === (candidate.authorImage ?? null) &&
         message.reason === candidate.reason;
     }
     return false;
   });
+}
+
+function keepStoredInboxFeedMessage(
+  stored: InboxMessage | undefined,
+  incoming: InboxMessage,
+): InboxMessage {
+  if (stored?.version !== incoming.version) return incoming;
+  if (stored.kind === "channel" && incoming.kind === "channel") {
+    return {
+      ...stored,
+      authorImage: stored.authorImage ?? incoming.authorImage ?? null,
+    };
+  }
+  return stored;
 }
 
 export function isInboxMessageUnread(
@@ -978,7 +996,7 @@ export function useInbox(
               // The organization feed intentionally uses compact summaries.
               // Preserve richer selected-project/session details and the active
               // channel association when the canonical read version is equal.
-              return stored?.version === message.version ? stored : message;
+              return keepStoredInboxFeedMessage(stored, message);
             });
             const messages = mergeInboxMessages(
               retainedMessages,

@@ -48,6 +48,7 @@ struct InboxMessage: Identifiable, Equatable, Sendable {
     var channelMessageId: UUID? = nil
     var channelName: String? = nil
     var issueKey: String? = nil
+    var authorImage: String? = nil
 
     var isUnread: Bool = true
 }
@@ -74,6 +75,7 @@ struct InboxFeedMessage: Codable, Equatable, Sendable {
     let rootMessageId: UUID?
     let body: String?
     let authorName: String?
+    let authorImage: String?
     let issueKey: String?
     let reason: String?
     let channelId: UUID?
@@ -100,6 +102,7 @@ struct InboxFeedMessage: Codable, Equatable, Sendable {
         rootMessageId: UUID? = nil,
         body: String? = nil,
         authorName: String? = nil,
+        authorImage: String? = nil,
         issueKey: String? = nil,
         reason: String? = nil,
         channelId: UUID? = nil,
@@ -125,6 +128,7 @@ struct InboxFeedMessage: Codable, Equatable, Sendable {
         self.rootMessageId = rootMessageId
         self.body = body
         self.authorName = authorName
+        self.authorImage = authorImage
         self.issueKey = issueKey
         self.reason = reason
         self.channelId = channelId
@@ -183,7 +187,8 @@ struct InboxFeedMessage: Codable, Equatable, Sendable {
             conversationMessageId: kind == .conversation ? messageId : nil,
             channelMessageId: kind == .channel ? messageId : nil,
             channelName: channelName,
-            issueKey: issueKey
+            issueKey: issueKey,
+            authorImage: kind == .channel ? authorImage : nil
         )
     }
 }
@@ -290,7 +295,8 @@ enum InboxMessageBuilder {
                     reason: notification.reason,
                     rootMessageId: notification.rootMessageId,
                     channelMessageId: notification.id,
-                    channelName: notification.channelName
+                    channelName: notification.channelName,
+                    authorImage: notification.author.image
                 ))
             }
         }

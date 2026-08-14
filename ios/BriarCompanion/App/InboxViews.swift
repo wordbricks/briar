@@ -102,22 +102,32 @@ struct InboxHomeView: View {
     private func inboxIcon(_ message: InboxMessage) -> some View {
         let category = InboxMessageBuilder.classify(message)
 
-        Image(systemName: categorySystemImage(category, kind: message.kind))
-            .font(.system(size: 19, weight: .semibold))
-            .foregroundStyle(categoryColor(category))
-            .frame(width: 46, height: 46)
-            .background(categoryColor(category).opacity(0.14), in: Circle())
-            .overlay(alignment: .bottomTrailing) {
-                if showsUnreadIndicator(message) {
-                    Circle()
-                        .fill(Color.accentColor)
-                        .frame(width: 11, height: 11)
-                        .overlay {
-                            Circle().stroke(Color(.systemBackground), lineWidth: 2)
-                        }
-                }
+        Group {
+            if message.kind == .channel {
+                ProfileImageView(
+                    image: message.authorImage,
+                    name: message.authorName,
+                    size: 46
+                )
+            } else {
+                Image(systemName: categorySystemImage(category, kind: message.kind))
+                    .font(.system(size: 19, weight: .semibold))
+                    .foregroundStyle(categoryColor(category))
+                    .frame(width: 46, height: 46)
+                    .background(categoryColor(category).opacity(0.14), in: Circle())
             }
-            .accessibilityHidden(true)
+        }
+        .overlay(alignment: .bottomTrailing) {
+            if showsUnreadIndicator(message) {
+                Circle()
+                    .fill(Color.accentColor)
+                    .frame(width: 11, height: 11)
+                    .overlay {
+                        Circle().stroke(Color(.systemBackground), lineWidth: 2)
+                    }
+            }
+        }
+        .accessibilityHidden(true)
     }
 
     private func secondaryText(_ message: InboxMessage) -> String {

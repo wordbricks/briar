@@ -65,6 +65,7 @@ type InboxFeedChannelNotification = Pick<
   | "root_message_id"
   | "body"
   | "author_name"
+  | "author_image"
   | "notification_reason"
   | "created_at"
 >;
@@ -100,6 +101,7 @@ export type InboxFeedMessage = {
   rootMessageId?: string;
   body?: string;
   authorName?: string;
+  authorImage?: string | null;
   issueKey?: string;
   reason?: "mention" | "thread_reply" | "subscription";
   channelId?: string;
@@ -334,6 +336,7 @@ export function buildInboxFeedMessages(
         version: notification.id,
         body: notification.body,
         authorName: notification.author_name ?? "",
+        authorImage: notification.author_image ?? null,
         reason: notification.notification_reason,
       });
     }

@@ -276,7 +276,7 @@ describe("Inbox messages", () => {
           author: {
             id: "member",
             name: "Member",
-            image: null,
+            image: "https://example.com/member.png",
             provider: null,
           },
           reason: "thread_reply",
@@ -294,6 +294,8 @@ describe("Inbox messages", () => {
       channelName: "product",
       messageId: "channel-reply",
       rootMessageId: "channel-root",
+      authorName: "Member",
+      authorImage: "https://example.com/member.png",
       reason: "thread_reply",
     });
     expect(classifyInboxMessage(message)).toBe("action_required");

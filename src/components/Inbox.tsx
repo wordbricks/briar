@@ -413,14 +413,20 @@ function InboxMessageRow({
             "inbox-message-icon grid size-9 shrink-0 place-items-center rounded-lg",
             category,
             message.kind,
+            message.kind === "channel" && "author",
             message.kind === "conversation" || message.kind === "channel"
               ? message.reason
               : message.status,
           )}
         >
-          {message.kind === "session" ? (
+          {message.kind === "channel" ? (
+            <InboxChannelAuthorAvatar
+              image={message.authorImage}
+              name={message.authorName}
+            />
+          ) : message.kind === "session" ? (
             <Bot size={17} />
-          ) : message.kind === "conversation" || message.kind === "channel" ? (
+          ) : message.kind === "conversation" ? (
             message.reason === "mention" ? (
               <AtSign size={17} />
             ) : (
@@ -437,7 +443,7 @@ function InboxMessageRow({
           ) : (
             <Clock3 size={17} />
           )}
-          {project ? (
+          {project && message.kind !== "channel" ? (
             <span
               aria-hidden="true"
               className="inbox-message-project-icon"
@@ -510,6 +516,35 @@ function InboxMessageRow({
         </button>
       ) : null}
     </div>
+  );
+}
+
+function InboxChannelAuthorAvatar({
+  image,
+  name,
+}: {
+  image?: string | null;
+  name: string;
+}) {
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    setFailed(false);
+  }, [image]);
+  const initial = name.trim().charAt(0).toUpperCase() || "?";
+  if (image && !failed) {
+    return (
+      <img
+        alt=""
+        className="inbox-message-author-avatar"
+        onError={() => setFailed(true)}
+        src={image}
+      />
+    );
+  }
+  return (
+    <span aria-hidden="true" className="inbox-message-author-fallback">
+      {initial}
+    </span>
   );
 }
 
