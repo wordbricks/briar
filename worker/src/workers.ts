@@ -393,6 +393,7 @@ export async function hasAvailableChannelReplyWorker(
   input: {
     organizationId: string;
     projectId: string | null;
+    preferredDeviceId?: string | null;
     provider: AgentProvider;
     model: string | null;
     effort: ModelEffort | null;
@@ -416,14 +417,32 @@ export async function hasAvailableChannelReplyWorker(
         and membership.user_id = device.owner_user_id
        where device.organization_id = ?
          and (? is null or worker.project_id = ?)
+         and (? is null or device.id = ?)
          and credential.revoked_at is null
-         and (credential.expires_at is null or credential.expires_at > ?)`,
+         and (credential.expires_at is null or credential.expires_at > ?)
+         and (
+           ? is null
+           or not exists (
+             select 1 from briar_project_execution_worker_policies policy
+             where policy.project_id = ?
+               and policy.selection_mode = 'allowlist'
+           )
+           or exists (
+             select 1 from briar_project_execution_worker_allowlist allowed
+             where allowed.project_id = ? and allowed.worker_id = worker.id
+           )
+         )`,
     )
     .bind(
       input.organizationId,
       input.projectId,
       input.projectId,
+      input.preferredDeviceId ?? null,
+      input.preferredDeviceId ?? null,
       input.observedAt,
+      input.projectId,
+      input.projectId,
+      input.projectId,
     )
     .all<{
       agent_provider: AgentProvider;
@@ -458,6 +477,18 @@ export async function hasAvailableChannelReplyWorker(
     (input.projectId !== null ||
       executionWorkerSupportsOrganizationAgentContext(worker))
   );
+}
+
+export async function userOwnsExecutionWorkerDevice(
+  db: D1Database,
+  input: { organizationId: string; userId: string; deviceId: string },
+) {
+  const row = await db.prepare(
+    `select 1 as present from briar_execution_worker_devices
+     where id = ? and organization_id = ? and owner_user_id = ?`,
+  ).bind(input.deviceId, input.organizationId, input.userId)
+    .first<{ present: number }>();
+  return row?.present === 1;
 }
 
 export type ExecutionDispatchRow = {

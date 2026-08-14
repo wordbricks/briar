@@ -34,6 +34,7 @@ const createChannelWebhook = vi.fn();
 const updateChannelWebhook = vi.fn();
 const rotateChannelWebhook = vi.fn();
 const revokeChannelWebhook = vi.fn();
+const currentExecutionWorkerDeviceId = vi.fn();
 const channelRealtime = vi.hoisted(() => ({
   listeners: new Set<(notification: { topic: "channels"; cursor: number }) => void>(),
 }));
@@ -81,6 +82,11 @@ vi.mock("../lib/channel-realtime", () => ({
       return () => channelRealtime.listeners.delete(listener);
     },
   }),
+}));
+
+vi.mock("../lib/execution-worker-device", () => ({
+  currentExecutionWorkerDeviceId: (...args: unknown[]) =>
+    currentExecutionWorkerDeviceId(...args),
 }));
 
 vi.mock("@emoji-mart/data", () => ({ default: {} }));
@@ -273,6 +279,7 @@ describe("Channels", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    currentExecutionWorkerDeviceId.mockResolvedValue(null);
     listChannelWebhooks.mockResolvedValue({ webhooks: [] });
     channelRealtime.listeners.clear();
     container = document.createElement("div");
@@ -1461,6 +1468,45 @@ describe("Channels", () => {
       expect.objectContaining({
         mentionedAgentIds: ["agent-1"],
         mentionedUserIds: [],
+      }),
+    );
+    expect(sendChannelMessage.mock.calls[0]?.[3]).not.toHaveProperty(
+      "preferredDeviceId",
+    );
+  });
+
+  it("sends the desktop Worker device with an Agent mention", async () => {
+    const preferredDeviceId = "c0000000-0000-4000-8000-000000000123";
+    currentExecutionWorkerDeviceId.mockResolvedValue(preferredDeviceId);
+    await render([message()]);
+    sendChannelMessage.mockResolvedValue({
+      message: message({ id: "message-local-worker", body: "@Honey help" }),
+      agentReplies: [],
+    });
+
+    const textarea = container.querySelector("textarea")!;
+    await typeInto(textarea, "@hon");
+    const suggestion = [
+      ...container.querySelectorAll<HTMLButtonElement>(
+        ".channel-mention-menu button",
+      ),
+    ].find((button) => button.textContent?.includes("@Honey"));
+    await act(async () => suggestion!.click());
+    await act(async () => {
+      container.querySelector("form.channel-composer")!.dispatchEvent(
+        new Event("submit", { bubbles: true, cancelable: true }),
+      );
+      await Promise.resolve();
+    });
+
+    expect(currentExecutionWorkerDeviceId).toHaveBeenCalledWith("org-1");
+    expect(sendChannelMessage).toHaveBeenCalledWith(
+      "token",
+      "org-1",
+      "channel-1",
+      expect.objectContaining({
+        mentionedAgentIds: ["agent-1"],
+        preferredDeviceId,
       }),
     );
   });
