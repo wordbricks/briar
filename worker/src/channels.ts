@@ -19,6 +19,10 @@ import type {
   AgentSkillExecutionProposalRow,
   IssueExecutionProposalRow,
 } from "./db";
+import {
+  executionWorkerSupportsSelection,
+  hasAvailableChannelReplyWorker,
+} from "./workers";
 
 export type ChannelRow = {
   id: string;
@@ -161,6 +165,7 @@ export type ChannelReplyJobRow = {
   reply_message_id: string;
   status: ChannelReplyStatus;
   agent_provider: AgentProvider | null;
+  preferred_device_id: string | null;
   claimed_device_id: string | null;
   claimed_worker_id: string | null;
   claim_token_hash: string | null;
@@ -1797,6 +1802,7 @@ export async function enqueueChannelAgentReplies(
       provider: AgentProvider;
       unavailableReason?: typeof channelReplyNoAvailableWorkerError | null;
     }>;
+    preferredDeviceId?: string | null;
     createdAt: string;
   },
 ) {
@@ -1830,9 +1836,10 @@ export async function enqueueChannelAgentReplies(
              id, organization_id, channel_id, project_id, agent_id, skill_id,
              selected_skill_id_snapshot${skillSnapshotColumns},
              trigger_message_id, parent_message_id, reply_message_id,
-             agent_provider, status, error, completed_at, created_at, updated_at
+             agent_provider, preferred_device_id, status, error, completed_at,
+             created_at, updated_at
            )
-           select ?, ?, ?, ?, ?, ?, ?${skillSnapshotValues}, ?, ?, ?, ?, ?, ?, ?, ?, ?
+           select ?, ?, ?, ?, ?, ?, ?${skillSnapshotValues}, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
            from briar_channel_agents roster
            join briar_project_agents current_agent
              on current_agent.id = roster.agent_id
@@ -1865,6 +1872,7 @@ export async function enqueueChannelAgentReplies(
           input.parentMessageId,
           crypto.randomUUID(),
           agent.provider,
+          input.preferredDeviceId ?? null,
           agent.unavailableReason ? "failed" : "queued",
           agent.unavailableReason ?? null,
           agent.unavailableReason ? input.createdAt : null,
@@ -1936,6 +1944,8 @@ export async function claimNextChannelAgentReply(
     deviceId: string;
     workerId: string;
     providers: AgentProvider[];
+    workerAgentProvider?: AgentProvider;
+    workerCapabilitiesJson?: string;
     supportsOrganizationAgentContext: boolean;
     claimTokenHash: string;
     claimedAt: string;
@@ -2012,81 +2022,189 @@ export async function claimNextChannelAgentReply(
     )
     .bind(input.claimedAt, organizationId, MAX_REPLY_ATTEMPTS, input.claimedAt)
     .run();
-  return db
-    .prepare(
+  const candidates = await db.prepare(
+    `select job.*,
+            case when job.selected_skill_id_snapshot is null
+              then current_agent.model
+              else job.selected_skill_model_snapshot end as runtime_model,
+            case when job.selected_skill_id_snapshot is null
+              then current_agent.effort
+              else job.selected_skill_effort_snapshot end as runtime_effort
+     from briar_channel_agent_reply_jobs job
+     join briar_project_agents current_agent on current_agent.id = job.agent_id
+     where job.organization_id = ? and job.attempts < ?
+       and (job.status = 'queued'
+         or (job.status = 'running' and job.lease_expires_at <= ?))
+       and exists (
+         select 1 from briar_channel_agents current_roster
+         where current_roster.channel_id = job.channel_id
+           and current_roster.agent_id = job.agent_id
+       )
+       and ${liveChannelReplyRuntime("job")}
+       and ${liveSkillSnapshot("job")}
+       and (job.project_id is not null or ? = 1)
+       and ((job.agent_provider = 'codex' and ? = 1)
+         or (job.agent_provider = 'claude' and ? = 1)
+         or (job.agent_provider = 'grok' and ? = 1)
+         or (job.agent_provider = 'agy' and ? = 1)
+         or (job.agent_provider = 'opencode' and ? = 1))
+       and exists (
+         select 1 from briar_execution_workers binding
+         where binding.id = ? and binding.device_id = ?
+           and binding.state <> 'disabled'
+           and (job.project_id is null or binding.project_id = job.project_id)
+           and (
+             job.project_id is null
+             or not exists (
+               select 1 from briar_project_execution_worker_policies policy
+               where policy.project_id = job.project_id
+                 and policy.selection_mode = 'allowlist'
+             )
+             or exists (
+               select 1 from briar_project_execution_worker_allowlist allowed
+               where allowed.project_id = job.project_id
+                 and allowed.worker_id = binding.id
+             )
+           )
+           and (
+             job.project_id is not null
+             or (
+               json_valid(binding.capabilities_json)
+               and json_type(
+                 binding.capabilities_json,
+                 '$.organizationAgentContext'
+               ) = 'object'
+               and json_type(
+                 binding.capabilities_json,
+                 '$.organizationAgentContext.protocol'
+               ) = 'integer'
+               and json_extract(
+                 binding.capabilities_json,
+                 '$.organizationAgentContext.protocol'
+               ) = 1
+             )
+           )
+       )
+     order by job.created_at, job.id`,
+  ).bind(
+    organizationId,
+    MAX_REPLY_ATTEMPTS,
+    input.claimedAt,
+    input.supportsOrganizationAgentContext ? 1 : 0,
+    input.providers.includes("codex") ? 1 : 0,
+    input.providers.includes("claude") ? 1 : 0,
+    input.providers.includes("grok") ? 1 : 0,
+    input.providers.includes("agy") ? 1 : 0,
+    input.providers.includes("opencode") ? 1 : 0,
+    input.workerId,
+    input.deviceId,
+  ).all<ChannelReplyJobRow & {
+    runtime_model: string | null;
+    runtime_effort: AgentSkillEffort | null;
+  }>();
+
+  const preferredAvailability = new Map<string, boolean>();
+  for (const candidate of candidates.results) {
+    if (!candidate.agent_provider) continue;
+    const supportsSelection = input.workerCapabilitiesJson &&
+        input.workerAgentProvider
+      ? executionWorkerSupportsSelection(
+          {
+            agent_provider: input.workerAgentProvider,
+            capabilities_json: input.workerCapabilitiesJson,
+          },
+          candidate.agent_provider,
+          candidate.runtime_model,
+          candidate.runtime_effort,
+        )
+      // Direct database callers predate capability snapshots. The production
+      // claim route always supplies them; retain provider-only compatibility
+      // for those internal callers while enforcing exact selection at the API.
+      : input.providers.includes(candidate.agent_provider);
+    if (!supportsSelection) continue;
+
+    if (
+      candidate.preferred_device_id &&
+      candidate.preferred_device_id !== input.deviceId
+    ) {
+      const preferenceKey = JSON.stringify([
+        candidate.preferred_device_id,
+        candidate.project_id,
+        candidate.agent_provider,
+        candidate.runtime_model,
+        candidate.runtime_effort,
+      ]);
+      let available = preferredAvailability.get(preferenceKey);
+      if (available === undefined) {
+        available = await hasAvailableChannelReplyWorker(db, {
+          organizationId,
+          projectId: candidate.project_id,
+          preferredDeviceId: candidate.preferred_device_id,
+          provider: candidate.agent_provider,
+          model: candidate.runtime_model,
+          effort: candidate.runtime_effort,
+          observedAt: input.claimedAt,
+        });
+        preferredAvailability.set(preferenceKey, available);
+      }
+      if (available) continue;
+    }
+
+    const claimed = await db.prepare(
       `update briar_channel_agent_reply_jobs
        set status = 'running', claimed_device_id = ?, claimed_worker_id = ?,
-           claim_token_hash = ?,
-           claimed_at = ?, lease_expires_at = ?, attempts = attempts + 1,
-           error = null, updated_at = ?
-       where id = (
-         select job.id from briar_channel_agent_reply_jobs job
-         where job.organization_id = ? and job.attempts < ?
-           and (job.status = 'queued'
-             or (job.status = 'running' and job.lease_expires_at <= ?))
-           and exists (
-             select 1 from briar_channel_agents current_roster
-             where current_roster.channel_id = job.channel_id
-               and current_roster.agent_id = job.agent_id
-           )
-           and ${liveChannelReplyRuntime("job")}
-           and ${liveSkillSnapshot("job")}
-           and (job.project_id is not null or ? = 1)
-           and ((job.agent_provider = 'codex' and ? = 1)
-             or (job.agent_provider = 'claude' and ? = 1)
-             or (job.agent_provider = 'grok' and ? = 1)
-             or (job.agent_provider = 'agy' and ? = 1)
-             or (job.agent_provider = 'opencode' and ? = 1))
-           and exists (
-             select 1 from briar_execution_workers binding
-             where binding.id = ? and binding.device_id = ?
-               and binding.state <> 'disabled'
-               and (
-                 job.project_id is null
-                 or binding.project_id = job.project_id
+           claim_token_hash = ?, claimed_at = ?, lease_expires_at = ?,
+           attempts = attempts + 1, error = null, updated_at = ?
+       where id = ? and organization_id = ? and attempts < ?
+         and (status = 'queued'
+           or (status = 'running' and lease_expires_at <= ?))
+         and exists (
+           select 1 from briar_channel_agents current_roster
+           where current_roster.channel_id = briar_channel_agent_reply_jobs.channel_id
+             and current_roster.agent_id = briar_channel_agent_reply_jobs.agent_id
+         )
+         and ${liveChannelReplyRuntime("briar_channel_agent_reply_jobs")}
+         and ${liveSkillSnapshot("briar_channel_agent_reply_jobs")}
+         and exists (
+           select 1 from briar_execution_workers binding
+           where binding.id = ? and binding.device_id = ?
+             and binding.state <> 'disabled'
+             and (
+               briar_channel_agent_reply_jobs.project_id is null
+               or binding.project_id = briar_channel_agent_reply_jobs.project_id
+             )
+             and (
+               briar_channel_agent_reply_jobs.project_id is null
+               or not exists (
+                 select 1 from briar_project_execution_worker_policies policy
+                 where policy.project_id = briar_channel_agent_reply_jobs.project_id
+                   and policy.selection_mode = 'allowlist'
                )
-               and (
-                 job.project_id is not null
-                 or (
-                   json_valid(binding.capabilities_json)
-                   and json_type(
-                     binding.capabilities_json,
-                     '$.organizationAgentContext'
-                   ) = 'object'
-                   and json_type(
-                     binding.capabilities_json,
-                     '$.organizationAgentContext.protocol'
-                   ) = 'integer'
-                   and json_extract(
-                     binding.capabilities_json,
-                     '$.organizationAgentContext.protocol'
-                   ) = 1
-                 )
+               or exists (
+                 select 1 from briar_project_execution_worker_allowlist allowed
+                 where allowed.project_id = briar_channel_agent_reply_jobs.project_id
+                   and allowed.worker_id = binding.id
                )
-           )
-         order by job.created_at, job.id limit 1
-       ) returning *`,
-    )
-    .bind(
+             )
+         )
+       returning *`,
+    ).bind(
       input.deviceId,
       input.workerId,
       input.claimTokenHash,
       input.claimedAt,
       input.leaseExpiresAt,
       input.claimedAt,
+      candidate.id,
       organizationId,
       MAX_REPLY_ATTEMPTS,
       input.claimedAt,
-      input.supportsOrganizationAgentContext ? 1 : 0,
-      input.providers.includes("codex") ? 1 : 0,
-      input.providers.includes("claude") ? 1 : 0,
-      input.providers.includes("grok") ? 1 : 0,
-      input.providers.includes("agy") ? 1 : 0,
-      input.providers.includes("opencode") ? 1 : 0,
       input.workerId,
       input.deviceId,
-    )
-    .first<ChannelReplyJobRow>();
+    ).first<ChannelReplyJobRow>();
+    if (claimed) return claimed;
+  }
+  return null;
 }
 
 export type ChannelReplyExecutionTargetRow = {
@@ -2369,6 +2487,7 @@ export async function failChannelReply(
       `update briar_channel_agent_reply_jobs
        set status = case when attempts >= ? then 'failed' else 'queued' end,
            error = ?, claimed_device_id = null, claimed_worker_id = null,
+           preferred_device_id = null,
            claim_token_hash = null, lease_expires_at = null,
            updated_at = ?
        where id = ? and claimed_device_id = ? and claimed_worker_id = ?

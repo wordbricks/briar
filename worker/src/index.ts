@@ -431,6 +431,7 @@ import {
   updateExecutionWorkerIcon,
   updateExecutionWorkerLabel,
   updateProjectExecutionWorkerPolicy,
+  userOwnsExecutionWorkerDevice,
 } from "./workers";
 import {
   ingestAgentTranscript,
@@ -2129,6 +2130,7 @@ export async function readChannelMessageRequest(request: Request) {
     throw new HttpError(400, "Every channel image must be referenced in the body");
   }
   const parentMessageId = form.get("parentMessageId");
+  const preferredDeviceId = form.get("preferredDeviceId");
   return {
     input: channelMessageInputSchema.parse({
       body: rawBody,
@@ -2138,6 +2140,10 @@ export async function readChannelMessageRequest(request: Request) {
           : null,
       mentionedUserIds: readMultipartJsonArray(form, "mentionedUserIds"),
       mentionedAgentIds: readMultipartJsonArray(form, "mentionedAgentIds"),
+      preferredDeviceId:
+        typeof preferredDeviceId === "string" && preferredDeviceId
+          ? preferredDeviceId
+          : null,
     }),
     attachments,
     attachmentReferences: attachmentReferences as string[],
@@ -7597,6 +7603,19 @@ async function route(
     }
     const { input: rawInput, attachments, attachmentReferences } =
       await readChannelMessageRequest(request);
+    if (
+      rawInput.preferredDeviceId &&
+      !(await userOwnsExecutionWorkerDevice(db, {
+        organizationId,
+        userId: session.user.id,
+        deviceId: rawInput.preferredDeviceId,
+      }))
+    ) {
+      throw new HttpError(
+        403,
+        "Preferred Worker device is not owned by the current user in this organization",
+      );
+    }
     const roster = await hydrateAgentSkills(
       db,
       await listChannelAgents(db, channel.id),
@@ -7715,6 +7734,7 @@ async function route(
         provider: activeSkill?.provider ?? agent.provider,
         unavailableReason,
       })),
+      preferredDeviceId: input.preferredDeviceId,
       createdAt,
     });
     return json(
@@ -12753,7 +12773,7 @@ async function route(
         binding.state,
       ) !== "online" ||
       binding.accepting_work !== 1 ||
-      binding.readiness_state === "needs_attention"
+      binding.readiness_state !== "ready"
     ) {
       throw new HttpError(409, "Worker is not ready to claim replies");
     }
@@ -12767,6 +12787,8 @@ async function route(
       deviceId: principal.deviceId,
       workerId: binding.id,
       providers,
+      workerAgentProvider: binding.agent_provider,
+      workerCapabilitiesJson: binding.capabilities_json,
       supportsOrganizationAgentContext:
         executionWorkerSupportsOrganizationAgentContext(binding),
       claimTokenHash,

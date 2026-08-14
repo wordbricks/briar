@@ -1825,6 +1825,7 @@ export async function sendChannelMessage(
     parentMessageId?: string | null;
     mentionedUserIds?: string[];
     mentionedAgentIds?: string[];
+    preferredDeviceId?: string | null;
     attachments?: File[];
     attachmentReferences?: string[];
   },
@@ -1836,6 +1837,9 @@ export async function sendChannelMessage(
     form.set("parentMessageId", input.parentMessageId ?? "");
     form.set("mentionedUserIds", JSON.stringify(input.mentionedUserIds ?? []));
     form.set("mentionedAgentIds", JSON.stringify(input.mentionedAgentIds ?? []));
+    if (input.preferredDeviceId) {
+      form.set("preferredDeviceId", input.preferredDeviceId);
+    }
     form.set(
       "attachmentReferences",
       JSON.stringify(input.attachmentReferences ?? []),

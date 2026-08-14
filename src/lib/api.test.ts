@@ -2314,12 +2314,14 @@ describe("channel message API", () => {
   });
 
   it("keeps attachment-only fields out of JSON channel messages", async () => {
+    const preferredDeviceId = "c0000000-0000-4000-8000-000000000123";
     const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
       expect(JSON.parse(String(init?.body))).toEqual({
         body: "Hello",
         parentMessageId: null,
         mentionedUserIds: [],
         mentionedAgentIds: [],
+        preferredDeviceId,
       });
       return new Response(
         JSON.stringify({ message: {}, agentReplies: [] }),
@@ -2333,6 +2335,7 @@ describe("channel message API", () => {
       parentMessageId: null,
       mentionedUserIds: [],
       mentionedAgentIds: [],
+      preferredDeviceId,
       attachments: [],
       attachmentReferences: [],
     });
@@ -2342,12 +2345,14 @@ describe("channel message API", () => {
 
   it("uploads channel images and attachment references as multipart form data", async () => {
     const reference = crypto.randomUUID();
+    const preferredDeviceId = "c0000000-0000-4000-8000-000000000123";
     const image = new File(["image"], "clipboard.png", { type: "image/png" });
     const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
       const form = init?.body as FormData;
       expect(form).toBeInstanceOf(FormData);
       expect(form.get("body")).toContain(`briar-attachment://${reference}`);
       expect(form.get("mentionedAgentIds")).toBe(JSON.stringify(["agent-1"]));
+      expect(form.get("preferredDeviceId")).toBe(preferredDeviceId);
       expect(form.get("attachmentReferences")).toBe(JSON.stringify([reference]));
       expect(form.getAll("attachments")).toEqual([image]);
       return new Response(
@@ -2385,6 +2390,7 @@ describe("channel message API", () => {
       parentMessageId: null,
       mentionedUserIds: [],
       mentionedAgentIds: ["agent-1"],
+      preferredDeviceId,
       attachments: [image],
       attachmentReferences: [reference],
     });

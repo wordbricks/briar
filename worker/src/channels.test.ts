@@ -59,6 +59,7 @@ const otherWorkerId = "d0000000-0000-4000-8000-000000000002";
 const ownerId = "owner";
 const outsiderId = "outsider";
 const contextWorkerToken = "briar_worker_channels-context-test";
+const ownerSessionToken = "channels-owner-session-token";
 const sha256Hex = (value: string) =>
   createHash("sha256").update(value).digest("hex");
 const at = (minute: number) =>
@@ -93,6 +94,11 @@ describe("organization channels", () => {
         .bind(id, name, `${id}@example.com`, at(0), at(0))
         .run();
     }
+    await db.prepare(
+      `insert into "session" (
+         id, expiresAt, token, createdAt, updatedAt, userId
+       ) values ('channels-owner-session', '2099-01-01T00:00:00.000Z', ?, ?, ?, ?)`,
+    ).bind(ownerSessionToken, at(0), at(0), ownerId).run();
     for (const id of [organizationId, otherOrganizationId]) {
       await db
         .prepare(
@@ -1823,6 +1829,255 @@ describe("organization channels", () => {
     });
   });
 
+  it("reserves a project reply for a compatible preferred device, then releases preference on retry and policy fallback", async () => {
+    const channelId = "e0000000-0000-4000-8000-000000000109";
+    const agentId = "aa000000-0000-4000-8000-000000000109";
+    const triggerId = "f0000000-0000-4000-8000-000000000109";
+    const fallbackDeviceId = "c0000000-0000-4000-8000-000000000109";
+    const fallbackWorkerId = "d0000000-0000-4000-8000-000000000109";
+    const observedAt = new Date().toISOString();
+    const leaseExpiresAt = new Date(Date.parse(observedAt) + 60_000).toISOString();
+    const capabilities = JSON.stringify({
+      providerHealth: { claude: { healthy: true } },
+      providerCapabilities: {
+        claude: {
+          models: [{
+            id: "claude-sonnet-local",
+            label: "Claude Sonnet Local",
+            efforts: [{ id: "high", label: "High" }],
+          }],
+          defaultEfforts: [],
+          allowCustomModels: false,
+          error: null,
+        },
+      },
+    });
+    // The preceding lease lifecycle test intentionally leaves its historical
+    // job queued. Close that fixture so this test observes only its own job.
+    await db.prepare(
+      `update briar_channel_agent_reply_jobs
+       set status = 'failed', completed_at = ?, updated_at = ?
+       where project_id = ? and status = 'queued'`,
+    ).bind(observedAt, observedAt, projectId).run();
+    await createChannel(db, {
+      id: channelId,
+      organizationId,
+      slug: "project-local-preference",
+      name: "Project local preference",
+      topic: null,
+      visibility: "public",
+      defaultProjectId: projectId,
+      createdByUserId: ownerId,
+      createdAt: observedAt,
+    });
+    await db.batch([
+      db.prepare(
+        `insert into briar_project_agents (
+           id, organization_id, project_id, name, provider, model,
+           responsibility, effort, created_at, updated_at
+         ) values (?, ?, ?, 'Local Project Agent', 'claude',
+                   'claude-sonnet-local', 'Use the project Worker', 'high', ?, ?)`,
+      ).bind(agentId, organizationId, projectId, observedAt, observedAt),
+      db.prepare(
+        `insert into briar_execution_worker_devices (
+           id, organization_id, owner_user_id, label, device_identity_hash,
+           state, last_heartbeat_at, created_at, updated_at
+         ) values (?, ?, ?, 'Fallback device', ?, 'online', ?, ?, ?)`,
+      ).bind(
+        fallbackDeviceId,
+        organizationId,
+        ownerId,
+        "8".repeat(64),
+        observedAt,
+        observedAt,
+        observedAt,
+      ),
+      db.prepare(
+        `insert into briar_execution_worker_credentials (
+           device_id, token_hash, created_at
+         ) values (?, ?, ?)`,
+      ).bind(fallbackDeviceId, "9".repeat(64), observedAt),
+      db.prepare(
+        `insert into briar_execution_workers (
+           id, project_id, device_id, label, host_fingerprint,
+           agent_provider, capabilities_json, state, accepting_work,
+           readiness_state, last_heartbeat_at, created_at, updated_at
+         ) values (?, ?, ?, 'Fallback binding', ?, 'claude', ?, 'online', 1,
+                   'ready', ?, ?, ?)`,
+      ).bind(
+        fallbackWorkerId,
+        projectId,
+        fallbackDeviceId,
+        "9".repeat(64),
+        capabilities,
+        observedAt,
+        observedAt,
+        observedAt,
+      ),
+      db.prepare(
+        `update briar_execution_worker_devices
+         set state = 'online', last_heartbeat_at = ?, updated_at = ?
+         where id = ?`,
+      ).bind(observedAt, observedAt, deviceId),
+      db.prepare(
+        `update briar_execution_workers
+         set capabilities_json = ?, state = 'online', accepting_work = 1,
+             readiness_state = 'ready', last_heartbeat_at = ?, updated_at = ?
+         where id = ?`,
+      ).bind(capabilities, observedAt, observedAt, boundWorkerId),
+    ]);
+    await addChannelAgent(db, {
+      channelId,
+      agentId,
+      addedByUserId: ownerId,
+      createdAt: observedAt,
+    });
+    await createChannelMessage(db, {
+      id: triggerId,
+      channelId,
+      parentMessageId: null,
+      authorUserId: ownerId,
+      authorAgentId: null,
+      authorAgentName: null,
+      authorAgentProvider: null,
+      body: "@Local-Project-Agent run locally",
+      mentionedUserIds: [],
+      mentionedAgentIds: [agentId],
+      createdAt: observedAt,
+    });
+    const [job] = await enqueueChannelAgentReplies(db, {
+      organizationId,
+      channelId,
+      triggerMessageId: triggerId,
+      parentMessageId: triggerId,
+      agents: [{ id: agentId, projectId, provider: "claude" }],
+      preferredDeviceId: deviceId,
+      createdAt: observedAt,
+    });
+    expect(job.preferred_device_id).toBe(deviceId);
+
+    const claim = (overrides: {
+      deviceId?: string;
+      workerId?: string;
+      claimTokenHash?: string;
+    } = {}) => claimNextChannelAgentReply(db, organizationId, {
+      deviceId: overrides.deviceId ?? fallbackDeviceId,
+      workerId: overrides.workerId ?? fallbackWorkerId,
+      providers: ["claude"],
+      workerAgentProvider: "claude",
+      workerCapabilitiesJson: capabilities,
+      supportsOrganizationAgentContext: false,
+      claimTokenHash: overrides.claimTokenHash ?? "1".repeat(64),
+      claimedAt: observedAt,
+      leaseExpiresAt,
+    });
+    await expect(claim()).resolves.toBeNull();
+    const localClaim = await claim({
+      deviceId,
+      workerId: boundWorkerId,
+      claimTokenHash: "2".repeat(64),
+    });
+    expect(localClaim).toMatchObject({
+      id: job.id,
+      claimed_device_id: deviceId,
+      claimed_worker_id: boundWorkerId,
+    });
+    const requeued = await failChannelReply(db, {
+      jobId: job.id,
+      deviceId,
+      workerId: boundWorkerId,
+      claimTokenHash: "2".repeat(64),
+      error: "local execution failed",
+      updatedAt: observedAt,
+    });
+    expect(requeued).toMatchObject({
+      status: "queued",
+      preferred_device_id: null,
+    });
+    const retryClaim = await claim({ claimTokenHash: "3".repeat(64) });
+    expect(retryClaim).toMatchObject({
+      id: job.id,
+      claimed_device_id: fallbackDeviceId,
+    });
+    await completeChannelReply(db, retryClaim!, {
+      jobId: retryClaim!.id,
+      deviceId: fallbackDeviceId,
+      workerId: fallbackWorkerId,
+      claimTokenHash: "3".repeat(64),
+      body: "Fallback completed the retry.",
+      document: null,
+      issueProposal: null,
+      executionProposal: null,
+      agentName: "Local Project Agent",
+      agentProvider: "claude",
+      completedAt: observedAt,
+    });
+
+    const policyTriggerId = "f0000000-0000-4000-8000-000000000110";
+    await createChannelMessage(db, {
+      id: policyTriggerId,
+      channelId,
+      parentMessageId: null,
+      authorUserId: ownerId,
+      authorAgentId: null,
+      authorAgentName: null,
+      authorAgentProvider: null,
+      body: "@Local-Project-Agent obey the allowlist",
+      mentionedUserIds: [],
+      mentionedAgentIds: [agentId],
+      createdAt: observedAt,
+    });
+    const [policyJob] = await enqueueChannelAgentReplies(db, {
+      organizationId,
+      channelId,
+      triggerMessageId: policyTriggerId,
+      parentMessageId: policyTriggerId,
+      agents: [{ id: agentId, projectId, provider: "claude" }],
+      preferredDeviceId: deviceId,
+      createdAt: observedAt,
+    });
+    await db.batch([
+      db.prepare(
+        `insert into briar_project_execution_worker_policies (
+           project_id, selection_mode, created_at, updated_at
+         ) values (?, 'allowlist', ?, ?)
+         on conflict (project_id) do update set selection_mode = 'allowlist'`,
+      ).bind(projectId, observedAt, observedAt),
+      db.prepare(
+        `insert into briar_project_execution_worker_allowlist (
+           project_id, worker_id, created_at
+         ) values (?, ?, ?)`,
+      ).bind(projectId, fallbackWorkerId, observedAt),
+    ]);
+    const policyClaim = await claim({ claimTokenHash: "4".repeat(64) });
+    expect(policyClaim).toMatchObject({
+      id: policyJob.id,
+      claimed_device_id: fallbackDeviceId,
+    });
+    await completeChannelReply(db, policyClaim!, {
+      jobId: policyClaim!.id,
+      deviceId: fallbackDeviceId,
+      workerId: fallbackWorkerId,
+      claimTokenHash: "4".repeat(64),
+      body: "The allowlisted Worker handled this reply.",
+      document: null,
+      issueProposal: null,
+      executionProposal: null,
+      agentName: "Local Project Agent",
+      agentProvider: "claude",
+      completedAt: observedAt,
+    });
+    await db.batch([
+      db.prepare(
+        `delete from briar_project_execution_worker_allowlist
+         where project_id = ? and worker_id = ?`,
+      ).bind(projectId, fallbackWorkerId),
+      db.prepare(
+        `delete from briar_project_execution_worker_policies where project_id = ?`,
+      ).bind(projectId),
+    ]);
+  });
+
   it("skips a provider the claiming device cannot run", async () => {
     const channelId = "e0000000-0000-4000-8000-000000000006";
     await createChannel(db, {
@@ -1887,6 +2142,150 @@ describe("organization channels", () => {
         leaseExpiresAt: at(29),
       }),
     ).toBeNull();
+  });
+
+  it("falls back immediately when the preferred device lacks organization Agent context support", async () => {
+    const channelId = "e0000000-0000-4000-8000-000000000111";
+    const agentId = "aa000000-0000-4000-8000-000000000111";
+    const triggerId = "f0000000-0000-4000-8000-000000000111";
+    const fallbackDeviceId = "c0000000-0000-4000-8000-000000000111";
+    const fallbackWorkerId = "d0000000-0000-4000-8000-000000000111";
+    const observedAt = new Date().toISOString();
+    const capabilities = JSON.stringify({
+      providerHealth: { claude: { healthy: true } },
+      organizationAgentContext: { protocol: 1 },
+    });
+    await createChannel(db, {
+      id: channelId,
+      organizationId,
+      slug: "organization-context-fallback",
+      name: "Organization context fallback",
+      topic: null,
+      visibility: "public",
+      defaultProjectId: null,
+      createdByUserId: ownerId,
+      createdAt: observedAt,
+    });
+    await createOrganizationAgent(db, {
+      id: agentId,
+      organizationId,
+      name: "Organization Fallback",
+      provider: "claude",
+      model: null,
+      responsibility: "Use organization context",
+      effort: null,
+      createdAt: observedAt,
+    });
+    await addChannelAgent(db, {
+      channelId,
+      agentId,
+      addedByUserId: ownerId,
+      createdAt: observedAt,
+    });
+    await db.batch([
+      db.prepare(
+        `update briar_execution_worker_devices
+         set state = 'online', last_heartbeat_at = ?, updated_at = ? where id = ?`,
+      ).bind(observedAt, observedAt, deviceId),
+      db.prepare(
+        `update briar_execution_workers
+         set state = 'online', accepting_work = 1, readiness_state = 'ready',
+             capabilities_json = ?, last_heartbeat_at = ?, updated_at = ?
+         where id = ?`,
+      ).bind(
+        JSON.stringify({ providerHealth: { claude: { healthy: true } } }),
+        observedAt,
+        observedAt,
+        otherWorkerId,
+      ),
+      db.prepare(
+        `insert into briar_execution_worker_devices (
+           id, organization_id, owner_user_id, label, device_identity_hash,
+           state, last_heartbeat_at, created_at, updated_at
+         ) values (?, ?, ?, 'Organization fallback', ?, 'online', ?, ?, ?)`,
+      ).bind(
+        fallbackDeviceId,
+        organizationId,
+        ownerId,
+        "a1".repeat(32),
+        observedAt,
+        observedAt,
+        observedAt,
+      ),
+      db.prepare(
+        `insert into briar_execution_worker_credentials (
+           device_id, token_hash, created_at
+         ) values (?, ?, ?)`,
+      ).bind(fallbackDeviceId, "b1".repeat(32), observedAt),
+      db.prepare(
+        `insert into briar_execution_workers (
+           id, project_id, device_id, label, host_fingerprint,
+           agent_provider, capabilities_json, state, accepting_work,
+           readiness_state, last_heartbeat_at, created_at, updated_at
+         ) values (?, ?, ?, 'Organization fallback binding', ?, 'claude', ?,
+                   'online', 1, 'ready', ?, ?, ?)`,
+      ).bind(
+        fallbackWorkerId,
+        otherProjectId,
+        fallbackDeviceId,
+        "c1".repeat(32),
+        capabilities,
+        observedAt,
+        observedAt,
+        observedAt,
+      ),
+    ]);
+    await createChannelMessage(db, {
+      id: triggerId,
+      channelId,
+      parentMessageId: null,
+      authorUserId: ownerId,
+      authorAgentId: null,
+      authorAgentName: null,
+      authorAgentProvider: null,
+      body: "@Organization-Fallback answer",
+      mentionedUserIds: [],
+      mentionedAgentIds: [agentId],
+      createdAt: observedAt,
+    });
+    const [job] = await enqueueChannelAgentReplies(db, {
+      organizationId,
+      channelId,
+      triggerMessageId: triggerId,
+      parentMessageId: triggerId,
+      agents: [{ id: agentId, projectId: null, provider: "claude" }],
+      preferredDeviceId: deviceId,
+      createdAt: observedAt,
+    });
+    const claimed = await claimNextChannelAgentReply(db, organizationId, {
+      deviceId: fallbackDeviceId,
+      workerId: fallbackWorkerId,
+      providers: ["claude"],
+      workerAgentProvider: "claude",
+      workerCapabilitiesJson: capabilities,
+      supportsOrganizationAgentContext: true,
+      claimTokenHash: "5".repeat(64),
+      claimedAt: observedAt,
+      leaseExpiresAt: new Date(Date.parse(observedAt) + 60_000).toISOString(),
+    });
+    expect(claimed).toMatchObject({
+      id: job.id,
+      preferred_device_id: deviceId,
+      claimed_device_id: fallbackDeviceId,
+    });
+    await completeChannelReply(db, claimed!, {
+      jobId: claimed!.id,
+      deviceId: fallbackDeviceId,
+      workerId: fallbackWorkerId,
+      claimTokenHash: "5".repeat(64),
+      body: "Organization fallback completed.",
+      document: null,
+      issueProposal: null,
+      executionProposal: null,
+      agentName: "Organization Fallback",
+      agentProvider: "claude",
+      completedAt: observedAt,
+    });
   });
 
   it("gives every mentioned Agent its own reply job", async () => {
@@ -1973,6 +2372,133 @@ describe("organization channels", () => {
       createdAt: at(22),
     });
     expect(again).toHaveLength(2);
+  });
+
+  it("accepts only the sender's organization device and copies it to every mentioned Agent job", async () => {
+    const channelId = "e0000000-0000-4000-8000-000000000107";
+    const firstAgentId = "aa000000-0000-4000-8000-000000000107";
+    const secondAgentId = "aa000000-0000-4000-8000-000000000108";
+    const outsiderDeviceId = "c0000000-0000-4000-8000-000000000107";
+    const observedAt = new Date().toISOString();
+    await createChannel(db, {
+      id: channelId,
+      organizationId,
+      slug: "preferred-device-api",
+      name: "Preferred device API",
+      topic: null,
+      visibility: "public",
+      defaultProjectId: null,
+      createdByUserId: ownerId,
+      createdAt: observedAt,
+    });
+    for (const [id, name] of [
+      [firstAgentId, "Local One"],
+      [secondAgentId, "Local Two"],
+    ]) {
+      await createOrganizationAgent(db, {
+        id,
+        organizationId,
+        name,
+        provider: "claude",
+        model: null,
+        responsibility: "Reply locally",
+        effort: null,
+        createdAt: observedAt,
+      });
+      await addChannelAgent(db, {
+        channelId,
+        agentId: id,
+        addedByUserId: ownerId,
+        createdAt: observedAt,
+      });
+    }
+    await db.batch([
+      db.prepare(
+        `update briar_execution_worker_devices
+         set state = 'online', last_heartbeat_at = ?, updated_at = ?
+         where id = ?`,
+      ).bind(observedAt, observedAt, deviceId),
+      db.prepare(
+        `update briar_execution_workers
+         set state = 'online', accepting_work = 1, readiness_state = 'ready',
+             capabilities_json = ?, last_heartbeat_at = ?, updated_at = ?
+         where id = ?`,
+      ).bind(
+        JSON.stringify({
+          providerHealth: { claude: { healthy: true } },
+          organizationAgentContext: { protocol: 1 },
+        }),
+        observedAt,
+        observedAt,
+        otherWorkerId,
+      ),
+      db.prepare(
+        `insert into briar_execution_worker_devices (
+           id, organization_id, owner_user_id, label, device_identity_hash,
+           state, last_heartbeat_at, created_at, updated_at
+         ) values (?, ?, ?, 'Outsider device', ?, 'online', ?, ?, ?)`,
+      ).bind(
+        outsiderDeviceId,
+        organizationId,
+        outsiderId,
+        "7".repeat(64),
+        observedAt,
+        observedAt,
+        observedAt,
+      ),
+    ]);
+    const apiEnv = {
+      DB: db,
+      ARCHIVES: archives,
+      BETTER_AUTH_SECRET: "channels-context-test-secret-channels-context-test",
+      GOOGLE_CLIENT_ID: "google-client-test",
+      GOOGLE_CLIENT_SECRET: "google-secret-test",
+    } as unknown as Env;
+    const endpoint =
+      `https://briar-api.example/organizations/${organizationId}/channels/${channelId}/messages`;
+    const accepted = await apiWorker.fetch(new Request(endpoint, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${ownerSessionToken}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        body: "@Local-One @Local-Two answer",
+        mentionedAgentIds: [firstAgentId, secondAgentId],
+        preferredDeviceId: deviceId,
+      }),
+    }), apiEnv);
+    expect(accepted.status).toBe(201);
+    const acceptedBody = await accepted.json() as {
+      message: { id: string };
+      agentReplies: Array<{ id: string }>;
+    };
+    expect(acceptedBody.agentReplies).toHaveLength(2);
+    const stored = await db.prepare(
+      `select agent_id, preferred_device_id
+       from briar_channel_agent_reply_jobs where trigger_message_id = ?
+       order by agent_id`,
+    ).bind(acceptedBody.message.id).all<{
+      agent_id: string;
+      preferred_device_id: string | null;
+    }>();
+    expect(stored.results).toEqual([
+      { agent_id: firstAgentId, preferred_device_id: deviceId },
+      { agent_id: secondAgentId, preferred_device_id: deviceId },
+    ]);
+
+    const rejected = await apiWorker.fetch(new Request(endpoint, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${ownerSessionToken}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        body: "Do not accept this preference",
+        preferredDeviceId: outsiderDeviceId,
+      }),
+    }), apiEnv);
+    expect(rejected.status).toBe(403);
   });
 
   it("persists an unavailable Worker as an immediate failed reply", async () => {
