@@ -6763,6 +6763,7 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .channel-mention-menu button > img,
 .channel-mention-avatar { width:24px; height:24px; flex:0 0 24px; border-radius:7px; object-fit:cover; }
 .channel-mention-avatar { display:grid; place-items:center; color:#fff; background:#7664b8; font-size:11px; font-weight:700; }
+.channel-mention-avatar.agent { color:var(--primary,#5943a4); background:color-mix(in srgb,var(--primary,#5943a4) 13%,var(--card,#fff)); }
 .channel-mention-menu button > span:not(.channel-mention-avatar) { margin-left: auto; color: var(--muted-foreground, #777168); font-size: 11px; }
 
 .channel-thread { display: flex; min-height: 0; flex-direction: column; border-left: 1px solid var(--border, #ddd8cf); background: var(--card, #fff); }

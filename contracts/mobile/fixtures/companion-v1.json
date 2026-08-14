@@ -1160,6 +1160,7 @@
           {
             "agentId": "66666666-6666-4666-8666-666666666666",
             "name": "Honey",
+            "avatar": "data:image/png;base64,cHJvamVjdC1hdmF0YXI=",
             "provider": "claude",
             "model": null,
             "projectId": null,

@@ -21,6 +21,14 @@ const suggestions: MentionTarget[] = [
     handle: "honey",
     label: "Honey",
     detail: "Writing partner",
+    image: "https://example.com/honey.png",
+  },
+  {
+    type: "agent",
+    id: "agent-2",
+    handle: "builder",
+    label: "Builder",
+    detail: "Project agent",
     image: null,
   },
   {
@@ -83,10 +91,12 @@ describe("ChannelMentionMenu", () => {
         "mention-list-option-0",
         "mention-list-option-1",
         "mention-list-option-2",
+        "mention-list-option-3",
       ]);
       expect(options.map((option) => option.getAttribute("aria-selected"))).toEqual([
         "false",
         "true",
+        "false",
         "false",
       ]);
       expect(options[1]?.className).toBe("active");
@@ -124,9 +134,14 @@ describe("ChannelMentionMenu", () => {
     expect(options[0]?.querySelector("span:last-child")?.textContent).toBe(
       "Member",
     );
-    expect(options[1]?.querySelector("svg")).not.toBeNull();
-    expect(options[2]?.querySelector("img")?.getAttribute("src")).toBe(
-      suggestions[2]?.image,
+    expect(options[1]?.querySelector("img")?.getAttribute("src")).toBe(
+      suggestions[1]?.image,
+    );
+    expect(
+      options[2]?.querySelector(".channel-mention-avatar.agent svg"),
+    ).not.toBeNull();
+    expect(options[3]?.querySelector("img")?.getAttribute("src")).toBe(
+      suggestions[3]?.image,
     );
   });
 
@@ -149,11 +164,14 @@ describe("ChannelMentionMenu", () => {
     expect(options[0]?.querySelector("strong")?.textContent).toBe("Sam");
     expect(options[0]?.querySelector("small")?.textContent).toBe("@sam");
     expect(options[0]?.querySelector("em")?.textContent).toBe("Member");
+    expect(options[1]?.querySelector("img")?.getAttribute("src")).toBe(
+      suggestions[1]?.image,
+    );
     expect(
-      options[1]?.querySelector(".companion-channel-mention-avatar.agent svg"),
+      options[2]?.querySelector(".companion-channel-mention-avatar.agent svg"),
     ).not.toBeNull();
-    expect(options[2]?.querySelector("img")?.getAttribute("src")).toBe(
-      suggestions[2]?.image,
+    expect(options[3]?.querySelector("img")?.getAttribute("src")).toBe(
+      suggestions[3]?.image,
     );
   });
 });

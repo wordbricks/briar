@@ -465,6 +465,7 @@ struct ChannelMember: Codable, Equatable, Identifiable, Sendable {
 struct ChannelAgentSummary: Codable, Equatable, Identifiable, Sendable {
     let agentId: UUID
     let name: String
+    let avatar: String?
     let provider: String
     let model: String?
     let projectId: UUID?
@@ -503,7 +504,7 @@ enum ChannelMentions {
                 handle: agent.name,
                 label: agent.name,
                 detail: "Agent",
-                image: nil
+                image: agent.avatar
             )
         }
         let memberTargets = members.map { member in

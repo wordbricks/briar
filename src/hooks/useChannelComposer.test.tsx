@@ -22,7 +22,7 @@ const agents: ChannelAgentSummary[] = [
   {
     agentId: "project-agent",
     name: "Builder",
-    avatar: null,
+    avatar: "data:image/png;base64,cHJvamVjdC1hdmF0YXI=",
     provider: "codex",
     model: null,
     effort: null,
@@ -107,6 +107,7 @@ function Harness({
           <li key={`${suggestion.type}:${suggestion.id}`}>
             <button
               aria-selected={index === composer.activeSuggestionIndex}
+              data-image={suggestion.image ?? ""}
               onClick={() => composer.pickSuggestion(suggestion)}
               type="button"
             >
@@ -162,6 +163,11 @@ describe("useChannelComposer", () => {
     expect(container.textContent).toContain("Builder · Project agent");
     expect(container.textContent).toContain("Helper · Organization agent");
     expect(container.textContent).toContain("Jay · You · jay@example.com");
+    expect(
+      [...container.querySelectorAll<HTMLButtonElement>("ul button")].map(
+        (button) => button.dataset.image,
+      ),
+    ).toEqual(["data:image/png;base64,cHJvamVjdC1hdmF0YXI=", "", ""]);
 
     await act(async () => input.dispatchEvent(
       new KeyboardEvent("keydown", { bubbles: true, key: "ArrowDown" }),

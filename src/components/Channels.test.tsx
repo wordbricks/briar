@@ -116,7 +116,7 @@ const channel: ChannelSummary = {
 const agent: ChannelAgentSummary = {
   agentId: "agent-1",
   name: "Honey",
-  avatar: null,
+  avatar: "data:image/png;base64,cHJvamVjdC1hdmF0YXI=",
   provider: "claude",
   model: null,
   effort: null,
@@ -1033,6 +1033,9 @@ describe("Channels", () => {
       ),
     ].find((button) => button.textContent?.includes("@Honey"));
     expect(suggestion).toBeDefined();
+    expect(suggestion?.querySelector("img")?.getAttribute("src")).toBe(
+      agent.avatar,
+    );
     await act(async () => {
       suggestion!.click();
     });
