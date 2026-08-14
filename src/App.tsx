@@ -113,6 +113,7 @@ import {
   createChannel,
   dispatchHuntRun,
   listChannels,
+  loadChannelDelta,
   markChannelRead,
   loadAgentUsageReport,
   loadDashboard,
@@ -132,7 +133,9 @@ import {
   CHANNEL_REALTIME_FALLBACK_MS,
   createChannelRealtimeTransport,
   createInboxRealtimeTransport,
+  MAX_CHANNEL_DELTA_PAGES_PER_SYNC,
 } from "./lib/channel-realtime";
+import { startDesktopChannelTransition } from "./lib/channel-performance";
 import { dispatchAutoHuntToWorkers } from "./lib/auto-hunt-worker-dispatch";
 import { demoProjectAgents } from "./lib/demo-project-agents";
 import { executeProjectAgentTask } from "./lib/project-agent-execution";
@@ -216,11 +219,18 @@ export function App() {
   const [activeChannelId, setActiveChannelId] = useState<string | null>(null);
   const [viewingChannelId, setViewingChannelId] = useState<string | null>(null);
   const [channelsLoading, setChannelsLoading] = useState(false);
+  const [channelCatalogSnapshot, setChannelCatalogSnapshot] = useState<{
+    organizationId: string;
+    cursor: number;
+  } | null>(null);
+  const channelCatalogCursorRef = useRef(0);
   useEffect(() => {
     const organizationId = briar.activeOrganizationId;
     const token = briar.token;
     setOrganizationChannels([]);
     setActiveChannelId(null);
+    setChannelCatalogSnapshot(null);
+    channelCatalogCursorRef.current = 0;
     if (!organizationId || !token) {
       setChannelsLoading(false);
       return;
@@ -230,7 +240,11 @@ export function App() {
     setChannelsLoading(true);
     void listChannels(token, organizationId)
       .then((result) => {
-        if (!cancelled) setOrganizationChannels(result.channels);
+        if (!cancelled) {
+          channelCatalogCursorRef.current = result.cursor;
+          setChannelCatalogSnapshot({ organizationId, cursor: result.cursor });
+          setOrganizationChannels(result.channels);
+        }
       })
       .catch(() => {
         // The conversation view reports request errors when opened. Keep the
@@ -246,39 +260,97 @@ export function App() {
   useEffect(() => {
     const organizationId = briar.activeOrganizationId;
     const token = briar.token;
-    if (!organizationId || !token) return;
+    if (
+      !organizationId ||
+      !token ||
+      channelCatalogSnapshot?.organizationId !== organizationId
+    ) return;
 
-    let cancelled = false;
+    let stopped = false;
+    let inFlight = false;
+    let pending = false;
+    const abortController = new AbortController();
     const transport = createChannelRealtimeTransport(token, organizationId);
-    const refresh = () => {
-      void listChannels(token, organizationId)
-        .then((result) => {
-          if (!cancelled) setOrganizationChannels(result.channels);
-        })
-        .catch(() => {
-          // Keep the last catalog. The Channels view reports request errors.
-        });
+    const sync = async () => {
+      pending = true;
+      if (stopped || inFlight || document.hidden) return;
+      inFlight = true;
+      try {
+        while (pending && !stopped) {
+          pending = false;
+          for (
+            let page = 0;
+            page < MAX_CHANNEL_DELTA_PAGES_PER_SYNC;
+            page += 1
+          ) {
+            const requestedCursor = channelCatalogCursorRef.current;
+            const delta = await loadChannelDelta(
+              token,
+              organizationId,
+              requestedCursor,
+              abortController.signal,
+            );
+            if (stopped || requestedCursor !== channelCatalogCursorRef.current) {
+              return;
+            }
+            channelCatalogCursorRef.current = delta.cursor;
+            if (delta.channels.length || delta.removedChannelIds.length) {
+              setOrganizationChannels((current) => {
+                const byId = new Map(
+                  current.map((channel) => [channel.id, channel]),
+                );
+                for (const channel of delta.channels) byId.set(channel.id, channel);
+                for (const id of delta.removedChannelIds) byId.delete(id);
+                return [...byId.values()].sort((left, right) =>
+                  left.name.localeCompare(right.name)
+                );
+              });
+            }
+            if (!delta.hasMore || delta.cursor <= requestedCursor) break;
+          }
+        }
+      } catch (error) {
+        if (!abortController.signal.aborted) {
+          console.warn("Channel catalog delta refresh failed", error);
+        }
+      } finally {
+        inFlight = false;
+        if (pending && !stopped) window.queueMicrotask(() => void sync());
+      }
     };
     const unsubscribe = transport.subscribe((notification) => {
-      if (notification.topic === "channels") refresh();
+      if (
+        notification.topic === "channels" &&
+        notification.cursor > channelCatalogCursorRef.current
+      ) {
+        void sync();
+      }
     });
     const updateVisibility = () => {
       if (document.hidden) transport.stop();
-      else transport.start();
+      else {
+        transport.start();
+        void sync();
+      }
     };
     document.addEventListener("visibilitychange", updateVisibility);
     updateVisibility();
     const interval = window.setInterval(() => {
-      if (!document.hidden) refresh();
+      if (!document.hidden) void sync();
     }, CHANNEL_REALTIME_FALLBACK_MS);
     return () => {
-      cancelled = true;
+      stopped = true;
       unsubscribe();
       transport.stop();
+      abortController.abort();
       document.removeEventListener("visibilitychange", updateVisibility);
       window.clearInterval(interval);
     };
-  }, [briar.activeOrganizationId, briar.token]);
+  }, [
+    briar.activeOrganizationId,
+    briar.token,
+    channelCatalogSnapshot?.organizationId,
+  ]);
   const markOrganizationChannelRead = useCallback(
     (channelId: string) => {
       const token = briar.token;
@@ -1303,6 +1375,11 @@ export function App() {
     ) : inboxDetailChannelId && briar.activeOrganizationId && briar.token ? (
       <Channels
         activeChannelId={inboxDetailChannelId}
+        channelCatalogCursor={
+          channelCatalogSnapshot?.organizationId === briar.activeOrganizationId
+            ? channelCatalogSnapshot.cursor
+            : null
+        }
         channelInboxSyncSignal={channelInboxSyncSignal}
         channels={organizationChannels}
         currentUserId={briar.user?.id ?? null}
@@ -1499,6 +1576,7 @@ export function App() {
             onChannelOpen={
               briar.activeOrganizationId
                 ? (channelId) => {
+                    startDesktopChannelTransition(channelId);
                     setActiveChannelId(channelId);
                     markOrganizationChannelRead(channelId);
                     navigateToPage("channels");
@@ -1861,6 +1939,11 @@ export function App() {
           briar.token ? (
           <Channels
             activeChannelId={activeChannelId}
+            channelCatalogCursor={
+              channelCatalogSnapshot?.organizationId === briar.activeOrganizationId
+                ? channelCatalogSnapshot.cursor
+                : null
+            }
             channelInboxSyncSignal={channelInboxSyncSignal}
             channels={organizationChannels}
             projects={activeOrganizationProjects}

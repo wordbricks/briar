@@ -1,4 +1,4 @@
-import { useMemo, useState, type MouseEvent } from "react";
+import { memo, useMemo, useState, type MouseEvent } from "react";
 import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type {
@@ -21,7 +21,7 @@ import {
 } from "./ProfileDialog";
 import { ImageLightbox } from "./ImageLightbox";
 
-export function ChannelMessageText({
+export const ChannelMessageText = memo(function ChannelMessageText({
   agents,
   members,
   message,
@@ -128,4 +128,4 @@ export function ChannelMessageText({
       />
     </>
   );
-}
+});

@@ -203,6 +203,16 @@ const typeInto = async (textarea: HTMLTextAreaElement, value: string) => {
   });
 };
 
+const deferred = <T,>() => {
+  let resolve!: (value: T) => void;
+  let reject!: (reason: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, reject, resolve };
+};
+
 describe("Channels", () => {
   let container: HTMLDivElement;
   let root: ReturnType<typeof createRoot>;
@@ -545,6 +555,7 @@ describe("Channels", () => {
       "org-1",
       channel.id,
       rootMessage.id,
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
   });
 
@@ -690,7 +701,352 @@ describe("Channels", () => {
       await pendingList;
       await Promise.resolve();
     });
-    expect(loadChannel).toHaveBeenCalledWith("token", "org-1", "channel-1");
+    expect(loadChannel).toHaveBeenCalledWith(
+      "token",
+      "org-1",
+      "channel-1",
+      expect.objectContaining({ messageLimit: 20, signal: expect.any(AbortSignal) }),
+    );
+  });
+
+  it("uses the parent catalog snapshot and shows a skeleton while the first page loads", async () => {
+    const pending = deferred<{
+      channel: ChannelSummary;
+      members: ChannelMember[];
+      agents: ChannelAgentSummary[];
+      messages: ChannelMessage[];
+      nextCursor: string | null;
+    }>();
+    loadChannel.mockReturnValue(pending.promise);
+    loadChannelDelta.mockResolvedValue({
+      cursor: 7,
+      hasMore: false,
+      channels: [],
+      removedChannelIds: [],
+      messages: [],
+      removedMessageIds: [],
+      agentReplies: [],
+    });
+
+    await act(async () => {
+      root.render(
+        <Channels
+          activeChannelId={channel.id}
+          channelCatalogCursor={7}
+          channels={[channel]}
+          currentUserId="user-1"
+          onChannelSelect={() => undefined}
+          onChannelsChange={() => undefined}
+          organizationId="org-1"
+          token="token"
+        />,
+      );
+      await Promise.resolve();
+    });
+
+    expect(listChannels).not.toHaveBeenCalled();
+    expect(container.querySelector(".channel-message-skeleton")).not.toBeNull();
+    expect(container.querySelector(".channel-header")?.textContent).toContain("Welcome");
+    expect(loadChannel).toHaveBeenCalledWith(
+      "token",
+      "org-1",
+      channel.id,
+      expect.objectContaining({ messageLimit: 20, signal: expect.any(AbortSignal) }),
+    );
+
+    await act(async () => {
+      pending.resolve({
+        channel,
+        members: [member],
+        agents: [agent],
+        messages: [message()],
+        nextCursor: null,
+      });
+      await pending.promise;
+    });
+    expect(container.querySelector(".channel-message-skeleton")).toBeNull();
+    expect(container.textContent).toContain("Hello team");
+  });
+
+  it("loads the previous 20 messages at the top and preserves the current channel", async () => {
+    const recent = Array.from({ length: 20 }, (_, index) => message({
+      id: `recent-${index}`,
+      body: `Recent ${index}`,
+      createdAt: `2026-08-01T01:${String(index).padStart(2, "0")}:00.000Z`,
+    }));
+    const earlier = message({
+      id: "earlier-1",
+      body: "Earlier history",
+      createdAt: "2026-08-01T00:59:00.000Z",
+    });
+    loadChannel.mockResolvedValue({
+      channel,
+      members: [member],
+      agents: [agent],
+      messages: recent,
+      nextCursor: "recent-0",
+    });
+    listChannelMessages.mockResolvedValue({ messages: [earlier], nextCursor: null });
+    loadChannelDelta.mockResolvedValue({
+      cursor: 7,
+      hasMore: false,
+      channels: [],
+      removedChannelIds: [],
+      messages: [],
+      removedMessageIds: [],
+      agentReplies: [],
+    });
+
+    await act(async () => {
+      root.render(
+        <Channels
+          activeChannelId={channel.id}
+          channelCatalogCursor={7}
+          channels={[channel]}
+          currentUserId="user-1"
+          onChannelSelect={() => undefined}
+          onChannelsChange={() => undefined}
+          organizationId="org-1"
+          token="token"
+        />,
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    const scroller = container.querySelector<HTMLElement>(".channel-messages")!;
+    await act(async () => {
+      scroller.scrollTop = 0;
+      scroller.dispatchEvent(new Event("scroll"));
+      scroller.dispatchEvent(new Event("scroll"));
+      await Promise.resolve();
+    });
+
+    expect(listChannelMessages).toHaveBeenCalledWith(
+      "token",
+      "org-1",
+      channel.id,
+      undefined,
+      expect.objectContaining({
+        cursor: "recent-0",
+        limit: 20,
+        signal: expect.any(AbortSignal),
+      }),
+    );
+    expect(container.textContent).toContain("Earlier history");
+    expect(container.querySelector(".channel-header")?.textContent).toContain("Welcome");
+  });
+
+  it("aborts an obsolete channel request and keeps its late result off screen", async () => {
+    const otherChannel: ChannelSummary = {
+      ...channel,
+      id: "channel-2",
+      slug: "other",
+      name: "Other",
+    };
+    const first = deferred<{
+      channel: ChannelSummary;
+      members: ChannelMember[];
+      agents: ChannelAgentSummary[];
+      messages: ChannelMessage[];
+      nextCursor: null;
+    }>();
+    const second = deferred<{
+      channel: ChannelSummary;
+      members: ChannelMember[];
+      agents: ChannelAgentSummary[];
+      messages: ChannelMessage[];
+      nextCursor: null;
+    }>();
+    loadChannel.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+    loadChannelDelta.mockResolvedValue({
+      cursor: 7,
+      hasMore: false,
+      channels: [],
+      removedChannelIds: [],
+      messages: [],
+      removedMessageIds: [],
+      agentReplies: [],
+    });
+    const props = {
+      channelCatalogCursor: 7,
+      channels: [channel, otherChannel],
+      currentUserId: "user-1",
+      onChannelSelect: () => undefined,
+      onChannelsChange: () => undefined,
+      organizationId: "org-1",
+      token: "token",
+    };
+
+    await act(async () => {
+      root.render(<Channels {...props} activeChannelId={channel.id} />);
+      await Promise.resolve();
+    });
+    const firstSignal = loadChannel.mock.calls[0]?.[3]?.signal as AbortSignal;
+    await act(async () => {
+      root.render(<Channels {...props} activeChannelId={otherChannel.id} />);
+      await Promise.resolve();
+    });
+    expect(firstSignal.aborted).toBe(true);
+    expect(container.querySelector(".channel-header")?.textContent).toContain("Other");
+
+    await act(async () => {
+      first.resolve({
+        channel,
+        members: [member],
+        agents: [agent],
+        messages: [message({ body: "Obsolete result" })],
+        nextCursor: null,
+      });
+      second.resolve({
+        channel: otherChannel,
+        members: [member],
+        agents: [agent],
+        messages: [message({
+          channelId: otherChannel.id,
+          id: "other-message",
+          body: "Current result",
+        })],
+        nextCursor: null,
+      });
+      await Promise.all([first.promise, second.promise]);
+    });
+    expect(container.textContent).toContain("Current result");
+    expect(container.textContent).not.toContain("Obsolete result");
+  });
+
+  it("reuses a channel's cached first page while refreshing it in the background", async () => {
+    const otherChannel: ChannelSummary = {
+      ...channel,
+      id: "channel-2",
+      slug: "other",
+      name: "Other",
+    };
+    const cachedMessage = message({ id: "cached-message", body: "Cached immediately" });
+    const refresh = deferred<{
+      channel: ChannelSummary;
+      members: ChannelMember[];
+      agents: ChannelAgentSummary[];
+      messages: ChannelMessage[];
+      nextCursor: null;
+    }>();
+    loadChannel
+      .mockResolvedValueOnce({
+        channel,
+        members: [member],
+        agents: [agent],
+        messages: [cachedMessage],
+        nextCursor: null,
+      })
+      .mockResolvedValueOnce({
+        channel: otherChannel,
+        members: [member],
+        agents: [agent],
+        messages: [message({ channelId: otherChannel.id, id: "other", body: "Other" })],
+        nextCursor: null,
+      })
+      .mockReturnValueOnce(refresh.promise);
+    loadChannelDelta.mockResolvedValue({
+      cursor: 7,
+      hasMore: false,
+      channels: [],
+      removedChannelIds: [],
+      messages: [],
+      removedMessageIds: [],
+      agentReplies: [],
+    });
+    const props = {
+      channelCatalogCursor: 7,
+      channels: [channel, otherChannel],
+      currentUserId: "user-1",
+      onChannelSelect: () => undefined,
+      onChannelsChange: () => undefined,
+      organizationId: "org-1",
+      token: "token",
+    };
+    await act(async () => {
+      root.render(<Channels {...props} activeChannelId={channel.id} />);
+      await Promise.resolve();
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    await act(async () => {
+      root.render(<Channels {...props} activeChannelId={otherChannel.id} />);
+      await Promise.resolve();
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    await act(async () => {
+      root.render(<Channels {...props} activeChannelId={channel.id} />);
+      await Promise.resolve();
+    });
+
+    expect(container.textContent).toContain("Cached immediately");
+    expect(container.querySelector(".channel-message-skeleton")).toBeNull();
+    expect(loadChannel).toHaveBeenCalledTimes(3);
+    refresh.resolve({
+      channel,
+      members: [member],
+      agents: [agent],
+      messages: [cachedMessage],
+      nextCursor: null,
+    });
+    await act(async () => {
+      await refresh.promise;
+    });
+  });
+
+  it("windows large message histories instead of mounting every message row", async () => {
+    const history = Array.from({ length: 60 }, (_, index) => message({
+      id: `history-${index}`,
+      body: `History ${index}`,
+      createdAt: `2026-08-01T${String(Math.floor(index / 60)).padStart(2, "0")}:${String(index % 60).padStart(2, "0")}:00.000Z`,
+    }));
+    loadChannel.mockResolvedValue({
+      channel,
+      members: [member],
+      agents: [agent],
+      messages: history,
+      nextCursor: null,
+    });
+    loadChannelDelta.mockResolvedValue({
+      cursor: 7,
+      hasMore: false,
+      channels: [],
+      removedChannelIds: [],
+      messages: [],
+      removedMessageIds: [],
+      agentReplies: [],
+    });
+    await act(async () => {
+      root.render(
+        <Channels
+          activeChannelId={channel.id}
+          channelCatalogCursor={7}
+          channels={[channel]}
+          currentUserId="user-1"
+          onChannelSelect={() => undefined}
+          onChannelsChange={() => undefined}
+          organizationId="org-1"
+          token="token"
+        />,
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(
+      container.querySelector(".channel-message-virtual-list")?.getAttribute(
+        "data-virtualized",
+      ),
+    ).toBe("true");
+    expect(container.querySelectorAll("[data-channel-message-id]").length).toBeLessThan(
+      history.length,
+    );
   });
 
   it("shows reply participants, count, and last reply time", async () => {
@@ -736,6 +1092,7 @@ describe("Channels", () => {
       "org-1",
       channel.id,
       rootMessage.id,
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
   });
 
@@ -976,6 +1333,7 @@ describe("Channels", () => {
       "org-1",
       channel.id,
       rootMessage.id,
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
     expect(container.textContent).toContain("Requested reply");
   });
