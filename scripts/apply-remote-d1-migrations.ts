@@ -86,6 +86,31 @@ export function buildMigrationImport(
   return `${migrationSql.trimEnd()}\n\nINSERT INTO d1_migrations (name) VALUES ('${escapedName}');\n`;
 }
 
+async function readAppliedMigrations(
+  runner: WranglerRunner,
+  database: string,
+): Promise<{ exitCode: number; names: Set<string> }> {
+  const history = await runner(
+    [
+      "d1",
+      "execute",
+      database,
+      "--remote",
+      "--command",
+      "SELECT name FROM d1_migrations ORDER BY id;",
+      "--json",
+    ],
+    true,
+  );
+  if (history.exitCode !== 0) {
+    return { exitCode: history.exitCode, names: new Set() };
+  }
+  return {
+    exitCode: 0,
+    names: parseAppliedMigrationNames(history.stdout),
+  };
+}
+
 export async function applyRemoteD1Migrations({
   database = "briar-db",
   migrationsDirectory = join(process.cwd(), "migrations"),
@@ -106,21 +131,10 @@ export async function applyRemoteD1Migrations({
   ]);
   if (initialize.exitCode !== 0) return initialize.exitCode;
 
-  const history = await runner(
-    [
-      "d1",
-      "execute",
-      database,
-      "--remote",
-      "--command",
-      "SELECT name FROM d1_migrations ORDER BY id;",
-      "--json",
-    ],
-    true,
-  );
+  const history = await readAppliedMigrations(runner, database);
   if (history.exitCode !== 0) return history.exitCode;
 
-  const appliedMigrations = parseAppliedMigrationNames(history.stdout);
+  const appliedMigrations = history.names;
   const migrationNames = (await readdir(migrationsDirectory))
     .filter((name) => name.endsWith(".sql"))
     .sort(compareMigrationNames);
@@ -157,7 +171,18 @@ export async function applyRemoteD1Migrations({
         importPath,
         "--yes",
       ]);
-      if (result.exitCode !== 0) return result.exitCode;
+      if (result.exitCode !== 0) {
+        // Wrangler can lose the final import polling race after D1 has already
+        // committed the file. The history INSERT is the last statement in the
+        // same atomic import, so its presence proves the migration completed.
+        const refreshedHistory = await readAppliedMigrations(runner, database);
+        if (!refreshedHistory.names.has(migrationName)) {
+          return result.exitCode;
+        }
+        console.warn(
+          `Remote D1 migration ${migrationName} was committed despite a failed final import poll.`,
+        );
+      }
     }
   } finally {
     await rm(temporaryDirectory, { recursive: true, force: true });
