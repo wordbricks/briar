@@ -32,6 +32,7 @@ import {
   executionWorkerProviders,
   executionWorkerSupportsOrganizationAgentContext,
   getProjectExecutionWorkerPolicy,
+  hasAvailableChannelReplyWorker,
   hasExecutionWorkerReadinessChanged,
   leaseExpiryFrom,
   listExecutionWorkers,
@@ -1251,6 +1252,56 @@ describe("detached execution workers", () => {
 
     expect(providers).toEqual(fullProjectionProviders);
     expect(providers).toEqual(["grok", "opencode", "codex"]);
+  });
+
+  it("requires a ready compatible Worker before a channel Agent reply can run", async () => {
+    const worker = await register("channel-reply", 1);
+    const projectReply = {
+      organizationId: projectId,
+      projectId,
+      provider: "codex" as const,
+      model: "gpt-5.6-sol",
+      effort: "high" as const,
+      observedAt: atMinute(2),
+    };
+
+    await expect(
+      hasAvailableChannelReplyWorker(db, projectReply),
+    ).resolves.toBe(true);
+    await expect(
+      hasAvailableChannelReplyWorker(db, {
+        ...projectReply,
+        projectId: null,
+      }),
+    ).resolves.toBe(false);
+
+    await recordWorkerHeartbeat(db, projectId, {
+      workerId: worker.worker.id,
+      readinessState: "ready",
+      capabilities: {
+        providerHealth: { codex: { healthy: true } },
+        organizationAgentContext: { protocol: 1 },
+      },
+      observedAt: atMinute(2),
+    });
+    await expect(
+      hasAvailableChannelReplyWorker(db, {
+        ...projectReply,
+        projectId: null,
+      }),
+    ).resolves.toBe(true);
+
+    await recordWorkerHeartbeat(db, projectId, {
+      workerId: worker.worker.id,
+      readinessState: "busy",
+      observedAt: atMinute(3),
+    });
+    await expect(
+      hasAvailableChannelReplyWorker(db, {
+        ...projectReply,
+        observedAt: atMinute(3),
+      }),
+    ).resolves.toBe(false);
   });
 
   it("renames a device and all of its project bindings together", async () => {

@@ -382,6 +382,84 @@ export function executionWorkerSupportsOrganizationAgentContext(
   }
 }
 
+/**
+ * Channel mentions are interactive, so only a Worker that can claim the reply
+ * immediately counts as available. Project Agents require an exact project
+ * binding; Organization Agents additionally require the organization-context
+ * protocol advertised by the claiming binding.
+ */
+export async function hasAvailableChannelReplyWorker(
+  db: D1Database,
+  input: {
+    organizationId: string;
+    projectId: string | null;
+    provider: AgentProvider;
+    model: string | null;
+    effort: ModelEffort | null;
+    observedAt: string;
+  },
+) {
+  const result = await db
+    .prepare(
+      `select worker.agent_provider, worker.capabilities_json,
+              worker.state as worker_state,
+              worker.accepting_work, worker.readiness_state,
+              worker.last_heartbeat_at as worker_last_heartbeat_at,
+              device.state as device_state,
+              device.last_heartbeat_at as device_last_heartbeat_at
+       from briar_execution_workers worker
+       join briar_execution_worker_devices device on device.id = worker.device_id
+       join briar_execution_worker_credentials credential
+         on credential.device_id = device.id
+       join briar_organization_members membership
+         on membership.organization_id = device.organization_id
+        and membership.user_id = device.owner_user_id
+       where device.organization_id = ?
+         and (? is null or worker.project_id = ?)
+         and credential.revoked_at is null
+         and (credential.expires_at is null or credential.expires_at > ?)`,
+    )
+    .bind(
+      input.organizationId,
+      input.projectId,
+      input.projectId,
+      input.observedAt,
+    )
+    .all<{
+      agent_provider: AgentProvider;
+      capabilities_json: string;
+      worker_state: ExecutionWorkerState;
+      accepting_work: number;
+      readiness_state: ExecutionWorkerReadiness;
+      worker_last_heartbeat_at: string;
+      device_state: ExecutionWorkerState;
+      device_last_heartbeat_at: string;
+    }>();
+
+  return result.results.some((worker) =>
+    workerStateAt(
+      worker.device_last_heartbeat_at,
+      input.observedAt,
+      worker.device_state,
+    ) === "online" &&
+    workerStateAt(
+      worker.worker_last_heartbeat_at,
+      input.observedAt,
+      worker.worker_state,
+    ) === "online" &&
+    worker.accepting_work === 1 &&
+    worker.readiness_state === "ready" &&
+    executionWorkerSupportsSelection(
+      worker,
+      input.provider,
+      input.model,
+      input.effort,
+    ) &&
+    (input.projectId !== null ||
+      executionWorkerSupportsOrganizationAgentContext(worker))
+  );
+}
+
 export type ExecutionDispatchRow = {
   runId: string;
   agentId: string | null;

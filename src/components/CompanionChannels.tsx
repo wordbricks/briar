@@ -62,6 +62,7 @@ import {
   mergeChannelMessages,
   mergeChannelMessageSnapshot,
 } from "../lib/channel-message-merge";
+import { channelReplyErrorText } from "../lib/channel-reply-error";
 import { maxIssueAttachmentCount } from "../lib/issue-attachments";
 import { useI18n } from "../i18n";
 import { useChannelComposer } from "../hooks/useChannelComposer";
@@ -603,7 +604,10 @@ export function CompanionChannels({
               if (failed) {
                 setError(
                   t("run.briarReplyFailed", {
-                    error: failed.error ?? t("run.failed"),
+                    error: channelReplyErrorText(failed.error, {
+                      fallback: t("run.failed"),
+                      noAvailableWorker: t("agents.agentWorkerUnavailable"),
+                    }),
                   }),
                 );
               }
@@ -858,6 +862,19 @@ export function CompanionChannels({
           attachmentReferences,
         });
         setReplies((current) => mergeReplies(current, result.agentReplies));
+        const failed = result.agentReplies.find(
+          (reply) => reply.status === "failed",
+        );
+        if (failed) {
+          setError(
+            t("run.briarReplyFailed", {
+              error: channelReplyErrorText(failed.error, {
+                fallback: t("run.failed"),
+                noAvailableWorker: t("agents.agentWorkerUnavailable"),
+              }),
+            }),
+          );
+        }
         if (threadParentId) {
           setThread((current) =>
             mergeChannelMessages(current ?? [], [result.message], []),
@@ -873,7 +890,7 @@ export function CompanionChannels({
         setBusy(false);
       }
     },
-    [channel, organizationId, threadParentId, token],
+    [channel, organizationId, t, threadParentId, token],
   );
 
   const pendingReplies = replies.filter(

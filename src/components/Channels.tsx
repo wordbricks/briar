@@ -87,6 +87,7 @@ import {
   mergeChannelMessages,
   mergeChannelMessageSnapshot,
 } from "../lib/channel-message-merge";
+import { channelReplyErrorText } from "../lib/channel-reply-error";
 import { maxIssueAttachmentCount } from "../lib/issue-attachments";
 import {
   ChannelDraftImages,
@@ -861,6 +862,21 @@ export function Channels({
                 for (const reply of delta.agentReplies) byId.set(reply.id, reply);
                 return [...byId.values()];
               });
+              const failed = delta.agentReplies.find(
+                (reply) =>
+                  reply.channelId === activeChannelId &&
+                  reply.status === "failed",
+              );
+              if (failed) {
+                setError(
+                  t("run.briarReplyFailed", {
+                    error: channelReplyErrorText(failed.error, {
+                      fallback: t("run.failed"),
+                      noAvailableWorker: t("agents.agentWorkerUnavailable"),
+                    }),
+                  }),
+                );
+              }
             }
             const relevant = delta.messages.filter(
               (message) => message.channelId === activeChannelId,
@@ -951,6 +967,7 @@ export function Channels({
     onChannelsChange,
     organizationId,
     recordProposalMessages,
+    t,
     token,
   ]);
 
@@ -1035,6 +1052,19 @@ export function Channels({
           attachmentReferences,
         });
         setReplies((current) => [...current, ...result.agentReplies]);
+        const failed = result.agentReplies.find(
+          (reply) => reply.status === "failed",
+        );
+        if (failed) {
+          setError(
+            t("run.briarReplyFailed", {
+              error: channelReplyErrorText(failed.error, {
+                fallback: t("run.failed"),
+                noAvailableWorker: t("agents.agentWorkerUnavailable"),
+              }),
+            }),
+          );
+        }
         if (parentMessageId) {
           setMessages((current) =>
             current.map((message) =>
@@ -1064,7 +1094,7 @@ export function Channels({
         setBusy(false);
       }
     },
-    [activeChannelId, organizationId, token],
+    [activeChannelId, organizationId, t, token],
   );
 
   const openIssue = useCallback(

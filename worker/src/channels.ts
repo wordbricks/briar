@@ -1,4 +1,5 @@
 import {
+  channelReplyNoAvailableWorkerError,
   type ChannelActionType,
   type ChannelAgentProvider as AgentProvider,
   type ChannelAgentReply,
@@ -1794,6 +1795,7 @@ export async function enqueueChannelAgentReplies(
       projectId: string | null;
       skillId?: string | null;
       provider: AgentProvider;
+      unavailableReason?: typeof channelReplyNoAvailableWorkerError | null;
     }>;
     createdAt: string;
   },
@@ -1828,9 +1830,9 @@ export async function enqueueChannelAgentReplies(
              id, organization_id, channel_id, project_id, agent_id, skill_id,
              selected_skill_id_snapshot${skillSnapshotColumns},
              trigger_message_id, parent_message_id, reply_message_id,
-             agent_provider, created_at, updated_at
+             agent_provider, status, error, completed_at, created_at, updated_at
            )
-           select ?, ?, ?, ?, ?, ?, ?${skillSnapshotValues}, ?, ?, ?, ?, ?, ?
+           select ?, ?, ?, ?, ?, ?, ?${skillSnapshotValues}, ?, ?, ?, ?, ?, ?, ?, ?, ?
            from briar_channel_agents roster
            join briar_project_agents current_agent
              on current_agent.id = roster.agent_id
@@ -1863,6 +1865,9 @@ export async function enqueueChannelAgentReplies(
           input.parentMessageId,
           crypto.randomUUID(),
           agent.provider,
+          agent.unavailableReason ? "failed" : "queued",
+          agent.unavailableReason ?? null,
+          agent.unavailableReason ? input.createdAt : null,
           input.createdAt,
           input.createdAt,
           agent.skillId ?? null,
