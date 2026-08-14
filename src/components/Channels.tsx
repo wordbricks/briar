@@ -88,6 +88,7 @@ import {
   markChannelCatalogRead,
 } from "../lib/channel-unread";
 import type { MentionTarget } from "../lib/channel-mentions";
+import { agentProviderLabels } from "../lib/agent-provider-contract";
 import {
   mergeChannelMessages,
   mergeChannelMessageSnapshot,
@@ -101,6 +102,7 @@ import {
 import { ChannelMentionMenu } from "./ChannelMentionMenu";
 import { ChannelTypingState } from "./ChannelTypingState";
 import { MentionComposerField } from "./MentionComposerField";
+import { AgentProviderIcon } from "./AgentIcons";
 import {
   ProfileDialog,
   profileTargetForChannelAgent,
@@ -2786,6 +2788,8 @@ const MessageRow = memo(function MessageRow({
   const isSelf =
     message.author.type === "user" && message.author.id === currentUserId;
   const displayName = isSelf ? t("channel.you") : message.author.name;
+  const agentProvider =
+    message.author.type === "agent" ? message.author.provider : null;
   const image =
     message.author.type === "user" || message.author.type === "agent"
       ? message.author.image
@@ -2839,8 +2843,19 @@ const MessageRow = memo(function MessageRow({
         <header>
           <strong>{displayName}</strong>
           {message.author.type === "agent" ? (
-            <span className="channel-agent-badge">
-              <Bot size={12} /> {message.author.provider ?? "agent"}
+            <span
+              aria-label={agentProvider ? agentProviderLabels[agentProvider] : "Agent"}
+              className={`channel-agent-badge${agentProvider ? ` ${agentProvider}` : ""}`}
+              role="img"
+              title={agentProvider ? agentProviderLabels[agentProvider] : "Agent"}
+            >
+              {agentProvider ? (
+                <AgentProviderIcon provider={agentProvider} size={12} />
+              ) : (
+                <>
+                  <Bot size={12} /> agent
+                </>
+              )}
             </span>
           ) : message.author.type === "webhook" ? (
             <span className="channel-agent-badge webhook">
