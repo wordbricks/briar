@@ -137,7 +137,7 @@ describe("Inbox", () => {
     ).toEqual(["true", "true", "true", "false"]);
     expect(
       filters.map((filter) => filter.getAttribute("aria-label")),
-    ).toEqual(["긴급", "확인 필요", "중요 변경", "최근 활동"]);
+    ).toEqual(["긴급 1", "확인 필요 1", "중요 변경 1", "최근 활동 1"]);
     expect(
       filters.map((filter) => filter.getAttribute("title")),
     ).toEqual(["긴급", "확인 필요", "중요 변경", "최근 활동"]);

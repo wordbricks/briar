@@ -278,9 +278,10 @@ export function Inbox({
                     const label = t(
                       `inbox.category.${category}` as MessageKey,
                     );
+                    const count = categoryCounts[category];
                     return (
                       <button
-                        aria-label={label}
+                        aria-label={`${label} ${count}`}
                         aria-pressed={activeFilters.has(category)}
                         className={cn("inbox-filter", category)}
                         key={category}
@@ -289,8 +290,8 @@ export function Inbox({
                         type="button"
                       >
                         <FilterIcon category={category} />
-                        <span className="inbox-filter-count">
-                          {categoryCounts[category]}
+                        <span aria-hidden="true" className="inbox-filter-count">
+                          {count}
                         </span>
                       </button>
                     );
