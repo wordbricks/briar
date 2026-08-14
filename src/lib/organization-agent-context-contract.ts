@@ -1,7 +1,7 @@
 import { z } from "zod";
 import {
   agentProviders,
-  modelEfforts,
+  modelEffortSchema,
 } from "./agent-provider-contract";
 import {
   autoHuntQaStatuses,
@@ -196,7 +196,7 @@ export const organizationAgentContextAgentSkillSchema = z
     instructions: z.string().max(10_000),
     provider: z.enum(agentProviders),
     model: z.string().min(1).max(100).nullable(),
-    effort: z.enum(modelEfforts).nullable(),
+    effort: modelEffortSchema.nullable(),
     kind: z.enum(["issue_processing", "custom"]),
     position: z.number().int().min(0).max(999),
   })
@@ -208,7 +208,7 @@ export const organizationAgentContextProjectAgentSchema = z
     name: z.string().min(1).max(100),
     provider: z.enum(agentProviders),
     model: z.string().min(1).max(100).nullable(),
-    effort: z.enum(modelEfforts).nullable(),
+    effort: modelEffortSchema.nullable(),
     responsibility: z.string().max(2_000),
     skills: z
       .array(organizationAgentContextAgentSkillSchema)
@@ -275,10 +275,10 @@ export const organizationAgentContextIssueSchema = z
       .nullable(),
     preferredProvider: z.enum(agentProviders).nullable(),
     preferredModel: z.string().min(1).max(100).nullable(),
-    preferredEffort: z.enum(modelEfforts).nullable(),
+    preferredEffort: modelEffortSchema.nullable(),
     requestedProvider: z.enum(agentProviders).nullable(),
     requestedModel: z.string().min(1).max(100).nullable(),
-    requestedEffort: z.enum(modelEfforts).nullable(),
+    requestedEffort: modelEffortSchema.nullable(),
     stagingQaStatus: z.enum(autoHuntQaStatuses).nullable(),
     productionQaStatus: z.enum(autoHuntQaStatuses).nullable(),
     stagingQaDetail: z.string().max(100_000).nullable(),

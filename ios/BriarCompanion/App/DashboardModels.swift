@@ -253,6 +253,9 @@ struct ResultReview: Codable, Equatable, Identifiable, Sendable {
 }
 
 struct DashboardWorker: Codable, Equatable, Identifiable, Sendable {
+    struct Capabilities: Codable, Equatable, Sendable {
+        let providerCapabilities: [String: AgentProviderCapability]?
+    }
     struct Icon: Codable, Equatable, Sendable {
         enum Kind: String, Codable, Sendable {
             case emoji
@@ -268,6 +271,7 @@ struct DashboardWorker: Codable, Equatable, Identifiable, Sendable {
     let icon: Icon?
     let agentProvider: AgentProvider?
     let providers: [AgentProvider]?
+    let capabilities: Capabilities?
     let readiness: String
     let acceptingWork: Bool
     let readinessDetail: String?
@@ -280,6 +284,7 @@ struct DashboardWorker: Codable, Equatable, Identifiable, Sendable {
         icon: Icon? = nil,
         agentProvider: AgentProvider? = nil,
         providers: [AgentProvider]? = nil,
+        capabilities: Capabilities? = nil,
         readiness: String,
         acceptingWork: Bool,
         readinessDetail: String?,
@@ -291,6 +296,7 @@ struct DashboardWorker: Codable, Equatable, Identifiable, Sendable {
         self.icon = icon
         self.agentProvider = agentProvider
         self.providers = providers
+        self.capabilities = capabilities
         self.readiness = readiness
         self.acceptingWork = acceptingWork
         self.readinessDetail = readinessDetail

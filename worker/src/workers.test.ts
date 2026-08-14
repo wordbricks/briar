@@ -310,6 +310,50 @@ describe("detached execution workers", () => {
           healthy: true,
         },
       },
+      providerCapabilities: {
+        codex: {
+          models: [{
+            id: "gpt-5.6-sol",
+            label: "GPT-5.6 Sol",
+            efforts: [
+              { id: "high", label: "high" },
+              { id: "xhigh", label: "xhigh" },
+            ],
+          }],
+          defaultEfforts: [],
+          allowCustomModels: false,
+          error: null,
+        },
+        claude: {
+          models: [{
+            id: "claude-sonnet-4-0",
+            label: "Claude Sonnet 4",
+            efforts: [{ id: "medium", label: "medium" }],
+          }],
+          defaultEfforts: [],
+          allowCustomModels: true,
+          error: null,
+        },
+        grok: {
+          models: [{
+            id: "grok-4.6",
+            label: "Grok 4.6",
+            efforts: [
+              { id: "high", label: "high" },
+              { id: "xhigh", label: "xhigh" },
+            ],
+          }],
+          defaultEfforts: [],
+          allowCustomModels: false,
+          error: null,
+        },
+        opencode: {
+          models: [],
+          defaultEfforts: [],
+          allowCustomModels: true,
+          error: null,
+        },
+      },
       versions: { briar: "1.1.1" },
       observedAt: atMinute(minute),
     });
@@ -602,6 +646,55 @@ describe("detached execution workers", () => {
       requested_agent_provider: "codex",
       requested_worker_id: selected.worker.id,
       worker_id: selected.worker.id,
+    });
+  });
+
+  it("dispatches a newly reported Grok model and model-specific effort", async () => {
+    const selected = await register("grok-46");
+    await recordWorkerHeartbeat(db, projectId, {
+      workerId: selected.worker.id,
+      capabilities: {
+        providers: ["grok"],
+        providerHealth: {
+          grok: { installed: true, authenticated: true, healthy: true },
+        },
+        providerCapabilities: {
+          codex: { models: [], defaultEfforts: [], allowCustomModels: false, error: null },
+          claude: { models: [], defaultEfforts: [], allowCustomModels: true, error: null },
+          grok: {
+            models: [{
+              id: "grok-4.6",
+              label: "Grok 4.6",
+              efforts: [{ id: "xhigh", label: "Extra High" }],
+            }],
+            defaultEfforts: [],
+            allowCustomModels: false,
+            error: null,
+          },
+          opencode: { models: [], defaultEfforts: [], allowCustomModels: true, error: null },
+        },
+      },
+      observedAt: atMinute(2),
+    });
+    const runId = await recordHuntEvent(
+      db,
+      projectId,
+      queuedEvent("grok-46-dispatch", 2),
+    );
+
+    await expect(dispatchHuntRun(db, projectId, projectId, {
+      runId,
+      provider: "grok",
+      model: "grok-4.6",
+      effort: "xhigh",
+      workerId: selected.worker.id,
+      requestedByUserId: "member",
+      requestId: "46464646-aaaa-4646-8646-464646464646",
+      occurredAt: atMinute(3),
+    })).resolves.toMatchObject({
+      provider: "grok",
+      model: "grok-4.6",
+      effort: "xhigh",
     });
   });
 

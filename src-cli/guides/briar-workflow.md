@@ -151,10 +151,12 @@ briar run rework --run '<run-id>' \
   --reason '<what must change>'
 ```
 
-Rework preserves the active attempt, claim, branch, worktree, and audit history. It
-increments the revision and makes events and evidence from the target stage onward
-non-canonical until those stages are recorded again. Do not use rework for transient
-infrastructure failures; remain in the current QA stage and retry the same check.
+Rework preserves the active attempt, branch, worktree, and audit history. It releases the
+current claim, queues the new revision for a fresh worker pass, and makes events and evidence
+from the target stage onward non-canonical until those stages are recorded again. After a
+successful rework command, stop the current worker pass so the queued revision can continue in
+the same worktree. Do not use rework for transient infrastructure failures; remain in the
+current QA stage and retry the same check.
 
 ## Record evidence
 

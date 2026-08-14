@@ -47,6 +47,47 @@ const projectAAgentToken = "briar_agent_execution_approval_test";
 const executionWorkerCredential = "briar_worker_execution_credential";
 const initialAt = "2026-08-11T00:00:00.000Z";
 
+const providerCapabilities = {
+  codex: {
+    models: [
+      {
+        id: "gpt-5.6-sol",
+        label: "GPT-5.6 Sol",
+        efforts: [
+          { id: "high", label: "High" },
+          { id: "medium", label: "Medium" },
+        ],
+      },
+      {
+        id: "gpt-provider-reported-model",
+        label: "Provider-reported model",
+        efforts: [{ id: "high", label: "High" }],
+      },
+    ],
+    defaultEfforts: [],
+    allowCustomModels: false,
+    error: null,
+  },
+  claude: {
+    models: [],
+    defaultEfforts: [],
+    allowCustomModels: true,
+    error: null,
+  },
+  grok: {
+    models: [],
+    defaultEfforts: [],
+    allowCustomModels: false,
+    error: null,
+  },
+  opencode: {
+    models: [],
+    defaultEfforts: [],
+    allowCustomModels: true,
+    error: null,
+  },
+};
+
 const event = (
   sourceKey: string,
   title: string,
@@ -191,6 +232,7 @@ describe("conversational issue execution approval", () => {
       providerHealth: {
         codex: { installed: true, authenticated: true, healthy: true },
       },
+      providerCapabilities,
       versions: { briar: "1.0.0" },
       observedAt: new Date().toISOString(),
     });
@@ -1516,6 +1558,7 @@ describe("conversational issue execution approval", () => {
       providerHealth: {
         codex: { installed: true, authenticated: true, healthy: true },
       },
+      providerCapabilities,
       versions: { briar: "1.0.0" },
       observedAt: new Date().toISOString(),
     });
@@ -1688,6 +1731,7 @@ describe("conversational issue execution approval", () => {
       providerHealth: {
         codex: { installed: true, authenticated: true, healthy: true },
       },
+      providerCapabilities,
       versions: { briar: "1.0.0" },
       observedAt: new Date().toISOString(),
     });

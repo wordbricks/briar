@@ -499,6 +499,7 @@ struct TaskListView: View {
                 mutations: mutations,
                 members: snapshot?.members ?? [],
                 providers: snapshot?.organizationProviders ?? [],
+                capabilities: AgentProviderCapabilityCatalog(workers: snapshot?.workers ?? []),
                 refresh: refresh
             )
         }
@@ -808,6 +809,10 @@ struct RunDetailView: View {
 
     private var issueMentionCandidates: [ChannelMentionTarget] {
         MessageMentions.issueCandidates(members: members, currentUserId: currentUserID)
+    }
+
+    private var providerCapabilities: AgentProviderCapabilityCatalog {
+        AgentProviderCapabilityCatalog(workers: workers)
     }
 
     private var issueMentionHandles: Set<String> {
@@ -1288,8 +1293,8 @@ struct RunDetailView: View {
             .accessibilityIdentifier("execution-provider-picker")
             Picker(L10n.text("모델", locale: locale), selection: modelSelection) {
                 Text(L10n.text("기본값", locale: locale)).tag(String?.none)
-                ForEach(preferences.provider?.models ?? [], id: \.self) {
-                    Text($0).tag(String?.some($0))
+                ForEach(providerCapabilities.models(for: preferences.provider)) {
+                    Text($0.label).tag(String?.some($0.id))
                 }
             }
             .disabled(
@@ -1299,8 +1304,11 @@ struct RunDetailView: View {
             .accessibilityIdentifier("execution-model-picker")
             Picker(L10n.text("Effort", locale: locale), selection: effortSelection) {
                 Text(L10n.text("기본값", locale: locale)).tag(ModelEffort?.none)
-                ForEach(preferences.provider?.efforts ?? []) {
-                    Text($0.rawValue).tag(ModelEffort?.some($0))
+                ForEach(providerCapabilities.efforts(
+                    for: preferences.provider,
+                    model: preferences.model
+                )) {
+                    Text($0.label).tag(ModelEffort?.some(ModelEffort(rawValue: $0.id)))
                 }
             }
             .disabled(

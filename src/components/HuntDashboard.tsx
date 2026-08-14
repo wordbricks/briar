@@ -240,7 +240,7 @@ import type {
   UpdateIssueInput,
 } from "../types";
 import {
-  agentEfforts,
+  agentEffortOptions,
   agentModelDisplayName,
   agentModelOptions,
   agentProviderLabels,
@@ -2974,7 +2974,10 @@ export function CreateIssueDialog({
               className="issue-model-select"
               disabled={!preferredProvider}
               label={t("issue.preferredModel")}
-              onValueChange={setPreferredModel}
+              onValueChange={(value) => {
+                setPreferredModel(value);
+                setPreferredEffort("");
+              }}
               options={preferredProvider
                 ? agentModelOptions(
                     providerModels,
@@ -2995,14 +2998,14 @@ export function CreateIssueDialog({
               label={t("settings.effort")}
               onValueChange={setPreferredEffort}
               options={
-                preferredProvider && preferredProvider in agentEfforts
+                preferredProvider
                   ? [
                       { label: t("settings.providerDefaultEffort"), value: "" },
-                      ...agentEfforts[preferredProvider as AgentProvider].map(
-                        (effort) => ({
-                          label: effort,
-                          value: effort,
-                        }),
+                      ...agentEffortOptions(
+                        providerModels,
+                        preferredProvider as AgentProvider,
+                        preferredModel,
+                        preferredEffort,
                       ),
                     ]
                   : []
@@ -4039,7 +4042,12 @@ function IssueContextMenu({
                       >
                         {[
                           null,
-                          ...agentEfforts[run.preferredProvider],
+                          ...agentEffortOptions(
+                            providerModels,
+                            run.preferredProvider,
+                            run.preferredModel,
+                            run.preferredEffort,
+                          ).map((option) => option.value),
                         ].map((effort) => (
                           <ContextMenu.RadioItem
                             className="issue-context-item issue-context-choice"
@@ -6056,6 +6064,10 @@ export function RunPage({
                                   <span>{run.structuredResult.nextAction}</span>
                                 </div>
                               ) : null}
+                              <RunResultScreenshots
+                                onLoad={onLoadRunEvidence}
+                                onLoadImage={onLoadRunEvidenceImage}
+                              />
                             </section>
                           </div>
                           {run.pullRequestUrls.length > 0 ? (
@@ -6233,6 +6245,10 @@ export function RunPage({
                               <span>{run.structuredResult.nextAction}</span>
                             </div>
                           ) : null}
+                          <RunResultScreenshots
+                            onLoad={onLoadRunEvidence}
+                            onLoadImage={onLoadRunEvidenceImage}
+                          />
                           {run.pullRequestUrls.length > 0 ? (
                             <div className="run-result-links">
                               {run.pullRequestUrls.map((url, index) => {
@@ -6318,10 +6334,12 @@ export function RunPage({
                           {executionMetricsPanel}
                         </div>
                       )}
-                      <RunResultScreenshots
-                        onLoad={onLoadRunEvidence}
-                        onLoadImage={onLoadRunEvidenceImage}
-                      />
+                      {run.status !== "paused" && !completionSummary ? (
+                        <RunResultScreenshots
+                          onLoad={onLoadRunEvidence}
+                          onLoadImage={onLoadRunEvidenceImage}
+                        />
+                      ) : null}
                     </div>
                   ) : activeDetailTab === "agentActivity" ? (
                     <IssueAgentActivityPanel
@@ -6587,11 +6605,11 @@ export function RunPage({
                             value: "",
                           },
                           ...(run.preferredProvider
-                            ? agentEfforts[run.preferredProvider].map(
-                                (effort) => ({
-                                  label: effort,
-                                  value: effort,
-                                }),
+                            ? agentEffortOptions(
+                                providerModels,
+                                run.preferredProvider,
+                                run.preferredModel,
+                                run.preferredEffort,
                               )
                             : []),
                         ]}

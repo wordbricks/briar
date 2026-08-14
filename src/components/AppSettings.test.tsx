@@ -13,6 +13,7 @@ import {
 } from "../lib/initial-onboarding";
 import {
   loadAppProviderSettings,
+  loadAgentProviderModels,
   updateAppProviderSettings,
 } from "../lib/project-llm";
 import type { RepositoryReadiness } from "../lib/project-connection";
@@ -42,6 +43,7 @@ vi.mock("../lib/project-llm", async (importOriginal) => {
   return {
     ...original,
     loadAppProviderSettings: vi.fn(),
+    loadAgentProviderModels: vi.fn(),
     updateAppProviderSettings: vi.fn(),
   };
 });
@@ -120,6 +122,41 @@ describe("AppSettings", () => {
       configPath: "/Users/jay/.zshrc",
     });
     vi.mocked(loadAppProviderSettings).mockReset();
+    vi.mocked(loadAgentProviderModels).mockReset();
+    vi.mocked(loadAgentProviderModels).mockResolvedValue({
+      codex: {
+        models: [{
+          id: "gpt-5.6-sol",
+          label: "GPT-5.6 Sol",
+          efforts: [{ id: "high", label: "High" }],
+        }],
+        defaultEfforts: [],
+        allowCustomModels: false,
+        error: null,
+      },
+      claude: {
+        models: [{
+          id: "sonnet",
+          label: "Claude Sonnet",
+          efforts: [{ id: "high", label: "High" }],
+        }],
+        defaultEfforts: [],
+        allowCustomModels: true,
+        error: null,
+      },
+      grok: {
+        models: [],
+        defaultEfforts: [],
+        allowCustomModels: false,
+        error: null,
+      },
+      opencode: {
+        models: [],
+        defaultEfforts: [],
+        allowCustomModels: true,
+        error: null,
+      },
+    });
     vi.mocked(updateAppProviderSettings).mockReset();
     vi.mocked(loadAppRuntimeSettings).mockReset();
     vi.mocked(updateAppRuntimeSettings).mockReset();

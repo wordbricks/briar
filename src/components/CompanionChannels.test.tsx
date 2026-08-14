@@ -1979,10 +1979,14 @@ describe("CompanionChannels", () => {
   });
 
   it("opens @ candidates and sends a picked Agent as a structured mention", async () => {
+    const mentionAgent = {
+      ...agent,
+      avatar: "data:image/png;base64,cHJvamVjdC1hdmF0YXI=",
+    };
     loadChannel.mockResolvedValue({
       channel: channel("c-common", "Welcome", null),
       members: [member],
-      agents: [agent],
+      agents: [mentionAgent],
       messages: [],
     });
     sendChannelMessage.mockResolvedValue({
@@ -2022,6 +2026,9 @@ describe("CompanionChannels", () => {
     ].find((button) => button.textContent?.includes("Honey"));
     expect(honey?.textContent).toContain("Organization agent");
     expect(honey?.textContent).not.toContain("조직 에이전트");
+    expect(honey?.querySelector("img")?.getAttribute("src")).toBe(
+      mentionAgent.avatar,
+    );
     await act(async () => honey!.click());
     const composerMention = container.querySelector<HTMLButtonElement>(
       ".companion-channel-composer-field .conversation-mention-button[data-mention-handle='Honey']",

@@ -4101,6 +4101,11 @@ describe("HuntDashboard", () => {
     expect(
       container.querySelector(".run-result-screenshots")?.textContent,
     ).toContain("결과 화면");
+    expect(
+      container
+        .querySelector(".completed-issue-card")
+        ?.contains(container.querySelector(".run-result-screenshots")),
+    ).toBe(true);
     const enlargeButton = container.querySelector<HTMLButtonElement>(
       '.run-result-screenshots [aria-label="finished-dashboard.png 크게 보기"]',
     );
@@ -6607,7 +6612,7 @@ describe("HuntDashboard", () => {
     );
 
     expect(markup).toContain('class="run-execution-identity"');
-    expect(markup).toContain("Codex · GPT-5.6 Sol · Lemon Worker");
+    expect(markup).toContain("Codex · gpt-5.6-sol · Lemon Worker");
     expect(
       (markup.match(/class="run-execution-identity"/g) ?? []).length,
     ).toBe(1);
@@ -6672,7 +6677,7 @@ describe("HuntDashboard", () => {
     expect(markup).toContain("프로바이더");
     expect(markup).toContain("Claude");
     expect(markup).toContain("모델");
-    expect(markup).toContain("Claude Opus");
+    expect(markup).toContain("opus");
     expect(markup).not.toContain("Grok");
     expect(markup).not.toContain("grok-4.5");
     expect(markup).not.toContain("claude-provider-default");

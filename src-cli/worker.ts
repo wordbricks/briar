@@ -33,6 +33,7 @@ export type ClaimedIssue = {
   createdByUserId?: string | null;
   claimToken: string;
   leaseExpiresAt: string;
+  claimAttempts?: number;
   execution?: {
     provider: AgentProvider;
     model: string | null;
@@ -129,6 +130,25 @@ export function workerExecutionPath(
   return [localBin, ...paths].join(delimiter);
 }
 
+/**
+ * Issue executions must never share a runtime directory. Keep the execution
+ * identity in the leaf name instead of nesting it below the legacy run-id
+ * directory: a still-running older CLI may recursively remove that legacy
+ * directory during cleanup.
+ */
+export function issueWorkerSessionDirectory(
+  configDirectory: string,
+  issue: Pick<ClaimedIssue, "runId" | "executionId"> & { claimAttempts: number },
+): string {
+  const executionIdentity = issue.executionId ??
+    `claim-${issue.claimAttempts}`;
+  return join(
+    configDirectory,
+    "worker-sessions",
+    `${issue.runId}--${executionIdentity}`,
+  );
+}
+
 /** Random, opaque identity persisted in Briar's 0600 local config. */
 export function createWorkerDeviceIdentity(
   randomHex = () => randomBytes(32).toString("hex"),
@@ -207,7 +227,11 @@ export async function runWorkerLoop(
     string,
     Promise<{ issue: ClaimedIssue; error: unknown | null }>
   >();
-  const workKey = (issue: ClaimedIssue) => issue.workId ?? issue.runId;
+  const serialTails = new Map<string, Promise<void>>();
+  const executionKey = (issue: ClaimedIssue) =>
+    issue.workId ?? issue.executionId ?? `${issue.runId}:${issue.claimToken}`;
+  const serialKey = (issue: ClaimedIssue) =>
+    !issue.workType || issue.workType === "issue" ? issue.runId : null;
 
   const applyHeartbeat = (
     heartbeat:
@@ -234,7 +258,7 @@ export async function runWorkerLoop(
     await reportState();
   };
 
-  const execute = async (issue: ClaimedIssue) => {
+  const execute = async (issue: ClaimedIssue, waitForTurn: Promise<void>) => {
     const renewal = new AbortController();
     const execution = new AbortController();
     let leaseFailure: unknown = null;
@@ -259,6 +283,11 @@ export async function runWorkerLoop(
     })();
 
     try {
+      // Rework can make the same run claimable before its previous provider
+      // process has exited. Renew the new claim above, but do not let two
+      // agents edit the same issue worktree at the same time.
+      await waitForTurn;
+      if (leaseFailure) throw leaseFailure;
       await dependencies.runIssue(issue, execution.signal);
       if (leaseFailure) throw leaseFailure;
       return { issue, error: null };
@@ -269,6 +298,29 @@ export async function runWorkerLoop(
       execution.abort();
       await renewalLoop;
     }
+  };
+
+  const schedule = (issue: ClaimedIssue) => {
+    const runKey = serialKey(issue);
+    const previous = runKey
+      ? (serialTails.get(runKey) ?? Promise.resolve())
+      : Promise.resolve();
+    let releaseTurn = () => {};
+    let tail: Promise<void> | null = null;
+    if (runKey) {
+      const current = new Promise<void>((resolve) => {
+        releaseTurn = resolve;
+      });
+      tail = previous.then(() => current);
+      serialTails.set(runKey, tail);
+    }
+    const execution = execute(issue, previous).finally(() => {
+      releaseTurn();
+      if (runKey && tail && serialTails.get(runKey) === tail) {
+        serialTails.delete(runKey);
+      }
+    });
+    active.set(executionKey(issue), execution);
   };
 
   while (processed < maxIssues) {
@@ -305,7 +357,7 @@ export async function runWorkerLoop(
         }
         consecutiveEmptyClaims = 0;
         dependencies.log(`claimed ${issue.sourceKey} (${issue.runId})`);
-        active.set(workKey(issue), execute(issue));
+        schedule(issue);
         await reportState();
       }
       if (!acceptingWork && active.size === 0) {
@@ -364,7 +416,7 @@ export async function runWorkerLoop(
     wake.abort();
     if (!outcome) continue;
 
-    active.delete(workKey(outcome.issue));
+    active.delete(executionKey(outcome.issue));
     if (outcome.error === null) {
       processed += 1;
       consecutiveFailures = 0;

@@ -33,7 +33,7 @@ import {
 } from "../src/lib/agent-execution-metrics";
 import {
   agentProviders,
-  modelEfforts,
+  modelEffortSchema,
 } from "../src/lib/agent-provider-contract";
 import { validateEvidenceImages } from "../src/lib/evidence-images";
 import {
@@ -84,6 +84,7 @@ import {
 import {
   createWorkerDeviceIdentity,
   defaultWorkerLabel,
+  issueWorkerSessionDirectory,
   interruptibleSleep,
   restartInstalledServices,
   runWorkerLoop,
@@ -144,6 +145,7 @@ import {
   inspectWorkerProviderHealth,
   providerHealthReadinessDetail,
 } from "./provider-health";
+import { discoverWorkerProviderCapabilities } from "./provider-capabilities";
 import {
   configureBrowserSkillGuide,
   getSkillGuide,
@@ -1847,6 +1849,8 @@ async function recoverRun(action: "retry" | "cancel") {
     { method: "POST", body: JSON.stringify(input) },
   );
   if (project.activeClaim?.runId === runId) {
+    // The server released this claim while queueing the new revision. Make the
+    // current provider turn stop instead of continuing with a stale token.
     config.projects = config.projects.map((candidate) =>
       candidate.id === project.id
         ? { ...candidate, activeClaim: undefined }
@@ -1877,7 +1881,7 @@ async function reworkRun() {
   z.string().uuid().parse(runId);
   const result = await request<{
     runId: string;
-    outcome: string;
+    outcome: "reworked" | "already_reworked";
     attempt: number;
     revision: number;
     workflowStage: string;
@@ -1887,6 +1891,14 @@ async function reworkRun() {
     executionToken(project),
     { method: "POST", body: JSON.stringify(input) },
   );
+  if (project.activeClaim?.runId === runId) {
+    config.projects = config.projects.map((candidate) =>
+      candidate.id === project.id
+        ? { ...candidate, activeClaim: undefined }
+        : candidate
+    );
+    await saveConfig(config);
+  }
   console.log(JSON.stringify(result));
 }
 
@@ -2021,7 +2033,7 @@ const workerBindingSchema = workerRegistrationSchema.omit({
 
 const detachedAgentProviderSchema = z.enum(agentProviders);
 
-const detachedAgentEffortSchema = z.enum(modelEfforts);
+const detachedAgentEffortSchema = modelEffortSchema;
 
 const detachedAgentSkillSchema = z.object({
   id: z.string().min(1),
@@ -2337,11 +2349,7 @@ async function runClaimedIssue(
   workerToken: string,
   signal: AbortSignal,
 ) {
-  const runtimeDirectory = join(
-    configDirectory,
-    "worker-sessions",
-    issue.runId,
-  );
+  const runtimeDirectory = issueWorkerSessionDirectory(configDirectory, issue);
   const runtimeConfig = structuredClone(config);
   runtimeConfig.projects = runtimeConfig.projects.map((candidate) =>
     candidate.id === project.id
@@ -3319,6 +3327,10 @@ async function workerRegisterCommand() {
   const providerHealth = await inspectWorkerProviderHealth(
     config.agentProviders,
   );
+  const providerCapabilities = await discoverWorkerProviderCapabilities(
+    config.agentProviders,
+    { refresh: true },
+  );
   const providers = healthyWorkerProviders(providerHealth);
   const provider = providers.includes(configuredProvider)
     ? configuredProvider
@@ -3342,6 +3354,7 @@ async function workerRegisterCommand() {
               agentProvider: provider,
               providers,
               providerHealth,
+              providerCapabilities,
               versions: { briar: cliVersion },
             }),
           },
@@ -3374,6 +3387,7 @@ async function workerRegisterCommand() {
           agentProvider: provider,
           providers,
           providerHealth,
+          providerCapabilities,
           ...(Number.isInteger(requestedMaxSessions) &&
           requestedMaxSessions > 0
             ? { maxConcurrentSessions: requestedMaxSessions }
@@ -3559,6 +3573,9 @@ async function workerCommand() {
     const providerHealth = await inspectWorkerProviderHealth(
       config.agentProviders,
     );
+    const providerCapabilities = await discoverWorkerProviderCapabilities(
+      config.agentProviders,
+    );
     const heartbeat = await request<{
       updateDirective?: WorkerUpdateDirective | null;
     }>(
@@ -3575,6 +3592,7 @@ async function workerCommand() {
           capabilities: {
             providers: healthyWorkerProviders(providerHealth),
             providerHealth,
+            providerCapabilities,
             worktrees: true,
             remoteUpdates: {
               supported: supportsRemoteWorkerUpdates(platform()),
@@ -3721,6 +3739,9 @@ async function workerCommand() {
         const providerHealth = await inspectWorkerProviderHealth(
           config.agentProviders,
         );
+        const providerCapabilities = await discoverWorkerProviderCapabilities(
+          config.agentProviders,
+        );
         const providers = healthyWorkerProviders(providerHealth);
         const hasHealthyProvider = providers.length > 0;
         // Shared project workflow tools must be ready on this worker machine.
@@ -3766,6 +3787,7 @@ async function workerCommand() {
               capabilities: {
                 providers,
                 providerHealth,
+                providerCapabilities,
                 worktrees: worktreesEnabled(project),
                 remoteUpdates: {
                   supported: supportsRemoteWorkerUpdates(platform()),
@@ -3846,6 +3868,7 @@ async function workerCommand() {
                     capabilities: {
                       providers,
                       providerHealth,
+                      providerCapabilities,
                       worktrees: worktreesEnabled(project),
                       remoteUpdates: {
                         supported: supportsRemoteWorkerUpdates(platform()),

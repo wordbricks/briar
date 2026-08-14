@@ -72,11 +72,15 @@ export function ChannelMentionMenu({
               <>
                 {target.image ? (
                   <img alt="" src={target.image} />
-                ) : target.type === "agent" ? (
-                  <Bot size={15} />
                 ) : (
-                  <span className="channel-mention-avatar">
-                    {mentionInitial(target)}
+                  <span
+                    className={`channel-mention-avatar ${target.type}`}
+                  >
+                    {target.type === "agent" ? (
+                      <Bot size={15} />
+                    ) : (
+                      mentionInitial(target)
+                    )}
                   </span>
                 )}
                 <strong>@{target.handle}</strong>

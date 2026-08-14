@@ -46,6 +46,47 @@ const projectAgentToken = "briar_agent_channel_proposal_test";
 const projectBAgentToken = "briar_agent_channel_proposal_target_test";
 const now = "2026-08-10T00:00:00.000Z";
 
+const providerCapabilities = {
+  codex: {
+    models: [
+      {
+        id: "gpt-5.6-sol",
+        label: "GPT-5.6 Sol",
+        efforts: [
+          { id: "high", label: "High" },
+          { id: "medium", label: "Medium" },
+        ],
+      },
+      {
+        id: "gpt-provider-reported-model",
+        label: "Provider-reported model",
+        efforts: [{ id: "high", label: "High" }],
+      },
+    ],
+    defaultEfforts: [],
+    allowCustomModels: false,
+    error: null,
+  },
+  claude: {
+    models: [],
+    defaultEfforts: [],
+    allowCustomModels: true,
+    error: null,
+  },
+  grok: {
+    models: [],
+    defaultEfforts: [],
+    allowCustomModels: false,
+    error: null,
+  },
+  opencode: {
+    models: [],
+    defaultEfforts: [],
+    allowCustomModels: true,
+    error: null,
+  },
+};
+
 describe("channel issue proposal approval route", () => {
   const miniflare = new Miniflare({
     modules: true,
@@ -208,6 +249,7 @@ describe("channel issue proposal approval route", () => {
     providerHealth: {
       codex: { installed: true, authenticated: true, healthy: true },
     },
+    providerCapabilities,
     versions: { briar: "1.0.0" },
     observedAt,
   });
@@ -1334,6 +1376,7 @@ describe("channel issue proposal approval route", () => {
       providerHealth: {
         codex: { installed: true, authenticated: true, healthy: true },
       },
+      providerCapabilities,
       versions: { briar: "1.0.0" },
       observedAt,
     });

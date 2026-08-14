@@ -2448,15 +2448,7 @@
               "string",
               "null"
             ],
-            "enum": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max",
-              "ultra",
-              null
-            ]
+            "maxLength": 50
           },
           "fullAuto": {
             "type": "boolean"
@@ -2485,15 +2477,7 @@
               "string",
               "null"
             ],
-            "enum": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max",
-              "ultra",
-              null
-            ]
+            "maxLength": 50
           },
           "requestedWorkerId": {
             "type": [
@@ -2769,6 +2753,16 @@
                 "opencode"
               ]
             }
+          },
+          "capabilities": {
+            "type": "object",
+            "properties": {
+              "providerCapabilities": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            },
+            "additionalProperties": true
           },
           "readiness": {
             "type": "string"
@@ -3318,15 +3312,7 @@
               "string",
               "null"
             ],
-            "enum": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max",
-              "ultra",
-              null
-            ]
+            "maxLength": 50
           },
           "requestedWorkerId": {
             "type": [
@@ -3392,7 +3378,7 @@
           "model": { "type": ["string", "null"] },
           "effort": {
             "type": ["string", "null"],
-            "enum": ["low", "medium", "high", "xhigh", "max", "ultra", null]
+            "maxLength": 50
           },
           "request": { "type": "string", "minLength": 1, "maxLength": 10000 },
           "delegatedByAgentId": {
@@ -3724,14 +3710,7 @@
           },
           "effort": {
             "type": "string",
-            "enum": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max",
-              "ultra"
-            ],
+            "maxLength": 50,
             "nullable": true
           },
           "kind": {
@@ -4817,15 +4796,7 @@
               "string",
               "null"
             ],
-            "enum": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max",
-              "ultra",
-              null
-            ]
+            "maxLength": 50
           },
           "workerId": {
             "type": [
@@ -4882,15 +4853,7 @@
               "string",
               "null"
             ],
-            "enum": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max",
-              "ultra",
-              null
-            ]
+            "maxLength": 50
           },
           "requestedWorkerId": {
             "type": [
