@@ -26,7 +26,6 @@ const sidebarProps = {
   onAddOrganization: () => undefined,
   onLogout: () => undefined,
   onOrganizationChange: () => undefined,
-  onOrganizationSettings: () => undefined,
   onProjectChange: () => undefined,
   onProjectReadinessOpen: () => undefined,
   onProjectSettings: () => undefined,
@@ -479,7 +478,7 @@ describe("Sidebar", () => {
     container.remove();
   });
 
-  it("switches organizations from the brand control", async () => {
+  it("opens the organization list directly from the brand control", async () => {
     const onOrganizationChange = vi.fn();
     const container = document.createElement("div");
     document.body.append(container);
@@ -521,22 +520,23 @@ describe("Sidebar", () => {
     await act(async () => trigger?.click());
     expect(trigger?.getAttribute("aria-expanded")).toBe("true");
     expect(container.querySelector('[aria-label="조직 메뉴"]')?.textContent).toContain(
+      "Briar",
+    );
+    expect(container.querySelector('[aria-label="조직 메뉴"]')?.textContent).toContain(
+      "Wordbricks",
+    );
+    expect(container.querySelector('[aria-label="조직 메뉴"]')?.textContent).not.toContain(
+      "조직 설정",
+    );
+    expect(container.querySelector('[aria-label="조직 메뉴"]')?.textContent).not.toContain(
       "멤버 초대 및 관리",
     );
     expect(container.querySelector('[aria-label="조직 메뉴"]')?.textContent).not.toContain(
-      "Wordbricks",
+      "조직 전환",
     );
-    expect(container.textContent).not.toContain("Console");
-
-    await act(async () => {
-      Array.from(
-        container.querySelectorAll<HTMLButtonElement>(
-          '[aria-label="조직 메뉴"] button',
-        ),
-      )
-        .find((button) => button.textContent?.includes("조직 전환"))
-        ?.click();
-    });
+    expect(container.querySelector('[aria-label="조직 메뉴"]')?.textContent).not.toContain(
+      "로그아웃",
+    );
     expect(container.querySelector('[aria-label="조직 선택"]')?.textContent).toContain(
       "Wordbricks",
     );
@@ -557,7 +557,7 @@ describe("Sidebar", () => {
     container.remove();
   });
 
-  it("opens the organization creation page from the bottom of the switcher", async () => {
+  it("opens the organization creation page from the bottom of the organization list", async () => {
     const onAddOrganization = vi.fn();
     const container = document.createElement("div");
     document.body.append(container);
@@ -576,15 +576,6 @@ describe("Sidebar", () => {
         .querySelector<HTMLButtonElement>('[aria-label="조직 메뉴 열기"]')
         ?.click();
     });
-    await act(async () => {
-      Array.from(
-        container.querySelectorAll<HTMLButtonElement>(
-          '[aria-label="조직 메뉴"] button',
-        ),
-      )
-        .find((button) => button.textContent?.includes("조직 전환"))
-        ?.click();
-    });
     const items = Array.from(
       container.querySelectorAll<HTMLButtonElement>(
         '[aria-label="조직 메뉴"] button',
@@ -595,62 +586,6 @@ describe("Sidebar", () => {
     await act(async () => items.at(-1)?.click());
     expect(onAddOrganization).toHaveBeenCalledOnce();
     expect(container.querySelector('[aria-label="조직 메뉴"]')).toBeNull();
-
-    await act(async () => root.unmount());
-    container.remove();
-  });
-
-  it("opens organization actions and logs out from the organization menu", async () => {
-    const onOrganizationSettings = vi.fn();
-    const onLogout = vi.fn();
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    await act(async () => {
-      root.render(
-        <Sidebar
-          {...sidebarProps}
-          onLogout={onLogout}
-          onOrganizationSettings={onOrganizationSettings}
-        />,
-      );
-    });
-
-    const openMenu = async () => {
-      await act(async () => {
-        container
-          .querySelector<HTMLButtonElement>('[aria-label="조직 메뉴 열기"]')
-          ?.click();
-      });
-    };
-    const clickMenuItem = async (label: string) => {
-      await act(async () => {
-        Array.from(
-          container.querySelectorAll<HTMLButtonElement>(
-            '[aria-label="조직 메뉴"] button',
-          ),
-        )
-          .find((button) => button.textContent?.includes(label))
-          ?.click();
-      });
-    };
-
-    await openMenu();
-    await clickMenuItem("조직 설정");
-    expect(onOrganizationSettings).toHaveBeenLastCalledWith(
-      "organization-1",
-    );
-
-    await openMenu();
-    await clickMenuItem("멤버 초대 및 관리");
-    expect(onOrganizationSettings).toHaveBeenLastCalledWith(
-      "organization-1",
-      "members",
-    );
-
-    await openMenu();
-    await clickMenuItem("로그아웃");
-    expect(onLogout).toHaveBeenCalledOnce();
 
     await act(async () => root.unmount());
     container.remove();
