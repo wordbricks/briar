@@ -53,6 +53,7 @@ import {
   PageHeader,
 } from "@/components/layout";
 import { Button } from "@/components/ui/button";
+import { LoadingState } from "@/components/ui/loading-state";
 import {
   Dialog,
   DialogContent,
@@ -1549,8 +1550,7 @@ export function HuntDashboard({
             className="issues-loading-overlay"
             role="status"
           >
-            <LoaderCircle aria-hidden="true" className="spin" size={20} />
-            <span>{t("dashboard.loadingIssues")}</span>
+            <LoadingState label={t("dashboard.loadingIssues")} />
           </div>
         ) : view === "list" && !companionMode ? (
           <IssueList
@@ -7464,8 +7464,7 @@ function IssueStatusHistoryPanel({
     >
       {loading ? (
         <div className="run-evidence-state">
-          <LoaderCircle className="spin" size={16} />
-          {t("run.activityLoading")}
+          <LoadingState label={t("run.activityLoading")} />
         </div>
       ) : loadError ? (
         <button
@@ -7670,8 +7669,7 @@ function RunEvidencePanel({
     >
       {loading ? (
         <div className="run-evidence-state">
-          <LoaderCircle className="spin" size={16} />
-          {t("run.evidenceLoading")}
+          <LoadingState label={t("run.evidenceLoading")} />
         </div>
       ) : loadError ? (
         <button
@@ -7900,8 +7898,7 @@ function RunResultScreenshots({
     >
       {loading ? (
         <div className="run-evidence-state">
-          <LoaderCircle className="spin" size={16} />
-          {t("run.evidenceLoading")}
+          <LoadingState label={t("run.evidenceLoading")} />
         </div>
       ) : loadError ? (
         <button
