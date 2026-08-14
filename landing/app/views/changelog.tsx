@@ -23,6 +23,22 @@ export const changelogCopy = {
     backTop: "맨 위로 ↑",
     entries: [
       {
+        version: "1.2.120",
+        date: "2026년 8월 14일",
+        title: "실시간 대화와 에이전트 실행을 더 정확하게 연결합니다",
+        summary:
+          "제공자가 실제 지원하는 모델로 작업을 배정하고, 채널 동기화·결과 확인·모바일 기록 탐색과 Worker 실행 안정성을 개선했습니다.",
+        items: [
+          "Codex·Claude·Grok·OpenCode CLI에서 사용 가능한 모델과 모델별 Effort를 동적으로 감지해 Worker가 보고하고, 데스크탑·모바일·iOS에서 같은 선택지를 사용하며 명시적 배정 전에 실제 지원 여부를 검증합니다.",
+          "채널·프로젝트 대화·Inbox가 조직별 WebSocket 하나를 공유하고, Inbox 변경을 즉시 반영하면서 트랜잭션 outbox와 60초 fallback으로 연결 누락을 복구합니다.",
+          "채널 Inbox 이벤트를 메시지 동기화 신호로 사용해 알림보다 답글 표시가 늦어지지 않게 하고, 사용자가 현재 보고 있는 채널의 알림만 억제하면서 로딩 중 도착한 갱신도 이어서 반영합니다.",
+          "완료 결과와 검토 대기 중인 부분 결과 리포트 안에 최신 통과 리비전의 증빙 스크린샷을 바로 표시해 별도 탭으로 이동하지 않고 결과를 확인할 수 있습니다.",
+          "채널 멘션 목록에서 사람과 마찬가지로 에이전트의 설정된 아바타를 보여주고, 이미지가 없는 에이전트에는 일관된 Bot 대체 아이콘을 표시합니다.",
+          "같은 이슈 실행을 중복 claim하는 Worker 요청을 직렬화하고 실행 시도별 세션 디렉터리를 분리해, 재작업 중 이전 정리가 새 실행을 지우거나 오래된 제공자 턴이 계속되는 경합을 막습니다.",
+          "iOS와 Android 채널은 최신 루트 메시지 20개부터 열고 위로 스크롤할 때 이전 기록을 추가하며, 오래된 알림을 직접 열어도 현재 읽던 위치를 보존합니다.",
+        ],
+      },
+      {
         version: "1.2.119",
         date: "2026년 8월 14일",
         title: "대화 화면과 에이전트 설정을 더 선명하게 다듬습니다",
@@ -551,6 +567,22 @@ export const changelogCopy = {
     home: "Home",
     backTop: "Back to top ↑",
     entries: [
+      {
+        version: "1.2.120",
+        date: "August 14, 2026",
+        title: "Connect live conversations and agent execution more precisely",
+        summary:
+          "Dispatch work with capabilities providers actually support, while improving channel sync, result review, mobile history navigation, and Worker execution reliability.",
+        items: [
+          "Discover available models and model-specific effort levels from the Codex, Claude, Grok, and OpenCode CLIs, report them from each Worker, use the same choices across desktop, mobile, and iOS, and validate explicit dispatches against live capabilities.",
+          "Share one organization-level WebSocket across channels, project conversations, and Inbox; apply Inbox changes immediately while recovering missed events through a transactional outbox and a 60-second fallback.",
+          "Use channel Inbox events as message-sync signals so replies appear before their notifications, suppress only alerts for the channel currently in view, and schedule a follow-up sync when updates arrive during loading.",
+          "Show evidence screenshots from the latest passing revision directly inside completed and review-pending result reports, without requiring a trip to the separate evidence tab.",
+          "Show configured agent avatars alongside people in channel mention suggestions, with a consistent Bot fallback when an agent has no image.",
+          "Serialize duplicate Worker claims for the same issue run and isolate session directories per execution attempt, preventing rework cleanup from deleting a new run or leaving a stale provider turn active.",
+          "Open iOS and Android channels at the latest 20 root messages, load older history when scrolling upward, preserve the reader's position, and still jump directly to old notification messages.",
+        ],
+      },
       {
         version: "1.2.119",
         date: "August 14, 2026",
@@ -1092,9 +1124,9 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <h1>{changelog.title}</h1>
           <p>{changelog.description}</p>
         </div>
-        <a href="#v1-2-119" className="changelog-current">
+        <a href="#v1-2-120" className="changelog-current">
           <span>{changelog.current}</span>
-          <strong>v1.2.119</strong>
+          <strong>v1.2.120</strong>
           <i aria-hidden="true">↓</i>
         </a>
       </section>
@@ -1119,6 +1151,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   {index === 0 ? <span>{changelog.latest}</span> : null}
                   <time
                     dateTime={
+                      entry.version === "1.2.120" ||
                       entry.version === "1.2.119"
                         ? "2026-08-14"
                         : entry.version === "1.2.118" ||
