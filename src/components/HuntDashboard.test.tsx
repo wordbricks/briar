@@ -4101,6 +4101,11 @@ describe("HuntDashboard", () => {
     expect(
       container.querySelector(".run-result-screenshots")?.textContent,
     ).toContain("결과 화면");
+    expect(
+      container
+        .querySelector(".completed-issue-card")
+        ?.contains(container.querySelector(".run-result-screenshots")),
+    ).toBe(true);
     const enlargeButton = container.querySelector<HTMLButtonElement>(
       '.run-result-screenshots [aria-label="finished-dashboard.png 크게 보기"]',
     );

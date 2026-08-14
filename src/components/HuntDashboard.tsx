@@ -6056,6 +6056,10 @@ export function RunPage({
                                   <span>{run.structuredResult.nextAction}</span>
                                 </div>
                               ) : null}
+                              <RunResultScreenshots
+                                onLoad={onLoadRunEvidence}
+                                onLoadImage={onLoadRunEvidenceImage}
+                              />
                             </section>
                           </div>
                           {run.pullRequestUrls.length > 0 ? (
@@ -6233,6 +6237,10 @@ export function RunPage({
                               <span>{run.structuredResult.nextAction}</span>
                             </div>
                           ) : null}
+                          <RunResultScreenshots
+                            onLoad={onLoadRunEvidence}
+                            onLoadImage={onLoadRunEvidenceImage}
+                          />
                           {run.pullRequestUrls.length > 0 ? (
                             <div className="run-result-links">
                               {run.pullRequestUrls.map((url, index) => {
@@ -6318,10 +6326,12 @@ export function RunPage({
                           {executionMetricsPanel}
                         </div>
                       )}
-                      <RunResultScreenshots
-                        onLoad={onLoadRunEvidence}
-                        onLoadImage={onLoadRunEvidenceImage}
-                      />
+                      {run.status !== "paused" && !completionSummary ? (
+                        <RunResultScreenshots
+                          onLoad={onLoadRunEvidence}
+                          onLoadImage={onLoadRunEvidenceImage}
+                        />
+                      ) : null}
                     </div>
                   ) : activeDetailTab === "agentActivity" ? (
                     <IssueAgentActivityPanel
