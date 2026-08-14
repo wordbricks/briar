@@ -4121,6 +4121,11 @@ describe("HuntDashboard", () => {
     expect(document.querySelector('[role="dialog"]')?.textContent).toContain(
       "finished-dashboard.png",
     );
+    const download = document.querySelector<HTMLAnchorElement>(
+      '[role="dialog"] .image-lightbox-download',
+    );
+    expect(download?.download).toBe("finished-dashboard.png");
+    expect(download?.getAttribute("href")).toBe("blob:result-screenshot");
 
     await act(async () => {
       document.querySelector<HTMLButtonElement>('[role="dialog"] button')?.click();
@@ -4638,6 +4643,24 @@ describe("HuntDashboard", () => {
     expect(
       container.querySelectorAll(".issue-description-scroll img"),
     ).toHaveLength(2);
+    const inlineImageTrigger = container.querySelector<HTMLButtonElement>(
+      '.issue-description-scroll [aria-label="inline.png 크게 보기"]',
+    );
+    const galleryImageTrigger = container.querySelector<HTMLButtonElement>(
+      '.issue-description-scroll [aria-label="gallery.png 크게 보기"]',
+    );
+    expect(inlineImageTrigger).not.toBeNull();
+    expect(galleryImageTrigger).not.toBeNull();
+
+    await act(async () => inlineImageTrigger?.click());
+    expect(
+      document.querySelector<HTMLAnchorElement>(
+        '[role="dialog"] .image-lightbox-download',
+      )?.download,
+    ).toBe("inline.png");
+    await act(async () => {
+      document.querySelector<HTMLButtonElement>('[role="dialog"] button')?.click();
+    });
 
     await act(async () => {
       root.render(renderPage(attachments.map((attachment) => ({
@@ -4719,6 +4742,11 @@ describe("HuntDashboard", () => {
     expect(
       container.querySelector<HTMLImageElement>(".issue-message-body img")?.src,
     ).toContain("blob:conversation-attachment");
+    expect(
+      container.querySelector<HTMLButtonElement>(
+        '.issue-message-body [aria-label="conversation.png 크게 보기"]',
+      ),
+    ).not.toBeNull();
 
     await act(async () => {
       root.render(renderPage({

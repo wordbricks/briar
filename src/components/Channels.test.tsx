@@ -286,6 +286,48 @@ describe("Channels", () => {
     expect(container.querySelector(".channel-composer-shell")).not.toBeNull();
   });
 
+  it("opens channel attachment and body images in the download modal", async () => {
+    Object.defineProperty(URL, "createObjectURL", {
+      configurable: true,
+      value: vi.fn(() => "blob:channel-attachment"),
+    });
+    Object.defineProperty(URL, "revokeObjectURL", {
+      configurable: true,
+      value: vi.fn(),
+    });
+    loadChannelMessageAttachment.mockResolvedValue(
+      new Blob(["image"], { type: "image/png" }),
+    );
+    await render([
+      message({
+        body: "![architecture.png](https://example.com/architecture.png)",
+        attachments: [{
+          id: "channel-attachment",
+          filename: "channel.png",
+          contentType: "image/png",
+          byteSize: 5,
+          url: "/channels/channel-1/attachments/channel-attachment",
+        }],
+      }),
+    ]);
+
+    const attachmentTrigger = container.querySelector<HTMLButtonElement>(
+      '.channel-message-images [aria-label="channel.png 크게 보기"]',
+    );
+    const bodyTrigger = container.querySelector<HTMLButtonElement>(
+      '.channel-message-text [aria-label="architecture.png 크게 보기"]',
+    );
+    expect(attachmentTrigger).not.toBeNull();
+    expect(bodyTrigger).not.toBeNull();
+
+    await act(async () => attachmentTrigger?.click());
+    const download = document.querySelector<HTMLAnchorElement>(
+      '[role="dialog"] .image-lightbox-download',
+    );
+    expect(download?.download).toBe("channel.png");
+    expect(download?.getAttribute("href")).toBe("blob:channel-attachment");
+  });
+
   it("uses Inbox channel changes as a delta recovery signal", async () => {
     vi.useFakeTimers();
     const channelList = [channel];
