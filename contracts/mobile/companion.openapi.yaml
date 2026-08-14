@@ -1277,6 +1277,17 @@
           },
           {
             "$ref": "#/components/parameters/ChannelId"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Maximum number of newest root messages to return",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
           }
         ],
         "security": [
@@ -1318,6 +1329,27 @@
             "name": "parentMessageId",
             "in": "query",
             "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Maximum number of messages to return",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "Oldest message ID from the previous page",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -4480,7 +4512,8 @@
           "channel",
           "members",
           "agents",
-          "messages"
+          "messages",
+          "nextCursor"
         ],
         "properties": {
           "channel": {
@@ -4505,6 +4538,10 @@
             "items": {
               "$ref": "#/components/schemas/ChannelMessage"
             }
+          },
+          "nextCursor": {
+            "type": ["string", "null"],
+            "format": "uuid"
           }
         },
         "additionalProperties": true
@@ -4512,7 +4549,8 @@
       "ChannelMessagesResponse": {
         "type": "object",
         "required": [
-          "messages"
+          "messages",
+          "nextCursor"
         ],
         "properties": {
           "messages": {
@@ -4520,6 +4558,10 @@
             "items": {
               "$ref": "#/components/schemas/ChannelMessage"
             }
+          },
+          "nextCursor": {
+            "type": ["string", "null"],
+            "format": "uuid"
           }
         },
         "additionalProperties": true

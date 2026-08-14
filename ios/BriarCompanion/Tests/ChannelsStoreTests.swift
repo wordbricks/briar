@@ -56,7 +56,8 @@ final class ChannelsStoreTests: XCTestCase {
         let listPath = MobileAPIContract.Endpoint.channels(organizationID: organizationID)
         let detailPath = MobileAPIContract.Endpoint.channel(
             organizationID: organizationID,
-            channelID: channelID
+            channelID: channelID,
+            messageLimit: ChannelsStore.messagePageSize
         )
         let api = ChannelPollingAPI(routes: [
             listPath: [try encoded(ChannelsResponse(channels: [listed], cursor: 10))],
@@ -75,6 +76,84 @@ final class ChannelsStoreTests: XCTestCase {
 
         XCTAssertEqual(store.channels.first?.name, archived.name)
         XCTAssertEqual(store.channels.first?.archivedAt, archivedAt)
+        store.applicationDidEnterBackground()
+    }
+
+    @MainActor
+    func testLoadsTwentyNewestMessagesThenPrependsAnEarlierPage() async throws {
+        let channel = summary(id: channelID, name: "Briar")
+        let cursor = UUID(uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!
+        let olderID = UUID(uuidString: "11111111-1111-4111-8111-111111111111")!
+        let latestID = UUID(uuidString: "22222222-2222-4222-8222-222222222222")!
+        let older = message(
+            id: olderID,
+            channelID: channelID,
+            body: "Older",
+            createdAt: Date(timeIntervalSince1970: 1_700_000_000)
+        )
+        let latest = message(
+            id: latestID,
+            channelID: channelID,
+            body: "Latest",
+            createdAt: Date(timeIntervalSince1970: 1_700_000_010)
+        )
+        let listPath = MobileAPIContract.Endpoint.channels(organizationID: organizationID)
+        let detailPath = MobileAPIContract.Endpoint.channel(
+            organizationID: organizationID,
+            channelID: channelID,
+            messageLimit: ChannelsStore.messagePageSize
+        )
+        let earlierPath = MobileAPIContract.Endpoint.channelMessages(
+            organizationID: organizationID,
+            channelID: channelID,
+            cursor: cursor,
+            limit: ChannelsStore.messagePageSize
+        )
+        let navigationPath = MobileAPIContract.Endpoint.channelMessages(
+            organizationID: organizationID,
+            channelID: channelID,
+            parentMessageID: olderID
+        )
+        let api = ChannelPollingAPI(routes: [
+            listPath: [try encoded(ChannelsResponse(channels: [channel], cursor: 10))],
+            detailPath: [try encoded(ChannelDetailResponse(
+                channel: channel,
+                members: [],
+                agents: [],
+                messages: [latest],
+                nextCursor: cursor
+            ))],
+            earlierPath: [try encoded(ChannelMessagesResponse(
+                messages: [older],
+                nextCursor: nil
+            ))],
+            navigationPath: [try encoded(ChannelMessagesResponse(
+                messages: [older],
+                nextCursor: nil
+            ))],
+        ])
+        let store = ChannelsStore(api: api, pollInterval: .seconds(3_600))
+
+        store.select(organizationID: organizationID, token: "token")
+        await waitForChannels(store, count: 1)
+        await store.openChannel(channelID)
+
+        XCTAssertEqual(store.messages.map(\.id), [latestID])
+        XCTAssertTrue(store.hasEarlierMessages)
+        let navigatedRoot = await store.loadRootMessageForNavigation(
+            channelID: channelID,
+            messageID: olderID
+        )
+        XCTAssertEqual(navigatedRoot?.id, olderID)
+        XCTAssertEqual(store.messages.map(\.id), [olderID, latestID])
+        await store.loadEarlierMessages(channelID: channelID)
+
+        XCTAssertEqual(store.messages.map(\.id), [olderID, latestID])
+        XCTAssertFalse(store.hasEarlierMessages)
+        let navigationRequestCount = await api.requestCount(for: navigationPath)
+        let earlierRequestCount = await api.requestCount(for: earlierPath)
+        XCTAssertEqual(navigationRequestCount, 1)
+        XCTAssertEqual(earlierRequestCount, 1)
         store.applicationDidEnterBackground()
     }
 
@@ -111,7 +190,8 @@ final class ChannelsStoreTests: XCTestCase {
         let listPath = MobileAPIContract.Endpoint.channels(organizationID: organizationID)
         let detailPath = MobileAPIContract.Endpoint.channel(
             organizationID: organizationID,
-            channelID: channelID
+            channelID: channelID,
+            messageLimit: ChannelsStore.messagePageSize
         )
         let threadPath = MobileAPIContract.Endpoint.channelMessages(
             organizationID: organizationID,
@@ -256,7 +336,8 @@ final class ChannelsStoreTests: XCTestCase {
         )
         let firstDetailPath = MobileAPIContract.Endpoint.channel(
             organizationID: organizationID,
-            channelID: channelID
+            channelID: channelID,
+            messageLimit: ChannelsStore.messagePageSize
         )
         let api = ChannelPollingAPI(routes: [
             firstListPath: [try encoded(ChannelsResponse(channels: [firstChannel], cursor: 9))],
@@ -362,7 +443,8 @@ final class ChannelsStoreTests: XCTestCase {
         let listPath = MobileAPIContract.Endpoint.channels(organizationID: organizationID)
         let detailPath = MobileAPIContract.Endpoint.channel(
             organizationID: organizationID,
-            channelID: channelID
+            channelID: channelID,
+            messageLimit: ChannelsStore.messagePageSize
         )
         let deltaPath = MobileAPIContract.Endpoint.channelChanges(
             organizationID: organizationID,
@@ -423,7 +505,8 @@ final class ChannelsStoreTests: XCTestCase {
         let listPath = MobileAPIContract.Endpoint.channels(organizationID: organizationID)
         let detailPath = MobileAPIContract.Endpoint.channel(
             organizationID: organizationID,
-            channelID: channelID
+            channelID: channelID,
+            messageLimit: ChannelsStore.messagePageSize
         )
         let api = ChannelPollingAPI(
             routes: [
@@ -513,7 +596,8 @@ final class ChannelsStoreTests: XCTestCase {
         let listPath = MobileAPIContract.Endpoint.channels(organizationID: organizationID)
         let detailPath = MobileAPIContract.Endpoint.channel(
             organizationID: organizationID,
-            channelID: channelID
+            channelID: channelID,
+            messageLimit: ChannelsStore.messagePageSize
         )
         let list = try encoded(ChannelsResponse(channels: [channel], cursor: 10))
         let api = ChannelPollingAPI(
@@ -632,7 +716,8 @@ final class ChannelsStoreTests: XCTestCase {
         XCTAssertEqual(executionRequests, 0, "create acceptance must never auto-dispatch")
         let detailPath = MobileAPIContract.Endpoint.channel(
             organizationID: organizationID,
-            channelID: channelID
+            channelID: channelID,
+            messageLimit: ChannelsStore.messagePageSize
         )
         let detailRequests = await configured.api.requestCount(for: detailPath)
         XCTAssertEqual(
@@ -2065,7 +2150,8 @@ final class ChannelsStoreTests: XCTestCase {
         let listPath = MobileAPIContract.Endpoint.channels(organizationID: organizationID)
         let detailPath = MobileAPIContract.Endpoint.channel(
             organizationID: organizationID,
-            channelID: channelID
+            channelID: channelID,
+            messageLimit: ChannelsStore.messagePageSize
         )
         let dashboardPath = MobileAPIContract.Endpoint.dashboard(projectID: projectID)
         let acceptPath = MobileAPIContract.Endpoint.acceptChannelExecutionProposal(
@@ -2142,7 +2228,8 @@ final class ChannelsStoreTests: XCTestCase {
         let listPath = MobileAPIContract.Endpoint.channels(organizationID: organizationID)
         let detailPath = MobileAPIContract.Endpoint.channel(
             organizationID: organizationID,
-            channelID: channelID
+            channelID: channelID,
+            messageLimit: ChannelsStore.messagePageSize
         )
         let dashboardPath = MobileAPIContract.Endpoint.dashboard(projectID: projectID)
         let acceptPath = MobileAPIContract.Endpoint.acceptChannelSkillExecutionProposal(
@@ -2233,7 +2320,8 @@ final class ChannelsStoreTests: XCTestCase {
         let listPath = MobileAPIContract.Endpoint.channels(organizationID: organizationID)
         let detailPath = MobileAPIContract.Endpoint.channel(
             organizationID: organizationID,
-            channelID: channelID
+            channelID: channelID,
+            messageLimit: ChannelsStore.messagePageSize
         )
         let acceptPath = MobileAPIContract.Endpoint.acceptChannelProposal(
             organizationID: organizationID,
@@ -2301,7 +2389,8 @@ final class ChannelsStoreTests: XCTestCase {
         if let focusChangeResponse {
             routes[MobileAPIContract.Endpoint.channel(
                 organizationID: organizationID,
-                channelID: focusChangeResponse.channel.id
+                channelID: focusChangeResponse.channel.id,
+                messageLimit: ChannelsStore.messagePageSize
             )] = [try encoded(focusChangeResponse)]
         }
         let api = ChannelPollingAPI(

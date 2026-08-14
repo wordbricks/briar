@@ -56,8 +56,14 @@ enum MobileAPIContract {
             "/organizations/\(organizationID.uuidString.lowercased())/channel-events?cursor=\(cursor)"
         }
 
-        static func channel(organizationID: UUID, channelID: UUID) -> String {
-            "\(channels(organizationID: organizationID))/\(channelID.uuidString.lowercased())"
+        static func channel(
+            organizationID: UUID,
+            channelID: UUID,
+            messageLimit: Int? = nil
+        ) -> String {
+            let base = "\(channels(organizationID: organizationID))/\(channelID.uuidString.lowercased())"
+            guard let messageLimit else { return base }
+            return "\(base)?limit=\(messageLimit)"
         }
 
         static func channelRead(organizationID: UUID, channelID: UUID) -> String {
@@ -67,11 +73,19 @@ enum MobileAPIContract {
         static func channelMessages(
             organizationID: UUID,
             channelID: UUID,
-            parentMessageID: UUID? = nil
+            parentMessageID: UUID? = nil,
+            cursor: UUID? = nil,
+            limit: Int? = nil
         ) -> String {
             let base = "\(channel(organizationID: organizationID, channelID: channelID))/messages"
-            guard let parentMessageID else { return base }
-            return "\(base)?parentMessageId=\(parentMessageID.uuidString.lowercased())"
+            var query: [String] = []
+            if let parentMessageID {
+                query.append("parentMessageId=\(parentMessageID.uuidString.lowercased())")
+            }
+            if let limit { query.append("limit=\(limit)") }
+            if let cursor { query.append("cursor=\(cursor.uuidString.lowercased())") }
+            guard !query.isEmpty else { return base }
+            return "\(base)?\(query.joined(separator: "&"))"
         }
 
         static func channelMessageReactions(

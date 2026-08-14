@@ -625,10 +625,12 @@ export const mobileChannelDetailResponseSchema = z.object({
     createdAt: z.iso.datetime(),
   })),
   messages: z.array(mobileChannelMessageSchema),
+  nextCursor: z.uuid().nullable(),
 });
 
 export const mobileChannelMessagesResponseSchema = z.object({
   messages: z.array(mobileChannelMessageSchema),
+  nextCursor: z.uuid().nullable(),
 });
 
 export const mobileCreateChannelMessageRequestSchema = z.object({

@@ -7230,17 +7230,32 @@ async function route(
       organizationChannelMatch[2],
       session.user.id,
     );
-    const [members, channelAgents, messages] = await Promise.all([
+    const rawMessageLimit = new URL(request.url).searchParams.get("limit");
+    const messageLimit = rawMessageLimit === null
+      ? null
+      : z.coerce.number().int().min(1).max(100).parse(rawMessageLimit);
+    const [members, channelAgents, messagePage] = await Promise.all([
       listChannelMembers(db, channel.id),
       listChannelAgents(db, channel.id),
-      listChannelRootMessages(db, channel.id),
+      messageLimit === null
+        ? listChannelRootMessages(db, channel.id).then((messages) => ({
+            messages,
+            nextCursor: null,
+          }))
+        : listChannelMessagePage(db, {
+            channelId: channel.id,
+            parentMessageId: null,
+            cursor: null,
+            limit: messageLimit,
+          }),
     ]);
     const agents = await hydrateAgentSkills(db, channelAgents);
     return json({
       channel: channelJson(channel),
       members,
       agents: agents.map(organizationAgentJson),
-      messages,
+      messages: messagePage?.messages ?? [],
+      nextCursor: messagePage?.nextCursor ?? null,
     });
   }
   if (organizationChannelMatch && request.method === "PATCH") {
@@ -7528,13 +7543,38 @@ async function route(
       channelMessagesMatch[2],
       session.user.id,
     );
-    const parentMessageId = new URL(request.url).searchParams.get(
-      "parentMessageId",
-    );
+    const searchParams = new URL(request.url).searchParams;
+    const parentMessageId = searchParams.get("parentMessageId");
+    const paginated = searchParams.has("limit") || searchParams.has("cursor");
+    if (paginated) {
+      const query = z
+        .object({
+          limit: z.coerce.number().int().min(1).max(100).default(20),
+          cursor: z.string().uuid().nullable().default(null),
+          parentMessageId: z.string().uuid().nullable().default(null),
+        })
+        .strict()
+        .parse({
+          limit: searchParams.get("limit") ?? undefined,
+          cursor: searchParams.get("cursor"),
+          parentMessageId,
+        });
+      const page = await listChannelMessagePage(db, {
+        channelId: channel.id,
+        parentMessageId: query.parentMessageId,
+        cursor: query.cursor,
+        limit: query.limit,
+      });
+      if (!page) {
+        throw new HttpError(400, "Cursor does not belong to this message view");
+      }
+      return json(page);
+    }
     return json({
       messages: parentMessageId
         ? await listChannelThreadMessages(db, channel.id, parentMessageId)
         : await listChannelRootMessages(db, channel.id),
+      nextCursor: null,
     });
   }
   if (channelMessagesMatch && request.method === "POST") {

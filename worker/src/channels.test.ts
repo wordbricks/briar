@@ -26,6 +26,7 @@ import {
   getChannelSyncCursor,
   getIncomingChannelWebhook,
   listChannelAgents,
+  listChannelMessagePage,
   listChannelRootMessages,
   listChannelThreadMessages,
   listChannels,
@@ -359,6 +360,61 @@ describe("organization channels", () => {
 
     const thread = await listChannelThreadMessages(db, channelId, rootId);
     expect(thread.map((message) => message.id)).toEqual([rootId, replyId]);
+  });
+
+  it("pages root messages from the newest twenty toward older history", async () => {
+    const channelId = "e1000000-0000-4000-8000-000000000001";
+    await createChannel(db, {
+      id: channelId,
+      organizationId,
+      slug: "paged-history",
+      name: "Paged history",
+      topic: null,
+      visibility: "public",
+      defaultProjectId: null,
+      createdByUserId: ownerId,
+      createdAt: at(6),
+    });
+    const messageIds: string[] = [];
+    for (let index = 1; index <= 25; index += 1) {
+      const id = `f1000000-0000-4000-8000-${String(index).padStart(12, "0")}`;
+      messageIds.push(id);
+      await createChannelMessage(db, {
+        id,
+        channelId,
+        parentMessageId: null,
+        authorUserId: ownerId,
+        authorAgentId: null,
+        authorAgentName: null,
+        authorAgentProvider: null,
+        body: `Message ${index}`,
+        mentionedUserIds: [],
+        mentionedAgentIds: [],
+        createdAt: at(6 + index),
+      });
+    }
+
+    const newest = await listChannelMessagePage(db, {
+      channelId,
+      parentMessageId: null,
+      cursor: null,
+      limit: 20,
+    });
+    expect(newest?.messages.map((message) => message.id)).toEqual(
+      messageIds.slice(5),
+    );
+    expect(newest?.nextCursor).toBe(messageIds[5]);
+
+    const earlier = await listChannelMessagePage(db, {
+      channelId,
+      parentMessageId: null,
+      cursor: newest?.nextCursor ?? null,
+      limit: 20,
+    });
+    expect(earlier?.messages.map((message) => message.id)).toEqual(
+      messageIds.slice(0, 5),
+    );
+    expect(earlier?.nextCursor).toBeNull();
   });
 
   it("resolves the Agent's configured avatar onto channel message authors", async () => {

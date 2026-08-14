@@ -1749,13 +1749,18 @@ export async function loadChannel(
   token: string,
   organizationId: string,
   channelId: string,
+  options: { messageLimit?: number } = {},
 ) {
+  const query = options.messageLimit
+    ? `?limit=${encodeURIComponent(String(options.messageLimit))}`
+    : "";
   return request<{
     channel: ChannelSummary;
     members: ChannelMember[];
     agents: ChannelAgentSummary[];
     messages: ChannelMessage[];
-  }>(`/organizations/${organizationId}/channels/${channelId}`, token);
+    nextCursor?: string | null;
+  }>(`/organizations/${organizationId}/channels/${channelId}${query}`, token);
 }
 
 export async function markChannelRead(
@@ -1795,11 +1800,14 @@ export async function listChannelMessages(
   organizationId: string,
   channelId: string,
   parentMessageId?: string,
+  page: { limit?: number; cursor?: string } = {},
 ) {
-  const query = parentMessageId
-    ? `?parentMessageId=${encodeURIComponent(parentMessageId)}`
-    : "";
-  return request<{ messages: ChannelMessage[] }>(
+  const params = new URLSearchParams();
+  if (parentMessageId) params.set("parentMessageId", parentMessageId);
+  if (page.limit) params.set("limit", String(page.limit));
+  if (page.cursor) params.set("cursor", page.cursor);
+  const query = params.size > 0 ? `?${params.toString()}` : "";
+  return request<{ messages: ChannelMessage[]; nextCursor?: string | null }>(
     `/organizations/${organizationId}/channels/${channelId}/messages${query}`,
     token,
   );
