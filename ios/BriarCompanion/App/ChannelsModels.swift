@@ -421,6 +421,30 @@ struct CreateChannelMessageRequest: Codable, Sendable {
     let parentMessageId: UUID?
     let mentionedUserIds: [String]
     let mentionedAgentIds: [UUID]
+
+    enum CodingKeys: String, CodingKey {
+        case body
+        case parentMessageId
+        case mentionedUserIds
+        case mentionedAgentIds
+    }
+
+    /// Channel and Agent IDs are stored as lowercase strings and compared
+    /// case-sensitively. Foundation's synthesized UUID encoding uses uppercase
+    /// characters, so keep every UUID request field in the API's canonical form.
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(body, forKey: .body)
+        try container.encodeIfPresent(
+            parentMessageId?.uuidString.lowercased(),
+            forKey: .parentMessageId
+        )
+        try container.encode(mentionedUserIds, forKey: .mentionedUserIds)
+        try container.encode(
+            mentionedAgentIds.map { $0.uuidString.lowercased() },
+            forKey: .mentionedAgentIds
+        )
+    }
 }
 
 struct CreateChannelMessageResponse: Codable, Sendable {

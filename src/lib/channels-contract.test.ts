@@ -1,12 +1,30 @@
 import { describe, expect, it } from "vitest";
 import {
   channelIncomingWebhookMessageSchema,
+  channelMessageInputSchema,
   channelReplyCompletionSchema,
   channelWebhookInputSchema,
 } from "./channels-contract";
 
 const projectId = "11111111-1111-4111-8111-111111111111";
 const agentId = "22222222-2222-4222-8222-222222222222";
+
+describe("channel message contract", () => {
+  it("canonicalizes UUID request fields before database comparisons", () => {
+    expect(
+      channelMessageInputSchema.parse({
+        body: "@Honey reply in the thread",
+        parentMessageId: projectId.toUpperCase(),
+        mentionedAgentIds: [agentId.toUpperCase()],
+        preferredDeviceId: agentId.toUpperCase(),
+      }),
+    ).toMatchObject({
+      parentMessageId: projectId,
+      mentionedAgentIds: [agentId],
+      preferredDeviceId: agentId,
+    });
+  });
+});
 
 describe("channel webhook contract", () => {
   it("trims bounded names and message fields without accepting extra input", () => {

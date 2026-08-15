@@ -112,13 +112,18 @@ export const channelUpdateInputSchema = z
   })
   .strict();
 
+const canonicalUuidSchema = z
+  .string()
+  .uuid()
+  .transform((value) => value.toLowerCase());
+
 export const channelMessageInputSchema = z
   .object({
     body: channelMessageBodySchema,
-    parentMessageId: z.string().uuid().nullable().default(null),
+    parentMessageId: canonicalUuidSchema.nullable().default(null),
     mentionedUserIds: z.array(z.string().min(1).max(64)).max(20).default([]),
-    mentionedAgentIds: z.array(z.string().uuid()).max(8).default([]),
-    preferredDeviceId: z.string().uuid().nullable().default(null),
+    mentionedAgentIds: z.array(canonicalUuidSchema).max(8).default([]),
+    preferredDeviceId: canonicalUuidSchema.nullable().default(null),
   })
   .strict();
 
