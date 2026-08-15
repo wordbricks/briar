@@ -9,6 +9,7 @@ import {
   FolderGit2,
   FolderOpen,
   GitBranch,
+  Info,
   LoaderCircle,
   LogOut,
   Sparkles,
@@ -32,6 +33,7 @@ import {
   agentProviderLabels,
   type ProjectLlmProgress,
 } from "../lib/project-llm";
+import { formatExecutionDuration } from "../lib/agent-execution-metrics";
 import type { SessionUser } from "../types";
 import { useI18n } from "../i18n";
 import { Logo } from "./Logo";
@@ -132,27 +134,118 @@ function OnboardingProviderProgress({
   progressMessageRef: RefObject<HTMLParagraphElement | null>;
 }) {
   const { t } = useI18n();
-  const message =
-    progress?.phase === "final" || progress?.phase === "final_answer"
-      ? t("onboarding.workflowProviderFinalizing")
-      : progress?.message ?? t("onboarding.workflowProviderWaiting");
+  const startedAt = useRef(Date.now());
+  const [lastActivityAt, setLastActivityAt] = useState(startedAt.current);
+  const [now, setNow] = useState(startedAt.current);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    const activityAt = Date.now();
+    setLastActivityAt(activityAt);
+    setNow(activityAt);
+  }, [progress?.message, progress?.messageId]);
+
+  const elapsed = formatExecutionDuration(now - startedAt.current);
+  const quietDuration = Math.max(0, now - lastActivityAt);
+  const isQuiet = quietDuration >= 60_000;
+  const displayedMessage = providerProgressMessage(progress, t);
 
   return (
     <div
-      aria-atomic="true"
-      aria-live="polite"
-      className="onboarding-provider-progress"
-      role="status"
+      aria-label={t("onboarding.workflowProviderProgress")}
+      className={`onboarding-provider-progress${isQuiet ? " quiet" : ""}`}
+      role="group"
     >
-      <span>
-        <i aria-hidden="true" />
-        {progress
-          ? agentProviderLabels[progress.provider]
-          : t("onboarding.workflowProviderProgress")}
-      </span>
-      <p ref={progressMessageRef}>{message}</p>
+      <div className="onboarding-provider-progress-heading">
+        <span>
+          <i aria-hidden="true" />
+          {progress
+            ? agentProviderLabels[progress.provider]
+            : t("onboarding.workflowProviderProgress")}
+        </span>
+        <small>{t("onboarding.workflowElapsed", { duration: elapsed })}</small>
+      </div>
+      <p
+        aria-atomic="true"
+        aria-live="polite"
+        ref={progressMessageRef}
+        role="status"
+      >
+        {displayedMessage}
+      </p>
+      <div className="onboarding-provider-progress-meta">
+        <span>
+          {isQuiet
+            ? t("onboarding.workflowQuietFor", {
+                duration: formatExecutionDuration(quietDuration),
+              })
+            : t("onboarding.workflowUpdatedNow")}
+        </span>
+      </div>
+      {isQuiet ? (
+        <div className="onboarding-provider-progress-notice">
+          <Info aria-hidden="true" size={14} />
+          <span>{t("onboarding.workflowStillWorking")}</span>
+        </div>
+      ) : null}
     </div>
   );
+}
+
+type Translate = ReturnType<typeof useI18n>["t"];
+
+function structuredProgressDetail(message: string) {
+  try {
+    const parsed = JSON.parse(message) as {
+      stages?: Array<{ evidence?: unknown }>;
+    };
+    const details = parsed.stages
+      ?.flatMap((stage) =>
+        Array.isArray(stage.evidence)
+          ? stage.evidence.filter(
+              (detail): detail is string =>
+                typeof detail === "string" && Boolean(detail.trim()),
+            )
+          : [],
+      );
+    return details?.at(-1)?.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+function providerProgressMessage(
+  progress: ProjectLlmProgress | null,
+  t: Translate,
+) {
+  if (!progress) return t("onboarding.workflowProviderWaiting");
+  if (progress.phase === "final" || progress.phase === "final_answer") {
+    return t("onboarding.workflowProviderFinalizing");
+  }
+  if (progress.activityKind) {
+    const activityKey = {
+      command: "onboarding.workflowActivityCommand",
+      fileChange: "onboarding.workflowActivityFiles",
+      webSearch: "onboarding.workflowActivityWeb",
+      tool: "onboarding.workflowActivityTool",
+    }[progress.activityKind] as
+      | "onboarding.workflowActivityCommand"
+      | "onboarding.workflowActivityFiles"
+      | "onboarding.workflowActivityWeb"
+      | "onboarding.workflowActivityTool";
+    return t(activityKey);
+  }
+  const message = progress.message.trim();
+  const structuredDetail = structuredProgressDetail(message);
+  if (structuredDetail) return structuredDetail;
+  if (message.startsWith("{") || message.startsWith("[")) {
+    return t("onboarding.workflowInspecting");
+  }
+  return message || t("onboarding.workflowInspecting");
 }
 
 export function ProjectOnboarding({
@@ -579,7 +672,7 @@ export function ProjectOnboarding({
             ) : null}
 
             {phase === "workflow-loading" ? (
-              <section className="onboarding-process" aria-live="polite">
+              <section className="onboarding-process">
                 {workflowError ? (
                   <>
                     <span className="onboarding-process-icon error"><CircleAlert size={25} /></span>
@@ -644,7 +737,7 @@ export function ProjectOnboarding({
             ) : null}
 
             {phase === "tools-loading" ? (
-              <section className="onboarding-process" aria-live="polite">
+              <section className="onboarding-process">
                 {toolsError ? (
                   <>
                     <span className="onboarding-process-icon error"><CircleAlert size={25} /></span>
