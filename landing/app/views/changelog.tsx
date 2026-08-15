@@ -23,6 +23,20 @@ export const changelogCopy = {
     backTop: "맨 위로 ↑",
     entries: [
       {
+        version: "1.2.124",
+        date: "2026년 8월 15일",
+        title: "채널 대화와 에이전트 진행 상황을 더 빠르게 연결합니다",
+        summary:
+          "채널을 빠르게 전환하고 에이전트 활동을 실시간으로 확인하며, Inbox와 백그라운드 동기화의 응답성을 높였습니다.",
+        items: [
+          "채널 에이전트의 명령·파일·검색·도구 활동을 답글 단위로 실시간 표시하고, 재연결 뒤에도 활성 작업 상태를 복구하며 민감한 값은 전송 전에 가립니다.",
+          "데스크탑 채널을 최신 메시지 20개와 캐시로 즉시 열고, 위로 스크롤해 이전 기록을 불러오며 긴 대화는 가상화해 빠른 연속 전환에도 오래된 결과가 섞이지 않게 합니다.",
+          "채널 답글 알림에서 연 스레드를 유지하고, 에이전트 제공자를 접근 가능한 아이콘으로 표시하며, 긴 이슈 설명은 남은 패널 높이를 채운 채 내부에서 스크롤합니다.",
+          "채널 답글은 가능한 경우 현재 조직의 로컬 Worker를 우선하고 실패하면 다른 Worker로 안전하게 전환합니다.",
+          "Inbox 알림 대상과 GitHub 병합 확인 후보를 인덱싱하고, 유휴 프로젝트 동기화를 조직 단위 실시간 갱신으로 묶어 불필요한 요청과 데이터베이스 작업을 줄였습니다.",
+        ],
+      },
+      {
         version: "1.2.123",
         date: "2026년 8월 14일",
         title: "이미지 확인과 Inbox·로딩 경험을 더 선명하게 다듬습니다",
@@ -606,6 +620,20 @@ export const changelogCopy = {
     home: "Home",
     backTop: "Back to top ↑",
     entries: [
+      {
+        version: "1.2.124",
+        date: "August 15, 2026",
+        title: "Connect channel conversations and agent progress faster",
+        summary:
+          "Switch channels faster, follow agent activity live, and improve the responsiveness of Inbox and background synchronization.",
+        items: [
+          "Stream command, file, search, and tool activity for channel agents at the reply level, restore active work after reconnecting, and redact sensitive values before they are published.",
+          "Open desktop channels immediately from cache with the latest 20 messages, load older history when scrolling upward, and virtualize long conversations while preventing stale results during rapid switching.",
+          "Keep notification-opened reply threads visible, show agent providers as accessible icons, and let long issue descriptions fill and scroll within the remaining pane height.",
+          "Prefer the current organization's local Worker for channel replies when it can run the job, with a safe fallback to another Worker on failure.",
+          "Index Inbox notification targets and GitHub merge-reconciliation candidates, and consolidate idle project synchronization around organization-level realtime updates to reduce unnecessary requests and database work.",
+        ],
+      },
       {
         version: "1.2.123",
         date: "August 14, 2026",
@@ -1202,9 +1230,9 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <h1>{changelog.title}</h1>
           <p>{changelog.description}</p>
         </div>
-        <a href="#v1-2-123" className="changelog-current">
+        <a href="#v1-2-124" className="changelog-current">
           <span>{changelog.current}</span>
-          <strong>v1.2.123</strong>
+          <strong>v1.2.124</strong>
           <i aria-hidden="true">↓</i>
         </a>
       </section>
@@ -1229,7 +1257,9 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   {index === 0 ? <span>{changelog.latest}</span> : null}
                   <time
                     dateTime={
-                      entry.version === "1.2.123" ||
+                      entry.version === "1.2.124"
+                        ? "2026-08-15"
+                        : entry.version === "1.2.123" ||
                       entry.version === "1.2.122" ||
                       entry.version === "1.2.121" ||
                       entry.version === "1.2.120" ||
