@@ -15,10 +15,12 @@ import {
 type HandleAvailability = "idle" | "checking" | "available" | "taken";
 
 export function OrganizationCreate({
+  embedded = false,
   onBack,
   onCheckHandle,
   onCreate,
 }: {
+  embedded?: boolean;
   onBack: () => void;
   onCheckHandle: (handle: string) => Promise<boolean>;
   onCreate: (input: { name: string; handle: string }) => Promise<void>;
@@ -82,6 +84,7 @@ export function OrganizationCreate({
     handleIsValid &&
     availability === "available" &&
     !isSubmitting;
+  const Root = embedded ? "section" : "main";
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -107,18 +110,27 @@ export function OrganizationCreate({
   };
 
   return (
-    <main className="organization-create min-w-0 flex-1 overflow-auto bg-background px-[clamp(28px,4.5vw,72px)] py-14">
+    <Root
+      className={cn(
+        "organization-create min-w-0",
+        embedded
+          ? "organization-create-embedded"
+          : "flex-1 overflow-auto bg-background px-[clamp(28px,4.5vw,72px)] py-14",
+      )}
+    >
       <header className="organization-create-header mx-auto mb-7 flex max-w-[620px] items-start gap-3">
-        <Button
-          aria-label={t("organization.create.back")}
-          className="organization-create-back size-8 shrink-0"
-          onClick={onBack}
-          size="icon-sm"
-          type="button"
-          variant="ghost"
-        >
-          <ArrowLeft aria-hidden="true" size={18} strokeWidth={1.8} />
-        </Button>
+        {!embedded ? (
+          <Button
+            aria-label={t("organization.create.back")}
+            className="organization-create-back size-8 shrink-0"
+            onClick={onBack}
+            size="icon-sm"
+            type="button"
+            variant="ghost"
+          >
+            <ArrowLeft aria-hidden="true" size={18} strokeWidth={1.8} />
+          </Button>
+        ) : null}
         <div className="min-w-0">
           <Typography as="span" className="tracking-wide uppercase" tone="primary" variant="micro">
             {t("organization.create.eyebrow")}
@@ -228,6 +240,6 @@ export function OrganizationCreate({
           </Button>
         </footer>
       </form>
-    </main>
+    </Root>
   );
 }
