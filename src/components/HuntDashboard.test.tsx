@@ -4237,6 +4237,111 @@ describe("HuntDashboard", () => {
     container.remove();
   });
 
+  it("reloads result screenshots when the open issue changes", async () => {
+    const observedAt = "2026-07-28T04:30:00.000Z";
+    const firstRun = {
+      ...demoDashboard.runs[0],
+      id: "run-result-first",
+      sourceKey: "BRIAR-101",
+      status: "completed" as const,
+      resultSummary: "첫 번째 이슈 결과입니다.",
+    };
+    const secondRun = {
+      ...firstRun,
+      id: "run-result-second",
+      sourceKey: "BRIAR-102",
+      resultSummary: "두 번째 이슈 결과입니다.",
+    };
+    const evidenceFor = (run: HuntRun): RunEvidence[] => [{
+      key: `${run.sourceKey}:local_qa:ui_result`,
+      attempt: 1,
+      revision: 1,
+      stage: "local_qa",
+      type: "ui_result",
+      status: "passed",
+      detail: `${run.sourceKey} 화면입니다.`,
+      command: null,
+      url: null,
+      metadata: null,
+      actor: "briar-workflow",
+      observedAt,
+      recordedAt: observedAt,
+      images: [{
+        id: `image-${run.id}`,
+        filename: `${run.id}.png`,
+        contentType: "image/png",
+        byteSize: 1024,
+        sha256: run.id,
+        position: 0,
+        url: `/projects/project-1/runs/${run.id}/evidence/images/image-${run.id}`,
+      }],
+      requiredRevision: 1,
+      canonical: true,
+    }];
+    const evidenceLoads: string[] = [];
+    const onLoadImage = vi.fn(async () =>
+      new Blob(["image"], { type: "image/png" }));
+    Object.defineProperty(URL, "createObjectURL", {
+      configurable: true,
+      value: vi.fn()
+        .mockReturnValueOnce("blob:first-result-screenshot")
+        .mockReturnValueOnce("blob:second-result-screenshot"),
+    });
+    Object.defineProperty(URL, "revokeObjectURL", {
+      configurable: true,
+      value: vi.fn(),
+    });
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    const renderPage = (run: HuntRun) => (
+      <RunPage
+        isSidebarOpen
+        error={null}
+        isRecovering={false}
+        onBack={() => undefined}
+        onCancel={async () => undefined}
+        onLoadAttachment={async () => new Blob()}
+        onLoadIssueMessages={async () => []}
+        onLoadRunEvidence={async () => {
+          evidenceLoads.push(run.id);
+          return evidenceFor(run);
+        }}
+        onLoadRunEvidenceImage={onLoadImage}
+        onMove={async () => undefined}
+        onRetry={async () => undefined}
+        onSendIssueMessage={async () => {
+          throw new Error("not implemented in this test");
+        }}
+        run={run}
+      />
+    );
+
+    await act(async () => root.render(renderPage(firstRun)));
+    expect(
+      container
+        .querySelector(".run-result-screenshots .run-evidence-image img")
+        ?.getAttribute("src"),
+    ).toBe("blob:first-result-screenshot");
+
+    await act(async () => root.render(renderPage(secondRun)));
+
+    expect(evidenceLoads).toEqual([firstRun.id, secondRun.id]);
+    expect(container.textContent).not.toContain(`${firstRun.id}.png`);
+    expect(container.textContent).toContain(`${secondRun.id}.png`);
+    expect(
+      container
+        .querySelector(".run-result-screenshots .run-evidence-image img")
+        ?.getAttribute("src"),
+    ).toBe("blob:second-result-screenshot");
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith(
+      "blob:first-result-screenshot",
+    );
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
   it("keeps loaded messages visible when the run snapshot refreshes", async () => {
     const createdAt = new Date().toISOString();
     const loadedMessage: IssueMessage = {
