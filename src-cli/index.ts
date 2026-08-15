@@ -49,7 +49,9 @@ import {
   createDetachedTranscriptSequencer,
   detachedAgentPrompt,
   detachedChannelReplyPrompt,
+  detachedChannelReplyOutputSchema,
   detachedIssueReplyPrompt,
+  detachedIssueReplyOutputSchema,
   detachedProjectAgentPrompt,
   detachedPayloadDirection,
   detachedProviderBlockedRunEvent,
@@ -2992,6 +2994,7 @@ async function runClaimedIssueReply(
           workspacePath,
           fullAccess: project.autoHunt?.sandbox?.fullAccess ?? true,
           attachments,
+          outputSchema: detachedIssueReplyOutputSchema,
           environment: {
             ...process.env,
             PATH: workerExecutionPath(),
@@ -3236,6 +3239,7 @@ async function runClaimedChannelReply(
         attachments: lookupRounds === 0
           ? downloadedImages.attachments
           : undefined,
+        outputSchema: detachedChannelReplyOutputSchema,
         organizationContextManifestPath:
           organizationContext?.manifestPath ?? null,
         delegationTargets: reply.scope.kind === "organization"
@@ -3258,14 +3262,33 @@ async function runClaimedChannelReply(
         throw new Error("Agent returned an empty channel reply");
       }
       const parsed = parseDetachedJsonResult(turn.resultText);
-      const lookup = organizationAgentContextRequestTurnSchema.safeParse(
-        parsed,
-      );
-      if (!lookup.success) {
+      const parsedRecord = parsed && typeof parsed === "object" &&
+          !Array.isArray(parsed)
+        ? parsed as Record<string, unknown>
+        : null;
+      const contextRequests = parsedRecord?.contextRequests;
+      if (contextRequests === null || contextRequests === undefined) {
         const parsedResult = parseChannelReplyAgentResult(parsed);
         result = parsedResult.result;
         attachmentPaths = parsedResult.attachmentPaths;
         break;
+      }
+      const lookup = organizationAgentContextRequestTurnSchema.parse({
+        contextRequests,
+      });
+      if (
+        parsedRecord?.body !== null ||
+        !Array.isArray(parsedRecord.attachments) ||
+        parsedRecord.attachments.length !== 0 ||
+        parsedRecord.document !== null ||
+        parsedRecord.issueProposal !== null ||
+        parsedRecord.executionProposal !== null ||
+        parsedRecord.skillExecutionProposal !== null ||
+        parsedRecord.delegation !== null
+      ) {
+        throw new Error(
+          "Organization context lookup cannot include a channel reply or proposal",
+        );
       }
       if (!organizationContext) {
         throw new Error(
@@ -3284,7 +3307,7 @@ async function runClaimedChannelReply(
         claimToken: reply.claimToken,
         snapshotAt: reply.organizationContext!.snapshotAt,
         workspacePath,
-        requests: lookup.data.contextRequests,
+        requests: lookup.contextRequests,
         signal,
       });
       if (hydrated.loaded === 0) {
