@@ -10,6 +10,9 @@ struct BriarCompanionApp: App {
                     locale: ProcessInfo.processInfo.arguments.contains("--ui-testing-english") ? .en : .ko,
                     delaysMessageSend: ProcessInfo.processInfo.arguments.contains(
                         "--ui-testing-delayed-message-send"
+                    ),
+                    hasChannelHistory: ProcessInfo.processInfo.arguments.contains(
+                        "--ui-testing-channel-history"
                     )
                 )
             } else {
@@ -59,14 +62,21 @@ private struct UITestCompanionFlow: View {
         createdAt: Date(timeIntervalSince1970: 1_775_260_900)
     )
 
-    init(offline: Bool, locale: CompanionLocale, delaysMessageSend: Bool) {
+    init(
+        offline: Bool,
+        locale: CompanionLocale,
+        delaysMessageSend: Bool,
+        hasChannelHistory: Bool
+    ) {
         self.offline = offline
         self.locale = locale
         api = UITestAPIClient(delaysMessageSend: delaysMessageSend)
         UserDefaults.standard.set(locale.rawValue, forKey: "companion-locale")
         _selectedProjectID = State(initialValue: project.id)
         _agents = StateObject(wrappedValue: AgentsStore(api: UITestAPIClient()))
-        _channels = StateObject(wrappedValue: ChannelsStore(api: UITestAPIClient()))
+        _channels = StateObject(wrappedValue: ChannelsStore(
+            api: UITestAPIClient(hasChannelHistory: hasChannelHistory)
+        ))
     }
 
     var body: some View {
@@ -263,9 +273,11 @@ private actor UITestAPIClient: MobileAPIClientProtocol {
     private var issueStatus: DashboardRun.Status?
     private var dependencyAdded = false
     private let delaysMessageSend: Bool
+    private let hasChannelHistory: Bool
 
-    init(delaysMessageSend: Bool = false) {
+    init(delaysMessageSend: Bool = false, hasChannelHistory: Bool = false) {
         self.delaysMessageSend = delaysMessageSend
+        self.hasChannelHistory = hasChannelHistory
     }
 
     func createdIssueStatus() -> DashboardRun.Status? { issueStatus }
@@ -286,9 +298,23 @@ private actor UITestAPIClient: MobileAPIClientProtocol {
         } else if path.hasSuffix(
             "/channels/cccccccc-cccc-4ccc-8ccc-cccccccccccc?limit=20"
         ) && method == "GET" {
-            payload = ##"""
-            {"channel":{"id":"cccccccc-cccc-4ccc-8ccc-cccccccccccc","organizationId":"22222222-2222-4222-8222-222222222222","slug":"design","name":"design","topic":"Mobile product design","visibility":"public","defaultProjectId":"11111111-1111-4111-8111-111111111111","archivedAt":null,"memberCount":4,"agentCount":3,"createdAt":"2026-08-02T01:00:00Z","updatedAt":"2026-08-02T01:00:00Z"},"members":[],"agents":[],"messages":[{"id":"dddddddd-dddd-4ddd-8ddd-dddddddddddd","channelId":"cccccccc-cccc-4ccc-8ccc-cccccccccccc","parentMessageId":null,"body":"상단 헤더 디자인을 함께 확인해 주세요.","author":{"type":"user","name":"Briar User","image":null,"provider":null},"mentionedUserIds":[],"mentionedAgentIds":[],"replyCount":0,"lastReplyAt":null,"document":null,"proposal":null,"createdAt":"2026-08-02T01:02:00Z"}],"nextCursor":null}
-            """##
+            if hasChannelHistory {
+                payload = String(
+                    decoding: try JSONEncoder.mobileContract.encode(Self.channelHistory),
+                    as: UTF8.self
+                )
+            } else {
+                payload = ##"""
+                {"channel":{"id":"cccccccc-cccc-4ccc-8ccc-cccccccccccc","organizationId":"22222222-2222-4222-8222-222222222222","slug":"design","name":"design","topic":"Mobile product design","visibility":"public","defaultProjectId":"11111111-1111-4111-8111-111111111111","archivedAt":null,"memberCount":4,"agentCount":3,"createdAt":"2026-08-02T01:00:00Z","updatedAt":"2026-08-02T01:00:00Z"},"members":[],"agents":[],"messages":[{"id":"dddddddd-dddd-4ddd-8ddd-dddddddddddd","channelId":"cccccccc-cccc-4ccc-8ccc-cccccccccccc","parentMessageId":null,"body":"상단 헤더 디자인을 함께 확인해 주세요.","author":{"type":"user","name":"Briar User","image":null,"provider":null},"mentionedUserIds":[],"mentionedAgentIds":[],"replyCount":0,"lastReplyAt":null,"document":null,"proposal":null,"createdAt":"2026-08-02T01:02:00Z"}],"nextCursor":null}
+                """##
+            }
+        } else if hasChannelHistory && path.contains(
+            "/channels/cccccccc-cccc-4ccc-8ccc-cccccccccccc/messages?limit=20&cursor="
+        ) && method == "GET" {
+            payload = String(
+                decoding: try JSONEncoder.mobileContract.encode(Self.earlierChannelHistory),
+                as: UTF8.self
+            )
         } else if path.contains("/channels/cccccccc-cccc-4ccc-8ccc-cccccccccccc/messages?parentMessageId=dddddddd-dddd-4ddd-8ddd-dddddddddddd") && method == "GET" {
             payload = ##"""
             {"messages":[{"id":"dddddddd-dddd-4ddd-8ddd-dddddddddddd","channelId":"cccccccc-cccc-4ccc-8ccc-cccccccccccc","parentMessageId":null,"body":"상단 헤더 디자인을 함께 확인해 주세요.","author":{"type":"user","name":"Briar User","image":null,"provider":null},"mentionedUserIds":[],"mentionedAgentIds":[],"replyCount":1,"lastReplyAt":"2026-08-02T01:03:00Z","document":null,"proposal":null,"createdAt":"2026-08-02T01:02:00Z"},{"id":"eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee","channelId":"cccccccc-cccc-4ccc-8ccc-cccccccccccc","parentMessageId":"dddddddd-dddd-4ddd-8ddd-dddddddddddd","body":"스레드에서 확인했습니다.","author":{"type":"agent","id":"agent-ui-test","name":"Briar Agent","provider":"codex"},"mentionedUserIds":[],"mentionedAgentIds":[],"replyCount":0,"lastReplyAt":null,"document":null,"proposal":null,"createdAt":"2026-08-02T01:03:00Z"}]}
@@ -358,4 +384,77 @@ private actor UITestAPIClient: MobileAPIClientProtocol {
         try png.write(to: destination, options: .atomic)
         return destination
     }
+
+    private static let channelHistory: ChannelDetailResponse = {
+        let channelID = UUID(uuidString: "cccccccc-cccc-4ccc-8ccc-cccccccccccc")!
+        let createdAt = Date(timeIntervalSince1970: 1_775_260_800)
+        let channel = ChannelSummary(
+            id: channelID,
+            organizationId: UUID(uuidString: "22222222-2222-4222-8222-222222222222")!,
+            slug: "design",
+            name: "design",
+            topic: "Mobile product design",
+            visibility: .org,
+            defaultProjectId: UUID(uuidString: "11111111-1111-4111-8111-111111111111")!,
+            archivedAt: nil,
+            memberCount: 4,
+            agentCount: 3,
+            createdAt: createdAt,
+            updatedAt: createdAt
+        )
+        let messages = (1 ... 20).map { index in
+            ChannelMessage(
+                id: UUID(
+                    uuidString: String(
+                        format: "10000000-0000-4000-8000-%012d",
+                        index
+                    )
+                )!,
+                channelId: channelID,
+                parentMessageId: nil,
+                body: index.isMultiple(of: 3)
+                    ? "가변 높이 채널 메시지 \(index)입니다.\n두 번째 줄도 함께 표시합니다."
+                    : "가변 높이 채널 메시지 \(index)입니다.",
+                author: ChannelMessage.Author(
+                    type: index.isMultiple(of: 2) ? .agent : .user,
+                    name: index.isMultiple(of: 2) ? "Briar Agent" : "Briar User",
+                    image: nil,
+                    provider: index.isMultiple(of: 2) ? "codex" : nil
+                ),
+                replyCount: 0,
+                lastReplyAt: nil,
+                document: nil,
+                proposal: nil,
+                createdAt: createdAt.addingTimeInterval(TimeInterval(index * 60))
+            )
+        }
+        return ChannelDetailResponse(
+            channel: channel,
+            members: [],
+            agents: [],
+            messages: messages,
+            nextCursor: UUID(uuidString: "20000000-0000-4000-8000-000000000001")
+        )
+    }()
+
+    private static let earlierChannelHistory = ChannelMessagesResponse(
+        messages: [ChannelMessage(
+            id: UUID(uuidString: "20000000-0000-4000-8000-000000000002")!,
+            channelId: UUID(uuidString: "cccccccc-cccc-4ccc-8ccc-cccccccccccc")!,
+            parentMessageId: nil,
+            body: "초기 진입에서 자동으로 불러오면 안 되는 이전 메시지입니다.",
+            author: ChannelMessage.Author(
+                type: .user,
+                name: "Briar User",
+                image: nil,
+                provider: nil
+            ),
+            replyCount: 0,
+            lastReplyAt: nil,
+            document: nil,
+            proposal: nil,
+            createdAt: Date(timeIntervalSince1970: 1_775_260_700)
+        )],
+        nextCursor: nil
+    )
 }
