@@ -845,3 +845,33 @@ The first exact-main verification attempt hit a transient XCTest accessibility
 audit timeout on iPad. The complete release gate was rerun from a clean checkout
 and passed before archive upload. Version `1.2.126 (1)` is the final build handed
 off from the latest main commit.
+
+## 2026-08-16 — 1.2.126 (2)
+
+- App: Briar Companion (`app.briar.companion`)
+- Marketing version: `1.2.126`
+- App Store Connect build: `2`
+- App Store Connect build ID: `7e84a6ef-3eb6-416f-bfaf-4b030469a1e4`
+- Latest main commit: `fed3d958`
+- Release source commit: `fed3d95817a40b8da651eb1364a3eacf1044df0b`
+- Implementation: native SwiftUI
+- Toolchain: Xcode 26.6, iOS 26.5 SDK
+- Minimum iOS version: 17.0
+- App Store Connect processing state: `VALID`
+- TestFlight state: `IN_BETA_TESTING`
+- Internal group: `wordbricks` (`hasAccessToAllBuilds=true`)
+- Automatic tester notification: enabled
+- IPA SHA-256: `46160c6f42991cfb37e251a00bb8e37d42e7984ba97930eabc02cee05e6f8bca`
+
+This release adds immediate message display when re-entering a mobile channel
+and dismisses the native iOS mention picker after a selection. The exact latest
+main commit passed the shared mobile contract, Swift unit and 15 iPhone UI
+tests, iPad accessibility and largest Dynamic Type layout testing, Production
+analyze and build checks, the Tauri iOS simulator bundle, and the Android ARM64
+APK build. Archive identity, App Store provisioning, distribution signature,
+production entitlements, exported IPA signature, and all alternate app icons
+were verified before upload.
+
+Version `1.2.126 (1)` remains `VALID`, but main advanced through PRs #1063 and
+#1064. Version `1.2.126 (2)` is therefore the final build handed off from the
+latest main commit.
