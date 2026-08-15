@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { InboxMessageWithReadState } from "./useInbox";
 import {
   findChangedInboxMessages,
+  inboxConversationSyncSignal,
   inboxNotificationVersion,
   shouldSuppressInboxNotification,
 } from "./useInboxNotifications";
@@ -95,16 +96,131 @@ describe("inbox notification change detection", () => {
     };
 
     expect(
-      shouldSuppressInboxNotification(channelMessage, "channel-1", true),
+      shouldSuppressInboxNotification(
+        channelMessage,
+        "channel-1",
+        null,
+        true,
+      ),
     ).toBe(true);
     expect(
-      shouldSuppressInboxNotification(channelMessage, "channel-2", true),
+      shouldSuppressInboxNotification(
+        channelMessage,
+        "channel-2",
+        null,
+        true,
+      ),
     ).toBe(false);
     expect(
-      shouldSuppressInboxNotification(channelMessage, "channel-1", false),
+      shouldSuppressInboxNotification(
+        channelMessage,
+        "channel-1",
+        null,
+        false,
+      ),
     ).toBe(false);
     expect(
-      shouldSuppressInboxNotification(message("issue-1", "v1"), "channel-1", true),
+      shouldSuppressInboxNotification(
+        message("issue-1", "v1"),
+        "channel-1",
+        null,
+        true,
+      ),
     ).toBe(false);
+  });
+
+  it("suppresses a conversation notification for the issue being viewed", () => {
+    const conversationMessage: InboxMessageWithReadState = {
+      id: "conversation:message-1",
+      kind: "conversation",
+      isUnread: true,
+      occurredAt: "2026-08-15T00:00:00.000Z",
+      projectId: "project-1",
+      projectName: "Briar",
+      targetId: "run-1",
+      messageId: "message-1",
+      rootMessageId: "root-1",
+      title: "Issue conversation",
+      version: "message-1",
+      body: "Reply completed",
+      authorName: "Briar",
+      reason: "thread_reply",
+    };
+
+    expect(
+      shouldSuppressInboxNotification(
+        conversationMessage,
+        null,
+        "run-1",
+        true,
+      ),
+    ).toBe(true);
+    expect(
+      shouldSuppressInboxNotification(
+        conversationMessage,
+        null,
+        "run-2",
+        true,
+      ),
+    ).toBe(false);
+    expect(
+      shouldSuppressInboxNotification(
+        conversationMessage,
+        null,
+        "run-1",
+        false,
+      ),
+    ).toBe(false);
+    expect(
+      shouldSuppressInboxNotification(
+        message("run-1", "v1"),
+        null,
+        "run-1",
+        true,
+      ),
+    ).toBe(false);
+  });
+
+  it("builds the same stable Inbox recovery signal for both conversation kinds", () => {
+    const conversationMessage: InboxMessageWithReadState = {
+      id: "conversation:message-1",
+      kind: "conversation",
+      isUnread: true,
+      occurredAt: "2026-08-15T00:00:00.000Z",
+      projectId: "project-1",
+      projectName: "Briar",
+      targetId: "run-1",
+      messageId: "message-1",
+      rootMessageId: "root-1",
+      title: "Issue conversation",
+      version: "message-1",
+      body: "Reply completed",
+      authorName: "Briar",
+      reason: "thread_reply",
+    };
+    const channelMessage: InboxMessageWithReadState = {
+      ...conversationMessage,
+      id: "channel:message-2",
+      kind: "channel",
+      targetId: "channel-1",
+      channelId: "channel-1",
+      channelName: "product",
+      messageId: "message-2",
+      version: "message-2",
+      reason: "mention",
+    };
+
+    expect(
+      inboxConversationSyncSignal(
+        [channelMessage, conversationMessage],
+        "conversation",
+      ),
+    ).toBe("conversation:message-1:message-1");
+    expect(
+      inboxConversationSyncSignal(
+        [conversationMessage, channelMessage],
+        "channel",
+      ),
+    ).toBe("channel:message-2:message-2");
   });
 });

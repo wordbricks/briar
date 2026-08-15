@@ -12,6 +12,7 @@ struct CompanionRootView: View {
     @StateObject private var agents: AgentsStore
     @StateObject private var inbox: InboxStore
     @StateObject private var notifications: LocalNotificationService
+    @StateObject private var issueConversationView = IssueConversationViewTracker()
     @StateObject private var navigation = CompanionNavigationModel()
     @State private var signingIn = false
     @State private var authError: String?
@@ -80,46 +81,7 @@ struct CompanionRootView: View {
             } else if let token = session.token,
                       let projectID = companion.selectedProjectID,
                       let project = companion.projects.first(where: { $0.id == projectID }) {
-                CompanionShellView(
-                    navigation: navigation,
-                    agents: agents,
-                    inbox: inbox,
-                    notifications: notifications,
-                    channels: channels,
-                    projects: companion.projects,
-                    project: project,
-                    snapshot: dashboard.snapshot,
-                    errorMessage: dashboard.errorMessage,
-                    token: token,
-                    api: api,
-                    user: companion.user,
-                    refresh: { await dashboard.refresh(forceSnapshot: true) },
-                    ensureIssueAvailable: { projectID, runID in
-                        guard let target = companion.projects.first(where: {
-                            $0.id == projectID
-                        }) else { return false }
-                        // Keep the account selection and every project-scoped
-                        // store aligned before loading the canonical dashboard.
-                        companion.selectedProjectID = projectID
-                        dashboard.select(projectID: projectID, token: token)
-                        channels.select(
-                            organizationID: target.organizationId,
-                            token: token
-                        )
-                        agents.select(
-                            projectID: projectID,
-                            token: token,
-                            locale: locale.rawValue
-                        )
-                        return await dashboard.ensureRunAvailable(
-                            projectID: projectID,
-                            runID: runID,
-                            token: token
-                        )
-                    },
-                    selectProject: { companion.selectedProjectID = $0 },
-                    signOut: signOut
-                )
+                authenticatedContent(token: token, project: project)
             } else {
                 recoveryView
             }
@@ -191,13 +153,20 @@ struct CompanionRootView: View {
                 let viewingChannelID = scenePhase == .active
                     ? channels.viewingChannelID
                     : nil
+                let viewingIssueConversationID = scenePhase == .active
+                    ? issueConversationView.runID
+                    : nil
                 if viewingChannelID != nil {
                     await channels.refreshChanges()
+                }
+                if viewingIssueConversationID != nil {
+                    await issueConversationView.refreshChanges()
                 }
                 await notifications.process(
                     messages: messages,
                     baselineID: baselineID,
-                    viewingChannelID: viewingChannelID
+                    viewingChannelID: viewingChannelID,
+                    viewingIssueConversationID: viewingIssueConversationID
                 )
             }
         }
@@ -209,13 +178,20 @@ struct CompanionRootView: View {
                 let viewingChannelID = scenePhase == .active
                     ? channels.viewingChannelID
                     : nil
+                let viewingIssueConversationID = scenePhase == .active
+                    ? issueConversationView.runID
+                    : nil
                 if viewingChannelID != nil {
                     await channels.refreshChanges()
+                }
+                if viewingIssueConversationID != nil {
+                    await issueConversationView.refreshChanges()
                 }
                 await notifications.process(
                     messages: messages,
                     baselineID: baselineID,
-                    viewingChannelID: viewingChannelID
+                    viewingChannelID: viewingChannelID,
+                    viewingIssueConversationID: viewingIssueConversationID
                 )
             }
         }
@@ -252,6 +228,53 @@ struct CompanionRootView: View {
         .onOpenURL { url in
             handleIncomingURL(url)
         }
+    }
+
+    private func authenticatedContent(
+        token: String,
+        project: ProjectsResponse.Project
+    ) -> some View {
+        CompanionShellView(
+            navigation: navigation,
+            agents: agents,
+            inbox: inbox,
+            notifications: notifications,
+            channels: channels,
+            issueConversationView: issueConversationView,
+            projects: companion.projects,
+            project: project,
+            snapshot: dashboard.snapshot,
+            errorMessage: dashboard.errorMessage,
+            token: token,
+            api: api,
+            user: companion.user,
+            refresh: { await dashboard.refresh(forceSnapshot: true) },
+            ensureIssueAvailable: { projectID, runID in
+                guard let target = companion.projects.first(where: {
+                    $0.id == projectID
+                }) else { return false }
+                // Keep the account selection and every project-scoped store
+                // aligned before loading the canonical dashboard.
+                companion.selectedProjectID = projectID
+                dashboard.select(projectID: projectID, token: token)
+                channels.select(
+                    organizationID: target.organizationId,
+                    token: token
+                )
+                agents.select(
+                    projectID: projectID,
+                    token: token,
+                    locale: locale.rawValue
+                )
+                return await dashboard.ensureRunAvailable(
+                    projectID: projectID,
+                    runID: runID,
+                    token: token
+                )
+            },
+            selectProject: { companion.selectedProjectID = $0 },
+            signOut: signOut
+        )
     }
 
     private var currentProject: ProjectsResponse.Project? {

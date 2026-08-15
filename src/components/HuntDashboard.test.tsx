@@ -7,6 +7,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
 import { demoDashboard, demoRunEvents } from "../lib/demo-data";
 import * as api from "../lib/api";
+import * as channelRealtime from "../lib/channel-realtime";
 import type {
   ExecutionWorker,
   HuntRun,
@@ -3160,6 +3161,7 @@ describe("HuntDashboard", () => {
     const container = document.createElement("div");
     document.body.append(container);
     const root = createRoot(container);
+    const onViewingIssueConversationChange = vi.fn();
     await act(async () => root.render(
       <RunPage
         error={null}
@@ -3172,12 +3174,16 @@ describe("HuntDashboard", () => {
         onLoadRunEvidence={async () => []}
         onMove={async () => undefined}
         onRetry={async () => undefined}
+        onViewingIssueConversationChange={onViewingIssueConversationChange}
         onSendIssueMessage={async () => {
           throw new Error("not implemented in this test");
         }}
         run={demoDashboard.runs[0]}
       />,
     ));
+    expect(onViewingIssueConversationChange).toHaveBeenLastCalledWith(
+      demoDashboard.runs[0].id,
+    );
 
     const layout = container.querySelector<HTMLElement>(".run-page-layout")!;
     const emitResize = async (width: number) => {
@@ -3202,12 +3208,16 @@ describe("HuntDashboard", () => {
     expect(conversationPanel?.hidden).toBe(true);
     expect(container.querySelector(".run-page-conversation-resizer")).toBeNull();
     expect(container.querySelectorAll(".issue-conversation")).toHaveLength(1);
+    expect(onViewingIssueConversationChange).toHaveBeenLastCalledWith(null);
 
     await act(async () => conversationTab?.click());
 
     expect(conversationTab?.getAttribute("aria-selected")).toBe("true");
     expect(conversationPanel?.hidden).toBe(false);
     expect(conversationPanel?.querySelector(".issue-conversation")).not.toBeNull();
+    expect(onViewingIssueConversationChange).toHaveBeenLastCalledWith(
+      demoDashboard.runs[0].id,
+    );
 
     await emitResize(960);
 
@@ -3222,8 +3232,12 @@ describe("HuntDashboard", () => {
     expect(
       container.querySelector<HTMLElement>(".issue-description-pane")?.hidden,
     ).toBe(false);
+    expect(onViewingIssueConversationChange).toHaveBeenLastCalledWith(
+      demoDashboard.runs[0].id,
+    );
 
     await act(async () => root.unmount());
+    expect(onViewingIssueConversationChange).toHaveBeenLastCalledWith(null);
     container.remove();
     vi.unstubAllGlobals();
   });
@@ -4421,6 +4435,129 @@ describe("HuntDashboard", () => {
 
     await act(async () => root.unmount());
     container.remove();
+  });
+
+  it("uses Inbox conversation changes as a delta recovery signal", async () => {
+    const run = demoDashboard.runs[0];
+    const createdAt = "2026-08-15T00:00:00.000Z";
+    const trigger: IssueMessage = {
+      id: "message-trigger",
+      runId: run.id,
+      parentMessageId: null,
+      body: "@briar 답변해 줘",
+      author: { id: "jay", name: "Jay", image: null, provider: null },
+      replyCount: 0,
+      createdAt,
+      updatedAt: createdAt,
+    };
+    const reply: IssueMessage = {
+      ...trigger,
+      id: "message-reply",
+      parentMessageId: trigger.id,
+      body: "완료된 답변",
+      author: {
+        id: null,
+        name: "Briar · Codex",
+        image: null,
+        provider: "codex",
+      },
+      createdAt: "2026-08-15T00:01:00.000Z",
+      updatedAt: "2026-08-15T00:01:00.000Z",
+    };
+    const replyJob = {
+      id: "reply-job-1",
+      triggerMessageId: trigger.id,
+      status: "queued" as const,
+      workerId: null,
+      provider: "codex" as const,
+      error: null,
+      updatedAt: createdAt,
+    };
+    const loadSnapshot = vi
+      .spyOn(api, "loadIssueConversationSnapshot")
+      .mockResolvedValue({
+        cursor: 7,
+        messages: [trigger],
+        agentReplies: [replyJob],
+      });
+    const loadDelta = vi
+      .spyOn(api, "loadIssueConversationDelta")
+      .mockResolvedValueOnce({
+        cursor: 7,
+        hasMore: false,
+        changed: false,
+      })
+      .mockResolvedValueOnce({
+        cursor: 8,
+        hasMore: false,
+        changed: true,
+        messages: [trigger, reply],
+        agentReplies: [{
+          ...replyJob,
+          status: "completed" as const,
+          updatedAt: "2026-08-15T00:01:00.000Z",
+        }],
+      });
+    const transport = {
+      start: vi.fn(),
+      stop: vi.fn(),
+      subscribe: vi.fn(() => vi.fn()),
+    };
+    const createTransport = vi
+      .spyOn(channelRealtime, "createProjectRealtimeTransport")
+      .mockReturnValue(transport);
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    const renderPage = (conversationInboxSyncSignal: string) => (
+      <RunPage
+        conversationInboxSyncSignal={conversationInboxSyncSignal}
+        error={null}
+        isRecovering={false}
+        isSidebarOpen
+        onBack={() => undefined}
+        onCancel={async () => undefined}
+        onLoadAttachment={async () => new Blob()}
+        onLoadIssueMessages={async () => []}
+        onLoadRunEvidence={async () => []}
+        onMove={async () => undefined}
+        onRetry={async () => undefined}
+        onSendIssueMessage={async () => {
+          throw new Error("message should not be sent");
+        }}
+        organizationId="organization-1"
+        projectId={demoDashboard.project.id}
+        run={run}
+        token="token"
+      />
+    );
+
+    await act(async () => {
+      root.render(renderPage("baseline"));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(loadSnapshot).toHaveBeenCalledOnce();
+    expect(loadDelta).toHaveBeenCalledOnce();
+    expect(container.textContent).toContain("Briar가 답변을 작성하고 있습니다");
+
+    await act(async () => {
+      root.render(renderPage("conversation:message-reply"));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(loadDelta).toHaveBeenCalledTimes(2);
+    expect(container.textContent).toContain(reply.body);
+    expect(container.textContent).not.toContain(
+      "Briar가 답변을 작성하고 있습니다",
+    );
+
+    await act(async () => root.unmount());
+    container.remove();
+    createTransport.mockRestore();
+    loadDelta.mockRestore();
+    loadSnapshot.mockRestore();
   });
 
   it("reloads execution proposals when the run execution snapshot changes", async () => {

@@ -43,6 +43,7 @@ import { useBriar, type UseBriarOptions } from "./hooks/useBriar";
 import { useAutoHuntSessions } from "./hooks/useAutoHuntSessions";
 import { useInbox } from "./hooks/useInbox";
 import {
+  inboxConversationSyncSignal,
   useInboxNotificationClicks,
   useInboxNotifications,
 } from "./hooks/useInboxNotifications";
@@ -218,6 +219,8 @@ export function App() {
   >([]);
   const [activeChannelId, setActiveChannelId] = useState<string | null>(null);
   const [viewingChannelId, setViewingChannelId] = useState<string | null>(null);
+  const [viewingIssueConversationRunId, setViewingIssueConversationRunId] =
+    useState<string | null>(null);
   const [channelsLoading, setChannelsLoading] = useState(false);
   const [channelCatalogSnapshot, setChannelCatalogSnapshot] = useState<{
     organizationId: string;
@@ -439,12 +442,11 @@ export function App() {
     [inbox.markIssueRead],
   );
   const channelInboxSyncSignal = useMemo(
-    () =>
-      inbox.messages
-        .filter((message) => message.kind === "channel")
-        .map((message) => `${message.id}:${message.version}`)
-        .sort()
-        .join("\n"),
+    () => inboxConversationSyncSignal(inbox.messages, "channel"),
+    [inbox.messages],
+  );
+  const conversationInboxSyncSignal = useMemo(
+    () => inboxConversationSyncSignal(inbox.messages, "conversation"),
     [inbox.messages],
   );
   useInboxNotifications(
@@ -453,6 +455,7 @@ export function App() {
     inbox.messages,
     inbox.notificationBaselineId,
     viewingChannelId,
+    viewingIssueConversationRunId,
   );
   useEffect(() => {
     void syncAppBadgeCount(inbox.unreadCount).catch(() => {
@@ -1274,6 +1277,7 @@ export function App() {
               ]
         }
         availableRuns={briar.dashboard?.runs ?? []}
+        conversationInboxSyncSignal={conversationInboxSyncSignal}
         error={briar.recoveryError}
         isDeletingIssue={briar.deletingIssueId === inboxDetailRun.id}
         isProcessing={processingIssueIds.has(inboxDetailRun.id)}
@@ -1337,6 +1341,7 @@ export function App() {
           briar.editIssueCheckpoints(inboxDetailRun.id, checkpoints)}
         onUpdateIssuePreferences={(input) =>
           briar.editIssueExecutionPreferences(inboxDetailRun.id, input)}
+        onViewingIssueConversationChange={setViewingIssueConversationRunId}
         performedAgentName={
           issueAgents.find((agent) => agent.id === inboxDetailRun.agentId)
             ?.name ?? null
@@ -1978,6 +1983,7 @@ export function App() {
         ) : (
           <HuntDashboard
             agents={activeProjectAgents}
+            conversationInboxSyncSignal={conversationInboxSyncSignal}
             currentUserId={briar.user?.id ?? null}
             dashboard={briar.dashboard}
             error={quickProcessError ?? briar.error}
@@ -2000,6 +2006,7 @@ export function App() {
               setIsIssueDialogOpen(isOpen);
             }}
             onIssueViewed={markInboxIssueRead}
+            onViewingIssueConversationChange={setViewingIssueConversationRunId}
             onSelectedRunChange={(runId) => {
               if (runId) navigateToIssue(runId);
               else navigateToPage("issues");
@@ -2270,6 +2277,7 @@ export function App() {
         ) : (
           <HuntDashboard
             agents={activeProjectAgents}
+            conversationInboxSyncSignal={conversationInboxSyncSignal}
             currentUserId={briar.user?.id ?? null}
             companionMode
             companionStatus={companionStatus}
@@ -2298,6 +2306,7 @@ export function App() {
               setIsIssueDialogOpen(isOpen);
             }}
             onIssueViewed={markInboxIssueRead}
+            onViewingIssueConversationChange={setViewingIssueConversationRunId}
             onDeleteIssue={briar.deleteIssue}
             onTransferIssue={briar.transferIssue}
             onAddIssueDependency={briar.addIssueDependency}

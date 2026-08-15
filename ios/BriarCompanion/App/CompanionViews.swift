@@ -20,6 +20,7 @@ struct CompanionShellView: View {
     @ObservedObject var inbox: InboxStore
     @ObservedObject var notifications: LocalNotificationService
     @ObservedObject var channels: ChannelsStore
+    let issueConversationView: IssueConversationViewTracker
 
     let projects: [ProjectsResponse.Project]
     let project: ProjectsResponse.Project
@@ -81,6 +82,7 @@ struct CompanionShellView: View {
                     token: token,
                     api: api,
                     currentUserID: user?.id,
+                    issueConversationView: issueConversationView,
                     refresh: refresh,
                     onSkillSessionMaterialized: { agents.materialize($0) },
                     onSkillSessionOpen: { projectID, sessionID in
@@ -111,6 +113,7 @@ struct CompanionShellView: View {
                 token: token,
                 api: api,
                 snapshot: snapshot,
+                issueConversationView: issueConversationView,
                 refreshDashboard: refresh,
                 toolbarContent: { companionToolbar(showsProjectMenu: true) }
             )
@@ -202,6 +205,7 @@ struct CompanionShellView: View {
                 members: snapshot?.members ?? [],
                 currentUserID: user?.id,
                 initialTab: initialTab,
+                issueConversationView: issueConversationView,
                 refresh: refresh,
                 onSkillSessionMaterialized: { agents.materialize($0) },
                 onSkillSessionOpen: { projectID, sessionID in
@@ -348,6 +352,7 @@ struct TaskListView: View {
     let token: String
     let api: any MobileAPIClientProtocol
     let currentUserID: String?
+    let issueConversationView: IssueConversationViewTracker?
     let refresh: () async -> Void
     let onSkillSessionMaterialized: SkillSessionMaterializedHandler
     let onSkillSessionOpen: SkillSessionOpenHandler
@@ -361,6 +366,7 @@ struct TaskListView: View {
         token: String,
         api: any MobileAPIClientProtocol,
         currentUserID: String? = nil,
+        issueConversationView: IssueConversationViewTracker? = nil,
         refresh: @escaping () async -> Void,
         onSkillSessionMaterialized: @escaping SkillSessionMaterializedHandler = { _ in },
         onSkillSessionOpen: @escaping SkillSessionOpenHandler = { _, _ in }
@@ -372,6 +378,7 @@ struct TaskListView: View {
         self.token = token
         self.api = api
         self.currentUserID = currentUserID
+        self.issueConversationView = issueConversationView
         self.refresh = refresh
         self.onSkillSessionMaterialized = onSkillSessionMaterialized
         self.onSkillSessionOpen = onSkillSessionOpen
@@ -436,6 +443,7 @@ struct TaskListView: View {
                                     providers: snapshot?.organizationProviders ?? [],
                                     members: snapshot?.members ?? [],
                                     currentUserID: currentUserID,
+                                    issueConversationView: issueConversationView,
                                     refresh: refresh,
                                     onSkillSessionMaterialized: onSkillSessionMaterialized,
                                     onSkillSessionOpen: onSkillSessionOpen
@@ -801,6 +809,7 @@ struct RunDetailView: View {
     private let providers: [AgentProvider]
     private let members: [OrganizationMember]
     private let currentUserID: String?
+    private let issueConversationView: IssueConversationViewTracker?
     private let refresh: () async -> Void
     private let onSkillSessionMaterialized: SkillSessionMaterializedHandler
     private let onSkillSessionOpen: SkillSessionOpenHandler
@@ -857,6 +866,7 @@ struct RunDetailView: View {
         members: [OrganizationMember] = [],
         currentUserID: String? = nil,
         initialTab: RunDetailTab? = nil,
+        issueConversationView: IssueConversationViewTracker? = nil,
         refresh: @escaping () async -> Void = {},
         onSkillSessionMaterialized: @escaping SkillSessionMaterializedHandler = { _ in },
         onSkillSessionOpen: @escaping SkillSessionOpenHandler = { _, _ in }
@@ -870,6 +880,7 @@ struct RunDetailView: View {
         self.providers = providers
         self.members = members
         self.currentUserID = currentUserID
+        self.issueConversationView = issueConversationView
         self.refresh = refresh
         self.onSkillSessionMaterialized = onSkillSessionMaterialized
         self.onSkillSessionOpen = onSkillSessionOpen
@@ -1057,6 +1068,15 @@ struct RunDetailView: View {
             .onChange(of: inbox.messages) { _, _ in
                 inbox.markIssueRead(runID: run.id)
             }
+            .onChange(of: selectedTab, initial: true) { _, tab in
+                if tab == .conversation {
+                    issueConversationView?.view(runID: run.id) {
+                        await detail.load(queueIfLoading: true)
+                    }
+                } else {
+                    issueConversationView?.leave(runID: run.id)
+                }
+            }
             .onChange(of: run.status) { _, status in
                 localStatus = status
                 // Keep parity with shared React RunPage: status transitions reselect the default tab.
@@ -1070,6 +1090,7 @@ struct RunDetailView: View {
                 subscribers = updatedSubscribers ?? []
             }
             .onDisappear {
+                issueConversationView?.leave(runID: run.id)
                 executionApprovalPresentation = nil
                 preparingExecutionProposalID = nil
                 skillExecutionApprovalPresentation = nil
