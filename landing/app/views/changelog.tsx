@@ -23,6 +23,18 @@ export const changelogCopy = {
     backTop: "맨 위로 ↑",
     entries: [
       {
+        version: "1.2.125",
+        date: "2026년 8월 15일",
+        title: "Inbox 답글과 좁은 이슈 화면을 더 자연스럽게 연결합니다",
+        summary:
+          "답글 작성자를 한눈에 알아보고, 좁은 이슈 화면에서도 설명·상태·대화를 탭으로 편하게 오갈 수 있도록 다듬었습니다.",
+        items: [
+          "이슈 대화 답글 알림에 일반 아이콘 대신 실제 작성자의 아바타를 데스크탑·Android·네이티브 iOS에서 표시하고, 이미지가 없거나 실패하면 이름 첫 글자로 안전하게 대체합니다.",
+          "이슈 상세 영역이 960px보다 좁아지면 대화 패널을 별도 메시지 탭으로 옮겨 설명·활동·상태와 같은 폭을 사용하며, 다시 넓어지면 기존 분할 패널로 자연스럽게 돌아갑니다.",
+          "랜딩페이지의 운영 의존성을 갱신해 알려진 프로덕션 취약점을 제거하면서 기존 Cloudflare Worker 빌드와 화면 동작을 유지했습니다.",
+        ],
+      },
+      {
         version: "1.2.124",
         date: "2026년 8월 15일",
         title: "채널 대화와 에이전트 진행 상황을 더 빠르게 연결합니다",
@@ -620,6 +632,18 @@ export const changelogCopy = {
     home: "Home",
     backTop: "Back to top ↑",
     entries: [
+      {
+        version: "1.2.125",
+        date: "August 15, 2026",
+        title: "Connect Inbox replies and narrow issue views more naturally",
+        summary:
+          "Recognize reply authors at a glance and move comfortably between description, status, and conversation when an issue view gets narrow.",
+        items: [
+          "Show the actual author's avatar on issue-conversation reply notifications across desktop, Android, and native iOS instead of a generic icon, with a safe initial fallback when an image is missing or fails to load.",
+          "Move the conversation pane into its own Messages tab when the issue detail area is narrower than 960px, sharing the full width with Description, Activity, and Status before returning naturally to the split pane at wider sizes.",
+          "Refresh the landing site's production dependencies to remove known production vulnerabilities while preserving its existing Cloudflare Worker build and behavior.",
+        ],
+      },
       {
         version: "1.2.124",
         date: "August 15, 2026",
@@ -1230,9 +1254,9 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <h1>{changelog.title}</h1>
           <p>{changelog.description}</p>
         </div>
-        <a href="#v1-2-124" className="changelog-current">
+        <a href="#v1-2-125" className="changelog-current">
           <span>{changelog.current}</span>
-          <strong>v1.2.124</strong>
+          <strong>v1.2.125</strong>
           <i aria-hidden="true">↓</i>
         </a>
       </section>
@@ -1257,6 +1281,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   {index === 0 ? <span>{changelog.latest}</span> : null}
                   <time
                     dateTime={
+                      entry.version === "1.2.125" ||
                       entry.version === "1.2.124"
                         ? "2026-08-15"
                         : entry.version === "1.2.123" ||
