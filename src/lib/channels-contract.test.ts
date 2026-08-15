@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   channelIncomingWebhookMessageSchema,
+  channelMessageBlocksFallback,
   channelMessageInputSchema,
   channelReplyCompletionSchema,
   channelWebhookInputSchema,
@@ -37,6 +38,46 @@ describe("channel webhook contract", () => {
     expect(channelIncomingWebhookMessageSchema.safeParse({
       text: "Deployment complete",
       channelId: projectId,
+    }).success).toBe(false);
+  });
+
+  it("accepts core Slack-compatible blocks and derives a readable fallback", () => {
+    const input = channelIncomingWebhookMessageSchema.parse({
+      blocks: [
+        {
+          type: "header",
+          text: { type: "plain_text", text: "Deployment complete" },
+        },
+        {
+          type: "section",
+          text: { type: "mrkdwn", text: "*Production* is now on `v42`." },
+        },
+        { type: "divider" },
+        {
+          type: "rich_text",
+          elements: [{
+            type: "rich_text_list",
+            style: "bullet",
+            elements: [{
+              type: "rich_text_section",
+              elements: [{ type: "text", text: "Health checks passed" }],
+            }],
+          }],
+        },
+      ],
+    });
+
+    expect(channelMessageBlocksFallback(input.blocks ?? [])).toBe(
+      "Deployment complete\n*Production* is now on `v42`.\n• Health checks passed",
+    );
+  });
+
+  it("requires visible content and rejects unsupported interactive blocks", () => {
+    expect(channelIncomingWebhookMessageSchema.safeParse({
+      blocks: [{ type: "divider" }],
+    }).success).toBe(false);
+    expect(channelIncomingWebhookMessageSchema.safeParse({
+      blocks: [{ type: "actions", elements: [] }],
     }).success).toBe(false);
   });
 });

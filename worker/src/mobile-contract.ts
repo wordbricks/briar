@@ -8,6 +8,7 @@ import {
   issueTitleAbsoluteMaxLength,
   issueTitleOverLimitMessage,
 } from "../../src/lib/issue-title";
+import { channelMessageBlockSchema } from "../../src/lib/channels-contract";
 
 export const mobileClientIds = ["briar-mobile", "briar-android"] as const;
 export const mobileClientIdSchema = z.enum(mobileClientIds);
@@ -239,6 +240,7 @@ const mobileInboxConversationMessageSchema = mobileInboxMessageBaseSchema.extend
   messageId: z.uuid(),
   rootMessageId: z.uuid(),
   body: z.string(),
+  blocks: z.array(channelMessageBlockSchema).nullable().optional(),
   authorName: z.string(),
   authorImage: z.string().nullable().optional(),
   issueKey: z.string().optional(),

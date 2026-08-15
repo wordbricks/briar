@@ -48,11 +48,172 @@ struct ChannelMessageReaction: Codable, Hashable, Identifiable, Sendable {
     var id: String { emoji }
 }
 
+struct ChannelBlockText: Codable, Hashable, Sendable {
+    let type: Kind
+    let text: String
+
+    enum Kind: String, Codable, Hashable, Sendable {
+        case plainText = "plain_text"
+        case markdown = "mrkdwn"
+    }
+}
+
+struct ChannelRichTextStyle: Codable, Hashable, Sendable {
+    let bold: Bool?
+    let italic: Bool?
+    let strike: Bool?
+    let code: Bool?
+}
+
+struct ChannelRichTextInline: Codable, Hashable, Sendable {
+    let type: Kind
+    let text: String?
+    let url: String?
+    let name: String?
+    let style: ChannelRichTextStyle?
+
+    enum Kind: String, Codable, Hashable, Sendable {
+        case text
+        case link
+        case emoji
+    }
+}
+
+struct ChannelRichTextSection: Codable, Hashable, Sendable {
+    let type: String
+    let elements: [ChannelRichTextInline]
+}
+
+struct ChannelRichTextElement: Codable, Hashable, Sendable {
+    let type: Kind
+    let elements: [ChannelRichTextInline]?
+    let sections: [ChannelRichTextSection]?
+    let style: String?
+    let indent: Int?
+    let offset: Int?
+
+    enum Kind: String, Codable, Hashable, Sendable {
+        case section = "rich_text_section"
+        case list = "rich_text_list"
+        case quote = "rich_text_quote"
+        case preformatted = "rich_text_preformatted"
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case type
+        case elements
+        case style
+        case indent
+        case offset
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        type = try container.decode(Kind.self, forKey: .type)
+        style = try container.decodeIfPresent(String.self, forKey: .style)
+        indent = try container.decodeIfPresent(Int.self, forKey: .indent)
+        offset = try container.decodeIfPresent(Int.self, forKey: .offset)
+        if type == .list {
+            sections = try container.decode([ChannelRichTextSection].self, forKey: .elements)
+            elements = nil
+        } else {
+            elements = try container.decode([ChannelRichTextInline].self, forKey: .elements)
+            sections = nil
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(type, forKey: .type)
+        try container.encodeIfPresent(style, forKey: .style)
+        try container.encodeIfPresent(indent, forKey: .indent)
+        try container.encodeIfPresent(offset, forKey: .offset)
+        if type == .list {
+            try container.encode(sections ?? [], forKey: .elements)
+        } else {
+            try container.encode(elements ?? [], forKey: .elements)
+        }
+    }
+}
+
+struct ChannelMessageBlock: Codable, Hashable, Sendable {
+    let type: Kind
+    let textObject: ChannelBlockText?
+    let markdownText: String?
+    let contextElements: [ChannelBlockText]?
+    let richTextElements: [ChannelRichTextElement]?
+
+    enum Kind: String, Codable, Hashable, Sendable {
+        case header
+        case section
+        case markdown
+        case divider
+        case context
+        case richText = "rich_text"
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case type
+        case text
+        case elements
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        type = try container.decode(Kind.self, forKey: .type)
+        switch type {
+        case .header, .section:
+            textObject = try container.decode(ChannelBlockText.self, forKey: .text)
+            markdownText = nil
+            contextElements = nil
+            richTextElements = nil
+        case .markdown:
+            textObject = nil
+            markdownText = try container.decode(String.self, forKey: .text)
+            contextElements = nil
+            richTextElements = nil
+        case .context:
+            textObject = nil
+            markdownText = nil
+            contextElements = try container.decode([ChannelBlockText].self, forKey: .elements)
+            richTextElements = nil
+        case .richText:
+            textObject = nil
+            markdownText = nil
+            contextElements = nil
+            richTextElements = try container.decode([ChannelRichTextElement].self, forKey: .elements)
+        case .divider:
+            textObject = nil
+            markdownText = nil
+            contextElements = nil
+            richTextElements = nil
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(type, forKey: .type)
+        switch type {
+        case .header, .section:
+            try container.encodeIfPresent(textObject, forKey: .text)
+        case .markdown:
+            try container.encodeIfPresent(markdownText, forKey: .text)
+        case .context:
+            try container.encode(contextElements ?? [], forKey: .elements)
+        case .richText:
+            try container.encode(richTextElements ?? [], forKey: .elements)
+        case .divider:
+            break
+        }
+    }
+}
+
 struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
     let id: UUID
     let channelId: UUID
     let parentMessageId: UUID?
     let body: String
+    let blocks: [ChannelMessageBlock]?
     let author: Author
     let mentionedUserIds: [String]
     let mentionedAgentIds: [UUID]
@@ -75,6 +236,7 @@ struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
         case channelId
         case parentMessageId
         case body
+        case blocks
         case author
         case mentionedUserIds
         case mentionedAgentIds
@@ -94,6 +256,7 @@ struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
         channelId: UUID,
         parentMessageId: UUID?,
         body: String,
+        blocks: [ChannelMessageBlock]? = nil,
         author: Author,
         mentionedUserIds: [String] = [],
         mentionedAgentIds: [UUID] = [],
@@ -111,6 +274,7 @@ struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
         self.channelId = channelId
         self.parentMessageId = parentMessageId
         self.body = body
+        self.blocks = blocks
         self.author = author
         self.mentionedUserIds = mentionedUserIds
         self.mentionedAgentIds = mentionedAgentIds
@@ -131,6 +295,7 @@ struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
         channelId = try container.decode(UUID.self, forKey: .channelId)
         parentMessageId = try container.decodeIfPresent(UUID.self, forKey: .parentMessageId)
         body = try container.decode(String.self, forKey: .body)
+        blocks = try container.decodeIfPresent([ChannelMessageBlock].self, forKey: .blocks)
         author = try container.decode(Author.self, forKey: .author)
         mentionedUserIds = try container.decodeIfPresent([String].self, forKey: .mentionedUserIds) ?? []
         mentionedAgentIds = try container.decodeIfPresent([UUID].self, forKey: .mentionedAgentIds) ?? []
