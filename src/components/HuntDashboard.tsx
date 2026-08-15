@@ -6113,6 +6113,7 @@ export function RunPage({
                               <RunResultScreenshots
                                 onLoad={onLoadRunEvidence}
                                 onLoadImage={onLoadRunEvidenceImage}
+                                runId={run.id}
                               />
                             </section>
                           </div>
@@ -6294,6 +6295,7 @@ export function RunPage({
                           <RunResultScreenshots
                             onLoad={onLoadRunEvidence}
                             onLoadImage={onLoadRunEvidenceImage}
+                            runId={run.id}
                           />
                           {run.pullRequestUrls.length > 0 ? (
                             <div className="run-result-links">
@@ -6384,6 +6386,7 @@ export function RunPage({
                         <RunResultScreenshots
                           onLoad={onLoadRunEvidence}
                           onLoadImage={onLoadRunEvidenceImage}
+                          runId={run.id}
                         />
                       ) : null}
                     </div>
@@ -7637,6 +7640,70 @@ function IssueAgentActivityPanel({
   );
 }
 
+type RunEvidenceLoadState = {
+  runId: string;
+  evidence: RunEvidence[];
+  loading: boolean;
+  loadError: string | null;
+};
+
+function useRunEvidenceLoader(
+  runId: string,
+  onLoad: () => Promise<RunEvidence[]>,
+  enabled: boolean,
+  fallbackError: string,
+) {
+  const [state, setState] = useState<RunEvidenceLoadState>(() => ({
+    runId,
+    evidence: [],
+    loading: enabled,
+    loadError: null,
+  }));
+  const onLoadRef = useRef(onLoad);
+  const requestRef = useRef(0);
+  onLoadRef.current = onLoad;
+
+  const reload = useCallback(async () => {
+    const request = ++requestRef.current;
+    setState({ runId, evidence: [], loading: true, loadError: null });
+    try {
+      const evidence = await onLoadRef.current();
+      if (request !== requestRef.current) return;
+      setState({ runId, evidence, loading: false, loadError: null });
+    } catch (caught) {
+      if (request !== requestRef.current) return;
+      setState({
+        runId,
+        evidence: [],
+        loading: false,
+        loadError:
+          caught instanceof Error ? caught.message : fallbackError,
+      });
+    }
+  }, [fallbackError, runId]);
+
+  useEffect(() => {
+    if (!enabled) {
+      requestRef.current += 1;
+      return;
+    }
+    void reload();
+    return () => {
+      requestRef.current += 1;
+    };
+  }, [enabled, reload]);
+
+  return state.runId === runId
+    ? { ...state, reload }
+    : {
+        runId,
+        evidence: [],
+        loading: enabled,
+        loadError: null,
+        reload,
+      };
+}
+
 function RunEvidencePanel({
   id,
   labelledBy,
@@ -7651,29 +7718,17 @@ function RunEvidencePanel({
   run: HuntRun;
 }) {
   const { localeTag, t } = useI18n();
-  const [evidence, setEvidence] = useState<RunEvidence[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const onLoadRef = useRef(onLoad);
-  onLoadRef.current = onLoad;
-
-  const loadEvidence = useCallback(async () => {
-    setLoading(true);
-    setLoadError(null);
-    try {
-      setEvidence(await onLoadRef.current());
-    } catch (caught) {
-      setLoadError(
-        caught instanceof Error ? caught.message : t("run.evidenceLoadFailed"),
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, [t]);
-
-  useEffect(() => {
-    void loadEvidence();
-  }, [loadEvidence]);
+  const {
+    evidence,
+    loading,
+    loadError,
+    reload: loadEvidence,
+  } = useRunEvidenceLoader(
+    run.id,
+    onLoad,
+    true,
+    t("run.evidenceLoadFailed"),
+  );
 
   const stageGroups = useMemo(() => {
     const knownStageIds = new Set(run.workflow.stages.map((stage) => stage.id));
@@ -7896,35 +7951,24 @@ function IssueResultReviewers({
 function RunResultScreenshots({
   onLoad,
   onLoadImage,
+  runId,
 }: {
   onLoad: () => Promise<RunEvidence[]>;
   onLoadImage?: (image: RunEvidenceImage) => Promise<Blob>;
+  runId: string;
 }) {
   const { t } = useI18n();
-  const [evidence, setEvidence] = useState<RunEvidence[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const onLoadRef = useRef(onLoad);
-  onLoadRef.current = onLoad;
-
-  const loadScreenshots = useCallback(async () => {
-    setLoading(true);
-    setLoadError(null);
-    try {
-      setEvidence(await onLoadRef.current());
-    } catch (caught) {
-      setLoadError(
-        caught instanceof Error ? caught.message : t("run.evidenceLoadFailed"),
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, [t]);
-
-  useEffect(() => {
-    if (!onLoadImage) return;
-    void loadScreenshots();
-  }, [loadScreenshots, onLoadImage]);
+  const {
+    evidence,
+    loading,
+    loadError,
+    reload: loadScreenshots,
+  } = useRunEvidenceLoader(
+    runId,
+    onLoad,
+    Boolean(onLoadImage),
+    t("run.evidenceLoadFailed"),
+  );
 
   const images = useMemo(
     () => evidence
