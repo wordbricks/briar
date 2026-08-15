@@ -179,6 +179,194 @@ describe("D1 migrations", () => {
     }
   }, 60_000);
 
+  it("backfills and maintains the channel notification inbox", async () => {
+    const miniflare = new Miniflare({
+      modules: true,
+      script: "export default { fetch() { return new Response('ok') } }",
+      d1Databases: { DB: "briar-channel-notification-inbox-migration-test" },
+    });
+    try {
+      const db = (await miniflare.getD1Database("DB")) as unknown as D1Database;
+      await applyD1Migrations(db, {
+        through: "0107_channel_reply_preferred_device.sql",
+      });
+      const now = "2026-08-15T00:00:00.000Z";
+      const organizationId = "channel-notification-migration-organization";
+      const channelId = "channel-notification-migration-channel";
+      const rootId = "channel-notification-migration-root";
+      const replyId = "channel-notification-migration-reply";
+      await db.batch([
+        db.prepare(
+          `insert into "user" (
+             id, name, email, emailVerified, createdAt, updatedAt
+           ) values (?, 'Root author', 'root-author@example.com', 1, ?, ?)`,
+        ).bind("channel-notification-root-author", now, now),
+        db.prepare(
+          `insert into "user" (
+             id, name, email, emailVerified, createdAt, updatedAt
+           ) values (?, 'Reply author', 'reply-author@example.com', 1, ?, ?)`,
+        ).bind("channel-notification-reply-author", now, now),
+        db.prepare(
+          `insert into briar_organizations (
+             id, name, handle, created_at, updated_at
+           ) values (?, 'Notification migration', 'notification-migration', ?, ?)`,
+        ).bind(organizationId, now, now),
+      ]);
+      await db.batch([
+        db.prepare(
+          `insert into briar_organization_members (
+             organization_id, user_id, role, created_at, updated_at
+           ) values (?, ?, 'owner', ?, ?)`,
+        ).bind(
+          organizationId,
+          "channel-notification-root-author",
+          now,
+          now,
+        ),
+        db.prepare(
+          `insert into briar_organization_members (
+             organization_id, user_id, role, created_at, updated_at
+           ) values (?, ?, 'member', ?, ?)`,
+        ).bind(
+          organizationId,
+          "channel-notification-reply-author",
+          now,
+          now,
+        ),
+        db.prepare(
+          `insert into briar_channels (
+             id, organization_id, slug, name, visibility,
+             created_by_user_id, created_at, updated_at
+           ) values (?, ?, 'migration', 'Migration', 'public', ?, ?, ?)`,
+        ).bind(
+          channelId,
+          organizationId,
+          "channel-notification-root-author",
+          now,
+          now,
+        ),
+      ]);
+      await db.batch([
+        db.prepare(
+          `insert into briar_channel_messages (
+             id, channel_id, parent_message_id, author_user_id,
+             body, created_at, updated_at
+           ) values (?, ?, null, ?, 'Root', ?, ?)`,
+        ).bind(
+          rootId,
+          channelId,
+          "channel-notification-root-author",
+          now,
+          now,
+        ),
+        db.prepare(
+          `insert into briar_channel_messages (
+             id, channel_id, parent_message_id, author_user_id,
+             body, created_at, updated_at
+           ) values (?, ?, ?, ?, 'Existing reply', ?, ?)`,
+        ).bind(
+          replyId,
+          channelId,
+          rootId,
+          "channel-notification-reply-author",
+          now,
+          now,
+        ),
+      ]);
+      await db.prepare(
+        `insert into briar_channel_message_mentions (
+           message_id, user_id, created_at
+         ) values (?, ?, ?)`,
+      ).bind(replyId, "channel-notification-root-author", now).run();
+
+      await applyD1Migrations(db, {
+        files: ["0108_channel_notification_inbox.sql"],
+      });
+
+      await expect(db.prepare(
+        `select message_id, notification_reason
+         from briar_channel_notification_inbox
+         where user_id = ?`,
+      ).bind("channel-notification-root-author").all()).resolves.toMatchObject({
+        results: [{ message_id: replyId, notification_reason: "mention" }],
+      });
+      await expect(db.prepare(
+        `select name from sqlite_master
+         where type = 'index'
+           and name =
+             'briar_channel_notification_inbox_user_organization_created_idx'`,
+      ).first("name")).resolves.toBe(
+        "briar_channel_notification_inbox_user_organization_created_idx",
+      );
+
+      const newReplyId = "channel-notification-migration-new-reply";
+      await db.prepare(
+        `insert into briar_channel_messages (
+           id, channel_id, parent_message_id, author_user_id,
+           body, created_at, updated_at
+         ) values (?, ?, ?, ?, 'New reply', ?, ?)`,
+      ).bind(
+        newReplyId,
+        channelId,
+        rootId,
+        "channel-notification-reply-author",
+        now,
+        now,
+      ).run();
+      await expect(db.prepare(
+        `select notification_reason from briar_channel_notification_inbox
+         where user_id = ? and message_id = ?`,
+      ).bind(
+        "channel-notification-root-author",
+        newReplyId,
+      ).first("notification_reason")).resolves.toBe("thread_reply");
+
+      await db.prepare(
+        `insert into briar_channel_message_mentions (
+           message_id, user_id, created_at
+         ) values (?, ?, ?)`,
+      ).bind(newReplyId, "channel-notification-root-author", now).run();
+      await expect(db.prepare(
+        `select notification_reason from briar_channel_notification_inbox
+         where user_id = ? and message_id = ?`,
+      ).bind(
+        "channel-notification-root-author",
+        newReplyId,
+      ).first("notification_reason")).resolves.toBe("mention");
+
+      await db.prepare(
+        `delete from briar_channel_message_mentions
+         where message_id = ? and user_id = ?`,
+      ).bind(newReplyId, "channel-notification-root-author").run();
+      await expect(db.prepare(
+        `select notification_reason from briar_channel_notification_inbox
+         where user_id = ? and message_id = ?`,
+      ).bind(
+        "channel-notification-root-author",
+        newReplyId,
+      ).first("notification_reason")).resolves.toBe("thread_reply");
+
+      await db.prepare(
+        `delete from briar_channel_messages where id = ?`,
+      ).bind(newReplyId).run();
+      await expect(db.prepare(
+        `select 1 from briar_channel_notification_inbox
+         where message_id = ?`,
+      ).bind(newReplyId).first()).resolves.toBeNull();
+      await db.prepare(
+        `delete from briar_channel_messages where id = ?`,
+      ).bind(replyId).run();
+      await expect(db.prepare(
+        `select 1 from briar_channel_notification_inbox
+         where message_id = ?`,
+      ).bind(replyId).first()).resolves.toBeNull();
+      await expect(db.prepare("pragma foreign_key_check").all())
+        .resolves.toMatchObject({ results: [] });
+    } finally {
+      await miniflare.dispose();
+    }
+  }, 60_000);
+
   it("adds a nullable preferred Worker device to channel reply jobs", async () => {
     const miniflare = new Miniflare({
       modules: true,
@@ -575,6 +763,7 @@ describe("D1 migrations", () => {
     "0102_auto_issue_subscriptions.sql",
     "0106_agent_provider_agy.sql",
     "0105_organization_inbox_realtime.sql",
+    "0108_channel_notification_inbox.sql",
   ])("keeps each trigger in a separate Wrangler statement: %s", async (name) => {
     const sql = await readFile(resolve("migrations", name), "utf8");
     const statements = unstable_splitSqlQuery(sql);
