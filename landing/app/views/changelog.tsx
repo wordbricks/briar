@@ -23,6 +23,20 @@ export const changelogCopy = {
     backTop: "맨 위로 ↑",
     entries: [
       {
+        version: "1.2.126",
+        date: "2026년 8월 15일",
+        title: "첫 실행과 대화 결과를 더 빠르고 정확하게 연결합니다",
+        summary:
+          "역할에 맞는 온보딩부터 구조화된 채널 메시지, 실시간 이슈 대화와 에이전트 응답까지 더 분명하고 안정적으로 다듬었습니다.",
+        items: [
+          "공통 소개와 Google 로그인 뒤 초대 사용자·개발자·협업자 경로를 나누고, 프로젝트 워크플로 생성 단계와 경과 시간·마무리 상태를 명확하게 보여줍니다.",
+          "Slack Block Kit 웹훅 메시지의 텍스트·섹션·필드·구분선·컨텍스트·이미지 블록을 채널에서 읽기 쉽게 렌더링하고, 원본 블록을 데이터베이스에 보존합니다.",
+          "이슈 전환 시 이전 결과 스크린샷이 남지 않게 하고, 열린 이슈 대화를 실시간 동기화하면서 현재 보고 있는 답글의 중복 알림을 억제합니다.",
+          "이슈 답변과 채널 에이전트 대기 상태를 픽셀 그리드 로더·진행 문구·경과 시간으로 표시해 오래 걸리는 작업의 상태를 더 쉽게 파악할 수 있습니다.",
+          "승인 요청의 구조화된 응답과 채널 멘션 UUID를 안정적으로 정규화하고, 네이티브 iOS에서 첫 채널 메시지 로드와 전송 직후 초안 초기화를 개선했습니다.",
+        ],
+      },
+      {
         version: "1.2.125",
         date: "2026년 8월 15일",
         title: "Inbox 답글과 좁은 이슈 화면을 더 자연스럽게 연결합니다",
@@ -632,6 +646,20 @@ export const changelogCopy = {
     home: "Home",
     backTop: "Back to top ↑",
     entries: [
+      {
+        version: "1.2.126",
+        date: "August 15, 2026",
+        title: "Make first-run setup and conversation results faster and more precise",
+        summary:
+          "Clarify role-based onboarding, structured channel messages, realtime issue conversations, and agent responses from start to finish.",
+        items: [
+          "Split invited-user, developer, and collaborator paths after a shared introduction and Google sign-in, then show clear workflow-generation stages, elapsed time, and finalization progress.",
+          "Render text, sections, fields, dividers, context, and images from Slack Block Kit webhook messages directly in channels while preserving the original blocks in the database.",
+          "Clear stale result screenshots when switching issues, synchronize open issue conversations in realtime, and suppress duplicate notifications for replies already being viewed.",
+          "Replace issue-response and channel-agent wait spinners with the pixel-grid loader, a descriptive status, and elapsed time so longer work remains easy to follow.",
+          "Normalize structured approval replies and channel mention UUIDs reliably, and improve native iOS initial channel loading and immediate draft clearing after send.",
+        ],
+      },
       {
         version: "1.2.125",
         date: "August 15, 2026",
@@ -1254,9 +1282,9 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <h1>{changelog.title}</h1>
           <p>{changelog.description}</p>
         </div>
-        <a href="#v1-2-125" className="changelog-current">
+        <a href="#v1-2-126" className="changelog-current">
           <span>{changelog.current}</span>
-          <strong>v1.2.125</strong>
+          <strong>v1.2.126</strong>
           <i aria-hidden="true">↓</i>
         </a>
       </section>
@@ -1281,6 +1309,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   {index === 0 ? <span>{changelog.latest}</span> : null}
                   <time
                     dateTime={
+                      entry.version === "1.2.126" ||
                       entry.version === "1.2.125" ||
                       entry.version === "1.2.124"
                         ? "2026-08-15"
