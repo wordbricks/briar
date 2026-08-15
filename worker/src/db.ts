@@ -9328,17 +9328,14 @@ export async function listChannelConversationNotifications(
               coalesce(author.name, message.author_agent_name, '') as author_name,
               author.image as author_image, message.body, message.created_at,
               coalesce(message.parent_message_id, message.id) as root_message_id,
-              case when mention.user_id is not null
-                then 'mention' else 'thread_reply' end as notification_reason
-       from briar_channel_messages message
+              notification.notification_reason
+       from briar_channel_notification_inbox notification
+       join briar_channel_messages message on message.id = notification.message_id
        join briar_channels channel on channel.id = message.channel_id
        left join "user" author on author.id = message.author_user_id
-       left join briar_channel_messages root
-         on root.id = message.parent_message_id
-        and root.channel_id = message.channel_id
-       left join briar_channel_message_mentions mention
-         on mention.message_id = message.id and mention.user_id = ?
-       where channel.organization_id = ?
+       where notification.user_id = ?
+         and notification.organization_id = ?
+         and channel.organization_id = notification.organization_id
          and channel.archived_at is null
          and (
            channel.visibility = 'public'
@@ -9347,18 +9344,10 @@ export async function listChannelConversationNotifications(
              where member.channel_id = channel.id and member.user_id = ?
            )
          )
-         and (message.author_user_id is null or message.author_user_id != ?)
-         and (
-           mention.user_id is not null
-           or (
-             message.parent_message_id is not null
-             and root.author_user_id = ?
-           )
-         )
-       order by message.created_at desc, message.id desc
+       order by notification.created_at desc, notification.message_id desc
        limit 500`,
     )
-    .bind(userId, organizationId, userId, userId, userId)
+    .bind(userId, organizationId, userId)
     .all<ChannelConversationNotificationRow>();
   return result.results;
 }

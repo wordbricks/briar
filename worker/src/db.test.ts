@@ -961,6 +961,13 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         "utf8",
       ),
     );
+    await executeSql(
+      db,
+      await readFile(
+        resolve("migrations/0108_channel_notification_inbox.sql"),
+        "utf8",
+      ),
+    );
   }, 30_000);
 
   afterAll(async () => {
@@ -4545,6 +4552,38 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     expect(notifications.map((notification) => notification.id)).not.toContain(
       "99999999-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
     );
+    await db.prepare(
+      `update briar_channel_messages
+       set body = 'Edited mention', updated_at = ?
+       where id = ?`,
+    ).bind(atMinute(30.6), mentionId).run();
+    await expect(
+      listChannelConversationNotifications(db, projectId, "owner"),
+    ).resolves.toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: mentionId, body: "Edited mention" }),
+    ]));
+    await expect(
+      db.prepare(
+        `select message_id, notification_reason
+         from briar_channel_notification_inbox
+         where user_id = 'owner'
+           and message_id in (?, ?, ?)
+         order by created_at, message_id`,
+      ).bind(
+        replyId,
+        mentionId,
+        "99999999-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      ).all(),
+    ).resolves.toMatchObject({
+      results: [
+        { message_id: replyId, notification_reason: "thread_reply" },
+        { message_id: mentionId, notification_reason: "mention" },
+        {
+          message_id: "99999999-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+          notification_reason: "mention",
+        },
+      ],
+    });
   });
 
   it("stores account-scoped inbox read versions for multi-device sync", async () => {
