@@ -55,7 +55,7 @@ describe("ChannelRealtimeHub", () => {
     expect(socket.sent).toHaveLength(1);
   });
 
-  it("tracks channel and project cursors independently", async () => {
+  it("tracks channel, project, and session cursors independently", async () => {
     const socket = new FakeSocket(42);
     const hub = new ChannelRealtimeHub(
       {
@@ -81,6 +81,26 @@ describe("ChannelRealtimeHub", () => {
       cursors: {
         channels: 42,
         "project:aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee": 3,
+      },
+    });
+
+    await hub.fetch(new Request("https://realtime.test/notify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        topic: "project-session",
+        projectId: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+        version: 8,
+      }),
+    }));
+    expect(socket.sent.at(-1)).toBe(
+      '{"topic":"project-session","projectId":"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee","version":8}',
+    );
+    expect(socket.attachment).toEqual({
+      cursors: {
+        channels: 42,
+        "project:aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee": 3,
+        "project-session:aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee": 8,
       },
     });
   });

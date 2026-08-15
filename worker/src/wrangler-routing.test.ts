@@ -17,6 +17,7 @@ describe("Cloudflare Worker routing", () => {
         "/issue-reply-claims*",
         "/agent-task-claims",
         "/agent-task-claims/*",
+        "/agent-schedule-runs/claim",
         "/queue*",
         "/run-events",
         "/github/*",

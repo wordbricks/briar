@@ -9,7 +9,7 @@ import {
   acceptIssueExecutionProposal,
   acceptIssueSkillExecutionProposal,
   beginDeviceAuthorization,
-  claimProjectAgentScheduleRun,
+  claimProjectAgentScheduleRuns,
   completeProjectAgentScheduleRun,
   completeIssueResultReview,
   createChannelWebhook,
@@ -2069,11 +2069,21 @@ describe("API errors", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(
-      claimProjectAgentScheduleRun(
+      claimProjectAgentScheduleRuns(
         "token",
-        "22222222-2222-4222-8222-222222222222",
+        ["22222222-2222-4222-8222-222222222222"],
       ),
     ).resolves.toMatchObject({ id: run.id, claimToken });
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      expect.stringContaining("/agent-schedule-runs/claim"),
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          projectIds: ["22222222-2222-4222-8222-222222222222"],
+        }),
+      }),
+    );
     await expect(
       completeProjectAgentScheduleRun(
         "token",

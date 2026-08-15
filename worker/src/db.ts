@@ -5991,6 +5991,57 @@ async function reclaimExpiredProjectAgentScheduleRun(
   return (await hydrateScheduleRunAgentSkills(db, [selected]))[0];
 }
 
+export async function listClaimableProjectAgentScheduleProjectIds(
+  db: D1Database,
+  userId: string,
+  projectIds: readonly string[],
+  observedAt: string,
+) {
+  const uniqueProjectIds = [...new Set(projectIds)].slice(0, 100);
+  if (uniqueProjectIds.length === 0) return [];
+  const placeholders = uniqueProjectIds.map(() => "?").join(", ");
+  const result = await db
+    .prepare(
+      `select project.id
+       from briar_projects project
+       join briar_organization_members membership
+         on membership.organization_id = project.organization_id
+        and membership.user_id = ?
+       where project.id in (${placeholders})
+         and (
+           exists (
+             select 1 from briar_project_agent_schedule_runs run
+             where run.project_id = project.id and run.status = 'running'
+               and run.lease_expires_at is not null
+               and run.lease_expires_at <= ?
+           )
+           or exists (
+             select 1 from briar_project_agent_schedules schedule
+             where schedule.project_id = project.id and schedule.enabled = 1
+               and (
+                 schedule.next_run_at is null or schedule.next_run_at <= ?
+               )
+               and not exists (
+                 select 1 from briar_project_agent_schedule_runs active
+                 where active.schedule_id = schedule.id
+                   and active.status = 'running'
+                   and active.lease_expires_at > ?
+               )
+           )
+         )
+       order by project.id`,
+    )
+    .bind(
+      userId,
+      ...uniqueProjectIds,
+      observedAt,
+      observedAt,
+      observedAt,
+    )
+    .all<{ id: string }>();
+  return result.results.map((row) => row.id);
+}
+
 export async function claimDueProjectAgentScheduleRun(
   db: D1Database,
   projectId: string,

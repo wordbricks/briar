@@ -11,6 +11,11 @@ export type OrganizationRealtimeNotification =
       topic: "project";
       projectId: string;
       cursor: number;
+    }
+  | {
+      topic: "project-session";
+      projectId: string;
+      version: number;
     };
 
 type OrganizationRealtimeSocketAttachment = {
@@ -54,10 +59,15 @@ export class ChannelRealtimeHub {
         : notification.topic === "inbox"
           ? Number.isSafeInteger(notification.version) &&
             notification.version >= 0
-          : notification.topic === "project" &&
-            /^[0-9a-f-]+$/iu.test(notification.projectId) &&
-            Number.isSafeInteger(notification.cursor) &&
-            notification.cursor >= 0;
+          : notification.topic === "project"
+            ? /^[0-9a-f-]+$/iu.test(notification.projectId) &&
+              Number.isSafeInteger(notification.cursor) &&
+              notification.cursor >= 0
+            : notification.topic === "project-session"
+              ? /^[0-9a-f-]+$/iu.test(notification.projectId) &&
+                Number.isSafeInteger(notification.version) &&
+                notification.version >= 0
+              : false;
       if (!valid) {
         return new Response("Invalid realtime notification", { status: 400 });
       }
@@ -76,6 +86,7 @@ export class ChannelRealtimeHub {
         cursors,
       } satisfies OrganizationRealtimeSocketAttachment,
     );
+    server.send(JSON.stringify({ topic: "ready" }));
     server.send(JSON.stringify({ topic: "channels", cursor: cursors.channels }));
     server.send(JSON.stringify({ topic: "inbox", version: cursors.inbox }));
     return new Response(null, {
@@ -90,10 +101,14 @@ export class ChannelRealtimeHub {
       ? "channels"
       : notification.topic === "inbox"
         ? "inbox"
-        : `project:${notification.projectId}`;
+        : notification.topic === "project"
+          ? `project:${notification.projectId}`
+          : `project-session:${notification.projectId}`;
     const nextVersion = notification.topic === "inbox"
       ? notification.version
-      : notification.cursor;
+      : notification.topic === "project-session"
+        ? notification.version
+        : notification.cursor;
     for (const client of this.state.getWebSockets()) {
       const attachment = client.deserializeAttachment() as
         | OrganizationRealtimeSocketAttachment
@@ -205,5 +220,28 @@ export async function publishProjectRealtime(
   });
   if (!response.ok) {
     throw new Error(`Project realtime notification failed (${response.status})`);
+  }
+}
+
+export async function publishProjectAgentSessionRealtime(
+  env: Env,
+  organizationId: string,
+  projectId: string,
+  version: number,
+) {
+  const hub = env.CHANNEL_REALTIME.getByName(organizationId);
+  const response = await hub.fetch("https://channel-realtime.internal/notify", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      topic: "project-session",
+      projectId,
+      version,
+    }),
+  });
+  if (!response.ok) {
+    throw new Error(
+      `Project Agent session realtime notification failed (${response.status})`,
+    );
   }
 }

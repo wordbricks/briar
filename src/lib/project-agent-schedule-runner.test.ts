@@ -124,20 +124,32 @@ describe("project agent schedule runner", () => {
     });
   });
 
-  it("isolates a project claim failure and continues to the next project", async () => {
+  it("claims all connected projects with one batched request", async () => {
     const current = dependencies({
-      claim: vi
-        .fn()
-        .mockRejectedValueOnce(new Error("offline"))
-        .mockResolvedValueOnce(run),
+      claim: vi.fn().mockResolvedValueOnce(run).mockResolvedValueOnce(null),
     });
 
     await pollProjectAgentSchedulesOnce(current, ["project-a", "project-b"]);
 
     expect(current.claim).toHaveBeenCalledTimes(2);
+    expect(current.claim).toHaveBeenNthCalledWith(
+      1,
+      ["project-a", "project-b"],
+    );
     expect(current.execute).toHaveBeenCalledWith(run);
+  });
+
+  it("stops the batch when claim fails", async () => {
+    const current = dependencies({
+      claim: vi.fn().mockRejectedValueOnce(new Error("offline")),
+    });
+
+    await pollProjectAgentSchedulesOnce(current, ["project-a", "project-b"]);
+
+    expect(current.claim).toHaveBeenCalledOnce();
+    expect(current.execute).not.toHaveBeenCalled();
     expect(current.log).toHaveBeenCalledWith(
-      "예약 실행 claim 실패 (project-a)",
+      "예약 실행 batch claim 실패",
       expect.any(Error),
     );
   });

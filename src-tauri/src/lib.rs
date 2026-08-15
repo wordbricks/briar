@@ -7907,7 +7907,7 @@ pub fn run() {
                 }
                 let schedule_poll_app = _app.handle().clone();
                 std::thread::spawn(move || loop {
-                    std::thread::sleep(std::time::Duration::from_secs(15));
+                    std::thread::sleep(std::time::Duration::from_secs(60));
                     let _ = schedule_poll_app.emit(PROJECT_AGENT_SCHEDULE_POLL_EVENT, ());
                 });
                 let resource_directory = _app.path().resource_dir()?;

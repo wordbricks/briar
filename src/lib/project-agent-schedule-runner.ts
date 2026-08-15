@@ -6,14 +6,14 @@ import type { ProjectLlmChatResponse } from "./project-llm";
 import type { StructuredAgentResult } from "./agent-result";
 import { isDesktopTauri } from "./platform";
 
-export const PROJECT_AGENT_SCHEDULE_POLL_INTERVAL_MS = 15_000;
+export const PROJECT_AGENT_SCHEDULE_POLL_INTERVAL_MS = 60_000;
 export const PROJECT_AGENT_SCHEDULE_RENEW_INTERVAL_MS = 5 * 60_000;
 export const PROJECT_AGENT_SCHEDULE_POLL_EVENT =
   "project-agent-schedule-poll";
 
 export type ProjectAgentScheduleRunnerDependencies = {
   claim: (
-    projectId: string,
+    projectIds: readonly string[],
   ) => Promise<ClaimedProjectAgentScheduleRun | null>;
   complete: (
     projectId: string,
@@ -108,15 +108,15 @@ export async function pollProjectAgentSchedulesOnce(
   dependencies: ProjectAgentScheduleRunnerDependencies,
   projectIds: readonly string[],
 ) {
-  for (const projectId of projectIds) {
+  for (let attempt = 0; attempt < projectIds.length; attempt += 1) {
     let run: ClaimedProjectAgentScheduleRun | null;
     try {
-      run = await dependencies.claim(projectId);
+      run = await dependencies.claim(projectIds);
     } catch (error) {
-      dependencies.log(`예약 실행 claim 실패 (${projectId})`, error);
-      continue;
+      dependencies.log("예약 실행 batch claim 실패", error);
+      return;
     }
-    if (!run) continue;
+    if (!run) return;
     try {
       await executeClaimedProjectAgentSchedule(dependencies, run);
     } catch (error) {
@@ -133,8 +133,9 @@ export function startProjectAgentSchedulePolling(
   let running = false;
   let stopped = false;
   let unlistenNativeTick: (() => void) | null = null;
-  const poll = async () => {
+  const poll = async (allowBackground = false) => {
     if (running || stopped) return;
+    if (!allowBackground && document.hidden) return;
     running = true;
     try {
       await pollProjectAgentSchedulesOnce(dependencies, projectIds);
@@ -142,16 +143,19 @@ export function startProjectAgentSchedulePolling(
       running = false;
     }
   };
-  void poll();
-  const timer = window.setInterval(() => void poll(), intervalMs);
+  void poll(true);
+  const desktop = isDesktopTauri();
+  const timer = desktop
+    ? null
+    : window.setInterval(() => void poll(), intervalMs);
   const pollAfterResume = () => void poll();
   window.addEventListener("focus", pollAfterResume);
   window.addEventListener("online", pollAfterResume);
   document.addEventListener("visibilitychange", pollAfterResume);
-  if (isDesktopTauri()) {
+  if (desktop) {
     void import("@tauri-apps/api/event")
       .then(({ listen }) =>
-        listen(PROJECT_AGENT_SCHEDULE_POLL_EVENT, pollAfterResume),
+        listen(PROJECT_AGENT_SCHEDULE_POLL_EVENT, () => void poll(true)),
       )
       .then((unlisten) => {
         if (stopped) {
@@ -166,7 +170,7 @@ export function startProjectAgentSchedulePolling(
   }
   return () => {
     stopped = true;
-    window.clearInterval(timer);
+    if (timer !== null) window.clearInterval(timer);
     window.removeEventListener("focus", pollAfterResume);
     window.removeEventListener("online", pollAfterResume);
     document.removeEventListener("visibilitychange", pollAfterResume);

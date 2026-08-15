@@ -1545,6 +1545,29 @@ export async function claimProjectAgentScheduleRun(
     : claimedProjectAgentScheduleRunSchema.parse(result.run);
 }
 
+export async function claimProjectAgentScheduleRuns(
+  token: string,
+  projectIds: readonly string[],
+): Promise<ClaimedProjectAgentScheduleRun | null> {
+  const uniqueProjectIds = [...new Set(projectIds)];
+  for (let offset = 0; offset < uniqueProjectIds.length; offset += 100) {
+    const result = await request<{ run: unknown }>(
+      "/agent-schedule-runs/claim",
+      token,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          projectIds: uniqueProjectIds.slice(offset, offset + 100),
+        }),
+      },
+    );
+    if (result.run !== null) {
+      return claimedProjectAgentScheduleRunSchema.parse(result.run);
+    }
+  }
+  return null;
+}
+
 export async function completeProjectAgentScheduleRun(
   token: string,
   projectId: string,

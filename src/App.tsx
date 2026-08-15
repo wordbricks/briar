@@ -402,7 +402,10 @@ export function App() {
   useEffect(() => {
     autoHunt.configureSync(
       briar.token,
-      briar.projects.map((project) => project.id),
+      briar.projects.map((project) => ({
+        id: project.id,
+        organizationId: project.organizationId,
+      })),
     );
   }, [autoHunt.configureSync, briar.projects, briar.token]);
   useEffect(() => {
