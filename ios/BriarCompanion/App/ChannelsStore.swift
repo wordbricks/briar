@@ -97,6 +97,14 @@ final class OrganizationRealtimeStore: ObservableObject {
 final class ChannelsStore: ObservableObject {
     static let messagePageSize = 20
 
+    private struct CachedChannelConversation {
+        let messages: [ChannelMessage]
+        let nextMessageCursor: UUID?
+        let members: [ChannelMember]
+        let agents: [ChannelAgentSummary]
+        let agentReplies: [ChannelAgentReply]
+    }
+
     struct FocusContext: Equatable, Sendable {
         let revision: Int
         let channelID: UUID
@@ -153,6 +161,7 @@ final class ChannelsStore: ObservableObject {
     private var focusedChannelID: UUID?
     private var focusedThreadParentID: UUID?
     private var nextMessageCursor: UUID?
+    private var cachedConversations: [UUID: CachedChannelConversation] = [:]
     private var generation = 0
     private var catalogLoadRevision = 0
     private var authoritativeLoadRevision = 0
@@ -218,6 +227,7 @@ final class ChannelsStore: ObservableObject {
         focusedChannelID = nil
         focusedThreadParentID = nil
         nextMessageCursor = nil
+        cachedConversations = [:]
         channels = []
         messages = []
         thread = []
@@ -286,7 +296,7 @@ final class ChannelsStore: ObservableObject {
 
     func openChannel(_ channelID: UUID) async {
         guard let organizationID, let token else { return }
-        let previousMessageIDs = Set(messages.map(\.id)).union(thread.map(\.id))
+        cacheFocusedConversation()
         if focusedChannelID != channelID || focusedThreadParentID != nil {
             invalidateProposalAcceptancePresentation()
         }
@@ -299,14 +309,19 @@ final class ChannelsStore: ObservableObject {
         startActivitySynchronization()
         conversationLoadInFlight = true
         updateLoadingState()
-        messages = []
-        nextMessageCursor = nil
-        hasEarlierMessages = false
+        let cachedConversation = cachedConversations[channelID]
+        messages = cachedConversation?.messages ?? []
+        nextMessageCursor = cachedConversation?.nextMessageCursor
+        hasEarlierMessages = cachedConversation?.nextMessageCursor != nil
         loadingEarlierMessages = false
         thread = []
-        members = []
-        agents = []
-        agentReplies = []
+        members = cachedConversation?.members ?? []
+        agents = cachedConversation?.agents ?? []
+        agentReplies = cachedConversation?.agentReplies ?? []
+        if let cachedConversation {
+            recordProposalMessages(cachedConversation.messages)
+        }
+        let previousMessageIDs = Set(messages.map(\.id)).union(thread.map(\.id))
         defer {
             if expectedGeneration == generation,
                expectedLoadRevision == authoritativeLoadRevision,
@@ -341,10 +356,11 @@ final class ChannelsStore: ObservableObject {
             recordProposalMessages(response.messages)
             messages = response.messages
             nextMessageCursor = response.nextCursor
-            hasEarlierMessages = response.nextCursor != nil
+            hasEarlierMessages = nextMessageCursor != nil
             members = response.members
             agents = response.agents
             agentReplies = response.agentReplies ?? []
+            cacheFocusedConversation()
             errorMessage = nil
         } catch {
             guard
@@ -363,6 +379,7 @@ final class ChannelsStore: ObservableObject {
     /// root focus here; the thread owns its own close lifecycle below.
     func closeChannelFocus(channelID: UUID) {
         guard focusedChannelID == channelID, focusedThreadParentID == nil else { return }
+        cacheFocusedConversation()
         authoritativeLoadRevision &+= 1
         invalidateProposalAcceptancePresentation()
         focusedChannelID = nil
@@ -1672,6 +1689,17 @@ final class ChannelsStore: ObservableObject {
         } else {
             channels.append(updated)
         }
+    }
+
+    private func cacheFocusedConversation() {
+        guard let focusedChannelID else { return }
+        cachedConversations[focusedChannelID] = CachedChannelConversation(
+            messages: messages,
+            nextMessageCursor: nextMessageCursor,
+            members: members,
+            agents: agents,
+            agentReplies: agentReplies
+        )
     }
 
     private func markChannelRead(_ channelID: UUID) async {

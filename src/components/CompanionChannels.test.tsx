@@ -5,6 +5,7 @@ import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { I18nProvider } from "../i18n";
 import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
+import type { CompanionChannelCache } from "./CompanionChannels";
 import type {
   ChannelAgentReply,
   ChannelAgentSummary,
@@ -168,6 +169,14 @@ const agent: ChannelAgentSummary = {
   createdAt: "2026-08-01T00:00:00.000Z",
 };
 
+const deferred = <T,>() => {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
+};
+
 describe("CompanionChannels", () => {
   let container: HTMLDivElement;
   let root: ReturnType<typeof createRoot>;
@@ -178,6 +187,7 @@ describe("CompanionChannels", () => {
     onRequestedMessageOpen?: () => void,
     onSkillSessionAccepted?: (session: AutoHuntSession) => void,
     channelInboxSyncSignal?: string,
+    channelCache?: CompanionChannelCache,
   ) => {
     await act(async () => {
       root.render(
@@ -192,6 +202,7 @@ describe("CompanionChannels", () => {
               { id: "project-2", name: "Sprout" },
             ]}
             token="token"
+            channelCache={channelCache}
             onIssueOpen={onIssueOpen}
             requestedMessage={requestedMessage}
             onRequestedMessageOpen={onRequestedMessageOpen}
@@ -318,6 +329,64 @@ describe("CompanionChannels", () => {
     );
     expect(container.textContent).toContain("Earlier message");
     expect(scroller.scrollTop).toBe(216);
+  });
+
+  it("shows a cached channel immediately after returning from another page", async () => {
+    const cache: CompanionChannelCache = new Map();
+    const summary = channel("c-common", "Welcome", null);
+    const cachedMessage = message("m-cached", "Cached immediately");
+    const refreshedMessage = message("m-cached", "Refreshed");
+    const refresh = deferred<{
+      channel: ChannelSummary;
+      members: ChannelMember[];
+      agents: ChannelAgentSummary[];
+      messages: ChannelMessage[];
+      nextCursor: null;
+    }>();
+    loadChannel
+      .mockResolvedValueOnce({
+        channel: summary,
+        members: [member],
+        agents: [agent],
+        messages: [cachedMessage],
+        nextCursor: null,
+      })
+      .mockReturnValueOnce(refresh.promise);
+    await render(undefined, undefined, undefined, undefined, undefined, cache);
+
+    const openWelcome = () => [
+      ...container.querySelectorAll<HTMLButtonElement>(
+        ".companion-channel-group button",
+      ),
+    ].find((button) => button.textContent?.includes("Welcome"));
+    await act(async () => {
+      openWelcome()?.click();
+      await Promise.resolve();
+    });
+    expect(container.textContent).toContain("Cached immediately");
+
+    act(() => root.unmount());
+    root = createRoot(container);
+    await render(undefined, undefined, undefined, undefined, undefined, cache);
+    await act(async () => {
+      openWelcome()?.click();
+      await Promise.resolve();
+    });
+
+    expect(container.textContent).toContain("Cached immediately");
+    expect(container.querySelector(".companion-channel-loading")).toBeNull();
+
+    refresh.resolve({
+      channel: summary,
+      members: [member],
+      agents: [agent],
+      messages: [refreshedMessage],
+      nextCursor: null,
+    });
+    await act(async () => {
+      await refresh.promise;
+    });
+    expect(container.textContent).toContain("Refreshed");
   });
 
   it("renders incoming webhook messages with a distinct author icon", async () => {

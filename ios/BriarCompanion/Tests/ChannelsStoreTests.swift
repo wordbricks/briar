@@ -158,6 +158,58 @@ final class ChannelsStoreTests: XCTestCase {
     }
 
     @MainActor
+    func testReopeningChannelShowsCachedMessagesWhileRefreshing() async throws {
+        let channel = summary(id: channelID, name: "Briar")
+        let cached = message(id: rootID, channelID: channelID, body: "Cached immediately")
+        let refreshed = message(id: rootID, channelID: channelID, body: "Refreshed")
+        let listPath = MobileAPIContract.Endpoint.channels(organizationID: organizationID)
+        let detailPath = MobileAPIContract.Endpoint.channel(
+            organizationID: organizationID,
+            channelID: channelID,
+            messageLimit: ChannelsStore.messagePageSize
+        )
+        let api = ChannelPollingAPI(
+            routes: [
+                listPath: [try encoded(ChannelsResponse(channels: [channel], cursor: 10))],
+                detailPath: [
+                    try encoded(ChannelDetailResponse(
+                        channel: channel,
+                        members: [],
+                        agents: [],
+                        messages: [cached]
+                    )),
+                    try encoded(ChannelDetailResponse(
+                        channel: channel,
+                        members: [],
+                        agents: [],
+                        messages: [refreshed]
+                    )),
+                ],
+            ],
+            requestDelays: [
+                detailPath: [.zero, .milliseconds(200)],
+            ]
+        )
+        let store = ChannelsStore(api: api, pollInterval: .seconds(3_600))
+
+        store.select(organizationID: organizationID, token: "token")
+        await waitForChannels(store, count: 1)
+        await store.openChannel(channelID)
+        store.closeChannelFocus(channelID: channelID)
+
+        let refresh = Task { await store.openChannel(channelID) }
+        await waitForRequests(api, path: detailPath, count: 2)
+
+        XCTAssertEqual(store.messages.first?.body, "Cached immediately")
+        XCTAssertTrue(store.loading)
+
+        await refresh.value
+        XCTAssertEqual(store.messages.first?.body, "Refreshed")
+        XCTAssertFalse(store.loading)
+        store.applicationDidEnterBackground()
+    }
+
+    @MainActor
     func testDeltaRefreshMergesOnlyTheFocusedChannelIntoRootsAndOpenThread() async throws {
         let channel = summary(id: channelID, name: "Briar")
         let root = message(id: rootID, channelID: channelID, body: "Question")

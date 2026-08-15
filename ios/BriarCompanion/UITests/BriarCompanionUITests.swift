@@ -137,6 +137,11 @@ final class BriarCompanionUITests: XCTestCase {
         let destination = app.coordinate(withNormalizedOffset: CGVector(dx: 0.75, dy: 0.5))
         edge.press(forDuration: 0.05, thenDragTo: destination)
         XCTAssertTrue(channel.waitForExistence(timeout: 5))
+
+        channel.tap()
+        let cachedMessage = app.staticTexts["상단 헤더 디자인을 함께 확인해 주세요."]
+        XCTAssertTrue(cachedMessage.waitForExistence(timeout: 5))
+        captureScreenshot(named: "companion-channel-reentry")
     }
 
     func testChannelWithHistoryShowsNewestMessageImmediately() {
