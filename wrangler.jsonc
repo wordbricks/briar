@@ -45,6 +45,7 @@
       "/issue-reply-claims*",
       "/agent-task-claims",
       "/agent-task-claims/*",
+      "/agent-schedule-runs/claim",
       "/channel-reply-claims*",
       "/queue*",
       "/run-events",

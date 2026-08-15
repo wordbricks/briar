@@ -9,7 +9,7 @@ import {
   addIssueDependency,
   beginDeviceAuthorization,
   cancelHuntRun,
-  claimProjectAgentScheduleRun,
+  claimProjectAgentScheduleRuns,
   completeProjectAgentScheduleRun,
   completeIssueResultReview as completeRemoteIssueResultReview,
   connectLinearImport,
@@ -662,7 +662,7 @@ export function useBriar(options: UseBriarOptions = {}) {
     if (projectIds.length === 0) return;
     return startProjectAgentSchedulePolling(
       {
-        claim: (projectId) => claimProjectAgentScheduleRun(token, projectId),
+        claim: (projectIds) => claimProjectAgentScheduleRuns(token, projectIds),
         complete: (projectId, runId, input) =>
           completeProjectAgentScheduleRun(token, projectId, runId, input),
         renew: (projectId, runId, claimToken) =>

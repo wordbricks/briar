@@ -261,6 +261,7 @@ import {
   listProjectAgentSessions,
   listProjectAgentSessionChanges,
   listProjectAgentSessionSummaries,
+  listClaimableProjectAgentScheduleProjectIds,
   listProjectAgentScheduleRuns,
   listProjectAgentSchedules,
   listSlackInstallations,
@@ -519,6 +520,7 @@ import {
   legacyChannelRealtimeResponse,
   publishChannelRealtime,
   publishInboxRealtime,
+  publishProjectAgentSessionRealtime,
   publishProjectRealtime,
   subscribeToOrganizationRealtime,
 } from "./channel-realtime";
@@ -832,6 +834,37 @@ function scheduleProjectRealtimePublish(
   scheduleInboxRealtimeFlush(env, db, context);
 }
 
+function scheduleProjectAgentSessionRealtimePublish(
+  env: Env,
+  db: D1Database,
+  projectId: string,
+  context?: ExecutionContext,
+) {
+  if (!env.CHANNEL_REALTIME) return;
+  const publish = Promise.all([
+    db.prepare(
+      `select organization_id from briar_projects where id = ?`,
+    ).bind(projectId).first<{ organization_id: string }>(),
+    getProjectAgentSessionSyncCursor(db, projectId),
+  ]).then(([project, version]) => {
+    if (!project) return;
+    return publishProjectAgentSessionRealtime(
+      env,
+      project.organization_id,
+      projectId,
+      version,
+    );
+  }).catch((error) => {
+    console.error(JSON.stringify({
+      message: "Project Agent session realtime publish failed",
+      projectId,
+      error: error instanceof Error ? error.message : String(error),
+    }));
+  });
+  if (context) context.waitUntil(publish);
+  else void publish;
+}
+
 function channelMutationOrganization(
   pathname: string,
   method: string,
@@ -843,12 +876,28 @@ function channelMutationOrganization(
   )?.[1] ?? null;
 }
 
-function projectMutationProject(
+export function projectScheduleClaimMutation(
+  pathname: string,
+  method: string,
+  status: number,
+) {
+  if (status >= 400 || method !== "POST") return false;
+  return pathname === "/agent-schedule-runs/claim" ||
+    /^\/projects\/[0-9a-f-]+\/agent-schedule-runs\/claim$/u.test(pathname);
+}
+
+export function projectMutationProject(
   pathname: string,
   method: string,
   status: number,
 ) {
   if (status >= 400 || method === "GET" || method === "HEAD") return null;
+  if (projectScheduleClaimMutation(pathname, method, status)) return null;
+  if (
+    /^\/projects\/[0-9a-f-]+\/agent-sessions\/[^/]+$/u.test(
+      pathname,
+    )
+  ) return null;
   return pathname.match(/^\/projects\/([0-9a-f-]+)(?:\/|$)/u)?.[1] ?? null;
 }
 const accountDeletionFreshAgeMs = 24 * 60 * 60 * 1_000;
@@ -1975,6 +2024,10 @@ export const inboxReadStatesInputSchema = z
       });
     }
   });
+
+export const projectAgentScheduleBatchClaimSchema = z.object({
+  projectIds: z.array(z.string().uuid()).min(1).max(100),
+}).strict();
 
 export const accountDeletionInputSchema = z
   .object({
@@ -9259,6 +9312,12 @@ async function route(
     if (!createdSession) {
       throw new HttpError(409, "Agent task session could not be created");
     }
+    scheduleProjectAgentSessionRealtimePublish(
+      env,
+      db,
+      project.id,
+      context,
+    );
     return json({ session: projectAgentSessionJson(createdSession) });
   }
   if (projectAgentSessionChangesMatch && request.method === "GET") {
@@ -9429,6 +9488,12 @@ async function route(
       updated_at: input.updatedAt,
     }, observedAt);
     if (!row) throw new HttpError(409, "Agent session could not be synchronized");
+    scheduleProjectAgentSessionRealtimePublish(
+      env,
+      db,
+      project.id,
+      context,
+    );
     return json({ session: projectAgentSessionJson(row) });
   }
   if (projectAgentsMatch && request.method === "GET") {
@@ -9564,6 +9629,36 @@ async function route(
     return json({ runs: runs.map((run) => projectAgentScheduleRunJson(run)) });
   }
 
+  if (pathname === "/agent-schedule-runs/claim" && request.method === "POST") {
+    const session = await requireSession(auth, request);
+    const input = projectAgentScheduleBatchClaimSchema.parse(
+      await readJson(request),
+    );
+    const observedAt = new Date().toISOString();
+    const projectIds = await listClaimableProjectAgentScheduleProjectIds(
+      db,
+      session.user.id,
+      input.projectIds,
+      observedAt,
+    );
+    for (const projectId of projectIds) {
+      const settings = await getProjectSettings(db, projectId);
+      const workflow = normalizeAutoHuntWorkflow(
+        settings?.workflow_json ? JSON.parse(settings.workflow_json) : null,
+      );
+      if (isRepositoryWorkflowPending(workflow)) continue;
+      const claimToken = `briar_schedule_claim_${crypto.randomUUID().replaceAll("-", "")}${crypto.randomUUID().replaceAll("-", "")}`;
+      const run = await claimDueProjectAgentScheduleRun(db, projectId, {
+        claimTokenHash: await sha256(claimToken),
+        observedAt,
+      });
+      if (!run) continue;
+      scheduleProjectRealtimePublish(env, db, projectId, context);
+      return json({ run: projectAgentScheduleRunJson(run, claimToken) });
+    }
+    return json({ run: null });
+  }
+
   const projectAgentScheduleRunsClaimMatch = pathname.match(
     /^\/projects\/([0-9a-f-]+)\/agent-schedule-runs\/claim$/u,
   );
@@ -9588,6 +9683,7 @@ async function route(
       claimTokenHash: await sha256(claimToken),
       observedAt,
     });
+    if (run) scheduleProjectRealtimePublish(env, db, project.id, context);
     return json({
       run: run ? projectAgentScheduleRunJson(run, claimToken) : null,
     });
@@ -14036,9 +14132,21 @@ async function route(
       error: "Worker lease expired after repeated attempts.",
     });
     await Promise.all(
-      reaped.filter((job) => !job.skill_execution_proposal_id).map((job) =>
-        syncProjectAgentTaskSession(db, job, { error: job.error }),
-      ),
+      reaped.filter((job) => !job.skill_execution_proposal_id).map(async (job) => {
+        const session = await syncProjectAgentTaskSession(
+          db,
+          job,
+          { error: job.error },
+        );
+        if (session) {
+          scheduleProjectAgentSessionRealtimePublish(
+            env,
+            db,
+            job.project_id,
+            context,
+          );
+        }
+      }),
     );
     const claimToken = `briar_agent_task_claim_${crypto.randomUUID().replaceAll("-", "")}${crypto.randomUUID().replaceAll("-", "")}`;
     const job = await claimNextProjectAgentTask(db, input.projectId, {
@@ -14140,6 +14248,7 @@ async function route(
       projectAgentTaskClaimMatch[1],
     );
     let session = hotSession ? projectAgentSessionJson(hotSession) : null;
+    let sessionChanged = false;
     if (
       completed && !completed.skill_execution_proposal_id &&
       hotSession &&
@@ -14154,6 +14263,15 @@ async function route(
           completed.result_conversation_id ?? input.conversationId ?? null,
         error: completed.error ?? input.error ?? null,
       });
+      sessionChanged = session !== null;
+    }
+    if (sessionChanged) {
+      scheduleProjectAgentSessionRealtimePublish(
+        env,
+        db,
+        input.projectId,
+        context,
+      );
     }
     if (!session) {
       const archived = await getArchivedProjectAgentSession(
@@ -15204,9 +15322,15 @@ export default {
       if (projectId) {
         scheduleProjectRealtimePublish(env, env.DB, projectId, ctx);
       }
+      const projectScheduleClaimHandled = projectScheduleClaimMutation(
+        url.pathname,
+        request.method,
+        response.status,
+      );
       if (
         !organizationId &&
         !projectId &&
+        !projectScheduleClaimHandled &&
         request.method !== "GET" &&
         request.method !== "HEAD"
       ) {

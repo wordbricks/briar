@@ -144,6 +144,43 @@ describe("WebSocketRealtimeTransport", () => {
     transport.stop();
   });
 
+  it("emits ready and project session revision notifications", async () => {
+    const socket = new FakeWebSocket();
+    const transport = new WebSocketRealtimeTransport({
+      url: "https://api.test/channel-events",
+      token: "secret-token",
+      fetch: async () => Response.json({
+        url: "wss://api.test/channel-events?ticket=signed",
+        expiresAt: "2026-08-12T00:00:00.000Z",
+      }),
+      createWebSocket: () => socket as unknown as WebSocket,
+    });
+    const notifications: RealtimeNotification[] = [];
+    transport.subscribe((notification) => notifications.push(notification));
+
+    transport.start();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    socket.emit("open", new Event("open"));
+    socket.emit("message", { data: '{"topic":"ready"}' } as MessageEvent);
+    socket.emit("message", {
+      data: JSON.stringify({
+        topic: "project-session",
+        projectId: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+        version: 11,
+      }),
+    } as MessageEvent);
+
+    expect(notifications).toEqual([
+      { topic: "ready" },
+      {
+        topic: "project-session",
+        projectId: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+        version: 11,
+      },
+    ]);
+    transport.stop();
+  });
+
   it("emits Inbox version notifications over the shared socket", async () => {
     const socket = new FakeWebSocket();
     const transport = new WebSocketRealtimeTransport({

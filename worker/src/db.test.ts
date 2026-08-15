@@ -86,6 +86,7 @@ import {
   listProjectAgents,
   listProjectAgentSessionSummaries,
   listProjectAgentSessions,
+  listClaimableProjectAgentScheduleProjectIds,
   listProjectAgentScheduleRuns,
   listProjectAgentSchedules,
   listProjectUsageTotals,
@@ -2373,6 +2374,15 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       .bind(schedule!.id)
       .run();
 
+    await expect(
+      listClaimableProjectAgentScheduleProjectIds(
+        db,
+        "owner",
+        [projectId, "22222222-2222-4222-8222-222222222222"],
+        "2026-07-27T09:00:10.000Z",
+      ),
+    ).resolves.toEqual([projectId]);
+
     const claimed = await claimDueProjectAgentScheduleRun(db, projectId, {
       claimTokenHash: "a".repeat(64),
       observedAt: "2026-07-27T09:00:10.000Z",
@@ -2405,6 +2415,14 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         observedAt: "2026-07-27T09:00:10.000Z",
       }),
     ).resolves.toBeNull();
+    await expect(
+      listClaimableProjectAgentScheduleProjectIds(
+        db,
+        "owner",
+        [projectId],
+        "2026-07-27T09:00:10.000Z",
+      ),
+    ).resolves.toEqual([]);
     await expect(
       deleteProjectAgentSchedule(db, projectId, schedule!.id),
     ).resolves.toBe("running");

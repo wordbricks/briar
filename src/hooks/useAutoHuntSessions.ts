@@ -13,10 +13,14 @@ import {
   upsertProjectAgentSession,
   type ProjectAgentSessionSyncState,
 } from "../lib/api";
-import { DASHBOARD_POLL_INTERVAL_MS } from "../lib/dashboard-polling";
+import {
+  startProjectRealtimeRefresh,
+  type ProjectRealtimeTarget,
+} from "../lib/project-realtime-refresh";
 import type { HuntRun, ProjectAgent } from "../types";
 
 const storageKey = "briar.auto-hunt-sessions.v1";
+const PROJECT_SESSION_REALTIME_FALLBACK_MS = 5 * 60_000;
 
 export type AutoHuntSessionStatus =
   | "running"
@@ -337,7 +341,7 @@ export function useAutoHuntSessions(
   const sessionsRef = useRef(sessions);
   const [syncContext, setSyncContext] = useState<{
     token: string;
-    projectIds: string[];
+    targets: ProjectRealtimeTarget[];
   } | null>(null);
   const [synchronizedProjects, setSynchronizedProjects] = useState<Set<string>>(
     () => new Set(),
@@ -358,21 +362,28 @@ export function useAutoHuntSessions(
 
   const configureSync = useCallback((
     token: string | null,
-    projectIds: readonly string[],
+    targets: readonly ProjectRealtimeTarget[],
   ) => {
-    const normalizedProjectIds = [...new Set(projectIds)].sort();
+    const normalizedTargets = [...new Map(
+      targets.map((target) => [target.id, {
+        id: target.id,
+        organizationId: target.organizationId ?? null,
+      }]),
+    ).values()].sort((left, right) => left.id.localeCompare(right.id));
     setSyncContext((current) => {
       if (!token) return current === null ? current : null;
       if (
         current?.token === token &&
-        current.projectIds.length === normalizedProjectIds.length &&
-        current.projectIds.every(
-          (projectId, index) => projectId === normalizedProjectIds[index],
+        current.targets.length === normalizedTargets.length &&
+        current.targets.every(
+          (target, index) =>
+            target.id === normalizedTargets[index]?.id &&
+            target.organizationId === normalizedTargets[index]?.organizationId,
         )
       ) {
         return current;
       }
-      return { token, projectIds: normalizedProjectIds };
+      return { token, targets: normalizedTargets };
     });
   }, []);
 
@@ -380,13 +391,17 @@ export function useAutoHuntSessions(
     uploadedVersionsRef.current.clear();
     syncStatesRef.current.clear();
     setSynchronizedProjects(new Set());
-    if (!syncContext || syncContext.projectIds.length === 0) return;
+    if (!syncContext || syncContext.targets.length === 0) return;
     let active = true;
+    let refreshing = false;
+    const pendingProjectIds = new Set<string>();
+    const knownProjectIds = new Set(
+      syncContext.targets.map((target) => target.id),
+    );
 
-    let timer: number | null = null;
-    const refreshRemoteSessions = async () => {
+    const refreshRemoteSessions = async (projectIds: readonly string[]) => {
       const loaded = await Promise.allSettled(
-        syncContext.projectIds.map(async (projectId) => {
+        projectIds.map(async (projectId) => {
           let state = syncStatesRef.current.get(projectId) ?? null;
           const sessions: AutoHuntSession[] = [];
           const deletedSessionIds = new Set<string>();
@@ -439,19 +454,39 @@ export function useAutoHuntSessions(
         }
         return next;
       });
-      setSynchronizedProjects(successfulProjectIds);
-      if (active) {
-        timer = window.setTimeout(
-          () => void refreshRemoteSessions(),
-          DASHBOARD_POLL_INTERVAL_MS,
-        );
-      }
+      setSynchronizedProjects((current) =>
+        new Set([...current, ...successfulProjectIds])
+      );
     };
 
-    void refreshRemoteSessions();
+    const drainRefreshes = async () => {
+      if (refreshing || !active) return;
+      refreshing = true;
+      try {
+        while (active && pendingProjectIds.size > 0) {
+          const projectIds = [...pendingProjectIds];
+          pendingProjectIds.clear();
+          await refreshRemoteSessions(projectIds);
+        }
+      } finally {
+        refreshing = false;
+      }
+    };
+    const requestRefresh = (projectIds: readonly string[]) => {
+      for (const projectId of projectIds) {
+        if (knownProjectIds.has(projectId)) pendingProjectIds.add(projectId);
+      }
+      void drainRefreshes();
+    };
+    const stopRealtimeRefresh = startProjectRealtimeRefresh({
+      token: syncContext.token,
+      targets: syncContext.targets,
+      refresh: requestRefresh,
+      fallbackMs: PROJECT_SESSION_REALTIME_FALLBACK_MS,
+    });
     return () => {
       active = false;
-      if (timer !== null) window.clearTimeout(timer);
+      stopRealtimeRefresh();
     };
   }, [syncContext]);
 

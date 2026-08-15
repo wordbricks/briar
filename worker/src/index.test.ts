@@ -30,7 +30,10 @@ import worker, {
   projectAgentSessionInputSchema,
   projectAgentInputSchema,
   projectAgentScheduleInputSchema,
+  projectAgentScheduleBatchClaimSchema,
   projectAgentScheduleRunCompletionSchema,
+  projectMutationProject,
+  projectScheduleClaimMutation,
   readChannelReplyCompleteRequest,
   readIssueRequest,
   readRunEvidenceRequest,
@@ -1794,6 +1797,31 @@ describe("Worker HTTP contract", () => {
         error: null,
       }),
     ).toThrow(/resultSummary must match structuredResult.summary/u);
+  });
+
+  it("publishes schedule claims only when the route handles a real claim", () => {
+    const projectId = "22222222-2222-4222-8222-222222222222";
+    const pathname = `/projects/${projectId}/agent-schedule-runs/claim`;
+    expect(projectScheduleClaimMutation(pathname, "POST", 200)).toBe(true);
+    expect(projectMutationProject(pathname, "POST", 200)).toBeNull();
+    expect(projectScheduleClaimMutation(
+      "/agent-schedule-runs/claim",
+      "POST",
+      200,
+    )).toBe(true);
+    expect(projectMutationProject(
+      `/projects/${projectId}/agent-schedules`,
+      "POST",
+      201,
+    )).toBe(projectId);
+    expect(projectMutationProject(
+      `/projects/${projectId}/agent-sessions/session-1`,
+      "PUT",
+      200,
+    )).toBeNull();
+    expect(projectAgentScheduleBatchClaimSchema.parse({
+      projectIds: [projectId, projectId],
+    })).toEqual({ projectIds: [projectId, projectId] });
   });
 
   it("renders mobile Companion authorization and returns to the app", async () => {
