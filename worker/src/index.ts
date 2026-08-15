@@ -6036,7 +6036,12 @@ const issueConversationNotificationJson = (
   runTitle: notification.run_title,
   rootMessageId: notification.root_message_id,
   body: notification.body,
-  author: issueMessageJson(notification).author,
+  author: {
+    ...issueMessageJson(notification).author,
+    image: notification.author_agent_provider
+      ? notification.author_agent_image
+      : notification.author_image,
+  },
   reason: notification.notification_reason,
   createdAt: notification.created_at,
 });

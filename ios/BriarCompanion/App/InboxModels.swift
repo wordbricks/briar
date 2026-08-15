@@ -188,7 +188,7 @@ struct InboxFeedMessage: Codable, Equatable, Sendable {
             channelMessageId: kind == .channel ? messageId : nil,
             channelName: channelName,
             issueKey: issueKey,
-            authorImage: kind == .channel ? authorImage : nil
+            authorImage: kind == .conversation || kind == .channel ? authorImage : nil
         )
     }
 }
@@ -270,7 +270,8 @@ enum InboxMessageBuilder {
                     reason: notification.reason,
                     rootMessageId: notification.rootMessageId,
                     conversationMessageId: notification.id,
-                    issueKey: issueKey
+                    issueKey: issueKey,
+                    authorImage: notification.author.image
                 ))
             }
 
