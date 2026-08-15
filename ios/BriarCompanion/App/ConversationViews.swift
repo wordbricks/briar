@@ -345,6 +345,9 @@ struct ConversationComposer: View {
     @State private var selectedPhotos: [PhotosPickerItem] = []
     @State private var isLoadingPhotos = false
     @State private var attachmentError: String?
+    // Agent names can contain spaces, so completed text can still parse as a query.
+    // Keep selection dismissal explicit until the author edits the draft again.
+    @State private var mentionSuggestionsDismissed = false
 
     let sending: Bool
     let candidates: [ChannelMentionTarget]
@@ -369,9 +372,20 @@ struct ConversationComposer: View {
         sending || submission.isSubmitting
     }
 
+    private var editableDraft: Binding<String> {
+        Binding(
+            get: { draft },
+            set: { body in
+                draft = body
+                mentionSuggestionsDismissed = false
+                mentions = ChannelMentions.retained(in: body, mentions: mentions)
+            }
+        )
+    }
+
     var body: some View {
         VStack(spacing: 0) {
-            if !suggestions.isEmpty {
+            if !mentionSuggestionsDismissed && !suggestions.isEmpty {
                 suggestionList
             }
             if let replyLabel {
@@ -415,16 +429,13 @@ struct ConversationComposer: View {
             }
             HStack(spacing: 8) {
                 attachmentControl
-                TextField(placeholder, text: $draft, axis: .vertical)
+                TextField(placeholder, text: editableDraft, axis: .vertical)
                     .textFieldStyle(.plain)
                     .font(.body)
                     .lineLimit(1...4)
                     .padding(.vertical, 10)
                     .disabled(isSending)
                     .accessibilityIdentifier(accessibility.field)
-                    .onChange(of: draft) { _, body in
-                        mentions = ChannelMentions.retained(in: body, mentions: mentions)
-                    }
                 if canSend || isSending {
                     Button {
                         submission.submit(
@@ -480,6 +491,7 @@ struct ConversationComposer: View {
                 ForEach(suggestions) { target in
                     Button {
                         draft = ChannelMentions.insert(target, into: draft)
+                        mentionSuggestionsDismissed = true
                         if !mentions.contains(where: { $0.id == target.id }) {
                             mentions.append(target)
                         }

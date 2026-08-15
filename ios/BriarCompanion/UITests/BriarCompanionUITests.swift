@@ -198,6 +198,37 @@ final class BriarCompanionUITests: XCTestCase {
         captureScreenshot(named: "companion-channel-composer")
     }
 
+    func testChannelMentionPickerDismissesAfterAgentSelection() {
+        let app = launchInsideCompanion()
+
+        app.tabBars.buttons["홈"].tap()
+        let channel = app.buttons[
+            "channel-row-cccccccc-cccc-4ccc-8ccc-cccccccccccc"
+        ]
+        XCTAssertTrue(channel.waitForExistence(timeout: 5))
+        channel.tap()
+
+        let field = app.textFields["channel-composer-field"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        field.tap()
+        field.typeText("@")
+
+        let menu = app.descendants(matching: .any)["channel-mention-menu"]
+        XCTAssertTrue(menu.waitForExistence(timeout: 5))
+        let agent = app.buttons[
+            "channel-mention-agent:AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA"
+        ]
+        XCTAssertTrue(agent.waitForExistence(timeout: 5))
+        agent.tap()
+
+        XCTAssertTrue(
+            menu.waitForNonExistence(timeout: 5),
+            "Agent를 선택하면 멘션 자동완성 메뉴가 즉시 닫혀야 합니다."
+        )
+        XCTAssertEqual(field.value as? String, "@Issue processing agent ")
+        captureScreenshot(named: "companion-channel-mention-selected")
+    }
+
     func testChannelThreadUsesReplyConversationWithoutNestedThreadSummaries() {
         let app = launchInsideCompanion()
 

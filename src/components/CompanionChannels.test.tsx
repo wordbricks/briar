@@ -2030,6 +2030,10 @@ describe("CompanionChannels", () => {
       mentionAgent.avatar,
     );
     await act(async () => honey!.click());
+    expect(input.getAttribute("aria-expanded")).toBe("false");
+    expect(
+      container.querySelector(".companion-channel-mention-menu"),
+    ).toBeNull();
     const composerMention = container.querySelector<HTMLButtonElement>(
       ".companion-channel-composer-field .conversation-mention-button[data-mention-handle='Honey']",
     );
