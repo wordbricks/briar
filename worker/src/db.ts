@@ -929,6 +929,7 @@ export type FreshBacklogExecutionTargetRow = {
 };
 
 export type IssueConversationNotificationRow = IssueMessageRow & {
+  author_agent_image: string | null;
   run_title: string;
   root_message_id: string;
   notification_reason: "mention" | "thread_reply" | "subscription";
@@ -9246,6 +9247,7 @@ export async function listIssueConversationNotifications(
       `select message.id, message.run_id, message.parent_message_id,
               message.author_user_id, message.author_agent_provider,
               author.name as author_name, author.image as author_image,
+              agent.avatar as author_agent_image,
               message.body, 0 as reply_count, message.created_at,
               message.updated_at, run.title as run_title,
               coalesce(message.parent_message_id, message.id) as root_message_id,
@@ -9261,6 +9263,8 @@ export async function listIssueConversationNotifications(
        join briar_issue_subscriptions subscription
          on subscription.run_id = run.id and subscription.user_id = ?
        left join "user" author on author.id = message.author_user_id
+       left join briar_project_agents agent
+         on agent.id = run.agent_id and agent.project_id = run.project_id
        left join briar_issue_messages root
          on root.id = message.parent_message_id
         and root.project_id = message.project_id

@@ -95,6 +95,8 @@ export type InboxConversationMessage = {
   version: string;
   body: string;
   authorName: string;
+  /** Sender photo URL or data URL. Absent on older stored messages. */
+  authorImage?: string | null;
   /** Human-readable project issue key used by reply notifications. */
   issueKey?: string;
   reason: "mention" | "thread_reply" | "subscription";
@@ -255,6 +257,7 @@ export function buildCurrentInboxMessages(
         version: notification.id,
         body: notification.body,
         authorName: notification.author.name,
+        authorImage: notification.author.image,
         ...(runNumber
           ? {
               issueKey: `${issueKeyPrefix}-${runNumber}`,
@@ -407,6 +410,7 @@ function inboxMessageSnapshotsEqual(
         message.rootMessageId === candidate.rootMessageId &&
         message.body === candidate.body &&
         message.authorName === candidate.authorName &&
+        (message.authorImage ?? null) === (candidate.authorImage ?? null) &&
         message.issueKey === candidate.issueKey &&
         message.reason === candidate.reason;
     }
@@ -429,7 +433,10 @@ function keepStoredInboxFeedMessage(
   incoming: InboxMessage,
 ): InboxMessage {
   if (stored?.version !== incoming.version) return incoming;
-  if (stored.kind === "channel" && incoming.kind === "channel") {
+  if (
+    (stored.kind === "conversation" && incoming.kind === "conversation") ||
+    (stored.kind === "channel" && incoming.kind === "channel")
+  ) {
     return {
       ...stored,
       authorImage: stored.authorImage ?? incoming.authorImage ?? null,

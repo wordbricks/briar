@@ -240,6 +240,7 @@ const mobileInboxConversationMessageSchema = mobileInboxMessageBaseSchema.extend
   rootMessageId: z.uuid(),
   body: z.string(),
   authorName: z.string(),
+  authorImage: z.string().nullable().optional(),
   issueKey: z.string().optional(),
   reason: z.enum(["mention", "thread_reply", "subscription"]),
 });

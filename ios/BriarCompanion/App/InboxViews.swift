@@ -103,7 +103,7 @@ struct InboxHomeView: View {
         let category = InboxMessageBuilder.classify(message)
 
         Group {
-            if message.kind == .channel {
+            if message.kind == .conversation || message.kind == .channel {
                 ProfileImageView(
                     image: message.authorImage,
                     name: message.authorName,
