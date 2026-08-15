@@ -53,6 +53,203 @@ export const channelTopicSchema = z.string().trim().max(500);
 export const channelMessageBodySchema = z.string().trim().min(1).max(10_000);
 export const channelWebhookNameSchema = z.string().trim().min(1).max(100);
 
+const channelBlockIdSchema = z.string().min(1).max(255).optional();
+const channelBlockTextValueSchema = z
+  .string()
+  .min(1)
+  .max(12_000)
+  .refine((value) => value.trim().length > 0, "Text must not be blank");
+
+const channelPlainTextObjectSchema = z
+  .object({
+    type: z.literal("plain_text"),
+    text: channelBlockTextValueSchema,
+    emoji: z.boolean().optional(),
+  })
+  .strict();
+
+const channelMarkdownTextObjectSchema = z
+  .object({
+    type: z.literal("mrkdwn"),
+    text: channelBlockTextValueSchema,
+    verbatim: z.boolean().optional(),
+  })
+  .strict();
+
+export const channelBlockTextObjectSchema = z.discriminatedUnion("type", [
+  channelPlainTextObjectSchema,
+  channelMarkdownTextObjectSchema,
+]);
+export type ChannelBlockTextObject = z.infer<
+  typeof channelBlockTextObjectSchema
+>;
+
+const channelRichTextStyleSchema = z
+  .object({
+    bold: z.boolean().optional(),
+    italic: z.boolean().optional(),
+    strike: z.boolean().optional(),
+    code: z.boolean().optional(),
+  })
+  .strict();
+
+const channelRichTextInlineSchema = z.discriminatedUnion("type", [
+  z
+    .object({
+      type: z.literal("text"),
+      text: channelBlockTextValueSchema,
+      style: channelRichTextStyleSchema.optional(),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("link"),
+      url: z
+        .string()
+        .max(2_048)
+        .refine((value) => {
+          try {
+            return ["http:", "https:", "mailto:"].includes(new URL(value).protocol);
+          } catch {
+            return false;
+          }
+        }, "Link URL must use http, https, or mailto"),
+      text: z.string().min(1).max(3_000).optional(),
+      style: channelRichTextStyleSchema.optional(),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("emoji"),
+      name: z.string().trim().min(1).max(100),
+    })
+    .strict(),
+]);
+
+const channelRichTextSectionSchema = z
+  .object({
+    type: z.literal("rich_text_section"),
+    elements: z.array(channelRichTextInlineSchema).min(1).max(100),
+  })
+  .strict();
+
+const channelRichTextElementSchema = z.discriminatedUnion("type", [
+  channelRichTextSectionSchema,
+  z
+    .object({
+      type: z.literal("rich_text_list"),
+      style: z.enum(["bullet", "ordered"]),
+      indent: z.number().int().min(0).max(8).optional(),
+      offset: z.number().int().min(0).max(10_000).optional(),
+      elements: z.array(channelRichTextSectionSchema).min(1).max(50),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("rich_text_quote"),
+      elements: z.array(channelRichTextInlineSchema).min(1).max(100),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("rich_text_preformatted"),
+      elements: z.array(channelRichTextInlineSchema).min(1).max(100),
+    })
+    .strict(),
+]);
+
+export const channelMessageBlockSchema = z.discriminatedUnion("type", [
+  z
+    .object({
+      type: z.literal("header"),
+      text: channelPlainTextObjectSchema.refine(
+        ({ text }) => text.length <= 150,
+        "Header text must contain at most 150 characters",
+      ),
+      block_id: channelBlockIdSchema,
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("section"),
+      text: channelBlockTextObjectSchema.refine(
+        ({ text }) => text.length <= 3_000,
+        "Section text must contain at most 3000 characters",
+      ),
+      block_id: channelBlockIdSchema,
+      expand: z.boolean().optional(),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("markdown"),
+      text: channelBlockTextValueSchema,
+      block_id: channelBlockIdSchema,
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("divider"),
+      block_id: channelBlockIdSchema,
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("context"),
+      elements: z.array(channelBlockTextObjectSchema).min(1).max(10),
+      block_id: channelBlockIdSchema,
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("rich_text"),
+      elements: z.array(channelRichTextElementSchema).min(1).max(50),
+      block_id: channelBlockIdSchema,
+    })
+    .strict(),
+]);
+export type ChannelMessageBlock = z.infer<typeof channelMessageBlockSchema>;
+
+const richTextInlineFallback = (
+  elements: Array<z.infer<typeof channelRichTextInlineSchema>>,
+) => elements.map((element) => {
+  if (element.type === "text") return element.text;
+  if (element.type === "link") return element.text ?? element.url;
+  return `:${element.name}:`;
+}).join("");
+
+/** Builds the durable plain-text body used by search, alerts, and old clients. */
+export function channelMessageBlocksFallback(blocks: ChannelMessageBlock[]) {
+  return blocks.map((block) => {
+    switch (block.type) {
+      case "header":
+      case "section":
+        return block.text.text;
+      case "markdown":
+        return block.text;
+      case "divider":
+        return "";
+      case "context":
+        return block.elements.map((element) => element.text).join(" ");
+      case "rich_text":
+        return block.elements.map((element) => {
+          if (element.type === "rich_text_section") {
+            return richTextInlineFallback(element.elements);
+          }
+          if (element.type === "rich_text_list") {
+            return element.elements.map((section, index) => {
+              const marker = element.style === "ordered"
+                ? `${(element.offset ?? 0) + index + 1}.`
+                : "•";
+              return `${marker} ${richTextInlineFallback(section.elements)}`;
+            }).join("\n");
+          }
+          return richTextInlineFallback(element.elements);
+        }).join("\n");
+    }
+  }).filter(Boolean).join("\n").trim().slice(0, 10_000);
+}
+
 export const channelAgentSkillInputSchema = z
   .object({
     id: z.string().uuid().optional(),
@@ -133,10 +330,41 @@ export const channelWebhookInputSchema = z
 
 export const channelIncomingWebhookMessageSchema = z
   .object({
-    text: channelMessageBodySchema,
+    text: channelMessageBodySchema.optional(),
+    blocks: z.array(channelMessageBlockSchema).min(1).max(50).optional(),
     eventId: z.string().trim().min(1).max(200).optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((input, context) => {
+    if (!input.text && !input.blocks) {
+      context.addIssue({
+        code: "custom",
+        message: "Either text or blocks is required",
+        path: ["text"],
+      });
+      return;
+    }
+    if (!input.text && input.blocks && !channelMessageBlocksFallback(input.blocks)) {
+      context.addIssue({
+        code: "custom",
+        message: "Blocks must contain visible text when text is omitted",
+        path: ["blocks"],
+      });
+    }
+    if (input.blocks) {
+      const markdownLength = input.blocks.reduce(
+        (total, block) => total + (block.type === "markdown" ? block.text.length : 0),
+        0,
+      );
+      if (markdownLength > 12_000) {
+        context.addIssue({
+          code: "custom",
+          message: "Markdown blocks may contain at most 12000 characters in total",
+          path: ["blocks"],
+        });
+      }
+    }
+  });
 
 export const organizationAgentInputSchema = z
   .object({
@@ -346,6 +574,8 @@ export type ChannelMessage = {
   parentMessageId: string | null;
   author: ChannelMessageAuthor;
   body: string;
+  /** Slack-compatible presentation blocks; absent on older API responses. */
+  blocks?: ChannelMessageBlock[] | null;
   mentionedUserIds: string[];
   mentionedAgentIds: string[];
   attachments: ChannelMessageAttachment[];

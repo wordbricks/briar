@@ -570,6 +570,7 @@ import {
   channelMessageInputSchema,
   channelMessageReactionInputSchema,
   channelIncomingWebhookMessageSchema,
+  channelMessageBlocksFallback,
   channelProposalAcceptInputSchema,
   channelReplyClaimTokenHeader,
   channelReplyClaimInputSchema,
@@ -15096,7 +15097,8 @@ async function handleIncomingChannelWebhook(
     channelId: webhook.channel_id,
     webhookName: webhook.name,
     eventId,
-    body: input.text,
+    body: input.text ?? channelMessageBlocksFallback(input.blocks ?? []),
+    blocks: input.blocks ?? null,
     createdAt: observedAt.toISOString(),
   });
   if (!result?.message) throw new HttpError(500, "Message was not created");

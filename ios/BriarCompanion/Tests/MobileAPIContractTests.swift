@@ -423,6 +423,43 @@ final class MobileAPIContractTests: XCTestCase {
         )
     }
 
+    func testChannelWebhookBlocksDecodeCoreSlackFormatting() throws {
+        let blocks = try JSONDecoder.mobileContract.decode(
+            [ChannelMessageBlock].self,
+            from: Data(
+                #"""
+                [
+                  {"type":"header","text":{"type":"plain_text","text":"Deploy complete"}},
+                  {"type":"section","text":{"type":"mrkdwn","text":"*Production* is healthy."}},
+                  {"type":"divider"},
+                  {"type":"markdown","text":"- [x] Health checks"},
+                  {
+                    "type":"rich_text",
+                    "elements":[{
+                      "type":"rich_text_list",
+                      "style":"bullet",
+                      "elements":[{
+                        "type":"rich_text_section",
+                        "elements":[{
+                          "type":"text",
+                          "text":"Monitor metrics",
+                          "style":{"bold":true}
+                        }]
+                      }]
+                    }]
+                  }
+                ]
+                """#.utf8
+            )
+        )
+
+        XCTAssertEqual(blocks.map(\.type), [.header, .section, .divider, .markdown, .richText])
+        XCTAssertEqual(blocks[1].textObject?.type, .markdown)
+        XCTAssertEqual(blocks[3].markdownText, "- [x] Health checks")
+        XCTAssertEqual(blocks[4].richTextElements?.first?.sections?.first?.elements.first?.text, "Monitor metrics")
+        XCTAssertEqual(blocks[4].richTextElements?.first?.sections?.first?.elements.first?.style?.bold, true)
+    }
+
     func testCreateAcceptanceExecutionProposalIsOptionalForOlderServers() throws {
         let channelResponses = [
             #"{"outcome":"accepted","projectId":"11111111-1111-4111-8111-111111111111","resultRunId":"33333333-3333-4333-8333-333333333333"}"#,
