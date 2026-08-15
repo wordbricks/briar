@@ -149,6 +149,36 @@ async function createPreWebhookChannelMessage(
 }
 
 describe("D1 migrations", () => {
+  it("indexes GitHub reconcile candidates in reconciliation order", async () => {
+    const miniflare = new Miniflare({
+      modules: true,
+      script: "export default { fetch() { return new Response('ok') } }",
+      d1Databases: { DB: "briar-github-reconcile-index-migration-test" },
+    });
+    try {
+      const db = (await miniflare.getD1Database("DB")) as unknown as D1Database;
+      await applyD1Migrations(db);
+
+      const plan = await db.prepare(
+        `explain query plan
+         select run.project_id, run.id as run_id
+         from briar_hunt_runs run
+         where run.status = 'running'
+           and run.paused_at is not null
+           and run.resume_requested_at is null
+           and run.workflow_stage = 'pr_open'
+         order by run.paused_at, run.id
+         limit 100`,
+      ).all<{ detail: string }>();
+      const details = plan.results.map((row) => row.detail).join("\n");
+
+      expect(details).toContain("briar_hunt_runs_github_reconcile_idx");
+      expect(details).not.toMatch(/use temp b-tree for order by/iu);
+    } finally {
+      await miniflare.dispose();
+    }
+  }, 60_000);
+
   it("adds a nullable preferred Worker device to channel reply jobs", async () => {
     const miniflare = new Miniflare({
       modules: true,
