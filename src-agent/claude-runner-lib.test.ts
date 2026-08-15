@@ -59,6 +59,24 @@ describe("Claude runner", () => {
     }
   });
 
+  it("forces structured output when a reply schema is provided", () => {
+    const schema = {
+      type: "object",
+      required: ["reply"],
+      properties: { reply: { type: "string" } },
+    };
+    const options = claudeOptions(
+      { ...request, outputSchema: schema },
+      vi.fn(),
+    );
+
+    expect(options.outputFormat).toEqual({
+      type: "json_schema",
+      schema,
+    });
+    expect(claudeOptions(request, vi.fn()).outputFormat).toBeUndefined();
+  });
+
   it("keeps read-only work offline and limits the tool surface", () => {
     const options = claudeOptions(request, vi.fn());
 

@@ -770,13 +770,79 @@ or, only for an Organization Agent with an eligible target,
   ].filter((section): section is string => section !== null).join("\n\n");
 }
 
+function extractBalancedJsonObject(
+  text: string,
+  start: number,
+): { value: string; end: number } | null {
+  let depth = 0;
+  let inString = false;
+  let escaping = false;
+  for (let index = start; index < text.length; index += 1) {
+    const char = text[index];
+    if (inString) {
+      if (escaping) {
+        escaping = false;
+      } else if (char === "\\") {
+        escaping = true;
+      } else if (char === '"') {
+        inString = false;
+      }
+      continue;
+    }
+    if (char === '"') {
+      inString = true;
+    } else if (char === "{") {
+      depth += 1;
+    } else if (char === "}") {
+      depth -= 1;
+      if (depth === 0) {
+        return { value: text.slice(start, index + 1), end: index + 1 };
+      }
+    }
+  }
+  return null;
+}
+
+function extractSingleJsonObject(text: string): string | null {
+  const objects: string[] = [];
+  let index = 0;
+  while (index < text.length) {
+    const start = text.indexOf("{", index);
+    if (start < 0) break;
+    const extracted = extractBalancedJsonObject(text, start);
+    if (!extracted) {
+      index = start + 1;
+      continue;
+    }
+    try {
+      const parsed = JSON.parse(extracted.value) as unknown;
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        objects.push(extracted.value);
+        if (objects.length > 1) return null;
+      }
+    } catch {
+      // Unbalanced prose braces or incomplete fragments are not reply objects.
+    }
+    index = extracted.end;
+  }
+  return objects.length === 1 ? objects[0] : null;
+}
+
 export function parseDetachedJsonResult(text: string): unknown {
   const trimmed = text.trim();
   const withoutFence = trimmed
     .replace(/^```(?:json)?\s*/iu, "")
     .replace(/\s*```$/u, "")
     .trim();
-  return JSON.parse(withoutFence);
+  try {
+    return JSON.parse(withoutFence);
+  } catch {
+    const extracted = extractSingleJsonObject(trimmed);
+    if (!extracted) {
+      throw new SyntaxError("Reply is not a single JSON object");
+    }
+    return JSON.parse(extracted);
+  }
 }
 
 export function issueReplyTextFromPayload(payload: unknown): string | null {
@@ -865,6 +931,7 @@ export function detachedProviderRequest(input: {
   attachments?: AgentAttachment[];
   organizationContextManifestPath?: string | null;
   delegationTargets?: readonly DetachedDelegationTarget[];
+  outputSchema?: Record<string, unknown> | boolean | null;
   agentBinary: string;
 }) {
   return {
@@ -880,7 +947,7 @@ export function detachedProviderRequest(input: {
           input.organizationContextManifestPath ?? null,
         delegationTargets: input.delegationTargets,
       }),
-      outputSchema: null,
+      outputSchema: input.outputSchema ?? null,
       model: input.agent.model,
       effort: input.agent.effort,
       approvalPolicy: "never",

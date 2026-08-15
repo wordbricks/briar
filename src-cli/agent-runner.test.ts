@@ -19,9 +19,14 @@ import {
   detachedTranscriptPayload,
   issueReplyTextFromPayload,
   parseDetachedIssueReplyResult,
+  parseDetachedJsonResult,
   runProjectAgentTaskCompletionFlow,
   shouldPersistDetachedTranscriptPayload,
 } from "./agent-runner";
+import {
+  channelReplyOutputSchema,
+  issueReplyOutputSchema,
+} from "./conversation-reply-schema";
 
 const agent = {
   id: "agent-1",
@@ -274,6 +279,7 @@ describe("detached Agent runner", () => {
     expect(launch.request).toMatchObject({
       conversationId: null,
       sandboxMode: "workspaceWrite",
+      outputSchema: null,
       codexBinary: "/bin/codex",
       model: "gpt-5",
       effort: "high",
@@ -662,7 +668,42 @@ describe("detached Agent runner", () => {
       sandboxMode: "dangerFullAccess",
       networkAccess: true,
       externalTools: true,
+      outputSchema: null,
       codexBinary: "/bin/codex",
+    });
+  });
+
+  it("passes conversation reply schemas through to the provider request", () => {
+    const issueLaunch = detachedProviderRequest({
+      agent,
+      prompt: "issue reply",
+      workspacePath: "/worktree",
+      fullAccess: true,
+      outputSchema: issueReplyOutputSchema,
+      agentBinary: "/bin/codex",
+    });
+    const channelLaunch = detachedProviderRequest({
+      agent,
+      prompt: "channel reply",
+      workspacePath: "/worktree",
+      fullAccess: true,
+      outputSchema: channelReplyOutputSchema,
+      agentBinary: "/bin/grok",
+    });
+
+    expect(issueLaunch.request.outputSchema).toEqual(issueReplyOutputSchema);
+    expect(channelLaunch.request.outputSchema).toEqual(channelReplyOutputSchema);
+    expect(issueReplyOutputSchema).toMatchObject({
+      type: "object",
+      required: expect.arrayContaining(["reply", "proposedAction"]),
+    });
+    expect(channelReplyOutputSchema).toMatchObject({
+      type: "object",
+      properties: expect.objectContaining({
+        body: expect.any(Object),
+        issueProposal: expect.any(Object),
+        contextRequests: expect.any(Object),
+      }),
     });
   });
 
@@ -901,6 +942,104 @@ describe("detached Agent runner", () => {
       "skillExecutionProposal must always be null",
     );
     expect(organizationPrompt).toContain("delegate that bounded request");
+  });
+
+  it("extracts a single JSON object from fenced or mixed issue replies", () => {
+    const proposed = {
+      reply: "제목 변경을 제안했습니다. 수락이 필요합니다.",
+      proposedAction: {
+        type: "request_issue_update",
+        changes: { title: "승인 컴포넌트" },
+      },
+      executionProposal: null,
+      skillExecutionProposal: null,
+    };
+    const expected = {
+      reply: "제목 변경을 제안했습니다. 수락이 필요합니다.",
+      proposedAction: {
+        type: "request_issue_update",
+        changes: { title: "승인 컴포넌트" },
+      },
+      executionProposal: null,
+      skillExecutionProposal: null,
+    };
+
+    expect(parseDetachedIssueReplyResult(JSON.stringify(proposed))).toEqual(
+      expected,
+    );
+    expect(parseDetachedIssueReplyResult(
+      `\`\`\`json\n${JSON.stringify(proposed)}\n\`\`\``,
+    )).toEqual(expected);
+    expect(parseDetachedIssueReplyResult(
+      `맞아요. 설명과 JSON을 함께 반환합니다.\n\`\`\`json\n${JSON.stringify(proposed)}\n\`\`\``,
+    )).toEqual(expected);
+    expect(parseDetachedJsonResult(
+      `prefix ${JSON.stringify(proposed)} trailing prose`,
+    )).toEqual(proposed);
+    expect(parseDetachedIssueReplyResult(
+      `checking {incomplete\n${JSON.stringify(proposed)}`,
+    )).toEqual(expected);
+  });
+
+  it("does not treat multiple JSON objects or invalid proposals as approvals", () => {
+    const first = {
+      reply: "첫 번째",
+      proposedAction: {
+        type: "request_issue_update",
+        changes: { title: "하나" },
+      },
+      executionProposal: null,
+      skillExecutionProposal: null,
+    };
+    const second = {
+      reply: "두 번째",
+      proposedAction: {
+        type: "request_issue_update",
+        changes: { title: "둘" },
+      },
+      executionProposal: null,
+      skillExecutionProposal: null,
+    };
+    const mixed = `${JSON.stringify(first)}\n${JSON.stringify(second)}`;
+    expect(parseDetachedIssueReplyResult(mixed)).toEqual({
+      reply: mixed,
+      proposedAction: null,
+      executionProposal: null,
+      skillExecutionProposal: null,
+    });
+    expect(() => parseDetachedJsonResult(mixed)).toThrow(
+      "Reply is not a single JSON object",
+    );
+
+    const invalid = {
+      reply: "잘못된 스키마",
+      proposedAction: { type: "request_issue_update", changes: {} },
+      executionProposal: null,
+      skillExecutionProposal: null,
+    };
+    expect(parseDetachedIssueReplyResult(
+      `설명입니다.\n${JSON.stringify(invalid)}`,
+    )).toEqual({
+      reply: `설명입니다.\n${JSON.stringify(invalid)}`,
+      proposedAction: null,
+      executionProposal: null,
+      skillExecutionProposal: null,
+    });
+
+    const unauthorizedSkill = {
+      reply: "권한 없는 Skill",
+      proposedAction: null,
+      executionProposal: null,
+      skillExecutionProposal: { type: "request_agent_skill_execute" },
+    };
+    expect(parseDetachedIssueReplyResult(
+      `설명입니다.\n${JSON.stringify(unauthorizedSkill)}`,
+    )).toEqual({
+      reply: `설명입니다.\n${JSON.stringify(unauthorizedSkill)}`,
+      proposedAction: null,
+      executionProposal: null,
+      skillExecutionProposal: null,
+    });
   });
 
   it("constrains channel execution proposals to delegated Project targets", () => {

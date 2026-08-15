@@ -29,6 +29,7 @@ export async function runDetachedProviderTurn(input: {
   attachments?: AgentAttachment[];
   organizationContextManifestPath?: string | null;
   delegationTargets?: readonly DetachedDelegationTarget[];
+  outputSchema?: Record<string, unknown> | boolean | null;
   environment: NodeJS.ProcessEnv;
   signal: AbortSignal;
   onPayload?: (payload: unknown, rawLine: string) => void | Promise<void>;
@@ -68,6 +69,7 @@ export async function runDetachedProviderTurn(input: {
     organizationContextManifestPath:
       input.organizationContextManifestPath ?? null,
     delegationTargets: input.delegationTargets,
+    outputSchema: input.outputSchema ?? null,
     agentBinary,
   }).request;
   const child = spawn(process.execPath, [runnerPath], {

@@ -112,6 +112,17 @@ describe("Codex App Server runner", () => {
         effort: "high",
       },
     });
+    expect(
+      codexTurnRequest(request, "thread-1").params,
+    ).not.toHaveProperty("outputSchema");
+    expect(
+      codexTurnRequest(
+        { ...request, outputSchema: { type: "object" } },
+        "thread-1",
+      ).params,
+    ).toMatchObject({
+      outputSchema: { type: "object" },
+    });
     expect(codexConfigReadRequest(request)).toEqual({
       method: "config/read",
       id: 2,

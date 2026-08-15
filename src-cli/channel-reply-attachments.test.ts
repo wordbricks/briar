@@ -2,6 +2,7 @@ import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { parseDetachedJsonResult } from "./agent-runner";
 import {
   channelReplyCompleteRequestBody,
   collectChannelReplyAttachments,
@@ -25,6 +26,86 @@ afterEach(async () => {
 });
 
 describe("channel reply agent attachments", () => {
+  it("builds approval components from pure, fenced, or mixed JSON replies", () => {
+    const proposed = {
+      body: "후속 이슈 생성을 제안했습니다. 수락이 필요합니다.",
+      attachments: [],
+      document: null,
+      issueProposal: {
+        projectId: "22222222-2222-4222-8222-222222222222",
+        executeAfterCreate: false,
+        issue: {
+          title: "후속 QA",
+          description: null,
+          priority: 2,
+          status: "backlog",
+        },
+      },
+      executionProposal: null,
+      skillExecutionProposal: null,
+      delegation: null,
+    };
+
+    for (const text of [
+      JSON.stringify(proposed),
+      `\`\`\`json\n${JSON.stringify(proposed)}\n\`\`\``,
+      `맞아요. 채널에서도 같은 계약을 씁니다.\n${JSON.stringify(proposed)}`,
+    ]) {
+      expect(parseChannelReplyAgentResult(parseDetachedJsonResult(text)))
+        .toMatchObject({
+          result: {
+            body: proposed.body,
+            issueProposal: proposed.issueProposal,
+            executionProposal: null,
+            skillExecutionProposal: null,
+          },
+          attachmentPaths: [],
+        });
+    }
+  });
+
+  it("rejects mixed replies that are not a single valid approval object", () => {
+    const first = {
+      body: "첫 제안",
+      issueProposal: {
+        projectId: null,
+        executeAfterCreate: false,
+        issue: {
+          title: "하나",
+          description: null,
+          priority: 2,
+          status: "backlog",
+        },
+      },
+    };
+    const second = {
+      body: "둘째 제안",
+      issueProposal: {
+        projectId: null,
+        executeAfterCreate: false,
+        issue: {
+          title: "둘",
+          description: null,
+          priority: 2,
+          status: "backlog",
+        },
+      },
+    };
+    expect(() =>
+      parseDetachedJsonResult(
+        `${JSON.stringify(first)}\n${JSON.stringify(second)}`,
+      ),
+    ).toThrow("Reply is not a single JSON object");
+    expect(() =>
+      parseChannelReplyAgentResult(parseDetachedJsonResult(
+        `설명입니다.\n${JSON.stringify({
+          body: "잘못된 스키마",
+          issueProposal: { issue: { title: "" } },
+        })}`,
+      )),
+    ).toThrow();
+  });
+
   it("strips workspace paths before the worker JSON contract is applied", () => {
     expect(parseChannelReplyAgentResult({
       body: "Here is the screen.",

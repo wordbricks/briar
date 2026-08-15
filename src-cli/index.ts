@@ -66,6 +66,10 @@ import {
 } from "./agent-runner";
 import { agentImageAttachments } from "../src-agent/runner-attachments";
 import {
+  channelReplyOutputSchema,
+  issueReplyOutputSchema,
+} from "./conversation-reply-schema";
+import {
   assertDetachedProviderTurnSucceeded,
   runDetachedProviderTurn,
 } from "./detached-provider-turn";
@@ -2992,6 +2996,7 @@ async function runClaimedIssueReply(
           workspacePath,
           fullAccess: project.autoHunt?.sandbox?.fullAccess ?? true,
           attachments,
+          outputSchema: issueReplyOutputSchema,
           environment: {
             ...process.env,
             PATH: workerExecutionPath(),
@@ -3241,6 +3246,7 @@ async function runClaimedChannelReply(
         delegationTargets: reply.scope.kind === "organization"
           ? reply.delegationTargets
           : undefined,
+        outputSchema: channelReplyOutputSchema,
         environment: {
           ...process.env,
           PATH: workerExecutionPath(),
