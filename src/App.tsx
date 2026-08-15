@@ -17,7 +17,10 @@ import { WorkerDispatchDialog } from "./components/WorkerDispatchDialog";
 import { Inbox } from "./components/Inbox";
 import { InboxDetailPanel } from "./components/InboxDetailPanel";
 import { Channels } from "./components/Channels";
-import { CompanionChannels } from "./components/CompanionChannels";
+import {
+  CompanionChannels,
+  type CompanionChannelCache,
+} from "./components/CompanionChannels";
 import { FirstOrganizationSetup } from "./components/FirstOrganizationSetup";
 import { FirstRunTutorial } from "./components/FirstRunTutorial";
 import { InitialOnboarding } from "./components/InitialOnboarding";
@@ -231,6 +234,7 @@ export function App() {
     cursor: number;
   } | null>(null);
   const channelCatalogCursorRef = useRef(0);
+  const companionChannelCache = useRef<CompanionChannelCache>(new Map());
   useEffect(() => {
     const organizationId = briar.activeOrganizationId;
     const token = briar.token;
@@ -238,6 +242,7 @@ export function App() {
     setActiveChannelId(null);
     setChannelCatalogSnapshot(null);
     channelCatalogCursorRef.current = 0;
+    companionChannelCache.current.clear();
     if (!organizationId || !token) {
       setChannelsLoading(false);
       return;
@@ -2226,6 +2231,7 @@ export function App() {
               onSkillSessionAccepted={autoHunt.adoptRemoteSession}
               onViewingChannelChange={setViewingChannelId}
               token={briar.token}
+              channelCache={companionChannelCache.current}
               requestedMessage={requestedChannelMessage}
               onRequestedMessageOpen={clearRequestedChannelMessage}
               onIssueOpen={async (projectId, runId) => {
