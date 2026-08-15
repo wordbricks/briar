@@ -7,7 +7,10 @@ struct BriarCompanionApp: App {
             if ProcessInfo.processInfo.arguments.contains("--ui-testing") {
                 UITestCompanionFlow(
                     offline: ProcessInfo.processInfo.arguments.contains("--ui-testing-offline"),
-                    locale: ProcessInfo.processInfo.arguments.contains("--ui-testing-english") ? .en : .ko
+                    locale: ProcessInfo.processInfo.arguments.contains("--ui-testing-english") ? .en : .ko,
+                    delaysMessageSend: ProcessInfo.processInfo.arguments.contains(
+                        "--ui-testing-delayed-message-send"
+                    )
                 )
             } else {
                 CompanionRootView(api: MobileAPIClient(baseURL: Self.apiBaseURL))
@@ -36,7 +39,7 @@ private struct UITestCompanionFlow: View {
 
     let offline: Bool
     let locale: CompanionLocale
-    private let api = UITestAPIClient()
+    private let api: UITestAPIClient
     private let project = ProjectsResponse.Project(
         id: UUID(uuidString: "11111111-1111-4111-8111-111111111111")!,
         name: "Briar",
@@ -56,9 +59,10 @@ private struct UITestCompanionFlow: View {
         createdAt: Date(timeIntervalSince1970: 1_775_260_900)
     )
 
-    init(offline: Bool, locale: CompanionLocale) {
+    init(offline: Bool, locale: CompanionLocale, delaysMessageSend: Bool) {
         self.offline = offline
         self.locale = locale
+        api = UITestAPIClient(delaysMessageSend: delaysMessageSend)
         UserDefaults.standard.set(locale.rawValue, forKey: "companion-locale")
         _selectedProjectID = State(initialValue: project.id)
         _agents = StateObject(wrappedValue: AgentsStore(api: UITestAPIClient()))
@@ -258,6 +262,11 @@ private struct UITestCompanionFlow: View {
 private actor UITestAPIClient: MobileAPIClientProtocol {
     private var issueStatus: DashboardRun.Status?
     private var dependencyAdded = false
+    private let delaysMessageSend: Bool
+
+    init(delaysMessageSend: Bool = false) {
+        self.delaysMessageSend = delaysMessageSend
+    }
 
     func createdIssueStatus() -> DashboardRun.Status? { issueStatus }
     func createdDependencyAdded() -> Bool { dependencyAdded }
@@ -304,6 +313,9 @@ private actor UITestAPIClient: MobileAPIClientProtocol {
             dependencyAdded = true
             payload = #"{"prerequisiteRunId":"eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee","dependentRunId":"99999999-9999-4999-8999-999999999999","outcome":"created"}"#
         } else if path.hasSuffix("/messages") && method == "POST" {
+            if delaysMessageSend {
+                try await Task.sleep(for: .seconds(2))
+            }
             payload = #"{"message":{"id":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","runId":"77777777-7777-4777-8777-777777777777","parentMessageId":null,"body":"모바일에서 확인했습니다","author":{"id":"fixture-user","name":"Briar User","image":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==","provider":null},"replyCount":0,"createdAt":"2026-08-02T01:02:00Z","updatedAt":"2026-08-02T01:02:00Z"},"agentReply":null}"#
         } else if path.hasSuffix("/events") {
             payload = #"{"events":[]}"#

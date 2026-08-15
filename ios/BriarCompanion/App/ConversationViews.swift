@@ -211,13 +211,62 @@ struct ConversationComposerAccessibility {
     let mentionItemPrefix: String
 }
 
-/// Shared channel/issue composer. Keeping attachment and mention drafts in
-/// bindings lets the caller decide whether a failed send should retain them.
+@MainActor
+final class ConversationComposerSubmissionModel: ObservableObject {
+    @Published private(set) var isSubmitting = false
+
+    @discardableResult
+    func submit(
+        draft: Binding<String>,
+        mentions: Binding<[ChannelMentionTarget]>,
+        attachments: Binding<[PendingIssueAttachment]>,
+        send: @escaping (
+            String,
+            [ChannelMentionTarget],
+            [PendingIssueAttachment]
+        ) async -> Bool
+    ) -> Task<Void, Never>? {
+        guard !isSubmitting else { return nil }
+
+        let submittedDraft = draft.wrappedValue
+        let submittedMentions = ChannelMentions.retained(
+            in: submittedDraft,
+            mentions: mentions.wrappedValue
+        )
+        let submittedAttachments = attachments.wrappedValue
+
+        isSubmitting = true
+        draft.wrappedValue = ""
+        mentions.wrappedValue = []
+        attachments.wrappedValue = []
+
+        return Task { @MainActor in
+            let succeeded = await send(
+                submittedDraft,
+                submittedMentions,
+                submittedAttachments
+            )
+            if !succeeded,
+               draft.wrappedValue.isEmpty,
+               mentions.wrappedValue.isEmpty,
+               attachments.wrappedValue.isEmpty {
+                draft.wrappedValue = submittedDraft
+                mentions.wrappedValue = submittedMentions
+                attachments.wrappedValue = submittedAttachments
+            }
+            isSubmitting = false
+        }
+    }
+}
+
+/// Shared channel/issue composer. Draft bindings are cleared optimistically
+/// when sending starts and restored together when the send fails.
 struct ConversationComposer: View {
     @Binding var draft: String
     @Binding var mentions: [ChannelMentionTarget]
     @Binding var attachments: [PendingIssueAttachment]
 
+    @StateObject private var submission = ConversationComposerSubmissionModel()
     @State private var selectedPhotos: [PhotosPickerItem] = []
     @State private var isLoadingPhotos = false
     @State private var attachmentError: String?
@@ -239,6 +288,10 @@ struct ConversationComposer: View {
     private var canSend: Bool {
         !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
             !attachments.isEmpty
+    }
+
+    private var isSending: Bool {
+        sending || submission.isSubmitting
     }
 
     var body: some View {
@@ -292,28 +345,21 @@ struct ConversationComposer: View {
                     .font(.body)
                     .lineLimit(1...4)
                     .padding(.vertical, 10)
-                    .disabled(sending)
+                    .disabled(isSending)
                     .accessibilityIdentifier(accessibility.field)
                     .onChange(of: draft) { _, body in
                         mentions = ChannelMentions.retained(in: body, mentions: mentions)
                     }
-                if canSend {
+                if canSend || isSending {
                     Button {
-                        let body = draft
-                        let retainedMentions = ChannelMentions.retained(
-                            in: body,
-                            mentions: mentions
+                        submission.submit(
+                            draft: $draft,
+                            mentions: $mentions,
+                            attachments: $attachments,
+                            send: send
                         )
-                        let selectedAttachments = attachments
-                        Task {
-                            if await send(body, retainedMentions, selectedAttachments) {
-                                draft = ""
-                                mentions = []
-                                attachments = []
-                            }
-                        }
                     } label: {
-                        if sending {
+                        if isSending {
                             ProgressView()
                                 .controlSize(.small)
                                 .tint(.white)
@@ -328,7 +374,7 @@ struct ConversationComposer: View {
                         }
                     }
                     .buttonStyle(.plain)
-                    .disabled(sending)
+                    .disabled(isSending)
                     .accessibilityLabel(L10n.text("보내기", locale: locale))
                     .accessibilityIdentifier(accessibility.send)
                 }
@@ -440,7 +486,7 @@ struct ConversationComposer: View {
                     .contentShape(Circle())
             }
             .disabled(
-                isLoadingPhotos || sending ||
+                isLoadingPhotos || isSending ||
                     attachments.count >= PendingIssueAttachment.maximumCount
             )
             .accessibilityLabel(L10n.text("이미지 첨부", locale: locale))
@@ -460,7 +506,7 @@ struct ConversationComposer: View {
                     .contentShape(Circle())
             }
             .disabled(
-                isLoadingPhotos || sending ||
+                isLoadingPhotos || isSending ||
                     attachments.count >= PendingIssueAttachment.maximumCount
             )
             .accessibilityLabel(L10n.text("이미지 첨부", locale: locale))

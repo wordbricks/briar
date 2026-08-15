@@ -11,6 +11,7 @@ import type {
   ExecutionWorker,
   HuntRun,
   IssueMessage,
+  IssueMessageSendResult,
   ProjectAgent,
   RunEvidence,
   UpdateIssueInput,
@@ -4948,6 +4949,75 @@ describe("HuntDashboard", () => {
       await Promise.resolve();
     });
     expect(messageList?.scrollTop).toBe(640);
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("clears the Android/Tauri conversation draft while sending and restores it on failure", async () => {
+    let rejectSend: (reason: Error) => void = () => undefined;
+    const pendingSend = new Promise<IssueMessageSendResult>((_resolve, reject) => {
+      rejectSend = reject;
+    });
+    const onSendIssueMessage = vi.fn(() => pendingSend);
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(
+        <RunPage
+          isSidebarOpen
+          error={null}
+          isRecovering={false}
+          onBack={() => undefined}
+          onCancel={async () => undefined}
+          onLoadAttachment={async () => new Blob()}
+          onLoadIssueMessages={async () => []}
+          onLoadRunEvidence={async () => []}
+          onMove={async () => undefined}
+          onRetry={async () => undefined}
+          onSendIssueMessage={onSendIssueMessage}
+          run={demoDashboard.runs[0]}
+        />,
+      );
+      await Promise.resolve();
+    });
+
+    const draft = "안드로이드 대화 초안";
+    const textarea = container.querySelector<HTMLTextAreaElement>(
+      ".issue-message-composer textarea",
+    );
+    await act(async () => {
+      if (!textarea) return;
+      Object.getOwnPropertyDescriptor(
+        HTMLTextAreaElement.prototype,
+        "value",
+      )?.set?.call(textarea, draft);
+      textarea.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(
+        ".issue-message-composer .issue-message-send",
+      )?.click();
+      await Promise.resolve();
+    });
+
+    expect(onSendIssueMessage).toHaveBeenCalledOnce();
+    expect(textarea?.value).toBe("");
+    expect(
+      container.querySelector<HTMLButtonElement>(
+        ".issue-message-composer .issue-message-send",
+      )?.disabled,
+    ).toBe(true);
+
+    await act(async () => {
+      rejectSend(new Error("전송 실패"));
+      await pendingSend.catch(() => undefined);
+      await Promise.resolve();
+    });
+    expect(textarea?.value).toBe(draft);
+    expect(container.querySelector(".issue-composer-error")?.textContent)
+      .toContain("전송 실패");
 
     await act(async () => root.unmount());
     container.remove();
