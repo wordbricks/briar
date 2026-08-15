@@ -7,7 +7,6 @@ import {
   useState,
 } from "react";
 import {
-  AtSign,
   BellRing,
   Bot,
   Check,
@@ -16,7 +15,6 @@ import {
   CircleAlert,
   Clock3,
   Inbox as InboxIcon,
-  MessageCircle,
   Siren,
 } from "lucide-react";
 
@@ -413,25 +411,20 @@ function InboxMessageRow({
             "inbox-message-icon grid size-9 shrink-0 place-items-center rounded-lg",
             category,
             message.kind,
-            message.kind === "channel" && "author",
+            (message.kind === "conversation" || message.kind === "channel") &&
+              "author",
             message.kind === "conversation" || message.kind === "channel"
               ? message.reason
               : message.status,
           )}
         >
-          {message.kind === "channel" ? (
-            <InboxChannelAuthorAvatar
+          {message.kind === "conversation" || message.kind === "channel" ? (
+            <InboxMessageAuthorAvatar
               image={message.authorImage}
               name={message.authorName}
             />
           ) : message.kind === "session" ? (
             <Bot size={17} />
-          ) : message.kind === "conversation" ? (
-            message.reason === "mention" ? (
-              <AtSign size={17} />
-            ) : (
-              <MessageCircle size={17} />
-            )
           ) : category === "urgent" ? (
             <Siren size={17} />
           ) : category === "action_required" ? (
@@ -443,7 +436,9 @@ function InboxMessageRow({
           ) : (
             <Clock3 size={17} />
           )}
-          {project && message.kind !== "channel" ? (
+          {project &&
+          message.kind !== "conversation" &&
+          message.kind !== "channel" ? (
             <span
               aria-hidden="true"
               className="inbox-message-project-icon"
@@ -519,7 +514,7 @@ function InboxMessageRow({
   );
 }
 
-function InboxChannelAuthorAvatar({
+function InboxMessageAuthorAvatar({
   image,
   name,
 }: {

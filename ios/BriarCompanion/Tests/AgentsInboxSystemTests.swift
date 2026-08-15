@@ -814,7 +814,12 @@ final class AgentsInboxSystemTests: XCTestCase {
                     runTitle: blocked.title,
                     rootMessageId: UUID(uuidString: "88888888-8888-4888-8888-888888888888")!,
                     body: "@you please look\n\nSecond line\nThird line\nFourth line",
-                    author: IssueMessage.Author(id: "u1", name: "Alex", image: nil, provider: nil),
+                    author: IssueMessage.Author(
+                        id: "u1",
+                        name: "Alex",
+                        image: "https://example.com/alex.png",
+                        provider: nil
+                    ),
                     reason: "mention",
                     createdAt: Date(timeIntervalSince1970: 1_700_000_120)
                 ),
@@ -890,6 +895,7 @@ final class AgentsInboxSystemTests: XCTestCase {
         )
         let mention = try XCTUnwrap(messages.first { $0.kind == .conversation })
         XCTAssertEqual(InboxMessageBuilder.classify(mention), .actionRequired)
+        XCTAssertEqual(mention.authorImage, "https://example.com/alex.png")
         // This reply also contains a mention. The message hierarchy, not the
         // reason label, controls the reply-specific system notification.
         XCTAssertEqual(

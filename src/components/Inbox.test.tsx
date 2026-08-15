@@ -399,6 +399,7 @@ describe("Inbox", () => {
         version: "mention",
         body: "@owner 확인해 주세요.",
         authorName: "Member",
+        authorImage: "https://example.com/member.png",
         reason: "mention",
         isUnread: true,
       },
@@ -442,6 +443,9 @@ describe("Inbox", () => {
     );
     expect(container.textContent).toContain("@owner 확인해 주세요.");
     expect(container.textContent).toContain("재현 절차를 추가했습니다.");
+    expect(
+      container.querySelector(".inbox-message-author-avatar")?.getAttribute("src"),
+    ).toBe("https://example.com/member.png");
   });
 
   it("shows channel name and reply context for channel notifications", async () => {

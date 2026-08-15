@@ -136,7 +136,10 @@ describe("organization Inbox feed", () => {
       run_title: second.runs[0]!.title,
       root_message_id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
       body: "Please review the second project.",
+      author_agent_provider: null,
       author_name: "Taylor",
+      author_image: "https://example.com/taylor.png",
+      author_agent_image: null,
       notification_reason: "thread_reply",
       created_at: occurredAt,
     }];
@@ -153,7 +156,37 @@ describe("organization Inbox feed", () => {
       id: "conversation:cccccccc-cccc-4ccc-8ccc-cccccccccccc",
       projectId: second.project.id,
       issueKey: "BR-1",
+      authorImage: "https://example.com/taylor.png",
       reason: "thread_reply",
+    }));
+  });
+
+  it("uses the configured agent avatar for issue replies", () => {
+    const project = projectData(
+      "33333333-3333-4333-8333-333333333333",
+      "Agent project",
+      "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+      "completed",
+    );
+    project.conversationNotifications = [{
+      id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+      run_id: project.runs[0]!.id,
+      run_title: project.runs[0]!.title,
+      root_message_id: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+      body: "The agent replied.",
+      author_agent_provider: "codex",
+      author_name: "Briar · Codex",
+      author_image: null,
+      author_agent_image: "https://example.com/codex.png",
+      notification_reason: "thread_reply",
+      created_at: occurredAt,
+    }];
+
+    const messages = buildInboxFeedMessages([project], []);
+
+    expect(messages).toContainEqual(expect.objectContaining({
+      id: "conversation:dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+      authorImage: "https://example.com/codex.png",
     }));
   });
 });

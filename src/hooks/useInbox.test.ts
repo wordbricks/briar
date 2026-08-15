@@ -226,7 +226,7 @@ describe("Inbox messages", () => {
             author: {
               id: "member",
               name: "Member",
-              image: null,
+              image: "https://example.com/member.png",
               provider: null,
             },
             reason: "thread_reply",
@@ -252,6 +252,7 @@ describe("Inbox messages", () => {
         targetId: "run-thread",
         messageId: "message-reply",
         rootMessageId: "message-root",
+        authorImage: "https://example.com/member.png",
         issueKey: `${demoDashboard.project.issueKeyPrefix ?? "AH"}-1321`,
         reason: "thread_reply",
       }),
