@@ -142,6 +142,7 @@ export type ProjectLlmProgress = {
   messageId: string;
   phase: string | null;
   message: string;
+  activityKind?: "command" | "fileChange" | "webSearch" | "tool";
 };
 
 type ProjectLlmProviderEvent =
@@ -287,6 +288,20 @@ export async function chatWithProjectLlm(
           return;
         }
         const { event } = payload;
+        if (
+          event.type === "activityStarted" ||
+          event.type === "activityCompleted"
+        ) {
+          const message = event.title.trim() || event.text.trim();
+          input.onProgress?.({
+            provider: payload.provider,
+            messageId: event.id,
+            phase: "activity",
+            message: message || event.kind,
+            activityKind: event.kind,
+          });
+          return;
+        }
         if (event.type === "messageStarted") {
           messages.set(event.id, event.text);
           phases.set(event.id, event.phase);

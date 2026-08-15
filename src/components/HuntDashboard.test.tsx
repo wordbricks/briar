@@ -121,6 +121,23 @@ function dashboardAgentSession(
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean })
   .IS_REACT_ACT_ENVIRONMENT = true;
 
+function pendingAgentReplyState(scope: ParentNode | null | undefined) {
+  return scope?.querySelector<HTMLElement>(":scope > .issue-agent-reply-state");
+}
+
+function expectPendingAgentReplyLoader(scope: ParentNode | null | undefined) {
+  const pending = pendingAgentReplyState(scope);
+  const loader = pending?.querySelector<HTMLElement>(
+    "[data-testid='loading-state']",
+  );
+  expect(loader).not.toBeNull();
+  expect(loader?.dataset.variant).toBe("Drive");
+  expect(pending?.textContent).toContain("Briar가 답변을 작성하고 있습니다");
+  expect(pending?.textContent).toContain("0.0s");
+  expect(pending?.querySelector(".spin")).toBeNull();
+  return pending;
+}
+
 describe("HuntDashboard", () => {
   it("offers issue creation from the work queue", () => {
     const markup = renderToStaticMarkup(
@@ -5381,9 +5398,7 @@ describe("HuntDashboard", () => {
     expect(messageList.scrollTop).toBe(480);
     expect(replyButton?.getAttribute("aria-expanded")).toBe("false");
     expect(messageGroup.querySelector(".issue-inline-reply-composer")).toBeNull();
-    expect(
-      messageGroup.querySelector(":scope > .issue-agent-reply-state")?.textContent,
-    ).toContain("Briar가 답변을 작성하고 있습니다");
+    expectPendingAgentReplyLoader(messageGroup);
     expect(messageList.textContent).toContain(sentReply.body);
     expect(
       Array.from(
@@ -5797,13 +5812,10 @@ describe("HuntDashboard", () => {
     expect(sentBody).toBe("@briar 변경 내용을 설명해 줘");
     expect(textarea?.value).toBe("");
     expect(container.textContent).toContain(userMessage.body);
-    expect(container.textContent).toContain("Briar가 답변을 작성하고 있습니다");
     const userMessageGroup = Array.from(
       container.querySelectorAll<HTMLElement>(".issue-message-group"),
     ).find((group) => group.textContent?.includes(userMessage.body));
-    expect(
-      userMessageGroup?.querySelector(":scope > .issue-agent-reply-state"),
-    ).not.toBeNull();
+    expectPendingAgentReplyLoader(userMessageGroup);
     expect(
       container.querySelector(".issue-message-list > .issue-agent-reply-state"),
     ).toBeNull();
@@ -5824,6 +5836,93 @@ describe("HuntDashboard", () => {
         container.querySelectorAll(".issue-message-parent-quote"),
       ).some((quote) => quote.textContent?.includes(userMessage.body)),
     ).toBe(true);
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("keeps the conversation error alert when an agent reply fails", async () => {
+    const createdAt = new Date().toISOString();
+    const userMessage: IssueMessage = {
+      id: "message-reply-failed",
+      runId: demoDashboard.runs[0].id,
+      parentMessageId: null,
+      body: "@briar 실패한 답변",
+      author: { id: "jay", name: "Jay", image: null, provider: null },
+      replyCount: 0,
+      createdAt,
+      updatedAt: createdAt,
+    };
+    let rejectAgentReply: (error: Error) => void = () => undefined;
+    const pendingAgentReply = new Promise<IssueMessage>((_, reject) => {
+      rejectAgentReply = reject;
+    });
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(
+        <RunPage
+          isSidebarOpen
+          error={null}
+          isRecovering={false}
+          onBack={() => undefined}
+          onCancel={async () => undefined}
+          onLoadAttachment={async () => new Blob()}
+          onLoadIssueMessages={async () => []}
+          onLoadRunEvidence={async () => []}
+          onMove={async () => undefined}
+          onRetry={async () => undefined}
+          onSendIssueMessage={async () => ({
+            message: userMessage,
+            agentReply: pendingAgentReply,
+          })}
+          run={demoDashboard.runs[0]}
+        />,
+      );
+    });
+
+    const textarea = container.querySelector<HTMLTextAreaElement>(
+      ".issue-message-composer textarea",
+    );
+    await act(async () => {
+      if (!textarea) return;
+      Object.getOwnPropertyDescriptor(
+        HTMLTextAreaElement.prototype,
+        "value",
+      )?.set?.call(textarea, userMessage.body);
+      textarea.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await act(async () => {
+      textarea?.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          bubbles: true,
+          cancelable: true,
+          key: "Enter",
+        }),
+      );
+      await Promise.resolve();
+    });
+
+    const userMessageGroup = Array.from(
+      container.querySelectorAll<HTMLElement>(".issue-message-group"),
+    ).find((group) => group.textContent?.includes(userMessage.body));
+    expectPendingAgentReplyLoader(userMessageGroup);
+
+    await act(async () => {
+      rejectAgentReply(new Error("worker unavailable"));
+      await pendingAgentReply.catch(() => undefined);
+    });
+
+    const errorState = userMessageGroup?.querySelector(
+      ":scope > .issue-agent-reply-state.error",
+    );
+    expect(errorState?.textContent).toContain(
+      "Briar 답변을 생성하지 못했습니다: worker unavailable",
+    );
+    expect(errorState?.querySelector("[data-testid='loading-state']")).toBeNull();
+    expect(errorState?.querySelector(".spin")).toBeNull();
+    expect(errorState?.querySelector("svg")).not.toBeNull();
+
     await act(async () => root.unmount());
     container.remove();
   });

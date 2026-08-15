@@ -4,11 +4,11 @@ import {
   Check,
   CheckCircle2,
   CircleAlert,
-  Compass,
   Cpu,
   FolderGit2,
   FolderOpen,
   GitBranch,
+  Info,
   LoaderCircle,
   LogOut,
   Sparkles,
@@ -32,8 +32,10 @@ import {
   agentProviderLabels,
   type ProjectLlmProgress,
 } from "../lib/project-llm";
+import { formatExecutionDuration } from "../lib/agent-execution-metrics";
 import type { SessionUser } from "../types";
 import { useI18n } from "../i18n";
+import { DeveloperToolsSetup } from "./DeveloperToolsSetup";
 import { Logo } from "./Logo";
 
 type PreparedProjectConnection = {
@@ -55,6 +57,7 @@ type Props = {
   canCancel?: boolean;
   connection: ProjectConnection | null;
   error: string | null;
+  includeDeveloperTools?: boolean;
   loading: boolean;
   onAnalyzeRequirements: (
     projectId: string,
@@ -73,7 +76,6 @@ type Props = {
     projectId: string,
     requestedChange: string,
   ) => Promise<AutoHuntWorkflow>;
-  onSkip: () => void;
   onRepositorySelect: () => Promise<string | null>;
   onRepositoryInspect: (
     repositoryPath: string,
@@ -83,17 +85,20 @@ type Props = {
 };
 
 type OnboardingPhase =
-  | "purpose"
+  | "developer-tools"
   | "repository"
   | "workflow-loading"
   | "workflow-review"
   | "tools-loading"
   | "tools-review";
 
-function Progress({ current }: { current: 1 | 2 | 3 }) {
+function Progress({ current, total }: { current: number; total: 3 | 4 }) {
   return (
-    <div aria-hidden="true" className="project-onboarding-progress">
-      {[1, 2, 3].map((step) => (
+    <div
+      aria-hidden="true"
+      className={`project-onboarding-progress total-${total}`}
+    >
+      {Array.from({ length: total }, (_, index) => index + 1).map((step) => (
         <span className={step <= current ? "active" : ""} key={step} />
       ))}
     </div>
@@ -132,33 +137,125 @@ function OnboardingProviderProgress({
   progressMessageRef: RefObject<HTMLParagraphElement | null>;
 }) {
   const { t } = useI18n();
-  const message =
-    progress?.phase === "final" || progress?.phase === "final_answer"
-      ? t("onboarding.workflowProviderFinalizing")
-      : progress?.message ?? t("onboarding.workflowProviderWaiting");
+  const startedAt = useRef(Date.now());
+  const [lastActivityAt, setLastActivityAt] = useState(startedAt.current);
+  const [now, setNow] = useState(startedAt.current);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    const activityAt = Date.now();
+    setLastActivityAt(activityAt);
+    setNow(activityAt);
+  }, [progress?.message, progress?.messageId]);
+
+  const elapsed = formatExecutionDuration(now - startedAt.current);
+  const quietDuration = Math.max(0, now - lastActivityAt);
+  const isQuiet = quietDuration >= 60_000;
+  const displayedMessage = providerProgressMessage(progress, t);
 
   return (
     <div
-      aria-atomic="true"
-      aria-live="polite"
-      className="onboarding-provider-progress"
-      role="status"
+      aria-label={t("onboarding.workflowProviderProgress")}
+      className={`onboarding-provider-progress${isQuiet ? " quiet" : ""}`}
+      role="group"
     >
-      <span>
-        <i aria-hidden="true" />
-        {progress
-          ? agentProviderLabels[progress.provider]
-          : t("onboarding.workflowProviderProgress")}
-      </span>
-      <p ref={progressMessageRef}>{message}</p>
+      <div className="onboarding-provider-progress-heading">
+        <span>
+          <i aria-hidden="true" />
+          {progress
+            ? agentProviderLabels[progress.provider]
+            : t("onboarding.workflowProviderProgress")}
+        </span>
+        <small>{t("onboarding.workflowElapsed", { duration: elapsed })}</small>
+      </div>
+      <p
+        aria-atomic="true"
+        aria-live="polite"
+        ref={progressMessageRef}
+        role="status"
+      >
+        {displayedMessage}
+      </p>
+      <div className="onboarding-provider-progress-meta">
+        <span>
+          {isQuiet
+            ? t("onboarding.workflowQuietFor", {
+                duration: formatExecutionDuration(quietDuration),
+              })
+            : t("onboarding.workflowUpdatedNow")}
+        </span>
+      </div>
+      {isQuiet ? (
+        <div className="onboarding-provider-progress-notice">
+          <Info aria-hidden="true" size={14} />
+          <span>{t("onboarding.workflowStillWorking")}</span>
+        </div>
+      ) : null}
     </div>
   );
+}
+
+type Translate = ReturnType<typeof useI18n>["t"];
+
+function structuredProgressDetail(message: string) {
+  try {
+    const parsed = JSON.parse(message) as {
+      stages?: Array<{ evidence?: unknown }>;
+    };
+    const details = parsed.stages
+      ?.flatMap((stage) =>
+        Array.isArray(stage.evidence)
+          ? stage.evidence.filter(
+              (detail): detail is string =>
+                typeof detail === "string" && Boolean(detail.trim()),
+            )
+          : [],
+      );
+    return details?.at(-1)?.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+function providerProgressMessage(
+  progress: ProjectLlmProgress | null,
+  t: Translate,
+) {
+  if (!progress) return t("onboarding.workflowProviderWaiting");
+  if (progress.phase === "final" || progress.phase === "final_answer") {
+    return t("onboarding.workflowProviderFinalizing");
+  }
+  if (progress.activityKind) {
+    const activityKey = {
+      command: "onboarding.workflowActivityCommand",
+      fileChange: "onboarding.workflowActivityFiles",
+      webSearch: "onboarding.workflowActivityWeb",
+      tool: "onboarding.workflowActivityTool",
+    }[progress.activityKind] as
+      | "onboarding.workflowActivityCommand"
+      | "onboarding.workflowActivityFiles"
+      | "onboarding.workflowActivityWeb"
+      | "onboarding.workflowActivityTool";
+    return t(activityKey);
+  }
+  const message = progress.message.trim();
+  const structuredDetail = structuredProgressDetail(message);
+  if (structuredDetail) return structuredDetail;
+  if (message.startsWith("{") || message.startsWith("[")) {
+    return t("onboarding.workflowInspecting");
+  }
+  return message || t("onboarding.workflowInspecting");
 }
 
 export function ProjectOnboarding({
   canCancel = false,
   connection,
   error,
+  includeDeveloperTools = false,
   loading,
   onAnalyzeRequirements,
   onCancel,
@@ -169,12 +266,11 @@ export function ProjectOnboarding({
   onRepositoryInspect,
   onRepositorySelect,
   onReviseWorkflow,
-  onSkip,
   user,
 }: Props) {
   const { t } = useI18n();
   const [phase, setPhase] = useState<OnboardingPhase>(
-    canCancel || connection ? "repository" : "purpose",
+    includeDeveloperTools && !connection ? "developer-tools" : "repository",
   );
   const [name, setName] = useState(connection?.project.name ?? "");
   const [repositoryPath, setRepositoryPath] = useState("");
@@ -402,91 +498,68 @@ export function ProjectOnboarding({
     connection?.workflow &&
     !isRepositoryWorkflowPending(connection.workflow),
   );
-  const currentStep: 1 | 2 | 3 =
-    phase === "repository" ? 1 : phase.startsWith("workflow") ? 2 : 3;
+  const totalSteps: 3 | 4 = includeDeveloperTools ? 4 : 3;
+  const currentStep = phase === "developer-tools"
+    ? 1
+    : phase === "repository"
+      ? includeDeveloperTools ? 2 : 1
+      : phase.startsWith("workflow")
+        ? includeDeveloperTools ? 3 : 2
+        : includeDeveloperTools ? 4 : 3;
 
   return (
     <div className="onboarding-shell project-onboarding-shell">
       <header className="onboarding-topbar">
         <Logo />
         <div className="onboarding-topbar-actions">
-          {phase === "repository" ? (
+          {phase === "developer-tools" ? (
+            <button onClick={onCancel} type="button">
+              <ArrowLeft size={14} /> {t("onboarding.back")}
+            </button>
+          ) : phase === "repository" ? (
             <button
               onClick={
-                !canCancel && !connection
-                  ? () => setPhase("purpose")
+                includeDeveloperTools && !connection
+                  ? () => setPhase("developer-tools")
                   : onCancel
               }
               type="button"
             >
               <ArrowLeft size={14} />
-              {!canCancel && !connection
-                ? t("onboarding.purposeBack")
+              {includeDeveloperTools && !connection
+                ? t("onboarding.developerToolsBack")
                 : t("onboarding.back")}
             </button>
-          ) : phase !== "purpose" ? (
+          ) : (
             <button onClick={onCancel} type="button">
               <ArrowLeft size={14} /> {t("onboarding.back")}
             </button>
-          ) : null}
+          )}
           <button onClick={onLogout} type="button">
             <LogOut size={14} /> {user.email}
           </button>
         </div>
       </header>
 
-      <main
-        className={`onboarding-card${phase === "purpose" ? " project-purpose-card" : " project-onboarding-card"}`}
-      >
-        {phase === "purpose" ? (
-          <>
-            <div className="onboarding-icon"><Compass size={24} /></div>
-            <p className="eyebrow">{t("onboarding.purposeEyebrow")}</p>
-            <h1>{t("onboarding.purposeTitle")}</h1>
-            <p className="onboarding-copy">{t("onboarding.purposeDescription")}</p>
-            <div className="project-purpose-options">
-              <button
-                aria-label={t("onboarding.purposeBuildAction")}
-                className="project-purpose-option"
-                onClick={() => setPhase("repository")}
-                type="button"
-              >
-                <span className="project-purpose-option-icon"><FolderGit2 size={22} /></span>
-                <span className="project-purpose-option-copy">
-                  <strong>{t("onboarding.purposeBuildTitle")}</strong>
-                  <span>{t("onboarding.purposeBuildDescription")}</span>
-                </span>
-                <span className="project-purpose-option-action">
-                  {t("onboarding.purposeBuildAction")}<ArrowRight size={17} />
-                </span>
-              </button>
-              <button
-                aria-label={t("onboarding.purposeObserveAction")}
-                className="project-purpose-option"
-                onClick={onSkip}
-                type="button"
-              >
-                <span className="project-purpose-option-icon"><Compass size={22} /></span>
-                <span className="project-purpose-option-copy">
-                  <strong>{t("onboarding.purposeObserveTitle")}</strong>
-                  <span>{t("onboarding.purposeObserveDescription")}</span>
-                </span>
-                <span className="project-purpose-option-action">
-                  {t("onboarding.purposeObserveAction")}<ArrowRight size={17} />
-                </span>
-              </button>
-            </div>
-          </>
-        ) : (
-          <>
+      <main className="onboarding-card project-onboarding-card">
+        <>
             {reconnectingExistingWorkflow ? (
               <p className="eyebrow">{t("health.reconnect")}</p>
             ) : (
               <>
-                <p className="eyebrow">{t("onboarding.setupProgress", { step: currentStep })}</p>
-                <Progress current={currentStep} />
+                <p className="eyebrow">
+                  {t("onboarding.setupProgress", {
+                    step: currentStep,
+                    total: totalSteps,
+                  })}
+                </p>
+                <Progress current={currentStep} total={totalSteps} />
               </>
             )}
+
+            {phase === "developer-tools" ? (
+              <DeveloperToolsSetup onContinue={() => setPhase("repository")} />
+            ) : null}
 
             {phase === "repository" ? (
               <>
@@ -579,7 +652,7 @@ export function ProjectOnboarding({
             ) : null}
 
             {phase === "workflow-loading" ? (
-              <section className="onboarding-process" aria-live="polite">
+              <section className="onboarding-process">
                 {workflowError ? (
                   <>
                     <span className="onboarding-process-icon error"><CircleAlert size={25} /></span>
@@ -644,7 +717,7 @@ export function ProjectOnboarding({
             ) : null}
 
             {phase === "tools-loading" ? (
-              <section className="onboarding-process" aria-live="polite">
+              <section className="onboarding-process">
                 {toolsError ? (
                   <>
                     <span className="onboarding-process-icon error"><CircleAlert size={25} /></span>
@@ -700,7 +773,6 @@ export function ProjectOnboarding({
               </section>
             ) : null}
           </>
-        )}
       </main>
     </div>
   );

@@ -198,6 +198,56 @@ describe("ChannelMessageText", () => {
     expect(container.querySelector("button.channel-mention-button")).toBeNull();
   });
 
+  it("renders webhook headers, mrkdwn, dividers, markdown, and rich text", async () => {
+    const webhookMessage: ChannelMessage = {
+      ...message,
+      author: { type: "webhook", id: "webhook-1", name: "Deploys" },
+      body: "Deployment complete",
+      blocks: [
+        {
+          type: "header",
+          text: { type: "plain_text", text: "Deployment complete" },
+        },
+        {
+          type: "section",
+          text: { type: "mrkdwn", text: "*Production* is on `v42`." },
+        },
+        { type: "divider" },
+        { type: "markdown", text: "- [x] Health checks\n- [ ] Monitor" },
+        {
+          type: "rich_text",
+          elements: [{
+            type: "rich_text_quote",
+            elements: [{
+              type: "text",
+              text: "All systems operational",
+              style: { bold: true },
+            }],
+          }],
+        },
+      ],
+    };
+
+    await act(async () => {
+      root.render(
+        <I18nProvider>
+          <ChannelMessageText
+            agents={[]}
+            members={[]}
+            message={webhookMessage}
+          />
+        </I18nProvider>,
+      );
+    });
+
+    expect(container.querySelector("h3")?.textContent).toBe("Deployment complete");
+    expect(container.querySelector("strong")?.textContent).toBe("Production");
+    expect(container.querySelector("hr")).not.toBeNull();
+    expect(container.querySelectorAll("input[type='checkbox']")).toHaveLength(2);
+    expect(container.querySelector("blockquote strong")?.textContent)
+      .toBe("All systems operational");
+  });
+
   it("shows the Agent's runtime and responsibility on its profile", async () => {
     await act(async () => {
       root.render(

@@ -2929,6 +2929,21 @@
           "body": {
             "type": "string"
           },
+          "blocks": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "description": "Slack-compatible webhook presentation blocks. Supported types are header, section, markdown, divider, context, and rich_text.",
+            "items": {
+              "type": "object",
+              "required": [
+                "type"
+              ],
+              "additionalProperties": true
+            },
+            "maxItems": 50
+          },
           "author": {
             "$ref": "#/components/schemas/MessageAuthor"
           },

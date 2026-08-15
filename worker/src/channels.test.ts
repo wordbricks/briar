@@ -593,6 +593,37 @@ describe("organization channels", () => {
       message: { body: "Production deployed through the API" },
     });
 
+    const blockResponse = await apiWorker.fetch(new Request(webhookUrl, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        blocks: [
+          {
+            type: "header",
+            text: { type: "plain_text", text: "Deploy complete" },
+          },
+          {
+            type: "section",
+            text: { type: "mrkdwn", text: "*Production* is healthy." },
+          },
+          { type: "divider" },
+        ],
+      }),
+    }), apiEnv);
+    expect(blockResponse.status).toBe(201);
+    await expect(blockResponse.json()).resolves.toMatchObject({
+      duplicate: false,
+      message: {
+        body: "Deploy complete\n*Production* is healthy.",
+        blocks: [
+          { type: "header" },
+          { type: "section" },
+          { type: "divider" },
+        ],
+        author: { type: "webhook", id: webhookId, name: "Deploy notifier" },
+      },
+    });
+
     const first = await createIncomingChannelWebhookMessage(db, {
       id: "f1000000-0000-4000-8000-000000000060",
       webhookId,
@@ -600,6 +631,7 @@ describe("organization channels", () => {
       webhookName: "Deploy notifier",
       eventId: "deploy-42",
       body: "Production deployed",
+      blocks: null,
       createdAt: at(59),
     });
     expect(first).toMatchObject({
@@ -616,6 +648,7 @@ describe("organization channels", () => {
       webhookName: "Deploy notifier",
       eventId: "deploy-42",
       body: "This duplicate is ignored",
+      blocks: null,
       createdAt: at(60),
     });
     expect(duplicate).toMatchObject({

@@ -239,17 +239,31 @@ describe("project LLM gateway", () => {
     );
     expect(onProgress).toHaveBeenNthCalledWith(1, {
       provider: "codex",
+      messageId: "command-1",
+      phase: "activity",
+      message: "git status",
+      activityKind: "command",
+    });
+    expect(onProgress).toHaveBeenNthCalledWith(2, {
+      provider: "codex",
+      messageId: "command-1",
+      phase: "activity",
+      message: "git status",
+      activityKind: "command",
+    });
+    expect(onProgress).toHaveBeenNthCalledWith(3, {
+      provider: "codex",
       messageId: "message-1",
       phase: "commentary",
       message: "저장소 구조를",
     });
-    expect(onProgress).toHaveBeenNthCalledWith(2, {
+    expect(onProgress).toHaveBeenNthCalledWith(4, {
       provider: "codex",
       messageId: "message-1",
       phase: "commentary",
       message: "저장소 구조를 분석하고 있습니다.",
     });
-    expect(onProgress).toHaveBeenCalledTimes(2);
+    expect(onProgress).toHaveBeenCalledTimes(4);
     expect(unlisten).toHaveBeenCalledOnce();
   });
 

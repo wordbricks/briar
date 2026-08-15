@@ -640,9 +640,14 @@ private struct ChannelMessageRow: View {
             timestamp: message.createdAt,
             accessibilityIdentifier: "channel-message-\(message.id.uuidString.lowercased())"
         ) {
-            MentionText(text: messageBodyWithoutAttachments, handles: mentionHandles)
-                .font(.body)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            if let blocks = message.blocks, !blocks.isEmpty {
+                ChannelWebhookBlocksView(blocks: blocks)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                MentionText(text: messageBodyWithoutAttachments, handles: mentionHandles)
+                    .font(.body)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
                 if !message.attachments.isEmpty {
                     LazyVGrid(
                         columns: Array(
@@ -787,6 +792,141 @@ private struct ChannelMessageRow: View {
             format: L10n.text(.channelLastReply, locale: locale),
             relative
         )
+    }
+}
+
+private enum ChannelWebhookBlockFormatting {
+    static func slackMarkdown(_ value: String) -> String {
+        value
+            .replacing(
+                #"<((?:https?://|mailto:)[^>|]+)\|([^>]+)>"#,
+                with: "[$2]($1)"
+            )
+            .replacing(
+                #"<((?:https?://|mailto:)[^>]+)>"#,
+                with: "$1"
+            )
+            .replacing(#"(?<!\*)\*([^*\n]+)\*(?!\*)"#, with: "**$1**")
+            .replacing(#"(?<!~)~([^~\n]+)~(?!~)"#, with: "~~$1~~")
+    }
+
+    static func richMarkdown(_ element: ChannelRichTextElement) -> String {
+        switch element.type {
+        case .section:
+            return inlineMarkdown(element.elements ?? [])
+        case .quote:
+            return inlineMarkdown(element.elements ?? [])
+                .split(separator: "\n", omittingEmptySubsequences: false)
+                .map { "> \($0)" }
+                .joined(separator: "\n")
+        case .preformatted:
+            return "```\n\(inlinePlainText(element.elements ?? []))\n```"
+        case .list:
+            let indentation = String(repeating: "  ", count: element.indent ?? 0)
+            return (element.sections ?? []).enumerated().map { index, section in
+                let marker = element.style == "ordered"
+                    ? "\((element.offset ?? 0) + index + 1)."
+                    : "-"
+                return "\(indentation)\(marker) \(inlineMarkdown(section.elements))"
+            }.joined(separator: "\n")
+        }
+    }
+
+    private static func inlineMarkdown(_ elements: [ChannelRichTextInline]) -> String {
+        elements.map { element in
+            var value: String
+            switch element.type {
+            case .text:
+                value = element.text ?? ""
+            case .link:
+                let url = element.url ?? ""
+                value = "[\(element.text ?? url)](\(url))"
+            case .emoji:
+                value = ":\(element.name ?? "emoji"):"
+            }
+            if element.style?.code == true { value = "`\(value)`" }
+            if element.style?.bold == true { value = "**\(value)**" }
+            if element.style?.italic == true { value = "_\(value)_" }
+            if element.style?.strike == true { value = "~~\(value)~~" }
+            return value
+        }.joined()
+    }
+
+    private static func inlinePlainText(_ elements: [ChannelRichTextInline]) -> String {
+        elements.map { element in
+            switch element.type {
+            case .text:
+                return element.text ?? ""
+            case .link:
+                return element.text ?? element.url ?? ""
+            case .emoji:
+                return ":\(element.name ?? "emoji"):"
+            }
+        }.joined()
+    }
+}
+
+private extension String {
+    func replacing(_ pattern: String, with template: String) -> String {
+        guard let expression = try? NSRegularExpression(pattern: pattern) else { return self }
+        return expression.stringByReplacingMatches(
+            in: self,
+            range: NSRange(startIndex..<endIndex, in: self),
+            withTemplate: template
+        )
+    }
+}
+
+private struct ChannelWebhookBlocksView: View {
+    let blocks: [ChannelMessageBlock]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in
+                switch block.type {
+                case .header:
+                    Text(block.textObject?.text ?? "")
+                        .font(.title3.weight(.bold))
+                case .section:
+                    if let text = block.textObject {
+                        if text.type == .markdown {
+                            MarkdownText(
+                                markdown: ChannelWebhookBlockFormatting.slackMarkdown(text.text)
+                            )
+                        } else {
+                            Text(text.text)
+                        }
+                    }
+                case .markdown:
+                    MarkdownText(markdown: block.markdownText ?? "")
+                case .divider:
+                    Divider()
+                case .context:
+                    VStack(alignment: .leading, spacing: 3) {
+                        ForEach(Array((block.contextElements ?? []).enumerated()), id: \.offset) { _, text in
+                            if text.type == .markdown {
+                                MarkdownText(
+                                    markdown: ChannelWebhookBlockFormatting.slackMarkdown(text.text)
+                                )
+                            } else {
+                                Text(text.text)
+                            }
+                        }
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                case .richText:
+                    VStack(alignment: .leading, spacing: 6) {
+                        ForEach(Array((block.richTextElements ?? []).enumerated()), id: \.offset) { _, element in
+                            MarkdownText(
+                                markdown: ChannelWebhookBlockFormatting.richMarkdown(element)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        .textSelection(.enabled)
     }
 }
 

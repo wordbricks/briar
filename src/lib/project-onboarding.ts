@@ -1,10 +1,29 @@
-export const projectOnboardingDeferredStorageKey =
-  "briar.project-onboarding.deferred.v1";
+export const firstRunTutorialPendingStorageKey =
+  "briar.first-run-tutorial.pending.v1";
 
 const storageKeyFor = (userId: string) =>
-  `${projectOnboardingDeferredStorageKey}:${userId}`;
+  `${firstRunTutorialPendingStorageKey}:${userId}`;
 
-export function hasDeferredProjectOnboarding(userId: string) {
+export function shouldShowFirstOrganizationSetup({
+  hasUser,
+  organizationCount,
+  projectCount,
+  remoteMode,
+}: {
+  hasUser: boolean;
+  organizationCount: number;
+  projectCount: number;
+  remoteMode: boolean;
+}) {
+  return (
+    !remoteMode &&
+    hasUser &&
+    organizationCount === 0 &&
+    projectCount === 0
+  );
+}
+
+export function hasPendingFirstRunTutorial(userId: string) {
   if (typeof window === "undefined") return false;
   try {
     return window.localStorage.getItem(storageKeyFor(userId)) === "true";
@@ -13,9 +32,17 @@ export function hasDeferredProjectOnboarding(userId: string) {
   }
 }
 
-export function markProjectOnboardingDeferred(userId: string) {
+export function markFirstRunTutorialPending(userId: string) {
   try {
     window.localStorage.setItem(storageKeyFor(userId), "true");
+  } catch {
+    // The current session can still continue when persistence is unavailable.
+  }
+}
+
+export function clearFirstRunTutorialPending(userId: string) {
+  try {
+    window.localStorage.removeItem(storageKeyFor(userId));
   } catch {
     // The current session can still continue when persistence is unavailable.
   }

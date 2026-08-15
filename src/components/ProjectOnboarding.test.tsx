@@ -9,6 +9,38 @@ import { repositoryWorkflowBootstrap } from "../lib/auto-hunt-contract";
 import type { ProjectLlmProgress } from "../lib/project-llm";
 import { ProjectOnboarding } from "./ProjectOnboarding";
 
+vi.mock("../lib/initial-onboarding", async (importOriginal) => {
+  const original =
+    await importOriginal<typeof import("../lib/initial-onboarding")>();
+  return {
+    ...original,
+    inspectOnboardingPrerequisites: vi.fn().mockResolvedValue({
+      git: {
+        installed: true,
+        version: "git version 2.50.1",
+        authenticated: true,
+      },
+      codex: {
+        installed: true,
+        version: "codex-cli 1.0.0",
+        authenticated: true,
+      },
+      claude: { installed: false, version: null, authenticated: false },
+      grok: { installed: false, version: null, authenticated: false },
+      agy: { installed: false, version: null, authenticated: false },
+      opencode: { installed: false, version: null, authenticated: false },
+    }),
+    inspectOpenCodeTerminalPath: vi.fn().mockResolvedValue({
+      supported: true,
+      configured: true,
+      binaryPath: "/Users/jay/.bun/bin/opencode",
+      configPath: "/Users/jay/.zshrc",
+    }),
+    configureOpenCodeTerminalPath: vi.fn(),
+    installOnboardingPrerequisite: vi.fn(),
+  };
+});
+
 const generatedWorkflow = {
   version: 2 as const,
   requirements: [
@@ -91,7 +123,6 @@ const baseProps = {
   onFinish: () => undefined,
   onLogout: () => undefined,
   onReviseWorkflow: async () => generatedWorkflow,
-  onSkip: () => undefined,
   onRepositorySelect: async () => readiness.repositoryPath,
   onRepositoryInspect: async () => readiness,
   user: { id: "user-1", name: "Jay", email: "jay@example.com" },
@@ -127,12 +158,35 @@ async function selectValidRepository(container: HTMLElement) {
 }
 
 describe("ProjectOnboarding", () => {
-  it("keeps the first-project purpose choice", () => {
+  it("starts manual project creation at repository setup", () => {
     const markup = renderToStaticMarkup(<ProjectOnboarding {...baseProps} />);
 
-    expect(markup).toContain("Briar를 어떻게 사용하고 싶으세요?");
-    expect(markup).toContain("개발 프로젝트 진행하기");
-    expect(markup).toContain("프로젝트 없이 시작");
+    expect(markup).toContain("로컬 Git 저장소");
+    expect(markup).not.toContain("Briar를 어떻게 사용하고 싶으세요?");
+  });
+
+  it("shows developer tools before repository setup", async () => {
+    const { container, root } = mountOnboarding();
+    await act(async () =>
+      root.render(
+        <ProjectOnboarding {...baseProps} includeDeveloperTools />,
+      ),
+    );
+
+    expect(container.textContent).toContain("개발 도구를 연결해 주세요");
+    expect(container.textContent).toContain("Git필수");
+    expect(container.querySelectorAll(".initial-prerequisite-row")).toHaveLength(6);
+    expect(container.textContent).not.toContain("로컬 Git 저장소");
+
+    await act(async () => {
+      buttonWithText(container, "저장소 연결하기")?.click();
+    });
+
+    expect(container.textContent).toContain("로컬 Git 저장소");
+    expect(container.textContent).toContain("프로젝트 설정 · 2/4");
+
+    await act(async () => root.unmount());
+    container.remove();
   });
 
   it("only offers an existing repository and makes it required", () => {
@@ -205,10 +259,13 @@ describe("ProjectOnboarding", () => {
     const providerProgress = container.querySelector(
       ".onboarding-provider-progress",
     );
-    expect(providerProgress?.getAttribute("role")).toBe("status");
-    expect(providerProgress?.getAttribute("aria-live")).toBe("polite");
-    expect(providerProgress?.getAttribute("aria-atomic")).toBe("true");
+    expect(providerProgress?.getAttribute("role")).toBe("group");
+    const liveProgress = providerProgress?.querySelector('[role="status"]');
+    expect(liveProgress?.getAttribute("aria-live")).toBe("polite");
+    expect(liveProgress?.getAttribute("aria-atomic")).toBe("true");
     expect(providerProgress?.textContent).toContain("Codex");
+    expect(providerProgress?.textContent).toContain("경과");
+    expect(providerProgress?.textContent).toContain("방금 업데이트됨");
     expect(providerProgress?.textContent).toContain("저장소 구조를 분석하고 있습니다.");
 
     await act(async () => reportProgress?.({
@@ -242,6 +299,56 @@ describe("ProjectOnboarding", () => {
 
     await act(async () => root.unmount());
     container.remove();
+  });
+
+  it("explains a quiet long-running workflow without exposing tool commands", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-14T04:00:00.000Z"));
+    const { container, root } = mountOnboarding();
+    let reportProgress: ((progress: ProjectLlmProgress) => void) | undefined;
+    const onConnect = vi.fn((
+      _settings: unknown,
+      _repositoryPath: string,
+      onProgress?: (progress: ProjectLlmProgress) => void,
+    ) => {
+      reportProgress = onProgress;
+      return new Promise<never>(() => undefined);
+    });
+
+    try {
+      await act(async () => root.render(
+        <ProjectOnboarding
+          {...baseProps}
+          connection={connection}
+          onConnect={onConnect}
+        />,
+      ));
+      await selectValidRepository(container);
+      await act(async () => buttonWithText(container, "다음")?.click());
+
+      expect(container.textContent).toContain("경과 0s");
+      await act(async () => vi.advanceTimersByTimeAsync(61_000));
+      expect(container.textContent).toContain("경과 1m 1s");
+      expect(container.textContent).toContain("1m 1s 동안 새 업데이트 없음");
+      expect(container.textContent).toContain("요청은 계속 실행 중입니다");
+
+      await act(async () => reportProgress?.({
+        provider: "codex",
+        messageId: "command-1",
+        phase: "activity",
+        message: "git status --short --branch",
+        activityKind: "command",
+      }));
+      expect(container.textContent).toContain(
+        "저장소 파일과 검증 명령을 확인하고 있습니다",
+      );
+      expect(container.textContent).not.toContain("git status");
+      expect(container.textContent).toContain("방금 업데이트됨");
+    } finally {
+      await act(async () => root.unmount());
+      container.remove();
+      vi.useRealTimers();
+    }
   });
 
   it("finishes reconnection without workflow setup or tool analysis when a workflow already exists", async () => {
@@ -469,9 +576,10 @@ describe("ProjectOnboarding", () => {
     const providerProgress = container.querySelector(
       ".onboarding-provider-progress",
     );
-    expect(providerProgress?.getAttribute("role")).toBe("status");
-    expect(providerProgress?.getAttribute("aria-live")).toBe("polite");
-    expect(providerProgress?.getAttribute("aria-atomic")).toBe("true");
+    expect(providerProgress?.getAttribute("role")).toBe("group");
+    const liveProgress = providerProgress?.querySelector('[role="status"]');
+    expect(liveProgress?.getAttribute("aria-live")).toBe("polite");
+    expect(liveProgress?.getAttribute("aria-atomic")).toBe("true");
     expect(providerProgress?.textContent).toContain("Codex");
     expect(providerProgress?.textContent).toContain(
       "패키지 매니저와 테스트 도구를 확인하고 있습니다.",

@@ -5,6 +5,7 @@ import {
   type ChannelAgentReply,
   type ChannelExecutionProposal,
   type ChannelMessage,
+  type ChannelMessageBlock,
   type ChannelMessageAttachment,
   type ChannelMessageReaction,
   type ChannelReplyStatus,
@@ -58,6 +59,7 @@ export type ChannelMessageRow = {
   author_webhook_name: string | null;
   webhook_event_id: string | null;
   body: string;
+  blocks_json: string | null;
   reply_count: number;
   last_reply_at: string | null;
   document_message_id: string | null;
@@ -279,6 +281,7 @@ const messageSelect = (
          message.author_agent_provider, agent.avatar as author_agent_image,
          message.author_webhook_id,
          message.author_webhook_name, message.webhook_event_id, message.body,
+         message.blocks_json,
          (select count(*) from briar_channel_messages reply
           where reply.parent_message_id = message.id) as reply_count,
          (select max(reply.created_at) from briar_channel_messages reply
@@ -548,6 +551,9 @@ export const channelMessageJson = (
   parentMessageId: row.parent_message_id,
   author: channelMessageAuthorJson(row),
   body: row.body,
+  blocks: row.blocks_json
+    ? JSON.parse(row.blocks_json) as ChannelMessageBlock[]
+    : null,
   mentionedUserIds: mentions.users,
   mentionedAgentIds: mentions.agents,
   attachments,
@@ -1669,6 +1675,7 @@ export async function createIncomingChannelWebhookMessage(
     webhookName: string;
     eventId: string | null;
     body: string;
+    blocks: ChannelMessageBlock[] | null;
     createdAt: string;
   },
 ) {
@@ -1676,8 +1683,9 @@ export async function createIncomingChannelWebhookMessage(
     `insert into briar_channel_messages (
        id, channel_id, parent_message_id, author_user_id, author_agent_id,
        author_agent_name, author_agent_provider, author_webhook_id,
-       author_webhook_name, webhook_event_id, body, created_at, updated_at
-     ) values (?, ?, null, null, null, null, null, ?, ?, ?, ?, ?, ?)
+       author_webhook_name, webhook_event_id, body, blocks_json,
+       created_at, updated_at
+     ) values (?, ?, null, null, null, null, null, ?, ?, ?, ?, ?, ?, ?)
      on conflict (author_webhook_id, webhook_event_id) where
        author_webhook_id is not null and webhook_event_id is not null
      do nothing
@@ -1689,6 +1697,7 @@ export async function createIncomingChannelWebhookMessage(
     input.webhookName,
     input.eventId,
     input.body,
+    input.blocks ? JSON.stringify(input.blocks) : null,
     input.createdAt,
     input.createdAt,
   ).first<{ id: string }>();
