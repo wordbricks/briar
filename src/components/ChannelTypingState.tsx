@@ -1,4 +1,4 @@
-import { LoaderCircle } from "lucide-react";
+import { LoadingState } from "@/components/ui/loading-state";
 import { useI18n } from "../i18n";
 import type { ChannelAgentActivityDescriptor } from "../lib/channel-agent-activity";
 
@@ -21,10 +21,13 @@ export function ChannelTypingState({
       key={name}
       role="status"
     >
-      <LoaderCircle className="spin" size={15} />
-      {activityByAgentName?.[name]
-        ? `${name} · ${activityByAgentName[name].headline}`
-        : t("channel.namedAgentTyping", { name })}
+      <LoadingState
+        label={
+          activityByAgentName?.[name]
+            ? `${name} · ${activityByAgentName[name].headline}`
+            : t("channel.namedAgentTyping", { name })
+        }
+      />
     </div>
   ));
 }
