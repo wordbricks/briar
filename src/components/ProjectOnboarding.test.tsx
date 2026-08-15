@@ -205,10 +205,13 @@ describe("ProjectOnboarding", () => {
     const providerProgress = container.querySelector(
       ".onboarding-provider-progress",
     );
-    expect(providerProgress?.getAttribute("role")).toBe("status");
-    expect(providerProgress?.getAttribute("aria-live")).toBe("polite");
-    expect(providerProgress?.getAttribute("aria-atomic")).toBe("true");
+    expect(providerProgress?.getAttribute("role")).toBe("group");
+    const liveProgress = providerProgress?.querySelector('[role="status"]');
+    expect(liveProgress?.getAttribute("aria-live")).toBe("polite");
+    expect(liveProgress?.getAttribute("aria-atomic")).toBe("true");
     expect(providerProgress?.textContent).toContain("Codex");
+    expect(providerProgress?.textContent).toContain("경과");
+    expect(providerProgress?.textContent).toContain("방금 업데이트됨");
     expect(providerProgress?.textContent).toContain("저장소 구조를 분석하고 있습니다.");
 
     await act(async () => reportProgress?.({
@@ -242,6 +245,56 @@ describe("ProjectOnboarding", () => {
 
     await act(async () => root.unmount());
     container.remove();
+  });
+
+  it("explains a quiet long-running workflow without exposing tool commands", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-14T04:00:00.000Z"));
+    const { container, root } = mountOnboarding();
+    let reportProgress: ((progress: ProjectLlmProgress) => void) | undefined;
+    const onConnect = vi.fn((
+      _settings: unknown,
+      _repositoryPath: string,
+      onProgress?: (progress: ProjectLlmProgress) => void,
+    ) => {
+      reportProgress = onProgress;
+      return new Promise<never>(() => undefined);
+    });
+
+    try {
+      await act(async () => root.render(
+        <ProjectOnboarding
+          {...baseProps}
+          connection={connection}
+          onConnect={onConnect}
+        />,
+      ));
+      await selectValidRepository(container);
+      await act(async () => buttonWithText(container, "다음")?.click());
+
+      expect(container.textContent).toContain("경과 0s");
+      await act(async () => vi.advanceTimersByTimeAsync(61_000));
+      expect(container.textContent).toContain("경과 1m 1s");
+      expect(container.textContent).toContain("1m 1s 동안 새 업데이트 없음");
+      expect(container.textContent).toContain("요청은 계속 실행 중입니다");
+
+      await act(async () => reportProgress?.({
+        provider: "codex",
+        messageId: "command-1",
+        phase: "activity",
+        message: "git status --short --branch",
+        activityKind: "command",
+      }));
+      expect(container.textContent).toContain(
+        "저장소 파일과 검증 명령을 확인하고 있습니다",
+      );
+      expect(container.textContent).not.toContain("git status");
+      expect(container.textContent).toContain("방금 업데이트됨");
+    } finally {
+      await act(async () => root.unmount());
+      container.remove();
+      vi.useRealTimers();
+    }
   });
 
   it("finishes reconnection without workflow setup or tool analysis when a workflow already exists", async () => {
@@ -469,9 +522,10 @@ describe("ProjectOnboarding", () => {
     const providerProgress = container.querySelector(
       ".onboarding-provider-progress",
     );
-    expect(providerProgress?.getAttribute("role")).toBe("status");
-    expect(providerProgress?.getAttribute("aria-live")).toBe("polite");
-    expect(providerProgress?.getAttribute("aria-atomic")).toBe("true");
+    expect(providerProgress?.getAttribute("role")).toBe("group");
+    const liveProgress = providerProgress?.querySelector('[role="status"]');
+    expect(liveProgress?.getAttribute("aria-live")).toBe("polite");
+    expect(liveProgress?.getAttribute("aria-atomic")).toBe("true");
     expect(providerProgress?.textContent).toContain("Codex");
     expect(providerProgress?.textContent).toContain(
       "패키지 매니저와 테스트 도구를 확인하고 있습니다.",
