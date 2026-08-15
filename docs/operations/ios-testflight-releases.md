@@ -781,3 +781,35 @@ all alternate app icons were verified before upload.
 The initial 1.2.124 gate was stopped before archive upload when main advanced
 to the 1.2.125 release commit. Version `1.2.125 (1)` is therefore the final
 build handed off from the latest main commit.
+
+## 2026-08-15 — 1.2.125 (2)
+
+- App: Briar Companion (`app.briar.companion`)
+- Marketing version: `1.2.125`
+- App Store Connect build: `2`
+- App Store Connect build ID: `93881e0e-ac81-4d47-80cc-783066572ce5`
+- Latest main commit: `3eb25611`
+- Release source commit: `3eb256117a6407b9ee9eeebfa2ef91876e4a1032`
+- Implementation: native SwiftUI
+- Toolchain: Xcode 26.6, iOS 26.5 SDK
+- Minimum iOS version: 17.0
+- App Store Connect processing state: `VALID`
+- TestFlight state: `IN_BETA_TESTING`
+- Internal group: `wordbricks` (`hasAccessToAllBuilds=true`)
+- Automatic tester notification: enabled
+- IPA SHA-256: `57c34076c6a979774d7a194d2b6a6ded9921fb6313ed75997c1f148fe61a23f9`
+
+This release adds initial-load channel messages on native iOS, immediate
+conversation draft clearing, issue conversation realtime synchronization and
+notification suppression, the redesigned first-run onboarding flow, Block Kit
+webhook rendering, pixel-grid agent reply loading, and structured approval
+reply output. The exact source commit passed the shared mobile contract, Swift
+unit and 14 iPhone UI tests, iPad accessibility and layout testing, Production
+analyze and build checks, the Tauri iOS simulator bundle, and the Android ARM64
+APK build. Archive identity, App Store provisioning, distribution signature,
+production entitlements, exported IPA signature, and all alternate app icons
+were verified before upload.
+
+Build `1` of version `1.2.125` remains `VALID`, but main advanced through the
+conversation, onboarding, and approval updates above. Version `1.2.125 (2)` is
+therefore the final build handed off from the latest main commit.
