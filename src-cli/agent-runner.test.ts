@@ -5,9 +5,11 @@ import {
   detachedAgentContext,
   detachedAgentPrompt,
   detachedChannelReplyPrompt,
+  detachedChannelReplyOutputSchema,
   detachedConversationIdFromPayload,
   detachedPayloadDirection,
   detachedIssueReplyPrompt,
+  detachedIssueReplyOutputSchema,
   detachedProjectAgentPrompt,
   detachedProviderRequest,
   detachedProviderBlockedRunEvent,
@@ -18,6 +20,7 @@ import {
   detachedTranscriptSessionId,
   detachedTranscriptPayload,
   issueReplyTextFromPayload,
+  parseDetachedJsonResult,
   parseDetachedIssueReplyResult,
   runProjectAgentTaskCompletionFlow,
   shouldPersistDetachedTranscriptPayload,
@@ -632,6 +635,65 @@ describe("detached Agent runner", () => {
     });
   });
 
+  it("passes reply schemas through every provider-neutral runner request", () => {
+    for (const provider of [
+      "codex",
+      "claude",
+      "grok",
+      "agy",
+      "opencode",
+    ] as const) {
+      const launch = detachedProviderRequest({
+        agent: { ...agent, provider },
+        prompt: "reply",
+        workspacePath: "/worktree",
+        fullAccess: false,
+        outputSchema: detachedIssueReplyOutputSchema,
+        agentBinary: `/bin/${provider}`,
+      });
+      expect(launch.request.outputSchema).toBe(detachedIssueReplyOutputSchema);
+    }
+
+    expect(detachedProviderRequest({
+      agent,
+      prompt: "channel reply",
+      workspacePath: "/worktree",
+      fullAccess: false,
+      outputSchema: detachedChannelReplyOutputSchema,
+      agentBinary: "/bin/codex",
+    }).request.outputSchema).toBe(detachedChannelReplyOutputSchema);
+  });
+
+  it("keeps every structured-output object strict and fully required", () => {
+    const inspect = (schema: unknown) => {
+      if (!schema || typeof schema !== "object" || Array.isArray(schema)) {
+        return;
+      }
+      const record = schema as Record<string, unknown>;
+      if (
+        record.type === "object" && record.properties &&
+        typeof record.properties === "object" &&
+        !Array.isArray(record.properties)
+      ) {
+        const propertyNames = Object.keys(record.properties);
+        expect(record.additionalProperties).toBe(false);
+        expect(new Set(record.required as string[])).toEqual(
+          new Set(propertyNames),
+        );
+      }
+      for (const value of Object.values(record)) {
+        if (Array.isArray(value)) {
+          value.forEach(inspect);
+        } else {
+          inspect(value);
+        }
+      }
+    };
+
+    inspect(detachedIssueReplyOutputSchema);
+    inspect(detachedChannelReplyOutputSchema);
+  });
+
   it("gives issue conversations the full Worker execution profile", () => {
     const prompt = detachedIssueReplyPrompt({
       agent,
@@ -728,6 +790,68 @@ describe("detached Agent runner", () => {
         type: "request_issue_create",
         issue: { title: "후속 QA", status: "backlog" },
       },
+    });
+  });
+
+  it("extracts one valid issue proposal from pure, fenced, or mixed JSON", () => {
+    const proposal = {
+      reply: "본문 업데이트를 제안했습니다. 승인이 필요합니다.",
+      proposedAction: {
+        type: "request_issue_update",
+        changes: { description: "새 본문" },
+      },
+      executionProposal: null,
+      skillExecutionProposal: null,
+    };
+    const json = JSON.stringify(proposal);
+
+    for (const response of [
+      json,
+      `\`\`\`json\n${json}\n\`\`\``,
+      `업데이트 내용을 준비했습니다.\n\n\`\`\`json\n${json}\n\`\`\``,
+    ]) {
+      expect(parseDetachedIssueReplyResult(response)).toEqual(proposal);
+    }
+  });
+
+  it("fails closed for multiple JSON objects or an invalid proposal schema", () => {
+    const valid = JSON.stringify({
+      reply: "승인이 필요합니다.",
+      proposedAction: {
+        type: "request_issue_update",
+        changes: { priority: 1 },
+      },
+      executionProposal: null,
+      skillExecutionProposal: null,
+    });
+    const multiple = `${valid}\n${valid}`;
+    expect(() => parseDetachedJsonResult(multiple)).toThrow(
+      "exactly one JSON object",
+    );
+    expect(() => parseDetachedJsonResult(`Wrapped [${valid}]`)).toThrow(
+      "exactly one JSON object",
+    );
+    expect(parseDetachedIssueReplyResult(multiple)).toEqual({
+      reply: multiple,
+      proposedAction: null,
+      executionProposal: null,
+      skillExecutionProposal: null,
+    });
+
+    const invalid = JSON.stringify({
+      reply: "범위를 벗어난 우선순위입니다.",
+      proposedAction: {
+        type: "request_issue_update",
+        changes: { priority: 9 },
+      },
+      executionProposal: null,
+      skillExecutionProposal: null,
+    });
+    expect(parseDetachedIssueReplyResult(invalid)).toEqual({
+      reply: invalid,
+      proposedAction: null,
+      executionProposal: null,
+      skillExecutionProposal: null,
     });
   });
 

@@ -15,6 +15,7 @@ import {
   type NormalizedAgentEvent,
 } from "./normalized-agent-event";
 import { readAgentImage } from "./runner-attachments";
+import { extractSingleJsonObject } from "../src/lib/single-json-object";
 
 export type {
   AgentActivityKind,
@@ -738,34 +739,13 @@ export function grokStopReasonSucceeded(stopReason: string | undefined) {
 
 export function extractJsonObject(raw: string): string {
   const trimmed = raw.trim();
-  const start = trimmed.indexOf("{");
-  if (start < 0) return trimmed;
-
-  let depth = 0;
-  let inString = false;
-  let escaping = false;
-  for (let index = start; index < trimmed.length; index += 1) {
-    const char = trimmed[index];
-    if (inString) {
-      if (escaping) {
-        escaping = false;
-      } else if (char === "\\") {
-        escaping = true;
-      } else if (char === '"') {
-        inString = false;
-      }
-      continue;
-    }
-    if (char === '"') {
-      inString = true;
-    } else if (char === "{") {
-      depth += 1;
-    } else if (char === "}") {
-      depth -= 1;
-      if (depth === 0) return trimmed.slice(start, index + 1);
-    }
+  try {
+    JSON.parse(trimmed);
+    return trimmed;
+  } catch {
+    // Continue with conversational-output extraction.
   }
-  return trimmed.slice(start);
+  return extractSingleJsonObject(trimmed)?.text ?? trimmed;
 }
 
 export function resolveGrokFinalMessage(

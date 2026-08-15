@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { resolve } from "node:path";
 import { createInterface } from "node:readline";
 import type { AgentAttachment } from "../src-agent/runner-attachments";
+import type { JsonSchema } from "../src/lib/project-llm";
 import {
   detachedConversationIdFromPayload,
   detachedProviderRequest,
@@ -29,6 +30,7 @@ export async function runDetachedProviderTurn(input: {
   attachments?: AgentAttachment[];
   organizationContextManifestPath?: string | null;
   delegationTargets?: readonly DetachedDelegationTarget[];
+  outputSchema?: JsonSchema | null;
   environment: NodeJS.ProcessEnv;
   signal: AbortSignal;
   onPayload?: (payload: unknown, rawLine: string) => void | Promise<void>;
@@ -68,6 +70,7 @@ export async function runDetachedProviderTurn(input: {
     organizationContextManifestPath:
       input.organizationContextManifestPath ?? null,
     delegationTargets: input.delegationTargets,
+    outputSchema: input.outputSchema ?? null,
     agentBinary,
   }).request;
   const child = spawn(process.execPath, [runnerPath], {

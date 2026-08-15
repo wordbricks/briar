@@ -26,10 +26,17 @@ export function parseChannelReplyAgentResult(parsed: unknown): {
     };
   }
   const record = parsed as Record<string, unknown>;
+  if (record.contextRequests !== null && record.contextRequests !== undefined) {
+    throw new Error("A completed channel reply cannot request more context");
+  }
   const attachmentPaths = channelReplyAgentAttachmentsSchema.parse(
     record.attachments ?? [],
   );
-  const { attachments: _ignored, ...rest } = record;
+  const {
+    attachments: _ignored,
+    contextRequests: _contextRequests,
+    ...rest
+  } = record;
   return {
     result: channelReplyCompletionSchema.parse(rest),
     attachmentPaths,

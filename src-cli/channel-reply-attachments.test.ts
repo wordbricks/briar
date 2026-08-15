@@ -7,6 +7,7 @@ import {
   collectChannelReplyAttachments,
   parseChannelReplyAgentResult,
 } from "./channel-reply-attachments";
+import { parseDetachedJsonResult } from "./agent-runner";
 
 const temporaryDirectories: string[] = [];
 
@@ -53,6 +54,101 @@ describe("channel reply agent attachments", () => {
       result: { body: "Answer", delegation: null },
       attachmentPaths: [],
     });
+  });
+
+  it("extracts channel issue proposals from pure, fenced, or mixed JSON", () => {
+    const proposal = {
+      body: "이슈 생성을 제안했습니다. 승인이 필요합니다.",
+      attachments: [],
+      document: null,
+      issueProposal: {
+        projectId: null,
+        executeAfterCreate: false,
+        issue: {
+          title: "승인 컴포넌트 QA",
+          description: null,
+          priority: 2,
+          status: "backlog",
+        },
+      },
+      executionProposal: null,
+      skillExecutionProposal: null,
+      delegation: null,
+      contextRequests: null,
+    };
+    const json = JSON.stringify(proposal);
+
+    for (const response of [
+      json,
+      `\`\`\`json\n${json}\n\`\`\``,
+      `제안 내용을 준비했습니다.\n\n\`\`\`json\n${json}\n\`\`\``,
+    ]) {
+      expect(parseChannelReplyAgentResult(parseDetachedJsonResult(response)))
+        .toMatchObject({
+          result: { issueProposal: proposal.issueProposal },
+          attachmentPaths: [],
+        });
+    }
+  });
+
+  it("rejects invalid channel proposal shapes and multiple JSON objects", () => {
+    const invalid = JSON.stringify({
+      body: "Invalid proposal",
+      attachments: [],
+      document: null,
+      issueProposal: {
+        projectId: null,
+        executeAfterCreate: false,
+        issue: {
+          title: "Out of range",
+          description: null,
+          priority: 9,
+          status: "backlog",
+        },
+      },
+      executionProposal: null,
+      skillExecutionProposal: null,
+      delegation: null,
+      contextRequests: null,
+    });
+    expect(() =>
+      parseChannelReplyAgentResult(parseDetachedJsonResult(invalid))
+    ).toThrow();
+
+    const valid = JSON.stringify({
+      body: "Answer",
+      attachments: [],
+      document: null,
+      issueProposal: null,
+      executionProposal: null,
+      skillExecutionProposal: null,
+      delegation: null,
+      contextRequests: null,
+    });
+    expect(() => parseDetachedJsonResult(`${valid}\n${valid}`)).toThrow(
+      "exactly one JSON object",
+    );
+  });
+
+  it("keeps context lookup turns out of the durable reply contract", () => {
+    expect(() =>
+      parseChannelReplyAgentResult({
+        body: null,
+        attachments: [],
+        document: null,
+        issueProposal: null,
+        executionProposal: null,
+        skillExecutionProposal: null,
+        delegation: null,
+        contextRequests: [{
+          resource: "issues",
+          projectId: "project-1",
+          detail: "summary",
+          limit: 25,
+          cursor: null,
+        }],
+      })
+    ).toThrow("cannot request more context");
   });
 
   it("rejects a local path left on the worker completion contract", () => {

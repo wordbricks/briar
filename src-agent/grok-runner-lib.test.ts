@@ -507,6 +507,13 @@ describe("Grok runner", () => {
     ).toBe('{"message":"literal } brace","nested":{"ok":true}}');
   });
 
+  it("does not hide multiple JSON objects from the shared validator", () => {
+    const mixed = 'First {"ok":true}\nThen {"ok":false}';
+    expect(extractJsonObject(mixed)).toBe(mixed);
+    const wrapped = 'Wrapped [{"ok":true}]';
+    expect(extractJsonObject(wrapped)).toBe(wrapped);
+  });
+
   it("uses the final assistant segment for structured output", () => {
     const state = createGrokEventState();
     normalizeGrokSessionUpdate(
