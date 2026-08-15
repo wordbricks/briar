@@ -1407,7 +1407,9 @@ export function useBriar(options: UseBriarOptions = {}) {
           ...input,
           organizationId: activeOrganizationId ?? undefined,
         });
+        const nextOrganizations = await loadOrganizations(token).catch(() => null);
         setProjects((current) => [...current, result.project]);
+        if (nextOrganizations) setOrganizations(nextOrganizations);
         setActiveOrganizationId(
           result.project.organizationId ?? activeOrganizationId,
         );

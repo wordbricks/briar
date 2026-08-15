@@ -42,7 +42,10 @@ where Message.ID: Hashable {
     let hasEarlierMessages: Bool
     let loadingEarlierMessages: Bool
     let onLoadEarlier: (() async -> Void)?
+    let measuresMessageHeightsEagerly: Bool
     let row: (Message) -> RowContent
+    @State private var requestedEarlierMessages = false
+    @State private var eagerInitialPositionReady = false
 
     init(
         messages: [Message],
@@ -52,6 +55,7 @@ where Message.ID: Hashable {
         hasEarlierMessages: Bool = false,
         loadingEarlierMessages: Bool = false,
         onLoadEarlier: (() async -> Void)? = nil,
+        measuresMessageHeightsEagerly: Bool = false,
         @ViewBuilder row: @escaping (Message) -> RowContent
     ) {
         self.messages = messages
@@ -61,6 +65,7 @@ where Message.ID: Hashable {
         self.hasEarlierMessages = hasEarlierMessages
         self.loadingEarlierMessages = loadingEarlierMessages
         self.onLoadEarlier = onLoadEarlier
+        self.measuresMessageHeightsEagerly = measuresMessageHeightsEagerly
         self.row = row
     }
 
@@ -69,40 +74,23 @@ where Message.ID: Hashable {
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(spacing: 0) {
-                    if loadingEarlierMessages {
-                        ProgressView()
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 8)
-                            .accessibilityIdentifier("conversation-earlier-messages-loading")
-                    } else if hasEarlierMessages {
-                        Color.clear
-                            .frame(height: 1)
-                            .onAppear {
-                                Task { await onLoadEarlier?() }
-                            }
-                            .accessibilityIdentifier("conversation-earlier-messages-trigger")
-                    }
-                    ForEach(Array(messages.indices), id: \.self) { index in
-                        if ConversationDatePresentation.startsNewDay(
-                            at: index,
-                            in: dates
-                        ) {
-                            ConversationDateDivider(
-                                date: timestamp(messages[index]),
-                                locale: locale
-                            )
-                        }
-                        row(messages[index])
-                            .id(messages[index].id)
-                    }
-                }
+                messageStack
                 .padding(.bottom, 8)
             }
             .defaultScrollAnchor(.bottom)
             .scrollDismissesKeyboard(.interactively)
-            .onChange(of: messages.last?.id) { previous, current in
-                guard previous != current, let current else { return }
+            .onChange(of: messages.last?.id, initial: true) { previous, current in
+                guard let current else { return }
+                if measuresMessageHeightsEagerly, !eagerInitialPositionReady {
+                    Task { @MainActor in
+                        await Task.yield()
+                        proxy.scrollTo(current, anchor: .bottom)
+                        await Task.yield()
+                        eagerInitialPositionReady = true
+                    }
+                    return
+                }
+                guard previous != current else { return }
                 withAnimation(.easeOut(duration: 0.2)) {
                     proxy.scrollTo(current, anchor: .bottom)
                 }
@@ -113,6 +101,93 @@ where Message.ID: Hashable {
             }
         }
         .accessibilityIdentifier(accessibilityIdentifier)
+    }
+
+    @ViewBuilder
+    private var messageStack: some View {
+        if measuresMessageHeightsEagerly {
+            // Channel history arrives in bounded pages. Measuring the current
+            // page before scrolling prevents variable-height rows from leaving
+            // the initial offset beyond the rendered content on older iOS.
+            VStack(spacing: 0) {
+                earlierMessagesBoundary
+                messageRows
+            }
+        } else {
+            LazyVStack(spacing: 0) {
+                earlierMessagesBoundary
+                messageRows
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var earlierMessagesBoundary: some View {
+        if loadingEarlierMessages {
+            ProgressView()
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 8)
+                .accessibilityIdentifier("conversation-earlier-messages-loading")
+        } else if hasEarlierMessages {
+            if measuresMessageHeightsEagerly {
+                Color.clear
+                    .frame(height: 1)
+                    .background {
+                        GeometryReader { geometry in
+                            Color.clear
+                                .onAppear {
+                                    requestEarlierMessagesIfNeeded(
+                                        boundaryMaxY: geometry.frame(in: .global).maxY
+                                    )
+                                }
+                                .onChange(of: geometry.frame(in: .global).maxY) { _, maxY in
+                                    requestEarlierMessagesIfNeeded(boundaryMaxY: maxY)
+                                }
+                        }
+                    }
+                    .accessibilityIdentifier("conversation-earlier-messages-trigger")
+            } else {
+                Color.clear
+                    .frame(height: 1)
+                    .onAppear {
+                        Task { await onLoadEarlier?() }
+                    }
+                    .accessibilityIdentifier("conversation-earlier-messages-trigger")
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var messageRows: some View {
+        ForEach(Array(messages.indices), id: \.self) { index in
+            if ConversationDatePresentation.startsNewDay(
+                at: index,
+                in: dates
+            ) {
+                ConversationDateDivider(
+                    date: timestamp(messages[index]),
+                    locale: locale
+                )
+            }
+            row(messages[index])
+                .id(messages[index].id)
+        }
+    }
+
+    private func requestEarlierMessagesIfNeeded(boundaryMaxY: CGFloat) {
+        guard
+            measuresMessageHeightsEagerly,
+            hasEarlierMessages,
+            !loadingEarlierMessages,
+            !requestedEarlierMessages,
+            eagerInitialPositionReady,
+            boundaryMaxY >= 0
+        else { return }
+        requestedEarlierMessages = true
+        Task {
+            await onLoadEarlier?()
+            requestedEarlierMessages = false
+        }
     }
 }
 
