@@ -367,7 +367,9 @@ final class BriarCompanionUITests: XCTestCase {
     }
 
     func testCreateRunStateAndMessageFlow() {
-        let app = launchInsideCompanion()
+        let app = launchInsideCompanion(
+            additionalArguments: ["--ui-testing-delayed-message-send"]
+        )
 
         app.buttons["create-issue-button"].tap()
         let title = app.textFields["create-issue-title"]
@@ -412,15 +414,26 @@ final class BriarCompanionUITests: XCTestCase {
             "이슈 대화 입력창은 화면의 하반부에 표시되어야 합니다."
         )
         message.tap()
-        message.typeText("모바일에서 확인했습니다")
-        app.buttons["issue-message-send"].tap()
-        XCTAssertTrue(app.staticTexts["모바일에서 확인했습니다"].waitForExistence(timeout: 5))
+        let sentBody = "모바일에서 확인했습니다"
+        message.typeText(sentBody)
+        let send = app.buttons["issue-message-send"]
+        send.tap()
+        XCTAssertFalse(
+            (message.value as? String ?? "").contains(sentBody),
+            "서버 응답을 기다리기 전에 전송한 초안이 입력창에서 즉시 사라져야 합니다."
+        )
+        XCTAssertTrue(send.exists)
+        XCTAssertFalse(send.isEnabled, "전송 중에는 중복 제출을 막아야 합니다.")
+        captureScreenshot(named: "companion-message-draft-cleared")
+        XCTAssertTrue(app.staticTexts[sentBody].waitForExistence(timeout: 5))
         captureScreenshot(named: "companion-native-write-flow")
     }
 
-    private func launchInsideCompanion() -> XCUIApplication {
+    private func launchInsideCompanion(
+        additionalArguments: [String] = []
+    ) -> XCUIApplication {
         let app = XCUIApplication()
-        app.launchArguments = ["--ui-testing"]
+        app.launchArguments = ["--ui-testing"] + additionalArguments
         app.launch()
         XCTAssertTrue(app.buttons["login-button"].waitForExistence(timeout: transitionTimeout))
         app.buttons["login-button"].tap()
