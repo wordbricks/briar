@@ -750,3 +750,34 @@ the Tauri iOS simulator and Android ARM64 regression builds. Archive identity,
 App Store provisioning, distribution signature, production entitlements
 (`get-task-allow=0`), exported IPA verification, and alternate app icons were
 verified before upload.
+
+## 2026-08-15 — 1.2.125 (1)
+
+- App: Briar Companion (`app.briar.companion`)
+- Marketing version: `1.2.125`
+- App Store Connect build: `1`
+- App Store Connect build ID: `67cdbe14-2c51-4ca6-b774-a95f96746d27`
+- Latest main commit: `c1be0a01`
+- Release source commit: `c1be0a0194ebf86fc00494f208c279912db190d9`
+- Implementation: native SwiftUI
+- Toolchain: Xcode 26.6, iOS 26.5 SDK
+- Minimum iOS version: 17.0
+- App Store Connect processing state: `VALID`
+- TestFlight state: `IN_BETA_TESTING`
+- Internal group: `wordbricks` (`hasAccessToAllBuilds=true`)
+- Automatic tester notification: enabled
+- IPA SHA-256: `54de458f6f604698010d188223776c2f3691b6995ee8ad42a8353ebf9de6212b`
+
+This release includes streamed channel-agent activity, faster channel and idle
+project synchronization, materialized channel notifications, persistent reply
+threads, provider and sender avatars, image lightbox downloads, and the narrow
+issue conversation tab. The exact source commit passed the shared mobile
+contract, Swift unit and 13 iPhone UI tests, iPad accessibility and layout
+testing, Production analyze and build checks, the Tauri iOS simulator bundle,
+and the Android ARM64 APK build. Archive identity, App Store provisioning,
+distribution signature, production entitlements, exported IPA signature, and
+all alternate app icons were verified before upload.
+
+The initial 1.2.124 gate was stopped before archive upload when main advanced
+to the 1.2.125 release commit. Version `1.2.125 (1)` is therefore the final
+build handed off from the latest main commit.
