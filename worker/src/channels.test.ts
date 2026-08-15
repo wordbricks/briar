@@ -2464,7 +2464,10 @@ describe("organization channels", () => {
       },
       body: JSON.stringify({
         body: "@Local-One @Local-Two answer",
-        mentionedAgentIds: [firstAgentId, secondAgentId],
+        mentionedAgentIds: [
+          firstAgentId.toUpperCase(),
+          secondAgentId.toUpperCase(),
+        ],
         preferredDeviceId: deviceId,
       }),
     }), apiEnv);

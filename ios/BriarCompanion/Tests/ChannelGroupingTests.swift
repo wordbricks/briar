@@ -268,9 +268,10 @@ final class ChannelGroupingTests: XCTestCase {
     }
 
     func testChannelMessageRequestEncodesStructuredMentionRecipients() throws {
+        let parentMessageId = UUID(uuidString: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")!
         let request = CreateChannelMessageRequest(
             body: "@Honey @sam 확인",
-            parentMessageId: nil,
+            parentMessageId: parentMessageId,
             mentionedUserIds: ["user-2"],
             mentionedAgentIds: [UUID(uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!]
         )
@@ -280,8 +281,12 @@ final class ChannelGroupingTests: XCTestCase {
 
         XCTAssertEqual(object["mentionedUserIds"] as? [String], ["user-2"])
         XCTAssertEqual(
+            object["parentMessageId"] as? String,
+            parentMessageId.uuidString.lowercased()
+        )
+        XCTAssertEqual(
             object["mentionedAgentIds"] as? [String],
-            ["AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA"]
+            ["aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"]
         )
     }
 
