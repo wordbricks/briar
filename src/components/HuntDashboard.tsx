@@ -257,6 +257,7 @@ import type { MessageKey } from "../i18n/messages";
 type SourceFilter = "all" | HuntSource;
 type StatusFilter = CompanionStatusFilter;
 type DashboardView = "kanban" | "list";
+const issueConversationTabBreakpoint = 960;
 type KanbanColumn = {
   id: string;
   label: string;
@@ -4503,6 +4504,29 @@ export function RunPage({
     min: conversationPaneWidthMin,
     save: saveConversationPaneWidth,
   });
+  const [isConversationLayoutCompact, setIsConversationLayoutCompact] =
+    useState(false);
+  useLayoutEffect(() => {
+    if (companionMode) return;
+    const layout = runPageLayoutRef.current;
+    if (!layout) return;
+    const update = (width: number) => {
+      if (width <= 0) return;
+      setIsConversationLayoutCompact(
+        width < issueConversationTabBreakpoint,
+      );
+    };
+    update(layout.getBoundingClientRect().width);
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries.find(({ target }) => target === layout);
+      if (entry) update(entry.contentRect.width);
+    });
+    observer.observe(layout);
+    return () => observer.disconnect();
+  }, [companionMode, runPageLayoutRef]);
+  const usesConversationTab =
+    companionMode || isConversationLayoutCompact;
   const [isCompletingResultReview, setIsCompletingResultReview] =
     useState(false);
   const [isResumePending, setIsResumePending] = useState(false);
@@ -4543,6 +4567,18 @@ export function RunPage({
   const [activeDetailTab, setActiveDetailTab] = useState<IssueDetailTab>(() =>
     initialDetailTab ?? defaultIssueDetailTab(run.status),
   );
+  const lastContentDetailTabRef = useRef<Exclude<
+    IssueDetailTab,
+    "conversation"
+  >>(
+    initialDetailTab && initialDetailTab !== "conversation"
+      ? initialDetailTab
+      : defaultIssueDetailTab(run.status),
+  );
+  const selectDetailTab = (tab: IssueDetailTab) => {
+    if (tab !== "conversation") lastContentDetailTabRef.current = tab;
+    setActiveDetailTab(tab);
+  };
   const hasWorkerExecution = Boolean(run.workerId);
   const workerExecutionIsLive = ![
     "completed",
@@ -4609,7 +4645,12 @@ export function RunPage({
   );
   const detailTabsId = useId();
   useEffect(() => {
-    setActiveDetailTab(initialDetailTab ?? defaultIssueDetailTab(run.status));
+    const nextDetailTab =
+      initialDetailTab ?? defaultIssueDetailTab(run.status);
+    setActiveDetailTab(nextDetailTab);
+    if (nextDetailTab !== "conversation") {
+      lastContentDetailTabRef.current = nextDetailTab;
+    }
     setIsPropertiesOpen(false);
     setRunEvents([]);
     setIsCompletingResultReview(false);
@@ -4621,6 +4662,10 @@ export function RunPage({
     setReworkError(null);
     setIsSubmittingRework(false);
   }, [initialDetailTab, run.id, run.status]);
+  useLayoutEffect(() => {
+    if (usesConversationTab || activeDetailTab !== "conversation") return;
+    setActiveDetailTab(lastContentDetailTabRef.current);
+  }, [activeDetailTab, usesConversationTab]);
   useEffect(() => {
     inlineSaveSequenceRef.current += 1;
     if (inlineSaveTimerRef.current) {
@@ -5622,10 +5667,10 @@ export function RunPage({
           ) : null}
           <div className="run-page-body">
             <div
-              className={`run-page-layout${isResizingConversation ? " is-resizing-conversation" : ""}`}
+              className={`run-page-layout${usesConversationTab ? " is-conversation-tabbed" : ""}${isResizingConversation ? " is-resizing-conversation" : ""}`}
               ref={runPageLayoutRef}
               style={
-                conversationPaneWidth === null
+                conversationPaneWidth === null || usesConversationTab
                   ? undefined
                   : ({
                       "--run-conversation-pane-width": `${conversationPaneWidth}%`,
@@ -5642,7 +5687,7 @@ export function RunPage({
                     aria-controls={`${detailTabsId}-description-panel`}
                     aria-selected={activeDetailTab === "description"}
                     id={`${detailTabsId}-description-tab`}
-                    onClick={() => setActiveDetailTab("description")}
+                    onClick={() => selectDetailTab("description")}
                     role="tab"
                     type="button"
                   >
@@ -5652,7 +5697,7 @@ export function RunPage({
                     aria-controls={`${detailTabsId}-result-panel`}
                     aria-selected={activeDetailTab === "result"}
                     id={`${detailTabsId}-result-tab`}
-                    onClick={() => setActiveDetailTab("result")}
+                    onClick={() => selectDetailTab("result")}
                     role="tab"
                     type="button"
                   >
@@ -5662,7 +5707,7 @@ export function RunPage({
                     aria-controls={`${detailTabsId}-evidence-panel`}
                     aria-selected={activeDetailTab === "evidence"}
                     id={`${detailTabsId}-evidence-tab`}
-                    onClick={() => setActiveDetailTab("evidence")}
+                    onClick={() => selectDetailTab("evidence")}
                     role="tab"
                     type="button"
                   >
@@ -5672,7 +5717,7 @@ export function RunPage({
                     aria-controls={`${detailTabsId}-agent-activity-panel`}
                     aria-selected={activeDetailTab === "agentActivity"}
                     id={`${detailTabsId}-agent-activity-tab`}
-                    onClick={() => setActiveDetailTab("agentActivity")}
+                    onClick={() => selectDetailTab("agentActivity")}
                     role="tab"
                     type="button"
                   >
@@ -5682,18 +5727,18 @@ export function RunPage({
                     aria-controls={`${detailTabsId}-status-history-panel`}
                     aria-selected={activeDetailTab === "statusHistory"}
                     id={`${detailTabsId}-status-history-tab`}
-                    onClick={() => setActiveDetailTab("statusHistory")}
+                    onClick={() => selectDetailTab("statusHistory")}
                     role="tab"
                     type="button"
                   >
                     {t("run.status")}
                   </button>
-                  {companionMode ? (
+                  {usesConversationTab ? (
                     <button
                       aria-controls={`${detailTabsId}-conversation-panel`}
                       aria-selected={activeDetailTab === "conversation"}
                       id={`${detailTabsId}-conversation-tab`}
-                      onClick={() => setActiveDetailTab("conversation")}
+                      onClick={() => selectDetailTab("conversation")}
                       role="tab"
                       type="button"
                     >
@@ -6372,7 +6417,7 @@ export function RunPage({
                     />
                   )}
                 </section>
-                {companionMode ? (
+                {usesConversationTab ? (
                   <div
                     aria-labelledby={`${detailTabsId}-conversation-tab`}
                     className="issue-conversation-tab-panel"
@@ -6409,7 +6454,7 @@ export function RunPage({
                   run={run}
                 />
               </div>
-              {!companionMode ? (
+              {!usesConversationTab ? (
                 <>
                   <div
                     aria-label={t("run.resizeContentPanels")}
