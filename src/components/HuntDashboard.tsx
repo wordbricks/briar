@@ -202,6 +202,7 @@ import {
   loadRunCostEstimate,
 } from "../lib/api";
 import {
+  CHANNEL_REALTIME_FALLBACK_MS,
   MAX_PROJECT_DELTA_PAGES_PER_SYNC,
   createProjectRealtimeTransport,
 } from "../lib/channel-realtime";
@@ -483,6 +484,7 @@ export function HuntDashboard({
   companionMode = false,
   companionStatus,
   companionUnreadInboxCount = 0,
+  conversationInboxSyncSignal,
   currentUserId = null,
   createIssueDefaultProjectId,
   dashboard,
@@ -528,6 +530,7 @@ export function HuntDashboard({
   onCompanionHomeOpen,
   onCompanionStatusChange,
   onIssueViewed,
+  onViewingIssueConversationChange,
   onSelectedRunChange,
   onRequestedRunOpen,
   onSendIssueMessage,
@@ -547,6 +550,7 @@ export function HuntDashboard({
   companionMode?: boolean;
   companionStatus?: CompanionStatusFilter;
   companionUnreadInboxCount?: number;
+  conversationInboxSyncSignal?: string;
   currentUserId?: string | null;
   createIssueDefaultProjectId?: string | null;
   dashboard: DashboardPayload | null;
@@ -627,6 +631,7 @@ export function HuntDashboard({
   onCompanionHomeOpen?: () => void;
   onCompanionStatusChange?: (status: CompanionStatusFilter) => void;
   onIssueViewed?: (runId: string) => void;
+  onViewingIssueConversationChange?: (runId: string | null) => void;
   onSelectedRunChange?: (runId: string | null) => void;
   onRequestedRunOpen?: () => void;
   onSendIssueMessage: (
@@ -1276,6 +1281,7 @@ export function HuntDashboard({
             null
           }
           companionMode={companionMode}
+          conversationInboxSyncSignal={conversationInboxSyncSignal}
           initialDetailTab={selectedRunInitialTab ?? undefined}
           issueKeyPrefix={dashboard?.project.issueKeyPrefix}
           currentUserId={currentUserId}
@@ -1334,6 +1340,7 @@ export function HuntDashboard({
           onLoadRunEvents={() => onLoadRunEvents(selected.id)}
           onLoadRunEvidence={() => onLoadRunEvidence(selected.id)}
           onLoadRunEvidenceImage={onLoadRunEvidenceImage}
+          onViewingIssueConversationChange={onViewingIssueConversationChange}
           onCompleteResultReview={onCompleteResultReview
             ? () => onCompleteResultReview(selected.id)
             : undefined}
@@ -4301,6 +4308,7 @@ export function RunPage({
   availableProviders = [],
   availableRuns = [],
   companionMode = false,
+  conversationInboxSyncSignal,
   currentUserId = null,
   error,
   executionPolicy,
@@ -4347,6 +4355,7 @@ export function RunPage({
   onUpdateIssueCheckpoints,
   onUpdateIssuePreferences = async () => undefined,
   onUpdateIssueSubscription,
+  onViewingIssueConversationChange,
   organizationId = null,
   performedAgentName = null,
   performedAgentProvider = null,
@@ -4360,6 +4369,7 @@ export function RunPage({
   availableProviders?: AgentProvider[];
   availableRuns?: HuntRun[];
   companionMode?: boolean;
+  conversationInboxSyncSignal?: string;
   currentUserId?: string | null;
   error: string | null;
   executionPolicy?: ProjectExecutionWorkerPolicy;
@@ -4428,6 +4438,7 @@ export function RunPage({
     input: IssueExecutionPreferences,
   ) => Promise<unknown>;
   onUpdateIssueSubscription?: (subscribed: boolean) => Promise<unknown>;
+  onViewingIssueConversationChange?: (runId: string | null) => void;
   organizationId?: string | null;
   performedAgentName?: string | null;
   performedAgentProvider?: AgentProvider | null;
@@ -4666,6 +4677,19 @@ export function RunPage({
     if (usesConversationTab || activeDetailTab !== "conversation") return;
     setActiveDetailTab(lastContentDetailTabRef.current);
   }, [activeDetailTab, usesConversationTab]);
+  useEffect(() => {
+    onViewingIssueConversationChange?.(
+      !usesConversationTab || activeDetailTab === "conversation"
+        ? run.id
+        : null,
+    );
+    return () => onViewingIssueConversationChange?.(null);
+  }, [
+    activeDetailTab,
+    onViewingIssueConversationChange,
+    run.id,
+    usesConversationTab,
+  ]);
   useEffect(() => {
     inlineSaveSequenceRef.current += 1;
     if (inlineSaveTimerRef.current) {
@@ -6431,6 +6455,7 @@ export function RunPage({
                     <IssueConversation
                       currentUserId={currentUserId}
                       executionRuns={availableRuns}
+                      inboxSyncSignal={conversationInboxSyncSignal}
                       mentionMembers={mentionMembers}
                       onAcceptIssueAction={onAcceptIssueAction}
                       onAcceptIssueExecution={onAcceptIssueExecution}
@@ -6473,6 +6498,7 @@ export function RunPage({
                   <IssueConversation
                     currentUserId={currentUserId}
                     executionRuns={availableRuns}
+                    inboxSyncSignal={conversationInboxSyncSignal}
                     mentionMembers={mentionMembers}
                     onAcceptIssueAction={onAcceptIssueAction}
                     onAcceptIssueExecution={onAcceptIssueExecution}
@@ -8093,6 +8119,7 @@ function IssueConversation({
   executionPolicy,
   executionRuns,
   executionWorkers,
+  inboxSyncSignal,
   mentionMembers,
   onAcceptIssueAction,
   onAcceptIssueExecution,
@@ -8113,6 +8140,7 @@ function IssueConversation({
   executionPolicy?: ProjectExecutionWorkerPolicy;
   executionRuns: HuntRun[];
   executionWorkers: ExecutionWorker[];
+  inboxSyncSignal?: string;
   mentionMembers: OrganizationMember[];
   onAcceptIssueAction?: (
     proposal: IssueProposedAction,
@@ -8428,9 +8456,8 @@ function IssueConversation({
         notification.cursor > (conversationCursorRef.current ?? -1)
       ) {
         void sync();
-      } else if (notification.topic === "channels") {
-        // The organization hub emits this ready frame on every socket connect,
-        // which closes any notification gap after a reconnect.
+      } else if (notification.topic === "ready") {
+        // An explicit ready frame closes any notification gap after a reconnect.
         void sync();
       }
     });
@@ -8439,21 +8466,29 @@ function IssueConversation({
         transport.stop();
       } else {
         transport.start();
-        void sync();
       }
     };
     document.addEventListener("visibilitychange", updateVisibility);
+    const fallback = window.setInterval(
+      () => void sync(),
+      CHANNEL_REALTIME_FALLBACK_MS,
+    );
     updateVisibility();
+    if (inboxSyncSignal !== undefined && !document.hidden) {
+      void sync();
+    }
 
     return () => {
       disposed = true;
       if (continuationTimer !== null) window.clearTimeout(continuationTimer);
       document.removeEventListener("visibilitychange", updateVisibility);
+      window.clearInterval(fallback);
       unsubscribe();
       transport.stop();
     };
   }, [
     conversationCursor,
+    inboxSyncSignal,
     loadMessages,
     organizationId,
     projectId,

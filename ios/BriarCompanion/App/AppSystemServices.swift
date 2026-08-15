@@ -164,6 +164,27 @@ struct InboxNotificationPreferences: Equatable, Sendable {
 }
 
 @MainActor
+final class IssueConversationViewTracker: ObservableObject {
+    private(set) var runID: UUID?
+    private var refreshAction: (() async -> Void)?
+
+    func view(runID: UUID, refresh: @escaping () async -> Void) {
+        self.runID = runID
+        refreshAction = refresh
+    }
+
+    func leave(runID: UUID) {
+        guard self.runID == runID else { return }
+        self.runID = nil
+        refreshAction = nil
+    }
+
+    func refreshChanges() async {
+        await refreshAction?()
+    }
+}
+
+@MainActor
 final class LocalNotificationService: ObservableObject {
     @Published var preferences = InboxNotificationPreferences.load()
     @Published private(set) var authorizationStatus: UNAuthorizationStatus = .notDetermined
@@ -203,7 +224,8 @@ final class LocalNotificationService: ObservableObject {
     func process(
         messages: [InboxMessage],
         baselineID: String = "local",
-        viewingChannelID: UUID? = nil
+        viewingChannelID: UUID? = nil,
+        viewingIssueConversationID: UUID? = nil
     ) async {
         let currentIDs = Set(messages.map(\.id))
         guard self.baselineID == baselineID else {
@@ -227,7 +249,11 @@ final class LocalNotificationService: ObservableObject {
             message.isUnread &&
                 !knownIDs.contains(message.id) &&
                 enabled.contains(InboxMessageBuilder.classify(message)) &&
-                Self.shouldDeliver(message, viewingChannelID: viewingChannelID)
+                Self.shouldDeliver(
+                    message,
+                    viewingChannelID: viewingChannelID,
+                    viewingIssueConversationID: viewingIssueConversationID
+                )
         }
         for message in newcomers.prefix(5) {
             await schedule(message)
@@ -237,14 +263,19 @@ final class LocalNotificationService: ObservableObject {
 
     static func shouldDeliver(
         _ message: InboxMessage,
-        viewingChannelID: UUID?
+        viewingChannelID: UUID?,
+        viewingIssueConversationID: UUID? = nil
     ) -> Bool {
-        guard
-            message.kind == .channel,
-            let viewingChannelID,
-            let notificationChannelID = UUID(uuidString: message.targetId)
-        else { return true }
-        return notificationChannelID != viewingChannelID
+        guard let notificationTargetID = UUID(uuidString: message.targetId) else {
+            return true
+        }
+        if message.kind == .channel, let viewingChannelID {
+            return notificationTargetID != viewingChannelID
+        }
+        if message.kind == .conversation, let viewingIssueConversationID {
+            return notificationTargetID != viewingIssueConversationID
+        }
+        return true
     }
 
     private func schedule(_ message: InboxMessage) async {

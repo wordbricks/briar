@@ -39,6 +39,7 @@ private struct UITestCompanionFlow: View {
     @StateObject private var channels: ChannelsStore
     @StateObject private var inbox = InboxStore()
     @StateObject private var notifications = LocalNotificationService()
+    @StateObject private var issueConversationView = IssueConversationViewTracker()
 
     let offline: Bool
     let locale: CompanionLocale
@@ -98,6 +99,7 @@ private struct UITestCompanionFlow: View {
                 inbox: inbox,
                 notifications: notifications,
                 channels: channels,
+                issueConversationView: issueConversationView,
                 projects: [project, alternateProject],
                 project: selectedProject,
                 snapshot: snapshot,

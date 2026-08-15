@@ -7,6 +7,7 @@ struct AgentsHomeView<ToolbarContentType: ToolbarContent>: View {
     let token: String
     let api: any MobileAPIClientProtocol
     let snapshot: DashboardSnapshot?
+    let issueConversationView: IssueConversationViewTracker?
     let refreshDashboard: () async -> Void
     @ToolbarContentBuilder let toolbarContent: () -> ToolbarContentType
 
@@ -113,6 +114,7 @@ struct AgentsHomeView<ToolbarContentType: ToolbarContent>: View {
                             token: token,
                             api: api,
                             snapshot: snapshot,
+                            issueConversationView: issueConversationView,
                             refreshDashboard: refreshDashboard,
                             onSkillSessionMaterialized: { agents.materialize($0) },
                             onSkillSessionOpen: { projectID, sessionID in
@@ -607,6 +609,7 @@ struct SessionDetailView: View {
     let token: String
     let api: any MobileAPIClientProtocol
     let snapshot: DashboardSnapshot?
+    let issueConversationView: IssueConversationViewTracker?
     let refreshDashboard: () async -> Void
     let onSkillSessionMaterialized: SkillSessionMaterializedHandler
     let onSkillSessionOpen: SkillSessionOpenHandler
@@ -618,6 +621,7 @@ struct SessionDetailView: View {
         token: String,
         api: any MobileAPIClientProtocol,
         snapshot: DashboardSnapshot?,
+        issueConversationView: IssueConversationViewTracker? = nil,
         refreshDashboard: @escaping () async -> Void,
         onSkillSessionMaterialized: @escaping SkillSessionMaterializedHandler = { _ in },
         onSkillSessionOpen: @escaping SkillSessionOpenHandler = { _, _ in }
@@ -628,6 +632,7 @@ struct SessionDetailView: View {
         self.token = token
         self.api = api
         self.snapshot = snapshot
+        self.issueConversationView = issueConversationView
         self.refreshDashboard = refreshDashboard
         self.onSkillSessionMaterialized = onSkillSessionMaterialized
         self.onSkillSessionOpen = onSkillSessionOpen
@@ -703,6 +708,7 @@ struct SessionDetailView: View {
                                     allRuns: snapshot?.runs ?? [],
                                     workers: snapshot?.workers ?? [],
                                     providers: snapshot?.organizationProviders ?? [],
+                                    issueConversationView: issueConversationView,
                                     refresh: refreshDashboard,
                                     onSkillSessionMaterialized: onSkillSessionMaterialized,
                                     onSkillSessionOpen: onSkillSessionOpen

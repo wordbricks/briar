@@ -2,6 +2,29 @@ import XCTest
 @testable import BriarCompanion
 
 final class AgentsInboxSystemTests: XCTestCase {
+    @MainActor
+    func testIssueConversationTrackerRefreshesOnlyTheVisibleIssue() async {
+        let tracker = IssueConversationViewTracker()
+        let visibleRunID = UUID()
+        var refreshCount = 0
+
+        tracker.view(runID: visibleRunID) {
+            refreshCount += 1
+        }
+        await tracker.refreshChanges()
+        XCTAssertEqual(tracker.runID, visibleRunID)
+        XCTAssertEqual(refreshCount, 1)
+
+        tracker.leave(runID: UUID())
+        await tracker.refreshChanges()
+        XCTAssertEqual(refreshCount, 2)
+
+        tracker.leave(runID: visibleRunID)
+        await tracker.refreshChanges()
+        XCTAssertNil(tracker.runID)
+        XCTAssertEqual(refreshCount, 2)
+    }
+
     func testDecodesAgentAndSessionFixturesFromSharedContract() throws {
         let bundle = Bundle(for: Self.self)
         let fixtureURL = try XCTUnwrap(bundle.url(forResource: "companion-v1", withExtension: "json"))
@@ -903,6 +926,28 @@ final class AgentsInboxSystemTests: XCTestCase {
             InboxNotificationPresentation(
                 title: "Alex in WB-1321",
                 body: "@you please look\nSecond line\nThird line"
+            )
+        )
+        let issueConversationID = try XCTUnwrap(UUID(uuidString: mention.targetId))
+        XCTAssertFalse(
+            LocalNotificationService.shouldDeliver(
+                mention,
+                viewingChannelID: nil,
+                viewingIssueConversationID: issueConversationID
+            )
+        )
+        XCTAssertTrue(
+            LocalNotificationService.shouldDeliver(
+                mention,
+                viewingChannelID: nil,
+                viewingIssueConversationID: UUID()
+            )
+        )
+        XCTAssertTrue(
+            LocalNotificationService.shouldDeliver(
+                blockedMessage,
+                viewingChannelID: nil,
+                viewingIssueConversationID: issueConversationID
             )
         )
         let issueNavigation = CompanionNavigationModel()
