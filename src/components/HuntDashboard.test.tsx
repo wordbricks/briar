@@ -3126,6 +3126,90 @@ describe("HuntDashboard", () => {
     window.localStorage.removeItem("briar.settings.conversation-pane.v1");
   });
 
+  it("moves the conversation into a tab when the issue page becomes narrow", async () => {
+    let resizeCallback: ResizeObserverCallback | null = null;
+    class TestResizeObserver {
+      constructor(callback: ResizeObserverCallback) {
+        resizeCallback = callback;
+      }
+
+      disconnect() {}
+      observe() {}
+      unobserve() {}
+    }
+    vi.stubGlobal("ResizeObserver", TestResizeObserver);
+
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => root.render(
+      <RunPage
+        error={null}
+        isRecovering={false}
+        isSidebarOpen
+        onBack={() => undefined}
+        onCancel={async () => undefined}
+        onLoadAttachment={async () => new Blob()}
+        onLoadIssueMessages={async () => []}
+        onLoadRunEvidence={async () => []}
+        onMove={async () => undefined}
+        onRetry={async () => undefined}
+        onSendIssueMessage={async () => {
+          throw new Error("not implemented in this test");
+        }}
+        run={demoDashboard.runs[0]}
+      />,
+    ));
+
+    const layout = container.querySelector<HTMLElement>(".run-page-layout")!;
+    const emitResize = async (width: number) => {
+      await act(async () => {
+        resizeCallback?.([{
+          contentRect: { width } as DOMRectReadOnly,
+          target: layout,
+        } as unknown as ResizeObserverEntry], {} as ResizeObserver);
+      });
+    };
+
+    await emitResize(959);
+
+    const conversationTab = Array.from(
+      container.querySelectorAll<HTMLButtonElement>('[role="tab"]'),
+    ).find((tab) => tab.textContent === "대화");
+    const conversationPanel = container.querySelector<HTMLElement>(
+      ".issue-conversation-tab-panel",
+    );
+    expect(layout.classList.contains("is-conversation-tabbed")).toBe(true);
+    expect(conversationTab).not.toBeNull();
+    expect(conversationPanel?.hidden).toBe(true);
+    expect(container.querySelector(".run-page-conversation-resizer")).toBeNull();
+    expect(container.querySelectorAll(".issue-conversation")).toHaveLength(1);
+
+    await act(async () => conversationTab?.click());
+
+    expect(conversationTab?.getAttribute("aria-selected")).toBe("true");
+    expect(conversationPanel?.hidden).toBe(false);
+    expect(conversationPanel?.querySelector(".issue-conversation")).not.toBeNull();
+
+    await emitResize(960);
+
+    expect(layout.classList.contains("is-conversation-tabbed")).toBe(false);
+    expect(
+      Array.from(container.querySelectorAll('[role="tab"]')).some(
+        (tab) => tab.textContent === "대화",
+      ),
+    ).toBe(false);
+    expect(container.querySelector(".issue-conversation-tab-panel")).toBeNull();
+    expect(container.querySelector(".run-page-conversation-resizer")).not.toBeNull();
+    expect(
+      container.querySelector<HTMLElement>(".issue-description-pane")?.hidden,
+    ).toBe(false);
+
+    await act(async () => root.unmount());
+    container.remove();
+    vi.unstubAllGlobals();
+  });
+
   it("marks an open issue viewed again when its inbox version changes", async () => {
     const container = document.createElement("div");
     document.body.append(container);

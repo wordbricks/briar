@@ -1459,6 +1459,7 @@ body { overflow: hidden; font-synthesis: none; }
 .run-page-back:focus-visible { outline:2px solid #8b70dd; outline-offset:2px; }
 .run-page-body { width:100%; min-height:0; flex:1; margin:0; padding:0; overflow:hidden; }
 .run-page-layout { height:100%; min-height:0; position:relative; display:grid; grid-template-columns:minmax(0,2fr) var(--run-conversation-resizer-width,6px) var(--run-conversation-pane-width,minmax(340px,1fr)); align-items:stretch; gap:0; }
+.run-page-layout.is-conversation-tabbed { grid-template-columns:minmax(0,1fr); }
 .run-page-layout.is-resizing-conversation { cursor:col-resize; user-select:none; }
 .run-page-conversation-resizer { min-width:0; min-height:0; height:100%; position:relative; z-index:1; cursor:col-resize; touch-action:none; outline:none; background:transparent; }
 .run-page-conversation-resizer::before { content:""; width:1px; position:absolute; top:0; bottom:0; left:50%; background:var(--border); opacity:0; transform:translateX(-50%); transition:opacity .12s ease-out,background-color .12s ease-out,box-shadow .12s ease-out; }
@@ -1866,6 +1867,7 @@ button.paused-review-state { width:100%; border:0; border-radius:8px; cursor:poi
 .issue-conversation { width:100%; min-width:0; min-height:0; height:100%; display:flex; flex-direction:column; overflow:hidden; border-left:1px solid var(--border); background:var(--card); }
 .issue-conversation-tab-panel { width:100%; min-width:0; min-height:0; height:100%; }
 .issue-conversation-tab-panel[hidden] { display:none; }
+.run-page-layout.is-conversation-tabbed .issue-conversation-tab-panel .issue-conversation { border:1px solid var(--border); border-radius:12px; }
 .issue-conversation-header { min-height:46px; flex:0 0 46px; padding:0 18px; display:flex; align-items:center; justify-content:space-between; gap:10px; border-bottom:1px solid var(--border); }
 .issue-conversation-header strong { min-width:0; display:flex; align-items:center; gap:7px; color:var(--foreground); font-size:var(--text-sm); }.issue-conversation-header strong span { color:var(--muted-foreground); font:500 var(--text-2xs) "DM Mono",monospace; }.issue-conversation-header small { overflow:hidden; color:var(--muted-foreground); font-size:var(--text-2xs); text-overflow:ellipsis; white-space:nowrap; }
 .issue-conversation-header-actions { min-width:0; display:flex; align-items:center; justify-content:flex-end; gap:9px; }
