@@ -9,6 +9,38 @@ import { repositoryWorkflowBootstrap } from "../lib/auto-hunt-contract";
 import type { ProjectLlmProgress } from "../lib/project-llm";
 import { ProjectOnboarding } from "./ProjectOnboarding";
 
+vi.mock("../lib/initial-onboarding", async (importOriginal) => {
+  const original =
+    await importOriginal<typeof import("../lib/initial-onboarding")>();
+  return {
+    ...original,
+    inspectOnboardingPrerequisites: vi.fn().mockResolvedValue({
+      git: {
+        installed: true,
+        version: "git version 2.50.1",
+        authenticated: true,
+      },
+      codex: {
+        installed: true,
+        version: "codex-cli 1.0.0",
+        authenticated: true,
+      },
+      claude: { installed: false, version: null, authenticated: false },
+      grok: { installed: false, version: null, authenticated: false },
+      agy: { installed: false, version: null, authenticated: false },
+      opencode: { installed: false, version: null, authenticated: false },
+    }),
+    inspectOpenCodeTerminalPath: vi.fn().mockResolvedValue({
+      supported: true,
+      configured: true,
+      binaryPath: "/Users/jay/.bun/bin/opencode",
+      configPath: "/Users/jay/.zshrc",
+    }),
+    configureOpenCodeTerminalPath: vi.fn(),
+    installOnboardingPrerequisite: vi.fn(),
+  };
+});
+
 const generatedWorkflow = {
   version: 2 as const,
   requirements: [
@@ -91,7 +123,6 @@ const baseProps = {
   onFinish: () => undefined,
   onLogout: () => undefined,
   onReviseWorkflow: async () => generatedWorkflow,
-  onSkip: () => undefined,
   onRepositorySelect: async () => readiness.repositoryPath,
   onRepositoryInspect: async () => readiness,
   user: { id: "user-1", name: "Jay", email: "jay@example.com" },
@@ -127,12 +158,35 @@ async function selectValidRepository(container: HTMLElement) {
 }
 
 describe("ProjectOnboarding", () => {
-  it("keeps the first-project purpose choice", () => {
+  it("starts manual project creation at repository setup", () => {
     const markup = renderToStaticMarkup(<ProjectOnboarding {...baseProps} />);
 
-    expect(markup).toContain("Briar를 어떻게 사용하고 싶으세요?");
-    expect(markup).toContain("개발 프로젝트 진행하기");
-    expect(markup).toContain("프로젝트 없이 시작");
+    expect(markup).toContain("로컬 Git 저장소");
+    expect(markup).not.toContain("Briar를 어떻게 사용하고 싶으세요?");
+  });
+
+  it("shows developer tools before repository setup", async () => {
+    const { container, root } = mountOnboarding();
+    await act(async () =>
+      root.render(
+        <ProjectOnboarding {...baseProps} includeDeveloperTools />,
+      ),
+    );
+
+    expect(container.textContent).toContain("개발 도구를 연결해 주세요");
+    expect(container.textContent).toContain("Git필수");
+    expect(container.querySelectorAll(".initial-prerequisite-row")).toHaveLength(6);
+    expect(container.textContent).not.toContain("로컬 Git 저장소");
+
+    await act(async () => {
+      buttonWithText(container, "저장소 연결하기")?.click();
+    });
+
+    expect(container.textContent).toContain("로컬 Git 저장소");
+    expect(container.textContent).toContain("프로젝트 설정 · 2/4");
+
+    await act(async () => root.unmount());
+    container.remove();
   });
 
   it("only offers an existing repository and makes it required", () => {
