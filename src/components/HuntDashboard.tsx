@@ -9468,8 +9468,7 @@ function AgentReplyState({
   if (state.pending > 0) {
     return (
       <div className="issue-agent-reply-state">
-        <LoaderCircle className="spin" size={14} />
-        {t("run.briarReplying")}
+        <LoadingState label={t("run.briarReplying")} />
       </div>
     );
   }
