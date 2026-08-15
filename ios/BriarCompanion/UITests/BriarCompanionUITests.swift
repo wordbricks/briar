@@ -139,6 +139,45 @@ final class BriarCompanionUITests: XCTestCase {
         XCTAssertTrue(channel.waitForExistence(timeout: 5))
     }
 
+    func testChannelWithHistoryShowsNewestMessageImmediately() {
+        let app = launchInsideCompanion(
+            additionalArguments: ["--ui-testing-channel-history"]
+        )
+
+        app.tabBars.buttons["홈"].tap()
+        let channel = app.buttons[
+            "channel-row-cccccccc-cccc-4ccc-8ccc-cccccccccccc"
+        ]
+        XCTAssertTrue(channel.waitForExistence(timeout: 5))
+        channel.tap()
+
+        let newestMessage = app.staticTexts["가변 높이 채널 메시지 20입니다."]
+        XCTAssertTrue(newestMessage.waitForExistence(timeout: 5))
+        captureScreenshot(named: "companion-channel-history-initial-position")
+        let windowFrame = app.windows.firstMatch.frame
+        XCTAssertTrue(
+            newestMessage.frame.intersects(windowFrame),
+            "메시지가 많은 채널도 스크롤 없이 최신 메시지를 화면에 표시해야 합니다. " +
+                "message=\(newestMessage.frame), window=\(windowFrame)"
+        )
+        let earlierMessage = app.staticTexts[
+            "초기 진입에서 자동으로 불러오면 안 되는 이전 메시지입니다."
+        ]
+        XCTAssertFalse(
+            earlierMessage.waitForExistence(timeout: 1),
+            "화면 상단에 도달하기 전에는 이전 메시지 페이지를 불러오면 안 됩니다."
+        )
+
+        let timeline = app.scrollViews["channel-message-timeline"]
+        XCTAssertTrue(timeline.exists)
+        for _ in 0 ..< 6 { timeline.swipeDown() }
+        captureScreenshot(named: "companion-channel-history-scrolled-to-top")
+        XCTAssertTrue(
+            earlierMessage.waitForExistence(timeout: 5),
+            "화면 상단에 도달하면 이전 메시지 페이지를 불러와야 합니다."
+        )
+    }
+
     func testChannelComposerShowsAttachmentButton() {
         let app = launchInsideCompanion()
 
