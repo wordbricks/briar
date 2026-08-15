@@ -198,7 +198,19 @@ type CompanionChannelsProps = {
     rootMessageId: string;
   } | null;
   onRequestedMessageOpen?: () => void;
+  channelCache?: CompanionChannelCache;
 };
+
+export type CachedCompanionChannel = {
+  channel: ChannelSummary;
+  members: ChannelMember[];
+  agents: ChannelAgentSummary[];
+  messages: ChannelMessage[];
+  nextCursor: string | null;
+  replies: ChannelAgentReply[];
+};
+
+export type CompanionChannelCache = Map<string, CachedCompanionChannel>;
 
 type ChannelSurfaceContext = {
   generation: number;
@@ -225,6 +237,7 @@ export function CompanionChannels({
   onViewingChannelChange,
   requestedMessage,
   onRequestedMessageOpen,
+  channelCache,
 }: CompanionChannelsProps) {
   const { t } = useI18n();
   const [channels, setChannels] = useState<ChannelSummary[]>([]);
@@ -270,8 +283,21 @@ export function CompanionChannels({
   const executionHistoryDashboards = useRef(
     new Map<string, ReturnType<typeof loadDashboard>>(),
   );
+  const localChannelCache = useRef<CompanionChannelCache>(new Map());
+  const resolvedChannelCache = channelCache ?? localChannelCache.current;
+  const renderedChannel = useRef<CachedCompanionChannel | null>(null);
   channelIdRef.current = channel?.id ?? null;
   threadParentIdRef.current = threadParentId;
+  renderedChannel.current = channel
+    ? {
+        channel,
+        members,
+        agents,
+        messages,
+        nextCursor: messageNextCursor,
+        replies,
+      }
+    : null;
 
   useEffect(() => {
     onViewingChannelChange?.(channel?.id ?? null);
@@ -317,13 +343,19 @@ export function CompanionChannels({
     [],
   );
 
+  const persistRenderedChannel = useCallback(() => {
+    const snapshot = renderedChannel.current;
+    if (snapshot) resolvedChannelCache.set(snapshot.channel.id, snapshot);
+  }, [resolvedChannelCache]);
+
   useEffect(
     () => () => {
+      persistRenderedChannel();
       channelSurfaceGeneration.current += 1;
       channelIdRef.current = null;
       threadParentIdRef.current = null;
     },
-    [],
+    [persistRenderedChannel],
   );
 
   useEffect(() => {
@@ -419,18 +451,20 @@ export function CompanionChannels({
 
   const openChannel = useCallback(
     async (summary: ChannelSummary) => {
+      persistRenderedChannel();
       invalidateChannelSurface(summary.id, null);
       const selectionVersion = ++channelSelectionVersion.current;
-      setChannel(markSelectedChannelRead(summary));
+      const cached = resolvedChannelCache.get(summary.id) ?? null;
+      setChannel(markSelectedChannelRead(cached?.channel ?? summary));
       setThread(null);
       setThreadParentId(null);
-      setMessages([]);
-      setMessageNextCursor(null);
+      setMessages(cached?.messages ?? []);
+      setMessageNextCursor(cached?.nextCursor ?? null);
       setLoadingEarlierMessages(false);
       loadingEarlierMessagesRef.current = false;
-      setMembers([]);
-      setAgents([]);
-      setReplies([]);
+      setMembers(cached?.members ?? []);
+      setAgents(cached?.agents ?? []);
+      setReplies(cached?.replies ?? []);
       setError(null);
       setLoading(true);
       try {
@@ -438,15 +472,26 @@ export function CompanionChannels({
           messageLimit: mobileChannelMessagePageSize,
         });
         if (selectionVersion !== channelSelectionVersion.current) return;
-        setChannel(markSelectedChannelRead(result.channel));
+        const nextChannel = markSelectedChannelRead(result.channel);
+        const nextMessages = result.messages;
+        const nextCursor = result.nextCursor ?? null;
+        const nextReplies = result.agentReplies ?? [];
+        resolvedChannelCache.set(summary.id, {
+          channel: nextChannel,
+          members: result.members,
+          agents: result.agents,
+          messages: nextMessages,
+          nextCursor,
+          replies: nextReplies,
+        });
+        setChannel(nextChannel);
         recordProposalMessages(result.messages);
         shouldScrollChannelToEnd.current = true;
-        setMessages((current) =>
-          mergeChannelMessageSnapshot(current, result.messages));
-        setMessageNextCursor(result.nextCursor ?? null);
+        setMessages(nextMessages);
+        setMessageNextCursor(nextCursor);
         setMembers(result.members);
         setAgents(result.agents);
-        setReplies(result.agentReplies ?? []);
+        setReplies(nextReplies);
       } catch (cause) {
         if (selectionVersion === channelSelectionVersion.current) {
           setError(message(cause));
@@ -461,7 +506,9 @@ export function CompanionChannels({
       invalidateChannelSurface,
       markSelectedChannelRead,
       organizationId,
+      persistRenderedChannel,
       recordProposalMessages,
+      resolvedChannelCache,
       token,
     ],
   );
@@ -1288,6 +1335,7 @@ export function CompanionChannels({
 
   const closeChannel = useCallback(() => {
     if (!channel) return false;
+    persistRenderedChannel();
     channelSelectionVersion.current += 1;
     invalidateChannelSurface(null, null);
     setChannel(null);
@@ -1299,7 +1347,7 @@ export function CompanionChannels({
     setLoading(false);
     setError(null);
     return true;
-  }, [channel, invalidateChannelSurface]);
+  }, [channel, invalidateChannelSurface, persistRenderedChannel]);
 
   useMobileBackHandler(
     () => closeThread() || closeChannel(),
