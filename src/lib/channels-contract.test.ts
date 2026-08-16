@@ -3,8 +3,10 @@ import {
   channelIncomingWebhookMessageSchema,
   channelMessageBlocksFallback,
   channelMessageInputSchema,
+  channelReplyContextMessageJson,
   channelReplyCompletionSchema,
   channelWebhookInputSchema,
+  type ChannelMessage,
 } from "./channels-contract";
 
 const projectId = "11111111-1111-4111-8111-111111111111";
@@ -26,6 +28,70 @@ describe("channel message contract", () => {
       parentMessageId: projectId,
       mentionedAgentIds: [agentId],
       preferredDeviceId: agentId,
+    });
+  });
+
+  it("projects display messages onto bounded Agent reply context", () => {
+    const message: ChannelMessage = {
+      id: clientMessageId,
+      channelId: projectId,
+      parentMessageId: null,
+      author: {
+        type: "agent",
+        id: agentId,
+        name: "Developer",
+        provider: "codex",
+        image: "data:image/png;base64,large-avatar",
+      },
+      body: "Investigated the repository.",
+      blocks: [{
+        type: "section",
+        text: { type: "mrkdwn", text: "Investigated the repository." },
+      }],
+      mentionedUserIds: [],
+      mentionedAgentIds: [agentId],
+      attachments: [{
+        id: agentId,
+        filename: "screen.png",
+        contentType: "image/png",
+        byteSize: 42,
+        url: "/private/display-only-url",
+      }],
+      reactions: [{ emoji: "👍", count: 1, userIds: [projectId] }],
+      replyCount: 2,
+      lastReplyAt: "2026-08-16T00:01:00.000Z",
+      replyAuthors: [{
+        type: "user",
+        id: projectId,
+        name: "Jay",
+        email: "jay@example.com",
+        image: "data:image/png;base64,another-avatar",
+      }],
+      document: null,
+      proposal: null,
+      executionProposal: null,
+      skillExecutionProposal: null,
+      createdAt: "2026-08-16T00:00:00.000Z",
+    };
+
+    expect(channelReplyContextMessageJson(message)).toEqual({
+      id: clientMessageId,
+      parentMessageId: null,
+      author: { type: "agent", id: agentId, name: "Developer" },
+      body: "Investigated the repository.",
+      mentionedUserIds: [],
+      mentionedAgentIds: [agentId],
+      attachments: [{
+        id: agentId,
+        filename: "screen.png",
+        contentType: "image/png",
+        byteSize: 42,
+      }],
+      document: null,
+      proposal: null,
+      executionProposal: null,
+      skillExecutionProposal: null,
+      createdAt: "2026-08-16T00:00:00.000Z",
     });
   });
 });
