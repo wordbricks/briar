@@ -2996,12 +2996,6 @@ const MessageRow = memo(function MessageRow({
           <time dateTime={message.createdAt}>
             {formatMessageTime(message.createdAt, localeTag)}
           </time>
-          {message.optimistic ? (
-            <span className="conversation-message-sending" role="status">
-              <LoaderCircle aria-hidden="true" className="spin" size={12} />
-              {t("run.sendingMessage")}
-            </span>
-          ) : null}
         </header>
         <ChannelMessageText agents={agents} members={members} message={message} />
         {showTypingState ? (

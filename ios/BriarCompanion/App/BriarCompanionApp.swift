@@ -337,6 +337,41 @@ private actor UITestAPIClient: MobileAPIClientProtocol {
             payload = ##"""
             {"messages":[{"id":"dddddddd-dddd-4ddd-8ddd-dddddddddddd","channelId":"cccccccc-cccc-4ccc-8ccc-cccccccccccc","parentMessageId":null,"body":"상단 헤더 디자인을 함께 확인해 주세요.","author":{"type":"user","name":"Briar User","image":null,"provider":null},"mentionedUserIds":[],"mentionedAgentIds":[],"replyCount":1,"lastReplyAt":"2026-08-02T01:03:00Z","document":null,"proposal":null,"createdAt":"2026-08-02T01:02:00Z"},{"id":"eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee","channelId":"cccccccc-cccc-4ccc-8ccc-cccccccccccc","parentMessageId":"dddddddd-dddd-4ddd-8ddd-dddddddddddd","body":"스레드에서 확인했습니다.","author":{"type":"agent","id":"agent-ui-test","name":"Briar Agent","provider":"codex"},"mentionedUserIds":[],"mentionedAgentIds":[],"replyCount":0,"lastReplyAt":null,"document":null,"proposal":null,"createdAt":"2026-08-02T01:03:00Z"}]}
             """##
+        } else if path.hasSuffix(
+            "/channels/cccccccc-cccc-4ccc-8ccc-cccccccccccc/messages"
+        ) && method == "POST" {
+            guard let body else { throw MobileAPIError.invalidRequest }
+            let requestData = try JSONEncoder.mobileContract.encode(UITestAnyEncodable(body))
+            let request = try JSONDecoder.mobileContract.decode(
+                CreateChannelMessageRequest.self,
+                from: requestData
+            )
+            if delaysMessageSend {
+                try await Task.sleep(for: .seconds(2))
+            }
+            let response = CreateChannelMessageResponse(message: ChannelMessage(
+                id: request.clientMessageId ?? UUID(),
+                channelId: UUID(uuidString: "cccccccc-cccc-4ccc-8ccc-cccccccccccc")!,
+                parentMessageId: request.parentMessageId,
+                body: request.body,
+                author: ChannelMessage.Author(
+                    type: .user,
+                    name: "Briar User",
+                    image: nil,
+                    provider: nil
+                ),
+                mentionedUserIds: request.mentionedUserIds,
+                mentionedAgentIds: request.mentionedAgentIds,
+                replyCount: 0,
+                lastReplyAt: nil,
+                document: nil,
+                proposal: nil,
+                createdAt: Date(timeIntervalSince1970: 1_775_264_520)
+            ))
+            payload = String(
+                decoding: try JSONEncoder.mobileContract.encode(response),
+                as: UTF8.self
+            )
         } else if path.hasSuffix("/issues") && method == "POST" {
             issueStatus = .queued
             payload = #"{"runId":"77777777-7777-4777-8777-777777777777","sourceKey":"briar-issue:ui-test","stage":"queued","status":"queued","attachments":[],"createdByUserId":"fixture-user"}"#
@@ -475,4 +510,16 @@ private actor UITestAPIClient: MobileAPIClientProtocol {
         )],
         nextCursor: nil
     )
+}
+
+private struct UITestAnyEncodable: Encodable {
+    let value: any Encodable
+
+    init(_ value: any Encodable) {
+        self.value = value
+    }
+
+    func encode(to encoder: Encoder) throws {
+        try value.encode(to: encoder)
+    }
 }

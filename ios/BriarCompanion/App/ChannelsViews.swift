@@ -677,12 +677,6 @@ private struct ChannelMessageRow: View {
             timestamp: message.createdAt,
             accessibilityIdentifier: "channel-message-\(message.id.uuidString.lowercased())"
         ) {
-            if isOptimistic {
-                Label(L10n.text("보내는 중", locale: locale), systemImage: "arrow.up.circle")
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                    .accessibilityIdentifier("channel-message-sending")
-            }
             if let blocks = message.blocks, !blocks.isEmpty {
                 ChannelWebhookBlocksView(blocks: blocks)
                     .frame(maxWidth: .infinity, alignment: .leading)
