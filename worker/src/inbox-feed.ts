@@ -67,8 +67,10 @@ type InboxFeedChannelNotification = Pick<
   | "channel_name"
   | "root_message_id"
   | "body"
+  | "author_agent_id"
   | "author_name"
   | "author_image"
+  | "author_agent_image"
   | "notification_reason"
   | "created_at"
 >;
@@ -342,7 +344,9 @@ export function buildInboxFeedMessages(
         version: notification.id,
         body: notification.body,
         authorName: notification.author_name ?? "",
-        authorImage: notification.author_image ?? null,
+        authorImage: notification.author_agent_id
+          ? notification.author_agent_image ?? null
+          : notification.author_image ?? null,
         reason: notification.notification_reason,
       });
     }

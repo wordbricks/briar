@@ -103,8 +103,10 @@ describe("organization Inbox feed", () => {
       channel_name: "product",
       root_message_id: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
       body: "Please review this.",
+      author_agent_id: null,
       author_name: "Taylor",
       author_image: "https://example.com/taylor.png",
+      author_agent_image: null,
       notification_reason: "mention",
       created_at: occurredAt,
     }]);
@@ -121,6 +123,55 @@ describe("organization Inbox feed", () => {
       targetId: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
       authorImage: "https://example.com/taylor.png",
     }));
+  });
+
+  it("uses configured agent avatars for channel replies and preserves fallback", () => {
+    const project = projectData(
+      "11111111-1111-4111-8111-111111111111",
+      "First project",
+      "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      "completed",
+    );
+
+    const messages = buildInboxFeedMessages([project], [
+      {
+        id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+        channel_id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+        channel_name: "product",
+        root_message_id: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+        body: "The agent replied.",
+        author_agent_id: "ffffffff-ffff-4fff-8fff-ffffffffffff",
+        author_name: "Honey",
+        author_image: null,
+        author_agent_image: "https://example.com/honey.png",
+        notification_reason: "thread_reply",
+        created_at: occurredAt,
+      },
+      {
+        id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        channel_id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+        channel_name: "product",
+        root_message_id: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+        body: "The agent without an avatar replied.",
+        author_agent_id: "99999999-9999-4999-8999-999999999999",
+        author_name: "Avatarless",
+        author_image: null,
+        author_agent_image: null,
+        notification_reason: "thread_reply",
+        created_at: occurredAt,
+      },
+    ]);
+
+    expect(messages).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: "channel:cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+        authorImage: "https://example.com/honey.png",
+      }),
+      expect.objectContaining({
+        id: "channel:bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        authorImage: null,
+      }),
+    ]));
   });
 
   it("keeps an unselected project's reply routed to that project", () => {

@@ -448,7 +448,7 @@ describe("Inbox", () => {
     ).toBe("https://example.com/member.png");
   });
 
-  it("shows channel name and reply context for channel notifications", async () => {
+  it("shows the configured agent avatar on channel reply notifications", async () => {
     const message: InboxMessageWithReadState = {
       id: "channel:reply",
       kind: "channel",
@@ -463,8 +463,8 @@ describe("Inbox", () => {
       occurredAt: "2026-07-28T07:48:00.000Z",
       version: "reply",
       body: "채널 답글입니다.",
-      authorName: "Member",
-      authorImage: "https://example.com/member.png",
+      authorName: "Inbox channel agent",
+      authorImage: "https://example.com/inbox-channel-agent.png",
       reason: "thread_reply",
       isUnread: true,
     };
@@ -485,7 +485,9 @@ describe("Inbox", () => {
       ),
     );
 
-    expect(container.textContent).toContain("Member님이 회원님의 스레드에 답글을 남겼습니다.");
+    expect(container.textContent).toContain(
+      "Inbox channel agent님이 회원님의 스레드에 답글을 남겼습니다.",
+    );
     expect(container.textContent).toContain("#product");
     expect(container.textContent).toContain("채널 답글입니다.");
     expect(container.querySelector(".inbox-message-project-icon")).toBeNull();
@@ -493,7 +495,7 @@ describe("Inbox", () => {
       container
         .querySelector(".inbox-message-author-avatar")
         ?.getAttribute("src"),
-    ).toBe("https://example.com/member.png");
+    ).toBe("https://example.com/inbox-channel-agent.png");
   });
 
   it("falls back to the sender initial when a channel row has no avatar", async () => {
