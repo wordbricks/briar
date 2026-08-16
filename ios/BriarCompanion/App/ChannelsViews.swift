@@ -84,11 +84,18 @@ struct ChannelsHomeView: View {
         }
         .listStyle(.insetGrouped)
         .overlay {
-            if groups.isEmpty, !channels.loading {
-                ContentUnavailableView(
-                    L10n.text(.channelsEmpty, locale: locale),
-                    systemImage: "number"
-                )
+            if groups.isEmpty {
+                if channels.loading {
+                    ChannelLoadingIndicator(
+                        accessibilityID: "channel-list-loading-spinner",
+                        label: L10n.text("채널을 불러오는 중…", locale: locale)
+                    )
+                } else {
+                    ContentUnavailableView(
+                        L10n.text(.channelsEmpty, locale: locale),
+                        systemImage: "number"
+                    )
+                }
             }
         }
         .refreshable { await channels.refresh() }
@@ -207,13 +214,32 @@ struct ChannelMessagesView: View {
             channels.closeChannelFocus(channelID: channel.id)
         }
         .overlay {
-            if channels.messages.isEmpty, !channels.loading {
-                ContentUnavailableView(
-                    L10n.text(.channelsEmpty, locale: locale),
-                    systemImage: "bubble.left.and.bubble.right"
-                )
+            if channels.messages.isEmpty {
+                if channels.loading {
+                    ChannelLoadingIndicator(
+                        accessibilityID: "channel-message-loading-spinner",
+                        label: L10n.text("채널 메시지를 불러오는 중…", locale: locale)
+                    )
+                } else {
+                    ContentUnavailableView(
+                        L10n.text(.channelsEmpty, locale: locale),
+                        systemImage: "bubble.left.and.bubble.right"
+                    )
+                }
             }
         }
+    }
+}
+
+private struct ChannelLoadingIndicator: View {
+    let accessibilityID: String
+    let label: String
+
+    var body: some View {
+        ProgressView()
+            .controlSize(.large)
+            .accessibilityLabel(label)
+            .accessibilityIdentifier(accessibilityID)
     }
 }
 
@@ -343,6 +369,14 @@ struct ChannelThreadView: View {
                 channelID: channel.id,
                 parentMessageID: parent.id
             )
+        }
+        .overlay {
+            if channels.thread.isEmpty, channels.loading {
+                ChannelLoadingIndicator(
+                    accessibilityID: "channel-thread-loading-spinner",
+                    label: L10n.text("채널 메시지를 불러오는 중…", locale: locale)
+                )
+            }
         }
     }
 }

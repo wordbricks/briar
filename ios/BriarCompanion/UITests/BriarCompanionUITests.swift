@@ -144,6 +144,27 @@ final class BriarCompanionUITests: XCTestCase {
         captureScreenshot(named: "companion-channel-reentry")
     }
 
+    func testChannelShowsLoadingSpinnerWhileMessagesLoad() {
+        let app = launchInsideCompanion(
+            additionalArguments: ["--ui-testing-delayed-channel-load"]
+        )
+
+        app.tabBars.buttons["홈"].tap()
+        let channel = app.buttons[
+            "channel-row-cccccccc-cccc-4ccc-8ccc-cccccccccccc"
+        ]
+        XCTAssertTrue(channel.waitForExistence(timeout: 5))
+        channel.tap()
+
+        let spinner = app.descendants(matching: .any)["channel-message-loading-spinner"]
+        XCTAssertTrue(spinner.waitForExistence(timeout: 1))
+        captureScreenshot(named: "companion-channel-message-loading-spinner")
+
+        let message = app.staticTexts["상단 헤더 디자인을 함께 확인해 주세요."]
+        XCTAssertTrue(message.waitForExistence(timeout: 5))
+        XCTAssertFalse(spinner.exists)
+    }
+
     func testChannelWithHistoryShowsNewestMessageImmediately() {
         let app = launchInsideCompanion(
             additionalArguments: ["--ui-testing-channel-history"]

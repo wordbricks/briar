@@ -11,6 +11,9 @@ struct BriarCompanionApp: App {
                     delaysMessageSend: ProcessInfo.processInfo.arguments.contains(
                         "--ui-testing-delayed-message-send"
                     ),
+                    delaysChannelLoad: ProcessInfo.processInfo.arguments.contains(
+                        "--ui-testing-delayed-channel-load"
+                    ),
                     hasChannelHistory: ProcessInfo.processInfo.arguments.contains(
                         "--ui-testing-channel-history"
                     )
@@ -67,6 +70,7 @@ private struct UITestCompanionFlow: View {
         offline: Bool,
         locale: CompanionLocale,
         delaysMessageSend: Bool,
+        delaysChannelLoad: Bool,
         hasChannelHistory: Bool
     ) {
         self.offline = offline
@@ -76,7 +80,10 @@ private struct UITestCompanionFlow: View {
         _selectedProjectID = State(initialValue: project.id)
         _agents = StateObject(wrappedValue: AgentsStore(api: UITestAPIClient()))
         _channels = StateObject(wrappedValue: ChannelsStore(
-            api: UITestAPIClient(hasChannelHistory: hasChannelHistory)
+            api: UITestAPIClient(
+                delaysChannelLoad: delaysChannelLoad,
+                hasChannelHistory: hasChannelHistory
+            )
         ))
     }
 
@@ -275,10 +282,16 @@ private actor UITestAPIClient: MobileAPIClientProtocol {
     private var issueStatus: DashboardRun.Status?
     private var dependencyAdded = false
     private let delaysMessageSend: Bool
+    private let delaysChannelLoad: Bool
     private let hasChannelHistory: Bool
 
-    init(delaysMessageSend: Bool = false, hasChannelHistory: Bool = false) {
+    init(
+        delaysMessageSend: Bool = false,
+        delaysChannelLoad: Bool = false,
+        hasChannelHistory: Bool = false
+    ) {
         self.delaysMessageSend = delaysMessageSend
+        self.delaysChannelLoad = delaysChannelLoad
         self.hasChannelHistory = hasChannelHistory
     }
 
@@ -300,6 +313,9 @@ private actor UITestAPIClient: MobileAPIClientProtocol {
         } else if path.hasSuffix(
             "/channels/cccccccc-cccc-4ccc-8ccc-cccccccccccc?limit=20"
         ) && method == "GET" {
+            if delaysChannelLoad {
+                try await Task.sleep(for: .seconds(2))
+            }
             if hasChannelHistory {
                 payload = String(
                     decoding: try JSONEncoder.mobileContract.encode(Self.channelHistory),
