@@ -3,11 +3,18 @@ import Foundation
 enum BriarLinkTarget: Equatable, Sendable {
     case issue(projectID: UUID, runID: UUID)
     case session(projectID: UUID, sessionID: String)
+    case channel(
+        organizationID: UUID,
+        channelID: UUID,
+        messageID: UUID,
+        rootMessageID: UUID
+    )
 
-    var projectID: UUID {
+    var projectID: UUID? {
         switch self {
         case let .issue(projectID, _): projectID
         case let .session(projectID, _): projectID
+        case .channel: nil
         }
     }
 }
@@ -31,6 +38,17 @@ enum BriarLinkParser {
                let projectID = UUID(uuidString: parts[0]) {
                 return .session(projectID: projectID, sessionID: parts[1])
             }
+            if host == "channels", parts.count >= 3,
+               let organizationID = UUID(uuidString: parts[0]),
+               let channelID = UUID(uuidString: parts[1]),
+               let messageID = UUID(uuidString: parts[2]) {
+                return .channel(
+                    organizationID: organizationID,
+                    channelID: channelID,
+                    messageID: messageID,
+                    rootMessageID: channelRootMessageID(from: url) ?? messageID
+                )
+            }
             // auth-complete and other non-navigation hosts are ignored here.
             return nil
         }
@@ -48,7 +66,27 @@ enum BriarLinkParser {
            let projectID = UUID(uuidString: segments[2]) {
             return .session(projectID: projectID, sessionID: segments[3])
         }
+        // /open/channels/{organizationId}/{channelId}/{messageId}
+        if segments.count >= 5, segments[0] == "open", segments[1] == "channels",
+           let organizationID = UUID(uuidString: segments[2]),
+           let channelID = UUID(uuidString: segments[3]),
+           let messageID = UUID(uuidString: segments[4]) {
+            return .channel(
+                organizationID: organizationID,
+                channelID: channelID,
+                messageID: messageID,
+                rootMessageID: channelRootMessageID(from: url) ?? messageID
+            )
+        }
         return nil
+    }
+
+    private static func channelRootMessageID(from url: URL) -> UUID? {
+        URLComponents(url: url, resolvingAgainstBaseURL: false)?
+            .queryItems?
+            .first(where: { $0.name == "root" })?
+            .value
+            .flatMap(UUID.init(uuidString:))
     }
 }
 
@@ -75,6 +113,27 @@ enum BriarShareLinks {
 
     static func sessionDeepLinkURL(projectID: UUID, sessionID: String) -> URL {
         URL(string: "briar-companion://sessions/\(projectID.uuidString.lowercased())/\(sessionID)")!
+    }
+
+    static func channelShareURL(
+        organizationID: UUID,
+        channelID: UUID,
+        messageID: UUID,
+        rootMessageID: UUID? = nil,
+        origin: URL
+    ) -> URL {
+        var url = origin
+            .appending(path: "open")
+            .appending(path: "channels")
+            .appending(path: organizationID.uuidString.lowercased())
+            .appending(path: channelID.uuidString.lowercased())
+            .appending(path: messageID.uuidString.lowercased())
+        if let rootMessageID, rootMessageID != messageID {
+            url.append(queryItems: [
+                URLQueryItem(name: "root", value: rootMessageID.uuidString.lowercased()),
+            ])
+        }
+        return url
     }
 
     static var defaultOrigin: URL {
@@ -128,13 +187,27 @@ final class CompanionNavigationModel: ObservableObject {
         case let .issue(_, runID):
             pendingIssueID = runID
             pendingSessionID = nil
+            pendingChannelID = nil
+            pendingChannelMessageID = nil
+            pendingChannelRootMessageID = nil
             selectedTab = .tasks
             pathIssueToken &+= 1
         case let .session(_, sessionID):
             pendingSessionID = sessionID
             pendingIssueID = nil
+            pendingChannelID = nil
+            pendingChannelMessageID = nil
+            pendingChannelRootMessageID = nil
             selectedTab = .agents
             pathSessionToken &+= 1
+        case let .channel(_, channelID, messageID, rootMessageID):
+            pendingIssueID = nil
+            pendingSessionID = nil
+            pendingChannelID = channelID
+            pendingChannelMessageID = messageID
+            pendingChannelRootMessageID = rootMessageID
+            selectedTab = .home
+            pathChannelToken &+= 1
         }
     }
 

@@ -690,6 +690,32 @@ final class AgentsInboxSystemTests: XCTestCase {
             ),
             .session(projectID: projectID, sessionID: "session-1")
         )
+        let organizationID = UUID(uuidString: "44444444-4444-4444-8444-444444444444")!
+        let channelID = UUID(uuidString: "55555555-5555-4555-8555-555555555555")!
+        let messageID = UUID(uuidString: "66666666-6666-4666-8666-666666666666")!
+        let rootMessageID = UUID(uuidString: "77777777-7777-4777-8777-777777777777")!
+        XCTAssertEqual(
+            BriarLinkParser.parse(
+                "briar-companion://channels/\(organizationID.uuidString)/\(channelID.uuidString)/\(messageID.uuidString)?root=\(rootMessageID.uuidString)"
+            ),
+            .channel(
+                organizationID: organizationID,
+                channelID: channelID,
+                messageID: messageID,
+                rootMessageID: rootMessageID
+            )
+        )
+        XCTAssertEqual(
+            BriarLinkParser.parse(
+                "https://briar-api.wbai.workers.dev/open/channels/\(organizationID.uuidString)/\(channelID.uuidString)/\(messageID.uuidString)"
+            ),
+            .channel(
+                organizationID: organizationID,
+                channelID: channelID,
+                messageID: messageID,
+                rootMessageID: messageID
+            )
+        )
         XCTAssertNil(BriarLinkParser.parse("briar-companion://auth-complete"))
     }
 
@@ -780,6 +806,21 @@ final class AgentsInboxSystemTests: XCTestCase {
         XCTAssertEqual(
             sessionURL.absoluteString,
             "https://briar-api.example/open/sessions/\(projectID.uuidString.lowercased())/session-1"
+        )
+        let organizationID = UUID(uuidString: "44444444-4444-4444-8444-444444444444")!
+        let channelID = UUID(uuidString: "55555555-5555-4555-8555-555555555555")!
+        let messageID = UUID(uuidString: "66666666-6666-4666-8666-666666666666")!
+        let rootMessageID = UUID(uuidString: "77777777-7777-4777-8777-777777777777")!
+        let channelURL = BriarShareLinks.channelShareURL(
+            organizationID: organizationID,
+            channelID: channelID,
+            messageID: messageID,
+            rootMessageID: rootMessageID,
+            origin: origin
+        )
+        XCTAssertEqual(
+            channelURL.absoluteString,
+            "https://briar-api.example/open/channels/\(organizationID.uuidString.lowercased())/\(channelID.uuidString.lowercased())/\(messageID.uuidString.lowercased())?root=\(rootMessageID.uuidString.lowercased())"
         )
     }
 

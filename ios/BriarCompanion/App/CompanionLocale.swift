@@ -110,7 +110,9 @@ enum L10n {
         "세션": "Sessions",
         "이슈 공유": "Share issue",
         "링크 복사": "Copy link",
+        "메시지 복사": "Copy message",
         "링크를 복사했습니다": "Link copied",
+        "메시지를 복사했습니다": "Message copied",
         "이메일": "Email",
         "공통 채널": "Common channels",
         "다른 프로젝트": "Other project",
@@ -691,7 +693,9 @@ enum L10n {
         case sessionsSection
         case shareIssue
         case copyLink
+        case copyMessage
         case linkCopied
+        case messageCopied
         case profileEmail
         case notificationHint
         case channelsCommon
@@ -740,7 +744,9 @@ enum L10n {
             case .sessionsSection: "세션"
             case .shareIssue: "이슈 공유"
             case .copyLink: "링크 복사"
+            case .copyMessage: "메시지 복사"
             case .linkCopied: "링크를 복사했습니다"
+            case .messageCopied: "메시지를 복사했습니다"
             case .profileEmail: "이메일"
             case .channelsCommon: "공통 채널"
             case .channelsOtherProject: "다른 프로젝트"
@@ -791,7 +797,9 @@ enum L10n {
             case .sessionsSection: "Sessions"
             case .shareIssue: "Share issue"
             case .copyLink: "Copy link"
+            case .copyMessage: "Copy message"
             case .linkCopied: "Link copied"
+            case .messageCopied: "Message copied"
             case .profileEmail: "Email"
             case .channelsCommon: "Common channels"
             case .channelsOtherProject: "Other project"
@@ -842,7 +850,9 @@ enum L10n {
             case .sessionsSection: "会话"
             case .shareIssue: "分享问题"
             case .copyLink: "复制链接"
+            case .copyMessage: "复制消息"
             case .linkCopied: "链接已复制"
+            case .messageCopied: "消息已复制"
             case .profileEmail: "电子邮件"
             case .channelsCommon: "公共频道"
             case .channelsOtherProject: "其他项目"

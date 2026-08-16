@@ -1,11 +1,15 @@
 import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  channelShareUrl,
+  copyChannelMessageText,
+  copyChannelShareLink,
   copyIssueId,
   copyIssueShareLink,
   copySessionShareLink,
   issueShareUrl,
   parseBriarLink,
+  parseChannelLink,
   parseIssueLink,
   parseSessionLink,
   sessionShareUrl,
@@ -15,6 +19,10 @@ import {
 const projectId = "11111111-1111-4111-8111-111111111111";
 const runId = "22222222-2222-4222-8222-222222222222";
 const sessionId = "33333333-3333-4333-8333-333333333333";
+const organizationId = "44444444-4444-4444-8444-444444444444";
+const channelId = "55555555-5555-4555-8555-555555555555";
+const messageId = "66666666-6666-4666-8666-666666666666";
+const rootMessageId = "77777777-7777-4777-8777-777777777777";
 const mobileConfig = (platform: "android" | "ios") =>
   JSON.parse(
     readFileSync(
@@ -87,7 +95,7 @@ describe("issue links", () => {
     ).toBeNull();
   });
 
-  it("classifies issue and session links through one app-link parser", () => {
+  it("classifies issue, session, and channel links through one app-link parser", () => {
     expect(
       parseBriarLink(
         `briar-companion://issues/${projectId}/${runId}`,
@@ -98,6 +106,58 @@ describe("issue links", () => {
         `briar-companion://sessions/${projectId}/${sessionId}`,
       ),
     ).toEqual({ kind: "session", projectId, sessionId });
+    expect(
+      parseBriarLink(
+        `briar-companion://channels/${organizationId}/${channelId}/${messageId}?root=${rootMessageId}`,
+      ),
+    ).toEqual({
+      kind: "channel",
+      organizationId,
+      channelId,
+      messageId,
+      rootMessageId,
+    });
+  });
+
+  it("builds and parses channel share and app deep links", () => {
+    expect(
+      channelShareUrl(
+        { organizationId, channelId, messageId },
+        "https://briar-api.example/base",
+      ),
+    ).toBe(
+      `https://briar-api.example/open/channels/${organizationId}/${channelId}/${messageId}`,
+    );
+    expect(
+      channelShareUrl(
+        { organizationId, channelId, messageId, rootMessageId },
+        "https://briar-api.example/base",
+      ),
+    ).toBe(
+      `https://briar-api.example/open/channels/${organizationId}/${channelId}/${messageId}?root=${rootMessageId}`,
+    );
+    expect(
+      parseChannelLink(
+        `https://briar-api.example/open/channels/${organizationId}/${channelId}/${messageId}`,
+      ),
+    ).toEqual({
+      organizationId,
+      channelId,
+      messageId,
+      rootMessageId: messageId,
+    });
+    expect(
+      parseChannelLink(
+        `briar-companion://channels/${organizationId}/${channelId}/${messageId}?root=${rootMessageId}`,
+      ),
+    ).toEqual({
+      organizationId,
+      channelId,
+      messageId,
+      rootMessageId,
+    });
+    expect(parseChannelLink("https://briar-api.example/open/channels/nope/nope/nope"))
+      .toBeNull();
   });
 
   it("registers issue and session deep links on both mobile platforms", () => {
@@ -114,7 +174,7 @@ describe("issue links", () => {
         {
           scheme: ["https"],
           host: "briar-api.wbai.workers.dev",
-          pathPrefix: ["/open/issues", "/open/sessions"],
+          pathPrefix: ["/open/issues", "/open/sessions", "/open/channels"],
           appLink: true,
         },
       ]),
@@ -140,6 +200,28 @@ describe("issue links", () => {
     expect(writeText).toHaveBeenCalledWith(
       `http://127.0.0.1:8787/open/issues/${projectId}/${runId}`,
     );
+  });
+
+  it("copies the deterministic channel URL and message text", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+
+    await copyChannelShareLink({
+      organizationId,
+      channelId,
+      messageId,
+      rootMessageId,
+    });
+    await copyChannelMessageText("Hello team");
+
+    expect(writeText).toHaveBeenNthCalledWith(
+      1,
+      `http://127.0.0.1:8787/open/channels/${organizationId}/${channelId}/${messageId}?root=${rootMessageId}`,
+    );
+    expect(writeText).toHaveBeenNthCalledWith(2, "Hello team");
   });
 
   it("copies the deterministic session URL directly", async () => {

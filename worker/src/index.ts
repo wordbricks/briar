@@ -3650,6 +3650,10 @@ const appleAppSiteAssociation = (head: boolean) =>
                   "/": "/open/sessions/*",
                   comment: "Opens a Briar session in the iOS Companion app",
                 },
+                {
+                  "/": "/open/channels/*",
+                  comment: "Opens a Briar channel message in the iOS Companion app",
+                },
               ],
             }],
           },
@@ -3664,15 +3668,30 @@ const appleAppSiteAssociation = (head: boolean) =>
   );
 
 const appLinkPage = (
-  resource: "issues" | "sessions",
+  resource: "issues" | "sessions" | "channels",
   projectId: string,
   targetId: string,
   head: boolean,
+  extraPath = "",
+  search = "",
 ) => {
-  const appUrl = `briar-companion://${resource}/${projectId}/${targetId}`;
-  const subject = resource === "issues" ? "이슈" : "세션";
-  const subjectWithParticle = resource === "issues" ? "이슈를" : "세션을";
-  const englishSubject = resource === "issues" ? "issue" : "session";
+  const appUrl =
+    `briar-companion://${resource}/${projectId}/${targetId}${extraPath}${search}`;
+  const subject = resource === "issues"
+    ? "이슈"
+    : resource === "sessions"
+      ? "세션"
+      : "메시지";
+  const subjectWithParticle = resource === "issues"
+    ? "이슈를"
+    : resource === "sessions"
+      ? "세션을"
+      : "메시지를";
+  const englishSubject = resource === "issues"
+    ? "issue"
+    : resource === "sessions"
+      ? "session"
+      : "message";
   const body = `<!doctype html>
 <html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="icon" type="image/png" href="/brand/briar-icon.png"><title>Briar에서 ${subject} 열기</title><style>
@@ -15518,6 +15537,26 @@ export default {
         sessionLinkMatch[1],
         sessionLinkMatch[2],
         request.method === "HEAD",
+      );
+    }
+    const channelLinkMatch = url.pathname.match(
+      /^\/open\/channels\/([0-9a-f-]{36})\/([0-9a-f-]{36})\/([0-9a-f-]{36})\/?$/iu,
+    );
+    if (
+      channelLinkMatch &&
+      (request.method === "GET" || request.method === "HEAD")
+    ) {
+      const root = url.searchParams.get("root")?.trim();
+      const search = root && root !== channelLinkMatch[3]
+        ? `?root=${encodeURIComponent(root)}`
+        : "";
+      return appLinkPage(
+        "channels",
+        channelLinkMatch[1],
+        `${channelLinkMatch[2]}/${channelLinkMatch[3]}`,
+        request.method === "HEAD",
+        "",
+        search,
       );
     }
     const releaseResponse = await serveRelease(request, env.RELEASES);

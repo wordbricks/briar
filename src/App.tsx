@@ -737,6 +737,32 @@ export function App() {
   }, [runsOnMacDesktop]);
   useEffect(() => {
     if (!pendingBriarLink || !briar.user || briar.loading) return;
+    if (pendingBriarLink.kind === "channel") {
+      if (
+        !briar.organizations.some(
+          (organization) => organization.id === pendingBriarLink.organizationId,
+        )
+      ) {
+        return;
+      }
+      if (pendingBriarLink.organizationId !== briar.activeOrganizationId) {
+        briar.setActiveOrganizationId(pendingBriarLink.organizationId);
+      }
+      setRequestedRunInitialTab(null);
+      setRequestedRunId(null);
+      setRequestedSessionId(null);
+      setRequestedChannelMessage({
+        channelId: pendingBriarLink.channelId,
+        messageId: pendingBriarLink.messageId,
+        rootMessageId: pendingBriarLink.rootMessageId,
+      });
+      setActiveChannelId(pendingBriarLink.channelId);
+      markOrganizationChannelRead(pendingBriarLink.channelId);
+      if (briar.companionMode) setCompanionPage("home");
+      else navigateToPage("channels");
+      setPendingBriarLink(null);
+      return;
+    }
     if (
       !briar.projects.some(
         (project) => project.id === pendingBriarLink.projectId,
@@ -764,11 +790,16 @@ export function App() {
     }
     setPendingBriarLink(null);
   }, [
+    briar.activeOrganizationId,
     briar.activeProjectId,
+    briar.companionMode,
     briar.loading,
+    briar.organizations,
     briar.projects,
+    briar.setActiveOrganizationId,
     briar.setActiveProjectId,
     briar.user,
+    markOrganizationChannelRead,
     navigateToIssue,
     navigateToPage,
     pendingBriarLink,
