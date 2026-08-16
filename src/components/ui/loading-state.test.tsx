@@ -60,16 +60,21 @@ describe("LoadingState", () => {
   it("renders the Drive wavefront with label and timer", async () => {
     const status = await renderLoader();
     expect(status?.dataset.variant).toBe("Drive");
+    expect(status?.className).toContain("min-w-0");
+    expect(status?.className).toContain("max-w-full");
     expect(status?.textContent).toContain("Churning");
     expect(status?.textContent).toContain("0.0s");
-    expect(
-      status?.querySelector(".tabular-nums")?.getAttribute("aria-hidden"),
-    ).toBe("true");
+    const label = status?.querySelector<HTMLElement>(".loading-state-label");
+    expect(label?.className).toContain("truncate");
+    const timer = status?.querySelector<HTMLElement>(".tabular-nums");
+    expect(timer?.getAttribute("aria-hidden")).toBe("true");
+    expect(timer?.className).toContain("shrink-0");
 
     const pixels = [
       ...(status?.querySelectorAll<HTMLElement>(".loading-state-pixel") ?? []),
     ];
     expect(pixels).toHaveLength(9);
+    expect(pixels[0]?.parentElement?.className).toContain("shrink-0");
     expect(pixels[0]?.className).toContain("rounded-[1px]");
     expect(pixels.every((pixel) => pixel.style.animation !== "none")).toBe(true);
   });

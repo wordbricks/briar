@@ -883,7 +883,7 @@ struct CreateIssueMessageRequest: Codable, Sendable {
     }
 }
 
-struct IssueAgentReplyJob: Codable, Sendable {
+struct IssueAgentReplyJob: Codable, Equatable, Sendable {
     enum Status: String, Codable, Sendable {
         case queued
         case running
@@ -893,8 +893,48 @@ struct IssueAgentReplyJob: Codable, Sendable {
 
     let id: UUID
     let triggerMessageId: UUID
+    let parentMessageId: UUID
     let status: Status
+    let attempts: Int
     let error: String?
+
+    init(
+        id: UUID,
+        triggerMessageId: UUID,
+        parentMessageId: UUID,
+        status: Status,
+        attempts: Int,
+        error: String?
+    ) {
+        self.id = id
+        self.triggerMessageId = triggerMessageId
+        self.parentMessageId = parentMessageId
+        self.status = status
+        self.attempts = attempts
+        self.error = error
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case triggerMessageId
+        case parentMessageId
+        case status
+        case attempts
+        case error
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        triggerMessageId = try container.decode(UUID.self, forKey: .triggerMessageId)
+        parentMessageId = try container.decodeIfPresent(
+            UUID.self,
+            forKey: .parentMessageId
+        ) ?? triggerMessageId
+        status = try container.decode(Status.self, forKey: .status)
+        attempts = try container.decodeIfPresent(Int.self, forKey: .attempts) ?? 0
+        error = try container.decodeIfPresent(String.self, forKey: .error)
+    }
 }
 
 struct CreateIssueMessageResponse: Codable, Sendable {

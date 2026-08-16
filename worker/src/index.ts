@@ -70,6 +70,7 @@ import {
   CHANNEL_AGENT_ACTIVITY_VERSION,
   channelAgentActivityPublishInputSchema,
   type ChannelAgentActivityFrame,
+  type IssueAgentActivityFrame,
 } from "../../src/lib/channel-agent-activity";
 import {
   issueTitleAbsoluteMaxLength,
@@ -528,14 +529,20 @@ export { ChannelRealtimeHub } from "./channel-realtime";
 import {
   disconnectChannelActivitySubscribers,
   publishChannelActivity,
+  publishIssueActivity,
   subscribeToChannelActivity,
+  subscribeToIssueActivity,
 } from "./channel-activity-realtime";
 export { ChannelActivityHub } from "./channel-activity-realtime";
 import {
   createChannelActivityPublishToken,
   createChannelActivitySocketTicket,
+  createIssueActivityPublishToken,
+  createIssueActivitySocketTicket,
   verifyChannelActivityPublishToken,
   verifyChannelActivitySocketTicket,
+  verifyIssueActivityPublishToken,
+  verifyIssueActivitySocketTicket,
 } from "./channel-activity-ticket";
 import {
   createChannelRealtimeTicket,
@@ -771,6 +778,98 @@ function scheduleChannelActivityClear(
         message: "Channel activity clear failed",
         organizationId: job.organization_id,
         channelId: job.channel_id,
+        replyJobId: job.id,
+        error: error instanceof Error ? error.message : String(error),
+      }));
+    },
+  );
+  if (context) context.waitUntil(publish);
+  else void publish;
+}
+
+type IssueActivityReplyIdentity = Pick<
+  IssueAgentReplyJobRow,
+  | "id"
+  | "project_id"
+  | "run_id"
+  | "trigger_message_id"
+  | "parent_message_id"
+  | "attempts"
+  | "lease_expires_at"
+>;
+
+async function issueActivityCredential(
+  env: Env,
+  organizationId: string,
+  job: IssueActivityReplyIdentity,
+  input: { workerId: string; deviceId: string },
+) {
+  if (!job.lease_expires_at) {
+    throw new HttpError(409, "Reply claim has no active lease");
+  }
+  const expiresAt = Date.parse(job.lease_expires_at);
+  if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
+    throw new HttpError(409, "Reply claim lease has expired");
+  }
+  const credential = await createIssueActivityPublishToken(
+    env.BETTER_AUTH_SECRET,
+    {
+      organizationId,
+      projectId: job.project_id,
+      runId: job.run_id,
+      replyJobId: job.id,
+      triggerMessageId: job.trigger_message_id,
+      parentMessageId: job.parent_message_id,
+      attempt: job.attempts,
+      workerId: input.workerId,
+      deviceId: input.deviceId,
+      expiresAt,
+    },
+  );
+  return {
+    token: credential.token,
+    expiresAt: new Date(credential.expiresAt).toISOString(),
+  };
+}
+
+function issueActivityFrame(
+  job: Omit<IssueActivityReplyIdentity, "lease_expires_at">,
+  input: Pick<IssueAgentActivityFrame, "sequence" | "activity">,
+  now = Date.now(),
+): IssueAgentActivityFrame {
+  return {
+    version: CHANNEL_AGENT_ACTIVITY_VERSION,
+    replyJobId: job.id,
+    attempt: job.attempts,
+    sequence: input.sequence,
+    projectId: job.project_id,
+    runId: job.run_id,
+    triggerMessageId: job.trigger_message_id,
+    parentMessageId: job.parent_message_id,
+    activity: input.activity,
+    sentAt: new Date(now).toISOString(),
+    expiresAt: new Date(now + CHANNEL_AGENT_ACTIVITY_STALE_MS).toISOString(),
+  };
+}
+
+function scheduleIssueActivityClear(
+  env: Env,
+  organizationId: string,
+  job: IssueActivityReplyIdentity,
+  context?: ExecutionContext,
+) {
+  if (!env.CHANNEL_ACTIVITY_REALTIME) return;
+  const frame = issueActivityFrame(job, {
+    sequence: Number.MAX_SAFE_INTEGER,
+    activity: null,
+  });
+  const publish = publishIssueActivity(env, organizationId, frame).catch(
+    (error) => {
+      console.error(JSON.stringify({
+        message: "Issue activity clear failed",
+        organizationId,
+        projectId: job.project_id,
+        runId: job.run_id,
         replyJobId: job.id,
         error: error instanceof Error ? error.message : String(error),
       }));
@@ -6033,7 +6132,9 @@ const issueMessageJson = (
 const issueAgentReplyJson = (job: IssueAgentReplyJobRow) => ({
   id: job.id,
   triggerMessageId: job.trigger_message_id,
+  parentMessageId: job.parent_message_id,
   status: job.status,
+  attempts: job.attempts,
   workerId: job.claimed_worker_id,
   provider: job.agent_provider,
   error: job.status === "failed" ? job.error : null,
@@ -7267,6 +7368,58 @@ async function route(
       status: response.status,
       statusText: response.statusText,
       headers,
+    });
+  }
+
+  const issueActivityEventsMatch = pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/agent-activity-events$/u,
+  );
+  if (issueActivityEventsMatch && request.method === "POST") {
+    const session = await requireSession(auth, request);
+    const [projectId, runId] = issueActivityEventsMatch.slice(1);
+    const project = await getProject(db, projectId, session.user.id);
+    if (!project) throw new HttpError(404, "Project not found");
+    const run = await getHuntRunForProject(db, projectId, runId);
+    if (!run) throw new HttpError(404, "Run not found");
+    const issued = await createIssueActivitySocketTicket(
+      env.BETTER_AUTH_SECRET,
+      {
+        organizationId: project.organization_id,
+        projectId,
+        runId,
+        userId: session.user.id,
+      },
+    );
+    const socketUrl = new URL(request.url);
+    socketUrl.protocol = socketUrl.protocol === "https:" ? "wss:" : "ws:";
+    socketUrl.search = "";
+    socketUrl.searchParams.set("ticket", issued.ticket);
+    return privateNoStoreJson({
+      url: socketUrl.toString(),
+      expiresAt: issued.expiresAt,
+    });
+  }
+  if (issueActivityEventsMatch && request.method === "GET") {
+    if (request.headers.get("Upgrade")?.toLowerCase() !== "websocket") {
+      throw new HttpError(426, "WebSocket transport required");
+    }
+    const [projectId, runId] = issueActivityEventsMatch.slice(1);
+    const ticket = new URL(request.url).searchParams.get("ticket") ?? "";
+    const verified = await verifyIssueActivitySocketTicket(
+      env.BETTER_AUTH_SECRET,
+      ticket,
+      projectId,
+      runId,
+    );
+    if (!verified) {
+      throw new HttpError(401, "Invalid or expired activity ticket");
+    }
+    return subscribeToIssueActivity(env, {
+      organizationId: verified.organizationId,
+      projectId,
+      runId,
+      userId: verified.userId,
+      authorizationExpiresAt: verified.authorizationExpiresAt,
     });
   }
 
@@ -13005,6 +13158,17 @@ async function route(
         claimToken,
         claimedAt: job.claimed_at,
         leaseExpiresAt: job.lease_expires_at,
+        activity: env.CHANNEL_ACTIVITY_REALTIME
+          ? await issueActivityCredential(
+              env,
+              authenticatedWorker.principal.organizationId,
+              job,
+              {
+                workerId: authenticatedWorker.binding.id,
+                deviceId: authenticatedWorker.principal.deviceId,
+              },
+            )
+          : null,
         snapshot: {
           run: {
             ...dashboardRunJson(run, attachments),
@@ -13940,6 +14104,37 @@ async function route(
     });
   }
 
+  const issueReplyActivityMatch = pathname.match(
+    /^\/issue-reply-claims\/([0-9a-f-]+)\/activity$/u,
+  );
+  if (issueReplyActivityMatch && request.method === "POST") {
+    const token = request.headers.get("X-Briar-Channel-Activity-Token") ?? "";
+    const verified = await verifyIssueActivityPublishToken(
+      env.BETTER_AUTH_SECRET,
+      token,
+      issueReplyActivityMatch[1],
+    );
+    if (!verified) {
+      throw new HttpError(401, "Invalid or expired activity token");
+    }
+    const input = channelAgentActivityPublishInputSchema.parse(
+      await readJson(request),
+    );
+    const frame = issueActivityFrame(
+      {
+        id: verified.replyJobId,
+        project_id: verified.projectId,
+        run_id: verified.runId,
+        trigger_message_id: verified.triggerMessageId,
+        parent_message_id: verified.parentMessageId,
+        attempts: verified.attempt,
+      },
+      input,
+    );
+    await publishIssueActivity(env, verified.organizationId, frame);
+    return new Response(null, { status: 204 });
+  }
+
   const issueReplyClaimMatch = pathname.match(
     /^\/issue-reply-claims\/([0-9a-f-]+)\/(lease|complete)$/u,
   );
@@ -13965,7 +14160,18 @@ async function route(
         },
       );
       if (!renewed) throw new HttpError(409, "Reply claim is no longer active");
-      return json({ leaseExpiresAt: renewed.lease_expires_at });
+      const activity = env.CHANNEL_ACTIVITY_REALTIME
+        ? await issueActivityCredential(
+            env,
+            worker.principal.organizationId,
+            renewed,
+            {
+              workerId: worker.binding.id,
+              deviceId: worker.principal.deviceId,
+            },
+          )
+        : null;
+      return json({ leaseExpiresAt: renewed.lease_expires_at, activity });
     }
 
     const input = issueAgentReplyCompletionSchema.parse(
@@ -14022,6 +14228,12 @@ async function route(
       );
       if (!failed) throw new HttpError(409, "Reply claim is no longer active");
       scheduleProjectRealtimePublish(env, db, input.projectId, context);
+      scheduleIssueActivityClear(
+        env,
+        worker.principal.organizationId,
+        failed,
+        context,
+      );
       return json({ agentReply: issueAgentReplyJson(failed) });
     }
     if (
@@ -14054,6 +14266,12 @@ async function route(
     );
     if (!completed) throw new HttpError(409, "Reply claim is no longer active");
     scheduleProjectRealtimePublish(env, db, input.projectId, context);
+    scheduleIssueActivityClear(
+      env,
+      worker.principal.organizationId,
+      completed,
+      context,
+    );
     const [
       messages,
       reworkProposals,

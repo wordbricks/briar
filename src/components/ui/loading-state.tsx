@@ -72,11 +72,17 @@ export function LoadingState({
 
   return (
     <div
-      className={cn("loading-state flex w-fit items-center gap-2.5", className)}
+      className={cn(
+        "loading-state flex w-fit min-w-0 max-w-full items-center gap-2.5",
+        className,
+      )}
       data-testid="loading-state"
       data-variant={variant}
     >
-      <span aria-hidden className="grid grid-cols-[repeat(3,4px)] gap-[1.5px]">
+      <span
+        aria-hidden
+        className="grid shrink-0 grid-cols-[repeat(3,4px)] gap-[1.5px]"
+      >
         {delays.map((d, i) => (
           <span
             key={i}
@@ -93,7 +99,7 @@ export function LoadingState({
         ))}
       </span>
       <span
-        className="loading-state-label bg-clip-text text-base font-medium text-transparent"
+        className="loading-state-label min-w-0 truncate bg-clip-text text-base font-medium text-transparent"
         style={{
           backgroundImage:
             "linear-gradient(90deg, var(--ink-3) 35%, var(--ink) 50%, var(--ink-3) 65%)",
@@ -105,7 +111,7 @@ export function LoadingState({
       </span>
       <span
         aria-hidden="true"
-        className="font-mono text-sm text-ink-3 tabular-nums"
+        className="shrink-0 font-mono text-sm text-ink-3 tabular-nums"
       >
         {elapsed}
       </span>

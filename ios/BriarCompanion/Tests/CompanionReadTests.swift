@@ -331,6 +331,48 @@ final class CompanionReadTests: XCTestCase {
     }
 
     @MainActor
+    func testRunDetailShowsLatestIssueAgentActivityUnderItsParentMessage() throws {
+        let projectID = UUID(uuidString: "11111111-1111-4111-8111-111111111111")!
+        let runID = UUID(uuidString: "33333333-3333-4333-8333-333333333333")!
+        let parentMessageID = UUID(uuidString: "99999999-9999-4999-8999-999999999999")!
+        let replyID = UUID(uuidString: "cccccccc-cccc-4ccc-8ccc-cccccccccccc")!
+        let store = RunDetailStore(
+            api: RunDetailSnapshotAPI(messageSnapshots: []),
+            projectID: projectID,
+            runID: runID,
+            token: "token"
+        )
+        store.updateAgentReply(IssueAgentReplyJob(
+            id: replyID,
+            triggerMessageId: parentMessageID,
+            parentMessageId: parentMessageID,
+            status: .running,
+            attempts: 1,
+            error: nil
+        ))
+        store.applyActivityFrame(IssueAgentActivityFrame(
+            version: 1,
+            replyJobId: replyID,
+            attempt: 1,
+            sequence: 1,
+            projectId: projectID,
+            runId: runID,
+            triggerMessageId: parentMessageID,
+            parentMessageId: parentMessageID,
+            activity: ChannelAgentActivity(
+                id: "commentary-1",
+                kind: .message,
+                headline: "원인을 확인하고 있습니다."
+            ),
+            sentAt: Date(),
+            expiresAt: Date().addingTimeInterval(30)
+        ))
+
+        let status = try XCTUnwrap(store.typingStatuses(parentMessageID: parentMessageID).first)
+        XCTAssertEqual(status.activity?.headline, "원인을 확인하고 있습니다.")
+    }
+
+    @MainActor
     func testRunDetailAuthoritativeRemovalInvalidatesPendingExecutionContext() async throws {
         let proposal = executionProposal()
         let api = RunDetailSnapshotAPI(messageSnapshots: [

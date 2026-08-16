@@ -536,6 +536,7 @@ struct ChannelAgentActivity: Codable, Equatable, Sendable {
     let headline: String
 
     enum Kind: String, Codable, Sendable {
+        case message
         case command
         case fileChange
         case webSearch
@@ -550,6 +551,20 @@ struct ChannelAgentActivityFrame: Codable, Equatable, Sendable {
     let sequence: Int
     let agentId: UUID
     let channelId: UUID
+    let triggerMessageId: UUID
+    let parentMessageId: UUID
+    let activity: ChannelAgentActivity?
+    let sentAt: Date
+    let expiresAt: Date
+}
+
+struct IssueAgentActivityFrame: Codable, Equatable, Sendable {
+    let version: Int
+    let replyJobId: UUID
+    let attempt: Int
+    let sequence: Int
+    let projectId: UUID
+    let runId: UUID
     let triggerMessageId: UUID
     let parentMessageId: UUID
     let activity: ChannelAgentActivity?

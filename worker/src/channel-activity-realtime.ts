@@ -1,6 +1,8 @@
 import {
-  channelAgentActivityFrameSchema,
+  agentReplyActivityFrameSchema,
+  type AgentReplyActivityFrame,
   type ChannelAgentActivityFrame,
+  type IssueAgentActivityFrame,
 } from "../../src/lib/channel-agent-activity";
 
 type ChannelActivitySocketAttachment = {
@@ -10,9 +12,14 @@ type ChannelActivitySocketAttachment = {
 
 const activityHubName = (organizationId: string, channelId: string) =>
   `${organizationId}:${channelId}`;
+const issueActivityHubName = (
+  organizationId: string,
+  projectId: string,
+  runId: string,
+) => `${organizationId}:issue:${projectId}:${runId}`;
 
 /**
- * Channel-scoped, ephemeral fan-out for user-visible Agent activity.
+ * Conversation-scoped, ephemeral fan-out for user-visible Agent activity.
  *
  * D1 remains authoritative for reply status and final messages. This object
  * deliberately uses no Durable Object storage: after hibernation or eviction,
@@ -20,7 +27,7 @@ const activityHubName = (organizationId: string, channelId: string) =>
  * next activity frame arrives.
  */
 export class ChannelActivityHub {
-  private readonly latestByReply = new Map<string, ChannelAgentActivityFrame>();
+  private readonly latestByReply = new Map<string, AgentReplyActivityFrame>();
 
   constructor(
     private readonly state: DurableObjectState,
@@ -46,7 +53,7 @@ export class ChannelActivityHub {
       return this.subscribe({ userId, authorizationExpiresAt });
     }
     if (url.pathname === "/publish" && request.method === "POST") {
-      const parsed = channelAgentActivityFrameSchema.safeParse(
+      const parsed = agentReplyActivityFrameSchema.safeParse(
         await request.json<unknown>(),
       );
       if (!parsed.success) {
@@ -57,7 +64,7 @@ export class ChannelActivityHub {
     }
     if (url.pathname === "/disconnect" && request.method === "POST") {
       for (const socket of this.state.getWebSockets()) {
-        socket.close(4003, "Channel access changed");
+        socket.close(4003, "Conversation access changed");
       }
       return new Response(null, { status: 204 });
     }
@@ -80,7 +87,7 @@ export class ChannelActivityHub {
     return new Response(null, { status: 101, webSocket: client });
   }
 
-  private publish(frame: ChannelAgentActivityFrame) {
+  private publish(frame: AgentReplyActivityFrame) {
     const now = Date.now();
     for (const [replyJobId, current] of this.latestByReply) {
       if (Date.parse(current.expiresAt) <= now) {
@@ -106,7 +113,7 @@ export class ChannelActivityHub {
         | ChannelActivitySocketAttachment
         | null;
       if (!attachment || attachment.authorizationExpiresAt <= now) {
-        socket.close(4003, "Channel activity authorization expired");
+        socket.close(4003, "Agent activity authorization expired");
         continue;
       }
       try {
@@ -118,7 +125,7 @@ export class ChannelActivityHub {
   }
 
   webSocketMessage(socket: WebSocket, _message: string | ArrayBuffer) {
-    socket.close(1008, "Channel activity is server-to-client only");
+    socket.close(1008, "Agent activity is server-to-client only");
   }
 
   webSocketClose(
@@ -171,6 +178,46 @@ export async function publishChannelActivity(
   });
   if (!response.ok) {
     throw new Error(`Channel activity publish failed (${response.status})`);
+  }
+}
+
+export async function subscribeToIssueActivity(
+  env: Env,
+  input: {
+    organizationId: string;
+    projectId: string;
+    runId: string;
+    userId: string;
+    authorizationExpiresAt: number;
+  },
+) {
+  const hub = env.CHANNEL_ACTIVITY_REALTIME.getByName(
+    issueActivityHubName(input.organizationId, input.projectId, input.runId),
+  );
+  const query = new URLSearchParams({
+    userId: input.userId,
+    authorizationExpiresAt: String(input.authorizationExpiresAt),
+  });
+  return hub.fetch(`https://channel-activity.internal/subscribe?${query}`, {
+    headers: { Upgrade: "websocket" },
+  });
+}
+
+export async function publishIssueActivity(
+  env: Env,
+  organizationId: string,
+  frame: IssueAgentActivityFrame,
+) {
+  const hub = env.CHANNEL_ACTIVITY_REALTIME.getByName(
+    issueActivityHubName(organizationId, frame.projectId, frame.runId),
+  );
+  const response = await hub.fetch("https://channel-activity.internal/publish", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(frame),
+  });
+  if (!response.ok) {
+    throw new Error(`Issue activity publish failed (${response.status})`);
   }
 }
 

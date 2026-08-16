@@ -139,7 +139,9 @@ final class BriarCompanionUITests: XCTestCase {
         XCTAssertTrue(channel.waitForExistence(timeout: 5))
 
         channel.tap()
-        let cachedMessage = app.staticTexts["상단 헤더 디자인을 함께 확인해 주세요."]
+        let cachedMessage = app.descendants(matching: .any)[
+            "상단 헤더 디자인을 함께 확인해 주세요."
+        ]
         XCTAssertTrue(cachedMessage.waitForExistence(timeout: 5))
         captureScreenshot(named: "companion-channel-reentry")
     }
@@ -160,7 +162,9 @@ final class BriarCompanionUITests: XCTestCase {
         XCTAssertTrue(spinner.waitForExistence(timeout: 3))
         captureScreenshot(named: "companion-channel-message-loading-spinner")
 
-        let message = app.staticTexts["상단 헤더 디자인을 함께 확인해 주세요."]
+        let message = app.descendants(matching: .any)[
+            "상단 헤더 디자인을 함께 확인해 주세요."
+        ]
         XCTAssertTrue(message.waitForExistence(timeout: 5))
         XCTAssertFalse(spinner.exists)
     }

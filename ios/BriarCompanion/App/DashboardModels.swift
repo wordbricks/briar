@@ -449,6 +449,26 @@ struct RunEvent: Codable, Equatable, Identifiable, Sendable {
 
 struct IssueMessagesResponse: Codable, Equatable, Sendable {
     let messages: [IssueMessage]
+    let agentReplies: [IssueAgentReplyJob]
+
+    init(messages: [IssueMessage], agentReplies: [IssueAgentReplyJob] = []) {
+        self.messages = messages
+        self.agentReplies = agentReplies
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case messages
+        case agentReplies
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        messages = try container.decode([IssueMessage].self, forKey: .messages)
+        agentReplies = try container.decodeIfPresent(
+            [IssueAgentReplyJob].self,
+            forKey: .agentReplies
+        ) ?? []
+    }
 }
 
 struct IssueMessage: Codable, Equatable, Identifiable, Sendable {

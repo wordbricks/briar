@@ -8,6 +8,7 @@ import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
 import { demoDashboard, demoRunEvents } from "../lib/demo-data";
 import * as api from "../lib/api";
 import * as channelRealtime from "../lib/channel-realtime";
+import * as issueActivityHook from "../hooks/use-issue-agent-activity";
 import type {
   ExecutionWorker,
   HuntRun,
@@ -4469,7 +4470,9 @@ describe("HuntDashboard", () => {
     const replyJob = {
       id: "reply-job-1",
       triggerMessageId: trigger.id,
-      status: "queued" as const,
+      parentMessageId: trigger.id,
+      status: "running" as const,
+      attempts: 1,
       workerId: null,
       provider: "codex" as const,
       error: null,
@@ -4508,6 +4511,28 @@ describe("HuntDashboard", () => {
     const createTransport = vi
       .spyOn(channelRealtime, "createProjectRealtimeTransport")
       .mockReturnValue(transport);
+    const activity = vi
+      .spyOn(issueActivityHook, "useIssueAgentActivity")
+      .mockReturnValue(new Map([[
+        replyJob.id,
+        {
+          version: 1,
+          replyJobId: replyJob.id,
+          attempt: 1,
+          sequence: 1,
+          projectId: demoDashboard.project.id,
+          runId: run.id,
+          triggerMessageId: trigger.id,
+          parentMessageId: trigger.id,
+          activity: {
+            id: "commentary-1",
+            kind: "message",
+            headline: "원인을 확인하고 있습니다.",
+          },
+          sentAt: createdAt,
+          expiresAt: "2099-01-01T00:00:00.000Z",
+        },
+      ]]));
     const container = document.createElement("div");
     document.body.append(container);
     const root = createRoot(container);
@@ -4541,7 +4566,7 @@ describe("HuntDashboard", () => {
     });
     expect(loadSnapshot).toHaveBeenCalledOnce();
     expect(loadDelta).toHaveBeenCalledOnce();
-    expect(container.textContent).toContain("Briar가 답변을 작성하고 있습니다");
+    expect(container.textContent).toContain("Briar · 원인을 확인하고 있습니다.");
 
     await act(async () => {
       root.render(renderPage("conversation:message-reply"));
@@ -4558,6 +4583,7 @@ describe("HuntDashboard", () => {
     await act(async () => root.unmount());
     container.remove();
     createTransport.mockRestore();
+    activity.mockRestore();
     loadDelta.mockRestore();
     loadSnapshot.mockRestore();
   });

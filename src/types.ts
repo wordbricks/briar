@@ -218,7 +218,9 @@ export type IssueMessageSendResult = {
 export type IssueAgentReplyState = {
   id: string;
   triggerMessageId: string;
+  parentMessageId: string;
   status: "queued" | "running" | "completed" | "failed";
+  attempts: number;
   workerId: string | null;
   provider: AgentProvider | null;
   error: string | null;
