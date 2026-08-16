@@ -398,6 +398,68 @@ describe("CompanionChannels", () => {
     expect(container.textContent).toContain("Refreshed");
   });
 
+  it("shows a cached thread immediately while refreshing it", async () => {
+    const summary = channel("c-common", "Welcome", null);
+    const rootMessage = message("m-root", "Question");
+    const cachedReply = {
+      ...message("m-reply", "Cached immediately"),
+      parentMessageId: rootMessage.id,
+    };
+    const refreshedReply = {
+      ...cachedReply,
+      body: "Refreshed",
+    };
+    const refresh = deferred<{ messages: ChannelMessage[] }>();
+    loadChannel.mockResolvedValue({
+      channel: summary,
+      members: [member],
+      agents: [agent],
+      messages: [rootMessage],
+      nextCursor: null,
+    });
+    listChannelMessages
+      .mockResolvedValueOnce({ messages: [rootMessage, cachedReply] })
+      .mockReturnValueOnce(refresh.promise);
+    await render();
+
+    const openWelcome = () => [
+      ...container.querySelectorAll<HTMLButtonElement>(
+        ".companion-channel-group button",
+      ),
+    ].find((button) => button.textContent?.includes("Welcome"));
+    await act(async () => {
+      openWelcome()?.click();
+      await Promise.resolve();
+    });
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(
+        ".companion-channel-message-button",
+      )?.click();
+      await Promise.resolve();
+    });
+    expect(container.textContent).toContain("Cached immediately");
+
+    await act(async () => {
+      requestMobileNavigationBack();
+      await Promise.resolve();
+    });
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(
+        ".companion-channel-message-button",
+      )?.click();
+      await Promise.resolve();
+    });
+
+    expect(container.textContent).toContain("Cached immediately");
+    expect(container.querySelector(".companion-channel-loading")).toBeNull();
+
+    refresh.resolve({ messages: [rootMessage, refreshedReply] });
+    await act(async () => {
+      await refresh.promise;
+    });
+    expect(container.textContent).toContain("Refreshed");
+  });
+
   it("renders incoming webhook messages with a distinct author icon", async () => {
     loadChannel.mockResolvedValue({
       channel: channel("c-common", "Welcome", null),

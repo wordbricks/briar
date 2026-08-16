@@ -226,6 +226,73 @@ final class ChannelsStoreTests: XCTestCase {
     }
 
     @MainActor
+    func testReopeningThreadShowsCachedMessagesWhileRefreshing() async throws {
+        let channel = summary(id: channelID, name: "Briar")
+        let root = message(id: rootID, channelID: channelID, body: "Question")
+        let cachedReply = message(
+            id: replyID,
+            channelID: channelID,
+            parentMessageID: rootID,
+            body: "Cached immediately"
+        )
+        let refreshedReply = message(
+            id: replyID,
+            channelID: channelID,
+            parentMessageID: rootID,
+            body: "Refreshed"
+        )
+        let listPath = MobileAPIContract.Endpoint.channels(organizationID: organizationID)
+        let detailPath = MobileAPIContract.Endpoint.channel(
+            organizationID: organizationID,
+            channelID: channelID,
+            messageLimit: ChannelsStore.messagePageSize
+        )
+        let threadPath = MobileAPIContract.Endpoint.channelMessages(
+            organizationID: organizationID,
+            channelID: channelID,
+            parentMessageID: rootID
+        )
+        let api = ChannelPollingAPI(
+            routes: [
+                listPath: [try encoded(ChannelsResponse(channels: [channel], cursor: 10))],
+                detailPath: [try encoded(ChannelDetailResponse(
+                    channel: channel,
+                    members: [],
+                    agents: [],
+                    messages: [root]
+                ))],
+                threadPath: [
+                    try encoded(ChannelMessagesResponse(messages: [root, cachedReply])),
+                    try encoded(ChannelMessagesResponse(messages: [root, refreshedReply])),
+                ],
+            ],
+            requestDelays: [
+                threadPath: [.zero, .milliseconds(200)],
+            ]
+        )
+        let store = ChannelsStore(api: api, pollInterval: .seconds(3_600))
+
+        store.select(organizationID: organizationID, token: "token")
+        await waitForChannels(store, count: 1)
+        await store.openChannel(channelID)
+        await store.openThread(channelID: channelID, parentMessageID: rootID)
+        store.closeThreadFocus(channelID: channelID, parentMessageID: rootID)
+
+        let refresh = Task {
+            await store.openThread(channelID: channelID, parentMessageID: rootID)
+        }
+        await waitForRequests(api, path: threadPath, count: 2)
+
+        XCTAssertEqual(store.thread.last?.body, "Cached immediately")
+        XCTAssertTrue(store.loading)
+
+        await refresh.value
+        XCTAssertEqual(store.thread.last?.body, "Refreshed")
+        XCTAssertFalse(store.loading)
+        store.applicationDidEnterBackground()
+    }
+
+    @MainActor
     func testDeltaRefreshMergesOnlyTheFocusedChannelIntoRootsAndOpenThread() async throws {
         let channel = summary(id: channelID, name: "Briar")
         let root = message(id: rootID, channelID: channelID, body: "Question")

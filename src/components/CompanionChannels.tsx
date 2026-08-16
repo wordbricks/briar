@@ -207,6 +207,7 @@ export type CachedCompanionChannel = {
   agents: ChannelAgentSummary[];
   messages: ChannelMessage[];
   nextCursor: string | null;
+  threads: Map<string, ChannelMessage[]>;
 };
 
 export type CompanionChannelCache = Map<string, CachedCompanionChannel>;
@@ -287,6 +288,9 @@ export function CompanionChannels({
   const renderedChannel = useRef<CachedCompanionChannel | null>(null);
   channelIdRef.current = channel?.id ?? null;
   threadParentIdRef.current = threadParentId;
+  const cachedThreads = channel
+    ? resolvedChannelCache.get(channel.id)?.threads ?? new Map()
+    : new Map<string, ChannelMessage[]>();
   renderedChannel.current = channel
     ? {
         channel,
@@ -294,8 +298,15 @@ export function CompanionChannels({
         agents,
         messages,
         nextCursor: messageNextCursor,
+        threads: cachedThreads,
       }
     : null;
+
+  useLayoutEffect(() => {
+    if (!channel || !threadParentId || thread === null) return;
+    const cached = resolvedChannelCache.get(channel.id);
+    if (cached) cached.threads.set(threadParentId, thread);
+  }, [channel, resolvedChannelCache, thread, threadParentId]);
 
   useEffect(() => {
     onViewingChannelChange?.(channel?.id ?? null);
@@ -343,7 +354,12 @@ export function CompanionChannels({
 
   const persistRenderedChannel = useCallback(() => {
     const snapshot = renderedChannel.current;
-    if (snapshot) resolvedChannelCache.set(snapshot.channel.id, snapshot);
+    if (!snapshot) return;
+    const cached = resolvedChannelCache.get(snapshot.channel.id);
+    resolvedChannelCache.set(snapshot.channel.id, {
+      ...snapshot,
+      threads: cached?.threads ?? snapshot.threads,
+    });
   }, [resolvedChannelCache]);
 
   useEffect(
@@ -483,6 +499,7 @@ export function CompanionChannels({
           agents: result.agents,
           messages: nextMessages,
           nextCursor,
+          threads: cached?.threads ?? new Map(),
         });
         setChannel(nextChannel);
         recordProposalMessages(result.messages);
@@ -634,6 +651,28 @@ export function CompanionChannels({
               (item) => item.channelId === selectedChannelId,
             );
             recordProposalMessages(selectedMessages);
+            const storedThreads = resolvedChannelCache
+              .get(selectedChannelId)?.threads;
+            if (storedThreads) {
+              for (const [parentId, storedThread] of storedThreads) {
+                if (delta.removedMessageIds.includes(parentId)) {
+                  storedThreads.delete(parentId);
+                  continue;
+                }
+                storedThreads.set(
+                  parentId,
+                  mergeChannelMessages(
+                    storedThread,
+                    selectedMessages.filter(
+                      (item) =>
+                        item.id === parentId ||
+                        item.parentMessageId === parentId,
+                    ),
+                    delta.removedMessageIds,
+                  ),
+                );
+              }
+            }
             if (
               selectedMessages.some((item) => item.parentMessageId === null) &&
               channelMessagesScrollRef.current &&
@@ -740,6 +779,7 @@ export function CompanionChannels({
     markSelectedChannelRead,
     organizationId,
     recordProposalMessages,
+    resolvedChannelCache,
     t,
     threadParentId,
     token,
@@ -750,8 +790,10 @@ export function CompanionChannels({
       if (!channel) return;
       invalidateChannelSurface(channel.id, parent.id);
       const selectionVersion = ++channelSelectionVersion.current;
+      const cachedThread = resolvedChannelCache
+        .get(channel.id)?.threads?.get(parent.id) ?? null;
       setThreadParentId(parent.id);
-      setThread(null);
+      setThread(cachedThread);
       setError(null);
       setLoading(true);
       try {
@@ -763,8 +805,15 @@ export function CompanionChannels({
         );
         if (selectionVersion !== channelSelectionVersion.current) return;
         recordProposalMessages(result.messages);
-        setThread((current) =>
-          mergeChannelMessageSnapshot(current ?? [], result.messages));
+        setThread((current) => {
+          const refreshed = mergeChannelMessageSnapshot(
+            current ?? [],
+            result.messages,
+          );
+          resolvedChannelCache
+            .get(channel.id)?.threads.set(parent.id, refreshed);
+          return refreshed;
+        });
       } catch (cause) {
         if (selectionVersion === channelSelectionVersion.current) {
           setError(message(cause));
@@ -780,6 +829,7 @@ export function CompanionChannels({
       invalidateChannelSurface,
       organizationId,
       recordProposalMessages,
+      resolvedChannelCache,
       token,
     ],
   );
@@ -825,6 +875,17 @@ export function CompanionChannels({
         setMessageNextCursor(result.nextCursor ?? null);
         setMembers(result.members);
         setAgents(result.agents);
+        setReplies(result.agentReplies ?? []);
+        const storedThreads = resolvedChannelCache.get(summary.id)?.threads ??
+          new Map<string, ChannelMessage[]>();
+        resolvedChannelCache.set(summary.id, {
+          channel: result.channel,
+          members: result.members,
+          agents: result.agents,
+          messages: result.messages,
+          nextCursor: result.nextCursor ?? null,
+          threads: storedThreads,
+        });
         let requestedThread: Awaited<ReturnType<typeof listChannelMessages>> | null =
           null;
         if (
@@ -865,6 +926,10 @@ export function CompanionChannels({
             selectionVersion !== channelSelectionVersion.current
           ) return;
           recordProposalMessages(threadResult.messages);
+          storedThreads.set(
+            requestedMessage.rootMessageId,
+            threadResult.messages,
+          );
           setThreadParentId(requestedMessage.rootMessageId);
           setThread((current) =>
             mergeChannelMessageSnapshot(current ?? [], threadResult.messages));
@@ -909,6 +974,7 @@ export function CompanionChannels({
     onRequestedMessageOpen,
     organizationId,
     recordProposalMessages,
+    resolvedChannelCache,
     requestedMessage,
     token,
   ]);
