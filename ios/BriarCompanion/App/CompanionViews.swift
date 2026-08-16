@@ -1062,6 +1062,7 @@ struct RunDetailView: View {
             )
             .task {
                 inbox.markIssueRead(runID: run.id)
+                detail.startActivitySynchronization()
                 await detail.load()
             }
             .refreshable { await detail.load() }
@@ -1845,6 +1846,24 @@ struct RunDetailView: View {
                         .font(.caption)
                         .buttonStyle(.plain)
                         .foregroundStyle(.tint)
+                    ForEach(detail.typingStatuses(parentMessageID: message.id)) { status in
+                        HStack(spacing: 8) {
+                            ProgressView()
+                                .controlSize(.small)
+                            Text(
+                                status.activity.map {
+                                    "Briar · \($0.headline)"
+                                } ?? L10n.text(
+                                    "Briar가 답변을 작성하고 있습니다…",
+                                    locale: locale
+                                )
+                            )
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                        }
+                        .accessibilityElement(children: .combine)
+                    }
                 }
         }
     }
@@ -2753,7 +2772,13 @@ struct RunDetailView: View {
                 parentMessageID: replyTo?.id,
                 mentionedUserIds: mentionedUserIds,
                 attachments: attachments,
-                attachmentReferences: attachmentReferences
+                attachmentReferences: attachmentReferences,
+                onCreated: { message in
+                    detail.appendMessages([message])
+                },
+                onAgentReplyChanged: { reply in
+                    detail.updateAgentReply(reply)
+                }
             )
             detail.appendMessages(sent)
             replyTo = nil

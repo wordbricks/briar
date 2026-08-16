@@ -60,6 +60,10 @@ enum MobileAPIContract {
             "\(channel(organizationID: organizationID, channelID: channelID))/agent-activity-events"
         }
 
+        static func issueActivityEvents(projectID: UUID, runID: UUID) -> String {
+            "\(run(projectID: projectID, runID: runID))/agent-activity-events"
+        }
+
         static func channel(
             organizationID: UUID,
             channelID: UUID,
@@ -469,6 +473,11 @@ protocol MobileRealtimeClientProtocol: Sendable {
         _ path: String,
         token: String
     ) -> AsyncThrowingStream<ChannelAgentActivityFrame, Error>
+
+    func issueActivityEvents(
+        _ path: String,
+        token: String
+    ) -> AsyncThrowingStream<IssueAgentActivityFrame, Error>
 }
 
 extension MobileRealtimeClientProtocol {
@@ -476,6 +485,13 @@ extension MobileRealtimeClientProtocol {
         _ path: String,
         token: String
     ) -> AsyncThrowingStream<ChannelAgentActivityFrame, Error> {
+        AsyncThrowingStream { continuation in continuation.finish() }
+    }
+
+    func issueActivityEvents(
+        _ path: String,
+        token: String
+    ) -> AsyncThrowingStream<IssueAgentActivityFrame, Error> {
         AsyncThrowingStream { continuation in continuation.finish() }
     }
 }
@@ -696,6 +712,13 @@ struct MobileAPIClient: MobileAPIClientProtocol, MobileRealtimeClientProtocol, S
         token: String
     ) -> AsyncThrowingStream<ChannelAgentActivityFrame, Error> {
         webSocketEvents(path, token: token, as: ChannelAgentActivityFrame.self)
+    }
+
+    func issueActivityEvents(
+        _ path: String,
+        token: String
+    ) -> AsyncThrowingStream<IssueAgentActivityFrame, Error> {
+        webSocketEvents(path, token: token, as: IssueAgentActivityFrame.self)
     }
 
     private func webSocketEvents<Event: Decodable & Sendable>(

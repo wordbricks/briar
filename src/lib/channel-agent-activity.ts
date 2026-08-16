@@ -5,6 +5,7 @@ export const CHANNEL_AGENT_ACTIVITY_HEADLINE_MAX_LENGTH = 240;
 export const CHANNEL_AGENT_ACTIVITY_STALE_MS = 30_000;
 
 export const channelAgentActivityKindSchema = z.enum([
+  "message",
   "command",
   "fileChange",
   "webSearch",
@@ -47,6 +48,27 @@ export const channelAgentActivityFrameSchema = z
   })
   .strict();
 
+export const issueAgentActivityFrameSchema = z
+  .object({
+    version: z.literal(CHANNEL_AGENT_ACTIVITY_VERSION),
+    replyJobId: z.uuid(),
+    attempt: z.number().int().positive(),
+    sequence: z.number().int().positive(),
+    projectId: z.uuid(),
+    runId: z.uuid(),
+    triggerMessageId: z.uuid(),
+    parentMessageId: z.uuid(),
+    activity: channelAgentActivityDescriptorSchema.nullable(),
+    sentAt: z.iso.datetime(),
+    expiresAt: z.iso.datetime(),
+  })
+  .strict();
+
+export const agentReplyActivityFrameSchema = z.union([
+  channelAgentActivityFrameSchema,
+  issueAgentActivityFrameSchema,
+]);
+
 export type ChannelAgentActivityKind = z.infer<
   typeof channelAgentActivityKindSchema
 >;
@@ -58,4 +80,10 @@ export type ChannelAgentActivityPublishInput = z.infer<
 >;
 export type ChannelAgentActivityFrame = z.infer<
   typeof channelAgentActivityFrameSchema
+>;
+export type IssueAgentActivityFrame = z.infer<
+  typeof issueAgentActivityFrameSchema
+>;
+export type AgentReplyActivityFrame = z.infer<
+  typeof agentReplyActivityFrameSchema
 >;

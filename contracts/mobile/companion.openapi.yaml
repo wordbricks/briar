@@ -376,6 +376,28 @@
         }
       }
     },
+    "/projects/{projectId}/runs/{runId}/agent-activity-events": {
+      "post": {
+        "operationId": "createIssueActivityTicket",
+        "parameters": [
+          { "$ref": "#/components/parameters/ProjectId" },
+          { "$ref": "#/components/parameters/RunId" }
+        ],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Short-lived WebSocket ticket for issue-scoped Agent activity",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ChannelRealtimeTicketResponse" }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Error" },
+          "404": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
     "/projects/{projectId}/runs/{runId}/messages": {
       "get": {
         "operationId": "listIssueMessages",
@@ -1849,6 +1871,12 @@
             "type": "object",
             "additionalProperties": {
               "type": "string"
+            }
+          },
+          "agentReplies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IssueAgentReply"
             }
           }
         },
@@ -4466,6 +4494,7 @@
           "kind": {
             "type": "string",
             "enum": [
+              "message",
               "command",
               "fileChange",
               "webSearch",
@@ -4547,6 +4576,64 @@
           }
         },
         "additionalProperties": false
+      },
+      "IssueAgentActivityFrame": {
+        "type": "object",
+        "required": [
+          "version",
+          "replyJobId",
+          "attempt",
+          "sequence",
+          "projectId",
+          "runId",
+          "triggerMessageId",
+          "parentMessageId",
+          "activity",
+          "sentAt",
+          "expiresAt"
+        ],
+        "properties": {
+          "version": { "type": "integer", "enum": [1] },
+          "replyJobId": { "type": "string", "format": "uuid" },
+          "attempt": { "type": "integer", "minimum": 1 },
+          "sequence": { "type": "integer", "minimum": 1 },
+          "projectId": { "type": "string", "format": "uuid" },
+          "runId": { "type": "string", "format": "uuid" },
+          "triggerMessageId": { "type": "string", "format": "uuid" },
+          "parentMessageId": { "type": "string", "format": "uuid" },
+          "activity": {
+            "oneOf": [
+              { "$ref": "#/components/schemas/ChannelAgentActivity" },
+              { "type": "null" }
+            ]
+          },
+          "sentAt": { "type": "string", "format": "date-time" },
+          "expiresAt": { "type": "string", "format": "date-time" }
+        },
+        "additionalProperties": false
+      },
+      "IssueAgentReply": {
+        "type": "object",
+        "required": [
+          "id",
+          "triggerMessageId",
+          "parentMessageId",
+          "status",
+          "attempts",
+          "error"
+        ],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "triggerMessageId": { "type": "string", "format": "uuid" },
+          "parentMessageId": { "type": "string", "format": "uuid" },
+          "status": {
+            "type": "string",
+            "enum": ["queued", "running", "completed", "failed"]
+          },
+          "attempts": { "type": "integer", "minimum": 0 },
+          "error": { "type": ["string", "null"] }
+        },
+        "additionalProperties": true
       },
       "ChannelAgentReply": {
         "type": "object",

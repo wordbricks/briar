@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   CHANNEL_AGENT_ACTIVITY_VERSION,
   type ChannelAgentActivityFrame,
+  type IssueAgentActivityFrame,
 } from "../../src/lib/channel-agent-activity";
 import { ChannelActivityHub } from "./channel-activity-realtime";
 
@@ -78,7 +79,7 @@ describe("ChannelActivityHub", () => {
     expect(socket.sent).toEqual([]);
     expect(socket.close).toHaveBeenCalledWith(
       4003,
-      "Channel activity authorization expired",
+      "Agent activity authorization expired",
     );
   });
 
@@ -106,6 +107,44 @@ describe("ChannelActivityHub", () => {
     expect(JSON.parse(socket.sent[0])).toMatchObject({
       sequence: Number.MAX_SAFE_INTEGER,
       activity: null,
+    });
+  });
+
+  it("fans out issue-scoped commentary frames through the same ephemeral hub", async () => {
+    const socket = new FakeSocket({
+      userId: "user-a",
+      authorizationExpiresAt: Date.now() + 60_000,
+    });
+    const hub = new ChannelActivityHub(
+      { getWebSockets: () => [socket] } as unknown as DurableObjectState,
+      {} as Env,
+    );
+    const issueFrame: IssueAgentActivityFrame = {
+      version: CHANNEL_AGENT_ACTIVITY_VERSION,
+      replyJobId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+      attempt: 1,
+      sequence: 1,
+      projectId: "11111111-1111-4111-8111-111111111111",
+      runId: "22222222-2222-4222-8222-222222222222",
+      triggerMessageId: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+      parentMessageId: "ffffffff-ffff-4fff-8fff-ffffffffffff",
+      activity: {
+        id: "commentary-1",
+        kind: "message",
+        headline: "원인을 확인하고 있습니다.",
+      },
+      sentAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + 30_000).toISOString(),
+    };
+    const response = await hub.fetch(new Request("https://activity.test/publish", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(issueFrame),
+    }));
+    expect(response.status).toBe(204);
+    expect(JSON.parse(socket.sent[0])).toMatchObject({
+      projectId: issueFrame.projectId,
+      activity: { kind: "message" },
     });
   });
 });

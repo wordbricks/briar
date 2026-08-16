@@ -494,6 +494,7 @@ export const mobileIssueMessagesResponseSchema = z.object({
     createdAt: z.iso.datetime(),
     updatedAt: z.iso.datetime(),
   })),
+  agentReplies: z.array(z.lazy(() => mobileAgentReplySchema)).default([]),
 });
 
 /**
@@ -899,7 +900,9 @@ export const mobileCreateMessageRequestSchema = z.object({
 const mobileAgentReplySchema = z.object({
   id: z.uuid(),
   triggerMessageId: z.uuid(),
+  parentMessageId: z.uuid(),
   status: z.enum(["queued", "running", "completed", "failed"]),
+  attempts: z.number().int().nonnegative(),
   error: z.string().nullable(),
 });
 export const mobileCreateMessageResponseSchema = z.object({

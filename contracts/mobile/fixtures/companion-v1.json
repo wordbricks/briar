@@ -826,7 +826,9 @@
         "agentReply": {
           "id": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
           "triggerMessageId": "99999999-9999-4999-8999-999999999999",
+          "parentMessageId": "99999999-9999-4999-8999-999999999999",
           "status": "queued",
+          "attempts": 0,
           "error": null
         }
       }
@@ -839,7 +841,9 @@
         "agentReply": {
           "id": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
           "triggerMessageId": "99999999-9999-4999-8999-999999999999",
+          "parentMessageId": "99999999-9999-4999-8999-999999999999",
           "status": "completed",
+          "attempts": 1,
           "error": null
         },
         "message": {

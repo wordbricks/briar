@@ -212,6 +212,8 @@ import {
   createProjectRealtimeTransport,
 } from "../lib/channel-realtime";
 import { issueExecutionApprovalUnavailable } from "../lib/issue-execution-approval";
+import type { ChannelAgentActivityDescriptor } from "../lib/channel-agent-activity";
+import { useIssueAgentActivity } from "../hooks/use-issue-agent-activity";
 import { mergeIssueMessages } from "../lib/issue-message-merge";
 import {
   copyIssueId,
@@ -8204,6 +8206,7 @@ function IssueConversation({
   const [agentReplyStates, setAgentReplyStates] = useState<
     Record<string, { pending: number; error: string | null }>
   >({});
+  const issueActivity = useIssueAgentActivity(token, projectId, run.id);
   const [actionProposalStates, setActionProposalStates] = useState<
     Record<string, { accepting: boolean; error: string | null }>
   >({});
@@ -8261,7 +8264,7 @@ function IssueConversation({
         return;
       }
       if (trackedAgentRepliesRef.current.has(job.id)) return;
-      const replyThreadId = agentReplyParentMessageId(trigger);
+      const replyThreadId = job.parentMessageId ?? agentReplyParentMessageId(trigger);
       trackedAgentRepliesRef.current.set(job.id, { replyThreadId });
       setAgentReplyStates((current) => ({
         ...current,
@@ -8576,6 +8579,27 @@ function IssueConversation({
       }),
     [messages],
   );
+  const agentReplyActivityByThreadId = useMemo(() => {
+    const result: Record<
+      string,
+      { activity: ChannelAgentActivityDescriptor; sentAt: string }
+    > = {};
+    for (const [jobId, tracked] of trackedAgentRepliesRef.current) {
+      const job = agentRepliesByIdRef.current.get(jobId);
+      const frame = issueActivity.get(jobId);
+      if (
+        !job || !frame?.activity || frame.attempt !== job.attempts
+      ) continue;
+      const current = result[tracked.replyThreadId];
+      if (!current || current.sentAt < frame.sentAt) {
+        result[tracked.replyThreadId] = {
+          activity: frame.activity,
+          sentAt: frame.sentAt,
+        };
+      }
+    }
+    return result;
+  }, [agentReplyStates, issueActivity]);
   const replySummaries = useMemo(() => {
     const summaries = new Map<
       string,
@@ -9128,7 +9152,10 @@ function IssueConversation({
                       )
                     : null}
                 />
-                <AgentReplyState state={agentReplyStates[message.id]} />
+                <AgentReplyState
+                  activity={agentReplyActivityByThreadId[message.id]?.activity}
+                  state={agentReplyStates[message.id]}
+                />
                 {isReplying && (
                   <div
                     className="issue-inline-reply-composer"
@@ -9590,8 +9617,10 @@ function IssueMessageItem({
 }
 
 function AgentReplyState({
+  activity,
   state,
 }: {
+  activity?: ChannelAgentActivityDescriptor;
   state?: { pending: number; error: string | null };
 }) {
   const { t } = useI18n();
@@ -9599,7 +9628,9 @@ function AgentReplyState({
   if (state.pending > 0) {
     return (
       <div className="issue-agent-reply-state">
-        <LoadingState label={t("run.briarReplying")} />
+        <LoadingState
+          label={activity ? `Briar · ${activity.headline}` : t("run.briarReplying")}
+        />
       </div>
     );
   }

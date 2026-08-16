@@ -409,7 +409,9 @@ final class IssueMutationStore: ObservableObject {
         attachments: [PendingIssueAttachment] = [],
         attachmentReferences: [String]? = nil,
         pollInterval: Duration = .seconds(2),
-        maximumPolls: Int = 150
+        maximumPolls: Int = 150,
+        onCreated: ((IssueMessage) -> Void)? = nil,
+        onAgentReplyChanged: ((IssueAgentReplyJob) -> Void)? = nil
     ) async throws -> [IssueMessage] {
         try await perform("message-\(runID)") {
             let trimmed = body.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -465,7 +467,9 @@ final class IssueMutationStore: ObservableObject {
                     as: CreateIssueMessageResponse.self
                 )
             }
-            guard response.agentReply != nil else { return [response.message] }
+            onCreated?(response.message)
+            guard let initialReply = response.agentReply else { return [response.message] }
+            onAgentReplyChanged?(initialReply)
             for _ in 0..<maximumPolls {
                 try await Task.sleep(for: pollInterval)
                 let polled: IssueAgentReplyResponse
@@ -486,6 +490,7 @@ final class IssueMutationStore: ObservableObject {
                 } catch {
                     throw IssueMutationError.agentReplyPollingFailed
                 }
+                onAgentReplyChanged?(polled.agentReply)
                 switch polled.agentReply.status {
                 case .completed:
                     return [response.message] + (polled.message.map { [$0] } ?? [])

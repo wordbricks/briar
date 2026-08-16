@@ -26,6 +26,7 @@ export const CHANNEL_ACTIVITY_MIN_INTERVAL_MS = 750;
 export const CHANNEL_ACTIVITY_HEARTBEAT_INTERVAL_MS = 10_000;
 
 const defaultHeadline: Record<ChannelAgentActivityDescriptor["kind"], string> = {
+  message: "Working on a reply",
   command: "Running a command",
   fileChange: "Updating files",
   webSearch: "Searching the web",
@@ -60,7 +61,15 @@ function normalizedEventFromPayload(payload: unknown): NormalizedAgentEvent | nu
   const event = Reflect.get(payload, "event");
   if (!event || typeof event !== "object") return null;
   const type = Reflect.get(event, "type");
-  if (type === "activityStarted") {
+  if (type === "messageStarted" || type === "messageCompleted") {
+    const id = Reflect.get(event, "id");
+    const phase = Reflect.get(event, "phase");
+    const text = Reflect.get(event, "text");
+    if (
+      typeof id !== "string" || phase !== "commentary" ||
+      typeof text !== "string" || !text.trim()
+    ) return null;
+  } else if (type === "activityStarted") {
     const id = Reflect.get(event, "id");
     const kind = Reflect.get(event, "kind");
     const title = Reflect.get(event, "title");
@@ -84,6 +93,7 @@ function normalizedEventFromPayload(payload: unknown): NormalizedAgentEvent | nu
  */
 export class ChannelActivityPublisher {
   private readonly active = new Map<string, ChannelAgentActivityDescriptor>();
+  private commentary: ChannelAgentActivityDescriptor | null = null;
   private readonly now: () => number;
   private readonly minIntervalMs: number;
   private readonly heartbeatIntervalMs: number;
@@ -115,7 +125,13 @@ export class ChannelActivityPublisher {
     if (this.stopped) return;
     const event = normalizedEventFromPayload(payload);
     if (!event) return;
-    if (event.type === "activityStarted") {
+    if (event.type === "messageStarted" || event.type === "messageCompleted") {
+      this.commentary = {
+        id: event.id,
+        kind: "message",
+        headline: safeChannelActivityHeadline("message", event.text),
+      };
+    } else if (event.type === "activityStarted") {
       this.active.delete(event.id);
       this.active.set(event.id, {
         id: event.id,
@@ -126,6 +142,7 @@ export class ChannelActivityPublisher {
       this.active.delete(event.id);
     } else {
       this.active.clear();
+      this.commentary = null;
     }
     this.queue(this.latest());
   }
@@ -138,10 +155,11 @@ export class ChannelActivityPublisher {
     this.heartbeat = null;
     this.pending = undefined;
     this.active.clear();
+    this.commentary = null;
   }
 
   private latest() {
-    return [...this.active.values()].at(-1) ?? null;
+    return [...this.active.values()].at(-1) ?? this.commentary;
   }
 
   private queue(activity: ChannelAgentActivityDescriptor | null) {

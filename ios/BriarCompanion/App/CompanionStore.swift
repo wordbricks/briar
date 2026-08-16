@@ -392,6 +392,11 @@ final class DashboardStore: ObservableObject {
 
 @MainActor
 final class RunDetailStore: ObservableObject {
+    struct AgentTypingStatus: Identifiable, Equatable, Sendable {
+        let id: UUID
+        let activity: ChannelAgentActivity?
+    }
+
     struct ExecutionProposalContext: Equatable, Sendable {
         let lifecycleRevision: Int
         let proposalRevision: Int
@@ -407,11 +412,14 @@ final class RunDetailStore: ObservableObject {
     @Published private(set) var events: [RunEvent] = []
     @Published private(set) var messages: [IssueMessage] = []
     @Published private(set) var optimisticMessageIDs: Set<UUID> = []
+    @Published private(set) var agentReplies: [IssueAgentReplyJob] = []
+    @Published private(set) var activityFrames: [UUID: IssueAgentActivityFrame] = [:]
     @Published private(set) var evidence: [RunEvidence] = []
     @Published private(set) var loading = false
     @Published private(set) var errorMessage: String?
 
     private let api: any MobileAPIClientProtocol
+    private let realtime: (any MobileRealtimeClientProtocol)?
     private let projectID: UUID
     private let runID: UUID
     private let token: String
@@ -421,6 +429,9 @@ final class RunDetailStore: ObservableObject {
     private var skillExecutionProposalRevisions: [UUID: Int] = [:]
     private var skillExecutionProposalIDsByMessage: [UUID: UUID] = [:]
     private var authoritativeReloadPending = false
+    private var activityTask: Task<Void, Never>?
+    private var activityExpiryTask: Task<Void, Never>?
+    private var activityGeneration = 0
 
     init(
         api: any MobileAPIClientProtocol,
@@ -429,6 +440,7 @@ final class RunDetailStore: ObservableObject {
         token: String
     ) {
         self.api = api
+        self.realtime = api as? any MobileRealtimeClientProtocol
         self.projectID = projectID
         self.runID = runID
         self.token = token
@@ -487,6 +499,7 @@ final class RunDetailStore: ObservableObject {
                     if $0.createdAt != $1.createdAt { return $0.createdAt < $1.createdAt }
                     return $0.id.uuidString < $1.id.uuidString
                 }
+                agentReplies = loaded.1.agentReplies
                 evidence = loaded.2.evidence
                 errorMessage = nil
             } catch {
@@ -539,6 +552,104 @@ final class RunDetailStore: ObservableObject {
 
     func isMessageOptimistic(_ messageID: UUID) -> Bool {
         optimisticMessageIDs.contains(messageID)
+    }
+
+    func updateAgentReply(_ reply: IssueAgentReplyJob) {
+        if let index = agentReplies.firstIndex(where: { $0.id == reply.id }) {
+            agentReplies[index] = reply
+        } else {
+            agentReplies.append(reply)
+        }
+    }
+
+    func typingStatuses(parentMessageID: UUID) -> [AgentTypingStatus] {
+        let now = Date()
+        return agentReplies.compactMap { reply in
+            guard reply.parentMessageId == parentMessageID,
+                  reply.status == .queued || reply.status == .running
+            else { return nil }
+            let frame = activityFrames[reply.id]
+            let activity = frame?.attempt == reply.attempts &&
+                    (frame?.expiresAt ?? .distantPast) > now
+                ? frame?.activity
+                : nil
+            return AgentTypingStatus(id: reply.id, activity: activity)
+        }
+    }
+
+    func startActivitySynchronization() {
+        activityGeneration &+= 1
+        activityTask?.cancel()
+        activityTask = nil
+        guard let realtime else { return }
+        let expectedGeneration = activityGeneration
+        activityTask = Task { [weak self] in
+            var reconnectAttempt = 0
+            while !Task.isCancelled {
+                guard let self, expectedGeneration == self.activityGeneration else { return }
+                do {
+                    let events = realtime.issueActivityEvents(
+                        MobileAPIContract.Endpoint.issueActivityEvents(
+                            projectID: self.projectID,
+                            runID: self.runID
+                        ),
+                        token: self.token
+                    )
+                    for try await frame in events {
+                        guard !Task.isCancelled,
+                              expectedGeneration == self.activityGeneration,
+                              frame.version == 1,
+                              frame.projectId == self.projectID,
+                              frame.runId == self.runID
+                        else { return }
+                        reconnectAttempt = 0
+                        self.applyActivityFrame(frame)
+                    }
+                } catch is CancellationError {
+                    return
+                } catch {
+                    // The durable reply job keeps the generic fallback visible.
+                }
+                reconnectAttempt = min(reconnectAttempt + 1, 5)
+                do {
+                    try await Task.sleep(for: .seconds(1 << reconnectAttempt))
+                } catch {
+                    return
+                }
+            }
+        }
+    }
+
+    func applyActivityFrame(_ frame: IssueAgentActivityFrame) {
+        if let previous = activityFrames[frame.replyJobId],
+           previous.attempt > frame.attempt ||
+            (previous.attempt == frame.attempt && previous.sequence >= frame.sequence) {
+            return
+        }
+        if frame.expiresAt > Date() {
+            activityFrames[frame.replyJobId] = frame
+        } else {
+            activityFrames.removeValue(forKey: frame.replyJobId)
+        }
+        scheduleActivityExpiry()
+    }
+
+    private func scheduleActivityExpiry() {
+        activityExpiryTask?.cancel()
+        activityExpiryTask = nil
+        guard let expiresAt = activityFrames.values.map(\.expiresAt).min() else { return }
+        let delay = max(0, expiresAt.timeIntervalSinceNow)
+        activityExpiryTask = Task { [weak self] in
+            do {
+                try await Task.sleep(for: .milliseconds(Int64(delay * 1_000) + 1))
+            } catch {
+                return
+            }
+            guard let self, !Task.isCancelled else { return }
+            let now = Date()
+            self.activityFrames = self.activityFrames.filter { $0.value.expiresAt > now }
+            self.scheduleActivityExpiry()
+        }
     }
 
     func updateIssueProposal(
@@ -641,6 +752,12 @@ final class RunDetailStore: ObservableObject {
     /// leaves this exact run detail.
     func close() {
         lifecycleRevision &+= 1
+        activityGeneration &+= 1
+        activityTask?.cancel()
+        activityTask = nil
+        activityExpiryTask?.cancel()
+        activityExpiryTask = nil
+        activityFrames = [:]
         authoritativeReloadPending = false
         loading = false
     }

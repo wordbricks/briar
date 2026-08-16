@@ -27,6 +27,32 @@ export type ChannelActivitySocketTicketPayload = {
   nonce: string;
 };
 
+export type IssueActivityPublishTokenPayload = {
+  purpose: "publish-issue";
+  organizationId: string;
+  projectId: string;
+  runId: string;
+  replyJobId: string;
+  triggerMessageId: string;
+  parentMessageId: string;
+  attempt: number;
+  workerId: string;
+  deviceId: string;
+  expiresAt: number;
+  nonce: string;
+};
+
+export type IssueActivitySocketTicketPayload = {
+  purpose: "subscribe-issue";
+  organizationId: string;
+  projectId: string;
+  runId: string;
+  userId: string;
+  expiresAt: number;
+  authorizationExpiresAt: number;
+  nonce: string;
+};
+
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -185,4 +211,103 @@ export async function verifyChannelActivitySocketTicket(
     return null;
   }
   return payload as ChannelActivitySocketTicketPayload;
+}
+
+export async function createIssueActivityPublishToken(
+  secret: string,
+  input: Omit<IssueActivityPublishTokenPayload, "purpose" | "nonce">,
+) {
+  const payload: IssueActivityPublishTokenPayload = {
+    purpose: "publish-issue",
+    ...input,
+    nonce: crypto.randomUUID(),
+  };
+  return { token: await signPayload(secret, payload), expiresAt: input.expiresAt };
+}
+
+export async function verifyIssueActivityPublishToken(
+  secret: string,
+  token: string,
+  replyJobId: string,
+  now = Date.now(),
+): Promise<IssueActivityPublishTokenPayload | null> {
+  const payload = await verifiedPayload(secret, token);
+  if (
+    payload?.purpose !== "publish-issue" ||
+    payload.replyJobId !== replyJobId ||
+    !validUuid(payload.organizationId) ||
+    !validUuid(payload.projectId) ||
+    !validUuid(payload.runId) ||
+    !validUuid(payload.replyJobId) ||
+    !validUuid(payload.triggerMessageId) ||
+    !validUuid(payload.parentMessageId) ||
+    !Number.isSafeInteger(payload.attempt) ||
+    (payload.attempt as number) < 1 ||
+    !validShortText(payload.workerId, 64) ||
+    !validShortText(payload.deviceId, 200) ||
+    !Number.isSafeInteger(payload.expiresAt) ||
+    (payload.expiresAt as number) <= now ||
+    (payload.expiresAt as number) > now + CHANNEL_ACTIVITY_PUBLISH_MAX_TTL_MS ||
+    !validShortText(payload.nonce, 100)
+  ) {
+    return null;
+  }
+  return payload as IssueActivityPublishTokenPayload;
+}
+
+export async function createIssueActivitySocketTicket(
+  secret: string,
+  input: {
+    organizationId: string;
+    projectId: string;
+    runId: string;
+    userId: string;
+    now?: number;
+  },
+) {
+  const now = input.now ?? Date.now();
+  const payload: IssueActivitySocketTicketPayload = {
+    purpose: "subscribe-issue",
+    organizationId: input.organizationId,
+    projectId: input.projectId,
+    runId: input.runId,
+    userId: input.userId,
+    expiresAt: now + CHANNEL_ACTIVITY_SOCKET_TICKET_TTL_MS,
+    authorizationExpiresAt: now + CHANNEL_ACTIVITY_SOCKET_AUTHORIZATION_TTL_MS,
+    nonce: crypto.randomUUID(),
+  };
+  return {
+    ticket: await signPayload(secret, payload),
+    expiresAt: new Date(payload.expiresAt).toISOString(),
+  };
+}
+
+export async function verifyIssueActivitySocketTicket(
+  secret: string,
+  ticket: string,
+  projectId: string,
+  runId: string,
+  now = Date.now(),
+): Promise<IssueActivitySocketTicketPayload | null> {
+  const payload = await verifiedPayload(secret, ticket);
+  if (
+    payload?.purpose !== "subscribe-issue" ||
+    payload.projectId !== projectId ||
+    payload.runId !== runId ||
+    !validUuid(payload.organizationId) ||
+    !validUuid(payload.projectId) ||
+    !validUuid(payload.runId) ||
+    !validShortText(payload.userId, 200) ||
+    !Number.isSafeInteger(payload.expiresAt) ||
+    (payload.expiresAt as number) <= now ||
+    (payload.expiresAt as number) > now + CHANNEL_ACTIVITY_SOCKET_TICKET_TTL_MS ||
+    !Number.isSafeInteger(payload.authorizationExpiresAt) ||
+    (payload.authorizationExpiresAt as number) <= now ||
+    (payload.authorizationExpiresAt as number) >
+      now + CHANNEL_ACTIVITY_SOCKET_AUTHORIZATION_TTL_MS ||
+    !validShortText(payload.nonce, 100)
+  ) {
+    return null;
+  }
+  return payload as IssueActivitySocketTicketPayload;
 }
