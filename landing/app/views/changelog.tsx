@@ -23,6 +23,20 @@ export const changelogCopy = {
     backTop: "맨 위로 ↑",
     entries: [
       {
+        version: "1.2.127",
+        date: "2026년 8월 16일",
+        title: "실시간 대화와 전송 경험을 더 즉각적으로 연결합니다",
+        summary:
+          "채널과 이슈 대화에서 보낸 메시지를 바로 확인하고, 에이전트 활동과 모바일 탐색 상태를 더 안정적으로 이어갈 수 있게 했습니다.",
+        items: [
+          "이슈 대화와 채널 에이전트의 진행 활동을 실시간으로 스트리밍하고, 작업이 끝나거나 연결이 끊길 때도 상태를 자연스럽게 정리합니다.",
+          "채널·이슈 메시지를 전송 직후 화면에 표시하고 클라이언트 메시지 ID로 중복을 막아, 답글·첨부 파일과 서버 동기화가 더 빠르게 이어집니다.",
+          "긴 채널 메시지를 모바일에서 길게 눌러 선택·복사할 수 있고, 대화가 아래에 있지 않을 때 최신 메시지로 돌아가는 버튼을 제공합니다.",
+          "모바일 채널과 이슈 대화의 캐시·재진입·로딩 상태를 다듬어 오래된 답글이 남거나 최신 메시지가 늦게 나타나는 문제를 줄였습니다.",
+          "실행 세션에 실제 Worker 이름을 표시해 UUID 대신 현재 작업을 처리하는 환경을 쉽게 식별할 수 있습니다.",
+        ],
+      },
+      {
         version: "1.2.126",
         date: "2026년 8월 15일",
         title: "첫 실행과 대화 결과를 더 빠르고 정확하게 연결합니다",
@@ -646,6 +660,20 @@ export const changelogCopy = {
     home: "Home",
     backTop: "Back to top ↑",
     entries: [
+      {
+        version: "1.2.127",
+        date: "August 16, 2026",
+        title: "Make live conversations and sending feel immediate",
+        summary:
+          "Sent messages appear right away, agent activity streams live, and mobile conversations recover their position and state more reliably.",
+        items: [
+          "Stream live progress from issue conversations and channel agents, then clear the activity cleanly when work finishes or the connection closes.",
+          "Show channel and issue messages immediately after sending and use stable client message IDs to prevent duplicates while replies, attachments, and server sync catch up.",
+          "Let mobile users long-press to select and copy long channel messages, and provide a button to return to the newest messages when they scroll away.",
+          "Improve mobile channel and issue conversation caching, re-entry, and loading states so stale replies disappear and new messages appear sooner.",
+          "Show the actual Worker name for agent sessions so the environment handling a run is easier to identify than a raw UUID.",
+        ],
+      },
       {
         version: "1.2.126",
         date: "August 15, 2026",
@@ -1282,9 +1310,9 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <h1>{changelog.title}</h1>
           <p>{changelog.description}</p>
         </div>
-        <a href="#v1-2-126" className="changelog-current">
+        <a href="#v1-2-127" className="changelog-current">
           <span>{changelog.current}</span>
-          <strong>v1.2.126</strong>
+          <strong>v1.2.127</strong>
           <i aria-hidden="true">↓</i>
         </a>
       </section>
@@ -1309,10 +1337,13 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   {index === 0 ? <span>{changelog.latest}</span> : null}
                   <time
                     dateTime={
+                      entry.version === "1.2.127" ||
                       entry.version === "1.2.126" ||
                       entry.version === "1.2.125" ||
                       entry.version === "1.2.124"
-                        ? "2026-08-15"
+                        ? entry.version === "1.2.127"
+                          ? "2026-08-16"
+                          : "2026-08-15"
                         : entry.version === "1.2.123" ||
                       entry.version === "1.2.122" ||
                       entry.version === "1.2.121" ||
