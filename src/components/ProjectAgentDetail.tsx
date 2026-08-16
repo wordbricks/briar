@@ -267,6 +267,7 @@ export function ProjectAgentDetail({
         onStop={() => onStopSession(selectedSession.id)}
         session={selectedSession}
         token={token}
+        workers={dashboard?.workers ?? []}
       />
     );
   }

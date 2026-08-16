@@ -670,8 +670,11 @@ struct SessionDetailView: View {
                 if let type = session.sessionType {
                     LabeledContent(L10n.text("유형"), value: type.rawValue)
                 }
-                if let workerID = session.workerId ?? session.requestedWorkerId {
-                    LabeledContent(L10n.text("실행 Worker"), value: workerID)
+                if let workerLabel = Self.workerLabel(
+                    for: session,
+                    workers: snapshot?.workers ?? []
+                ) {
+                    LabeledContent(L10n.text("실행 Worker"), value: workerLabel)
                 }
                 LabeledContent(L10n.text("시작"), value: L10n.dateTime(session.startedAt, locale: locale))
                 if let completedAt = session.completedAt {
@@ -765,6 +768,14 @@ struct SessionDetailView: View {
             isPresented: $copied,
             message: L10n.text(.linkCopied, locale: locale)
         )
+    }
+
+    static func workerLabel(
+        for session: ProjectAgentSession,
+        workers: [DashboardWorker]
+    ) -> String? {
+        guard let workerID = session.workerId ?? session.requestedWorkerId else { return nil }
+        return workers.first { $0.id == workerID }?.label ?? workerID
     }
 
     private func issueLabel(_ issue: ProjectAgentSession.Issue) -> some View {

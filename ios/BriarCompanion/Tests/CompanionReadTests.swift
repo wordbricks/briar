@@ -203,6 +203,67 @@ final class CompanionReadTests: XCTestCase {
         XCTAssertNil(RunRow.worker(for: unknownRun, workers: workers))
     }
 
+    func testSessionDetailPrefersAssignedWorkerNameOverUUID() {
+        let assignedWorker = DashboardWorker(
+            id: "94ba9871-ec10-4752-9e7b-de876b587214",
+            label: "Studio Mac",
+            readiness: "available",
+            acceptingWork: true,
+            readinessDetail: nil,
+            activeSessions: 0,
+            availableSessions: 1
+        )
+        let requestedWorker = DashboardWorker(
+            id: "worker-requested",
+            label: "Laptop Mac",
+            readiness: "available",
+            acceptingWork: true,
+            readinessDetail: nil,
+            activeSessions: 0,
+            availableSessions: 1
+        )
+        let workers = [assignedWorker, requestedWorker]
+        let projectID = UUID(uuidString: "11111111-1111-4111-8111-111111111111")!
+
+        XCTAssertEqual(
+            SessionDetailView.workerLabel(
+                for: session(
+                    projectID: projectID,
+                    requestedWorkerId: requestedWorker.id,
+                    workerId: assignedWorker.id
+                ),
+                workers: workers
+            ),
+            "Studio Mac"
+        )
+        XCTAssertEqual(
+            SessionDetailView.workerLabel(
+                for: session(
+                    projectID: projectID,
+                    requestedWorkerId: requestedWorker.id
+                ),
+                workers: workers
+            ),
+            "Laptop Mac"
+        )
+        XCTAssertEqual(
+            SessionDetailView.workerLabel(
+                for: session(
+                    projectID: projectID,
+                    workerId: "missing-worker"
+                ),
+                workers: workers
+            ),
+            "missing-worker"
+        )
+        XCTAssertNil(
+            SessionDetailView.workerLabel(
+                for: session(projectID: projectID),
+                workers: workers
+            )
+        )
+    }
+
     func testAgentSkillWorkerEligibilityUsesAvailabilityAndHealthyProviders() {
         let pausedWorker = DashboardWorker(
             id: "worker-paused",
@@ -577,6 +638,37 @@ final class CompanionReadTests: XCTestCase {
             skillExecutionProposal: skillExecutionProposal,
             createdAt: Date(timeIntervalSince1970: 1_700_000_000),
             updatedAt: Date(timeIntervalSince1970: 1_700_000_000)
+        )
+    }
+
+    private func session(
+        projectID: UUID,
+        requestedWorkerId: String? = nil,
+        workerId: String? = nil
+    ) -> ProjectAgentSession {
+        ProjectAgentSession(
+            id: "session-1",
+            projectId: projectID,
+            dispatchGroupId: "session-1",
+            agentId: nil,
+            sessionType: .task,
+            trigger: .manual,
+            scheduleId: nil,
+            scheduleRunId: nil,
+            parentSessionId: nil,
+            request: "릴리즈",
+            status: .running,
+            issues: [],
+            startedAt: newer,
+            completedAt: nil,
+            conversationId: nil,
+            workspaceRoot: nil,
+            requestedWorkerId: requestedWorkerId,
+            workerId: workerId,
+            summary: nil,
+            error: nil,
+            events: nil,
+            updatedAt: newer
         )
     }
 }

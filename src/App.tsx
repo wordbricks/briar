@@ -1431,6 +1431,7 @@ export function App() {
         onStop={() => autoHunt.stopSession(inboxDetailSession.id)}
         session={inboxDetailSession}
         token={briar.token}
+        workers={briar.dashboard?.workers ?? []}
       />
     ) : inboxDetailChannelId && briar.activeOrganizationId && briar.token ? (
       <Channels
@@ -2212,6 +2213,7 @@ export function App() {
             onStop={() => autoHunt.stopSession(requestedCompanionSession.id)}
             session={requestedCompanionSession}
             token={briar.token}
+            workers={briar.dashboard?.workers ?? []}
           />
         ) : companionPage === "settings" ? (
           <CompanionSettings
