@@ -174,16 +174,25 @@ enum MessageMentions {
 }
 
 /// Renders message text with known @mentions as blue hyperlinks.
+/// Truncated quotes stay on SwiftUI `Text` so `lineLimit` still clips.
 struct MentionText: View {
     let text: String
     let handles: Set<String>
+    var allowsRangeSelection = true
 
     var body: some View {
-        Text(MessageMentions.attributed(text, handles: handles))
-            .environment(\.openURL, OpenURLAction { url in
-                // Keep mention taps in-app; do not hand briar-mention:// to Safari.
-                if url.scheme == "briar-mention" { return .handled }
-                return .systemAction
-            })
+        let attributed = MessageMentions.attributed(text, handles: handles)
+        Group {
+            if allowsRangeSelection {
+                SelectableText(attributed: attributed)
+            } else {
+                Text(attributed)
+            }
+        }
+        .environment(\.openURL, OpenURLAction { url in
+            // Keep mention taps in-app; do not hand briar-mention:// to Safari.
+            if url.scheme == "briar-mention" { return .handled }
+            return .systemAction
+        })
     }
 }

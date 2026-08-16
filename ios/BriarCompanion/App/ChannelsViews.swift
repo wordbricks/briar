@@ -919,8 +919,7 @@ private struct ChannelWebhookBlocksView: View {
             ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in
                 switch block.type {
                 case .header:
-                    Text(block.textObject?.text ?? "")
-                        .font(.title3.weight(.bold))
+                    SelectableText(block.textObject?.text ?? "", style: .title3Bold)
                 case .section:
                     if let text = block.textObject {
                         if text.type == .markdown {
@@ -928,7 +927,7 @@ private struct ChannelWebhookBlocksView: View {
                                 markdown: ChannelWebhookBlockFormatting.slackMarkdown(text.text)
                             )
                         } else {
-                            Text(text.text)
+                            SelectableText(text.text)
                         }
                     }
                 case .markdown:
@@ -943,12 +942,10 @@ private struct ChannelWebhookBlocksView: View {
                                     markdown: ChannelWebhookBlockFormatting.slackMarkdown(text.text)
                                 )
                             } else {
-                                Text(text.text)
+                                SelectableText(text.text, style: .secondaryCaption)
                             }
                         }
                     }
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
                 case .richText:
                     VStack(alignment: .leading, spacing: 6) {
                         ForEach(Array((block.richTextElements ?? []).enumerated()), id: \.offset) { _, element in
@@ -960,7 +957,6 @@ private struct ChannelWebhookBlocksView: View {
                 }
             }
         }
-        .textSelection(.enabled)
     }
 }
 

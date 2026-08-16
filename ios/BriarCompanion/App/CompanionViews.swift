@@ -1644,7 +1644,8 @@ struct RunDetailView: View {
                             .foregroundStyle(.secondary)
                         MentionText(
                             text: conversationMessageText(parent.body),
-                            handles: issueMentionHandles
+                            handles: issueMentionHandles,
+                            allowsRangeSelection: false
                         )
                         .font(.caption)
                         .lineLimit(2)
@@ -2917,8 +2918,7 @@ struct MarkdownText: View {
             ForEach(Array(MarkdownDocument.parse(markdown).enumerated()), id: \.offset) { _, block in
                 switch block {
                 case let .heading(level, content):
-                    inlineText(content)
-                        .font(headingFont(level))
+                    inlineText(content, style: headingStyle(level))
                         .padding(.top, level == 1 ? 4 : 2)
                 case let .paragraph(content):
                     inlineText(content)
@@ -2952,7 +2952,7 @@ struct MarkdownText: View {
                         RoundedRectangle(cornerRadius: 1)
                             .fill(Color.secondary.opacity(0.45))
                             .frame(width: 3)
-                        inlineText(content).foregroundStyle(.secondary)
+                        inlineText(content, style: .secondaryBody)
                     }
                 case let .code(language, content):
                     VStack(alignment: .leading, spacing: 6) {
@@ -2975,21 +2975,20 @@ struct MarkdownText: View {
                 }
             }
         }
-        .textSelection(.enabled)
     }
 
-    private func inlineText(_ value: String) -> Text {
-        guard let attributed = try? AttributedString(
-            markdown: value,
-            options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)
-        ) else { return Text(value) }
-        return Text(attributed)
+    @ViewBuilder
+    private func inlineText(
+        _ value: String,
+        style: SelectableTextStyle = .body
+    ) -> some View {
+        SelectableText(markdown: value, style: style)
     }
 
-    private func headingFont(_ level: Int) -> Font {
+    private func headingStyle(_ level: Int) -> SelectableTextStyle {
         switch level {
-        case 1: .title2.bold()
-        case 2: .title3.bold()
+        case 1: .title2Bold
+        case 2: .title3Bold
         default: .headline
         }
     }
