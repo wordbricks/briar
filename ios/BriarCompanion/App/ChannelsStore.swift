@@ -105,6 +105,11 @@ final class ChannelsStore: ObservableObject {
         let agentReplies: [ChannelAgentReply]
     }
 
+    private struct ThreadCacheKey: Hashable {
+        let channelID: UUID
+        let parentMessageID: UUID
+    }
+
     struct FocusContext: Equatable, Sendable {
         let revision: Int
         let channelID: UUID
@@ -162,6 +167,7 @@ final class ChannelsStore: ObservableObject {
     private var focusedThreadParentID: UUID?
     private var nextMessageCursor: UUID?
     private var cachedConversations: [UUID: CachedChannelConversation] = [:]
+    private var cachedThreads: [ThreadCacheKey: [ChannelMessage]] = [:]
     private var generation = 0
     private var catalogLoadRevision = 0
     private var authoritativeLoadRevision = 0
@@ -228,6 +234,7 @@ final class ChannelsStore: ObservableObject {
         focusedThreadParentID = nil
         nextMessageCursor = nil
         cachedConversations = [:]
+        cachedThreads = [:]
         channels = []
         messages = []
         thread = []
@@ -296,6 +303,7 @@ final class ChannelsStore: ObservableObject {
 
     func openChannel(_ channelID: UUID) async {
         guard let organizationID, let token else { return }
+        cacheFocusedThread()
         cacheFocusedConversation()
         if focusedChannelID != channelID || focusedThreadParentID != nil {
             invalidateProposalAcceptancePresentation()
@@ -528,6 +536,7 @@ final class ChannelsStore: ObservableObject {
             focusedChannelID == channelID,
             focusedThreadParentID == parentMessageID
         else { return }
+        cacheFocusedThread()
         authoritativeLoadRevision &+= 1
         invalidateProposalAcceptancePresentation()
         focusedThreadParentID = nil
@@ -537,7 +546,7 @@ final class ChannelsStore: ObservableObject {
 
     func openThread(channelID: UUID, parentMessageID: UUID) async {
         guard let organizationID, let token else { return }
-        let previousThreadMessageIDs = Set(thread.map(\.id))
+        cacheFocusedThread()
         if focusedChannelID != channelID || focusedThreadParentID != parentMessageID {
             invalidateProposalAcceptancePresentation()
         }
@@ -548,7 +557,13 @@ final class ChannelsStore: ObservableObject {
         focusedThreadParentID = parentMessageID
         conversationLoadInFlight = true
         updateLoadingState()
-        thread = []
+        let cacheKey = ThreadCacheKey(
+            channelID: channelID,
+            parentMessageID: parentMessageID
+        )
+        thread = cachedThreads[cacheKey] ?? []
+        recordProposalMessages(thread)
+        let previousThreadMessageIDs = Set(thread.map(\.id))
         defer {
             if expectedGeneration == generation,
                expectedLoadRevision == authoritativeLoadRevision,
@@ -583,6 +598,7 @@ final class ChannelsStore: ObservableObject {
             )
             recordProposalMessages(response.messages)
             thread = response.messages
+            cachedThreads[cacheKey] = response.messages
             errorMessage = nil
         } catch {
             guard
@@ -768,6 +784,7 @@ final class ChannelsStore: ObservableObject {
                 messages.append(response.message)
             } else {
                 thread.append(response.message)
+                cacheFocusedThread()
             }
             errorMessage = nil
         } catch {
@@ -808,6 +825,7 @@ final class ChannelsStore: ObservableObject {
             }
             messages = messages.map(apply)
             thread = thread.map(apply)
+            cacheFocusedThread()
             errorMessage = nil
         } catch {
             errorMessage = CompanionStore.message(for: error)
@@ -1604,6 +1622,12 @@ final class ChannelsStore: ObservableObject {
             }
         }
         channels = nextChannels
+        for removedChannelID in removedChannelIDs {
+            cachedConversations.removeValue(forKey: removedChannelID)
+        }
+        cachedThreads = cachedThreads.filter {
+            !removedChannelIDs.contains($0.key.channelID)
+        }
         if let focusedChannelID,
            nextChannels.contains(where: { $0.id == focusedChannelID && $0.hasUnread == true }) {
             Task { await markChannelRead(focusedChannelID) }
@@ -1615,6 +1639,15 @@ final class ChannelsStore: ObservableObject {
            }) {
             invalidateProposalAcceptancePresentation()
         }
+
+        let removedMessageIDs = Set(delta.removedMessageIds)
+        let stabilizedMessages = preservingLocallyAcceptedExecutionProposals(
+            in: delta.messages
+        )
+        updateCachedThreads(
+            with: stabilizedMessages,
+            removing: removedMessageIDs
+        )
 
         if let focusedChannelID, removedChannelIDs.contains(focusedChannelID) {
             authoritativeLoadRevision &+= 1
@@ -1635,11 +1668,7 @@ final class ChannelsStore: ObservableObject {
         }
 
         guard let focusedChannelID else { return }
-        let removedMessageIDs = Set(delta.removedMessageIds)
         invalidateExecutionProposals(forMessageIDs: removedMessageIDs)
-        let stabilizedMessages = preservingLocallyAcceptedExecutionProposals(
-            in: delta.messages
-        )
         recordProposalMessages(stabilizedMessages)
         let relevant = stabilizedMessages.filter { $0.channelId == focusedChannelID }
         messages = Self.mergeMessages(
@@ -1700,6 +1729,36 @@ final class ChannelsStore: ObservableObject {
             agents: agents,
             agentReplies: agentReplies
         )
+    }
+
+    private func cacheFocusedThread() {
+        guard let focusedChannelID, let focusedThreadParentID else { return }
+        cachedThreads[ThreadCacheKey(
+            channelID: focusedChannelID,
+            parentMessageID: focusedThreadParentID
+        )] = thread
+    }
+
+    private func updateCachedThreads(
+        with messages: [ChannelMessage],
+        removing removedMessageIDs: Set<UUID>
+    ) {
+        for key in Array(cachedThreads.keys) {
+            if removedMessageIDs.contains(key.parentMessageID) {
+                cachedThreads.removeValue(forKey: key)
+                continue
+            }
+            let relevantMessages = messages.filter {
+                $0.channelId == key.channelID &&
+                    ($0.id == key.parentMessageID ||
+                        $0.parentMessageId == key.parentMessageID)
+            }
+            cachedThreads[key] = Self.mergeMessages(
+                cachedThreads[key] ?? [],
+                updates: relevantMessages,
+                removing: removedMessageIDs
+            )
+        }
     }
 
     private func markChannelRead(_ channelID: UUID) async {
