@@ -9359,12 +9359,6 @@ function IssueMessageItem({
           <time dateTime={message.createdAt}>
             {formatDate(message.createdAt, localeTag)}
           </time>
-          {message.optimistic ? (
-            <span className="conversation-message-sending" role="status">
-              <LoaderCircle aria-hidden="true" className="spin" size={12} />
-              {t("run.sendingMessage")}
-            </span>
-          ) : null}
         </header>
         {parentMessage ? (
           <blockquote className="issue-message-parent-quote">

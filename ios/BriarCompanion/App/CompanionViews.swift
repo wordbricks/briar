@@ -1639,12 +1639,6 @@ struct RunDetailView: View {
             timestamp: message.createdAt,
             accessibilityIdentifier: "issue-message-\(message.id.uuidString.lowercased())"
         ) {
-                if isOptimistic {
-                    Label(L10n.text("보내는 중", locale: locale), systemImage: "arrow.up.circle")
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                        .accessibilityIdentifier("issue-message-sending")
-                }
                 if let parent = detail.messages.first(where: { $0.id == message.parentMessageId }) {
                     HStack(alignment: .top, spacing: 6) {
                         Image(systemName: "arrowshape.turn.up.left")

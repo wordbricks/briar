@@ -232,6 +232,48 @@ final class BriarCompanionUITests: XCTestCase {
         captureScreenshot(named: "companion-channel-composer")
     }
 
+    func testChannelSentMessageAppearsImmediatelyWithoutSendingLabel() {
+        let app = launchInsideCompanion(
+            additionalArguments: ["--ui-testing-delayed-message-send"]
+        )
+
+        app.tabBars.buttons["홈"].tap()
+        let channel = app.buttons[
+            "channel-row-cccccccc-cccc-4ccc-8ccc-cccccccccccc"
+        ]
+        XCTAssertTrue(channel.waitForExistence(timeout: 5))
+        channel.tap()
+
+        let field = app.textFields["channel-composer-field"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        field.tap()
+        let sentBody = "채널에서 바로 보이는 메시지"
+        field.typeText(sentBody)
+        let send = app.buttons["channel-composer-send"]
+        send.tap()
+
+        XCTAssertTrue(
+            app.staticTexts[sentBody].waitForExistence(timeout: 1),
+            "서버 응답 전에도 채널 메시지가 즉시 표시되어야 합니다."
+        )
+        XCTAssertFalse(
+            app.descendants(matching: .any)["channel-message-sending"].exists,
+            "낙관적으로 표시한 채널 메시지에는 보내는 중 문구가 없어야 합니다."
+        )
+        captureScreenshot(named: "companion-channel-optimistic-message")
+
+        XCTAssertTrue(
+            send.waitForNonExistence(timeout: 5),
+            "서버가 메시지를 확정하면 빈 입력창의 전송 버튼이 다시 숨겨져야 합니다."
+        )
+        XCTAssertEqual(
+            app.staticTexts.matching(
+                NSPredicate(format: "label == %@", sentBody)
+            ).count,
+            1
+        )
+    }
+
     func testChannelMentionPickerDismissesAfterAgentSelection() {
         let app = launchInsideCompanion()
 
@@ -529,8 +571,25 @@ final class BriarCompanionUITests: XCTestCase {
         )
         XCTAssertTrue(send.exists)
         XCTAssertFalse(send.isEnabled, "전송 중에는 중복 제출을 막아야 합니다.")
+        XCTAssertTrue(
+            element(withLabel: sentBody, in: app).waitForExistence(timeout: 5),
+            "서버 응답 전에도 이슈 대화 메시지가 즉시 표시되어야 합니다."
+        )
+        XCTAssertFalse(
+            app.descendants(matching: .any)["issue-message-sending"].exists,
+            "낙관적으로 표시한 이슈 메시지에는 보내는 중 문구가 없어야 합니다."
+        )
         captureScreenshot(named: "companion-message-draft-cleared")
-        XCTAssertTrue(element(withLabel: sentBody, in: app).waitForExistence(timeout: 5))
+        XCTAssertTrue(
+            send.waitForNonExistence(timeout: 5),
+            "서버가 메시지를 확정하면 빈 입력창의 전송 버튼이 다시 숨겨져야 합니다."
+        )
+        XCTAssertEqual(
+            app.descendants(matching: .any).matching(
+                NSPredicate(format: "label == %@", sentBody)
+            ).count,
+            2
+        )
         captureScreenshot(named: "companion-native-write-flow")
     }
 
