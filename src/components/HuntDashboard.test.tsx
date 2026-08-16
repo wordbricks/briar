@@ -2973,7 +2973,9 @@ describe("HuntDashboard", () => {
     );
     expect(conversationResizer?.nextElementSibling).toBe(conversation);
     expect(
-      conversation?.querySelector(".issue-message-list + .issue-message-composer"),
+      conversation?.querySelector(
+        ".conversation-scroll-region + .issue-message-composer",
+      ),
     ).not.toBeNull();
     expect(container.querySelector(".run-page-composer-dock")).toBeNull();
 
@@ -5208,6 +5210,77 @@ describe("HuntDashboard", () => {
       await Promise.resolve();
     });
     expect(messageList?.scrollTop).toBe(640);
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("shows the latest-message button above the companion issue composer when scrolled up", async () => {
+    const createdAt = new Date().toISOString();
+    const loadedMessage: IssueMessage = {
+      id: "message-loaded",
+      runId: demoDashboard.runs[0].id,
+      parentMessageId: null,
+      body: "기존 메시지",
+      author: { id: "jay", name: "Jay", image: null, provider: null },
+      replyCount: 0,
+      createdAt,
+      updatedAt: createdAt,
+    };
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(
+        <RunPage
+          companionMode
+          initialDetailTab="conversation"
+          isSidebarOpen
+          error={null}
+          isRecovering={false}
+          onBack={() => undefined}
+          onCancel={async () => undefined}
+          onLoadAttachment={async () => new Blob()}
+          onLoadIssueMessages={async () => [loadedMessage]}
+          onLoadRunEvidence={async () => []}
+          onMove={async () => undefined}
+          onRetry={async () => undefined}
+          onSendIssueMessage={async () => ({
+            message: loadedMessage,
+            agentReply: null,
+          })}
+          run={demoDashboard.runs[0]}
+        />,
+      );
+      await Promise.resolve();
+    });
+
+    const scroller = container.querySelector<HTMLElement>(
+      ".issue-message-list",
+    )!;
+    Object.defineProperties(scroller, {
+      clientHeight: { configurable: true, value: 500 },
+      scrollHeight: { configurable: true, value: 1_200 },
+    });
+    scroller.scrollTop = 619;
+    await act(async () => {
+      scroller.dispatchEvent(new Event("scroll", { bubbles: true }));
+    });
+
+    const jump = container.querySelector<HTMLButtonElement>(
+      '[aria-label="최신 메시지로 이동"]',
+    );
+    expect(jump?.parentElement?.className).toBe("conversation-scroll-region");
+    expect(
+      jump?.parentElement?.nextElementSibling?.classList.contains(
+        "issue-message-composer",
+      ),
+    ).toBe(true);
+    await act(async () => jump?.click());
+    expect(scroller.scrollTop).toBe(1_200);
+    expect(
+      container.querySelector('[aria-label="최신 메시지로 이동"]'),
+    ).toBeNull();
 
     await act(async () => root.unmount());
     container.remove();

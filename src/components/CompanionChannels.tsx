@@ -68,6 +68,10 @@ import { useI18n } from "../i18n";
 import { useChannelComposer } from "../hooks/useChannelComposer";
 import { useMobileBackHandler } from "../hooks/useMobileNavigation";
 import { useChannelAgentActivity } from "../hooks/use-channel-agent-activity";
+import {
+  conversationIsAwayFromBottom,
+  scrollConversationToBottom,
+} from "../lib/conversation-scroll";
 import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
 import type {
   ChannelAgentActivityDescriptor,
@@ -96,6 +100,7 @@ import {
 } from "./ChannelIssueProposalDetails";
 import { IssueExecutionApproval } from "./IssueExecutionApproval";
 import { AgentSkillExecutionApproval } from "./AgentSkillExecutionApproval";
+import { ConversationScrollToBottomButton } from "./ConversationScrollToBottomButton";
 import {
   CHANNEL_REALTIME_FALLBACK_MS,
   createChannelRealtimeTransport,
@@ -259,6 +264,8 @@ export function CompanionChannels({
   const [loadingEarlierMessages, setLoadingEarlierMessages] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [channelIsAwayFromBottom, setChannelIsAwayFromBottom] = useState(false);
+  const [threadIsAwayFromBottom, setThreadIsAwayFromBottom] = useState(false);
   const [acceptingProposalId, setAcceptingProposalId] = useState<string | null>(
     null,
   );
@@ -272,6 +279,7 @@ export function CompanionChannels({
   const channelIdRef = useRef(channel?.id ?? null);
   const threadParentIdRef = useRef(threadParentId);
   const channelMessagesScrollRef = useRef<HTMLDivElement | null>(null);
+  const threadMessagesScrollRef = useRef<HTMLDivElement | null>(null);
   const channelMessagesEndRef = useRef<HTMLDivElement | null>(null);
   const threadMessagesEndRef = useRef<HTMLDivElement | null>(null);
   const loadingEarlierMessagesRef = useRef(false);
@@ -317,12 +325,19 @@ export function CompanionChannels({
     if (!channel || threadParentId || !shouldScrollChannelToEnd.current) return;
     channelMessagesEndRef.current?.scrollIntoView?.({ block: "end" });
     shouldScrollChannelToEnd.current = false;
+    setChannelIsAwayFromBottom(false);
   }, [channel, messages, threadParentId]);
 
   useEffect(() => {
     if (!threadParentId) return;
     threadMessagesEndRef.current?.scrollIntoView?.({ block: "end" });
+    setThreadIsAwayFromBottom(false);
   }, [thread, threadParentId, replies.length]);
+
+  useEffect(() => {
+    setChannelIsAwayFromBottom(false);
+    setThreadIsAwayFromBottom(false);
+  }, [channel?.id, threadParentId]);
 
   const captureChannelSurface = useCallback(
     (): ChannelSurfaceContext => ({
@@ -1428,9 +1443,17 @@ export function CompanionChannels({
           title={t("companion.channelThread")}
         />
         {error ? <p className="companion-channel-error">{error}</p> : null}
-        <div className="companion-channel-messages">
-          {loading && !thread ? <Spinner /> : null}
-          {(thread ?? []).map((item) => (
+        <div className="conversation-scroll-region">
+          <div
+            className="companion-channel-messages"
+            onScroll={(event) =>
+              setThreadIsAwayFromBottom(
+                conversationIsAwayFromBottom(event.currentTarget),
+              )}
+            ref={threadMessagesScrollRef}
+          >
+            {loading && !thread ? <Spinner /> : null}
+            {(thread ?? []).map((item) => (
             <MessageRow
               acceptingProposal={acceptingProposalId === item.proposal?.id}
               agents={agents}
@@ -1486,8 +1509,20 @@ export function CompanionChannels({
               )}
               showTypingState={false}
             />
-          ))}
-          <div ref={threadMessagesEndRef} />
+            ))}
+            <div ref={threadMessagesEndRef} />
+          </div>
+          {threadIsAwayFromBottom ? (
+            <ConversationScrollToBottomButton
+              label={t("run.jumpToLatest")}
+              onClick={() => {
+                const scroller = threadMessagesScrollRef.current;
+                if (!scroller) return;
+                setThreadIsAwayFromBottom(false);
+                scrollConversationToBottom(scroller);
+              }}
+            />
+          ) : null}
         </div>
         <ChannelTypingState
           agentNames={threadTypingAgentNames}
@@ -1513,18 +1548,22 @@ export function CompanionChannels({
           channel={channel}
         />
         {error ? <p className="companion-channel-error">{error}</p> : null}
-        <div
-          className="companion-channel-messages"
-          onScroll={(event) => {
-            if (event.currentTarget.scrollTop <= 32) {
-              void loadEarlierChannelMessages();
-            }
-          }}
-          ref={channelMessagesScrollRef}
-        >
-          {loadingEarlierMessages ? <Spinner /> : null}
-          {loading && messages.length === 0 ? <Spinner /> : null}
-          {messages.map((item) => (
+        <div className="conversation-scroll-region">
+          <div
+            className="companion-channel-messages"
+            onScroll={(event) => {
+              setChannelIsAwayFromBottom(
+                conversationIsAwayFromBottom(event.currentTarget),
+              );
+              if (event.currentTarget.scrollTop <= 32) {
+                void loadEarlierChannelMessages();
+              }
+            }}
+            ref={channelMessagesScrollRef}
+          >
+            {loadingEarlierMessages ? <Spinner /> : null}
+            {loading && messages.length === 0 ? <Spinner /> : null}
+            {messages.map((item) => (
             <MessageRow
               acceptingProposal={acceptingProposalId === item.proposal?.id}
               agents={agents}
@@ -1581,13 +1620,25 @@ export function CompanionChannels({
                 t("channel.projectAgent"),
               )}
             />
-          ))}
-          {!loading && messages.length === 0 ? (
-            <p className="companion-channel-empty">
-              {t("companion.channelsEmpty")}
-            </p>
+            ))}
+            {!loading && messages.length === 0 ? (
+              <p className="companion-channel-empty">
+                {t("companion.channelsEmpty")}
+              </p>
+            ) : null}
+            <div ref={channelMessagesEndRef} />
+          </div>
+          {channelIsAwayFromBottom ? (
+            <ConversationScrollToBottomButton
+              label={t("run.jumpToLatest")}
+              onClick={() => {
+                const scroller = channelMessagesScrollRef.current;
+                if (!scroller) return;
+                setChannelIsAwayFromBottom(false);
+                scrollConversationToBottom(scroller);
+              }}
+            />
           ) : null}
-          <div ref={channelMessagesEndRef} />
         </div>
         <CompanionChannelComposer
           agents={agents}

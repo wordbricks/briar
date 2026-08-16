@@ -35,4 +35,26 @@ describe("companion channel chrome", () => {
     expect(addButton).toContain("border-radius:50%");
     expect(addButton).toContain("background:color-mix");
   });
+
+  it("anchors the latest-message control above the composer", () => {
+    const region = ruleBody(".conversation-scroll-region");
+    expect(region).toContain("position:relative");
+    expect(region).toContain("flex:1");
+
+    const button = ruleBody(".conversation-scroll-to-bottom");
+    expect(button).toContain("position:absolute");
+    expect(button).toContain("bottom:12px");
+    expect(button).toContain("border-radius:50%");
+  });
+
+  it("keeps the mobile issue conversation scrollable above its composer", () => {
+    const panel = ruleBody(
+      ".companion-shell .issue-conversation-tab-panel",
+    );
+    expect(panel).toContain("height:min(560px,calc(100dvh - 160px))");
+
+    const conversation = ruleBody(".companion-shell .issue-conversation");
+    expect(conversation).toContain("height:100%");
+    expect(conversation).toContain("min-height:0");
+  });
 });
