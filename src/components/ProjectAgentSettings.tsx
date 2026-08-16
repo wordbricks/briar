@@ -14,8 +14,6 @@ import { useI18n } from "../i18n";
 import {
   agentEffortOptions,
   agentModelOptions,
-  agentProviderLabels,
-  agentProviders,
   type AgentProvider,
   type ModelEffort,
 } from "../lib/project-llm";
@@ -28,6 +26,7 @@ import { projectAgentAvatarFromCodexPet } from "../lib/codex-pets";
 import type { Project, ProjectAgent, UpdateProjectAgentInput } from "../types";
 import { CodexPetAttribution, CodexPetPicker } from "./CodexPetPicker";
 import { NativeSelect } from "./NativeSelect";
+import { ProviderSelect } from "./ProviderSelect";
 import {
   ProjectAgentSkillsEditor,
   projectAgentSkillInputs,
@@ -378,7 +377,7 @@ export function ProjectAgentSettings({
                 <div className="project-agent-settings-field-grid">
                   <div className="project-agent-settings-field">
                     <Label>{t("agents.provider")}</Label>
-                    <NativeSelect
+                    <ProviderSelect
                       disabled={profileSaving}
                       label={t("agents.provider")}
                       onValueChange={(value) => {
@@ -386,10 +385,6 @@ export function ProjectAgentSettings({
                         setModel("");
                         setEffort(null);
                       }}
-                      options={agentProviders.map((candidate) => ({
-                        label: agentProviderLabels[candidate],
-                        value: candidate,
-                      }))}
                       value={provider}
                     />
                   </div>

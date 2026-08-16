@@ -19,6 +19,7 @@ export type SelectMenuOption = {
   description?: string;
   disabled?: boolean;
   icon?: string | null;
+  leading?: ReactNode;
 };
 
 type MenuPosition = {
@@ -82,6 +83,30 @@ function getFixedContainingBlock(element: HTMLElement) {
     ancestor = ancestor.parentElement;
   }
 
+  return null;
+}
+
+function OptionVisual({
+  icon,
+  iconClassName,
+  leading,
+  leadingClassName,
+}: {
+  icon?: string | null;
+  iconClassName: string;
+  leading?: ReactNode;
+  leadingClassName: string;
+}) {
+  if (leading) {
+    return (
+      <span aria-hidden="true" className={leadingClassName}>
+        {leading}
+      </span>
+    );
+  }
+  if (icon) {
+    return <img alt="" className={iconClassName} src={icon} />;
+  }
   return null;
 }
 
@@ -412,13 +437,12 @@ export function SelectMenu({
               {leadingIcon}
             </span>
           ) : null}
-          {selectedOption?.icon ? (
-            <img
-              alt=""
-              className="select-menu-trigger-icon"
-              src={selectedOption.icon}
-            />
-          ) : null}
+          <OptionVisual
+            icon={selectedOption?.icon}
+            iconClassName="select-menu-trigger-icon"
+            leading={selectedOption?.leading}
+            leadingClassName="select-menu-trigger-leading"
+          />
           <span
             className={`select-menu-value${selectedOption ? "" : " is-placeholder"}`}
           >
@@ -479,13 +503,12 @@ export function SelectMenu({
                     role="option"
                     type="button"
                   >
-                    {option.icon ? (
-                      <img
-                        alt=""
-                        className="select-menu-option-icon"
-                        src={option.icon}
-                      />
-                    ) : null}
+                    <OptionVisual
+                      icon={option.icon}
+                      iconClassName="select-menu-option-icon"
+                      leading={option.leading}
+                      leadingClassName="select-menu-option-leading"
+                    />
                     <span className="select-menu-option-copy">
                       <strong>{option.label}</strong>
                       {option.description ? <small>{option.description}</small> : null}

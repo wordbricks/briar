@@ -54,7 +54,6 @@ import {
   agentEffortOptions,
   agentModelOptions,
   agentProviderLabels,
-  agentProviders,
   defaultAppProviderSettings,
   defaultProjectLlmSettings,
   defaultProjectSandboxSettings,
@@ -87,6 +86,7 @@ import {
 } from "../lib/project-icon";
 import { LinearIssueImport } from "./LinearIssueImport";
 import { ProjectExecutionSettings } from "./ProjectExecutionSettings";
+import { ProviderSelect } from "./ProviderSelect";
 import { SelectMenu } from "./SelectMenu";
 
 export type ProjectSettingsSection =
@@ -937,7 +937,7 @@ export function ProjectSettings({
                 <label htmlFor="project-runtime-provider">
                   {t("settings.provider")}
                 </label>
-                <SelectMenu
+                <ProviderSelect
                   disabled={runtimeLoading || runtimeSaving}
                   id="project-runtime-provider"
                   label={t("settings.provider")}
@@ -946,14 +946,12 @@ export function ProjectSettings({
                     setRuntimeModel(null);
                     setRuntimeEffort(null);
                   }}
-                  options={agentProviders.map((candidate) => ({
+                  optionExtras={(candidate) => ({
                     description: !providerAvailability[candidate]
                       ? t("settings.providerDisabled")
                       : undefined,
                     disabled: !providerAvailability[candidate],
-                    label: agentProviderLabels[candidate],
-                    value: candidate,
-                  }))}
+                  })}
                   size="small"
                   value={runtimeProvider}
                 />

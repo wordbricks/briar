@@ -642,6 +642,11 @@ describe("CreateIssueDialog attachments", () => {
         ".issue-provider-select .select-menu-trigger",
       )?.textContent,
     ).toContain("Claude");
+    expect(
+      container.querySelector(
+        ".issue-provider-select .select-menu-trigger-leading svg",
+      ),
+    ).not.toBeNull();
     await act(async () => {
       container
         .querySelector<HTMLButtonElement>(
