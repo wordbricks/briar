@@ -86,6 +86,8 @@
   --accent: #f0ecfb;
   --accent-foreground: #4a3594;
 
+  --mention-foreground: #0969da;
+
   --destructive: #d85c70;
   --destructive-foreground: #fff8f9;
 
@@ -161,6 +163,8 @@
 
   --accent: #24212f;
   --accent-foreground: #d4cbff;
+
+  --mention-foreground: #75baff;
 
   --destructive: #e56b7d;
   --destructive-foreground: #1a0a0d;
