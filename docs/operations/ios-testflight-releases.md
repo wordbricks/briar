@@ -903,3 +903,32 @@ analyze and build checks, the Tauri iOS simulator bundle, and the Android ARM64
 APK build. Archive identity, App Store provisioning, distribution signature,
 production entitlements, exported IPA signature, and all alternate app icons
 were verified before upload.
+
+## 2026-08-16 — 1.2.126 (4)
+
+- App: Briar Companion (`app.briar.companion`)
+- Marketing version: `1.2.126`
+- App Store Connect build: `4`
+- App Store Connect build ID: `c2994ed2-41e2-494a-aa42-f4d074ec0bb8`
+- Latest main commit: `37ea2e1345f282ec55a647d1b560b31cf72e2d1a`
+- Release source commit: `fd8514d85ddce893d7cb749bb1ae5935a306f467`
+- Implementation: native SwiftUI
+- Toolchain: Xcode 26.6, iOS 26.5 SDK
+- Minimum iOS version: 17.0
+- App Store Connect processing state: `VALID`
+- TestFlight state: `IN_BETA_TESTING`
+- Internal group: `wordbricks` (`hasAccessToAllBuilds=true`)
+- Automatic tester notification: enabled
+- IPA SHA-256: `409356d6f90bec6de1b87cce2a8a07ca82695bbb2c5d40a9bc1513f220a5f8a0`
+
+This release carries the latest main updates for the conversation scroll-to-
+latest action, selectable long-press message ranges, optimistic sent-message
+display, and streamed live agent activity. The exact release source also
+updates UI assertions for the selectable native text surface and regenerates
+the Xcode project metadata. The complete release gate passed the shared mobile
+contract, Swift unit and 16 iPhone UI tests, iPad accessibility and largest
+Dynamic Type layout testing, Production analyze and build checks, session/
+download/log security checks, and the Tauri iOS simulator and Android ARM64
+regression builds. Archive identity, App Store provisioning, distribution
+signature, production entitlements, exported IPA signature, and all alternate
+app icons were verified before upload.
