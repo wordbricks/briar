@@ -1,5 +1,8 @@
 /** @vitest-environment jsdom */
 
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -173,6 +176,25 @@ describe("ChannelMessageText", () => {
       markdown?.querySelector(".channel-message-table-wrap table th")
         ?.textContent,
     ).toBe("Name");
+  });
+
+  it("opts Android and web message bodies into long-press text selection", () => {
+    const css = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), "../styles.css"),
+      "utf8",
+    );
+    for (const selector of [
+      ".issue-message-body",
+      ".channel-message-text",
+      ".channel-message-blocks",
+      ".companion-channel-message-copy",
+    ]) {
+      expect(css).toContain(`${selector}`);
+      const start = css.indexOf(selector);
+      const slice = css.slice(start, start + 280);
+      expect(slice).toMatch(/-webkit-user-select:\s*text/);
+      expect(slice).toMatch(/user-select:\s*text/);
+    }
   });
 
   it("leaves duplicate Agent Names unlinked instead of opening the wrong profile", async () => {

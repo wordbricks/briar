@@ -14,6 +14,7 @@
 | 실행 진행 상황 | 제공 | 제공 | 제공 | snapshot/delta 공유 계약, 15초 polling, foreground·오프라인 복귀, cursor 만료 시 snapshot 복구 |
 | 이벤트 및 증빙 | 제공 | 제공 | 제공 | 인증된 GET 경로만 사용하며 증빙 이미지는 Android/Tauri와 네이티브 iOS 상세 화면에 바로 표시하고, 원본 확대용 임시 파일로도 다운로드 |
 | 이슈 대화 및 첨부 | 제공 | 제공 | 제공 | 이미지 첨부는 Android/Tauri와 네이티브 iOS 상세 화면에 바로 표시하고 탭하면 원본을 확대하며, 비이미지 파일은 기존 미리보기 동작을 유지. 설명 본문의 `briar-attachment://` 인라인 이미지도 인증 다운로드로 표시하고, List 재사용으로 인한 재다운로드를 메모리 캐시로 방지. 메시지·답글, Agent reply polling, multipart 이미지·영상 업로드를 공유하며, 전송 시 초안을 즉시 비우고 실패하면 본문·멘션·첨부를 복원함 |
+| 메시지 텍스트 범위 선택·복사 | 제공 | 제공 | 제공 | 길게 눌러 범위를 지정한 뒤 복사. 네이티브 iOS는 편집 불가 UITextView, Android/Tauri는 메시지 본문에 `user-select: text` |
 | 이슈 생성·편집·삭제와 draft | 제공 | 제공 | 제공 | 제목·설명·우선순위·backlog/queued, 5개/파일당 20MB/전체 25MB 제한, 성공 전 draft 보존 |
 | 이슈를 다른 프로젝트로 이동 | 제공 | 제공 | 제공 | 동일 조직 내 대상 프로젝트 선택, 대화·첨부·활동 기록 함께 이전, 실행 중/할당된 이슈 거부, 의존성 해제, `POST /projects/{id}/runs/{runId}/transfer` |
 | 의존성·실행 설정 | 제공 | 제공 | 제공 | 선행 이슈 DAG와 provider/model/effort 설정을 dashboard 및 공통 쓰기 API로 사용 |
