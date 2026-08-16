@@ -36,6 +36,8 @@ describe("mention composer caret alignment", () => {
     expect(composerMention).toContain("font-weight:inherit");
     expect(composerMention).toContain("padding:.06em .12em .06em .36em");
     expect(composerMention).toContain("margin:-.06em -.12em -.06em -.36em");
+    expect(composerMention).toContain("color:var(--mention-foreground)");
+    expect(composerMention).toContain("background:transparent");
   });
 
   it("uses the channel mirror to grow the textarea grid with wrapped content", () => {

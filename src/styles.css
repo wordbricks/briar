@@ -1915,7 +1915,7 @@ button.conversation-reply-summary:focus-visible { outline:2px solid var(--ring);
 .conversation-mention-button:focus-visible { outline:2px solid var(--ring); outline-offset:1px; }
 .mention-composer-field { min-width:0; position:relative; }
 .mention-composer-mirror { position:absolute; z-index:2; inset:0; overflow:hidden; color:var(--foreground); pointer-events:none; }
-.mention-composer-mirror .conversation-mention-button { padding:.06em .12em .06em .36em; margin:-.06em -.12em -.06em -.36em; font-weight:inherit; pointer-events:auto; }
+.mention-composer-mirror .conversation-mention-button { padding:.06em .12em .06em .36em; margin:-.06em -.12em -.06em -.36em; color:var(--mention-foreground); background:transparent; font-weight:inherit; pointer-events:auto; }
 .mention-composer-field > input,
 .mention-composer-field > textarea { position:relative; z-index:1; color:transparent !important; caret-color:var(--foreground); -webkit-text-fill-color:transparent; }
 .mention-composer-field > input::placeholder,
