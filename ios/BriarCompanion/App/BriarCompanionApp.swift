@@ -314,7 +314,7 @@ private actor UITestAPIClient: MobileAPIClientProtocol {
             "/channels/cccccccc-cccc-4ccc-8ccc-cccccccccccc?limit=20"
         ) && method == "GET" {
             if delaysChannelLoad {
-                try await Task.sleep(for: .seconds(2))
+                try await Task.sleep(for: .seconds(5))
             }
             if hasChannelHistory {
                 payload = String(
