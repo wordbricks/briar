@@ -138,6 +138,7 @@ const huntRun = (
 const providerPointKeys: UsageAttribution[] = [
   "codex",
   "claude",
+  "cursor",
   "grok",
   "agy",
   "opencode",

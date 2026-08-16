@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import {
+  agentProviderBinaryName,
   agentProviders,
   type AgentProvider,
 } from "../src/lib/agent-provider-contract";
@@ -99,6 +100,38 @@ export const claudeAuthenticated = async (binary: string) => {
   return parseClaudeAuthStatus(result.stdout);
 };
 
+const cursorEmailIsAuthenticated = (value: unknown) => {
+  if (typeof value !== "string") return false;
+  const email = value.trim().toLowerCase();
+  return Boolean(
+    email && email !== "not logged in" &&
+      !email.includes("login required") &&
+      !email.includes("authentication required"),
+  );
+};
+
+export const parseCursorAuthStatus = (stdout: string) => {
+  try {
+    const status = JSON.parse(stdout) as { userEmail?: unknown };
+    return cursorEmailIsAuthenticated(status.userEmail);
+  } catch {
+    const line = stdout.split(/\r?\n/u).find((candidate) =>
+      candidate.trimStart().startsWith("User Email"),
+    );
+    return cursorEmailIsAuthenticated(
+      line?.trimStart().slice("User Email".length).trim(),
+    );
+  }
+};
+
+export const cursorAuthenticated = async (binary: string) => {
+  if (process.env.CURSOR_API_KEY?.trim()) return true;
+  const json = commandResult(binary, ["about", "--format", "json"]);
+  if (json.status === 0 && parseCursorAuthStatus(json.stdout)) return true;
+  const plain = commandResult(binary, ["about"]);
+  return plain.status === 0 && parseCursorAuthStatus(plain.stdout);
+};
+
 export const agyAuthenticated = async (binary: string) => {
   const result = agyCommandResult(binary, ["--output-format", "json", "models"]);
   return result.status === 0 && !result.error;
@@ -136,13 +169,16 @@ export const grokAuthenticated = async (home: string, now: number) => {
 const defaultDependencies: ProviderHealthDependencies = {
   home: homedir(),
   now: Date.now,
-  which: (provider) => Bun.which(provider),
+  which: (provider) => Bun.which(agentProviderBinaryName(provider)),
   authenticated: async (provider, binary, home, now) => {
     if (provider === "codex") {
       return codexAuthenticated(binary);
     }
     if (provider === "claude") {
       return claudeAuthenticated(binary);
+    }
+    if (provider === "cursor") {
+      return cursorAuthenticated(binary);
     }
     if (provider === "opencode") {
       // OpenCode delegates credentials to its configured model providers.

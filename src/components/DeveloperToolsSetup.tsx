@@ -17,22 +17,17 @@ import {
   type OnboardingPrerequisites,
   type PrerequisiteId,
 } from "../lib/initial-onboarding";
+import { agentProviders } from "../lib/agent-provider-contract";
 import {
   AntigravityIcon,
   ClaudeIcon,
   CodexIcon,
+  CursorIcon,
   GrokIcon,
   OpenCodeIcon,
 } from "./AgentIcons";
 
-const prerequisiteIds: PrerequisiteId[] = [
-  "git",
-  "codex",
-  "claude",
-  "grok",
-  "agy",
-  "opencode",
-];
+const prerequisiteIds: PrerequisiteId[] = ["git", ...agentProviders];
 
 export function DeveloperToolsSetup({
   onContinue,
@@ -145,6 +140,8 @@ export function DeveloperToolsSetup({
                   <CodexIcon size={20} />
                 ) : id === "claude" ? (
                   <ClaudeIcon size={20} />
+                ) : id === "cursor" ? (
+                  <CursorIcon size={20} />
                 ) : id === "grok" ? (
                   <GrokIcon size={20} />
                 ) : id === "agy" ? (

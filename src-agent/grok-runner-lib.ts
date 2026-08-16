@@ -16,6 +16,7 @@ import {
 } from "./normalized-agent-event";
 import { readAgentImage } from "./runner-attachments";
 import { extractSingleJsonObject } from "../src/lib/single-json-object";
+import type { AcpJsonRpcMessage } from "./acp-json-rpc";
 
 export type {
   AgentActivityKind,
@@ -91,14 +92,7 @@ export type GrokRunnerOutput =
       message: string;
     };
 
-export type JsonRpcMessage = {
-  jsonrpc?: string;
-  id?: number | string | null;
-  method?: string;
-  params?: unknown;
-  result?: unknown;
-  error?: { code?: number; message?: string; data?: unknown };
-};
+export type JsonRpcMessage = AcpJsonRpcMessage;
 
 export const GROK_OAUTH2_REFERRER_ENV = "GROK_OAUTH2_REFERRER";
 export const BRIAR_OAUTH_REFERRER = "briar";

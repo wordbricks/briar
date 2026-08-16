@@ -436,6 +436,7 @@ struct OnboardingPrerequisites {
     git: OnboardingPrerequisiteStatus,
     codex: OnboardingPrerequisiteStatus,
     claude: OnboardingPrerequisiteStatus,
+    cursor: OnboardingPrerequisiteStatus,
     grok: OnboardingPrerequisiteStatus,
     agy: OnboardingPrerequisiteStatus,
     opencode: OnboardingPrerequisiteStatus,
@@ -473,6 +474,7 @@ struct AgentProviderModelCatalogEntry {
 struct AgentProviderModelCatalog {
     codex: AgentProviderModelCatalogEntry,
     claude: AgentProviderModelCatalogEntry,
+    cursor: AgentProviderModelCatalogEntry,
     grok: AgentProviderModelCatalogEntry,
     agy: AgentProviderModelCatalogEntry,
     opencode: AgentProviderModelCatalogEntry,
@@ -805,6 +807,8 @@ struct AppProviderSettings {
     #[serde(default = "enabled_by_default")]
     claude: bool,
     #[serde(default = "enabled_by_default")]
+    cursor: bool,
+    #[serde(default = "enabled_by_default")]
     grok: bool,
     #[serde(default = "enabled_by_default")]
     agy: bool,
@@ -817,6 +821,7 @@ impl Default for AppProviderSettings {
         Self {
             codex: true,
             claude: true,
+            cursor: true,
             grok: true,
             agy: true,
             opencode: true,
@@ -829,6 +834,7 @@ impl AppProviderSettings {
         match provider {
             agent::AgentProviderKind::Codex => self.codex,
             agent::AgentProviderKind::Claude => self.claude,
+            agent::AgentProviderKind::Cursor => self.cursor,
             agent::AgentProviderKind::Grok => self.grok,
             agent::AgentProviderKind::Agy => self.agy,
             agent::AgentProviderKind::Opencode => self.opencode,
@@ -836,7 +842,7 @@ impl AppProviderSettings {
     }
 
     fn any_enabled(self) -> bool {
-        self.codex || self.claude || self.grok || self.agy || self.opencode
+        self.codex || self.claude || self.cursor || self.grok || self.agy || self.opencode
     }
 }
 
@@ -1186,11 +1192,61 @@ fn inspect_agent_browser_cli(
     }
 }
 
+fn cursor_locally_authenticated(home: &Path, binary: &Path) -> bool {
+    if env::var("CURSOR_API_KEY").is_ok_and(|value| !value.trim().is_empty()) {
+        return true;
+    }
+    let execution_path = cli_execution_path(home).unwrap_or_default();
+    let output = Command::new(binary)
+        .env("HOME", home)
+        .env("PATH", execution_path)
+        .args(["about", "--format", "json"])
+        .output()
+        .ok();
+    if let Some(output) = output.filter(|output| output.status.success()) {
+        if let Ok(value) = serde_json::from_slice::<serde_json::Value>(&output.stdout) {
+            return value
+                .get("userEmail")
+                .and_then(serde_json::Value::as_str)
+                .is_some_and(|email| {
+                    let email = email.trim().to_ascii_lowercase();
+                    !email.is_empty()
+                        && email != "not logged in"
+                        && !email.contains("login required")
+                        && !email.contains("authentication required")
+                });
+        }
+    }
+    let output = Command::new(binary)
+        .env("HOME", home)
+        .args(["about"])
+        .output()
+        .ok();
+    output
+        .filter(|output| output.status.success())
+        .map(|output| {
+            String::from_utf8_lossy(&output.stdout)
+                .lines()
+                .find_map(|line| line.trim().strip_prefix("User Email"))
+                .map(str::trim)
+                .is_some_and(|email| {
+                    let email = email.to_ascii_lowercase();
+                    !email.is_empty()
+                        && email != "not logged in"
+                        && !email.contains("login required")
+                        && !email.contains("authentication required")
+                })
+        })
+        .unwrap_or(false)
+}
+
 fn inspect_onboarding_prerequisites_sync(home: &Path) -> OnboardingPrerequisites {
     let execution_path = cli_execution_path(home).unwrap_or_default();
     let mut codex = inspect_cli(agent::codex_binary(home, &execution_path));
     let claude_binary = agent::claude_binary(home, &execution_path);
     let mut claude = inspect_cli(claude_binary.clone());
+    let cursor_binary = agent::cursor_binary(home, &execution_path);
+    let mut cursor = inspect_cli(cursor_binary.clone());
     let mut grok = inspect_cli(agent::grok_binary(home, &execution_path));
     let agy_binary = agent::agy_binary(home, &execution_path);
     let mut agy = inspect_cli(agy_binary.clone());
@@ -1200,6 +1256,10 @@ fn inspect_onboarding_prerequisites_sync(home: &Path) -> OnboardingPrerequisites
         && claude_binary.as_deref().is_ok_and(|binary| {
             agent_usage::claude_locally_authenticated(home, binary, &execution_path)
         });
+    cursor.authenticated = cursor.installed
+        && cursor_binary
+            .as_deref()
+            .is_ok_and(|binary| cursor_locally_authenticated(home, binary));
     grok.authenticated = grok.installed && agent_usage::grok_locally_authenticated(home);
     agy.authenticated = agy.installed
         && agy_binary.as_deref().is_ok_and(|binary| {
@@ -1213,6 +1273,7 @@ fn inspect_onboarding_prerequisites_sync(home: &Path) -> OnboardingPrerequisites
         git: inspect_cli(git_binary(home)),
         codex,
         claude,
+        cursor,
         grok,
         agy,
         opencode,
@@ -1704,6 +1765,10 @@ fn load_agent_provider_models_sync(home: &Path) -> AgentProviderModelCatalog {
     AgentProviderModelCatalog {
         codex: provider_model_entry(codex, Vec::new(), false),
         claude: provider_model_entry(claude, claude_efforts, true),
+        // Cursor model ids are provider-owned and accepted by the ACP runtime.
+        // Keep the selector open so users can choose one or leave the runtime
+        // on Cursor's provider default.
+        cursor: provider_model_entry(Ok(Vec::new()), Vec::new(), true),
         grok: provider_model_entry(grok, Vec::new(), false),
         agy: provider_model_entry(agy, agy_efforts, false),
         opencode: provider_model_entry(opencode, Vec::new(), true),
@@ -1717,6 +1782,7 @@ fn connected_agent_provider(
     [
         (agent::AgentProviderKind::Codex, &prerequisites.codex),
         (agent::AgentProviderKind::Claude, &prerequisites.claude),
+        (agent::AgentProviderKind::Cursor, &prerequisites.cursor),
         (agent::AgentProviderKind::Grok, &prerequisites.grok),
         (agent::AgentProviderKind::Agy, &prerequisites.agy),
         (agent::AgentProviderKind::Opencode, &prerequisites.opencode),
@@ -1727,7 +1793,7 @@ fn connected_agent_provider(
             .then_some(provider)
     })
     .ok_or_else(|| {
-        "연결된 LLM 프로바이더가 없습니다. 앱 설정에서 Codex, Claude, Grok, Antigravity 또는 OpenCode를 연결한 뒤 다시 시도하세요."
+        "연결된 LLM 프로바이더가 없습니다. 앱 설정에서 Codex, Claude, Cursor, Grok, Antigravity 또는 OpenCode를 연결한 뒤 다시 시도하세요."
             .to_string()
     })
 }
@@ -1743,6 +1809,21 @@ fn provider_login_binary_and_args(
             agent::claude_binary(home, &execution_path)?,
             vec!["auth", "login", "--claudeai"],
         )),
+        "cursor" => {
+            let cursor_binary = agent::cursor_binary(home, &execution_path)?;
+            let sibling = cursor_binary.with_file_name(if cfg!(target_os = "windows") {
+                "agent.exe"
+            } else {
+                "agent"
+            });
+            let login_binary = sibling.is_file().then_some(sibling).or_else(|| {
+                which::which_in("agent", Some(&execution_path), home).ok()
+            }).ok_or_else(|| {
+                "Cursor 로그인 명령을 찾지 못했습니다. Cursor CLI를 다시 설치한 뒤 `agent login`을 실행하세요."
+                    .to_string()
+            })?;
+            Ok((login_binary, vec!["login"]))
+        }
         "grok" => Ok((agent::grok_binary(home, &execution_path)?, vec!["login"])),
         "agy" => Ok((agent::agy_binary(home, &execution_path)?, vec![])),
         "opencode" => Ok((
@@ -2119,6 +2200,29 @@ fn install_grok_cli(home: &Path) -> Result<(), String> {
     Err(format!("Grok CLI를 설치하지 못했습니다: {message}"))
 }
 
+fn install_cursor_cli(home: &Path) -> Result<(), String> {
+    let execution_path = cli_execution_path(home)?;
+    let shell = which::which_in("bash", Some(&execution_path), home)
+        .or_else(|_| which::which_in("sh", Some(&execution_path), home))
+        .map_err(|_| "Cursor 설치에 필요한 shell을 찾지 못했습니다.".to_string())?;
+    let output = Command::new(shell)
+        .env("PATH", &execution_path)
+        .env("HOME", home)
+        .args(["-c", "curl https://cursor.com/install -fsS | bash"])
+        .output()
+        .map_err(|error| format!("Cursor CLI 설치 명령을 실행하지 못했습니다: {error}"))?;
+    if output.status.success() {
+        return Ok(());
+    }
+    let message = [output.stderr.as_slice(), output.stdout.as_slice()]
+        .into_iter()
+        .map(String::from_utf8_lossy)
+        .map(|value| value.trim().to_string())
+        .find(|value| !value.is_empty())
+        .unwrap_or_else(|| "unknown error".to_string());
+    Err(format!("Cursor CLI를 설치하지 못했습니다: {message}"))
+}
+
 fn install_agy_cli(home: &Path) -> Result<(), String> {
     let execution_path = cli_execution_path(home)?;
     let shell = which::which_in("bash", Some(&execution_path), home)
@@ -2156,6 +2260,7 @@ async fn install_onboarding_prerequisite(
             "git" => install_brew_package(&home, "git")?,
             "codex" => install_cli_package(&home, "@openai/codex")?,
             "claude" => install_cli_package(&home, "@anthropic-ai/claude-code")?,
+            "cursor" => install_cursor_cli(&home)?,
             "grok" => install_grok_cli(&home)?,
             "agy" => install_agy_cli(&home)?,
             "opencode" => install_cli_package(&home, "opencode-ai")?,
@@ -2166,6 +2271,7 @@ async fn install_onboarding_prerequisite(
             "git" => prerequisites.git.installed,
             "codex" => prerequisites.codex.installed,
             "claude" => prerequisites.claude.installed,
+            "cursor" => prerequisites.cursor.installed,
             "grok" => prerequisites.grok.installed,
             "agy" => prerequisites.agy.installed,
             "opencode" => prerequisites.opencode.installed,
@@ -2336,6 +2442,7 @@ fn cli_execution_path_with_runtime(
     paths.extend(runtime_directories);
     paths.extend([
         home.join(".grok/bin"),
+        home.join(".cursor/bin"),
         home.join(".opencode/bin"),
         home.join("bin"),
         home.join(".bun/bin"),
@@ -4311,6 +4418,7 @@ fn install_auto_hunt_assets(resource_directory: &Path, home: &Path) -> Result<()
         for skill_destination in [
             home.join(".codex").join("skills").join(skill_name),
             home.join(".claude").join("skills").join(skill_name),
+            home.join(".cursor").join("skills").join(skill_name),
             home.join(".grok").join("skills").join(skill_name),
             home.join(".gemini")
                 .join("config")
@@ -4348,6 +4456,11 @@ fn install_auto_hunt_assets(resource_directory: &Path, home: &Path) -> Result<()
         "agent/grok-runner.js",
         "dist-agent/grok-runner.js",
     );
+    let cursor_runner_source = bundled_path(
+        resource_directory,
+        "agent/cursor-runner.js",
+        "dist-agent/cursor-runner.js",
+    );
     let agy_runner_source = bundled_path(
         resource_directory,
         "agent/agy-runner.js",
@@ -4363,6 +4476,7 @@ fn install_auto_hunt_assets(resource_directory: &Path, home: &Path) -> Result<()
     }
     if !codex_runner_source.is_file()
         || !claude_runner_source.is_file()
+        || !cursor_runner_source.is_file()
         || !grok_runner_source.is_file()
         || !agy_runner_source.is_file()
         || !opencode_runner_source.is_file()
@@ -4384,6 +4498,11 @@ fn install_auto_hunt_assets(resource_directory: &Path, home: &Path) -> Result<()
         agent_directory.join("claude-runner.js"),
     )
     .map_err(|error| format!("Claude runner를 설치하지 못했습니다: {error}"))?;
+    fs::copy(
+        cursor_runner_source,
+        agent_directory.join("cursor-runner.js"),
+    )
+    .map_err(|error| format!("Cursor runner를 설치하지 못했습니다: {error}"))?;
     fs::copy(grok_runner_source, agent_directory.join("grok-runner.js"))
         .map_err(|error| format!("Grok runner를 설치하지 못했습니다: {error}"))?;
     fs::copy(agy_runner_source, agent_directory.join("agy-runner.js"))
@@ -4430,6 +4549,7 @@ fn auto_hunt_assets_are_current(resource_directory: &Path, home: &Path) -> bool 
         && cli_directory.join("briar.js").is_file()
         && cli_directory.join("agent/codex-runner.js").is_file()
         && cli_directory.join("agent/claude-runner.js").is_file()
+        && cli_directory.join("agent/cursor-runner.js").is_file()
         && cli_directory.join("agent/grok-runner.js").is_file()
         && cli_directory.join("agent/agy-runner.js").is_file()
         && cli_directory.join("agent/opencode-runner.js").is_file()
@@ -4447,6 +4567,7 @@ fn auto_hunt_assets_are_current(resource_directory: &Path, home: &Path) -> bool 
         [
             home.join(".codex").join("skills").join(skill_name),
             home.join(".claude").join("skills").join(skill_name),
+            home.join(".cursor").join("skills").join(skill_name),
             home.join(".grok").join("skills").join(skill_name),
             home.join(".gemini")
                 .join("config")
@@ -4924,6 +5045,7 @@ fn auto_hunt_health_sync_with(
     let skill_directory = match project.llm.clone().unwrap_or_default().provider {
         agent::AgentProviderKind::Codex => ".codex",
         agent::AgentProviderKind::Claude => ".claude",
+        agent::AgentProviderKind::Cursor => ".cursor",
         agent::AgentProviderKind::Grok => ".grok",
         agent::AgentProviderKind::Agy => ".gemini/config",
         agent::AgentProviderKind::Opencode => ".config/opencode",
@@ -5079,6 +5201,11 @@ async fn project_llm_chat(
         "agent/claude-runner.js",
         "dist-agent/claude-runner.js",
     );
+    let cursor_runner = bundled_path(
+        &resource_directory,
+        "agent/cursor-runner.js",
+        "dist-agent/cursor-runner.js",
+    );
     let grok_runner = bundled_path(
         &resource_directory,
         "agent/grok-runner.js",
@@ -5207,6 +5334,7 @@ async fn project_llm_chat(
             runner.clone(),
             agent::AgentRunnerBundles {
                 claude: &claude_runner,
+                cursor: &cursor_runner,
                 grok: &grok_runner,
                 agy: &agy_runner,
                 opencode: &opencode_runner,
@@ -5332,6 +5460,11 @@ async fn run_project_agent(
         "agent/claude-runner.js",
         "dist-agent/claude-runner.js",
     );
+    let cursor_runner = bundled_path(
+        &resource_directory,
+        "agent/cursor-runner.js",
+        "dist-agent/cursor-runner.js",
+    );
     let grok_runner = bundled_path(
         &resource_directory,
         "agent/grok-runner.js",
@@ -5391,6 +5524,7 @@ async fn run_project_agent(
             runner.clone(),
             agent::AgentRunnerBundles {
                 claude: &claude_runner,
+                cursor: &cursor_runner,
                 grok: &grok_runner,
                 agy: &agy_runner,
                 opencode: &opencode_runner,
@@ -6202,6 +6336,11 @@ async fn start_project_auto_hunt(
         "agent/claude-runner.js",
         "dist-agent/claude-runner.js",
     );
+    let cursor_runner = bundled_path(
+        &resource_directory,
+        "agent/cursor-runner.js",
+        "dist-agent/cursor-runner.js",
+    );
     let grok_runner = bundled_path(
         &resource_directory,
         "agent/grok-runner.js",
@@ -6257,6 +6396,7 @@ async fn start_project_auto_hunt(
             runner.clone(),
             agent::AgentRunnerBundles {
                 claude: &claude_runner,
+                cursor: &cursor_runner,
                 grok: &grok_runner,
                 agy: &agy_runner,
                 opencode: &opencode_runner,
@@ -8206,6 +8346,7 @@ mod tests {
             git: provider_prerequisite(true, true),
             codex: provider_prerequisite(codex.0, codex.1),
             claude: provider_prerequisite(claude.0, claude.1),
+            cursor: provider_prerequisite(false, false),
             grok: provider_prerequisite(grok.0, grok.1),
             agy: provider_prerequisite(false, false),
             opencode: provider_prerequisite(opencode.0, opencode.1),
@@ -8235,6 +8376,7 @@ mod tests {
                 AppProviderSettings {
                     codex: false,
                     claude: true,
+                    cursor: true,
                     grok: true,
                     agy: true,
                     opencode: true,
@@ -8444,6 +8586,29 @@ mod tests {
                 .expect("Codex should resolve through the mise shim directory"),
             shims.join("codex")
         );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn uses_the_cursor_agent_companion_binary_for_login() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let home = tempfile::tempdir().expect("fixture home should exist");
+        let binary_directory = home.path().join(".local/bin");
+        fs::create_dir_all(&binary_directory).expect("Cursor CLI directory should exist");
+        for name in ["cursor-agent", "agent"] {
+            let binary = binary_directory.join(name);
+            fs::write(&binary, "#!/bin/sh\nexit 0\n")
+                .expect("Cursor CLI fixture should be written");
+            fs::set_permissions(&binary, fs::Permissions::from_mode(0o700))
+                .expect("Cursor CLI fixture should be executable");
+        }
+
+        let (binary, arguments) = provider_login_binary_and_args(home.path(), "cursor")
+            .expect("Cursor login command should resolve");
+
+        assert_eq!(binary, binary_directory.join("agent"));
+        assert_eq!(arguments, vec!["login"]);
     }
 
     #[cfg(unix)]
@@ -9416,6 +9581,7 @@ branch refs/heads/briar/second-11111111
             AppProviderSettings {
                 codex: false,
                 claude: true,
+                cursor: true,
                 grok: true,
                 agy: true,
                 opencode: true,
@@ -9476,6 +9642,7 @@ branch refs/heads/briar/second-11111111
             .expect("missing provider settings should use defaults");
         assert!(defaults.codex);
         assert!(defaults.claude);
+        assert!(defaults.cursor);
         assert!(defaults.grok);
         assert!(defaults.agy);
         assert!(defaults.opencode);
@@ -9485,6 +9652,7 @@ branch refs/heads/briar/second-11111111
             AppProviderSettings {
                 codex: true,
                 claude: false,
+                cursor: false,
                 grok: false,
                 agy: false,
                 opencode: false,
@@ -9495,6 +9663,7 @@ branch refs/heads/briar/second-11111111
         let saved = read_cli_config(&config_path).expect("saved config should be readable");
         assert!(saved.agent_providers.codex);
         assert!(!saved.agent_providers.claude);
+        assert!(!saved.agent_providers.cursor);
         assert!(!saved.agent_providers.grok);
         assert!(!saved.agent_providers.agy);
         assert!(!saved.agent_providers.opencode);
@@ -9685,6 +9854,7 @@ branch refs/heads/briar/second-11111111
         for runner in [
             "codex-runner.js",
             "claude-runner.js",
+            "cursor-runner.js",
             "grok-runner.js",
             "opencode-runner.js",
         ] {
@@ -9698,12 +9868,16 @@ branch refs/heads/briar/second-11111111
         assert!(home
             .join(".claude/skills/briar-workflow/SKILL.md")
             .is_file());
+        assert!(home
+            .join(".cursor/skills/briar-workflow/SKILL.md")
+            .is_file());
         assert!(home.join(".grok/skills/briar-workflow/SKILL.md").is_file());
         assert!(home
             .join(".config/opencode/skills/briar-workflow/SKILL.md")
             .is_file());
         assert!(home.join(".codex/skills/browser/SKILL.md").is_file());
         assert!(home.join(".claude/skills/browser/SKILL.md").is_file());
+        assert!(home.join(".cursor/skills/browser/SKILL.md").is_file());
         assert!(home.join(".grok/skills/browser/SKILL.md").is_file());
         assert!(home
             .join(".config/opencode/skills/browser/SKILL.md")

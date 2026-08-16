@@ -1152,6 +1152,14 @@ describe("Worker HTTP contract", () => {
             usageExhausted: false,
             maxUsedPercent: null,
           },
+          cursor: {
+            installed: true,
+            authenticated: true,
+            healthy: true,
+            reason: null,
+            usageExhausted: false,
+            maxUsedPercent: null,
+          },
           grok: {
             installed: true,
             authenticated: true,
@@ -1183,6 +1191,7 @@ describe("Worker HTTP contract", () => {
       providerHealth: {
         codex: { usageExhausted: false, maxUsedPercent: 3 },
         claude: { usageExhausted: false, maxUsedPercent: null },
+        cursor: { usageExhausted: false, maxUsedPercent: null },
         grok: { usageExhausted: true, maxUsedPercent: 100 },
         agy: { usageExhausted: false, maxUsedPercent: null },
         opencode: { usageExhausted: false, maxUsedPercent: null },

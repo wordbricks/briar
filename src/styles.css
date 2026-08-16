@@ -187,6 +187,7 @@ body { overflow: hidden; font-synthesis: none; }
 .usage-overview-provider-shares header > b { margin-left:auto; font:620 var(--text-sm) "DM Mono",ui-monospace,monospace; }
 .usage-overview-provider-mark { width:20px; height:20px; flex:0 0 20px; display:grid; place-items:center; border:1px solid var(--border); border-radius:6px; color:var(--foreground); background:var(--card); }
 .usage-overview-provider-mark.codex { color:var(--usage-codex-color); }
+.usage-overview-provider-mark.cursor { color:#24241f; }
 .usage-overview-provider-mark.grok { color:#7765b5; }
 .usage-overview-provider-mark.opencode { color:#4f8a70; }
 .usage-overview-provider-mark.agy { color:#4285f4; }
@@ -2846,6 +2847,7 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .initial-prerequisite-icon.git { background:linear-gradient(145deg,#d84b2e,#f47a56); }
 .initial-prerequisite-icon.codex { color:var(--foreground); background:#f1f2ee; }
 .initial-prerequisite-icon.claude { background:#fff1e9; }
+.initial-prerequisite-icon.cursor { background:#f1f1ee; }
 .initial-prerequisite-icon.grok { background:#ececf1; }
 .initial-prerequisite-icon img { display:block; width:20px; height:20px; object-fit:contain; }
 .initial-prerequisite-copy {

@@ -1,12 +1,14 @@
 import type { CSSProperties } from "react";
 import antigravityIconUrl from "../assets/antigravity.png";
+import cursorIconUrl from "../assets/cursor.png";
 import grokIconUrl from "../assets/grok.png";
 
 // Why: SVG paths sourced from Orca
 // (`~/git/orca/src/renderer/src/components/status-bar/icons.tsx`) so Briar
 // matches Orca’s Claude/Codex branding. Grok uses the bundled favicon PNG from
-// `~/git/orca/src/shared/agent-icons/grok.png` (same asset Orca ships offline),
-// while Antigravity uses the provider artwork bundled with Briar.
+// `~/git/orca/src/shared/agent-icons/grok.png` (same asset Orca ships offline).
+// Cursor uses the user-provided artwork, while Antigravity uses the provider
+// artwork bundled with Briar.
 
 type AgentIconProps = {
   size?: number;
@@ -66,6 +68,20 @@ export function GrokIcon({ size = 14, className, style }: AgentIconProps) {
   );
 }
 
+export function CursorIcon({ size = 14, className, style }: AgentIconProps) {
+  return (
+    <img
+      alt=""
+      aria-hidden
+      className={className}
+      height={size}
+      src={cursorIconUrl}
+      style={{ display: "block", width: size, height: size, ...style }}
+      width={size}
+    />
+  );
+}
+
 export function OpenCodeIcon({ size = 14, className, style }: AgentIconProps) {
   return (
     <svg
@@ -100,6 +116,7 @@ export function AntigravityIcon({ size = 14, className, style }: AgentIconProps)
 export type AgentProviderIconId =
   | "claude"
   | "codex"
+  | "cursor"
   | "grok"
   | "agy"
   | "opencode";
@@ -120,6 +137,9 @@ export function AgentProviderIcon({
   }
   if (provider === "grok") {
     return <GrokIcon className={className} size={size} style={style} />;
+  }
+  if (provider === "cursor") {
+    return <CursorIcon className={className} size={size} style={style} />;
   }
   if (provider === "opencode") {
     return <OpenCodeIcon className={className} size={size} style={style} />;

@@ -36,7 +36,7 @@
     "cli": "bun run src-cli/index.ts",
     "cli:build": "bun run skills:generate && bun build src-cli/index.ts --target=bun --outfile dist-cli/briar.js",
     "cli:install": "bun run cli:build && sh scripts/install-cli.sh",
-    "agent:build": "bun build src-agent/claude-runner.ts --target=bun --outfile dist-agent/claude-runner.js && bun build src-agent/grok-runner.ts --target=bun --outfile dist-agent/grok-runner.js && bun build src-agent/agy-runner.ts --target=bun --outfile dist-agent/agy-runner.js && bun build src-agent/opencode-runner.ts --target=bun --outfile dist-agent/opencode-runner.js && bun build src-agent/codex-runner.ts --target=bun --outfile dist-agent/codex-runner.js",
+    "agent:build": "bun build src-agent/claude-runner.ts --target=bun --outfile dist-agent/claude-runner.js && bun build src-agent/cursor-runner.ts --target=bun --outfile dist-agent/cursor-runner.js && bun build src-agent/grok-runner.ts --target=bun --outfile dist-agent/grok-runner.js && bun build src-agent/agy-runner.ts --target=bun --outfile dist-agent/agy-runner.js && bun build src-agent/opencode-runner.ts --target=bun --outfile dist-agent/opencode-runner.js && bun build src-agent/codex-runner.ts --target=bun --outfile dist-agent/codex-runner.js",
     "runtime:prepare": "bun run scripts/prepare-bun-sidecar.ts",
     "skills:generate": "bun run scripts/generate-skill-guides.ts",
     "skills:check": "bun run scripts/generate-skill-guides.ts --check",

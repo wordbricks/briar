@@ -1334,6 +1334,8 @@ export function detachedProviderRequest(input: {
           }
         : input.agent.provider === "claude"
           ? { claudeBinary: input.agentBinary }
+          : input.agent.provider === "cursor"
+            ? { cursorBinary: input.agentBinary }
           : input.agent.provider === "grok"
             ? { grokBinary: input.agentBinary }
             : input.agent.provider === "agy"

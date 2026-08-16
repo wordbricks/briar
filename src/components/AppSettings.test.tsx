@@ -97,6 +97,11 @@ const providerStatuses: OnboardingPrerequisites = {
     version: "2.1.206",
     authenticated: true,
   },
+  cursor: {
+    installed: true,
+    version: "2026.08.1",
+    authenticated: true,
+  },
   grok: {
     installed: true,
     version: "0.2.112",
@@ -145,6 +150,12 @@ describe("AppSettings", () => {
           label: "Claude Sonnet",
           efforts: [{ id: "high", label: "High" }],
         }],
+        defaultEfforts: [],
+        allowCustomModels: true,
+        error: null,
+      },
+      cursor: {
+        models: [],
         defaultEfforts: [],
         allowCustomModels: true,
         error: null,
@@ -500,6 +511,7 @@ describe("AppSettings", () => {
     vi.mocked(loadAppProviderSettings).mockResolvedValue({
       codex: true,
       claude: true,
+      cursor: true,
       grok: true,
       agy: true,
       opencode: true,
@@ -578,6 +590,7 @@ describe("AppSettings", () => {
     expect(updateAppProviderSettings).toHaveBeenCalledWith({
       codex: true,
       claude: false,
+      cursor: true,
       grok: true,
       agy: true,
       opencode: true,
@@ -618,6 +631,7 @@ describe("AppSettings", () => {
     vi.mocked(loadAppProviderSettings).mockResolvedValue({
       codex: true,
       claude: true,
+      cursor: true,
       grok: true,
       agy: true,
       opencode: true,
@@ -678,6 +692,7 @@ describe("AppSettings", () => {
     vi.mocked(loadAppProviderSettings).mockResolvedValue({
       codex: true,
       claude: true,
+      cursor: true,
       grok: true,
       agy: true,
       opencode: true,

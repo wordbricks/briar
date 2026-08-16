@@ -330,7 +330,14 @@ export const demoDashboard: DashboardPayload = {
       createdAt: ago(3_000),
     },
   ],
-  organizationProviders: ["codex", "claude", "grok", "agy", "opencode"],
+  organizationProviders: [
+    "codex",
+    "claude",
+    "cursor",
+    "grok",
+    "agy",
+    "opencode",
+  ],
   generatedAt: new Date().toISOString(),
 };
 

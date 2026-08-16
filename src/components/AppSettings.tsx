@@ -69,6 +69,7 @@ import {
   AntigravityIcon,
   ClaudeIcon,
   CodexIcon,
+  CursorIcon,
   GrokIcon,
   OpenCodeIcon,
 } from "./AgentIcons";
@@ -720,6 +721,91 @@ export function AppSettings({
                         {t("appSettings.install")}
                       </Button>
                     ) : providerSaving === "claude" ? (
+                      <LoaderCircle
+                        aria-label={t("common.saving")}
+                        className="spin"
+                        size={16}
+                      />
+                    ) : null
+                  }
+                />
+                <ProviderRow
+                  available={Boolean(
+                    providerStatuses?.cursor.installed &&
+                      providerStatuses.cursor.authenticated,
+                  )}
+                  description={providerDescription({
+                    authenticated: providerStatuses?.cursor.authenticated,
+                    enabled: providerSettings?.cursor ?? false,
+                    installed: providerStatuses?.cursor.installed,
+                    loading: providersLoading && !providerStatuses,
+                    providerName: "Cursor CLI",
+                    t,
+                  })}
+                  disabled={
+                    providerSaving !== null || providerInstalling !== null
+                  }
+                  details={
+                    <ProviderDetails
+                      authenticated={providerStatuses?.cursor.authenticated}
+                      installed={providerStatuses?.cursor.installed}
+                      loading={providersLoading && !providerStatuses}
+                      loginOpening={providerLoginOpening === "cursor"}
+                      models={providerModels.cursor}
+                      onLogin={() => void openProviderLogin("cursor")}
+                      providerName="Cursor"
+                    />
+                  }
+                  detailsId="provider-cursor-details"
+                  detailsLabel={t("appSettings.toggleProviderDetails", { provider: "Cursor" })}
+                  enabled={providerSettings?.cursor ?? false}
+                  expanded={expandedProvider === "cursor"}
+                  icon={
+                    <ProviderIcon tone="cursor">
+                      <CursorIcon size={19} />
+                    </ProviderIcon>
+                  }
+                  name="Cursor"
+                  onExpandedChange={(expanded) =>
+                    setExpandedProvider(expanded ? "cursor" : null)
+                  }
+                  onToggle={(enabled) => void toggleProvider("cursor", enabled)}
+                  title={
+                    <>
+                      Cursor
+                      {providerStatuses?.cursor.version ? (
+                        <code>{providerStatuses.cursor.version}</code>
+                      ) : null}
+                    </>
+                  }
+                  trailing={
+                    providerInstalling === "cursor" ? (
+                      <Button
+                        aria-label={t("appSettings.installingProvider", {
+                          provider: "Cursor",
+                        })}
+                        disabled
+                        size="sm"
+                        type="button"
+                        variant="outline"
+                      >
+                        <LoaderCircle className="spin" />
+                        {t("appSettings.installing")}
+                      </Button>
+                    ) : providerStatuses?.cursor.installed === false ? (
+                      <Button
+                        aria-label={t("appSettings.installProvider", {
+                          provider: "Cursor",
+                        })}
+                        onClick={() => void installProvider("cursor")}
+                        size="sm"
+                        type="button"
+                        variant="outline"
+                      >
+                        <Download />
+                        {t("appSettings.install")}
+                      </Button>
+                    ) : providerSaving === "cursor" ? (
                       <LoaderCircle
                         aria-label={t("common.saving")}
                         className="spin"

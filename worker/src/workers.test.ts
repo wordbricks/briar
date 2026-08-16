@@ -335,6 +335,12 @@ describe("detached execution workers", () => {
           allowCustomModels: true,
           error: null,
         },
+        cursor: {
+          models: [],
+          defaultEfforts: [],
+          allowCustomModels: true,
+          error: null,
+        },
         grok: {
           models: [{
             id: "grok-4.6",
@@ -668,6 +674,7 @@ describe("detached execution workers", () => {
         providerCapabilities: {
           codex: { models: [], defaultEfforts: [], allowCustomModels: false, error: null },
           claude: { models: [], defaultEfforts: [], allowCustomModels: true, error: null },
+          cursor: { models: [], defaultEfforts: [], allowCustomModels: true, error: null },
           grok: {
             models: [{
               id: "grok-4.6",
@@ -1755,10 +1762,11 @@ describe("detached execution workers", () => {
     await recordWorkerHeartbeat(db, projectId, {
       workerId: registered.worker.id,
       capabilities: {
-        providers: ["codex", "claude", "grok", "agy", "opencode"],
+        providers: ["codex", "claude", "cursor", "grok", "agy", "opencode"],
         providerHealth: {
           codex: { installed: true, authenticated: true, healthy: true },
           claude: { installed: true, authenticated: true, healthy: true },
+          cursor: { installed: true, authenticated: true, healthy: true },
           grok: { installed: true, authenticated: true, healthy: true },
           agy: { installed: true, authenticated: true, healthy: true },
           opencode: { installed: true, authenticated: true, healthy: true },
@@ -1804,7 +1812,7 @@ describe("detached execution workers", () => {
       claimedAt: atMinute(4),
       leaseExpiresAt: leaseExpiryFrom(atMinute(4)),
       workerId: registered.worker.id,
-      agentProviders: ["codex", "claude", "grok", "agy", "opencode"],
+      agentProviders: ["codex", "claude", "cursor", "grok", "agy", "opencode"],
       detachedOnly: true,
     });
     expect(claimed).toMatchObject({
@@ -1821,6 +1829,7 @@ describe("detached execution workers", () => {
     expect(devices[0].bindings[0].providers).toEqual([
       "codex",
       "claude",
+      "cursor",
       "grok",
       "agy",
       "opencode",

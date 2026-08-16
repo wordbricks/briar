@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import {
+  agentProviderBinaryName,
   agentProviders,
   emptyAgentProviderCapabilityCatalog,
   type AgentEffortCapability,
@@ -163,6 +164,164 @@ export function parseOpenCodeVerbose(output: string): AgentModelCapability[] {
   return models;
 }
 
+const normalizedCursorEffort = (value: string) => {
+  const normalized = value.trim().toLowerCase().replaceAll("_", "-");
+  return normalized === "extra-high" || normalized === "extra high"
+    ? "xhigh"
+    : normalized;
+};
+
+export function parseCursorAvailableModelsResponse(
+  response: unknown,
+): AgentModelCapability[] {
+  if (!response || typeof response !== "object" || Array.isArray(response)) {
+    return [];
+  }
+  const rawModels = (response as Record<string, unknown>).models;
+  if (!Array.isArray(rawModels)) return [];
+  const seen = new Set<string>();
+  return rawModels.flatMap((rawModel) => {
+    if (!rawModel || typeof rawModel !== "object" || Array.isArray(rawModel)) {
+      return [];
+    }
+    const model = rawModel as Record<string, unknown>;
+    const id = typeof model.value === "string" ? model.value.trim() : "";
+    if (!id || id.length > 100 || seen.has(id)) return [];
+    seen.add(id);
+    const configOptions = Array.isArray(model.configOptions)
+      ? model.configOptions
+      : [];
+    const reasoning = configOptions.find((rawOption) => {
+      if (!rawOption || typeof rawOption !== "object" || Array.isArray(rawOption)) {
+        return false;
+      }
+      const option = rawOption as Record<string, unknown>;
+      const optionId = typeof option.id === "string" ? option.id.toLowerCase() : "";
+      const name = typeof option.name === "string" ? option.name.toLowerCase() : "";
+      return optionId.includes("effort") || optionId.includes("reasoning") ||
+        name.includes("effort") || name.includes("reasoning");
+    }) as Record<string, unknown> | undefined;
+    const selections = Array.isArray(reasoning?.options)
+      ? reasoning.options.flatMap((rawOption) => {
+          if (!rawOption || typeof rawOption !== "object" || Array.isArray(rawOption)) {
+            return [];
+          }
+          const option = rawOption as Record<string, unknown>;
+          return Array.isArray(option.options) ? option.options : [option];
+        })
+      : [];
+    const current = typeof reasoning?.currentValue === "string"
+      ? normalizedCursorEffort(reasoning.currentValue)
+      : null;
+    const efforts = selections.flatMap((rawSelection) => {
+      if (
+        !rawSelection || typeof rawSelection !== "object" ||
+        Array.isArray(rawSelection)
+      ) return [];
+      const selection = rawSelection as Record<string, unknown>;
+      const value = typeof selection.value === "string"
+        ? selection.value.trim()
+        : "";
+      const effortId = normalizedCursorEffort(value);
+      if (!effortId || effortId.length > 50) return [];
+      return [effort(effortId, {
+        label: typeof selection.name === "string"
+          ? selection.name.trim() || effortId
+          : effortId,
+        isDefault: current === effortId,
+      })];
+    }).slice(0, MAX_EFFORTS);
+    return [{
+      id,
+      label: typeof model.name === "string" ? model.name.trim() || id : id,
+      isDefault: false,
+      defaultEffortId: efforts.find((candidate) => candidate.isDefault)?.id ?? null,
+      efforts,
+    }];
+  }).slice(0, MAX_MODELS);
+}
+
+async function cursorModels(binary: string): Promise<AgentModelCapability[]> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(binary, ["acp"], {
+      env: process.env,
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    let settled = false;
+    let buffer = "";
+    let stderr = "";
+    const finish = (error?: Error, models: AgentModelCapability[] = []) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      child.kill();
+      if (error) reject(error);
+      else resolve(models);
+    };
+    const timer = setTimeout(
+      () => finish(new Error("Cursor model discovery timed out")),
+      15_000,
+    );
+    const send = (value: Record<string, unknown>) =>
+      child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", ...value })}\n`);
+    child.stderr.on("data", (chunk) => {
+      stderr = `${stderr}${String(chunk)}`.slice(-8_000);
+    });
+    child.on("error", finish);
+    child.on("exit", (code) => {
+      if (!settled) {
+        finish(new Error(stderr.trim() || `Cursor ACP exited (${code})`));
+      }
+    });
+    child.stdout.on("data", (chunk) => {
+      buffer += String(chunk);
+      while (buffer.includes("\n")) {
+        const newline = buffer.indexOf("\n");
+        const line = buffer.slice(0, newline).trim();
+        buffer = buffer.slice(newline + 1);
+        let message: {
+          id?: unknown;
+          result?: unknown;
+          error?: { message?: unknown };
+        };
+        try {
+          message = JSON.parse(line);
+        } catch {
+          continue;
+        }
+        if (message.error) {
+          finish(new Error(
+            typeof message.error.message === "string"
+              ? message.error.message
+              : "Cursor ACP request failed",
+          ));
+          continue;
+        }
+        if (message.id === 1) {
+          send({ id: 2, method: "authenticate", params: { methodId: "cursor_login" } });
+          continue;
+        }
+        if (message.id === 2) {
+          send({ id: 3, method: "cursor/list_available_models", params: {} });
+          continue;
+        }
+        if (message.id === 3) {
+          finish(undefined, parseCursorAvailableModelsResponse(message.result));
+        }
+      }
+    });
+    send({
+      id: 1,
+      method: "initialize",
+      params: {
+        protocolVersion: 1,
+        clientCapabilities: { _meta: { parameterizedModelPicker: true } },
+        clientInfo: { name: "briar-worker", version: "1" },
+      },
+    });
+  });
+}
+
 async function codexModels(binary: string): Promise<AgentModelCapability[]> {
   return new Promise((resolve, reject) => {
     const child = spawn(binary, ["app-server"], { env: process.env, stdio: ["pipe", "pipe", "pipe"] });
@@ -251,13 +410,14 @@ export async function discoverWorkerProviderCapabilities(
   ) return cached.value;
   const catalog = emptyAgentProviderCapabilityCatalog();
   await Promise.all(agentProviders.map(async (provider) => {
-    const binary = Bun.which(provider);
+    const binary = Bun.which(agentProviderBinaryName(provider));
     if (!enabled[provider] || !binary) {
       catalog[provider].error = enabled[provider] ? `${provider} is not installed` : `${provider} is disabled`;
       return;
     }
     try {
       if (provider === "codex") catalog.codex.models = await codexModels(binary);
+      if (provider === "cursor") catalog.cursor.models = await cursorModels(binary);
       if (provider === "grok") catalog.grok.models = await grokModels(binary, home);
       if (provider === "opencode") catalog.opencode.models = parseOpenCodeVerbose(command(binary, ["models", "--verbose"]));
       if (provider === "claude") {

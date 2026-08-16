@@ -25,7 +25,14 @@ for (const name of migrationNames) {
   }
 }
 
-const existingProviders = ["codex", "claude", "grok", "opencode"];
+const existingProviders = [
+  "codex",
+  "claude",
+  "grok",
+  "opencode",
+  "agy",
+  "cursor",
+];
 const providerList = existingProviders.map((value) => `'${value}'`).join(", ");
 const expandedProviderList = [...existingProviders, nextProvider]
   .map((value) => `'${value}'`)

@@ -73,6 +73,12 @@ const providerCapabilities = {
     allowCustomModels: true,
     error: null,
   },
+  cursor: {
+    models: [],
+    defaultEfforts: [],
+    allowCustomModels: true,
+    error: null,
+  },
   grok: {
     models: [],
     defaultEfforts: [],

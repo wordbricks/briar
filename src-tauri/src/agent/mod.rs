@@ -6,6 +6,7 @@
 mod agy;
 mod claude;
 mod codex;
+mod cursor;
 mod grok;
 mod opencode;
 mod sidecar;
@@ -32,6 +33,7 @@ pub(crate) enum AgentProviderKind {
     #[default]
     Codex,
     Claude,
+    Cursor,
     Grok,
     Agy,
     Opencode,
@@ -52,6 +54,13 @@ impl AgentProviderKind {
             .is_some_and(|id| !id.is_empty())
         {
             return Some(Self::Grok);
+        }
+        let cursor_prefix = format!("briar:cursor:{project_id}:");
+        if conversation_id
+            .strip_prefix(&cursor_prefix)
+            .is_some_and(|id| !id.is_empty())
+        {
+            return Some(Self::Cursor);
         }
         let opencode_prefix = format!("briar:opencode:{project_id}:");
         if conversation_id
@@ -78,6 +87,7 @@ impl AgentProviderKind {
         match self {
             Self::Codex => "Codex",
             Self::Claude => "Claude",
+            Self::Cursor => "Cursor",
             Self::Grok => "Grok",
             Self::Agy => "Antigravity",
             Self::Opencode => "OpenCode",
@@ -391,6 +401,7 @@ impl AgentBackend for CodexBackend {
 pub(crate) enum AgentBackendHandle {
     Codex(CodexBackend),
     Claude(sidecar::SidecarBackend),
+    Cursor(sidecar::SidecarBackend),
     Grok(sidecar::SidecarBackend),
     Agy(sidecar::SidecarBackend),
     Opencode(sidecar::SidecarBackend),
@@ -411,6 +422,7 @@ impl AgentBackend for AgentBackendHandle {
                 backend.run(project_id, workspace_root, execution, request, approve)
             }
             Self::Claude(backend)
+            | Self::Cursor(backend)
             | Self::Grok(backend)
             | Self::Agy(backend)
             | Self::Opencode(backend) => {
@@ -422,6 +434,7 @@ impl AgentBackend for AgentBackendHandle {
 
 pub(crate) struct AgentRunnerBundles<'a> {
     pub(crate) claude: &'a Path,
+    pub(crate) cursor: &'a Path,
     pub(crate) grok: &'a Path,
     pub(crate) agy: &'a Path,
     pub(crate) opencode: &'a Path,
@@ -437,6 +450,10 @@ pub(crate) fn discover_backend(
         AgentProviderKind::Claude => {
             sidecar::SidecarBackend::discover(runner, runners.claude, claude::CONFIG)
                 .map(AgentBackendHandle::Claude)
+        }
+        AgentProviderKind::Cursor => {
+            sidecar::SidecarBackend::discover(runner, runners.cursor, cursor::CONFIG)
+                .map(AgentBackendHandle::Cursor)
         }
         AgentProviderKind::Grok => {
             sidecar::SidecarBackend::discover(runner, runners.grok, grok::CONFIG)
@@ -493,6 +510,10 @@ pub(crate) fn claude_binary(home: &Path, execution_path: &OsStr) -> Result<PathB
 
 pub(crate) fn grok_binary(home: &Path, execution_path: &OsStr) -> Result<PathBuf, String> {
     sidecar::provider_binary(grok::CONFIG, home, execution_path)
+}
+
+pub(crate) fn cursor_binary(home: &Path, execution_path: &OsStr) -> Result<PathBuf, String> {
+    sidecar::provider_binary(cursor::CONFIG, home, execution_path)
 }
 
 pub(crate) fn agy_binary(home: &Path, execution_path: &OsStr) -> Result<PathBuf, String> {
@@ -582,6 +603,10 @@ mod tests {
         assert_eq!(
             AgentProviderKind::for_conversation_id("project-1", "briar:grok:project-1:session-1"),
             Some(AgentProviderKind::Grok)
+        );
+        assert_eq!(
+            AgentProviderKind::for_conversation_id("project-1", "briar:cursor:project-1:session-1"),
+            Some(AgentProviderKind::Cursor)
         );
         assert_eq!(
             AgentProviderKind::for_conversation_id("project-1", "briar:agy:project-1:session-1"),
