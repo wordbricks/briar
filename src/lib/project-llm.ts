@@ -25,6 +25,7 @@ export type AppProviderSettings = Record<AgentProvider, boolean>;
 export const defaultAppProviderSettings: AppProviderSettings = {
   codex: true,
   claude: true,
+  cursor: true,
   grok: true,
   agy: true,
   opencode: true,

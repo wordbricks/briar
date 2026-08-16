@@ -11,10 +11,18 @@ import {
 
 describe("agent provider contract", () => {
   it("keeps only the provider roster and labels static", () => {
-    expect(agentProviders).toEqual(["codex", "claude", "grok", "agy", "opencode"]);
+    expect(agentProviders).toEqual([
+      "codex",
+      "claude",
+      "cursor",
+      "grok",
+      "agy",
+      "opencode",
+    ]);
     expect(agentProviderLabels).toEqual({
       codex: "Codex",
       claude: "Claude",
+      cursor: "Cursor",
       grok: "Grok",
       agy: "Antigravity",
       opencode: "OpenCode",

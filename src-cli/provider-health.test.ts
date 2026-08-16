@@ -8,14 +8,28 @@ import {
   healthyWorkerProviders,
   inspectWorkerProviderHealth,
   parseClaudeAuthStatus,
+  parseCursorAuthStatus,
   providerHealthReadinessDetail,
   type WorkerProvider,
   type WorkerProviderHealthMap,
 } from "./provider-health";
 
-const enabled = { codex: true, claude: true, grok: true, agy: true, opencode: true };
+const enabled = {
+  codex: true,
+  claude: true,
+  cursor: true,
+  grok: true,
+  agy: true,
+  opencode: true,
+};
 
 describe("inspectWorkerProviderHealth", () => {
+  it("parses Cursor's JSON and human-readable account status", () => {
+    expect(parseCursorAuthStatus('{"userEmail":"jay@example.com"}')).toBe(true);
+    expect(parseCursorAuthStatus('{"userEmail":"Not logged in"}')).toBe(false);
+    expect(parseCursorAuthStatus("User Email  jay@example.com\n")).toBe(true);
+  });
+
   it("uses Claude's loggedIn response even when its CLI exit code is unreliable", async () => {
     expect(parseClaudeAuthStatus('{"loggedIn":true,"authMethod":"claude.ai"}'))
       .toBe(true);
@@ -74,6 +88,12 @@ describe("inspectWorkerProviderHealth", () => {
         healthy: false,
         reason: "not_authenticated",
       },
+      cursor: {
+        installed: true,
+        authenticated: false,
+        healthy: false,
+        reason: "not_authenticated",
+      },
       grok: {
         installed: false,
         authenticated: false,
@@ -117,6 +137,7 @@ describe("inspectWorkerProviderHealth", () => {
     expect(health.claude.healthy).toBe(true);
     expect(healthyWorkerProviders(health)).toEqual([
       "claude",
+      "cursor",
       "grok",
       "agy",
       "opencode",
@@ -144,6 +165,7 @@ describe("inspectWorkerProviderHealth", () => {
     expect(healthyWorkerProviders(health)).toEqual([
       "codex",
       "claude",
+      "cursor",
       "grok",
       "agy",
       "opencode",
@@ -158,7 +180,14 @@ describe("inspectWorkerProviderHealth", () => {
       error: null,
     }));
     const health = await inspectWorkerProviderHealth(
-      { codex: false, claude: true, grok: false, agy: false, opencode: false },
+      {
+        codex: false,
+        claude: true,
+        cursor: false,
+        grok: false,
+        agy: false,
+        opencode: false,
+      },
       {
         which: (provider) => `/usr/local/bin/${provider}`,
         authenticated,
@@ -176,6 +205,7 @@ describe("inspectWorkerProviderHealth", () => {
     expect(usage).toHaveBeenCalledTimes(1);
     expect(healthyWorkerProviders(health)).toEqual(["claude"]);
     expect(health.codex.reason).toBe("disabled");
+    expect(health.cursor.reason).toBe("disabled");
     expect(health.grok.reason).toBe("disabled");
     expect(health.agy.reason).toBe("disabled");
     expect(health.opencode.reason).toBe("disabled");
@@ -194,6 +224,12 @@ describe("inspectWorkerProviderHealth", () => {
         authenticated: false,
         healthy: false,
         reason: "not_authenticated",
+      },
+      cursor: {
+        installed: false,
+        authenticated: false,
+        healthy: false,
+        reason: "disabled",
       },
       grok: {
         installed: false,

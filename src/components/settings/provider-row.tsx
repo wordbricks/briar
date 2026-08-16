@@ -133,6 +133,7 @@ export function ProviderIcon({
     | "github"
     | "codex"
     | "claude"
+    | "cursor"
     | "grok"
     | "agy"
     | "opencode";
@@ -146,6 +147,7 @@ export function ProviderIcon({
         tone === "github" && "bg-secondary text-foreground",
         tone === "codex" && "bg-secondary text-foreground",
         tone === "claude" && "bg-[#fff1e9] text-[#d66f45]",
+        tone === "cursor" && "bg-[#f1f1ee] text-[#23231f]",
         tone === "grok" && "bg-[#ececf1] text-[#111114]",
         tone === "agy" && "bg-[#eef3ff] text-[#4285f4]",
         tone === "opencode" && "bg-[#ececf1] text-[#211e1e]",

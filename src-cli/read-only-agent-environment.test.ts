@@ -47,6 +47,47 @@ describe("read-only Agent environment", () => {
     ).toEqual({ XAI_API_KEY: "xai-secret" });
   });
 
+  it("keeps only Cursor credentials in the Cursor environment", () => {
+    expect(
+      readOnlyAgentEnvironment("cursor", {
+        HOME: "/Users/worker",
+        CURSOR_API_KEY: "cursor-secret",
+        CURSOR_TRACE_ID: "trace",
+        OPENAI_API_KEY: "openai-secret",
+        BRIAR_WORKER_TOKEN: "worker-secret",
+      }),
+    ).toEqual({
+      HOME: "/Users/worker",
+      CURSOR_API_KEY: "cursor-secret",
+      CURSOR_TRACE_ID: "trace",
+    });
+  });
+
+  it("isolates Cursor configuration while preserving CLI authentication", async () => {
+    const sourceHome = await mkdtemp(join(tmpdir(), "briar-cursor-source-"));
+    const sourceCursorHome = join(sourceHome, ".cursor");
+    await mkdir(sourceCursorHome, { recursive: true });
+    await writeFile(join(sourceCursorHome, "cli-config.json"), '{"userEmail":"test@example.com"}');
+    await writeFile(join(sourceCursorHome, "rules.json"), '{"unsafe":true}');
+
+    const prepared = await prepareReadOnlyAgentEnvironment("cursor", {
+      workspaceRoot: "/repo",
+      environment: { HOME: sourceHome, CURSOR_API_KEY: "cursor-secret" },
+    });
+    const isolatedHome = prepared.environment.HOME!;
+    try {
+      expect(isolatedHome).not.toBe(sourceHome);
+      expect(await readFile(join(isolatedHome, ".cursor", "cli-config.json"), "utf8"))
+        .toBe('{"userEmail":"test@example.com"}');
+      await expect(access(join(isolatedHome, ".cursor", "rules.json")))
+        .rejects.toMatchObject({ code: "ENOENT" });
+      expect(prepared.environment.CURSOR_API_KEY).toBe("cursor-secret");
+    } finally {
+      await prepared.cleanup();
+      await rm(sourceHome, { recursive: true, force: true });
+    }
+  });
+
   it("isolates Codex configuration while preserving authentication", async () => {
     const sourceCodexHome = await mkdtemp(
       join(tmpdir(), "briar-codex-source-"),

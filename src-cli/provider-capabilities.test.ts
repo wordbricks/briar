@@ -2,11 +2,39 @@ import { describe, expect, it } from "vitest";
 import {
   parseClaudeEfforts,
   parseClaudeModels,
+  parseCursorAvailableModelsResponse,
   parseGrokModelList,
   parseOpenCodeVerbose,
 } from "./provider-capabilities";
 
 describe("worker provider capabilities", () => {
+  it("reads Cursor models and reasoning options from the ACP extension", () => {
+    expect(parseCursorAvailableModelsResponse({
+      models: [{
+        value: "composer-2",
+        name: "Composer 2",
+        configOptions: [{
+          id: "reasoning",
+          name: "Reasoning Effort",
+          currentValue: "extra-high",
+          options: [
+            { value: "medium", name: "Medium" },
+            { value: "extra-high", name: "Extra High" },
+          ],
+        }],
+      }],
+    })).toEqual([{
+      id: "composer-2",
+      label: "Composer 2",
+      isDefault: false,
+      defaultEffortId: "xhigh",
+      efforts: [
+        { id: "medium", label: "Medium", isDefault: false },
+        { id: "xhigh", label: "Extra High", isDefault: true },
+      ],
+    }]);
+  });
+
   it("parses both default and non-default Grok model markers", () => {
     expect(parseGrokModelList(`Default model: grok-4.6
 Available models:

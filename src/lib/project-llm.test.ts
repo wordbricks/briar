@@ -92,6 +92,7 @@ describe("project LLM gateway", () => {
     invoke.mockResolvedValue({
       codex: { models: [{ id: "cached-model", label: "Cached model" }], error: null },
       claude: { models: [], error: null },
+      cursor: { models: [], error: null },
       grok: { models: [], error: null },
       agy: { models: [], error: null },
       opencode: { models: [], error: null },
@@ -115,6 +116,7 @@ describe("project LLM gateway", () => {
         error: null,
       },
       claude: { models: [], error: null },
+      cursor: { models: [], error: null },
       grok: { models: [], error: null },
       agy: { models: [], error: null },
       opencode: { models: [], error: null },
@@ -442,23 +444,24 @@ describe("project LLM gateway", () => {
 
   it("loads and updates app-wide provider enablement", async () => {
     invoke
-      .mockResolvedValueOnce({ codex: true, claude: true, grok: true, agy: true, opencode: true })
-      .mockResolvedValueOnce({ codex: false, claude: true, grok: true, agy: true, opencode: true });
+      .mockResolvedValueOnce({ codex: true, claude: true, cursor: true, grok: true, agy: true, opencode: true })
+      .mockResolvedValueOnce({ codex: false, claude: true, cursor: true, grok: true, agy: true, opencode: true });
 
     await expect(loadAppProviderSettings()).resolves.toEqual({
       codex: true,
       claude: true,
+      cursor: true,
       grok: true,
       agy: true,
       opencode: true,
     });
     await expect(
-      updateAppProviderSettings({ codex: false, claude: true, grok: true, agy: true, opencode: true }),
-    ).resolves.toEqual({ codex: false, claude: true, grok: true, agy: true, opencode: true });
+      updateAppProviderSettings({ codex: false, claude: true, cursor: true, grok: true, agy: true, opencode: true }),
+    ).resolves.toEqual({ codex: false, claude: true, cursor: true, grok: true, agy: true, opencode: true });
 
     expect(invoke).toHaveBeenNthCalledWith(1, "load_app_provider_settings");
     expect(invoke).toHaveBeenNthCalledWith(2, "update_app_provider_settings", {
-      settings: { codex: false, claude: true, grok: true, agy: true, opencode: true },
+      settings: { codex: false, claude: true, cursor: true, grok: true, agy: true, opencode: true },
     });
   });
 

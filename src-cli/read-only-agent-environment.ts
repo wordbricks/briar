@@ -54,6 +54,7 @@ const commonEnvironmentKeys = new Set([
 const providerPrefixes: Record<AgentProvider, string[]> = {
   codex: ["OPENAI_"],
   claude: ["ANTHROPIC_", "AWS_", "GOOGLE_", "VERTEX_"],
+  cursor: ["CURSOR_"],
   grok: [],
   agy: [],
   opencode: [
@@ -80,6 +81,7 @@ const providerPrefixes: Record<AgentProvider, string[]> = {
 const providerEnvironmentKeys: Record<AgentProvider, Set<string>> = {
   codex: new Set(["CODEX_ACCESS_TOKEN"]),
   claude: new Set(["CLAUDE_CODE_OAUTH_TOKEN"]),
+  cursor: new Set(["CURSOR_API_KEY"]),
   grok: new Set(["XAI_API_KEY"]),
   agy: new Set(),
   opencode: new Set(),
@@ -350,6 +352,39 @@ async function prepareGrokEnvironment(
   };
 }
 
+async function prepareCursorEnvironment(
+  allowed: NodeJS.ProcessEnv,
+  environment: NodeJS.ProcessEnv,
+) {
+  const isolatedRoot = await mkdtemp(join(tmpdir(), "briar-cursor-read-only-"));
+  const targetCursorHome = join(isolatedRoot, ".cursor");
+  const sourceHome = environment.HOME?.trim() || homedir();
+  const sourceCursorHome = join(sourceHome, ".cursor");
+  try {
+    await mkdir(targetCursorHome, { recursive: true, mode: 0o700 });
+    for (const name of ["cli-config.json", "auth.json"]) {
+      await copyOptionalCredential(
+        join(sourceCursorHome, name),
+        join(targetCursorHome, name),
+      );
+    }
+  } catch (error) {
+    await rm(isolatedRoot, { recursive: true, force: true });
+    throw error;
+  }
+  return {
+    environment: {
+      ...allowed,
+      HOME: isolatedRoot,
+      USERPROFILE: isolatedRoot,
+      TMPDIR: isolatedRoot,
+      TMP: isolatedRoot,
+      TEMP: isolatedRoot,
+    },
+    cleanup: () => rm(isolatedRoot, { recursive: true, force: true }),
+  };
+}
+
 async function prepareOpenCodeEnvironment(
   allowed: NodeJS.ProcessEnv,
   environment: NodeJS.ProcessEnv,
@@ -480,6 +515,9 @@ export async function prepareReadOnlyAgentEnvironment(
       environment,
       input.workspaceRoot,
     );
+  }
+  if (provider === "cursor") {
+    return prepareCursorEnvironment(allowed, environment);
   }
   if (provider === "agy") {
     return prepareAgyEnvironment(allowed, environment);

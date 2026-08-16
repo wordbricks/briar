@@ -2497,7 +2497,9 @@
             "enum": [
               "codex",
               "claude",
+              "cursor",
               "grok",
+              "agy",
               "opencode",
               null
             ]
@@ -2526,7 +2528,9 @@
             "enum": [
               "codex",
               "claude",
+              "cursor",
               "grok",
+              "agy",
               "opencode",
               null
             ]
@@ -2636,10 +2640,12 @@
             "items": {
               "type": "string",
               "enum": [
-                "codex",
-                "claude",
-                "grok",
-                "opencode"
+              "codex",
+              "claude",
+              "cursor",
+              "grok",
+              "agy",
+              "opencode"
               ]
             }
           },
@@ -2719,10 +2725,12 @@
             "items": {
               "type": "string",
               "enum": [
-                "codex",
-                "claude",
-                "grok",
-                "opencode"
+              "codex",
+              "claude",
+              "cursor",
+              "grok",
+              "agy",
+              "opencode"
               ]
             }
           },
@@ -2803,7 +2811,9 @@
             "enum": [
               "codex",
               "claude",
+              "cursor",
               "grok",
+              "agy",
               "opencode"
             ]
           },
@@ -2812,10 +2822,12 @@
             "items": {
               "type": "string",
               "enum": [
-                "codex",
-                "claude",
-                "grok",
-                "opencode"
+              "codex",
+              "claude",
+              "cursor",
+              "grok",
+              "agy",
+              "opencode"
               ]
             }
           },
@@ -3376,7 +3388,9 @@
             "enum": [
               "codex",
               "claude",
+              "cursor",
               "grok",
+              "agy",
               "opencode",
               null
             ]
@@ -3453,7 +3467,7 @@
           "skillName": { "type": "string", "minLength": 1, "maxLength": 100 },
           "provider": {
             "type": "string",
-            "enum": ["codex", "claude", "grok", "opencode"]
+            "enum": ["codex", "claude", "cursor", "grok", "agy", "opencode"]
           },
           "model": { "type": ["string", "null"] },
           "effort": {
@@ -3780,7 +3794,9 @@
             "enum": [
               "codex",
               "claude",
+              "cursor",
               "grok",
+              "agy",
               "opencode"
             ]
           },
@@ -3878,7 +3894,9 @@
             "enum": [
               "codex",
               "claude",
+              "cursor",
               "grok",
+              "agy",
               "opencode"
             ]
           },
@@ -5045,7 +5063,9 @@
             "enum": [
               "codex",
               "claude",
+              "cursor",
               "grok",
+              "agy",
               "opencode"
             ]
           },
@@ -5102,7 +5122,9 @@
             "enum": [
               "codex",
               "claude",
+              "cursor",
               "grok",
+              "agy",
               "opencode"
             ]
           },

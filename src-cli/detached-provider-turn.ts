@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { createInterface } from "node:readline";
 import type { AgentAttachment } from "../src-agent/runner-attachments";
 import type { JsonSchema } from "../src/lib/project-llm";
+import { agentProviderBinaryName } from "../src/lib/agent-provider-contract";
 import {
   detachedConversationIdFromPayload,
   detachedProviderRequest,
@@ -41,7 +42,7 @@ export async function runDetachedProviderTurn(input: {
       : new Error("Worker execution was cancelled");
   }
   const provider = input.agent.provider;
-  const binaryName = provider === "claude" ? "claude" : provider;
+  const binaryName = agentProviderBinaryName(provider);
   const agentBinary = Bun.which(binaryName);
   if (!agentBinary) {
     throw new Error(`${binaryName} coding agent is not installed on this Worker`);

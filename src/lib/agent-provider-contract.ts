@@ -3,11 +3,16 @@ import { z } from "zod";
 export const agentProviders = [
   "codex",
   "claude",
+  "cursor",
   "grok",
   "agy",
   "opencode",
 ] as const;
 export type AgentProvider = (typeof agentProviders)[number];
+
+export function agentProviderBinaryName(provider: AgentProvider) {
+  return provider === "cursor" ? "cursor-agent" : provider;
+}
 
 /**
  * Model and effort identifiers are provider-owned capability values. Keep the
@@ -87,6 +92,7 @@ export const agentProviderCapabilityCatalogSchema = z
 export const agentProviderLabels: Record<AgentProvider, string> = {
   codex: "Codex",
   claude: "Claude",
+  cursor: "Cursor",
   grok: "Grok",
   agy: "Antigravity",
   opencode: "OpenCode",
@@ -99,7 +105,8 @@ export function emptyAgentProviderCapabilityCatalog(): AgentProviderCapabilityCa
       {
         models: [],
         defaultEfforts: [],
-        allowCustomModels: provider === "claude" || provider === "opencode",
+        allowCustomModels:
+          provider === "claude" || provider === "cursor" || provider === "opencode",
         error: null,
       },
     ]),

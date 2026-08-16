@@ -47,6 +47,7 @@ const rangeOptions = [7, 30, 90] as const satisfies readonly UsageRangeDays[];
 const providerColors: Record<UsageAttribution, string> = {
   claude: "#d97757",
   codex: "var(--usage-codex-color)",
+  cursor: "#24241f",
   grok: "#7765b5",
   agy: "#4285f4",
   opencode: "#4f8a70",
@@ -58,6 +59,7 @@ type BreakdownMode = "model" | "day";
 
 function providerName(provider: UsageAttribution) {
   if (provider === "claude") return "Claude";
+  if (provider === "cursor") return "Cursor";
   if (provider === "grok") return "Grok";
   if (provider === "agy") return "Antigravity";
   if (provider === "opencode") return "OpenCode";

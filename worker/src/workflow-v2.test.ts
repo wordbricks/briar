@@ -166,6 +166,9 @@ describe("workflow v2 D1 persistence and transitions", () => {
         // 0106 snapshots the fully migrated provider-constrained schema and
         // therefore depends on the deliberately excluded approval tables.
         "0106_agent_provider_agy.sql",
+        // 0111 is the equivalent full-schema rebuild for Cursor and has the
+        // same dependency on the deliberately excluded approval tables.
+        "0111_agent_provider_cursor.sql",
       ],
     });
 

@@ -4,6 +4,7 @@ import UIKit
 enum AgentProvider: String, Codable, CaseIterable, Hashable, Identifiable, Sendable {
     case codex
     case claude
+    case cursor
     case grok
     case agy
     case opencode

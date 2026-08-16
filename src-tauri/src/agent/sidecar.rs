@@ -573,7 +573,7 @@ fn decode_conversation_id<'a>(
 mod tests {
     use super::*;
     use crate::{
-        agent::{agy, claude, grok, opencode},
+        agent::{agy, claude, cursor, grok, opencode},
         host::CommandOutput,
     };
     use std::fs;
@@ -603,8 +603,14 @@ mod tests {
         }
     }
 
-    fn provider_configs() -> [SidecarProviderConfig; 4] {
-        [claude::CONFIG, grok::CONFIG, agy::CONFIG, opencode::CONFIG]
+    fn provider_configs() -> [SidecarProviderConfig; 5] {
+        [
+            claude::CONFIG,
+            cursor::CONFIG,
+            grok::CONFIG,
+            agy::CONFIG,
+            opencode::CONFIG,
+        ]
     }
 
     #[test]
@@ -646,7 +652,13 @@ mod tests {
             assert_eq!(raw["networkAccess"], true);
             assert_eq!(raw[config.executable.request_key], "/provider/bin");
 
-            for key in ["claudeBinary", "grokBinary", "agyBinary", "opencodeBinary"] {
+            for key in [
+                "claudeBinary",
+                "cursorBinary",
+                "grokBinary",
+                "agyBinary",
+                "opencodeBinary",
+            ] {
                 assert_eq!(
                     raw.get(key).is_some(),
                     key == config.executable.request_key,
@@ -699,6 +711,10 @@ mod tests {
             [".local/bin/grok", ".grok/bin/grok", ".bun/bin/grok"]
         );
         assert_eq!(
+            cursor::CONFIG.executable.home_candidates,
+            [".local/bin/cursor-agent", ".cursor/bin/cursor-agent"]
+        );
+        assert_eq!(
             opencode::CONFIG.executable.home_candidates,
             [
                 ".opencode/bin/opencode",
@@ -734,6 +750,14 @@ mod tests {
         assert_eq!(
             grok::CONFIG.missing_bun_error,
             "Grok runner 실행에 필요한 Bun을 로컬 환경에서 찾지 못했습니다."
+        );
+        assert_eq!(
+            cursor::CONFIG.executable.missing_error,
+            "Cursor CLI가 필요합니다. Cursor CLI를 설치하고 `agent login`을 실행한 뒤 다시 시도하세요."
+        );
+        assert_eq!(
+            cursor::CONFIG.missing_bun_error,
+            "Cursor Agent runner 실행에 필요한 Bun을 로컬 환경에서 찾지 못했습니다."
         );
         assert_eq!(
             agy::CONFIG.executable.missing_error,

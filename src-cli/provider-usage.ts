@@ -3,7 +3,10 @@ import { spawn, spawnSync } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import type { AgentProvider } from "../src/lib/agent-provider-contract";
+import {
+  agentProviderBinaryName,
+  type AgentProvider,
+} from "../src/lib/agent-provider-contract";
 import {
   isProviderUsageExhausted,
   type AgentUsageProvider,
@@ -648,7 +651,7 @@ const defaultProbe: ProviderUsageProbeDependencies["probe"] = async (
   if (provider === "grok") {
     return probeGrokUsage(home, now, timeoutMs);
   }
-  // Antigravity and OpenCode have no stable first-class quota surface in
+  // Antigravity, Cursor, and OpenCode have no stable first-class quota surface in
   // Briar yet. Unknown usage deliberately fails open.
   return unknownUsage(null);
 };
@@ -658,7 +661,7 @@ const defaultDependencies: ProviderUsageProbeDependencies = {
   now: Date.now,
   probeTimeoutMs: DEFAULT_PROBE_TIMEOUT_MS,
   cacheTtlMs: DEFAULT_CACHE_TTL_MS,
-  which: (provider) => Bun.which(provider),
+  which: (provider) => Bun.which(agentProviderBinaryName(provider)),
   probe: defaultProbe,
 };
 
