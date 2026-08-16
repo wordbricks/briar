@@ -6168,9 +6168,11 @@ const channelConversationNotificationJson = (
   rootMessageId: notification.root_message_id,
   body: notification.body,
   author: {
-    id: notification.author_user_id,
+    id: notification.author_agent_id ?? notification.author_user_id,
     name: notification.author_name ?? "",
-    image: notification.author_image,
+    image: notification.author_agent_id
+      ? notification.author_agent_image
+      : notification.author_image,
     provider: notification.author_agent_provider,
   },
   reason: notification.notification_reason,

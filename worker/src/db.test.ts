@@ -41,6 +41,7 @@ import {
   deleteIssueDependency,
   deleteProjectAgentSchedule,
   deleteProject,
+  enqueueIssueAgentReply,
   findProjectIdByAgentTokenHash,
   getProject,
   getProjectSettings,
@@ -858,6 +859,12 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         resolve("migrations/0082_explicit_agent_skill_selection.sql"),
         "utf8",
       ),
+    );
+    await executeSql(
+      db,
+      `alter table briar_issue_agent_reply_jobs
+         add column skill_id text
+           references briar_agent_skills (id) on delete set null;`,
     );
     await executeSql(
       db,
@@ -4436,6 +4443,90 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     await removeOrganizationMember(db, projectId, "mentioned-member");
   });
 
+  it("resolves an issue reply avatar through its selected Agent Skill", async () => {
+    const agent = await createProjectAgent(db, projectId, {
+      name: "Inbox issue agent",
+      avatar: "data:image/png;base64,aW5ib3gtaXNzdWUtYWdlbnQ=",
+      provider: "codex",
+      model: null,
+      effort: null,
+      responsibility: "Reply to issue conversations.",
+      skills: [{
+        name: "Issue processing",
+        instructions: "Reply to issue conversations.",
+        provider: "codex",
+        model: null,
+        effort: null,
+        kind: "issue_processing",
+        position: 0,
+      }],
+      calendarColor: "#3275d5",
+    });
+    const runId = await recordHuntEvent(
+      db,
+      projectId,
+      event("queued", 29.6, {
+        sourceKey: "inbox-agent-reply-run",
+        eventKey: "inbox-agent-reply-run:queued",
+        assigneeUserId: "owner",
+      }),
+    );
+    await db.prepare(
+      `update briar_hunt_runs set agent_id = ? where id = ? and project_id = ?`,
+    ).bind(agent.id, runId, projectId).run();
+    const rootId = "11111111-eeee-4eee-8eee-eeeeeeeeeeee";
+    const replyId = "22222222-eeee-4eee-8eee-eeeeeeeeeeee";
+    const jobId = "33333333-eeee-4eee-8eee-eeeeeeeeeeee";
+    await createIssueMessage(db, {
+      id: rootId,
+      projectId,
+      runId,
+      parentMessageId: null,
+      authorUserId: "owner",
+      authorAgentProvider: null,
+      body: "Please investigate this issue.",
+      createdAt: atMinute(29.61),
+    });
+    await enqueueIssueAgentReply(db, {
+      id: jobId,
+      projectId,
+      runId,
+      triggerMessageId: rootId,
+      parentMessageId: rootId,
+      replyMessageId: replyId,
+      skillId: agent.skills[0]!.id,
+      createdAt: atMinute(29.62),
+    });
+    // This broad lifecycle fixture predates the full approval migration; add
+    // the production job attribution explicitly for this notification query.
+    await db.prepare(
+      `update briar_issue_agent_reply_jobs set skill_id = ? where id = ?`,
+    ).bind(agent.skills[0]!.id, jobId).run();
+    await createIssueMessage(db, {
+      id: replyId,
+      projectId,
+      runId,
+      parentMessageId: rootId,
+      authorUserId: null,
+      authorAgentProvider: "codex",
+      body: "The configured agent replied.",
+      createdAt: atMinute(29.63),
+    });
+    await db.prepare(
+      `update briar_hunt_runs set agent_id = null where id = ? and project_id = ?`,
+    ).bind(runId, projectId).run();
+
+    await expect(
+      listIssueConversationNotifications(db, projectId, "owner"),
+    ).resolves.toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: replyId,
+        author_agent_image: "data:image/png;base64,aW5ib3gtaXNzdWUtYWdlbnQ=",
+        notification_reason: "thread_reply",
+      }),
+    ]));
+  });
+
   it("keeps assignees subscribed and supports manual subscription changes", async () => {
     await executeSql(
       db,
@@ -4504,12 +4595,25 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     const rootId = "66666666-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
     const replyId = "77777777-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
     const mentionId = "88888888-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    const agentReplyId = "aaaaaaaa-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+    const agent = await createProjectAgent(db, projectId, {
+      name: "Inbox channel agent",
+      avatar: "data:image/png;base64,aW5ib3gtY2hhbm5lbC1hZ2VudA==",
+      provider: "codex",
+      model: null,
+      effort: null,
+      responsibility: "Reply to channel conversations.",
+      calendarColor: "#3275d5",
+    });
     await executeSql(
       db,
       `
-      insert into user (id, name, email, emailVerified, createdAt, updatedAt)
+      insert into user (
+        id, name, email, image, emailVerified, createdAt, updatedAt
+      )
       values (
-        'channel-member', 'Channel Member', 'channel@example.com', 1,
+        'channel-member', 'Channel Member', 'channel@example.com',
+        'https://example.com/channel-member.png', 1,
         '${atMinute(0)}', '${atMinute(0)}'
       );
       insert into briar_organization_members (
@@ -4525,6 +4629,11 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
          'public', '${atMinute(30)}', '${atMinute(30)}'),
         ('${privateChannelId}', '${projectId}', 'inbox-private', 'Inbox Private',
          'private', '${atMinute(30)}', '${atMinute(30)}');
+      insert into briar_channel_agents (
+        channel_id, agent_id, added_by_user_id, created_at
+      ) values (
+        '${publicChannelId}', '${agent.id}', 'owner', '${atMinute(30)}'
+      );
       insert into briar_channel_messages (
         id, channel_id, parent_message_id, author_user_id, body, created_at, updated_at
       ) values
@@ -4538,6 +4647,14 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
          'owner', 'Own reply', '${atMinute(30.4)}', '${atMinute(30.4)}'),
         ('99999999-bbbb-4bbb-8bbb-bbbbbbbbbbbb', '${privateChannelId}', null,
          'channel-member', 'Hidden mention', '${atMinute(30.5)}', '${atMinute(30.5)}');
+      insert into briar_channel_messages (
+        id, channel_id, parent_message_id, author_agent_id,
+        author_agent_name, author_agent_provider, body, created_at, updated_at
+      ) values (
+        '${agentReplyId}', '${publicChannelId}', '${rootId}', '${agent.id}',
+        '${agent.name}', '${agent.provider}', 'Agent reply',
+        '${atMinute(30.25)}', '${atMinute(30.25)}'
+      );
       insert into briar_channel_message_mentions (message_id, user_id, created_at)
       values
         ('${mentionId}', 'owner', '${atMinute(30.3)}'),
@@ -4561,6 +4678,13 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       expect.objectContaining({
         id: replyId,
         root_message_id: rootId,
+        author_image: "https://example.com/channel-member.png",
+        notification_reason: "thread_reply",
+      }),
+      expect.objectContaining({
+        id: agentReplyId,
+        author_agent_id: agent.id,
+        author_agent_image: "data:image/png;base64,aW5ib3gtY2hhbm5lbC1hZ2VudA==",
         notification_reason: "thread_reply",
       }),
     ]));

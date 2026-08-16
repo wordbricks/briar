@@ -948,9 +948,11 @@ export type ChannelConversationNotificationRow = {
   channel_name: string;
   parent_message_id: string | null;
   author_user_id: string | null;
+  author_agent_id: string | null;
   author_agent_provider: ProjectAgentProvider | null;
   author_name: string | null;
   author_image: string | null;
+  author_agent_image: string | null;
   body: string;
   created_at: string;
   root_message_id: string;
@@ -9263,8 +9265,15 @@ export async function listIssueConversationNotifications(
        join briar_issue_subscriptions subscription
          on subscription.run_id = run.id and subscription.user_id = ?
        left join "user" author on author.id = message.author_user_id
+       left join briar_issue_agent_reply_jobs reply_job
+         on reply_job.reply_message_id = message.id
+        and reply_job.project_id = message.project_id
+        and reply_job.run_id = message.run_id
+       left join briar_agent_skills reply_skill
+         on reply_skill.id = reply_job.skill_id
        left join briar_project_agents agent
-         on agent.id = run.agent_id and agent.project_id = run.project_id
+         on agent.id = coalesce(reply_skill.agent_id, run.agent_id)
+        and agent.project_id = run.project_id
        left join briar_issue_messages root
          on root.id = message.parent_message_id
         and root.project_id = message.project_id
@@ -9379,15 +9388,19 @@ export async function listChannelConversationNotifications(
     .prepare(
       `select message.id, message.channel_id, channel.name as channel_name,
               message.parent_message_id, message.author_user_id,
-              message.author_agent_provider,
+              message.author_agent_id, message.author_agent_provider,
               coalesce(author.name, message.author_agent_name, '') as author_name,
-              author.image as author_image, message.body, message.created_at,
+              author.image as author_image,
+              agent.avatar as author_agent_image,
+              message.body, message.created_at,
               coalesce(message.parent_message_id, message.id) as root_message_id,
               notification.notification_reason
        from briar_channel_notification_inbox notification
        join briar_channel_messages message on message.id = notification.message_id
        join briar_channels channel on channel.id = message.channel_id
        left join "user" author on author.id = message.author_user_id
+       left join briar_project_agents agent
+         on agent.id = message.author_agent_id
        where notification.user_id = ?
          and notification.organization_id = ?
          and channel.organization_id = notification.organization_id
