@@ -1850,6 +1850,7 @@ function MessageRow({
   showTypingState?: boolean;
 }) {
   const { localeTag, t } = useI18n();
+  const [reacting, setReacting] = useState(false);
   const issueProposal = message.proposal?.actionType === "request_issue_create"
     ? message.proposal
     : null;
@@ -1872,7 +1873,7 @@ function MessageRow({
     : null;
   return (
     <article
-      className={`companion-channel-message${message.optimistic ? " is-optimistic" : ""}`}
+      className={`companion-channel-message${reacting ? " is-reacting" : ""}${message.optimistic ? " is-optimistic" : ""}`}
       data-companion-channel-message-id={message.id}
     >
       <MessageAvatar message={message} />
@@ -2007,7 +2008,11 @@ function MessageRow({
           busy={busy || message.optimistic}
           currentUserId={currentUserId}
           message={message}
+          onOpenThread={message.optimistic ? undefined : onOpenThread}
+          onReactingChange={setReacting}
           onToggle={onToggleReaction}
+          organizationId={channel.organizationId}
+          showHoverActions
         />
         {showThreadSummary && onOpenThread && !message.optimistic ? (
           <button

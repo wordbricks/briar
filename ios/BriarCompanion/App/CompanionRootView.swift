@@ -364,6 +364,13 @@ struct CompanionRootView: View {
         if url.host == "auth-complete" { return }
         guard let target = BriarLinkParser.parse(url) else { return }
         navigation.open(target)
+        if case let .channel(organizationID, _, _, _) = target,
+           navigation.pendingProjectID == nil,
+           let project = companion.projects.first(where: {
+               $0.organizationId == organizationID
+           }) {
+            navigation.pendingProjectID = project.id
+        }
         applyPendingProjectIfNeeded()
     }
 

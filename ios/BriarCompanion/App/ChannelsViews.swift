@@ -635,6 +635,8 @@ private struct ChannelMessageRow: View {
     let providers: [AgentProvider]
     let workers: [DashboardWorker]
     var showsThreadSummary = false
+    @State private var copiedToast = ""
+    @State private var showingCopiedToast = false
 
     private var mentionHandles: Set<String> {
         MessageMentions.channelHandles(
@@ -820,6 +822,39 @@ private struct ChannelMessageRow: View {
                     .buttonStyle(.plain)
             }
         }
+        .contextMenu {
+            if !isOptimistic {
+                Button {
+                    ClipboardService.copy(
+                        BriarShareLinks.channelShareURL(
+                            organizationID: channel.organizationId,
+                            channelID: channel.id,
+                            messageID: message.id,
+                            rootMessageID: message.parentMessageId ?? message.id,
+                            origin: BriarShareLinks.defaultOrigin
+                        ).absoluteString
+                    )
+                    copiedToast = L10n.text(.linkCopied, locale: locale)
+                    showingCopiedToast = true
+                } label: {
+                    Label(L10n.text(.copyLink, locale: locale), systemImage: "link")
+                }
+                .accessibilityIdentifier("channel-copy-link")
+            }
+            Button {
+                ClipboardService.copy(
+                    messageBodyWithoutAttachments.isEmpty
+                        ? message.body
+                        : messageBodyWithoutAttachments
+                )
+                copiedToast = L10n.text(.messageCopied, locale: locale)
+                showingCopiedToast = true
+            } label: {
+                Label(L10n.text(.copyMessage, locale: locale), systemImage: "doc.on.doc")
+            }
+            .accessibilityIdentifier("channel-copy-message")
+        }
+        .companionToast(isPresented: $showingCopiedToast, message: copiedToast)
     }
 
     private var lastReplyText: String? {

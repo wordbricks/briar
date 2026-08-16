@@ -1203,6 +1203,9 @@ describe("Channels", () => {
     await render([reacted]);
 
     expect(container.querySelector(".channel-message-actions")).not.toBeNull();
+    expect(
+      container.querySelector(".channel-message-actions .open-more"),
+    ).not.toBeNull();
     expect(container.querySelector(".channel-reaction-chip")).not.toBeNull();
     expect(container.querySelector(".channel-proposal-card")).not.toBeNull();
     expect(container.querySelector(".execution-proposal-card")).not.toBeNull();
@@ -1224,6 +1227,55 @@ describe("Channels", () => {
     );
     expect(container.querySelector(".channel-proposal-card")).not.toBeNull();
     expect(container.querySelector(".execution-proposal-card")).not.toBeNull();
+  });
+
+  it("copies a message permalink and body from the overflow menu", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+    await render([
+      message({
+        id: "message-copy",
+        body: "Copy this note\n\n![shot.png](briar-attachment://aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa)",
+      }),
+    ]);
+
+    const trigger = container.querySelector<HTMLButtonElement>(
+      ".channel-message-actions .open-more",
+    );
+    expect(trigger).not.toBeNull();
+    await act(async () => {
+      trigger?.dispatchEvent(
+        new MouseEvent("pointerdown", { bubbles: true, button: 0 }),
+      );
+    });
+    const menu = document.body.querySelector('[role="menu"]');
+    expect(menu?.textContent).toContain("링크 복사");
+    expect(menu?.textContent).toContain("메시지 복사");
+
+    const copyLinkItem = Array.from(
+      menu?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [],
+    ).find((item) => item.textContent?.includes("링크 복사"));
+    await act(async () => copyLinkItem?.click());
+    expect(writeText).toHaveBeenCalledWith(
+      expect.stringContaining(
+        `/open/channels/${channel.organizationId}/${channel.id}/message-copy`,
+      ),
+    );
+
+    await act(async () => {
+      trigger?.dispatchEvent(
+        new MouseEvent("pointerdown", { bubbles: true, button: 0 }),
+      );
+    });
+    const reopened = document.body.querySelector('[role="menu"]');
+    const copyMessageItem = Array.from(
+      reopened?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [],
+    ).find((item) => item.textContent?.includes("메시지 복사"));
+    await act(async () => copyMessageItem?.click());
+    expect(writeText).toHaveBeenCalledWith("Copy this note");
   });
 
   it("preserves accepted Skill history when a reaction response is stale", async () => {

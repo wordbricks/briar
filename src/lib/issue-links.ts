@@ -4,6 +4,8 @@ const issueLinkPathPattern =
   /^\/open\/issues\/([0-9a-f-]{36})\/([0-9a-f-]{36})\/?$/iu;
 const sessionLinkPathPattern =
   /^\/open\/sessions\/([0-9a-f-]{36})\/([0-9a-f-]{36})\/?$/iu;
+const channelLinkPathPattern =
+  /^\/open\/channels\/([0-9a-f-]{36})\/([0-9a-f-]{36})\/([0-9a-f-]{36})\/?$/iu;
 const issueDeepLinkScheme = "briar-companion:";
 
 export type IssueLinkTarget = {
@@ -16,9 +18,17 @@ export type SessionLinkTarget = {
   sessionId: string;
 };
 
+export type ChannelLinkTarget = {
+  organizationId: string;
+  channelId: string;
+  messageId: string;
+  rootMessageId: string;
+};
+
 export type BriarLinkTarget =
   | ({ kind: "issue" } & IssueLinkTarget)
-  | ({ kind: "session" } & SessionLinkTarget);
+  | ({ kind: "session" } & SessionLinkTarget)
+  | ({ kind: "channel" } & ChannelLinkTarget);
 
 export type IssueShareResult = "cancelled" | "copied" | "shared";
 
@@ -50,6 +60,29 @@ export function sessionShareUrl(
   url.pathname = `/open/sessions/${encodeURIComponent(projectId)}/${encodeURIComponent(sessionId)}`;
   url.search = "";
   url.hash = "";
+  return url.toString();
+}
+
+export function channelShareUrl(
+  input: {
+    organizationId: string;
+    channelId: string;
+    messageId: string;
+    rootMessageId?: string | null;
+  },
+  origin = configuredShareOrigin(),
+): string {
+  const url = new URL(origin);
+  url.pathname =
+    `/open/channels/${encodeURIComponent(input.organizationId)}` +
+    `/${encodeURIComponent(input.channelId)}` +
+    `/${encodeURIComponent(input.messageId)}`;
+  url.search = "";
+  url.hash = "";
+  const rootMessageId = input.rootMessageId?.trim();
+  if (rootMessageId && rootMessageId !== input.messageId) {
+    url.searchParams.set("root", rootMessageId);
+  }
   return url.toString();
 }
 
@@ -95,11 +128,63 @@ export function parseSessionLink(value: string): SessionLinkTarget | null {
   return null;
 }
 
+function channelLinkFromParts(
+  organizationId: string,
+  channelId: string,
+  messageId: string,
+  rootMessageId?: string | null,
+): ChannelLinkTarget {
+  const root = rootMessageId?.trim();
+  return {
+    organizationId,
+    channelId,
+    messageId,
+    rootMessageId: root || messageId,
+  };
+}
+
+export function parseChannelLink(value: string): ChannelLinkTarget | null {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return null;
+  }
+
+  if (url.protocol === issueDeepLinkScheme && url.hostname === "channels") {
+    const match = `/open/channels${url.pathname}`.match(channelLinkPathPattern);
+    return match
+      ? channelLinkFromParts(
+          match[1],
+          match[2],
+          match[3],
+          url.searchParams.get("root"),
+        )
+      : null;
+  }
+
+  if (url.protocol === "https:" || url.protocol === "http:") {
+    const match = url.pathname.match(channelLinkPathPattern);
+    return match
+      ? channelLinkFromParts(
+          match[1],
+          match[2],
+          match[3],
+          url.searchParams.get("root"),
+        )
+      : null;
+  }
+
+  return null;
+}
+
 export function parseBriarLink(value: string): BriarLinkTarget | null {
   const issue = parseIssueLink(value);
   if (issue) return { kind: "issue", ...issue };
   const session = parseSessionLink(value);
-  return session ? { kind: "session", ...session } : null;
+  if (session) return { kind: "session", ...session };
+  const channel = parseChannelLink(value);
+  return channel ? { kind: "channel", ...channel } : null;
 }
 
 async function copyText(value: string): Promise<void> {
@@ -139,6 +224,19 @@ export async function copySessionShareLink(input: {
   sessionId: string;
 }): Promise<void> {
   await copyText(sessionShareUrl(input.projectId, input.sessionId));
+}
+
+export async function copyChannelShareLink(input: {
+  organizationId: string;
+  channelId: string;
+  messageId: string;
+  rootMessageId?: string | null;
+}): Promise<void> {
+  await copyText(channelShareUrl(input));
+}
+
+export async function copyChannelMessageText(value: string): Promise<void> {
+  await copyText(value);
 }
 
 export async function shareIssueLink(input: {

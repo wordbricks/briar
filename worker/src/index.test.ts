@@ -1920,6 +1920,28 @@ describe("Worker HTTP contract", () => {
     expect(page).toContain("Briar 앱이 설치되어 있어야 합니다.");
   });
 
+  it("serves channel links that open the exact message in the Briar app", async () => {
+    const organizationId = "44444444-4444-4444-8444-444444444444";
+    const channelId = "55555555-5555-4555-8555-555555555555";
+    const messageId = "66666666-6666-4666-8666-666666666666";
+    const rootMessageId = "77777777-7777-4777-8777-777777777777";
+    const response = await worker.fetch(
+      new Request(
+        `https://briar-api.example/open/channels/${organizationId}/${channelId}/${messageId}?root=${rootMessageId}`,
+      ),
+      {} as never,
+    );
+    const page = await response.text();
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Content-Type")).toContain("text/html");
+    expect(page).toContain(
+      `briar-companion://channels/${organizationId}/${channelId}/${messageId}?root=${rootMessageId}`,
+    );
+    expect(page).toContain("Briar에서 메시지를 여는 중입니다");
+    expect(page).toContain("Briar 앱이 설치되어 있어야 합니다.");
+  });
+
   it("publishes the iOS Universal Link association", async () => {
     const response = await worker.fetch(
       new Request(
@@ -1936,6 +1958,7 @@ describe("Worker HTTP contract", () => {
           components: [
             { "/": "/open/issues/*" },
             { "/": "/open/sessions/*" },
+            { "/": "/open/channels/*" },
           ],
         }],
       },

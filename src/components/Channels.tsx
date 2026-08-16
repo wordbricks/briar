@@ -3129,6 +3129,7 @@ const MessageRow = memo(function MessageRow({
           onOpenThread={message.optimistic ? undefined : onOpenThread}
           onReactingChange={setReacting}
           onToggle={onToggleReaction}
+          organizationId={channel.organizationId}
           showHoverActions
         />
 

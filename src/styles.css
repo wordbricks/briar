@@ -6485,7 +6485,8 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .channel-quick-reaction:active { transform: scale(.94); }
 .channel-quick-reaction:disabled { opacity: .55; cursor: wait; }
 .channel-quick-reaction.open-picker,
-.channel-quick-reaction.open-thread {
+.channel-quick-reaction.open-thread,
+.channel-quick-reaction.open-more {
   color: var(--muted-foreground, #777168);
 }
 .channel-message-reactions {
@@ -7032,7 +7033,14 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .conversation-scroll-region > .companion-channel-messages { width:100%; height:100%; }
 .companion-channel-message-button { display: block; width: 100%; border: 0; background: transparent; padding: 0; color: inherit; font: inherit; text-align: left; }
 .companion-channel-message-button:active { background:var(--muted,#f2efe9); }
-.companion-channel-message { min-width: 0; display:grid; grid-template-columns:42px minmax(0,1fr); align-items:start; gap:11px; padding: 11px max(16px,env(safe-area-inset-right)) 11px max(16px,env(safe-area-inset-left)); }
+.companion-channel-message { position: relative; min-width: 0; display:grid; grid-template-columns:42px minmax(0,1fr); align-items:start; gap:11px; padding: 11px max(16px,env(safe-area-inset-right)) 11px max(16px,env(safe-area-inset-left)); }
+.companion-channel-message:hover .channel-message-actions,
+.companion-channel-message:focus-within .channel-message-actions,
+.companion-channel-message.is-reacting .channel-message-actions {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
 .companion-channel-avatar { width:40px; height:40px; overflow:hidden; display:grid; place-items:center; border:1px solid color-mix(in srgb,var(--border,#ddd8cf) 72%,transparent); border-radius:50%; background:var(--muted,#eee9e1); object-fit:cover; }
 .companion-channel-avatar.fallback { color:#fff; background:linear-gradient(145deg,#765bc5,#5943a4); font-size:15px; font-weight:750; }
 .companion-channel-avatar.fallback.agent { color:var(--primary,#5b43aa); background:var(--accent,#eee9ff); }

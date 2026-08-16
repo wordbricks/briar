@@ -1,6 +1,7 @@
 import data from "@emoji-mart/data";
 import Picker from "@emoji-mart/react";
-import { SmilePlus } from "lucide-react";
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
+import { Copy, EllipsisVertical, Link2, SmilePlus } from "lucide-react";
 import {
   useEffect,
   useId,
@@ -10,7 +11,9 @@ import {
   type MouseEvent as ReactMouseEvent,
 } from "react";
 import { createPortal } from "react-dom";
+import { useToast } from "@/components/ui/toast";
 import { useI18n } from "../i18n";
+import { channelBodyWithoutImages } from "./ChannelImages";
 import {
   getChannelEmojiPickerPosition,
   type ChannelEmojiPickerPosition,
@@ -20,10 +23,15 @@ import {
   type ChannelMessage,
   type ChannelMessageReaction,
 } from "../lib/channels-contract";
+import {
+  copyChannelMessageText,
+  copyChannelShareLink,
+} from "../lib/issue-links";
 
 type ChannelMessageReactionsProps = {
   message: ChannelMessage;
   currentUserId: string | null;
+  organizationId?: string;
   busy?: boolean;
   /** Compact mobile layout keeps the add control always visible. */
   alwaysShowAdd?: boolean;
@@ -42,6 +50,7 @@ type EmojiMartSelection = {
 export function ChannelMessageReactions({
   message,
   currentUserId,
+  organizationId,
   busy = false,
   alwaysShowAdd = false,
   showHoverActions = false,
@@ -52,6 +61,7 @@ export function ChannelMessageReactions({
   const { t } = useI18n();
   const pickerId = useId();
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [pickerPosition, setPickerPosition] =
     useState<ChannelEmojiPickerPosition | null>(null);
   const pickerAnchorRef = useRef<HTMLButtonElement | null>(null);
@@ -59,8 +69,8 @@ export function ChannelMessageReactions({
   const hasReactions = message.reactions.length > 0;
 
   useEffect(() => {
-    onReactingChange?.(pickerOpen);
-  }, [onReactingChange, pickerOpen]);
+    onReactingChange?.(pickerOpen || menuOpen);
+  }, [onReactingChange, menuOpen, pickerOpen]);
 
   useEffect(() => {
     if (!pickerOpen) return;
@@ -190,9 +200,13 @@ export function ChannelMessageReactions({
       {showHoverActions ? (
         <ChannelMessageHoverActions
           busy={busy}
+          menuOpen={menuOpen}
+          message={message}
+          onMenuOpenChange={setMenuOpen}
           onOpenPicker={openPicker}
           onOpenThread={onOpenThread}
           onToggle={handleToggle}
+          organizationId={organizationId}
           pickerId={pickerId}
           pickerOpen={pickerOpen}
         />
@@ -247,23 +261,51 @@ export function ChannelMessageReactions({
 
 function ChannelMessageHoverActions({
   busy = false,
+  menuOpen,
+  message,
+  onMenuOpenChange,
   onOpenPicker,
   onOpenThread,
   onToggle,
+  organizationId,
   pickerId,
   pickerOpen,
 }: {
   busy?: boolean;
+  menuOpen: boolean;
+  message: ChannelMessage;
+  onMenuOpenChange: (open: boolean) => void;
   onOpenPicker: (event: ReactMouseEvent<HTMLButtonElement>) => void;
   onOpenThread?: () => void;
   onToggle: (emoji: string) => void;
+  organizationId?: string;
   pickerId: string;
   pickerOpen: boolean;
 }) {
   const { t } = useI18n();
+  const { toast } = useToast();
+  const canCopyLink = Boolean(organizationId) && !message.optimistic;
 
   const stop = (event: ReactMouseEvent) => {
     event.stopPropagation();
+  };
+
+  const copyLink = () => {
+    if (!organizationId) return;
+    void copyChannelShareLink({
+      organizationId,
+      channelId: message.channelId,
+      messageId: message.id,
+      rootMessageId: message.parentMessageId ?? message.id,
+    })
+      .then(() => toast(t("channel.linkCopied"), { tone: "success" }))
+      .catch(() => toast(t("channel.copyFailed"), { tone: "error" }));
+  };
+
+  const copyMessage = () => {
+    void copyChannelMessageText(channelMessageCopyText(message))
+      .then(() => toast(t("channel.messageCopied"), { tone: "success" }))
+      .catch(() => toast(t("channel.copyFailed"), { tone: "error" }));
   };
 
   return (
@@ -311,8 +353,48 @@ function ChannelMessageHoverActions({
           <span aria-hidden="true">↩</span>
         </button>
       ) : null}
+      <DropdownMenu.Root onOpenChange={onMenuOpenChange} open={menuOpen}>
+        <DropdownMenu.Trigger asChild>
+          <button
+            aria-label={t("channel.moreActions")}
+            className="channel-quick-reaction open-more"
+            disabled={busy}
+            title={t("channel.moreActions")}
+            type="button"
+          >
+            <EllipsisVertical aria-hidden="true" size={16} />
+          </button>
+        </DropdownMenu.Trigger>
+        <DropdownMenu.Portal>
+          <DropdownMenu.Content
+            align="end"
+            className="run-page-actions-menu"
+            sideOffset={6}
+          >
+            <DropdownMenu.Item
+              className="run-page-actions-item"
+              disabled={!canCopyLink}
+              onSelect={copyLink}
+            >
+              <Link2 size={14} />
+              {t("channel.copyLink")}
+            </DropdownMenu.Item>
+            <DropdownMenu.Item
+              className="run-page-actions-item"
+              onSelect={copyMessage}
+            >
+              <Copy size={14} />
+              {t("channel.copyMessage")}
+            </DropdownMenu.Item>
+          </DropdownMenu.Content>
+        </DropdownMenu.Portal>
+      </DropdownMenu.Root>
     </div>
   );
+}
+
+function channelMessageCopyText(message: ChannelMessage): string {
+  return channelBodyWithoutImages(message.body) || message.body.trim();
 }
 
 function ReactionChip({
