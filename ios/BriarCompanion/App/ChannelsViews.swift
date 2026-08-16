@@ -463,6 +463,7 @@ private struct ChannelConversationView: View {
                             agents: channels.agents,
                             channel: channel,
                             currentUserID: currentUserID,
+                            isOptimistic: channels.isMessageOptimistic(message.id),
                             members: channels.members,
                             message: message,
                             locale: locale,
@@ -585,6 +586,7 @@ private struct ChannelConversationView: View {
                         channelID: channel.id,
                         parentMessageID: parentMessageID,
                         body: body,
+                        currentUserID: currentUserID,
                         mentions: mentions,
                         attachments: attachments
                     )
@@ -605,6 +607,7 @@ private struct ChannelMessageRow: View {
     let agents: [ChannelAgentSummary]
     let channel: ChannelSummary
     let currentUserID: String?
+    let isOptimistic: Bool
     let members: [ChannelMember]
     let message: ChannelMessage
     let locale: CompanionLocale
@@ -674,6 +677,12 @@ private struct ChannelMessageRow: View {
             timestamp: message.createdAt,
             accessibilityIdentifier: "channel-message-\(message.id.uuidString.lowercased())"
         ) {
+            if isOptimistic {
+                Label(L10n.text("보내는 중", locale: locale), systemImage: "arrow.up.circle")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("channel-message-sending")
+            }
             if let blocks = message.blocks, !blocks.isEmpty {
                 ChannelWebhookBlocksView(blocks: blocks)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -781,15 +790,17 @@ private struct ChannelMessageRow: View {
                     )
                     .padding(.top, 5)
                 }
-                ChannelReactionBar(
-                    currentUserID: currentUserID,
-                    locale: locale,
-                    message: message,
-                    onToggleReaction: onToggleReaction,
-                    quickEmojis: Self.quickReactionEmojis
-                )
-                .padding(.top, 4)
-                if showsThreadSummary {
+                if !isOptimistic {
+                    ChannelReactionBar(
+                        currentUserID: currentUserID,
+                        locale: locale,
+                        message: message,
+                        onToggleReaction: onToggleReaction,
+                        quickEmojis: Self.quickReactionEmojis
+                    )
+                    .padding(.top, 4)
+                }
+                if showsThreadSummary && !isOptimistic {
                     NavigationLink(value: message) {
                         HStack(spacing: 6) {
                             Image(systemName: "bubble.left")

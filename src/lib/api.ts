@@ -1846,6 +1846,7 @@ export async function sendChannelMessage(
   channelId: string,
   input: {
     body: string;
+    clientMessageId?: string;
     parentMessageId?: string | null;
     mentionedUserIds?: string[];
     mentionedAgentIds?: string[];
@@ -1854,10 +1855,14 @@ export async function sendChannelMessage(
     attachmentReferences?: string[];
   },
 ) {
+  const clientMessageId = input.clientMessageId?.toLowerCase();
   let body: BodyInit;
   if (input.attachments?.length) {
     const form = new FormData();
     form.set("body", input.body);
+    if (clientMessageId) {
+      form.set("clientMessageId", clientMessageId);
+    }
     form.set("parentMessageId", input.parentMessageId ?? "");
     form.set("mentionedUserIds", JSON.stringify(input.mentionedUserIds ?? []));
     form.set("mentionedAgentIds", JSON.stringify(input.mentionedAgentIds ?? []));
@@ -1878,7 +1883,7 @@ export async function sendChannelMessage(
       attachmentReferences: _attachmentReferences,
       ...jsonInput
     } = input;
-    body = JSON.stringify(jsonInput);
+    body = JSON.stringify({ ...jsonInput, clientMessageId });
   }
   return request<{
     message: ChannelMessage;
@@ -2496,6 +2501,7 @@ export async function createIssueMessage(
   runId: string,
   input: {
     body: string;
+    clientMessageId?: string;
     parentMessageId: string | null;
     mentionedUserIds?: string[];
     agentConversationId?: string | null;
@@ -2504,6 +2510,7 @@ export async function createIssueMessage(
   },
 ) {
   const attachments = input.attachments ?? [];
+  const clientMessageId = input.clientMessageId?.toLowerCase();
   const parentMessageId = input.parentMessageId?.toLowerCase() ?? null;
   let body: BodyInit;
   if (attachments.length > 0) {
@@ -2511,6 +2518,9 @@ export async function createIssueMessage(
     if (attachmentError) throw new Error(attachmentError);
     const form = new FormData();
     form.set("body", input.body);
+    if (clientMessageId) {
+      form.set("clientMessageId", clientMessageId);
+    }
     form.set("parentMessageId", parentMessageId ?? "");
     form.set("mentionedUserIds", JSON.stringify(input.mentionedUserIds ?? []));
     form.set("agentConversationId", input.agentConversationId ?? "");
@@ -2528,7 +2538,7 @@ export async function createIssueMessage(
       attachmentReferences: _attachmentReferences,
       ...message
     } = input;
-    body = JSON.stringify({ ...message, parentMessageId });
+    body = JSON.stringify({ ...message, clientMessageId, parentMessageId });
   }
   const result = await request<{
     message: IssueMessage;

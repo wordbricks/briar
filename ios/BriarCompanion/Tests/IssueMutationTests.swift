@@ -142,8 +142,10 @@ final class IssueMutationTests: XCTestCase {
 
     func testCreateIssueMessageRequestEncodesCanonicalParentMessageID() throws {
         let parentMessageID = UUID(uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!
+        let clientMessageID = UUID(uuidString: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")!
         let request = CreateIssueMessageRequest(
             body: "답글",
+            clientMessageId: clientMessageID,
             parentMessageId: parentMessageID,
             mentionedUserIds: [],
             agentConversationId: nil
@@ -155,6 +157,10 @@ final class IssueMutationTests: XCTestCase {
             ) as? [String: Any]
         )
 
+        XCTAssertEqual(
+            object["clientMessageId"] as? String,
+            clientMessageID.uuidString.lowercased()
+        )
         XCTAssertEqual(
             object["parentMessageId"] as? String,
             parentMessageID.uuidString.lowercased()

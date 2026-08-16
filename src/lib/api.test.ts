@@ -1076,8 +1076,10 @@ describe("API errors", () => {
 
   it("canonicalizes parent message IDs in JSON replies", async () => {
     const parentMessageId = "AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA";
+    const clientMessageId = "CCCCCCCC-CCCC-4CCC-8CCC-CCCCCCCCCCCC";
     const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
       expect(JSON.parse(String(init?.body))).toMatchObject({
+        clientMessageId: clientMessageId.toLowerCase(),
         parentMessageId: parentMessageId.toLowerCase(),
       });
       return new Response(
@@ -1101,6 +1103,7 @@ describe("API errors", () => {
 
     await createIssueMessage("token", "project-1", "11111111-1111-4111-8111-111111111111", {
       body: "답글",
+      clientMessageId,
       parentMessageId,
     });
 
@@ -1111,12 +1114,14 @@ describe("API errors", () => {
     const projectId = "22222222-2222-4222-8222-222222222222";
     const runId = "11111111-1111-4111-8111-111111111111";
     const reference = crypto.randomUUID();
+    const clientMessageId = crypto.randomUUID();
     const image = new File(["image"], "clipboard.png", { type: "image/png" });
     const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
       const form = init?.body as FormData;
       expect(form).toBeInstanceOf(FormData);
       expect(form.get("body")).toContain(`briar-attachment://${reference}`);
       expect(form.get("attachmentReferences")).toBe(JSON.stringify([reference]));
+      expect(form.get("clientMessageId")).toBe(clientMessageId);
       expect(form.getAll("attachments")).toEqual([image]);
       return new Response(
         JSON.stringify({
@@ -1140,6 +1145,7 @@ describe("API errors", () => {
 
     await createIssueMessage("token", projectId, runId, {
       body: `스크린샷\n\n![clipboard.png](briar-attachment://${reference})`,
+      clientMessageId,
       parentMessageId: "AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA",
       attachments: [image],
       attachmentReferences: [reference],
@@ -2325,9 +2331,11 @@ describe("channel message API", () => {
 
   it("keeps attachment-only fields out of JSON channel messages", async () => {
     const preferredDeviceId = "c0000000-0000-4000-8000-000000000123";
+    const clientMessageId = "d0000000-0000-4000-8000-000000000123";
     const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
       expect(JSON.parse(String(init?.body))).toEqual({
         body: "Hello",
+        clientMessageId,
         parentMessageId: null,
         mentionedUserIds: [],
         mentionedAgentIds: [],
@@ -2342,6 +2350,7 @@ describe("channel message API", () => {
 
     await sendChannelMessage("token", "org-1", "channel-1", {
       body: "Hello",
+      clientMessageId,
       parentMessageId: null,
       mentionedUserIds: [],
       mentionedAgentIds: [],
@@ -2355,12 +2364,14 @@ describe("channel message API", () => {
 
   it("uploads channel images and attachment references as multipart form data", async () => {
     const reference = crypto.randomUUID();
+    const clientMessageId = crypto.randomUUID();
     const preferredDeviceId = "c0000000-0000-4000-8000-000000000123";
     const image = new File(["image"], "clipboard.png", { type: "image/png" });
     const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
       const form = init?.body as FormData;
       expect(form).toBeInstanceOf(FormData);
       expect(form.get("body")).toContain(`briar-attachment://${reference}`);
+      expect(form.get("clientMessageId")).toBe(clientMessageId);
       expect(form.get("mentionedAgentIds")).toBe(JSON.stringify(["agent-1"]));
       expect(form.get("preferredDeviceId")).toBe(preferredDeviceId);
       expect(form.get("attachmentReferences")).toBe(JSON.stringify([reference]));
@@ -2397,6 +2408,7 @@ describe("channel message API", () => {
 
     await sendChannelMessage("token", "org-1", "channel-1", {
       body: `Screenshot\n\n![clipboard.png](briar-attachment://${reference})`,
+      clientMessageId,
       parentMessageId: null,
       mentionedUserIds: [],
       mentionedAgentIds: ["agent-1"],

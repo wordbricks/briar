@@ -1893,6 +1893,7 @@ button.paused-review-state { width:100%; border:0; border-radius:8px; cursor:poi
 .issue-message-group + .issue-message-group { margin-top:6px; padding-top:6px; border-top:1px solid var(--border); }
 .issue-message { min-width:0; max-width:100%; position:relative; padding:6px 10px; display:grid; grid-template-columns:34px minmax(0,1fr); align-items:start; gap:10px; border-radius:10px; transition:background-color .12s ease-out; }
 .issue-message:hover { background:var(--muted); }
+.issue-message.is-optimistic { background:color-mix(in srgb,var(--muted) 58%,transparent); }
 .issue-message-avatar { width:34px; height:34px; overflow:hidden; display:grid; place-items:center; border:1px solid rgba(83,72,118,.1); border-radius:9px; color:#fff; background:linear-gradient(145deg,#8068ce,#5943a4); object-fit:cover; font-size:var(--text-sm); font-weight:700; }
 .issue-message-avatar.agent { color:var(--accent-foreground); border-color:var(--border); background:var(--accent); }
 .conversation-reply-summary { --conversation-reply-avatar-size:22px; width:max-content; max-width:100%; min-height:28px; margin-top:6px; padding:2px 5px; display:inline-flex; align-items:center; gap:6px; border:0; border-radius:8px; color:var(--primary); background:transparent; font:inherit; font-size:var(--text-2xs); line-height:1.3; text-align:left; }
@@ -1911,6 +1912,7 @@ button.conversation-reply-summary:focus-visible { outline:2px solid var(--ring);
 .issue-message > div > header { min-width:0; min-height:19px; display:flex; align-items:baseline; gap:7px; }
 .issue-message > div > header strong { min-width:0; overflow:hidden; color:var(--foreground); font-size:var(--text-xs); text-overflow:ellipsis; white-space:nowrap; }
 .issue-message > div > header time { flex:0 0 auto; color:var(--muted-foreground); font:500 var(--text-2xs) "DM Mono",monospace; }
+.conversation-message-sending { display:inline-flex; align-items:center; gap:4px; color:var(--muted-foreground); font-size:var(--text-2xs); font-weight:600; }
 .issue-message-body { min-width:0; max-width:100%; margin:2px 0 0; color:var(--foreground); font-size:var(--text-xs); line-height:1.65; overflow-wrap:anywhere; -webkit-user-select:text; user-select:text; -webkit-touch-callout:default; }
 .issue-message-body > :first-child { margin-top:0; }
 .issue-message-body > :last-child { margin-bottom:0; }
@@ -6568,6 +6570,8 @@ button.issue-message-state { width:100%; cursor:pointer; }
   line-height: 1.55;
 }
 .channel-message:hover { background: color-mix(in srgb, var(--muted, #f7f4ef) 70%, transparent); }
+.channel-message.is-optimistic,
+.companion-channel-message.is-optimistic { background:color-mix(in srgb,var(--muted,#f7f4ef) 58%,transparent); }
 .channel-message-avatar {
   width: 40px;
   height: 40px;

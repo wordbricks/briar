@@ -4775,6 +4775,10 @@
             "type": "string",
             "minLength": 1
           },
+          "clientMessageId": {
+            "type": "string",
+            "format": "uuid"
+          },
           "parentMessageId": {
             "type": [
               "string",

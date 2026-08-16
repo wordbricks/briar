@@ -458,7 +458,7 @@ struct IssueMessage: Codable, Equatable, Identifiable, Sendable {
     let body: String
     let attachments: [IssueAttachment]?
     let author: Author
-    let replyCount: Int
+    var replyCount: Int
     var proposedAction: IssueProposedAction? = nil
     /// Kept separate so an accepted create proposal and its pending execution
     /// follow-up can be rendered together without collapsing either approval.

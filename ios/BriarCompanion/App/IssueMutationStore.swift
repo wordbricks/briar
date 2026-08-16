@@ -403,9 +403,11 @@ final class IssueMutationStore: ObservableObject {
     func sendMessage(
         runID: UUID,
         body: String,
+        clientMessageID: UUID? = nil,
         parentMessageID: UUID?,
         mentionedUserIds: [String] = [],
         attachments: [PendingIssueAttachment] = [],
+        attachmentReferences: [String]? = nil,
         pollInterval: Duration = .seconds(2),
         maximumPolls: Int = 150
     ) async throws -> [IssueMessage] {
@@ -434,6 +436,7 @@ final class IssueMutationStore: ObservableObject {
                     token: token,
                     body: CreateIssueMessageRequest(
                         body: trimmed,
+                        clientMessageId: clientMessageID,
                         parentMessageId: parentMessageID,
                         mentionedUserIds: uniqueMentionedUserIds,
                         agentConversationId: nil
@@ -444,12 +447,14 @@ final class IssueMutationStore: ObservableObject {
                 let payload = try AttachmentMessagePayload(
                     body: trimmed,
                     attachments: attachments,
+                    references: attachmentReferences,
                     referenceGenerator: attachmentReference
                 )
                 response = try await api.upload(
                     path,
                     fields: [
                         "body": payload.body,
+                        "clientMessageId": clientMessageID?.uuidString.lowercased() ?? "",
                         "parentMessageId": parentMessageID?.uuidString.lowercased() ?? "",
                         "mentionedUserIds": mentionedUserIdsJSON,
                         "agentConversationId": "",

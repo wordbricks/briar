@@ -833,15 +833,31 @@ struct DependencyResponse: Codable, Sendable {
 
 struct CreateIssueMessageRequest: Codable, Sendable {
     let body: String
+    let clientMessageId: UUID?
     let parentMessageId: UUID?
     let mentionedUserIds: [String]
     let agentConversationId: String?
 
     private enum CodingKeys: String, CodingKey {
         case body
+        case clientMessageId
         case parentMessageId
         case mentionedUserIds
         case agentConversationId
+    }
+
+    init(
+        body: String,
+        clientMessageId: UUID? = nil,
+        parentMessageId: UUID?,
+        mentionedUserIds: [String],
+        agentConversationId: String?
+    ) {
+        self.body = body
+        self.clientMessageId = clientMessageId
+        self.parentMessageId = parentMessageId
+        self.mentionedUserIds = mentionedUserIds
+        self.agentConversationId = agentConversationId
     }
 
     /// The API stores UUID identifiers in lowercase. Foundation's synthesized
@@ -850,6 +866,10 @@ struct CreateIssueMessageRequest: Codable, Sendable {
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(body, forKey: .body)
+        try container.encodeIfPresent(
+            clientMessageId?.uuidString.lowercased(),
+            forKey: .clientMessageId
+        )
         if let parentMessageId {
             try container.encode(
                 parentMessageId.uuidString.lowercased(),

@@ -47,6 +47,21 @@ const message = (
 });
 
 describe("mergeIssueMessages", () => {
+  it("keeps a pending local message until the snapshot includes it", () => {
+    const optimistic = { ...message(null), optimistic: true };
+
+    expect(mergeIssueMessages([optimistic], [])).toEqual([optimistic]);
+  });
+
+  it("replaces a pending local message with the authoritative same-id row", () => {
+    const optimistic = { ...message(null), body: "Sending", optimistic: true };
+    const authoritative = { ...message(null), body: "Sent" };
+
+    expect(mergeIssueMessages([optimistic], [authoritative])).toEqual([
+      authoritative,
+    ]);
+  });
+
   it("does not regress accepted Skill history to a delayed pending snapshot", () => {
     const accepted = skill("skill-1", "accepted");
     expect(mergeIssueMessages(

@@ -168,11 +168,16 @@ struct AttachmentMessagePayload: Sendable {
     init(
         body: String,
         attachments: [PendingIssueAttachment],
+        references providedReferences: [String]? = nil,
         referenceGenerator: @Sendable () -> String = {
             UUID().uuidString.lowercased()
         }
     ) throws {
-        references = attachments.map { _ in referenceGenerator() }
+        let generatedReferences = providedReferences ?? attachments.map { _ in referenceGenerator() }
+        guard generatedReferences.count == attachments.count else {
+            throw PhotoAttachmentImportError.unreadable
+        }
+        references = generatedReferences
         let markdown = zip(attachments, references).map { attachment, reference in
             Self.markdown(reference: reference, filename: attachment.filename)
         }.joined(separator: "\n\n")

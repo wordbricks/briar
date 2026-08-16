@@ -78,4 +78,29 @@ final class AttachmentPipelineTests: XCTestCase {
         XCTAssertEqual(payload.files.map(\.contentType), ["image/png"])
         XCTAssertEqual(payload.files.first?.data, attachment.data)
     }
+
+    func testMessagePayloadReusesProvidedReferencesForOptimisticPreview() throws {
+        let attachments = [
+            PendingIssueAttachment(
+                filename: "first.png",
+                contentType: "image/png",
+                data: Data([1])
+            ),
+            PendingIssueAttachment(
+                filename: "second.png",
+                contentType: "image/png",
+                data: Data([2])
+            ),
+        ]
+
+        let payload = try AttachmentMessagePayload(
+            body: "screens",
+            attachments: attachments,
+            references: ["first-ref", "second-ref"]
+        )
+
+        XCTAssertEqual(payload.references, ["first-ref", "second-ref"])
+        XCTAssertTrue(payload.body.contains("briar-attachment://first-ref"))
+        XCTAssertTrue(payload.body.contains("briar-attachment://second-ref"))
+    }
 }

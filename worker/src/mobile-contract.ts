@@ -640,6 +640,7 @@ export const mobileChannelMessagesResponseSchema = z.object({
 
 export const mobileCreateChannelMessageRequestSchema = z.object({
   body: z.string().min(1),
+  clientMessageId: z.uuid().optional(),
   parentMessageId: z.uuid().nullable().default(null),
   mentionedUserIds: z.array(z.string()).default([]),
   mentionedAgentIds: z.array(z.uuid()).default([]),
@@ -890,6 +891,7 @@ export const mobileIssueExecutionApprovalResponseSchema = z.object({
 export const mobileIssueMessageSchema = mobileIssueMessagesResponseSchema.shape.messages.element;
 export const mobileCreateMessageRequestSchema = z.object({
   body: z.string().trim().min(1).max(10_000),
+  clientMessageId: z.uuid().optional(),
   parentMessageId: z.uuid().nullable(),
   mentionedUserIds: z.array(z.string()),
   agentConversationId: z.string().nullable(),

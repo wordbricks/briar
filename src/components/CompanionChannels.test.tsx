@@ -2182,16 +2182,89 @@ describe("CompanionChannels", () => {
       await Promise.resolve();
     });
 
-    expect(sendChannelMessage).toHaveBeenCalledWith("token", "org-1", "c-common", {
-      body: "답글",
-      parentMessageId: "m-1",
-      mentionedAgentIds: [],
-      mentionedUserIds: [],
-      attachments: [],
-      attachmentReferences: [],
-    });
+    expect(sendChannelMessage).toHaveBeenCalledWith(
+      "token",
+      "org-1",
+      "c-common",
+      expect.objectContaining({
+        body: "답글",
+        clientMessageId: expect.any(String),
+        parentMessageId: "m-1",
+        mentionedAgentIds: [],
+        mentionedUserIds: [],
+        attachments: [],
+        attachmentReferences: [],
+      }),
+    );
     expect(container.textContent).toContain("답글");
     expect(scrollIntoView).toHaveBeenCalledWith({ block: "end" });
+  });
+
+  it("shows a sent message immediately and reconciles the same row", async () => {
+    const pending = deferred<{
+      message: ChannelMessage;
+      agentReplies: [];
+    }>();
+    loadChannel.mockResolvedValue({
+      channel: channel("c-common", "Welcome", null),
+      members: [],
+      agents: [],
+      messages: [],
+    });
+    sendChannelMessage.mockReturnValue(pending.promise);
+    await render();
+
+    await act(async () => {
+      [
+        ...container.querySelectorAll<HTMLButtonElement>(
+          ".companion-channel-group button",
+        ),
+      ]
+        .find((button) => button.textContent?.includes("Welcome"))!
+        .click();
+      await Promise.resolve();
+    });
+
+    const input = container.querySelector<HTMLInputElement>(
+      ".companion-channel-composer input",
+    )!;
+    Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      "value",
+    )!.set!.call(input, "바로 보이는 메시지");
+    await act(async () => {
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      container
+        .querySelector("form.companion-channel-composer")!
+        .dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+      await Promise.resolve();
+    });
+
+    const optimistic = container.querySelector<HTMLElement>(
+      ".companion-channel-message.is-optimistic",
+    );
+    expect(optimistic?.textContent).toContain("바로 보이는 메시지");
+    expect(optimistic?.querySelector(".conversation-message-sending"))
+      .not.toBeNull();
+    const request = sendChannelMessage.mock.calls[0]?.[3] as {
+      clientMessageId: string;
+    };
+    expect(request.clientMessageId).toEqual(expect.any(String));
+
+    await act(async () => {
+      pending.resolve({
+        message: message(request.clientMessageId, "바로 보이는 메시지"),
+        agentReplies: [],
+      });
+      await pending.promise;
+    });
+
+    expect(container.querySelector(".companion-channel-message.is-optimistic"))
+      .toBeNull();
+    expect(
+      [...container.querySelectorAll(".companion-channel-message")]
+        .filter((row) => row.textContent?.includes("바로 보이는 메시지")),
+    ).toHaveLength(1);
   });
 
   it("opens @ candidates and sends a picked Agent as a structured mention", async () => {
@@ -2269,14 +2342,20 @@ describe("CompanionChannels", () => {
         .dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
     });
 
-    expect(sendChannelMessage).toHaveBeenCalledWith("token", "org-1", "c-common", {
-      body: "@Honey 확인해 줘",
-      parentMessageId: null,
-      mentionedAgentIds: ["agent-1"],
-      mentionedUserIds: [],
-      attachments: [],
-      attachmentReferences: [],
-    });
+    expect(sendChannelMessage).toHaveBeenCalledWith(
+      "token",
+      "org-1",
+      "c-common",
+      expect.objectContaining({
+        body: "@Honey 확인해 줘",
+        clientMessageId: expect.any(String),
+        parentMessageId: null,
+        mentionedAgentIds: ["agent-1"],
+        mentionedUserIds: [],
+        attachments: [],
+        attachmentReferences: [],
+      }),
+    );
   });
 
   it("attaches a pasted image and sends an image-only message", async () => {

@@ -146,6 +146,7 @@ final class ChannelsStore: ObservableObject {
     @Published private(set) var loadingEarlierMessages = false
     @Published private(set) var loading = false
     @Published private(set) var sending = false
+    @Published private(set) var optimisticMessageIDs: Set<UUID> = []
     @Published private(set) var acceptingProposalID: UUID?
     @Published private(set) var approvingExecutionProposalID: UUID?
     @Published private(set) var preparingExecutionProposalID: UUID?
@@ -237,6 +238,7 @@ final class ChannelsStore: ObservableObject {
         channels = []
         messages = []
         thread = []
+        optimisticMessageIDs = []
         members = []
         agents = []
         agentReplies = []
@@ -364,7 +366,10 @@ final class ChannelsStore: ObservableObject {
                 forMessageIDs: previousMessageIDs.subtracting(Set(response.messages.map(\.id)))
             )
             recordProposalMessages(response.messages)
-            messages = response.messages
+            messages = mergeAuthoritativeSnapshot(
+                current: messages,
+                incoming: response.messages
+            )
             nextMessageCursor = response.nextCursor
             hasEarlierMessages = nextMessageCursor != nil
             members = response.members
@@ -599,8 +604,11 @@ final class ChannelsStore: ObservableObject {
                 )
             )
             recordProposalMessages(response.messages)
-            thread = response.messages
-            cachedThreads[cacheKey] = response.messages
+            thread = mergeAuthoritativeSnapshot(
+                current: thread,
+                incoming: response.messages
+            )
+            cachedThreads[cacheKey] = thread
             errorMessage = nil
         } catch {
             guard
@@ -708,11 +716,16 @@ final class ChannelsStore: ObservableObject {
 
     var viewingChannelID: UUID? { focusedChannelID }
 
+    func isMessageOptimistic(_ messageID: UUID) -> Bool {
+        optimisticMessageIDs.contains(messageID)
+    }
+
     /// A nil `parentMessageID` posts to the channel; otherwise into that thread.
     func send(
         channelID: UUID,
         parentMessageID: UUID?,
         body: String,
+        currentUserID: String? = nil,
         mentions: [ChannelMentionTarget],
         attachments: [PendingIssueAttachment] = []
     ) async {
@@ -726,6 +739,49 @@ final class ChannelsStore: ObservableObject {
         guard attachments.allSatisfy({ $0.contentType.hasPrefix("image/") }) else {
             errorMessage = L10n.text("채널에는 이미지만 첨부할 수 있습니다.")
             return
+        }
+        let clientMessageID = UUID()
+        let attachmentReferences = attachments.map { _ in attachmentReference() }
+        let payload = attachments.isEmpty
+            ? nil
+            : try? AttachmentMessagePayload(
+                body: trimmed,
+                attachments: attachments,
+                references: attachmentReferences,
+                referenceGenerator: attachmentReference
+            )
+        let optimisticBody = payload?.body ?? trimmed
+        let currentMember = members.first { $0.userId == currentUserID }
+        let optimistic = ChannelMessage(
+            id: clientMessageID,
+            channelId: channelID,
+            parentMessageId: parentMessageID,
+            body: optimisticBody,
+            author: ChannelMessage.Author(
+                type: .user,
+                name: currentMember?.name ?? L10n.text("나"),
+                image: currentMember?.image,
+                provider: nil
+            ),
+            mentionedUserIds: mentions.compactMap {
+                $0.kind == .user ? $0.recipientId : nil
+            },
+            mentionedAgentIds: mentions.compactMap {
+                $0.kind == .agent ? UUID(uuidString: $0.recipientId) : nil
+            },
+            replyCount: 0,
+            lastReplyAt: nil,
+            document: nil,
+            proposal: nil,
+            createdAt: Date()
+        )
+        optimisticMessageIDs.insert(clientMessageID)
+        if parentMessageID == nil {
+            messages = Self.mergeMessages(messages, updates: [optimistic], removing: [])
+            cacheFocusedConversation()
+        } else {
+            thread = Self.mergeMessages(thread, updates: [optimistic], removing: [])
+            cacheFocusedThread()
         }
         sending = true
         defer { sending = false }
@@ -748,6 +804,7 @@ final class ChannelsStore: ObservableObject {
                     token: token,
                     body: CreateChannelMessageRequest(
                         body: trimmed,
+                        clientMessageId: clientMessageID,
                         parentMessageId: parentMessageID,
                         mentionedUserIds: mentionedUserIds,
                         mentionedAgentIds: mentionedAgentIds
@@ -755,15 +812,12 @@ final class ChannelsStore: ObservableObject {
                     as: CreateChannelMessageResponse.self
                 )
             } else {
-                let payload = try AttachmentMessagePayload(
-                    body: trimmed,
-                    attachments: attachments,
-                    referenceGenerator: attachmentReference
-                )
+                guard let payload else { throw MobileAPIError.invalidRequest }
                 response = try await api.upload(
                     path,
                     fields: [
                         "body": payload.body,
+                        "clientMessageId": clientMessageID.uuidString.lowercased(),
                         "parentMessageId": parentMessageID?.uuidString.lowercased() ?? "",
                         "mentionedUserIds": String(
                             data: try JSONEncoder().encode(mentionedUserIds),
@@ -783,13 +837,21 @@ final class ChannelsStore: ObservableObject {
                 )
             }
             if parentMessageID == nil {
-                messages.append(response.message)
+                messages = Self.mergeMessages(messages, updates: [response.message], removing: [])
+                cacheFocusedConversation()
             } else {
-                thread.append(response.message)
+                thread = Self.mergeMessages(thread, updates: [response.message], removing: [])
                 cacheFocusedThread()
             }
+            optimisticMessageIDs.remove(clientMessageID)
             errorMessage = nil
         } catch {
+            if optimisticMessageIDs.remove(clientMessageID) != nil {
+                messages.removeAll { $0.id == clientMessageID }
+                thread.removeAll { $0.id == clientMessageID }
+                cacheFocusedConversation()
+                cacheFocusedThread()
+            }
             errorMessage = CompanionStore.message(for: error)
         }
     }
@@ -1673,6 +1735,7 @@ final class ChannelsStore: ObservableObject {
         invalidateExecutionProposals(forMessageIDs: removedMessageIDs)
         recordProposalMessages(stabilizedMessages)
         let relevant = stabilizedMessages.filter { $0.channelId == focusedChannelID }
+        optimisticMessageIDs.subtract(relevant.map(\.id))
         messages = Self.mergeMessages(
             messages,
             updates: relevant.filter { $0.parentMessageId == nil },
@@ -1730,6 +1793,18 @@ final class ChannelsStore: ObservableObject {
             members: members,
             agents: agents
         )
+    }
+
+    private func mergeAuthoritativeSnapshot(
+        current: [ChannelMessage],
+        incoming: [ChannelMessage]
+    ) -> [ChannelMessage] {
+        let incomingIDs = Set(incoming.map(\.id))
+        let pending = current.filter {
+            optimisticMessageIDs.contains($0.id) && !incomingIDs.contains($0.id)
+        }
+        optimisticMessageIDs.subtract(incomingIDs)
+        return Self.mergeMessages(incoming, updates: pending, removing: [])
     }
 
     private func cacheFocusedThread() {

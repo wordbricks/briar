@@ -983,6 +983,7 @@ export function App() {
     runId: string,
     input: {
       body: string;
+      clientMessageId?: string;
       parentMessageId: string | null;
       mentionedUserIds?: string[];
     },

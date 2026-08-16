@@ -58,7 +58,7 @@ export function mergeChannelMessageSnapshot(
     current,
     incoming,
     current
-      .filter((message) => !incomingIds.has(message.id))
+      .filter((message) => !message.optimistic && !incomingIds.has(message.id))
       .map((message) => message.id),
   );
 }
