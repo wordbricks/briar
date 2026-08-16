@@ -181,7 +181,10 @@ final class BriarCompanionUITests: XCTestCase {
         XCTAssertTrue(channel.waitForExistence(timeout: 5))
         channel.tap()
 
-        let newestMessage = app.staticTexts["가변 높이 채널 메시지 20입니다."]
+        let newestMessage = element(
+            withLabel: "가변 높이 채널 메시지 20입니다.",
+            in: app
+        )
         XCTAssertTrue(newestMessage.waitForExistence(timeout: 5))
         captureScreenshot(named: "companion-channel-history-initial-position")
         let windowFrame = app.windows.firstMatch.frame
@@ -190,9 +193,10 @@ final class BriarCompanionUITests: XCTestCase {
             "메시지가 많은 채널도 스크롤 없이 최신 메시지를 화면에 표시해야 합니다. " +
                 "message=\(newestMessage.frame), window=\(windowFrame)"
         )
-        let earlierMessage = app.staticTexts[
-            "초기 진입에서 자동으로 불러오면 안 되는 이전 메시지입니다."
-        ]
+        let earlierMessage = element(
+            withLabel: "초기 진입에서 자동으로 불러오면 안 되는 이전 메시지입니다.",
+            in: app
+        )
         XCTAssertFalse(
             earlierMessage.waitForExistence(timeout: 1),
             "화면 상단에 도달하기 전에는 이전 메시지 페이지를 불러오면 안 됩니다."
@@ -296,7 +300,8 @@ final class BriarCompanionUITests: XCTestCase {
             resultTab.waitForExistence(timeout: 5) && resultTab.isSelected,
             "완료된 이슈는 결과 탭이 먼저 보여야 합니다."
         )
-        XCTAssertTrue(app.staticTexts["공유 계약이 검증되었습니다."].waitForExistence(timeout: 5))
+        XCTAssertTrue(element(withLabel: "공유 계약이 검증되었습니다.", in: app)
+            .waitForExistence(timeout: 5))
         captureScreenshot(named: "companion-completed-result-tab")
     }
 
@@ -525,7 +530,7 @@ final class BriarCompanionUITests: XCTestCase {
         XCTAssertTrue(send.exists)
         XCTAssertFalse(send.isEnabled, "전송 중에는 중복 제출을 막아야 합니다.")
         captureScreenshot(named: "companion-message-draft-cleared")
-        XCTAssertTrue(app.staticTexts[sentBody].waitForExistence(timeout: 5))
+        XCTAssertTrue(element(withLabel: sentBody, in: app).waitForExistence(timeout: 5))
         captureScreenshot(named: "companion-native-write-flow")
     }
 
@@ -540,6 +545,12 @@ final class BriarCompanionUITests: XCTestCase {
         XCTAssertTrue(app.buttons["project-menu"].waitForExistence(timeout: transitionTimeout))
         XCTAssertTrue(app.navigationBars["Tasks"].waitForExistence(timeout: transitionTimeout))
         return app
+    }
+
+    private func element(withLabel label: String, in app: XCUIApplication) -> XCUIElement {
+        app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label == %@", label))
+            .firstMatch
     }
 
     private func performAccessibilityAudit(
