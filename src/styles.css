@@ -1865,6 +1865,11 @@ button.paused-review-state { width:100%; border:0; border-radius:8px; cursor:poi
 .issue-activity-history .timeline-event strong em { margin-left:5px; padding:2px 5px; border-radius:999px; background:var(--secondary); color:var(--muted-foreground); font:500 var(--text-2xs) "DM Mono",monospace; }
 .issue-activity-empty { margin:46px 0; color:var(--muted-foreground); font-size:var(--text-xs); text-align:center; }
 .issue-conversation { width:100%; min-width:0; min-height:0; height:100%; display:flex; flex-direction:column; overflow:hidden; border-left:1px solid var(--border); background:var(--card); }
+.conversation-scroll-region { position:relative; min-width:0; min-height:0; flex:1; }
+.issue-conversation > .conversation-scroll-region { margin:0 8px; }
+.conversation-scroll-to-bottom { position:absolute; z-index:3; right:50%; bottom:12px; width:40px; height:40px; display:grid; place-items:center; transform:translateX(50%); border:1px solid color-mix(in srgb,var(--border) 72%,white); border-radius:50%; color:var(--foreground); background:color-mix(in srgb,var(--card) 88%,transparent); box-shadow:0 6px 18px rgba(22,20,28,.16); cursor:pointer; backdrop-filter:blur(18px) saturate(150%); -webkit-backdrop-filter:blur(18px) saturate(150%); }
+.conversation-scroll-to-bottom:hover { background:var(--card); }
+.conversation-scroll-to-bottom:focus-visible { outline:2px solid var(--ring); outline-offset:2px; }
 .issue-conversation-tab-panel { width:100%; min-width:0; min-height:0; height:100%; }
 .issue-conversation-tab-panel[hidden] { display:none; }
 .run-page-layout.is-conversation-tabbed .issue-conversation-tab-panel .issue-conversation { border:1px solid var(--border); border-radius:12px; }
@@ -1881,6 +1886,7 @@ button.paused-review-state { width:100%; border:0; border-radius:8px; cursor:poi
 .issue-subscribe-button:disabled { cursor:not-allowed; opacity:.62; }
 .issue-subscribe-button:focus-visible { outline:2px solid var(--ring); outline-offset:2px; }
 .issue-message-list { min-width:0; min-height:0; flex:1; margin:0 8px; display:grid; align-content:start; overflow-x:hidden; overflow-y:auto; overscroll-behavior:contain; scrollbar-gutter:stable; scrollbar-width:thin; }
+.conversation-scroll-region > .issue-message-list { width:100%; height:100%; margin:0; }
 .issue-message-list::before,.issue-message-list::after { content:""; height:10px; }
 .issue-message-list::after { height:12px; }
 .issue-message-group { min-width:0; max-width:100%; }
@@ -5075,8 +5081,8 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .companion-shell .issue-status-history-panel { max-height:520px; }
 .companion-shell .run-evidence-panel { max-height:520px; }
 .companion-shell .run-evidence-item > footer { align-items:flex-start; flex-direction:column; gap:4px; }
-.companion-shell .issue-conversation-tab-panel { min-height:420px; }
-.companion-shell .issue-conversation { min-height:420px; border:1px solid var(--border); border-radius:14px; }
+.companion-shell .issue-conversation-tab-panel { height:min(560px,calc(100dvh - 160px)); min-height:420px; }
+.companion-shell .issue-conversation { height:100%; min-height:0; border:1px solid var(--border); border-radius:14px; }
 .companion-shell .run-properties-layer { position:static; }
 .companion-shell .run-properties { width:100%; height:auto; position:static; overflow:visible; gap:24px; padding:0 0 26px; border:1px solid var(--border); border-radius:14px; box-shadow:none; }
 .companion-shell .run-properties-header,.companion-shell .run-properties section { padding-right:16px; padding-left:16px; }
@@ -6989,6 +6995,7 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .companion-channel-bar-identity small { overflow:hidden; color:var(--muted-foreground,#777168); font-size:13px; line-height:1.25; text-overflow:ellipsis; white-space:nowrap; }
 
 .companion-channel-messages { display: flex; min-height: 0; flex: 1; flex-direction: column; overflow-y:auto; overscroll-behavior:contain; padding: 8px 0 14px; }
+.conversation-scroll-region > .companion-channel-messages { width:100%; height:100%; }
 .companion-channel-message-button { display: block; width: 100%; border: 0; background: transparent; padding: 0; color: inherit; font: inherit; text-align: left; }
 .companion-channel-message-button:active { background:var(--muted,#f2efe9); }
 .companion-channel-message { min-width: 0; display:grid; grid-template-columns:42px minmax(0,1fr); align-items:start; gap:11px; padding: 11px max(16px,env(safe-area-inset-right)) 11px max(16px,env(safe-area-inset-left)); }
@@ -7105,12 +7112,14 @@ button.issue-message-state { width:100%; cursor:pointer; }
 @media (prefers-reduced-transparency: reduce) {
   .companion-channel-bar-back,
   .companion-channel-bar-identity,
-  .companion-channel-composer { background:var(--card,#fff); backdrop-filter:none; -webkit-backdrop-filter:none; }
+  .companion-channel-composer,
+  .conversation-scroll-to-bottom { background:var(--card,#fff); backdrop-filter:none; -webkit-backdrop-filter:none; }
 }
 @media (prefers-contrast: more) {
   .companion-channel-bar-back,
   .companion-channel-bar-identity,
-  .companion-channel-composer { border-color:var(--foreground,#1c1915); }
+  .companion-channel-composer,
+  .conversation-scroll-to-bottom { border-color:var(--foreground,#1c1915); }
 }
 .companion-channel-mention-menu { position:absolute; right:0; bottom:calc(100% + 8px); left:0; z-index:4; max-height:min(310px,48vh); margin:0; overflow-y:auto; border:1px solid var(--border,#d6d1c8); border-radius:16px; background:var(--card,#fff); padding:6px; list-style:none; box-shadow:0 16px 38px rgba(22,20,28,.18); }
 .companion-channel-mention-menu button { display:flex; width:100%; min-height:48px; align-items:center; gap:10px; border:0; border-radius:11px; background:transparent; padding:6px 8px; color:inherit; font:inherit; text-align:left; }

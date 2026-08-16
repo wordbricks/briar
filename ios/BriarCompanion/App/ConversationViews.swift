@@ -30,6 +30,27 @@ enum ConversationDatePresentation {
     }
 }
 
+enum ConversationScrollPresentation {
+    static let bottomThreshold: CGFloat = 80
+
+    static func isAwayFromBottom(
+        bottomMaxY: CGFloat,
+        viewportHeight: CGFloat
+    ) -> Bool {
+        bottomMaxY - viewportHeight > bottomThreshold
+    }
+}
+
+private struct ConversationBottomMaxYPreferenceKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
+    }
+}
+
+private let conversationBottomAnchorID = "conversation-timeline-bottom-anchor"
+
 /// Shared, bottom-anchored timeline used by channel and issue conversations.
 /// It owns date dividers and scroll behavior while each surface supplies its
 /// message-specific actions and proposal cards.
@@ -46,6 +67,8 @@ where Message.ID: Hashable {
     let row: (Message) -> RowContent
     @State private var requestedEarlierMessages = false
     @State private var eagerInitialPositionReady = false
+    @State private var showsScrollToBottom = false
+    @Namespace private var scrollCoordinateSpace
 
     init(
         messages: [Message],
@@ -73,31 +96,67 @@ where Message.ID: Hashable {
 
     var body: some View {
         ScrollViewReader { proxy in
-            ScrollView {
-                messageStack
-                .padding(.bottom, 8)
-            }
-            .defaultScrollAnchor(.bottom)
-            .scrollDismissesKeyboard(.interactively)
-            .onChange(of: messages.last?.id, initial: true) { previous, current in
-                guard let current else { return }
-                if measuresMessageHeightsEagerly, !eagerInitialPositionReady {
-                    Task { @MainActor in
-                        await Task.yield()
-                        proxy.scrollTo(current, anchor: .bottom)
-                        await Task.yield()
-                        eagerInitialPositionReady = true
+            GeometryReader { viewport in
+                ScrollView {
+                    messageStack
+                        .padding(.bottom, 8)
+                }
+                .coordinateSpace(name: scrollCoordinateSpace)
+                .defaultScrollAnchor(.bottom)
+                .scrollDismissesKeyboard(.interactively)
+                .onPreferenceChange(ConversationBottomMaxYPreferenceKey.self) { bottomMaxY in
+                    showsScrollToBottom = ConversationScrollPresentation.isAwayFromBottom(
+                        bottomMaxY: bottomMaxY,
+                        viewportHeight: viewport.size.height
+                    )
+                }
+                .onChange(of: messages.last?.id, initial: true) { previous, current in
+                    guard let current else { return }
+                    if measuresMessageHeightsEagerly, !eagerInitialPositionReady {
+                        Task { @MainActor in
+                            await Task.yield()
+                            proxy.scrollTo(current, anchor: .bottom)
+                            await Task.yield()
+                            eagerInitialPositionReady = true
+                        }
+                        return
                     }
-                    return
+                    guard previous != current else { return }
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        proxy.scrollTo(current, anchor: .bottom)
+                    }
                 }
-                guard previous != current else { return }
-                withAnimation(.easeOut(duration: 0.2)) {
-                    proxy.scrollTo(current, anchor: .bottom)
+                .onChange(of: messages.first?.id) { previous, current in
+                    guard let previous, previous != current else { return }
+                    proxy.scrollTo(previous, anchor: .top)
                 }
-            }
-            .onChange(of: messages.first?.id) { previous, current in
-                guard let previous, previous != current else { return }
-                proxy.scrollTo(previous, anchor: .top)
+                .overlay(alignment: .bottom) {
+                    if showsScrollToBottom {
+                        Button {
+                            showsScrollToBottom = false
+                            withAnimation(.easeOut(duration: 0.2)) {
+                                proxy.scrollTo(conversationBottomAnchorID, anchor: .bottom)
+                            }
+                        } label: {
+                            Image(systemName: "arrow.down")
+                                .font(.body.weight(.bold))
+                                .frame(width: 40, height: 40)
+                                .background(.regularMaterial, in: Circle())
+                                .overlay {
+                                    Circle()
+                                        .stroke(Color.primary.opacity(0.1), lineWidth: 0.5)
+                                }
+                                .shadow(color: .black.opacity(0.14), radius: 10, y: 4)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(
+                            L10n.text("최신 메시지로 이동", locale: locale)
+                        )
+                        .accessibilityIdentifier("conversation-scroll-to-bottom")
+                        .padding(.bottom, 12)
+                        .transition(.scale.combined(with: .opacity))
+                    }
+                }
             }
         }
         .accessibilityIdentifier(accessibilityIdentifier)
@@ -112,13 +171,31 @@ where Message.ID: Hashable {
             VStack(spacing: 0) {
                 earlierMessagesBoundary
                 messageRows
+                bottomAnchor
             }
         } else {
             LazyVStack(spacing: 0) {
                 earlierMessagesBoundary
                 messageRows
+                bottomAnchor
             }
         }
+    }
+
+    private var bottomAnchor: some View {
+        Color.clear
+            .frame(height: 1)
+            .id(conversationBottomAnchorID)
+            .background {
+                GeometryReader { geometry in
+                    Color.clear.preference(
+                        key: ConversationBottomMaxYPreferenceKey.self,
+                        value: geometry.frame(
+                            in: .named(scrollCoordinateSpace)
+                        ).maxY
+                    )
+                }
+            }
     }
 
     @ViewBuilder
