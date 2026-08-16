@@ -23,6 +23,16 @@ export const changelogCopy = {
     backTop: "맨 위로 ↑",
     entries: [
       {
+        version: "1.2.128",
+        date: "2026년 8월 16일",
+        title: "보낸 메시지를 더 자연스럽게 이어 보여줍니다",
+        summary:
+          "메시지를 보내자마자 대화에 표시하면서도 불필요한 전송 상태 문구 없이 실제 대화처럼 자연스럽게 읽히도록 다듬었습니다.",
+        items: [
+          "채널·이슈·Companion 대화에서 낙관적으로 표시되는 내 메시지의 ‘전송 중’ 문구를 제거하고, 서버 확인 전후에도 작성자·시간·내용의 배치가 흔들리지 않게 유지합니다.",
+        ],
+      },
+      {
         version: "1.2.127",
         date: "2026년 8월 16일",
         title: "실시간 대화와 전송 경험을 더 즉각적으로 연결합니다",
@@ -660,6 +670,16 @@ export const changelogCopy = {
     home: "Home",
     backTop: "Back to top ↑",
     entries: [
+      {
+        version: "1.2.128",
+        date: "August 16, 2026",
+        title: "Keep sent messages flowing naturally",
+        summary:
+          "Messages still appear immediately after sending, now without a transient status label interrupting the conversation.",
+        items: [
+          "Remove the sending label from optimistic messages in channel, issue, and Companion conversations while keeping the author, timestamp, and content layout stable before and after server confirmation.",
+        ],
+      },
       {
         version: "1.2.127",
         date: "August 16, 2026",
@@ -1310,9 +1330,9 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <h1>{changelog.title}</h1>
           <p>{changelog.description}</p>
         </div>
-        <a href="#v1-2-127" className="changelog-current">
+        <a href="#v1-2-128" className="changelog-current">
           <span>{changelog.current}</span>
-          <strong>v1.2.127</strong>
+          <strong>v1.2.128</strong>
           <i aria-hidden="true">↓</i>
         </a>
       </section>
@@ -1337,11 +1357,13 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   {index === 0 ? <span>{changelog.latest}</span> : null}
                   <time
                     dateTime={
+                      entry.version === "1.2.128" ||
                       entry.version === "1.2.127" ||
                       entry.version === "1.2.126" ||
                       entry.version === "1.2.125" ||
                       entry.version === "1.2.124"
-                        ? entry.version === "1.2.127"
+                        ? entry.version === "1.2.128" ||
+                          entry.version === "1.2.127"
                           ? "2026-08-16"
                           : "2026-08-15"
                         : entry.version === "1.2.123" ||
