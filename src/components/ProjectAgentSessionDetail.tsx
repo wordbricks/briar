@@ -34,6 +34,15 @@ import { copySessionShareLink } from "../lib/issue-links";
 import { formatIssueKey } from "../lib/issue-key";
 import { loadProjectAgentSession } from "../lib/api";
 
+export function sessionWorkerLabel(
+  session: Pick<AutoHuntSession, "workerId" | "requestedWorkerId">,
+  workers: ReadonlyArray<{ id: string; label: string }>,
+) {
+  const workerId = session.workerId ?? session.requestedWorkerId;
+  if (!workerId) return null;
+  return workers.find((worker) => worker.id === workerId)?.label ?? workerId;
+}
+
 export function ProjectAgentSessionDetail({
   isSidebarOpen,
   issueKeyPrefix,
@@ -43,6 +52,7 @@ export function ProjectAgentSessionDetail({
   onStop,
   session: sessionSummary,
   token = null,
+  workers = [],
 }: {
   isSidebarOpen: boolean;
   issueKeyPrefix?: string;
@@ -52,6 +62,7 @@ export function ProjectAgentSessionDetail({
   onStop: () => Promise<boolean>;
   session: AutoHuntSession;
   token?: string | null;
+  workers?: ReadonlyArray<{ id: string; label: string }>;
 }) {
   const { localeTag, t } = useI18n();
   const [loadedSession, setLoadedSession] = useState<AutoHuntSession | null>(null);
@@ -91,6 +102,7 @@ export function ProjectAgentSessionDetail({
       loadedSession.updatedAt === sessionSummary.updatedAt
       ? loadedSession
       : sessionSummary;
+  const workerLabel = sessionWorkerLabel(session, workers);
   const isRemoteSession = session.localOwner === false;
   const appServerEvents = useAutoHuntAppServerEvents(
     !isRemoteSession && session.sessionType === "task" ? session.id : null,
@@ -515,11 +527,13 @@ export function ProjectAgentSessionDetail({
                       )}
                     </dd>
                   </div>
-                  {session.requestedWorkerId || session.workerId ? (
+                  {workerLabel ? (
                     <div>
                       <dt>실행 Worker</dt>
-                      <dd title={session.workerId ?? session.requestedWorkerId ?? undefined}>
-                        {session.workerId ?? session.requestedWorkerId}
+                      <dd
+                        title={session.workerId ?? session.requestedWorkerId ?? undefined}
+                      >
+                        {workerLabel}
                       </dd>
                     </div>
                   ) : null}

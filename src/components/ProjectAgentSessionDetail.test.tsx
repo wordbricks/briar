@@ -6,7 +6,10 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
 import { useAutoHuntAppServerEvents } from "../hooks/useAutoHuntAppServerEvents";
 import { useProjectAgentWorkerEvents } from "../hooks/useProjectAgentWorkerEvents";
-import { ProjectAgentSessionDetail } from "./ProjectAgentSessionDetail";
+import {
+  ProjectAgentSessionDetail,
+  sessionWorkerLabel,
+} from "./ProjectAgentSessionDetail";
 import { ToastProvider } from "./ui/toast";
 
 vi.mock("../hooks/useAutoHuntAppServerEvents", () => ({
@@ -63,6 +66,7 @@ async function mount(
   onIssueOpen: (runId: string) => void = vi.fn(),
   issueKeyPrefix?: string,
   onFollowUp?: (message: string) => Promise<void>,
+  workers: Array<{ id: string; label: string }> = [],
 ) {
   const container = document.createElement("div");
   document.body.append(container);
@@ -79,6 +83,7 @@ async function mount(
           onFollowUp={onFollowUp}
           onStop={vi.fn().mockResolvedValue(true)}
           session={session}
+          workers={workers}
         />
       </ToastProvider>,
     );
@@ -371,5 +376,43 @@ describe("ProjectAgentSessionDetail", () => {
     expect(container.textContent).toContain("워커가 수정과 검증을 완료했습니다.");
     expect(container.textContent).toContain("Codex");
     expect(container.textContent).not.toContain("최종 메시지");
+  });
+
+  it("shows the assigned worker name instead of the worker id", async () => {
+    const workerId = "94ba9871-ec10-4752-9e7b-de876b587214";
+    const workers = [
+      { id: workerId, label: "Studio Mac" },
+      { id: "worker-requested", label: "Laptop Mac" },
+    ];
+
+    expect(sessionWorkerLabel({
+      workerId,
+      requestedWorkerId: "worker-requested",
+    }, workers)).toBe("Studio Mac");
+    expect(sessionWorkerLabel({
+      workerId: null,
+      requestedWorkerId: "worker-requested",
+    }, workers)).toBe("Laptop Mac");
+    expect(sessionWorkerLabel({
+      workerId: "missing-worker",
+      requestedWorkerId: null,
+    }, workers)).toBe("missing-worker");
+    expect(sessionWorkerLabel({
+      workerId: null,
+      requestedWorkerId: null,
+    }, workers)).toBeNull();
+
+    const container = await mount({
+      ...session,
+      workerId,
+      requestedWorkerId: "worker-requested",
+    }, vi.fn(), undefined, undefined, workers);
+    const workerRow = Array.from(container.querySelectorAll("div")).find((row) =>
+      row.querySelector("dt")?.textContent === "실행 Worker"
+    );
+
+    expect(workerRow?.querySelector("dd")?.textContent).toBe("Studio Mac");
+    expect(workerRow?.querySelector("dd")?.getAttribute("title")).toBe(workerId);
+    expect(container.textContent).not.toContain(workerId);
   });
 });
