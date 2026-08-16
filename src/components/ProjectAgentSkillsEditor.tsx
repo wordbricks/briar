@@ -9,14 +9,13 @@ import { useI18n } from "../i18n";
 import {
   agentEffortOptions,
   agentModelOptions,
-  agentProviderLabels,
-  agentProviders,
   type AgentProvider,
   type ModelEffort,
 } from "../lib/project-llm";
 import { useAgentProviderModels } from "../hooks/useAgentProviderModels";
 import type { ProjectAgentSkillInput } from "../types";
 import { NativeSelect } from "./NativeSelect";
+import { ProviderSelect } from "./ProviderSelect";
 
 function positioned(skills: ProjectAgentSkillInput[]) {
   return skills.map((skill, position) => ({ ...skill, position }));
@@ -228,7 +227,7 @@ export function ProjectAgentSkillsEditor({
                   <div className="project-agent-skill-runtime-grid">
                     <div className="project-agent-settings-field">
                       <Label>{t("agents.provider")}</Label>
-                      <NativeSelect
+                      <ProviderSelect
                         disabled={disabled}
                         label={`${accessibleSkillName} · ${t("agents.provider")}`}
                         onValueChange={(value) =>
@@ -238,10 +237,6 @@ export function ProjectAgentSkillsEditor({
                             effort: null,
                           })
                         }
-                        options={agentProviders.map((provider) => ({
-                          label: agentProviderLabels[provider],
-                          value: provider,
-                        }))}
                         value={skill.provider}
                       />
                     </div>

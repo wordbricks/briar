@@ -88,6 +88,7 @@ import {
 import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { NativeSelect } from "./NativeSelect";
+import { ProviderSelect } from "./ProviderSelect";
 import { SelectMenu } from "./SelectMenu";
 import { AgentProviderIcon } from "./AgentIcons";
 import { AgentWorkLog } from "./AgentWorkLog";
@@ -2970,21 +2971,16 @@ export function CreateIssueDialog({
               ]}
               value={priority}
             />
-            <NativeSelect
+            <ProviderSelect
               className="issue-provider-select"
+              emptyOption={{ label: t("issue.agentDefault"), value: "" }}
               label={t("issue.preferredProvider")}
               onValueChange={(value) => {
                 setPreferredProvider(value);
                 if (preferredModel) setPreferredModel("");
                 setPreferredEffort("high");
               }}
-              options={[
-                { label: t("issue.agentDefault"), value: "" },
-                ...availableProviders.map((provider) => ({
-                  label: agentProviderLabels[provider],
-                  value: provider,
-                })),
-              ]}
+              providers={availableProviders}
               value={preferredProvider}
             />
             <NativeSelect
@@ -3979,7 +3975,10 @@ function IssueContextMenu({
                           <Check aria-hidden="true" size={14} />
                         ) : null}
                       </ContextMenu.ItemIndicator>
-                      <span>{agentProviderLabels[provider]}</span>
+                      <span>
+                        <AgentProviderIcon provider={provider} size={14} />
+                        {agentProviderLabels[provider]}
+                      </span>
                     </ContextMenu.RadioItem>
                   ))}
                   {availableProviders.length === 0 ? (
@@ -6595,9 +6594,13 @@ export function RunPage({
                       <Waypoints size={15} />
                     </span>
                     <span className="run-property-copy">
-                      <SelectMenu
+                      <ProviderSelect
                         align="end"
                         disabled={isUpdatingIssue}
+                        emptyOption={{
+                          label: t("issue.agentDefault"),
+                          value: "",
+                        }}
                         label={t("issue.preferredProvider")}
                         onValueChange={(value) => {
                           void onUpdateIssuePreferences({
@@ -6606,16 +6609,7 @@ export function RunPage({
                             effort: null,
                           }).catch(() => undefined);
                         }}
-                        options={[
-                          {
-                            label: t("issue.agentDefault"),
-                            value: "",
-                          },
-                          ...availableProviders.map((provider) => ({
-                            label: agentProviderLabels[provider],
-                            value: provider,
-                          })),
-                        ]}
+                        providers={availableProviders}
                         size="small"
                         value={run.preferredProvider ?? ""}
                       />

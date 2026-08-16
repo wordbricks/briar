@@ -184,6 +184,46 @@ describe("SelectMenu", () => {
     container.remove();
   });
 
+  it("renders a React leading mark on the trigger and option rows", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <SelectMenu
+          id="leading-select"
+          label="Provider"
+          onValueChange={() => undefined}
+          options={[
+            {
+              label: "Claude",
+              leading: <span data-testid="claude-mark">C</span>,
+              value: "claude",
+            },
+            { label: "Codex", value: "codex" },
+          ]}
+          value="claude"
+        />,
+      );
+    });
+
+    const trigger = container.querySelector<HTMLButtonElement>("#leading-select");
+    expect(trigger?.querySelector("[data-testid='claude-mark']")?.textContent).toBe(
+      "C",
+    );
+
+    await act(async () => trigger?.click());
+    const listbox = document.querySelector("#leading-select-listbox");
+    expect(listbox?.querySelectorAll(".select-menu-option-leading")).toHaveLength(1);
+    expect(
+      listbox?.querySelector("[data-value='claude'] [data-testid='claude-mark']"),
+    ).not.toBeNull();
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
   it("renders the portaled listbox above the trigger's ancestor layer", async () => {
     const container = document.createElement("div");
     container.style.position = "fixed";

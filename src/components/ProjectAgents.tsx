@@ -31,7 +31,6 @@ import {
   agentModelDisplayName,
   agentModelOptions,
   agentProviderLabels,
-  agentProviders,
   type AgentProvider,
   type AgentProviderModelCatalog,
   type ModelEffort,
@@ -62,6 +61,7 @@ import type {
 } from "../types";
 import { AgentProviderIcon } from "./AgentIcons";
 import { NativeSelect } from "./NativeSelect";
+import { ProviderSelect } from "./ProviderSelect";
 import { ProjectAgentAvatar } from "./ProjectAgentAvatar";
 import { ProjectAgentDetail } from "./ProjectAgentDetail";
 import { ProjectAgentSettings } from "./ProjectAgentSettings";
@@ -789,17 +789,13 @@ export function ProjectAgentDialog({
               <span>
                 {t("agents.provider")} <em>{t("common.required")}</em>
               </span>
-              <NativeSelect
+              <ProviderSelect
                 label={t("agents.provider")}
                 onValueChange={(value) => {
                   setProvider(value as AgentProvider);
                   setModel("");
                   setEffort(null);
                 }}
-                options={agentProviders.map((candidate) => ({
-                  label: agentProviderLabels[candidate],
-                  value: candidate,
-                }))}
                 value={provider}
               />
             </label>

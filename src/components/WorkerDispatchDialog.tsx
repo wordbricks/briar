@@ -32,6 +32,7 @@ import type {
   ProjectExecutionWorkerPolicy,
 } from "../types";
 import { NativeSelect } from "./NativeSelect";
+import { ProviderSelect } from "./ProviderSelect";
 import { WorkerIcon } from "./WorkerIcon";
 
 export function WorkerDispatchDialog({
@@ -231,7 +232,7 @@ export function WorkerDispatchDialog({
         <div className="worker-dispatch-form">
           <label>
             <span><Waypoints size={15} />{t("worker.provider")}</span>
-            <NativeSelect
+            <ProviderSelect
               label={t("worker.provider")}
               onValueChange={(value) => {
                 selectionDirtyRef.current = true;
@@ -239,17 +240,7 @@ export function WorkerDispatchDialog({
                 setModel("");
                 setEffort("");
               }}
-              options={healthyProviders.map((candidate) => ({
-                label:
-                  candidate === "codex"
-                    ? "Codex"
-                    : candidate === "claude"
-                      ? "Claude"
-                      : candidate === "grok"
-                        ? "Grok"
-                        : "OpenCode",
-                value: candidate,
-              }))}
+              providers={healthyProviders}
               value={provider}
             />
           </label>

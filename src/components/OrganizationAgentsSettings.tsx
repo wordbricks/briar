@@ -39,6 +39,7 @@ import {
 } from "../lib/agent-provider-contract";
 import { AgentProviderIcon } from "./AgentIcons";
 import { NativeSelect } from "./NativeSelect";
+import { ProviderSelect } from "./ProviderSelect";
 import {
   ProjectAgentSkillsEditor,
   projectAgentSkillInputs,
@@ -534,17 +535,14 @@ function OrganizationAgentCreateDialog({
           <div className="grid gap-4 md:grid-cols-3">
             <div className="grid gap-2">
               <Label>{t("agents.provider")}</Label>
-              <NativeSelect
+              <ProviderSelect
                 label={t("agents.provider")}
                 onValueChange={(value) => {
                   setProvider(value as ChannelAgentProvider);
                   setModel("");
                   setEffort(null);
                 }}
-                options={providers.map((candidate) => ({
-                  label: agentProviderLabels[candidate],
-                  value: candidate,
-                }))}
+                providers={providers}
                 value={provider}
               />
             </div>
