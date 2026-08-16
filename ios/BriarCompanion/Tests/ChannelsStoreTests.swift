@@ -80,6 +80,72 @@ final class ChannelsStoreTests: XCTestCase {
     }
 
     @MainActor
+    func testSendPublishesOptimisticMessageBeforeTheRequestCompletes() async throws {
+        let channel = summary(id: channelID, name: "Briar")
+        let listPath = MobileAPIContract.Endpoint.channels(organizationID: organizationID)
+        let detailPath = MobileAPIContract.Endpoint.channel(
+            organizationID: organizationID,
+            channelID: channelID,
+            messageLimit: ChannelsStore.messagePageSize
+        )
+        let sendPath = MobileAPIContract.Endpoint.channelMessages(
+            organizationID: organizationID,
+            channelID: channelID
+        )
+        let api = ChannelPollingAPI(
+            routes: [
+                listPath: [try encoded(ChannelsResponse(channels: [channel], cursor: 10))],
+                detailPath: [try encoded(ChannelDetailResponse(
+                    channel: channel,
+                    members: [],
+                    agents: [],
+                    messages: []
+                ))],
+                sendPath: [try encoded(CreateChannelMessageResponse(message: message(
+                    id: replyID,
+                    channelID: channelID,
+                    body: "바로 보이는 메시지"
+                )))],
+            ],
+            delays: [sendPath: .seconds(30)]
+        )
+        let store = ChannelsStore(api: api, pollInterval: .seconds(3_600))
+        store.select(organizationID: organizationID, token: "token")
+        await waitForChannels(store, count: 1)
+        await store.openChannel(channelID)
+
+        let sendTask = Task {
+            await store.send(
+                channelID: channelID,
+                parentMessageID: nil,
+                body: "바로 보이는 메시지",
+                currentUserID: "user-1",
+                mentions: []
+            )
+        }
+        await waitForRequests(api, path: sendPath, count: 1)
+
+        let optimistic = try XCTUnwrap(store.messages.first)
+        XCTAssertEqual(optimistic.body, "바로 보이는 메시지")
+        XCTAssertTrue(store.isMessageOptimistic(optimistic.id))
+        let recordedRequestData = await api.lastJSONBody(for: sendPath)
+        let requestData = try XCTUnwrap(recordedRequestData)
+        let request = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: requestData) as? [String: Any]
+        )
+        XCTAssertEqual(
+            request["clientMessageId"] as? String,
+            optimistic.id.uuidString.lowercased()
+        )
+
+        sendTask.cancel()
+        await sendTask.value
+        XCTAssertTrue(store.messages.isEmpty)
+        XCTAssertFalse(store.isMessageOptimistic(optimistic.id))
+        store.applicationDidEnterBackground()
+    }
+
+    @MainActor
     func testLoadsTwentyNewestMessagesThenPrependsAnEarlierPage() async throws {
         let channel = summary(id: channelID, name: "Briar")
         let cursor = UUID(uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!

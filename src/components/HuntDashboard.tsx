@@ -643,6 +643,7 @@ export function HuntDashboard({
     runId: string,
     input: {
       body: string;
+      clientMessageId?: string;
       parentMessageId: string | null;
       mentionedUserIds?: string[];
       attachments?: File[];
@@ -4425,6 +4426,7 @@ export function RunPage({
   onRemoveDependency?: (prerequisiteRunId: string) => Promise<unknown>;
   onSendIssueMessage: (input: {
     body: string;
+    clientMessageId?: string;
     parentMessageId: string | null;
     mentionedUserIds?: string[];
     attachments?: File[];
@@ -8171,6 +8173,7 @@ function IssueConversation({
   onLoad: () => Promise<IssueMessage[]>;
   onSend: (input: {
     body: string;
+    clientMessageId?: string;
     parentMessageId: string | null;
     mentionedUserIds?: string[];
     attachments?: File[];
@@ -8682,15 +8685,67 @@ function IssueConversation({
           message,
         ];
       });
-    const result = await onSend({
-      body,
+    const clientMessageId = crypto.randomUUID();
+    const createdAt = new Date().toISOString();
+    const currentMember = mentionMembers.find(
+      (member) => member.userId === currentUserId,
+    );
+    const previewUrls = attachments.map((attachment) =>
+      URL.createObjectURL(attachment)
+    );
+    appendMessage({
+      id: clientMessageId,
+      runId: run.id,
       parentMessageId,
-      mentionedUserIds,
-      ...(attachments.length > 0
-        ? { attachments, attachmentReferences }
-        : {}),
+      body,
+      attachments: attachments.map((attachment, index) => ({
+        id: attachmentReferences[index] ?? crypto.randomUUID(),
+        filename: attachment.name,
+        contentType: attachment.type,
+        byteSize: attachment.size,
+        url: previewUrls[index] ?? "",
+      })),
+      author: {
+        id: currentUserId,
+        name: currentMember?.name ?? t("channel.you"),
+        image: currentMember?.image ?? null,
+        provider: null,
+      },
+      replyCount: 0,
+      optimistic: true,
+      createdAt,
+      updatedAt: createdAt,
     });
-    appendMessage(result.message);
+    let result: IssueMessageSendResult;
+    try {
+      result = await onSend({
+        body,
+        clientMessageId,
+        parentMessageId,
+        mentionedUserIds,
+        ...(attachments.length > 0
+          ? { attachments, attachmentReferences }
+          : {}),
+      });
+      appendMessage(result.message);
+    } catch (caught) {
+      setMessages((current) => {
+        const pending = current.find(
+          (message) => message.id === clientMessageId && message.optimistic,
+        );
+        if (!pending) return current;
+        return current
+          .filter((message) => message.id !== clientMessageId)
+          .map((message) =>
+            message.id === parentMessageId
+              ? { ...message, replyCount: Math.max(0, message.replyCount - 1) }
+              : message
+          );
+      });
+      throw caught;
+    } finally {
+      for (const url of previewUrls) URL.revokeObjectURL(url);
+    }
     if (result.agentReplyJob) {
       trackAgentReply(result.agentReplyJob, result.message);
     }
@@ -9038,14 +9093,16 @@ function IssueConversation({
                       ) ?? null
                     : run}
                   executionWorkers={executionWorkers}
-                  onDelete={() => void deleteMessage(message.id)}
-                  onEdit={() =>
+                  onDelete={message.optimistic
+                    ? undefined
+                    : () => void deleteMessage(message.id)}
+                  onEdit={message.optimistic ? undefined : () =>
                     setActiveEditMessageId((current) =>
                       current === message.id ? null : message.id,
                     )
                   }
                   onLoadAttachment={onLoadAttachment}
-                  onReply={() =>
+                  onReply={message.optimistic ? undefined : () =>
                     setActiveReplyMessageId((current) =>
                       current === message.id ? null : message.id,
                     )
@@ -9267,7 +9324,7 @@ function IssueMessageItem({
       ? t("run.issueCreateProposalAccept")
       : t("run.reworkProposalAccept");
   return (
-    <article className="issue-message">
+    <article className={`issue-message${message.optimistic ? " is-optimistic" : ""}`}>
       <MessageAvatar message={message} />
       <div>
         <header>
@@ -9275,6 +9332,12 @@ function IssueMessageItem({
           <time dateTime={message.createdAt}>
             {formatDate(message.createdAt, localeTag)}
           </time>
+          {message.optimistic ? (
+            <span className="conversation-message-sending" role="status">
+              <LoaderCircle aria-hidden="true" className="spin" size={12} />
+              {t("run.sendingMessage")}
+            </span>
+          ) : null}
         </header>
         {parentMessage ? (
           <blockquote className="issue-message-parent-quote">
@@ -10007,11 +10070,15 @@ function IssueMarkdownImage({
   const attachment = reference
     ? attachments.find((candidate) => candidate.id === reference) ?? null
     : null;
+  const localSource = attachment?.url.startsWith("blob:")
+    ? attachment.url
+    : null;
   const loadImage = useMemo(() => {
-    if (!reference || !attachment) return null;
+    if (!reference || !attachment || localSource) return null;
     return () => onLoadAttachment(attachment);
-  }, [attachment?.url, onLoadAttachment, reference]);
-  const { failed, source } = useObjectUrl(loadImage);
+  }, [attachment?.url, localSource, onLoadAttachment, reference]);
+  const { failed, source: loadedSource } = useObjectUrl(loadImage);
+  const source = localSource ?? loadedSource;
 
   if (!reference) {
     return src ? <ImageLightbox alt={alt} source={src} /> : null;

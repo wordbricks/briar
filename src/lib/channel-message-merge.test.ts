@@ -4,7 +4,10 @@ import type {
   ChannelMessage,
 } from "./channels-contract";
 import type { AgentSkillExecutionProposal } from "../types";
-import { mergeChannelMessages } from "./channel-message-merge";
+import {
+  mergeChannelMessages,
+  mergeChannelMessageSnapshot,
+} from "./channel-message-merge";
 
 const execution = (
   id: string,
@@ -81,6 +84,21 @@ const skillExecution = (
 });
 
 describe("mergeChannelMessages", () => {
+  it("keeps a pending local message until the snapshot includes it", () => {
+    const optimistic = { ...message(null), optimistic: true };
+
+    expect(mergeChannelMessageSnapshot([optimistic], [])).toEqual([optimistic]);
+  });
+
+  it("replaces a pending local message with the authoritative same-id row", () => {
+    const optimistic = { ...message(null), body: "Sending", optimistic: true };
+    const authoritative = { ...message(null), body: "Sent" };
+
+    expect(mergeChannelMessageSnapshot([optimistic], [authoritative])).toEqual([
+      authoritative,
+    ]);
+  });
+
   it("keeps accepted UI over a delayed pending snapshot of the same proposal", () => {
     const accepted = execution("execution-1", "accepted");
     expect(mergeChannelMessages(

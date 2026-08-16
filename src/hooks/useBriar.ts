@@ -2826,6 +2826,7 @@ export function useBriar(options: UseBriarOptions = {}) {
       runId: string,
       input: {
         body: string;
+        clientMessageId?: string;
         parentMessageId: string | null;
         mentionedUserIds?: string[];
         attachments?: File[];
@@ -2855,7 +2856,7 @@ export function useBriar(options: UseBriarOptions = {}) {
       if (demoMode) {
         const createdAt = new Date().toISOString();
         const message = cacheMessage({
-          id: crypto.randomUUID(),
+          id: input.clientMessageId ?? crypto.randomUUID(),
           runId,
           parentMessageId: input.parentMessageId,
           body,
@@ -2885,6 +2886,7 @@ export function useBriar(options: UseBriarOptions = {}) {
         runId,
         {
           body,
+          clientMessageId: input.clientMessageId,
           parentMessageId: input.parentMessageId,
           mentionedUserIds: input.mentionedUserIds,
           attachments: input.attachments,

@@ -29,6 +29,8 @@ final class CompanionReadTests: XCTestCase {
             "The title is too long. Shorten it to 80 characters or fewer (currently 92)."
         )
         XCTAssertEqual(L10n.text("계정 메뉴", locale: .en), "Account menu")
+        XCTAssertEqual(L10n.text("보내는 중", locale: .en), "Sending")
+        XCTAssertEqual(L10n.text("보내는 중", locale: .zh), "发送中")
     }
 
     func testIssueCreateApprovalExplainsBacklogBoundaryInEveryLocale() {
@@ -574,6 +576,63 @@ final class CompanionReadTests: XCTestCase {
         XCTAssertNil(store.messages.first?.skillExecutionProposal)
     }
 
+    @MainActor
+    func testRunDetailKeepsOptimisticMessageUntilSameIDBecomesAuthoritative() async {
+        let parent = issueMessage(body: "Parent")
+        let pendingID = UUID(uuidString: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")!
+        let pending = issueMessage(
+            id: pendingID,
+            parentMessageId: parent.id,
+            body: "바로 보이는 답글"
+        )
+        let api = RunDetailSnapshotAPI(messageSnapshots: [
+            IssueMessagesResponse(messages: [parent]),
+        ])
+        let store = RunDetailStore(
+            api: api,
+            projectID: executionProposal().projectId,
+            runID: parent.runId,
+            token: "token"
+        )
+        store.appendMessages([parent])
+        store.appendOptimisticMessage(pending)
+
+        XCTAssertTrue(store.isMessageOptimistic(pendingID))
+        XCTAssertEqual(store.messages.first(where: { $0.id == parent.id })?.replyCount, 1)
+        await store.load()
+        XCTAssertTrue(store.messages.contains { $0.id == pendingID })
+        XCTAssertTrue(store.isMessageOptimistic(pendingID))
+
+        store.appendMessages([pending])
+
+        XCTAssertFalse(store.isMessageOptimistic(pendingID))
+        XCTAssertEqual(store.messages.filter { $0.id == pendingID }.count, 1)
+    }
+
+    @MainActor
+    func testRunDetailRollsBackOnlyPendingOptimisticMessage() {
+        let parent = issueMessage(body: "Parent")
+        let pending = issueMessage(
+            id: UUID(uuidString: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")!,
+            parentMessageId: parent.id,
+            body: "실패할 답글"
+        )
+        let store = RunDetailStore(
+            api: RunDetailSnapshotAPI(messageSnapshots: []),
+            projectID: executionProposal().projectId,
+            runID: parent.runId,
+            token: "token"
+        )
+        store.appendMessages([parent])
+        store.appendOptimisticMessage(pending)
+
+        store.removeOptimisticMessage(pending.id)
+        store.removeOptimisticMessage(pending.id)
+
+        XCTAssertFalse(store.messages.contains { $0.id == pending.id })
+        XCTAssertEqual(store.messages.first(where: { $0.id == parent.id })?.replyCount, 0)
+    }
+
     private func executionProposal(
         status: IssueExecutionProposal.Status = .pending
     ) -> IssueExecutionProposal {
@@ -621,15 +680,18 @@ final class CompanionReadTests: XCTestCase {
     }
 
     private func issueMessage(
+        id: UUID = UUID(uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!,
+        parentMessageId: UUID? = nil,
+        body: String = "Execution proposal",
         proposedAction: IssueProposedAction? = nil,
         executionProposal: IssueExecutionProposal? = nil,
         skillExecutionProposal: AgentSkillExecutionProposal? = nil
     ) -> IssueMessage {
         IssueMessage(
-            id: UUID(uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!,
+            id: id,
             runId: UUID(uuidString: "33333333-3333-4333-8333-333333333333")!,
-            parentMessageId: nil,
-            body: "Execution proposal",
+            parentMessageId: parentMessageId,
+            body: body,
             attachments: [],
             author: .init(id: nil, name: "Bumble", image: nil, provider: "codex"),
             replyCount: 0,

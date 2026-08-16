@@ -317,6 +317,7 @@ const canonicalUuidSchema = z
 export const channelMessageInputSchema = z
   .object({
     body: channelMessageBodySchema,
+    clientMessageId: canonicalUuidSchema.optional(),
     parentMessageId: canonicalUuidSchema.nullable().default(null),
     mentionedUserIds: z.array(z.string().min(1).max(64)).max(20).default([]),
     mentionedAgentIds: z.array(canonicalUuidSchema).max(8).default([]),
@@ -588,6 +589,8 @@ export type ChannelMessage = {
   proposal: ChannelMessageProposal | null;
   executionProposal: ChannelExecutionProposal | null;
   skillExecutionProposal?: ChannelSkillExecutionProposal | null;
+  /** Client-only state while a newly sent message awaits its server response. */
+  optimistic?: boolean;
   createdAt: string;
 };
 

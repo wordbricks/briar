@@ -406,6 +406,7 @@ final class RunDetailStore: ObservableObject {
 
     @Published private(set) var events: [RunEvent] = []
     @Published private(set) var messages: [IssueMessage] = []
+    @Published private(set) var optimisticMessageIDs: Set<UUID> = []
     @Published private(set) var evidence: [RunEvidence] = []
     @Published private(set) var loading = false
     @Published private(set) var errorMessage: String?
@@ -476,7 +477,16 @@ final class RunDetailStore: ObservableObject {
                     in: loaded.1.messages
                 )
                 reconcileExecutionProposals(stabilizedMessages, authoritative: true)
-                messages = stabilizedMessages
+                let incomingIDs = Set(stabilizedMessages.map(\.id))
+                let pending = messages.filter {
+                    optimisticMessageIDs.contains($0.id) &&
+                        !incomingIDs.contains($0.id)
+                }
+                optimisticMessageIDs.subtract(incomingIDs)
+                messages = (stabilizedMessages + pending).sorted {
+                    if $0.createdAt != $1.createdAt { return $0.createdAt < $1.createdAt }
+                    return $0.id.uuidString < $1.id.uuidString
+                }
                 evidence = loaded.2.evidence
                 errorMessage = nil
             } catch {
@@ -495,10 +505,40 @@ final class RunDetailStore: ObservableObject {
         let replacements = Dictionary(
             uniqueKeysWithValues: stabilizedMessages.map { ($0.id, $0) }
         )
+        optimisticMessageIDs.subtract(stabilizedMessages.map(\.id))
         let existing = Set(messages.map(\.id))
         messages = messages.map { replacements[$0.id] ?? $0 }
         messages.append(contentsOf: stabilizedMessages.filter { !existing.contains($0.id) })
         messages.sort { $0.createdAt < $1.createdAt }
+    }
+
+    func appendOptimisticMessage(_ message: IssueMessage) {
+        optimisticMessageIDs.insert(message.id)
+        messages = messages.map { current in
+            guard current.id == message.parentMessageId else { return current }
+            var updated = current
+            updated.replyCount += 1
+            return updated
+        }
+        messages.append(message)
+        messages.sort { $0.createdAt < $1.createdAt }
+    }
+
+    func removeOptimisticMessage(_ messageID: UUID) {
+        guard optimisticMessageIDs.remove(messageID) != nil,
+              let pending = messages.first(where: { $0.id == messageID })
+        else { return }
+        messages.removeAll { $0.id == messageID }
+        messages = messages.map { current in
+            guard current.id == pending.parentMessageId else { return current }
+            var updated = current
+            updated.replyCount = max(0, updated.replyCount - 1)
+            return updated
+        }
+    }
+
+    func isMessageOptimistic(_ messageID: UUID) -> Bool {
+        optimisticMessageIDs.contains(messageID)
     }
 
     func updateIssueProposal(

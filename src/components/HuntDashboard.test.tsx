@@ -5335,7 +5335,17 @@ describe("HuntDashboard", () => {
     });
 
     expect(onSendIssueMessage).toHaveBeenCalledOnce();
+    expect(onSendIssueMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        body: draft,
+        clientMessageId: expect.any(String),
+      }),
+    );
     expect(textarea?.value).toBe("");
+    expect(container.querySelector(".issue-message.is-optimistic")?.textContent)
+      .toContain(draft);
+    expect(container.querySelector(".conversation-message-sending"))
+      .not.toBeNull();
     expect(
       container.querySelector<HTMLButtonElement>(
         ".issue-message-composer .issue-message-send",
@@ -5348,6 +5358,7 @@ describe("HuntDashboard", () => {
       await Promise.resolve();
     });
     expect(textarea?.value).toBe(draft);
+    expect(container.querySelector(".issue-message.is-optimistic")).toBeNull();
     expect(container.querySelector(".issue-composer-error")?.textContent)
       .toContain("전송 실패");
 
@@ -6378,6 +6389,7 @@ describe("HuntDashboard", () => {
 
     expect(sentInput).toEqual({
       body: "@member 확인해 주세요",
+      clientMessageId: expect.any(String),
       parentMessageId: null,
       mentionedUserIds: ["member-1"],
     });

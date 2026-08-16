@@ -10,7 +10,8 @@ export function mergeIssueMessages(
   incoming: IssueMessage[],
 ) {
   const previousById = new Map(current.map((message) => [message.id, message]));
-  return incoming.map((message) => {
+  const incomingIds = new Set(incoming.map((message) => message.id));
+  const merged = incoming.map((message) => {
     const previous = previousById.get(message.id);
     const acceptedIssueExecution =
       previous?.executionProposal?.status === "accepted"
@@ -34,4 +35,14 @@ export function mergeIssueMessages(
         : {}),
     };
   });
+  merged.push(
+    ...current.filter(
+      (message) => message.optimistic && !incomingIds.has(message.id),
+    ),
+  );
+  return merged.sort((left, right) =>
+    left.createdAt === right.createdAt
+      ? left.id.localeCompare(right.id)
+      : left.createdAt.localeCompare(right.createdAt)
+  );
 }

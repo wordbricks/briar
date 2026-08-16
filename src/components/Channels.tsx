@@ -145,6 +145,10 @@ import {
   type DesktopChannelDisplaySource,
 } from "../lib/channel-performance";
 import { currentExecutionWorkerDeviceId } from "../lib/execution-worker-device";
+import {
+  createOptimisticChannelMessage,
+  removeOptimisticChannelMessage,
+} from "../lib/optimistic-channel-message";
 import { useChannelAgentActivity } from "../hooks/use-channel-agent-activity";
 import type {
   ChannelAgentActivityDescriptor,
@@ -466,6 +470,7 @@ export function Channels({
   );
   const messagesScrollRef = useRef<HTMLDivElement | null>(null);
   const threadMessagesScrollRef = useRef<HTMLDivElement | null>(null);
+  const optimisticThreadMessageIds = useRef(new Set<string>());
   const activeChannelIdRef = useRef(activeChannelId);
   const channelCache = useRef(new Map<string, CachedDesktopChannel>());
   const channelLoadAbortController = useRef<AbortController | null>(null);
@@ -1306,6 +1311,14 @@ export function Channels({
     scrollContainerToEnd(threadMessagesScrollRef.current);
   }, [threadMessages, threadParentId]);
 
+  useEffect(() => {
+    for (const message of threadMessages) {
+      if (!message.optimistic) {
+        optimisticThreadMessageIds.current.delete(message.id);
+      }
+    }
+  }, [threadMessages]);
+
   const openThread = useCallback(
     async (parentId: string) => {
       if (!activeChannelId) return;
@@ -1363,8 +1376,44 @@ export function Channels({
     ) => {
       if (!activeChannelId || !body.trim()) return;
       const sendContext = captureChannelSurface();
+      const clientMessageId = crypto.randomUUID();
+      const attachmentUrls = attachments.map((attachment) =>
+        URL.createObjectURL(attachment)
+      );
+      const optimisticMessage = createOptimisticChannelMessage({
+        id: clientMessageId,
+        channelId: activeChannelId,
+        parentMessageId,
+        body: body.trim(),
+        currentUserId,
+        fallbackAuthorName: t("channel.you"),
+        members,
+        mentions,
+        attachments,
+        attachmentReferences,
+        attachmentUrls,
+      });
+      const parentBeforeSend = parentMessageId
+        ? messages.find((message) => message.id === parentMessageId) ?? null
+        : null;
       setBusy(true);
       setError(null);
+      if (parentMessageId) {
+        optimisticThreadMessageIds.current.add(clientMessageId);
+        updateRootMessages((current) => current.map((message) =>
+          message.id === parentMessageId
+            ? appendChannelReplySummary(message, optimisticMessage)
+            : message
+        ));
+        setThreadMessages((current) =>
+          mergeChannelMessages(current, [optimisticMessage], [])
+        );
+      } else {
+        shouldScrollChannelToEnd.current = true;
+        updateRootMessages((current) =>
+          mergeChannelMessages(current, [optimisticMessage], [])
+        );
+      }
       try {
         const hasAgentMention = mentions.some(
           (mention) => mention.type === "agent",
@@ -1374,6 +1423,7 @@ export function Channels({
           : null;
         const result = await sendChannelMessage(token, organizationId, activeChannelId, {
           body: body.trim(),
+          clientMessageId,
           parentMessageId,
           mentionedUserIds: mentions
             .filter((mention) => mention.type === "user")
@@ -1401,22 +1451,9 @@ export function Channels({
           );
         }
         if (parentMessageId) {
-          updateRootMessages((current) =>
-            current.map((message) =>
-              message.id === parentMessageId
-                ? appendChannelReplySummary(message, result.message)
-                : message,
-            ));
+          optimisticThreadMessageIds.current.delete(clientMessageId);
           setThreadMessages((current) =>
-            mergeChannelMessages(
-              current.map((message) =>
-                message.id === parentMessageId
-                  ? appendChannelReplySummary(message, result.message)
-                  : message,
-              ),
-              [result.message],
-              [],
-            ),
+            mergeChannelMessages(current, [result.message], []),
           );
         } else {
           shouldScrollChannelToEnd.current = true;
@@ -1424,8 +1461,40 @@ export function Channels({
             mergeChannelMessages(current, [result.message], []));
         }
       } catch (cause) {
-        if (channelSurfaceIsCurrent(sendContext)) setError(errorMessage(cause));
+        if (channelSurfaceIsCurrent(sendContext)) {
+          const shouldRollbackReplySummary = parentMessageId
+            ? optimisticThreadMessageIds.current.delete(clientMessageId)
+            : false;
+          setThreadMessages((current) =>
+            removeOptimisticChannelMessage(current, clientMessageId)
+          );
+          updateRootMessages((current) => {
+            const removed = removeOptimisticChannelMessage(
+              current,
+              clientMessageId,
+            );
+            return parentMessageId && shouldRollbackReplySummary
+              ? removed.map((message) =>
+                  message.id === parentMessageId
+                    ? {
+                        ...message,
+                        replyCount: Math.max(0, message.replyCount - 1),
+                        ...(message.lastReplyAt === optimisticMessage.createdAt
+                          ? {
+                              lastReplyAt: parentBeforeSend?.lastReplyAt ?? null,
+                              replyAuthors: parentBeforeSend?.replyAuthors ?? [],
+                            }
+                          : {}),
+                      }
+                    : message
+                )
+              : removed;
+          });
+          setError(errorMessage(cause));
+        }
       } finally {
+        optimisticThreadMessageIds.current.delete(clientMessageId);
+        for (const url of attachmentUrls) URL.revokeObjectURL(url);
         if (channelSurfaceIsCurrent(sendContext)) setBusy(false);
       }
     },
@@ -1433,6 +1502,9 @@ export function Channels({
       activeChannelId,
       captureChannelSurface,
       channelSurfaceIsCurrent,
+      currentUserId,
+      members,
+      messages,
       organizationId,
       t,
       token,
@@ -2878,7 +2950,7 @@ const MessageRow = memo(function MessageRow({
 
   return (
     <article
-      className={`channel-message ${message.author.type}${reacting ? " is-reacting" : ""}`}
+      className={`channel-message ${message.author.type}${reacting ? " is-reacting" : ""}${message.optimistic ? " is-optimistic" : ""}`}
       data-channel-message-id={message.id}
     >
       <div className="channel-message-avatar" aria-hidden="true">
@@ -2924,6 +2996,12 @@ const MessageRow = memo(function MessageRow({
           <time dateTime={message.createdAt}>
             {formatMessageTime(message.createdAt, localeTag)}
           </time>
+          {message.optimistic ? (
+            <span className="conversation-message-sending" role="status">
+              <LoaderCircle aria-hidden="true" className="spin" size={12} />
+              {t("run.sendingMessage")}
+            </span>
+          ) : null}
         </header>
         <ChannelMessageText agents={agents} members={members} message={message} />
         {showTypingState ? (
@@ -3051,16 +3129,16 @@ const MessageRow = memo(function MessageRow({
         ) : null}
 
         <ChannelMessageReactions
-          busy={busy}
+          busy={busy || message.optimistic}
           currentUserId={currentUserId}
           message={message}
-          onOpenThread={onOpenThread}
+          onOpenThread={message.optimistic ? undefined : onOpenThread}
           onReactingChange={setReacting}
           onToggle={onToggleReaction}
           showHoverActions
         />
 
-        {onOpenThread && message.replyCount > 0 ? (
+        {!message.optimistic && onOpenThread && message.replyCount > 0 ? (
           <ConversationReplySummary
             countLabel={t("channel.replyCount", {
               count: message.replyCount,

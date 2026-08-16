@@ -142,6 +142,8 @@ export type IssueMessage = {
   executionProposal?: IssueExecutionProposal | null;
   /** A separate approval boundary for a matched saved Project Agent Skill. */
   skillExecutionProposal?: AgentSkillExecutionProposal | null;
+  /** Client-only state while a newly sent message awaits its server response. */
+  optimistic?: boolean;
   createdAt: string;
   updatedAt: string;
 };

@@ -1628,7 +1628,8 @@ struct RunDetailView: View {
     }
 
     private func messageRow(_ message: IssueMessage) -> some View {
-        ConversationMessageLayout(
+        let isOptimistic = detail.isMessageOptimistic(message.id)
+        return ConversationMessageLayout(
             authorImage: message.author.image,
             profileName: message.author.provider == nil ? message.author.name : nil,
             authorName: message.author.name,
@@ -1637,6 +1638,12 @@ struct RunDetailView: View {
             timestamp: message.createdAt,
             accessibilityIdentifier: "issue-message-\(message.id.uuidString.lowercased())"
         ) {
+                if isOptimistic {
+                    Label(L10n.text("보내는 중", locale: locale), systemImage: "arrow.up.circle")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("issue-message-sending")
+                }
                 if let parent = detail.messages.first(where: { $0.id == message.parentMessageId }) {
                     HStack(alignment: .top, spacing: 6) {
                         Image(systemName: "arrowshape.turn.up.left")
@@ -1833,10 +1840,12 @@ struct RunDetailView: View {
                 if let proposal = message.skillExecutionProposal {
                     issueSkillExecutionProposalCard(proposal)
                 }
-                Button(L10n.text("답글", locale: locale)) { replyTo = message }
-                    .font(.caption)
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.tint)
+                if !isOptimistic {
+                    Button(L10n.text("답글", locale: locale)) { replyTo = message }
+                        .font(.caption)
+                        .buttonStyle(.plain)
+                        .foregroundStyle(.tint)
+                }
         }
     }
 
@@ -2709,13 +2718,42 @@ struct RunDetailView: View {
         let mentionedUserIds = mentions.compactMap {
             $0.kind == .user ? $0.recipientId : nil
         }
+        let clientMessageID = UUID()
+        let attachmentReferences = attachments.map { _ in
+            UUID().uuidString.lowercased()
+        }
+        let optimisticBody = (try? AttachmentMessagePayload(
+            body: body.trimmingCharacters(in: .whitespacesAndNewlines),
+            attachments: attachments,
+            references: attachmentReferences
+        ))?.body ?? body
+        let currentMember = members.first { $0.userId == currentUserID }
+        let createdAt = Date()
+        detail.appendOptimisticMessage(IssueMessage(
+            id: clientMessageID,
+            runId: run.id,
+            parentMessageId: replyTo?.id,
+            body: optimisticBody,
+            attachments: nil,
+            author: IssueMessage.Author(
+                id: currentUserID,
+                name: currentMember?.name ?? L10n.text("나", locale: locale),
+                image: currentMember?.image,
+                provider: nil
+            ),
+            replyCount: 0,
+            createdAt: createdAt,
+            updatedAt: createdAt
+        ))
         do {
             let sent = try await mutations.sendMessage(
                 runID: run.id,
                 body: body,
+                clientMessageID: clientMessageID,
                 parentMessageID: replyTo?.id,
                 mentionedUserIds: mentionedUserIds,
-                attachments: attachments
+                attachments: attachments,
+                attachmentReferences: attachmentReferences
             )
             detail.appendMessages(sent)
             replyTo = nil
@@ -2740,6 +2778,7 @@ struct RunDetailView: View {
                 await refresh()
                 return true
             }
+            detail.removeOptimisticMessage(clientMessageID)
             return false
         }
     }

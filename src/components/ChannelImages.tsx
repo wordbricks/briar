@@ -1,5 +1,5 @@
 import { CircleAlert, LoaderCircle, X } from "lucide-react";
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import { useObjectUrl } from "../hooks/useObjectUrl";
 import type { ChannelMessageAttachment } from "../lib/channels-contract";
 import { loadChannelMessageAttachment } from "../lib/api";
@@ -112,11 +112,17 @@ function ChannelMessageImage({
   interactive: boolean;
   token: string;
 }) {
-  const loadImage = useCallback(
-    () => loadChannelMessageAttachment(token, attachment),
-    [attachment.url, token],
+  const localSource = attachment.url.startsWith("blob:")
+    ? attachment.url
+    : null;
+  const loadImage = useMemo(
+    () => localSource
+      ? null
+      : () => loadChannelMessageAttachment(token, attachment),
+    [attachment.url, localSource, token],
   );
-  const { failed, source } = useObjectUrl(loadImage);
+  const { failed, source: loadedSource } = useObjectUrl(loadImage);
+  const source = localSource ?? loadedSource;
 
   if (failed) {
     return (

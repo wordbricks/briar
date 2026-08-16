@@ -583,15 +583,31 @@ struct ChannelMessagesResponse: Codable, Sendable {
 
 struct CreateChannelMessageRequest: Codable, Sendable {
     let body: String
+    let clientMessageId: UUID?
     let parentMessageId: UUID?
     let mentionedUserIds: [String]
     let mentionedAgentIds: [UUID]
 
     enum CodingKeys: String, CodingKey {
         case body
+        case clientMessageId
         case parentMessageId
         case mentionedUserIds
         case mentionedAgentIds
+    }
+
+    init(
+        body: String,
+        clientMessageId: UUID? = nil,
+        parentMessageId: UUID?,
+        mentionedUserIds: [String],
+        mentionedAgentIds: [UUID]
+    ) {
+        self.body = body
+        self.clientMessageId = clientMessageId
+        self.parentMessageId = parentMessageId
+        self.mentionedUserIds = mentionedUserIds
+        self.mentionedAgentIds = mentionedAgentIds
     }
 
     /// Channel and Agent IDs are stored as lowercase strings and compared
@@ -600,6 +616,10 @@ struct CreateChannelMessageRequest: Codable, Sendable {
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(body, forKey: .body)
+        try container.encodeIfPresent(
+            clientMessageId?.uuidString.lowercased(),
+            forKey: .clientMessageId
+        )
         try container.encodeIfPresent(
             parentMessageId?.uuidString.lowercased(),
             forKey: .parentMessageId

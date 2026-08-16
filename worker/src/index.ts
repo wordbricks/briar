@@ -2198,6 +2198,7 @@ const linearImportInputSchema = z
 const issueMessageInputSchema = z
   .object({
     body: z.string().trim().min(1).max(10_000),
+    clientMessageId: z.string().uuid().transform((value) => value.toLowerCase()).optional(),
     parentMessageId: z.string().uuid().nullable().optional(),
     mentionedUserIds: z.array(z.string().min(1).max(200)).max(50).optional(),
     agentConversationId: z
@@ -2257,11 +2258,16 @@ export async function readIssueMessageRequest(request: Request) {
     throw new HttpError(400, "Every message attachment must be referenced in the body");
   }
   const mentionedUserIds = readMultipartJsonArray(form, "mentionedUserIds");
+  const clientMessageId = form.get("clientMessageId");
   const parentMessageId = form.get("parentMessageId");
   const agentConversationId = form.get("agentConversationId");
   return {
     input: issueMessageInputSchema.parse({
       body: form.get("body"),
+      clientMessageId:
+        typeof clientMessageId === "string" && clientMessageId
+          ? clientMessageId
+          : undefined,
       parentMessageId:
         typeof parentMessageId === "string" && parentMessageId
           ? parentMessageId
@@ -2317,10 +2323,15 @@ export async function readChannelMessageRequest(request: Request) {
     throw new HttpError(400, "Every channel image must be referenced in the body");
   }
   const parentMessageId = form.get("parentMessageId");
+  const clientMessageId = form.get("clientMessageId");
   const preferredDeviceId = form.get("preferredDeviceId");
   return {
     input: channelMessageInputSchema.parse({
       body: rawBody,
+      clientMessageId:
+        typeof clientMessageId === "string" && clientMessageId
+          ? clientMessageId
+          : undefined,
       parentMessageId:
         typeof parentMessageId === "string" && parentMessageId
           ? parentMessageId
@@ -7888,7 +7899,7 @@ async function route(
       }
     }
     const createdAt = new Date().toISOString();
-    const messageId = crypto.randomUUID();
+    const messageId = rawInput.clientMessageId ?? crypto.randomUUID();
     const storedAttachments = prepareStoredAttachments(attachments, () => {
       const id = crypto.randomUUID();
       return {
@@ -10634,7 +10645,7 @@ async function route(
         storedAttachments.map(({ file: _file, ...attachment }) => attachment),
       );
       message = await createIssueMessage(db, {
-        id: crypto.randomUUID(),
+        id: input.clientMessageId ?? crypto.randomUUID(),
         projectId: project.id,
         runId: issueMessagesMatch[2],
         parentMessageId: input.parentMessageId ?? null,

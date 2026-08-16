@@ -353,10 +353,12 @@ describe("issue multipart input", () => {
 describe("channel image multipart input", () => {
   it("parses image references and structured mentions", async () => {
     const reference = "7316678b-e3d4-4de3-a045-b76a0fc2e765";
+    const clientMessageId = "33333333-3333-4333-8333-333333333333";
     const image = new File(["image"], "screen.png", { type: "image/png" });
     const form = new FormData();
     form.set("body", `Screenshot\n\n![screen.png](briar-attachment://${reference})`);
     form.set("parentMessageId", "11111111-1111-4111-8111-111111111111");
+    form.set("clientMessageId", clientMessageId.toUpperCase());
     form.set("mentionedUserIds", JSON.stringify(["owner"]));
     form.set(
       "mentionedAgentIds",
@@ -382,6 +384,7 @@ describe("channel image multipart input", () => {
     );
     expect(result.attachmentReferences).toEqual([reference]);
     expect(result.input).toMatchObject({
+      clientMessageId,
       parentMessageId: "11111111-1111-4111-8111-111111111111",
       mentionedUserIds: ["owner"],
       mentionedAgentIds: ["22222222-2222-4222-8222-222222222222"],
@@ -502,13 +505,18 @@ describe("issue update multipart input", () => {
 });
 
 describe("issue conversation multipart input", () => {
-  const messageRequest = (file: File, reference = crypto.randomUUID()) => {
+  const messageRequest = (
+    file: File,
+    reference = crypto.randomUUID(),
+    clientMessageId = crypto.randomUUID(),
+  ) => {
     const form = new FormData();
     form.set(
       "body",
       `확인해 주세요\n\n![${file.name}](briar-attachment://${reference})`,
     );
     form.set("parentMessageId", "");
+    form.set("clientMessageId", clientMessageId.toUpperCase());
     form.set("mentionedUserIds", "[]");
     form.set("agentConversationId", "");
     form.set("attachmentReferences", JSON.stringify([reference]));
@@ -522,13 +530,16 @@ describe("issue conversation multipart input", () => {
 
   it("parses pasted conversation images and their inline references", async () => {
     const reference = crypto.randomUUID();
+    const clientMessageId = crypto.randomUUID();
     const result = await readIssueMessageRequest(
       messageRequest(
         new File(["image"], "clipboard.png", { type: "image/png" }),
         reference,
+        clientMessageId,
       ),
     );
 
+    expect(result.input.clientMessageId).toBe(clientMessageId);
     expect(result.input.body).toContain(`briar-attachment://${reference}`);
     expect(result.attachments).toEqual([
       expect.objectContaining({ name: "clipboard.png", type: "image/png" }),

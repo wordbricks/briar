@@ -1503,6 +1503,55 @@ describe("Channels", () => {
     expect(container.textContent).toContain("Hello team");
   });
 
+  it("shows a sent message immediately and reconciles the same row", async () => {
+    const pending = deferred<{
+      message: ChannelMessage;
+      agentReplies: [];
+    }>();
+    sendChannelMessage.mockReturnValue(pending.promise);
+    await render([message()]);
+
+    const textarea = container.querySelector<HTMLTextAreaElement>(
+      "form.channel-composer textarea",
+    )!;
+    await typeInto(textarea, "바로 보이는 메시지");
+    await act(async () => {
+      container
+        .querySelector("form.channel-composer")!
+        .dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+      await Promise.resolve();
+    });
+
+    const optimistic = container.querySelector<HTMLElement>(
+      ".channel-message.is-optimistic",
+    );
+    expect(optimistic?.textContent).toContain("바로 보이는 메시지");
+    expect(optimistic?.querySelector(".conversation-message-sending"))
+      .not.toBeNull();
+    const input = sendChannelMessage.mock.calls[0]?.[3] as {
+      clientMessageId: string;
+    };
+    expect(input.clientMessageId).toEqual(expect.any(String));
+
+    await act(async () => {
+      pending.resolve({
+        message: message({
+          id: input.clientMessageId,
+          body: "바로 보이는 메시지",
+        }),
+        agentReplies: [],
+      });
+      await pending.promise;
+    });
+
+    expect(container.querySelector(".channel-message.is-optimistic")).toBeNull();
+    expect(
+      container.querySelectorAll(
+        `[data-channel-message-id="${input.clientMessageId}"]`,
+      ),
+    ).toHaveLength(1);
+  });
+
   it("sends the picked Agent as a structured mention rather than parsing the text", async () => {
     await render([message()]);
     sendChannelMessage.mockResolvedValue({

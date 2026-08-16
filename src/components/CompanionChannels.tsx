@@ -62,6 +62,10 @@ import {
   mergeChannelMessages,
   mergeChannelMessageSnapshot,
 } from "../lib/channel-message-merge";
+import {
+  createOptimisticChannelMessage,
+  removeOptimisticChannelMessage,
+} from "../lib/optimistic-channel-message";
 import { channelReplyErrorText } from "../lib/channel-reply-error";
 import { maxIssueAttachmentCount } from "../lib/issue-attachments";
 import { useI18n } from "../i18n";
@@ -1002,11 +1006,39 @@ export function CompanionChannels({
       attachmentReferences: string[],
     ) => {
       if (!channel || !body.trim()) return;
+      const clientMessageId = crypto.randomUUID();
+      const attachmentUrls = attachments.map((attachment) =>
+        URL.createObjectURL(attachment)
+      );
+      const optimisticMessage = createOptimisticChannelMessage({
+        id: clientMessageId,
+        channelId: channel.id,
+        parentMessageId: threadParentId,
+        body: body.trim(),
+        currentUserId,
+        fallbackAuthorName: t("channel.you"),
+        members,
+        mentions,
+        attachments,
+        attachmentReferences,
+        attachmentUrls,
+      });
       setBusy(true);
       setError(null);
+      if (threadParentId) {
+        setThread((current) =>
+          mergeChannelMessages(current ?? [], [optimisticMessage], [])
+        );
+      } else {
+        shouldScrollChannelToEnd.current = true;
+        setMessages((current) =>
+          mergeChannelMessages(current, [optimisticMessage], [])
+        );
+      }
       try {
         const result = await sendChannelMessage(token, organizationId, channel.id, {
           body: body.trim(),
+          clientMessageId,
           parentMessageId: threadParentId,
           mentionedUserIds: mentions
             .filter((mention) => mention.type === "user")
@@ -1041,12 +1073,19 @@ export function CompanionChannels({
             mergeChannelMessages(current, [result.message], []));
         }
       } catch (cause) {
+        setThread((current) =>
+          removeOptimisticChannelMessage(current ?? [], clientMessageId)
+        );
+        setMessages((current) =>
+          removeOptimisticChannelMessage(current, clientMessageId)
+        );
         setError(message(cause));
       } finally {
+        for (const url of attachmentUrls) URL.revokeObjectURL(url);
         setBusy(false);
       }
     },
-    [channel, organizationId, t, threadParentId, token],
+    [channel, currentUserId, members, organizationId, t, threadParentId, token],
   );
 
   const pendingReplies = replies.filter(
@@ -1833,7 +1872,7 @@ function MessageRow({
     : null;
   return (
     <article
-      className="companion-channel-message"
+      className={`companion-channel-message${message.optimistic ? " is-optimistic" : ""}`}
       data-companion-channel-message-id={message.id}
     >
       <MessageAvatar message={message} />
@@ -1848,6 +1887,12 @@ function MessageRow({
               minute: "2-digit",
             })}
           </time>
+          {message.optimistic ? (
+            <span className="conversation-message-sending" role="status">
+              <LoaderCircle aria-hidden="true" className="spin" size={12} />
+              {t("run.sendingMessage")}
+            </span>
+          ) : null}
         </header>
         <ChannelMessageText agents={agents} members={members} message={message} />
         {showTypingState ? (
@@ -1965,12 +2010,12 @@ function MessageRow({
         ) : null}
         <ChannelMessageReactions
           alwaysShowAdd
-          busy={busy}
+          busy={busy || message.optimistic}
           currentUserId={currentUserId}
           message={message}
           onToggle={onToggleReaction}
         />
-        {showThreadSummary && onOpenThread ? (
+        {showThreadSummary && onOpenThread && !message.optimistic ? (
           <button
             aria-label={`${t("run.viewThread")}: ${message.author.name} — ${message.body}`}
             className="companion-channel-message-button companion-channel-thread-summary"
