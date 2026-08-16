@@ -48,6 +48,27 @@ final class ConversationPresentationTests: XCTestCase {
         XCTAssertTrue(previousLabel.contains("2025"))
     }
 
+    func testScrollToBottomControlAppearsOnlyBeyondThreshold() {
+        XCTAssertFalse(
+            ConversationScrollPresentation.isAwayFromBottom(
+                bottomMaxY: 700,
+                viewportHeight: 640
+            )
+        )
+        XCTAssertFalse(
+            ConversationScrollPresentation.isAwayFromBottom(
+                bottomMaxY: 720,
+                viewportHeight: 640
+            )
+        )
+        XCTAssertTrue(
+            ConversationScrollPresentation.isAwayFromBottom(
+                bottomMaxY: 721,
+                viewportHeight: 640
+            )
+        )
+    }
+
     @MainActor
     func testComposerClearsImmediatelyAndRestoresDraftAfterFailedSend() async throws {
         let draft = ConversationComposerDraftBox()

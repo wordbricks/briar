@@ -93,6 +93,7 @@ import { AgentProviderIcon } from "./AgentIcons";
 import { AgentWorkLog } from "./AgentWorkLog";
 import { ImageLightbox } from "./ImageLightbox";
 import { WorkerIcon } from "./WorkerIcon";
+import { ConversationScrollToBottomButton } from "./ConversationScrollToBottomButton";
 import {
   CompanionBottomNavigation,
   type CompanionStatusFilter,
@@ -105,6 +106,10 @@ import { useObjectUrl } from "../hooks/useObjectUrl";
 import { useIssueDialogAttachments } from "../hooks/useIssueDialogAttachments";
 import { useProjectAgentWorkerEvents } from "../hooks/useProjectAgentWorkerEvents";
 import { useHorizontalPaneResize } from "../hooks/useHorizontalPaneResize";
+import {
+  conversationIsAwayFromBottom,
+  scrollConversationToBottom,
+} from "../lib/conversation-scroll";
 import {
   errorDiagnosticOccurrenceKey,
   errorDiagnosticsForMessage,
@@ -6473,6 +6478,7 @@ export function RunPage({
                       run={run}
                       projectId={projectId}
                       token={token}
+                      showsScrollToLatest={companionMode}
                     />
                   </div>
                 ) : null}
@@ -6516,6 +6522,7 @@ export function RunPage({
                     run={run}
                     projectId={projectId}
                     token={token}
+                    showsScrollToLatest={companionMode}
                   />
                 </>
               ) : null}
@@ -8134,6 +8141,7 @@ function IssueConversation({
   organizationId,
   projectId,
   run,
+  showsScrollToLatest = false,
   token,
 }: {
   currentUserId?: string | null;
@@ -8172,6 +8180,7 @@ function IssueConversation({
   organizationId: string | null;
   projectId: string;
   run: HuntRun;
+  showsScrollToLatest?: boolean;
   token: string | null;
 }) {
   const { localeTag, t } = useI18n();
@@ -8185,6 +8194,7 @@ function IssueConversation({
   >(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [isAwayFromBottom, setIsAwayFromBottom] = useState(false);
   const [messageErrors, setMessageErrors] = useState<
     Record<string, string | null>
   >({});
@@ -8643,7 +8653,10 @@ function IssueConversation({
 
   useLayoutEffect(() => {
     const messageList = messageListRef.current;
-    if (messageList) messageList.scrollTop = messageList.scrollHeight;
+    if (messageList) {
+      messageList.scrollTop = messageList.scrollHeight;
+      setIsAwayFromBottom(false);
+    }
   }, [loading, messages.length, pendingAgentReplyCount]);
 
   const sendMessage = async (
@@ -8926,7 +8939,15 @@ function IssueConversation({
           )}
         </div>
       </header>
-      <div className="issue-message-list" ref={messageListRef}>
+      <div className="conversation-scroll-region">
+        <div
+          className="issue-message-list"
+          onScroll={(event) =>
+            setIsAwayFromBottom(
+              conversationIsAwayFromBottom(event.currentTarget),
+            )}
+          ref={messageListRef}
+        >
         {loading ? (
           <div className="issue-message-state">
             <LoaderCircle className="spin" size={16} />
@@ -9112,6 +9133,18 @@ function IssueConversation({
             );
           })
         )}
+        </div>
+        {showsScrollToLatest && isAwayFromBottom ? (
+          <ConversationScrollToBottomButton
+            label={t("run.jumpToLatest")}
+            onClick={() => {
+              const scroller = messageListRef.current;
+              if (!scroller) return;
+              setIsAwayFromBottom(false);
+              scrollConversationToBottom(scroller);
+            }}
+          />
+        ) : null}
       </div>
       <MessageComposer
         mentionMembers={mentionMembers}
