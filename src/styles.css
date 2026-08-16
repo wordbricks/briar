@@ -1912,7 +1912,6 @@ button.conversation-reply-summary:focus-visible { outline:2px solid var(--ring);
 .issue-message > div > header { min-width:0; min-height:19px; display:flex; align-items:baseline; gap:7px; }
 .issue-message > div > header strong { min-width:0; overflow:hidden; color:var(--foreground); font-size:var(--text-xs); text-overflow:ellipsis; white-space:nowrap; }
 .issue-message > div > header time { flex:0 0 auto; color:var(--muted-foreground); font:500 var(--text-2xs) "DM Mono",monospace; }
-.conversation-message-sending { display:inline-flex; align-items:center; gap:4px; color:var(--muted-foreground); font-size:var(--text-2xs); font-weight:600; }
 .issue-message-body { min-width:0; max-width:100%; margin:2px 0 0; color:var(--foreground); font-size:var(--text-xs); line-height:1.65; overflow-wrap:anywhere; -webkit-user-select:text; user-select:text; -webkit-touch-callout:default; }
 .issue-message-body > :first-child { margin-top:0; }
 .issue-message-body > :last-child { margin-bottom:0; }

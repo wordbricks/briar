@@ -1503,7 +1503,7 @@ describe("Channels", () => {
     expect(container.textContent).toContain("Hello team");
   });
 
-  it("shows a sent message immediately and reconciles the same row", async () => {
+  it("shows a sent message immediately without a sending label and reconciles the same row", async () => {
     const pending = deferred<{
       message: ChannelMessage;
       agentReplies: [];
@@ -1527,7 +1527,7 @@ describe("Channels", () => {
     );
     expect(optimistic?.textContent).toContain("바로 보이는 메시지");
     expect(optimistic?.querySelector(".conversation-message-sending"))
-      .not.toBeNull();
+      .toBeNull();
     const input = sendChannelMessage.mock.calls[0]?.[3] as {
       clientMessageId: string;
     };

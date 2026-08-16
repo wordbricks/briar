@@ -5312,7 +5312,7 @@ describe("HuntDashboard", () => {
     container.remove();
   });
 
-  it("clears the Android/Tauri conversation draft while sending and restores it on failure", async () => {
+  it("shows an Android/Tauri message without a sending label and restores the draft on failure", async () => {
     let rejectSend: (reason: Error) => void = () => undefined;
     const pendingSend = new Promise<IssueMessageSendResult>((_resolve, reject) => {
       rejectSend = reject;
@@ -5371,7 +5371,7 @@ describe("HuntDashboard", () => {
     expect(container.querySelector(".issue-message.is-optimistic")?.textContent)
       .toContain(draft);
     expect(container.querySelector(".conversation-message-sending"))
-      .not.toBeNull();
+      .toBeNull();
     expect(
       container.querySelector<HTMLButtonElement>(
         ".issue-message-composer .issue-message-send",

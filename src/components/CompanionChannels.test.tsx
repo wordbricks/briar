@@ -2200,7 +2200,7 @@ describe("CompanionChannels", () => {
     expect(scrollIntoView).toHaveBeenCalledWith({ block: "end" });
   });
 
-  it("shows a sent message immediately and reconciles the same row", async () => {
+  it("shows a sent message immediately without a sending label and reconciles the same row", async () => {
     const pending = deferred<{
       message: ChannelMessage;
       agentReplies: [];
@@ -2245,7 +2245,7 @@ describe("CompanionChannels", () => {
     );
     expect(optimistic?.textContent).toContain("바로 보이는 메시지");
     expect(optimistic?.querySelector(".conversation-message-sending"))
-      .not.toBeNull();
+      .toBeNull();
     const request = sendChannelMessage.mock.calls[0]?.[3] as {
       clientMessageId: string;
     };
