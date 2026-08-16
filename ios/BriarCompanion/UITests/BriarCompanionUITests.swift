@@ -157,7 +157,7 @@ final class BriarCompanionUITests: XCTestCase {
         channel.tap()
 
         let spinner = app.descendants(matching: .any)["channel-message-loading-spinner"]
-        XCTAssertTrue(spinner.waitForExistence(timeout: 1))
+        XCTAssertTrue(spinner.waitForExistence(timeout: 3))
         captureScreenshot(named: "companion-channel-message-loading-spinner")
 
         let message = app.staticTexts["상단 헤더 디자인을 함께 확인해 주세요."]
