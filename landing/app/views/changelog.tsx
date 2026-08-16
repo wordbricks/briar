@@ -23,6 +23,19 @@ export const changelogCopy = {
     backTop: "맨 위로 ↑",
     entries: [
       {
+        version: "1.2.129",
+        date: "2026년 8월 16일",
+        title: "Cursor 에이전트와 채널 메시지 공유를 연결합니다",
+        summary:
+          "Cursor를 정식 에이전트 제공자로 추가하고, 채널 메시지를 정확한 링크나 원문으로 공유하며, 제공자와 답글 작성자를 더 쉽게 알아볼 수 있게 했습니다.",
+        items: [
+          "Cursor CLI를 설치·로그인하고 모델과 Effort를 선택해 이슈·채널·자동 작업에서 실행할 수 있고, 데스크탑 앱에 필요한 실행기를 함께 번들링합니다.",
+          "채널 메시지의 더보기 메뉴에서 링크나 원문을 복사하고, 데스크탑·Companion·네이티브 iOS의 HTTPS 링크로 해당 메시지를 바로 엽니다.",
+          "이슈 생성과 설정·Worker 화면의 제공자 선택기에 같은 브랜드 아이콘을 표시하고, Inbox 답글에는 설정된 에이전트 아바타를 정확히 보여줍니다.",
+          "채널 답글 실행에 사용할 컨텍스트 스냅샷을 작업에 안전하게 묶어, 나중에 바뀐 채널 상태가 이미 시작된 응답에 섞이지 않게 합니다.",
+        ],
+      },
+      {
         version: "1.2.128",
         date: "2026년 8월 16일",
         title: "보낸 메시지를 더 자연스럽게 이어 보여줍니다",
@@ -670,6 +683,19 @@ export const changelogCopy = {
     home: "Home",
     backTop: "Back to top ↑",
     entries: [
+      {
+        version: "1.2.129",
+        date: "August 16, 2026",
+        title: "Connect Cursor agents and channel message sharing",
+        summary:
+          "Use Cursor as a first-class agent provider, share exact channel messages by link or text, and identify providers and reply authors more clearly.",
+        items: [
+          "Install and sign in to the Cursor CLI, choose supported models and effort, and run Cursor from issues, channels, and automated work with the required runner bundled in the desktop app.",
+          "Copy a link or the original text from a channel message's overflow menu, then open that exact message from HTTPS links in desktop, Companion, and native iOS.",
+          "Show consistent brand icons in provider selectors across issue creation, settings, and Worker flows, and use configured agent avatars for Inbox replies.",
+          "Bind channel-reply context snapshots to the queued job so later channel state cannot leak into a response that is already underway.",
+        ],
+      },
       {
         version: "1.2.128",
         date: "August 16, 2026",
@@ -1330,9 +1356,9 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <h1>{changelog.title}</h1>
           <p>{changelog.description}</p>
         </div>
-        <a href="#v1-2-128" className="changelog-current">
+        <a href="#v1-2-129" className="changelog-current">
           <span>{changelog.current}</span>
-          <strong>v1.2.128</strong>
+          <strong>v1.2.129</strong>
           <i aria-hidden="true">↓</i>
         </a>
       </section>
@@ -1357,12 +1383,14 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   {index === 0 ? <span>{changelog.latest}</span> : null}
                   <time
                     dateTime={
+                      entry.version === "1.2.129" ||
                       entry.version === "1.2.128" ||
                       entry.version === "1.2.127" ||
                       entry.version === "1.2.126" ||
                       entry.version === "1.2.125" ||
                       entry.version === "1.2.124"
-                        ? entry.version === "1.2.128" ||
+                        ? entry.version === "1.2.129" ||
+                          entry.version === "1.2.128" ||
                           entry.version === "1.2.127"
                           ? "2026-08-16"
                           : "2026-08-15"

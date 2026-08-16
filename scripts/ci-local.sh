@@ -168,14 +168,25 @@ run_selected_contexts() {
   local index
   local pid
   local failed=false
+  local contexts_to_run=("${selected_contexts[@]}")
   local pids=()
   local logs=()
 
+  if includes_context app-worker && includes_context d1-migrations; then
+    echo
+    echo "[local-ci] Running d1-migrations before the parallel contexts."
+    run_context d1-migrations run_d1_migrations
+    contexts_to_run=()
+    for context in "${selected_contexts[@]}"; do
+      [[ "$context" == "d1-migrations" ]] || contexts_to_run+=("$context")
+    done
+  fi
+
   ci_temp="$(mktemp -d "$ci_temp_base/briar-local-ci.XXXXXX")"
   echo
-  echo "[local-ci] Running ${#selected_contexts[@]} context(s) in parallel."
+  echo "[local-ci] Running ${#contexts_to_run[@]} context(s) in parallel."
 
-  for context in "${selected_contexts[@]}"; do
+  for context in "${contexts_to_run[@]}"; do
     runner="$(context_runner "$context")"
     log_path="$ci_temp/${context}.log"
     logs+=("$log_path")
@@ -187,7 +198,7 @@ run_selected_contexts() {
     echo "[local-ci] Started ${context} (pid ${pid})."
   done
 
-  for index in "${!selected_contexts[@]}"; do
+  for index in "${!contexts_to_run[@]}"; do
     if ! wait "${pids[$index]}"; then
       failed=true
     fi
