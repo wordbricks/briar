@@ -347,6 +347,76 @@ describe("detached Agent runner", () => {
     }
   });
 
+  it("excludes display-only channel data from provider context", () => {
+    const avatar = `data:image/png;base64,${"a".repeat(62_554)}`;
+    const prompt = detachedChannelReplyPrompt({
+      agent,
+      workspaceAvailable: true,
+      snapshot: {
+        channel: {
+          id: "11111111-1111-4111-8111-111111111111",
+          name: "project-briar",
+          slug: "project-briar",
+          topic: "Briar development",
+          defaultProjectId: "22222222-2222-4222-8222-222222222222",
+        },
+        agent: {
+          name: "Developer",
+          provider: "codex",
+          responsibility: "Duplicated trusted profile",
+          avatar,
+        },
+        projectTargets: [{
+          id: "22222222-2222-4222-8222-222222222222",
+          name: "Duplicated project target",
+        }],
+        messages: [{
+          id: "33333333-3333-4333-8333-333333333333",
+          channelId: "11111111-1111-4111-8111-111111111111",
+          parentMessageId: null,
+          author: {
+            type: "agent",
+            id: "44444444-4444-4444-8444-444444444444",
+            name: "Developer",
+            provider: "codex",
+            image: avatar,
+            email: "agent@example.com",
+          },
+          body: "Repository findings",
+          blocks: [{ type: "section", text: "display copy" }],
+          mentionedUserIds: [],
+          mentionedAgentIds: [],
+          attachments: [{
+            id: "55555555-5555-4555-8555-555555555555",
+            filename: "evidence.png",
+            contentType: "image/png",
+            byteSize: 42,
+            url: "/private/display-only-url",
+          }],
+          reactions: [{ emoji: "👍", count: 10 }],
+          replyCount: 10,
+          lastReplyAt: "2026-08-16T00:01:00.000Z",
+          replyAuthors: [{ name: "Developer", image: avatar }],
+          createdAt: "2026-08-16T00:00:00.000Z",
+        }],
+        downloadedImagePaths: [".briar-channel-images/evidence.png"],
+      },
+    });
+
+    expect(prompt).toContain("Repository findings");
+    expect(prompt).toContain("evidence.png");
+    expect(prompt).toContain("Briar development");
+    expect(prompt).not.toContain(avatar);
+    expect(prompt).not.toContain("agent@example.com");
+    expect(prompt).not.toContain("display-only-url");
+    expect(prompt).not.toContain("Duplicated trusted profile");
+    expect(prompt).not.toContain("Duplicated project target");
+    expect(prompt).not.toContain('"replyAuthors"');
+    expect(prompt).not.toContain('"reactions"');
+    expect(prompt).not.toContain('"blocks"');
+    expect(prompt.length).toBeLessThan(20_000);
+  });
+
   it("keeps organization and project channel scope authoritative", () => {
     const organizationAgent = {
       ...agent,

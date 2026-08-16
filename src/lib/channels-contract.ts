@@ -594,6 +594,83 @@ export type ChannelMessage = {
   createdAt: string;
 };
 
+export type ChannelReplyContextAuthor =
+  | Pick<
+    Extract<ChannelMessageAuthor, { type: "user" }>,
+    "type" | "id" | "name"
+  >
+  | Pick<
+    Extract<ChannelMessageAuthor, { type: "agent" }>,
+    "type" | "id" | "name"
+  >
+  | Pick<
+    Extract<ChannelMessageAuthor, { type: "webhook" }>,
+    "type" | "id" | "name"
+  >;
+
+export type ChannelReplyContextMessage = {
+  id: string;
+  parentMessageId: string | null;
+  author: ChannelReplyContextAuthor;
+  body: string;
+  mentionedUserIds: string[];
+  mentionedAgentIds: string[];
+  attachments: Array<
+    Pick<ChannelMessageAttachment, "id" | "filename" | "contentType" | "byteSize">
+  >;
+  document: ChannelMessageDocument | null;
+  proposal: ChannelMessageProposal | null;
+  executionProposal: ChannelExecutionProposal | null;
+  skillExecutionProposal: ChannelSkillExecutionProposal | null;
+  createdAt: string;
+};
+
+/**
+ * Project a display-oriented channel message onto the semantic fields an Agent
+ * can use when answering. In particular, never copy profile images, email
+ * addresses, reactions, presentation blocks, or reply-summary decorations into
+ * a model context snapshot.
+ */
+export function channelReplyContextMessageJson(
+  message: ChannelMessage,
+): ChannelReplyContextMessage {
+  let author: ChannelReplyContextAuthor;
+  switch (message.author.type) {
+    case "user":
+      author = { type: "user", id: message.author.id, name: message.author.name };
+      break;
+    case "agent":
+      author = { type: "agent", id: message.author.id, name: message.author.name };
+      break;
+    case "webhook":
+      author = {
+        type: "webhook",
+        id: message.author.id,
+        name: message.author.name,
+      };
+      break;
+  }
+  return {
+    id: message.id,
+    parentMessageId: message.parentMessageId,
+    author,
+    body: message.body,
+    mentionedUserIds: message.mentionedUserIds,
+    mentionedAgentIds: message.mentionedAgentIds,
+    attachments: message.attachments.map((attachment) => ({
+      id: attachment.id,
+      filename: attachment.filename,
+      contentType: attachment.contentType,
+      byteSize: attachment.byteSize,
+    })),
+    document: message.document,
+    proposal: message.proposal,
+    executionProposal: message.executionProposal,
+    skillExecutionProposal: message.skillExecutionProposal ?? null,
+    createdAt: message.createdAt,
+  };
+}
+
 /** Quick-react chips shown on hover; order matches Slack-like defaults. */
 export const channelQuickReactionEmojis = [
   "👍",

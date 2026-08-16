@@ -1106,6 +1106,10 @@ describe("organization channels", () => {
     });
     expect(agent?.skills).toHaveLength(2);
     expect(agent).toMatchObject({ name: "Honey", project_id: null });
+    const avatar = "data:image/png;base64,large-agent-avatar";
+    await db.prepare(
+      `update briar_project_agents set avatar = ? where id = ?`,
+    ).bind(avatar, agent!.id).run();
     await addChannelAgent(db, {
       channelId,
       agentId: agent!.id,
@@ -1125,6 +1129,20 @@ describe("organization channels", () => {
       body: "@Honey write the plan",
       mentionedUserIds: [],
       mentionedAgentIds: [agent!.id],
+      createdAt: at(9),
+    });
+    const agentReplyId = "f5000000-0000-4000-8000-000000000004";
+    await createChannelMessage(db, {
+      id: agentReplyId,
+      channelId,
+      parentMessageId: triggerId,
+      authorUserId: null,
+      authorAgentId: agent!.id,
+      authorAgentName: agent!.name,
+      authorAgentProvider: "claude",
+      body: "I can write that plan.",
+      mentionedUserIds: [],
+      mentionedAgentIds: [],
       createdAt: at(9),
     });
     const jobs = await enqueueChannelAgentReplies(db, {
@@ -1243,7 +1261,10 @@ describe("organization channels", () => {
         claimedAt: string;
         leaseExpiresAt: string;
         organizationContext: { schemaVersion: 1; snapshotAt: string };
-        snapshot: { projectTargets: Array<{ id: string; name: string }> };
+        snapshot: {
+          projectTargets: Array<{ id: string; name: string }>;
+          messages: Array<Record<string, unknown>>;
+        };
       };
     };
     expect(claimPayload.work).toMatchObject({
@@ -1254,6 +1275,23 @@ describe("organization channels", () => {
       },
       snapshot: { projectTargets: [] },
     });
+    expect(claimPayload.work.snapshot.messages).toHaveLength(2);
+    expect(claimPayload.work.snapshot.messages[1]).toMatchObject({
+      id: agentReplyId,
+      parentMessageId: triggerId,
+      author: { type: "agent", id: agent!.id, name: "Honey" },
+      body: "I can write that plan.",
+    });
+    expect(Object.keys(claimPayload.work.snapshot.messages[1]!.author as object))
+      .toEqual(["type", "id", "name"]);
+    const serializedReplyContext = JSON.stringify(
+      claimPayload.work.snapshot.messages,
+    );
+    expect(serializedReplyContext).not.toContain(avatar);
+    expect(serializedReplyContext).not.toContain("owner@example.com");
+    expect(serializedReplyContext).not.toContain("replyAuthors");
+    expect(serializedReplyContext).not.toContain("reactions");
+    expect(serializedReplyContext).not.toContain("blocks");
     const claimed = await getChannelAgentReplyJob(
       db,
       organizationId,

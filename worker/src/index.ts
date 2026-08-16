@@ -578,6 +578,7 @@ import {
   channelMessageReactionInputSchema,
   channelIncomingWebhookMessageSchema,
   channelMessageBlocksFallback,
+  channelReplyContextMessageJson,
   channelProposalAcceptInputSchema,
   channelReplyClaimTokenHeader,
   channelReplyClaimInputSchema,
@@ -13523,7 +13524,7 @@ async function route(
               title: target.title,
               status: target.status,
             })),
-            messages,
+            messages: messages.map(channelReplyContextMessageJson),
           },
         },
       });
