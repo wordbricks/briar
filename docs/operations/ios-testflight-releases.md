@@ -875,3 +875,31 @@ were verified before upload.
 Version `1.2.126 (1)` remains `VALID`, but main advanced through PRs #1063 and
 #1064. Version `1.2.126 (2)` is therefore the final build handed off from the
 latest main commit.
+
+## 2026-08-16 — 1.2.126 (3)
+
+- App: Briar Companion (`app.briar.companion`)
+- Marketing version: `1.2.126`
+- App Store Connect build: `3`
+- App Store Connect build ID: `c0b38739-1de1-40bc-abfa-f945e87d84f0`
+- Latest main commit: `53d51ffe`
+- Release source commit: `15363661bd9575b40b01a2c310970fb40cf22157`
+- Implementation: native SwiftUI
+- Toolchain: Xcode 26.6, iOS 26.5 SDK
+- Minimum iOS version: 17.0
+- App Store Connect processing state: `VALID`
+- TestFlight state: `IN_BETA_TESTING`
+- Internal group: `wordbricks` (`hasAccessToAllBuilds=true`)
+- Automatic tester notification: enabled
+- IPA SHA-256: `c4a6d4bb08f06e830e30afd062bb96efe8555690fbc860b310cfb6f2cc0cd2c8`
+
+This release carries the latest main updates for stale mobile reply-state
+handling, native channel-load progress, valid mention highlighting, and thread
+re-entry cache display. The exact release source also includes a test-only
+timing stabilization for the channel loading-spinner UI test. The complete
+release gate passed the shared mobile contract, Swift unit and 16 iPhone UI
+tests, iPad accessibility and largest Dynamic Type layout testing, Production
+analyze and build checks, the Tauri iOS simulator bundle, and the Android ARM64
+APK build. Archive identity, App Store provisioning, distribution signature,
+production entitlements, exported IPA signature, and all alternate app icons
+were verified before upload.
