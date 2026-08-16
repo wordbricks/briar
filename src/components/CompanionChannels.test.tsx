@@ -336,12 +336,17 @@ describe("CompanionChannels", () => {
     const summary = channel("c-common", "Welcome", null);
     const cachedMessage = message("m-cached", "Cached immediately");
     const refreshedMessage = message("m-cached", "Refreshed");
+    const staleReply = {
+      ...agentReply("running"),
+      parentMessageId: cachedMessage.id,
+    };
     const refresh = deferred<{
       channel: ChannelSummary;
       members: ChannelMember[];
       agents: ChannelAgentSummary[];
       messages: ChannelMessage[];
       nextCursor: null;
+      agentReplies: ChannelAgentReply[];
     }>();
     loadChannel
       .mockResolvedValueOnce({
@@ -350,6 +355,7 @@ describe("CompanionChannels", () => {
         agents: [agent],
         messages: [cachedMessage],
         nextCursor: null,
+        agentReplies: [staleReply],
       })
       .mockReturnValueOnce(refresh.promise);
     await render(undefined, undefined, undefined, undefined, undefined, cache);
@@ -364,6 +370,7 @@ describe("CompanionChannels", () => {
       await Promise.resolve();
     });
     expect(container.textContent).toContain("Cached immediately");
+    expect(container.querySelector(".companion-channel-typing")).not.toBeNull();
 
     act(() => root.unmount());
     root = createRoot(container);
@@ -374,6 +381,7 @@ describe("CompanionChannels", () => {
     });
 
     expect(container.textContent).toContain("Cached immediately");
+    expect(container.querySelector(".companion-channel-typing")).toBeNull();
     expect(container.querySelector(".companion-channel-loading")).toBeNull();
 
     refresh.resolve({
@@ -382,6 +390,7 @@ describe("CompanionChannels", () => {
       agents: [agent],
       messages: [refreshedMessage],
       nextCursor: null,
+      agentReplies: [],
     });
     await act(async () => {
       await refresh.promise;
