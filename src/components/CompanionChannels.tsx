@@ -207,7 +207,6 @@ export type CachedCompanionChannel = {
   agents: ChannelAgentSummary[];
   messages: ChannelMessage[];
   nextCursor: string | null;
-  replies: ChannelAgentReply[];
   threads: Map<string, ChannelMessage[]>;
 };
 
@@ -299,7 +298,6 @@ export function CompanionChannels({
         agents,
         messages,
         nextCursor: messageNextCursor,
-        replies,
         threads: cachedThreads,
       }
     : null;
@@ -480,7 +478,10 @@ export function CompanionChannels({
       loadingEarlierMessagesRef.current = false;
       setMembers(cached?.members ?? []);
       setAgents(cached?.agents ?? []);
-      setReplies(cached?.replies ?? []);
+      // Reply jobs are live execution state. A cached running job can finish
+      // while another screen is open, so restoring it would replay a stale
+      // typing indicator until the authoritative channel load completes.
+      setReplies([]);
       setError(null);
       setLoading(true);
       try {
@@ -498,7 +499,6 @@ export function CompanionChannels({
           agents: result.agents,
           messages: nextMessages,
           nextCursor,
-          replies: nextReplies,
           threads: cached?.threads ?? new Map(),
         });
         setChannel(nextChannel);
@@ -875,6 +875,7 @@ export function CompanionChannels({
         setMessageNextCursor(result.nextCursor ?? null);
         setMembers(result.members);
         setAgents(result.agents);
+        setReplies(result.agentReplies ?? []);
         const storedThreads = resolvedChannelCache.get(summary.id)?.threads ??
           new Map<string, ChannelMessage[]>();
         resolvedChannelCache.set(summary.id, {
@@ -883,7 +884,6 @@ export function CompanionChannels({
           agents: result.agents,
           messages: result.messages,
           nextCursor: result.nextCursor ?? null,
-          replies: result.agentReplies ?? [],
           threads: storedThreads,
         });
         let requestedThread: Awaited<ReturnType<typeof listChannelMessages>> | null =

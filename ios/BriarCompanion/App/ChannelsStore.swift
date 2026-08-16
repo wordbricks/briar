@@ -102,7 +102,6 @@ final class ChannelsStore: ObservableObject {
         let nextMessageCursor: UUID?
         let members: [ChannelMember]
         let agents: [ChannelAgentSummary]
-        let agentReplies: [ChannelAgentReply]
     }
 
     private struct ThreadCacheKey: Hashable {
@@ -325,7 +324,10 @@ final class ChannelsStore: ObservableObject {
         thread = []
         members = cachedConversation?.members ?? []
         agents = cachedConversation?.agents ?? []
-        agentReplies = cachedConversation?.agentReplies ?? []
+        // Reply jobs are live execution state. A cached running job can finish
+        // while another screen is open, so restoring it would replay a stale
+        // typing indicator until the authoritative channel load completes.
+        agentReplies = []
         if let cachedConversation {
             recordProposalMessages(cachedConversation.messages)
         }
@@ -1726,8 +1728,7 @@ final class ChannelsStore: ObservableObject {
             messages: messages,
             nextMessageCursor: nextMessageCursor,
             members: members,
-            agents: agents,
-            agentReplies: agentReplies
+            agents: agents
         )
     }
 

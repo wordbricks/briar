@@ -162,6 +162,19 @@ final class ChannelsStoreTests: XCTestCase {
         let channel = summary(id: channelID, name: "Briar")
         let cached = message(id: rootID, channelID: channelID, body: "Cached immediately")
         let refreshed = message(id: rootID, channelID: channelID, body: "Refreshed")
+        let staleReply = ChannelAgentReply(
+            id: proposalID,
+            agentId: projectID,
+            channelId: channelID,
+            triggerMessageId: rootID,
+            parentMessageId: rootID,
+            replyMessageId: replyID,
+            status: .running,
+            attempts: 1,
+            error: nil,
+            createdAt: Date(timeIntervalSince1970: 1_700_000_020),
+            updatedAt: Date(timeIntervalSince1970: 1_700_000_021)
+        )
         let listPath = MobileAPIContract.Endpoint.channels(organizationID: organizationID)
         let detailPath = MobileAPIContract.Endpoint.channel(
             organizationID: organizationID,
@@ -176,7 +189,8 @@ final class ChannelsStoreTests: XCTestCase {
                         channel: channel,
                         members: [],
                         agents: [],
-                        messages: [cached]
+                        messages: [cached],
+                        agentReplies: [staleReply]
                     )),
                     try encoded(ChannelDetailResponse(
                         channel: channel,
@@ -195,12 +209,14 @@ final class ChannelsStoreTests: XCTestCase {
         store.select(organizationID: organizationID, token: "token")
         await waitForChannels(store, count: 1)
         await store.openChannel(channelID)
+        XCTAssertEqual(store.agentReplies.map(\.id), [staleReply.id])
         store.closeChannelFocus(channelID: channelID)
 
         let refresh = Task { await store.openChannel(channelID) }
         await waitForRequests(api, path: detailPath, count: 2)
 
         XCTAssertEqual(store.messages.first?.body, "Cached immediately")
+        XCTAssertTrue(store.agentReplies.isEmpty)
         XCTAssertTrue(store.loading)
 
         await refresh.value
