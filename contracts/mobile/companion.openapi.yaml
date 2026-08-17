@@ -3843,6 +3843,7 @@
           "avatar",
           "provider",
           "model",
+          "description",
           "responsibility",
           "skill",
           "skills",
@@ -3906,6 +3907,10 @@
           "model": {
             "type": "string",
             "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 500
           },
           "responsibility": {
             "type": "string"

@@ -6,6 +6,7 @@ import {
   type ModelEffort,
 } from "./agent-provider-contract";
 import {
+  agentDescriptionMaxLength,
   agentResponsibilityMaxLength,
   agentSkillInstructionsMaxLength,
   agentSkillsMaxCount,
@@ -379,6 +380,7 @@ export const channelIncomingWebhookMessageSchema = z
 export const organizationAgentInputSchema = z
   .object({
     name: z.string().trim().min(1).max(100),
+    description: z.string().trim().max(agentDescriptionMaxLength).optional(),
     provider: z.enum(channelAgentProviders),
     model: z.string().trim().min(1).max(100).nullable().default(null),
     responsibility: z
@@ -475,6 +477,7 @@ export type ChannelAgentSkill = {
 export type ChannelAgentSummary = {
   agentId: string;
   name: string;
+  description?: string;
   avatar: string | null;
   provider: ChannelAgentProvider;
   model: string | null;

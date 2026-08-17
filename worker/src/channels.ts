@@ -986,7 +986,8 @@ export async function listChannelAgents(db: D1Database, channelId: string) {
     .prepare(
       `select agent.id, agent.organization_id, agent.project_id,
               project.name as project_name, agent.name, agent.avatar,
-              agent.provider, agent.model, agent.responsibility,
+              agent.provider, agent.model, agent.description,
+              agent.responsibility,
               agent.effort, agent.created_at, agent.updated_at
        from briar_channel_agents roster
        join briar_project_agents agent on agent.id = roster.agent_id
@@ -1009,6 +1010,7 @@ export async function listChannelAgents(db: D1Database, channelId: string) {
       avatar: string | null;
       provider: AgentProvider;
       model: string | null;
+      description: string;
       responsibility: string;
       effort: AgentSkillEffort | null;
       created_at: string;

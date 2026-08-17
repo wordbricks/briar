@@ -201,6 +201,7 @@ final class ChannelGroupingTests: XCTestCase {
             provider: "claude",
             model: nil,
             projectId: nil,
+            description: "Writing and editing support",
             responsibility: "Writing partner",
             createdAt: Date(timeIntervalSince1970: 1_700_000_000)
         )
@@ -225,6 +226,7 @@ final class ChannelGroupingTests: XCTestCase {
             provider: "claude",
             model: nil,
             projectId: nil,
+            description: "Writing and editing support",
             responsibility: "Writing partner",
             createdAt: Date(timeIntervalSince1970: 1_700_000_000)
         )
@@ -383,6 +385,7 @@ final class ChannelGroupingTests: XCTestCase {
             provider: "claude",
             model: nil,
             projectId: nil,
+            description: "Writing and editing support",
             responsibility: "Writing partner",
             createdAt: Date(timeIntervalSince1970: 1_700_000_000)
         )

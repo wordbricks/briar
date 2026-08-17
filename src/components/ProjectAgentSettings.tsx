@@ -11,7 +11,10 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { useI18n } from "../i18n";
-import { agentResponsibilityMaxLength } from "../lib/agent-limits";
+import {
+  agentDescriptionMaxLength,
+  agentResponsibilityMaxLength,
+} from "../lib/agent-limits";
 import {
   agentEffortOptions,
   agentModelOptions,
@@ -78,6 +81,7 @@ export function ProjectAgentSettings({
   const [provider, setProvider] = useState<AgentProvider>(agent.provider);
   const [model, setModel] = useState(agent.model ?? "");
   const [effort, setEffort] = useState<ModelEffort | null>(agent.effort);
+  const [description, setDescription] = useState(agent.description ?? "");
   const [responsibility, setResponsibility] = useState(agent.responsibility);
   const [calendarColor, setCalendarColor] = useState(agent.calendarColor);
   const [skills, setSkills] = useState(() =>
@@ -90,6 +94,7 @@ export function ProjectAgentSettings({
     provider: agent.provider,
     model: agent.model ?? "",
     effort: agent.effort,
+    description: agent.description ?? "",
     responsibility: agent.responsibility,
     skills: projectAgentSkillInputs(agent.skills),
     calendarColor: agent.calendarColor,
@@ -107,6 +112,7 @@ export function ProjectAgentSettings({
     provider !== savedProfile.provider ||
     model !== savedProfile.model ||
     effort !== savedProfile.effort ||
+    description !== savedProfile.description ||
     responsibility !== savedProfile.responsibility ||
     JSON.stringify(skills) !== JSON.stringify(savedProfile.skills) ||
     calendarColor !== savedProfile.calendarColor;
@@ -131,6 +137,7 @@ export function ProjectAgentSettings({
         provider,
         model: model || null,
         effort,
+        description: description.trim(),
         responsibility: responsibility.trim(),
         skills: projectAgentSkillInputs(skills),
         calendarColor,
@@ -142,6 +149,7 @@ export function ProjectAgentSettings({
         provider: saved.provider,
         model: saved.model ?? "",
         effort: saved.effort,
+        description: saved.description ?? "",
         responsibility: saved.responsibility,
         skills: projectAgentSkillInputs(saved.skills),
         calendarColor: saved.calendarColor,
@@ -152,6 +160,7 @@ export function ProjectAgentSettings({
       setProvider(nextProfile.provider);
       setModel(nextProfile.model);
       setEffort(nextProfile.effort);
+      setDescription(nextProfile.description);
       setResponsibility(nextProfile.responsibility);
       setSkills(nextProfile.skills);
       setCalendarColor(nextProfile.calendarColor);
@@ -363,6 +372,22 @@ export function ProjectAgentSettings({
                     placeholder={t("agents.namePlaceholder")}
                     value={name}
                   />
+                </div>
+                <div className="project-agent-settings-field">
+                  <Label htmlFor="project-agent-settings-description">
+                    {t("agents.agentDescription")}
+                  </Label>
+                  <Textarea
+                    id="project-agent-settings-description"
+                    maxLength={agentDescriptionMaxLength}
+                    onChange={(event) => setDescription(event.target.value)}
+                    placeholder={t("agents.agentDescriptionPlaceholder")}
+                    rows={3}
+                    value={description}
+                  />
+                  <Typography as="small" tone="muted" variant="caption">
+                    {t("agents.agentDescriptionHint")}
+                  </Typography>
                 </div>
                 <div className="project-agent-settings-runtime-heading">
                   <Cpu aria-hidden="true" size={15} />

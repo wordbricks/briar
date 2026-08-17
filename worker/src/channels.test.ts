@@ -1078,6 +1078,7 @@ describe("organization channels", () => {
       name: "Honey",
       provider: "claude",
       model: null,
+      description: "Helps the team write and refine content.",
       responsibility: "Writing partner",
       effort: null,
       skills: [
@@ -1105,7 +1106,11 @@ describe("organization channels", () => {
       createdAt: at(8),
     });
     expect(agent?.skills).toHaveLength(2);
-    expect(agent).toMatchObject({ name: "Honey", project_id: null });
+    expect(agent).toMatchObject({
+      name: "Honey",
+      description: "Helps the team write and refine content.",
+      project_id: null,
+    });
     const avatar = "data:image/png;base64,large-agent-avatar";
     await db.prepare(
       `update briar_project_agents set avatar = ? where id = ?`,
@@ -2745,6 +2750,9 @@ describe("organization channels", () => {
       "e0000000-0000-4000-8000-000000000004",
     );
     expect(agents.map((agent) => agent.name)).toEqual(["Honey"]);
+    expect(agents[0]?.description).toBe(
+      "Helps the team write and refine content.",
+    );
   });
 
   it("toggles emoji reactions and refreshes them through channel deltas", async () => {

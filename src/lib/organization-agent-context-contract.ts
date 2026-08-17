@@ -4,6 +4,7 @@ import {
   modelEffortSchema,
 } from "./agent-provider-contract";
 import {
+  agentDescriptionMaxLength,
   agentResponsibilityMaxLength,
   agentSkillInstructionsMaxLength,
   agentSkillsMaxCount,
@@ -214,6 +215,7 @@ export const organizationAgentContextProjectAgentSchema = z
     provider: z.enum(agentProviders),
     model: z.string().min(1).max(100).nullable(),
     effort: modelEffortSchema.nullable(),
+    description: z.string().max(agentDescriptionMaxLength),
     responsibility: z.string().max(agentResponsibilityMaxLength),
     skills: z
       .array(organizationAgentContextAgentSkillSchema)

@@ -106,6 +106,24 @@ describe("Companion mobile API contract", () => {
     expect(taskResponse.session.agentName).toBe("Issue processing agent");
   });
 
+  it("carries Agent descriptions without replacing responsibilities", () => {
+    const projectAgent = mobileOperationSchemas.listProjectAgents.response
+      .parse(fixture.operations.listProjectAgents.response).agents[0];
+    const channelAgent = mobileOperationSchemas.getChannel.response
+      .parse(fixture.operations.getChannel.response).agents[0];
+
+    expect(projectAgent?.description).toBe(
+      "Handles issue processing and development work for the project.",
+    );
+    expect(projectAgent?.responsibility).toBe(
+      "Owns the project's development and code-related work.",
+    );
+    expect(channelAgent?.description).toBe(
+      "글쓰기와 콘텐츠 다듬기를 돕는 에이전트입니다.",
+    );
+    expect(channelAgent?.responsibility).toBe("글쓰기 파트너");
+  });
+
   it("accepts channel inbox ids in an all-read state update", () => {
     const request = fixture.operations.putInboxReadStates.request as {
       readVersions: Record<string, string>;

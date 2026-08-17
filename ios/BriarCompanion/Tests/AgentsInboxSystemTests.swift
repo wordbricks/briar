@@ -143,6 +143,7 @@ final class AgentsInboxSystemTests: XCTestCase {
             provider: .codex,
             model: nil,
             effort: nil,
+            description: "제품 개발 에이전트",
             responsibility: "제품 개발을 담당합니다.",
             skill: "legacy runtime profile",
             skills: [skill],
@@ -369,6 +370,7 @@ final class AgentsInboxSystemTests: XCTestCase {
             provider: .codex,
             model: nil,
             effort: nil,
+            description: "제품 개발 에이전트",
             responsibility: "제품 개발을 담당합니다.",
             skill: "legacy runtime profile",
             skills: [skill],
@@ -609,6 +611,7 @@ final class AgentsInboxSystemTests: XCTestCase {
             provider: .codex,
             model: "gpt-5.6-sol",
             effort: .high,
+            description: "이슈 처리 에이전트",
             responsibility: "queued 이슈를 처리합니다.",
             skill: "skill",
             skills: [ProjectAgent.Skill(
