@@ -26,6 +26,7 @@ import {
 import { useI18n, type Locale } from "../i18n";
 import { featureFlags } from "../lib/feature-flags";
 import { isProjectConnectedLocally } from "../lib/local-project-connection";
+import { isProjectScheduleTabEnabled } from "../lib/project-tabs";
 import type { RepositoryReadiness } from "../lib/project-connection";
 import type { ChannelSummary } from "../lib/channels-contract";
 import { channelHasUnread } from "../lib/channel-unread";
@@ -784,22 +785,24 @@ export function Sidebar({
                         </div>
                       ) : null}
                     </div>
-                    <a
-                      aria-current={
-                        isActive && activePage === "schedule" ? "page" : undefined
-                      }
-                      className={`sidebar-project-view${
-                        isActive && activePage === "schedule" ? " active" : ""
-                      }`}
-                      href="#schedule"
-                      onClick={(event) => {
-                        event.preventDefault();
-                        openProjectPage(onScheduleOpen);
-                      }}
-                    >
-                      <CalendarDays size={14} strokeWidth={1.7} />
-                      <span>{t("sidebar.schedule")}</span>
-                    </a>
+                    {isProjectScheduleTabEnabled(project) ? (
+                      <a
+                        aria-current={
+                          isActive && activePage === "schedule" ? "page" : undefined
+                        }
+                        className={`sidebar-project-view${
+                          isActive && activePage === "schedule" ? " active" : ""
+                        }`}
+                        href="#schedule"
+                        onClick={(event) => {
+                          event.preventDefault();
+                          openProjectPage(onScheduleOpen);
+                        }}
+                      >
+                        <CalendarDays size={14} strokeWidth={1.7} />
+                        <span>{t("sidebar.schedule")}</span>
+                      </a>
+                    ) : null}
                   </div>
                 )}
               </section>

@@ -27,6 +27,7 @@ import worker, {
   projectUsageSummaryJson,
   projectIconInputSchema,
   projectIssueKeyPrefixInputSchema,
+  projectTabsInputSchema,
   projectAgentSessionInputSchema,
   projectAgentInputSchema,
   projectAgentScheduleInputSchema,
@@ -1111,6 +1112,16 @@ describe("Worker HTTP contract", () => {
     expect(() =>
       projectIssueKeyPrefixInputSchema.parse({ issueKeyPrefix: "B-R" }),
     ).toThrow();
+  });
+
+  it("accepts only the optional schedule tab in project tab updates", () => {
+    expect(projectTabsInputSchema.parse({ schedule: false })).toEqual({
+      schedule: false,
+    });
+    expect(() =>
+      projectTabsInputSchema.parse({ issues: false, schedule: true }),
+    ).toThrow();
+    expect(() => projectTabsInputSchema.parse({})).toThrow();
   });
 
   it("validates structural issue model effort preferences", () => {

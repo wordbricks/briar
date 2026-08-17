@@ -285,6 +285,7 @@ export const demoDashboard: DashboardPayload = {
     id: "demo-project",
     name: "Briar",
     issueKeyPrefix: "AH",
+    scheduleTabEnabled: true,
     organizationId: "demo-organization",
     organizationName: "Briar",
     role: "owner",

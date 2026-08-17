@@ -58,6 +58,7 @@ import {
   updateOrganizationLogo as updateRemoteOrganizationLogo,
   updateProjectIcon as updateRemoteProjectIcon,
   updateProjectIssueKeyPrefix as updateRemoteProjectIssueKeyPrefix,
+  updateProjectTabs as updateRemoteProjectTabs,
   updateProjectSettings,
   updateCheckpointPolicy,
   type DeviceClientId,
@@ -1306,6 +1307,39 @@ export function useBriar(options: UseBriarOptions = {}) {
                 projectId,
                 issueKeyPrefix,
               )
+            ).project;
+      setProjects((current) =>
+        current.map((candidate) =>
+          candidate.id === projectId ? project : candidate,
+        ),
+      );
+      setDashboard((current) =>
+        current?.project.id === projectId
+          ? { ...current, project }
+          : current,
+      );
+      setProjectConnection((current) =>
+        current?.project.id === projectId
+          ? { ...current, project }
+          : current,
+      );
+      return project;
+    },
+    [projects, token],
+  );
+
+  const changeProjectScheduleTab = useCallback(
+    async (projectId: string, scheduleTabEnabled: boolean) => {
+      const currentProject = projects.find((project) => project.id === projectId);
+      if (!currentProject) throw new Error("변경할 프로젝트를 찾을 수 없습니다.");
+      if (!demoMode && !token) throw new Error("로그인이 필요합니다.");
+      const project =
+        demoMode || !token
+          ? { ...currentProject, scheduleTabEnabled }
+          : (
+              await updateRemoteProjectTabs(token, projectId, {
+                schedule: scheduleTabEnabled,
+              })
             ).project;
       setProjects((current) =>
         current.map((candidate) =>
@@ -3601,6 +3635,7 @@ export function useBriar(options: UseBriarOptions = {}) {
     changeOrganizationLogo,
     changeProjectIcon,
     changeProjectIssueKeyPrefix,
+    changeProjectScheduleTab,
     checkOrganizationHandle,
     connectProject,
     connectedProjectIds,

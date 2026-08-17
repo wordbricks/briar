@@ -312,6 +312,7 @@ import {
   updateOrganizationMemberRole,
   updateProjectIcon,
   updateProjectIssueKeyPrefix,
+  updateProjectScheduleTabEnabled,
   updateIssue,
   updateIssueWithAttachmentMetadata,
   updateIssueCheckpoints,
@@ -1823,6 +1824,11 @@ export const projectIssueKeyPrefixInputSchema = z
       .trim()
       .toUpperCase()
       .regex(/^[A-Z0-9]{1,3}$/u),
+  })
+  .strict();
+export const projectTabsInputSchema = z
+  .object({
+    schedule: z.boolean(),
   })
   .strict();
 export const projectAgentInputSchema = z
@@ -4001,6 +4007,7 @@ function projectJson(row: ProjectRow) {
     id: row.id,
     name: row.name,
     issueKeyPrefix: row.issue_key_prefix,
+    scheduleTabEnabled: row.schedule_tab_enabled !== 0,
     icon: row.icon,
     organizationId: row.organization_id,
     organizationName: row.organization_name,
@@ -9178,6 +9185,38 @@ async function route(
       project: projectJson({
         ...project,
         issue_key_prefix: input.issueKeyPrefix,
+      }),
+    });
+  }
+
+  const projectTabsMatch = pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/tabs$/u,
+  );
+  if (projectTabsMatch && request.method === "PUT") {
+    const session = await requireSession(auth, request);
+    const project = await getProject(
+      db,
+      projectTabsMatch[1],
+      session.user.id,
+    );
+    if (!project) throw new HttpError(404, "Project not found");
+    if (!canManageOrganization(project.member_role)) {
+      throw new HttpError(403, "Organization admin access required");
+    }
+    const input = projectTabsInputSchema.parse(await readJson(request));
+    if (
+      !(await updateProjectScheduleTabEnabled(
+        db,
+        project.id,
+        input.schedule,
+      ))
+    ) {
+      throw new HttpError(404, "Project not found");
+    }
+    return json({
+      project: projectJson({
+        ...project,
+        schedule_tab_enabled: input.schedule ? 1 : 0,
       }),
     });
   }

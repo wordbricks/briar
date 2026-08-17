@@ -48,6 +48,7 @@ describe("ProjectSettings", () => {
     }));
     const onIconChange = vi.fn(async () => undefined);
     const onIssueKeyPrefixChange = vi.fn(async () => undefined);
+    const onScheduleTabChange = vi.fn(async () => undefined);
     vi.mocked(projectIconFromFile).mockResolvedValue(
       "data:image/webp;base64,aWNvbg==",
     );
@@ -141,6 +142,7 @@ describe("ProjectSettings", () => {
           onImportLinearIssues={onImportLinearIssues}
           onIconChange={onIconChange}
           onIssueKeyPrefixChange={onIssueKeyPrefixChange}
+          onScheduleTabChange={onScheduleTabChange}
           onRefreshVelen={onRefreshVelen}
           project={{
             id: "project-1",
@@ -157,6 +159,7 @@ describe("ProjectSettings", () => {
     const openSection = async (
       section:
         | "general"
+        | "tabs"
         | "integrations"
         | "issue-import"
         | "agent-configuration"
@@ -179,6 +182,7 @@ describe("ProjectSettings", () => {
       ).map((button) => button.textContent),
     ).toEqual([
       "General",
+      "탭",
       "Integrations",
       "이슈 임포트",
       "에이전트 구성",
@@ -387,6 +391,22 @@ describe("ProjectSettings", () => {
     expect(onIssueKeyPrefixChange).toHaveBeenCalledWith("project-1", "BR");
     expect(container.textContent).toContain("이슈 키 프리픽스를 저장했습니다.");
 
+    await openSection("tabs");
+    expect(container.textContent).toContain("이슈 탭은 항상 표시됩니다.");
+    expect(container.textContent).toContain("에이전트 탭은 항상 표시됩니다.");
+    const tabSwitches = Array.from(
+      container.querySelectorAll<HTMLButtonElement>(
+        '[data-project-settings-panel="tabs"] button[role="switch"]',
+      ),
+    );
+    expect(tabSwitches).toHaveLength(3);
+    expect(tabSwitches[0]?.disabled).toBe(true);
+    expect(tabSwitches[1]?.disabled).toBe(true);
+    expect(tabSwitches[2]?.getAttribute("aria-checked")).toBe("true");
+    await act(async () => tabSwitches[2]?.click());
+    expect(onScheduleTabChange).toHaveBeenCalledWith("project-1", false);
+
+    await openSection("general");
     const iconFile = new File(["icon"], "icon.svg", { type: "image/svg+xml" });
     const iconInput = container.querySelector<HTMLInputElement>(
       'input[aria-label="아이콘 업로드"]',
@@ -441,6 +461,7 @@ describe("ProjectSettings", () => {
           })}
           onIconChange={async () => undefined}
           onIssueKeyPrefixChange={async () => undefined}
+          onScheduleTabChange={async () => undefined}
           onRefreshVelen={async () => null}
           project={{
             id: "project-1",

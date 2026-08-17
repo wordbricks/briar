@@ -115,6 +115,7 @@ import {
   updateOrganizationMemberRole,
   updateProjectIcon,
   updateProjectIssueKeyPrefix,
+  updateProjectScheduleTabEnabled,
   updateIssue,
   unsubscribeIssue,
   upsertInboxReadStates,
@@ -973,6 +974,13 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       db,
       await readFile(
         resolve("migrations/0108_channel_notification_inbox.sql"),
+        "utf8",
+      ),
+    );
+    await executeSql(
+      db,
+      await readFile(
+        resolve("migrations/0113_project_schedule_tab.sql"),
         "utf8",
       ),
     );
@@ -4012,6 +4020,27 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     await expect(getProject(db, projectId, "owner")).resolves.toMatchObject({
       id: projectId,
       issue_key_prefix: "BR",
+    });
+  });
+
+  it("stores whether the schedule tab is visible", async () => {
+    await expect(getProject(db, projectId, "owner")).resolves.toMatchObject({
+      id: projectId,
+      schedule_tab_enabled: 1,
+    });
+    await expect(
+      updateProjectScheduleTabEnabled(db, projectId, false),
+    ).resolves.toBe(true);
+    await expect(getProject(db, projectId, "owner")).resolves.toMatchObject({
+      id: projectId,
+      schedule_tab_enabled: 0,
+    });
+    await expect(
+      updateProjectScheduleTabEnabled(db, projectId, true),
+    ).resolves.toBe(true);
+    await expect(getProject(db, projectId, "owner")).resolves.toMatchObject({
+      id: projectId,
+      schedule_tab_enabled: 1,
     });
   });
 

@@ -5,6 +5,7 @@ import {
   ChevronDown,
   Download,
   GitBranch,
+  LayoutList,
   Plug,
   ShieldCheck,
   SlidersHorizontal,
@@ -248,6 +249,11 @@ export function UnifiedSettingsSidebar({
         id: "general",
         icon: <SlidersHorizontal size={16} strokeWidth={1.75} />,
         label: t("settings.navGeneral"),
+      },
+      {
+        id: "tabs",
+        icon: <LayoutList size={16} strokeWidth={1.75} />,
+        label: t("settings.navTabs"),
       },
       {
         id: "integrations",

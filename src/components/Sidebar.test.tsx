@@ -433,6 +433,38 @@ describe("Sidebar", () => {
     container.remove();
   });
 
+  it("hides the schedule tab when the project has turned it off", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(
+        <Sidebar
+          {...sidebarProps}
+          projects={[
+            {
+              ...sidebarProps.projects[0]!,
+              scheduleTabEnabled: false,
+            },
+          ]}
+        />,
+      );
+    });
+
+    expect(
+      container.querySelector('a[href="#schedule"]'),
+    ).toBeNull();
+    expect(
+      container.querySelector('a[href="#issues"]'),
+    ).not.toBeNull();
+    expect(
+      container.querySelector('a[href="#agents"]'),
+    ).not.toBeNull();
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
   it("opens issue creation for the clicked project when another is active", async () => {
     const onProjectChange = vi.fn();
     const onCreateIssue = vi.fn();

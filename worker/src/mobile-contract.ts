@@ -73,6 +73,7 @@ export const mobileProjectsResponseSchema = z.object({
     id: z.uuid(),
     name: z.string(),
     issueKeyPrefix: z.string().regex(/^[A-Z0-9]{1,3}$/u).default("AH"),
+    scheduleTabEnabled: z.boolean().default(true),
     icon: z.string().nullable(),
     organizationId: z.uuid(),
     organizationName: z.string(),

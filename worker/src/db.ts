@@ -63,6 +63,7 @@ export type ProjectRow = {
   id: string;
   name: string;
   issue_key_prefix: string;
+  schedule_tab_enabled: number;
   icon: string | null;
   organization_id: string;
   organization_name: string;
@@ -4180,6 +4181,7 @@ export async function listProjects(db: D1Database, userId: string) {
     .prepare(
       `select project.id, project.name,
               project.issue_key_prefix,
+              project.schedule_tab_enabled,
               coalesce(project.icon_data_url_browser, project.icon_data_url) as icon,
               project.organization_id,
               organization.name as organization_name,
@@ -4204,6 +4206,7 @@ export async function listOrganizationProjects(
     .prepare(
       `select project.id, project.name,
               project.issue_key_prefix,
+              project.schedule_tab_enabled,
               coalesce(project.icon_data_url_browser, project.icon_data_url) as icon,
               project.organization_id,
               organization.name as organization_name,
@@ -4300,6 +4303,7 @@ export async function createProject(
     id: crypto.randomUUID(),
     name: input.name,
     issue_key_prefix: "AH",
+    schedule_tab_enabled: 1,
     icon: null,
     organization_id: input.organizationId,
     organization_name: "",
@@ -4394,6 +4398,7 @@ export async function getProject(
     .prepare(
       `select project.id, project.name,
               project.issue_key_prefix,
+              project.schedule_tab_enabled,
               coalesce(project.icon_data_url_browser, project.icon_data_url) as icon,
               project.organization_id,
               organization.name as organization_name,
@@ -4439,6 +4444,23 @@ export async function updateProjectIssueKeyPrefix(
        where id = ?`,
     )
     .bind(issueKeyPrefix, updatedAt, projectId)
+    .run();
+  return result.meta.changes > 0;
+}
+
+export async function updateProjectScheduleTabEnabled(
+  db: D1Database,
+  projectId: string,
+  scheduleTabEnabled: boolean,
+) {
+  const updatedAt = new Date().toISOString();
+  const result = await db
+    .prepare(
+      `update briar_projects
+       set schedule_tab_enabled = ?, updated_at = ?
+       where id = ?`,
+    )
+    .bind(scheduleTabEnabled ? 1 : 0, updatedAt, projectId)
     .run();
   return result.meta.changes > 0;
 }
