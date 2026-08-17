@@ -795,7 +795,7 @@ export function HuntDashboard({
           `translate3d(${clientX + 14}px, ${clientY + 14}px, 0)`;
       }
       const columnId = kanbanColumnIdAtPoint(clientX, clientY);
-      setDragOverColumnId(columnId === "status:paused" ? null : columnId);
+      setDragOverColumnId(columnId);
     },
     [kanbanColumnIdAtPoint],
   );
@@ -1093,13 +1093,6 @@ export function HuntDashboard({
         placement: { status: "running" as const, workflowStage: stage.id },
       })),
       {
-        id: "status:paused",
-        label: t("status.paused"),
-        tone: "amber",
-        // Paused runs are resumed from the detail page, not moved by drag/drop.
-        placement: { status: "queued" as const, workflowStage: null },
-      },
-      {
         id: "status:blocked",
         label: t("status.blocked"),
         tone: "rose",
@@ -1152,7 +1145,10 @@ export function HuntDashboard({
         return !["status:completed", "status:cancelled"].includes(column.id);
       }
       if (status === "attention") {
-        return ["status:paused", "status:blocked", "status:failed"].includes(column.id);
+        return (
+          column.id.startsWith("stage:") ||
+          ["status:blocked", "status:failed"].includes(column.id)
+        );
       }
       if (status === "completed") {
         return ["status:completed", "status:cancelled"].includes(column.id);
@@ -1176,6 +1172,10 @@ export function HuntDashboard({
         ? checkpointsByBoundary.get(column.id) ?? []
         : [],
     }));
+    const boardColumns = status === "attention"
+      ? columns.filter((column) =>
+          !column.id.startsWith("stage:") || column.runs.length > 0)
+      : columns;
     // Mobile companion Tasks: one newest-updated-first stream (iOS TaskListView parity),
     // not status/stage columns.
     if (companionMode) {
@@ -1190,7 +1190,7 @@ export function HuntDashboard({
           }]
         : [];
     }
-    return columns;
+    return boardColumns;
   }, [
     companionMode,
     dashboard?.settings.checkpointPolicy,
@@ -1778,6 +1778,7 @@ export function HuntDashboard({
                       if (
                         companionMode ||
                         recoveringRunId === run.id ||
+                        run.status === "paused" ||
                         event.pointerType === "touch" ||
                         !event.isPrimary ||
                         event.button !== 0 ||
@@ -1843,7 +1844,6 @@ export function HuntDashboard({
                       clearKanbanDragState();
                       if (
                         !targetColumn ||
-                        targetColumn.id === "status:paused" ||
                         placementMatchesRun(run, targetColumn.placement)
                       ) return;
                       void onMoveRun(run.id, targetColumn.placement).catch(
@@ -3465,7 +3465,7 @@ function KanbanCard({
       <div
         aria-label={t("run.details", { title: run.title })}
         aria-disabled={isMoving}
-        className={`kanban-card ${meta.tone}${isMoving ? " moving" : ""}${isDragging ? " dragging" : ""}${assignmentBadgeCount > 0 ? " has-assignees" : ""}${assignmentBadgeCount > 1 ? " has-multiple-assignees" : ""}${assignmentBadgeCount > 2 ? " has-three-assignees" : ""}${assignmentBadgeCount > 3 ? " has-four-assignees" : ""}`}
+        className={`kanban-card ${meta.tone}${run.status === "paused" ? " awaiting-review" : ""}${isMoving ? " moving" : ""}${isDragging ? " dragging" : ""}${assignmentBadgeCount > 0 ? " has-assignees" : ""}${assignmentBadgeCount > 1 ? " has-multiple-assignees" : ""}${assignmentBadgeCount > 2 ? " has-three-assignees" : ""}${assignmentBadgeCount > 3 ? " has-four-assignees" : ""}`}
         draggable={false}
         onClick={onOpen}
         onKeyDown={(event) => {
@@ -3577,6 +3577,12 @@ function KanbanCard({
             <ChevronRight size={14} />
           </span>
         </span>
+        {run.status === "paused" ? (
+          <span className="kanban-card-review-banner" role="status">
+            <i aria-hidden="true" />
+            {t("run.awaitingReviewBanner")}
+          </span>
+        ) : null}
       </div>
     </IssueContextMenu>
   );
@@ -3761,7 +3767,10 @@ function IssueContextMenu({
           <ContextMenu.Separator className="issue-context-separator" />
 
           <ContextMenu.Sub>
-            <ContextMenu.SubTrigger className="issue-context-item">
+            <ContextMenu.SubTrigger
+              className="issue-context-item"
+              disabled={run.status === "paused"}
+            >
               <Activity aria-hidden="true" size={17} />
               <span>{t("dashboard.status")}</span>
               <small>{currentStatusLabel}</small>
@@ -3777,10 +3786,15 @@ function IssueContextMenu({
                   {statusOptions.map((option) => (
                     <ContextMenu.RadioItem
                       className="issue-context-item issue-context-choice"
+                      disabled={run.status === "paused"}
                       key={option.value}
                       onSelect={() => {
                         const placement = placementForId(option.value);
-                        if (!placement || placementMatchesRun(run, placement)) {
+                        if (
+                          run.status === "paused" ||
+                          !placement ||
+                          placementMatchesRun(run, placement)
+                        ) {
                           return;
                         }
                         onMove(placement);
@@ -10193,13 +10207,15 @@ type Translate = ReturnType<typeof useI18n>["t"];
 const builtInStageIds = new Set(["analyzing", "planning", "implementing", "reviewing", "pr_open", "local_qa", "ci_qa", "staging_qa", "production_qa", "monitoring"]);
 
 function kanbanColumnForRun(run: HuntRun, workflowStageIds: string[]) {
-  if (run.status !== "running") return `status:${run.status}`;
-  if (run.workflowStage && workflowStageIds.includes(run.workflowStage)) {
-    return `stage:${run.workflowStage}`;
+  if (run.status === "paused" || run.status === "running") {
+    if (run.workflowStage && workflowStageIds.includes(run.workflowStage)) {
+      return `stage:${run.workflowStage}`;
+    }
+    return workflowStageIds[0]
+      ? `stage:${workflowStageIds[0]}`
+      : "status:queued";
   }
-  return workflowStageIds[0]
-    ? `stage:${workflowStageIds[0]}`
-    : "status:queued";
+  return `status:${run.status}`;
 }
 
 function placementIdForRun(run: HuntRun) {
