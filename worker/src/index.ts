@@ -35,6 +35,7 @@ import {
   type AgentProvider,
 } from "../../src/lib/agent-provider-contract";
 import {
+  agentDescriptionMaxLength,
   agentResponsibilityMaxLength,
   agentSkillsMaxCount,
 } from "../../src/lib/agent-limits";
@@ -506,8 +507,11 @@ import {
   listChannels,
   loadChannelDelta,
   markChannelRead,
+  resolveChannelThreadRootId,
+  subscribeChannelThread,
   isChannelReactionEmoji,
   isChannelRootMessage,
+  listChannelThreadSubscriptions,
   removeChannelAgent,
   removeChannelMember,
   revokeChannelWebhook,
@@ -516,6 +520,7 @@ import {
   reserveChannelExecutionProposalApproval,
   renewChannelReplyLease,
   snapshotChannelReplyExecutionTargets,
+  unsubscribeChannelThread,
   toggleChannelMessageReaction,
   updateChannel,
   updateChannelWebhook,
@@ -1834,6 +1839,7 @@ export const projectTabsInputSchema = z
 export const projectAgentInputSchema = z
   .object({
     name: z.string().trim().min(1).max(100).nullable().optional(),
+    description: z.string().trim().max(agentDescriptionMaxLength).optional(),
     avatar: z
       .string()
       .max(400_000)
@@ -4033,6 +4039,7 @@ const projectAgentJson = (row: ProjectAgentRow) => {
     provider: row.provider,
     model: row.model,
     effort: row.effort,
+    description: row.description,
     responsibility: row.responsibility,
     skill: row.skill_markdown,
     skills: (row.skills ?? []).map(agentSkillJson),
@@ -4234,6 +4241,7 @@ const projectAgentScheduleRunJson = (
     provider: row.agent_provider,
     model: row.agent_model,
     effort: row.agent_effort,
+    description: row.agent_description,
     responsibility: row.agent_responsibility,
     skill: row.agent_skill_markdown,
     skills: row.agent_skills.map(agentSkillJson),
@@ -7294,6 +7302,7 @@ async function route(
       name: input.name,
       provider: input.provider,
       model: input.model,
+      description: input.description ?? "",
       responsibility: input.responsibility,
       effort: input.effort,
       skills: input.skills ?? [],
@@ -7320,6 +7329,7 @@ async function route(
       name: input.name,
       provider: input.provider,
       model: input.model,
+      description: input.description,
       responsibility: input.responsibility,
       effort: input.effort,
       skills: input.skills,
@@ -8193,6 +8203,52 @@ async function route(
       },
       201,
     );
+  }
+
+  const channelThreadSubscriptionMatch = pathname.match(
+    /^\/organizations\/([0-9a-f-]+)\/channels\/([0-9a-f-]+)\/messages\/([0-9a-f-]+)\/subscription$/u,
+  );
+  if (
+    channelThreadSubscriptionMatch &&
+    (request.method === "PUT" || request.method === "DELETE")
+  ) {
+    const session = await requireSession(auth, request);
+    const channel = await requireChannelAccess(
+      db,
+      channelThreadSubscriptionMatch[1],
+      channelThreadSubscriptionMatch[2],
+      session.user.id,
+    );
+    const rootMessageId = await resolveChannelThreadRootId(
+      db,
+      channel.id,
+      channelThreadSubscriptionMatch[3],
+    );
+    if (!rootMessageId) throw new HttpError(404, "Message not found");
+    if (request.method === "DELETE") {
+      await unsubscribeChannelThread(
+        db,
+        channel.id,
+        rootMessageId,
+        session.user.id,
+      );
+    } else {
+      await subscribeChannelThread(
+        db,
+        channel.id,
+        rootMessageId,
+        session.user.id,
+        new Date().toISOString(),
+      );
+    }
+    return json({
+      rootMessageId,
+      subscribers: await listChannelThreadSubscriptions(
+        db,
+        channel.id,
+        rootMessageId,
+      ),
+    });
   }
 
   const channelMessageReactionMatch = pathname.match(
@@ -9763,6 +9819,7 @@ async function route(
       provider: input.provider,
       model: input.model ?? null,
       effort: input.effort ?? null,
+      description: input.description ?? "",
       responsibility: input.responsibility,
       skills: input.skills ?? [],
       calendarColor: input.calendarColor,
@@ -10050,6 +10107,7 @@ async function route(
           provider: input.provider,
           model: input.model ?? null,
           effort: input.effort ?? null,
+          description: input.description ?? existing.description,
           responsibility: input.responsibility,
           skills: input.skills,
           calendarColor: input.calendarColor,

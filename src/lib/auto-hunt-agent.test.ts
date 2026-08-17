@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   agentMessagesFromAppServerEvents,
+  displayChannelActivityHeadline,
   mergeAutoHuntAppServerEvents,
   naturalLanguageFromAgentMessage,
   type AutoHuntAppServerEvent,
@@ -292,5 +293,39 @@ describe("naturalLanguageFromAgentMessage", () => {
     expect(naturalLanguageFromAgentMessage(
       "[commentary] 저장소를 확인하고 있습니다.",
     )).toBe("저장소를 확인하고 있습니다.");
+  });
+
+  it("extracts a string body from a channel reply envelope", () => {
+    expect(naturalLanguageFromAgentMessage(JSON.stringify({
+      body: "Approve 동시성 처리와 staging 배포 흐름을 코드 기준으로 확인하겠습니다.",
+      attachments: [],
+      document: null,
+      issueProposal: null,
+    }))).toBe("Approve 동시성 처리와 staging 배포 흐름을 코드 기준으로 확인하겠습니다.");
+  });
+
+  it("extracts a complete body from a streamed or truncated reply envelope", () => {
+    expect(naturalLanguageFromAgentMessage(
+      '{"body":"Approve 동시성 처리와 staging 배포 흐름을 코드 기준으로 확인하겠습니다.","attachments":[],"document":null,"issueProposal"',
+    )).toBe("Approve 동시성 처리와 staging 배포 흐름을 코드 기준으로 확인하겠습니다.");
+  });
+
+  it("keeps valid JSON without a string body unchanged", () => {
+    expect(naturalLanguageFromAgentMessage(
+      '{"body":null,"attachments":[],"document":null}',
+    )).toBe('{"body":null,"attachments":[],"document":null}');
+  });
+});
+
+describe("displayChannelActivityHeadline", () => {
+  it("post-processes only message headlines", () => {
+    expect(displayChannelActivityHeadline({
+      kind: "message",
+      headline: '{"body":"저장소를 확인하고 있습니다.","attachments":[]}',
+    })).toBe("저장소를 확인하고 있습니다.");
+    expect(displayChannelActivityHeadline({
+      kind: "command",
+      headline: '{"body":"should not extract"}',
+    })).toBe('{"body":"should not extract"}');
   });
 });

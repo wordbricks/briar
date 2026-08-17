@@ -13,6 +13,7 @@ describe("default project agent copy", () => {
   it("uses the requested Korean responsibility", () => {
     expect(defaultProjectAgentCopy("ko")).toEqual({
       name: "개발자 에이전트",
+      description: "프로젝트의 개발과 코드 관련 작업을 수행하는 에이전트입니다.",
       responsibility: "프로젝트의 개발과 코드 관련 작업을 책임집니다.",
     });
     expect(defaultProjectAgentSkillCopy("ko")).toEqual({
@@ -24,10 +25,12 @@ describe("default project agent copy", () => {
   it("localizes English and Chinese project agents", () => {
     expect(defaultProjectAgentCopy("en")).toEqual({
       name: "Developer agent",
+      description: "Handles development and code-related work for the project.",
       responsibility: "Owns the project's development and code-related work.",
     });
     expect(defaultProjectAgentCopy("zh")).toEqual({
       name: "开发者智能体",
+      description: "负责项目开发和代码相关工作的智能体。",
       responsibility: "负责项目的开发和代码相关工作。",
     });
   });

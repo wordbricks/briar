@@ -32,6 +32,7 @@ import {
   listChannelMessagePage,
   listChannelRootMessages,
   listChannelThreadMessages,
+  listChannelThreadSubscriptions,
   listChannels,
   listChannelWebhooks,
   loadChannelDelta,
@@ -40,8 +41,11 @@ import {
   renewChannelReplyLease,
   revokeChannelWebhook,
   rotateChannelWebhook,
+  subscribeChannelThread,
   toggleChannelMessageReaction,
+  unsubscribeChannelThread,
 } from "./channels";
+import { listChannelConversationNotifications } from "./db";
 import { processArchiveCleanupQueue } from "./archive";
 import {
   createOrganizationAgent,
@@ -369,6 +373,104 @@ describe("organization channels", () => {
 
     const thread = await listChannelThreadMessages(db, channelId, rootId);
     expect(thread.map((message) => message.id)).toEqual([rootId, replyId]);
+    expect(thread[0]?.subscribers).toEqual(expect.arrayContaining([
+      expect.objectContaining({ userId: ownerId }),
+      expect.objectContaining({ userId: outsiderId }),
+    ]));
+    expect(thread[0]?.subscribers).toHaveLength(2);
+  });
+
+  it("auto-subscribes thread participants and notifies other subscribers", async () => {
+    const channelId = "e2000000-0000-4000-8000-000000000001";
+    const rootId = "e2000000-0000-4000-8000-000000000010";
+    const replyId = "e2000000-0000-4000-8000-000000000011";
+    const laterReplyId = "e2000000-0000-4000-8000-000000000012";
+    await createChannel(db, {
+      id: channelId,
+      organizationId,
+      slug: "thread-subscribe",
+      name: "Thread subscribe",
+      topic: null,
+      visibility: "public",
+      defaultProjectId: null,
+      createdByUserId: ownerId,
+      createdAt: at(40),
+    });
+    await createChannelMessage(db, {
+      id: rootId,
+      channelId,
+      parentMessageId: null,
+      authorUserId: ownerId,
+      authorAgentId: null,
+      authorAgentName: null,
+      authorAgentProvider: null,
+      body: "Root for subscribers",
+      mentionedUserIds: [],
+      mentionedAgentIds: [],
+      createdAt: at(41),
+    });
+    await createChannelMessage(db, {
+      id: replyId,
+      channelId,
+      parentMessageId: rootId,
+      authorUserId: outsiderId,
+      authorAgentId: null,
+      authorAgentName: null,
+      authorAgentProvider: null,
+      body: "Joining this thread",
+      mentionedUserIds: [],
+      mentionedAgentIds: [],
+      createdAt: at(42),
+    });
+    await expect(
+      listChannelThreadSubscriptions(db, channelId, rootId),
+    ).resolves.toEqual([
+      expect.objectContaining({ userId: ownerId }),
+      expect.objectContaining({ userId: outsiderId }),
+    ]);
+    await expect(
+      listChannelConversationNotifications(db, organizationId, ownerId),
+    ).resolves.toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: replyId,
+        notification_reason: "thread_reply",
+      }),
+    ]));
+
+    await unsubscribeChannelThread(db, channelId, rootId, ownerId);
+    await subscribeChannelThread(
+      db,
+      channelId,
+      rootId,
+      ownerId,
+      at(43),
+    );
+    await createChannelMessage(db, {
+      id: laterReplyId,
+      channelId,
+      parentMessageId: rootId,
+      authorUserId: outsiderId,
+      authorAgentId: null,
+      authorAgentName: null,
+      authorAgentProvider: null,
+      body: "A later update for subscribers",
+      mentionedUserIds: [],
+      mentionedAgentIds: [],
+      createdAt: at(44),
+    });
+    await expect(
+      listChannelConversationNotifications(db, organizationId, ownerId),
+    ).resolves.toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: laterReplyId,
+        notification_reason: "thread_reply",
+      }),
+    ]));
+    await expect(
+      listChannelConversationNotifications(db, organizationId, outsiderId),
+    ).resolves.not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: laterReplyId }),
+    ]));
   });
 
   it("pages root messages from the newest twenty toward older history", async () => {
@@ -1078,6 +1180,7 @@ describe("organization channels", () => {
       name: "Honey",
       provider: "claude",
       model: null,
+      description: "Helps the team write and refine content.",
       responsibility: "Writing partner",
       effort: null,
       skills: [
@@ -1105,7 +1208,11 @@ describe("organization channels", () => {
       createdAt: at(8),
     });
     expect(agent?.skills).toHaveLength(2);
-    expect(agent).toMatchObject({ name: "Honey", project_id: null });
+    expect(agent).toMatchObject({
+      name: "Honey",
+      description: "Helps the team write and refine content.",
+      project_id: null,
+    });
     const avatar = "data:image/png;base64,large-agent-avatar";
     await db.prepare(
       `update briar_project_agents set avatar = ? where id = ?`,
@@ -2745,6 +2852,9 @@ describe("organization channels", () => {
       "e0000000-0000-4000-8000-000000000004",
     );
     expect(agents.map((agent) => agent.name)).toEqual(["Honey"]);
+    expect(agents[0]?.description).toBe(
+      "Helps the team write and refine content.",
+    );
   });
 
   it("toggles emoji reactions and refreshes them through channel deltas", async () => {

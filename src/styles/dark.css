@@ -142,6 +142,12 @@
   border-color: var(--background);
 }
 
+.dark .kanban-card-review-banner {
+  color: #e8c37a;
+  background: rgba(215, 154, 65, 0.16);
+  border-top-color: rgba(215, 154, 65, 0.32);
+}
+
 .dark .kanban-card,
 .dark .issue-list-body,
 .dark .issue-list-row,

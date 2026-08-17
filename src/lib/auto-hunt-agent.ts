@@ -332,10 +332,32 @@ export function naturalLanguageFromAgentMessage(text: string): string {
     const payloadRecord = record(payload);
     const naturalLanguage =
       string(payloadRecord?.message)?.trim() ||
-      string(payloadRecord?.summary)?.trim();
+      string(payloadRecord?.summary)?.trim() ||
+      string(payloadRecord?.body)?.trim();
     return naturalLanguage || withoutPhase;
   } catch {
-    return withoutPhase;
+    return stringBodyFromPartialJson(jsonText) || withoutPhase;
+  }
+}
+
+export function displayChannelActivityHeadline(activity: {
+  kind: string;
+  headline: string;
+}): string {
+  if (activity.kind !== "message") return activity.headline;
+  return naturalLanguageFromAgentMessage(activity.headline);
+}
+
+function stringBodyFromPartialJson(text: string): string | null {
+  const trimmed = text.trim();
+  if (!trimmed.startsWith("{")) return null;
+  const match = /"body"\s*:\s*("(?:\\.|[^"\\])*")/u.exec(trimmed);
+  if (!match?.[1]) return null;
+  try {
+    const value = JSON.parse(match[1]) as unknown;
+    return typeof value === "string" && value.trim() ? value : null;
+  } catch {
+    return null;
   }
 }
 

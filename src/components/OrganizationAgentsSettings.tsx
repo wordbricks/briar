@@ -17,7 +17,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Typography } from "@/components/ui/typography";
 import { useI18n } from "../i18n";
-import { agentResponsibilityMaxLength } from "../lib/agent-limits";
+import {
+  agentDescriptionMaxLength,
+  agentResponsibilityMaxLength,
+} from "../lib/agent-limits";
 import {
   createOrganizationAgent,
   deleteOrganizationAgent,
@@ -103,6 +106,7 @@ export function OrganizationAgentsSettings({
     provider: ChannelAgentProvider;
     model: string | null;
     effort: ModelEffort | null;
+    description: string;
     responsibility: string;
   }) => {
     const result = await createOrganizationAgent(token, organizationId, input);
@@ -169,6 +173,7 @@ export function OrganizationAgentsSettings({
           provider: editingAgent.provider,
           model: editingAgent.model,
           effort: editingAgent.effort,
+          description: editingAgent.description ?? "",
           responsibility: editingAgent.responsibility,
           skills: projectAgentSkillInputs(editingSkills),
         },
@@ -269,7 +274,7 @@ export function OrganizationAgentsSettings({
                   </Typography>
                 </div>
                 <Typography className="mt-3 whitespace-pre-wrap" variant="bodySm">
-                  {agent.responsibility}
+                  {agent.description || agent.responsibility}
                 </Typography>
                 {agent.skills.length > 0 ? (
                   <div className="mt-3 flex flex-wrap gap-1.5">
@@ -451,6 +456,7 @@ function OrganizationAgentCreateDialog({
     provider: ChannelAgentProvider;
     model: string | null;
     effort: ModelEffort | null;
+    description: string;
     responsibility: string;
   }) => Promise<void>;
 }) {
@@ -461,6 +467,7 @@ function OrganizationAgentCreateDialog({
     useState<ChannelAgentProvider>("codex");
   const [model, setModel] = useState("");
   const [effort, setEffort] = useState<ModelEffort | null>(null);
+  const [description, setDescription] = useState("");
   const [responsibility, setResponsibility] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -470,6 +477,7 @@ function OrganizationAgentCreateDialog({
       setProvider("codex");
       setModel("");
       setEffort(null);
+      setDescription("");
       setResponsibility("");
       setError(null);
     }
@@ -510,6 +518,7 @@ function OrganizationAgentCreateDialog({
               provider,
               model: model || null,
               effort,
+              description: description.trim(),
               responsibility: responsibility.trim(),
             })
               .catch((caught) =>
@@ -531,6 +540,23 @@ function OrganizationAgentCreateDialog({
               required
               value={name}
             />
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="organization-agent-description">
+              {t("agents.agentDescription")} · {t("common.optional")}
+            </Label>
+            <Textarea
+              id="organization-agent-description"
+              maxLength={agentDescriptionMaxLength}
+              onChange={(event) => setDescription(event.target.value)}
+              placeholder={t("agents.agentDescriptionPlaceholder")}
+              rows={3}
+              value={description}
+            />
+            <Typography tone="muted" variant="caption">
+              {t("agents.agentDescriptionHint")}
+            </Typography>
           </div>
 
           <div className="grid gap-4 md:grid-cols-3">

@@ -43,6 +43,7 @@ const projectItem = (id: string, name: string) => ({
 const agentItem = (id: string) => ({
   id,
   name: "Builder",
+  description: "Builds and maintains this project.",
   provider: "codex",
   model: null,
   effort: null,

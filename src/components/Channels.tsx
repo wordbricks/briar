@@ -61,6 +61,7 @@ import {
   setChannelAgent,
   setChannelMember,
   toggleChannelMessageReaction,
+  updateChannelThreadSubscription,
   updateChannelWebhook,
 } from "../lib/api";
 import type {
@@ -73,14 +74,15 @@ import type {
   Project,
   ProjectExecutionWorkerPolicy,
 } from "../types";
-import type {
-  ChannelAgentReply,
-  ChannelAgentSummary,
-  ChannelMember,
-  ChannelMessage,
-  ChannelExecutionProposal,
-  ChannelSummary,
-  ChannelWebhook,
+import {
+  applyChannelThreadSubscribers,
+  type ChannelAgentReply,
+  type ChannelAgentSummary,
+  type ChannelMember,
+  type ChannelMessage,
+  type ChannelExecutionProposal,
+  type ChannelSummary,
+  type ChannelWebhook,
 } from "../lib/channels-contract";
 import {
   channelHasUnread,
@@ -119,6 +121,7 @@ import {
 } from "../lib/channel-thread-width";
 import { ChannelMessageText } from "./ChannelMessageText";
 import { ChannelMessageReactions } from "./ChannelMessageReactions";
+import { ChannelThreadSubscribeControls } from "./ChannelThreadSubscribeControls";
 import {
   ConversationReplySummary,
   type ConversationReplyParticipant,
@@ -418,6 +421,7 @@ export function Channels({
   );
   const [threadParentId, setThreadParentId] = useState<string | null>(null);
   const [threadMessages, setThreadMessages] = useState<ChannelMessage[]>([]);
+  const [threadSubscriptionPending, setThreadSubscriptionPending] = useState(false);
   const [proposalProjects, setProposalProjects] = useState<
     Record<string, string>
   >({});
@@ -1859,6 +1863,43 @@ export function Channels({
     [activeChannelId, organizationId, token, updateRootMessages],
   );
 
+  const toggleThreadSubscription = useCallback(
+    async (subscribed: boolean) => {
+      if (!activeChannelId || !threadParentId || threadSubscriptionPending) return;
+      setThreadSubscriptionPending(true);
+      setError(null);
+      try {
+        const result = await updateChannelThreadSubscription(
+          token,
+          organizationId,
+          activeChannelId,
+          threadParentId,
+          subscribed,
+        );
+        const apply = (current: ChannelMessage[]) =>
+          applyChannelThreadSubscribers(
+            current,
+            result.rootMessageId,
+            result.subscribers,
+          );
+        updateRootMessages(apply);
+        setThreadMessages(apply);
+      } catch (cause) {
+        setError(errorMessage(cause));
+      } finally {
+        setThreadSubscriptionPending(false);
+      }
+    },
+    [
+      activeChannelId,
+      organizationId,
+      threadParentId,
+      threadSubscriptionPending,
+      token,
+      updateRootMessages,
+    ],
+  );
+
   const pendingReplies = replies.filter(
     (reply) =>
       reply.channelId === activeChannelId &&
@@ -2098,19 +2139,33 @@ export function Channels({
             <span>
               <MessageSquare size={15} /> {t("channel.thread")}
             </span>
-            <button
-              aria-label={t("channel.closeThread")}
-              onClick={() => {
-                if (showRequestedThreadOnly) {
-                  onInboxDetailClose?.();
-                  return;
+            <div className="channel-thread-header-actions">
+              <ChannelThreadSubscribeControls
+                currentUserId={currentUserId}
+                members={members}
+                pending={threadSubscriptionPending}
+                subscribers={
+                  threadMessages.find((message) => message.id === threadParentId)
+                    ?.subscribers ?? []
                 }
-                invalidateChannelSurface(activeChannel.id, null);
-                setThreadParentId(null);
-              }}
-            >
-              <X size={15} />
-            </button>
+                onToggle={(subscribed) => {
+                  void toggleThreadSubscription(subscribed);
+                }}
+              />
+              <button
+                aria-label={t("channel.closeThread")}
+                onClick={() => {
+                  if (showRequestedThreadOnly) {
+                    onInboxDetailClose?.();
+                    return;
+                  }
+                  invalidateChannelSurface(activeChannel.id, null);
+                  setThreadParentId(null);
+                }}
+              >
+                <X size={15} />
+              </button>
+            </div>
           </header>
           <div className="channel-messages" ref={threadMessagesScrollRef}>
             {threadMessages.map((message) => (
@@ -2700,7 +2755,7 @@ function ChannelInviteDialog({
     const searchable =
       candidate.type === "user"
         ? `${candidate.member.name} ${candidate.member.email}`
-        : `${candidate.agent.name} ${candidate.agent.projectName ?? ""} ${candidate.agent.provider} ${candidate.agent.responsibility} ${candidate.agent.skills.map((skill) => skill.name).join(" ")}`;
+        : `${candidate.agent.name} ${candidate.agent.projectName ?? ""} ${candidate.agent.provider} ${candidate.agent.description ?? ""} ${candidate.agent.responsibility} ${candidate.agent.skills.map((skill) => skill.name).join(" ")}`;
     return searchable.toLowerCase().includes(normalizedQuery);
   });
 

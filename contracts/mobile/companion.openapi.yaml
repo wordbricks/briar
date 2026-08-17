@@ -1541,6 +1541,60 @@
         }
       }
     },
+    "/organizations/{organizationId}/channels/{channelId}/messages/{messageId}/subscription": {
+      "put": {
+        "operationId": "putChannelThreadSubscription",
+        "parameters": [
+          { "$ref": "#/components/parameters/OrganizationId" },
+          { "$ref": "#/components/parameters/ChannelId" },
+          {
+            "name": "messageId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Channel thread subscription enabled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChannelThreadSubscriptionResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteChannelThreadSubscription",
+        "parameters": [
+          { "$ref": "#/components/parameters/OrganizationId" },
+          { "$ref": "#/components/parameters/ChannelId" },
+          {
+            "name": "messageId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Channel thread subscription disabled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChannelThreadSubscriptionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/organizations/{organizationId}/channels/{channelId}/proposals/{proposalId}/accept": {
       "post": {
         "operationId": "acceptChannelProposal",
@@ -3026,7 +3080,7 @@
           "author": { "$ref": "#/components/schemas/MessageAuthor" },
           "reason": {
             "type": "string",
-            "enum": ["mention", "thread_reply"]
+            "enum": ["mention", "thread_reply", "subscription"]
           },
           "createdAt": { "type": "string", "format": "date-time" }
         },
@@ -3843,6 +3897,7 @@
           "avatar",
           "provider",
           "model",
+          "description",
           "responsibility",
           "skill",
           "skills",
@@ -3906,6 +3961,10 @@
           "model": {
             "type": "string",
             "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 500
           },
           "responsibility": {
             "type": "string"
@@ -4432,9 +4491,38 @@
           "createdAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "subscribers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["userId", "subscribedAt"],
+              "properties": {
+                "userId": { "type": "string" },
+                "subscribedAt": { "type": "string", "format": "date-time" }
+              }
+            }
           }
         },
         "additionalProperties": true
+      },
+      "ChannelThreadSubscriptionResponse": {
+        "type": "object",
+        "required": ["rootMessageId", "subscribers"],
+        "properties": {
+          "rootMessageId": { "type": "string", "format": "uuid" },
+          "subscribers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["userId", "subscribedAt"],
+              "properties": {
+                "userId": { "type": "string" },
+                "subscribedAt": { "type": "string", "format": "date-time" }
+              }
+            }
+          }
+        }
       },
       "ChannelMessageReaction": {
         "type": "object",

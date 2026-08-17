@@ -11,6 +11,7 @@ export const defaultProjectAgentCalendarColor = "#3275d5";
 
 type DefaultProjectAgentCopy = {
   name: string;
+  description: string;
   responsibility: string;
 };
 
@@ -19,7 +20,10 @@ export type DefaultProjectAgentSkillCopy = {
   instructions: string;
 };
 
-export type ProjectAgentSkillInput = DefaultProjectAgentCopy;
+export type ProjectAgentSkillInput = Pick<
+  DefaultProjectAgentCopy,
+  "name" | "responsibility"
+>;
 
 type ProjectAgentRuntimeProfile = {
   name: string;
@@ -37,14 +41,17 @@ const defaultProjectAgentCopyByLocale: Record<
 > = {
   ko: {
     name: "개발자 에이전트",
+    description: "프로젝트의 개발과 코드 관련 작업을 수행하는 에이전트입니다.",
     responsibility: "프로젝트의 개발과 코드 관련 작업을 책임집니다.",
   },
   en: {
     name: "Developer agent",
+    description: "Handles development and code-related work for the project.",
     responsibility: "Owns the project's development and code-related work.",
   },
   zh: {
     name: "开发者智能体",
+    description: "负责项目开发和代码相关工作的智能体。",
     responsibility: "负责项目的开发和代码相关工作。",
   },
 };

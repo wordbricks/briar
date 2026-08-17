@@ -267,6 +267,7 @@ export type ProjectAgentRow = {
   provider: ProjectAgentProvider;
   model: string | null;
   effort: AgentSkillEffort | null;
+  description: string;
   responsibility: string;
   skill_markdown: string;
   calendar_color: string;
@@ -401,6 +402,7 @@ export type ProjectAgentScheduleRunRow = {
   agent_provider: ProjectAgentProvider;
   agent_model: string | null;
   agent_effort: string | null;
+  agent_description: string;
   agent_responsibility: string;
   agent_skill_markdown: string;
   agent_skills: AgentSkillRow[];
@@ -957,7 +959,7 @@ export type ChannelConversationNotificationRow = {
   body: string;
   created_at: string;
   root_message_id: string;
-  notification_reason: "mention" | "thread_reply";
+  notification_reason: "mention" | "thread_reply" | "subscription";
 };
 
 export type DashboardChangeRow = {
@@ -4323,6 +4325,7 @@ export async function createProject(
     provider: "codex",
     model: null,
     effort: null,
+    description: defaultAgentCopy.description,
     responsibility: defaultAgentCopy.responsibility,
     skill_markdown: projectAgentSkill({
       name: defaultAgentCopy.name,
@@ -4368,9 +4371,9 @@ export async function createProject(
           .prepare(
             `insert into briar_project_agents (
                id, organization_id, project_id, name, provider, model,
-               responsibility, skill_markdown, calendar_color, created_at,
+               description, responsibility, skill_markdown, calendar_color, created_at,
                updated_at
-             ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+             ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           )
           .bind(
             defaultAgent.id,
@@ -4379,6 +4382,7 @@ export async function createProject(
             defaultAgent.name,
             defaultAgent.provider,
             defaultAgent.model,
+            defaultAgent.description,
             defaultAgent.responsibility,
             defaultAgent.skill_markdown,
             defaultAgent.calendar_color,
@@ -4656,7 +4660,8 @@ export async function listProjectAgents(db: D1Database, projectId: string) {
   const result = await db
     .prepare(
       `select id, organization_id, project_id, name, avatar, avatar_pet_json,
-              avatar_spritesheet_object_key, provider, model, effort, responsibility, skill_markdown, calendar_color,
+              avatar_spritesheet_object_key, provider, model, effort,
+              description, responsibility, skill_markdown, calendar_color,
               created_at, updated_at
        from briar_project_agents
        where project_id = ?
@@ -4675,7 +4680,8 @@ export async function getProjectAgent(
   const agent = await db
     .prepare(
       `select id, organization_id, project_id, name, avatar, avatar_pet_json,
-              avatar_spritesheet_object_key, provider, model, effort, responsibility,
+              avatar_spritesheet_object_key, provider, model, effort,
+              description, responsibility,
               skill_markdown, calendar_color, created_at, updated_at
        from briar_project_agents
        where id = ? and project_id = ?`,
@@ -5499,6 +5505,7 @@ export async function createProjectAgent(
     provider: ProjectAgentProvider;
     model: string | null;
     effort: AgentSkillEffort | null;
+    description?: string;
     responsibility: string;
     calendarColor: string;
     skills?: AgentSkillInput[];
@@ -5516,6 +5523,7 @@ export async function createProjectAgent(
     provider: input.provider,
     model: input.model,
     effort: input.effort,
+    description: input.description ?? "",
     responsibility: input.responsibility,
     skill_markdown: projectAgentSkill({
       name: input.name,
@@ -5551,9 +5559,9 @@ export async function createProjectAgent(
           `insert into briar_project_agents (
              id, organization_id, project_id, name, avatar,
              avatar_pet_json, avatar_spritesheet_object_key, provider, model,
-             effort, responsibility, skill_markdown, calendar_color, created_at,
+             effort, description, responsibility, skill_markdown, calendar_color, created_at,
              updated_at
-           ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .bind(
           agent.id,
@@ -5566,6 +5574,7 @@ export async function createProjectAgent(
           agent.provider,
           agent.model,
           agent.effort,
+          agent.description,
           agent.responsibility,
           agent.skill_markdown,
           agent.calendar_color,
@@ -5592,7 +5601,7 @@ export async function deleteProjectAgent(
          )
        returning id, organization_id, project_id, name, avatar, avatar_pet_json,
                  avatar_spritesheet_object_key, provider, model, effort,
-                 responsibility, skill_markdown, calendar_color,
+                 description, responsibility, skill_markdown, calendar_color,
                  created_at, updated_at`,
     )
     .bind(agentId, projectId, projectId, agentId)
@@ -5853,6 +5862,7 @@ const scheduleRunSelect = `
          agent.provider as agent_provider,
          agent.model as agent_model,
          agent.effort as agent_effort,
+         agent.description as agent_description,
          agent.responsibility as agent_responsibility,
          agent.skill_markdown as agent_skill_markdown,
          settings.workflow_json,
@@ -6277,6 +6287,7 @@ export async function updateProjectAgent(
     provider: ProjectAgentProvider;
     model: string | null;
     effort: AgentSkillEffort | null;
+    description?: string;
     responsibility: string;
     calendarColor: string;
     skills?: AgentSkillInput[];
@@ -6335,7 +6346,7 @@ export async function updateProjectAgent(
              avatar_pet_json = case when ? = 1 then ? else avatar_pet_json end,
              avatar_spritesheet_object_key =
                case when ? = 1 then ? else avatar_spritesheet_object_key end,
-             provider = ?, model = ?, effort = ?, responsibility = ?,
+             provider = ?, model = ?, effort = ?, description = ?, responsibility = ?,
              skill_markdown = ?, calendar_color = ?, updated_at = ?
          where id = ? and project_id = ?`,
       ).bind(
@@ -6349,6 +6360,7 @@ export async function updateProjectAgent(
         input.provider,
         input.model,
         input.effort,
+        input.description ?? existing.description,
         input.responsibility,
         skill,
         input.calendarColor,

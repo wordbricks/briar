@@ -57,4 +57,27 @@ describe("ChannelTypingState", () => {
     });
     expect(container.textContent).toContain("1.2s");
   });
+
+  it("shows only the body when a message headline is a reply envelope", async () => {
+    await act(async () => {
+      root.render(
+        <ChannelTypingState
+          agentNames={["Developer"]}
+          activityByAgentName={{
+            Developer: {
+              id: "commentary-1",
+              kind: "message",
+              headline:
+                '{"body":"Approve 동시성 처리와 staging 배포 흐름을 코드 기준으로 확인하겠습니다.","attachments":[],"document":null,"issueProposal"',
+            },
+          }}
+        />,
+      );
+    });
+    expect(container.textContent).toContain(
+      "Developer · Approve 동시성 처리와 staging 배포 흐름을 코드 기준으로 확인하겠습니다.",
+    );
+    expect(container.textContent).not.toContain("attachments");
+    expect(container.textContent).not.toContain("issueProposal");
+  });
 });

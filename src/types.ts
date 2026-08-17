@@ -264,7 +264,7 @@ export type ChannelConversationNotification = {
   rootMessageId: string;
   body: string;
   author: IssueMessageAuthor;
-  reason: "mention" | "thread_reply";
+  reason: "mention" | "thread_reply" | "subscription";
   createdAt: string;
 };
 
@@ -603,6 +603,7 @@ export type ProjectAgent = {
   provider: AgentProvider;
   model: string | null;
   effort: ModelEffort | null;
+  description?: string;
   responsibility: string;
   skill: string;
   skills: ProjectAgentSkill[];
@@ -647,6 +648,7 @@ export type CreateProjectAgentInput = {
   provider: AgentProvider;
   model: string | null;
   effort?: ModelEffort | null;
+  description?: string;
   responsibility: string;
   skills?: ProjectAgentSkillInput[];
   calendarColor: string;
@@ -699,6 +701,7 @@ export type ProjectAgentScheduleRun = {
     | "provider"
     | "model"
     | "effort"
+    | "description"
     | "responsibility"
     | "skill"
     | "skills"

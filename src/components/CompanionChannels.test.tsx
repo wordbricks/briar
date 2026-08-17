@@ -26,6 +26,7 @@ const acceptChannelExecutionProposal = vi.fn();
 const acceptChannelSkillExecutionProposal = vi.fn();
 const loadDashboard = vi.fn();
 const toggleChannelMessageReaction = vi.fn();
+const updateChannelThreadSubscription = vi.fn();
 const channelRealtime = vi.hoisted(() => ({
   listeners: new Set<(notification: { topic: "channels"; cursor: number }) => void>(),
 }));
@@ -45,6 +46,8 @@ vi.mock("../lib/api", () => ({
   loadDashboard: (...args: unknown[]) => loadDashboard(...args),
   toggleChannelMessageReaction: (...args: unknown[]) =>
     toggleChannelMessageReaction(...args),
+  updateChannelThreadSubscription: (...args: unknown[]) =>
+    updateChannelThreadSubscription(...args),
 }));
 
 vi.mock("../lib/channel-realtime", () => ({

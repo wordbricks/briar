@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { groupChannels } from "./channel-grouping";
+import {
+  groupChannels,
+  organizationSidebarChannels,
+  projectSidebarChannels,
+} from "./channel-grouping";
 import type { ChannelSummary } from "./channels-contract";
 
 const channel = (
@@ -137,5 +141,23 @@ describe("groupChannels", () => {
     expect(
       groupChannels([], { activeProjectId: "project-1", projects: [], ...labels }),
     ).toEqual([]);
+  });
+});
+
+describe("sidebar channel split", () => {
+  it("keeps organization-wide channels out of a project's list", () => {
+    const channels = [
+      channel("c-1", "General", null),
+      channel("c-2", "Briar dev", "project-1"),
+      channel("c-3", "Sprout", "project-2"),
+    ];
+
+    expect(organizationSidebarChannels(channels).map((item) => item.id)).toEqual([
+      "c-1",
+    ]);
+    expect(
+      projectSidebarChannels(channels, "project-1").map((item) => item.id),
+    ).toEqual(["c-2"]);
+    expect(projectSidebarChannels(channels, "project-3")).toEqual([]);
   });
 });

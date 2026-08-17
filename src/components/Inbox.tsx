@@ -553,9 +553,12 @@ function messageTitle(
       return t("inbox.conversationMention", { author: message.authorName });
     }
     if (message.reason === "subscription") {
-      return t("inbox.conversationSubscription", {
-        author: message.authorName,
-      });
+      return t(
+        message.kind === "channel"
+          ? "inbox.channelSubscription"
+          : "inbox.conversationSubscription",
+        { author: message.authorName },
+      );
     }
     return t("inbox.conversationThreadReply", { author: message.authorName });
   }

@@ -1,4 +1,5 @@
 import type { NormalizedAgentEvent } from "../src-agent/normalized-agent-event";
+import { naturalLanguageFromAgentMessage } from "../src/lib/auto-hunt-agent";
 import {
   CHANNEL_AGENT_ACTIVITY_HEADLINE_MAX_LENGTH,
   type ChannelAgentActivityDescriptor,
@@ -129,7 +130,10 @@ export class ChannelActivityPublisher {
       this.commentary = {
         id: event.id,
         kind: "message",
-        headline: safeChannelActivityHeadline("message", event.text),
+        headline: safeChannelActivityHeadline(
+          "message",
+          naturalLanguageFromAgentMessage(event.text),
+        ),
       };
     } else if (event.type === "activityStarted") {
       this.active.delete(event.id);

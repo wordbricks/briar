@@ -209,7 +209,7 @@ private struct AgentRow: View {
             }
             VStack(alignment: .leading, spacing: 4) {
                 Text(agent.name).font(.headline)
-                Text(agent.responsibility)
+                Text(agent.summary)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
@@ -332,7 +332,13 @@ struct AgentDetailView: View {
                     LabeledContent("Model", value: model)
                 }
                 LabeledContent(L10n.text("색상"), value: agent.calendarColor)
-                Text(agent.responsibility)
+                if let description = agent.displayDescription {
+                    LabeledContent(L10n.text("설명"), value: description)
+                }
+                LabeledContent(
+                    L10n.text("책임"),
+                    value: agent.responsibility
+                )
             }
             Section("Skills") {
                 if sortedSkills.isEmpty {

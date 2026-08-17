@@ -213,6 +213,7 @@ export function ProjectSchedule({
                   provider: agent.provider,
                   model: agent.model,
                   effort: agent.effort,
+                  description: agent.description,
                   responsibility: agent.responsibility,
                   skill: agent.skill,
                   skills: agent.skills,
@@ -1234,7 +1235,9 @@ export function CreateProjectAgentScheduleDialog({
               </span>
               <div>
                 <strong>{selectedAgent.name}</strong>
-                <p>{selectedAgent.responsibility}</p>
+                <p>
+                  {selectedAgent.description || selectedAgent.responsibility}
+                </p>
               </div>
             </div>
           )}

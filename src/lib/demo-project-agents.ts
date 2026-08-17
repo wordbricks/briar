@@ -38,6 +38,7 @@ export function demoProjectAgents(
       provider: "codex",
       model: null,
       effort: null,
+      description: defaultAgent.description,
       responsibility: defaultAgent.responsibility,
       skill: projectAgentSkill(defaultAgent),
       skills: [
@@ -61,6 +62,7 @@ export function demoProjectAgents(
       provider: "claude",
       model: "opus",
       effort: null,
+      description: "Sentry 오류를 분석해 실행 가능한 이슈로 정리합니다.",
       responsibility:
         "Sentry의 에러 내역들을 보고 issue를 만들어서 배정하는 에이전트",
       skill: projectAgentSkill({
@@ -92,6 +94,7 @@ export function demoProjectAgents(
       provider: "grok",
       model: "grok-4.5",
       effort: null,
+      description: "사용자 피드백을 분석해 제품 액션 아이템을 도출합니다.",
       responsibility:
         "유저 피드백 채널에 들어오는 피드백을 취합하고 분석해서 액션아이템을 만들어 이슈를 만드는 에이전트",
       skill: projectAgentSkill({

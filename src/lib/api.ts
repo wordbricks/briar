@@ -168,6 +168,7 @@ const projectAgentSchema = z.object({
   provider: z.enum(agentProviders),
   model: z.string().nullable(),
   effort: modelEffortSchema.nullable().default(null),
+  description: z.string().default(""),
   responsibility: z.string(),
   skill: z.string(),
   skills: z
@@ -320,6 +321,7 @@ const projectAgentScheduleRunSchema = z.object({
     provider: true,
     model: true,
     effort: true,
+    description: true,
     responsibility: true,
     skill: true,
     skills: true,
@@ -2214,6 +2216,7 @@ export async function createOrganizationAgent(
     name: string;
     provider: AgentProvider;
     model: string | null;
+    description?: string;
     responsibility: string;
     effort?: ModelEffort | null;
     skills?: ChannelAgentSkillInput[];
@@ -2234,6 +2237,7 @@ export async function updateOrganizationAgent(
     name: string;
     provider: AgentProvider;
     model: string | null;
+    description?: string;
     responsibility: string;
     effort?: ModelEffort | null;
     skills: ChannelAgentSkillInput[];
@@ -2306,6 +2310,23 @@ export async function updateIssue(
     `/projects/${projectId}/runs/${runId}`,
     token,
     { method: "PATCH", body: form },
+  );
+}
+
+export async function updateChannelThreadSubscription(
+  token: string,
+  organizationId: string,
+  channelId: string,
+  messageId: string,
+  subscribed: boolean,
+) {
+  return request<{
+    rootMessageId: string;
+    subscribers: Array<{ userId: string; subscribedAt: string }>;
+  }>(
+    `/organizations/${organizationId}/channels/${channelId}/messages/${messageId}/subscription`,
+    token,
+    { method: subscribed ? "PUT" : "DELETE" },
   );
 }
 

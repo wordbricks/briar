@@ -2454,6 +2454,180 @@ describe("HuntDashboard", () => {
     expect(markup).toContain('aria-label="취소"');
     expect(markup).toContain("Security review 완료 후 확인");
     expect(markup).toContain('data-checkpoint-count="1"');
+    const securityReviewStart = markup.indexOf(
+      'data-kanban-column-id="stage:security_review"',
+    );
+    const blockedStart = markup.indexOf(
+      'data-kanban-column-id="status:blocked"',
+    );
+    expect(securityReviewStart).toBeGreaterThan(-1);
+    expect(blockedStart).toBeGreaterThan(securityReviewStart);
+    expect(
+      markup.slice(0, securityReviewStart),
+    ).toContain("Security review 완료 후 확인");
+    expect(
+      markup.slice(securityReviewStart, blockedStart),
+    ).not.toContain("Security review 완료 후 확인");
+  });
+
+  it("keeps paused issues in their workflow stage column with a review banner", () => {
+    const pausedRun = demoDashboard.runs.find((run) => run.status === "paused");
+    expect(pausedRun?.workflowStage).toBe("local_qa");
+
+    const markup = renderToStaticMarkup(
+      <HuntDashboard
+        {...dashboardProps}
+        dashboard={demoDashboard}
+      />,
+    );
+
+    expect(markup).not.toContain('data-kanban-column-id="status:paused"');
+    expect(markup).toContain("리뷰를 기다리고 있습니다");
+    expect(markup).toContain('class="kanban-card-review-banner"');
+    expect(markup).toContain("kanban-card amber awaiting-review");
+
+    const localQaColumnStart = markup.indexOf(
+      'data-kanban-column-id="stage:local_qa"',
+    );
+    const nextColumnStart = markup.indexOf(
+      "data-kanban-column-id=",
+      localQaColumnStart + 1,
+    );
+    const localQaColumn = markup.slice(
+      localQaColumnStart,
+      nextColumnStart === -1 ? undefined : nextColumnStart,
+    );
+    expect(localQaColumn).toContain(pausedRun!.title);
+    expect(localQaColumn).toContain("리뷰를 기다리고 있습니다");
+    expect(localQaColumn).toContain("검토 대기");
+  });
+
+  it("shows paused issues in their stage column on the attention filter", async () => {
+    const pausedRun = demoDashboard.runs.find((run) => run.status === "paused");
+    const blockedRun = demoDashboard.runs.find((run) => run.status === "blocked");
+    expect(pausedRun).toBeTruthy();
+    expect(blockedRun).toBeTruthy();
+
+    const container = document.createElement("div");
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(
+        <HuntDashboard
+          {...dashboardProps}
+          dashboard={demoDashboard}
+        />,
+      );
+    });
+
+    const attentionTab = Array.from(
+      container.querySelectorAll<HTMLButtonElement>(".status-tabs button"),
+    ).find((button) => button.textContent?.includes("확인 필요"));
+    expect(attentionTab).toBeTruthy();
+    await act(async () => {
+      attentionTab?.click();
+    });
+
+    expect(
+      container.querySelector('[data-kanban-column-id="status:paused"]'),
+    ).toBeNull();
+    const localQaColumn = container.querySelector(
+      '[data-kanban-column-id="stage:local_qa"]',
+    );
+    expect(localQaColumn?.textContent).toContain(pausedRun!.title);
+    expect(localQaColumn?.querySelector(".kanban-card-review-banner")?.textContent)
+      .toContain("리뷰를 기다리고 있습니다");
+    expect(
+      container.querySelector('[data-kanban-column-id="stage:implementing"]'),
+    ).toBeNull();
+    expect(
+      container.querySelector('[data-kanban-column-id="status:blocked"]')
+        ?.textContent,
+    ).toContain(blockedRun!.title);
+    expect(
+      container.querySelector('[data-kanban-column-id="status:failed"]'),
+    ).not.toBeNull();
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("does not start a pointer drag for paused review cards", async () => {
+    const pausedRun = {
+      ...demoDashboard.runs[1],
+      status: "paused" as const,
+      workflowStage: "local_qa",
+    };
+    const onMoveRun = vi.fn(async () => undefined);
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(
+        <HuntDashboard
+          {...dashboardProps}
+          dashboard={{ ...demoDashboard, runs: [pausedRun] }}
+          onMoveRun={onMoveRun}
+        />,
+      );
+    });
+
+    const card = container.querySelector<HTMLElement>(".kanban-card");
+    const backlogColumn = container.querySelector<HTMLElement>(
+      '[aria-label="백로그"]',
+    );
+    expect(card?.className).toContain("awaiting-review");
+    expect(card?.querySelector(".kanban-card-review-banner")).not.toBeNull();
+
+    const firePointer = (
+      target: EventTarget | null,
+      type: string,
+      clientX: number,
+      clientY: number,
+    ) => {
+      const event = new Event(type, {
+        bubbles: true,
+        cancelable: true,
+      });
+      Object.defineProperties(event, {
+        button: { value: 0 },
+        clientX: { value: clientX },
+        clientY: { value: clientY },
+        isPrimary: { value: true },
+        pointerId: { value: 1 },
+        pointerType: { value: "mouse" },
+      });
+      target?.dispatchEvent(event);
+    };
+
+    const originalElementFromPoint = Object.getOwnPropertyDescriptor(
+      document,
+      "elementFromPoint",
+    );
+    Object.defineProperty(document, "elementFromPoint", {
+      configurable: true,
+      value: vi.fn(() => backlogColumn),
+    });
+    await act(async () => {
+      firePointer(card, "pointerdown", 120, 120);
+      firePointer(card, "pointermove", 180, 120);
+      firePointer(card, "pointerup", 180, 120);
+    });
+    if (originalElementFromPoint) {
+      Object.defineProperty(
+        document,
+        "elementFromPoint",
+        originalElementFromPoint,
+      );
+    } else {
+      Reflect.deleteProperty(document, "elementFromPoint");
+    }
+
+    expect(card?.className).not.toContain("dragging");
+    expect(document.body.querySelector(".kanban-card-drag-preview")).toBeNull();
+    expect(onMoveRun).not.toHaveBeenCalled();
+
+    await act(async () => root.unmount());
+    container.remove();
   });
 
   it("marks effective pause checkpoints at their kanban boundaries", () => {
@@ -6583,34 +6757,39 @@ describe("HuntDashboard", () => {
     container.remove();
   });
 
-  it("keeps the resume button spinning until the paused run actually resumes", async () => {
+  it("clears the resume spinner when the run reaches another paused checkpoint", async () => {
     const onResume = vi.fn(async () => undefined);
     const container = document.createElement("div");
     document.body.append(container);
     const root = createRoot(container);
+    const pausedRun: HuntRun = {
+      ...demoDashboard.runs[1],
+      status: "paused",
+    };
+    const renderRun = (run: HuntRun) => (
+      <TooltipProvider>
+        <RunPage
+          isSidebarOpen
+          error={null}
+          isRecovering={false}
+          onBack={() => undefined}
+          onCancel={async () => undefined}
+          onLoadAttachment={async () => new Blob()}
+          onLoadIssueMessages={async () => []}
+          onLoadRunEvidence={async () => []}
+          onMove={async () => undefined}
+          onResume={onResume}
+          onRetry={async () => undefined}
+          onSendIssueMessage={async () => {
+            throw new Error("not implemented in this test");
+          }}
+          run={run}
+        />
+      </TooltipProvider>
+    );
 
     await act(async () => {
-      root.render(
-        <TooltipProvider>
-          <RunPage
-            isSidebarOpen
-            error={null}
-            isRecovering={false}
-            onBack={() => undefined}
-            onCancel={async () => undefined}
-            onLoadAttachment={async () => new Blob()}
-            onLoadIssueMessages={async () => []}
-            onLoadRunEvidence={async () => []}
-            onMove={async () => undefined}
-            onResume={onResume}
-            onRetry={async () => undefined}
-            onSendIssueMessage={async () => {
-              throw new Error("not implemented in this test");
-            }}
-            run={{ ...demoDashboard.runs[1], status: "paused" as const }}
-          />
-        </TooltipProvider>,
-      );
+      root.render(renderRun(pausedRun));
     });
 
     const resumeButton = container.querySelector<HTMLButtonElement>(
@@ -6627,6 +6806,28 @@ describe("HuntDashboard", () => {
     expect(onResume).toHaveBeenCalledOnce();
     expect(resumeButton?.disabled).toBe(true);
     expect(resumeButton?.querySelector(".spin")).not.toBeNull();
+
+    await act(async () => {
+      root.render(renderRun({
+        ...pausedRun,
+        checkpoint: pausedRun.checkpoint
+          ? {
+              ...pausedRun.checkpoint,
+              key: "project-after-pr_open",
+              stage: "pr_open",
+              stageLabel: "Pull request",
+              terminalReviewOnly: false,
+            }
+          : null,
+        workflowStage: "pr_open",
+      }));
+    });
+
+    const nextCheckpointButton = container.querySelector<HTMLButtonElement>(
+      ".paused-result-resume",
+    );
+    expect(nextCheckpointButton?.disabled).toBe(false);
+    expect(nextCheckpointButton?.querySelector(".spin")).toBeNull();
 
     await act(async () => root.unmount());
     container.remove();

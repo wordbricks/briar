@@ -229,6 +229,7 @@ struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
     /// Mutually exclusive with issue creation/execution on the same reply. Its
     /// immutable snapshot and monotonic merge lifecycle are tracked separately.
     var skillExecutionProposal: AgentSkillExecutionProposal?
+    var subscribers: [IssueSubscriber]
     let createdAt: Date
 
     enum CodingKeys: String, CodingKey {
@@ -248,6 +249,7 @@ struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
         case proposal
         case executionProposal
         case skillExecutionProposal
+        case subscribers
         case createdAt
     }
 
@@ -268,6 +270,7 @@ struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
         proposal: Proposal?,
         executionProposal: IssueExecutionProposal? = nil,
         skillExecutionProposal: AgentSkillExecutionProposal? = nil,
+        subscribers: [IssueSubscriber] = [],
         createdAt: Date
     ) {
         self.id = id
@@ -286,6 +289,7 @@ struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
         self.proposal = proposal
         self.executionProposal = executionProposal
         self.skillExecutionProposal = skillExecutionProposal
+        self.subscribers = subscribers
         self.createdAt = createdAt
     }
 
@@ -313,6 +317,10 @@ struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
             AgentSkillExecutionProposal.self,
             forKey: .skillExecutionProposal
         )
+        subscribers = try container.decodeIfPresent(
+            [IssueSubscriber].self,
+            forKey: .subscribers
+        ) ?? []
         createdAt = try container.decode(Date.self, forKey: .createdAt)
     }
 
@@ -542,6 +550,66 @@ struct ChannelAgentActivity: Codable, Equatable, Sendable {
         case webSearch
         case tool
     }
+
+    var displayHeadline: String {
+        kind == .message ? Self.naturalLanguage(from: headline) : headline
+    }
+
+    static func naturalLanguage(from text: String) -> String {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return text }
+
+        let withoutPhase = trimmed.replacingOccurrences(
+            of: #"^\[(?:commentary|final_answer|final|analysis)\]\s*"#,
+            with: "",
+            options: [.regularExpression, .caseInsensitive]
+        )
+        let jsonText = unwrapFencedJSON(withoutPhase)
+
+        if let data = jsonText.data(using: .utf8),
+           let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            for key in ["message", "summary", "body"] {
+                if let value = (object[key] as? String)?
+                    .trimmingCharacters(in: .whitespacesAndNewlines),
+                   !value.isEmpty {
+                    return value
+                }
+            }
+            return withoutPhase
+        }
+        return stringBody(fromPartialJSON: jsonText) ?? withoutPhase
+    }
+
+    private static func unwrapFencedJSON(_ text: String) -> String {
+        guard let regex = try? NSRegularExpression(
+            pattern: #"^```(?:json)?\s*([\s\S]*?)\s*```$"#,
+            options: [.caseInsensitive]
+        ) else { return text }
+        let range = NSRange(text.startIndex..., in: text)
+        guard let match = regex.firstMatch(in: text, range: range),
+              let inner = Range(match.range(at: 1), in: text)
+        else { return text }
+        return String(text[inner])
+    }
+
+    private static func stringBody(fromPartialJSON text: String) -> String? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.hasPrefix("{") else { return nil }
+        guard let regex = try? NSRegularExpression(
+            pattern: #""body"\s*:\s*("(?:\\.|[^"\\])*")"#,
+            options: []
+        ) else { return nil }
+        let range = NSRange(trimmed.startIndex..., in: trimmed)
+        guard let match = regex.firstMatch(in: trimmed, range: range),
+              let quotedRange = Range(match.range(at: 1), in: trimmed)
+        else { return nil }
+        let quoted = String(trimmed[quotedRange])
+        guard let data = quoted.data(using: .utf8),
+              let value = try? JSONDecoder().decode(String.self, from: data)
+        else { return nil }
+        let cleaned = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return cleaned.isEmpty ? nil : cleaned
+    }
 }
 
 struct ChannelAgentActivityFrame: Codable, Equatable, Sendable {
@@ -743,6 +811,7 @@ struct ChannelAgentSummary: Codable, Equatable, Identifiable, Sendable {
     let provider: String
     let model: String?
     let projectId: UUID?
+    let description: String?
     let responsibility: String
     let createdAt: Date
 

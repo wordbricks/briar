@@ -9,12 +9,23 @@ struct ProjectAgent: Codable, Equatable, Identifiable, Sendable {
     let provider: AgentProvider
     let model: String?
     let effort: ModelEffort?
+    let description: String?
     let responsibility: String
     let skill: String
     let skills: [Skill]
     let calendarColor: String
     let createdAt: Date
     let updatedAt: Date
+
+    var displayDescription: String? {
+        guard let description = description?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !description.isEmpty else {
+            return nil
+        }
+        return description
+    }
+
+    var summary: String { displayDescription ?? responsibility }
 
     struct CodexPet: Codable, Equatable, Sendable {
         let slug: String

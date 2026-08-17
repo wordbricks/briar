@@ -85,6 +85,7 @@ describe("project Agent routes", () => {
       provider: "opencode",
       model: "vendor/custom-model",
       effort: "high",
+      description: "Builds and maintains the project with OpenCode.",
       responsibility: "Run project work through OpenCode.",
     };
     const createdResponse = await worker.fetch(
@@ -99,12 +100,14 @@ describe("project Agent routes", () => {
         name: string;
         provider: string;
         model: string | null;
+        description: string;
       };
     }>();
     expect(created.agent).toMatchObject({
       name: "OpenCode Agent",
       provider: "opencode",
       model: "vendor/custom-model",
+      description: input.description,
     });
 
     const updatedResponse = await worker.fetch(
@@ -123,8 +126,19 @@ describe("project Agent routes", () => {
         name: "OpenCode Agent",
         provider: "opencode",
         model: "vendor/custom-model",
+        description: input.description,
       },
     });
+
+    const tooLongResponse = await worker.fetch(
+      request(`/projects/${projectId}/agents/${created.agent.id}`, "PUT", {
+        ...input,
+        description: "d".repeat(501),
+        name: null,
+      }),
+      env(),
+    );
+    expect(tooLongResponse.status).toBe(400);
   });
 
   it("persists 20000-character responsibility and five 20000-character Skills", async () => {

@@ -889,6 +889,7 @@
             "codexPet": null,
             "provider": "codex",
             "model": "gpt-5.4",
+            "description": "Handles issue processing and development work for the project.",
             "responsibility": "Owns the project's development and code-related work.",
             "skill": "# Issue processing agent\n\n## Responsibility\n\nOwns the project's development and code-related work.",
             "skills": [
@@ -1170,6 +1171,7 @@
             "provider": "claude",
             "model": null,
             "projectId": null,
+            "description": "글쓰기와 콘텐츠 다듬기를 돕는 에이전트입니다.",
             "responsibility": "글쓰기 파트너",
             "createdAt": "2026-08-06T00:00:00.000Z"
           }
@@ -1480,6 +1482,29 @@
           "workers": [],
           "updatedAt": "2026-08-11T01:10:00.000Z"
         }
+      }
+    },
+    "putChannelThreadSubscription": {
+      "method": "PUT",
+      "path": "/organizations/{organizationId}/channels/{channelId}/messages/{messageId}/subscription",
+      "status": 200,
+      "response": {
+        "rootMessageId": "44444444-4444-4444-8444-444444444444",
+        "subscribers": [
+          {
+            "userId": "fixture-user",
+            "subscribedAt": "2026-08-06T00:03:00.000Z"
+          }
+        ]
+      }
+    },
+    "deleteChannelThreadSubscription": {
+      "method": "DELETE",
+      "path": "/organizations/{organizationId}/channels/{channelId}/messages/{messageId}/subscription",
+      "status": 200,
+      "response": {
+        "rootMessageId": "44444444-4444-4444-8444-444444444444",
+        "subscribers": []
       }
     },
     "toggleChannelMessageReaction": {

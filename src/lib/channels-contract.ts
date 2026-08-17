@@ -6,6 +6,7 @@ import {
   type ModelEffort,
 } from "./agent-provider-contract";
 import {
+  agentDescriptionMaxLength,
   agentResponsibilityMaxLength,
   agentSkillInstructionsMaxLength,
   agentSkillsMaxCount,
@@ -379,6 +380,7 @@ export const channelIncomingWebhookMessageSchema = z
 export const organizationAgentInputSchema = z
   .object({
     name: z.string().trim().min(1).max(100),
+    description: z.string().trim().max(agentDescriptionMaxLength).optional(),
     provider: z.enum(channelAgentProviders),
     model: z.string().trim().min(1).max(100).nullable().default(null),
     responsibility: z
@@ -475,6 +477,7 @@ export type ChannelAgentSkill = {
 export type ChannelAgentSummary = {
   agentId: string;
   name: string;
+  description?: string;
   avatar: string | null;
   provider: ChannelAgentProvider;
   model: string | null;
@@ -585,6 +588,11 @@ export type ChannelMessageReaction = {
   userIds: string[];
 };
 
+export type ChannelThreadSubscriber = {
+  userId: string;
+  subscribedAt: string;
+};
+
 export type ChannelMessage = {
   id: string;
   channelId: string;
@@ -601,6 +609,8 @@ export type ChannelMessage = {
   lastReplyAt: string | null;
   /** Up to three unique reply authors, ordered by their most recent reply. */
   replyAuthors?: ChannelMessageAuthor[];
+  /** Present on thread roots. Older API responses omit the field. */
+  subscribers?: ChannelThreadSubscriber[];
   document: ChannelMessageDocument | null;
   proposal: ChannelMessageProposal | null;
   executionProposal: ChannelExecutionProposal | null;
@@ -609,6 +619,16 @@ export type ChannelMessage = {
   optimistic?: boolean;
   createdAt: string;
 };
+
+export function applyChannelThreadSubscribers(
+  messages: ChannelMessage[],
+  rootMessageId: string,
+  subscribers: ChannelThreadSubscriber[],
+) {
+  return messages.map((message) =>
+    message.id === rootMessageId ? { ...message, subscribers } : message,
+  );
+}
 
 export type ChannelReplyContextAuthor =
   | Pick<

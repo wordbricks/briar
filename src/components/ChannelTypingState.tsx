@@ -1,5 +1,6 @@
 import { LoadingState } from "@/components/ui/loading-state";
 import { useI18n } from "../i18n";
+import { displayChannelActivityHeadline } from "../lib/auto-hunt-agent";
 import type { ChannelAgentActivityDescriptor } from "../lib/channel-agent-activity";
 
 export function ChannelTypingState({
@@ -24,7 +25,7 @@ export function ChannelTypingState({
       <LoadingState
         label={
           activityByAgentName?.[name]
-            ? `${name} · ${activityByAgentName[name].headline}`
+            ? `${name} · ${displayChannelActivityHeadline(activityByAgentName[name])}`
             : t("channel.namedAgentTyping", { name })
         }
       />

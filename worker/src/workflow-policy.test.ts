@@ -99,7 +99,7 @@ describe("workflow checkpoint policy persistence", () => {
       .prepare(`update briar_project_settings set workflow_json = ? where project_id = ?`)
       .bind(JSON.stringify(workflow), projectId)
       .run();
-  }, 30_000);
+  }, 60_000);
 
   afterAll(async () => miniflare.dispose());
 
