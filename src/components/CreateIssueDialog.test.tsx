@@ -487,6 +487,50 @@ describe("CreateIssueDialog attachments", () => {
     await act(async () => root.unmount());
   });
 
+  it("renders description URLs as clickable hyperlinks inside the editor", async () => {
+    const draft = {
+      title: "링크 이슈",
+      description: "버그 재현 사이트: https://github.com/org/repo/issues/1",
+      status: "queued" as const,
+      priority: "2" as const,
+      projectId: "project-1",
+    };
+    window.localStorage.setItem(
+      createIssueDraftStorageKey,
+      JSON.stringify(draft),
+    );
+    const onCreate = vi.fn(async () => undefined);
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(
+        <CreateIssueDialog
+          {...projectProps}
+          isSubmitting={false}
+          onClose={() => undefined}
+          onCreate={onCreate}
+        />,
+      );
+    });
+
+    const textarea = container.querySelector<HTMLTextAreaElement>(
+      ".issue-description-input",
+    );
+    expect(textarea?.value).toBe(draft.description);
+
+    const link = container.querySelector<HTMLAnchorElement>(
+      ".issue-description-mirror a",
+    );
+    expect(link?.textContent).toBe("https://github.com/org/repo/issues/1");
+    expect(link?.getAttribute("href")).toBe(
+      "https://github.com/org/repo/issues/1",
+    );
+    expect(link?.target).toBe("_blank");
+    expect(link?.rel).toBe("noreferrer");
+
+    await act(async () => root.unmount());
+    window.localStorage.removeItem(createIssueDraftStorageKey);
+  });
+
   it("does not submit Enter while the title is being composed", async () => {
     const onCreate = vi.fn(async () => undefined);
     const root = createRoot(container);
