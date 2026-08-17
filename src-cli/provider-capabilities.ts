@@ -11,6 +11,7 @@ import {
   type AgentProvider,
   type AgentProviderCapabilityCatalog,
 } from "../src/lib/agent-provider-contract";
+import { cursorAuthenticated } from "./provider-health";
 
 const MAX_MODELS = 500;
 const MAX_EFFORTS = 20;
@@ -241,7 +242,14 @@ export function parseCursorAvailableModelsResponse(
   }).slice(0, MAX_MODELS);
 }
 
-async function cursorModels(binary: string): Promise<AgentModelCapability[]> {
+export async function cursorModels(
+  binary: string,
+  isAuthenticated: (binary: string) => Promise<boolean> = cursorAuthenticated,
+): Promise<AgentModelCapability[]> {
+  // Capability discovery must never turn into an interactive login flow.
+  if (!(await isAuthenticated(binary))) {
+    throw new Error("Cursor CLI is not authenticated");
+  }
   return new Promise((resolve, reject) => {
     const child = spawn(binary, ["acp"], {
       env: process.env,

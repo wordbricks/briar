@@ -1,5 +1,9 @@
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  cursorModels,
   parseClaudeEfforts,
   parseClaudeModels,
   parseCursorAvailableModelsResponse,
@@ -8,6 +12,26 @@ import {
 } from "./provider-capabilities";
 
 describe("worker provider capabilities", () => {
+  it("does not start Cursor ACP when the CLI is not authenticated", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "briar-cursor-capabilities-"));
+    const binary = join(directory, "cursor-agent");
+    const marker = join(directory, "acp-started");
+    try {
+      await writeFile(
+        binary,
+        `#!/bin/sh\nprintf spawned > ${JSON.stringify(marker)}\n`,
+        { mode: 0o755 },
+      );
+
+      await expect(cursorModels(binary, async () => false)).rejects.toThrow(
+        "Cursor CLI is not authenticated",
+      );
+      await expect(readFile(marker, "utf8")).rejects.toThrow();
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
   it("reads Cursor models and reasoning options from the ACP extension", () => {
     expect(parseCursorAvailableModelsResponse({
       models: [{
