@@ -980,7 +980,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     await executeSql(
       db,
       await readFile(
-        resolve("migrations/0112_project_schedule_tab.sql"),
+        resolve("migrations/0113_project_schedule_tab.sql"),
         "utf8",
       ),
     );
