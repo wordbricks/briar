@@ -106,6 +106,7 @@ const projectSchema = z.object({
   id: z.string().uuid(),
   name: z.string(),
   issueKeyPrefix: z.string().regex(/^[A-Z0-9]{1,3}$/u).default("AH"),
+  scheduleTabEnabled: z.boolean().default(true),
   icon: z
     .string()
     .max(400_000)
@@ -1238,6 +1239,22 @@ export async function updateProjectIssueKeyPrefix(
     {
       method: "PUT",
       body: JSON.stringify({ issueKeyPrefix }),
+    },
+  );
+  return { project: projectSchema.parse(result.project) };
+}
+
+export async function updateProjectTabs(
+  token: string,
+  projectId: string,
+  tabs: { schedule: boolean },
+) {
+  const result = await request<{ project: unknown }>(
+    `/projects/${projectId}/tabs`,
+    token,
+    {
+      method: "PUT",
+      body: JSON.stringify(tabs),
     },
   );
   return { project: projectSchema.parse(result.project) };

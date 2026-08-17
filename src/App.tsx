@@ -58,6 +58,7 @@ import {
   useMobileNavigationGestures,
 } from "./hooks/useMobileNavigation";
 import { useNavigationHistory } from "./hooks/useNavigationHistory";
+import { isProjectScheduleTabEnabled } from "./lib/project-tabs";
 import {
   clearLaunchIntroPreview,
   isLaunchIntroPreview,
@@ -652,6 +653,17 @@ export function App() {
     (page: ActivePage) => resetNavigationLocation(page),
     [resetNavigationLocation],
   );
+  const activeProjectForTabs = briar.projects.find(
+    (project) => project.id === briar.activeProjectId,
+  );
+  useEffect(() => {
+    if (
+      activePage === "schedule" &&
+      !isProjectScheduleTabEnabled(activeProjectForTabs)
+    ) {
+      navigateToPage("issues");
+    }
+  }, [activePage, activeProjectForTabs, navigateToPage]);
   const createOrganizationChannel = useCallback(
     async (name: string) => {
       if (!briar.activeOrganizationId || !briar.token) {
@@ -1937,6 +1949,7 @@ export function App() {
             }
             onIconChange={briar.changeProjectIcon}
             onIssueKeyPrefixChange={briar.changeProjectIssueKeyPrefix}
+            onScheduleTabChange={briar.changeProjectScheduleTab}
             onRefreshVelen={briar.refreshVelen}
             onRefreshHealth={briar.refreshHealth}
             project={activeProject}

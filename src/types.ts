@@ -586,6 +586,7 @@ export type Project = {
   id: string;
   name: string;
   issueKeyPrefix?: string;
+  scheduleTabEnabled?: boolean;
   icon?: string | null;
   organizationId?: string;
   organizationName?: string;

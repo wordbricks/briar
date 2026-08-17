@@ -13,6 +13,7 @@ import {
   FolderGit2,
   GitBranch,
   ImagePlus,
+  LayoutList,
   LoaderCircle,
   Plug,
   RefreshCw,
@@ -84,13 +85,16 @@ import {
   projectIconAccept,
   projectIconFromFile,
 } from "../lib/project-icon";
+import { isProjectScheduleTabEnabled } from "../lib/project-tabs";
 import { LinearIssueImport } from "./LinearIssueImport";
 import { ProjectExecutionSettings } from "./ProjectExecutionSettings";
+import { ProjectTabsSettings } from "./ProjectTabsSettings";
 import { ProviderSelect } from "./ProviderSelect";
 import { SelectMenu } from "./SelectMenu";
 
 export type ProjectSettingsSection =
   | "general"
+  | "tabs"
   | "integrations"
   | "issue-import"
   | "agent-configuration"
@@ -117,6 +121,7 @@ export function ProjectSettings({
   onImportLinearIssues,
   onIconChange,
   onIssueKeyPrefixChange,
+  onScheduleTabChange,
   onRefreshVelen,
   onRefreshHealth,
   project,
@@ -158,6 +163,10 @@ export function ProjectSettings({
   onIssueKeyPrefixChange: (
     projectId: string,
     issueKeyPrefix: string,
+  ) => Promise<unknown>;
+  onScheduleTabChange: (
+    projectId: string,
+    scheduleTabEnabled: boolean,
   ) => Promise<unknown>;
   onRefreshVelen: (org?: string | null) => Promise<VelenInspection | null>;
   onRefreshHealth?: () => Promise<AutoHuntHealth | null>;
@@ -216,6 +225,9 @@ export function ProjectSettings({
   const [issueKeyPrefixSaving, setIssueKeyPrefixSaving] = useState(false);
   const [issueKeyPrefixError, setIssueKeyPrefixError] = useState<string | null>(null);
   const [issueKeyPrefixSaved, setIssueKeyPrefixSaved] = useState(false);
+  const [scheduleTabSaving, setScheduleTabSaving] = useState(false);
+  const [scheduleTabError, setScheduleTabError] = useState<string | null>(null);
+  const [scheduleTabSaved, setScheduleTabSaved] = useState(false);
   useEffect(() => {
     if (initialSection) setActiveSection(initialSection);
   }, [initialSection]);
@@ -550,6 +562,12 @@ export function ProjectSettings({
       description: t("settings.navGeneralDescription"),
     },
     {
+      id: "tabs" as const,
+      icon: <LayoutList size={16} strokeWidth={1.75} />,
+      label: t("settings.navTabs"),
+      description: t("settings.navTabsDescription"),
+    },
+    {
       id: "integrations" as const,
       icon: <Plug size={16} strokeWidth={1.75} />,
       label: t("settings.navIntegrations"),
@@ -811,6 +829,27 @@ export function ProjectSettings({
             </section>
           ) : null}
 
+          {activeSection === "tabs" ? (
+            <ProjectTabsSettings
+              canEdit={project.role !== "member"}
+              error={scheduleTabError}
+              onScheduleChange={(enabled) => {
+                if (scheduleTabSaving) return;
+                setScheduleTabSaving(true);
+                setScheduleTabError(null);
+                setScheduleTabSaved(false);
+                void onScheduleTabChange(project.id, enabled)
+                  .then(() => setScheduleTabSaved(true))
+                  .catch(() =>
+                    setScheduleTabError(t("settings.tabsSaveFailed")),
+                  )
+                  .finally(() => setScheduleTabSaving(false));
+              }}
+              saved={scheduleTabSaved}
+              saving={scheduleTabSaving}
+              scheduleEnabled={isProjectScheduleTabEnabled(project)}
+            />
+          ) : null}
 
           <section
             className="project-settings-integration"
