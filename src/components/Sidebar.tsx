@@ -24,11 +24,16 @@ import {
   type AutoHuntSession,
 } from "../hooks/useAutoHuntSessions";
 import { useI18n, type Locale } from "../i18n";
+import type { MessageKey } from "../i18n/messages";
 import { featureFlags } from "../lib/feature-flags";
 import { isProjectConnectedLocally } from "../lib/local-project-connection";
 import { isProjectScheduleTabEnabled } from "../lib/project-tabs";
 import type { RepositoryReadiness } from "../lib/project-connection";
 import type { ChannelSummary } from "../lib/channels-contract";
+import {
+  organizationSidebarChannels,
+  projectSidebarChannels,
+} from "../lib/channel-grouping";
 import { channelHasUnread } from "../lib/channel-unread";
 import type {
   Organization,
@@ -39,6 +44,25 @@ import type {
 import { ProjectAgentAvatar } from "./ProjectAgentAvatar";
 import { ProjectIcon } from "./ProjectIcon";
 import { UpdateControl } from "./UpdateControl";
+
+type SidebarPage =
+  | "issues"
+  | "lobby"
+  | "agents"
+  | "channels"
+  | "schedule"
+  | "inbox"
+  | "project-settings"
+  | "organization-create"
+  | "organization-settings"
+  | "settings";
+
+type Translate = (
+  key: MessageKey,
+  variables?: Record<string, string | number>,
+) => string;
+
+const EMPTY_CHANNELS: ChannelSummary[] = [];
 
 export function Sidebar({
   activePage,
@@ -75,17 +99,7 @@ export function Sidebar({
   unreadInboxCount,
   user,
 }: {
-  activePage:
-    | "issues"
-    | "lobby"
-    | "agents"
-    | "channels"
-    | "schedule"
-    | "inbox"
-    | "project-settings"
-    | "organization-create"
-    | "organization-settings"
-    | "settings";
+  activePage: SidebarPage;
   activeOrganizationId: string | null;
   activeProjectId: string | null;
   activeChannelId?: string | null;
@@ -122,6 +136,10 @@ export function Sidebar({
   const { locale, setLocale, t } = useI18n();
   const [isOrganizationMenuOpen, setIsOrganizationMenuOpen] = useState(false);
   const [areChannelsExpanded, setAreChannelsExpanded] = useState(true);
+  // Project Channels tabs start expanded; only explicitly collapsed IDs are stored.
+  const [collapsedProjectChannelIds, setCollapsedProjectChannelIds] = useState<
+    Set<string>
+  >(() => new Set());
   const [isChannelCreateOpen, setIsChannelCreateOpen] = useState(false);
   const [channelName, setChannelName] = useState("");
   const [channelCreateError, setChannelCreateError] = useState<string | null>(
@@ -143,9 +161,34 @@ export function Sidebar({
   const languageMenuRef = useRef<HTMLDivElement>(null);
   const languageTriggerRef = useRef<HTMLButtonElement>(null);
 
+  const catalog = channels ?? EMPTY_CHANNELS;
+  const unlinkedChannels = useMemo(
+    () => organizationSidebarChannels(catalog),
+    [catalog],
+  );
+  const activeChannel = useMemo(
+    () => catalog.find((channel) => channel.id === activeChannelId) ?? null,
+    [activeChannelId, catalog],
+  );
+
   useEffect(() => {
-    if (activePage === "channels") setAreChannelsExpanded(true);
-  }, [activePage]);
+    if (activePage !== "channels") return;
+    setAreChannelsExpanded(true);
+    const projectId = activeChannel?.defaultProjectId;
+    if (!projectId) return;
+    setCollapsedProjectIds((current) => {
+      if (!current.has(projectId)) return current;
+      const next = new Set(current);
+      next.delete(projectId);
+      return next;
+    });
+    setCollapsedProjectChannelIds((current) => {
+      if (!current.has(projectId)) return current;
+      const next = new Set(current);
+      next.delete(projectId);
+      return next;
+    });
+  }, [activeChannel?.defaultProjectId, activePage]);
 
   const closeChannelCreate = () => {
     if (isCreatingChannel) return;
@@ -329,6 +372,18 @@ export function Sidebar({
     setProjectExpanded(projectId, !isProjectExpanded(projectId));
   };
 
+  const isProjectChannelsExpanded = (projectId: string) =>
+    !collapsedProjectChannelIds.has(projectId);
+
+  const toggleProjectChannelsExpanded = (projectId: string) => {
+    setCollapsedProjectChannelIds((current) => {
+      const next = new Set(current);
+      if (next.has(projectId)) next.delete(projectId);
+      else next.add(projectId);
+      return next;
+    });
+  };
+
   const selectProject = (projectId: string) => {
     if (projectId !== activeProjectId) onProjectChange(projectId);
     setProjectExpanded(projectId, true);
@@ -481,7 +536,9 @@ export function Sidebar({
                       : t("sidebar.expandChannels")
                   }
                   className={`sidebar-channels-toggle${
-                    activePage === "channels" ? " active" : ""
+                    activePage === "channels" && !activeChannel?.defaultProjectId
+                      ? " active"
+                      : ""
                   }`}
                   onClick={() => setAreChannelsExpanded((expanded) => !expanded)}
                   type="button"
@@ -516,31 +573,16 @@ export function Sidebar({
 
             {areChannelsExpanded ? (
               <div className="sidebar-channel-list" id="sidebar-channel-list">
-                {(channels ?? []).map((channel) => {
-                  const isActive =
-                    activePage === "channels" && channel.id === activeChannelId;
-                  const unread = !isActive && channelHasUnread(channel);
-                  return (
-                    <button
-                      aria-current={isActive ? "page" : undefined}
-                      className={[
-                        isActive ? "active" : "",
-                        unread ? "unread" : "",
-                      ].filter(Boolean).join(" ")}
-                      key={channel.id}
-                      onClick={() => onChannelOpen(channel.id)}
-                      type="button"
-                    >
-                      {channel.visibility === "private" ? (
-                        <Lock aria-hidden="true" size={14} strokeWidth={1.7} />
-                      ) : (
-                        <Hash aria-hidden="true" size={14} strokeWidth={1.7} />
-                      )}
-                      <span>{channel.name}</span>
-                    </button>
-                  );
-                })}
-                {!channelsLoading && (channels ?? []).length === 0 ? (
+                {unlinkedChannels.map((channel) => (
+                  <SidebarChannelButton
+                    activePage={activePage}
+                    activeChannelId={activeChannelId}
+                    channel={channel}
+                    key={channel.id}
+                    onOpen={onChannelOpen}
+                  />
+                ))}
+                {!channelsLoading && unlinkedChannels.length === 0 ? (
                   <p>{t("sidebar.noChannels")}</p>
                 ) : null}
               </div>
@@ -785,6 +827,20 @@ export function Sidebar({
                         </div>
                       ) : null}
                     </div>
+                    {onChannelOpen ? (
+                      <ProjectChannelsTab
+                        activeChannelId={activeChannelId}
+                        activePage={activePage}
+                        channels={projectSidebarChannels(catalog, project.id)}
+                        channelsLoading={channelsLoading}
+                        expanded={isProjectChannelsExpanded(project.id)}
+                        onOpen={onChannelOpen}
+                        onToggle={() => toggleProjectChannelsExpanded(project.id)}
+                        projectId={project.id}
+                        projectName={project.name}
+                        t={t}
+                      />
+                    ) : null}
                     {isProjectScheduleTabEnabled(project) ? (
                       <a
                         aria-current={
@@ -973,6 +1029,110 @@ export function Sidebar({
         </Dialog.Portal>
       </Dialog.Root>
     </aside>
+  );
+}
+
+function SidebarChannelButton({
+  activeChannelId,
+  activePage,
+  channel,
+  onOpen,
+}: {
+  activeChannelId?: string | null;
+  activePage: SidebarPage;
+  channel: ChannelSummary;
+  onOpen: (channelId: string) => void;
+}) {
+  const isActive = activePage === "channels" && channel.id === activeChannelId;
+  const unread = !isActive && channelHasUnread(channel);
+  return (
+    <button
+      aria-current={isActive ? "page" : undefined}
+      className={[isActive ? "active" : "", unread ? "unread" : ""]
+        .filter(Boolean)
+        .join(" ")}
+      onClick={() => onOpen(channel.id)}
+      type="button"
+    >
+      {channel.visibility === "private" ? (
+        <Lock aria-hidden="true" size={14} strokeWidth={1.7} />
+      ) : (
+        <Hash aria-hidden="true" size={14} strokeWidth={1.7} />
+      )}
+      <span>{channel.name}</span>
+    </button>
+  );
+}
+
+function ProjectChannelsTab({
+  activeChannelId,
+  activePage,
+  channels,
+  channelsLoading,
+  expanded,
+  onOpen,
+  onToggle,
+  projectId,
+  projectName,
+  t,
+}: {
+  activeChannelId?: string | null;
+  activePage: SidebarPage;
+  channels: ChannelSummary[];
+  channelsLoading: boolean;
+  expanded: boolean;
+  onOpen: (channelId: string) => void;
+  onToggle: () => void;
+  projectId: string;
+  projectName: string;
+  t: Translate;
+}) {
+  const listId = `project-channel-list-${projectId}`;
+  const hasActiveChannel =
+    activePage === "channels" &&
+    channels.some((channel) => channel.id === activeChannelId);
+  return (
+    <div className="sidebar-project-channels">
+      <button
+        aria-controls={listId}
+        aria-expanded={expanded}
+        aria-label={
+          expanded
+            ? t("sidebar.collapseProjectChannels", { name: projectName })
+            : t("sidebar.expandProjectChannels", { name: projectName })
+        }
+        className={`sidebar-channels-toggle sidebar-project-channels-toggle${
+          hasActiveChannel ? " active" : ""
+        }`}
+        onClick={onToggle}
+        type="button"
+      >
+        <ChevronRight
+          aria-hidden="true"
+          className={expanded ? "open" : ""}
+          size={14}
+          strokeWidth={1.8}
+        />
+        <Hash aria-hidden="true" size={14} strokeWidth={1.7} />
+        <span>{t("sidebar.channels")}</span>
+      </button>
+      {expanded ? (
+        <div className="sidebar-channel-list sidebar-project-channel-list" id={listId}>
+          {channels.map((channel) => (
+            <SidebarChannelButton
+              activeChannelId={activeChannelId}
+              activePage={activePage}
+              channel={channel}
+              key={channel.id}
+              onOpen={onOpen}
+            />
+          ))}
+          {!channelsLoading && channels.length === 0 ? (
+            <p>{t("sidebar.noChannels")}</p>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
   );
 }
 
