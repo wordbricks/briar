@@ -23,6 +23,19 @@ export const changelogCopy = {
     backTop: "맨 위로 ↑",
     entries: [
       {
+        version: "1.2.130",
+        date: "2026년 8월 17일",
+        title: "에이전트 지침과 프로젝트 운영 화면을 더 유연하게 다듬습니다",
+        summary:
+          "더 긴 Agent 책임과 Skill 지침을 저장하고, Schedule 표시와 리뷰 대기 카드를 더 명확하게 정리하며, 사용하지 않는 Cursor가 로그인 창을 여는 일을 막았습니다.",
+        items: [
+          "Agent 책임과 각 Skill 지침을 최대 20,000자까지 작성하고 Agent마다 최대 5개의 Skill을 연결할 수 있으며, UI·API·Worker·CLI·데이터베이스가 같은 한도를 적용합니다.",
+          "프로젝트 설정의 탭 페이지에서 Schedule을 표시하거나 숨길 수 있습니다. Issues와 Agents는 항상 유지되고, 탭을 숨겨도 기존 예약 작업은 계속 실행됩니다.",
+          "검토를 기다리는 이슈가 별도의 Awaiting review 열로 이동하지 않고 현재 워크플로 단계에 남으며, 황색 리뷰 배너로 다음 조치가 필요한 상태를 분명하게 보여줍니다.",
+          "Cursor CLI가 로그인되지 않은 상태에서는 Worker의 기능 탐색이 ACP 인증을 시작하지 않아, Cursor 작업을 요청하지 않았는데도 브라우저 로그인 창이 반복해서 열리지 않습니다.",
+        ],
+      },
+      {
         version: "1.2.129",
         date: "2026년 8월 16일",
         title: "Cursor 에이전트와 채널 메시지 공유를 연결합니다",
@@ -683,6 +696,19 @@ export const changelogCopy = {
     home: "Home",
     backTop: "Back to top ↑",
     entries: [
+      {
+        version: "1.2.130",
+        date: "August 17, 2026",
+        title: "Make agent guidance and project operations more flexible",
+        summary:
+          "Store longer Agent responsibilities and Skill instructions, clarify Schedule visibility and review-pending cards, and stop unused Cursor providers from opening login windows.",
+        items: [
+          "Write Agent responsibilities and individual Skill instructions up to 20,000 characters, attach up to five Skills per Agent, and enforce the same limits across the UI, API, Worker, CLI, and database.",
+          "Show or hide Schedule from the new Tabs page in project settings. Issues and Agents remain available, and existing scheduled jobs keep running while the tab is hidden.",
+          "Keep paused issues in their current workflow stage instead of moving them to a separate Awaiting review column, and highlight the next required action with an amber review banner.",
+          "Skip Cursor ACP authentication during Worker capability discovery when the Cursor CLI is signed out, preventing repeated browser login windows when no Cursor work was requested.",
+        ],
+      },
       {
         version: "1.2.129",
         date: "August 16, 2026",
@@ -1356,9 +1382,9 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <h1>{changelog.title}</h1>
           <p>{changelog.description}</p>
         </div>
-        <a href="#v1-2-129" className="changelog-current">
+        <a href="#v1-2-130" className="changelog-current">
           <span>{changelog.current}</span>
-          <strong>v1.2.129</strong>
+          <strong>v1.2.130</strong>
           <i aria-hidden="true">↓</i>
         </a>
       </section>
@@ -1383,12 +1409,14 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   {index === 0 ? <span>{changelog.latest}</span> : null}
                   <time
                     dateTime={
-                      entry.version === "1.2.129" ||
-                      entry.version === "1.2.128" ||
-                      entry.version === "1.2.127" ||
-                      entry.version === "1.2.126" ||
-                      entry.version === "1.2.125" ||
-                      entry.version === "1.2.124"
+                      entry.version === "1.2.130"
+                        ? "2026-08-17"
+                        : entry.version === "1.2.129" ||
+                          entry.version === "1.2.128" ||
+                          entry.version === "1.2.127" ||
+                          entry.version === "1.2.126" ||
+                          entry.version === "1.2.125" ||
+                          entry.version === "1.2.124"
                         ? entry.version === "1.2.129" ||
                           entry.version === "1.2.128" ||
                           entry.version === "1.2.127"
