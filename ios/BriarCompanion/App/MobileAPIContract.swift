@@ -104,6 +104,14 @@ enum MobileAPIContract {
             "\(channelMessages(organizationID: organizationID, channelID: channelID))/\(messageID.uuidString.lowercased())/reactions"
         }
 
+        static func channelThreadSubscription(
+            organizationID: UUID,
+            channelID: UUID,
+            messageID: UUID
+        ) -> String {
+            "\(channelMessages(organizationID: organizationID, channelID: channelID))/\(messageID.uuidString.lowercased())/subscription"
+        }
+
         static func acceptChannelProposal(
             organizationID: UUID,
             channelID: UUID,

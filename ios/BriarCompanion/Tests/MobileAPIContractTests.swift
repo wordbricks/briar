@@ -781,6 +781,14 @@ final class MobileAPIContractTests: XCTestCase {
             "/organizations/22222222-2222-4222-8222-222222222222/channels/33333333-3333-4333-8333-333333333333/messages?limit=20&cursor=44444444-4444-4444-8444-444444444444"
         )
         XCTAssertEqual(
+            MobileAPIContract.Endpoint.channelThreadSubscription(
+                organizationID: organizationID,
+                channelID: channelID,
+                messageID: messageCursor
+            ),
+            "/organizations/22222222-2222-4222-8222-222222222222/channels/33333333-3333-4333-8333-333333333333/messages/44444444-4444-4444-8444-444444444444/subscription"
+        )
+        XCTAssertEqual(
             MobileAPIContract.Endpoint.acceptChannelProposal(
                 organizationID: organizationID,
                 channelID: channelID,

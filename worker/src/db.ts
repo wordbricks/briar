@@ -959,7 +959,7 @@ export type ChannelConversationNotificationRow = {
   body: string;
   created_at: string;
   root_message_id: string;
-  notification_reason: "mention" | "thread_reply";
+  notification_reason: "mention" | "thread_reply" | "subscription";
 };
 
 export type DashboardChangeRow = {

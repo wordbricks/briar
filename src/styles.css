@@ -7045,7 +7045,9 @@ button.issue-message-state { width:100%; cursor:pointer; }
   font-weight: 650;
 }
 .channel-thread > header span { display: inline-flex; align-items: center; gap: 6px; }
-.channel-thread > header button {
+.channel-thread-header-actions,
+.channel-thread-subscribe { display: inline-flex; align-items: center; gap: 8px; }
+.channel-thread-header-actions > button[aria-label] {
   display: grid;
   width: 28px;
   height: 28px;
@@ -7087,6 +7089,7 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .companion-channel-bar-back { width:46px; height:46px; flex:0 0 46px; border:1px solid color-mix(in srgb,var(--border,#ddd8cf) 64%,white); border-radius:50%; color:var(--foreground,#1c1915); background:color-mix(in srgb,var(--card,#fff) 84%,transparent); box-shadow:0 5px 16px rgba(22,20,28,.08); backdrop-filter:blur(20px) saturate(150%); -webkit-backdrop-filter:blur(20px) saturate(150%); transition:transform 100ms ease-out,background-color 100ms ease-out; }
 .companion-channel-bar-back:active { transform:scale(.96); background:var(--card,#fff); }
 .companion-channel-bar-title { min-width: 0; overflow: hidden; font-size: 18px; font-weight:700; letter-spacing:-.02em; text-overflow: ellipsis; white-space: nowrap; }
+.companion-channel-bar .channel-thread-subscribe { margin-left: auto; }
 .companion-channel-bar-identity { min-width:0; min-height:54px; flex:1; display:grid; grid-template-columns:30px minmax(0,1fr); align-items:center; gap:10px; border:1px solid color-mix(in srgb,var(--border,#ddd8cf) 64%,white); border-radius:27px; background:color-mix(in srgb,var(--card,#fff) 84%,transparent); padding:7px 14px; box-shadow:0 5px 18px rgba(22,20,28,.08); backdrop-filter:blur(22px) saturate(160%); -webkit-backdrop-filter:blur(22px) saturate(160%); }
 .companion-channel-bar-identity > svg { color:var(--foreground,#1c1915); }
 .companion-channel-bar-identity > span { min-width:0; display:flex; flex-direction:column; }

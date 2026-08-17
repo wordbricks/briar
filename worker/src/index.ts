@@ -507,8 +507,11 @@ import {
   listChannels,
   loadChannelDelta,
   markChannelRead,
+  resolveChannelThreadRootId,
+  subscribeChannelThread,
   isChannelReactionEmoji,
   isChannelRootMessage,
+  listChannelThreadSubscriptions,
   removeChannelAgent,
   removeChannelMember,
   revokeChannelWebhook,
@@ -517,6 +520,7 @@ import {
   reserveChannelExecutionProposalApproval,
   renewChannelReplyLease,
   snapshotChannelReplyExecutionTargets,
+  unsubscribeChannelThread,
   toggleChannelMessageReaction,
   updateChannel,
   updateChannelWebhook,
@@ -8199,6 +8203,52 @@ async function route(
       },
       201,
     );
+  }
+
+  const channelThreadSubscriptionMatch = pathname.match(
+    /^\/organizations\/([0-9a-f-]+)\/channels\/([0-9a-f-]+)\/messages\/([0-9a-f-]+)\/subscription$/u,
+  );
+  if (
+    channelThreadSubscriptionMatch &&
+    (request.method === "PUT" || request.method === "DELETE")
+  ) {
+    const session = await requireSession(auth, request);
+    const channel = await requireChannelAccess(
+      db,
+      channelThreadSubscriptionMatch[1],
+      channelThreadSubscriptionMatch[2],
+      session.user.id,
+    );
+    const rootMessageId = await resolveChannelThreadRootId(
+      db,
+      channel.id,
+      channelThreadSubscriptionMatch[3],
+    );
+    if (!rootMessageId) throw new HttpError(404, "Message not found");
+    if (request.method === "DELETE") {
+      await unsubscribeChannelThread(
+        db,
+        channel.id,
+        rootMessageId,
+        session.user.id,
+      );
+    } else {
+      await subscribeChannelThread(
+        db,
+        channel.id,
+        rootMessageId,
+        session.user.id,
+        new Date().toISOString(),
+      );
+    }
+    return json({
+      rootMessageId,
+      subscribers: await listChannelThreadSubscriptions(
+        db,
+        channel.id,
+        rootMessageId,
+      ),
+    });
   }
 
   const channelMessageReactionMatch = pathname.match(

@@ -302,6 +302,38 @@ describe("Inbox messages", () => {
     expect(classifyInboxMessage(message)).toBe("action_required");
   });
 
+  it("treats subscribed channel thread updates as activity", () => {
+    const [message] = buildCurrentInboxMessages(
+      {
+        ...demoDashboard,
+        runs: [],
+        channelNotifications: [{
+          id: "channel-subscribed",
+          channelId: "channel-product",
+          channelName: "product",
+          rootMessageId: "channel-root",
+          body: "A later update for subscribers.",
+          author: {
+            id: "member",
+            name: "Member",
+            image: null,
+            provider: null,
+          },
+          reason: "subscription",
+          createdAt: "2026-07-30T02:00:00.000Z",
+        }],
+      },
+      [],
+      [project],
+    );
+
+    expect(message).toMatchObject({
+      kind: "channel",
+      reason: "subscription",
+    });
+    expect(classifyInboxMessage(message)).toBe("activity");
+  });
+
   it("includes only subscribed issue updates and treats regular messages as activity", () => {
     // Use an equivalent offset form so filtering compares instants rather
     // than relying on lexicographic timestamp formatting.

@@ -146,6 +146,7 @@ final class ChannelsStore: ObservableObject {
     @Published private(set) var loadingEarlierMessages = false
     @Published private(set) var loading = false
     @Published private(set) var sending = false
+    @Published private(set) var subscriptionPending = false
     @Published private(set) var optimisticMessageIDs: Set<UUID> = []
     @Published private(set) var acceptingProposalID: UUID?
     @Published private(set) var approvingExecutionProposalID: UUID?
@@ -857,6 +858,41 @@ final class ChannelsStore: ObservableObject {
     }
 
     /// Toggles the current user's emoji reaction on a channel message.
+    func setThreadSubscription(
+        channelID: UUID,
+        messageID: UUID,
+        subscribed: Bool
+    ) async {
+        guard let organizationID, let token, !subscriptionPending else { return }
+        subscriptionPending = true
+        defer { subscriptionPending = false }
+        do {
+            let response: ChannelThreadSubscriptionResponse = try await api.send(
+                MobileAPIContract.Endpoint.channelThreadSubscription(
+                    organizationID: organizationID,
+                    channelID: channelID,
+                    messageID: messageID
+                ),
+                method: subscribed ? "PUT" : "DELETE",
+                token: token,
+                body: nil,
+                as: ChannelThreadSubscriptionResponse.self
+            )
+            let apply: (ChannelMessage) -> ChannelMessage = { candidate in
+                guard candidate.id == response.rootMessageId else { return candidate }
+                var updated = candidate
+                updated.subscribers = response.subscribers
+                return updated
+            }
+            messages = messages.map(apply)
+            thread = thread.map(apply)
+            cacheFocusedThread()
+            errorMessage = nil
+        } catch {
+            errorMessage = CompanionStore.message(for: error)
+        }
+    }
+
     func toggleReaction(channelID: UUID, messageID: UUID, emoji: String) async {
         guard let organizationID, let token else { return }
         let trimmed = emoji.trimmingCharacters(in: .whitespacesAndNewlines)
