@@ -6046,73 +6046,6 @@ export function RunPage({
                           </div>
                           {executionMetricsPanel}
                           <div className="paused-review-content">
-                            <section
-                              aria-busy={runEventsLoading}
-                              className="paused-review-section paused-review-work"
-                            >
-                              <header>
-                                <div>
-                                  <strong>{t("run.reviewWorkHistory")}</strong>
-                                  <p>{t("run.reviewWorkHistoryDescription")}</p>
-                                </div>
-                                {!runEventsLoading && !runEventsLoadError ? (
-                                  <small>
-                                    {t("run.activityCount", {
-                                      count: pausedReviewEvents.length,
-                                    })}
-                                  </small>
-                                ) : null}
-                              </header>
-                              {runEventsLoading ? (
-                                <div className="paused-review-state">
-                                  <LoaderCircle className="spin" size={15} />
-                                  {t("run.activityLoading")}
-                                </div>
-                              ) : runEventsLoadError ? (
-                                <button
-                                  className="paused-review-state error"
-                                  onClick={() => void loadRunEvents()}
-                                  type="button"
-                                >
-                                  <CircleAlert size={14} />
-                                  <span>{runEventsLoadError}</span>
-                                  <RefreshCw size={13} />
-                                </button>
-                              ) : pausedReviewEvents.length > 0 ? (
-                                <div className="paused-review-timeline">
-                                  {pausedReviewEvents.map((event) => {
-                                    const display = eventMeta(
-                                      event.status,
-                                      event.workflowStage,
-                                      run.workflow,
-                                    );
-                                    return (
-                                      <div className="paused-review-event" key={event.id}>
-                                        <i className={display.tone} />
-                                        <div>
-                                          <strong>
-                                            {localizeEvent(
-                                              t,
-                                              event.status,
-                                              event.workflowStage,
-                                              display.label,
-                                            )}
-                                          </strong>
-                                          {event.detail ? <p>{event.detail}</p> : null}
-                                          <small>
-                                            {event.actor} · {relativeTime(event.occurredAt, t)}
-                                          </small>
-                                        </div>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              ) : (
-                                <p className="paused-review-empty">
-                                  {t("run.activityEmpty")}
-                                </p>
-                              )}
-                            </section>
                             <section className="paused-review-section paused-review-result">
                               <header>
                                 <div>
@@ -6281,6 +6214,75 @@ export function RunPage({
                               </div>
                             </form>
                           ) : null}
+                          <div className="paused-review-content">
+                            <section
+                              aria-busy={runEventsLoading}
+                              className="paused-review-section paused-review-work"
+                            >
+                              <header>
+                                <div>
+                                  <strong>{t("run.reviewWorkHistory")}</strong>
+                                  <p>{t("run.reviewWorkHistoryDescription")}</p>
+                                </div>
+                                {!runEventsLoading && !runEventsLoadError ? (
+                                  <small>
+                                    {t("run.activityCount", {
+                                      count: pausedReviewEvents.length,
+                                    })}
+                                  </small>
+                                ) : null}
+                              </header>
+                              {runEventsLoading ? (
+                                <div className="paused-review-state">
+                                  <LoaderCircle className="spin" size={15} />
+                                  {t("run.activityLoading")}
+                                </div>
+                              ) : runEventsLoadError ? (
+                                <button
+                                  className="paused-review-state error"
+                                  onClick={() => void loadRunEvents()}
+                                  type="button"
+                                >
+                                  <CircleAlert size={14} />
+                                  <span>{runEventsLoadError}</span>
+                                  <RefreshCw size={13} />
+                                </button>
+                              ) : pausedReviewEvents.length > 0 ? (
+                                <div className="paused-review-timeline">
+                                  {pausedReviewEvents.map((event) => {
+                                    const display = eventMeta(
+                                      event.status,
+                                      event.workflowStage,
+                                      run.workflow,
+                                    );
+                                    return (
+                                      <div className="paused-review-event" key={event.id}>
+                                        <i className={display.tone} />
+                                        <div>
+                                          <strong>
+                                            {localizeEvent(
+                                              t,
+                                              event.status,
+                                              event.workflowStage,
+                                              display.label,
+                                            )}
+                                          </strong>
+                                          {event.detail ? <p>{event.detail}</p> : null}
+                                          <small>
+                                            {event.actor} · {relativeTime(event.occurredAt, t)}
+                                          </small>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              ) : (
+                                <p className="paused-review-empty">
+                                  {t("run.activityEmpty")}
+                                </p>
+                              )}
+                            </section>
+                          </div>
                         </section>
                       ) : completionSummary ? (
                         <section

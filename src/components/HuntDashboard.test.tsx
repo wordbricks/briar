@@ -6517,6 +6517,13 @@ describe("HuntDashboard", () => {
     expect(markup).toContain("검토 전 작업");
     expect(markup).toContain("작업 결과");
     expect(markup).toContain("리비전 1");
+    const workResultIndex = markup.indexOf("paused-review-result");
+    const workHistoryIndex = markup.indexOf("paused-review-work");
+    const ctaIndex = markup.indexOf("paused-result-actions");
+    expect(workResultIndex).toBeGreaterThan(-1);
+    expect(workHistoryIndex).toBeGreaterThan(workResultIndex);
+    expect(ctaIndex).toBeGreaterThan(workResultIndex);
+    expect(workHistoryIndex).toBeGreaterThan(ctaIndex);
     expect(markup).toContain('<div class="completed-issue-summary paused-result-summary"><h2>구현</h2>');
     expect(markup.match(/<li>/g)).toHaveLength(3);
     expect(markup).toContain("승인하고 계속");
