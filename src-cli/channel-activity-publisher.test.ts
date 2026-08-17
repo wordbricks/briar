@@ -111,6 +111,37 @@ describe("ChannelActivityPublisher", () => {
     ).toBe("TOKEN=[redacted] [redacted]");
   });
 
+  it("publishes only the reply body when commentary is a JSON envelope", async () => {
+    const send = vi.fn(async (
+      _credential: typeof credential,
+      _input: ChannelAgentActivityPublishInput,
+    ) => undefined);
+    const publisher = new ChannelActivityPublisher({
+      credential,
+      send,
+      minIntervalMs: 1,
+    });
+
+    publisher.observePayload({
+      event: {
+        type: "messageCompleted",
+        id: "commentary-json",
+        phase: "commentary",
+        text: '{"body":"Approve 동시성 처리와 staging 배포 흐름을 코드 기준으로 확인하겠습니다.","attachments":[],"document":null,"issueProposal"',
+      },
+    });
+    await vi.waitFor(() => expect(send).toHaveBeenCalledTimes(1));
+    expect(send.mock.calls[0]?.[1]).toMatchObject({
+      activity: {
+        id: "commentary-json",
+        kind: "message",
+        headline:
+          "Approve 동시성 처리와 staging 배포 흐름을 코드 기준으로 확인하겠습니다.",
+      },
+    });
+    publisher.stop();
+  });
+
   it("ignores malformed activity payloads without throwing", () => {
     const send = vi.fn(async () => undefined);
     const publisher = new ChannelActivityPublisher({ credential, send });

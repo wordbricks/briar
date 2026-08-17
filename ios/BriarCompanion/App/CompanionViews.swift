@@ -1846,7 +1846,7 @@ struct RunDetailView: View {
                                 .controlSize(.small)
                             Text(
                                 status.activity.map {
-                                    "Briar · \($0.headline)"
+                                    "Briar · \($0.displayHeadline)"
                                 } ?? L10n.text(
                                     "Briar가 답변을 작성하고 있습니다…",
                                     locale: locale
