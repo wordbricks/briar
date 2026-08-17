@@ -24,6 +24,7 @@ export type OrganizationAgentRow = {
   avatar: string | null;
   provider: AgentProvider;
   model: string | null;
+  description: string;
   responsibility: string;
   skill_markdown?: string;
   effort: AgentSkillEffort | null;
@@ -43,6 +44,7 @@ export const organizationAgentJson = (
   effort: row.effort,
   projectId: row.project_id,
   projectName: row.project_name,
+  description: row.description,
   responsibility: row.responsibility,
   skills: (row.skills ?? []).map(agentSkillJson),
   createdAt: row.created_at,
@@ -51,7 +53,7 @@ export const organizationAgentJson = (
 const agentSelect = `
   select agent.id, agent.organization_id, agent.project_id,
          project.name as project_name, agent.name, agent.avatar,
-         agent.provider, agent.model, agent.responsibility,
+         agent.provider, agent.model, agent.description, agent.responsibility,
          agent.skill_markdown, agent.effort, agent.created_at, agent.updated_at
   from briar_project_agents agent
   left join briar_projects project on project.id = agent.project_id`;
@@ -109,6 +111,7 @@ export async function createOrganizationAgent(
     name: string;
     provider: AgentProvider;
     model: string | null;
+    description?: string;
     responsibility: string;
     effort: AgentSkillEffort | null;
     skills?: AgentSkillInput[];
@@ -132,14 +135,15 @@ export async function createOrganizationAgent(
     db.prepare(
       `insert into briar_project_agents (
          id, organization_id, project_id, name, provider, model,
-         responsibility, effort, created_at, updated_at
-       ) values (?, ?, null, ?, ?, ?, ?, ?, ?, ?)`,
+         description, responsibility, effort, created_at, updated_at
+       ) values (?, ?, null, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).bind(
       input.id,
       input.organizationId,
       input.name,
       input.provider,
       input.model,
+      input.description ?? "",
       input.responsibility,
       input.effort,
       input.createdAt,
@@ -158,6 +162,7 @@ export async function updateOrganizationAgent(
     name: string;
     provider: AgentProvider;
     model: string | null;
+    description?: string;
     responsibility: string;
     effort: AgentSkillEffort | null;
     skills?: AgentSkillInput[];
@@ -211,13 +216,14 @@ export async function updateOrganizationAgent(
   await db.batch([
     db.prepare(
       `update briar_project_agents
-       set name = ?, provider = ?, model = ?, responsibility = ?,
+       set name = ?, provider = ?, model = ?, description = ?, responsibility = ?,
            effort = ?, updated_at = ?
        where id = ? and organization_id = ? and project_id is null`,
     ).bind(
       input.name,
       input.provider,
       input.model,
+      input.description ?? existing.description,
       input.responsibility,
       input.effort,
       input.updatedAt,

@@ -275,6 +275,7 @@ const projectAgentContextJson = (
   provider: agent.provider,
   model: agent.model,
   effort: agent.effort,
+  description: agent.description,
   responsibility: agent.responsibility,
   skills: (agent.skills ?? [])
     .filter((skill) => skill.created_at <= snapshotAt)
@@ -428,7 +429,8 @@ export async function listOrganizationAgentContextAgentsPage(
       `select agent.id, agent.organization_id, agent.project_id,
               project.name as project_name, agent.name,
               null as avatar, agent.provider, agent.model,
-              agent.responsibility, null as skill_markdown, agent.effort,
+              agent.description, agent.responsibility,
+              null as skill_markdown, agent.effort,
               agent.created_at, agent.updated_at
        from briar_project_agents agent
        join briar_projects project on project.id = agent.project_id
@@ -1193,7 +1195,8 @@ async function organizationAgentContextAgentSummaries(
     ).first<{ count: number }>(),
     db.prepare(
       `select agent.id, agent.name, agent.provider, agent.model,
-              agent.effort, agent.responsibility, agent.created_at,
+              agent.effort, agent.description, agent.responsibility,
+              agent.created_at,
               agent.updated_at
        from briar_project_agents agent
        join briar_projects project on project.id = agent.project_id
@@ -1217,6 +1220,7 @@ async function organizationAgentContextAgentSummaries(
       provider: string;
       model: string | null;
       effort: string | null;
+      description: string;
       responsibility: string;
       created_at: string;
       updated_at: string;
@@ -1253,6 +1257,7 @@ async function organizationAgentContextAgentSummaries(
     provider: row.provider,
     model: row.model,
     effort: row.effort,
+    description: row.description,
     responsibility: row.responsibility,
     skills: (skillsByAgent.get(row.id) ?? []).map((skill) => ({
       id: skill.id,
@@ -1295,7 +1300,8 @@ async function organizationAgentContextAgentDetails(
     `select agent.id, agent.organization_id, agent.project_id,
             project.name as project_name, agent.name,
             null as avatar, agent.provider, agent.model,
-            agent.responsibility, null as skill_markdown, agent.effort,
+            agent.description, agent.responsibility,
+            null as skill_markdown, agent.effort,
             agent.created_at, agent.updated_at
      from briar_project_agents agent
      join briar_projects project on project.id = agent.project_id

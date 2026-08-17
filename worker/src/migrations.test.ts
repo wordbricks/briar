@@ -16,8 +16,38 @@ import {
   recordHuntEvent,
   transferIssue,
 } from "./db";
-import { createOrganizationAgent } from "./organization-agents";
 import { applyD1Migrations, executeD1Sql } from "./test-helpers/d1";
+
+async function createPreDescriptionOrganizationAgent(
+  db: D1Database,
+  input: {
+    id: string;
+    organizationId: string;
+    name: string;
+    provider: string;
+    model: string | null;
+    responsibility: string;
+    effort: string | null;
+    createdAt: string;
+  },
+) {
+  await db.prepare(
+    `insert into briar_project_agents (
+       id, organization_id, project_id, name, provider, model,
+       responsibility, effort, created_at, updated_at
+     ) values (?, ?, null, ?, ?, ?, ?, ?, ?, ?)`,
+  ).bind(
+    input.id,
+    input.organizationId,
+    input.name,
+    input.provider,
+    input.model,
+    input.responsibility,
+    input.effort,
+    input.createdAt,
+    input.createdAt,
+  ).run();
+}
 
 async function withPreWorkflowMigrationDatabase(
   name: string,
@@ -569,7 +599,7 @@ describe("D1 migrations", () => {
         createdByUserId: userId,
         createdAt: now,
       });
-      await createOrganizationAgent(db, {
+      await createPreDescriptionOrganizationAgent(db, {
         id: agentId,
         organizationId,
         name: "Migration Agent",
@@ -1088,7 +1118,7 @@ describe("D1 migrations", () => {
         createdByUserId: ownerId,
         createdAt: now,
       });
-      await createOrganizationAgent(db, {
+      await createPreDescriptionOrganizationAgent(db, {
         id: agentId,
         organizationId,
         name: "Canonical Agent",
@@ -1432,7 +1462,7 @@ describe("D1 migrations", () => {
         createdByUserId: userId,
         createdAt: now,
       });
-      await createOrganizationAgent(db, {
+      await createPreDescriptionOrganizationAgent(db, {
         id: agentId,
         organizationId,
         name: "Upgrade Agent",
@@ -3563,6 +3593,49 @@ describe("D1 migrations", () => {
     },
   );
 
+  it("adds optional Agent descriptions with a 500-character limit", async () => {
+    const miniflare = new Miniflare({
+      modules: true,
+      script: "export default { fetch() { return new Response('ok') } }",
+      d1Databases: { DB: "briar-agent-description-migration-test" },
+    });
+    try {
+      const db = (await miniflare.getD1Database("DB")) as unknown as D1Database;
+      await executeD1Sql(
+        db,
+        `create table briar_project_agents (
+           id text primary key not null,
+           responsibility text not null
+         );
+         insert into briar_project_agents (id, responsibility)
+         values ('existing-agent', 'Keep this responsibility');`,
+      );
+      await executeD1Sql(
+        db,
+        await readFile(
+          resolve("migrations", "0113_agent_descriptions.sql"),
+          "utf8",
+        ),
+      );
+
+      expect(await db.prepare(
+        `select description, responsibility
+         from briar_project_agents where id = 'existing-agent'`,
+      ).first()).toEqual({
+        description: "",
+        responsibility: "Keep this responsibility",
+      });
+      await db.prepare(
+        `update briar_project_agents set description = ? where id = ?`,
+      ).bind("d".repeat(500), "existing-agent").run();
+      await expect(db.prepare(
+        `update briar_project_agents set description = ? where id = ?`,
+      ).bind("d".repeat(501), "existing-agent").run()).rejects.toThrow();
+    } finally {
+      await miniflare.dispose();
+    }
+  });
+
   it("expands Agent limits without losing linked rows", async () => {
     const miniflare = new Miniflare({
       modules: true,
@@ -3806,7 +3879,7 @@ describe("D1 migrations", () => {
         `insert into briar_organizations (id, name, handle, created_at, updated_at)
          values ('org-1', 'Example', 'example', '2026-08-13', '2026-08-13')`,
       ).run();
-      await createOrganizationAgent(db, {
+      await createPreDescriptionOrganizationAgent(db, {
         id: "agent-1",
         organizationId: "org-1",
         name: "기획 도우미",

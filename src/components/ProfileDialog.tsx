@@ -31,6 +31,7 @@ export type ProfileTarget =
       name: string;
       provider: ChannelAgentProvider | null;
       model: string | null;
+      description?: string | null;
       responsibility: string | null;
       skills: ChannelAgentSkill[];
       projectId: string | null;
@@ -46,6 +47,7 @@ export function profileTargetForChannelAgent(
     name: agent.name,
     provider: agent.provider,
     model: agent.model,
+    description: agent.description ?? null,
     responsibility: agent.responsibility,
     skills: agent.skills,
     projectId: agent.projectId,
@@ -156,6 +158,12 @@ export function ProfileDialog({
               ) : null}
             </dl>
 
+            {profile.type === "agent" && profile.description ? (
+              <section className="profile-dialog-responsibility">
+                <h3>{t("agents.agentDescription")}</h3>
+                <p>{profile.description}</p>
+              </section>
+            ) : null}
             {profile.type === "agent" && profile.responsibility ? (
               <section className="profile-dialog-responsibility">
                 <h3>{t("profile.responsibility")}</h3>

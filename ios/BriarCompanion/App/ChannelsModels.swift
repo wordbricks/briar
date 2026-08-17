@@ -743,6 +743,7 @@ struct ChannelAgentSummary: Codable, Equatable, Identifiable, Sendable {
     let provider: String
     let model: String?
     let projectId: UUID?
+    let description: String?
     let responsibility: String
     let createdAt: Date
 

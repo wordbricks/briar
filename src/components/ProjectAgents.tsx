@@ -26,7 +26,10 @@ import {
   loadProjectAgents,
   updateProjectAgent,
 } from "../lib/api";
-import { agentResponsibilityMaxLength } from "../lib/agent-limits";
+import {
+  agentDescriptionMaxLength,
+  agentResponsibilityMaxLength,
+} from "../lib/agent-limits";
 import {
   agentEffortOptions,
   agentModelDisplayName,
@@ -260,6 +263,7 @@ export function ProjectAgents({
           model: input.model,
           effort:
             input.effort === undefined ? agent.effort : input.effort,
+          description: input.description?.trim() ?? "",
           responsibility: input.responsibility,
           skills: localProjectAgentSkills(
             agent.id,
@@ -501,6 +505,7 @@ export function ProjectAgents({
                   const isRunning =
                     runningAgentIds.has(agent.id) ||
                     isStarting;
+                  const summary = agent.description || agent.responsibility;
                   return (
                     <article className="project-agent-card" key={agent.id}>
                       <button
@@ -551,12 +556,18 @@ export function ProjectAgents({
                           </span>
                         </div>
                         <section>
-                          <small>{t("agents.responsibility")}</small>
+                          <small>
+                            {t(
+                              agent.description
+                                ? "agents.agentDescription"
+                                : "agents.responsibility",
+                            )}
+                          </small>
                           <p
                             className="project-agent-card-responsibility"
-                            title={agent.responsibility}
+                            title={summary}
                           >
-                            {agent.responsibility}
+                            {summary}
                           </p>
                           <div className="project-agent-card-skills">
                             <small>{t("agents.skills")}</small>
@@ -712,6 +723,7 @@ export function ProjectAgentDialog({
   const [effort, setEffort] = useState<ModelEffort | null>(
     agent?.effort ?? null,
   );
+  const [description, setDescription] = useState(agent?.description ?? "");
   const [responsibility, setResponsibility] = useState(
     agent?.responsibility ?? "",
   );
@@ -743,6 +755,7 @@ export function ProjectAgentDialog({
             provider,
             model: model || null,
             effort,
+            description: description.trim(),
             responsibility: responsibility.trim(),
             calendarColor,
           }).catch((caught) => {
@@ -784,6 +797,19 @@ export function ProjectAgentDialog({
               placeholder={t("agents.namePlaceholder")}
               value={name}
             />
+          </label>
+          <label>
+            <span>
+              {t("agents.agentDescription")} <em>{t("common.optional")}</em>
+            </span>
+            <textarea
+              maxLength={agentDescriptionMaxLength}
+              onChange={(event) => setDescription(event.target.value)}
+              placeholder={t("agents.agentDescriptionPlaceholder")}
+              rows={3}
+              value={description}
+            />
+            <small>{t("agents.agentDescriptionHint")}</small>
           </label>
           <div className="project-agent-form-runtime">
             <label>
@@ -924,6 +950,7 @@ function localProjectAgent(
     provider: input.provider,
     model: input.model,
     effort: input.effort ?? null,
+    description: input.description?.trim() ?? "",
     responsibility: input.responsibility,
     skill: projectAgentSkill({ name, responsibility: input.responsibility }),
     skills: localProjectAgentSkills(

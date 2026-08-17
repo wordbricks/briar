@@ -889,6 +889,7 @@
             "codexPet": null,
             "provider": "codex",
             "model": "gpt-5.4",
+            "description": "Handles issue processing and development work for the project.",
             "responsibility": "Owns the project's development and code-related work.",
             "skill": "# Issue processing agent\n\n## Responsibility\n\nOwns the project's development and code-related work.",
             "skills": [
@@ -1170,6 +1171,7 @@
             "provider": "claude",
             "model": null,
             "projectId": null,
+            "description": "글쓰기와 콘텐츠 다듬기를 돕는 에이전트입니다.",
             "responsibility": "글쓰기 파트너",
             "createdAt": "2026-08-06T00:00:00.000Z"
           }
