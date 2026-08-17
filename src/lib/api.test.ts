@@ -2030,6 +2030,7 @@ describe("API errors", () => {
       agent: {
         id: "44444444-4444-4444-8444-444444444444",
         name: "Repository auditor",
+        description: "",
         provider: "codex",
         model: null,
         responsibility: "Audit the connected repository.",
@@ -2118,6 +2119,7 @@ describe("API errors", () => {
       agent: {
         id: "44444444-4444-4444-8444-444444444444",
         name: "Repository auditor",
+        description: "",
         provider: "codex",
         model: null,
         effort: null,
