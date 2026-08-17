@@ -2454,6 +2454,20 @@ describe("HuntDashboard", () => {
     expect(markup).toContain('aria-label="취소"');
     expect(markup).toContain("Security review 완료 후 확인");
     expect(markup).toContain('data-checkpoint-count="1"');
+    const securityReviewStart = markup.indexOf(
+      'data-kanban-column-id="stage:security_review"',
+    );
+    const blockedStart = markup.indexOf(
+      'data-kanban-column-id="status:blocked"',
+    );
+    expect(securityReviewStart).toBeGreaterThan(-1);
+    expect(blockedStart).toBeGreaterThan(securityReviewStart);
+    expect(
+      markup.slice(0, securityReviewStart),
+    ).toContain("Security review 완료 후 확인");
+    expect(
+      markup.slice(securityReviewStart, blockedStart),
+    ).not.toContain("Security review 완료 후 확인");
   });
 
   it("keeps paused issues in their workflow stage column with a review banner", () => {

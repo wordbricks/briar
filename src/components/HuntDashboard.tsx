@@ -1127,9 +1127,17 @@ export function HuntDashboard({
         (column) => column.id === `stage:${checkpoint.stage}`,
       );
       if (stageColumnIndex < 0) continue;
-      const boundaryColumn = definitions[
+      const nextColumn = definitions[
         stageColumnIndex + (checkpoint.position === "after" ? 1 : 0)
       ];
+      // After the last workflow stage there is no review column anymore.
+      // Keep the marker on that stage instead of the following status column.
+      const boundaryColumn =
+        checkpoint.position === "after" &&
+        nextColumn &&
+        !nextColumn.id.startsWith("stage:")
+          ? definitions[stageColumnIndex]
+          : nextColumn;
       const stageLabel = stageLabels.get(checkpoint.stage) ?? checkpoint.stage;
       const label = checkpoint.position === "before"
         ? t("run.checkpointBefore", { stage: stageLabel })
