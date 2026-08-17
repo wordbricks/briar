@@ -10,6 +10,10 @@ import {
   normalizedAgentSkillRows,
   type AgentSkillRow,
 } from "./agent-skills";
+import {
+  agentSkillInstructionsMaxLength,
+  agentSkillsMaxCount,
+} from "../../src/lib/agent-limits";
 
 const skill = (
   input: Partial<AgentSkillRow> & Pick<AgentSkillRow, "id" | "name">,
@@ -131,6 +135,54 @@ describe("Agent Skill normalization", () => {
         "2026-08-10T00:00:00.000Z",
       ),
     ).toEqual([]);
+  });
+
+  it("accepts five Skills with 20000-character instructions", () => {
+    const rows = normalizedAgentSkillRows(
+      "agent-1",
+      Array.from({ length: agentSkillsMaxCount }, (_, index) => ({
+        name: `Skill ${index}`,
+        instructions: "x".repeat(agentSkillInstructionsMaxLength),
+        provider: "codex" as const,
+        model: null,
+        effort: null,
+        kind: "custom" as const,
+        position: index,
+      })),
+      fallback,
+      "2026-08-10T00:00:00.000Z",
+    );
+
+    expect(rows).toHaveLength(agentSkillsMaxCount);
+    expect(rows[0]?.instructions).toHaveLength(agentSkillInstructionsMaxLength);
+  });
+
+  it("rejects a sixth Skill and instructions longer than 20000 characters", () => {
+    const input = (index: number) => ({
+      name: `Skill ${index}`,
+      instructions: "instructions",
+      provider: "codex" as const,
+      model: null,
+      effort: null,
+      kind: "custom" as const,
+      position: index,
+    });
+
+    expect(() => normalizedAgentSkillRows(
+      "agent-1",
+      Array.from({ length: agentSkillsMaxCount + 1 }, (_, index) => input(index)),
+      fallback,
+      "2026-08-10T00:00:00.000Z",
+    )).toThrow("at most 5 Skills");
+    expect(() => normalizedAgentSkillRows(
+      "agent-1",
+      [{
+        ...input(0),
+        instructions: "x".repeat(agentSkillInstructionsMaxLength + 1),
+      }],
+      fallback,
+      "2026-08-10T00:00:00.000Z",
+    )).toThrow("cannot exceed 20000 characters");
   });
 });
 

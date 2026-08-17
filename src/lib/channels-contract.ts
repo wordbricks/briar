@@ -5,6 +5,11 @@ import {
   type AgentProvider,
   type ModelEffort,
 } from "./agent-provider-contract";
+import {
+  agentResponsibilityMaxLength,
+  agentSkillInstructionsMaxLength,
+  agentSkillsMaxCount,
+} from "./agent-limits";
 
 export const channelAgentProviders = agentProviders;
 export type ChannelAgentProvider = AgentProvider;
@@ -254,7 +259,11 @@ export const channelAgentSkillInputSchema = z
   .object({
     id: z.string().uuid().optional(),
     name: z.string().trim().min(1).max(100),
-    instructions: z.string().trim().max(10_000).default(""),
+    instructions: z
+      .string()
+      .trim()
+      .max(agentSkillInstructionsMaxLength)
+      .default(""),
     provider: z.enum(channelAgentProviders),
     model: z.string().trim().min(1).max(100).nullable().default(null),
     effort: modelEffortSchema.nullable().default(null),
@@ -372,9 +381,16 @@ export const organizationAgentInputSchema = z
     name: z.string().trim().min(1).max(100),
     provider: z.enum(channelAgentProviders),
     model: z.string().trim().min(1).max(100).nullable().default(null),
-    responsibility: z.string().trim().min(1).max(2000),
+    responsibility: z
+      .string()
+      .trim()
+      .min(1)
+      .max(agentResponsibilityMaxLength),
     effort: modelEffortSchema.nullable().default(null),
-    skills: z.array(channelAgentSkillInputSchema).max(50).optional(),
+    skills: z
+      .array(channelAgentSkillInputSchema)
+      .max(agentSkillsMaxCount)
+      .optional(),
   })
   .strict();
 

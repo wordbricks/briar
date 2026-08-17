@@ -7,6 +7,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Typography } from "@/components/ui/typography";
 import { useI18n } from "../i18n";
 import {
+  agentSkillInstructionsMaxLength,
+  agentSkillsMaxCount,
+} from "../lib/agent-limits";
+import {
   agentEffortOptions,
   agentModelOptions,
   type AgentProvider,
@@ -44,9 +48,13 @@ export function projectAgentSkillsValid(
     skill.name.trim().normalize("NFKC").toLocaleLowerCase(),
   );
   return (
+    skills.length <= agentSkillsMaxCount &&
     new Set(names).size === names.length &&
     skills.every(
-      (skill) => skill.name.trim() && skill.instructions.trim(),
+      (skill) =>
+        skill.name.trim() &&
+        skill.instructions.trim() &&
+        skill.instructions.length <= agentSkillInstructionsMaxLength,
     )
   );
 }
@@ -83,6 +91,7 @@ export function ProjectAgentSkillsEditor({
   };
 
   const addSkill = () => {
+    if (skills.length >= agentSkillsMaxCount) return;
     onChange([
       ...positioned(skills),
       {
@@ -115,7 +124,7 @@ export function ProjectAgentSkillsEditor({
           </Typography>
         </span>
         <Button
-          disabled={disabled}
+          disabled={disabled || skills.length >= agentSkillsMaxCount}
           onClick={addSkill}
           size="sm"
           type="button"
@@ -211,7 +220,7 @@ export function ProjectAgentSkillsEditor({
                     <Textarea
                       disabled={disabled}
                       id={`project-agent-skill-instructions-${index}`}
-                      maxLength={10_000}
+                      maxLength={agentSkillInstructionsMaxLength}
                       onChange={(event) =>
                         updateSkill(index, {
                           instructions: event.target.value,

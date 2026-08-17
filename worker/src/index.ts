@@ -35,6 +35,10 @@ import {
   type AgentProvider,
 } from "../../src/lib/agent-provider-contract";
 import {
+  agentResponsibilityMaxLength,
+  agentSkillsMaxCount,
+} from "../../src/lib/agent-limits";
+import {
   defaultProjectAgentCalendarColor,
   normalizeProjectAgentLocale,
 } from "../../src/lib/project-agent";
@@ -1848,8 +1852,15 @@ export const projectAgentInputSchema = z
     provider: z.enum(agentProviders),
     model: z.string().trim().min(1).max(100).nullable().optional(),
     effort: modelEffortSchema.nullable().optional(),
-    responsibility: z.string().trim().min(1).max(2_000),
-    skills: z.array(channelAgentSkillInputSchema).max(50).optional(),
+    responsibility: z
+      .string()
+      .trim()
+      .min(1)
+      .max(agentResponsibilityMaxLength),
+    skills: z
+      .array(channelAgentSkillInputSchema)
+      .max(agentSkillsMaxCount)
+      .optional(),
     calendarColor: z
       .string()
       .trim()

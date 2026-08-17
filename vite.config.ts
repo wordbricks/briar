@@ -31,7 +31,9 @@ export default defineConfig({
   },
   test: {
     exclude: [...configDefaults.exclude, "**/.claude/worktrees/**"],
-    hookTimeout: 30_000,
+    // D1 integration fixtures apply the complete migration history before
+    // seeding data; leave enough time for generated table-rebuild migrations.
+    hookTimeout: 60_000,
     maxWorkers: 4,
     setupFiles: ["./src/test/setup.ts"],
     testTimeout: 15_000,

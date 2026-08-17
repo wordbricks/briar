@@ -4,6 +4,11 @@ import {
   modelEffortSchema,
 } from "./agent-provider-contract";
 import {
+  agentResponsibilityMaxLength,
+  agentSkillInstructionsMaxLength,
+  agentSkillsMaxCount,
+} from "./agent-limits";
+import {
   autoHuntQaStatuses,
   autoHuntRunStatuses,
   autoHuntSources,
@@ -193,7 +198,7 @@ export const organizationAgentContextAgentSkillSchema = z
   .object({
     id: organizationAgentContextIdSchema,
     name: z.string().min(1).max(100),
-    instructions: z.string().max(10_000),
+    instructions: z.string().max(agentSkillInstructionsMaxLength),
     provider: z.enum(agentProviders),
     model: z.string().min(1).max(100).nullable(),
     effort: modelEffortSchema.nullable(),
@@ -209,10 +214,10 @@ export const organizationAgentContextProjectAgentSchema = z
     provider: z.enum(agentProviders),
     model: z.string().min(1).max(100).nullable(),
     effort: modelEffortSchema.nullable(),
-    responsibility: z.string().max(2_000),
+    responsibility: z.string().max(agentResponsibilityMaxLength),
     skills: z
       .array(organizationAgentContextAgentSkillSchema)
-      .max(50),
+      .max(agentSkillsMaxCount),
     createdAt: organizationAgentContextTimestampSchema,
     updatedAt: organizationAgentContextTimestampSchema,
   })

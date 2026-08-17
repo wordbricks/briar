@@ -8,6 +8,10 @@ import {
   projectAgentSkillInputs,
   projectAgentSkillsValid,
 } from "./ProjectAgentSkillsEditor";
+import {
+  agentSkillInstructionsMaxLength,
+  agentSkillsMaxCount,
+} from "../lib/agent-limits";
 
 beforeAll(() => {
   (
@@ -159,5 +163,50 @@ describe("ProjectAgentSkillsEditor", () => {
     expect(deleteButton?.disabled).toBe(false);
     await act(async () => deleteButton?.click());
     expect(onChange).toHaveBeenCalledWith([]);
+  });
+
+  it("allows 20000-character instructions and rejects a sixth Skill", async () => {
+    const skills = Array.from({ length: agentSkillsMaxCount }, (_, index) => ({
+      id: `skill-${index}`,
+      name: `Skill ${index}`,
+      instructions: "x".repeat(agentSkillInstructionsMaxLength),
+      provider: "codex" as const,
+      model: null,
+      effort: null,
+      kind: "custom" as const,
+      position: index,
+    }));
+    expect(projectAgentSkillsValid(skills)).toBe(true);
+    expect(projectAgentSkillsValid([
+      ...skills,
+      { ...skills[0]!, id: "skill-6", name: "Skill 6", position: 5 },
+    ])).toBe(false);
+
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    mounted.push({ container, root });
+
+    await act(async () => {
+      root.render(
+        <ProjectAgentSkillsEditor
+          defaultEffort={null}
+          defaultModel={null}
+          defaultProvider="codex"
+          onChange={vi.fn()}
+          skills={skills}
+        />,
+      );
+    });
+
+    const addButton = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent?.includes("스킬 추가"),
+    );
+    expect(addButton?.disabled).toBe(true);
+    expect(
+      container.querySelector<HTMLTextAreaElement>(
+        "#project-agent-skill-instructions-0",
+      )?.maxLength,
+    ).toBe(agentSkillInstructionsMaxLength);
   });
 });

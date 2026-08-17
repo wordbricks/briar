@@ -2,6 +2,10 @@ import type {
   AgentProvider,
   ModelEffort,
 } from "../../src/lib/agent-provider-contract";
+import {
+  agentSkillInstructionsMaxLength,
+  agentSkillsMaxCount,
+} from "../../src/lib/agent-limits";
 
 export type AgentSkillProvider = AgentProvider;
 export type AgentSkillEffort = ModelEffort;
@@ -71,6 +75,9 @@ export function normalizedAgentSkillRows(
     kind: fallback.kind ?? "custom",
     position: 0,
   }];
+  if (requested.length > agentSkillsMaxCount) {
+    throw new Error(`An Agent can have at most ${agentSkillsMaxCount} Skills`);
+  }
   const names = new Set<string>();
   const ids = new Set<string>();
   return requested.map((skill, index) => {
@@ -90,8 +97,10 @@ export function normalizedAgentSkillRows(
       throw new Error("Agent Skill IDs must be unique within an Agent");
     }
     ids.add(id);
-    if (normalizedInstructions.length > 10_000) {
-      throw new Error("Agent Skill instructions cannot exceed 10000 characters");
+    if (normalizedInstructions.length > agentSkillInstructionsMaxLength) {
+      throw new Error(
+        `Agent Skill instructions cannot exceed ${agentSkillInstructionsMaxLength} characters`,
+      );
     }
     return {
       id,

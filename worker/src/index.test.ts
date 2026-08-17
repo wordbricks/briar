@@ -51,6 +51,11 @@ import worker, {
   type ScheduledTaskDependencies,
 } from "./index";
 import { slackCreateIssueShortcutCallbackId } from "./slack";
+import {
+  agentResponsibilityMaxLength,
+  agentSkillInstructionsMaxLength,
+  agentSkillsMaxCount,
+} from "../../src/lib/agent-limits";
 
 const createScheduledTaskDependencies = (): ScheduledTaskDependencies => ({
   archiveCompletedLogs: vi.fn(async () => ({
@@ -318,6 +323,35 @@ describe("Worker HTTP contract", () => {
     expect(projectAgentInputSchema.parse(input).skills).toBeUndefined();
     expect(projectAgentInputSchema.parse({ ...input, skills: [] }).skills)
       .toEqual([]);
+  });
+
+  it("enforces the expanded Agent responsibility and Skill limits", () => {
+    const skill = (index: number) => ({
+      name: `Skill ${index}`,
+      instructions: "x".repeat(agentSkillInstructionsMaxLength),
+      provider: "codex" as const,
+      model: null,
+      effort: null,
+      kind: "custom" as const,
+      position: index,
+    });
+    const input = {
+      provider: "codex" as const,
+      responsibility: "x".repeat(agentResponsibilityMaxLength),
+      skills: Array.from({ length: agentSkillsMaxCount }, (_, index) =>
+        skill(index)
+      ),
+    };
+
+    expect(projectAgentInputSchema.safeParse(input).success).toBe(true);
+    expect(projectAgentInputSchema.safeParse({
+      ...input,
+      responsibility: `${input.responsibility}x`,
+    }).success).toBe(false);
+    expect(projectAgentInputSchema.safeParse({
+      ...input,
+      skills: [...input.skills, skill(agentSkillsMaxCount)],
+    }).success).toBe(false);
   });
 
   it("routes minute and six-hour scheduled work separately", async () => {
