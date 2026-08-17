@@ -4649,6 +4649,9 @@ export function RunPage({
   const [isCompletingResultReview, setIsCompletingResultReview] =
     useState(false);
   const [isResumePending, setIsResumePending] = useState(false);
+  const resumeCheckpointIdentity = run.checkpoint
+    ? `${run.checkpoint.key}:${run.checkpoint.attempt}:${run.checkpoint.revision}`
+    : null;
   const [resultReviewError, setResultReviewError] = useState<string | null>(
     null,
   );
@@ -4781,6 +4784,9 @@ export function RunPage({
     setReworkError(null);
     setIsSubmittingRework(false);
   }, [initialDetailTab, run.id, run.status]);
+  useEffect(() => {
+    setIsResumePending(false);
+  }, [resumeCheckpointIdentity]);
   useLayoutEffect(() => {
     if (usesConversationTab || activeDetailTab !== "conversation") return;
     setActiveDetailTab(lastContentDetailTabRef.current);
