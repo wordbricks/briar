@@ -2334,6 +2334,78 @@ describe("HuntDashboard", () => {
     await act(async () => root.unmount());
   });
 
+  it("expands a wrapped URL between inline images so the first line is not scrolled under the previous image", async () => {
+    URL.createObjectURL = vi.fn(() => "blob:preview");
+    URL.revokeObjectURL = vi.fn();
+    const longUrl =
+      "https://www.figma.com/design/wwSVz2qdnWZ2U8ZBwQE9QN/NEW-GetGPT?node-id=3484-49593&t=Jl0lYctMpHtKZly6-4";
+    const run: HuntRun = {
+      ...demoDashboard.runs[0],
+      issueDescription:
+        `![one.png](briar-attachment://existing-1)\n문서 UI\n반영되어야 할 UI : ${longUrl}\n![two.png](briar-attachment://existing-2)`,
+      attachments: [
+        {
+          id: "existing-1",
+          filename: "one.png",
+          contentType: "image/png",
+          byteSize: 100,
+          url: "/projects/project/runs/run/attachments/existing-1",
+        },
+        {
+          id: "existing-2",
+          filename: "two.png",
+          contentType: "image/png",
+          byteSize: 100,
+          url: "/projects/project/runs/run/attachments/existing-2",
+        },
+      ],
+    };
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    const scrollHeight = vi
+      .spyOn(HTMLTextAreaElement.prototype, "scrollHeight", "get")
+      .mockImplementation(function (this: HTMLTextAreaElement) {
+        return this.value.includes("figma.com") ? 129 : 40;
+      });
+
+    try {
+      await act(async () => {
+        root.render(
+          <EditIssueDialog
+            isSubmitting={false}
+            members={[]}
+            onClose={() => undefined}
+            onLoadAttachment={async () => new Blob()}
+            onUpdate={async () => undefined}
+            run={run}
+          />,
+        );
+      });
+
+      const wrapped = Array.from(
+        container.querySelectorAll<HTMLTextAreaElement>(
+          ".issue-description-input",
+        ),
+      ).find((textarea) => textarea.value.includes("figma.com"));
+      expect(wrapped).toBeDefined();
+      expect(wrapped!.rows).toBe(
+        Math.max(1, wrapped!.value.split("\n").length),
+      );
+      expect(wrapped!.style.minHeight).toBe("129px");
+      expect(wrapped!.scrollTop).toBe(0);
+      expect(
+        container.querySelectorAll<HTMLImageElement>(
+          ".issue-inline-attachment img",
+        ),
+      ).toHaveLength(2);
+    } finally {
+      scrollHeight.mockRestore();
+      await act(async () => root.unmount());
+      container.remove();
+    }
+  });
+
   it("keeps all existing attachments when the kept list is not changed", async () => {
     URL.createObjectURL = vi.fn(() => "blob:preview");
     URL.revokeObjectURL = vi.fn();
