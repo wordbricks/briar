@@ -117,6 +117,7 @@ import {
 } from "../lib/error-diagnostics";
 import {
   agentMessagesFromAppServerEvents,
+  displayChannelActivityHeadline,
   type AutoHuntAgentMessage,
 } from "../lib/auto-hunt-agent";
 import { eventMeta, runMeta } from "../lib/stages";
@@ -9723,7 +9724,9 @@ function AgentReplyState({
     return (
       <div className="issue-agent-reply-state">
         <LoadingState
-          label={activity ? `Briar · ${activity.headline}` : t("run.briarReplying")}
+          label={activity
+            ? `Briar · ${displayChannelActivityHeadline(activity)}`
+            : t("run.briarReplying")}
         />
       </div>
     );

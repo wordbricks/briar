@@ -555,7 +555,7 @@ private struct ChannelConversationView: View {
                                 .controlSize(.small)
                             Text(
                                 status.activity.map {
-                                    "\(status.agentName) · \($0.headline)"
+                                    "\(status.agentName) · \($0.displayHeadline)"
                                 } ?? String(
                                     format: L10n.text(.channelAgentTyping, locale: locale),
                                     status.agentName

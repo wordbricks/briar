@@ -370,6 +370,34 @@ final class CompanionReadTests: XCTestCase {
 
         let status = try XCTUnwrap(store.typingStatuses(parentMessageID: parentMessageID).first)
         XCTAssertEqual(status.activity?.headline, "원인을 확인하고 있습니다.")
+        XCTAssertEqual(status.activity?.displayHeadline, "원인을 확인하고 있습니다.")
+    }
+
+    func testChannelActivityDisplayHeadlineExtractsReplyBody() {
+        let streamed = ChannelAgentActivity(
+            id: "commentary-json",
+            kind: .message,
+            headline:
+                "{\"body\":\"Approve 동시성 처리와 staging 배포 흐름을 코드 기준으로 확인하겠습니다.\",\"attachments\":[],\"document\":null,\"issueProposal\""
+        )
+        XCTAssertEqual(
+            streamed.displayHeadline,
+            "Approve 동시성 처리와 staging 배포 흐름을 코드 기준으로 확인하겠습니다."
+        )
+
+        let command = ChannelAgentActivity(
+            id: "command-1",
+            kind: .command,
+            headline: "{\"body\":\"should not extract\"}"
+        )
+        XCTAssertEqual(command.displayHeadline, "{\"body\":\"should not extract\"}")
+
+        XCTAssertEqual(
+            ChannelAgentActivity.naturalLanguage(
+                from: "{\"body\":null,\"attachments\":[],\"document\":null}"
+            ),
+            "{\"body\":null,\"attachments\":[],\"document\":null}"
+        )
     }
 
     @MainActor
