@@ -18,6 +18,21 @@ export type ChannelGroupProject = { id: string; name: string };
 const byName = (left: ChannelSummary, right: ChannelSummary) =>
   left.name.localeCompare(right.name) || left.id.localeCompare(right.id);
 
+/** Channels with no `defaultProjectId` stay in the organization-wide list. */
+export function organizationSidebarChannels(
+  channels: readonly ChannelSummary[],
+): ChannelSummary[] {
+  return channels.filter((channel) => !channel.defaultProjectId);
+}
+
+/** Channels whose `defaultProjectId` matches the project belong under that project. */
+export function projectSidebarChannels(
+  channels: readonly ChannelSummary[],
+  projectId: string,
+): ChannelSummary[] {
+  return channels.filter((channel) => channel.defaultProjectId === projectId);
+}
+
 /**
  * Orders groups as common, the active project, then every other project in the
  * organization by name. Archived channels are dropped, and a channel pointing

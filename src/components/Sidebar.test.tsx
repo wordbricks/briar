@@ -57,6 +57,25 @@ const sidebarProps = {
   user: { id: "user-1", name: "Jay", email: "jay@example.com" },
 };
 
+const sidebarChannel = (
+  id: string,
+  name: string,
+  defaultProjectId: string | null,
+) => ({
+  id,
+  organizationId: "organization-1",
+  slug: name.toLowerCase().replaceAll(" ", "-"),
+  name,
+  topic: null,
+  visibility: "public" as const,
+  defaultProjectId,
+  archivedAt: null,
+  memberCount: 1,
+  agentCount: 0,
+  createdAt: "2026-08-01T00:00:00Z",
+  updatedAt: "2026-08-01T00:00:00Z",
+});
+
 describe("Sidebar", () => {
   it("shows channels as an accordion and creates one from its context menu", async () => {
     const onChannelOpen = vi.fn();
@@ -96,20 +115,20 @@ describe("Sidebar", () => {
       ".sidebar-channels-toggle",
     )!;
     expect(toggle.getAttribute("aria-expanded")).toBe("true");
-    expect(container.querySelector(".sidebar-channel-list")?.textContent).toContain(
+    expect(container.querySelector("#sidebar-channel-list")?.textContent).toContain(
       "General",
     );
 
     await act(async () => {
       container
-        .querySelector<HTMLButtonElement>(".sidebar-channel-list button")
+        .querySelector<HTMLButtonElement>("#sidebar-channel-list button")
         ?.click();
     });
     expect(onChannelOpen).toHaveBeenCalledWith("channel-1");
 
     await act(async () => toggle.click());
     expect(toggle.getAttribute("aria-expanded")).toBe("false");
-    expect(container.querySelector(".sidebar-channel-list")).toBeNull();
+    expect(container.querySelector("#sidebar-channel-list")).toBeNull();
     await act(async () => toggle.click());
 
     await act(async () => {
@@ -153,6 +172,120 @@ describe("Sidebar", () => {
     container.remove();
   });
 
+  it("nests project-linked channels under that project and keeps unlinked ones at the top", async () => {
+    const onChannelOpen = vi.fn();
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(
+        <Sidebar
+          {...sidebarProps}
+          activeChannelId="channel-project"
+          activePage="channels"
+          channels={[
+            sidebarChannel("channel-common", "General", null),
+            sidebarChannel("channel-project", "Briar dev", "project-1"),
+            sidebarChannel("channel-other", "Console chat", "project-2"),
+          ]}
+          onChannelOpen={onChannelOpen}
+          projects={[
+            ...sidebarProps.projects,
+            {
+              id: "project-2",
+              name: "Console",
+              organizationId: "organization-1",
+              organizationName: "Briar",
+              role: "member",
+              createdAt: "2026-07-23T00:00:00Z",
+            },
+          ]}
+        />,
+      );
+    });
+
+    const topLevel = container.querySelector("#sidebar-channel-list");
+    expect(topLevel?.textContent).toContain("General");
+    expect(topLevel?.textContent).not.toContain("Briar dev");
+    expect(topLevel?.textContent).not.toContain("Console chat");
+
+    const briarChannels = container.querySelector("#project-channel-list-project-1");
+    expect(briarChannels?.textContent).toContain("Briar dev");
+    expect(briarChannels?.textContent).not.toContain("General");
+    expect(briarChannels?.textContent).not.toContain("Console chat");
+    expect(
+      briarChannels?.querySelector("button")?.getAttribute("aria-current"),
+    ).toBe("page");
+
+    const consoleChannels = container.querySelector("#project-channel-list-project-2");
+    expect(consoleChannels?.textContent).toContain("Console chat");
+
+    await act(async () => {
+      briarChannels?.querySelector<HTMLButtonElement>("button")?.click();
+    });
+    expect(onChannelOpen).toHaveBeenCalledWith("channel-project");
+
+    const collapseBriarChannels = container.querySelector<HTMLButtonElement>(
+      '[aria-label="Briar 채널 접기"]',
+    );
+    expect(collapseBriarChannels?.getAttribute("aria-expanded")).toBe("true");
+    await act(async () => collapseBriarChannels?.click());
+    expect(container.querySelector("#project-channel-list-project-1")).toBeNull();
+    expect(container.querySelector("#project-channel-list-project-2")).not.toBeNull();
+    expect(container.querySelector("#sidebar-channel-list")).not.toBeNull();
+    expect(
+      container.querySelector('[aria-label="Briar 채널 펼치기"]'),
+    ).not.toBeNull();
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("expands a project's Channels tab when that project's channel is open", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(
+        <Sidebar
+          {...sidebarProps}
+          activePage="issues"
+          channels={[sidebarChannel("channel-project", "Briar dev", "project-1")]}
+          onChannelOpen={() => undefined}
+        />,
+      );
+    });
+
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>('[aria-label="Briar 채널 접기"]')
+        ?.click();
+    });
+    expect(container.querySelector("#project-channel-list-project-1")).toBeNull();
+
+    await act(async () => {
+      root.render(
+        <Sidebar
+          {...sidebarProps}
+          activeChannelId="channel-project"
+          activePage="channels"
+          channels={[sidebarChannel("channel-project", "Briar dev", "project-1")]}
+          onChannelOpen={() => undefined}
+        />,
+      );
+    });
+
+    expect(container.querySelector("#project-channel-list-project-1")).not.toBeNull();
+    expect(
+      container.querySelector('[aria-label="Briar 채널 접기"]')?.getAttribute(
+        "aria-expanded",
+      ),
+    ).toBe("true");
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
   it("bolds unread channel names and restores the regular weight when read", async () => {
     const container = document.createElement("div");
     document.body.append(container);
@@ -183,7 +316,7 @@ describe("Sidebar", () => {
       );
     });
     expect(
-      container.querySelector(".sidebar-channel-list button")?.className,
+      container.querySelector("#sidebar-channel-list button")?.className,
     ).toContain("unread");
 
     await act(async () => {
@@ -197,7 +330,7 @@ describe("Sidebar", () => {
       );
     });
     expect(
-      container.querySelector(".sidebar-channel-list button")?.className,
+      container.querySelector("#sidebar-channel-list button")?.className,
     ).not.toContain("unread");
 
     await act(async () => root.unmount());
