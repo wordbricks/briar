@@ -932,3 +932,39 @@ download/log security checks, and the Tauri iOS simulator and Android ARM64
 regression builds. Archive identity, App Store provisioning, distribution
 signature, production entitlements, exported IPA signature, and all alternate
 app icons were verified before upload.
+
+## 2026-08-18 — 1.2.131 (1)
+
+- App: Briar Companion (`app.briar.companion`)
+- Marketing version: `1.2.131`
+- App Store Connect build: `1`
+- App Store Connect build ID: `8c8ebdd8-3d5b-44f0-8647-a827ac6afaa8`
+- Latest main commit: `db54d3a55386f273969b4f49f958feaee0208621`
+- Release source commit: `e54e97ec410c4ca15465da279af33ecfa5732cb5`
+- Implementation: native SwiftUI
+- Toolchain: Xcode 26.6, iOS 26.5 SDK
+- Minimum iOS version: 17.0
+- App Store Connect processing state: `VALID`
+- TestFlight state: `IN_BETA_TESTING`
+- Internal group: `wordbricks` (`hasAccessToAllBuilds=true`)
+- Automatic tester notification: enabled
+- IPA SHA-256: `9081c8ef28f7160d909d5e22252eef7bdb44a1c412992ad7e4202ea88dd60939`
+
+This release adds Cursor agent support, richer agent descriptions and branding,
+project-grouped channels, channel thread subscriptions, copy-link and copy-
+message actions, clearer in-progress agent output, configurable schedule tabs,
+awaiting-review work summaries, and issue-editor layout and link improvements.
+The exact release source differs from latest main only by squash history and has
+the identical Git tree. It passed the shared mobile contract, Swift unit and 17
+iPhone UI tests, iPad accessibility and largest Dynamic Type layout testing,
+Production analyze and build checks, session/download/log security checks, and
+the Tauri iOS simulator and Android ARM64 regression builds. Archive identity,
+App Store provisioning, distribution signature, production entitlements,
+exported IPA signature, and all alternate app icons were verified before upload.
+
+The initial gate stopped before upload because selectable SwiftUI message text
+is exposed to XCTest as a text view instead of a static text. PR #1101 made the
+optimistic-message assertion element-type independent, passed the complete
+repository signoff, and was merged into main before this exact verified IPA was
+uploaded. App Store Connect accepted the build as `VALID` and automatically
+made it available to the all-builds internal group.
