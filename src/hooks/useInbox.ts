@@ -478,10 +478,7 @@ export function inboxReadVersionsToPush(
 export function classifyInboxMessage(
   message: InboxMessage,
 ): InboxCategory {
-  if (message.kind === "conversation") {
-    return message.reason === "subscription" ? "activity" : "action_required";
-  }
-  if (message.kind === "channel") {
+  if (message.kind === "conversation" || message.kind === "channel") {
     return message.reason === "subscription" ? "activity" : "action_required";
   }
   if (message.kind === "session") {

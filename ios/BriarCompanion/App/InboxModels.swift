@@ -335,10 +335,7 @@ enum InboxMessageBuilder {
     }
 
     static func classify(_ message: InboxMessage) -> InboxCategory {
-        if message.kind == .conversation {
-            return message.reason == "subscription" ? .activity : .actionRequired
-        }
-        if message.kind == .channel {
+        if message.kind == .conversation || message.kind == .channel {
             return message.reason == "subscription" ? .activity : .actionRequired
         }
         if message.kind == .session {
