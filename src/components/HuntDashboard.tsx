@@ -190,6 +190,7 @@ import {
   issueMentionHandleFromUrl,
   remarkIssueMentions,
 } from "../lib/issue-mentions";
+import { hyperlinkSegments } from "../lib/hyperlink-text";
 import { ProfileDialog, type ProfileTarget } from "./ProfileDialog";
 import { MentionComposerField } from "./MentionComposerField";
 import {
@@ -3191,6 +3192,84 @@ function draftIssueDescriptionParts(
   return parts;
 }
 
+function IssueDescriptionField({
+  end,
+  label,
+  maxLength,
+  onChange,
+  placeholder,
+  rows,
+  start,
+  value,
+}: {
+  end: number;
+  label: string;
+  maxLength: number;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  rows: number;
+  start: number;
+  value: string;
+}) {
+  const fieldRef = useRef<HTMLDivElement | null>(null);
+  const mirrorRef = useRef<HTMLDivElement | null>(null);
+
+  const syncScroll = (target: HTMLTextAreaElement) => {
+    const mirror = mirrorRef.current;
+    if (!mirror) return;
+    mirror.scrollLeft = target.scrollLeft;
+    mirror.scrollTop = target.scrollTop;
+  };
+
+  useLayoutEffect(() => {
+    const input = fieldRef.current?.querySelector<HTMLTextAreaElement>(
+      ".issue-description-input",
+    );
+    if (input) syncScroll(input);
+  }, [value]);
+
+  const segments = useMemo(() => hyperlinkSegments(value), [value]);
+
+  return (
+    <div className="issue-description-field" ref={fieldRef}>
+      <div className="issue-description-mirror" ref={mirrorRef} aria-hidden="true">
+        {segments.map((segment, segmentIndex) =>
+          segment.type === "link" ? (
+            <a
+              href={segment.url}
+              key={`link-${segmentIndex}`}
+              onMouseDown={(event) => event.preventDefault()}
+              rel="noreferrer"
+              target="_blank"
+            >
+              {segment.value}
+            </a>
+          ) : (
+            <span key={`text-${segmentIndex}`}>{segment.value}</span>
+          ),
+        )}
+        {value.endsWith("\n") ? (
+          <span aria-hidden="true">&nbsp;</span>
+        ) : null}
+      </div>
+      <textarea
+        aria-label={label}
+        className="issue-description-input"
+        data-description-end={end}
+        data-description-start={start}
+        maxLength={maxLength}
+        onChange={(event) => {
+          onChange(event.currentTarget.value);
+        }}
+        onScroll={(event) => syncScroll(event.currentTarget)}
+        placeholder={placeholder}
+        rows={rows}
+        value={value}
+      />
+    </div>
+  );
+}
+
 function DraftIssueDescriptionEditor({
   attachments,
   className,
@@ -3229,23 +3308,22 @@ function DraftIssueDescriptionEditor({
     >
       {parts.map((part, index) =>
         part.type === "text" ? (
-          <textarea
-            aria-label={label}
-            className="issue-description-input"
-            data-description-end={part.end}
-            data-description-start={part.start}
+          <IssueDescriptionField
+            end={part.end}
             key={`text-${index}`}
+            label={label}
             maxLength={Math.max(
               0,
               100000 - (description.length - part.value.length),
             )}
-            onChange={(event) =>
+            onChange={(nextValue) =>
               onChange(
-                `${description.slice(0, part.start)}${event.target.value}${description.slice(part.end)}`,
+                `${description.slice(0, part.start)}${nextValue}${description.slice(part.end)}`,
               )
             }
             placeholder={parts.length === 1 ? placeholder : undefined}
             rows={Math.max(1, part.value.split("\n").length)}
+            start={part.start}
             value={part.value}
           />
         ) : (
