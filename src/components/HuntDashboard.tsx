@@ -192,6 +192,7 @@ import {
   remarkIssueMentions,
 } from "../lib/issue-mentions";
 import { hyperlinkSegments } from "../lib/hyperlink-text";
+import { fitIssueDescriptionField } from "../lib/issue-description-field-size";
 import { ProfileDialog, type ProfileTarget } from "./ProfileDialog";
 import { MentionComposerField } from "./MentionComposerField";
 import {
@@ -3194,6 +3195,7 @@ function draftIssueDescriptionParts(
 }
 
 function IssueDescriptionField({
+  autoSize = false,
   end,
   label,
   maxLength,
@@ -3203,6 +3205,7 @@ function IssueDescriptionField({
   start,
   value,
 }: {
+  autoSize?: boolean;
   end: number;
   label: string;
   maxLength: number;
@@ -3214,6 +3217,7 @@ function IssueDescriptionField({
 }) {
   const fieldRef = useRef<HTMLDivElement | null>(null);
   const mirrorRef = useRef<HTMLDivElement | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   const syncScroll = (target: HTMLTextAreaElement) => {
     const mirror = mirrorRef.current;
@@ -3223,11 +3227,23 @@ function IssueDescriptionField({
   };
 
   useLayoutEffect(() => {
-    const input = fieldRef.current?.querySelector<HTMLTextAreaElement>(
-      ".issue-description-input",
-    );
-    if (input) syncScroll(input);
-  }, [value]);
+    const input = textareaRef.current;
+    if (!input) return;
+    if (autoSize) fitIssueDescriptionField(input);
+    syncScroll(input);
+    if (!autoSize || typeof ResizeObserver === "undefined") return undefined;
+
+    let lastWidth = input.getBoundingClientRect().width;
+    const observer = new ResizeObserver((entries) => {
+      const width = entries[0]?.contentRect.width ?? lastWidth;
+      if (width === lastWidth) return;
+      lastWidth = width;
+      fitIssueDescriptionField(input);
+      syncScroll(input);
+    });
+    observer.observe(input);
+    return () => observer.disconnect();
+  }, [autoSize, rows, value]);
 
   const segments = useMemo(() => hyperlinkSegments(value), [value]);
 
@@ -3262,8 +3278,12 @@ function IssueDescriptionField({
         onChange={(event) => {
           onChange(event.currentTarget.value);
         }}
-        onScroll={(event) => syncScroll(event.currentTarget)}
+        onScroll={(event) => {
+          if (autoSize) event.currentTarget.scrollTop = 0;
+          syncScroll(event.currentTarget);
+        }}
         placeholder={placeholder}
+        ref={textareaRef}
         rows={rows}
         value={value}
       />
@@ -3310,6 +3330,7 @@ function DraftIssueDescriptionEditor({
       {parts.map((part, index) =>
         part.type === "text" ? (
           <IssueDescriptionField
+            autoSize={hasInlineAttachments}
             end={part.end}
             key={`text-${index}`}
             label={label}
