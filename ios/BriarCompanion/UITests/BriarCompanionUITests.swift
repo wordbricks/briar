@@ -252,8 +252,11 @@ final class BriarCompanionUITests: XCTestCase {
         let send = app.buttons["channel-composer-send"]
         send.tap()
 
+        let sentMessage = app.descendants(matching: .any).matching(
+            NSPredicate(format: "label == %@", sentBody)
+        ).firstMatch
         XCTAssertTrue(
-            app.staticTexts[sentBody].waitForExistence(timeout: 1),
+            sentMessage.waitForExistence(timeout: 1),
             "서버 응답 전에도 채널 메시지가 즉시 표시되어야 합니다."
         )
         XCTAssertFalse(
@@ -267,7 +270,7 @@ final class BriarCompanionUITests: XCTestCase {
             "서버가 메시지를 확정하면 빈 입력창의 전송 버튼이 다시 숨겨져야 합니다."
         )
         XCTAssertEqual(
-            app.staticTexts.matching(
+            app.descendants(matching: .any).matching(
                 NSPredicate(format: "label == %@", sentBody)
             ).count,
             1
