@@ -6750,34 +6750,39 @@ describe("HuntDashboard", () => {
     container.remove();
   });
 
-  it("keeps the resume button spinning until the paused run actually resumes", async () => {
+  it("clears the resume spinner when the run reaches another paused checkpoint", async () => {
     const onResume = vi.fn(async () => undefined);
     const container = document.createElement("div");
     document.body.append(container);
     const root = createRoot(container);
+    const pausedRun: HuntRun = {
+      ...demoDashboard.runs[1],
+      status: "paused",
+    };
+    const renderRun = (run: HuntRun) => (
+      <TooltipProvider>
+        <RunPage
+          isSidebarOpen
+          error={null}
+          isRecovering={false}
+          onBack={() => undefined}
+          onCancel={async () => undefined}
+          onLoadAttachment={async () => new Blob()}
+          onLoadIssueMessages={async () => []}
+          onLoadRunEvidence={async () => []}
+          onMove={async () => undefined}
+          onResume={onResume}
+          onRetry={async () => undefined}
+          onSendIssueMessage={async () => {
+            throw new Error("not implemented in this test");
+          }}
+          run={run}
+        />
+      </TooltipProvider>
+    );
 
     await act(async () => {
-      root.render(
-        <TooltipProvider>
-          <RunPage
-            isSidebarOpen
-            error={null}
-            isRecovering={false}
-            onBack={() => undefined}
-            onCancel={async () => undefined}
-            onLoadAttachment={async () => new Blob()}
-            onLoadIssueMessages={async () => []}
-            onLoadRunEvidence={async () => []}
-            onMove={async () => undefined}
-            onResume={onResume}
-            onRetry={async () => undefined}
-            onSendIssueMessage={async () => {
-              throw new Error("not implemented in this test");
-            }}
-            run={{ ...demoDashboard.runs[1], status: "paused" as const }}
-          />
-        </TooltipProvider>,
-      );
+      root.render(renderRun(pausedRun));
     });
 
     const resumeButton = container.querySelector<HTMLButtonElement>(
@@ -6794,6 +6799,28 @@ describe("HuntDashboard", () => {
     expect(onResume).toHaveBeenCalledOnce();
     expect(resumeButton?.disabled).toBe(true);
     expect(resumeButton?.querySelector(".spin")).not.toBeNull();
+
+    await act(async () => {
+      root.render(renderRun({
+        ...pausedRun,
+        checkpoint: pausedRun.checkpoint
+          ? {
+              ...pausedRun.checkpoint,
+              key: "project-after-pr_open",
+              stage: "pr_open",
+              stageLabel: "Pull request",
+              terminalReviewOnly: false,
+            }
+          : null,
+        workflowStage: "pr_open",
+      }));
+    });
+
+    const nextCheckpointButton = container.querySelector<HTMLButtonElement>(
+      ".paused-result-resume",
+    );
+    expect(nextCheckpointButton?.disabled).toBe(false);
+    expect(nextCheckpointButton?.querySelector(".spin")).toBeNull();
 
     await act(async () => root.unmount());
     container.remove();
