@@ -29,6 +29,7 @@ const listOrganizationAgents = vi.fn();
 const setChannelMember = vi.fn();
 const setChannelAgent = vi.fn();
 const toggleChannelMessageReaction = vi.fn();
+const updateChannelThreadSubscription = vi.fn();
 const listChannelWebhooks = vi.fn();
 const createChannelWebhook = vi.fn();
 const updateChannelWebhook = vi.fn();
@@ -62,6 +63,8 @@ vi.mock("../lib/api", () => ({
   setChannelAgent: (...args: unknown[]) => setChannelAgent(...args),
   toggleChannelMessageReaction: (...args: unknown[]) =>
     toggleChannelMessageReaction(...args),
+  updateChannelThreadSubscription: (...args: unknown[]) =>
+    updateChannelThreadSubscription(...args),
   listChannelWebhooks: (...args: unknown[]) => listChannelWebhooks(...args),
   createChannelWebhook: (...args: unknown[]) => createChannelWebhook(...args),
   updateChannelWebhook: (...args: unknown[]) => updateChannelWebhook(...args),
@@ -1423,6 +1426,46 @@ describe("Channels", () => {
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
     expect(container.textContent).toContain("Requested reply");
+  });
+
+  it("subscribes and unsubscribes from the open channel thread", async () => {
+    const rootMessage = message({
+      id: "message-root",
+      replyCount: 1,
+      subscribers: [{ userId: "user-1", subscribedAt: "2026-08-01T01:00:00.000Z" }],
+    });
+    const reply = message({
+      id: "message-reply",
+      parentMessageId: "message-root",
+      body: "Requested reply",
+    });
+    listChannelMessages.mockResolvedValue({ messages: [rootMessage, reply] });
+    updateChannelThreadSubscription.mockResolvedValue({
+      rootMessageId: rootMessage.id,
+      subscribers: [],
+    });
+
+    await render(
+      [rootMessage],
+      {
+        channelId: channel.id,
+        messageId: reply.id,
+        rootMessageId: rootMessage.id,
+      },
+    );
+
+    const subscribeButton = container.querySelector<HTMLButtonElement>(
+      ".channel-thread .issue-subscribe-button",
+    );
+    expect(subscribeButton?.textContent).toContain("구독 중");
+    await act(async () => subscribeButton?.click());
+    expect(updateChannelThreadSubscription).toHaveBeenCalledWith(
+      "token",
+      "org-1",
+      channel.id,
+      rootMessage.id,
+      false,
+    );
   });
 
   it("keeps a requested reply thread open after its parent consumes the request", async () => {

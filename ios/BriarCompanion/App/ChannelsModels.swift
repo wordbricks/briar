@@ -229,6 +229,7 @@ struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
     /// Mutually exclusive with issue creation/execution on the same reply. Its
     /// immutable snapshot and monotonic merge lifecycle are tracked separately.
     var skillExecutionProposal: AgentSkillExecutionProposal?
+    var subscribers: [IssueSubscriber]
     let createdAt: Date
 
     enum CodingKeys: String, CodingKey {
@@ -248,6 +249,7 @@ struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
         case proposal
         case executionProposal
         case skillExecutionProposal
+        case subscribers
         case createdAt
     }
 
@@ -268,6 +270,7 @@ struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
         proposal: Proposal?,
         executionProposal: IssueExecutionProposal? = nil,
         skillExecutionProposal: AgentSkillExecutionProposal? = nil,
+        subscribers: [IssueSubscriber] = [],
         createdAt: Date
     ) {
         self.id = id
@@ -286,6 +289,7 @@ struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
         self.proposal = proposal
         self.executionProposal = executionProposal
         self.skillExecutionProposal = skillExecutionProposal
+        self.subscribers = subscribers
         self.createdAt = createdAt
     }
 
@@ -313,6 +317,10 @@ struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
             AgentSkillExecutionProposal.self,
             forKey: .skillExecutionProposal
         )
+        subscribers = try container.decodeIfPresent(
+            [IssueSubscriber].self,
+            forKey: .subscribers
+        ) ?? []
         createdAt = try container.decode(Date.self, forKey: .createdAt)
     }
 

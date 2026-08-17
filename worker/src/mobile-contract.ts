@@ -257,7 +257,7 @@ const mobileInboxChannelMessageSchema = mobileInboxMessageBaseSchema.extend({
   body: z.string(),
   authorName: z.string(),
   authorImage: z.string().nullable().optional(),
-  reason: z.enum(["mention", "thread_reply"]),
+  reason: z.enum(["mention", "thread_reply", "subscription"]),
 });
 
 const mobileInboxSessionMessageSchema = mobileInboxMessageBaseSchema.extend({
@@ -333,7 +333,7 @@ export const mobileChannelNotificationSchema = z.object({
   rootMessageId: z.uuid(),
   body: z.string(),
   author: mobileMessageAuthorSchema,
-  reason: z.enum(["mention", "thread_reply"]),
+  reason: z.enum(["mention", "thread_reply", "subscription"]),
   createdAt: z.iso.datetime(),
 });
 
@@ -602,6 +602,7 @@ export const mobileChannelMessageSchema = z.object({
   executionProposal: mobileIssueExecutionProposalSchema.nullable().optional(),
   skillExecutionProposal:
     mobileAgentSkillExecutionProposalSchema.nullable().optional(),
+  subscribers: z.array(mobileIssueSubscriberSchema).optional(),
   createdAt: z.iso.datetime(),
 });
 
@@ -655,6 +656,11 @@ export const mobileToggleChannelMessageReactionRequestSchema = z.object({
 
 export const mobileToggleChannelMessageReactionResponseSchema = z.object({
   message: mobileChannelMessageSchema,
+});
+
+export const mobileChannelThreadSubscriptionResponseSchema = z.object({
+  rootMessageId: z.uuid(),
+  subscribers: z.array(mobileIssueSubscriberSchema),
 });
 
 export const mobileChannelAgentReplySchema = z.object({
@@ -1146,6 +1152,12 @@ export const mobileOperationSchemas = {
   toggleChannelMessageReaction: {
     request: mobileToggleChannelMessageReactionRequestSchema,
     response: mobileToggleChannelMessageReactionResponseSchema,
+  },
+  putChannelThreadSubscription: {
+    response: mobileChannelThreadSubscriptionResponseSchema,
+  },
+  deleteChannelThreadSubscription: {
+    response: mobileChannelThreadSubscriptionResponseSchema,
   },
   acceptChannelProposal: {
     request: mobileAcceptChannelProposalRequestSchema,

@@ -358,6 +358,17 @@ struct ChannelThreadView: View {
         .navigationTitle(L10n.text(.channelThread, locale: locale))
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(.hidden, for: .navigationBar)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                ChannelThreadSubscriptionControls(
+                    channels: channels,
+                    channelID: channel.id,
+                    currentUserID: currentUserID,
+                    locale: locale,
+                    rootMessageID: parent.id
+                )
+            }
+        }
         .sheet(item: $previewFile) { file in
             QuickLookPreview(fileURL: file.url)
         }
@@ -375,6 +386,83 @@ struct ChannelThreadView: View {
                 ChannelLoadingIndicator(
                     accessibilityID: "channel-thread-loading-spinner",
                     label: L10n.text("채널 메시지를 불러오는 중…", locale: locale)
+                )
+            }
+        }
+    }
+}
+
+private struct ChannelThreadSubscriptionControls: View {
+    @ObservedObject var channels: ChannelsStore
+
+    let channelID: UUID
+    let currentUserID: String?
+    let locale: CompanionLocale
+    let rootMessageID: UUID
+
+    private var rootMessage: ChannelMessage? {
+        channels.thread.first(where: { $0.id == rootMessageID })
+            ?? channels.messages.first(where: { $0.id == rootMessageID })
+    }
+
+    private var subscribers: [IssueSubscriber] {
+        rootMessage?.subscribers ?? []
+    }
+
+    private var subscriberMembers: [ChannelMember] {
+        subscribers.compactMap { subscriber in
+            channels.members.first(where: { $0.userId == subscriber.userId })
+        }
+    }
+
+    private var isSubscribed: Bool {
+        guard let currentUserID else { return false }
+        return subscribers.contains { $0.userId == currentUserID }
+    }
+
+    var body: some View {
+        HStack(spacing: 8) {
+            if !subscriberMembers.isEmpty {
+                HStack(spacing: -6) {
+                    ForEach(Array(subscriberMembers.prefix(4)), id: \.userId) { member in
+                        ProfileImageView(
+                            image: member.image,
+                            name: member.name,
+                            systemImage: "person.fill",
+                            size: 22
+                        )
+                        .overlay(Circle().stroke(Color(.systemBackground), lineWidth: 2))
+                    }
+                }
+                .accessibilityLabel(
+                    L10n.format("구독 멤버 %d명", locale: locale, subscriberMembers.count)
+                )
+            }
+            if currentUserID != nil {
+                Button {
+                    Task {
+                        await channels.setThreadSubscription(
+                            channelID: channelID,
+                            messageID: rootMessageID,
+                            subscribed: !isSubscribed
+                        )
+                    }
+                } label: {
+                    Label(
+                        isSubscribed
+                            ? L10n.text("구독 중", locale: locale)
+                            : L10n.text("구독", locale: locale),
+                        systemImage: isSubscribed ? "bell.fill" : "bell"
+                    )
+                    .font(.caption.weight(.semibold))
+                }
+                .buttonStyle(.borderless)
+                .disabled(channels.subscriptionPending)
+                .accessibilityIdentifier("channel-thread-subscribe-button")
+                .help(
+                    isSubscribed
+                        ? L10n.text("구독 해제", locale: locale)
+                        : L10n.text("구독", locale: locale)
                 )
             }
         }

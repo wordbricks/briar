@@ -249,6 +249,11 @@ struct IssueSubscriptionResponse: Codable, Equatable, Sendable {
     let subscribers: [IssueSubscriber]
 }
 
+struct ChannelThreadSubscriptionResponse: Codable, Equatable, Sendable {
+    let rootMessageId: UUID
+    let subscribers: [IssueSubscriber]
+}
+
 struct TransferIssueRequest: Codable, Sendable {
     let targetProjectId: UUID
 }

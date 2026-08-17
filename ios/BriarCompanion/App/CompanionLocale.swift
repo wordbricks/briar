@@ -238,6 +238,7 @@ enum L10n {
         "멘션": "Mention",
         "답글": "Reply",
         "구독 대화": "Subscribed conversation",
+        "구독한 스레드": "Subscribed thread",
         "구독": "Subscribe",
         "구독 중": "Subscribed",
         "구독 해제": "Unsubscribe",

@@ -58,6 +58,7 @@ import {
   updateIssue,
   updateIssueCheckpoints,
   updateIssueExecutionPreferences,
+  updateChannelThreadSubscription,
   updateIssueSubscription,
   updateProjectSettings,
   upsertProjectAgentSession,
@@ -724,6 +725,49 @@ describe("API errors", () => {
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
       expect.stringContaining(`/projects/${projectId}/runs/${runId}/subscription`),
+      expect.objectContaining({ method: "DELETE" }),
+    );
+  });
+
+  it("toggles the current member's channel thread subscription", async () => {
+    const organizationId = "11111111-1111-4111-8111-111111111111";
+    const channelId = "22222222-2222-4222-8222-222222222222";
+    const messageId = "33333333-3333-4333-8333-333333333333";
+    const fetchMock = vi.fn(async () =>
+      new Response(JSON.stringify({ rootMessageId: messageId, subscribers: [] }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await updateChannelThreadSubscription(
+      "token",
+      organizationId,
+      channelId,
+      messageId,
+      true,
+    );
+    await updateChannelThreadSubscription(
+      "token",
+      organizationId,
+      channelId,
+      messageId,
+      false,
+    );
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      expect.stringContaining(
+        `/organizations/${organizationId}/channels/${channelId}/messages/${messageId}/subscription`,
+      ),
+      expect.objectContaining({ method: "PUT" }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining(
+        `/organizations/${organizationId}/channels/${channelId}/messages/${messageId}/subscription`,
+      ),
       expect.objectContaining({ method: "DELETE" }),
     );
   });

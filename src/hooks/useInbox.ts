@@ -119,7 +119,7 @@ export type InboxChannelMessage = {
   authorName: string;
   /** Sender photo URL or data URL. Absent on older stored messages. */
   authorImage?: string | null;
-  reason: "mention" | "thread_reply";
+  reason: "mention" | "thread_reply" | "subscription";
 };
 
 export type InboxMessage =
@@ -478,11 +478,8 @@ export function inboxReadVersionsToPush(
 export function classifyInboxMessage(
   message: InboxMessage,
 ): InboxCategory {
-  if (message.kind === "conversation") {
+  if (message.kind === "conversation" || message.kind === "channel") {
     return message.reason === "subscription" ? "activity" : "action_required";
-  }
-  if (message.kind === "channel") {
-    return "action_required";
   }
   if (message.kind === "session") {
     return message.requiresAttention || message.status === "failed"

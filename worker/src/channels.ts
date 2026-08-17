@@ -11,6 +11,7 @@ import {
   type ChannelReplyStatus,
   type ChannelSkillExecutionProposal,
   type ChannelSummary,
+  type ChannelThreadSubscriber,
   type ChannelVisibility,
   type ChannelWebhook,
 } from "../../src/lib/channels-contract";
@@ -545,6 +546,7 @@ export const channelMessageJson = (
   attachments: ChannelMessageAttachment[] = [],
   reactions: ChannelMessageReaction[] = [],
   replyAuthors: ChannelMessage["replyAuthors"] = [],
+  subscribers: ChannelThreadSubscriber[] = [],
 ): ChannelMessage => ({
   id: row.id,
   channelId: row.channel_id,
@@ -561,6 +563,7 @@ export const channelMessageJson = (
   replyCount: row.reply_count,
   lastReplyAt: row.last_reply_at,
   replyAuthors,
+  subscribers,
   document: row.document_message_id
     ? {
         messageId: row.document_message_id,
@@ -1239,8 +1242,13 @@ async function attachMessageRelations(
 ): Promise<ChannelMessage[]> {
   if (rows.length === 0) return [];
   const ids = rows.map((row) => row.id);
+  const rootIds = rows
+    .filter((row) => row.parent_message_id === null)
+    .map((row) => row.id);
   const placeholders = ids.map(() => "?").join(", ");
-  const [userMentions, agentMentions, attachments, reactions, replyAuthors] = await Promise.all([
+  const rootPlaceholders = rootIds.map(() => "?").join(", ");
+  const [userMentions, agentMentions, attachments, reactions, replyAuthors, subscribers] =
+    await Promise.all([
     db
       .prepare(
         `select message_id, user_id from briar_channel_message_mentions
@@ -1323,6 +1331,27 @@ async function attachMessageRelations(
       )
       .bind(...ids)
       .all<ChannelReplyAuthorRow>(),
+    rootIds.length === 0
+      ? Promise.resolve({
+          results: [] as Array<{
+            root_message_id: string;
+            user_id: string;
+            created_at: string;
+          }>,
+        })
+      : db
+          .prepare(
+            `select root_message_id, user_id, created_at
+             from briar_channel_thread_subscriptions
+             where root_message_id in (${rootPlaceholders})
+             order by created_at, user_id`,
+          )
+          .bind(...rootIds)
+          .all<{
+            root_message_id: string;
+            user_id: string;
+            created_at: string;
+          }>(),
   ]);
   const byMessage = new Map<string, { users: string[]; agents: string[] }>();
   for (const row of rows) byMessage.set(row.id, { users: [], agents: [] });
@@ -1348,6 +1377,15 @@ async function attachMessageRelations(
     current.push(channelMessageAuthorJson(replyAuthor));
     replyAuthorsByMessage.set(replyAuthor.parent_message_id, current);
   }
+  const subscribersByRoot = new Map<string, ChannelThreadSubscriber[]>();
+  for (const subscriber of subscribers.results) {
+    const current = subscribersByRoot.get(subscriber.root_message_id) ?? [];
+    current.push({
+      userId: subscriber.user_id,
+      subscribedAt: subscriber.created_at,
+    });
+    subscribersByRoot.set(subscriber.root_message_id, current);
+  }
   return rows.map((row) =>
     channelMessageJson(
       row,
@@ -1355,6 +1393,7 @@ async function attachMessageRelations(
       attachmentsByMessage.get(row.id) ?? [],
       reactionsByMessage.get(row.id) ?? [],
       replyAuthorsByMessage.get(row.id) ?? [],
+      subscribersByRoot.get(row.id) ?? [],
     ),
   );
 }
@@ -1533,6 +1572,86 @@ export async function isChannelRootMessage(
       .bind(channelId, messageId)
       .first<{ present: number }>(),
   );
+}
+
+export async function resolveChannelThreadRootId(
+  db: D1Database,
+  channelId: string,
+  messageId: string,
+) {
+  const row = await db
+    .prepare(
+      `select id, parent_message_id
+       from briar_channel_messages
+       where channel_id = ? and id = ?`,
+    )
+    .bind(channelId, messageId)
+    .first<{ id: string; parent_message_id: string | null }>();
+  if (!row) return null;
+  return row.parent_message_id ?? row.id;
+}
+
+export async function listChannelThreadSubscriptions(
+  db: D1Database,
+  channelId: string,
+  rootMessageId: string,
+) {
+  const result = await db
+    .prepare(
+      `select user_id, created_at
+       from briar_channel_thread_subscriptions
+       where channel_id = ? and root_message_id = ?
+       order by created_at, user_id`,
+    )
+    .bind(channelId, rootMessageId)
+    .all<{ user_id: string; created_at: string }>();
+  return result.results.map((row) => ({
+    userId: row.user_id,
+    subscribedAt: row.created_at,
+  }));
+}
+
+export async function subscribeChannelThread(
+  db: D1Database,
+  channelId: string,
+  rootMessageId: string,
+  userId: string,
+  createdAt: string,
+) {
+  return db
+    .prepare(
+      `insert into briar_channel_thread_subscriptions (
+         root_message_id, channel_id, organization_id, user_id, created_at
+       )
+       select message.id, message.channel_id, channel.organization_id, ?, ?
+       from briar_channel_messages message
+       join briar_channels channel on channel.id = message.channel_id
+       join briar_organization_members membership
+         on membership.organization_id = channel.organization_id
+        and membership.user_id = ?
+       where message.id = ? and message.channel_id = ?
+         and message.parent_message_id is null
+       on conflict (root_message_id, user_id) do nothing
+       returning root_message_id`,
+    )
+    .bind(userId, createdAt, userId, rootMessageId, channelId)
+    .first<{ root_message_id: string }>();
+}
+
+export async function unsubscribeChannelThread(
+  db: D1Database,
+  channelId: string,
+  rootMessageId: string,
+  userId: string,
+) {
+  return db
+    .prepare(
+      `delete from briar_channel_thread_subscriptions
+       where root_message_id = ? and user_id = ? and channel_id = ?
+       returning root_message_id`,
+    )
+    .bind(rootMessageId, userId, channelId)
+    .first<{ root_message_id: string }>();
 }
 
 export async function getChannelMessage(
