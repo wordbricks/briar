@@ -1,6 +1,6 @@
 [package]
 name = "briar"
-version = "1.2.130"
+version = "1.2.131"
 description = "Agent Development Environment"
 authors = ["Wordbricks"]
 license = "Apache-2.0"

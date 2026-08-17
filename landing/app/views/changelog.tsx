@@ -23,6 +23,21 @@ export const changelogCopy = {
     backTop: "맨 위로 ↑",
     entries: [
       {
+        version: "1.2.131",
+        date: "2026년 8월 17일",
+        title: "이슈 검토와 채널 협업을 더 빠르게 이어갑니다",
+        summary:
+          "검토 대기 결과와 다음 조치를 먼저 보여주고, Agent 설명과 프로젝트별 채널 정리, 스레드 구독, 이슈 링크 편집을 더 자연스럽게 연결합니다.",
+        items: [
+          "검토 대기 화면에서 작업 결과와 승인·수정 요청 버튼을 작업 기록보다 먼저 보여주며, 다음 체크포인트에 도달하면 이전 승인 스피너를 초기화해 바로 계속할 수 있습니다.",
+          "실행 지침인 책임과 별도로 최대 500자의 짧은 Agent 설명을 저장하고, Agent 카드·프로필·설정·검색·위임·채널·Schedule과 네이티브 iOS에서 일관되게 보여줍니다.",
+          "프로젝트에 연결된 채널을 사이드바의 접을 수 있는 프로젝트별 Channels 탭 아래에 모으고, 연결되지 않은 조직 채널은 기존 목록에 분리해 탐색을 단순하게 합니다.",
+          "채널 스레드 작성자와 멘션된 사용자를 자동 구독하고, 데스크탑·Companion·네이티브 iOS에서 구독을 끄거나 다시 켜며 새 답글을 Inbox 최근 활동으로 받을 수 있습니다.",
+          "채널 에이전트의 진행 상태에 JSON 응답 봉투 대신 사람이 읽는 본문만 표시해 모든 에이전트 제공자의 활동 문구를 깔끔하게 유지합니다.",
+          "이슈 설명의 HTTP·HTTPS·www 링크를 클릭 가능한 형식으로 표시하고, 이미지 사이의 긴 URL이 여러 줄로 감겨도 입력 칸이 실제 높이에 맞게 늘어나 내용이 겹치거나 잘리지 않습니다.",
+        ],
+      },
+      {
         version: "1.2.130",
         date: "2026년 8월 17일",
         title: "에이전트 지침과 프로젝트 운영 화면을 더 유연하게 다듬습니다",
@@ -696,6 +711,21 @@ export const changelogCopy = {
     home: "Home",
     backTop: "Back to top ↑",
     entries: [
+      {
+        version: "1.2.131",
+        date: "August 17, 2026",
+        title: "Move issue reviews and channel collaboration forward faster",
+        summary:
+          "Put review results and next actions first, then connect Agent descriptions, project-scoped channels, thread subscriptions, and issue-link editing more naturally.",
+        items: [
+          "Show the work result and approve or request-changes actions above work history while a run awaits review, and reset the previous approval spinner when the next checkpoint arrives so work can continue immediately.",
+          "Store a concise Agent description of up to 500 characters separately from its execution responsibility, then show it consistently across Agent cards, profiles, settings, search, delegation, channels, Schedule, and native iOS.",
+          "Group project-linked channels under collapsible Channels tabs in each sidebar project while keeping organization channels without a project in the existing top-level list.",
+          "Automatically subscribe channel-thread authors and mentioned members, let people opt out or back in from desktop, Companion, and native iOS, and deliver new replies as recent Inbox activity.",
+          "Display only the human-readable body from in-progress channel JSON envelopes so activity headlines stay clean across every agent provider.",
+          "Render HTTP, HTTPS, and www links as clickable text in issue descriptions, and grow fields to their real wrapped height so long URLs between images no longer overlap or clip.",
+        ],
+      },
       {
         version: "1.2.130",
         date: "August 17, 2026",
@@ -1382,9 +1412,9 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <h1>{changelog.title}</h1>
           <p>{changelog.description}</p>
         </div>
-        <a href="#v1-2-130" className="changelog-current">
+        <a href="#v1-2-131" className="changelog-current">
           <span>{changelog.current}</span>
-          <strong>v1.2.130</strong>
+          <strong>v1.2.131</strong>
           <i aria-hidden="true">↓</i>
         </a>
       </section>
@@ -1409,6 +1439,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   {index === 0 ? <span>{changelog.latest}</span> : null}
                   <time
                     dateTime={
+                      entry.version === "1.2.131" ||
                       entry.version === "1.2.130"
                         ? "2026-08-17"
                         : entry.version === "1.2.129" ||
