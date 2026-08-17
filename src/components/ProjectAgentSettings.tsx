@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { useI18n } from "../i18n";
+import { agentResponsibilityMaxLength } from "../lib/agent-limits";
 import {
   agentEffortOptions,
   agentModelOptions,
@@ -436,7 +437,7 @@ export function ProjectAgentSettings({
                   </Label>
                   <Textarea
                     id="project-agent-settings-responsibility"
-                    maxLength={2_000}
+                    maxLength={agentResponsibilityMaxLength}
                     onChange={(event) => setResponsibility(event.target.value)}
                     placeholder={t("agents.responsibilityPlaceholder")}
                     required

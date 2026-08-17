@@ -5,13 +5,65 @@ import {
   channelMessageInputSchema,
   channelReplyContextMessageJson,
   channelReplyCompletionSchema,
+  channelAgentSkillInputSchema,
   channelWebhookInputSchema,
+  organizationAgentInputSchema,
   type ChannelMessage,
 } from "./channels-contract";
+import {
+  agentResponsibilityMaxLength,
+  agentSkillInstructionsMaxLength,
+  agentSkillsMaxCount,
+} from "./agent-limits";
 
 const projectId = "11111111-1111-4111-8111-111111111111";
 const agentId = "22222222-2222-4222-8222-222222222222";
 const clientMessageId = "33333333-3333-4333-8333-333333333333";
+
+describe("Agent input limits", () => {
+  const skill = (index: number) => ({
+    name: `Skill ${index}`,
+    instructions: "x".repeat(agentSkillInstructionsMaxLength),
+    provider: "codex" as const,
+    model: null,
+    effort: null,
+    kind: "custom" as const,
+    position: index,
+  });
+
+  it("accepts 20000-character responsibility and Skill instructions", () => {
+    expect(channelAgentSkillInputSchema.safeParse(skill(0)).success).toBe(true);
+    expect(organizationAgentInputSchema.safeParse({
+      name: "Builder",
+      provider: "codex",
+      responsibility: "x".repeat(agentResponsibilityMaxLength),
+      skills: Array.from({ length: agentSkillsMaxCount }, (_, index) =>
+        skill(index)
+      ),
+    }).success).toBe(true);
+  });
+
+  it("rejects responsibility, instructions, and rosters above their limits", () => {
+    expect(channelAgentSkillInputSchema.safeParse({
+      ...skill(0),
+      instructions: "x".repeat(agentSkillInstructionsMaxLength + 1),
+    }).success).toBe(false);
+    expect(organizationAgentInputSchema.safeParse({
+      name: "Builder",
+      provider: "codex",
+      responsibility: "x".repeat(agentResponsibilityMaxLength + 1),
+      skills: [],
+    }).success).toBe(false);
+    expect(organizationAgentInputSchema.safeParse({
+      name: "Builder",
+      provider: "codex",
+      responsibility: "Build the project.",
+      skills: Array.from({ length: agentSkillsMaxCount + 1 }, (_, index) =>
+        skill(index)
+      ),
+    }).success).toBe(false);
+  });
+});
 
 describe("channel message contract", () => {
   it("canonicalizes UUID request fields before database comparisons", () => {

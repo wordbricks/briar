@@ -56,6 +56,8 @@ const DEFAULT_MAIN_WINDOW_SIZE: (f64, f64) = (1440.0, 900.0);
 const DEFAULT_MAIN_WINDOW_MIN_SIZE: (f64, f64) = (980.0, 680.0);
 const ONBOARDING_MAIN_WINDOW_SIZE: (f64, f64) = (780.0, 580.0);
 const MAX_REPOSITORY_ICON_BYTES: u64 = 10 * 1024 * 1024;
+const MAX_AGENT_RESPONSIBILITY_CHARS: usize = 20_000;
+const MAX_RENDERED_AGENT_SKILL_ROSTER_CHARS: usize = 125_000;
 const REPOSITORY_ICON_CANDIDATES: &[&str] = &[
     "favicon.svg",
     "favicon.ico",
@@ -5404,9 +5406,9 @@ async fn run_project_agent(
             .as_ref()
             .is_some_and(|model| model.trim().is_empty() || model.len() > 100)
         || request.responsibility.trim().is_empty()
-        || request.responsibility.len() > 2_000
+        || request.responsibility.chars().count() > MAX_AGENT_RESPONSIBILITY_CHARS
         || request.skill.trim().is_empty()
-        || request.skill.len() > 10_000
+        || request.skill.chars().count() > MAX_RENDERED_AGENT_SKILL_ROSTER_CHARS
         || request.message.trim().is_empty()
         || request.message.len() > 20_000
         || request.runs.len() > 500
@@ -6230,9 +6232,9 @@ fn validate_project_auto_hunt_request(
             .as_ref()
             .is_some_and(|model| model.trim().is_empty() || model.len() > 100)
         || request.responsibility.trim().is_empty()
-        || request.responsibility.len() > 2_000
+        || request.responsibility.chars().count() > MAX_AGENT_RESPONSIBILITY_CHARS
         || request.skill.trim().is_empty()
-        || request.skill.len() > 10_000
+        || request.skill.chars().count() > MAX_RENDERED_AGENT_SKILL_ROSTER_CHARS
     {
         return Err("이슈 처리 에이전트 설정이 올바르지 않습니다.".to_string());
     }

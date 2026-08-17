@@ -770,6 +770,7 @@ describe("D1 migrations", () => {
     "0102_auto_issue_subscriptions.sql",
     "0106_agent_provider_agy.sql",
     "0111_agent_provider_cursor.sql",
+    "0112_expand_agent_text_limits.sql",
     "0105_organization_inbox_realtime.sql",
     "0108_channel_notification_inbox.sql",
   ])("keeps each trigger in a separate Wrangler statement: %s", async (name) => {
@@ -3550,6 +3551,7 @@ describe("D1 migrations", () => {
     "0073_organization_channels.sql",
     "0106_agent_provider_agy.sql",
     "0111_agent_provider_cursor.sql",
+    "0112_expand_agent_text_limits.sql",
   ])(
     "uses D1 transaction-safe foreign-key deferral for table rebuilds: %s",
     async (name) => {
@@ -3560,6 +3562,205 @@ describe("D1 migrations", () => {
       expect(sql).not.toMatch(/pragma\s+foreign_keys\s*=/iu);
     },
   );
+
+  it("expands Agent limits without losing linked rows", async () => {
+    const miniflare = new Miniflare({
+      modules: true,
+      script: "export default { fetch() { return new Response('ok') } }",
+      d1Databases: { DB: "briar-expand-agent-limits-migration-test" },
+    });
+    try {
+      const db = (await miniflare.getD1Database("DB")) as unknown as D1Database;
+      await applyD1Migrations(db, {
+        through: "0111_agent_provider_cursor.sql",
+      });
+      const workflow = JSON.stringify({
+        version: 2,
+        requirements: [],
+        stages: [{
+          id: "repository_workflow_pending",
+          label: "Repository workflow pending",
+          required: true,
+        }],
+        execution: {
+          checkpoints: [{
+            key: "project-after-repository_workflow_pending",
+            stage: "repository_workflow_pending",
+            position: "after",
+          }],
+        },
+        completion: { requiredStages: ["repository_workflow_pending"] },
+      });
+      await db.prepare(
+        `insert into "user" (
+           id, name, email, emailVerified, createdAt, updatedAt
+         ) values (?, 'Migration Owner', 'migration@example.com', 1, ?, ?)`,
+      ).bind(
+        migrationFixture.userId,
+        migrationFixture.now,
+        migrationFixture.now,
+      ).run();
+      await db.prepare(
+        `insert into briar_organizations (
+           id, name, handle, created_at, updated_at
+         ) values (?, 'Migration Organization', 'migration-organization', ?, ?)`,
+      ).bind(
+        migrationFixture.organizationId,
+        migrationFixture.now,
+        migrationFixture.now,
+      ).run();
+      await db.prepare(
+        `insert into briar_projects (
+           id, owner_user_id, organization_id, name, agent_token_hash,
+           created_at, updated_at
+         ) values (?, ?, ?, 'Migration Project', ?, ?, ?)`,
+      ).bind(
+        migrationFixture.projectId,
+        migrationFixture.userId,
+        migrationFixture.organizationId,
+        "a".repeat(64),
+        migrationFixture.now,
+        migrationFixture.now,
+      ).run();
+
+      await db.prepare(
+        `insert into briar_project_agents (
+           id, organization_id, project_id, name, provider, responsibility,
+           created_at, updated_at
+         ) values (?, ?, ?, 'Migration Agent', 'codex',
+                   'Preserve this responsibility', ?, ?)`,
+      ).bind(
+        "migration-agent",
+        migrationFixture.organizationId,
+        migrationFixture.projectId,
+        migrationFixture.now,
+        migrationFixture.now,
+      ).run();
+      await db.prepare(
+        `insert into briar_hunt_runs (
+           id, project_id, source, source_key, title, stage, repository,
+           started_at, last_event_at, created_at, updated_at,
+           workflow_snapshot_json, workflow_stage, status, agent_id
+         ) values (
+           ?, ?, 'issue', 'migration-issue', 'Migration run', 'queued',
+           'example/repository', ?, ?, ?, ?, ?,
+           'repository_workflow_pending', 'backlog', 'migration-agent'
+         )`,
+      ).bind(
+        migrationFixture.runId,
+        migrationFixture.projectId,
+        migrationFixture.now,
+        migrationFixture.now,
+        migrationFixture.now,
+        migrationFixture.now,
+        workflow,
+      ).run();
+      for (let position = 0; position < 5; position += 1) {
+        await db.prepare(
+          `insert into briar_agent_skills (
+             id, agent_id, name, instructions, provider, position,
+             created_at, updated_at
+           ) values (?, 'migration-agent', ?, ?, 'codex', ?, ?, ?)`,
+        ).bind(
+          `migration-skill-${position}`,
+          `Skill ${position + 1}`,
+          `Preserve skill ${position + 1}`,
+          position,
+          migrationFixture.now,
+          migrationFixture.now,
+        ).run();
+      }
+      await db.prepare(
+        `insert into briar_project_agent_schedules (
+           id, project_id, agent_id, name, recurrence, time_of_day,
+           day_of_week, time_zone, created_at, updated_at
+         ) values (
+           'migration-schedule', ?, 'migration-agent', 'Daily check',
+           'daily', '09:00', null, 'Asia/Seoul', ?, ?
+         )`,
+      ).bind(
+        migrationFixture.projectId,
+        migrationFixture.now,
+        migrationFixture.now,
+      ).run();
+      await db.prepare(
+        `insert into briar_project_agent_schedule_runs (
+           id, project_id, schedule_id, agent_id, status, scheduled_for,
+           started_at, created_at, updated_at
+         ) values (
+           'migration-schedule-run', ?, 'migration-schedule',
+           'migration-agent', 'running', ?, ?, ?, ?
+         )`,
+      ).bind(
+        migrationFixture.projectId,
+        migrationFixture.now,
+        migrationFixture.now,
+        migrationFixture.now,
+        migrationFixture.now,
+      ).run();
+
+      await executeD1Sql(
+        db,
+        await readFile(
+          resolve("migrations", "0112_expand_agent_text_limits.sql"),
+          "utf8",
+        ),
+      );
+
+      expect(await db.prepare(
+        `select responsibility from briar_project_agents where id = ?`,
+      ).bind("migration-agent").first()).toEqual({
+        responsibility: "Preserve this responsibility",
+      });
+      expect(await db.prepare(
+        `select count(*) as count from briar_agent_skills where agent_id = ?`,
+      ).bind("migration-agent").first()).toEqual({ count: 5 });
+      expect(await db.prepare(
+        `select agent_id from briar_hunt_runs where id = ?`,
+      ).bind(migrationFixture.runId).first()).toEqual({
+        agent_id: "migration-agent",
+      });
+      expect(await db.prepare(
+        `select agent_id from briar_project_agent_schedules where id = ?`,
+      ).bind("migration-schedule").first()).toEqual({
+        agent_id: "migration-agent",
+      });
+      expect(await db.prepare(
+        `select agent_id from briar_project_agent_schedule_runs where id = ?`,
+      ).bind("migration-schedule-run").first()).toEqual({
+        agent_id: "migration-agent",
+      });
+
+      await db.prepare(
+        `update briar_project_agents set responsibility = ? where id = ?`,
+      ).bind("r".repeat(20_000), "migration-agent").run();
+      await db.prepare(
+        `update briar_agent_skills set instructions = ? where id = ?`,
+      ).bind("s".repeat(20_000), "migration-skill-0").run();
+      await expect(db.prepare(
+        `update briar_project_agents set responsibility = ? where id = ?`,
+      ).bind("r".repeat(20_001), "migration-agent").run()).rejects.toThrow();
+      await expect(db.prepare(
+        `insert into briar_agent_skills (
+           id, agent_id, name, instructions, provider, position,
+           created_at, updated_at
+         ) values (
+           'migration-skill-5', 'migration-agent', 'Skill 6', '', 'codex',
+           5, ?, ?
+         )`,
+      ).bind(
+        migrationFixture.now,
+        migrationFixture.now,
+      ).run()).rejects.toThrow(/at most 5 skills/iu);
+
+      const foreignKeyViolations = await db.prepare(
+        "pragma foreign_key_check",
+      ).all();
+      expect(foreignKeyViolations.results).toEqual([]);
+    } finally {
+      await miniflare.dispose();
+    }
+  }, 60_000);
 
   it("keeps Agent and idea ownership organization-scoped with an optional project", async () => {
     const agents = await readFile(

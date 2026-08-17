@@ -17,6 +17,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Typography } from "@/components/ui/typography";
 import { useI18n } from "../i18n";
+import { agentResponsibilityMaxLength } from "../lib/agent-limits";
 import {
   createOrganizationAgent,
   deleteOrganizationAgent,
@@ -587,7 +588,7 @@ function OrganizationAgentCreateDialog({
             </Label>
             <Textarea
               id="organization-agent-responsibility"
-              maxLength={2_000}
+              maxLength={agentResponsibilityMaxLength}
               onChange={(event) => setResponsibility(event.target.value)}
               placeholder={t("agents.responsibilityPlaceholder")}
               required
