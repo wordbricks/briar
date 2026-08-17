@@ -114,7 +114,7 @@ describe("ProjectAgents", () => {
     ).toBe("에이전트");
   });
 
-  it("shows the example responsibility-based agent roster in demo mode", async () => {
+  it("shows description summaries in the demo Agent roster", async () => {
     const container = await mount(
       <ProjectAgents
         {...projectAgentsProps}
@@ -127,7 +127,7 @@ describe("ProjectAgents", () => {
     expect(container.textContent).toContain("Sentry 오류 탐지 에이전트");
     expect(container.textContent).toContain("Feedback 분석 에이전트");
     expect(container.textContent).toContain(
-      "프로젝트의 개발과 코드 관련 작업을 책임집니다.",
+      "프로젝트의 개발과 코드 관련 작업을 수행하는 에이전트입니다.",
     );
     const createCard = container.querySelector<HTMLButtonElement>(
       ".project-agent-create-card",
@@ -532,7 +532,7 @@ describe("ProjectAgents", () => {
     expect(container.querySelector("#project-agents")).not.toBeNull();
   });
 
-  it("submits provider, default model, and a concrete responsibility", async () => {
+  it("submits a description, provider, default model, and responsibility", async () => {
     const onCreate = vi.fn(async () => undefined);
     const container = await mount(
       <ProjectAgentDialog
@@ -544,8 +544,8 @@ describe("ProjectAgents", () => {
     );
 
     const name = container.querySelector<HTMLInputElement>("input");
-    const responsibility =
-      container.querySelector<HTMLTextAreaElement>("textarea");
+    const [description, responsibility] =
+      container.querySelectorAll<HTMLTextAreaElement>("textarea");
     await act(async () => {
       if (name) {
         Object.getOwnPropertyDescriptor(
@@ -553,6 +553,13 @@ describe("ProjectAgents", () => {
           "value",
         )?.set?.call(name, "Jay 이슈 처리 에이전트");
         name.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+      if (description) {
+        Object.getOwnPropertyDescriptor(
+          HTMLTextAreaElement.prototype,
+          "value",
+        )?.set?.call(description, "할당된 이슈를 처리하는 개발 에이전트");
+        description.dispatchEvent(new Event("input", { bubbles: true }));
       }
       if (responsibility) {
         Object.getOwnPropertyDescriptor(
@@ -579,6 +586,7 @@ describe("ProjectAgents", () => {
       provider: "codex",
       model: null,
       effort: null,
+      description: "할당된 이슈를 처리하는 개발 에이전트",
       responsibility:
         "Jay한테 assign된 todo 이슈를 3개씩 처리하는 에이전트",
       calendarColor: "#3275d5",
@@ -607,10 +615,15 @@ describe("ProjectAgents", () => {
     const name = form?.querySelector<HTMLInputElement>(
       'input:not([type="file"]):not([type="color"])',
     );
-    const responsibility = form?.querySelector<HTMLTextAreaElement>("textarea");
+    const [description, responsibility] = form
+      ? Array.from(form.querySelectorAll<HTMLTextAreaElement>("textarea"))
+      : [];
     expect(settingsPage?.textContent).toContain("에이전트 설정");
     expect(settingsPage?.textContent).not.toContain("프로젝트 실행 기본값");
     expect(name?.value).toBe("개발자 에이전트");
+    expect(description?.value).toBe(
+      "프로젝트의 개발과 코드 관련 작업을 수행하는 에이전트입니다.",
+    );
     expect(responsibility?.value).toBe(
       "프로젝트의 개발과 코드 관련 작업을 책임집니다.",
     );
@@ -622,6 +635,13 @@ describe("ProjectAgents", () => {
           "value",
         )?.set?.call(name, "릴리스 점검 에이전트");
         name.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+      if (description) {
+        Object.getOwnPropertyDescriptor(
+          HTMLTextAreaElement.prototype,
+          "value",
+        )?.set?.call(description, "릴리스 품질을 점검하는 에이전트");
+        description.dispatchEvent(new Event("input", { bubbles: true }));
       }
       if (responsibility) {
         Object.getOwnPropertyDescriptor(
@@ -639,6 +659,7 @@ describe("ProjectAgents", () => {
     });
 
     expect(container.textContent).toContain("릴리스 점검 에이전트");
+    expect(container.textContent).toContain("릴리스 품질을 점검하는 에이전트");
     expect(container.textContent).toContain(
       "릴리스 상태를 점검하고 결과를 보고합니다.",
     );

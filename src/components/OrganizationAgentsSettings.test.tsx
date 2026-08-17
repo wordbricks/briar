@@ -31,6 +31,7 @@ const organizationAgent = {
   model: null,
   effort: null,
   projectId: null,
+  description: "제품 기획 질문을 돕는 에이전트",
   responsibility: "채널에서 제품 기획을 돕습니다.",
   skills: [
     {
@@ -216,9 +217,15 @@ describe("OrganizationAgentsSettings", () => {
     const responsibility = document.querySelector<HTMLTextAreaElement>(
       "#organization-agent-responsibility",
     )!;
+    const description = document.querySelector<HTMLTextAreaElement>(
+      "#organization-agent-description",
+    )!;
 
     await act(async () => setInputValue(name, "Honey Bee"));
     await act(async () => setInputValue(name, "Honey Planner"));
+    await act(async () =>
+      setInputValue(description, "제품 기획 질문에 답하는 에이전트"),
+    );
     expect(document.querySelector("#organization-agent-handle")).toBeNull();
 
     await act(async () =>
@@ -240,6 +247,7 @@ describe("OrganizationAgentsSettings", () => {
         provider: "codex",
         model: null,
         effort: null,
+        description: "제품 기획 질문에 답하는 에이전트",
         responsibility: "채널에서 기획 질문에 답합니다.",
       }),
     );

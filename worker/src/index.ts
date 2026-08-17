@@ -35,6 +35,7 @@ import {
   type AgentProvider,
 } from "../../src/lib/agent-provider-contract";
 import {
+  agentDescriptionMaxLength,
   agentResponsibilityMaxLength,
   agentSkillsMaxCount,
 } from "../../src/lib/agent-limits";
@@ -1834,6 +1835,7 @@ export const projectTabsInputSchema = z
 export const projectAgentInputSchema = z
   .object({
     name: z.string().trim().min(1).max(100).nullable().optional(),
+    description: z.string().trim().max(agentDescriptionMaxLength).optional(),
     avatar: z
       .string()
       .max(400_000)
@@ -4033,6 +4035,7 @@ const projectAgentJson = (row: ProjectAgentRow) => {
     provider: row.provider,
     model: row.model,
     effort: row.effort,
+    description: row.description,
     responsibility: row.responsibility,
     skill: row.skill_markdown,
     skills: (row.skills ?? []).map(agentSkillJson),
@@ -4234,6 +4237,7 @@ const projectAgentScheduleRunJson = (
     provider: row.agent_provider,
     model: row.agent_model,
     effort: row.agent_effort,
+    description: row.agent_description,
     responsibility: row.agent_responsibility,
     skill: row.agent_skill_markdown,
     skills: row.agent_skills.map(agentSkillJson),
@@ -7294,6 +7298,7 @@ async function route(
       name: input.name,
       provider: input.provider,
       model: input.model,
+      description: input.description ?? "",
       responsibility: input.responsibility,
       effort: input.effort,
       skills: input.skills ?? [],
@@ -7320,6 +7325,7 @@ async function route(
       name: input.name,
       provider: input.provider,
       model: input.model,
+      description: input.description,
       responsibility: input.responsibility,
       effort: input.effort,
       skills: input.skills,
@@ -9763,6 +9769,7 @@ async function route(
       provider: input.provider,
       model: input.model ?? null,
       effort: input.effort ?? null,
+      description: input.description ?? "",
       responsibility: input.responsibility,
       skills: input.skills ?? [],
       calendarColor: input.calendarColor,
@@ -10050,6 +10057,7 @@ async function route(
           provider: input.provider,
           model: input.model ?? null,
           effort: input.effort ?? null,
+          description: input.description ?? existing.description,
           responsibility: input.responsibility,
           skills: input.skills,
           calendarColor: input.calendarColor,
