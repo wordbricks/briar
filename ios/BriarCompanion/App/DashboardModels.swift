@@ -1,6 +1,6 @@
 import Foundation
 
-struct IssueSubscriber: Codable, Equatable, Sendable {
+struct IssueSubscriber: Codable, Equatable, Hashable, Sendable {
     let userId: String
     let subscribedAt: Date
 }

@@ -588,6 +588,11 @@ export type ChannelMessageReaction = {
   userIds: string[];
 };
 
+export type ChannelThreadSubscriber = {
+  userId: string;
+  subscribedAt: string;
+};
+
 export type ChannelMessage = {
   id: string;
   channelId: string;
@@ -604,6 +609,8 @@ export type ChannelMessage = {
   lastReplyAt: string | null;
   /** Up to three unique reply authors, ordered by their most recent reply. */
   replyAuthors?: ChannelMessageAuthor[];
+  /** Present on thread roots. Older API responses omit the field. */
+  subscribers?: ChannelThreadSubscriber[];
   document: ChannelMessageDocument | null;
   proposal: ChannelMessageProposal | null;
   executionProposal: ChannelExecutionProposal | null;
@@ -612,6 +619,16 @@ export type ChannelMessage = {
   optimistic?: boolean;
   createdAt: string;
 };
+
+export function applyChannelThreadSubscribers(
+  messages: ChannelMessage[],
+  rootMessageId: string,
+  subscribers: ChannelThreadSubscriber[],
+) {
+  return messages.map((message) =>
+    message.id === rootMessageId ? { ...message, subscribers } : message,
+  );
+}
 
 export type ChannelReplyContextAuthor =
   | Pick<

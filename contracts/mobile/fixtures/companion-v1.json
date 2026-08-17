@@ -1484,6 +1484,29 @@
         }
       }
     },
+    "putChannelThreadSubscription": {
+      "method": "PUT",
+      "path": "/organizations/{organizationId}/channels/{channelId}/messages/{messageId}/subscription",
+      "status": 200,
+      "response": {
+        "rootMessageId": "44444444-4444-4444-8444-444444444444",
+        "subscribers": [
+          {
+            "userId": "fixture-user",
+            "subscribedAt": "2026-08-06T00:03:00.000Z"
+          }
+        ]
+      }
+    },
+    "deleteChannelThreadSubscription": {
+      "method": "DELETE",
+      "path": "/organizations/{organizationId}/channels/{channelId}/messages/{messageId}/subscription",
+      "status": 200,
+      "response": {
+        "rootMessageId": "44444444-4444-4444-8444-444444444444",
+        "subscribers": []
+      }
+    },
     "toggleChannelMessageReaction": {
       "method": "PUT",
       "path": "/organizations/{organizationId}/channels/{channelId}/messages/{messageId}/reactions",

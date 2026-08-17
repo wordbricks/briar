@@ -17,6 +17,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type ReactNode,
 } from "react";
 import {
   acceptChannelSkillExecutionProposal,
@@ -30,18 +31,20 @@ import {
   loadDashboard,
   sendChannelMessage,
   toggleChannelMessageReaction,
+  updateChannelThreadSubscription,
 } from "../lib/api";
 import {
   groupChannels,
   type ChannelGroupProject,
 } from "../lib/channel-grouping";
-import type {
-  ChannelAgentReply,
-  ChannelAgentSummary,
-  ChannelExecutionProposal,
-  ChannelMember,
-  ChannelMessage,
-  ChannelSummary,
+import {
+  applyChannelThreadSubscribers,
+  type ChannelAgentReply,
+  type ChannelAgentSummary,
+  type ChannelExecutionProposal,
+  type ChannelMember,
+  type ChannelMessage,
+  type ChannelSummary,
 } from "../lib/channels-contract";
 import {
   channelHasUnread,
@@ -86,6 +89,7 @@ import {
   ChannelMessageImages,
 } from "./ChannelImages";
 import { ChannelMentionMenu } from "./ChannelMentionMenu";
+import { ChannelThreadSubscribeControls } from "./ChannelThreadSubscribeControls";
 import { ChannelTypingState } from "./ChannelTypingState";
 import { MentionComposerField } from "./MentionComposerField";
 import { ChannelMessageText } from "./ChannelMessageText";
@@ -262,6 +266,7 @@ export function CompanionChannels({
   );
   const [thread, setThread] = useState<ChannelMessage[] | null>(null);
   const [threadParentId, setThreadParentId] = useState<string | null>(null);
+  const [threadSubscriptionPending, setThreadSubscriptionPending] = useState(false);
   const [messageNextCursor, setMessageNextCursor] = useState<string | null>(
     null,
   );
@@ -1441,6 +1446,36 @@ export function CompanionChannels({
     [channel, organizationId, token],
   );
 
+  const toggleThreadSubscription = useCallback(
+    async (subscribed: boolean) => {
+      if (!channel || !threadParentId || threadSubscriptionPending) return;
+      setThreadSubscriptionPending(true);
+      setError(null);
+      try {
+        const result = await updateChannelThreadSubscription(
+          token,
+          organizationId,
+          channel.id,
+          threadParentId,
+          subscribed,
+        );
+        const apply = (current: ChannelMessage[]) =>
+          applyChannelThreadSubscribers(
+            current,
+            result.rootMessageId,
+            result.subscribers,
+          );
+        setMessages(apply);
+        setThread((current) => (current ? apply(current) : current));
+      } catch (cause) {
+        setError(message(cause));
+      } finally {
+        setThreadSubscriptionPending(false);
+      }
+    },
+    [channel, organizationId, threadParentId, threadSubscriptionPending, token],
+  );
+
   const closeThread = useCallback(() => {
     if (!channel || !threadParentId) return false;
     channelSelectionVersion.current += 1;
@@ -1479,6 +1514,20 @@ export function CompanionChannels({
       <section className="companion-channels companion-channel-detail">
         <ChannelBar
           onBack={closeThread}
+          subscribe={(
+            <ChannelThreadSubscribeControls
+              currentUserId={currentUserId}
+              members={members}
+              pending={threadSubscriptionPending}
+              subscribers={
+                thread?.find((item) => item.id === threadParentId)
+                  ?.subscribers ?? []
+              }
+              onToggle={(subscribed) => {
+                void toggleThreadSubscription(subscribed);
+              }}
+            />
+          )}
           title={t("companion.channelThread")}
         />
         {error ? <p className="companion-channel-error">{error}</p> : null}
@@ -1733,10 +1782,12 @@ export function CompanionChannels({
 function ChannelBar({
   channel,
   onBack,
+  subscribe,
   title,
 }: {
   channel?: ChannelSummary;
   onBack: () => void;
+  subscribe?: ReactNode;
   title?: string;
 }) {
   const { t } = useI18n();
@@ -1779,6 +1830,7 @@ function ChannelBar({
       ) : (
         <strong className="companion-channel-bar-title">{title}</strong>
       )}
+      {subscribe}
     </header>
   );
 }

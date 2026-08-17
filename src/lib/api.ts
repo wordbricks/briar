@@ -2313,6 +2313,23 @@ export async function updateIssue(
   );
 }
 
+export async function updateChannelThreadSubscription(
+  token: string,
+  organizationId: string,
+  channelId: string,
+  messageId: string,
+  subscribed: boolean,
+) {
+  return request<{
+    rootMessageId: string;
+    subscribers: Array<{ userId: string; subscribedAt: string }>;
+  }>(
+    `/organizations/${organizationId}/channels/${channelId}/messages/${messageId}/subscription`,
+    token,
+    { method: subscribed ? "PUT" : "DELETE" },
+  );
+}
+
 export async function updateIssueSubscription(
   token: string,
   projectId: string,

@@ -803,6 +803,7 @@ describe("D1 migrations", () => {
     "0112_expand_agent_text_limits.sql",
     "0105_organization_inbox_realtime.sql",
     "0108_channel_notification_inbox.sql",
+    "0114_channel_thread_subscriptions.sql",
   ])("keeps each trigger in a separate Wrangler statement: %s", async (name) => {
     const sql = await readFile(resolve("migrations", name), "utf8");
     const statements = unstable_splitSqlQuery(sql);

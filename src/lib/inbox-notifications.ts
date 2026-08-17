@@ -389,9 +389,7 @@ export function inboxNotificationContent(
 
   if (
     (message.kind === "conversation" || message.kind === "channel") &&
-    (isReplyMessage(message) || (
-      message.kind === "conversation" && message.reason === "subscription"
-    ))
+    (isReplyMessage(message) || message.reason === "subscription")
   ) {
     const destination =
       message.kind === "channel"

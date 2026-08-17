@@ -264,7 +264,7 @@ export type ChannelConversationNotification = {
   rootMessageId: string;
   body: string;
   author: IssueMessageAuthor;
-  reason: "mention" | "thread_reply";
+  reason: "mention" | "thread_reply" | "subscription";
   createdAt: string;
 };
 
