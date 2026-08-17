@@ -26,6 +26,7 @@ import {
   loadProjectAgents,
   updateProjectAgent,
 } from "../lib/api";
+import { agentResponsibilityMaxLength } from "../lib/agent-limits";
 import {
   agentEffortOptions,
   agentModelDisplayName,
@@ -849,7 +850,7 @@ export function ProjectAgentDialog({
               {t("agents.responsibility")} <em>{t("common.required")}</em>
             </span>
             <textarea
-              maxLength={2_000}
+              maxLength={agentResponsibilityMaxLength}
               onChange={(event) => setResponsibility(event.target.value)}
               placeholder={t("agents.responsibilityPlaceholder")}
               required

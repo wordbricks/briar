@@ -127,6 +127,60 @@ describe("project Agent routes", () => {
     });
   });
 
+  it("persists 20000-character responsibility and five 20000-character Skills", async () => {
+    const responsibility = "r".repeat(20_000);
+    const instructions = "s".repeat(20_000);
+    const skills = Array.from({ length: 5 }, (_, index) => ({
+      name: `Boundary Skill ${index + 1}`,
+      instructions,
+      provider: "codex" as const,
+      model: null,
+      effort: null,
+      kind: "custom" as const,
+      position: index,
+    }));
+    const createdResponse = await worker.fetch(
+      request(`/projects/${projectId}/agents`, "POST", {
+        name: "Boundary Agent",
+        provider: "codex",
+        responsibility,
+        skills,
+      }),
+      env(),
+    );
+
+    expect(createdResponse.status).toBe(201);
+    const created = await createdResponse.json<{
+      agent: { id: string; responsibility: string; skills: unknown[] };
+    }>();
+    expect(created.agent.responsibility).toHaveLength(20_000);
+    expect(created.agent.skills).toHaveLength(5);
+
+    const tooManyResponse = await worker.fetch(
+      request(`/projects/${projectId}/agents/${created.agent.id}`, "PUT", {
+        name: "Boundary Agent",
+        provider: "codex",
+        responsibility,
+        skills: [
+          ...skills,
+          { ...skills[0], name: "Boundary Skill 6", position: 5 },
+        ],
+      }),
+      env(),
+    );
+    expect(tooManyResponse.status).toBe(400);
+
+    await expect(
+      db.prepare(
+        `insert into briar_agent_skills (
+           id, agent_id, name, instructions, provider, model, effort, kind,
+           is_default, position, created_at, updated_at
+         ) values (?, ?, 'Boundary Skill 6', '', 'codex', null, null,
+                   'custom', 0, 5, ?, ?)`,
+      ).bind(crypto.randomUUID(), created.agent.id, now, now).run(),
+    ).rejects.toThrow(/at most 5 Skills/u);
+  });
+
   it("syncs lightweight summaries with cursors and loads detail on demand", async () => {
     const sessionId = "session-sync-1";
     const startedAt = "2026-08-10T01:00:00.000Z";

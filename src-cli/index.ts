@@ -35,6 +35,10 @@ import {
   agentProviders,
   modelEffortSchema,
 } from "../src/lib/agent-provider-contract";
+import {
+  agentResponsibilityMaxLength,
+  agentSkillsMaxCount,
+} from "../src/lib/agent-limits";
 import { validateEvidenceImages } from "../src/lib/evidence-images";
 import {
   organizationAgentContextCapability,
@@ -2156,11 +2160,15 @@ const channelDelegationTargetSchema = z.object({
   agentName: z.string().trim().min(1).max(100),
   projectId: z.string().uuid(),
   projectName: z.string().trim().min(1).max(300),
-  responsibility: z.string().trim().min(1).max(2_000),
+  responsibility: z
+    .string()
+    .trim()
+    .min(1)
+    .max(agentResponsibilityMaxLength),
   skills: z.array(z.object({
     id: z.string().uuid(),
     name: z.string().trim().min(1).max(100),
-  }).strict()).max(50),
+  }).strict()).max(agentSkillsMaxCount),
 }).strict();
 
 const claimedChannelDelegationSchema = z.object({
