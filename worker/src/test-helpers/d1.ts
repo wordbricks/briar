@@ -437,10 +437,10 @@ export async function prepareD1TestTemplate(): Promise<D1TestTemplate> {
     let manifest: TemplateManifest;
     try {
       manifest = await buildTemplate(temporaryDirectory, fingerprint);
-      // Keep the temporary tree writable until the atomic move. macOS rejects
-      // renaming a read-only directory in this worker environment.
+      // macOS requires write permission on a directory to rename it.
+      await chmod(temporaryDirectory, 0o700);
       await rename(temporaryDirectory, directory);
-      await chmodTree(directory, false);
+      await chmod(directory, 0o500);
     } catch (error) {
       await removeTemplateDirectory(temporaryDirectory);
       await removeTemplateDirectory(directory);
