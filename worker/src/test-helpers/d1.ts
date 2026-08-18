@@ -389,7 +389,6 @@ async function buildTemplate(
     `${JSON.stringify(manifest, null, 2)}\n`,
     { flag: "wx" },
   );
-  await chmodTree(temporaryDirectory, false);
   return manifest;
 }
 
@@ -438,9 +437,13 @@ export async function prepareD1TestTemplate(): Promise<D1TestTemplate> {
     let manifest: TemplateManifest;
     try {
       manifest = await buildTemplate(temporaryDirectory, fingerprint);
+      // Keep the temporary tree writable until the atomic move. macOS rejects
+      // renaming a read-only directory in this worker environment.
       await rename(temporaryDirectory, directory);
+      await chmodTree(directory, false);
     } catch (error) {
       await removeTemplateDirectory(temporaryDirectory);
+      await removeTemplateDirectory(directory);
       throw error;
     }
     const migrationPreparationMs = performance.now() - startedAt;
