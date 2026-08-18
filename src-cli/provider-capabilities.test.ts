@@ -4,6 +4,9 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   cursorModels,
+  discoverWorkerProviderCapabilities,
+  parseAgyEfforts,
+  parseAgyModels,
   parseClaudeEfforts,
   parseClaudeModels,
   parseCursorAvailableModelsResponse,
@@ -79,6 +82,98 @@ Available models:
         { id: "xhigh", label: "xhigh" },
         { id: "max", label: "max" },
       ]);
+  });
+
+  it("reads Antigravity models from the nested JSON command payload", () => {
+    expect(parseAgyModels(JSON.stringify({
+      status: "SUCCESS",
+      command: {
+        name: "models",
+        data: {
+          models: [
+            { id: "gemini-3.7-flash-high", label: "Gemini 3.7 Flash (High)" },
+            { model_id: "gemini-3.7-flash-low", display_name: "Gemini 3.7 Flash (Low)" },
+            { modelId: "gemini-3.7-flash-high", name: "duplicate" },
+          ],
+        },
+      },
+    }))).toEqual([
+      {
+        id: "gemini-3.7-flash-high",
+        label: "Gemini 3.7 Flash (High)",
+        isDefault: false,
+        defaultEffortId: null,
+        efforts: [],
+      },
+      {
+        id: "gemini-3.7-flash-low",
+        label: "Gemini 3.7 Flash (Low)",
+        isDefault: false,
+        defaultEffortId: null,
+        efforts: [],
+      },
+    ]);
+  });
+
+  it("reads pipe-delimited Antigravity efforts from CLI help", () => {
+    expect(parseAgyEfforts("--effort <level>  effort (low|medium|high)"))
+      .toEqual([
+        { id: "low", label: "low" },
+        { id: "medium", label: "medium" },
+        { id: "high", label: "high" },
+      ]);
+  });
+
+  it("advertises Antigravity models in Worker capabilities", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "briar-agy-capabilities-"));
+    const binary = join(directory, "agy");
+    try {
+      await writeFile(
+        binary,
+        `#!/bin/sh
+if [ "$1" = "--output-format" ]; then
+  printf '%s' '{"command":{"name":"models","data":{"models":[{"id":"gemini-3.7-flash-high","label":"Gemini 3.7 Flash (High)"}]}}}'
+elif [ "$1" = "--help" ]; then
+  printf '%s' '--effort <level>  effort (low|medium|high)'
+else
+  exit 2
+fi
+`,
+        { mode: 0o755 },
+      );
+
+      const catalog = await discoverWorkerProviderCapabilities({
+        codex: false,
+        claude: false,
+        cursor: false,
+        grok: false,
+        agy: true,
+        opencode: false,
+      }, {
+        refresh: true,
+        home: directory,
+        which: (provider) => provider === "agy" ? binary : null,
+      });
+
+      expect(catalog.agy).toEqual({
+        models: [{
+          id: "gemini-3.7-flash-high",
+          label: "Gemini 3.7 Flash (High)",
+          isDefault: false,
+          defaultEffortId: null,
+          efforts: [],
+        }],
+        defaultEfforts: [
+          { id: "low", label: "low" },
+          { id: "medium", label: "medium" },
+          { id: "high", label: "high" },
+        ],
+        allowCustomModels: false,
+        error: null,
+      });
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
   });
 
   it("reads Claude model aliases from the installed CLI help", () => {
