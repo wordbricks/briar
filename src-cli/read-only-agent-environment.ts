@@ -76,6 +76,7 @@ const providerPrefixes: Record<AgentProvider, string[]> = {
     "TOGETHER_",
     "CEREBRAS_",
   ],
+  openrouter: ["OPENROUTER_"],
 };
 
 const providerEnvironmentKeys: Record<AgentProvider, Set<string>> = {
@@ -85,6 +86,7 @@ const providerEnvironmentKeys: Record<AgentProvider, Set<string>> = {
   grok: new Set(["XAI_API_KEY"]),
   agy: new Set(),
   opencode: new Set(),
+  openrouter: new Set(["OPENCODE_CONFIG_CONTENT"]),
 };
 
 const grokReadOnlyProfile = "briar_read_only";

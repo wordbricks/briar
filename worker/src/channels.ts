@@ -2216,7 +2216,8 @@ export async function claimNextChannelAgentReply(
          or (job.agent_provider = 'cursor' and ? = 1)
          or (job.agent_provider = 'grok' and ? = 1)
          or (job.agent_provider = 'agy' and ? = 1)
-         or (job.agent_provider = 'opencode' and ? = 1))
+         or (job.agent_provider = 'opencode' and ? = 1)
+         or (job.agent_provider = 'openrouter' and ? = 1))
        and exists (
          select 1 from briar_execution_workers binding
          where binding.id = ? and binding.device_id = ?
@@ -2266,6 +2267,7 @@ export async function claimNextChannelAgentReply(
     input.providers.includes("grok") ? 1 : 0,
     input.providers.includes("agy") ? 1 : 0,
     input.providers.includes("opencode") ? 1 : 0,
+    input.providers.includes("openrouter") ? 1 : 0,
     input.workerId,
     input.deviceId,
   ).all<ChannelReplyJobRow & {

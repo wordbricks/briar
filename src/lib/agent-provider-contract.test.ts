@@ -18,6 +18,7 @@ describe("agent provider contract", () => {
       "grok",
       "agy",
       "opencode",
+      "openrouter",
     ]);
     expect(agentProviderLabels).toEqual({
       codex: "Codex",
@@ -26,6 +27,7 @@ describe("agent provider contract", () => {
       grok: "Grok",
       agy: "Antigravity",
       opencode: "OpenCode",
+      openrouter: "OpenRouter",
     });
     expect(emptyAgentProviderCapabilityCatalog().grok.models).toEqual([]);
   });

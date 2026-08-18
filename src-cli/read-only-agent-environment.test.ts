@@ -295,6 +295,30 @@ describe("read-only Agent environment", () => {
     }
   });
 
+  it("keeps only the OpenRouter key and generated OpenCode config", async () => {
+    const prepared = await prepareReadOnlyAgentEnvironment("openrouter", {
+      workspaceRoot: "/repo",
+      environment: {
+        HOME: "/Users/worker",
+        OPENROUTER_API_KEY: "sk-or-v1-provider-secret",
+        OPENCODE_CONFIG_CONTENT: '{"provider":{"openrouter":{}}}',
+        OPENAI_API_KEY: "unrelated-secret",
+        BRIAR_WORKER_TOKEN: "worker-secret",
+      },
+    });
+    try {
+      expect(prepared.environment.OPENROUTER_API_KEY)
+        .toBe("sk-or-v1-provider-secret");
+      expect(prepared.environment.OPENCODE_CONFIG_CONTENT)
+        .toBe('{"provider":{"openrouter":{}}}');
+      expect(prepared.environment.OPENAI_API_KEY).toBeUndefined();
+      expect(prepared.environment.BRIAR_WORKER_TOKEN).toBeUndefined();
+      expect(prepared.environment.OPENCODE_DISABLE_PROJECT_CONFIG).toBe("1");
+    } finally {
+      await prepared.cleanup();
+    }
+  });
+
   it("isolates Antigravity state while preserving Google subscription OAuth", async () => {
     const sourceHome = await mkdtemp(join(tmpdir(), "briar-agy-source-"));
     await Promise.all([

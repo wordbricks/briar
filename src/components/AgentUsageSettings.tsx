@@ -52,6 +52,7 @@ const providerColors: Record<UsageAttribution, string> = {
   grok: "#7765b5",
   agy: "#4285f4",
   opencode: "#4f8a70",
+  openrouter: "#6d5bd0",
   unknown: "var(--usage-unknown-color)",
 };
 
