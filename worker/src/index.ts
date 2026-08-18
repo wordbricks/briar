@@ -13385,7 +13385,9 @@ async function route(
         binding.state,
       ) !== "online" ||
       binding.accepting_work !== 1 ||
-      binding.readiness_state !== "ready"
+      // `busy` represents occupied regular execution slots. Reply work does
+      // not consume those slots, so only an unhealthy readiness state blocks.
+      binding.readiness_state === "needs_attention"
     ) {
       throw new HttpError(409, "Worker is not ready to claim replies");
     }

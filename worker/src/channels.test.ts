@@ -1341,6 +1341,11 @@ describe("organization channels", () => {
         leaseExpiresAt: at(20),
       }),
     ).resolves.toBeNull();
+    // A normal execution may occupy the Worker while a reply still claims
+    // the same provider; replies must not consume the regular slot.
+    await db.prepare(
+      `update briar_execution_workers set readiness_state = 'busy' where id = ?`,
+    ).bind(otherWorkerId).run();
 
     const apiEnv = {
       DB: db,
