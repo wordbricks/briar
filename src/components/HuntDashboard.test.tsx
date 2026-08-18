@@ -3703,6 +3703,9 @@ describe("HuntDashboard", () => {
         selectedRunId={null}
       />,
     ));
+    const board = container.querySelector<HTMLDivElement>(".kanban-board");
+    expect(board).not.toBeNull();
+    if (board) board.scrollLeft = 248;
     await act(async () =>
       container.querySelector<HTMLButtonElement>(".kanban-card")?.click(),
     );
@@ -3726,6 +3729,17 @@ describe("HuntDashboard", () => {
         ?.click(),
     );
     expect(onSelectedRunChange).toHaveBeenLastCalledWith(null);
+
+    await act(async () => root.render(
+      <HuntDashboard
+        {...dashboardProps}
+        dashboard={dashboard}
+        onSelectedRunChange={onSelectedRunChange}
+        selectedRunId={null}
+      />,
+    ));
+    expect(container.querySelector<HTMLDivElement>(".kanban-board")?.scrollLeft)
+      .toBe(248);
 
     await act(async () => root.unmount());
     container.remove();
