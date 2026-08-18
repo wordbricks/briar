@@ -24,6 +24,7 @@ const loadDashboard = vi.fn();
 const listChannelMessages = vi.fn();
 const createChannel = vi.fn();
 const loadChannelMessageAttachment = vi.fn();
+const loadChannelMessageDocument = vi.fn();
 const loadOrganizationMembers = vi.fn();
 const listOrganizationAgents = vi.fn();
 const setChannelMember = vi.fn();
@@ -57,6 +58,8 @@ vi.mock("../lib/api", () => ({
   createChannel: (...args: unknown[]) => createChannel(...args),
   loadChannelMessageAttachment: (...args: unknown[]) =>
     loadChannelMessageAttachment(...args),
+  loadChannelMessageDocument: (...args: unknown[]) =>
+    loadChannelMessageDocument(...args),
   loadOrganizationMembers: (...args: unknown[]) =>
     loadOrganizationMembers(...args),
   listOrganizationAgents: (...args: unknown[]) => listOrganizationAgents(...args),
@@ -3463,7 +3466,24 @@ describe("Channels", () => {
     );
   });
 
-  it("shows a plan document card with its organization scope", async () => {
+  it("opens a plan document in a large Markdown dialog", async () => {
+    loadChannelMessageDocument.mockResolvedValue({
+      document: {
+        messageId: "message-5",
+        title: "Onboarding plan",
+        projectId: null,
+        markdown: [
+          "# Rollout",
+          "",
+          "- [x] Invite the team",
+          "- [ ] Verify access",
+          "",
+          "| Owner | Status |",
+          "| --- | --- |",
+          "| Jay | Ready |",
+        ].join("\n"),
+      },
+    });
     await render([
       message({
         id: "message-5",
@@ -3474,9 +3494,66 @@ describe("Channels", () => {
         },
       }),
     ]);
-    const card = container.querySelector(".channel-document-card");
+    const card = container.querySelector<HTMLButtonElement>(
+      ".channel-document-card",
+    );
     expect(card?.textContent).toContain("Onboarding plan");
     expect(card?.textContent).toContain("조직 문서");
+    expect(card?.getAttribute("aria-haspopup")).toBe("dialog");
+
+    await act(async () => card?.click());
+    await act(async () => Promise.resolve());
+
+    expect(loadChannelMessageDocument).toHaveBeenCalledWith(
+      "token",
+      "org-1",
+      "channel-1",
+      "message-5",
+    );
+    const dialog = document.querySelector<HTMLElement>(
+      '[role="dialog"].channel-document-dialog',
+    );
+    expect(dialog).not.toBeNull();
+    expect(dialog?.querySelector("h1")?.textContent).toBe("Rollout");
+    expect(dialog?.querySelector("ul")?.textContent).toContain("Invite the team");
+    expect(dialog?.querySelector("table")?.textContent).toContain("Ready");
+  });
+
+  it("offers a retry when a channel document cannot be loaded", async () => {
+    loadChannelMessageDocument
+      .mockRejectedValueOnce(new Error("document unavailable"))
+      .mockResolvedValueOnce({
+        document: {
+          messageId: "message-document-retry",
+          title: "Recovery plan",
+          projectId: "project-1",
+          markdown: "# Recovered",
+        },
+      });
+    await render([
+      message({
+        id: "message-document-retry",
+        document: {
+          messageId: "message-document-retry",
+          title: "Recovery plan",
+          projectId: "project-1",
+        },
+      }),
+    ]);
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(".channel-document-card")?.click();
+    });
+    await act(async () => Promise.resolve());
+    const alert = document.querySelector<HTMLElement>(
+      '[role="dialog"] .channel-document-state[role="alert"]',
+    );
+    expect(alert?.textContent).toContain("문서를 불러오지 못했습니다.");
+
+    await act(async () => alert?.querySelector<HTMLButtonElement>("button")?.click());
+    await act(async () => Promise.resolve());
+    expect(document.querySelector("[role=dialog] h1")?.textContent).toBe("Recovered");
+    expect(loadChannelMessageDocument).toHaveBeenCalledTimes(2);
   });
 
   it("scrolls the thread panel to the bottom when a thread reply is sent", async () => {

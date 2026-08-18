@@ -518,6 +518,11 @@ export type ChannelMessageDocument = {
   projectId: string | null;
 };
 
+/** Full document body, loaded only when a member opens the document card. */
+export type ChannelMessageDocumentContent = ChannelMessageDocument & {
+  markdown: string;
+};
+
 export type ChannelMessageProposal = {
   id: string;
   actionType: ChannelActionType;
