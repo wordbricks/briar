@@ -85,7 +85,13 @@ const runDefaults = {
 const event = (
   input: Pick<
     HuntEvent,
-    "id" | "status" | "workflowStage" | "detail" | "actor" | "occurredAt"
+    | "id"
+    | "status"
+    | "workflowStage"
+    | "detail"
+    | "actor"
+    | "actorName"
+    | "occurredAt"
   >,
 ): HuntEvent => ({
   ...input,
@@ -129,7 +135,8 @@ const runSeeds: DemoRunSeed[] = [
         status: "running",
         workflowStage: "implementing",
         detail: "이벤트 스트림 어댑터 구현 시작",
-        actor: "codex",
+        actor: "briar-app:demo-user",
+        actorName: "Jay",
         occurredAt: ago(23),
       }),
       event({

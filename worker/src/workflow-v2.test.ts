@@ -172,6 +172,8 @@ describe("workflow v2 D1 persistence and transitions", () => {
         // 0112 rebuilds the Agent approval tables whose migrations are
         // deliberately excluded by this historical workflow fixture.
         "0112_expand_agent_text_limits.sql",
+        // 0115 backfills approval events from the progress table introduced by 0059.
+        "0115_issue_status_actor_tracking.sql",
       ],
     });
 
@@ -388,6 +390,18 @@ describe("workflow v2 D1 persistence and transitions", () => {
       approvedAt: at(19),
     });
     expect(approved.outcome).toBe("approved");
+    expect(
+      (await listHuntRunEvents(db, projectId, v2RunId)).find(
+        (item) => item.event_key ===
+          "workflow:checkpoint-approved:1:1:project-before-pr_open",
+      ),
+    ).toMatchObject({
+      status: "running",
+      workflow_stage: "pr_open",
+      actor: "pm",
+      detail: "Open PR 단계의 검토를 승인했습니다.",
+      occurred_at: at(19),
+    });
     expect(await getHuntRunForProject(db, projectId, v2RunId)).toMatchObject({
       status: "running",
       stage: "pr_open",
@@ -404,6 +418,12 @@ describe("workflow v2 D1 persistence and transitions", () => {
     });
     expect(duplicate.outcome).toBe("already_approved");
     expect(duplicate.nextStage).toBe("pr_open");
+    expect(
+      (await listHuntRunEvents(db, projectId, v2RunId)).filter(
+        (item) => item.event_key ===
+          "workflow:checkpoint-approved:1:1:project-before-pr_open",
+      ),
+    ).toHaveLength(1);
     await claimResumedRun(v2RunId, 20.5);
 
     expect((await startWorkflowStage(db, projectId, {

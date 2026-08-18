@@ -2158,6 +2158,14 @@ export async function resumeWorkflowCheckpoint(
       : workflow.stages[workflowStageRank(workflow, configured.stage) + 1]?.id ?? null;
   const resumedWorkflowStage = nextStage ?? configured.stage;
   const resumedStage = dashboardStageFor("running", resumedWorkflowStage);
+  const approvalEventStage = dashboardStageFor("running", configured.stage);
+  const approvedStageLabel = workflow.stages.find(
+    (stage) => stage.id === configured.stage,
+  )?.label ?? configured.stage;
+  const approvalEventId = crypto.randomUUID();
+  const approvalEventKey =
+    `workflow:checkpoint-approved:${attempt}:${revision}:${configured.key}`;
+  const recordedAt = new Date().toISOString();
   const githubCheckpointMergeGuard = input.requireAllGithubPullRequestsMerged
     ? `and exists (
          select 1 from briar_run_pull_requests link
@@ -2278,6 +2286,7 @@ export async function resumeWorkflowCheckpoint(
              waiting_checkpoint_key = null, waiting_checkpoint_revision = null,
              claim_token_hash = null, claimed_by = null, claimed_at = null,
              lease_expires_at = null, completed_at = null,
+             last_event_at = max(last_event_at, ?),
              updated_at = max(updated_at, ?)
          where id = ? and project_id = ? and current_attempt = ?
            and current_revision = ? and waiting_checkpoint_key = ?
@@ -2290,6 +2299,7 @@ export async function resumeWorkflowCheckpoint(
         resumedWorkflowStage,
         input.approvedAt,
         input.approvedAt,
+        input.approvedAt,
         run.id,
         projectId,
         attempt,
@@ -2297,8 +2307,51 @@ export async function resumeWorkflowCheckpoint(
         configured.key,
         revision,
       ),
+    db
+      .prepare(
+        `insert into briar_hunt_events (
+           id, run_id, event_key, attempt, revision, stage, status,
+           workflow_stage, detail, actor, branch, commit_sha, qa_status,
+           tracker_issue_state, pull_request_urls, target_sha,
+           occurred_at, recorded_at
+         )
+         select ?, id, ?, current_attempt, current_revision, ?, 'running',
+                ?, ?, ?, branch, commit_sha, null, tracker_issue_state,
+                pull_request_urls, target_sha, ?, ?
+         from briar_hunt_runs
+         where id = ? and project_id = ? and current_attempt = ?
+           and current_revision = ? and resume_requested_at = ?
+           and exists (
+             select 1 from briar_run_checkpoint_progress progress
+             where progress.run_id = briar_hunt_runs.id
+               and progress.attempt = briar_hunt_runs.current_attempt
+               and progress.revision = briar_hunt_runs.current_revision
+               and progress.checkpoint_key = ? and progress.state = 'approved'
+           )
+         on conflict(run_id, event_key) do nothing`,
+      )
+      .bind(
+        approvalEventId,
+        approvalEventKey,
+        approvalEventStage,
+        configured.stage,
+        `${approvedStageLabel} 단계의 검토를 승인했습니다.`,
+        input.actor,
+        input.approvedAt,
+        recordedAt,
+        run.id,
+        projectId,
+        attempt,
+        revision,
+        input.approvedAt,
+        configured.key,
+      ),
   ]);
-  if ((results[0]?.meta.changes ?? 0) === 0 || (results[1]?.meta.changes ?? 0) === 0) {
+  if (
+    (results[0]?.meta.changes ?? 0) === 0 ||
+    (results[1]?.meta.changes ?? 0) === 0 ||
+    (results[2]?.meta.changes ?? 0) === 0
+  ) {
     return {
       outcome: "conflict",
       checkpointKey: configured.key,
@@ -7089,6 +7142,40 @@ export async function listHuntRunEvents(
     .all<HuntEventRow>();
 
   return events.results;
+}
+
+export async function resolveHuntEventActorNames(
+  db: D1Database,
+  projectId: string,
+  actors: readonly string[],
+) {
+  const userIds = [...new Set(
+    actors
+      .filter((actor) => actor.startsWith("briar-app:"))
+      .map((actor) => actor.slice("briar-app:".length))
+      .filter(Boolean),
+  )];
+  const names = new Map<string, string>();
+  const chunkSize = 50;
+  for (let offset = 0; offset < userIds.length; offset += chunkSize) {
+    const chunk = userIds.slice(offset, offset + chunkSize);
+    const users = await db
+      .prepare(
+        `select account.id, account.name
+         from "user" account
+         join briar_organization_members member on member.user_id = account.id
+         join briar_projects project
+           on project.organization_id = member.organization_id
+         where project.id = ?
+           and account.id in (${chunk.map(() => "?").join(", ")})`,
+      )
+      .bind(projectId, ...chunk)
+      .all<{ id: string; name: string }>();
+    for (const user of users.results) {
+      names.set(`briar-app:${user.id}`, user.name);
+    }
+  }
+  return names;
 }
 
 export async function listIssueDependencies(
