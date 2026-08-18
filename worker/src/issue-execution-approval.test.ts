@@ -29,7 +29,7 @@ import {
 } from "./db";
 import worker from "./index";
 import { createOrganizationAgent } from "./organization-agents";
-import { applyD1Migrations } from "./test-helpers/d1";
+import { createIsolatedTestDatabase } from "./test-helpers/d1";
 import {
   dispatchHuntRun,
   registerExecutionWorker,
@@ -133,21 +133,24 @@ const event = (
 });
 
 describe("conversational issue execution approval", () => {
-  const miniflare = new Miniflare({
-    modules: true,
-    script: "export default { fetch() { return new Response('ok') } }",
-    d1Databases: { DB: "briar-issue-execution-approval-test" },
-    r2Buckets: ["ATTACHMENTS"],
-  });
+  let miniflare: Miniflare;
   let db: D1Database;
   let attachments: R2Bucket;
   let sequence = 0;
   let projectAgentId: string;
 
   beforeAll(async () => {
-    db = (await miniflare.getD1Database("DB")) as unknown as D1Database;
+    const database = await createIsolatedTestDatabase({
+      suite: "issue-execution-approval",
+      miniflareOptions: {
+        modules: true,
+        script: "export default { fetch() { return new Response('ok') } }",
+        r2Buckets: ["ATTACHMENTS"],
+      },
+    });
+    miniflare = database.miniflare;
+    db = database.db;
     attachments = await miniflare.getR2Bucket("ATTACHMENTS") as unknown as R2Bucket;
-    await applyD1Migrations(db);
 
     for (const [id, name, token] of [
       [ownerId, "Owner", ownerToken],

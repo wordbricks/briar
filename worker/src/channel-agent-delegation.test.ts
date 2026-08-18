@@ -22,7 +22,7 @@ import {
 } from "./db";
 import apiWorker from "./index";
 import { createOrganizationAgent } from "./organization-agents";
-import { applyD1Migrations } from "./test-helpers/d1";
+import { createIsolatedTestDatabase } from "./test-helpers/d1";
 
 const organizationId = "10000000-0000-4000-8000-000000000001";
 const projectId = "20000000-0000-4000-8000-000000000001";
@@ -65,12 +65,7 @@ const backlogEvent = (sourceKey: string): HuntEventInput => ({
 });
 
 describe("Organization Agent channel delegation", () => {
-  const miniflare = new Miniflare({
-    modules: true,
-    script: "export default { fetch() { return new Response('ok') } }",
-    d1Databases: { DB: "briar-channel-agent-delegation-test" },
-    r2Buckets: ["ARCHIVES"],
-  });
+  let miniflare: Miniflare;
   let db: D1Database;
   let archives: R2Bucket;
   let projectAgent: Awaited<ReturnType<typeof createProjectAgent>>;
@@ -80,9 +75,17 @@ describe("Organization Agent channel delegation", () => {
   >;
 
   beforeAll(async () => {
-    db = await miniflare.getD1Database("DB") as unknown as D1Database;
+    const database = await createIsolatedTestDatabase({
+      suite: "channel-agent-delegation",
+      miniflareOptions: {
+        modules: true,
+        script: "export default { fetch() { return new Response('ok') } }",
+        r2Buckets: ["ARCHIVES"],
+      },
+    });
+    miniflare = database.miniflare;
+    db = database.db;
     archives = await miniflare.getR2Bucket("ARCHIVES") as unknown as R2Bucket;
-    await applyD1Migrations(db);
     const now = new Date().toISOString();
     await db.batch([
       db.prepare(

@@ -14,22 +14,24 @@ import {
 } from "./db";
 import { processSlackRevocationQueue } from "./index";
 import { encryptSlackToken } from "./slack";
-import { applyD1Migrations, executeD1Sql } from "./test-helpers/d1";
+import {
+  createIsolatedTestDatabase,
+  executeD1Sql,
+} from "./test-helpers/d1";
 
 describe("Slack D1 integration", () => {
-  const miniflare = new Miniflare({
-    modules: true,
-    script: "export default { fetch() { return new Response('ok') } }",
-    d1Databases: { DB: "briar-slack-test" },
-  });
+  let miniflare: Miniflare;
   let db: D1Database;
   const organizationId = "11111111-1111-4111-8111-111111111111";
   const firstProjectId = "22222222-2222-4222-8222-222222222222";
   const secondProjectId = "33333333-3333-4333-8333-333333333333";
 
   beforeAll(async () => {
-    db = (await miniflare.getD1Database("DB")) as unknown as D1Database;
-    await applyD1Migrations(db);
+    const database = await createIsolatedTestDatabase({
+      suite: "slack-db",
+    });
+    miniflare = database.miniflare;
+    db = database.db;
     const now = "2026-07-29T00:00:00.000Z";
     await executeD1Sql(
       db,

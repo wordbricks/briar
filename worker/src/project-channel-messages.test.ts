@@ -7,14 +7,10 @@ import {
   createChannel,
   createChannelMessage,
 } from "./channels";
-import { applyD1Migrations } from "./test-helpers/d1";
+import { createIsolatedTestDatabase } from "./test-helpers/d1";
 
 describe("Project Agent channel message history", () => {
-  const miniflare = new Miniflare({
-    modules: true,
-    script: "export default { fetch() { return new Response('ok') } }",
-    d1Databases: { DB: "briar-project-channel-messages-test" },
-  });
+  let miniflare: Miniflare;
   const organizationId = "11000000-0000-4000-8000-000000000001";
   const projectId = "22000000-0000-4000-8000-000000000001";
   const otherProjectId = "22000000-0000-4000-8000-000000000002";
@@ -43,8 +39,11 @@ describe("Project Agent channel message history", () => {
     createHash("sha256").update(value).digest("hex");
 
   beforeAll(async () => {
-    db = (await miniflare.getD1Database("DB")) as unknown as D1Database;
-    await applyD1Migrations(db);
+    const database = await createIsolatedTestDatabase({
+      suite: "project-channel-messages",
+    });
+    miniflare = database.miniflare;
+    db = database.db;
     await db.batch([
       db.prepare(
         `insert into "user" (id, name, email, emailVerified, createdAt, updatedAt)
