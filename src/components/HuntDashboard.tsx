@@ -4882,7 +4882,9 @@ export function RunPage({
   useEffect(() => {
     const lastSaved = lastSavedInlineIssueRef.current;
     const currentTitle = inlineTitle.trim();
-    const currentDescription = inlineDescription.trim() || null;
+    // Keep whitespace-only edits distinct from server-normalized descriptions
+    // so typing a space or newline is not overwritten by the sync effect.
+    const currentDescription = inlineDescription || null;
     const currentKeptAttachmentIds = inlineKeptAttachmentIds;
     if (
       lastSaved.runId !== run.id ||
