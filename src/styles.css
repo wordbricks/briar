@@ -1587,7 +1587,7 @@ body { overflow: hidden; font-synthesis: none; }
 .issue-detail-tabs button[aria-selected="true"] { color:var(--accent-foreground); }
 .issue-detail-tabs button[aria-selected="true"]::after { background:var(--primary); }
 .issue-detail-tabs button:focus-visible { z-index:1; outline:2px solid #8b70dd; outline-offset:-2px; border-radius:7px; }
-.issue-description-scroll { width:100%; min-height:0; flex:1; padding:7px 6px 8px 0; overflow-y:auto; overscroll-behavior:contain; scrollbar-gutter:stable; scrollbar-width:thin; }
+.issue-description-scroll { width:100%; min-height:0; flex:1; padding:7px 6px 8px 0; overflow-y:auto; display:flex; flex-direction:column; overscroll-behavior:contain; scrollbar-gutter:stable; scrollbar-width:thin; }
 .issue-dependencies { margin:0 0 16px; padding:14px; display:grid; gap:13px; border:1px solid var(--border); border-radius:12px; background:color-mix(in srgb,var(--card) 94%,var(--accent)); }
 .issue-dependencies > header { display:flex; align-items:flex-start; gap:9px; }
 .issue-dependencies > header > span { width:28px; height:28px; display:grid; place-items:center; flex:0 0 auto; border-radius:8px; color:var(--primary); background:color-mix(in srgb,var(--primary) 12%,transparent); }
