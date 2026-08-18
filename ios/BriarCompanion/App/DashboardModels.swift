@@ -444,6 +444,7 @@ struct RunEvent: Codable, Equatable, Identifiable, Sendable {
     let workflowStage: String?
     let detail: String?
     let actor: String
+    let actorName: String?
     let occurredAt: Date
 }
 

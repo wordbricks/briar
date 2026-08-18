@@ -114,6 +114,7 @@ export type HuntEvent = {
   workflowStage: AutoHuntWorkflowStageId | null;
   detail: string | null;
   actor: string;
+  actorName?: string | null;
   qaStatus: AutoHuntQaStatus | null;
   trackerState: string | null;
   pullRequestUrls: string[];
