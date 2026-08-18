@@ -10,7 +10,7 @@ import type {
   ChannelSummary,
 } from "../lib/channels-contract";
 import { channelReplyNoAvailableWorkerError } from "../lib/channels-contract";
-import type { OrganizationMember } from "../types";
+import type { OrganizationMember, Project } from "../types";
 
 const listChannels = vi.fn();
 const loadChannel = vi.fn();
@@ -35,6 +35,7 @@ const createChannelWebhook = vi.fn();
 const updateChannelWebhook = vi.fn();
 const rotateChannelWebhook = vi.fn();
 const revokeChannelWebhook = vi.fn();
+const updateChannel = vi.fn();
 const currentExecutionWorkerDeviceId = vi.fn();
 const channelRealtime = vi.hoisted(() => ({
   listeners: new Set<(notification: { topic: "channels"; cursor: number }) => void>(),
@@ -70,6 +71,7 @@ vi.mock("../lib/api", () => ({
   updateChannelWebhook: (...args: unknown[]) => updateChannelWebhook(...args),
   rotateChannelWebhook: (...args: unknown[]) => rotateChannelWebhook(...args),
   revokeChannelWebhook: (...args: unknown[]) => revokeChannelWebhook(...args),
+  updateChannel: (...args: unknown[]) => updateChannel(...args),
 }));
 
 vi.mock("../lib/channel-realtime", () => ({
@@ -222,6 +224,25 @@ const deferred = <T,>() => {
   return { promise, reject, resolve };
 };
 
+/** Same native-setter trick as typeInto, but for text inputs and selects. */
+const changeInputValue = async (
+  field: HTMLInputElement | HTMLSelectElement,
+  value: string,
+) => {
+  const prototype = field instanceof HTMLSelectElement
+    ? HTMLSelectElement.prototype
+    : HTMLInputElement.prototype;
+  const setter = Object.getOwnPropertyDescriptor(prototype, "value")!.set!;
+  setter.call(field, value);
+  await act(async () => {
+    field.dispatchEvent(
+      new Event(field instanceof HTMLSelectElement ? "change" : "input", {
+        bubbles: true,
+      }),
+    );
+  });
+};
+
 describe("Channels", () => {
   let container: HTMLDivElement;
   let root: ReturnType<typeof createRoot>;
@@ -234,6 +255,7 @@ describe("Channels", () => {
     inboxDetail = false,
     onInboxDetailClose?: () => void,
     consumeRequestedMessage = false,
+    projects: Pick<Project, "id" | "name" | "organizationId">[] = [],
   ) => {
     listChannels.mockResolvedValue({ channels: [channel], cursor: 7 });
     loadChannel.mockResolvedValue({
@@ -277,6 +299,7 @@ describe("Channels", () => {
             onRequestedMessageOpen?.();
             if (consumeRequestedMessage) setPendingRequest(undefined);
           }}
+          projects={projects}
         />
       );
     };
@@ -548,6 +571,173 @@ describe("Channels", () => {
     expect(container.querySelector<HTMLInputElement>(
       ".channel-webhook-row input",
     )?.value).toBe("Deploy notifier");
+  });
+
+  it("opens channel settings from the more button and copies the channel id", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    const previousClipboard = navigator.clipboard;
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+    try {
+      await render([message()]);
+
+      const moreButton = container.querySelector<HTMLButtonElement>(
+        '.channel-header-icon[aria-label="더 보기"]',
+      );
+      expect(moreButton).not.toBeNull();
+      await act(async () => {
+        moreButton!.click();
+        await Promise.resolve();
+      });
+
+      const dialog = container.querySelector<HTMLElement>(
+        ".channel-settings-dialog",
+      );
+      expect(dialog).not.toBeNull();
+      expect(dialog?.querySelector("h2")?.textContent).toContain("Welcome");
+      expect(dialog?.textContent).toContain("채널 ID");
+      expect(dialog?.querySelector(".channel-settings-id")?.textContent).toBe(
+        channel.id,
+      );
+      expect(dialog?.textContent).toContain("만든 날짜");
+
+      const tabs = [
+        ...dialog!.querySelectorAll<HTMLButtonElement>(
+          ".channel-settings-tabs button",
+        ),
+      ];
+      expect(tabs.map((tab) => tab.textContent)).toEqual(["설정", "멤버 2"]);
+      expect(tabs.every((tab) => tab.tabIndex >= 0)).toBe(true);
+
+      const copyButton = [...dialog!.querySelectorAll("button")].find((button) =>
+        button.textContent?.includes("ID 복사")
+      );
+      expect(copyButton).not.toBeNull();
+      await act(async () => {
+        copyButton!.click();
+        await Promise.resolve();
+      });
+      expect(writeText).toHaveBeenCalledWith(channel.id);
+      expect(dialog?.textContent).toContain("복사됨");
+    } finally {
+      Object.defineProperty(navigator, "clipboard", {
+        configurable: true,
+        value: previousClipboard,
+      });
+    }
+  });
+
+  it("renames the channel and changes the linked project from settings", async () => {
+    updateChannel.mockResolvedValue({ channel: { ...channel, name: "Design" } });
+    await render(
+      [message()],
+      undefined,
+      undefined,
+      undefined,
+      false,
+      undefined,
+      false,
+      [
+        { id: "project-1", name: "Briar", organizationId: "org-1" },
+        { id: "project-2", name: "Console", organizationId: "org-1" },
+        { id: "project-other", name: "Other org", organizationId: "org-2" },
+      ],
+    );
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(
+        '.channel-header-icon[aria-label="더 보기"]',
+      )!.click();
+      await Promise.resolve();
+    });
+    const dialog = container.querySelector<HTMLElement>(
+      ".channel-settings-dialog",
+    );
+    expect(dialog).not.toBeNull();
+
+    const nameInput = dialog!.querySelector<HTMLInputElement>(
+      "#channel-settings-name",
+    );
+    expect(nameInput?.value).toBe("Welcome");
+    await changeInputValue(nameInput!, "Design");
+    const saveButton = [...dialog!.querySelectorAll("button")].find((button) =>
+      button.textContent === "저장"
+    );
+    expect(saveButton?.disabled).toBe(false);
+    await act(async () => {
+      saveButton!.click();
+      await Promise.resolve();
+    });
+    expect(updateChannel).toHaveBeenCalledWith("token", "org-1", "channel-1", {
+      name: "Design",
+    });
+
+    updateChannel.mockResolvedValue({
+      channel: { ...channel, defaultProjectId: null },
+    });
+    const projectSelect = dialog!.querySelector<HTMLSelectElement>(
+      "#channel-settings-project",
+    );
+    expect(projectSelect?.value).toBe("project-1");
+    expect(
+      [...projectSelect!.querySelectorAll("option")].map((option) => option.value),
+    ).toEqual(["", "project-1", "project-2"]);
+    await changeInputValue(projectSelect!, "");
+    expect(updateChannel).toHaveBeenCalledWith("token", "org-1", "channel-1", {
+      defaultProjectId: null,
+    });
+  });
+
+  it("lists channel members in the members tab and opens the invite dialog", async () => {
+    await render([message()]);
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(
+        '.channel-header-icon[aria-label="더 보기"]',
+      )!.click();
+      await Promise.resolve();
+    });
+    const dialog = container.querySelector<HTMLElement>(
+      ".channel-settings-dialog",
+    );
+    expect(dialog).not.toBeNull();
+
+    const membersTab = [...dialog!.querySelectorAll<HTMLButtonElement>(
+      ".channel-settings-tabs button",
+    )].find((button) => button.textContent === "멤버 2");
+    expect(membersTab).not.toBeNull();
+    await act(async () => {
+      membersTab!.click();
+      await Promise.resolve();
+    });
+
+    expect(dialog?.textContent).toContain("Sam");
+    expect(dialog?.textContent).toContain("sam@example.com");
+    expect(dialog?.textContent).toContain("채널 멤버");
+    expect(dialog?.textContent).toContain("Honey");
+    expect(dialog?.textContent).toContain("조직 에이전트");
+
+    const search = dialog!.querySelector<HTMLInputElement>(
+      '.channel-settings-search input',
+    );
+    await changeInputValue(search!, "sam");
+    expect(dialog?.textContent).toContain("Sam");
+    expect(dialog?.textContent).not.toContain("Honey");
+    await changeInputValue(search!, "");
+
+    const addButton = [...dialog!.querySelectorAll("button")].find((button) =>
+      button.textContent?.includes("사람 또는 에이전트 추가")
+    );
+    expect(addButton).not.toBeNull();
+    await act(async () => {
+      addButton!.click();
+      await Promise.resolve();
+    });
+    // The invite dialog stacks on top while settings stays open underneath.
+    expect(container.querySelector(".channel-invite-results")).not.toBeNull();
+    expect(container.querySelector(".channel-settings-dialog")).not.toBeNull();
   });
 
   it("hides the persistent reply link when a message has no thread", async () => {
