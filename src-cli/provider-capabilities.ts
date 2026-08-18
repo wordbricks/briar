@@ -22,10 +22,14 @@ const effort = (
   input: Partial<AgentEffortCapability> = {},
 ): AgentEffortCapability => ({ id, label: input.label ?? id, ...input });
 
-const command = (binary: string, args: string[]) => {
+const commandWithEnv = (
+  binary: string,
+  args: string[],
+  env: NodeJS.ProcessEnv,
+) => {
   const result = spawnSync(binary, args, {
     encoding: "utf8",
-    env: process.env,
+    env,
     timeout: 15_000,
     maxBuffer: 10 * 1024 * 1024,
   });
@@ -33,6 +37,22 @@ const command = (binary: string, args: string[]) => {
     throw result.error ?? new Error(result.stderr.trim() || `${binary} ${args.join(" ")} failed`);
   }
   return result.stdout;
+};
+
+const command = (binary: string, args: string[]) =>
+  commandWithEnv(binary, args, process.env);
+
+const agyCommand = (binary: string, args: string[]) => {
+  const env = { ...process.env };
+  for (const key of [
+    "AGY_ADC_AUTH",
+    "GEMINI_API_KEY",
+    "GOOGLE_API_KEY",
+    "GOOGLE_APPLICATION_CREDENTIALS",
+  ]) {
+    delete env[key];
+  }
+  return commandWithEnv(binary, args, env);
 };
 
 export function parseGrokModelList(output: string) {
@@ -111,8 +131,72 @@ export function parseClaudeEfforts(output: string) {
   const line = output.split(/\r?\n/u).find((candidate) => candidate.includes("--effort"));
   const values = line?.match(/\(([^)]+)\)/u)?.[1];
   return values
-    ? values.split(",").map((value) => value.trim()).filter(Boolean).slice(0, MAX_EFFORTS).map((id) => effort(id))
+    ? values.split(/[|,]/u).map((value) => value.trim()).filter(Boolean).slice(0, MAX_EFFORTS).map((id) => effort(id))
     : [];
+}
+
+export const parseAgyEfforts = parseClaudeEfforts;
+
+export function parseAgyModels(output: string): AgentModelCapability[] {
+  let root: unknown;
+  try {
+    root = JSON.parse(output);
+  } catch {
+    return [];
+  }
+
+  const models = new Map<string, AgentModelCapability>();
+  const collect = (value: unknown) => {
+    if (Array.isArray(value)) {
+      for (const candidate of value) {
+        if (typeof candidate === "string") {
+          const id = candidate.trim();
+          if (id && id.length <= 100 && !models.has(id)) {
+            models.set(id, {
+              id,
+              label: id,
+              isDefault: false,
+              defaultEffortId: null,
+              efforts: [],
+            });
+          }
+        } else {
+          collect(candidate);
+        }
+      }
+      return;
+    }
+    if (!value || typeof value !== "object") return;
+
+    const record = value as Record<string, unknown>;
+    const rawId = record.id ?? record.model_id ?? record.modelId;
+    const id = typeof rawId === "string" ? rawId.trim() : "";
+    if (id && id.length <= 100) {
+      const rawLabel =
+        record.display_name ?? record.displayName ?? record.label ?? record.name;
+      const label = typeof rawLabel === "string" && rawLabel.trim()
+        ? rawLabel.trim()
+        : id;
+      const existing = models.get(id);
+      models.set(id, {
+        id,
+        label: existing?.label === id ? label : (existing?.label ?? label),
+        isDefault:
+          existing?.isDefault === true ||
+          record.is_default === true ||
+          record.isDefault === true,
+        defaultEffortId: null,
+        efforts: [],
+      });
+      return;
+    }
+    for (const candidate of Object.values(record)) collect(candidate);
+  };
+
+  collect(root);
+  return [...models.values()]
+    .sort((left, right) => left.id.localeCompare(right.id))
+    .slice(0, MAX_MODELS);
 }
 
 export function parseClaudeModels(output: string): AgentModelCapability[] {
@@ -408,7 +492,15 @@ let cached: {
 
 export async function discoverWorkerProviderCapabilities(
   enabled: Record<AgentProvider, boolean>,
-  { refresh = false, home = homedir() }: { refresh?: boolean; home?: string } = {},
+  {
+    refresh = false,
+    home = homedir(),
+    which = (provider) => Bun.which(agentProviderBinaryName(provider)),
+  }: {
+    refresh?: boolean;
+    home?: string;
+    which?: (provider: AgentProvider) => string | null;
+  } = {},
 ): Promise<AgentProviderCapabilityCatalog> {
   const cacheKey = JSON.stringify({ enabled, home });
   if (
@@ -418,7 +510,7 @@ export async function discoverWorkerProviderCapabilities(
   ) return cached.value;
   const catalog = emptyAgentProviderCapabilityCatalog();
   await Promise.all(agentProviders.map(async (provider) => {
-    const binary = Bun.which(agentProviderBinaryName(provider));
+    const binary = which(provider);
     if (!enabled[provider] || !binary) {
       catalog[provider].error = enabled[provider] ? `${provider} is not installed` : `${provider} is disabled`;
       return;
@@ -427,6 +519,12 @@ export async function discoverWorkerProviderCapabilities(
       if (provider === "codex") catalog.codex.models = await codexModels(binary);
       if (provider === "cursor") catalog.cursor.models = await cursorModels(binary);
       if (provider === "grok") catalog.grok.models = await grokModels(binary, home);
+      if (provider === "agy") {
+        catalog.agy.models = parseAgyModels(
+          agyCommand(binary, ["--output-format", "json", "models"]),
+        );
+        catalog.agy.defaultEfforts = parseAgyEfforts(command(binary, ["--help"]));
+      }
       if (provider === "opencode") catalog.opencode.models = parseOpenCodeVerbose(command(binary, ["models", "--verbose"]));
       if (provider === "claude") {
         const help = command(binary, ["--help"]);
