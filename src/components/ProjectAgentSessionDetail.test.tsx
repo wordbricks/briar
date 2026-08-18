@@ -6,6 +6,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
 import { useAutoHuntAppServerEvents } from "../hooks/useAutoHuntAppServerEvents";
 import { useProjectAgentWorkerEvents } from "../hooks/useProjectAgentWorkerEvents";
+import { loadProjectAgentSession } from "../lib/api";
 import {
   ProjectAgentSessionDetail,
   sessionWorkerLabel,
@@ -26,9 +27,13 @@ vi.mock("../hooks/useProjectAgentWorkerEvents", () => ({
     error: null,
   })),
 }));
+vi.mock("../lib/api", () => ({
+  loadProjectAgentSession: vi.fn(),
+}));
 
 const mockedAppServerEvents = vi.mocked(useAutoHuntAppServerEvents);
 const mockedWorkerEvents = vi.mocked(useProjectAgentWorkerEvents);
+const mockedLoadProjectAgentSession = vi.mocked(loadProjectAgentSession);
 
 const mounted: Array<{
   container: HTMLDivElement;
@@ -59,6 +64,7 @@ afterEach(async () => {
     isLoading: false,
     error: null,
   });
+  mockedLoadProjectAgentSession.mockReset();
 });
 
 async function mount(
@@ -67,6 +73,7 @@ async function mount(
   issueKeyPrefix?: string,
   onFollowUp?: (message: string) => Promise<void>,
   workers: Array<{ id: string; label: string }> = [],
+  token: string | null = null,
 ) {
   const container = document.createElement("div");
   document.body.append(container);
@@ -83,6 +90,7 @@ async function mount(
           onFollowUp={onFollowUp}
           onStop={vi.fn().mockResolvedValue(true)}
           session={session}
+          token={token}
           workers={workers}
         />
       </ToastProvider>,
@@ -371,11 +379,136 @@ describe("ProjectAgentSessionDetail", () => {
       "project-1",
       ["run-42"],
       false,
+      [],
     );
     expect(container.textContent).toContain("수행 로그");
     expect(container.textContent).toContain("워커가 수정과 검증을 완료했습니다.");
     expect(container.textContent).toContain("Codex");
     expect(container.textContent).not.toContain("최종 메시지");
+  });
+
+  it("shows a remote task transcript instead of suppressing its log", async () => {
+    mockedWorkerEvents.mockReturnValue({
+      events: [{
+        sessionId: "remote-task-1",
+        sequence: 1,
+        occurredAtMs: Date.parse("2026-08-18T00:01:00.000Z"),
+        direction: "server",
+        provider: "codex",
+        message: {
+          type: "event",
+          event: {
+            type: "messageCompleted",
+            id: "message-1",
+            phase: "final_answer",
+            text: "원격 Agent 결과가 저장되었습니다.",
+          },
+        },
+        event: {
+          type: "messageCompleted",
+          id: "remote-task-1:message-1",
+          phase: "final_answer",
+          text: "원격 Agent 결과가 저장되었습니다.",
+        },
+      }],
+      isLoading: false,
+      error: null,
+    });
+
+    const container = await mount({
+      ...session,
+      id: "remote-task-1",
+      dispatchGroupId: "remote-task-1",
+      sessionType: "task",
+      status: "completed",
+      completedAt: "2026-08-18T00:01:00.000Z",
+      localOwner: false,
+      dispatchEvents: [],
+      summary: "원격 Agent 결과가 저장되었습니다.",
+    });
+
+    expect(mockedAppServerEvents).toHaveBeenCalledWith(null);
+    expect(mockedWorkerEvents).toHaveBeenCalledWith(
+      null,
+      "project-1",
+      [],
+      false,
+      ["remote-task-1"],
+    );
+    expect(container.textContent).toContain("원격 Agent 결과가 저장되었습니다.");
+    expect(container.textContent).not.toContain("아직 Agent 메시지가 없습니다.");
+  });
+
+  it("uses a completed remote task summary when no historical transcript exists", async () => {
+    mockedWorkerEvents.mockReturnValue({
+      events: [],
+      isLoading: false,
+      error: "Transcript not found",
+    });
+
+    const container = await mount({
+      ...session,
+      id: "historical-remote-task",
+      dispatchGroupId: "historical-remote-task",
+      sessionType: "task",
+      status: "completed",
+      completedAt: "2026-08-17T00:01:00.000Z",
+      localOwner: false,
+      dispatchEvents: [],
+      summary: "기존 원격 Agent 작업 결과입니다.",
+    });
+
+    const workLog = container.querySelector(".auto-hunt-agent-messages");
+    expect(workLog?.textContent).toContain("기존 원격 Agent 작업 결과입니다.");
+    expect(workLog?.textContent).not.toContain("Transcript not found");
+  });
+
+  it("loads authoritative completed detail after a lightweight remote update", async () => {
+    const synchronizedSummary = {
+      ...session,
+      id: "completed-remote-task",
+      dispatchGroupId: "completed-remote-task",
+      sessionType: "task" as const,
+      status: "completed" as const,
+      completedAt: "2026-08-18T00:05:00.000Z",
+      localOwner: false,
+      dispatchEvents: [],
+      summary: null,
+      events: [],
+      updatedAt: "2026-08-18T00:05:00.000Z",
+      detailLoaded: false,
+    };
+    mockedLoadProjectAgentSession.mockResolvedValue({
+      ...synchronizedSummary,
+      summary: "완료된 원격 Agent 산출물입니다.",
+      events: [{
+        id: "completed-event",
+        type: "completed",
+        occurredAt: "2026-08-18T00:05:00.000Z",
+      }],
+      detailLoaded: true,
+    });
+
+    const container = await mount(
+      synchronizedSummary,
+      vi.fn(),
+      undefined,
+      undefined,
+      [],
+      "token",
+    );
+    await act(async () => {
+      await new Promise((resolve) => window.setTimeout(resolve, 0));
+    });
+
+    expect(mockedLoadProjectAgentSession).toHaveBeenCalledWith(
+      "token",
+      "project-1",
+      "completed-remote-task",
+    );
+    expect(
+      container.querySelector(".auto-hunt-session-output-card")?.textContent,
+    ).toContain("완료된 원격 Agent 산출물입니다.");
   });
 
   it("shows the assigned worker name instead of the worker id", async () => {

@@ -2142,6 +2142,7 @@ const claimedProjectAgentTaskSchema = z.object({
   sourceKey: z.string().min(1),
   title: z.string().min(1),
   claimToken: z.string().startsWith("briar_agent_task_claim_"),
+  claimAttempts: z.number().int().positive(),
   claimedAt: z.string().datetime({ offset: true }),
   leaseExpiresAt: z.string().datetime({ offset: true }),
   request: z.string().min(1),
@@ -2854,20 +2855,71 @@ async function runClaimedProjectAgentTask(
     request: task.request,
     workspacePath,
   });
-  const turn = await runDetachedProviderTurn({
-    agent,
-    prompt,
-    workspacePath,
-    fullAccess: project.autoHunt?.sandbox?.fullAccess ?? true,
-    environment: providerExecutionEnvironment(config, agent.provider, {
-      ...process.env,
-      PATH: workerExecutionPath(),
-      BRIAR_CLI: workerCliPath(),
-      BRIAR_WORKER_TOKEN: workerToken,
-      BRIAR_PROJECT_ID: project.id,
-    }),
-    signal,
+  const transcriptSequencer = createDetachedTranscriptSequencer(
+    task.claimAttempts,
+  );
+  // Direct Agent tasks are not Hunt runs. Their task/session UUID is the
+  // durable transcript key, while attempt-scoped sequence ranges make Worker
+  // retries append safely without requiring a Hunt-run binding.
+  const transcriptEnvelope = {
+    projectId: project.id,
+    sessionId: task.workId,
+    workerId,
+    agentProvider: agent.provider,
+  };
+  const transcriptBatcher = new TranscriptBatcher({
+    send: async (events) => {
+      await request(config.apiUrl, "/transcripts", workerToken, {
+        method: "POST",
+        body: serializeTranscriptRequest(transcriptEnvelope, events),
+      });
+    },
+    measureBytes: (events) =>
+      Buffer.byteLength(
+        serializeTranscriptRequest(transcriptEnvelope, events),
+        "utf8",
+      ),
+    isPayloadTooLarge: isTranscriptPayloadTooLarge,
+    onError: (error) => {
+      console.error(
+        `transcript upload failed for ${task.sourceKey}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    },
   });
+  const turn = await (async () => {
+    try {
+      return await runDetachedProviderTurn({
+        agent,
+        prompt,
+        workspacePath,
+        fullAccess: project.autoHunt?.sandbox?.fullAccess ?? true,
+        environment: providerExecutionEnvironment(config, agent.provider, {
+          ...process.env,
+          PATH: workerExecutionPath(),
+          BRIAR_CLI: workerCliPath(),
+          BRIAR_WORKER_TOKEN: workerToken,
+          BRIAR_PROJECT_ID: project.id,
+        }),
+        signal,
+        onPayload: async (rawPayload, line) => {
+          const payload = detachedTranscriptPayload(rawPayload, line);
+          const sequence = transcriptSequencer.nextForPayload(payload);
+          if (sequence === null) return;
+          await transcriptBatcher.enqueue({
+            sequence,
+            direction: detachedPayloadDirection(rawPayload),
+            payload,
+          });
+        },
+      });
+    } finally {
+      // Transcript telemetry remains optional, but buffered progress deserves
+      // one final upload attempt before the durable task result is settled.
+      await transcriptBatcher.flush();
+    }
+  })();
   assertDetachedProviderTurnSucceeded(turn);
   if (!turn.resultText) throw new Error("Agent returned an empty direct-run summary");
   return {

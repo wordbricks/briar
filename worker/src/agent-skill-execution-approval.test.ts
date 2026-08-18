@@ -922,9 +922,60 @@ describe("conversational Agent Skill execution approval", () => {
     const claim = await claimTask();
     expect(claim.status).toBe(200);
     const work = ((await claim.json()) as {
-      work: { workId: string; claimToken: string } | null;
+      work: {
+        workId: string;
+        claimToken: string;
+        claimAttempts: number;
+      } | null;
     }).work!;
     expect(work.workId).toBe(taskId);
+    expect(work.claimAttempts).toBe(1);
+    const transcript = await apiWorker.fetch(new Request(
+      "https://briar.example/transcripts",
+      {
+        method: "POST",
+        headers: {
+          authorization: "Bearer briar_worker_skill_credential_one",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          projectId,
+          sessionId: taskId,
+          workerId,
+          agentProvider: "codex",
+          events: [{
+            sequence: 1,
+            direction: "server",
+            payload: {
+              type: "event",
+              event: {
+                type: "messageCompleted",
+                id: "task-progress-1",
+                phase: "commentary",
+                text: "Direct task progress was persisted.",
+              },
+            },
+          }],
+        }),
+      },
+    ), env());
+    expect(transcript.status).toBe(202);
+    const storedTranscript = await apiWorker.fetch(new Request(
+      `https://briar.example/projects/${projectId}/sessions/${taskId}/transcript`,
+      { headers: { authorization: `Bearer ${ownerToken}` } },
+    ), env());
+    expect(storedTranscript.status).toBe(200);
+    await expect(storedTranscript.json()).resolves.toMatchObject({
+      session: { sessionId: taskId, runId: null },
+      events: [{
+        message: {
+          event: {
+            type: "messageCompleted",
+            text: "Direct task progress was persisted.",
+          },
+        },
+      }],
+    });
     const payload = {
       summary: "Direct task provider turn completed.",
       conversationId: "direct-conversation",
