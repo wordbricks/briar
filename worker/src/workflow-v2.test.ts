@@ -172,6 +172,9 @@ describe("workflow v2 D1 persistence and transitions", () => {
         // 0112 rebuilds the Agent approval tables whose migrations are
         // deliberately excluded by this historical workflow fixture.
         "0112_expand_agent_text_limits.sql",
+        // 0116 is another full-schema provider rebuild and therefore has the
+        // same dependency on the deliberately excluded approval tables.
+        "0116_agent_provider_openrouter.sql",
         // 0115 backfills approval events from the progress table introduced by 0059.
         "0115_issue_status_actor_tracking.sql",
       ],

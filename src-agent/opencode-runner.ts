@@ -81,6 +81,15 @@ export function openCodeServerArgs(port: number, pure: boolean) {
   ];
 }
 
+export function openCodeServerEnvironment(
+  environment: NodeJS.ProcessEnv,
+): NodeJS.ProcessEnv {
+  return {
+    ...environment,
+    OPENCODE_CONFIG_CONTENT: environment.OPENCODE_CONFIG_CONTENT || "{}",
+  };
+}
+
 export function openCodeReadOnlySeatbeltProfile(input: {
   workspaceRoot: string;
   stateRoot: string;
@@ -151,7 +160,7 @@ class OpenCodeServer {
       spawnSpec.arguments,
       {
         cwd: workspaceRoot,
-        env: { ...environment, OPENCODE_CONFIG_CONTENT: "{}" },
+        env: openCodeServerEnvironment(environment),
         detached: process.platform !== "win32",
         stdio: ["pipe", "pipe", "pipe"],
       },

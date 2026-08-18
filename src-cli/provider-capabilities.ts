@@ -526,6 +526,11 @@ export async function discoverWorkerProviderCapabilities(
         catalog.agy.defaultEfforts = parseAgyEfforts(command(binary, ["--help"]));
       }
       if (provider === "opencode") catalog.opencode.models = parseOpenCodeVerbose(command(binary, ["models", "--verbose"]));
+      if (provider === "openrouter") {
+        catalog.openrouter.models = parseOpenCodeVerbose(
+          command(binary, ["models", "--verbose"]),
+        ).filter((model) => model.id.startsWith("openrouter/"));
+      }
       if (provider === "claude") {
         const help = command(binary, ["--help"]);
         catalog.claude.models = parseClaudeModels(help);

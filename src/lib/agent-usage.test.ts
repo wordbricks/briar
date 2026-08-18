@@ -94,6 +94,7 @@ describe("agent usage presentation", () => {
       grok: { ...provider, provider: "grok" as const },
       agy: { ...provider, provider: "agy" as const },
       opencode: { ...provider, provider: "opencode" as const },
+      openrouter: { ...provider, provider: "openrouter" as const },
       cursor: { ...provider, provider: "cursor" as const },
     };
     recordAgentUsageSnapshot(snapshot);
@@ -121,6 +122,7 @@ describe("agent usage presentation", () => {
     const [restored] = readAgentUsageHistory();
     expect(restored?.agy.provider).toBe("agy");
     expect(restored?.opencode.provider).toBe("opencode");
+    expect(restored?.openrouter.provider).toBe("openrouter");
     expect(restored?.cursor.provider).toBe("cursor");
     expect(restored?.agy.status).toBe("unavailable");
     clearAgentUsageHistory();

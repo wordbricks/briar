@@ -42,6 +42,7 @@ export async function runDetachedProviderTurn(input: {
       : new Error("Worker execution was cancelled");
   }
   const provider = input.agent.provider;
+  const runnerProvider = provider === "openrouter" ? "opencode" : provider;
   const binaryName = agentProviderBinaryName(provider);
   const agentBinary = Bun.which(binaryName);
   if (!agentBinary) {
@@ -50,8 +51,8 @@ export async function runDetachedProviderTurn(input: {
   const runnerPath = (
     await Promise.all(
       [
-        resolve(import.meta.dir, `agent/${provider}-runner.js`),
-        resolve(import.meta.dir, `../dist-agent/${provider}-runner.js`),
+        resolve(import.meta.dir, `agent/${runnerProvider}-runner.js`),
+        resolve(import.meta.dir, `../dist-agent/${runnerProvider}-runner.js`),
       ].map(async (path) => ((await Bun.file(path).exists()) ? path : null)),
     )
   ).find((path): path is string => Boolean(path));
