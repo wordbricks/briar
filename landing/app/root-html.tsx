@@ -3,23 +3,13 @@ import "./globals.css";
 import { GoogleAnalytics } from "./google-analytics";
 import { copy, supportedLocales, type Locale } from "./i18n";
 
-// Self-hosted latin-only slices of the Geist variable fonts, extracted
-// from the woff2 files Google's own API serves for Geist/Geist Mono at
-// wght 100-900. `next/font/google` with `subsets: ["latin"]` still ships
-// every script Geist supports
-// (latin, latin-ext, cyrillic, cyrillic-ext, vietnamese, +symbols2 for
-// Mono) as 5-6 separate woff2 files each, and preloads all of them - 11
-// files total - because there's no per-subset filtering. This page only
-// renders latin text plus Korean and Chinese copy. Both CJK scripts fall
-// back to the platform's system font because Geist has no Hangul or Han
-// glyphs, while decorative symbols (↗ ⌁ ▦ ⌕ ◆ ◇ ＋) also use system fallback.
-// Loading just the latin file per family (still the full variable 100-900
-// weight range, so every fractional font-weight in globals.css still
-// interpolates exactly as before) cuts 11 preloaded fonts down to 2 with no
-// visual change.
-const geistSans = localFont({
-  src: "./fonts/geist-sans-latin.woff2",
-  variable: "--font-geist-sans",
+// Pretendard is self-hosted so the Latin and Hangul portions of the landing
+// site use the same metrics at every locale and do not depend on a third-party
+// font request. The variable font keeps the existing fractional weights while
+// Han glyphs continue to fall back to the platform's Chinese font.
+const pretendard = localFont({
+  src: "./fonts/PretendardVariable.woff2",
+  variable: "--font-pretendard",
   weight: "100 900",
   display: "swap",
 });
@@ -60,7 +50,7 @@ export function RootHtml({
       <head>
         <GoogleAnalytics />
       </head>
-      <body className={`${geistSans.variable} ${geistMono.variable}`}>
+      <body className={`${pretendard.variable} ${geistMono.variable}`}>
         {otherLocales.map((otherLocale) => (
           <meta
             key={otherLocale}

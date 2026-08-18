@@ -15,6 +15,17 @@ import {
   WEB_APP_URL,
 } from "../site-links";
 
+function DisplayLineBreak() {
+  return (
+    <>
+      <br className="display-line-break" />
+      <span aria-hidden="true" className="display-line-break-space">
+        {" "}
+      </span>
+    </>
+  );
+}
+
 function ProductStage({ c }: { c: LandingCopy }) {
   return (
     <div
@@ -220,7 +231,7 @@ export default async function HomeView({ locale }: { locale: Locale }) {
           </div>
           <h1>
             {c.hero.line1}
-            <br />
+            <DisplayLineBreak />
             {c.hero.line2}
           </h1>
           <p>{c.hero.description}</p>
@@ -303,7 +314,7 @@ export default async function HomeView({ locale }: { locale: Locale }) {
           <span className="section-index">01 / {c.nav.product.toUpperCase()}</span>
           <h2>
             {c.principles.line1}
-            <br />
+            <DisplayLineBreak />
             {c.principles.line2}
           </h2>
           <p>{c.principles.description}</p>
@@ -410,7 +421,7 @@ export default async function HomeView({ locale }: { locale: Locale }) {
             <span className="section-index">04 / {c.nav.security.toUpperCase()}</span>
             <h2>
               {c.security.line1}
-              <br />
+              <DisplayLineBreak />
               {c.security.line2}
             </h2>
             <p>{c.security.description}</p>
@@ -480,7 +491,7 @@ export default async function HomeView({ locale }: { locale: Locale }) {
         <span className="section-index">{c.final.eyebrow}</span>
         <h2>
           {c.final.line1}
-          <br />
+          <DisplayLineBreak />
           {c.final.line2}
         </h2>
         <p>{c.final.description}</p>
