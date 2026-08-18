@@ -177,13 +177,26 @@ export function assertDetachedProviderTurnSucceeded(
   result: DetachedProviderTurnResult,
   options: { requireResult?: boolean } = {},
 ) {
+  const failure = detachedProviderTurnFailure(result, options);
+  if (failure) throw new Error(failure);
+}
+
+/**
+ * Return a provider-turn diagnostic without deciding the claimed run's
+ * lifecycle. Issue workers use this to inspect the durable claim first: an
+ * agent CLI exiting after a failed tool or CI command is a recoverable turn
+ * while the run remains active, not permission to fail the whole run.
+ */
+export function detachedProviderTurnFailure(
+  result: DetachedProviderTurnResult,
+  options: { requireResult?: boolean } = {},
+): string | null {
   if (result.exitCode !== 0 || result.runnerError) {
-    throw new Error(
-      result.runnerError ??
-        (result.stderr.trim() || `Agent exited with ${result.exitCode}`),
-    );
+    return result.runnerError ??
+      (result.stderr.trim() || `Agent exited with ${result.exitCode}`);
   }
   if (options.requireResult !== false && !result.completed) {
-    throw new Error("Agent runner exited without a result");
+    return "Agent runner exited without a result";
   }
+  return null;
 }
