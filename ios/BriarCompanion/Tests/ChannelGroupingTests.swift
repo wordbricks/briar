@@ -298,6 +298,26 @@ final class ChannelGroupingTests: XCTestCase {
         )
     }
 
+    func testAcceptChannelProposalRequestEncodesLowercaseProjectId() throws {
+        let projectID = UUID(uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!
+        let object = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder.mobileContract.encode(
+                    AcceptChannelProposalRequest(projectId: projectID)
+                )
+            ) as? [String: Any]
+        )
+
+        XCTAssertEqual(
+            object["projectId"] as? String,
+            "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+        )
+        XCTAssertNotEqual(
+            object["projectId"] as? String,
+            projectID.uuidString
+        )
+    }
+
     func testChannelMessageDecodesStructuredMentionRecipients() throws {
         let json = """
         {
