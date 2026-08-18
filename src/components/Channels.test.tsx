@@ -256,6 +256,8 @@ describe("Channels", () => {
     onInboxDetailClose?: () => void,
     consumeRequestedMessage = false,
     projects: Pick<Project, "id" | "name" | "organizationId">[] = [],
+    initialInviteChannelId: string | null = null,
+    onInitialInviteHandled?: (channelId: string) => void,
   ) => {
     listChannels.mockResolvedValue({ channels: [channel], cursor: 7 });
     loadChannel.mockResolvedValue({
@@ -288,11 +290,14 @@ describe("Channels", () => {
           channels={[channel]}
           currentUserId="user-1"
           inboxDetail={inboxDetail}
+          initialInviteChannelId={initialInviteChannelId}
           onChannelSelect={() => undefined}
           onChannelsChange={() => undefined}
           onCreateAgent={onCreateAgent}
+          onInitialInviteHandled={onInitialInviteHandled}
           onInboxDetailClose={onInboxDetailClose}
           organizationId="org-1"
+          organizationName="wordbricks"
           requestedMessage={pendingRequest}
           token="token"
           onRequestedMessageOpen={() => {
@@ -2067,6 +2072,57 @@ describe("Channels", () => {
       "org-1",
       "channel-1",
       "agent-2",
+      true,
+    );
+    expect(container.querySelector(".channel-invite-dialog")).toBeNull();
+  });
+
+  it("opens the initial invite modal for a new channel and adds all members", async () => {
+    const initialInviteHandled = vi.fn();
+    await render(
+      [message()],
+      undefined,
+      undefined,
+      undefined,
+      false,
+      undefined,
+      false,
+      [],
+      "channel-1",
+      initialInviteHandled,
+    );
+
+    const dialog = container.querySelector<HTMLElement>(
+      ".channel-invite-dialog.initial",
+    );
+    expect(dialog?.textContent).toContain("Welcome에 사람 추가");
+    expect(dialog?.textContent).toContain("wordbricks의 멤버 2명 모두 추가");
+    expect(dialog?.textContent).toContain("특정 사람 추가");
+    expect(
+      dialog?.querySelector<HTMLInputElement>('input[value="all"]')?.checked,
+    ).toBe(true);
+    expect(initialInviteHandled).toHaveBeenCalledWith("channel-1");
+
+    const add = [...dialog!.querySelectorAll<HTMLButtonElement>("button")]
+      .find((button) => button.textContent === "추가");
+    await act(async () => {
+      add?.click();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(setChannelMember).toHaveBeenCalledWith(
+      "token",
+      "org-1",
+      "channel-1",
+      "user-2",
+      true,
+    );
+    expect(setChannelMember).toHaveBeenCalledWith(
+      "token",
+      "org-1",
+      "channel-1",
+      "user-3",
       true,
     );
     expect(container.querySelector(".channel-invite-dialog")).toBeNull();
