@@ -59,6 +59,44 @@ const snapshot: AgentUsageSnapshot = {
     updatedAt: 1,
     error: null,
   },
+  agy: {
+    provider: "agy",
+    status: "ok",
+    session: {
+      usedPercent: 22,
+      windowMinutes: 60,
+      resetsAt: Date.now() + 40 * 60_000,
+    },
+    weekly: null,
+    monthly: null,
+    planType: null,
+    updatedAt: 1,
+    error: null,
+  },
+  opencode: {
+    provider: "opencode",
+    status: "unavailable",
+    session: null,
+    weekly: null,
+    monthly: null,
+    planType: null,
+    updatedAt: 1,
+    error: null,
+  },
+  cursor: {
+    provider: "cursor",
+    status: "ok",
+    session: null,
+    weekly: null,
+    monthly: {
+      usedPercent: 41,
+      windowMinutes: 43_200,
+      resetsAt: Date.now() + 12 * 86_400_000,
+    },
+    planType: "Pro",
+    updatedAt: 1,
+    error: null,
+  },
 };
 
 describe("AgentUsageStatusBar", () => {
@@ -88,6 +126,8 @@ describe("AgentUsageStatusBar", () => {
     expect(container.textContent).toContain("48%");
     expect(container.textContent).toContain("93%");
     expect(container.textContent).toContain("5%");
+    expect(container.textContent).toContain("22%");
+    expect(container.textContent).toContain("41%");
     const trigger = container.querySelector<HTMLButtonElement>(
       ".agent-usage-status-trigger",
     );
@@ -98,6 +138,9 @@ describe("AgentUsageStatusBar", () => {
     );
     expect(container.textContent).toContain("Usage details & history");
     expect(container.textContent).toContain("Grok");
+    expect(container.textContent).toContain("Antigravity");
+    expect(container.textContent).toContain("OpenCode");
+    expect(container.textContent).toContain("Cursor");
 
     const details = Array.from(container.querySelectorAll("button")).find(
       (button) => button.textContent?.includes("Usage details & history"),
