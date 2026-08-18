@@ -21,6 +21,13 @@ export const changelogCopy = {
     releaseNotes: "GitHub 릴리즈 열기",
     home: "홈",
     backTop: "맨 위로 ↑",
+    categories: {
+      label: "변경 유형",
+      breaking: "Breaking",
+      added: "Added",
+      improved: "Improved",
+      fixed: "Fixed",
+    },
     entries: [
       {
         version: "1.2.131",
@@ -710,6 +717,13 @@ export const changelogCopy = {
     releaseNotes: "Open GitHub release",
     home: "Home",
     backTop: "Back to top ↑",
+    categories: {
+      label: "Change types",
+      breaking: "Breaking",
+      added: "Added",
+      improved: "Improved",
+      fixed: "Fixed",
+    },
     entries: [
       {
         version: "1.2.131",
@@ -1384,6 +1398,48 @@ export const changelogCopy = {
 } as const satisfies Record<Locale, unknown>;
 
 const PATH = "/changelog" as const;
+const CHANGE_CATEGORY_ORDER = [
+  "breaking",
+  "added",
+  "improved",
+  "fixed",
+] as const;
+
+type ChangeCategory = (typeof CHANGE_CATEGORY_ORDER)[number];
+
+const CANONICAL_ITEMS_BY_VERSION = new Map<string, readonly string[]>(
+  changelogCopy.en.entries.map((entry) => [entry.version, entry.items]),
+);
+
+function getChangeCategory(item: string): ChangeCategory {
+  const isBreaking = item.includes(
+    "resets pre-deployment work-log history",
+  );
+  if (isBreaking) return "breaking";
+
+  const isFixed =
+    /\b(fix(?:ed)?|restore(?:d)?|prevent(?:s|ed|ing)?|stop(?:ped|s|ping)?|stale|duplicate|incorrect|wrong|lost|race|leak|overlap|clip|fail(?:ed|ure|ing)?)\b|no longer|without opening/i.test(
+      item,
+    );
+  if (isFixed) return "fixed";
+
+  const isAdded =
+    /^(add|allow|enable|introduce|support|install|store|provide|expose|create|stream|automatically|render|record|list|copy|write|connect)\b/i.test(
+      item,
+    );
+  return isAdded ? "added" : "improved";
+}
+
+function groupChanges(version: string, items: readonly string[]) {
+  const canonicalItems = CANONICAL_ITEMS_BY_VERSION.get(version);
+  return items.reduce<Record<ChangeCategory, string[]>>(
+    (groups, item, index) => {
+      groups[getChangeCategory(canonicalItems?.[index] ?? item)].push(item);
+      return groups;
+    },
+    { breaking: [], added: [], improved: [], fixed: [] },
+  );
+}
 
 export default function ChangelogView({ locale }: { locale: Locale }) {
   const c = copy[locale];
@@ -1407,36 +1463,46 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
       />
 
       <section className="changelog-hero shell">
-        <div>
-          <span className="section-index">{changelog.eyebrow}</span>
-          <h1>{changelog.title}</h1>
-          <p>{changelog.description}</p>
-        </div>
-        <a href="#v1-2-131" className="changelog-current">
-          <span>{changelog.current}</span>
-          <strong>v1.2.131</strong>
-          <i aria-hidden="true">↓</i>
-        </a>
+        <span className="section-index">{changelog.eyebrow}</span>
+        <h1>{changelog.title}</h1>
+        <p>{changelog.description}</p>
+        <ul
+          aria-label={changelog.categories.label}
+          className="changelog-category-key"
+        >
+          {CHANGE_CATEGORY_ORDER.map((category) => (
+            <li className={`is-${category}`} key={category}>
+              {changelog.categories[category]}
+            </li>
+          ))}
+        </ul>
       </section>
 
       <section className="changelog-list shell" aria-label={changelog.title}>
+        <div className="changelog-product-heading">
+          <p>
+            <strong>Briar</strong> <span>1.2</span>
+          </p>
+          <a href="#v1-2-131">
+            {changelog.current} <span aria-hidden="true">↓</span>
+          </a>
+        </div>
         {changelog.entries.map((entry, index) => {
           const tagUrl = `${GITHUB_RELEASES_URL}/tag/v${entry.version}`;
           const entryId = `v${entry.version.replaceAll(".", "-")}`;
+          const changeGroups = groupChanges(entry.version, entry.items);
           return (
             <article
               className={`changelog-entry${index === 0 ? " is-latest" : ""}`}
               id={entryId}
               key={entry.version}
             >
-              <div className="changelog-entry-index" aria-hidden="true">
-                <span>{String(index + 1).padStart(2, "0")}</span>
-                <i />
-              </div>
               <div className="changelog-entry-body">
                 <div className="changelog-entry-meta">
-                  <strong>v{entry.version}</strong>
-                  {index === 0 ? <span>{changelog.latest}</span> : null}
+                  <div>
+                    <strong>v{entry.version}</strong>
+                    {index === 0 ? <span>{changelog.latest}</span> : null}
+                  </div>
                   <time
                     dateTime={
                       entry.version === "1.2.131" ||
@@ -1508,17 +1574,40 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                           : "2026-08-07"
                     }
                   >
-                    {changelog.released} · {entry.date}
+                    {entry.date}
                   </time>
                 </div>
                 <h2>{entry.title}</h2>
                 <p>{entry.summary}</p>
-                <ul>
-                  {entry.items.map((item) => (
-                    <li key={item}>{item}</li>
-                  ))}
-                </ul>
-                <a href={tagUrl} target="_blank" rel="noreferrer">
+                <div className="changelog-entry-categories">
+                  {CHANGE_CATEGORY_ORDER.map((category) => {
+                    const items = changeGroups[category];
+                    if (items.length === 0) return null;
+                    const categoryId = `${entryId}-${category}`;
+                    return (
+                      <section
+                        aria-labelledby={categoryId}
+                        className={`changelog-change-category is-${category}`}
+                        key={category}
+                      >
+                        <h3 id={categoryId}>
+                          {changelog.categories[category]}
+                        </h3>
+                        <ul>
+                          {items.map((item) => (
+                            <li key={item}>{item}</li>
+                          ))}
+                        </ul>
+                      </section>
+                    );
+                  })}
+                </div>
+                <a
+                  className="changelog-release-link"
+                  href={tagUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                >
                   {changelog.releaseNotes} <Arrow />
                 </a>
               </div>
