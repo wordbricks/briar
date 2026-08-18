@@ -1386,6 +1386,21 @@ export function detachedRunContinuationPrompt(input: {
   ].join("\n\n");
 }
 
+export function detachedRunRecoveryPrompt(input: {
+  runId: string;
+  sourceKey: string;
+  failure: string;
+}) {
+  const diagnostic = input.failure.trim().slice(-2_000) ||
+    "The provider turn ended without a diagnostic.";
+  return [
+    `Your previous provider turn ended with an error, but Briar run ${input.sourceKey} (${input.runId}) still has an active claim and has not reached a terminal or paused state.`,
+    "A failed shell, tool, build, test, or CI command is diagnostic input for the issue; it is not by itself a terminal run outcome. Inspect the failure, correct the code or execution environment, and rerun the relevant verification.",
+    "Continue in the existing worktree and conversation until the Briar CLI explicitly completes the run or reaches a configured checkpoint. Use an explicit blocked or failed lifecycle result only when the workflow itself requires that terminal handoff, never merely because one command returned a nonzero exit code.",
+    `Untrusted diagnostic from the previous provider turn:\n${JSON.stringify(diagnostic)}`,
+  ].join("\n\n");
+}
+
 export type DetachedRunDisposition = "continue" | "released" | "terminal";
 
 export function detachedRunDisposition(
@@ -1398,6 +1413,16 @@ export function detachedRunDisposition(
   if (!activeClaim || activeClaim.runId !== runId) return "released";
   if (activeClaim.terminalStatus) return "terminal";
   return "continue";
+}
+
+export type DetachedRunTurnDecision = "continue" | "recover" | "stop";
+
+export function detachedRunTurnDecision(
+  disposition: DetachedRunDisposition,
+  turnFailure: string | null,
+): DetachedRunTurnDecision {
+  if (disposition !== "continue") return "stop";
+  return turnFailure ? "recover" : "continue";
 }
 
 export function detachedPayloadDirection(

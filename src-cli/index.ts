@@ -62,6 +62,8 @@ import {
   detachedProviderBlockFromPayload,
   detachedRunContinuationPrompt,
   detachedRunDisposition,
+  detachedRunRecoveryPrompt,
+  detachedRunTurnDecision,
   detachedTranscriptPayload,
   detachedTranscriptSessionId,
   parseDetachedIssueReplyResult,
@@ -73,6 +75,7 @@ import {
 import { agentImageAttachments } from "../src-agent/runner-attachments";
 import {
   assertDetachedProviderTurnSucceeded,
+  detachedProviderTurnFailure,
   runDetachedProviderTurn,
 } from "./detached-provider-turn";
 import {
@@ -94,6 +97,7 @@ import {
 import {
   createWorkerDeviceIdentity,
   defaultWorkerLabel,
+  errorDelayMs,
   issueWorkerSessionDirectory,
   interruptibleSleep,
   restartInstalledServices,
@@ -2579,6 +2583,7 @@ async function runClaimedIssueInRuntime(
   let conversationId: string | null = null;
   let nextPrompt = prompt;
   let turnNumber = 0;
+  let consecutiveProviderTurnFailures = 0;
   try {
     for (;;) {
       turnNumber += 1;
@@ -2630,7 +2635,7 @@ async function runClaimedIssueInRuntime(
         });
         return;
       }
-      assertDetachedProviderTurnSucceeded(turn);
+      const turnFailure = detachedProviderTurnFailure(turn);
 
       const runtimeConfig = configSchema.parse(
         JSON.parse(await readFile(join(runtimeDirectory, "config.json"), "utf8")),
@@ -2640,7 +2645,29 @@ async function runClaimedIssueInRuntime(
           ?.activeClaim,
         issue.runId,
       );
-      if (disposition !== "continue") return;
+      const turnDecision = detachedRunTurnDecision(disposition, turnFailure);
+      if (turnDecision === "stop") return;
+
+      if (turnDecision === "recover" && turnFailure) {
+        consecutiveProviderTurnFailures += 1;
+        console.error(
+          `recovering ${issue.sourceKey}: agent turn ${turnNumber} failed while the run remained active: ${turnFailure}`,
+        );
+        nextPrompt = detachedRunRecoveryPrompt({
+          runId: issue.runId,
+          sourceKey: issue.sourceKey,
+          failure: turnFailure,
+        });
+        if (!conversationId) {
+          nextPrompt = `${nextPrompt}\n\nThe provider did not return a reusable conversation ID, so the durable issue context follows again.\n\n${prompt}`;
+        }
+        await interruptibleSleep(
+          errorDelayMs(consecutiveProviderTurnFailures, 30_000),
+          signal,
+        );
+        continue;
+      }
+      consecutiveProviderTurnFailures = 0;
 
       console.error(
         `continuing ${issue.sourceKey}: agent turn ${turnNumber} ended while the run remained active`,
