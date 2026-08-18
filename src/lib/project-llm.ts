@@ -29,6 +29,11 @@ export const defaultAppProviderSettings: AppProviderSettings = {
   grok: true,
   agy: true,
   opencode: true,
+  openrouter: true,
+};
+
+export type OpenRouterCredentialStatus = {
+  configured: boolean;
 };
 
 export type AgentModelOption = {
@@ -436,6 +441,22 @@ export async function updateAppProviderSettings(
   const { invoke } = await import("@tauri-apps/api/core");
   return invoke<AppProviderSettings>("update_app_provider_settings", {
     settings,
+  });
+}
+
+export async function loadOpenRouterCredentialStatus(): Promise<OpenRouterCredentialStatus> {
+  if (!isTauri()) return { configured: false };
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke<OpenRouterCredentialStatus>("load_openrouter_credential_status");
+}
+
+export async function updateOpenRouterApiKey(
+  apiKey: string | null,
+): Promise<OpenRouterCredentialStatus> {
+  if (!isTauri()) return { configured: Boolean(apiKey?.trim()) };
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke<OpenRouterCredentialStatus>("update_openrouter_api_key", {
+    apiKey,
   });
 }
 

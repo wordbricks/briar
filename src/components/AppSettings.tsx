@@ -48,10 +48,13 @@ import {
 import {
   loadAppProviderSettings,
   loadAgentProviderModels,
+  loadOpenRouterCredentialStatus,
   updateAppProviderSettings,
+  updateOpenRouterApiKey,
   type AgentProvider,
   type AgentProviderModelCatalogEntry,
   type AppProviderSettings,
+  type OpenRouterCredentialStatus,
   defaultAgentProviderModelCatalog,
 } from "../lib/project-llm";
 import {
@@ -72,7 +75,9 @@ import {
   CursorIcon,
   GrokIcon,
   OpenCodeIcon,
+  OpenRouterIcon,
 } from "./AgentIcons";
+import { MacSecurePasswordInput } from "./MacSecurePasswordInput";
 import { AgentUsageSettings } from "./AgentUsageSettings";
 import { AppearanceSettings } from "./AppearanceSettings";
 import { InboxNotificationSettings } from "./InboxNotificationSettings";
@@ -202,6 +207,10 @@ export function AppSettings({
   const [providerModels, setProviderModels] = useState(
     defaultAgentProviderModelCatalog,
   );
+  const [openRouterCredential, setOpenRouterCredential] =
+    useState<OpenRouterCredentialStatus>({ configured: false });
+  const [openRouterApiKey, setOpenRouterApiKey] = useState("");
+  const [openRouterKeySaving, setOpenRouterKeySaving] = useState(false);
   const [runtimeSettings, setRuntimeSettings] =
     useState<AppRuntimeSettings | null>(null);
   const [runtimeSettingsLoading, setRuntimeSettingsLoading] = useState(false);
@@ -222,7 +231,7 @@ export function AppSettings({
     setProvidersLoading(true);
     setProviderError(null);
     try {
-      const [statuses, settings, usage, models, terminalPath] = await Promise.all([
+      const [statuses, settings, usage, models, terminalPath, openRouterStatus] = await Promise.all([
         inspectOnboardingPrerequisites(),
         loadAppProviderSettings(),
         loadAgentUsage().catch(() => null),
@@ -230,12 +239,14 @@ export function AppSettings({
           () => defaultAgentProviderModelCatalog,
         ),
         inspectOpenCodeTerminalPath().catch(() => null),
+        loadOpenRouterCredentialStatus(),
       ]);
       setProviderStatuses(statuses);
       setProviderSettings(settings);
       setProviderUsage(usage);
       setProviderModels(models);
       setOpenCodeTerminalPath(terminalPath);
+      setOpenRouterCredential(openRouterStatus);
       setProvidersChecked(true);
     } catch (caught) {
       setProviderError(
@@ -344,6 +355,28 @@ export function AppSettings({
       );
     } finally {
       setTerminalPathSaving(false);
+    }
+  };
+
+  const saveOpenRouterApiKey = async (apiKey: string | null) => {
+    if (openRouterKeySaving) return;
+    setOpenRouterKeySaving(true);
+    setProviderError(null);
+    try {
+      setOpenRouterCredential(await updateOpenRouterApiKey(apiKey));
+      setOpenRouterApiKey("");
+      setProviderStatuses(await inspectOnboardingPrerequisites());
+      setProviderModels(
+        await loadAgentProviderModels({ refresh: true }).catch(
+          () => defaultAgentProviderModelCatalog,
+        ),
+      );
+    } catch (caught) {
+      setProviderError(
+        caught instanceof Error ? caught.message : String(caught),
+      );
+    } finally {
+      setOpenRouterKeySaving(false);
     }
   };
 
@@ -1106,6 +1139,91 @@ export function AppSettings({
                     ) : null
                   }
                 />
+                <ProviderRow
+                  available={Boolean(
+                    providerStatuses?.openrouter.installed &&
+                      providerStatuses.openrouter.authenticated,
+                  )}
+                  description={providerDescription({
+                    authenticated: providerStatuses?.openrouter.authenticated,
+                    enabled: providerSettings?.openrouter ?? false,
+                    installed: providerStatuses?.openrouter.installed,
+                    loading: providersLoading && !providerStatuses,
+                    providerName: "OpenRouter",
+                    t,
+                  })}
+                  disabled={
+                    providerSaving !== null ||
+                    providerInstalling !== null ||
+                    openRouterKeySaving
+                  }
+                  details={
+                    <OpenRouterDetails
+                      apiKey={openRouterApiKey}
+                      configured={openRouterCredential.configured}
+                      installed={providerStatuses?.openrouter.installed}
+                      loading={providersLoading && !providerStatuses}
+                      models={providerModels.openrouter}
+                      onApiKeyChange={setOpenRouterApiKey}
+                      onRemove={() => void saveOpenRouterApiKey(null)}
+                      onSave={() => void saveOpenRouterApiKey(openRouterApiKey)}
+                      saving={openRouterKeySaving}
+                    />
+                  }
+                  detailsId="provider-openrouter-details"
+                  detailsLabel={t("appSettings.toggleProviderDetails", {
+                    provider: "OpenRouter",
+                  })}
+                  enabled={providerSettings?.openrouter ?? false}
+                  expanded={expandedProvider === "openrouter"}
+                  icon={
+                    <ProviderIcon tone="openrouter">
+                      <OpenRouterIcon size={20} />
+                    </ProviderIcon>
+                  }
+                  name="OpenRouter"
+                  onExpandedChange={(expanded) =>
+                    setExpandedProvider(expanded ? "openrouter" : null)
+                  }
+                  onToggle={(enabled) =>
+                    void toggleProvider("openrouter", enabled)
+                  }
+                  title={
+                    <>
+                      OpenRouter
+                      {providerStatuses?.openrouter.version ? (
+                        <code>{providerStatuses.openrouter.version}</code>
+                      ) : null}
+                    </>
+                  }
+                  trailing={
+                    providerInstalling === "openrouter" ? (
+                      <Button disabled size="sm" type="button" variant="outline">
+                        <LoaderCircle className="spin" />
+                        {t("appSettings.installing")}
+                      </Button>
+                    ) : providerStatuses?.openrouter.installed === false ? (
+                      <Button
+                        aria-label={t("appSettings.installProvider", {
+                          provider: "OpenRouter runtime",
+                        })}
+                        onClick={() => void installProvider("openrouter")}
+                        size="sm"
+                        type="button"
+                        variant="outline"
+                      >
+                        <Download />
+                        {t("appSettings.install")}
+                      </Button>
+                    ) : providerSaving === "openrouter" || openRouterKeySaving ? (
+                      <LoaderCircle
+                        aria-label={t("common.saving")}
+                        className="spin"
+                        size={16}
+                      />
+                    ) : null
+                  }
+                />
               </SettingsCard>
 
               {providerError ? <SettingsAlert>{providerError}</SettingsAlert> : null}
@@ -1261,6 +1379,117 @@ export function AppSettings({
         </SettingsScroll>
       </SettingsMain>
     </SettingsShell>
+  );
+}
+
+function OpenRouterDetails({
+  apiKey,
+  configured,
+  installed,
+  loading,
+  models,
+  onApiKeyChange,
+  onRemove,
+  onSave,
+  saving,
+}: {
+  apiKey: string;
+  configured: boolean;
+  installed?: boolean;
+  loading: boolean;
+  models: AgentProviderModelCatalogEntry;
+  onApiKeyChange: (value: string) => void;
+  onRemove: () => void;
+  onSave: () => void;
+  saving: boolean;
+}) {
+  const { t } = useI18n();
+  return (
+    <div className="grid gap-5 md:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
+      <section className="grid content-start gap-3">
+        <div>
+          <Typography as="h3" className="font-semibold" variant="bodySm">
+            {t("appSettings.openrouterApiKey")}
+          </Typography>
+          <Typography as="p" className="mt-1" tone="muted" variant="caption">
+            {t("appSettings.openrouterApiKeyHelp")}
+          </Typography>
+        </div>
+        <Typography as="p" tone={configured ? "default" : "muted"} variant="caption">
+          {t(
+            configured
+              ? "appSettings.openrouterApiKeyConfigured"
+              : "appSettings.openrouterApiKeyMissing",
+          )}
+        </Typography>
+        <MacSecurePasswordInput
+          aria-label={t("appSettings.openrouterApiKey")}
+          autoCapitalize="none"
+          autoComplete="off"
+          className="h-9 w-full rounded-md border border-input bg-background px-3 font-mono text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          disabled={!installed || saving}
+          onChange={(event) => onApiKeyChange(event.target.value)}
+          placeholder={t("appSettings.openrouterApiKeyPlaceholder")}
+          secureInputEligible={Boolean(installed && !saving)}
+          spellCheck={false}
+          value={apiKey}
+        />
+        <div className="flex flex-wrap gap-2">
+          <Button
+            disabled={!installed || saving || apiKey.trim().length < 10}
+            onClick={onSave}
+            size="sm"
+            type="button"
+          >
+            {saving ? <LoaderCircle className="spin" /> : null}
+            {t("common.save")}
+          </Button>
+          {configured ? (
+            <Button
+              disabled={saving}
+              onClick={onRemove}
+              size="sm"
+              type="button"
+              variant="outline"
+            >
+              {t("appSettings.openrouterApiKeyRemove")}
+            </Button>
+          ) : null}
+        </div>
+      </section>
+      <section aria-label={t("appSettings.supportedModels")} className="min-w-0">
+        <div className="flex items-center justify-between gap-3">
+          <Typography as="h3" className="font-semibold" variant="bodySm">
+            {t("appSettings.supportedModels")}
+          </Typography>
+          <Typography tone="muted" variant="caption">
+            {t("appSettings.modelCount", { count: models.models.length })}
+          </Typography>
+        </div>
+        {loading ? (
+          <Typography as="p" className="mt-3" tone="muted" variant="bodySm">
+            {t("appSettings.checkingProviders")}
+          </Typography>
+        ) : models.models.length > 0 ? (
+          <div className="mt-3 max-h-56 overflow-y-auto rounded-lg border border-border/80 bg-card">
+            {models.models.map((model) => (
+              <div className="border-b border-border/70 px-3 py-2.5 last:border-b-0" key={model.id}>
+                <Typography as="strong" className="block truncate" variant="bodySm">
+                  {model.label}
+                </Typography>
+                {model.label !== model.id ? (
+                  <code className="block truncate text-xs text-muted-foreground">{model.id}</code>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <Typography as="p" className="mt-3 rounded-lg border border-dashed border-border px-3 py-4" tone="muted" variant="bodySm">
+            {t("appSettings.noSupportedModels")}
+          </Typography>
+        )}
+      </section>
+    </div>
   );
 }
 

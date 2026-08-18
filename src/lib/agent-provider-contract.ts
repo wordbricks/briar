@@ -7,11 +7,14 @@ export const agentProviders = [
   "grok",
   "agy",
   "opencode",
+  "openrouter",
 ] as const;
 export type AgentProvider = (typeof agentProviders)[number];
 
 export function agentProviderBinaryName(provider: AgentProvider) {
-  return provider === "cursor" ? "cursor-agent" : provider;
+  if (provider === "cursor") return "cursor-agent";
+  if (provider === "openrouter") return "opencode";
+  return provider;
 }
 
 /**
@@ -96,6 +99,7 @@ export const agentProviderLabels: Record<AgentProvider, string> = {
   grok: "Grok",
   agy: "Antigravity",
   opencode: "OpenCode",
+  openrouter: "OpenRouter",
 };
 
 export function emptyAgentProviderCapabilityCatalog(): AgentProviderCapabilityCatalog {
@@ -106,7 +110,10 @@ export function emptyAgentProviderCapabilityCatalog(): AgentProviderCapabilityCa
         models: [],
         defaultEfforts: [],
         allowCustomModels:
-          provider === "claude" || provider === "cursor" || provider === "opencode",
+          provider === "claude" ||
+          provider === "cursor" ||
+          provider === "opencode" ||
+          provider === "openrouter",
         error: null,
       },
     ]),

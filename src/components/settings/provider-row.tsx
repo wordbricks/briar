@@ -136,7 +136,8 @@ export function ProviderIcon({
     | "cursor"
     | "grok"
     | "agy"
-    | "opencode";
+    | "opencode"
+    | "openrouter";
 }) {
   return (
     <span
@@ -151,6 +152,7 @@ export function ProviderIcon({
         tone === "grok" && "bg-[#ececf1] text-[#111114]",
         tone === "agy" && "bg-[#eef3ff] text-[#4285f4]",
         tone === "opencode" && "bg-[#ececf1] text-[#211e1e]",
+        tone === "openrouter" && "bg-[#f1edff] text-[#5941a9]",
         className,
       )}
     >

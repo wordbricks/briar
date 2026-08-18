@@ -11,6 +11,7 @@ export const quotaUsageProviders = [
   "grok",
   "agy",
   "opencode",
+  "openrouter",
   "cursor",
 ] as const;
 
@@ -41,6 +42,7 @@ export type AgentUsageSnapshot = {
   grok: AgentUsageProvider;
   agy: AgentUsageProvider;
   opencode: AgentUsageProvider;
+  openrouter: AgentUsageProvider;
   cursor: AgentUsageProvider;
   updatedAt: number;
 };
@@ -95,6 +97,7 @@ function isQuotaUsageProvider(value: unknown): value is QuotaUsageProvider {
     value === "grok" ||
     value === "agy" ||
     value === "opencode" ||
+    value === "openrouter" ||
     value === "cursor"
   );
 }
@@ -130,6 +133,9 @@ function parseUsageSnapshot(value: unknown): AgentUsageSnapshot | null {
     opencode: isUsageProvider(snapshot.opencode)
       ? snapshot.opencode
       : emptyUsageProvider("opencode"),
+    openrouter: isUsageProvider(snapshot.openrouter)
+      ? snapshot.openrouter
+      : emptyUsageProvider("openrouter"),
     cursor: isUsageProvider(snapshot.cursor)
       ? snapshot.cursor
       : emptyUsageProvider("cursor"),
