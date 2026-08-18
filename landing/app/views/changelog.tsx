@@ -30,6 +30,20 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.135",
+        date: "2026년 8월 18일",
+        title: "채널 문서와 Agent 제공자 선택을 더 넓게 지원합니다",
+        summary:
+          "OpenRouter와 채널 문서 미리보기, 반응 작성자 정보, 결과 QA 안내를 추가하고 답글 진행 표시를 다듬습니다.",
+        items: [
+          "OpenRouter를 Agent 제공자로 추가해 API 키를 이 컴퓨터에 저장하고 여러 모델을 선택해 실행할 수 있습니다.",
+          "채널 Agent가 만든 계획 문서를 카드에서 열어 본문을 확인하고, 로드 오류가 나면 다시 시도할 수 있습니다.",
+          "채널 메시지의 이모지 반응을 누가 남겼는지 아바타·이름과 함께 확인하고, 많은 반응자는 요약해서 볼 수 있습니다.",
+          "완료된 작업 결과에 수동 QA 안내를 추가해 로컬 검증 단계나 배포된 대상 URL에서 확인할 위치와 리비전을 바로 볼 수 있습니다.",
+          "Briar 답글 진행 표시의 글꼴 크기와 굵기를 맞춰 실제 답변 UI와 일관되게 표시합니다.",
+        ],
+      },
+      {
         version: "1.2.134",
         date: "2026년 8월 18일",
         title: "새 Agent 템플릿과 제공자 사용량을 더 넓게 지원합니다",
@@ -767,6 +781,20 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.135",
+        date: "August 18, 2026",
+        title: "Expand channel documents and Agent provider support",
+        summary:
+          "Add OpenRouter and channel document previews, show who reacted to messages, add actionable manual QA guidance, and refine reply progress styling.",
+        items: [
+          "Add OpenRouter as an Agent provider, keeping its API key on this computer and allowing people to choose from multiple models.",
+          "Let people open plan documents created by channel Agents from a message card, read the full body, and retry when loading fails.",
+          "Show who reacted to a channel message with names and avatars, summarizing the list when many people reacted.",
+          "Add manual QA guidance to completed work results so people can jump to local checks or a deployed target URL with the relevant revision.",
+          "Match Briar reply progress typography to the surrounding response UI for a more consistent visual hierarchy.",
+        ],
+      },
       {
         version: "1.2.134",
         date: "August 18, 2026",
@@ -1596,7 +1624,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <p>
             <strong>Briar</strong> <span>1.2</span>
           </p>
-          <a href="#v1-2-134">
+          <a href="#v1-2-135">
             {changelog.current} <span aria-hidden="true">↓</span>
           </a>
         </div>
@@ -1618,7 +1646,9 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   </div>
                   <time
                     dateTime={
-                      entry.version === "1.2.134"
+                      entry.version === "1.2.135"
+                        ? "2026-08-18"
+                        : entry.version === "1.2.134"
                         ? "2026-08-18"
                         : entry.version === "1.2.133" ||
                       entry.version === "1.2.132" ||
