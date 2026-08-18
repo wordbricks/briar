@@ -443,6 +443,8 @@ test("server-renders the localized changelog from published releases", async () 
   assert.match(koreanHtml, /<html lang="ko"[\s>]/i);
   assert.match(koreanHtml, /Briar 변경 기록/);
   assert.match(koreanHtml, /현재 안정 버전/);
+  assert.match(koreanHtml, /새 Agent 템플릿과 제공자 사용량을 더 넓게 지원합니다/);
+  assert.match(koreanHtml, /v1\.2\.134/);
   assert.match(koreanHtml, /채널 설정과 이슈 기록을 더 분명하게 관리합니다/);
   assert.match(koreanHtml, /v1\.2\.132/);
   assert.match(koreanHtml, /긴 에이전트 작업 기록을 더 안정적으로 보존합니다/);
@@ -501,6 +503,10 @@ test("server-renders the localized changelog from published releases", async () 
   assert.match(koreanHtml, /changelog-change-category is-breaking/);
   assert.match(
     koreanHtml,
+    /id="v1-2-134"[\s\S]*?changelog-change-category is-added[\s\S]*?changelog-change-category is-improved[\s\S]*?changelog-change-category is-fixed[\s\S]*?releases\/tag\/v1\.2\.134/,
+  );
+  assert.match(
+    koreanHtml,
     /id="v1-2-132"[\s\S]*?changelog-change-category is-added[\s\S]*?changelog-change-category is-improved[\s\S]*?changelog-change-category is-fixed[\s\S]*?releases\/tag\/v1\.2\.132/,
   );
   assert.match(koreanHtml, /배포 전 작업 기록은 초기화/);
@@ -515,6 +521,8 @@ test("server-renders the localized changelog from published releases", async () 
   const englishHtml = await englishResponse.text();
   assert.match(englishHtml, /<html lang="en"[\s>]/i);
   assert.match(englishHtml, /Briar changelog/);
+  assert.match(englishHtml, /Add agent templates and broader provider usage visibility/);
+  assert.match(englishHtml, /v1\.2\.134/);
   assert.match(englishHtml, /Manage channel settings and issue history more clearly/);
   assert.match(englishHtml, /v1\.2\.132/);
   assert.match(englishHtml, /Preserve long agent work logs more reliably/);
