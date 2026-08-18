@@ -1,14 +1,10 @@
 import { Miniflare } from "miniflare";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import worker from "./index";
-import { applyD1Migrations } from "./test-helpers/d1";
+import { createIsolatedTestDatabase } from "./test-helpers/d1";
 
 describe("project Agent routes", () => {
-  const miniflare = new Miniflare({
-    modules: true,
-    script: "export default { fetch() { return new Response('ok') } }",
-    d1Databases: { DB: "briar-project-agent-routes-test" },
-  });
+  let miniflare: Miniflare;
   const organizationId = "11111111-1111-4111-8111-111111111111";
   const projectId = "22222222-2222-4222-8222-222222222222";
   const ownerId = "project-agent-route-owner";
@@ -17,8 +13,11 @@ describe("project Agent routes", () => {
   let db: D1Database;
 
   beforeAll(async () => {
-    db = (await miniflare.getD1Database("DB")) as unknown as D1Database;
-    await applyD1Migrations(db);
+    const database = await createIsolatedTestDatabase({
+      suite: "project-agent-routes",
+    });
+    miniflare = database.miniflare;
+    db = database.db;
     await db.prepare(
       `insert into "user" (id, name, email, emailVerified, createdAt, updatedAt)
        values (?, 'Owner', 'owner@example.com', 1, ?, ?)`,

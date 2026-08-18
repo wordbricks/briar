@@ -15,7 +15,7 @@ import {
   isStoredWorkflowUnchanged,
   loadWorkflowCheckpointPolicy,
 } from "./workflow-policy";
-import { applyD1Migrations } from "./test-helpers/d1";
+import { createIsolatedTestDatabase } from "./test-helpers/d1";
 
 const queuedEvent = (
   sourceKey: string,
@@ -48,17 +48,16 @@ const queuedEvent = (
 });
 
 describe("workflow checkpoint policy persistence", () => {
-  const miniflare = new Miniflare({
-    modules: true,
-    script: "export default { fetch() { return new Response('ok') } }",
-    d1Databases: { DB: "briar-workflow-policy-test" },
-  });
+  let miniflare: Miniflare;
   let db: D1Database;
   let projectId: string;
 
   beforeAll(async () => {
-    db = (await miniflare.getD1Database("DB")) as unknown as D1Database;
-    await applyD1Migrations(db);
+    const database = await createIsolatedTestDatabase({
+      suite: "workflow-policy",
+    });
+    miniflare = database.miniflare;
+    db = database.db;
     await db
       .prepare(
         `insert into user (id, name, email, emailVerified, createdAt, updatedAt)

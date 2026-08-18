@@ -51,7 +51,7 @@ import {
   createOrganizationAgent,
   listOrganizationAgents,
 } from "./organization-agents";
-import { applyD1Migrations } from "./test-helpers/d1";
+import { createIsolatedTestDatabase } from "./test-helpers/d1";
 
 const organizationId = "a0000000-0000-4000-8000-000000000001";
 const otherOrganizationId = "a0000000-0000-4000-8000-000000000002";
@@ -70,21 +70,22 @@ const at = (minute: number) =>
   new Date(Date.UTC(2026, 0, 1, 0, minute)).toISOString();
 
 describe("organization channels", () => {
-  const miniflare = new Miniflare({
-    modules: true,
-    script: "export default { fetch() { return new Response('ok') } }",
-    d1Databases: { DB: "briar-channels-test" },
-    r2Buckets: ["ARCHIVES"],
-  });
+  let miniflare: Miniflare;
   let db: D1Database;
   let archives: R2Bucket;
 
   beforeAll(async () => {
-    db = (await miniflare.getD1Database("DB")) as unknown as D1Database;
+    const database = await createIsolatedTestDatabase({
+      suite: "channels",
+      miniflareOptions: {
+        modules: true,
+        script: "export default { fetch() { return new Response('ok') } }",
+        r2Buckets: ["ARCHIVES"],
+      },
+    });
+    miniflare = database.miniflare;
+    db = database.db;
     archives = await miniflare.getR2Bucket("ARCHIVES") as unknown as R2Bucket;
-    // Channel work spans migrations that rebuild tables, so this suite applies
-    // the full migration directory instead of replaying a subset.
-    await applyD1Migrations(db);
 
     for (const [id, name] of [
       [ownerId, "Owner"],

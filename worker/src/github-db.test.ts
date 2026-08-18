@@ -6,7 +6,7 @@ import type {
   HuntEventInput,
   RunPullRequestRow,
 } from "./db";
-import { applyD1Migrations } from "./test-helpers/d1";
+import { createIsolatedTestDatabase } from "./test-helpers/d1";
 import {
   claimGithubDelivery,
   connectGithubInstallation,
@@ -131,11 +131,7 @@ const workflowFor = (checkpoint: Checkpoint) => {
 };
 
 describe("GitHub pull request D1 integration", () => {
-  const miniflare = new Miniflare({
-    modules: true,
-    script: "export default { fetch() { return new Response('ok') } }",
-    d1Databases: { DB: "briar-github-db-test" },
-  });
+  let miniflare: Miniflare;
   let db: D1Database;
   let organizationId: string;
 
@@ -314,8 +310,11 @@ describe("GitHub pull request D1 integration", () => {
       .first<RunPullRequestRow>();
 
   beforeAll(async () => {
-    db = (await miniflare.getD1Database("DB")) as unknown as D1Database;
-    await applyD1Migrations(db);
+    const database = await createIsolatedTestDatabase({
+      suite: "github-db",
+    });
+    miniflare = database.miniflare;
+    db = database.db;
     const createdAt = nextTime();
     await db
       .prepare(
