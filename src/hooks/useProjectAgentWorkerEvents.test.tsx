@@ -13,12 +13,19 @@ vi.mock("../lib/api", () => ({
 const mockedLoadProjectAgentTranscript = vi.mocked(loadProjectAgentTranscript);
 let workerEvents: ReturnType<typeof useProjectAgentWorkerEvents>;
 
-function Harness() {
+function Harness({
+  runIds = ["run-1"],
+  sessionIds = [],
+}: {
+  runIds?: string[];
+  sessionIds?: string[];
+}) {
   workerEvents = useProjectAgentWorkerEvents(
     "token",
     "project-1",
-    ["run-1"],
+    runIds,
     false,
+    sessionIds,
   );
   return null;
 }
@@ -182,6 +189,61 @@ describe("useProjectAgentWorkerEvents", () => {
         status: "failed",
       },
     ]);
+
+    await act(async () => root.unmount());
+  });
+
+  it("loads a direct Agent task transcript by its exact session id", async () => {
+    mockedLoadProjectAgentTranscript.mockResolvedValue({
+      session: {
+        sessionId: "task-session-1",
+        runId: null,
+        workerId: "worker-1",
+        agentProvider: "codex",
+        startedAt: "2026-08-18T00:00:00.000Z",
+        lastEventAt: "2026-08-18T00:01:00.000Z",
+        eventCount: 1,
+      },
+      events: [{
+        sequence: 1,
+        direction: "server",
+        message: {
+          type: "event",
+          event: {
+            type: "messageCompleted",
+            id: "message-1",
+            phase: "final_answer",
+            text: "원격 Agent 작업을 완료했습니다.",
+          },
+        },
+        recordedAt: "2026-08-18T00:01:00.000Z",
+      }],
+    });
+
+    const container = document.createElement("div");
+    const root = createRoot(container);
+    await act(async () =>
+      root.render(<Harness runIds={[]} sessionIds={["task-session-1"]} />)
+    );
+    await act(async () => {
+      await new Promise((resolve) => window.setTimeout(resolve, 10));
+    });
+
+    expect(mockedLoadProjectAgentTranscript).toHaveBeenCalledWith(
+      "token",
+      "project-1",
+      "task-session-1",
+      0,
+    );
+    expect(workerEvents.events).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        sessionId: "task-session-1",
+        event: expect.objectContaining({
+          type: "messageCompleted",
+          text: "원격 Agent 작업을 완료했습니다.",
+        }),
+      }),
+    ]));
 
     await act(async () => root.unmount());
   });

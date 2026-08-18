@@ -114,10 +114,9 @@ export function ProjectAgentSessionDetail({
       ? session.issues.map((issue) => issue.runId)
       : [],
     session.status === "running",
+    isRemoteSession && session.sessionType === "task" ? [session.id] : [],
   );
-  const executionEvents = isRemoteSession
-    ? { events: [], isLoading: false, error: null }
-    : session.sessionType === "task"
+  const executionEvents = !isRemoteSession && session.sessionType === "task"
       ? appServerEvents
       : workerEvents;
   const agentMessages = useMemo(
@@ -408,7 +407,14 @@ export function ProjectAgentSessionDetail({
                       })}
                     </span>
                   </header>
-                  {executionEvents.error ? (
+                  {executionLogEntries.length > 0 ? (
+                    <AgentWorkLog
+                      activity={executionLogEntries}
+                      autoScroll
+                      provider={activityProvider}
+                      terminal={session.status !== "running"}
+                    />
+                  ) : executionEvents.error ? (
                     <div className="auto-hunt-event-state error">
                       <CircleAlert size={14} />
                       {executionEvents.error}
@@ -418,17 +424,10 @@ export function ProjectAgentSessionDetail({
                       <LoaderCircle className="spin" size={14} />
                       {t("autoHunt.eventsLoading")}
                     </div>
-                  ) : executionLogEntries.length === 0 ? (
+                  ) : (
                     <div className="auto-hunt-event-state">
                       {t("autoHunt.eventsEmpty")}
                     </div>
-                  ) : (
-                    <AgentWorkLog
-                      activity={executionLogEntries}
-                      autoScroll
-                      provider={activityProvider}
-                      terminal={session.status !== "running"}
-                    />
                   )}
                   {onFollowUp &&
                       session.sessionType === "task" &&

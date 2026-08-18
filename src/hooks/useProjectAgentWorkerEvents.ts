@@ -16,11 +16,16 @@ export function useProjectAgentWorkerEvents(
   projectId: string,
   runIds: readonly string[],
   live: boolean,
+  sessionIds: readonly string[] = [],
 ) {
   const [events, setEvents] = useState<AutoHuntAppServerEvent[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const runKey = runIds.join(":");
+  const transcriptIds = [...new Set([
+    ...runIds.map((runId) => `detached-${runId}`),
+    ...sessionIds,
+  ])];
+  const transcriptKey = transcriptIds.join(":");
 
   useEffect(() => {
     let active = true;
@@ -31,18 +36,17 @@ export function useProjectAgentWorkerEvents(
     const activeSessionIds = new Map<string, string>();
     setEvents([]);
     setError(null);
-    setIsLoading(Boolean(token && runIds.length));
-    if (!token || runIds.length === 0) return;
+    setIsLoading(Boolean(token && transcriptIds.length));
+    if (!token || transcriptIds.length === 0) return;
 
     const refresh = async () => {
       const loaded = await Promise.allSettled(
-        runIds.map(async (runId) => {
-          const sessionAlias = `detached-${runId}`;
-          const previousSessionId = activeSessionIds.get(runId);
+        transcriptIds.map(async (requestedSessionId) => {
+          const previousSessionId = activeSessionIds.get(requestedSessionId);
           let transcript = await loadProjectAgentTranscript(
             token,
             projectId,
-            sessionAlias,
+            requestedSessionId,
             previousSessionId
               ? (sequences.get(previousSessionId) ?? 0)
               : 0,
@@ -57,12 +61,12 @@ export function useProjectAgentWorkerEvents(
             transcript = await loadProjectAgentTranscript(
               token,
               projectId,
-              sessionAlias,
+              requestedSessionId,
               0,
             );
           }
           const sessionId = transcript.session.sessionId;
-          activeSessionIds.set(runId, sessionId);
+          activeSessionIds.set(requestedSessionId, sessionId);
           const receivedEventCount =
             (receivedEventCounts.get(sessionId) ?? 0) + transcript.events.length;
           receivedEventCounts.set(sessionId, receivedEventCount);
@@ -121,7 +125,7 @@ export function useProjectAgentWorkerEvents(
       active = false;
       if (timer !== null) window.clearTimeout(timer);
     };
-  }, [live, projectId, runKey, token]);
+  }, [live, projectId, transcriptKey, token]);
 
   return { events, isLoading, error };
 }

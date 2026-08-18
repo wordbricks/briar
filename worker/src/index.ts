@@ -14574,6 +14574,7 @@ async function route(
         sourceKey: `project-agent:${input.projectId}:${job.id}`,
         title: job.agent_name,
         claimToken,
+        claimAttempts: job.attempts,
         claimedAt: job.claimed_at,
         leaseExpiresAt: job.lease_expires_at,
         request: job.request,
