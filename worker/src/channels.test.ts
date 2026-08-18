@@ -26,6 +26,7 @@ import {
   getChannelAgentReplyJob,
   getChannelMessage,
   getChannelMessageAttachment,
+  getChannelMessageDocument,
   getChannelSyncCursor,
   getIncomingChannelWebhook,
   listChannelAgents,
@@ -869,6 +870,70 @@ describe("organization channels", () => {
         attachmentId,
       ),
     ).resolves.toMatchObject({ object_key: expect.stringContaining(attachmentId) });
+  });
+
+  it("returns a channel document body only through the authenticated document route", async () => {
+    const channelId = "e0000000-0000-4000-8000-000000000150";
+    const messageId = "f0000000-0000-4000-8000-000000000150";
+    await createChannel(db, {
+      id: channelId,
+      organizationId,
+      slug: "document-room",
+      name: "Document room",
+      topic: null,
+      visibility: "public",
+      defaultProjectId: null,
+      createdByUserId: ownerId,
+      createdAt: at(7),
+    });
+    await createChannelMessage(db, {
+      id: messageId,
+      channelId,
+      parentMessageId: null,
+      authorUserId: ownerId,
+      authorAgentId: null,
+      authorAgentName: null,
+      authorAgentProvider: null,
+      body: "Attached the plan.",
+      mentionedUserIds: [],
+      mentionedAgentIds: [],
+      createdAt: at(8),
+    });
+    await db.prepare(
+      `insert into briar_channel_message_documents (
+         message_id, channel_id, project_id, title, markdown, created_at, updated_at
+       ) values (?, ?, null, 'Rollout plan', '# Rollout\n\n- Verify access', ?, ?)`,
+    ).bind(messageId, channelId, at(8), at(8)).run();
+
+    await expect(getChannelMessageDocument(db, channelId, messageId))
+      .resolves.toMatchObject({
+        message_id: messageId,
+        title: "Rollout plan",
+        markdown: "# Rollout\n\n- Verify access",
+      });
+
+    const apiEnv = {
+      DB: db,
+      ARCHIVES: archives,
+      BETTER_AUTH_SECRET: "channels-document-test-channels-document-test",
+      GOOGLE_CLIENT_ID: "google-client-test",
+      GOOGLE_CLIENT_SECRET: "google-secret-test",
+    } as unknown as Env;
+    const response = await apiWorker.fetch(new Request(
+      `https://briar-api.example/organizations/${organizationId}/channels/${channelId}/messages/${messageId}/document`,
+      { headers: { authorization: `Bearer ${ownerSessionToken}` } },
+    ), apiEnv);
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Cache-Control")).toBe("private, no-store");
+    await expect(response.json()).resolves.toEqual({
+      document: {
+        messageId,
+        title: "Rollout plan",
+        markdown: "# Rollout\n\n- Verify access",
+        projectId: null,
+      },
+    });
   });
 
   it("atomically queues channel attachments for retryable deletion", async () => {
