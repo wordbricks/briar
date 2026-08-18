@@ -29,7 +29,7 @@ import {
 } from "./db";
 import { archiveCompletedLogs, type ArchiveBucket } from "./archive";
 import apiWorker from "./index";
-import { applyD1Migrations } from "./test-helpers/d1";
+import { createIsolatedTestDatabase } from "./test-helpers/d1";
 import {
   bindExecutionWorkerProject,
   countExecutionWorkerDeviceSessions,
@@ -94,18 +94,22 @@ const backlogEvent = (
 });
 
 describe("conversational Agent Skill execution approval", () => {
-  const miniflare = new Miniflare({
-    modules: true,
-    script: "export default { fetch() { return new Response('ok') } }",
-    d1Databases: { DB: "briar-agent-skill-execution-approval-test" },
-    r2Buckets: ["ARCHIVES"],
-  });
+  let miniflare: Miniflare;
   let db: D1Database;
   let archives: ArchiveBucket;
   let sequence = 0;
 
   beforeAll(async () => {
-    db = await miniflare.getD1Database("DB") as unknown as D1Database;
+    const database = await createIsolatedTestDatabase({
+      suite: "agent-skill-execution-approval",
+      miniflareOptions: {
+        modules: true,
+        script: "export default { fetch() { return new Response('ok') } }",
+        r2Buckets: ["ARCHIVES"],
+      },
+    });
+    miniflare = database.miniflare;
+    db = database.db;
     const miniflareBucket = await miniflare.getR2Bucket("ARCHIVES");
     archives = {
       async head(key) {
@@ -143,7 +147,6 @@ describe("conversational Agent Skill execution approval", () => {
         await miniflareBucket.delete(keys);
       },
     };
-    await applyD1Migrations(db);
     const observedAt = new Date().toISOString();
     for (const [id, name, token] of [
       [ownerId, "Owner", ownerToken],

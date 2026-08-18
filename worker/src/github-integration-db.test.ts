@@ -15,14 +15,10 @@ import {
   syncGithubConnectionRepositories,
 } from "./db";
 import { githubSha256Hex } from "./github";
-import { applyD1Migrations } from "./test-helpers/d1";
+import { createIsolatedTestDatabase } from "./test-helpers/d1";
 
 describe("GitHub integration D1 state", () => {
-  const miniflare = new Miniflare({
-    modules: true,
-    script: "export default { fetch() { return new Response('ok') } }",
-    d1Databases: { DB: "briar-github-integration-test" },
-  });
+  let miniflare: Miniflare;
   let db: D1Database;
   const firstOrganizationId = "11111111-1111-4111-8111-111111111111";
   const secondOrganizationId = "22222222-2222-4222-8222-222222222222";
@@ -32,8 +28,11 @@ describe("GitHub integration D1 state", () => {
   const now = "2026-08-05T00:00:00.000Z";
 
   beforeAll(async () => {
-    db = (await miniflare.getD1Database("DB")) as unknown as D1Database;
-    await applyD1Migrations(db);
+    const database = await createIsolatedTestDatabase({
+      suite: "github-integration-db",
+    });
+    miniflare = database.miniflare;
+    db = database.db;
     await db.prepare(
       `insert into user (id, name, email, emailVerified, createdAt, updatedAt)
        values (?, 'Owner', 'owner@example.com', 1, ?, ?)`,

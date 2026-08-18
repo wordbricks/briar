@@ -27,7 +27,10 @@ import {
   readArchivedWorkLog,
   readLatestArchivedWorkLogForRun,
 } from "./archive";
-import { applyD1Migrations, executeD1Sql } from "./test-helpers/d1";
+import {
+  createIsolatedTestDatabase,
+  executeD1Sql,
+} from "./test-helpers/d1";
 
 const projectId = "11111111-1111-4111-8111-111111111111";
 let runId = "";
@@ -103,17 +106,21 @@ const event = (
 });
 
 describe("D1 to R2 log archives", () => {
-  const miniflare = new Miniflare({
-    modules: true,
-    script: "export default { fetch() { return new Response('ok') } }",
-    d1Databases: { DB: "briar-archive-test" },
-    r2Buckets: ["ARCHIVES"],
-  });
+  let miniflare: Miniflare;
   let db: D1Database;
   let bucket: ArchiveBucket;
 
   beforeAll(async () => {
-    db = await miniflare.getD1Database("DB");
+    const database = await createIsolatedTestDatabase({
+      suite: "archive",
+      miniflareOptions: {
+        modules: true,
+        script: "export default { fetch() { return new Response('ok') } }",
+        r2Buckets: ["ARCHIVES"],
+      },
+    });
+    miniflare = database.miniflare;
+    db = database.db;
     const miniflareBucket = await miniflare.getR2Bucket("ARCHIVES");
     bucket = {
       async head(key) {
@@ -151,7 +158,6 @@ describe("D1 to R2 log archives", () => {
         await miniflareBucket.delete(keys);
       },
     };
-    await applyD1Migrations(db);
     await executeD1Sql(
       db,
       `insert into user (id, name, email, emailVerified, createdAt, updatedAt)

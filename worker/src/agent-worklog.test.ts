@@ -7,25 +7,31 @@ import {
   readAgentWorkLog,
 } from "./agent-worklog";
 import { MAX_TRANSCRIPT_PAYLOAD_BYTES } from "./workers";
-import { applyD1Migrations, executeD1Sql } from "./test-helpers/d1";
+import {
+  createIsolatedTestDatabase,
+  executeD1Sql,
+} from "./test-helpers/d1";
 
 const projectId = "11111111-1111-4111-8111-111111111111";
 const observedAt = "2026-08-13T00:00:00.000Z";
 
 describe("provider-independent agent work log", () => {
-  const miniflare = new Miniflare({
-    modules: true,
-    script: "export default { fetch() { return new Response('ok') } }",
-    d1Databases: { DB: "briar-agent-worklog-test" },
-    r2Buckets: ["ARCHIVES"],
-  });
+  let miniflare: Miniflare;
   let db: D1Database;
   let bucket: R2Bucket;
 
   beforeAll(async () => {
-    db = (await miniflare.getD1Database("DB")) as unknown as D1Database;
+    const database = await createIsolatedTestDatabase({
+      suite: "agent-worklog",
+      miniflareOptions: {
+        modules: true,
+        script: "export default { fetch() { return new Response('ok') } }",
+        r2Buckets: ["ARCHIVES"],
+      },
+    });
+    miniflare = database.miniflare;
+    db = database.db;
     bucket = (await miniflare.getR2Bucket("ARCHIVES")) as unknown as R2Bucket;
-    await applyD1Migrations(db);
     await executeD1Sql(
       db,
       `insert into user (id, name, email, emailVerified, createdAt, updatedAt)
