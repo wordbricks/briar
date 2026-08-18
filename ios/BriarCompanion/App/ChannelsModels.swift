@@ -729,6 +729,22 @@ struct ToggleChannelMessageReactionResponse: Codable, Sendable {
 
 struct AcceptChannelProposalRequest: Codable, Equatable, Sendable {
     let projectId: UUID?
+
+    /// Approval compares project IDs as lowercase strings. Foundation's
+    /// synthesized UUID encoding uses uppercase characters, which the worker
+    /// used to reject as a different project.
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        if let projectId {
+            try container.encode(projectId.uuidString.lowercased(), forKey: .projectId)
+        } else {
+            try container.encodeNil(forKey: .projectId)
+        }
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case projectId
+    }
 }
 
 struct AcceptChannelProposalResponse: Codable, Equatable, Sendable {

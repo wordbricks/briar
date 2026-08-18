@@ -1110,24 +1110,33 @@ class HttpError extends Error {
   }
 }
 
+const canonicalProjectId = (value: string | null | undefined) =>
+  value ? value.toLowerCase() : null;
+
 export function resolveChannelProposalTargetProjectId(input: {
   requestedProjectId: string | null | undefined;
   proposedProjectId: string | null | undefined;
   defaultProjectId: string | null | undefined;
 }) {
+  const proposedProjectId = canonicalProjectId(input.proposedProjectId);
+  const requestedProjectId = canonicalProjectId(input.requestedProjectId);
+  const defaultProjectId = canonicalProjectId(input.defaultProjectId);
+  // UUIDs are case-insensitive. Native iOS encodes UUID request fields in
+  // uppercase, while stored proposal project IDs are lowercase. Compare the
+  // canonical form so the same project is not rejected as a mismatch.
   if (
-    input.proposedProjectId &&
-    input.requestedProjectId &&
-    input.proposedProjectId !== input.requestedProjectId
+    proposedProjectId &&
+    requestedProjectId &&
+    proposedProjectId !== requestedProjectId
   ) {
     throw new HttpError(
       400,
       "The approved project must match the Agent proposal",
     );
   }
-  return input.proposedProjectId ??
-    input.requestedProjectId ??
-    input.defaultProjectId ??
+  return proposedProjectId ??
+    requestedProjectId ??
+    defaultProjectId ??
     null;
 }
 
