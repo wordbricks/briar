@@ -7564,6 +7564,169 @@ describe("HuntDashboard", () => {
     expect(markup).not.toContain('class="issue-description-markdown"');
   });
 
+  it("prioritizes verified deployment evidence for completed-issue manual QA", async () => {
+    const completedRun: HuntRun = {
+      ...demoDashboard.runs[0],
+      status: "completed",
+      currentRevision: 2,
+      resultSummary: "검증된 배포 대상에서 완료 결과를 확인합니다.",
+      workflow: {
+        ...demoDashboard.runs[0].workflow,
+        stages: [
+          ...demoDashboard.runs[0].workflow.stages,
+          {
+            id: "production_qa",
+            label: "Production QA",
+            required: true,
+            evidence: ["production target"],
+          },
+        ],
+      },
+    };
+    const evidence = (overrides: Partial<RunEvidence>): RunEvidence => ({
+      key: "deployment-evidence",
+      attempt: 1,
+      revision: 2,
+      stage: "production_qa",
+      type: "production target",
+      status: "passed",
+      detail: "배포 후 화면을 확인했습니다.",
+      command: null,
+      url: "https://qa.example.com/result/2",
+      metadata: { environment: "Production EU" },
+      actor: "briar-workflow",
+      observedAt: "2026-08-18T01:00:00.000Z",
+      recordedAt: "2026-08-18T01:00:00.000Z",
+      requiredRevision: 2,
+      canonical: true,
+      ...overrides,
+    });
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <TooltipProvider>
+          <RunPage
+            error={null}
+            isRecovering={false}
+            isSidebarOpen
+            onBack={() => undefined}
+            onCancel={async () => undefined}
+            onLoadAttachment={async () => new Blob()}
+            onLoadIssueMessages={async () => []}
+            onLoadRunEvidence={async () => [
+              evidence({}),
+              evidence({
+                key: "ci-url",
+                stage: "ci_qa",
+                type: "ci run",
+                url: "https://ci.example.com/run/2",
+                metadata: { environment: "CI" },
+              }),
+              evidence({
+                key: "release-pr-url",
+                stage: "pr_open",
+                type: "release pull request",
+                url: "https://github.com/example/repo/pull/2",
+                metadata: { environment: "Release review" },
+              }),
+              evidence({
+                key: "stale-deployment",
+                canonical: false,
+                url: "https://stale.example.com/result/1",
+              }),
+              evidence({
+                key: "pending-deployment",
+                status: "pending",
+                url: "https://pending.example.com/result/2",
+              }),
+              evidence({
+                key: "unsafe-deployment",
+                url: "javascript:alert(1)",
+              }),
+            ]}
+            onMove={async () => undefined}
+            onRetry={async () => undefined}
+            onSendIssueMessage={async () => {
+              throw new Error("not implemented in this test");
+            }}
+            run={completedRun}
+          />
+        </TooltipProvider>,
+      );
+      await Promise.resolve();
+    });
+
+    const guide = container.querySelector(".run-manual-qa");
+    expect(guide?.textContent).toContain("검증된 배포 대상");
+    expect(guide?.textContent).toContain("Production EU");
+    expect(guide?.textContent).toContain("대상 리비전 2");
+    expect(
+      guide?.querySelector<HTMLAnchorElement>("a")?.getAttribute("href"),
+    ).toBe("https://qa.example.com/result/2");
+    expect(guide?.textContent).toContain("‘대화’ 탭에서 @briar");
+    expect(guide?.textContent).not.toContain("배포되지 않은 상태");
+    expect(guide?.innerHTML).not.toContain("ci.example.com");
+    expect(guide?.innerHTML).not.toContain("github.com");
+    expect(guide?.innerHTML).not.toContain("stale.example.com");
+    expect(guide?.innerHTML).not.toContain("pending.example.com");
+    expect(guide?.innerHTML).not.toContain("javascript:");
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("shows local QA preparation, checks, expected result, and paused actions without a deployment URL", async () => {
+    const pausedRun: HuntRun = {
+      ...demoDashboard.runs[1],
+      status: "paused",
+    };
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <TooltipProvider>
+          <RunPage
+            error={null}
+            isRecovering={false}
+            isSidebarOpen
+            onBack={() => undefined}
+            onCancel={async () => undefined}
+            onLoadAttachment={async () => new Blob()}
+            onLoadIssueMessages={async () => []}
+            onLoadRunEvidence={async () => []}
+            onMove={async () => undefined}
+            onRetry={async () => undefined}
+            onSendIssueMessage={async () => {
+              throw new Error("not implemented in this test");
+            }}
+            run={pausedRun}
+          />
+        </TooltipProvider>,
+      );
+      await Promise.resolve();
+    });
+
+    const guide = container.querySelector(".run-manual-qa");
+    expect(guide?.textContent).toContain("배포되지 않은 상태");
+    expect(guide?.textContent).toContain("1. 실행 준비");
+    expect(guide?.textContent).toContain("c49b012");
+    expect(guide?.textContent).toContain("2. 확인 절차");
+    expect(guide?.textContent).toContain("bun run test");
+    expect(guide?.textContent).toContain("bun run build");
+    expect(guide?.textContent).toContain("3. 기대 결과");
+    expect(guide?.textContent).toContain("‘승인하고 계속’을");
+    expect(guide?.textContent).toContain("‘수정 요청’을");
+    expect(guide?.querySelector("a")).toBeNull();
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
   it("shows provider, model, and worker next to the attempt · revision label", () => {
     const completedRun = {
       ...demoDashboard.runs[0],
