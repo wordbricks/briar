@@ -4646,7 +4646,7 @@ export function RunPage({
     save: saveConversationPaneWidth,
   });
   const [isConversationLayoutCompact, setIsConversationLayoutCompact] =
-    useState(false);
+    useState(() => Boolean(initialDetailTab === "conversation"));
   useLayoutEffect(() => {
     if (companionMode) return;
     const layout = runPageLayoutRef.current;
@@ -4810,9 +4810,19 @@ export function RunPage({
     setIsResumePending(false);
   }, [resumeCheckpointIdentity]);
   useLayoutEffect(() => {
-    if (usesConversationTab || activeDetailTab !== "conversation") return;
+    if (
+      companionMode ||
+      isConversationLayoutCompact ||
+      activeDetailTab !== "conversation"
+    ) {
+      return;
+    }
     setActiveDetailTab(lastContentDetailTabRef.current);
-  }, [activeDetailTab, usesConversationTab]);
+  }, [
+    activeDetailTab,
+    companionMode,
+    isConversationLayoutCompact,
+  ]);
   useEffect(() => {
     onViewingIssueConversationChange?.(
       !usesConversationTab || activeDetailTab === "conversation"
