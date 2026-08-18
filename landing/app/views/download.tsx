@@ -1,4 +1,4 @@
-import { type Locale, copy, localizedPath } from "../i18n";
+import { type Locale, copy, localizedHrefs, localizedPath } from "../i18n";
 import { DesktopDownloadLink } from "../desktop-download-link";
 import { Arrow, SiteFooter, SiteHeader } from "../site-chrome";
 import {
@@ -7,7 +7,7 @@ import {
   WEB_APP_URL,
 } from "../site-links";
 
-export const downloadCopy = {
+const downloadCopyByLocale = {
   ko: {
     metadata: {
       title: "Briar 다운로드 — macOS, Android, Web",
@@ -72,6 +72,42 @@ export const downloadCopy = {
     home: "Home",
     backTop: "Back to top ↑",
   },
+} as const;
+
+export const downloadCopy = {
+  ...downloadCopyByLocale,
+  zh: {
+    metadata: {
+      title: "下载 Briar — macOS、Android 和 Web",
+      description:
+        "安装 macOS 版 Briar，获取 Android companion，或直接在浏览器中打开 Briar。",
+    },
+    eyebrow: "随时随地运营 Agent 工作",
+    title: "下载 Briar",
+    description:
+      "在 Mac 上运行 Agent，再通过 Android companion 或任意浏览器继续跟进工作流。",
+    desktop: "桌面端",
+    desktopDescription: "连接本地仓库和 Agent 的主应用",
+    mac: "macOS",
+    macDetail: "Apple Silicon · macOS 13 或更高版本",
+    macAction: "下载 Apple Silicon 版本",
+    recommended: "推荐",
+    mobile: "移动端",
+    mobileDescription: "离开办公桌时也能查看进度和结果",
+    android: "Android",
+    androidDetail: "Android companion · 最新 GitHub 版本",
+    androidAction: "打开 Android 版本",
+    web: "Web",
+    webDescription: "无需安装，从任意浏览器连接 Briar",
+    webApp: "Briar Web",
+    webDetail: "最新版本 · 自动更新",
+    webAction: "打开 Web 应用",
+    releasesPrefix: "旧版本和更新日志请查看",
+    releasesLink: "GitHub Releases",
+    releasesSuffix: "。",
+    home: "首页",
+    backTop: "返回顶部 ↑",
+  },
 } as const satisfies Record<Locale, unknown>;
 
 function PlatformIcon({ platform }: { platform: "mac" | "android" | "web" }) {
@@ -88,10 +124,7 @@ const PATH = "/download" as const;
 export default function DownloadView({ locale }: { locale: Locale }) {
   const c = copy[locale];
   const d = downloadCopy[locale];
-  const hrefs = {
-    en: localizedPath("en", PATH),
-    ko: localizedPath("ko", PATH),
-  } as const;
+  const hrefs = localizedHrefs(PATH);
 
   return (
     <main className="download-page" id="top">

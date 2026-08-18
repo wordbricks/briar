@@ -7,6 +7,7 @@ type LanguageSwitcherProps = {
   label: string;
   englishLabel: string;
   koreanLabel: string;
+  chineseLabel: string;
   /** The real, crawlable URL for this page in each locale. */
   hrefs: Record<Locale, string>;
 };
@@ -16,6 +17,7 @@ export function LanguageSwitcher({
   label,
   englishLabel,
   koreanLabel,
+  chineseLabel,
   hrefs,
 }: LanguageSwitcherProps) {
   function changeLanguage(nextLocale: Locale) {
@@ -52,6 +54,16 @@ export function LanguageSwitcher({
         onClick={() => changeLanguage("ko")}
       >
         KO
+      </button>
+      <i aria-hidden="true" />
+      <button
+        type="button"
+        className={locale === "zh" ? "is-active" : undefined}
+        aria-pressed={locale === "zh"}
+        aria-label={chineseLabel}
+        onClick={() => changeLanguage("zh")}
+      >
+        ZH
       </button>
     </div>
   );

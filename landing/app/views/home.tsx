@@ -1,4 +1,10 @@
-import { type LandingCopy, type Locale, copy, localizedPath } from "../i18n";
+import {
+  type LandingCopy,
+  type Locale,
+  copy,
+  localizedHrefs,
+  localizedPath,
+} from "../i18n";
 import { DesktopDownloadLink } from "../desktop-download-link";
 import { resolveOrigin } from "../seo";
 import { Arrow, SiteFooter, SiteHeader } from "../site-chrome";
@@ -146,10 +152,7 @@ const PATH = "/" as const;
 export default async function HomeView({ locale }: { locale: Locale }) {
   const c = copy[locale];
   const origin = await resolveOrigin();
-  const hrefs = {
-    en: localizedPath("en", PATH),
-    ko: localizedPath("ko", PATH),
-  } as const;
+  const hrefs = localizedHrefs(PATH);
   const structuredData = {
     "@context": "https://schema.org",
     "@graph": [

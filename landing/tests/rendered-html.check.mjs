@@ -102,6 +102,12 @@ test("redirects a Korean-browser visitor from / to /ko", async () => {
   assert.equal(response.headers.get("location"), "http://localhost/ko");
 });
 
+test("redirects a Chinese-browser visitor from / to /zh", async () => {
+  const response = await render({ acceptLanguage: "zh-CN,zh;q=0.9" });
+  assert.equal(response.status, 307);
+  assert.equal(response.headers.get("location"), "http://localhost/zh");
+});
+
 test("server-renders Korean at /ko regardless of Accept-Language", async () => {
   // Deliberately send an English Accept-Language header: the URL alone
   // must decide the locale here, never the header.
@@ -206,6 +212,32 @@ test("server-renders English for an English browser", async () => {
   assert.match(html, /data-download-architecture="arm64"/);
 });
 
+test("server-renders Chinese at /zh regardless of Accept-Language", async () => {
+  const response = await render({
+    acceptLanguage: "en-US,en;q=0.9",
+    path: "/zh",
+  });
+  assert.equal(response.status, 200);
+
+  const html = await response.text();
+  assert.match(html, /<html lang="zh"[\s>]/i);
+  assert.match(html, /Briar — 本地执行的 Agent Development Environment/);
+  assert.match(html, /从 issue 到 PR/);
+  assert.match(html, /让 Agent 工作井然有序/);
+  assert.match(html, /代码留在本地/);
+  assert.match(html, /连接 Agent 事件流/);
+  assert.match(html, /下载 Mac 版 Briar/);
+  assert.match(html, /不限制仓库/);
+  assert.match(html, /本地执行/);
+  assert.match(html, /aria-label="语言"/);
+  assert.match(html, /aria-pressed="true"[^>]*aria-label="中文"/);
+  assert.match(html, /href="\/zh\/tutorial"/);
+  assert.match(html, /href="\/zh\/docs"/);
+  assert.match(html, /href="\/zh\/blog"/);
+  assert.match(html, /href="\/zh\/download"/);
+  assert.doesNotMatch(html, /Operate your agent work\./);
+});
+
 test("falls back to English when the browser language is unsupported", async () => {
   const response = await render({ acceptLanguage: "ja-JP,ko;q=0.9" });
   assert.equal(response.status, 200);
@@ -224,6 +256,15 @@ test("a saved ko cookie convenience-redirects the unprefixed / to /ko", async ()
   assert.equal(response.headers.get("location"), "http://localhost/ko");
 });
 
+test("a saved zh cookie convenience-redirects the unprefixed / to /zh", async () => {
+  const response = await render({
+    acceptLanguage: "en-US,en;q=0.9",
+    cookie: "briar-locale=zh",
+  });
+  assert.equal(response.status, 307);
+  assert.equal(response.headers.get("location"), "http://localhost/zh");
+});
+
 test("a saved en cookie keeps an English browser on the unprefixed /", async () => {
   const response = await render({
     acceptLanguage: "ko-KR,ko;q=0.9",
@@ -240,6 +281,13 @@ test("/ko is reachable directly without any cookie or Accept-Language", async ()
   assert.equal(response.status, 200);
   const html = await response.text();
   assert.match(html, /<html lang="ko"[\s>]/i);
+});
+
+test("/zh is reachable directly without any cookie or Accept-Language", async () => {
+  const response = await render({ path: "/zh" });
+  assert.equal(response.status, 200);
+  const html = await response.text();
+  assert.match(html, /<html lang="zh"[\s>]/i);
 });
 
 test("server-renders the localized tutorial at /ko/tutorial with captured product screens", async () => {
@@ -286,6 +334,20 @@ test("server-renders the localized download catalog at /ko/download", async () =
     html,
     /https:\/\/github\.com\/wordbricks\/briar\/releases\/latest/,
   );
+  assert.match(html, /data-download-platform="macos"/);
+  assert.match(html, /data-download-architecture="arm64"/);
+});
+
+test("server-renders the localized download catalog at /zh/download", async () => {
+  const response = await render({ path: "/zh/download" });
+  assert.equal(response.status, 200);
+
+  const html = await response.text();
+  assert.match(html, /<html lang="zh"[\s>]/i);
+  assert.match(html, /下载 Briar/);
+  assert.match(html, /下载 Apple Silicon 版本/);
+  assert.match(html, /打开 Android 版本/);
+  assert.match(html, /打开 Web 应用/);
   assert.match(html, /data-download-platform="macos"/);
   assert.match(html, /data-download-architecture="arm64"/);
 });
@@ -362,25 +424,31 @@ test("tutorial keeps its focused navigation and exposes docs on desktop and mobi
   assert.deepEqual(navigationHrefs(mobileNavigation), tutorialHrefs);
 });
 
-test("all public API docs routes render directly in English and Korean", async () => {
+test("all public API docs routes render directly in English, Korean, and Chinese", async () => {
   const pages = [
     {
       en: "/docs",
       ko: "/ko/docs",
+      zh: "/zh/docs",
       english: "Bring external events",
       korean: "외부 이벤트를",
+      chinese: "将外部事件",
     },
     {
       en: "/docs/get-started",
       ko: "/ko/docs/get-started",
+      zh: "/zh/docs/get-started",
       english: "Send your first event",
       korean: "첫 이벤트를 보내기까지",
+      chinese: "发送你的第一个事件",
     },
     {
       en: "/docs/webhooks",
       ko: "/ko/docs/webhooks",
+      zh: "/zh/docs/webhooks",
       english: "Incoming channel webhooks",
       korean: "채널 수신 웹훅",
+      chinese: "频道接收 Webhook",
     },
   ];
 
@@ -404,6 +472,16 @@ test("all public API docs routes render directly in English and Korean", async (
     assert.match(koreanHtml, /href="\/ko\/docs\/get-started"/);
     assert.match(koreanHtml, /href="\/ko\/docs\/webhooks"/);
     assert.match(koreanHtml, /href="#main-content"/);
+
+    const chineseResponse = await render({ path: page.zh });
+    assert.equal(chineseResponse.status, 200);
+    const chineseHtml = await chineseResponse.text();
+    assert.match(chineseHtml, /<html lang="zh"[\s>]/i);
+    assert.match(chineseHtml, new RegExp(page.chinese));
+    assert.match(chineseHtml, /aria-label="API 文档导航"/);
+    assert.match(chineseHtml, /href="\/zh\/docs\/get-started"/);
+    assert.match(chineseHtml, /href="\/zh\/docs\/webhooks"/);
+    assert.match(chineseHtml, /href="#main-content"/);
   }
 });
 
@@ -560,6 +638,15 @@ test("server-renders the localized changelog from published releases", async () 
   assert.match(englishHtml, /changelog-change-category is-improved/);
   assert.match(englishHtml, /changelog-change-category is-fixed/);
   assert.match(englishHtml, /resets pre-deployment work-log history/);
+
+  const chineseResponse = await render({ path: "/zh/changelog" });
+  assert.equal(chineseResponse.status, 200);
+  const chineseHtml = await chineseResponse.text();
+  assert.match(chineseHtml, /<html lang="zh"[\s>]/i);
+  assert.match(chineseHtml, /Briar 更新日志/);
+  assert.match(chineseHtml, /当前稳定版本/);
+  assert.match(chineseHtml, /历史版本条目保留原始英文/);
+  assert.match(chineseHtml, /aria-label="变更类型"/);
 });
 
 test("server-renders the localized empty blog at /ko/blog", async () => {
@@ -577,6 +664,17 @@ test("server-renders the localized empty blog at /ko/blog", async () => {
   );
 });
 
+test("server-renders the localized empty blog at /zh/blog", async () => {
+  const response = await render({ path: "/zh/blog" });
+  assert.equal(response.status, 200);
+
+  const html = await response.text();
+  assert.match(html, /<html lang="zh"[\s>]/i);
+  assert.match(html, /Briar 博客/);
+  assert.match(html, /第一篇文章正在准备中/);
+  assert.match(html, /aria-current="page"[^>]*>博客</);
+});
+
 test("/ emits canonical + hreflang alternates (including x-default) for English", async () => {
   const response = await render();
   const html = await response.text();
@@ -592,6 +690,10 @@ test("/ emits canonical + hreflang alternates (including x-default) for English"
   assert.match(
     html,
     /<link rel="alternate" hrefLang="ko" href="http:\/\/localhost\/ko"\s*\/>/,
+  );
+  assert.match(
+    html,
+    /<link rel="alternate" hrefLang="zh" href="http:\/\/localhost\/zh"\s*\/>/,
   );
   assert.match(
     html,
@@ -617,7 +719,33 @@ test("/ko emits canonical + hreflang alternates pointing at each locale's own UR
   );
   assert.match(
     html,
+    /<link rel="alternate" hrefLang="zh" href="http:\/\/localhost\/zh"\s*\/>/,
+  );
+  assert.match(
+    html,
     /<link rel="alternate" hrefLang="x-default" href="http:\/\/localhost\/"\s*\/>/,
+  );
+});
+
+test("/zh emits canonical + hreflang alternates pointing at each locale's own URL", async () => {
+  const response = await render({ path: "/zh" });
+  const html = await response.text();
+
+  assert.match(
+    html,
+    /<link rel="canonical" href="http:\/\/localhost\/zh"\s*\/>/,
+  );
+  assert.match(
+    html,
+    /<link rel="alternate" hrefLang="en" href="http:\/\/localhost\/"\s*\/>/,
+  );
+  assert.match(
+    html,
+    /<link rel="alternate" hrefLang="ko" href="http:\/\/localhost\/ko"\s*\/>/,
+  );
+  assert.match(
+    html,
+    /<link rel="alternate" hrefLang="zh" href="http:\/\/localhost\/zh"\s*\/>/,
   );
 });
 
@@ -639,6 +767,15 @@ test("/tutorial and /ko/tutorial each carry their own canonical + hreflang pair"
   );
   assert.match(
     ko,
+    /<link rel="alternate" hrefLang="en" href="http:\/\/localhost\/tutorial"\s*\/>/,
+  );
+  const zh = await (await render({ path: "/zh/tutorial" })).text();
+  assert.match(
+    zh,
+    /<link rel="canonical" href="http:\/\/localhost\/zh\/tutorial"\s*\/>/,
+  );
+  assert.match(
+    zh,
     /<link rel="alternate" hrefLang="en" href="http:\/\/localhost\/tutorial"\s*\/>/,
   );
 });
@@ -671,22 +808,38 @@ test("/docs/webhooks and /ko/docs/webhooks carry localized metadata", async () =
     ko,
     /<title>Briar 수신 웹훅 API — 요청, 중복 방지와 오류<\/title>/,
   );
+  const zh = await (await render({ path: "/zh/docs/webhooks" })).text();
+  assert.match(
+    zh,
+    /<link rel="canonical" href="http:\/\/localhost\/zh\/docs\/webhooks"\s*\/>/,
+  );
+  assert.match(
+    zh,
+    /<title>Briar 接收 Webhook API — 请求、幂等性与错误<\/title>/,
+  );
 });
 
 test("og:url and og:locale reflect the actual locale of the rendered page", async () => {
   const en = await (await render()).text();
   const ko = await (await render({ path: "/ko" })).text();
+  const zh = await (await render({ path: "/zh" })).text();
 
-  for (const html of [en, ko]) {
-    assert.match(
-      html,
-      /<meta property="og:title" content="Delegate agent work\. Review the evidence\. Ship with confidence\."\s*\/>/,
-    );
-    assert.match(
-      html,
-      /<meta name="twitter:title" content="Delegate agent work\. Review the evidence\. Ship with confidence\."\s*\/>/,
-    );
-  }
+  assert.match(
+    en,
+    /<meta property="og:title" content="Delegate agent work\. Review the evidence\. Ship with confidence\."\s*\/>/,
+  );
+  assert.match(
+    en,
+    /<meta name="twitter:title" content="Delegate agent work\. Review the evidence\. Ship with confidence\."\s*\/>/,
+  );
+  assert.match(
+    ko,
+    /<meta property="og:title" content="에이전트 작업을 맡기고, 근거를 검토하고, 자신 있게 배포하세요\."\s*\/>/,
+  );
+  assert.match(
+    ko,
+    /<meta name="twitter:title" content="에이전트 작업을 맡기고, 근거를 검토하고, 자신 있게 배포하세요\."\s*\/>/,
+  );
 
   assert.match(en, /<meta property="og:url" content="http:\/\/localhost\/"\s*\/>/);
   assert.match(en, /<meta property="og:locale" content="en_US"\s*\/>/);
@@ -704,6 +857,13 @@ test("og:url and og:locale reflect the actual locale of the rendered page", asyn
     ko,
     /<meta property="og:locale:alternate" content="en_US"\s*\/>/,
   );
+
+  assert.match(zh, /<meta property="og:url" content="http:\/\/localhost\/zh"\s*\/>/);
+  assert.match(zh, /<meta property="og:locale" content="zh_CN"\s*\/>/);
+  assert.match(zh, /<meta property="og:title" content="把 Agent 工作交出去。检查证据。自信发布。"\s*\/>/);
+  assert.match(zh, /<meta name="twitter:title" content="把 Agent 工作交出去。检查证据。自信发布。"\s*\/>/);
+  assert.match(zh, /<meta property="og:locale:alternate" content="en_US"\s*\/>/);
+  assert.match(zh, /<meta property="og:locale:alternate" content="ko_KR"\s*\/>/);
 });
 
 test("/robots.txt disallows the proxied web app and points at the sitemap", async () => {
@@ -745,6 +905,14 @@ test("/sitemap.xml is well-formed and lists every route in every locale", async 
       "http://localhost/ko/docs/webhooks",
       "http://localhost/ko/download",
       "http://localhost/ko/tutorial",
+      "http://localhost/zh",
+      "http://localhost/zh/blog",
+      "http://localhost/zh/changelog",
+      "http://localhost/zh/docs",
+      "http://localhost/zh/docs/get-started",
+      "http://localhost/zh/docs/webhooks",
+      "http://localhost/zh/download",
+      "http://localhost/zh/tutorial",
       "http://localhost/tutorial",
     ].sort(),
   );
@@ -754,10 +922,11 @@ test("/sitemap.xml is well-formed and lists every route in every locale", async 
 
   // Every <url> entry carries the full hreflang set, including x-default.
   const urlBlocks = xml.match(/<url>[\s\S]*?<\/url>/g) ?? [];
-  assert.equal(urlBlocks.length, 16);
+  assert.equal(urlBlocks.length, 24);
   for (const block of urlBlocks) {
     assert.match(block, /hreflang="en"/);
     assert.match(block, /hreflang="ko"/);
+    assert.match(block, /hreflang="zh"/);
     assert.match(block, /hreflang="x-default"/);
   }
 });

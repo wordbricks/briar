@@ -9,9 +9,6 @@ import {
   type RoutePath,
 } from "./i18n";
 
-const SOCIAL_TITLE =
-  "Delegate agent work. Review the evidence. Ship with confidence.";
-
 /**
  * Resolve the public origin (protocol + host) the current request arrived
  * on. Mirrors Cloudflare's forwarded headers so this works the same in
@@ -66,6 +63,7 @@ export async function buildPageMetadata({
   const canonical = `${origin}${localizedPath(locale, path)}`;
   const languages = await buildAlternateLanguages(path);
   const ogDescription = socialDescription ?? description;
+  const socialTitle = copy[locale].metadata.socialTitle;
 
   return {
     title,
@@ -75,7 +73,7 @@ export async function buildPageMetadata({
       languages,
     },
     openGraph: {
-      title: SOCIAL_TITLE,
+      title: socialTitle,
       description: ogDescription,
       type: "website",
       // `alternateLocale` here would normally produce `og:locale:alternate`,
@@ -88,13 +86,13 @@ export async function buildPageMetadata({
           url: `${origin}/og-briar-workflow.png`,
           width: 1200,
           height: 630,
-          alt: SOCIAL_TITLE,
+          alt: socialTitle,
         },
       ],
     },
     twitter: {
       card: "summary_large_image",
-      title: SOCIAL_TITLE,
+      title: socialTitle,
       description: ogDescription,
       images: [`${origin}/og-briar-workflow.png`],
     },
