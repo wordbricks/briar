@@ -1,10 +1,8 @@
-import { mentionsBriar } from "./briar-mention";
-
 export type IssueReplyContextMessage = {
   id: string;
   parentMessageId: string | null;
   body: string;
-  author: { provider: string | null };
+  author: { agentId: string | null; provider: string | null };
 };
 
 export function agentReplyParentMessageId(
@@ -13,30 +11,43 @@ export function agentReplyParentMessageId(
   return message.parentMessageId ?? message.id;
 }
 
-export function shouldBriarReply(
+/**
+ * Resolve the Project Agents that should answer an issue message.
+ *
+ * Agent IDs are deliberately the only routing authority. The rendered
+ * `@handle` is presentation text and must never be used to decide who gets a
+ * reply. A follow-up without explicit mentions continues with the agents that
+ * already participated in the same thread.
+ */
+export function issueReplyAgentIds(
   messages: readonly IssueReplyContextMessage[],
-  input: { body: string; parentMessageId: string | null },
+  input: {
+    mentionedAgentIds?: readonly string[];
+    parentMessageId: string | null;
+  },
 ) {
-  if (mentionsBriar(input.body)) return true;
-  if (!input.parentMessageId) return false;
+  const explicit = [...new Set(
+    (input.mentionedAgentIds ?? [])
+      .map((agentId) => agentId.trim())
+      .filter(Boolean),
+  )];
+  if (explicit.length > 0) return explicit;
+  if (!input.parentMessageId) return [];
   const byId = new Map(messages.map((message) => [message.id, message]));
-  const isAgentActive = (message: IssueReplyContextMessage | undefined) =>
-    message !== undefined &&
-    (message.author.provider !== null || mentionsBriar(message.body));
-  const siblingActive = messages.some(
-    (message) =>
-      message.parentMessageId === input.parentMessageId &&
-      isAgentActive(message),
-  );
-  if (siblingActive) return true;
-  const parent = byId.get(input.parentMessageId);
-  if (!parent) return false;
-  let ancestor: IssueReplyContextMessage | undefined = parent;
+  const participatingAgents = new Set<string>();
+  const addAgent = (message: IssueReplyContextMessage | undefined) => {
+    if (message?.author.agentId) participatingAgents.add(message.author.agentId);
+  };
+
+  for (const message of messages) {
+    if (message.parentMessageId === input.parentMessageId) addAgent(message);
+  }
+  let ancestor = byId.get(input.parentMessageId);
   while (ancestor) {
-    if (isAgentActive(ancestor)) return true;
+    addAgent(ancestor);
     ancestor = ancestor.parentMessageId
       ? byId.get(ancestor.parentMessageId)
       : undefined;
   }
-  return false;
+  return [...participatingAgents];
 }

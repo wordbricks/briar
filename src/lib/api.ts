@@ -2543,6 +2543,7 @@ export async function createIssueMessage(
     clientMessageId?: string;
     parentMessageId: string | null;
     mentionedUserIds?: string[];
+    mentionedAgentIds?: string[];
     agentConversationId?: string | null;
     attachments?: File[];
     attachmentReferences?: string[];
@@ -2562,6 +2563,7 @@ export async function createIssueMessage(
     }
     form.set("parentMessageId", parentMessageId ?? "");
     form.set("mentionedUserIds", JSON.stringify(input.mentionedUserIds ?? []));
+    form.set("mentionedAgentIds", JSON.stringify(input.mentionedAgentIds ?? []));
     form.set("agentConversationId", input.agentConversationId ?? "");
     form.set(
       "attachmentReferences",
@@ -2582,6 +2584,7 @@ export async function createIssueMessage(
   const result = await request<{
     message: IssueMessage;
     agentReply: IssueAgentReplyState | null;
+    agentReplies?: IssueAgentReplyState[];
   }>(
     `/projects/${projectId}/runs/${runId}/messages`,
     token,

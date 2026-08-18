@@ -4,13 +4,14 @@ import { Buffer } from "node:buffer";
 import { existsSync } from "node:fs";
 import {
   chmod,
+  mkdtemp,
   mkdir,
   readFile,
   rm,
   writeFile,
 } from "node:fs/promises";
 import { spawn } from "node:child_process";
-import { homedir, platform } from "node:os";
+import { homedir, platform, tmpdir } from "node:os";
 import { basename, isAbsolute, join, resolve } from "node:path";
 import { z } from "zod";
 import packageJson from "../package.json";
@@ -113,6 +114,7 @@ import {
   allocateAnalysisWorktree,
   allocateIssueWorktree,
   defaultWorktreeRoot,
+  findExistingIssueWorktree,
   listCompletedWorktrees,
   listIssueWorktrees,
   maintainTerminalIssueWorktree,
@@ -2889,20 +2891,30 @@ async function runClaimedIssueReply(
     (message) => message.id === issue.triggerMessageId,
   );
   if (!trigger) throw new Error("Mention message is missing from the reply snapshot");
-  // Conversational execution uses a detached checkout so local mutations do
-  // not affect a durable issue branch. The checkout receives the same
-  // .worktreeinclude inputs and execution permissions as a project Worker.
-  const analysisWorktree = await allocateAnalysisWorktree({
-    repositoryPath: project.repositoryPath,
-    projectId: project.id,
-    workId: issue.workId,
-    settings: worktreeSettings(project),
-    git: runGit,
-  });
-  const workspacePath = analysisWorktree.path;
-  const imageDirectory = join(workspacePath, ".briar-issue-reply-images");
+  // The reply must see the same uncommitted files as the Worker processing the
+  // issue. A fresh analysis checkout would only contain the last committed
+  // branch and would hide the work that the user is asking about.
+  const configuredWorktree = worktreesEnabled(project)
+    ? findExistingIssueWorktree(
+        runGit,
+        project.repositoryPath,
+        projectWorktreeRoot(worktreeSettings(project).root, project.id),
+        {
+          runId: issue.runId,
+          sourceKey: issue.sourceKey,
+          title: issue.title,
+        },
+        issue.branch,
+      )
+    : null;
+  if (worktreesEnabled(project) && !configuredWorktree) {
+    throw new Error(
+      "The issue processing worktree is not available on this Worker",
+    );
+  }
+  const workspacePath = configuredWorktree?.path ?? project.repositoryPath;
+  const imageDirectory = await mkdtemp(join(tmpdir(), "briar-issue-reply-images-"));
   let imagesCleaned = false;
-  let workspaceCleaned = false;
   let lastActivityErrorAt = Number.NEGATIVE_INFINITY;
   const activityPublisher = new ChannelActivityPublisher({
     credential: issue.activity,
@@ -2942,18 +2954,6 @@ async function runClaimedIssueReply(
           imagesCleaned = true;
         },
       },
-      {
-        label: "issue reply analysis worktree",
-        run: async () => {
-          if (workspaceCleaned) return;
-          await removeAnalysisWorktree({
-            repositoryPath: project.repositoryPath,
-            path: analysisWorktree.path,
-            git: runGit,
-          });
-          workspaceCleaned = true;
-        },
-      },
     ]);
   try {
     await mkdir(imageDirectory, { recursive: true, mode: 0o700 });
@@ -2981,7 +2981,7 @@ async function runClaimedIssueReply(
       agent: issue.agent,
       activeSkill: issue.activeSkill,
       snapshot: issue.snapshot,
-      fallbackName: "Briar",
+      fallbackName: "Project Agent",
       scope: {
         kind: "project",
         organizationId: registered.organizationId,
@@ -3008,6 +3008,7 @@ async function runClaimedIssueReply(
       },
       userMessage: trigger.body,
       workspaceAvailable: true,
+      workspaceShared: true,
       skillExecutionTarget: issue.skillExecutionTarget,
     });
     let sequence = 0;
@@ -3045,7 +3046,8 @@ async function runClaimedIssueReply(
           agent,
           prompt,
           workspacePath,
-          fullAccess: project.autoHunt?.sandbox?.fullAccess ?? true,
+          fullAccess: false,
+          readOnly: true,
           attachments,
           outputSchema: detachedIssueReplyOutputSchema,
           environment: {
@@ -3082,8 +3084,8 @@ async function runClaimedIssueReply(
       allowSkillExecutionProposal: issue.skillExecutionTarget !== null,
     });
     if (!result.reply) throw new Error("Agent returned an empty issue reply");
-    // Private images and the repository snapshot must be removed before the
-    // durable reply succeeds. Cleanup failure leaves the claim retryable.
+    // Private downloaded images must be removed before the durable reply
+    // succeeds. The issue worktree itself belongs to the processing Worker.
     await cleanupContext();
     await request(
       config.apiUrl,

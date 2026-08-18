@@ -842,6 +842,7 @@ struct CreateIssueMessageRequest: Codable, Sendable {
     let clientMessageId: UUID?
     let parentMessageId: UUID?
     let mentionedUserIds: [String]
+    let mentionedAgentIds: [String]
     let agentConversationId: String?
 
     private enum CodingKeys: String, CodingKey {
@@ -849,6 +850,7 @@ struct CreateIssueMessageRequest: Codable, Sendable {
         case clientMessageId
         case parentMessageId
         case mentionedUserIds
+        case mentionedAgentIds
         case agentConversationId
     }
 
@@ -857,12 +859,14 @@ struct CreateIssueMessageRequest: Codable, Sendable {
         clientMessageId: UUID? = nil,
         parentMessageId: UUID?,
         mentionedUserIds: [String],
+        mentionedAgentIds: [String] = [],
         agentConversationId: String?
     ) {
         self.body = body
         self.clientMessageId = clientMessageId
         self.parentMessageId = parentMessageId
         self.mentionedUserIds = mentionedUserIds
+        self.mentionedAgentIds = mentionedAgentIds
         self.agentConversationId = agentConversationId
     }
 
@@ -885,6 +889,7 @@ struct CreateIssueMessageRequest: Codable, Sendable {
             try container.encodeNil(forKey: .parentMessageId)
         }
         try container.encode(mentionedUserIds, forKey: .mentionedUserIds)
+        try container.encode(mentionedAgentIds, forKey: .mentionedAgentIds)
         try container.encodeIfPresent(agentConversationId, forKey: .agentConversationId)
     }
 }
@@ -900,6 +905,8 @@ struct IssueAgentReplyJob: Codable, Equatable, Sendable {
     let id: UUID
     let triggerMessageId: UUID
     let parentMessageId: UUID
+    let agentId: UUID?
+    let agentName: String?
     let status: Status
     let attempts: Int
     let error: String?
@@ -908,6 +915,8 @@ struct IssueAgentReplyJob: Codable, Equatable, Sendable {
         id: UUID,
         triggerMessageId: UUID,
         parentMessageId: UUID,
+        agentId: UUID? = nil,
+        agentName: String? = nil,
         status: Status,
         attempts: Int,
         error: String?
@@ -915,6 +924,8 @@ struct IssueAgentReplyJob: Codable, Equatable, Sendable {
         self.id = id
         self.triggerMessageId = triggerMessageId
         self.parentMessageId = parentMessageId
+        self.agentId = agentId
+        self.agentName = agentName
         self.status = status
         self.attempts = attempts
         self.error = error
@@ -924,6 +935,8 @@ struct IssueAgentReplyJob: Codable, Equatable, Sendable {
         case id
         case triggerMessageId
         case parentMessageId
+        case agentId
+        case agentName
         case status
         case attempts
         case error
@@ -937,6 +950,8 @@ struct IssueAgentReplyJob: Codable, Equatable, Sendable {
             UUID.self,
             forKey: .parentMessageId
         ) ?? triggerMessageId
+        agentId = try container.decodeIfPresent(UUID.self, forKey: .agentId)
+        agentName = try container.decodeIfPresent(String.self, forKey: .agentName)
         status = try container.decode(Status.self, forKey: .status)
         attempts = try container.decodeIfPresent(Int.self, forKey: .attempts) ?? 0
         error = try container.decodeIfPresent(String.self, forKey: .error)
@@ -946,11 +961,64 @@ struct IssueAgentReplyJob: Codable, Equatable, Sendable {
 struct CreateIssueMessageResponse: Codable, Sendable {
     let message: IssueMessage
     let agentReply: IssueAgentReplyJob?
+    let agentReplies: [IssueAgentReplyJob]
+
+    init(
+        message: IssueMessage,
+        agentReply: IssueAgentReplyJob?,
+        agentReplies: [IssueAgentReplyJob] = []
+    ) {
+        self.message = message
+        self.agentReply = agentReply
+        self.agentReplies = agentReplies
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case message
+        case agentReply
+        case agentReplies
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        message = try container.decode(IssueMessage.self, forKey: .message)
+        agentReply = try container.decodeIfPresent(
+            IssueAgentReplyJob.self,
+            forKey: .agentReply
+        )
+        agentReplies = try container.decodeIfPresent(
+            [IssueAgentReplyJob].self,
+            forKey: .agentReplies
+        ) ?? []
+    }
 }
 
 struct IssueAgentReplyResponse: Codable, Sendable {
     let agentReply: IssueAgentReplyJob
     let message: IssueMessage?
+    let agentReplies: [IssueAgentReplyJob]
+    let messages: [IssueMessage]
+
+    private enum CodingKeys: String, CodingKey {
+        case agentReply
+        case message
+        case agentReplies
+        case messages
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        agentReply = try container.decode(IssueAgentReplyJob.self, forKey: .agentReply)
+        message = try container.decodeIfPresent(IssueMessage.self, forKey: .message)
+        agentReplies = try container.decodeIfPresent(
+            [IssueAgentReplyJob].self,
+            forKey: .agentReplies
+        ) ?? []
+        messages = try container.decodeIfPresent(
+            [IssueMessage].self,
+            forKey: .messages
+        ) ?? []
+    }
 }
 
 enum IssueMutationError: LocalizedError, Equatable {
@@ -973,9 +1041,9 @@ enum IssueMutationError: LocalizedError, Equatable {
         case .invalidMessage: L10n.text("메시지를 입력해 주세요.")
         case .invalidPreferences: L10n.text("모델과 effort를 선택하려면 프로바이더와 모델을 순서대로 선택해 주세요.")
         case let .attachment(message): message
-        case .agentReplyTimedOut: L10n.text("Briar 답변이 아직 대기 중입니다. 잠시 후 다시 확인해 주세요.")
+        case .agentReplyTimedOut: L10n.text("Agent 답변이 아직 대기 중입니다. 잠시 후 다시 확인해 주세요.")
         case .agentReplyPollingFailed:
-            L10n.text("메시지는 전송됐지만 Briar 답변 상태를 확인하지 못했습니다. 상세를 새로고침해 주세요.")
+            L10n.text("메시지는 전송됐지만 Agent 답변 상태를 확인하지 못했습니다. 상세를 새로고침해 주세요.")
         case let .agentReplyFailed(message): message
         }
     }

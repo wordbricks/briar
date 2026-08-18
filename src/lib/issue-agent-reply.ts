@@ -1,12 +1,11 @@
 import type { OrganizationMember } from "../types";
 import { mentionAtCaret as issueMentionAtCaret } from "./mention-token";
 
-export { mentionsBriar } from "./briar-mention";
 export { issueMentionAtCaret };
 
 export {
   agentReplyParentMessageId,
-  shouldBriarReply,
+  issueReplyAgentIds,
   type IssueReplyContextMessage,
 } from "./issue-reply-decision";
 

@@ -68,7 +68,7 @@ import {
 } from "../../src/lib/issue-markdown";
 import {
   agentReplyParentMessageId,
-  shouldBriarReply,
+  issueReplyAgentIds,
 } from "../../src/lib/issue-reply-decision";
 import {
   CHANNEL_AGENT_ACTIVITY_STALE_MS,
@@ -1052,13 +1052,12 @@ export function issueReplyExecutionConfig(input: {
   requested: IssueReplyExecutionSource;
   activeSkill: IssueReplyExecutionSource | null;
   agent: IssueReplyExecutionSource | null;
+  prioritizeAgent?: boolean;
 }) {
-  const source = [
-    input.requested,
-    input.preferred,
-    input.activeSkill,
-    input.agent,
-  ].find((candidate) => candidate?.provider === input.provider);
+  const source = (input.prioritizeAgent
+    ? [input.activeSkill, input.agent, input.requested, input.preferred]
+    : [input.requested, input.preferred, input.activeSkill, input.agent]
+  ).find((candidate) => candidate?.provider === input.provider);
   return {
     model: source?.model ?? null,
     effort: source?.effort ?? null,
@@ -2334,6 +2333,7 @@ const issueMessageInputSchema = z
     clientMessageId: z.string().uuid().transform((value) => value.toLowerCase()).optional(),
     parentMessageId: z.string().uuid().nullable().optional(),
     mentionedUserIds: z.array(z.string().min(1).max(200)).max(50).optional(),
+    mentionedAgentIds: z.array(z.string().uuid()).max(20).optional(),
     agentConversationId: z
       .string()
       .trim()
@@ -2391,6 +2391,7 @@ export async function readIssueMessageRequest(request: Request) {
     throw new HttpError(400, "Every message attachment must be referenced in the body");
   }
   const mentionedUserIds = readMultipartJsonArray(form, "mentionedUserIds");
+  const mentionedAgentIds = readMultipartJsonArray(form, "mentionedAgentIds");
   const clientMessageId = form.get("clientMessageId");
   const parentMessageId = form.get("parentMessageId");
   const agentConversationId = form.get("agentConversationId");
@@ -2406,6 +2407,7 @@ export async function readIssueMessageRequest(request: Request) {
           ? parentMessageId
           : null,
       mentionedUserIds,
+      mentionedAgentIds,
       agentConversationId:
         typeof agentConversationId === "string" && agentConversationId
           ? agentConversationId
@@ -6160,11 +6162,18 @@ const issueMessageJson = (
     )
     .map(attachmentJson),
   author: {
-    id: message.author_agent_provider ? null : message.author_user_id,
-    name: message.author_agent_provider
-      ? `Briar · ${agentProviderLabels[message.author_agent_provider]}`
-      : (message.author_name ?? "알 수 없는 사용자"),
-    image: message.author_agent_provider ? null : message.author_image,
+    id: message.author_agent_id ?? message.author_user_id,
+    name: message.author_agent_id
+      ? (message.author_agent_name ?? message.author_name ?? "Project Agent")
+      : message.author_agent_provider
+        ? `Agent · ${agentProviderLabels[message.author_agent_provider]}`
+        : (message.author_name ?? "알 수 없는 사용자"),
+    image: message.author_agent_id
+      ? message.author_agent_image
+      : message.author_agent_provider
+        ? null
+        : message.author_image,
+    agentId: message.author_agent_id,
     provider: message.author_agent_provider,
   },
   replyCount: message.reply_count,
@@ -6183,6 +6192,8 @@ const issueAgentReplyJson = (job: IssueAgentReplyJobRow) => ({
   id: job.id,
   triggerMessageId: job.trigger_message_id,
   parentMessageId: job.parent_message_id,
+  agentId: job.agent_id,
+  agentName: job.agent_name_snapshot,
   status: job.status,
   attempts: job.attempts,
   workerId: job.claimed_worker_id,
@@ -6201,7 +6212,7 @@ const issueConversationNotificationJson = (
   body: notification.body,
   author: {
     ...issueMessageJson(notification).author,
-    image: notification.author_agent_provider
+    image: notification.author_agent_id
       ? notification.author_agent_image
       : notification.author_image,
   },
@@ -10882,6 +10893,12 @@ async function route(
       session.user.id,
     );
     if (!project) throw new HttpError(404, "Project not found");
+    const run = await getHuntRunForProject(
+      db,
+      project.id,
+      issueMessagesMatch[2],
+    );
+    if (!run) throw new HttpError(404, "Run not found");
     const { input: rawInput, attachments, attachmentReferences } =
       await readIssueMessageRequest(request);
     const storedAttachments = prepareStoredAttachments(
@@ -10916,6 +10933,20 @@ async function route(
         400,
         "Agent conversation does not belong to this project",
       );
+    }
+    const explicitMentionedAgentIds = [...new Set(input.mentionedAgentIds ?? [])];
+    const explicitlyMentionedAgents = new Map<
+      string,
+      NonNullable<Awaited<ReturnType<typeof getProjectAgent>>>
+    >();
+    if (!agentProvider) {
+      for (const agentId of explicitMentionedAgentIds) {
+        const agent = await getProjectAgent(db, project.id, agentId);
+        if (!agent) {
+          throw new HttpError(400, "Mentioned Agent is not in this project");
+        }
+        explicitlyMentionedAgents.set(agent.id, agent);
+      }
     }
     const createdAt = new Date().toISOString();
     const uploadedKeys: string[] = [];
@@ -10971,54 +11002,67 @@ async function route(
         input.parentMessageId ? "Thread message not found" : "Run not found",
       );
     }
-    const shouldEnqueueAgentReply =
-      !agentProvider && shouldBriarReply(
-        (message.parent_message_id
-          ? await listIssueThreadMessages(
-              db,
-              project.id,
-              issueMessagesMatch[2],
-              message.parent_message_id,
-            )
-          : []
-        ).map((threadMessage) => ({
-          id: threadMessage.id,
-          parentMessageId: threadMessage.parent_message_id,
-          body: threadMessage.body,
-          author: { provider: threadMessage.author_agent_provider },
-        })),
-        { body: input.body, parentMessageId: message.parent_message_id ?? null },
-      );
-    let selectedSkillId: string | null = null;
-    if (shouldEnqueueAgentReply &&
-        await agentSkillExecutionApprovalTablesAvailable(db)) {
-      const conversationRun = await getHuntRunForProject(
-        db,
-        project.id,
-        issueMessagesMatch[2],
-      );
-      const assignedAgent = conversationRun?.agent_id
-        ? await getProjectAgent(db, project.id, conversationRun.agent_id)
-        : null;
-      selectedSkillId = assignedAgent
-        ? agentSkillForMessage(assignedAgent.skills, input.body)?.id ?? null
-        : null;
+    const threadMessages = message.parent_message_id
+      ? await listIssueThreadMessages(
+          db,
+          project.id,
+          issueMessagesMatch[2],
+          message.parent_message_id,
+        )
+      : [];
+    const targetAgentIds = agentProvider
+      ? []
+      : issueReplyAgentIds(
+          threadMessages.map((threadMessage) => ({
+            id: threadMessage.id,
+            parentMessageId: threadMessage.parent_message_id,
+            body: threadMessage.body,
+            author: {
+              agentId: threadMessage.author_agent_id,
+              provider: threadMessage.author_agent_provider,
+            },
+          })),
+          {
+            mentionedAgentIds: explicitMentionedAgentIds,
+            parentMessageId: message.parent_message_id ?? null,
+          },
+        );
+    const targetAgents = new Map(explicitlyMentionedAgents);
+    for (const agentId of targetAgentIds) {
+      if (targetAgents.has(agentId)) continue;
+      const agent = await getProjectAgent(db, project.id, agentId);
+      if (agent) targetAgents.set(agent.id, agent);
     }
-    const agentReply = shouldEnqueueAgentReply
-        ? await enqueueIssueAgentReply(db, {
-            id: crypto.randomUUID(),
-            projectId: project.id,
-            runId: issueMessagesMatch[2],
-            triggerMessageId: message.id,
-            parentMessageId: agentReplyParentMessageId({
-              id: message.id,
-              parentMessageId: message.parent_message_id,
-            }),
-            replyMessageId: crypto.randomUUID(),
-            skillId: selectedSkillId,
-            createdAt,
-          })
-        : null;
+    const agentReplies: IssueAgentReplyJobRow[] = [];
+    if (targetAgents.size > 0) {
+      const skillExecutionAvailable =
+        await agentSkillExecutionApprovalTablesAvailable(db);
+      for (const agent of targetAgents.values()) {
+        const selectedSkillId = skillExecutionAvailable
+          ? agentSkillForMessage(agent.skills, input.body)?.id ?? null
+          : null;
+        const agentReply = await enqueueIssueAgentReply(db, {
+          id: crypto.randomUUID(),
+          projectId: project.id,
+          runId: issueMessagesMatch[2],
+          triggerMessageId: message.id,
+          parentMessageId: agentReplyParentMessageId({
+            id: message.id,
+            parentMessageId: message.parent_message_id,
+          }),
+          replyMessageId: crypto.randomUUID(),
+          agentId: agent.id,
+          skillId: selectedSkillId,
+          // A live processing Worker is the only safe place to look for the
+          // issue's uncommitted worktree. If the run has not been claimed yet,
+          // keep the reply claimable and let the Worker answer from the
+          // durable snapshot/repository context instead.
+          requiresPreferredWorker: run.worker_id !== null,
+          createdAt,
+        });
+        if (agentReply) agentReplies.push(agentReply);
+      }
+    }
     return json(
       {
         message: issueMessageJson(
@@ -11030,7 +11074,10 @@ async function route(
             created_at: createdAt,
           })),
         ),
-        agentReply: agentReply ? issueAgentReplyJson(agentReply) : null,
+        agentReply: agentReplies.length === 1
+          ? issueAgentReplyJson(agentReplies[0])
+          : null,
+        agentReplies: agentReplies.map(issueAgentReplyJson),
       },
       201,
     );
@@ -11158,7 +11205,15 @@ async function route(
       session.user.id,
     );
     if (!project) throw new HttpError(404, "Project not found");
-    const job = await getIssueAgentReplyJob(
+    const replyJobs = (await listIssueAgentReplyJobs(
+      db,
+      project.id,
+      issueAgentReplyStatusMatch[2],
+    )).filter(
+      (candidate) =>
+        candidate.trigger_message_id === issueAgentReplyStatusMatch[3],
+    );
+    const job = replyJobs[0] ?? await getIssueAgentReplyJob(
       db,
       project.id,
       issueAgentReplyStatusMatch[3],
@@ -11173,7 +11228,7 @@ async function route(
       executionProposals,
       skillExecutionProposals,
     ] =
-      job.status === "completed"
+      replyJobs.some((candidate) => candidate.status === "completed")
         ? await Promise.all([
             listIssueMessagesWithArchive(
               db,
@@ -11190,11 +11245,15 @@ async function route(
     const reply = messages.find(
       (message) => message.id === job.reply_message_id,
     );
+    const replyMessages = messages.filter((message) =>
+      replyJobs.some((candidate) => candidate.reply_message_id === message.id),
+    );
     const proposal = [...reworkProposals, ...actionProposals].find(
       (candidate) => candidate.reply_message_id === job.reply_message_id,
     ) ?? null;
     return json({
       agentReply: issueAgentReplyJson(job),
+      agentReplies: replyJobs.map(issueAgentReplyJson),
       message: reply
         ? issueMessageJson(
             reply,
@@ -11208,6 +11267,21 @@ async function route(
             ) ?? null,
           )
         : null,
+      messages: replyMessages.map((replyMessage) =>
+        issueMessageJson(
+          replyMessage,
+          [],
+          [...reworkProposals, ...actionProposals].find(
+            (candidate) => candidate.reply_message_id === replyMessage.id,
+          ) ?? null,
+          executionProposals.find(
+            (candidate) => candidate.reply_message_id === replyMessage.id,
+          ) ?? null,
+          skillExecutionProposals.find(
+            (candidate) => candidate.reply_message_id === replyMessage.id,
+          ) ?? null,
+        ),
+      ),
     });
   }
 
@@ -13192,9 +13266,14 @@ async function route(
     if (!run || !job.agent_provider) {
       throw new HttpError(409, "Reply job lost its issue context");
     }
-    const liveAgent = run.agent_id
-      ? await getProjectAgent(db, input.projectId, run.agent_id)
-      : null;
+    const liveAgent = job.agent_id
+      ? await getProjectAgent(db, input.projectId, job.agent_id)
+      : run.agent_id
+        ? await getProjectAgent(db, input.projectId, run.agent_id)
+        : null;
+    if (job.agent_id && !liveAgent) {
+      throw new HttpError(409, "Reply job lost its Project Agent");
+    }
     const triggerMessage = messages.find(
       (message) => message.id === job.trigger_message_id,
     ) ?? null;
@@ -13228,16 +13307,19 @@ async function route(
           effort: job.selected_skill_effort_snapshot ?? null,
         }
       : null;
-    const agent = liveAgent && selectedSkill
+    const agent = liveAgent
       ? {
           ...liveAgent,
-          name: job.selected_agent_name_snapshot!,
-          responsibility: job.selected_agent_responsibility_snapshot!,
-          skills: liveAgent.skills.map((skill) =>
-            skill.id === selectedSkill.id ? selectedSkill : skill
-          ),
+          name: job.agent_name_snapshot ?? liveAgent.name,
+          responsibility:
+            job.agent_responsibility_snapshot ?? liveAgent.responsibility,
+          skills: selectedSkill
+            ? liveAgent.skills.map((skill) =>
+                skill.id === selectedSkill.id ? selectedSkill : skill
+              )
+            : liveAgent.skills,
         }
-      : liveAgent;
+      : null;
     const activeSkill = selectedSkill ?? (agent
       ? issueProcessingAgentSkillRow(agent.skills)
       : null);
@@ -13255,6 +13337,7 @@ async function route(
       },
       activeSkill,
       agent,
+      prioritizeAgent: job.agent_id !== null,
     });
     return json({
       work: {

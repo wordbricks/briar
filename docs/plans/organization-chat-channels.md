@@ -131,7 +131,8 @@ FK 없는 텍스트 컬럼이다. 다만 스케줄은 프로젝트 워크플로�
 
 ### 핸들
 
-현재 에이전트 멘션은 `@briar` 단일 핸들이고(`src/lib/briar-mention.ts`)
+현재 에이전트 멘션은 Project Agent의 표시 이름을 핸들로 사용하고,
+서버는 클라이언트가 보낸 구조화된 Agent ID를 라우팅 권한으로 사용한다.
 에이전트 행에는 `name`만 있다. 첨부 화면처럼 `@Honey`, `@Bumble`을 구분해
 부르려면 조직 내 유일한 핸들이 필요하다.
 
@@ -143,8 +144,7 @@ create unique index briar_project_agents_handle_idx
 
 `organization_id`가 행에 직접 있으므로 조인 없이 유일성을 강제할 수 있다.
 핸들 백필은 `name` 슬러그화 + 충돌 시 접미사 부여로 처리하며, SQL만으로는
-안전하지 않으므로 마이그레이션 이후 1회성 백필 경로를 둔다. `briar`는
-예약어로 유지한다.
+안전하지 않으므로 마이그레이션 이후 1회성 백필 경로를 둔다.
 
 ## 데이터 모델
 
@@ -401,8 +401,7 @@ create table briar_channel_changes (
   조직 에이전트인지 어느 프로젝트 소속인지를 부기해 구분한다.
 - 서버 검증: 멘션된 유저는 채널 접근 권한이 있어야 하고, 멘션된 에이전트는
   `briar_channel_agents`에 있어야 한다. 아니면 400.
-- 답글 잡 트리거는 `mentionsBriar` 같은 정규식이 아니라 검증된
-  `mentionedAgentIds`다.
+- 답글 잡 트리거는 본문 정규식이 아니라 검증된 `mentionedAgentIds`다.
 
 ## 실행 경로와 프로젝트 귀속
 

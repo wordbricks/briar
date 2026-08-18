@@ -174,6 +174,9 @@ describe("workflow v2 D1 persistence and transitions", () => {
         "0112_expand_agent_text_limits.sql",
         // 0115 backfills approval events from the progress table introduced by 0059.
         "0115_issue_status_actor_tracking.sql",
+        // 0116 rebuilds issue reply jobs from the explicit-skill schema that
+        // this historical workflow fixture deliberately leaves out.
+        "0116_issue_project_agent_replies.sql",
       ],
     });
 

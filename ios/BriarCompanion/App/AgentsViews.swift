@@ -110,6 +110,9 @@ struct AgentsHomeView<ToolbarContentType: ToolbarContent>: View {
                         SessionDetailView(
                             session: session,
                             agent: session.agentId.flatMap { agents.agent(id: $0) },
+                            projectAgents: agents.agents.filter {
+                                $0.projectId == project.id
+                            },
                             project: project,
                             token: token,
                             api: api,
@@ -611,6 +614,7 @@ func workerCanRunAgentSkill(_ worker: DashboardWorker, provider: AgentProvider) 
 struct SessionDetailView: View {
     let session: ProjectAgentSession
     let agent: ProjectAgent?
+    let projectAgents: [ProjectAgent]
     let project: ProjectsResponse.Project
     let token: String
     let api: any MobileAPIClientProtocol
@@ -623,6 +627,7 @@ struct SessionDetailView: View {
     init(
         session: ProjectAgentSession,
         agent: ProjectAgent?,
+        projectAgents: [ProjectAgent] = [],
         project: ProjectsResponse.Project,
         token: String,
         api: any MobileAPIClientProtocol,
@@ -634,6 +639,7 @@ struct SessionDetailView: View {
     ) {
         self.session = session
         self.agent = agent
+        self.projectAgents = projectAgents
         self.project = project
         self.token = token
         self.api = api
@@ -714,6 +720,7 @@ struct SessionDetailView: View {
                                     issueKeyPrefix: project.effectiveIssueKeyPrefix,
                                     token: token,
                                     api: api,
+                                    projectAgents: projectAgents,
                                     allRuns: snapshot?.runs ?? [],
                                     workers: snapshot?.workers ?? [],
                                     providers: snapshot?.organizationProviders ?? [],

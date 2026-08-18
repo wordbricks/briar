@@ -9,6 +9,7 @@ import {
   createIssueDependency,
   createIssueMessage,
   enqueueIssueAgentReply,
+  failIssueAgentReply,
   listIssueThreadMessages,
   listOrganizationUsageExecutionAttempts,
   listOrganizationUsageCostRecords,
@@ -207,8 +208,18 @@ describe("detached execution workers", () => {
          add column selected_skill_model_snapshot text;
        alter table briar_issue_agent_reply_jobs
          add column selected_skill_effort_snapshot text;
+       alter table briar_issue_messages add column author_agent_id text;
+       alter table briar_issue_messages add column author_agent_name text;
+       alter table briar_issue_agent_reply_jobs add column agent_id text;
        alter table briar_issue_agent_reply_jobs
-         add column skill_execution_request_snapshot text;`,
+         add column requires_preferred_worker integer not null default 0;
+       alter table briar_issue_agent_reply_jobs add column agent_name_snapshot text;
+       alter table briar_issue_agent_reply_jobs
+         add column agent_responsibility_snapshot text;
+       alter table briar_issue_agent_reply_jobs
+         add column skill_execution_request_snapshot text;
+       create unique index briar_issue_agent_reply_jobs_agent_test_idx
+         on briar_issue_agent_reply_jobs (project_id, trigger_message_id, agent_id);`,
     );
     await executeD1Sql(
       db,
@@ -843,7 +854,7 @@ describe("detached execution workers", () => {
       parentMessageId: null,
       authorUserId: "owner",
       authorAgentProvider: null,
-      body: "@briar what changed?",
+      body: "@Developer what changed?",
       createdAt: atMinute(3),
     });
     await enqueueIssueAgentReply(db, {
@@ -884,7 +895,7 @@ describe("detached execution workers", () => {
     });
   });
 
-  it("lets another worker answer when the previous worker is inaccessible", async () => {
+  it("does not move a reply away from the processing worker's worktree", async () => {
     const previous = await register("offline", 1);
     const fallback = await register("available", 10);
     const runId = await recordHuntEvent(
@@ -904,7 +915,7 @@ describe("detached execution workers", () => {
       parentMessageId: null,
       authorUserId: "owner",
       authorAgentProvider: null,
-      body: "@briar summarize the result",
+      body: "@Developer summarize the result",
       createdAt: atMinute(11),
     });
     await enqueueIssueAgentReply(db, {
@@ -927,9 +938,95 @@ describe("detached execution workers", () => {
         leaseExpiresAt: atMinute(27),
         staleBefore: atMinute(9),
       }),
+    ).resolves.toBeNull();
+  });
+
+  it("keeps a failed reply on the processing worker for retry", async () => {
+    const previous = await register("retry-processing", 1);
+    const fallback = await register("retry-fallback", 1);
+    const runId = await recordHuntEvent(
+      db,
+      projectId,
+      queuedEvent("mention-retry", 2),
+    );
+    await db
+      .prepare(`update briar_hunt_runs set worker_id = ? where id = ?`)
+      .bind(previous.worker.id, runId)
+      .run();
+    const triggerMessageId = "aaaaaaa1-dddd-4ddd-8ddd-aaaaaaaaaaaa";
+    await createIssueMessage(db, {
+      id: triggerMessageId,
+      projectId,
+      runId,
+      parentMessageId: null,
+      authorUserId: "owner",
+      authorAgentProvider: null,
+      body: "@Developer retry this reply",
+      createdAt: atMinute(3),
+    });
+    await enqueueIssueAgentReply(db, {
+      id: "bbbbbbb2-eeee-4eee-8eee-bbbbbbbbbbbb",
+      projectId,
+      runId,
+      triggerMessageId,
+      parentMessageId: triggerMessageId,
+      replyMessageId: "ccccccc3-ffff-4fff-8fff-cccccccccccc",
+      createdAt: atMinute(3),
+    });
+
+    const claimTokenHash = fingerprint("retry-processing-claim");
+    await expect(
+      claimNextIssueAgentReply(db, projectId, {
+        workerId: previous.worker.id,
+        agentProvider: "codex",
+        agentProviders: ["codex"],
+        claimTokenHash,
+        claimedAt: atMinute(4),
+        leaseExpiresAt: atMinute(19),
+        staleBefore: atMinute(0),
+      }),
     ).resolves.toMatchObject({
-      trigger_message_id: triggerMessageId,
-      claimed_worker_id: fallback.worker.id,
+      claimed_worker_id: previous.worker.id,
+      preferred_worker_id: previous.worker.id,
+    });
+
+    await expect(
+      failIssueAgentReply(db, projectId, "bbbbbbb2-eeee-4eee-8eee-bbbbbbbbbbbb", {
+        workerId: previous.worker.id,
+        claimTokenHash,
+        error: "temporary reply failure",
+        updatedAt: atMinute(5),
+      }),
+    ).resolves.toMatchObject({
+      status: "queued",
+      preferred_worker_id: previous.worker.id,
+    });
+
+    await expect(
+      claimNextIssueAgentReply(db, projectId, {
+        workerId: fallback.worker.id,
+        agentProvider: "codex",
+        agentProviders: ["codex"],
+        claimTokenHash: fingerprint("retry-fallback-claim"),
+        claimedAt: atMinute(6),
+        leaseExpiresAt: atMinute(21),
+        staleBefore: atMinute(0),
+      }),
+    ).resolves.toBeNull();
+    await expect(
+      claimNextIssueAgentReply(db, projectId, {
+        workerId: previous.worker.id,
+        agentProvider: "codex",
+        agentProviders: ["codex"],
+        claimTokenHash: fingerprint("retry-processing-claim-2"),
+        claimedAt: atMinute(6),
+        leaseExpiresAt: atMinute(21),
+        staleBefore: atMinute(0),
+      }),
+    ).resolves.toMatchObject({
+      status: "running",
+      claimed_worker_id: previous.worker.id,
+      attempts: 2,
     });
   });
 
@@ -948,7 +1045,7 @@ describe("detached execution workers", () => {
       parentMessageId: null,
       authorUserId: "owner",
       authorAgentProvider: null,
-      body: "@briar inspect the server record",
+      body: "@Developer inspect the server record",
       createdAt: atMinute(3),
     });
     await enqueueIssueAgentReply(db, {
@@ -999,8 +1096,10 @@ describe("detached execution workers", () => {
       runId,
       parentMessageId: "aaaaaaaa-1111-4aaa-8aaa-aaaaaaaaaaaa",
       authorUserId: null,
+      authorAgentId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      authorAgentName: "Codex Agent",
       authorAgentProvider: "codex",
-      body: "Briar의 답변",
+      body: "Developer의 답변",
       createdAt: atMinute(3),
     });
     await createIssueMessage(db, {
@@ -1020,7 +1119,7 @@ describe("detached execution workers", () => {
       parentMessageId: "bbbbbbbb-2222-4bbb-8bbb-bbbbbbbbbbbb",
       authorUserId: "owner",
       authorAgentProvider: null,
-      body: "Briar 답변에 대한 대댓글",
+      body: "Developer 답변에 대한 대댓글",
       createdAt: atMinute(5),
     });
 

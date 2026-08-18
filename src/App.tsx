@@ -1040,6 +1040,7 @@ export function App() {
       clientMessageId?: string;
       parentMessageId: string | null;
       mentionedUserIds?: string[];
+      mentionedAgentIds?: string[];
     },
   ) => briar.addIssueMessage(runId, input);
   const processIssueNow = (run: HuntRun) => {
@@ -1393,6 +1394,9 @@ export function App() {
         issueKeyPrefix={briar.dashboard?.project.issueKeyPrefix}
         isUpdatingIssue={briar.updatingIssueId === inboxDetailRun.id}
         mentionMembers={briar.dashboard?.members ?? []}
+        mentionAgents={issueAgents.filter(
+          (agent) => agent.projectId === inboxDetailTarget.projectId,
+        )}
         currentUserId={briar.user?.id ?? null}
         onAddDependency={(prerequisiteRunId) =>
           briar.addIssueDependency(inboxDetailRun.id, prerequisiteRunId)}

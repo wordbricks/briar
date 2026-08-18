@@ -92,6 +92,7 @@ export const mobileIssueAttachmentSchema = z.object({
 
 export const mobileMessageAuthorSchema = z.object({
   id: z.string().nullable(),
+  agentId: z.uuid().nullable().optional(),
   name: z.string(),
   image: z.string().nullable(),
   provider: z.string().nullable(),
@@ -904,12 +905,15 @@ export const mobileCreateMessageRequestSchema = z.object({
   clientMessageId: z.uuid().optional(),
   parentMessageId: z.uuid().nullable(),
   mentionedUserIds: z.array(z.string()),
+  mentionedAgentIds: z.array(z.uuid()).default([]),
   agentConversationId: z.string().nullable(),
 }).strict();
 const mobileAgentReplySchema = z.object({
   id: z.uuid(),
   triggerMessageId: z.uuid(),
   parentMessageId: z.uuid(),
+  agentId: z.uuid().nullable().optional(),
+  agentName: z.string().nullable().optional(),
   status: z.enum(["queued", "running", "completed", "failed"]),
   attempts: z.number().int().nonnegative(),
   error: z.string().nullable(),
@@ -917,10 +921,13 @@ const mobileAgentReplySchema = z.object({
 export const mobileCreateMessageResponseSchema = z.object({
   message: mobileIssueMessageSchema,
   agentReply: mobileAgentReplySchema.nullable(),
+  agentReplies: z.array(mobileAgentReplySchema).default([]),
 });
 export const mobileAgentReplyResponseSchema = z.object({
   agentReply: mobileAgentReplySchema,
   message: mobileIssueMessageSchema.nullable(),
+  agentReplies: z.array(mobileAgentReplySchema).default([]),
+  messages: z.array(mobileIssueMessageSchema).default([]),
 });
 export const mobileAcceptIssueReworkProposalResponseSchema = z.object({
   proposal: mobileIssueReworkProposalSchema,

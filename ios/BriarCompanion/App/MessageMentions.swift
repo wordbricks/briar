@@ -130,11 +130,17 @@ enum MessageMentions {
         return URL(string: "briar-mention://\(encoded)")
     }
 
-    /// Issue conversation linkifies known organization members plus the Briar agent.
-    static func issueHandles(members: [OrganizationMember]) -> Set<String> {
-        var handles: Set<String> = ["briar"]
+    /// Issue conversation linkifies known organization members and Project Agents.
+    static func issueHandles(
+        members: [OrganizationMember],
+        agents: [ProjectAgent] = []
+    ) -> Set<String> {
+        var handles = Set<String>()
         for member in members {
             handles.insert(issueHandle(for: member))
+        }
+        for agent in agents {
+            handles.insert(issueHandle(for: agent))
         }
         return handles
     }
@@ -145,18 +151,25 @@ enum MessageMentions {
         )
     }
 
+    static func issueHandle(for agent: ProjectAgent) -> String {
+        ChannelMentions.normalizedHandle(agent.name)
+    }
+
     static func issueCandidates(
         members: [OrganizationMember],
+        agents: [ProjectAgent] = [],
         currentUserId: String?
     ) -> [ChannelMentionTarget] {
-        let briar = ChannelMentionTarget(
-            kind: .agent,
-            recipientId: "briar",
-            handle: "briar",
-            label: "Briar",
-            detail: "Agent",
-            image: nil
-        )
+        let agentTargets = agents.map { agent in
+            ChannelMentionTarget(
+                kind: .agent,
+                recipientId: agent.id.uuidString,
+                handle: issueHandle(for: agent),
+                label: agent.name,
+                detail: agent.summary,
+                image: agent.avatar
+            )
+        }
         let memberTargets = members.map { member in
             ChannelMentionTarget(
                 kind: .user,
@@ -169,7 +182,7 @@ enum MessageMentions {
                 image: member.image
             )
         }
-        return [briar] + memberTargets
+        return agentTargets + memberTargets
     }
 }
 
