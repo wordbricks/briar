@@ -3776,6 +3776,9 @@ describe("HuntDashboard", () => {
         selectedRunId={null}
       />,
     ));
+    const board = container.querySelector<HTMLDivElement>(".kanban-board");
+    expect(board).not.toBeNull();
+    if (board) board.scrollLeft = 248;
     await act(async () =>
       container.querySelector<HTMLButtonElement>(".kanban-card")?.click(),
     );
@@ -3799,6 +3802,51 @@ describe("HuntDashboard", () => {
         ?.click(),
     );
     expect(onSelectedRunChange).toHaveBeenLastCalledWith(null);
+
+    await act(async () => root.render(
+      <HuntDashboard
+        {...dashboardProps}
+        dashboard={dashboard}
+        onSelectedRunChange={onSelectedRunChange}
+        selectedRunId={null}
+      />,
+    ));
+    expect(container.querySelector<HTMLDivElement>(".kanban-board")?.scrollLeft)
+      .toBe(248);
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("restores the Kanban scroll position through internal issue navigation", async () => {
+    const run = demoDashboard.runs[0];
+    const dashboard = { ...demoDashboard, runs: [run] };
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => root.render(
+      <HuntDashboard
+        {...dashboardProps}
+        dashboard={dashboard}
+      />,
+    ));
+    const board = container.querySelector<HTMLDivElement>(".kanban-board");
+    expect(board).not.toBeNull();
+    if (board) board.scrollLeft = 248;
+
+    await act(async () =>
+      container.querySelector<HTMLElement>(".kanban-card")?.click(),
+    );
+    expect(container.querySelector(".run-page-shell")).not.toBeNull();
+
+    await act(async () =>
+      container.querySelector<HTMLButtonElement>(
+        ".run-page-titlebar-back",
+      )?.click(),
+    );
+    expect(container.querySelector<HTMLDivElement>(".kanban-board")?.scrollLeft)
+      .toBe(248);
 
     await act(async () => root.unmount());
     container.remove();
