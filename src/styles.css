@@ -6338,6 +6338,148 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .channel-message-avatar-fallback.webhook { color: #17605b; background: #d9f3ee; }
 .channel-agent-badge.webhook { color: #17605b; background: #d9f3ee; }
 
+.channel-settings-dialog { width: min(600px, calc(100vw - 40px)); }
+.channel-settings-dialog h2 {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.channel-settings-dialog h2 svg { flex: 0 0 auto; color: var(--muted-foreground); }
+.channel-settings-tabs {
+  display: flex;
+  gap: 4px;
+  margin: 0 24px;
+  border-bottom: 1px solid var(--border);
+}
+.channel-settings-tabs button {
+  margin-bottom: -1px;
+  padding: 9px 12px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--muted-foreground);
+  background: transparent;
+  cursor: pointer;
+  font: 600 var(--text-xs)/1 inherit;
+}
+.channel-settings-tabs button:hover { color: var(--foreground); }
+.channel-settings-tabs button.active {
+  border-bottom-color: var(--primary);
+  color: var(--foreground);
+}
+.channel-settings-body {
+  min-height: 220px;
+  max-height: 420px;
+  overflow-y: auto;
+  padding: 18px 24px 20px;
+  display: grid;
+  align-content: start;
+  gap: 16px;
+}
+.channel-settings-field { display: grid; gap: 7px; }
+.channel-settings-field > label,
+.channel-settings-field > span {
+  color: var(--muted-foreground);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+}
+.channel-settings-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 9px; }
+.channel-settings-row input,
+.channel-settings-field select {
+  min-width: 0;
+  height: 40px;
+  border: 1px solid var(--input);
+  border-radius: 10px;
+  padding: 0 12px;
+  color: var(--foreground);
+  background: var(--background);
+  font: 500 var(--text-sm)/1 inherit;
+}
+.channel-settings-row input:focus,
+.channel-settings-field select:focus {
+  border-color: var(--ring);
+  outline: 0;
+  box-shadow: 0 0 0 3px rgb(118 91 208 / 11%);
+}
+.channel-settings-row button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 40px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0 14px;
+  color: var(--foreground);
+  background: var(--card);
+  cursor: pointer;
+  font: 700 var(--text-xs)/1 inherit;
+  white-space: nowrap;
+}
+.channel-settings-row button:hover:not(:disabled) { background: var(--muted); }
+.channel-settings-id {
+  min-width: 0;
+  overflow: hidden;
+  padding: 12px;
+  border-radius: 10px;
+  background: var(--muted);
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.channel-settings-created {
+  margin: 0;
+  color: var(--foreground);
+  font-size: var(--text-sm);
+}
+.channel-settings-search { margin: 0; }
+.channel-settings-add {
+  display: flex;
+  width: 100%;
+  min-height: 46px;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 12px;
+  border: 1px dashed var(--border);
+  border-radius: 11px;
+  color: var(--primary);
+  background: transparent;
+  cursor: pointer;
+  font: 600 var(--text-xs)/1 inherit;
+}
+.channel-settings-add:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--primary) 40%, transparent);
+  background: color-mix(in srgb, var(--primary) 6%, var(--card));
+}
+.channel-settings-member-list {
+  display: grid;
+  align-content: start;
+  gap: 3px;
+}
+.channel-settings-member {
+  min-height: 54px;
+  padding: 7px 9px;
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  border-radius: 11px;
+}
+.channel-settings-member:hover { background: var(--muted); }
+.channel-settings-member-copy { min-width: 0; display: grid; gap: 4px; }
+.channel-settings-member-copy strong,
+.channel-settings-member-copy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.channel-settings-member-copy strong { font-size: var(--text-xs); }
+.channel-settings-member-copy small { color: var(--muted-foreground); font-size: var(--text-2xs); }
+.channel-settings-member em {
+  color: var(--muted-foreground);
+  font-size: var(--text-2xs);
+  font-style: normal;
+}
+
 .channel-messages {
   display: flex;
   min-height: 0;
