@@ -186,6 +186,10 @@ export const ko = {
   "channel.react": "React",
   "channel.reactWith": "{emoji} 리액션",
   "channel.reactionCount": "{emoji} {count}",
+  "channel.reactionPeople": "{emoji} 리액션",
+  "channel.reactionPeopleLabel": "{emoji} {count} · {names}",
+  "channel.reactionPeopleMore": "+{count}명 더",
+  "channel.reactionUnknown": "알 수 없는 멤버",
   "channel.messageActions": "메시지 동작",
   "channel.moreActions": "더 보기",
   "channel.copyLink": "링크 복사",
@@ -1945,6 +1949,10 @@ export type Messages = Record<MessageKey, string>;
 
 export const en: Messages = {
   ...ko,
+  "channel.reactionPeople": "{emoji} reaction",
+  "channel.reactionPeopleLabel": "{emoji} {count} · {names}",
+  "channel.reactionPeopleMore": "+{count} more",
+  "channel.reactionUnknown": "Unknown member",
   "channel.loadingMessages": "Loading messages…",
   "inbox.noNotificationSelected": "No notification selected",
   "inbox.resizeDetailPane": "Resize inbox detail panel",
@@ -2969,6 +2977,10 @@ export const en: Messages = {
 };
 export const zh: Messages = {
   ...en,
+  "channel.reactionPeople": "{emoji} 回应",
+  "channel.reactionPeopleLabel": "{emoji} {count} · {names}",
+  "channel.reactionPeopleMore": "另有 {count} 人",
+  "channel.reactionUnknown": "未知成员",
   "channel.loadingMessages": "正在加载消息…",
   "inbox.noNotificationSelected": "未选择通知",
   "inbox.resizeDetailPane": "调整收件箱详情面板大小",

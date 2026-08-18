@@ -12,6 +12,12 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { useToast } from "@/components/ui/toast";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useI18n } from "../i18n";
 import { channelBodyWithoutImages } from "./ChannelImages";
 import {
@@ -19,7 +25,13 @@ import {
   type ChannelEmojiPickerPosition,
 } from "../lib/channel-emoji-picker-position";
 import {
+  previewChannelReactionPeople,
+  resolveChannelReactionPeople,
+  type ChannelReactionPerson,
+} from "../lib/channel-reaction-people";
+import {
   channelQuickReactionEmojis,
+  type ChannelMember,
   type ChannelMessage,
   type ChannelMessageReaction,
 } from "../lib/channels-contract";
@@ -31,6 +43,7 @@ import {
 type ChannelMessageReactionsProps = {
   message: ChannelMessage;
   currentUserId: string | null;
+  members?: readonly ChannelMember[];
   organizationId?: string;
   busy?: boolean;
   /** Compact mobile layout keeps the add control always visible. */
@@ -50,6 +63,7 @@ type EmojiMartSelection = {
 export function ChannelMessageReactions({
   message,
   currentUserId,
+  members = [],
   organizationId,
   busy = false,
   alwaysShowAdd = false,
@@ -215,30 +229,33 @@ export function ChannelMessageReactions({
         className={`channel-message-reactions${hasReactions ? " has-reactions" : ""}${alwaysShowAdd ? " always-show-add" : ""}`}
       >
         {hasReactions ? (
-          <div className="channel-reaction-chips" role="list">
-            {message.reactions.map((reaction) => (
-              <ReactionChip
-                key={reaction.emoji}
-                busy={busy}
-                currentUserId={currentUserId}
-                onToggle={() => handleToggle(reaction.emoji)}
-                reaction={reaction}
-              />
-            ))}
-            <button
-              aria-controls={pickerId}
-              aria-expanded={pickerOpen}
-              aria-label={t("channel.react")}
-              className="channel-reaction-add"
-              disabled={busy}
-              onClick={openPicker}
-              title={t("channel.react")}
-              type="button"
-            >
-              <SmilePlus aria-hidden="true" size={14} />
-              <span>{t("channel.react")}</span>
-            </button>
-          </div>
+          <TooltipProvider delayDuration={200}>
+            <div className="channel-reaction-chips" role="list">
+              {message.reactions.map((reaction) => (
+                <ReactionChip
+                  key={reaction.emoji}
+                  busy={busy}
+                  currentUserId={currentUserId}
+                  members={members}
+                  onToggle={() => handleToggle(reaction.emoji)}
+                  reaction={reaction}
+                />
+              ))}
+              <button
+                aria-controls={pickerId}
+                aria-expanded={pickerOpen}
+                aria-label={t("channel.react")}
+                className="channel-reaction-add"
+                disabled={busy}
+                onClick={openPicker}
+                title={t("channel.react")}
+                type="button"
+              >
+                <SmilePlus aria-hidden="true" size={14} />
+                <span>{t("channel.react")}</span>
+              </button>
+            </div>
+          </TooltipProvider>
         ) : alwaysShowAdd ? (
           <button
             aria-controls={pickerId}
@@ -397,14 +414,41 @@ function channelMessageCopyText(message: ChannelMessage): string {
   return channelBodyWithoutImages(message.body) || message.body.trim();
 }
 
+function reactionPersonLabel(
+  person: ChannelReactionPerson,
+  t: ReturnType<typeof useI18n>["t"],
+) {
+  if (person.name && person.isCurrentUser) {
+    return `${person.name} (${t("channel.you")})`;
+  }
+  if (person.name) return person.name;
+  if (person.isCurrentUser) return t("channel.you");
+  return t("channel.reactionUnknown");
+}
+
+function ReactionPersonAvatar({
+  name,
+  image,
+}: {
+  name: string;
+  image: string | null;
+}) {
+  if (image) {
+    return <img alt="" src={image} />;
+  }
+  return <span>{name.trim().charAt(0).toUpperCase() || "?"}</span>;
+}
+
 function ReactionChip({
   busy,
   currentUserId,
+  members,
   onToggle,
   reaction,
 }: {
   busy: boolean;
   currentUserId: string | null;
+  members: readonly ChannelMember[];
   onToggle: () => void;
   reaction: ChannelMessageReaction;
 }) {
@@ -412,24 +456,77 @@ function ReactionChip({
   const mine = Boolean(
     currentUserId && reaction.userIds.includes(currentUserId),
   );
-  return (
-    <button
-      aria-label={t("channel.reactionCount", {
+  const people = resolveChannelReactionPeople({
+    currentUserId,
+    members,
+    userIds: reaction.userIds,
+  });
+  const { visible, hiddenCount } = previewChannelReactionPeople(people);
+  const names = people.map((person) => reactionPersonLabel(person, t));
+  const label = names.length > 0
+    ? t("channel.reactionPeopleLabel", {
         emoji: reaction.emoji,
         count: reaction.count,
-      })}
-      aria-pressed={mine}
-      className={`channel-reaction-chip${mine ? " is-mine" : ""}`}
-      disabled={busy}
-      onClick={(event) => {
-        event.stopPropagation();
-        onToggle();
-      }}
-      role="listitem"
-      type="button"
-    >
-      <span aria-hidden="true">{reaction.emoji}</span>
-      <span>{reaction.count}</span>
-    </button>
+        names: names.join(", "),
+      })
+    : t("channel.reactionCount", {
+        emoji: reaction.emoji,
+        count: reaction.count,
+      });
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          aria-label={label}
+          aria-pressed={mine}
+          className={`channel-reaction-chip${mine ? " is-mine" : ""}`}
+          disabled={busy}
+          onClick={(event) => {
+            event.stopPropagation();
+            onToggle();
+          }}
+          role="listitem"
+          type="button"
+        >
+          <span aria-hidden="true">{reaction.emoji}</span>
+          <span>{reaction.count}</span>
+        </button>
+      </TooltipTrigger>
+      <TooltipContent
+        className="channel-reaction-people-tooltip"
+        side="top"
+        sideOffset={6}
+      >
+        <div className="channel-reaction-people-heading">
+          {t("channel.reactionPeople", { emoji: reaction.emoji })}
+        </div>
+        <ul className="channel-reaction-people">
+          {visible.map((person) => {
+            const name = reactionPersonLabel(person, t);
+            return (
+              <li className="channel-reaction-person" key={person.userId}>
+                <span
+                  aria-hidden="true"
+                  className="channel-reaction-person-avatar"
+                >
+                  <ReactionPersonAvatar
+                    image={person.image}
+                    name={person.name ??
+                      (person.isCurrentUser ? t("channel.you") : "?")}
+                  />
+                </span>
+                <span className="channel-reaction-person-name">{name}</span>
+              </li>
+            );
+          })}
+        </ul>
+        {hiddenCount > 0 ? (
+          <div className="channel-reaction-people-more">
+            {t("channel.reactionPeopleMore", { count: hiddenCount })}
+          </div>
+        ) : null}
+      </TooltipContent>
+    </Tooltip>
   );
 }
