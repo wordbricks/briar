@@ -4026,6 +4026,40 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .project-agent-dialog > header .eyebrow { margin-bottom:4px; }
 .project-agent-dialog > header button { width:34px; height:34px; display:grid; place-items:center; border:1px solid var(--border); border-radius:9px; color:var(--muted-foreground); background:var(--muted); cursor:pointer; }
 .project-agent-form { padding:22px 24px; overflow-y:auto; display:grid; gap:17px; }
+.project-agent-template-picker { display:grid; gap:10px; }
+.project-agent-template-picker > header { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; }
+.project-agent-template-picker > header > span { min-width:0; display:grid; gap:3px; }
+.project-agent-template-picker > header strong { color:var(--foreground); font-size:var(--text-2xs); }
+.project-agent-template-picker > header small { color:var(--muted-foreground); font-size:var(--text-2xs); font-weight:500; line-height:1.5; }
+.project-agent-template-picker > header em { flex:0 0 auto; color:var(--muted-foreground); font-size:var(--text-2xs); font-style:normal; }
+.project-agent-template-list { display:grid; gap:10px; }
+.project-agent-template-list > article { overflow:hidden; border:1px solid var(--border); border-radius:14px; background:var(--card); transition:border-color .15s ease,box-shadow .15s ease; }
+.project-agent-template-list > article.selected { border-color:color-mix(in srgb,var(--primary) 55%,var(--border)); box-shadow:0 0 0 3px color-mix(in srgb,var(--primary) 10%,transparent); }
+.project-agent-template-identity { padding:14px 14px 10px; display:grid; grid-template-columns:38px minmax(0,1fr); align-items:start; gap:11px; }
+.project-agent-template-identity > span { width:38px; height:38px; display:grid; place-items:center; border:1px solid color-mix(in srgb,#06b6d4 30%,var(--border)); border-radius:11px; background:color-mix(in srgb,#06b6d4 10%,var(--card)); font-size:19px; }
+.project-agent-template-identity > div { min-width:0; }
+.project-agent-template-identity h3 { margin:1px 0 4px; color:var(--foreground); font-size:var(--text-sm); line-height:1.3; }
+.project-agent-template-identity p { margin:0; color:var(--muted-foreground); font-size:var(--text-2xs); line-height:1.5; }
+.project-agent-template-badges { padding:0 14px 12px 63px; display:flex; flex-wrap:wrap; gap:5px; }
+.project-agent-template-badges span { min-height:22px; padding:3px 7px; display:inline-flex; align-items:center; border:1px solid var(--border); border-radius:999px; color:var(--foreground); background:var(--muted); font-size:10px; font-weight:600; }
+.project-agent-template-actions { min-height:46px; padding:8px 10px 8px 14px; display:flex; align-items:center; justify-content:space-between; gap:10px; border-top:1px solid var(--border); background:var(--muted); }
+.project-agent-template-actions > div { min-width:0; display:flex; align-items:center; flex-wrap:wrap; gap:5px 10px; }
+.project-agent-template-actions a,.project-agent-template-actions summary { display:inline-flex; align-items:center; gap:4px; color:var(--foreground); font-size:10px; font-weight:600; text-decoration:none; cursor:pointer; }
+.project-agent-template-actions a:hover,.project-agent-template-actions summary:hover { color:var(--foreground); }
+.project-agent-template-actions details { position:relative; }
+.project-agent-template-actions summary { list-style:none; }
+.project-agent-template-actions summary::-webkit-details-marker { display:none; }
+.project-agent-template-actions details[open] { width:100%; }
+.project-agent-template-actions pre { max-width:450px; max-height:170px; margin:8px 0 2px; padding:10px; overflow:auto; border:1px solid var(--border); border-radius:9px; color:var(--foreground); background:var(--card); font:500 10px/1.5 "DM Mono",monospace; white-space:pre-wrap; }
+.project-agent-template-actions > button { min-width:112px; height:31px; padding:0 10px; flex:0 0 auto; display:flex; align-items:center; justify-content:center; gap:6px; border:1px solid var(--border); border-radius:8px; color:var(--foreground); background:var(--card); cursor:pointer; font-size:var(--text-2xs); font-weight:650; }
+.project-agent-template-actions > button:hover { border-color:color-mix(in srgb,var(--primary) 45%,var(--border)); }
+.project-agent-template-actions > button[aria-pressed="true"] { border-color:color-mix(in srgb,var(--primary) 35%,var(--border)); color:var(--primary); background:color-mix(in srgb,var(--primary) 9%,var(--card)); }
+.project-agent-template-actions a:focus-visible,.project-agent-template-actions summary:focus-visible { border-radius:4px; outline:2px solid var(--ring); outline-offset:2px; }
+.project-agent-template-skill { min-height:50px; padding:9px 14px; display:grid; grid-template-columns:18px minmax(0,1fr) auto; align-items:center; gap:8px; border-top:1px solid color-mix(in srgb,var(--primary) 18%,var(--border)); color:var(--primary); background:color-mix(in srgb,var(--primary) 5%,var(--card)); }
+.project-agent-template-skill > span { min-width:0; display:grid; gap:2px; }
+.project-agent-template-skill strong { overflow:hidden; color:var(--foreground); font-size:var(--text-2xs); text-overflow:ellipsis; white-space:nowrap; }
+.project-agent-template-skill small { color:var(--foreground); font-size:10px; line-height:1.4; }
+.project-agent-template-skill > small { max-width:160px; text-align:right; }
 .project-agent-form label { min-width:0; display:grid; gap:7px; color:var(--foreground); font-size:var(--text-2xs); font-weight:600; }
 .project-agent-form label > span em { color:var(--muted-foreground); font-style:normal; }
 .project-agent-form input,.project-agent-form textarea { width:100%; padding:12px 13px; border:1px solid var(--border); border-radius:11px; outline:none; color:var(--foreground); background:var(--muted); font-size:var(--text-xs); resize:vertical; }
@@ -4232,6 +4266,12 @@ button.issue-message-state { width:100%; cursor:pointer; }
   .project-agent-grid { grid-template-columns:1fr; }
   .project-agent-form-runtime { grid-template-columns:1fr; }
   .project-agent-dialog { width:calc(100vw - 28px); max-height:calc(100dvh - 28px); }
+  .project-agent-template-badges { padding-left:14px; }
+  .project-agent-template-actions { align-items:stretch; flex-direction:column; }
+  .project-agent-template-actions > button { width:100%; }
+  .project-agent-template-actions pre { max-width:100%; }
+  .project-agent-template-skill { grid-template-columns:18px minmax(0,1fr); }
+  .project-agent-template-skill > small { grid-column:2; max-width:none; text-align:left; }
   .project-agent-run-panel { width:calc(100% - 36px); margin-top:20px; }
   .project-agent-run-composer > div { align-items:stretch; flex-direction:column; }
   .project-agent-run-composer > div > button { width:100%; }

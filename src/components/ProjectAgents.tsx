@@ -1,12 +1,15 @@
 import {
   Bot,
+  Check,
   ChevronRight,
   CircleAlert,
+  ExternalLink,
   LoaderCircle,
   Pencil,
   Play,
   Plus,
   Settings,
+  Wrench,
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -30,6 +33,11 @@ import {
   agentDescriptionMaxLength,
   agentResponsibilityMaxLength,
 } from "../lib/agent-limits";
+import {
+  projectAgentTemplates,
+  projectAgentTemplateSkillInputs,
+  type ProjectAgentTemplate,
+} from "../lib/agent-templates";
 import {
   agentEffortOptions,
   agentModelDisplayName,
@@ -730,21 +738,37 @@ export function ProjectAgentDialog({
   const [calendarColor, setCalendarColor] = useState(
     agent?.calendarColor ?? defaultProjectAgentCalendarColor,
   );
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(
+    null,
+  );
   const [submitError, setSubmitError] = useState<string | null>(null);
   const isEditing = agent !== null;
+  const selectedTemplate = projectAgentTemplates.find(
+    (template) => template.id === selectedTemplateId,
+  );
+
+  const applyTemplate = (template: ProjectAgentTemplate) => {
+    setSelectedTemplateId(template.id);
+    setName(template.name);
+    setDescription(template.description);
+    setResponsibility(template.responsibility);
+    setCalendarColor(template.calendarColor);
+    setSubmitError(null);
+  };
 
   return (
     <div
+      aria-label={t(
+        isEditing ? "agents.editDialog" : "agents.createDialog",
+      )}
+      aria-modal="true"
       className="dialog-backdrop"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget && !isSubmitting) onClose();
       }}
+      role="dialog"
     >
       <form
-        aria-label={t(
-          isEditing ? "agents.editDialog" : "agents.createDialog",
-        )}
-        aria-modal="true"
         className="project-agent-dialog"
         onSubmit={(event) => {
           event.preventDefault();
@@ -757,6 +781,15 @@ export function ProjectAgentDialog({
             effort,
             description: description.trim(),
             responsibility: responsibility.trim(),
+            ...(selectedTemplate
+              ? {
+                  skills: projectAgentTemplateSkillInputs(selectedTemplate, {
+                    provider,
+                    model: model || null,
+                    effort,
+                  }),
+                }
+              : {}),
             calendarColor,
           }).catch((caught) => {
             setSubmitError(
@@ -764,7 +797,6 @@ export function ProjectAgentDialog({
             );
           });
         }}
-        role="dialog"
       >
         <header>
           <div>
@@ -786,6 +818,97 @@ export function ProjectAgentDialog({
         </header>
 
         <div className="project-agent-form">
+          {!isEditing && (
+            <section
+              aria-labelledby="project-agent-template-title"
+              className="project-agent-template-picker"
+            >
+              <header>
+                <span>
+                  <strong id="project-agent-template-title">
+                    {t("agents.templateTitle")}
+                  </strong>
+                  <small>{t("agents.templateDescription")}</small>
+                </span>
+                <em>{t("common.optional")}</em>
+              </header>
+              <div className="project-agent-template-list">
+                {projectAgentTemplates.map((template) => {
+                  const isSelected = template.id === selectedTemplateId;
+                  const includedSkill = template.skills[0];
+                  return (
+                    <article
+                      className={isSelected ? "selected" : undefined}
+                      key={template.id}
+                    >
+                      <div className="project-agent-template-identity">
+                        <span aria-hidden="true">{template.emoji}</span>
+                        <div>
+                          <h3>{template.name}</h3>
+                          <p>{template.description}</p>
+                        </div>
+                      </div>
+                      <div className="project-agent-template-badges">
+                        <span>{t("agents.templateEngineering")}</span>
+                        <span>
+                          {t("agents.templateSkillCount", {
+                            count: template.skills.length,
+                          })}
+                        </span>
+                        <span>{t("agents.templateProviderNeutral")}</span>
+                      </div>
+                      <div className="project-agent-template-actions">
+                        <div>
+                          <a
+                            href={template.source.url}
+                            rel="noreferrer"
+                            target="_blank"
+                          >
+                            {t("agents.templateSource")}
+                            <ExternalLink aria-hidden="true" size={12} />
+                          </a>
+                          <details>
+                            <summary>{t("agents.templateLicense")}</summary>
+                            <pre>{template.source.licenseNotice}</pre>
+                          </details>
+                        </div>
+                        <button
+                          aria-pressed={isSelected}
+                          onClick={() => applyTemplate(template)}
+                          type="button"
+                        >
+                          {isSelected ? (
+                            <Check aria-hidden="true" size={14} />
+                          ) : (
+                            <Plus aria-hidden="true" size={14} />
+                          )}
+                          {t(
+                            isSelected
+                              ? "agents.templateApplied"
+                              : "agents.useTemplate",
+                          )}
+                        </button>
+                      </div>
+                      {isSelected && includedSkill && (
+                        <div className="project-agent-template-skill">
+                          <Wrench aria-hidden="true" size={15} />
+                          <span>
+                            <strong>{includedSkill.name}</strong>
+                            <small>
+                              {t("agents.templateInstructionsCount", {
+                                count: includedSkill.instructions.length,
+                              })}
+                            </small>
+                          </span>
+                          <small>{t("agents.templateCopyHint")}</small>
+                        </div>
+                      )}
+                    </article>
+                  );
+                })}
+              </div>
+            </section>
+          )}
           <label>
             <span>
               {t("agents.name")} <em>{t("common.optional")}</em>
