@@ -6397,7 +6397,7 @@ export function RunPage({
                                           </strong>
                                           {event.detail ? <p>{event.detail}</p> : null}
                                           <small>
-                                            {event.actor} · {relativeTime(event.occurredAt, t)}
+                                            {event.actorName ?? event.actor} · {relativeTime(event.occurredAt, t)}
                                           </small>
                                         </div>
                                       </div>
@@ -7711,7 +7711,7 @@ function IssueStatusHistoryPanel({
                   </strong>
                   {event.detail && <p>{event.detail}</p>}
                   <small>
-                    {event.actor} · {relativeTime(event.occurredAt, t)}
+                    {event.actorName ?? event.actor} · {relativeTime(event.occurredAt, t)}
                   </small>
                 </span>
               </div>

@@ -244,6 +244,7 @@ import {
   listDashboardRunsByIds,
   listDashboardChanges,
   listHuntRunEvents,
+  resolveHuntEventActorNames,
   listRunEvidence,
   listRunEvidenceImages,
   listRunStageRevisions,
@@ -5817,7 +5818,10 @@ export function projectUsageSummaryJson(
   );
 }
 
-const dashboardEventJson = (event: HuntEventRow) => ({
+const dashboardEventJson = (
+  event: HuntEventRow,
+  actorNames: ReadonlyMap<string, string> = new Map(),
+) => ({
   id: event.id,
   attempt: event.attempt,
   revision: event.revision,
@@ -5825,6 +5829,7 @@ const dashboardEventJson = (event: HuntEventRow) => ({
   workflowStage: event.workflow_stage,
   detail: event.detail,
   actor: event.actor,
+  actorName: actorNames.get(event.actor) ?? null,
   qaStatus: event.qa_status,
   trackerState: event.tracker_issue_state,
   pullRequestUrls: parseJsonArray(event.pull_request_urls),
@@ -10734,10 +10739,15 @@ async function route(
         right.occurred_at.localeCompare(left.occurred_at) ||
         right.id.localeCompare(left.id),
     );
+    const actorNames = await resolveHuntEventActorNames(
+      db,
+      project.id,
+      events.map((event) => event.actor),
+    );
     return json({
       runId: run.id,
       eventCount: events.length,
-      events: events.map(dashboardEventJson),
+      events: events.map((event) => dashboardEventJson(event, actorNames)),
     });
   }
 
@@ -13292,7 +13302,7 @@ async function route(
         snapshot: {
           run: {
             ...dashboardRunJson(run, attachments),
-            events: events.map(dashboardEventJson),
+            events: events.map((event) => dashboardEventJson(event)),
             // Workers from before first-class Agent Skills ignore work.agent,
             // but retain arbitrary fields inside snapshot.run. Keep the saved
             // profile here as read-only context during a rolling upgrade.

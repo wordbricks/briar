@@ -1609,7 +1609,11 @@ describe("API errors", () => {
   it("loads and normalizes timeline events from the run detail endpoint", async () => {
     const projectId = "22222222-2222-4222-8222-222222222222";
     const runId = "11111111-1111-4111-8111-111111111111";
-    const [{ revision: _revision, ...legacyEvent }] = demoRunEvents["demo-1"];
+    const [{
+      revision: _revision,
+      actorName: _actorName,
+      ...legacyEvent
+    }] = demoRunEvents["demo-1"];
     const fetchMock = vi.fn(async () =>
       new Response(JSON.stringify({ events: [legacyEvent] }), {
         headers: { "Content-Type": "application/json" },
@@ -1620,6 +1624,7 @@ describe("API errors", () => {
     const events = await loadRunEvents("token", projectId, runId);
 
     expect(events[0].revision).toBe(1);
+    expect(events[0].actorName).toBeNull();
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining(`/projects/${projectId}/runs/${runId}/events`),
       expect.objectContaining({ headers: expect.any(Headers) }),

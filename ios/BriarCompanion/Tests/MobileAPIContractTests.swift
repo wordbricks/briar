@@ -654,6 +654,7 @@ final class MobileAPIContractTests: XCTestCase {
         XCTAssertEqual(delta.runs.first?.status, .completed)
         XCTAssertEqual(delta.runs.first?.structuredResult?.outcome, "completed")
         XCTAssertEqual(events.events.first?.workflowStage, "implementing")
+        XCTAssertEqual(events.events.first?.actorName, "Briar User")
         XCTAssertEqual(messages.messages.first?.author.name, "Briar User")
         XCTAssertEqual(evidence.evidence.first?.status, .passed)
         XCTAssertEqual(evidence.evidence.first?.images?.first?.filename, "companion.png")

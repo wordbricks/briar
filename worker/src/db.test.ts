@@ -75,6 +75,7 @@ import {
   listDashboardRuns,
   listDashboardRunsByIds,
   listHuntRunEvents,
+  resolveHuntEventActorNames,
   listOrganizations,
   listOrganizationInvitations,
   listOrganizationIssueSubscriptionRunIds,
@@ -5694,6 +5695,20 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         actor: "briar-app:test-user",
       },
     ]);
+    await db.prepare(
+      `insert into "user" (id, name, email, emailVerified, createdAt, updatedAt)
+       values ('status-actor-outsider', 'Outsider', 'outsider@example.com', 1, ?, ?)`,
+    ).bind(atMinute(76), atMinute(76)).run();
+    const actorNames = await resolveHuntEventActorNames(db, projectId, [
+      "briar-app:owner",
+      "briar-app:status-actor-outsider",
+      "briar-app:deleted-user",
+      "briar-workflow",
+    ]);
+    expect(actorNames.get("briar-app:owner")).toBe("Owner");
+    expect(actorNames.has("briar-app:status-actor-outsider")).toBe(false);
+    expect(actorNames.has("briar-app:deleted-user")).toBe(false);
+    expect(actorNames.has("briar-workflow")).toBe(false);
   });
 
   it("rejects a manual running state outside the run workflow", async () => {

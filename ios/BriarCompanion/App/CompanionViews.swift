@@ -2439,7 +2439,7 @@ struct RunDetailView: View {
                         if let eventDetail = event.detail, !eventDetail.isEmpty {
                             Text(eventDetail).font(.subheadline)
                         }
-                        Text(event.actor).font(.caption).foregroundStyle(.secondary)
+                        Text(event.actorName ?? event.actor).font(.caption).foregroundStyle(.secondary)
                     }
                 }
             }
