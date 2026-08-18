@@ -214,6 +214,7 @@ const activityByAgentNameForReplies = (
 
 type ChannelsProps = {
   organizationId: string;
+  organizationName?: string;
   token: string;
   currentUserId: string | null;
   channels: ChannelSummary[];
@@ -226,6 +227,8 @@ type ChannelsProps = {
   onIssueCreated?: (projectId: string, runId: string) => void | Promise<void>;
   onSkillSessionAccepted?: (session: AutoHuntSession) => void;
   onViewingChannelChange?: (channelId: string | null) => void;
+  initialInviteChannelId?: string | null;
+  onInitialInviteHandled?: (channelId: string) => void;
   onCreateAgent?: () => void;
   inboxDetail?: boolean;
   onInboxDetailClose?: () => void;
@@ -253,6 +256,8 @@ const desktopChannelVirtualOverscan = 6;
 type ChannelInviteCandidate =
   | { type: "user"; id: string; member: OrganizationMember }
   | { type: "agent"; id: string; agent: ChannelAgentSummary };
+
+type ChannelInviteMode = "all" | "specific";
 
 const dayKey = (iso: string, localeTag: string) => {
   const date = new Date(iso);
@@ -362,6 +367,7 @@ const appendChannelReplySummary = (
 
 export function Channels({
   organizationId,
+  organizationName = "",
   token,
   currentUserId,
   channels,
@@ -374,6 +380,8 @@ export function Channels({
   onIssueCreated,
   onSkillSessionAccepted,
   onViewingChannelChange,
+  initialInviteChannelId = null,
+  onInitialInviteHandled,
   requestedMessage,
   onRequestedMessageOpen,
   inboxDetail = false,
@@ -432,6 +440,7 @@ export function Channels({
     null,
   );
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [inviteIsInitial, setInviteIsInitial] = useState(false);
   const [inviteMembers, setInviteMembers] = useState<OrganizationMember[]>([]);
   const [inviteAgents, setInviteAgents] = useState<ChannelAgentSummary[]>([]);
   const [inviteLoading, setInviteLoading] = useState(false);
@@ -475,6 +484,7 @@ export function Channels({
   const messagesScrollRef = useRef<HTMLDivElement | null>(null);
   const threadMessagesScrollRef = useRef<HTMLDivElement | null>(null);
   const optimisticThreadMessageIds = useRef(new Set<string>());
+  const initialInviteHandledChannelId = useRef<string | null>(null);
   const activeChannelIdRef = useRef(activeChannelId);
   const channelCache = useRef(new Map<string, CachedDesktopChannel>());
   const channelLoadAbortController = useRef<AbortController | null>(null);
@@ -591,9 +601,10 @@ export function Channels({
     }
   }, []);
 
-  const openInvite = useCallback(() => {
+  const openInvite = useCallback((initial = false) => {
     if (!activeChannelId) return;
     setInviteOpen(true);
+    setInviteIsInitial(initial);
     setInviteLoading(true);
     setInviteError(null);
     setInviteMembers([]);
@@ -609,6 +620,30 @@ export function Channels({
       .catch((cause) => setInviteError(errorMessage(cause)))
       .finally(() => setInviteLoading(false));
   }, [activeChannelId, organizationId, token]);
+
+  useEffect(() => {
+    if (
+      !initialInviteChannelId ||
+      initialInviteChannelId !== activeChannelId ||
+      !activeChannel ||
+      !channelListReady ||
+      channelLoading ||
+      initialInviteHandledChannelId.current === initialInviteChannelId
+    ) {
+      return;
+    }
+    initialInviteHandledChannelId.current = initialInviteChannelId;
+    openInvite(true);
+    onInitialInviteHandled?.(initialInviteChannelId);
+  }, [
+    activeChannel,
+    activeChannelId,
+    channelListReady,
+    channelLoading,
+    initialInviteChannelId,
+    onInitialInviteHandled,
+    openInvite,
+  ]);
 
   const openWebhooks = useCallback(() => {
     if (!activeChannelId) return;
@@ -695,7 +730,12 @@ export function Channels({
 
   const addInvitees = useCallback(
     async (selected: ChannelInviteCandidate[]) => {
-      if (!activeChannelId || selected.length === 0) return;
+      if (!activeChannelId) return;
+      if (selected.length === 0) {
+        setInviteOpen(false);
+        setInviteIsInitial(false);
+        return;
+      }
       setInviteSaving(true);
       setInviteError(null);
       const refreshRoster = async () => {
@@ -761,6 +801,7 @@ export function Channels({
           return;
         }
         setInviteOpen(false);
+        setInviteIsInitial(false);
       } finally {
         setInviteSaving(false);
       }
@@ -1969,7 +2010,7 @@ export function Channels({
                   type="button"
                   className="channel-header-icon channel-header-members"
                   aria-label={t("channel.headerMembers", { count: memberCount })}
-                  onClick={openInvite}
+                  onClick={() => openInvite()}
                 >
                   <Users size={16} aria-hidden="true" />
                   <span>{memberCount}</span>
@@ -2015,7 +2056,7 @@ export function Channels({
                   <ChannelWelcome
                     channel={activeChannel}
                     onCreateAgent={onCreateAgent}
-                    onAddPeople={openInvite}
+                    onAddPeople={() => openInvite()}
                   />
                   {loadingEarlierMessages ? (
                     <div className="channel-message-page-loader" role="status">
@@ -2107,7 +2148,7 @@ export function Channels({
               members={members}
               currentUserId={currentUserId}
               channelName={activeChannel.name}
-              onInvite={openInvite}
+              onInvite={() => openInvite()}
               onSend={(body, mentions, attachments, references) =>
                 void send(body, mentions, null, attachments, references)
               }
@@ -2244,7 +2285,7 @@ export function Channels({
             members={members}
             currentUserId={currentUserId}
             channelName={activeChannel.name}
-            onInvite={openInvite}
+            onInvite={() => openInvite()}
             placeholder={t("channel.threadPlaceholder")}
             onSend={(body, mentions, attachments, references) =>
               void send(
@@ -2274,11 +2315,16 @@ export function Channels({
           channelMembers={members}
           loading={inviteLoading}
           members={inviteMembers}
+          initialInvite={inviteIsInitial}
+          organizationName={organizationName}
           saving={inviteSaving}
           error={inviteError}
           onAdd={(selected) => void addInvitees(selected)}
           onClose={() => {
-            if (!inviteSaving) setInviteOpen(false);
+            if (!inviteSaving) {
+              setInviteOpen(false);
+              setInviteIsInitial(false);
+            }
           }}
         />
       ) : null}
@@ -2694,8 +2740,10 @@ function ChannelInviteDialog({
   channelAgents,
   channelMembers,
   error,
+  initialInvite,
   loading,
   members,
+  organizationName,
   saving,
   onAdd,
   onClose,
@@ -2705,8 +2753,10 @@ function ChannelInviteDialog({
   channelAgents: ChannelAgentSummary[];
   channelMembers: ChannelMember[];
   error: string | null;
+  initialInvite: boolean;
   loading: boolean;
   members: OrganizationMember[];
+  organizationName: string;
   saving: boolean;
   onAdd: (selected: ChannelInviteCandidate[]) => void;
   onClose: () => void;
@@ -2715,6 +2765,9 @@ function ChannelInviteDialog({
   const titleId = useId();
   const [query, setQuery] = useState("");
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
+  const [inviteMode, setInviteMode] = useState<ChannelInviteMode>(
+    initialInvite ? "all" : "specific",
+  );
 
   useEffect(() => {
     const closeOnEscape = (event: KeyboardEvent) => {
@@ -2749,8 +2802,21 @@ function ChannelInviteDialog({
     ];
   }, [agents, channelAgents, channelMembers, members]);
 
+  const allMemberCandidates = useMemo<ChannelInviteCandidate[]>(
+    () =>
+      members.map((member) => ({
+        type: "user" as const,
+        id: member.userId,
+        member,
+      })),
+    [members],
+  );
+  const candidatesToInvite = initialInvite
+    ? candidates.filter((candidate) => candidate.type === "user")
+    : candidates;
+
   const normalizedQuery = query.trim().toLowerCase();
-  const filtered = candidates.filter((candidate) => {
+  const filtered = candidatesToInvite.filter((candidate) => {
     if (!normalizedQuery) return true;
     const searchable =
       candidate.type === "user"
@@ -2769,9 +2835,16 @@ function ChannelInviteDialog({
     });
   };
 
-  const selected = candidates.filter((candidate) =>
+  const selected = candidatesToInvite.filter((candidate) =>
     selectedKeys.has(`${candidate.type}:${candidate.id}`),
   );
+  const selectedForAdd =
+    initialInvite && inviteMode === "all" ? allMemberCandidates : selected;
+  const organizationLabel = organizationName || t("channel.inviteOrganizationFallback");
+  const canAdd =
+    initialInvite && inviteMode === "all"
+      ? !loading && !saving
+      : selected.length > 0 && !loading && !saving;
 
   return (
     <div
@@ -2783,15 +2856,24 @@ function ChannelInviteDialog({
       <section
         aria-labelledby={titleId}
         aria-modal="true"
-        className="channel-invite-dialog"
+        className={`channel-invite-dialog${initialInvite ? " initial" : ""}`}
         role="dialog"
       >
         <header>
           <div>
             <h2 id={titleId}>
-              {t("channel.inviteTitle", { name: channel.name })}
+              {t(
+                initialInvite
+                  ? "channel.inviteInitialTitle"
+                  : "channel.inviteTitle",
+                { name: channel.name },
+              )}
             </h2>
-            <p>{t("channel.inviteDescription")}</p>
+            <p>
+              {initialInvite
+                ? t("channel.inviteInitialChannelName", { name: channel.name })
+                : t("channel.inviteDescription")}
+            </p>
           </div>
           <button
             aria-label={t("common.close")}
@@ -2803,78 +2885,124 @@ function ChannelInviteDialog({
           </button>
         </header>
 
-        <label className="channel-invite-search">
-          <Search aria-hidden="true" size={17} />
-          <input
-            autoFocus
-            disabled={loading || saving}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder={t("channel.inviteSearchPlaceholder")}
-            type="search"
-            value={query}
-          />
-        </label>
-
-        <div className="channel-invite-results">
-          {loading ? (
-            <p className="channel-invite-status">
-              <LoaderCircle className="spin" size={16} />
-              {t("channel.inviteLoading")}
-            </p>
-          ) : filtered.length > 0 ? (
-            filtered.map((candidate) => {
-              const key = `${candidate.type}:${candidate.id}`;
-              const checked = selectedKeys.has(key);
-              const name =
-                candidate.type === "user"
-                  ? candidate.member.name
-                  : candidate.agent.name;
-              const detail =
-                candidate.type === "user"
-                  ? candidate.member.email
-                  : candidate.agent.projectId
-                    ? candidate.agent.projectName
-                      ? `${t("channel.projectAgent")} · ${candidate.agent.projectName}`
-                      : t("channel.projectAgent")
-                    : t("channel.orgAgent");
-              const image =
-                candidate.type === "user"
-                  ? candidate.member.image
-                  : candidate.agent.avatar;
-              return (
-                <button
-                  aria-pressed={checked}
-                  className="channel-invite-candidate"
+        {initialInvite ? (
+          <fieldset className="channel-invite-mode-fieldset">
+            <legend>{t("channel.inviteMode")}</legend>
+            <div className="channel-invite-mode-options">
+              <label
+                className="channel-invite-mode-option"
+                data-selected={inviteMode === "all"}
+              >
+                <input
+                  autoFocus={inviteMode === "all"}
+                  checked={inviteMode === "all"}
                   disabled={saving}
-                  key={key}
-                  onClick={() => toggle(candidate)}
-                  type="button"
-                >
-                  <span className={`channel-invite-avatar ${candidate.type}`}>
-                    {image ? (
-                      <img alt="" src={image} />
-                    ) : candidate.type === "agent" ? (
-                      <Bot aria-hidden="true" size={18} />
-                    ) : (
-                      authorInitial(name)
-                    )}
-                  </span>
-                  <span>
-                    <strong>{name}</strong>
-                    <small>{detail}</small>
-                  </span>
-                  <i aria-hidden="true">{checked ? <Check size={15} /> : null}</i>
-                </button>
-              );
-            })
-          ) : (
-            <p className="channel-invite-status">
-              {candidates.length === 0
-                ? t("channel.inviteEveryoneAdded")
-                : t("channel.inviteNoResults")}
-            </p>
-          )}
-        </div>
+                  name="channel-invite-mode"
+                  onChange={() => setInviteMode("all")}
+                  type="radio"
+                  value="all"
+                />
+                <strong>
+                  {t("channel.inviteAllMembers", {
+                    count: loading ? "…" : members.length,
+                    organization: organizationLabel,
+                  })}
+                </strong>
+              </label>
+              <label
+                className="channel-invite-mode-option"
+                data-selected={inviteMode === "specific"}
+              >
+                <input
+                  checked={inviteMode === "specific"}
+                  disabled={saving}
+                  name="channel-invite-mode"
+                  onChange={() => setInviteMode("specific")}
+                  type="radio"
+                  value="specific"
+                />
+                <strong>{t("channel.inviteSpecificPeople")}</strong>
+              </label>
+            </div>
+          </fieldset>
+        ) : null}
+
+        {!initialInvite || inviteMode === "specific" ? (
+          <>
+            <label className="channel-invite-search">
+              <Search aria-hidden="true" size={17} />
+              <input
+                autoFocus={initialInvite && inviteMode === "specific"}
+                disabled={loading || saving}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder={t("channel.inviteSearchPlaceholder")}
+                type="search"
+                value={query}
+              />
+            </label>
+
+            <div className="channel-invite-results">
+              {loading ? (
+                <p className="channel-invite-status">
+                  <LoaderCircle className="spin" size={16} />
+                  {t("channel.inviteLoading")}
+                </p>
+              ) : filtered.length > 0 ? (
+                filtered.map((candidate) => {
+                  const key = `${candidate.type}:${candidate.id}`;
+                  const checked = selectedKeys.has(key);
+                  const name =
+                    candidate.type === "user"
+                      ? candidate.member.name
+                      : candidate.agent.name;
+                  const detail =
+                    candidate.type === "user"
+                      ? candidate.member.email
+                      : candidate.agent.projectId
+                        ? candidate.agent.projectName
+                          ? `${t("channel.projectAgent")} · ${candidate.agent.projectName}`
+                          : t("channel.projectAgent")
+                        : t("channel.orgAgent");
+                  const image =
+                    candidate.type === "user"
+                      ? candidate.member.image
+                      : candidate.agent.avatar;
+                  return (
+                    <button
+                      aria-pressed={checked}
+                      className="channel-invite-candidate"
+                      disabled={saving}
+                      key={key}
+                      onClick={() => toggle(candidate)}
+                      type="button"
+                    >
+                      <span className={`channel-invite-avatar ${candidate.type}`}>
+                        {image ? (
+                          <img alt="" src={image} />
+                        ) : candidate.type === "agent" ? (
+                          <Bot aria-hidden="true" size={18} />
+                        ) : (
+                          authorInitial(name)
+                        )}
+                      </span>
+                      <span>
+                        <strong>{name}</strong>
+                        <small>{detail}</small>
+                      </span>
+                      <i aria-hidden="true">{checked ? <Check size={15} /> : null}</i>
+                    </button>
+                  );
+                })
+              ) : (
+                <p className="channel-invite-status">
+                  {candidatesToInvite.length === 0
+                    ? t("channel.inviteEveryoneAdded")
+                    : t("channel.inviteNoResults")}
+                </p>
+              )}
+            </div>
+          </>
+        ) : null}
 
         {error ? (
           <p className="channel-invite-error" role="alert">
@@ -2884,13 +3012,15 @@ function ChannelInviteDialog({
 
         <footer>
           <span>
-            {selected.length > 0
+            {initialInvite && inviteMode === "all"
+              ? null
+              : selected.length > 0
               ? t("channel.inviteSelected", { count: selected.length })
               : t("channel.inviteSelectHint")}
           </span>
           <button
-            disabled={selected.length === 0 || loading || saving}
-            onClick={() => onAdd(selected)}
+            disabled={!canAdd}
+            onClick={() => onAdd(selectedForAdd)}
             type="button"
           >
             {saving ? t("channel.inviting") : t("channel.inviteAdd")}

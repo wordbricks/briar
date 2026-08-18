@@ -8,9 +8,13 @@ import {
   projectSidebarChannels,
 } from "../lib/channel-grouping";
 import { channelHasUnread } from "../lib/channel-unread";
-import type { ChannelSummary } from "../lib/channels-contract";
+import type {
+  ChannelSummary,
+  ChannelVisibility,
+} from "../lib/channels-contract";
 
 type SidebarChannelPage = string;
+type ChannelCreateStep = 1 | 2;
 
 type ChannelOpenHandler = (channelId: string) => void;
 
@@ -26,13 +30,19 @@ export function SidebarOrganizationChannels({
   activePage: SidebarChannelPage;
   channels: readonly ChannelSummary[];
   channelsLoading: boolean;
-  onChannelCreate?: (name: string) => Promise<void>;
+  onChannelCreate?: (
+    name: string,
+    visibility: ChannelVisibility,
+  ) => Promise<void>;
   onChannelOpen: ChannelOpenHandler;
 }) {
   const { t } = useI18n();
   const [expanded, setExpanded] = useState(true);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [channelName, setChannelName] = useState("");
+  const [channelVisibility, setChannelVisibility] =
+    useState<ChannelVisibility>("public");
+  const [createStep, setCreateStep] = useState<ChannelCreateStep>(1);
   const [createError, setCreateError] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const unlinkedChannels = useMemo(
@@ -51,23 +61,41 @@ export function SidebarOrganizationChannels({
     if (isCreating) return;
     setIsCreateOpen(false);
     setChannelName("");
+    setChannelVisibility("public");
+    setCreateStep(1);
     setCreateError(null);
   };
 
   const submitCreate = async () => {
     const name = channelName.trim();
     if (!name || !onChannelCreate || isCreating) return;
+    if (createStep === 1) {
+      setCreateStep(2);
+      return;
+    }
     setIsCreating(true);
     setCreateError(null);
     try {
-      await onChannelCreate(name);
+      await onChannelCreate(name, channelVisibility);
       setIsCreateOpen(false);
       setChannelName("");
+      setChannelVisibility("public");
+      setCreateStep(1);
     } catch (cause) {
       setCreateError(cause instanceof Error ? cause.message : String(cause));
     } finally {
       setIsCreating(false);
     }
+  };
+
+  const goBackFromCreate = () => {
+    if (isCreating) return;
+    if (createStep === 2) {
+      setCreateStep(1);
+      setCreateError(null);
+      return;
+    }
+    closeCreate();
   };
 
   return (
@@ -154,36 +182,94 @@ export function SidebarOrganizationChannels({
                 void submitCreate();
               }}
             >
-              <label htmlFor="new-channel-name">{t("channel.name")}</label>
-              <input
-                autoComplete="off"
-                autoFocus
-                disabled={isCreating}
-                id="new-channel-name"
-                maxLength={100}
-                onChange={(event) => setChannelName(event.target.value)}
-                placeholder={t("channel.namePlaceholder")}
-                value={channelName}
-              />
+              {createStep === 1 ? (
+                <>
+                  <label htmlFor="new-channel-name">{t("channel.name")}</label>
+                  <input
+                    autoComplete="off"
+                    autoFocus
+                    disabled={isCreating}
+                    id="new-channel-name"
+                    maxLength={100}
+                    onChange={(event) => setChannelName(event.target.value)}
+                    placeholder={t("channel.namePlaceholder")}
+                    value={channelName}
+                  />
+                </>
+              ) : (
+                <fieldset
+                  aria-label={t("channel.visibility")}
+                  className="channel-visibility-fieldset"
+                >
+                  <legend>{t("channel.visibility")}</legend>
+                  <div className="channel-visibility-options" role="radiogroup">
+                    <label
+                      className="channel-visibility-option"
+                      data-selected={channelVisibility === "public"}
+                    >
+                      <input
+                        checked={channelVisibility === "public"}
+                        disabled={isCreating}
+                        name="channel-visibility"
+                        onChange={() => setChannelVisibility("public")}
+                        type="radio"
+                        value="public"
+                      />
+                      <span className="channel-visibility-option-content">
+                        <strong>{t("channel.visibilityPublic")}</strong>
+                        <small>{t("channel.visibilityPublicDescription")}</small>
+                      </span>
+                    </label>
+                    <label
+                      className="channel-visibility-option"
+                      data-selected={channelVisibility === "private"}
+                    >
+                      <input
+                        checked={channelVisibility === "private"}
+                        disabled={isCreating}
+                        name="channel-visibility"
+                        onChange={() => setChannelVisibility("private")}
+                        type="radio"
+                        value="private"
+                      />
+                      <span className="channel-visibility-option-content">
+                        <strong>{t("channel.visibilityPrivate")}</strong>
+                        <small>{t("channel.visibilityPrivateDescription")}</small>
+                      </span>
+                    </label>
+                  </div>
+                </fieldset>
+              )}
               {createError ? (
                 <p className="channel-create-error" role="alert">
                   {createError}
                 </p>
               ) : null}
               <footer>
-                <button
-                  disabled={isCreating}
-                  onClick={closeCreate}
-                  type="button"
-                >
-                  {t("common.cancel")}
-                </button>
-                <button
-                  disabled={isCreating || !channelName.trim()}
-                  type="submit"
-                >
-                  {isCreating ? t("channel.creating") : t("channel.create")}
-                </button>
+                <span className="channel-create-step">
+                  {t("channel.createStep", { step: createStep })}
+                </span>
+                <div className="channel-create-actions">
+                  <button
+                    disabled={isCreating}
+                    onClick={goBackFromCreate}
+                    type="button"
+                  >
+                    {createStep === 1
+                      ? t("common.cancel")
+                      : t("navigation.back")}
+                  </button>
+                  <button
+                    disabled={isCreating || !channelName.trim()}
+                    type="submit"
+                  >
+                    {createStep === 1
+                      ? t("channel.next")
+                      : isCreating
+                        ? t("channel.creating")
+                        : t("channel.create")}
+                  </button>
+                </div>
               </footer>
             </form>
           </Dialog.Content>

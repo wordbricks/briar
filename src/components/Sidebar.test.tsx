@@ -167,7 +167,25 @@ describe("Sidebar", () => {
         ?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
     });
 
-    expect(onChannelCreate).toHaveBeenCalledWith("제품 피드백");
+    expect(onChannelCreate).not.toHaveBeenCalled();
+    expect(dialog?.textContent).toContain("공개 범위");
+    expect(dialog?.textContent).toContain("2 / 2단계");
+    const privateVisibility = dialog?.querySelector<HTMLInputElement>(
+      'input[type="radio"][value="private"]',
+    );
+    expect(
+      dialog?.querySelector<HTMLInputElement>('input[type="radio"][value="public"]')
+        ?.checked,
+    ).toBe(true);
+    await act(async () => privateVisibility?.click());
+    expect(privateVisibility?.checked).toBe(true);
+    await act(async () => {
+      dialog
+        ?.querySelector("form")
+        ?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    });
+
+    expect(onChannelCreate).toHaveBeenCalledWith("제품 피드백", "private");
     await act(async () => root.unmount());
     container.remove();
   });

@@ -421,8 +421,19 @@ body { overflow: hidden; font-synthesis: none; }
 .channel-create-dialog label { color:#555650; font-size:var(--text-xs); font-weight:600; }
 .channel-create-dialog input { width:100%; height:40px; padding:0 12px; border:1px solid #dedfda; border-radius:9px; outline:0; color:var(--foreground); background:var(--background); font:500 var(--text-sm)/1 inherit; }
 .channel-create-dialog input:focus { border-color:#9c89df; box-shadow:0 0 0 3px rgba(118,91,208,.11); }
+.channel-visibility-fieldset { min-width:0; margin:0; padding:0; border:0; }
+.channel-visibility-fieldset legend { padding:0; color:var(--foreground); font-size:var(--text-sm); font-weight:650; }
+.channel-visibility-options { display:grid; gap:8px; margin-top:10px; }
+.channel-visibility-option { display:flex; align-items:flex-start; gap:10px; padding:11px 12px; border:1px solid var(--border); border-radius:10px; color:var(--foreground)!important; background:var(--background); cursor:pointer; }
+.channel-visibility-option[data-selected="true"] { border-color:color-mix(in srgb,var(--primary) 48%,var(--border)); background:color-mix(in srgb,var(--primary) 7%,var(--card)); }
+.channel-visibility-option input[type="radio"] { width:17px; height:17px; flex:0 0 17px; margin:2px 0 0; padding:0; accent-color:var(--primary); }
+.channel-visibility-option-content { min-width:0; display:grid; gap:3px; }
+.channel-visibility-option-content strong { color:var(--foreground); font-size:var(--text-xs); }
+.channel-visibility-option-content small { color:var(--muted-foreground); font-size:var(--text-2xs); font-weight:450; line-height:1.45; }
 .channel-create-error { margin:1px 0 0; color:var(--destructive); font-size:var(--text-xs); }
-.channel-create-dialog footer { display:flex; justify-content:flex-end; gap:8px; padding-top:11px; }
+.channel-create-dialog footer { display:flex; align-items:center; justify-content:space-between; gap:8px; padding-top:11px; }
+.channel-create-step { color:var(--muted-foreground); font-size:var(--text-xs); }
+.channel-create-actions { display:flex; justify-content:flex-end; gap:8px; }
 .channel-create-dialog footer button { height:36px; padding:0 15px; border:1px solid var(--border); border-radius:999px; color:var(--foreground); background:var(--card); cursor:pointer; font-size:var(--text-xs); font-weight:600; }
 .channel-create-dialog footer button:last-child { border-color:var(--primary); color:var(--primary-foreground); background:var(--primary); }
 .channel-create-dialog footer button:active:not(:disabled) { transform:scale(.97); }
@@ -6113,6 +6124,49 @@ button.issue-message-state { width:100%; cursor:pointer; }
   color: var(--foreground);
   background: var(--muted);
 }
+.channel-invite-dialog.initial {
+  width: min(680px, calc(100vw - 40px));
+}
+.channel-invite-dialog.initial > header {
+  padding: 26px 32px 12px;
+}
+.channel-invite-dialog.initial h2 { font-size: var(--text-2xl); }
+.channel-invite-dialog.initial header p { margin-top: 4px; font-size: var(--text-sm); }
+.channel-invite-mode-fieldset {
+  margin: 24px 32px 28px;
+  padding: 0;
+  border: 0;
+}
+.channel-invite-mode-fieldset legend {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.channel-invite-mode-options { display: grid; gap: 18px; }
+.channel-invite-mode-option {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  color: var(--foreground);
+  cursor: pointer;
+}
+.channel-invite-mode-option input[type="radio"] {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+  margin: 0;
+  accent-color: var(--primary);
+}
+.channel-invite-mode-option strong { font-size: var(--text-lg); font-weight: 600; }
+.channel-invite-dialog.initial > footer {
+  min-height: 82px;
+  padding: 18px 32px 26px;
+  border-top: 0;
+}
+.channel-invite-dialog.initial > footer span:empty { min-width: 1px; }
 .channel-invite-search {
   height: 44px;
   margin: 0 24px 14px;

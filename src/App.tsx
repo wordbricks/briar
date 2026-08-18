@@ -132,7 +132,10 @@ import {
   runProjectAgentTaskOnWorker,
   retryHuntRun,
 } from "./lib/api";
-import type { ChannelSummary } from "./lib/channels-contract";
+import type {
+  ChannelSummary,
+  ChannelVisibility,
+} from "./lib/channels-contract";
 import {
   channelHasUnread,
   laterTimestamp,
@@ -226,6 +229,9 @@ export function App() {
     ChannelSummary[]
   >([]);
   const [activeChannelId, setActiveChannelId] = useState<string | null>(null);
+  const [initialChannelInviteId, setInitialChannelInviteId] = useState<string | null>(
+    null,
+  );
   const [viewingChannelId, setViewingChannelId] = useState<string | null>(null);
   const [viewingIssueConversationRunId, setViewingIssueConversationRunId] =
     useState<string | null>(null);
@@ -241,6 +247,7 @@ export function App() {
     const token = briar.token;
     setOrganizationChannels([]);
     setActiveChannelId(null);
+    setInitialChannelInviteId(null);
     setChannelCatalogSnapshot(null);
     channelCatalogCursorRef.current = 0;
     companionChannelCache.current.clear();
@@ -665,14 +672,14 @@ export function App() {
     }
   }, [activePage, activeProjectForTabs, navigateToPage]);
   const createOrganizationChannel = useCallback(
-    async (name: string) => {
+    async (name: string, visibility: ChannelVisibility) => {
       if (!briar.activeOrganizationId || !briar.token) {
         throw new Error("Organization is not available");
       }
       const result = await createChannel(
         briar.token,
         briar.activeOrganizationId,
-        { name },
+        { name, visibility },
       );
       setOrganizationChannels((current) =>
         [
@@ -680,6 +687,7 @@ export function App() {
           result.channel,
         ].sort((left, right) => left.name.localeCompare(right.name)),
       );
+      setInitialChannelInviteId(result.channel.id);
       setActiveChannelId(result.channel.id);
       markOrganizationChannelRead(result.channel.id);
       navigateToPage("channels");
@@ -902,6 +910,9 @@ export function App() {
   const hasCompactedWindowForOnboarding = useRef(false);
   const activeProject = briar.projects.find(
     (project) => project.id === briar.activeProjectId,
+  );
+  const activeOrganization = briar.organizations.find(
+    (organization) => organization.id === briar.activeOrganizationId,
   );
   const activeOrganizationProjects = briar.projects.filter(
     (project) =>
@@ -1514,6 +1525,7 @@ export function App() {
         onSkillSessionAccepted={autoHunt.adoptRemoteSession}
         onViewingChannelChange={setViewingChannelId}
         organizationId={briar.activeOrganizationId}
+        organizationName={activeOrganization?.name}
         projects={activeOrganizationProjects}
         requestedMessage={requestedChannelMessage}
         token={briar.token}
@@ -2056,6 +2068,9 @@ export function App() {
             onSkillSessionAccepted={autoHunt.adoptRemoteSession}
             onViewingChannelChange={setViewingChannelId}
             organizationId={briar.activeOrganizationId}
+            organizationName={activeOrganization?.name}
+            initialInviteChannelId={initialChannelInviteId}
+            onInitialInviteHandled={() => setInitialChannelInviteId(null)}
             token={briar.token}
             requestedMessage={requestedChannelMessage}
             onRequestedMessageOpen={clearRequestedChannelMessage}
