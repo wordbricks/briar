@@ -467,7 +467,9 @@ export async function hasAvailableChannelReplyWorker(
       worker.worker_state,
     ) === "online" &&
     worker.accepting_work === 1 &&
-    worker.readiness_state === "ready" &&
+    // Reply work is independent of regular execution slots. `busy` means
+    // those slots are occupied, while `needs_attention` remains a hard stop.
+    worker.readiness_state !== "needs_attention" &&
     executionWorkerSupportsSelection(
       worker,
       input.provider,

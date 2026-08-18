@@ -56,9 +56,20 @@ export type WorkerClaimResult = {
   retryAfterMs?: number;
 };
 
+export type WorkerClaimOptions = {
+  /** The caller's regular execution slots are full; prefer reply work only. */
+  repliesOnly?: boolean;
+};
+
+export const isReplyWork = (
+  issue: Pick<ClaimedIssue, "workType">,
+): boolean => issue.workType === "issueReply" || issue.workType === "channelReply";
+
 export type WorkerLoopDependencies = {
-  /** Claim the next queued issue, or report an empty queue. */
-  claim: () => Promise<ClaimedIssue | null | WorkerClaimResult>;
+  /** Claim the next queued work item, or report an empty queue. */
+  claim: (
+    options?: WorkerClaimOptions,
+  ) => Promise<ClaimedIssue | null | WorkerClaimResult>;
   /** Renew the lease of the run currently in flight. */
   renewLease: (issue: ClaimedIssue) => Promise<void>;
   heartbeat: (
@@ -227,6 +238,7 @@ export async function runWorkerLoop(
     string,
     Promise<{ issue: ClaimedIssue; error: unknown | null }>
   >();
+  let activeSlotCount = 0;
   const serialTails = new Map<string, Promise<void>>();
   const executionKey = (issue: ClaimedIssue) =>
     issue.workId ?? issue.executionId ?? `${issue.runId}:${issue.claimToken}`;
@@ -249,7 +261,7 @@ export async function runWorkerLoop(
   };
   const reportState = async () => {
     applyHeartbeat(
-      await dependencies.heartbeat(active.size > 0 ? "busy" : "ready"),
+      await dependencies.heartbeat(activeSlotCount > 0 ? "busy" : "ready"),
     );
     lastHeartbeatAt = dependencies.now();
   };
@@ -330,10 +342,10 @@ export async function runWorkerLoop(
       await beat();
       while (
         acceptingWork &&
-        active.size < maxConcurrentSessions &&
         processed + active.size < maxIssues
       ) {
-        const claim = await dependencies.claim();
+        const repliesOnly = activeSlotCount >= maxConcurrentSessions;
+        const claim = await dependencies.claim({ repliesOnly });
         const issue = isWorkerClaimResult(claim) ? claim.work : claim;
         if (!issue) {
           queueWasEmpty = true;
@@ -355,9 +367,15 @@ export async function runWorkerLoop(
           );
           break;
         }
+        if (repliesOnly && !isReplyWork(issue)) {
+          throw new Error(
+            "Worker claim returned slot-consuming work while reply-only polling",
+          );
+        }
         consecutiveEmptyClaims = 0;
         dependencies.log(`claimed ${issue.sourceKey} (${issue.runId})`);
         schedule(issue);
+        if (!isReplyWork(issue)) activeSlotCount += 1;
         await reportState();
       }
       if (!acceptingWork && active.size === 0) {
@@ -402,7 +420,7 @@ export async function runWorkerLoop(
       heartbeatIntervalMs - (dependencies.now() - lastHeartbeatAt),
     );
     const waitDelayMs =
-      queueWasEmpty && active.size < maxConcurrentSessions
+      queueWasEmpty && activeSlotCount < maxConcurrentSessions
         ? Math.min(emptyQueueDelayMs, heartbeatDelayMs)
         : heartbeatDelayMs;
     // Wake for the next heartbeat even when every execution slot is occupied.
@@ -417,6 +435,7 @@ export async function runWorkerLoop(
     if (!outcome) continue;
 
     active.delete(executionKey(outcome.issue));
+    if (!isReplyWork(outcome.issue)) activeSlotCount -= 1;
     if (outcome.error === null) {
       processed += 1;
       consecutiveFailures = 0;

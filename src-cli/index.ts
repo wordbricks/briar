@@ -3755,7 +3755,12 @@ async function workerCommand() {
   let lastTriggeredUpdateId: string | null = null;
   const result = await runWorkerLoop(
     {
-      claim: async () => {
+      claim: async (_options) => {
+        // The combined API claim is ordered by reply queues first and applies
+        // the regular-session limit atomically to issue/task queues. The loop
+        // still passes its local reply-only hint without adding a wire-field,
+        // keeping this endpoint compatible with older API deployments during
+        // rollout.
         const claim = await request<{
           work: unknown;
           retryAfterMs?: number;

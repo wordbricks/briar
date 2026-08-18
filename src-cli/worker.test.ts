@@ -8,6 +8,7 @@ import {
   errorDelayMs,
   idleDelayWithBackoffMs,
   issueWorkerSessionDirectory,
+  isReplyWork,
   leaseRenewDelayMs,
   launchdPlist,
   runWorkerLoop,
@@ -55,7 +56,15 @@ const harness = (
   let renewalTicks = options.renewalTicks ?? 0;
 
   const dependencies: WorkerLoopDependencies = {
-    claim: async () => queue.shift() ?? null,
+    claim: async (options) => {
+      if (options?.repliesOnly) {
+        const replyIndex = queue.findIndex(
+          (candidate) => candidate !== null && isReplyWork(candidate),
+        );
+        return replyIndex >= 0 ? queue.splice(replyIndex, 1)[0]! : null;
+      }
+      return queue.shift() ?? null;
+    },
     renewLease: async (claimed) => {
       renewals.push(claimed.sourceKey);
     },
@@ -213,6 +222,73 @@ describe("briar worker loop", () => {
     expect(observedMaximum).toBe(2);
   });
 
+  it("runs issue and channel replies without consuming regular session slots", async () => {
+    const regularWork = [issue("issue-1")];
+    const replyWork: ClaimedIssue[] = [
+      {
+        ...issue("channel-reply"),
+        workType: "channelReply",
+        workId: "channel-reply",
+      },
+      {
+        ...issue("issue-reply"),
+        workType: "issueReply",
+        workId: "issue-reply",
+      },
+    ];
+    const claimModes: boolean[] = [];
+    const readinessStates: Array<"ready" | "busy" | undefined> = [];
+    const replyReleases: Array<() => void> = [];
+    let releaseRegular: (() => void) | undefined;
+    let allReleased = false;
+    let inFlight = 0;
+    let observedMaximum = 0;
+
+    const maybeRelease = () => {
+      if (allReleased || replyReleases.length < 2 || !releaseRegular) return;
+      allReleased = true;
+      releaseRegular();
+      for (const release of replyReleases.splice(0)) release();
+    };
+    const test = harness([], {
+      claim: async (options) => {
+        const repliesOnly = options?.repliesOnly === true;
+        claimModes.push(repliesOnly);
+        return repliesOnly
+          ? replyWork.shift() ?? null
+          : regularWork.shift() ?? null;
+      },
+      heartbeat: async (readinessState) => {
+        readinessStates.push(readinessState);
+      },
+      runIssue: async (claimed) => {
+        inFlight += 1;
+        observedMaximum = Math.max(observedMaximum, inFlight);
+        await new Promise<void>((resolve) => {
+          if (isReplyWork(claimed)) {
+            replyReleases.push(resolve);
+            maybeRelease();
+          } else {
+            releaseRegular = resolve;
+            maybeRelease();
+          }
+        });
+        inFlight -= 1;
+      },
+    });
+
+    const result = await runWorkerLoop(test.dependencies, {
+      maxIssues: 3,
+      maxConcurrentSessions: 1,
+    });
+
+    expect(result).toMatchObject({ processed: 3, failures: 0 });
+    expect(observedMaximum).toBe(3);
+    expect(claimModes.slice(0, 3)).toEqual([false, true, true]);
+    expect(readinessStates).toContain("busy");
+    expect(readinessStates.at(-1)).toBe("ready");
+  });
+
   it("serializes repeated claims for one issue run without overlapping worktree mutations", async () => {
     const sharedRunId = "run-shared";
     const claims = [
@@ -230,7 +306,8 @@ describe("briar worker loop", () => {
     const test = harness(
       [],
       {
-        claim: async () => {
+        claim: async (options) => {
+          if (options?.repliesOnly) return null;
           const claimed = claims.shift() ?? null;
           if (claimed) claimCount += 1;
           return claimed;
