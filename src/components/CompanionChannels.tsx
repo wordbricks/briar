@@ -2059,6 +2059,7 @@ function MessageRow({
           alwaysShowAdd
           busy={busy || message.optimistic}
           currentUserId={currentUserId}
+          members={members}
           message={message}
           onOpenThread={message.optimistic ? undefined : onOpenThread}
           onReactingChange={setReacting}
