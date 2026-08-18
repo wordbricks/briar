@@ -30,6 +30,18 @@ export const changelogCopy = {
     },
     entries: [
       {
+        version: "1.2.133",
+        date: "2026년 8월 18일",
+        title: "바쁜 Worker에서도 Agent 답글을 안정적으로 처리합니다",
+        summary:
+          "이슈와 채널 Agent 답글을 일반 Worker 실행 슬롯과 분리해, Worker가 일반 작업 중이어도 답글을 지연 없이 처리하도록 개선합니다.",
+        items: [
+          "이슈·채널 Agent 답글은 일반 실행 슬롯 계산에서 제외해 하나의 Worker가 일반 작업을 수행하는 동안에도 답글을 처리할 수 있습니다.",
+          "일반 슬롯이 모두 사용 중이면 CLI Worker가 답글 전용 작업을 우선 조회하고, 일반 작업과 답글 작업의 동시 실행 상태를 정확히 보고합니다.",
+          "API가 건강한 busy Worker를 답글 claim 대상으로 허용하고, needs_attention 상태처럼 실제로 문제가 있는 Worker만 거부해 답글 처리 용량을 안정적으로 유지합니다.",
+        ],
+      },
+      {
         version: "1.2.132",
         date: "2026년 8월 18일",
         title: "채널 설정과 이슈 기록을 더 분명하게 관리합니다",
@@ -740,6 +752,18 @@ export const changelogCopy = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.133",
+        date: "August 18, 2026",
+        title: "Keep Agent replies moving while Workers are busy",
+        summary:
+          "Separate issue and channel Agent replies from regular Worker execution slots so replies can be handled without waiting for ordinary work to finish.",
+        items: [
+          "Exclude issue and channel Agent replies from regular slot accounting, allowing one Worker to handle replies while it is already running ordinary work.",
+          "When regular slots are full, have the CLI Worker poll reply-only work first and report combined regular and reply execution state accurately.",
+          "Allow healthy busy Workers to claim replies at the API while still rejecting genuinely unhealthy needs_attention Workers, preserving reply capacity without hiding faults.",
+        ],
+      },
       {
         version: "1.2.132",
         date: "August 18, 2026",
@@ -1513,7 +1537,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <p>
             <strong>Briar</strong> <span>1.2</span>
           </p>
-          <a href="#v1-2-132">
+          <a href="#v1-2-133">
             {changelog.current} <span aria-hidden="true">↓</span>
           </a>
         </div>
@@ -1535,9 +1559,10 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   </div>
                   <time
                     dateTime={
-                      entry.version === "1.2.132"
+                      entry.version === "1.2.133"
                         ? "2026-08-18"
-                        : entry.version === "1.2.131" ||
+                        : entry.version === "1.2.132" ||
+                      entry.version === "1.2.131" ||
                       entry.version === "1.2.130"
                         ? "2026-08-17"
                         : entry.version === "1.2.129" ||
