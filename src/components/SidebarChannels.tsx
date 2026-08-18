@@ -116,14 +116,14 @@ export function SidebarOrganizationChannels({
             onClick={() => setExpanded((current) => !current)}
             type="button"
           >
+            <Hash aria-hidden="true" size={16} strokeWidth={1.7} />
+            <span>{t("sidebar.channels")}</span>
             <ChevronRight
               aria-hidden="true"
-              className={expanded ? "open" : ""}
+              className={`sidebar-channels-chevron${expanded ? " open" : ""}`}
               size={14}
               strokeWidth={1.8}
             />
-            <Hash aria-hidden="true" size={16} strokeWidth={1.7} />
-            <span>{t("sidebar.channels")}</span>
           </button>
         </ContextMenu.Trigger>
         {onChannelCreate ? (
@@ -327,14 +327,14 @@ export function SidebarProjectChannels({
         onClick={() => setExpanded((current) => !current)}
         type="button"
       >
+        <Hash aria-hidden="true" size={14} strokeWidth={1.7} />
+        <span>{t("sidebar.channels")}</span>
         <ChevronRight
           aria-hidden="true"
-          className={expanded ? "open" : ""}
+          className={`sidebar-channels-chevron${expanded ? " open" : ""}`}
           size={14}
           strokeWidth={1.8}
         />
-        <Hash aria-hidden="true" size={14} strokeWidth={1.7} />
-        <span>{t("sidebar.channels")}</span>
       </button>
       {expanded ? (
         <div className="sidebar-channel-list sidebar-project-channel-list" id={listId}>

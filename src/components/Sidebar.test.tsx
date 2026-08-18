@@ -1098,4 +1098,48 @@ describe("Sidebar", () => {
     await act(async () => root.unmount());
     container.remove();
   });
+
+  it("renders the chevron to the right of the Channels label for alignment with other menu items", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(
+        <Sidebar
+          {...sidebarProps}
+          activePage="channels"
+          channels={[
+            sidebarChannel("channel-org", "General", null),
+            sidebarChannel("channel-project", "Project dev", "project-1"),
+          ]}
+          onChannelOpen={() => undefined}
+        />,
+      );
+    });
+
+    const orgToggle = container.querySelector<HTMLButtonElement>(
+      ".sidebar-primary-nav .sidebar-channels-toggle",
+    );
+    expect(orgToggle).not.toBeNull();
+    const orgChildren = Array.from(orgToggle!.children);
+    expect(orgChildren[0]?.tagName.toLowerCase()).toBe("svg");
+    expect(orgChildren[1]?.tagName.toLowerCase()).toBe("span");
+    expect(
+      orgChildren[2]?.classList.contains("sidebar-channels-chevron"),
+    ).toBe(true);
+
+    const projectToggle = container.querySelector<HTMLButtonElement>(
+      ".sidebar-project-channels-toggle",
+    );
+    expect(projectToggle).not.toBeNull();
+    const projectChildren = Array.from(projectToggle!.children);
+    expect(projectChildren[0]?.tagName.toLowerCase()).toBe("svg");
+    expect(projectChildren[1]?.tagName.toLowerCase()).toBe("span");
+    expect(
+      projectChildren[2]?.classList.contains("sidebar-channels-chevron"),
+    ).toBe(true);
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
 });
