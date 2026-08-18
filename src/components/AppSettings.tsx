@@ -754,6 +754,7 @@ export function AppSettings({
                       models={providerModels.cursor}
                       onLogin={() => void openProviderLogin("cursor")}
                       providerName="Cursor"
+                      usage={providerUsage?.cursor}
                     />
                   }
                   detailsId="provider-cursor-details"
@@ -925,6 +926,7 @@ export function AppSettings({
                       models={providerModels.agy}
                       onLogin={() => void openProviderLogin("agy")}
                       providerName="Antigravity"
+                      usage={providerUsage?.agy}
                     />
                   }
                   detailsId="provider-agy-details"
@@ -1020,6 +1022,7 @@ export function AppSettings({
                       models={providerModels.opencode}
                       onLogin={() => void openProviderLogin("opencode")}
                       providerName="OpenCode"
+                      usage={providerUsage?.opencode}
                     />
                   }
                   detailsId="provider-opencode-details"

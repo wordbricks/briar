@@ -1194,54 +1194,6 @@ fn inspect_agent_browser_cli(
     }
 }
 
-fn cursor_locally_authenticated(home: &Path, binary: &Path) -> bool {
-    if env::var("CURSOR_API_KEY").is_ok_and(|value| !value.trim().is_empty()) {
-        return true;
-    }
-    let execution_path = cli_execution_path(home).unwrap_or_default();
-    let output = Command::new(binary)
-        .env("HOME", home)
-        .env("PATH", execution_path)
-        .args(["about", "--format", "json"])
-        .output()
-        .ok();
-    if let Some(output) = output.filter(|output| output.status.success()) {
-        if let Ok(value) = serde_json::from_slice::<serde_json::Value>(&output.stdout) {
-            return value
-                .get("userEmail")
-                .and_then(serde_json::Value::as_str)
-                .is_some_and(|email| {
-                    let email = email.trim().to_ascii_lowercase();
-                    !email.is_empty()
-                        && email != "not logged in"
-                        && !email.contains("login required")
-                        && !email.contains("authentication required")
-                });
-        }
-    }
-    let output = Command::new(binary)
-        .env("HOME", home)
-        .args(["about"])
-        .output()
-        .ok();
-    output
-        .filter(|output| output.status.success())
-        .map(|output| {
-            String::from_utf8_lossy(&output.stdout)
-                .lines()
-                .find_map(|line| line.trim().strip_prefix("User Email"))
-                .map(str::trim)
-                .is_some_and(|email| {
-                    let email = email.to_ascii_lowercase();
-                    !email.is_empty()
-                        && email != "not logged in"
-                        && !email.contains("login required")
-                        && !email.contains("authentication required")
-                })
-        })
-        .unwrap_or(false)
-}
-
 fn inspect_onboarding_prerequisites_sync(home: &Path) -> OnboardingPrerequisites {
     let execution_path = cli_execution_path(home).unwrap_or_default();
     let mut codex = inspect_cli(agent::codex_binary(home, &execution_path));
@@ -1261,7 +1213,7 @@ fn inspect_onboarding_prerequisites_sync(home: &Path) -> OnboardingPrerequisites
     cursor.authenticated = cursor.installed
         && cursor_binary
             .as_deref()
-            .is_ok_and(|binary| cursor_locally_authenticated(home, binary));
+            .is_ok_and(|binary| agent_usage::cursor_locally_authenticated(home, binary));
     grok.authenticated = grok.installed && agent_usage::grok_locally_authenticated(home);
     agy.authenticated = agy.installed
         && agy_binary.as_deref().is_ok_and(|binary| {
