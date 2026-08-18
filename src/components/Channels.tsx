@@ -3,7 +3,6 @@ import {
   Bot,
   Check,
   Copy,
-  FileText,
   Hash,
   Headphones,
   LoaderCircle,
@@ -122,6 +121,7 @@ import {
 } from "../lib/channel-thread-width";
 import { ChannelMessageText } from "./ChannelMessageText";
 import { ChannelMessageReactions } from "./ChannelMessageReactions";
+import { ChannelDocumentPreview } from "./ChannelDocumentPreview";
 import { ChannelThreadSubscribeControls } from "./ChannelThreadSubscribeControls";
 import {
   ConversationReplySummary,
@@ -3579,16 +3579,12 @@ const MessageRow = memo(function MessageRow({
         <ChannelMessageImages attachments={message.attachments} token={token} />
 
         {message.document ? (
-          <div className="channel-document-card">
-            <FileText size={15} />
-            <div>
-              <strong>{message.document.title}</strong>
-              <span>
-                {t("channel.planDocument")}
-                {message.document.projectId ? "" : ` · ${t("channel.orgDocument")}`}
-              </span>
-            </div>
-          </div>
+          <ChannelDocumentPreview
+            channelId={message.channelId}
+            document={message.document}
+            organizationId={channel.organizationId}
+            token={token}
+          />
         ) : null}
 
         {issueProposal ? (
