@@ -34,13 +34,14 @@ export const changelogCopy = {
         date: "2026년 8월 18일",
         title: "채널 설정과 이슈 기록을 더 분명하게 관리합니다",
         summary:
-          "채널 정보와 멤버를 한곳에서 관리하고, 이슈 상태 변경과 승인을 실제 사용자 이름으로 기록하며, Antigravity 모델 탐색과 편집 화면·릴리즈 노트 탐색을 다듬습니다.",
+          "채널 정보와 멤버를 한곳에서 관리하고, 이슈 상태 변경과 승인을 실제 사용자 이름으로 기록하며, Antigravity 모델 탐색과 iOS 제안 승인·편집 화면·릴리즈 노트 탐색을 다듬습니다.",
         items: [
           "채널 헤더의 더 보기 메뉴에서 설정 모달을 열어 이름과 연결 프로젝트를 바꾸고, 채널 ID와 생성일을 확인하며, 멤버 탭에서 사람과 Agent를 검색하거나 초대할 수 있습니다.",
           "이슈 상태 기록의 내부 사용자 ID를 현재 조직 구성원의 표시 이름으로 안전하게 바꾸고, 체크포인트 승인도 승인자·시각·단계를 포함한 Status 이벤트로 원자적으로 기록하며 기존 승인 내역을 보완합니다.",
           "이슈 설명 편집기가 상세 패널의 남은 높이를 채우도록 수정해, 짧은 설명도 워크플로 진행 표시 위의 전체 편집 공간에서 자연스럽게 작성할 수 있습니다.",
           "모든 릴리즈 노트를 Breaking·Added·Improved·Fixed로 분류하고, 데스크탑과 모바일에서 버전별 변경을 더 빠르게 훑을 수 있는 간결한 다크 체인지로그로 개편합니다.",
           "Antigravity Worker가 설치된 CLI에서 지원 모델과 Effort를 다시 탐색해 광고하도록 수정하고, 기능 확인 중 불필요한 Google 인증 환경 변수가 개입하지 않도록 분리합니다.",
+          "iOS가 대문자로 전송한 프로젝트 UUID도 Worker가 같은 채널 이슈 제안으로 인식하도록 수정해, 올바른 프로젝트의 제안 승인이 잘못 거부되지 않습니다.",
         ],
       },
       {
@@ -744,13 +745,14 @@ export const changelogCopy = {
         date: "August 18, 2026",
         title: "Manage channel settings and issue history more clearly",
         summary:
-          "Manage channel details and members in one place, record issue-status changes and approvals with readable actors, and refine Antigravity model discovery, editing, and release-note navigation.",
+          "Manage channel details and members in one place, record issue-status changes and approvals with readable actors, and refine Antigravity model discovery, iOS proposal approvals, editing, and release-note navigation.",
         items: [
           "Add a channel settings modal from the header overflow menu to rename the channel, change its linked project, inspect its ID and creation date, and search or invite people and Agents from a Members tab.",
           "Record readable issue-status actors by resolving internal user IDs to organization display names, write checkpoint approvals atomically with approver, time, and stage details, and backfill existing approval history.",
           "Fix the issue description editor so it fills the remaining detail-pane height, letting even short descriptions use the complete editing area above workflow progress.",
           "Group every changelog release into four change-type sections in a compact dark layout that makes version-by-version changes faster to scan on desktop and mobile.",
           "Restore Antigravity Worker model and effort discovery from the installed CLI while isolating capability checks from unrelated Google authentication environment variables.",
+          "Prevent valid iOS channel issue proposal approvals from being rejected when the app sends an uppercase project UUID by canonicalizing IDs across iOS, the shared contract, and the Worker.",
         ],
       },
       {
