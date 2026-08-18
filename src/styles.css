@@ -2039,6 +2039,8 @@ button.conversation-reply-summary:focus-visible { outline:2px solid var(--ring);
 button.issue-message-state { width:100%; cursor:pointer; }
 .issue-message-state.error { color:var(--foreground); border-color:color-mix(in srgb,var(--destructive) 36%,var(--border)); background:color-mix(in srgb,var(--destructive) 10%,var(--card)); }
 .issue-agent-reply-state { min-width:0; margin:4px 10px; padding:9px 11px; display:flex; align-items:center; gap:7px; border-radius:9px; color:var(--accent-foreground); background:var(--accent); font-size:var(--text-2xs); overflow-wrap:anywhere; }
+.issue-agent-reply-state .loading-state-label { font-size:var(--text-xs); }
+.issue-agent-reply-state .loading-state > span:last-child { font-size:var(--text-2xs); }
 .issue-message-group > .issue-agent-reply-state { margin-left:54px; }
 .issue-agent-reply-state.error { color:var(--foreground); background:color-mix(in srgb,var(--destructive) 10%,var(--card)); }
 .issue-rework-proposal { min-width:0; max-width:100%; margin-top:10px; padding:11px; display:grid; gap:8px; border:1px solid color-mix(in srgb,var(--primary) 28%,var(--border)); border-radius:10px; background:color-mix(in srgb,var(--primary) 6%,var(--card)); }
