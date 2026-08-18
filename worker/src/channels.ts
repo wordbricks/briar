@@ -151,6 +151,14 @@ export type ChannelMessageAttachmentRow = {
   created_at: string;
 };
 
+export type ChannelMessageDocumentRow = {
+  message_id: string;
+  channel_id: string;
+  project_id: string | null;
+  title: string;
+  markdown: string;
+};
+
 export type ChannelMessageAttachmentInput = Pick<
   ChannelMessageAttachmentRow,
   "id" | "organization_id" | "object_key" | "filename" | "content_type" | "byte_size"
@@ -1855,6 +1863,21 @@ export async function getChannelMessageAttachment(
     )
     .bind(organizationId, channelId, messageId, attachmentId)
     .first<ChannelMessageAttachmentRow>();
+}
+
+export async function getChannelMessageDocument(
+  db: D1Database,
+  channelId: string,
+  messageId: string,
+) {
+  return db
+    .prepare(
+      `select message_id, channel_id, project_id, title, markdown
+       from briar_channel_message_documents
+       where channel_id = ? and message_id = ?`,
+    )
+    .bind(channelId, messageId)
+    .first<ChannelMessageDocumentRow>();
 }
 
 /**
