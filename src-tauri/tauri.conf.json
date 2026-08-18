@@ -68,7 +68,8 @@
       "../skills/briar-workflow/": "skills/briar-workflow/",
       "../skills/browser/": "skills/browser/",
       "../third-party/bun-LICENSE.md": "licenses/bun-LICENSE.md",
-      "../third-party/claude-agent-sdk-LICENSE.md": "licenses/claude-agent-sdk-LICENSE.md"
+      "../third-party/claude-agent-sdk-LICENSE.md": "licenses/claude-agent-sdk-LICENSE.md",
+      "../third-party/agency-agents-LICENSE.md": "licenses/agency-agents-LICENSE.md"
     },
     "macOS": {
       "minimumSystemVersion": "12.0",

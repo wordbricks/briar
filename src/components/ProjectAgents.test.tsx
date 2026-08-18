@@ -4,6 +4,7 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
+import { frontendDeveloperAgentTemplate } from "../lib/agent-templates";
 import { requestMobileNavigationBack } from "../lib/mobile-navigation";
 import { runProjectAgent } from "../lib/project-llm";
 import type { DashboardPayload, ProjectAgent } from "../types";
@@ -590,6 +591,66 @@ describe("ProjectAgents", () => {
       responsibility:
         "Jay한테 assign된 todo 이슈를 3개씩 처리하는 에이전트",
       calendarColor: "#3275d5",
+    });
+  });
+
+  it("prefills the Frontend Developer template and creates its Skill", async () => {
+    const onCreate = vi.fn(async () => undefined);
+    const container = await mount(
+      <ProjectAgentDialog
+        agent={null}
+        isSubmitting={false}
+        onClose={() => undefined}
+        onSubmit={onCreate}
+      />,
+    );
+
+    const useTemplate = Array.from(
+      container.querySelectorAll<HTMLButtonElement>("button"),
+    ).find((button) => button.textContent?.includes("템플릿 사용"));
+    await act(async () => useTemplate?.click());
+
+    const name = container.querySelector<HTMLInputElement>(
+      'input:not([type="color"])',
+    );
+    const [description, responsibility] =
+      container.querySelectorAll<HTMLTextAreaElement>("textarea");
+    expect(name?.value).toBe(frontendDeveloperAgentTemplate.name);
+    expect(description?.value).toBe(
+      frontendDeveloperAgentTemplate.description,
+    );
+    expect(responsibility?.value).toBe(
+      frontendDeveloperAgentTemplate.responsibility,
+    );
+    expect(container.textContent).toContain("Frontend Development");
+    expect(container.textContent).toContain("agency-agents 원본 보기");
+
+    await act(async () => {
+      container
+        .querySelector<HTMLFormElement>("form")
+        ?.dispatchEvent(
+          new Event("submit", { bubbles: true, cancelable: true }),
+        );
+      await Promise.resolve();
+    });
+
+    expect(onCreate).toHaveBeenCalledWith({
+      name: frontendDeveloperAgentTemplate.name,
+      provider: "codex",
+      model: null,
+      effort: null,
+      description: frontendDeveloperAgentTemplate.description,
+      responsibility: frontendDeveloperAgentTemplate.responsibility,
+      skills: [
+        {
+          ...frontendDeveloperAgentTemplate.skills[0],
+          provider: "codex",
+          model: null,
+          effort: null,
+          position: 0,
+        },
+      ],
+      calendarColor: frontendDeveloperAgentTemplate.calendarColor,
     });
   });
 
