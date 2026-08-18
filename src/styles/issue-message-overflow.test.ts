@@ -18,6 +18,16 @@ const ruleBody = (selector: string) => {
 };
 
 describe("issue conversation message overflow containment", () => {
+  it("keeps the Briar reply state on the conversation typography scale", () => {
+    const label = ruleBody(".issue-agent-reply-state .loading-state-label");
+    expect(label).toContain("font-size:var(--text-xs)");
+
+    const elapsed = ruleBody(
+      ".issue-agent-reply-state .loading-state > span:last-child",
+    );
+    expect(elapsed).toContain("font-size:var(--text-2xs)");
+  });
+
   it("keeps the message list and body within the conversation pane width", () => {
     const list = ruleBody(".issue-message-list");
     expect(list).toContain("min-width:0");
