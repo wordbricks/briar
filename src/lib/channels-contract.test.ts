@@ -3,6 +3,7 @@ import {
   channelIncomingWebhookMessageSchema,
   channelMessageBlocksFallback,
   channelMessageInputSchema,
+  channelProposalAcceptInputSchema,
   channelReplyContextMessageJson,
   channelReplyCompletionSchema,
   channelAgentSkillInputSchema,
@@ -80,6 +81,17 @@ describe("channel message contract", () => {
       parentMessageId: projectId,
       mentionedAgentIds: [agentId],
       preferredDeviceId: agentId,
+    });
+  });
+
+  it("canonicalizes channel proposal accept project IDs", () => {
+    expect(
+      channelProposalAcceptInputSchema.parse({
+        projectId: projectId.toUpperCase(),
+      }),
+    ).toEqual({ projectId });
+    expect(channelProposalAcceptInputSchema.parse({})).toEqual({
+      projectId: null,
     });
   });
 

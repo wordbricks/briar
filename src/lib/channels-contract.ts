@@ -401,7 +401,7 @@ export const channelMemberInputSchema = z
   .strict();
 
 export const channelProposalAcceptInputSchema = z
-  .object({ projectId: z.string().uuid().nullable().default(null) })
+  .object({ projectId: canonicalUuidSchema.nullable().default(null) })
   .strict();
 
 export const channelExecutionProposalAcceptInputSchema = z

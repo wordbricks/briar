@@ -862,6 +862,34 @@ final class ChannelsStoreTests: XCTestCase {
     }
 
     @MainActor
+    func testAcceptProposalEncodesLowercaseProjectId() async throws {
+        let mixedProjectID = UUID(uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!
+        let configured = try await proposalStore(
+            response: AcceptChannelProposalResponse(
+                outcome: .accepted,
+                projectId: mixedProjectID,
+                resultRunId: resultRunID
+            )
+        )
+
+        _ = await configured.store.acceptProposal(
+            channelID: channelID,
+            proposalID: proposalID,
+            projectID: mixedProjectID
+        )
+
+        let body = try XCTUnwrap(await configured.api.lastJSONBody(for: configured.acceptPath))
+        let object = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: body) as? [String: Any]
+        )
+        XCTAssertEqual(
+            object["projectId"] as? String,
+            "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+        )
+        configured.store.applicationDidEnterBackground()
+    }
+
+    @MainActor
     func testAcceptProposalTreatsAlreadyAcceptedAsSuccess() async throws {
         let configured = try await proposalStore(
             response: AcceptChannelProposalResponse(
