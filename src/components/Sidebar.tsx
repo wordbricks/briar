@@ -23,7 +23,10 @@ import { useI18n, type Locale } from "../i18n";
 import { isProjectConnectedLocally } from "../lib/local-project-connection";
 import { isProjectScheduleTabEnabled } from "../lib/project-tabs";
 import type { RepositoryReadiness } from "../lib/project-connection";
-import type { ChannelSummary } from "../lib/channels-contract";
+import type {
+  ChannelSummary,
+  ChannelVisibility,
+} from "../lib/channels-contract";
 import type {
   Organization,
   Project,
@@ -102,7 +105,10 @@ export function Sidebar({
   onLobbyOpen: () => void;
   onScheduleOpen: () => void;
   onInboxOpen: () => void;
-  onChannelCreate?: (name: string) => Promise<void>;
+  onChannelCreate?: (
+    name: string,
+    visibility: ChannelVisibility,
+  ) => Promise<void>;
   onChannelOpen?: (channelId: string) => void;
   onIssuesOpen: () => void;
   onCreateIssue: (projectId: string) => void;

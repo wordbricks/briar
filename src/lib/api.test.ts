@@ -12,6 +12,7 @@ import {
   claimProjectAgentScheduleRuns,
   completeProjectAgentScheduleRun,
   completeIssueResultReview,
+  createChannel,
   createChannelWebhook,
   createIssue,
   createIssueMessage,
@@ -2330,6 +2331,26 @@ describe("API errors", () => {
 });
 
 describe("channel message API", () => {
+  it("sends the selected visibility when creating a channel", async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      channel: {},
+    }), { headers: { "Content-Type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await createChannel("token", "org-1", {
+      name: "Private notes",
+      visibility: "private",
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/organizations/org-1/channels"),
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ name: "Private notes", visibility: "private" }),
+      }),
+    );
+  });
+
   it("uses the channel-scoped webhook management routes", async () => {
     const webhook = {
       id: "webhook-1",
