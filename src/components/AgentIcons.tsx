@@ -99,6 +99,25 @@ export function OpenCodeIcon({ size = 14, className, style }: AgentIconProps) {
   );
 }
 
+export function OpenRouterIcon({ size = 14, className, style }: AgentIconProps) {
+  return (
+    <svg
+      aria-hidden
+      className={className}
+      fill="none"
+      height={size}
+      style={style}
+      viewBox="0 0 24 24"
+      width={size}
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path d="M3 7h12.5l-2.25-2.25M15.5 7l-2.25 2.25M21 17H8.5l2.25-2.25M8.5 17l2.25 2.25" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
+      <circle cx="3" cy="7" fill="currentColor" r="1.5" />
+      <circle cx="21" cy="17" fill="currentColor" r="1.5" />
+    </svg>
+  );
+}
+
 export function AntigravityIcon({ size = 14, className, style }: AgentIconProps) {
   return (
     <img
@@ -119,7 +138,8 @@ export type AgentProviderIconId =
   | "cursor"
   | "grok"
   | "agy"
-  | "opencode";
+  | "opencode"
+  | "openrouter";
 
 export function AgentProviderIcon({
   provider,
@@ -143,6 +163,9 @@ export function AgentProviderIcon({
   }
   if (provider === "opencode") {
     return <OpenCodeIcon className={className} size={size} style={style} />;
+  }
+  if (provider === "openrouter") {
+    return <OpenRouterIcon className={className} size={size} style={style} />;
   }
   if (provider === "agy") {
     return <AntigravityIcon className={className} size={size} style={style} />;

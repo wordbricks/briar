@@ -58,6 +58,7 @@ pub(crate) struct AgentUsageSnapshot {
     grok: ProviderUsage,
     agy: ProviderUsage,
     opencode: ProviderUsage,
+    openrouter: ProviderUsage,
     cursor: ProviderUsage,
     updated_at: u64,
 }
@@ -181,12 +182,18 @@ pub(crate) async fn load(home: PathBuf) -> AgentUsageSnapshot {
     let cursor = cursor.await.unwrap_or_else(|error| {
         failed_provider("cursor", format!("Cursor usage task failed: {error}"))
     });
+    let openrouter = provider_without_usage(
+        "openrouter",
+        "unavailable",
+        "OpenRouter usage limits are managed at openrouter.ai.".to_string(),
+    );
     AgentUsageSnapshot {
         codex,
         claude,
         grok,
         agy,
         opencode,
+        openrouter,
         cursor,
         updated_at: now_millis(),
     }

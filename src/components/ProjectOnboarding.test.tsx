@@ -175,7 +175,7 @@ describe("ProjectOnboarding", () => {
 
     expect(container.textContent).toContain("개발 도구를 연결해 주세요");
     expect(container.textContent).toContain("Git필수");
-    expect(container.querySelectorAll(".initial-prerequisite-row")).toHaveLength(7);
+    expect(container.querySelectorAll(".initial-prerequisite-row")).toHaveLength(8);
     expect(container.textContent).toContain("Cursor");
     expect(container.textContent).not.toContain("로컬 Git 저장소");
 

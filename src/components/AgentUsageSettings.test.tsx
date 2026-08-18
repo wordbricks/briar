@@ -185,6 +185,7 @@ const snapshot: AgentUsageSnapshot = {
   grok: provider("grok", 10),
   agy: provider("agy", 18),
   opencode: provider("opencode", 7),
+  openrouter: provider("openrouter", 0),
   cursor: provider("cursor", 33),
   updatedAt: Date.now(),
 };

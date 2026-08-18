@@ -7875,6 +7875,7 @@ export async function claimNextIssueAgentReply(
              when preferred_provider = 'grok' and ? = 1 then 'grok'
              when preferred_provider = 'agy' and ? = 1 then 'agy'
              when preferred_provider = 'opencode' and ? = 1 then 'opencode'
+             when preferred_provider = 'openrouter' and ? = 1 then 'openrouter'
              else ?
            end,
            claim_token_hash = ?, claimed_at = ?, lease_expires_at = ?,
@@ -7948,6 +7949,7 @@ export async function claimNextIssueAgentReply(
       input.agentProviders.includes("grok") ? 1 : 0,
       input.agentProviders.includes("agy") ? 1 : 0,
       input.agentProviders.includes("opencode") ? 1 : 0,
+      input.agentProviders.includes("openrouter") ? 1 : 0,
       input.agentProvider,
       input.claimTokenHash,
       input.claimedAt,
@@ -10048,6 +10050,26 @@ export async function claimNextQueuedHuntRun(
                  )
                ) = 'opencode'
              )
+             or (
+               ? = 1
+               and coalesce(
+                 requested_agent_provider,
+                 preferred_agent_provider,
+                 (
+                   select skill.provider
+                   from briar_agent_skills skill
+                   where skill.agent_id = briar_hunt_runs.agent_id
+                     and skill.kind = 'issue_processing'
+                   order by skill.position, skill.created_at, skill.id
+                   limit 1
+                 ),
+                 (
+                   select agent.provider from briar_project_agents agent
+                   where agent.id = briar_hunt_runs.agent_id
+                     and agent.project_id = briar_hunt_runs.project_id
+                 )
+               ) = 'openrouter'
+             )
            )
            and (
              ? is null or (
@@ -10112,6 +10134,7 @@ export async function claimNextQueuedHuntRun(
       allowedProviders?.includes("grok") ? 1 : 0,
       allowedProviders?.includes("agy") ? 1 : 0,
       allowedProviders?.includes("opencode") ? 1 : 0,
+      allowedProviders?.includes("openrouter") ? 1 : 0,
       input.workerDeviceId ?? null,
       input.workerDeviceId ?? null,
       input.claimedAt,

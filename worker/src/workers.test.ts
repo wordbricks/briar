@@ -367,6 +367,12 @@ describe("detached execution workers", () => {
           allowCustomModels: true,
           error: null,
         },
+        openrouter: {
+          models: [],
+          defaultEfforts: [],
+          allowCustomModels: true,
+          error: null,
+        },
       },
       versions: { briar: "1.1.1" },
       observedAt: atMinute(minute),
@@ -1763,7 +1769,7 @@ describe("detached execution workers", () => {
     await recordWorkerHeartbeat(db, projectId, {
       workerId: registered.worker.id,
       capabilities: {
-        providers: ["codex", "claude", "cursor", "grok", "agy", "opencode"],
+        providers: ["codex", "claude", "cursor", "grok", "agy", "opencode", "openrouter"],
         providerHealth: {
           codex: { installed: true, authenticated: true, healthy: true },
           claude: { installed: true, authenticated: true, healthy: true },
@@ -1771,6 +1777,7 @@ describe("detached execution workers", () => {
           grok: { installed: true, authenticated: true, healthy: true },
           agy: { installed: true, authenticated: true, healthy: true },
           opencode: { installed: true, authenticated: true, healthy: true },
+          openrouter: { installed: true, authenticated: true, healthy: true },
         },
         worktrees: true,
       },
@@ -1813,7 +1820,7 @@ describe("detached execution workers", () => {
       claimedAt: atMinute(4),
       leaseExpiresAt: leaseExpiryFrom(atMinute(4)),
       workerId: registered.worker.id,
-      agentProviders: ["codex", "claude", "cursor", "grok", "agy", "opencode"],
+      agentProviders: ["codex", "claude", "cursor", "grok", "agy", "opencode", "openrouter"],
       detachedOnly: true,
     });
     expect(claimed).toMatchObject({
@@ -1834,6 +1841,7 @@ describe("detached execution workers", () => {
       "grok",
       "agy",
       "opencode",
+      "openrouter",
     ]);
   });
 

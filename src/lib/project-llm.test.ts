@@ -96,6 +96,7 @@ describe("project LLM gateway", () => {
       grok: { models: [], error: null },
       agy: { models: [], error: null },
       opencode: { models: [], error: null },
+      openrouter: { models: [], error: null },
     });
 
     const first = await loadAgentProviderModels({ refresh: true });
@@ -120,6 +121,7 @@ describe("project LLM gateway", () => {
       grok: { models: [], error: null },
       agy: { models: [], error: null },
       opencode: { models: [], error: null },
+      openrouter: { models: [], error: null },
     };
 
     expect(
@@ -444,8 +446,8 @@ describe("project LLM gateway", () => {
 
   it("loads and updates app-wide provider enablement", async () => {
     invoke
-      .mockResolvedValueOnce({ codex: true, claude: true, cursor: true, grok: true, agy: true, opencode: true })
-      .mockResolvedValueOnce({ codex: false, claude: true, cursor: true, grok: true, agy: true, opencode: true });
+      .mockResolvedValueOnce({ codex: true, claude: true, cursor: true, grok: true, agy: true, opencode: true, openrouter: true })
+      .mockResolvedValueOnce({ codex: false, claude: true, cursor: true, grok: true, agy: true, opencode: true, openrouter: true });
 
     await expect(loadAppProviderSettings()).resolves.toEqual({
       codex: true,
@@ -454,14 +456,15 @@ describe("project LLM gateway", () => {
       grok: true,
       agy: true,
       opencode: true,
+      openrouter: true,
     });
     await expect(
-      updateAppProviderSettings({ codex: false, claude: true, cursor: true, grok: true, agy: true, opencode: true }),
-    ).resolves.toEqual({ codex: false, claude: true, cursor: true, grok: true, agy: true, opencode: true });
+      updateAppProviderSettings({ codex: false, claude: true, cursor: true, grok: true, agy: true, opencode: true, openrouter: true }),
+    ).resolves.toEqual({ codex: false, claude: true, cursor: true, grok: true, agy: true, opencode: true, openrouter: true });
 
     expect(invoke).toHaveBeenNthCalledWith(1, "load_app_provider_settings");
     expect(invoke).toHaveBeenNthCalledWith(2, "update_app_provider_settings", {
-      settings: { codex: false, claude: true, cursor: true, grok: true, agy: true, opencode: true },
+      settings: { codex: false, claude: true, cursor: true, grok: true, agy: true, opencode: true, openrouter: true },
     });
   });
 
