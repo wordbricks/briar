@@ -264,6 +264,13 @@ describe("Worker HTTP contract", () => {
         defaultProjectId: "project-default",
       }),
     ).toBe("project-b");
+    expect(
+      resolveChannelProposalTargetProjectId({
+        requestedProjectId: "AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA",
+        proposedProjectId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        defaultProjectId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      }),
+    ).toBe("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
   });
 
   it("rejects legacy Project Agent proposals whose stored target lost scope", () => {

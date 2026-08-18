@@ -4464,6 +4464,57 @@ describe("D1 migrations", () => {
     );
   }, 30_000);
 
+  it("backfills checkpoint approval actors into issue status history", async () => {
+    await withPreWorkflowMigrationDatabase(
+      "briar-status-actor-backfill-migration-test",
+      async (db) => {
+        await seedPreWorkflowProjectRun(db);
+        await applyD1Migrations(db, {
+          files: ["0059_workflow_v2_progress.sql"],
+        });
+        const approvedAt = "2026-08-10T00:06:00.000Z";
+        await db.prepare(
+          `insert into briar_run_checkpoint_progress (
+             run_id, attempt, revision, checkpoint_key, stage_id,
+             position, state, reached_at, approved_at, approved_by,
+             approved_request_id
+           ) values (?, 1, 1, 'review-implementing', 'implementing',
+                     'after', 'approved', ?, ?, ?, ?)`,
+        ).bind(
+          migrationFixture.runId,
+          migrationFixture.pausedAt,
+          approvedAt,
+          `briar-app:${migrationFixture.userId}`,
+          "status-actor-backfill-request",
+        ).run();
+
+        await applyD1Migrations(db, {
+          files: ["0115_issue_status_actor_tracking.sql"],
+        });
+        await applyD1Migrations(db, {
+          files: ["0115_issue_status_actor_tracking.sql"],
+        });
+
+        const events = await db.prepare(
+          `select event_key, status, workflow_stage, detail, actor, occurred_at
+           from briar_hunt_events where run_id = ?`,
+        ).bind(migrationFixture.runId).all();
+        expect(events.results).toEqual([{
+          event_key:
+            "workflow:checkpoint-approved:1:1:review-implementing",
+          status: "running",
+          workflow_stage: "implementing",
+          detail: "Implement 단계의 검토를 승인했습니다.",
+          actor: `briar-app:${migrationFixture.userId}`,
+          occurred_at: approvedAt,
+        }]);
+        expect(await db.prepare(
+          `select last_event_at from briar_hunt_runs where id = ?`,
+        ).bind(migrationFixture.runId).first("last_event_at")).toBe(approvedAt);
+      },
+    );
+  }, 30_000);
+
   it("stores valid issue proposals without changing their source run", async () => {
     await withPreWorkflowMigrationDatabase(
       "briar-issue-proposal-migration-test",

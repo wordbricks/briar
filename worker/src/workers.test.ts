@@ -1262,7 +1262,7 @@ describe("detached execution workers", () => {
     expect(providers).toEqual(["grok", "opencode", "codex"]);
   });
 
-  it("requires a ready compatible Worker before a channel Agent reply can run", async () => {
+  it("allows a busy compatible Worker to run a channel Agent reply", async () => {
     const worker = await register("channel-reply", 1);
     const projectReply = {
       organizationId: projectId,
@@ -1309,7 +1309,7 @@ describe("detached execution workers", () => {
         ...projectReply,
         observedAt: atMinute(3),
       }),
-    ).resolves.toBe(false);
+    ).resolves.toBe(true);
   });
 
   it("renames a device and all of its project bindings together", async () => {

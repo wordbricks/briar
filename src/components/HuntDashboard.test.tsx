@@ -3180,6 +3180,8 @@ describe("HuntDashboard", () => {
     expect(statusHistoryPanel?.textContent).toContain(
       demoRunEvents[demoDashboard.runs[0].id][0].detail ?? "",
     );
+    expect(statusHistoryPanel?.textContent).toContain("Jay");
+    expect(statusHistoryPanel?.textContent).not.toContain("briar-app:demo-user");
     expect(
       statusHistoryPanel?.querySelectorAll(".timeline-event"),
     ).toHaveLength(demoRunEvents[demoDashboard.runs[0].id].length);

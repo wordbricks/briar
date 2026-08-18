@@ -374,6 +374,7 @@ export const mobileRunEventsResponseSchema = z.object({
     workflowStage: z.string().nullable(),
     detail: z.string().nullable(),
     actor: z.string(),
+    actorName: z.string().nullable().optional(),
     occurredAt: z.iso.datetime(),
   })),
 });

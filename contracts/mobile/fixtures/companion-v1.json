@@ -334,6 +334,7 @@
             "workflowStage": "implementing",
             "detail": "Implemented the read-only shell",
             "actor": "briar-workflow",
+            "actorName": "Briar User",
             "occurredAt": "2026-08-02T01:00:00.000Z"
           }
         ]

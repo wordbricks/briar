@@ -244,6 +244,7 @@ import {
   listDashboardRunsByIds,
   listDashboardChanges,
   listHuntRunEvents,
+  resolveHuntEventActorNames,
   listRunEvidence,
   listRunEvidenceImages,
   listRunStageRevisions,
@@ -1110,24 +1111,33 @@ class HttpError extends Error {
   }
 }
 
+const canonicalProjectId = (value: string | null | undefined) =>
+  value ? value.toLowerCase() : null;
+
 export function resolveChannelProposalTargetProjectId(input: {
   requestedProjectId: string | null | undefined;
   proposedProjectId: string | null | undefined;
   defaultProjectId: string | null | undefined;
 }) {
+  const proposedProjectId = canonicalProjectId(input.proposedProjectId);
+  const requestedProjectId = canonicalProjectId(input.requestedProjectId);
+  const defaultProjectId = canonicalProjectId(input.defaultProjectId);
+  // UUIDs are case-insensitive. Native iOS encodes UUID request fields in
+  // uppercase, while stored proposal project IDs are lowercase. Compare the
+  // canonical form so the same project is not rejected as a mismatch.
   if (
-    input.proposedProjectId &&
-    input.requestedProjectId &&
-    input.proposedProjectId !== input.requestedProjectId
+    proposedProjectId &&
+    requestedProjectId &&
+    proposedProjectId !== requestedProjectId
   ) {
     throw new HttpError(
       400,
       "The approved project must match the Agent proposal",
     );
   }
-  return input.proposedProjectId ??
-    input.requestedProjectId ??
-    input.defaultProjectId ??
+  return proposedProjectId ??
+    requestedProjectId ??
+    defaultProjectId ??
     null;
 }
 
@@ -5817,7 +5827,10 @@ export function projectUsageSummaryJson(
   );
 }
 
-const dashboardEventJson = (event: HuntEventRow) => ({
+const dashboardEventJson = (
+  event: HuntEventRow,
+  actorNames: ReadonlyMap<string, string> = new Map(),
+) => ({
   id: event.id,
   attempt: event.attempt,
   revision: event.revision,
@@ -5825,6 +5838,7 @@ const dashboardEventJson = (event: HuntEventRow) => ({
   workflowStage: event.workflow_stage,
   detail: event.detail,
   actor: event.actor,
+  actorName: actorNames.get(event.actor) ?? null,
   qaStatus: event.qa_status,
   trackerState: event.tracker_issue_state,
   pullRequestUrls: parseJsonArray(event.pull_request_urls),
@@ -10734,10 +10748,15 @@ async function route(
         right.occurred_at.localeCompare(left.occurred_at) ||
         right.id.localeCompare(left.id),
     );
+    const actorNames = await resolveHuntEventActorNames(
+      db,
+      project.id,
+      events.map((event) => event.actor),
+    );
     return json({
       runId: run.id,
       eventCount: events.length,
-      events: events.map(dashboardEventJson),
+      events: events.map((event) => dashboardEventJson(event, actorNames)),
     });
   }
 
@@ -13292,7 +13311,7 @@ async function route(
         snapshot: {
           run: {
             ...dashboardRunJson(run, attachments),
-            events: events.map(dashboardEventJson),
+            events: events.map((event) => dashboardEventJson(event)),
             // Workers from before first-class Agent Skills ignore work.agent,
             // but retain arbitrary fields inside snapshot.run. Keep the saved
             // profile here as read-only context during a rolling upgrade.
@@ -13366,7 +13385,9 @@ async function route(
         binding.state,
       ) !== "online" ||
       binding.accepting_work !== 1 ||
-      binding.readiness_state !== "ready"
+      // `busy` represents occupied regular execution slots. Reply work does
+      // not consume those slots, so only an unhealthy readiness state blocks.
+      binding.readiness_state === "needs_attention"
     ) {
       throw new HttpError(409, "Worker is not ready to claim replies");
     }

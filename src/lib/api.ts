@@ -1116,6 +1116,7 @@ export async function loadRunEvents(
   );
   return result.events.map((event) => ({
     ...event,
+    actorName: event.actorName ?? null,
     revision:
       Number.isInteger(event.revision) && event.revision >= 1
         ? event.revision
