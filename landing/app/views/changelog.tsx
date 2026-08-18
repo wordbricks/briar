@@ -30,6 +30,21 @@ export const changelogCopy = {
     },
     entries: [
       {
+        version: "1.2.134",
+        date: "2026년 8월 18일",
+        title: "새 Agent 템플릿과 제공자 사용량을 더 넓게 지원합니다",
+        summary:
+          "Frontend Developer Agent 템플릿을 추가하고 주요 제공자 사용량을 보여주며, Inbox 답글과 제공자 오류 뒤의 실행을 안전하게 이어가도록 개선합니다.",
+        items: [
+          "바로 사용할 수 있는 책임과 Skill, 출처 정보를 포함한 Frontend Developer Agent 템플릿을 추가합니다.",
+          "데스크탑 사용량 팝오버·하단 상태 바·제공자 목록에 Antigravity, OpenCode, Cursor를 추가하고, 가능한 경우 Antigravity Gemini quota와 로컬 계정 정보를 함께 보여줍니다.",
+          "Provider turn이 실패해도 활성 claim을 가진 Antigravity 실행을 종료하지 않고 복구 가능한 상태로 유지합니다.",
+          "사이드바 Channels 메뉴의 아이콘·간격·클릭 영역을 맞춰 항목을 더 안정적으로 탐색할 수 있게 합니다.",
+          "마이그레이션된 D1 테스트 데이터베이스 템플릿을 캐시해 로컬 테스트 준비를 줄이고 실행 일관성을 높입니다.",
+          "Inbox에서 이슈 답글을 열면 화면 너비에 맞춰 대화 탭을 바로 선택하고, 관련 이슈로 이동할 때도 올바른 상세 탭을 유지합니다.",
+        ],
+      },
+      {
         version: "1.2.133",
         date: "2026년 8월 18일",
         title: "바쁜 Worker에서도 Agent 답글을 안정적으로 처리합니다",
@@ -752,6 +767,21 @@ export const changelogCopy = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.134",
+        date: "August 18, 2026",
+        title: "Add agent templates and broader provider usage visibility",
+        summary:
+          "Add a Frontend Developer Agent template, broaden provider usage visibility, and keep Inbox replies and active runs on the right path after navigation or provider errors.",
+        items: [
+          "Add a ready-to-use Frontend Developer Agent template with its responsibility, Skills, and upstream attribution.",
+          "Add Antigravity, OpenCode, and Cursor to the desktop usage popover, bottom status bar, provider roster, and local account labels, including live Antigravity Gemini quota when available.",
+          "Prevent an active Antigravity run from ending after a failed provider turn while its claim remains active, so the run can recover and continue.",
+          "Align Channels menu icons, spacing, and hit areas in the sidebar for more consistent navigation.",
+          "Cache migrated D1 database templates so local tests spend less time preparing shared fixtures and run more consistently.",
+          "Open Inbox issue replies directly in the conversation tab on compact layouts, and preserve the correct detail tab when navigating to a related issue.",
+        ],
+      },
       {
         version: "1.2.133",
         date: "August 18, 2026",
@@ -1537,7 +1567,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <p>
             <strong>Briar</strong> <span>1.2</span>
           </p>
-          <a href="#v1-2-133">
+          <a href="#v1-2-134">
             {changelog.current} <span aria-hidden="true">↓</span>
           </a>
         </div>
@@ -1559,9 +1589,10 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   </div>
                   <time
                     dateTime={
-                      entry.version === "1.2.133"
+                      entry.version === "1.2.134"
                         ? "2026-08-18"
-                        : entry.version === "1.2.132" ||
+                        : entry.version === "1.2.133" ||
+                      entry.version === "1.2.132" ||
                       entry.version === "1.2.131" ||
                       entry.version === "1.2.130"
                         ? "2026-08-17"
