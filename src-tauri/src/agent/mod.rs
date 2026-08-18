@@ -9,6 +9,7 @@ mod codex;
 mod cursor;
 mod grok;
 mod opencode;
+mod openrouter;
 mod sidecar;
 
 use std::{
@@ -37,6 +38,7 @@ pub(crate) enum AgentProviderKind {
     Grok,
     Agy,
     Opencode,
+    Openrouter,
 }
 
 impl AgentProviderKind {
@@ -76,6 +78,13 @@ impl AgentProviderKind {
         {
             return Some(Self::Agy);
         }
+        let openrouter_prefix = format!("briar:openrouter:{project_id}:");
+        if conversation_id
+            .strip_prefix(&openrouter_prefix)
+            .is_some_and(|id| !id.is_empty())
+        {
+            return Some(Self::Openrouter);
+        }
         let codex_prefix = format!("briar:{project_id}:");
         conversation_id
             .strip_prefix(&codex_prefix)
@@ -91,6 +100,7 @@ impl AgentProviderKind {
             Self::Grok => "Grok",
             Self::Agy => "Antigravity",
             Self::Opencode => "OpenCode",
+            Self::Openrouter => "OpenRouter",
         }
     }
 }
@@ -467,6 +477,10 @@ pub(crate) fn discover_backend(
             sidecar::SidecarBackend::discover(runner, runners.opencode, opencode::CONFIG)
                 .map(AgentBackendHandle::Opencode)
         }
+        AgentProviderKind::Openrouter => {
+            sidecar::SidecarBackend::discover(runner, runners.opencode, openrouter::CONFIG)
+                .map(AgentBackendHandle::Opencode)
+        }
     }
 }
 
@@ -618,6 +632,13 @@ mod tests {
                 "briar:opencode:project-1:session-1"
             ),
             Some(AgentProviderKind::Opencode)
+        );
+        assert_eq!(
+            AgentProviderKind::for_conversation_id(
+                "project-1",
+                "briar:openrouter:project-1:session-1"
+            ),
+            Some(AgentProviderKind::Openrouter)
         );
         assert_eq!(
             AgentProviderKind::for_conversation_id("project-2", "briar:project-1:thread-1"),

@@ -14,7 +14,9 @@ import {
 import {
   loadAppProviderSettings,
   loadAgentProviderModels,
+  loadOpenRouterCredentialStatus,
   updateAppProviderSettings,
+  updateOpenRouterApiKey,
 } from "../lib/project-llm";
 import type { RepositoryReadiness } from "../lib/project-connection";
 import {
@@ -44,7 +46,9 @@ vi.mock("../lib/project-llm", async (importOriginal) => {
     ...original,
     loadAppProviderSettings: vi.fn(),
     loadAgentProviderModels: vi.fn(),
+    loadOpenRouterCredentialStatus: vi.fn(),
     updateAppProviderSettings: vi.fn(),
+    updateOpenRouterApiKey: vi.fn(),
   };
 });
 
@@ -117,6 +121,11 @@ const providerStatuses: OnboardingPrerequisites = {
     version: "1.18.11",
     authenticated: true,
   },
+  openrouter: {
+    installed: true,
+    version: "1.18.11",
+    authenticated: true,
+  },
 };
 
 describe("AppSettings", () => {
@@ -133,6 +142,10 @@ describe("AppSettings", () => {
     });
     vi.mocked(loadAppProviderSettings).mockReset();
     vi.mocked(loadAgentProviderModels).mockReset();
+    vi.mocked(loadOpenRouterCredentialStatus).mockReset();
+    vi.mocked(loadOpenRouterCredentialStatus).mockResolvedValue({ configured: false });
+    vi.mocked(updateOpenRouterApiKey).mockReset();
+    vi.mocked(updateOpenRouterApiKey).mockResolvedValue({ configured: true });
     vi.mocked(loadAgentProviderModels).mockResolvedValue({
       codex: {
         models: [{
@@ -177,6 +190,12 @@ describe("AppSettings", () => {
         error: null,
       },
       opencode: {
+        models: [],
+        defaultEfforts: [],
+        allowCustomModels: true,
+        error: null,
+      },
+      openrouter: {
         models: [],
         defaultEfforts: [],
         allowCustomModels: true,
@@ -515,6 +534,7 @@ describe("AppSettings", () => {
       grok: true,
       agy: true,
       opencode: true,
+      openrouter: true,
     });
     vi.mocked(updateAppProviderSettings).mockImplementation(
       async (settings) => settings,
@@ -582,6 +602,29 @@ describe("AppSettings", () => {
     expect(claudeDetails?.getAttribute("aria-expanded")).toBe("true");
     expect(container.textContent).toContain("Claude Sonnet");
 
+    const openRouterDetails = container.querySelector<HTMLButtonElement>(
+      '[aria-label="Toggle OpenRouter details"]',
+    );
+    await act(async () => openRouterDetails?.click());
+    const apiKeyInput = container.querySelector<HTMLInputElement>(
+      '[aria-label="OpenRouter API key"]',
+    );
+    const inputSetter = Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      "value",
+    )?.set;
+    await act(async () => {
+      inputSetter?.call(apiKeyInput, "sk-or-v1-ui-test-key");
+      apiKeyInput?.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    const saveButton = Array.from(
+      apiKeyInput?.closest("section")?.querySelectorAll<HTMLButtonElement>("button") ?? [],
+    ).find((button) => button.textContent === "Save");
+    await act(async () => saveButton?.click());
+    expect(updateOpenRouterApiKey).toHaveBeenCalledWith("sk-or-v1-ui-test-key");
+    expect(apiKeyInput?.value).toBe("");
+    expect(container.textContent).toContain("An API key is saved.");
+
     await act(async () => {
       container
         .querySelector<HTMLButtonElement>('[aria-label="Claude enabled"]')
@@ -594,6 +637,7 @@ describe("AppSettings", () => {
       grok: true,
       agy: true,
       opencode: true,
+      openrouter: true,
     });
     expect(switchState("Claude enabled")).toMatch(/unchecked|false/);
 
@@ -604,7 +648,7 @@ describe("AppSettings", () => {
         )
         ?.click();
     });
-    expect(inspectOnboardingPrerequisites).toHaveBeenCalledTimes(2);
+    expect(inspectOnboardingPrerequisites).toHaveBeenCalledTimes(3);
 
     await act(async () => root.unmount());
     container.remove();
@@ -635,6 +679,7 @@ describe("AppSettings", () => {
       grok: true,
       agy: true,
       opencode: true,
+      openrouter: true,
     });
     const container = document.createElement("div");
     document.body.append(container);
@@ -696,6 +741,7 @@ describe("AppSettings", () => {
       grok: true,
       agy: true,
       opencode: true,
+      openrouter: true,
     });
     const container = document.createElement("div");
     document.body.append(container);

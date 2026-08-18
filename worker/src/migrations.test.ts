@@ -801,6 +801,7 @@ describe("D1 migrations", () => {
     "0106_agent_provider_agy.sql",
     "0111_agent_provider_cursor.sql",
     "0112_expand_agent_text_limits.sql",
+    "0116_agent_provider_openrouter.sql",
     "0105_organization_inbox_realtime.sql",
     "0108_channel_notification_inbox.sql",
     "0114_channel_thread_subscriptions.sql",
@@ -3583,6 +3584,7 @@ describe("D1 migrations", () => {
     "0106_agent_provider_agy.sql",
     "0111_agent_provider_cursor.sql",
     "0112_expand_agent_text_limits.sql",
+    "0116_agent_provider_openrouter.sql",
   ])(
     "uses D1 transaction-safe foreign-key deferral for table rebuilds: %s",
     async (name) => {

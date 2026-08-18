@@ -4646,7 +4646,7 @@ export function RunPage({
     save: saveConversationPaneWidth,
   });
   const [isConversationLayoutCompact, setIsConversationLayoutCompact] =
-    useState(false);
+    useState(() => Boolean(initialDetailTab === "conversation"));
   useLayoutEffect(() => {
     if (companionMode) return;
     const layout = runPageLayoutRef.current;
@@ -4810,9 +4810,19 @@ export function RunPage({
     setIsResumePending(false);
   }, [resumeCheckpointIdentity]);
   useLayoutEffect(() => {
-    if (usesConversationTab || activeDetailTab !== "conversation") return;
+    if (
+      companionMode ||
+      isConversationLayoutCompact ||
+      activeDetailTab !== "conversation"
+    ) {
+      return;
+    }
     setActiveDetailTab(lastContentDetailTabRef.current);
-  }, [activeDetailTab, usesConversationTab]);
+  }, [
+    activeDetailTab,
+    companionMode,
+    isConversationLayoutCompact,
+  ]);
   useEffect(() => {
     onViewingIssueConversationChange?.(
       !usesConversationTab || activeDetailTab === "conversation"
@@ -6203,10 +6213,10 @@ export function RunPage({
                                   <span>{run.structuredResult.nextAction}</span>
                                 </div>
                               ) : null}
-                              <RunResultScreenshots
+                              <RunResultArtifacts
                                 onLoad={onLoadRunEvidence}
                                 onLoadImage={onLoadRunEvidenceImage}
-                                runId={run.id}
+                                run={run}
                               />
                             </section>
                           </div>
@@ -6454,10 +6464,10 @@ export function RunPage({
                               <span>{run.structuredResult.nextAction}</span>
                             </div>
                           ) : null}
-                          <RunResultScreenshots
+                          <RunResultArtifacts
                             onLoad={onLoadRunEvidence}
                             onLoadImage={onLoadRunEvidenceImage}
-                            runId={run.id}
+                            run={run}
                           />
                           {run.pullRequestUrls.length > 0 ? (
                             <div className="run-result-links">
@@ -6544,7 +6554,13 @@ export function RunPage({
                           {executionMetricsPanel}
                         </div>
                       )}
-                      {run.status !== "paused" && !completionSummary ? (
+                      {run.status === "completed" && !completionSummary ? (
+                        <RunResultArtifacts
+                          onLoad={onLoadRunEvidence}
+                          onLoadImage={onLoadRunEvidenceImage}
+                          run={run}
+                        />
+                      ) : run.status !== "paused" && !completionSummary ? (
                         <RunResultScreenshots
                           onLoad={onLoadRunEvidence}
                           onLoadImage={onLoadRunEvidenceImage}
@@ -8109,6 +8125,277 @@ function IssueResultReviewers({
   );
 }
 
+type DeploymentQaTarget = {
+  environment: string;
+  revision: number;
+  url: string;
+};
+
+const deploymentStagePattern =
+  /(^|[\s_-])(deploy(?:ment)?|preview|publish|release|staging|production)([\s_-]|$)/i;
+const deploymentEvidenceTypePattern =
+  /(^|[\s_-])(deploy(?:ed|ment)?|preview|staging|production)([\s_-]|$)/i;
+
+function metadataString(
+  metadata: Record<string, unknown> | null,
+  keys: string[],
+) {
+  for (const key of keys) {
+    const value = metadata?.[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return null;
+}
+
+function verifiedHttpUrl(value: string | null) {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" || url.protocol === "http:"
+      ? url.toString()
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function deploymentQaTargets(
+  evidence: RunEvidence[],
+  workflow: AutoHuntWorkflow,
+): DeploymentQaTarget[] {
+  const stages = new Map(workflow.stages.map((stage) => [stage.id, stage]));
+  const targets = evidence.flatMap((item) => {
+    if (!item.canonical || item.status !== "passed") return [];
+    const url = verifiedHttpUrl(item.url);
+    if (!url) return [];
+
+    const stage = stages.get(item.stage);
+    const environment = metadataString(item.metadata, [
+      "environment",
+      "environmentName",
+      "environment_name",
+      "deploymentEnvironment",
+      "deployment_environment",
+      "targetEnvironment",
+      "target_environment",
+    ]);
+    const isDeploymentStage = item.stage === "staging_qa" ||
+      item.stage === "production_qa" ||
+      deploymentStagePattern.test(item.stage);
+    if (
+      !isDeploymentStage &&
+      !deploymentEvidenceTypePattern.test(item.type)
+    ) {
+      return [];
+    }
+
+    return [{
+      environment: environment ?? stage?.label ?? item.stage,
+      revision: item.revision,
+      url,
+    }];
+  });
+  const environmentPriority = (target: DeploymentQaTarget) => {
+    if (/production|prod/i.test(target.environment)) return 0;
+    if (/staging/i.test(target.environment)) return 1;
+    if (/preview/i.test(target.environment)) return 2;
+    return 3;
+  };
+  const unique = new Map<string, DeploymentQaTarget>();
+  for (const target of targets.sort(
+    (left, right) => environmentPriority(left) - environmentPriority(right),
+  )) {
+    if (!unique.has(target.url)) unique.set(target.url, target);
+  }
+  return [...unique.values()];
+}
+
+function RunResultArtifacts({
+  onLoad,
+  onLoadImage,
+  run,
+}: {
+  onLoad: () => Promise<RunEvidence[]>;
+  onLoadImage?: (image: RunEvidenceImage) => Promise<Blob>;
+  run: HuntRun;
+}) {
+  const { t } = useI18n();
+  const {
+    evidence,
+    loading,
+    loadError,
+    reload,
+  } = useRunEvidenceLoader(
+    run.id,
+    onLoad,
+    true,
+    t("run.evidenceLoadFailed"),
+  );
+
+  return (
+    <>
+      <RunManualQaGuide
+        evidence={evidence}
+        loadError={loadError}
+        loading={loading}
+        onRetry={reload}
+        run={run}
+      />
+      <RunResultScreenshotsContent
+        evidence={evidence}
+        loadError={loadError}
+        loading={loading}
+        onLoadImage={onLoadImage}
+        onRetry={reload}
+      />
+    </>
+  );
+}
+
+function RunManualQaGuide({
+  evidence,
+  loadError,
+  loading,
+  onRetry,
+  run,
+}: {
+  evidence: RunEvidence[];
+  loadError: string | null;
+  loading: boolean;
+  onRetry: () => Promise<void>;
+  run: HuntRun;
+}) {
+  const { t } = useI18n();
+  const deploymentTargets = useMemo(
+    () => deploymentQaTargets(evidence, run.workflow),
+    [evidence, run.workflow],
+  );
+  const localChecks = useMemo(
+    () => Array.from(new Set(
+      run.workflow.stages
+        .filter((stage) => stage.id === "local_qa")
+        .flatMap((stage) => stage.checks ?? [])
+        .map((check) => check.trim())
+        .filter(Boolean),
+    )),
+    [run.workflow.stages],
+  );
+  const revisionTarget = run.commitSha?.trim() || run.branch?.trim() ||
+    t("run.revision", { count: run.currentRevision });
+  const showLocalGuide = !loading && deploymentTargets.length === 0;
+
+  return (
+    <section
+      aria-label={t("run.manualQaTitle")}
+      className="run-manual-qa"
+    >
+      <header>
+        <span>
+          <ListChecks aria-hidden="true" size={17} />
+          <strong>{t("run.manualQaTitle")}</strong>
+        </span>
+        <p>{t("run.manualQaDescription")}</p>
+      </header>
+      {loading ? (
+        <div className="run-manual-qa-state">
+          <LoaderCircle aria-hidden="true" className="spin" size={15} />
+          {t("run.manualQaLoading")}
+        </div>
+      ) : loadError ? (
+        <>
+          <button
+            className="run-manual-qa-state error"
+            onClick={() => void onRetry()}
+            type="button"
+          >
+            <CircleAlert aria-hidden="true" size={15} />
+            <span>{t("run.manualQaLoadFailed")}</span>
+            <RefreshCw aria-hidden="true" size={13} />
+          </button>
+          <p className="run-manual-qa-deployment-note unknown">
+            {t("run.manualQaDeploymentUnknown")}
+          </p>
+        </>
+      ) : deploymentTargets.length > 0 ? (
+        <>
+          <div className="run-manual-qa-deployments">
+            {deploymentTargets.map((target) => (
+              <article key={target.url}>
+                <div>
+                  <small>{t("run.manualQaDeploymentReady")}</small>
+                  <strong>{target.environment}</strong>
+                  <span>
+                    {t("run.manualQaTargetRevision", {
+                      revision: target.revision,
+                    })}
+                  </span>
+                </div>
+                <a href={target.url} rel="noreferrer" target="_blank">
+                  <Link2 aria-hidden="true" size={14} />
+                  {t("run.manualQaOpenTarget")}
+                  <ArrowUp aria-hidden="true" size={13} />
+                </a>
+              </article>
+            ))}
+          </div>
+          <div className="run-manual-qa-steps compact">
+            <div>
+              <strong>{t("run.manualQaProcedureTitle")}</strong>
+              <p>{t("run.manualQaDeploymentProcedure")}</p>
+            </div>
+            <div>
+              <strong>{t("run.manualQaExpectedTitle")}</strong>
+              <p>{t("run.manualQaExpected")}</p>
+            </div>
+          </div>
+        </>
+      ) : null}
+      {showLocalGuide ? (
+        <>
+          {!loadError ? (
+            <p className="run-manual-qa-deployment-note">
+              <CircleAlert aria-hidden="true" size={14} />
+              {t("run.manualQaNoDeployment")}
+            </p>
+          ) : null}
+          <strong className="run-manual-qa-local-title">
+            {t("run.manualQaLocalTitle")}
+          </strong>
+          <div className="run-manual-qa-steps">
+            <div>
+              <strong>{t("run.manualQaPrepareTitle")}</strong>
+              <p>{t("run.manualQaPrepare", { target: revisionTarget })}</p>
+            </div>
+            <div>
+              <strong>{t("run.manualQaProcedureTitle")}</strong>
+              <p>{t("run.manualQaLocalProcedure")}</p>
+              {localChecks.length > 0 ? (
+                <div className="run-manual-qa-checks">
+                  {localChecks.map((check) => <code key={check}>{check}</code>)}
+                </div>
+              ) : null}
+            </div>
+            <div>
+              <strong>{t("run.manualQaExpectedTitle")}</strong>
+              <p>{t("run.manualQaExpected")}</p>
+            </div>
+          </div>
+        </>
+      ) : null}
+      <div className="run-manual-qa-next-action">
+        <strong>{t("run.manualQaNextActionTitle")}</strong>
+        <p>
+          {t(
+            run.status === "paused"
+              ? "run.manualQaPausedNextAction"
+              : "run.manualQaCompletedNextAction",
+          )}
+        </p>
+      </div>
+    </section>
+  );
+}
+
 function RunResultScreenshots({
   onLoad,
   onLoadImage,
@@ -8130,6 +8417,32 @@ function RunResultScreenshots({
     Boolean(onLoadImage),
     t("run.evidenceLoadFailed"),
   );
+
+  return (
+    <RunResultScreenshotsContent
+      evidence={evidence}
+      loadError={loadError}
+      loading={loading}
+      onLoadImage={onLoadImage}
+      onRetry={loadScreenshots}
+    />
+  );
+}
+
+function RunResultScreenshotsContent({
+  evidence,
+  loadError,
+  loading,
+  onLoadImage,
+  onRetry,
+}: {
+  evidence: RunEvidence[];
+  loadError: string | null;
+  loading: boolean;
+  onLoadImage?: (image: RunEvidenceImage) => Promise<Blob>;
+  onRetry: () => Promise<void>;
+}) {
+  const { t } = useI18n();
 
   const images = useMemo(
     () => evidence
@@ -8153,7 +8466,7 @@ function RunResultScreenshots({
       ) : loadError ? (
         <button
           className="run-evidence-state error"
-          onClick={() => void loadScreenshots()}
+          onClick={() => void onRetry()}
           type="button"
         >
           <CircleAlert size={15} />

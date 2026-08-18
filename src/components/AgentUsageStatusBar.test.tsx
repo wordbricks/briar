@@ -83,6 +83,16 @@ const snapshot: AgentUsageSnapshot = {
     updatedAt: 1,
     error: null,
   },
+  openrouter: {
+    provider: "openrouter",
+    status: "unavailable",
+    session: null,
+    weekly: null,
+    monthly: null,
+    planType: null,
+    updatedAt: 1,
+    error: null,
+  },
   cursor: {
     provider: "cursor",
     status: "ok",

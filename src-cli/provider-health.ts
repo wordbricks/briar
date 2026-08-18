@@ -40,6 +40,7 @@ export type WorkerProviderHealthMap = Record<
 
 type ProviderHealthDependencies = {
   home: string;
+  openrouterApiKey: string | null;
   now: () => number;
   which: (provider: WorkerProvider) => string | null;
   authenticated: (
@@ -47,6 +48,7 @@ type ProviderHealthDependencies = {
     binary: string,
     home: string,
     now: number,
+    openrouterApiKey: string | null,
   ) => Promise<boolean>;
   /**
    * Probe remaining provider quota. Return `exhausted: true` only when usage
@@ -168,9 +170,10 @@ export const grokAuthenticated = async (home: string, now: number) => {
 
 const defaultDependencies: ProviderHealthDependencies = {
   home: homedir(),
+  openrouterApiKey: process.env.OPENROUTER_API_KEY?.trim() || null,
   now: Date.now,
   which: (provider) => Bun.which(agentProviderBinaryName(provider)),
-  authenticated: async (provider, binary, home, now) => {
+  authenticated: async (provider, binary, home, now, openrouterApiKey) => {
     if (provider === "codex") {
       return codexAuthenticated(binary);
     }
@@ -183,6 +186,9 @@ const defaultDependencies: ProviderHealthDependencies = {
     if (provider === "opencode") {
       // OpenCode delegates credentials to its configured model providers.
       return true;
+    }
+    if (provider === "openrouter") {
+      return Boolean(openrouterApiKey?.trim());
     }
     if (provider === "agy") {
       return agyAuthenticated(binary);
@@ -229,6 +235,7 @@ export async function inspectWorkerProviderHealth(
               binary,
               resolved.home,
               resolved.now(),
+              resolved.openrouterApiKey,
             )
           : false;
       if (!enabled[provider]) {

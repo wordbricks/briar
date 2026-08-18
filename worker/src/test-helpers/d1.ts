@@ -389,6 +389,7 @@ async function buildTemplate(
     `${JSON.stringify(manifest, null, 2)}\n`,
     { flag: "wx" },
   );
+  await chmodTree(temporaryDirectory, false);
   return manifest;
 }
 
@@ -437,9 +438,10 @@ export async function prepareD1TestTemplate(): Promise<D1TestTemplate> {
     let manifest: TemplateManifest;
     try {
       manifest = await buildTemplate(temporaryDirectory, fingerprint);
+      // macOS requires write permission on a directory to rename it.
+      await chmod(temporaryDirectory, 0o700);
       await rename(temporaryDirectory, directory);
-      // macOS rejects renaming a directory after its write permission has been removed.
-      await chmodTree(directory, false);
+      await chmod(directory, 0o500);
     } catch (error) {
       await removeTemplateDirectory(temporaryDirectory);
       throw error;

@@ -21,6 +21,7 @@ const enabled = {
   grok: true,
   agy: true,
   opencode: true,
+  openrouter: true,
 };
 
 describe("inspectWorkerProviderHealth", () => {
@@ -112,6 +113,12 @@ describe("inspectWorkerProviderHealth", () => {
         healthy: false,
         reason: "not_authenticated",
       },
+      openrouter: {
+        installed: true,
+        authenticated: false,
+        healthy: false,
+        reason: "not_authenticated",
+      },
     });
     expect(healthyWorkerProviders(health)).toEqual(["codex"]);
   });
@@ -141,6 +148,7 @@ describe("inspectWorkerProviderHealth", () => {
       "grok",
       "agy",
       "opencode",
+      "openrouter",
     ]);
     expect(usage).toHaveBeenCalled();
   });
@@ -169,6 +177,7 @@ describe("inspectWorkerProviderHealth", () => {
       "grok",
       "agy",
       "opencode",
+      "openrouter",
     ]);
   });
 
@@ -187,6 +196,7 @@ describe("inspectWorkerProviderHealth", () => {
         grok: false,
         agy: false,
         opencode: false,
+        openrouter: false,
       },
       {
         which: (provider) => `/usr/local/bin/${provider}`,
@@ -201,6 +211,7 @@ describe("inspectWorkerProviderHealth", () => {
       "/usr/local/bin/claude",
       expect.any(String),
       expect.any(Number),
+      null,
     );
     expect(usage).toHaveBeenCalledTimes(1);
     expect(healthyWorkerProviders(health)).toEqual(["claude"]);
@@ -209,6 +220,40 @@ describe("inspectWorkerProviderHealth", () => {
     expect(health.grok.reason).toBe("disabled");
     expect(health.agy.reason).toBe("disabled");
     expect(health.opencode.reason).toBe("disabled");
+    expect(health.openrouter.reason).toBe("disabled");
+  });
+
+  it("requires an API key before advertising OpenRouter as healthy", async () => {
+    const onlyOpenRouter = {
+      ...Object.fromEntries(Object.keys(enabled).map((provider) => [provider, false])),
+      openrouter: true,
+    } as Record<WorkerProvider, boolean>;
+    const withoutKey = await inspectWorkerProviderHealth(onlyOpenRouter, {
+      which: (provider) => provider === "openrouter" ? "/usr/local/bin/opencode" : null,
+      openrouterApiKey: null,
+    });
+    expect(withoutKey.openrouter).toMatchObject({
+      installed: true,
+      authenticated: false,
+      healthy: false,
+      reason: "not_authenticated",
+    });
+
+    const withKey = await inspectWorkerProviderHealth(onlyOpenRouter, {
+      which: (provider) => provider === "openrouter" ? "/usr/local/bin/opencode" : null,
+      openrouterApiKey: "sk-or-v1-test-key",
+      usage: vi.fn(async () => ({
+        exhausted: false,
+        maxUsedPercent: null,
+        error: null,
+      })),
+    });
+    expect(withKey.openrouter).toMatchObject({
+      installed: true,
+      authenticated: true,
+      healthy: true,
+      reason: null,
+    });
   });
 
   it("explains readiness when remaining providers are usage-exhausted", () => {
@@ -244,6 +289,12 @@ describe("inspectWorkerProviderHealth", () => {
         reason: "disabled",
       },
       opencode: {
+        installed: false,
+        authenticated: false,
+        healthy: false,
+        reason: "disabled",
+      },
+      openrouter: {
         installed: false,
         authenticated: false,
         healthy: false,

@@ -34,6 +34,7 @@ import {
 import {
   agentProviders,
   modelEffortSchema,
+  type AgentProvider,
 } from "../src/lib/agent-provider-contract";
 import {
   agentResponsibilityMaxLength,
@@ -318,6 +319,7 @@ const configSchema = z
         grok: z.boolean().default(true),
         agy: z.boolean().default(true),
         opencode: z.boolean().default(true),
+        openrouter: z.boolean().default(true),
       })
       .default({
         codex: true,
@@ -326,7 +328,9 @@ const configSchema = z
         grok: true,
         agy: true,
         opencode: true,
+        openrouter: true,
       }),
+    openrouterApiKey: z.string().trim().min(10).max(500).optional(),
     appSettings: z
       .object({
         preventSleepWhileRunning: z.boolean().default(false),
@@ -349,6 +353,28 @@ const configSchema = z
 
 type Config = z.infer<typeof configSchema>;
 type ProjectConfig = z.infer<typeof projectConfigSchema>;
+const openRouterOpenCodeConfig = JSON.stringify({
+  provider: {
+    openrouter: { options: { apiKey: "{env:OPENROUTER_API_KEY}" } },
+  },
+});
+
+function providerExecutionEnvironment(
+  config: Config,
+  provider: AgentProvider,
+  environment: NodeJS.ProcessEnv,
+): NodeJS.ProcessEnv {
+  if (provider !== "openrouter") return environment;
+  const apiKey = config.openrouterApiKey?.trim();
+  if (!apiKey) {
+    throw new Error("앱 설정에서 OpenRouter API 키를 먼저 저장하세요.");
+  }
+  return {
+    ...environment,
+    OPENROUTER_API_KEY: apiKey,
+    OPENCODE_CONFIG_CONTENT: openRouterOpenCodeConfig,
+  };
+}
 const executionToken = (project: ProjectConfig) =>
   process.env.BRIAR_WORKER_TOKEN ??
   process.env.BRIAR_AGENT_TOKEN ??
@@ -396,6 +422,7 @@ async function loadConfig(): Promise<Config> {
           grok: true,
           agy: true,
           opencode: true,
+          openrouter: true,
         },
         appSettings: {
           preventSleepWhileRunning: false,
@@ -2522,14 +2549,14 @@ async function runClaimedIssueInRuntime(
     issue.runId,
     issue.executionId,
   );
-  const environment = {
+  const environment = providerExecutionEnvironment(config, provider, {
     ...process.env,
     PATH: workerExecutionPath(),
     BRIAR_CLI: workerCliPath(),
     BRIAR_WORKER_TOKEN: workerToken,
     BRIAR_PROJECT_ID: project.id,
     BRIAR_CONFIG_HOME: runtimeDirectory,
-  };
+  });
 
   const detachedAgent: DetachedAgent = {
     id: logicalAgent?.id ?? issue.runId,
@@ -2832,13 +2859,13 @@ async function runClaimedProjectAgentTask(
     prompt,
     workspacePath,
     fullAccess: project.autoHunt?.sandbox?.fullAccess ?? true,
-    environment: {
+    environment: providerExecutionEnvironment(config, agent.provider, {
       ...process.env,
       PATH: workerExecutionPath(),
       BRIAR_CLI: workerCliPath(),
       BRIAR_WORKER_TOKEN: workerToken,
       BRIAR_PROJECT_ID: project.id,
-    },
+    }),
     signal,
   });
   assertDetachedProviderTurnSucceeded(turn);
@@ -3075,13 +3102,13 @@ async function runClaimedIssueReply(
           fullAccess: project.autoHunt?.sandbox?.fullAccess ?? true,
           attachments,
           outputSchema: detachedIssueReplyOutputSchema,
-          environment: {
+          environment: providerExecutionEnvironment(config, agent.provider, {
             ...process.env,
             PATH: workerExecutionPath(),
             BRIAR_CLI: workerCliPath(),
             BRIAR_WORKER_TOKEN: workerToken,
             BRIAR_PROJECT_ID: project.id,
-          },
+          }),
           signal,
           onPayload: async (payload, line) => {
             activityPublisher.observePayload(payload);
@@ -3330,13 +3357,13 @@ async function runClaimedChannelReply(
         delegationTargets: reply.scope.kind === "organization"
           ? reply.delegationTargets
           : undefined,
-        environment: {
+        environment: providerExecutionEnvironment(config, agent.provider, {
           ...process.env,
           PATH: workerExecutionPath(),
           BRIAR_CLI: workerCliPath(),
           BRIAR_WORKER_TOKEN: workerToken,
           BRIAR_PROJECT_ID: project.id,
-        },
+        }),
         signal,
         onPayload: (payload) => {
           activityPublisher.observePayload(payload);
@@ -3486,6 +3513,7 @@ async function workerRegisterCommand() {
   const configuredProvider = project.llm?.provider ?? "codex";
   const providerHealth = await inspectWorkerProviderHealth(
     config.agentProviders,
+    { openrouterApiKey: config.openrouterApiKey ?? null },
   );
   const providerCapabilities = await discoverWorkerProviderCapabilities(
     config.agentProviders,
@@ -3732,6 +3760,7 @@ async function workerCommand() {
   if (readinessProblem) {
     const providerHealth = await inspectWorkerProviderHealth(
       config.agentProviders,
+      { openrouterApiKey: config.openrouterApiKey ?? null },
     );
     const providerCapabilities = await discoverWorkerProviderCapabilities(
       config.agentProviders,
@@ -3915,6 +3944,7 @@ async function workerCommand() {
         }
         const providerHealth = await inspectWorkerProviderHealth(
           config.agentProviders,
+          { openrouterApiKey: config.openrouterApiKey ?? null },
         );
         const providerCapabilities = await discoverWorkerProviderCapabilities(
           config.agentProviders,

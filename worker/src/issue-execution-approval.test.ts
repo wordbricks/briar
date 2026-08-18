@@ -98,6 +98,12 @@ const providerCapabilities = {
     allowCustomModels: true,
     error: null,
   },
+  openrouter: {
+    models: [],
+    defaultEfforts: [],
+    allowCustomModels: true,
+    error: null,
+  },
 };
 
 const event = (

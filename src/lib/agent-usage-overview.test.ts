@@ -142,6 +142,7 @@ const providerPointKeys: UsageAttribution[] = [
   "grok",
   "agy",
   "opencode",
+  "openrouter",
   "unknown",
 ];
 
