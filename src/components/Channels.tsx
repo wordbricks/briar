@@ -2705,7 +2705,6 @@ function ChannelSettingsDialog({
             id={`${settingsPanelId}-tab`}
             onClick={() => setTab("settings")}
             role="tab"
-            tabIndex={tab === "settings" ? 0 : -1}
             type="button"
           >
             {t("channel.settingsTabGeneral")}
@@ -2717,7 +2716,6 @@ function ChannelSettingsDialog({
             id={`${membersPanelId}-tab`}
             onClick={() => setTab("members")}
             role="tab"
-            tabIndex={tab === "members" ? 0 : -1}
             type="button"
           >
             {t("channel.settingsTabMembers", {

@@ -603,6 +603,14 @@ describe("Channels", () => {
       );
       expect(dialog?.textContent).toContain("만든 날짜");
 
+      const tabs = [
+        ...dialog!.querySelectorAll<HTMLButtonElement>(
+          ".channel-settings-tabs button",
+        ),
+      ];
+      expect(tabs.map((tab) => tab.textContent)).toEqual(["설정", "멤버 2"]);
+      expect(tabs.every((tab) => tab.tabIndex >= 0)).toBe(true);
+
       const copyButton = [...dialog!.querySelectorAll("button")].find((button) =>
         button.textContent?.includes("ID 복사")
       );
