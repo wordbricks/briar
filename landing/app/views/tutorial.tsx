@@ -1,9 +1,9 @@
-import { type Locale, copy, localizedPath } from "../i18n";
+import { type Locale, copy, localizedHrefs, localizedPath } from "../i18n";
 import { DesktopDownloadLink } from "../desktop-download-link";
 import { Arrow, SiteFooter, SiteHeader } from "../site-chrome";
 import { MAC_DOWNLOAD_URL, WEB_APP_URL } from "../site-links";
 
-export const tutorialCopy = {
+const tutorialCopyByLocale = {
   ko: {
     metadata: {
       title: "Briar 튜토리얼 — 첫 이슈부터 검증된 결과까지",
@@ -310,6 +310,162 @@ export const tutorialCopy = {
     backHome: "Home",
     backTop: "Back to top ↑",
   },
+} as const;
+
+export const tutorialCopy = {
+  ...tutorialCopyByLocale,
+  zh: {
+    ...tutorialCopyByLocale.en,
+    metadata: {
+      title: "Briar 教程 — 从第一个 issue 到可验证的结果",
+      description:
+        "了解如何在 Briar 中创建 issue，使用 issue 处理 Agent 自动执行工作，查看结构化结果和证据，并安排重复任务。",
+    },
+    eyebrow: "9 分钟产品导览",
+    title: "从第一个 issue\n到可验证的结果。",
+    description:
+      "跟随 Briar 的真实界面创建 issue，使用 issue 处理 Agent 自动执行工作，并查看带有证据的结构化结果。",
+    start: "开始教程",
+    openApp: "打开 Briar",
+    captured: "画面直接截取自本地 Briar v1.2.67 演示环境。",
+    shotBarLabel: "briar · 本地演示",
+    setupTitle: "开始之前",
+    setup: [
+      ["打开 Briar", "打开 Web 应用或安装 Mac 应用并登录。"],
+      ["连接仓库", "将要处理的 Git 仓库连接为项目。"],
+      ["准备 Agent", "登录 Codex、Claude 或 Grok，准备执行 Agent 工作。"],
+    ],
+    tocTitle: "本教程内容",
+    steps: [
+      {
+        id: "create-issue",
+        label: "01 · INTAKE",
+        nav: "创建 issue",
+        title: "把需求变成可执行的 issue。",
+        description:
+          "在新建 issue 中填写标题和描述，再选择负责人、初始状态和优先级。截图或复现视频也可以作为附件留下。",
+        bullets: [
+          "在描述中写清预期结果和完成条件。",
+          "准备开始的工作放入队列，仍需整理的请求放入待办。",
+        ],
+        image: "/tutorial/01-create-issue.webp",
+        alt: "Briar 新建 issue 对话框",
+        caption: "在一个界面中设置标题、上下文、优先级和附件。",
+      },
+      {
+        id: "track-work",
+        label: "02 · WORKFLOW",
+        nav: "跟踪工作",
+        title: "在看板上查看每个任务的位置。",
+        description:
+          "工作从待办和队列开始，经过分析、实现、本地验证和审核。阻塞和已完成的工作也会保留在同一个运营视图中。",
+        bullets: [
+          "使用进行中和需要关注筛选器，聚焦当前最重要的工作。",
+          "打开卡片即可查看当前阶段和最新活动。",
+        ],
+        image: "/tutorial/02-task-board.webp",
+        alt: "Briar issue 处理看板",
+        caption: "人与 Agent 共享同一个任务状态来源。",
+      },
+      {
+        id: "run-auto-hunt",
+        label: "03 · EXECUTE",
+        nav: "处理排队的 issue",
+        title: "让 issue 处理 Agent 自动处理排队的 issue。",
+        description:
+          "在 Agent 页面打开 issue 处理 Agent 的运行任务，查找排队的 issue，并让每个任务经过分析、实现和验证。Briar 会隔离每个 issue，并将进度记录在看板上。",
+        bullets: [
+          "确认 Agent 责任包含“负责项目的开发和代码相关工作”，然后选择运行任务。",
+          "运行开始后，排队的 issue 会经过工作流并继续执行所需检查。",
+        ],
+        image: "/tutorial/07-run-auto-hunt.webp",
+        alt: "Briar issue 处理 Agent 的运行任务对话框",
+        caption: "运行 issue 处理 Agent，自动处理排队的 issue。",
+      },
+      {
+        id: "collaborate",
+        label: "04 · COLLABORATE",
+        nav: "与 Agent 协作",
+        title: "让上下文留在 issue 中。",
+        description:
+          "Issue 标签页会把人的补充要求和 Agent 回复放在一起。工作进行中出现的新约束和问题，也会继续附着在同一个任务上。",
+        bullets: [
+          "用评论补充要求、边界条件和审核反馈。",
+          "在结果、证据、工作记录和状态之间切换，也不会丢失 issue 上下文。",
+        ],
+        image: "/tutorial/03-issue-conversation.webp",
+        alt: "Briar issue 详情与 Agent 对话",
+        caption: "指令和 Agent 回复会持续累积在 issue 中。",
+      },
+      {
+        id: "review-result",
+        label: "05 · RESULT",
+        nav: "查看工作结果",
+        title: "在 issue 详情中阅读清晰的结构化结果。",
+        description:
+          "工作完成或到达审核检查点后，结果页会在一个视图中整理实现内容、已完成阶段、验证摘要和下一步行动。无需读完全部工作记录，也能了解发生了什么变化。",
+        bullets: [
+          "先从工作结果开始，阅读实现和验证摘要。",
+          "根据下一步行动批准或请求修改；需要细节时再打开证据。",
+        ],
+        image: "/tutorial/08-result.webp",
+        alt: "Briar issue 详情中的结构化工作结果",
+        caption: "实现、验证和下一步行动都集中在结果页中。",
+      },
+      {
+        id: "review-evidence",
+        label: "06 · VERIFY",
+        nav: "查看证据",
+        title: "检查“完成”背后的依据。",
+        description:
+          "证据页按工作流阶段整理产物和验证状态。执行过的命令、通过状态、尝试次数和修订都会保留下来。",
+        bullets: [
+          "通过、等待和未记录状态可以帮助你发现缺失的验证。",
+          "先阅读结果摘要，再在证据页确认支持结论的记录。",
+        ],
+        image: "/tutorial/04-evidence.webp",
+        alt: "Briar 按阶段显示的验证证据",
+        caption: "分析、实现和本地验证证据都会与每次修订绑定。",
+      },
+      {
+        id: "create-agents",
+        label: "07 · AGENTS",
+        nav: "创建专业 Agent",
+        title: "把重复的职责定义为 Agent。",
+        description:
+          "将一项职责、一个提供商和一个模型组合成可复用的项目 Agent。可以围绕排队 issue 处理、错误接收或反馈分析等真实团队角色来设计。",
+        bullets: [
+          "用一句具体的责任描述，让执行范围保持清晰。",
+          "点击卡片上的运行操作，按需执行这项职责。",
+        ],
+        image: "/tutorial/05-agents.webp",
+        alt: "Briar 项目 Agent 列表",
+        caption: "用同一套系统运营不同的提供商和模型。",
+      },
+      {
+        id: "schedule-agents",
+        label: "08 · AUTOMATE",
+        nav: "安排重复运行",
+        title: "安排日常的 Agent 工作。",
+        description:
+          "在 Schedule 中选择 Agent、重复周期、时间和通知级别。按照团队时区自动执行仓库审计或反馈分拣等容易遗漏的工作。",
+        bullets: [
+          "根据任务选择工作日、每天或每周重复。",
+          "只在需要人工判断的时刻接收重要更新通知。",
+        ],
+        image: "/tutorial/06-schedule.webp",
+        alt: "Briar 创建 Agent 计划对话框",
+        caption: "将 Agent、周期、运行时间和通知保存为一个计划。",
+      },
+    ],
+    nextEyebrow: "现在轮到你",
+    nextTitle: "从一个小 issue 开始。",
+    nextDescription:
+      "连接仓库，创建一个完成条件清晰的 issue。Briar 会把执行和验证保持在同一条流程中。",
+    download: "下载 Mac 版",
+    backHome: "首页",
+    backTop: "返回顶部 ↑",
+  },
 } as const satisfies Record<Locale, unknown>;
 
 const PATH = "/tutorial" as const;
@@ -317,10 +473,7 @@ const PATH = "/tutorial" as const;
 export default function TutorialView({ locale }: { locale: Locale }) {
   const c = copy[locale];
   const t = tutorialCopy[locale];
-  const hrefs = {
-    en: localizedPath("en", PATH),
-    ko: localizedPath("ko", PATH),
-  } as const;
+  const hrefs = localizedHrefs(PATH);
 
   return (
     <main className="tutorial-page" id="top">

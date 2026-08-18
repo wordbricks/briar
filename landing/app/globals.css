@@ -34,6 +34,10 @@ body {
   background-image: var(--noise-texture);
   background-size: 180px 180px;
   font-family: var(--font-geist-sans),
+    "PingFang SC",
+    "Hiragino Sans GB",
+    "Microsoft YaHei",
+    "Noto Sans SC",
     "Apple SD Gothic Neo",
     "Noto Sans KR",
     sans-serif;
@@ -48,9 +52,11 @@ body {
  * only break at spaces/punctuation. `overflow-wrap: anywhere` is a safety
  * valve so a single unbreakable long token (a URL, an unspaced English
  * phrase) can still wrap instead of overflowing the layout. Scoped to
- * :lang(ko) only — English pages must keep their normal word wrapping.
+ * :lang(ko) and :lang(zh) only — English pages must keep their normal word
+ * wrapping.
  */
-:lang(ko) {
+:lang(ko),
+:lang(zh) {
   word-break: keep-all;
   overflow-wrap: anywhere;
 }
@@ -116,6 +122,33 @@ which doesn't
 :lang(ko) .download-hero > p,
 :lang(ko) .blog-hero > p,
 :lang(ko) .mobile-menu nav a {
+  letter-spacing: normal;
+}
+
+/* Chinese glyphs use a system fallback; reset display tracking tuned for
+ * Geist's Latin letterforms so Han characters do not crowd. */
+:lang(zh) .hero h1,
+:lang(zh) .tutorial-hero-copy h1,
+:lang(zh) .final-cta h2,
+:lang(zh) .section-intro h2,
+:lang(zh) .security-copy h2,
+:lang(zh) .tutorial-setup h2,
+:lang(zh) .tutorial-step h2,
+:lang(zh) .tutorial-next h2,
+:lang(zh) .download-hero h1,
+:lang(zh) .download-group-heading h2,
+:lang(zh) .blog-hero h1,
+:lang(zh) .changelog-hero h1,
+:lang(zh) .changelog-entry h2,
+:lang(zh) .blog-empty h2,
+:lang(zh) .hero-content > p,
+:lang(zh) .hero-actions-compact a,
+:lang(zh) .section-intro > p,
+:lang(zh) .principle-grid p,
+:lang(zh) .tutorial-hero-copy > p,
+:lang(zh) .download-hero > p,
+:lang(zh) .blog-hero > p,
+:lang(zh) .mobile-menu nav a {
   letter-spacing: normal;
 }
 

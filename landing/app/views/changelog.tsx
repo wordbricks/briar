@@ -1,8 +1,8 @@
-import { type Locale, copy, localizedPath } from "../i18n";
+import { type Locale, copy, localizedHrefs, localizedPath } from "../i18n";
 import { Arrow, SiteFooter, SiteHeader } from "../site-chrome";
 import { GITHUB_RELEASES_URL } from "../site-links";
 
-export const changelogCopy = {
+const changelogCopyByLocale = {
   ko: {
     metadata: {
       title: "Briar 변경 기록 — 새로운 기능과 개선 사항",
@@ -1449,6 +1449,38 @@ export const changelogCopy = {
       },
     ],
   },
+} as const;
+
+export const changelogCopy = {
+  ...changelogCopyByLocale,
+  zh: {
+    ...changelogCopyByLocale.en,
+    metadata: {
+      title: "Briar 更新日志 — 新功能与改进",
+      description:
+        "查看 Briar 桌面端、频道、移动端和 Agent 工作流的最新更新。",
+    },
+    eyebrow: "PRODUCT UPDATES",
+    title: "Briar 更新日志",
+    description:
+      "记录让人与 Agent 协作更清晰的新功能与改进。历史版本条目保留原始英文，便于对应 GitHub 发布记录。",
+    current: "当前稳定版本",
+    latest: "最新",
+    released: "发布",
+    openApp: "打开 Briar",
+    allReleases: "查看全部版本",
+    releaseNotes: "打开 GitHub 版本",
+    home: "首页",
+    backTop: "返回顶部 ↑",
+    categories: {
+      label: "变更类型",
+      breaking: "Breaking",
+      added: "Added",
+      improved: "Improved",
+      fixed: "Fixed",
+    },
+    entries: changelogCopyByLocale.en.entries,
+  },
 } as const satisfies Record<Locale, unknown>;
 
 const PATH = "/changelog" as const;
@@ -1498,10 +1530,7 @@ function groupChanges(version: string, items: readonly string[]) {
 export default function ChangelogView({ locale }: { locale: Locale }) {
   const c = copy[locale];
   const changelog = changelogCopy[locale];
-  const hrefs = {
-    en: localizedPath("en", PATH),
-    ko: localizedPath("ko", PATH),
-  } as const;
+  const hrefs = localizedHrefs(PATH);
 
   return (
     <main className="changelog-page" id="top">

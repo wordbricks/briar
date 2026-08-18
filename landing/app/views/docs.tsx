@@ -2,6 +2,7 @@ import {
   type Locale,
   type RoutePath,
   copy,
+  localizedHrefs,
   localizedPath,
 } from "../i18n";
 import { Arrow, SiteFooter, SiteHeader } from "../site-chrome";
@@ -14,7 +15,7 @@ export const docsPaths = {
 
 export type DocsPage = keyof typeof docsPaths;
 
-export const docsCopy = {
+const docsCopyByLocale = {
   ko: {
     common: {
       label: "API 문서",
@@ -665,6 +666,140 @@ export const docsCopy = {
   },
 } as const;
 
+export const docsCopy = {
+  ...docsCopyByLocale,
+  zh: {
+    ...docsCopyByLocale.en,
+    common: {
+      ...docsCopyByLocale.en.common,
+      label: "API 文档",
+      navLabel: "API 文档导航",
+      overview: "概览",
+      getStarted: "开始使用",
+      webhooks: "接收 Webhook",
+      openApp: "打开 Briar",
+      home: "首页",
+      tutorial: "教程",
+      changelog: "更新日志",
+      backTop: "返回顶部 ↑",
+      previous: "上一页",
+      next: "下一页",
+      onThisPage: "本页内容",
+    },
+    overview: {
+      ...docsCopyByLocale.en.overview,
+      metadata: {
+        title: "Briar API 文档 — 开始使用公开 API",
+        description:
+          "了解 Briar 公开 API 的范围和集成流程，然后查看频道接收 Webhook 参考。",
+      },
+      eyebrow: "PUBLIC API",
+      title: "将外部事件\n接入 Briar。",
+      description:
+        "公开 API 文档介绍如何将外部服务的部署、监控和运营事件安全地发送到 Briar 频道。",
+      chooseTitle: "从需要的指南开始",
+      cards: [
+        {
+          path: "/docs/get-started",
+          index: "01",
+          title: "开始使用",
+          description: "从创建秘密 URL 到发送第一个 JSON 请求，了解基本集成流程。",
+          action: "查看集成指南",
+        },
+        {
+          path: "/docs/webhooks",
+          index: "02",
+          title: "接收 Webhook",
+          description: "查看 Webhook 生命周期、请求模式、幂等性、限制、错误和可运行的 curl 示例。",
+          action: "查看 Webhook 参考",
+        },
+      ],
+      scopeTitle: "当前公开范围",
+      scopeBody:
+        "目前公开 API 专注于频道接收 Webhook。Briar 应用使用的登录管理 API 不属于公开集成契约。",
+      flowTitle: "如何使用这些文档",
+      flow: [
+        {
+          title: "准备",
+          description: "在 Briar 频道中创建 Webhook，并安全保存只显示一次的秘密 URL。",
+        },
+        {
+          title: "实现",
+          description: "遵守 JSON 和大小限制，为每个逻辑事件选择稳定的幂等键。",
+        },
+        {
+          title: "运营",
+          description: "区分新消息、重复消息和错误响应，并在归属或暴露情况变化时轮换或撤销 URL。",
+        },
+      ],
+    },
+    getStarted: {
+      ...docsCopyByLocale.en.getStarted,
+      metadata: {
+        title: "开始使用 Briar API — 第一个频道 Webhook",
+        description:
+          "创建 Briar 频道接收 Webhook，保存秘密 URL，然后发送格式正确的 JSON 请求。",
+      },
+      eyebrow: "GET STARTED",
+      title: "发送你的第一个事件",
+      description:
+        "从在频道中生成秘密 URL，到配置外部服务发送 JSON 消息的最短路径。",
+      contents: [
+        ["prepare", "1. 准备 Webhook"],
+        ["request", "2. 构造请求"],
+        ["checklist", "3. 常见注意事项"],
+      ],
+      prepareTitle: "1. 准备 Webhook",
+      requestTitle: "2. 构造请求",
+      requestDescription:
+        "向生成的 URL 发送 POST 请求。不需要额外的 Authorization 标头，完整 URL 就是凭证。",
+      requestLabels: {
+        method: "方法",
+        endpoint: "端点",
+        contentType: "Content-Type",
+        body: "最小请求体",
+      },
+      checklistTitle: "3. 常见注意事项",
+      nextTitle: "需要请求和响应契约吗？",
+      nextDescription:
+        "在接收 Webhook 参考中查看完整 JSON 模式、可执行 curl 和按错误恢复的方法。",
+      nextAction: "查看接收 Webhook",
+    },
+    webhooks: {
+      ...docsCopyByLocale.en.webhooks,
+      metadata: {
+        title: "Briar 接收 Webhook API — 请求、幂等性与错误",
+        description:
+          "查看 Briar 频道接收 Webhook 的创建、保存、轮换和撤销，JSON 模式、幂等键、限制、响应与 curl 示例。",
+      },
+      eyebrow: "WEBHOOK REFERENCE",
+      title: "频道接收 Webhook",
+      description:
+        "将外部系统事件传递为频道中的 Webhook 作者消息，从秘密 URL 生命周期到重试和错误恢复，用一份契约运营。",
+      contents: [
+        ["lifecycle", "生命周期"],
+        ["endpoint", "端点"],
+        ["schema", "JSON 模式"],
+        ["example", "curl 示例"],
+        ["idempotency", "幂等性"],
+        ["limits", "限制"],
+        ["errors", "错误与恢复"],
+      ],
+      lifecycleTitle: "生命周期",
+      endpointTitle: "端点",
+      secretWarningTitle: "秘密 URL",
+      schemaTitle: "JSON 模式",
+      headerTitle: "可选标头",
+      exampleTitle: "可执行的 curl 示例",
+      responseTitle: "新消息响应 · 201 Created",
+      idempotencyTitle: "幂等性与安全重试",
+      limitsTitle: "限制",
+      errorsTitle: "错误与恢复",
+      finalTitle: "运营检查清单",
+    },
+  },
+} as const satisfies Record<Locale, unknown>;
+
 function DocsNavigation({
   locale,
   page,
@@ -1049,10 +1184,7 @@ export default function DocsView({
   const c = copy[locale];
   const common = docsCopy[locale].common;
   const path = docsPaths[page];
-  const hrefs = {
-    en: localizedPath("en", path),
-    ko: localizedPath("ko", path),
-  } as const;
+  const hrefs = localizedHrefs(path);
 
   return (
     <div className="docs-page" id="top">

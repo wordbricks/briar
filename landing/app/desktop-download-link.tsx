@@ -5,6 +5,7 @@ import type {
   MouseEventHandler,
   ReactNode,
 } from "react";
+import type { Locale } from "./i18n";
 
 declare global {
   interface Window {
@@ -19,7 +20,7 @@ type DesktopDownloadLinkProps = Omit<
 > & {
   children: ReactNode;
   href: string;
-  locale: "en" | "ko";
+  locale: Locale;
   trackingLabel: string;
   trackingLocation: "download_page" | "home_final" | "home_hero" | "tutorial";
 };

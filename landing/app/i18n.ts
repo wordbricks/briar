@@ -1,4 +1,4 @@
-export const supportedLocales = ["en", "ko"] as const;
+export const supportedLocales = ["en", "ko", "zh"] as const;
 
 export type Locale = (typeof supportedLocales)[number];
 
@@ -13,7 +13,11 @@ export function resolveBrowserLocale(acceptLanguage: string | null): Locale {
     ?.toLowerCase()
     .split("-", 1)[0];
 
-  return primaryLanguage === "ko" ? "ko" : defaultLocale;
+  if (primaryLanguage === "ko" || primaryLanguage === "zh") {
+    return primaryLanguage;
+  }
+
+  return defaultLocale;
 }
 
 export function isLocale(value: string | undefined): value is Locale {
@@ -53,6 +57,13 @@ export function localizedPath(locale: Locale, path: RoutePath | string): string 
   return path === "/" ? `/${locale}` : `/${locale}${path}`;
 }
 
+/** Build the language switcher's crawlable URL set for one page. */
+export function localizedHrefs(path: RoutePath | string): Record<Locale, string> {
+  return Object.fromEntries(
+    supportedLocales.map((locale) => [locale, localizedPath(locale, path)]),
+  ) as Record<Locale, string>;
+}
+
 export const copy = {
   ko: {
     metadata: {
@@ -61,6 +72,7 @@ export const copy = {
         "이슈에서 PR까지, 사람과 코딩 에이전트의 작업을 클라우드에서 조율하고 로컬 저장소에서 실행하는 Agent Development Environment.",
       socialDescription:
         "Briar는 클라우드로 조율하고 로컬에서 실행하는 Agent Development Environment입니다. 코드는 로컬에, 에이전트 작업은 이슈에서 PR까지 한눈에.",
+      socialTitle: "에이전트 작업을 맡기고, 근거를 검토하고, 자신 있게 배포하세요.",
       locale: "ko_KR",
     },
     aria: {
@@ -84,6 +96,7 @@ export const copy = {
       label: "언어",
       english: "영어",
       korean: "한국어",
+      chinese: "중국어",
     },
     nav: {
       product: "제품",
@@ -330,6 +343,7 @@ export const copy = {
         "A cloud-coordinated, local-execution Agent Development Environment that connects people and coding agents from issue to PR.",
       socialDescription:
         "Briar is a cloud-coordinated, local-execution Agent Development Environment. Keep code local and see every agent task from issue to PR.",
+      socialTitle: "Delegate agent work. Review the evidence. Ship with confidence.",
       locale: "en_US",
     },
     aria: {
@@ -354,6 +368,7 @@ export const copy = {
       label: "Language",
       english: "English",
       korean: "Korean",
+      chinese: "Chinese",
     },
     nav: {
       product: "Product",
@@ -594,6 +609,272 @@ export const copy = {
         repository: "Repository",
         analyzing: "analyzing",
         implementing: "implementing",
+      },
+    },
+  },
+  zh: {
+    metadata: {
+      title: "Briar — 本地执行的 Agent Development Environment",
+      description:
+        "Briar 是一个由云端协调、在本地执行的 Agent Development Environment，将人员与编码 Agent 从 issue 连接到 PR。",
+      socialDescription:
+        "Briar 由云端协调、在本地执行。让代码留在本地，清晰查看从 issue 到 PR 的每项 Agent 工作。",
+      socialTitle: "把 Agent 工作交出去。检查证据。自信发布。",
+      locale: "zh_CN",
+    },
+    aria: {
+      skipToContent: "跳转到正文",
+      brandHome: "Briar 首页",
+      mainMenu: "主导航",
+      productPreview: "Briar 工作仪表盘预览",
+      workflowPreview:
+        "Briar issue 详情界面截图，展示已完成的分析阶段证据，以及正在编写回归测试的实现阶段。",
+      heroArtwork: "引导 Briar 工作流的人物版画插图",
+      securityVisual: "Briar 安全架构",
+      sendCommand: "发送给 Agent",
+      openWebApp: "打开 Briar Web 应用",
+      macDownload: "下载最新的 Mac 版 Briar",
+      androidDownload: "下载最新的 Android 版 Briar",
+      menuOpen: "打开菜单",
+      menuClose: "关闭菜单",
+      githubLink: "在 GitHub 上查看 Briar",
+    },
+    language: {
+      label: "语言",
+      english: "English",
+      korean: "한국어",
+      chinese: "中文",
+    },
+    nav: {
+      product: "产品",
+      workflow: "工作流",
+      security: "安全",
+      agents: "Agent",
+      tutorial: "教程",
+      docs: "文档",
+      changelog: "更新日志",
+      blog: "博客",
+      download: "下载",
+      openWebApp: "打开 Web 应用",
+      macDownload: "下载 Mac 版",
+    },
+    hero: {
+      kicker: "Agent Development Environment",
+      line1: "从 issue 到 PR。",
+      line2: "让 Agent 工作井然有序。",
+      description:
+        "Briar 是一个由云端协调、在本地执行的 Agent Development Environment，将人员与编码 Agent 的工作连接起来并持续观察，同时在你的真实代码仓库中执行任务。",
+      openWebApp: "在 Web 上打开 Briar",
+      macDownload: "下载 Mac 版 Briar",
+      androidDownload: "下载 Android 版",
+      howItWorks: "了解工作方式",
+      allDownloads: "查看全部下载",
+      meta: [
+        "macOS Apple Silicon",
+        "Android companion",
+        "不限制仓库",
+        "Codex + Claude",
+        "本地执行",
+      ],
+    },
+    dashboard: {
+      agentRuns: "Agent 运行",
+      newIssue: "+ 新建 issue",
+      active: "运行中",
+      today: "↑ 今日 2 个",
+      readyToReview: "待审核",
+      prsLinked: "已关联 3 个 PR",
+      successRate: "成功率",
+      lastRuns: "最近 30 次",
+      issue: "Issue",
+      stage: "阶段",
+      agent: "Agent",
+      updated: "更新",
+      issues: [
+        "连接 Agent 事件流",
+        "改进任务详情面板",
+        "会话恢复回归测试",
+        "D1 事件模式",
+        "同步 GitHub issue 标签",
+        "在时间线中展示 diff 预览",
+        "规范化 Agent 事件负载",
+      ],
+      implementing: "实现中",
+      review: "审核",
+      localQa: "本地 QA",
+      completed: "已完成",
+      now: "刚刚",
+      liveActivity: "实时活动",
+      activityWorking: "正在实现事件流适配器。",
+      thinkingNow: "思考中 · 刚刚",
+      qaPassed: "本地 QA 通过",
+      minutesAgo8: "8 分钟前",
+      prOpened: "已创建 PR #124",
+      readyForHumanReview: "等待人工审核",
+      minutesAgo12: "12 分钟前",
+      command: "全部检查通过后请求审核",
+      prReady: "PR #124 已准备好",
+    },
+    principles: {
+      line1: "将 Agent 开发",
+      line2: "变成可运营的系统。",
+      description:
+        "超越一次性自动化，建立真实产品团队可以信赖的执行流程。",
+      cards: [
+        {
+          title: "代码留在本地",
+          description:
+            "仓库源代码不会离开你的设备。Briar 只安全同步工作所需的任务状态和 Git 元数据。",
+        },
+        {
+          title: "人与 Agent 协作",
+          description:
+            "在同一条时间线和工作流中连接 Codex、Claude 与团队审批。",
+        },
+        {
+          title: "闭环完成工作",
+          description:
+            "从收集上下文、实现，到 QA、审核和发布，都明确记录完成条件。",
+        },
+      ],
+    },
+    workflow: {
+      title: "让工作持续向前推进。",
+      description:
+        "把对话和 issue 变成可执行的任务，随时掌握它们进行到了哪里。",
+      steps: [
+        {
+          title: "收集",
+          description: "把 issue、反馈和错误集中到一个可执行的任务队列中。",
+        },
+        {
+          title: "执行",
+          description: "Codex 和 Claude 读取真实仓库的上下文并开始工作。",
+        },
+        {
+          title: "观察",
+          description: "从分析、实现到 QA，一眼查看每个状态和决策依据。",
+        },
+        {
+          title: "发布",
+          description: "关联验证结果与 PR，只发布满足完成条件的工作。",
+        },
+      ],
+      issueTitle: "连接 Agent 事件流",
+      running: "运行中",
+      context: "上下文",
+      contextLoaded: "Velen 上下文已加载",
+      analyze: "分析",
+      repositoryMapped: "仓库映射完成",
+      implement: "实现",
+      codexWorking: "Codex 工作中",
+      localQa: "本地 QA",
+      waiting: "等待中",
+      review: "审核",
+      liveExecution: "实时执行",
+      connected: "已连接",
+      readingContext: "正在读取仓库上下文",
+      agentsLoaded: "AGENTS.md 已加载",
+      filesMapped: "已映射 24 个相关文件",
+      implementingAdapter: "正在实现适配器",
+      writingTests: "正在编写回归测试",
+    },
+    agents: {
+      title: "继续使用你偏好的 Agent。",
+      description:
+        "无需更换工具。Briar 用同一套运营模型连接不同 Agent 的执行过程。",
+      activeCollaborators: "活跃协作者",
+      operational: "所有系统运行正常",
+      humanName: "人",
+      states: ["3 个运行中", "1 个审核中", "2 个待审批"],
+      roles: ["实现与本地 QA", "审核与推理", "方向与审批"],
+    },
+    security: {
+      line1: "代码留在本地。",
+      line2: "让信任成为默认设置。",
+      description:
+        "Agent 只在已连接的 Git 根目录内运行。源代码留在本地，令牌以哈希形式保存，高风险操作可以要求人工审批。",
+      points: [
+        "仓库路径不会离开你的设备",
+        "感知权限的 Agent 执行",
+        "可审计且支持安全重试的事件记录",
+      ],
+      yourDevice: "你的设备",
+      secure: "安全",
+      localRepository: "本地仓库",
+      private: "私密",
+      agentExecution: "Agent 执行",
+      cwdLocked: "工作目录限制在 Git 根目录",
+      sourceCode: "源代码",
+      neverUploaded: "不会上传",
+      encryptedSync: "加密状态同步",
+      cloudDetail: "任务状态 + Git 元数据",
+    },
+    final: {
+      eyebrow: "准备好就开始",
+      line1: "把工作交给 Agent。",
+      line2: "对结果充满信心。",
+      description: "用 Briar 开启人与 Agent 协作的开发流程。",
+      openWebApp: "在 Web 上打开 Briar",
+      macDownload: "下载 Mac 版 Briar",
+      androidDownload: "下载 Android 版",
+      github: "在 GitHub 上查看",
+      note: "最新版本 · macOS Apple Silicon · Android companion",
+    },
+    differentiators: {
+      index: "为什么选择 Briar",
+      title: "Briar 为你已经使用的 Agent 带来什么。",
+      description:
+        "Codex 和 Claude Code 已经可以编写代码。Briar 为这些工作增加队列、记录，以及让人审批工作的空间。",
+      items: [
+        {
+          title: "明确的完成条件",
+          description:
+            "Issue 会经过你定义的分析、实现、本地 QA、审核和发布阶段。运行结束是因为满足了条件，而不是因为 Agent 停止了对话。",
+        },
+        {
+          title: "可观察的运行时间线",
+          description:
+            "每个阶段都记录执行过的命令和是否通过等证据，无需重新阅读整段对话也能检查工作。",
+        },
+        {
+          title: "安全重试的事件历史",
+          description:
+            "状态更新和证据都会被记录，中断的运行可以从准确的检查点和尝试位置恢复，而不是从头开始。",
+        },
+        {
+          title: "人工审批关卡",
+          description: "你可以选择运行在哪些位置暂停审核，只有批准后才会继续。",
+        },
+        {
+          title: "仓库本地执行模型",
+          description:
+            "Agent 在你设备上的隔离 Git worktree 中运行。同步到 Briar 的只有任务状态和 Git 元数据，不包括源代码。",
+        },
+      ],
+      accessLabel: "免费且开源。",
+      accessDescription:
+        "Briar 以 Apache-2.0 许可证发布在 GitHub。连接仓库需要登录。",
+    },
+    footer: {
+      tagline:
+        "从 issue 到 PR，将云端协调与本地执行结合起来的 Agent Development Environment。",
+      security: "安全",
+      backToTop: "返回顶部 ↑",
+    },
+    mockup: {
+      detail: {
+        description: "描述",
+        evidence: "证据",
+        passed: "已通过",
+        command: "执行命令",
+        attemptRevision: "尝试 1 · 修订 1",
+        leaveComment: "留下评论…",
+        properties: "属性",
+        highPriority: "高优先级",
+        repository: "仓库",
+        analyzing: "分析中",
+        implementing: "实现中",
       },
     },
   },
