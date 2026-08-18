@@ -491,6 +491,17 @@ test("server-renders the localized changelog from published releases", async () 
   assert.match(koreanHtml, /v1\.2\.85/);
   assert.match(koreanHtml, /v1\.2\.80/);
   assert.match(koreanHtml, /aria-current="page"[^>]*>변경 기록</);
+  assert.match(koreanHtml, /aria-label="변경 유형"/);
+  assert.match(koreanHtml, />Breaking</);
+  assert.match(koreanHtml, />Added</);
+  assert.match(koreanHtml, />Improved</);
+  assert.match(koreanHtml, />Fixed</);
+  assert.match(koreanHtml, /changelog-change-category is-breaking/);
+  assert.match(
+    koreanHtml,
+    /id="v1-2-131"[\s\S]*?changelog-change-category is-added[\s\S]*?releases\/tag\/v1\.2\.131/,
+  );
+  assert.match(koreanHtml, /배포 전 작업 기록은 초기화/);
   assert.match(
     koreanHtml,
     /href="https:\/\/github\.com\/wordbricks\/briar\/releases\/tag\/v1\.2\.103"/,
@@ -532,6 +543,11 @@ test("server-renders the localized changelog from published releases", async () 
   assert.match(englishHtml, /See conversations and run status more clearly/);
   assert.match(englishHtml, /React to channel messages with any emoji/);
   assert.match(englishHtml, /Current stable release/);
+  assert.match(englishHtml, /aria-label="Change types"/);
+  assert.match(englishHtml, /changelog-change-category is-added/);
+  assert.match(englishHtml, /changelog-change-category is-improved/);
+  assert.match(englishHtml, /changelog-change-category is-fixed/);
+  assert.match(englishHtml, /resets pre-deployment work-log history/);
 });
 
 test("server-renders the localized empty blog at /ko/blog", async () => {
