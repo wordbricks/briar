@@ -1462,6 +1462,88 @@ describe("HuntDashboard", () => {
     }
   });
 
+  it("keeps spaces and newlines typed after an inline save", async () => {
+    vi.useFakeTimers();
+    const onUpdateIssue = vi.fn(async () => undefined);
+    const run = {
+      ...demoDashboard.runs[0],
+      issueDescription: "저장된 본문",
+      workerId: null,
+    };
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    const renderRun = async (nextRun: typeof run) => {
+      await act(async () => {
+        root.render(
+          <RunPage
+            isSidebarOpen
+            error={null}
+            isRecovering={false}
+            onBack={() => undefined}
+            onCancel={async () => undefined}
+            onLoadAttachment={async () => new Blob()}
+            onLoadIssueMessages={async () => []}
+            onLoadRunEvidence={async () => []}
+            onMove={async () => undefined}
+            onRetry={async () => undefined}
+            onSendIssueMessage={async () => {
+              throw new Error("not implemented in this test");
+            }}
+            onUpdateIssue={onUpdateIssue}
+            run={nextRun}
+          />,
+        );
+      });
+    };
+
+    try {
+      await renderRun(run);
+      const description = container.querySelector<HTMLTextAreaElement>(
+        ".issue-description-inline-editor .issue-description-input",
+      );
+      expect(description?.value).toBe(run.issueDescription);
+
+      await act(async () => {
+        Object.getOwnPropertyDescriptor(
+          HTMLTextAreaElement.prototype,
+          "value",
+        )?.set?.call(description, "저장된 본문 수정");
+        description?.dispatchEvent(new Event("input", { bubbles: true }));
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(600);
+      });
+      expect(onUpdateIssue).toHaveBeenCalledWith({
+        title: run.title,
+        description: "저장된 본문 수정",
+        priority: run.priority,
+        attachments: [],
+      });
+
+      await renderRun({ ...run, issueDescription: "저장된 본문 수정" });
+
+      const setDescriptionValue = async (value: string) => {
+        await act(async () => {
+          Object.getOwnPropertyDescriptor(
+            HTMLTextAreaElement.prototype,
+            "value",
+          )?.set?.call(description, value);
+          description?.dispatchEvent(new Event("input", { bubbles: true }));
+        });
+      };
+      await setDescriptionValue("저장된 본문 수정 ");
+      expect(description?.value).toBe("저장된 본문 수정 ");
+      await setDescriptionValue("저장된 본문 수정 \n");
+      expect(description?.value).toBe("저장된 본문 수정 \n");
+    } finally {
+      await act(async () => root.unmount());
+      container.remove();
+      vi.useRealTimers();
+    }
+  });
+
   it("keeps referenced images inline while the issue body remains editable", async () => {
     vi.useFakeTimers();
     const createObjectUrl = vi.fn((blob: Blob) =>

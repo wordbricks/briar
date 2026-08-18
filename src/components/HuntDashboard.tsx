@@ -4850,13 +4850,17 @@ export function RunPage({
   }, [run.id]);
   useEffect(() => {
     const lastSaved = lastSavedInlineIssueRef.current;
-    const currentTitle = inlineTitle.trim();
-    const currentDescription = inlineDescription.trim() || null;
+    // Autosave canonicalizes these values with trim(), but whitespace-only
+    // edits are still part of the active draft and must not be overwritten
+    // while the user is typing after a save completes.
+    const currentTitle = inlineTitle;
+    const currentDescription = inlineDescription;
+    const lastSavedDescription = lastSaved.description ?? "";
     const currentKeptAttachmentIds = inlineKeptAttachmentIds;
     if (
       lastSaved.runId !== run.id ||
       currentTitle !== lastSaved.title ||
-      currentDescription !== lastSaved.description ||
+      currentDescription !== lastSavedDescription ||
       currentKeptAttachmentIds.length !==
         lastSaved.keptAttachmentIds.length ||
       currentKeptAttachmentIds.some(
