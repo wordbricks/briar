@@ -758,10 +758,17 @@ export function HuntDashboard({
   const [dragOverColumnId, setDragOverColumnId] = useState<string | null>(null);
   const suppressCardClickRef = useRef(false);
   const kanbanBoardRef = useRef<HTMLDivElement>(null);
+  const kanbanScrollLeftRef = useRef<number | null>(null);
   const pointerDragRef = useRef<KanbanPointerDrag | null>(null);
   const pointerDragPositionRef = useRef({ x: 0, y: 0 });
   const pointerDragPreviewRef = useRef<HTMLElement | null>(null);
   const pointerAutoScrollRef = useRef<number | null>(null);
+
+  const rememberKanbanScrollPosition = useCallback(() => {
+    const board = kanbanBoardRef.current;
+    if (!board) return;
+    kanbanScrollLeftRef.current = board.scrollLeft;
+  }, []);
 
   const stopKanbanAutoScroll = useCallback(() => {
     if (pointerAutoScrollRef.current === null) return;
@@ -1210,6 +1217,19 @@ export function HuntDashboard({
     status,
     t,
   ]);
+  useLayoutEffect(() => {
+    if (
+      companionMode ||
+      issuesLoading ||
+      selectedRunId !== null ||
+      view !== "kanban"
+    ) return;
+    const board = kanbanBoardRef.current;
+    const scrollLeft = kanbanScrollLeftRef.current;
+    if (!board || scrollLeft === null) return;
+    board.scrollLeft = scrollLeft;
+    kanbanScrollLeftRef.current = null;
+  }, [companionMode, dashboard, issuesLoading, selectedRunId, view]);
   const visibleKanbanColumns = useMemo(
     () =>
       companionMode
@@ -1870,6 +1890,7 @@ export function HuntDashboard({
                         suppressCardClickRef.current = false;
                         return;
                       }
+                      rememberKanbanScrollPosition();
                       setSelectedRunInitialTab(null);
                       setSelectedRunId(run.id);
                     }}
