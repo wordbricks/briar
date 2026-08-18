@@ -61,6 +61,7 @@ import {
   setChannelAgent,
   setChannelMember,
   toggleChannelMessageReaction,
+  updateChannel,
   updateChannelThreadSubscription,
   updateChannelWebhook,
 } from "../lib/api";
@@ -443,6 +444,9 @@ export function Channels({
   const [webhooksSaving, setWebhooksSaving] = useState(false);
   const [webhooksError, setWebhooksError] = useState<string | null>(null);
   const [revealedWebhookUrl, setRevealedWebhookUrl] = useState<string | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsSaving, setSettingsSaving] = useState(false);
+  const [settingsError, setSettingsError] = useState<string | null>(null);
   const {
     containerRef: channelsRef,
     effectiveWidth: effectiveThreadWidth,
@@ -622,6 +626,45 @@ export function Channels({
       .catch((cause) => setWebhooksError(errorMessage(cause)))
       .finally(() => setWebhooksLoading(false));
   }, [activeChannelId, organizationId, token]);
+
+  const openSettings = useCallback(() => {
+    if (!activeChannelId) return;
+    setSettingsError(null);
+    setSettingsOpen(true);
+  }, [activeChannelId]);
+
+  const saveChannelSettings = useCallback(
+    async (input: { name?: string; defaultProjectId?: string | null }) => {
+      if (!activeChannelId) return;
+      setSettingsSaving(true);
+      setSettingsError(null);
+      try {
+        const result = await updateChannel(
+          token,
+          organizationId,
+          activeChannelId,
+          input,
+        );
+        onChannelsChange((current) =>
+          current.map((channel) =>
+            channel.id === result.channel.id ? result.channel : channel,
+          ),
+        );
+        const cached = channelCache.current.get(activeChannelId);
+        if (cached) {
+          channelCache.current.set(activeChannelId, {
+            ...cached,
+            channel: result.channel,
+          });
+        }
+      } catch (cause) {
+        setSettingsError(errorMessage(cause));
+      } finally {
+        setSettingsSaving(false);
+      }
+    },
+    [activeChannelId, onChannelsChange, organizationId, token],
+  );
 
   const createWebhook = useCallback(async (name: string) => {
     if (!activeChannelId) return;
@@ -1987,6 +2030,7 @@ export function Channels({
                   className="channel-header-icon"
                   aria-label={t("channel.headerMore")}
                   title={t("channel.headerMore")}
+                  onClick={openSettings}
                 >
                   <MoreHorizontal size={16} aria-hidden="true" />
                 </button>
@@ -2266,6 +2310,22 @@ export function Channels({
         </div>
       ) : null}
 
+      {settingsOpen && activeChannel ? (
+        <ChannelSettingsDialog
+          agents={agents}
+          channel={activeChannel}
+          currentUserId={currentUserId}
+          error={settingsError}
+          members={members}
+          projects={projects}
+          saving={settingsSaving}
+          onAddPeople={openInvite}
+          onClose={() => {
+            if (!settingsSaving && !inviteOpen) setSettingsOpen(false);
+          }}
+          onSave={saveChannelSettings}
+        />
+      ) : null}
       {inviteOpen && activeChannel ? (
         <ChannelInviteDialog
           agents={inviteAgents}
@@ -2518,6 +2578,335 @@ function ChannelWelcome({
           <span>{t("channel.addPeopleHint")}</span>
         </button>
       </div>
+    </div>
+  );
+}
+
+function ChannelSettingsDialog({
+  agents,
+  channel,
+  currentUserId,
+  error,
+  members,
+  projects,
+  saving,
+  onAddPeople,
+  onClose,
+  onSave,
+}: {
+  agents: ChannelAgentSummary[];
+  channel: ChannelSummary;
+  currentUserId: string | null;
+  error: string | null;
+  members: ChannelMember[];
+  projects: readonly Pick<Project, "id" | "name" | "organizationId">[];
+  saving: boolean;
+  onAddPeople: () => void;
+  onClose: () => void;
+  onSave: (input: {
+    name?: string;
+    defaultProjectId?: string | null;
+  }) => Promise<void>;
+}) {
+  const { t, localeTag } = useI18n();
+  const titleId = useId();
+  const settingsPanelId = useId();
+  const membersPanelId = useId();
+  const [tab, setTab] = useState<"settings" | "members">("settings");
+  const [name, setName] = useState(channel.name);
+  const [memberQuery, setMemberQuery] = useState("");
+  const [copied, setCopied] = useState(false);
+  const copyTimer = useRef<number | null>(null);
+
+  useEffect(() => {
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !saving) onClose();
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [onClose, saving]);
+
+  // Follow external renames (catalog sync) while the dialog stays open.
+  useEffect(() => setName(channel.name), [channel.name]);
+
+  useEffect(() => () => {
+    if (copyTimer.current !== null) window.clearTimeout(copyTimer.current);
+  }, []);
+
+  const archived = Boolean(channel.archivedAt);
+  const trimmedName = name.trim();
+  const nameDirty = trimmedName !== channel.name;
+  const projectId = channel.defaultProjectId ?? "";
+  const organizationProjects = useMemo(
+    () =>
+      projects.filter(
+        (project) => project.organizationId === channel.organizationId,
+      ),
+    [channel.organizationId, projects],
+  );
+
+  const submitName = async () => {
+    if (!nameDirty || !trimmedName) return;
+    await onSave({ name: trimmedName });
+  };
+
+  const normalizedQuery = memberQuery.trim().toLowerCase();
+  const visibleMembers = members.filter((member) =>
+    !normalizedQuery ||
+    `${member.name} ${member.email}`.toLowerCase().includes(normalizedQuery)
+  );
+  const visibleAgents = agents.filter((agent) =>
+    !normalizedQuery ||
+    `${agent.name} ${agent.projectName ?? ""}`.toLowerCase().includes(
+      normalizedQuery,
+    )
+  );
+
+  return (
+    <div
+      className="channel-invite-overlay"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget && !saving) onClose();
+      }}
+    >
+      <section
+        aria-labelledby={titleId}
+        aria-modal="true"
+        className="channel-invite-dialog channel-settings-dialog"
+        role="dialog"
+      >
+        <header>
+          <div>
+            <h2 id={titleId}>
+              {channel.visibility === "private" ? (
+                <Lock aria-hidden="true" size={18} />
+              ) : (
+                <Hash aria-hidden="true" size={18} />
+              )}
+              {channel.name}
+            </h2>
+            <p>{t("channel.settingsDescription")}</p>
+          </div>
+          <button
+            aria-label={t("common.close")}
+            disabled={saving}
+            onClick={onClose}
+            type="button"
+          >
+            <X size={20} />
+          </button>
+        </header>
+
+        <div className="channel-settings-tabs" role="tablist">
+          <button
+            aria-controls={settingsPanelId}
+            aria-selected={tab === "settings"}
+            className={tab === "settings" ? "active" : ""}
+            id={`${settingsPanelId}-tab`}
+            onClick={() => setTab("settings")}
+            role="tab"
+            tabIndex={tab === "settings" ? 0 : -1}
+            type="button"
+          >
+            {t("channel.settingsTabGeneral")}
+          </button>
+          <button
+            aria-controls={membersPanelId}
+            aria-selected={tab === "members"}
+            className={tab === "members" ? "active" : ""}
+            id={`${membersPanelId}-tab`}
+            onClick={() => setTab("members")}
+            role="tab"
+            tabIndex={tab === "members" ? 0 : -1}
+            type="button"
+          >
+            {t("channel.settingsTabMembers", {
+              count: members.length + agents.length,
+            })}
+          </button>
+        </div>
+
+        {tab === "settings" ? (
+          <div
+            aria-labelledby={`${settingsPanelId}-tab`}
+            className="channel-settings-body"
+            id={settingsPanelId}
+            role="tabpanel"
+          >
+            <div className="channel-settings-field">
+              <label htmlFor="channel-settings-name">{t("channel.name")}</label>
+              <div className="channel-settings-row">
+                <input
+                  disabled={saving || archived}
+                  id="channel-settings-name"
+                  maxLength={100}
+                  onChange={(event) => setName(event.currentTarget.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") void submitName();
+                  }}
+                  value={name}
+                />
+                <button
+                  disabled={!nameDirty || !trimmedName || saving || archived}
+                  onClick={() => void submitName()}
+                  type="button"
+                >
+                  {saving
+                    ? t("channel.settingsSaving")
+                    : t("channel.settingsSave")}
+                </button>
+              </div>
+            </div>
+
+            <div className="channel-settings-field">
+              <label htmlFor="channel-settings-project">
+                {t("channel.settingsProject")}
+              </label>
+              <select
+                disabled={saving || archived}
+                id="channel-settings-project"
+                onChange={(event) => {
+                  const next = event.currentTarget.value;
+                  if (next !== projectId) {
+                    void onSave({ defaultProjectId: next || null });
+                  }
+                }}
+                value={projectId}
+              >
+                <option value="">{t("channel.settingsProjectNone")}</option>
+                {organizationProjects.map((project) => (
+                  <option key={project.id} value={project.id}>
+                    {project.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="channel-settings-field">
+              <span>{t("channel.settingsChannelId")}</span>
+              <div className="channel-settings-row">
+                <code className="channel-settings-id">{channel.id}</code>
+                <button
+                  onClick={() => {
+                    void navigator.clipboard.writeText(channel.id)
+                      .then(() => {
+                        setCopied(true);
+                        if (copyTimer.current !== null) {
+                          window.clearTimeout(copyTimer.current);
+                        }
+                        copyTimer.current = window.setTimeout(
+                          () => setCopied(false),
+                          2000,
+                        );
+                      })
+                      .catch(() => setCopied(false));
+                  }}
+                  type="button"
+                >
+                  <Copy size={14} aria-hidden="true" />
+                  {copied
+                    ? t("channel.settingsIdCopied")
+                    : t("channel.settingsCopyId")}
+                </button>
+              </div>
+            </div>
+
+            <div className="channel-settings-field">
+              <span>{t("channel.settingsCreatedAt")}</span>
+              <p className="channel-settings-created">
+                {new Date(channel.createdAt).toLocaleString(localeTag)}
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div
+            aria-labelledby={`${membersPanelId}-tab`}
+            className="channel-settings-body"
+            id={membersPanelId}
+            role="tabpanel"
+          >
+            <label className="channel-invite-search channel-settings-search">
+              <Search aria-hidden="true" size={17} />
+              <input
+                disabled={saving}
+                onChange={(event) => setMemberQuery(event.target.value)}
+                placeholder={t("channel.settingsMembersSearch")}
+                type="search"
+                value={memberQuery}
+              />
+            </label>
+            <button
+              className="channel-settings-add"
+              disabled={saving || archived}
+              onClick={onAddPeople}
+              type="button"
+            >
+              <UserPlus aria-hidden="true" size={16} />
+              {t("channel.settingsAddPeople")}
+            </button>
+            <div className="channel-settings-member-list">
+              {visibleMembers.length + visibleAgents.length === 0 ? (
+                <p className="channel-invite-status">
+                  {members.length + agents.length === 0
+                    ? t("channel.settingsMembersEmpty")
+                    : t("channel.inviteNoResults")}
+                </p>
+              ) : (
+                <>
+                  {visibleMembers.map((member) => (
+                    <article className="channel-settings-member" key={member.userId}>
+                      <span className="channel-invite-avatar user">
+                        {member.image
+                          ? <img alt="" src={member.image} />
+                          : authorInitial(member.name)}
+                      </span>
+                      <span className="channel-settings-member-copy">
+                        <strong>
+                          {member.name}
+                          {member.userId === currentUserId
+                            ? ` (${t("channel.you")})`
+                            : ""}
+                        </strong>
+                        <small>{member.email}</small>
+                      </span>
+                      <em>
+                        {member.role === "owner"
+                          ? t("profile.channelOwner")
+                          : t("profile.channelMember")}
+                      </em>
+                    </article>
+                  ))}
+                  {visibleAgents.map((agent) => (
+                    <article className="channel-settings-member" key={agent.agentId}>
+                      <span className="channel-invite-avatar agent">
+                        {agent.avatar
+                          ? <img alt="" src={agent.avatar} />
+                          : <Bot aria-hidden="true" size={18} />}
+                      </span>
+                      <span className="channel-settings-member-copy">
+                        <strong>{agent.name}</strong>
+                        <small>
+                          {agent.projectId
+                            ? agent.projectName
+                              ? `${t("channel.projectAgent")} · ${agent.projectName}`
+                              : t("channel.projectAgent")
+                            : t("channel.orgAgent")}
+                        </small>
+                      </span>
+                    </article>
+                  ))}
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
+        {error ? (
+          <p className="channel-invite-error" role="alert">
+            {error}
+          </p>
+        ) : null}
+      </section>
     </div>
   );
 }
