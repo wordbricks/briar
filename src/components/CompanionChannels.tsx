@@ -69,6 +69,8 @@ import {
   createOptimisticChannelMessage,
   removeOptimisticChannelMessage,
 } from "../lib/optimistic-channel-message";
+import { toggleOptimisticChannelReaction } from "../lib/optimistic-channel-reaction";
+import { useToast } from "./ui/toast";
 import { channelReplyErrorText } from "../lib/channel-reply-error";
 import { maxIssueAttachmentCount } from "../lib/issue-attachments";
 import { useI18n } from "../i18n";
@@ -257,6 +259,7 @@ export function CompanionChannels({
   channelCache,
 }: CompanionChannelsProps) {
   const { t } = useI18n();
+  const { toast } = useToast();
   const [channels, setChannels] = useState<ChannelSummary[]>([]);
   const [channel, setChannel] = useState<ChannelSummary | null>(null);
   const [messages, setMessages] = useState<ChannelMessage[]>([]);
@@ -1443,8 +1446,19 @@ export function CompanionChannels({
   const toggleReaction = useCallback(
     async (item: ChannelMessage, emoji: string) => {
       if (!channel) return;
-      setBusy(true);
-      setError(null);
+      const optimisticReactions = (candidate: ChannelMessage) =>
+        candidate.id === item.id
+          ? {
+              ...candidate,
+              reactions: toggleOptimisticChannelReaction(
+                candidate.reactions,
+                emoji,
+                currentUserId,
+              ),
+            }
+          : candidate;
+      setMessages((current) => current.map(optimisticReactions));
+      setThread((current) => current?.map(optimisticReactions) ?? null);
       try {
         const result = await toggleChannelMessageReaction(
           token,
@@ -1460,12 +1474,23 @@ export function CompanionChannels({
         setMessages((current) => current.map(applyReactions));
         setThread((current) => current?.map(applyReactions) ?? null);
       } catch (cause) {
-        setError(message(cause));
-      } finally {
-        setBusy(false);
+        const revertReactions = (candidate: ChannelMessage) =>
+          candidate.id === item.id
+            ? {
+                ...candidate,
+                reactions: toggleOptimisticChannelReaction(
+                  candidate.reactions,
+                  emoji,
+                  currentUserId,
+                ),
+              }
+            : candidate;
+        setMessages((current) => current.map(revertReactions));
+        setThread((current) => current?.map(revertReactions) ?? null);
+        toast(message(cause), { tone: "error" });
       }
     },
-    [channel, organizationId, token],
+    [channel, currentUserId, organizationId, toast, token],
   );
 
   const toggleThreadSubscription = useCallback(
