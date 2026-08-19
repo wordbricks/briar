@@ -1,5 +1,13 @@
 import { CircleAlert, LoaderCircle, X } from "lucide-react";
-import { useCallback, useMemo } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 import { useObjectUrl } from "../hooks/useObjectUrl";
 import type { ChannelMessageAttachment } from "../lib/channels-contract";
 import { loadChannelMessageAttachment } from "../lib/api";
@@ -7,6 +15,149 @@ import { issueAttachmentMarkdown } from "../lib/issue-markdown";
 import { ImageLightbox } from "./ImageLightbox";
 
 export type DraftChannelImage = { file: File; reference: string };
+
+type ChannelMessageImageCacheEntry = {
+  promise: Promise<string> | null;
+  source: string | null;
+};
+
+export type ChannelMessageImageCache = {
+  disposed: boolean;
+  entries: Map<string, ChannelMessageImageCacheEntry>;
+};
+
+const ChannelMessageImageCacheContext =
+  createContext<ChannelMessageImageCache | null>(null);
+
+export function useChannelMessageImageCache(identity: string) {
+  const cache = useMemo<ChannelMessageImageCache>(() => ({
+    disposed: false,
+    entries: new Map(),
+  }), [identity]);
+
+  useEffect(() => () => {
+    cache.disposed = true;
+    for (const entry of cache.entries.values()) {
+      if (entry.source) URL.revokeObjectURL(entry.source);
+    }
+    cache.entries.clear();
+  }, [cache]);
+
+  return cache;
+}
+
+export function ChannelMessageImageCacheProvider({
+  cache,
+  children,
+}: {
+  cache: ChannelMessageImageCache;
+  children: ReactNode;
+}) {
+  return (
+    <ChannelMessageImageCacheContext.Provider value={cache}>
+      {children}
+    </ChannelMessageImageCacheContext.Provider>
+  );
+}
+
+function loadCachedChannelMessageImage(
+  cache: ChannelMessageImageCache,
+  key: string,
+  loader: () => Blob | Promise<Blob>,
+) {
+  const cached = cache.entries.get(key);
+  if (cached?.source) return Promise.resolve(cached.source);
+  if (cached?.promise) return cached.promise;
+
+  const entry: ChannelMessageImageCacheEntry = {
+    promise: null,
+    source: null,
+  };
+  const promise = Promise.resolve().then(loader).then((blob) => {
+    if (cache.disposed) throw new Error("Image cache disposed");
+    const source = URL.createObjectURL(blob);
+    if (cache.disposed) {
+      URL.revokeObjectURL(source);
+      throw new Error("Image cache disposed");
+    }
+    entry.promise = null;
+    entry.source = source;
+    return source;
+  }).catch((cause) => {
+    if (cache.entries.get(key) === entry) cache.entries.delete(key);
+    throw cause;
+  });
+  entry.promise = promise;
+  cache.entries.set(key, entry);
+  return promise;
+}
+
+function useChannelMessageImageSource(
+  cache: ChannelMessageImageCache | null,
+  key: string,
+  loader: (() => Blob | Promise<Blob>) | null,
+) {
+  const cachedSource = cache?.entries.get(key)?.source ?? null;
+  const [state, setState] = useState({
+    failed: false,
+    key,
+    source: cachedSource,
+  });
+  const current = state.key === key
+    ? state
+    : { failed: false, key, source: cachedSource };
+
+  useEffect(() => {
+    let active = true;
+    let localSource: string | null = null;
+    const setSource = (source: string) => {
+      if (active) setState({ failed: false, key, source });
+    };
+    const fail = () => {
+      if (active) setState({ failed: true, key, source: null });
+    };
+
+    const existing = cache?.entries.get(key)?.source ?? null;
+    if (existing) {
+      setSource(existing);
+      return () => {
+        active = false;
+      };
+    }
+    setState({ failed: false, key, source: null });
+    if (!loader) {
+      return () => {
+        active = false;
+      };
+    }
+
+    if (cache) {
+      void loadCachedChannelMessageImage(cache, key, loader).then(setSource, fail);
+    } else {
+      try {
+        const blob = loader();
+        void Promise.resolve(blob).then((loaded) => {
+          if (!active) return;
+          try {
+            localSource = URL.createObjectURL(loaded);
+            setSource(localSource);
+          } catch {
+            fail();
+          }
+        }, fail);
+      } catch {
+        fail();
+      }
+    }
+
+    return () => {
+      active = false;
+      if (localSource) URL.revokeObjectURL(localSource);
+    };
+  }, [cache, key, loader]);
+
+  return { failed: current.failed, source: current.source };
+}
 
 export function draftChannelImage(file: File): DraftChannelImage {
   return {
@@ -112,6 +263,7 @@ function ChannelMessageImage({
   interactive: boolean;
   token: string;
 }) {
+  const imageCache = useContext(ChannelMessageImageCacheContext);
   const localSource = attachment.url.startsWith("blob:")
     ? attachment.url
     : null;
@@ -121,7 +273,11 @@ function ChannelMessageImage({
       : () => loadChannelMessageAttachment(token, attachment),
     [attachment.url, localSource, token],
   );
-  const { failed, source: loadedSource } = useObjectUrl(loadImage);
+  const { failed, source: loadedSource } = useChannelMessageImageSource(
+    imageCache,
+    `${attachment.id}:${attachment.url}`,
+    loadImage,
+  );
   const source = localSource ?? loadedSource;
 
   if (failed) {
