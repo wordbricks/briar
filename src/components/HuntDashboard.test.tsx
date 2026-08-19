@@ -140,7 +140,8 @@ function expectPendingAgentReplyLoader(scope: ParentNode | null | undefined) {
   );
   expect(loader).not.toBeNull();
   expect(loader?.dataset.variant).toBe("Drive");
-  expect(pending?.textContent).toContain("Agent가 답변을 작성하고 있습니다");
+  expect(loader?.dataset.size).toBe("compact");
+  expect(pending?.textContent).toContain("에이전트가 답변을 작성하고 있습니다");
   expect(pending?.textContent).toContain("0.0s");
   expect(pending?.querySelector(".spin")).toBeNull();
   return pending;
@@ -4986,6 +4987,8 @@ describe("HuntDashboard", () => {
       id: "reply-job-1",
       triggerMessageId: trigger.id,
       parentMessageId: trigger.id,
+      agentId: "agent-developer",
+      agentName: "Developer",
       status: "running" as const,
       attempts: 1,
       workerId: null,
@@ -4993,12 +4996,18 @@ describe("HuntDashboard", () => {
       error: null,
       updatedAt: createdAt,
     };
+    const reviewerReplyJob = {
+      ...replyJob,
+      id: "reply-job-2",
+      agentId: "agent-reviewer",
+      agentName: "Reviewer",
+    };
     const loadSnapshot = vi
       .spyOn(api, "loadIssueConversationSnapshot")
       .mockResolvedValue({
         cursor: 7,
         messages: [trigger],
-        agentReplies: [replyJob],
+        agentReplies: [replyJob, reviewerReplyJob],
       });
     const loadDelta = vi
       .spyOn(api, "loadIssueConversationDelta")
@@ -5012,11 +5021,11 @@ describe("HuntDashboard", () => {
         hasMore: false,
         changed: true,
         messages: [trigger, reply],
-        agentReplies: [{
-          ...replyJob,
+        agentReplies: [replyJob, reviewerReplyJob].map((job) => ({
+          ...job,
           status: "completed" as const,
           updatedAt: "2026-08-15T00:01:00.000Z",
-        }],
+        })),
       });
     const transport = {
       start: vi.fn(),
@@ -5081,7 +5090,15 @@ describe("HuntDashboard", () => {
     });
     expect(loadSnapshot).toHaveBeenCalledOnce();
     expect(loadDelta).toHaveBeenCalledOnce();
-    expect(container.textContent).toContain("Briar · 원인을 확인하고 있습니다.");
+    expect(container.textContent).toContain(
+      "Developer · 원인을 확인하고 있습니다.",
+    );
+    expect(container.textContent).not.toContain(
+      "Briar · 원인을 확인하고 있습니다.",
+    );
+    expect(container.textContent).toContain(
+      "Reviewer님이 답변을 작성하고 있습니다…",
+    );
 
     await act(async () => {
       root.render(renderPage("conversation:message-reply"));

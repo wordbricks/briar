@@ -8741,6 +8741,7 @@ function IssueConversation({
       if (observed?.status === "completed" || observed?.status === "failed") {
         return;
       }
+      agentRepliesByIdRef.current.set(job.id, job);
       if (trackedAgentRepliesRef.current.has(job.id)) return;
       const replyThreadId = job.parentMessageId ?? agentReplyParentMessageId(trigger);
       trackedAgentRepliesRef.current.set(job.id, { replyThreadId });
@@ -9057,27 +9058,57 @@ function IssueConversation({
       }),
     [messages],
   );
-  const agentReplyActivityByThreadId = useMemo(() => {
-    const result: Record<
+  const agentReplyIndicatorsByThreadId = useMemo(() => {
+    const byThread = new Map<
       string,
-      { activity: ChannelAgentActivityDescriptor; sentAt: string }
-    > = {};
+      Map<
+        string,
+        {
+          agentName: string | null;
+          activity?: ChannelAgentActivityDescriptor;
+          sentAt?: string;
+        }
+      >
+    >();
     for (const [jobId, tracked] of trackedAgentRepliesRef.current) {
       const job = agentRepliesByIdRef.current.get(jobId);
+      if (!job) continue;
+      const agentName = job.agentName?.trim() ||
+        mentionAgents.find((agent) => agent.id === job.agentId)?.name.trim() ||
+        null;
       const frame = issueActivity.get(jobId);
+      const key = job.agentId
+        ? `agent:${job.agentId}`
+        : agentName
+          ? `name:${agentName}`
+          : `job:${job.id}`;
+      const indicators = byThread.get(tracked.replyThreadId) ?? new Map();
+      const current = indicators.get(key);
+      const hasCurrentActivity = Boolean(current?.activity && current.sentAt);
+      const hasNextActivity = Boolean(
+        frame?.activity && frame.attempt === job.attempts,
+      );
       if (
-        !job || !frame?.activity || frame.attempt !== job.attempts
-      ) continue;
-      const current = result[tracked.replyThreadId];
-      if (!current || current.sentAt < frame.sentAt) {
-        result[tracked.replyThreadId] = {
-          activity: frame.activity,
-          sentAt: frame.sentAt,
-        };
+        !current ||
+        (hasNextActivity &&
+          (!hasCurrentActivity || current.sentAt! < frame!.sentAt))
+      ) {
+        indicators.set(key, {
+          agentName,
+          ...(hasNextActivity
+            ? { activity: frame!.activity, sentAt: frame!.sentAt }
+            : {}),
+        });
       }
+      byThread.set(tracked.replyThreadId, indicators);
     }
-    return result;
-  }, [agentReplyStates, issueActivity]);
+    return Object.fromEntries(
+      [...byThread].map(([threadId, indicators]) => [
+        threadId,
+        [...indicators].map(([key, indicator]) => ({ key, ...indicator })),
+      ]),
+    );
+  }, [agentReplyStates, issueActivity, mentionAgents]);
   const replySummaries = useMemo(() => {
     const summaries = new Map<
       string,
@@ -9639,7 +9670,7 @@ function IssueConversation({
                     : null}
                 />
                 <AgentReplyState
-                  activity={agentReplyActivityByThreadId[message.id]?.activity}
+                  indicators={agentReplyIndicatorsByThreadId[message.id]}
                   state={agentReplyStates[message.id]}
                 />
                 {isReplying && (
@@ -10110,23 +10141,39 @@ function IssueMessageItem({
 }
 
 function AgentReplyState({
-  activity,
+  indicators = [],
   state,
 }: {
-  activity?: ChannelAgentActivityDescriptor;
+  indicators?: Array<{
+    key: string;
+    agentName: string | null;
+    activity?: ChannelAgentActivityDescriptor;
+  }>;
   state?: { pending: number; error: string | null };
 }) {
   const { t } = useI18n();
   if (!state) return null;
   if (state.pending > 0) {
     return (
-      <div className="issue-agent-reply-state">
-        <LoadingState
-          label={activity
-            ? `Briar · ${displayChannelActivityHeadline(activity)}`
-            : t("run.briarReplying")}
-        />
-      </div>
+      <>
+        {(indicators.length > 0
+          ? indicators
+          : [{ key: "generic", agentName: null }]
+        ).map((indicator) => (
+          <div className="issue-agent-reply-state" key={indicator.key}>
+            <LoadingState
+              label={indicator.activity
+                ? indicator.agentName
+                  ? `${indicator.agentName} · ${displayChannelActivityHeadline(indicator.activity)}`
+                  : displayChannelActivityHeadline(indicator.activity)
+                : indicator.agentName
+                  ? t("channel.namedAgentTyping", { name: indicator.agentName })
+                  : t("channel.agentTyping")}
+              size="compact"
+            />
+          </div>
+        ))}
+      </>
     );
   }
   if (!state.error) return null;

@@ -109,4 +109,27 @@ describe("LoadingState", () => {
     });
     expect(status?.textContent).toContain("1.2s");
   });
+
+  it("supports a compact pixel grid for constrained surfaces", async () => {
+    await act(async () =>
+      root.render(
+        <I18nProvider>
+          <LoadingState label="Replying" size="compact" />
+        </I18nProvider>,
+      ),
+    );
+    const status = container.querySelector<HTMLElement>(
+      "[data-testid='loading-state']",
+    );
+    const pixels = [
+      ...(status?.querySelectorAll<HTMLElement>(".loading-state-pixel") ?? []),
+    ];
+    expect(status?.dataset.size).toBe("compact");
+    expect(status?.className).toContain("gap-2");
+    expect(pixels[0]?.parentElement?.className).toContain(
+      "grid-cols-[repeat(3,3px)]",
+    );
+    expect(pixels.every((pixel) => pixel.className.includes("size-[3px]")))
+      .toBe(true);
+  });
 });
