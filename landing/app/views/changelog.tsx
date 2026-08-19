@@ -30,6 +30,19 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.137",
+        date: "2026년 8월 19일",
+        title: "채널 관리와 링크 탐색을 더 안전하게 정리합니다",
+        summary:
+          "권한 있는 채널 삭제를 지원하고 사이드바 작업을 넓히며, 데스크탑과 Companion의 채널 링크 대상을 정확하게 이어갑니다.",
+        items: [
+          "채널 생성자와 조직 owner가 자신이 관리하는 채널을 삭제할 수 있도록 권한과 확인 흐름을 정비합니다.",
+          "사이드바 채널 메뉴에서 채널 ID·링크 복사, 설정 열기, 채널 삭제를 바로 실행할 수 있습니다.",
+          "삭제된 채널이 활성 화면이나 캐시에 남지 않게 하고, 삭제 뒤 첨부 파일을 정리합니다.",
+          "데스크탑과 Companion에서 채널 링크를 열 때 조직·메시지·설정 대상이 올바르게 이어지도록 개선합니다.",
+        ],
+      },
+      {
         version: "1.2.136",
         date: "2026년 8월 19일",
         title: "Agent 실행과 채널 탐색을 더 안정적으로 개선합니다",
@@ -796,6 +809,19 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.137",
+        date: "August 19, 2026",
+        title: "Make channel management and links safer",
+        summary:
+          "Allow authorized channel deletion, add practical sidebar actions, and keep desktop and Companion channel links on the right target.",
+        items: [
+          "Allow channel creators and organization owners to delete channels they manage, with a confirmation flow.",
+          "Add channel ID and link copy, settings, and delete actions to the sidebar channel menu.",
+          "Prevent deleted channels from lingering in active views or caches, and clean up their attachments after deletion.",
+          "Keep desktop and Companion channel links pointed at the correct organization, message, or settings target.",
+        ],
+      },
       {
         version: "1.2.136",
         date: "August 19, 2026",
@@ -1654,7 +1680,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <p>
             <strong>Briar</strong> <span>1.2</span>
           </p>
-          <a href="#v1-2-136">
+          <a href="#v1-2-137">
             {changelog.current} <span aria-hidden="true">↓</span>
           </a>
         </div>
@@ -1676,7 +1702,9 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   </div>
                   <time
                     dateTime={
-                      entry.version === "1.2.136"
+                      entry.version === "1.2.137"
+                        ? "2026-08-19"
+                        : entry.version === "1.2.136"
                         ? "2026-08-19"
                         : entry.version === "1.2.135"
                         ? "2026-08-18"
