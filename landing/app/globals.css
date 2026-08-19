@@ -70,7 +70,7 @@ body {
  *     badges), so :lang(ko) would never apply to visible Korean, or
  *   - the tracking is already positive (widens spacing, which does not crowd
  *     Hangul the way negative tracking does).
- * Not relaxed for that reason: .brand, .hero-kicker, .hero-meta,
+ * Not relaxed for that reason: .brand, .hero-kicker, .download-bar-supports,
  * .section-index, .device-top small, .download-note, .tutorial-toc > strong,
  * .download-group-index, .download-badge, .blog-empty > span,
  * .download-card h3.
@@ -99,6 +99,8 @@ body {
 
 :lang(ko) .hero-content > p,
 :lang(ko) .hero-actions-compact a,
+:lang(ko) .download-bar-all,
+:lang(ko) .download-bar-button,
 :lang(ko) .section-intro > p,
 :lang(ko) .principle-grid p,
 :lang(ko) .tutorial-hero-copy > p,
@@ -126,6 +128,8 @@ body {
 :lang(zh) .blog-empty h2,
 :lang(zh) .hero-content > p,
 :lang(zh) .hero-actions-compact a,
+:lang(zh) .download-bar-all,
+:lang(zh) .download-bar-button,
 :lang(zh) .section-intro > p,
 :lang(zh) .principle-grid p,
 :lang(zh) .tutorial-hero-copy > p,
@@ -643,6 +647,121 @@ button:focus-visible {
 .hero-meta i {
   color: #6f6567;
   font-style: normal;
+}
+
+.download-bar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 38px;
+}
+
+.download-hero .download-bar {
+  align-items: flex-start;
+}
+
+.download-bar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  justify-content: center;
+}
+
+.download-hero .download-bar-actions {
+  justify-content: flex-start;
+}
+
+.download-bar-button,
+.download-bar-icon {
+  border-radius: 14px;
+  min-height: 44px;
+}
+
+.download-bar-button {
+  padding: 0 18px;
+}
+
+.download-bar-icon {
+  width: 44px;
+  padding: 0;
+}
+
+.download-bar-mark {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+}
+
+.download-bar-all {
+  margin-top: 18px;
+  color: #8a7f82;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.download-bar-all:hover {
+  color: #43383b;
+}
+
+.download-bar-all:focus-visible {
+  border-radius: 4px;
+  outline: 2px solid var(--violet);
+  outline-offset: 3px;
+}
+
+.download-bar-supports {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  justify-content: center;
+  margin-top: 26px;
+  color: #8a7f82;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.download-hero .download-bar-supports {
+  justify-content: flex-start;
+}
+
+.download-bar-providers {
+  display: inline-flex;
+  gap: 12px;
+  align-items: center;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.download-bar-providers li {
+  display: grid;
+  width: 18px;
+  height: 18px;
+  color: #7a7073;
+  place-items: center;
+}
+
+.download-bar-provider {
+  display: block;
+  width: 18px;
+  height: 18px;
+}
+
+.download-bar-providers img.download-bar-provider {
+  object-fit: contain;
+  filter: grayscale(1);
+  opacity: 0.68;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .hero-product {
@@ -1709,11 +1828,17 @@ footer {
     width: 100%;
   }
 
-  /* Only the primary CTA stays as a full-width button on mobile. The Mac
-     download button is replaced by the compact text-link row below, since
-     a Mac-only download button is not useful on a phone. */
-  .hero-action-download {
-    display: none;
+  .download-bar-actions {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .download-bar-button {
+    flex: 1 1 calc(50% - 5px);
+  }
+
+  .download-bar-icon {
+    flex: 0 0 44px;
   }
 
   .hero-actions-compact {
@@ -3057,6 +3182,39 @@ footer {
 .download-platform-icon.web {
   color: #6251ad;
   background: #ece8fa;
+}
+
+.download-platform-icon.ios {
+  color: #3f3033;
+  background: #efe7e3;
+}
+
+.download-platform-icon.cli {
+  color: #4a4145;
+  background: #ece8e4;
+  font-size: 20px;
+}
+
+.download-card-stack {
+  display: grid;
+  gap: 16px;
+}
+
+.download-card-stack .download-card-compact {
+  min-height: 0;
+}
+
+.download-card-stack .download-card-compact > .button {
+  margin-top: 22px;
+}
+
+.download-catalog > #cli {
+  margin-top: 76px;
+}
+
+#mobile,
+#cli {
+  scroll-margin-top: 88px;
 }
 
 .download-badge {

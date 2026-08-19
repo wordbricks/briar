@@ -5,6 +5,7 @@ import {
   localizedHrefs,
   localizedPath,
 } from "../i18n";
+import { DownloadBar } from "../download-bar";
 import { DesktopDownloadLink } from "../desktop-download-link";
 import { resolveOrigin } from "../seo";
 import { Arrow, SiteFooter, SiteHeader } from "../site-chrome";
@@ -235,49 +236,15 @@ export default async function HomeView({ locale }: { locale: Locale }) {
             {c.hero.line2}
           </h1>
           <p>{c.hero.description}</p>
-          <div className="hero-actions">
-            <a
-              className="button button-primary"
-              href={WEB_APP_URL}
-              aria-label={c.aria.openWebApp}
-            >
-              {c.hero.openWebApp} <Arrow />
-            </a>
-            <DesktopDownloadLink
-              className="button button-secondary hero-action-download"
-              href={MAC_DOWNLOAD_URL}
-              aria-label={c.aria.macDownload}
-              locale={locale}
-              trackingLabel={c.hero.macDownload}
-              trackingLocation="home_hero"
-            >
-              {c.hero.macDownload} <span aria-hidden="true">↓</span>
-            </DesktopDownloadLink>
-          </div>
+          <DownloadBar
+            copy={c}
+            locale={locale}
+            trackingLocation="home_hero"
+          />
           <div className="hero-actions-compact">
-            <a href={localizedPath(locale, "/download")}>
-              {c.hero.allDownloads} <span aria-hidden="true">↓</span>
-            </a>
             <a href="#workflow">
               {c.hero.howItWorks} <span aria-hidden="true">↓</span>
             </a>
-          </div>
-          <div className="hero-meta">
-            <span>
-              <i>⌘</i> {c.hero.meta[0]}
-            </span>
-            <span>
-              <i>●</i> {c.hero.meta[1]}
-            </span>
-            <span>
-              <i>✓</i> {c.hero.meta[2]}
-            </span>
-            <span>
-              <i>✓</i> {c.hero.meta[3]}
-            </span>
-            <span>
-              <i>✓</i> {c.hero.meta[4]}
-            </span>
           </div>
         </div>
       </section>
