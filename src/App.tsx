@@ -1687,48 +1687,6 @@ export function App() {
         user={briar.user}
       />
     );
-  } else if (
-    !briar.remoteMode &&
-    (briar.isCreatingProject || briar.projectConnection)
-  ) {
-    content = (
-      <ProjectOnboarding
-        canCancel={briar.organizations.length > 0}
-        connection={briar.projectConnection}
-        error={briar.error}
-        includeDeveloperTools={developerToolsProjectSetupRequested}
-        loading={briar.loading}
-        onCancel={() => {
-          setDeveloperToolsProjectSetupRequested(false);
-          briar.cancelProjectCreation();
-        }}
-        onAnalyzeRequirements={async (projectId, onProgress) => {
-          const workflow = await briar.analyzeWorkflowRequirements(
-            projectId,
-            onProgress,
-          );
-          const health = await briar.refreshHealth();
-          return {
-            workflow,
-            requirements: health?.requirements ?? [],
-          };
-        }}
-        onConnect={briar.connectProject}
-        onCreate={briar.addProject}
-        onFinish={() => {
-          setDeveloperToolsProjectSetupRequested(false);
-          briar.finishProjectCreation();
-          setRequestedRunId(null);
-          setRequestedSessionId(null);
-          resetNavigation("lobby");
-        }}
-        onLogout={() => void briar.logout()}
-        onReviseWorkflow={briar.reviseWorkflow}
-        onRepositorySelect={briar.selectProjectRepository}
-        onRepositoryInspect={briar.inspectProjectRepository}
-        user={briar.user}
-      />
-    );
   } else {
     content = (
       <div className="desktop-app-frame">
@@ -2564,6 +2522,45 @@ export function App() {
   return (
     <>
       {content}
+      {!briar.remoteMode &&
+      briar.user &&
+      (briar.isCreatingProject || briar.projectConnection) ? (
+        <ProjectOnboarding
+          canCancel={briar.organizations.length > 0}
+          connection={briar.projectConnection}
+          error={briar.error}
+          includeDeveloperTools={developerToolsProjectSetupRequested}
+          loading={briar.loading}
+          onCancel={() => {
+            setDeveloperToolsProjectSetupRequested(false);
+            briar.cancelProjectCreation();
+          }}
+          onAnalyzeRequirements={async (projectId, onProgress) => {
+            const workflow = await briar.analyzeWorkflowRequirements(
+              projectId,
+              onProgress,
+            );
+            const health = await briar.refreshHealth();
+            return {
+              workflow,
+              requirements: health?.requirements ?? [],
+            };
+          }}
+          onCloneRepository={briar.cloneProjectRepository}
+          onConnect={briar.connectProject}
+          onCreate={briar.addProject}
+          onFinish={() => {
+            setDeveloperToolsProjectSetupRequested(false);
+            briar.finishProjectCreation();
+            setRequestedRunId(null);
+            setRequestedSessionId(null);
+            resetNavigation("lobby");
+          }}
+          onReviseWorkflow={briar.reviseWorkflow}
+          onRepositorySelect={briar.selectProjectRepository}
+          onRepositoryInspect={briar.inspectProjectRepository}
+        />
+      ) : null}
       <WorkerDispatchDialog
         didDispatchSuccessfully={completedDispatchRunId === dispatchRun?.id}
         error={quickProcessError}

@@ -3221,6 +3221,49 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .repository-readiness-error { margin:10px 1px 0; display:flex; align-items:center; gap:6px; color:#a34854; font-size:var(--text-2xs); line-height:1.5; }
 .project-onboarding-shell { background:#f7f7f3; }
 .project-onboarding-card { width:min(700px,calc(100vw - 48px)); }
+.project-onboarding-modal-backdrop { z-index:95; padding:32px; background:rgba(33,35,30,.34); }
+.project-onboarding-dialog { width:min(900px,calc(100vw - 64px)); max-height:calc(100dvh - 64px); margin:0; padding:0; overflow:hidden; display:flex; flex-direction:column; border-radius:26px; box-shadow:0 34px 110px rgba(26,29,23,.28); }
+.project-onboarding-dialog-toolbar { min-height:58px; padding:0 18px 0 22px; flex:0 0 auto; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid var(--border); background:rgba(250,250,247,.94); }
+.project-onboarding-dialog-toolbar > span { min-width:92px; }
+.project-onboarding-dialog-toolbar button { height:34px; padding:0 10px; display:flex; align-items:center; justify-content:center; gap:6px; border:0; border-radius:10px; color:var(--muted-foreground); background:transparent; cursor:pointer; font-size:var(--text-2xs); font-weight:650; }
+.project-onboarding-dialog-toolbar button:hover:not(:disabled) { color:var(--foreground); background:#eeeeea; }
+.project-onboarding-dialog-toolbar button:focus-visible { outline:3px solid rgba(96,70,184,.24); outline-offset:2px; }
+.project-onboarding-dialog-toolbar button:disabled { opacity:.45; cursor:not-allowed; }
+.project-onboarding-dialog-toolbar .project-onboarding-dialog-close { width:34px; padding:0; }
+.project-onboarding-dialog-body { min-height:0; padding:34px 40px 40px; overflow-y:auto; overscroll-behavior:contain; }
+.project-start-choice > .eyebrow { margin-bottom:8px; }
+.project-start-choice-grid { margin-top:8px; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
+.project-start-choice-grid > button { min-width:0; min-height:218px; padding:20px; position:relative; display:flex; align-items:flex-start; flex-direction:column; gap:18px; border:1px solid #deded8; border-radius:18px; color:var(--foreground); background:#fbfbf8; cursor:pointer; text-align:left; transition:transform .15s ease,border-color .15s ease,background-color .15s ease,box-shadow .15s ease; }
+.project-start-choice-grid > button:hover:not(:disabled) { border-color:#cfc5ec; background:#f9f7ff; box-shadow:0 12px 28px rgba(64,52,103,.08); transform:translateY(-2px); }
+.project-start-choice-grid > button:focus-visible { outline:3px solid rgba(96,70,184,.25); outline-offset:2px; }
+.project-start-choice-grid > button:disabled { color:#8d8e88; background:#f5f5f1; cursor:not-allowed; }
+.project-start-choice-grid > button > i { width:48px; height:48px; display:grid; place-items:center; border-radius:15px; color:#654db5; background:#eee9ff; font-style:normal; }
+.project-start-choice-grid > button > i.lovable,.onboarding-icon.lovable { color:#c4416a; background:#fff0f5; }
+.project-start-choice-grid > button > span { display:grid; gap:8px; }
+.project-start-choice-grid strong { font-size:var(--text-md); line-height:1.35; }
+.project-start-choice-grid small { color:#70726c; font-size:var(--text-xs); line-height:1.6; }
+.project-start-choice-grid > button > svg { margin-top:auto; align-self:flex-end; color:#7660bd; }
+.project-start-choice-grid > button > em { margin-top:auto; padding:5px 8px; border-radius:999px; color:#898a85; background:#e8e8e3; font-size:var(--text-2xs); font-style:normal; font-weight:700; }
+.lovable-video-frame { width:100%; aspect-ratio:16/9; overflow:hidden; border:1px solid #dedde4; border-radius:16px; background:#18171c; box-shadow:0 10px 28px rgba(35,31,47,.12); }
+.lovable-video-frame iframe { width:100%; height:100%; display:block; border:0; }
+.lovable-tutorial-note { margin-top:14px; padding:14px 15px; display:grid; grid-template-columns:22px minmax(0,1fr); align-items:start; gap:10px; border:1px solid #d8e7df; border-radius:13px; color:#39745f; background:#f3faf6; }
+.lovable-tutorial-note > span { display:grid; gap:4px; }
+.lovable-tutorial-note strong { font-size:var(--text-xs); }
+.lovable-tutorial-note small { color:#637a70; font-size:var(--text-2xs); line-height:1.55; }
+.lovable-docs-link { width:max-content; margin:12px 2px 0; display:flex; align-items:center; gap:5px; color:#6750b0; font-size:var(--text-2xs); font-weight:700; text-decoration:none; }
+.lovable-docs-link:hover { text-decoration:underline; }
+.lovable-copy-steps { margin:0 0 18px; padding:0; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:9px; list-style:none; }
+.lovable-copy-steps li { min-width:0; padding:13px; display:grid; grid-template-columns:26px minmax(0,1fr); align-items:start; gap:8px; border:1px solid var(--border); border-radius:13px; background:#fbfbf8; }
+.lovable-copy-steps li > span { width:25px; height:25px; display:grid; place-items:center; border-radius:8px; color:#604aa9; background:#eee9ff; font:650 var(--text-2xs)/1 "DM Mono",monospace; }
+.lovable-copy-steps p { margin:1px 0 0; color:#666861; font-size:var(--text-2xs); line-height:1.55; }
+.lovable-repository-form { display:grid; gap:9px; }
+.lovable-repository-form > label { color:#62645e; font-size:var(--text-2xs); font-weight:700; }
+.lovable-repository-input { height:56px; padding:0 15px; display:grid; grid-template-columns:20px minmax(0,1fr); align-items:center; gap:10px; border:1px solid var(--border); border-radius:15px; color:#6b55b8; background:var(--muted); transition:border-color .15s ease,background-color .15s ease,box-shadow .15s ease; }
+.lovable-repository-input:focus-within { border-color:var(--ring); background:var(--card); box-shadow:0 0 0 3px color-mix(in srgb,var(--ring) 14%,transparent); }
+.lovable-repository-input input { width:100%; min-width:0; height:100%; border:0; outline:0; color:var(--foreground); background:transparent; font:500 var(--text-xs)/1.3 "DM Mono",monospace; }
+.lovable-repository-input input::placeholder { color:#a0a198; }
+.lovable-destination-preview { margin:1px 2px 0; display:flex; align-items:center; gap:6px; color:#37836a; font-size:var(--text-2xs); line-height:1.5; }
+.lovable-repository-form .onboarding-primary-action { margin-top:6px; }
 .project-organization-card { width:min(660px,calc(100vw - 48px)); }
 .project-onboarding-progress { margin:9px 0 28px; display:grid; grid-template-columns:repeat(4,1fr); gap:7px; }
 .project-onboarding-progress.total-3 { grid-template-columns:repeat(3,1fr); }
@@ -3236,6 +3279,11 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .organization-create-embedded .organization-create-card { max-width:none; border:0; padding:0; box-shadow:none; }
 @media (max-width:680px) {
   .developer-prerequisites-list { grid-template-columns:1fr; }
+  .project-onboarding-modal-backdrop { padding:12px; }
+  .project-onboarding-dialog { width:100%; max-height:calc(100dvh - 24px); border-radius:20px; }
+  .project-onboarding-dialog-body { padding:26px 22px 30px; }
+  .project-start-choice-grid,.lovable-copy-steps { grid-template-columns:1fr; }
+  .project-start-choice-grid > button { min-height:150px; }
 }
 .onboarding-process { min-height:430px; display:flex; align-items:center; justify-content:center; flex-direction:column; text-align:center; }
 .onboarding-process-icon { width:54px; height:54px; margin-bottom:24px; display:grid; place-items:center; border-radius:17px; color:#654db5; background:#eee9ff; }

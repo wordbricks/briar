@@ -71,6 +71,7 @@ import {
 } from "../lib/demo-data";
 import { isRepositoryConnectedForImport } from "../lib/linear-import";
 import {
+  cloneGithubSshRepository,
   connectLocalProject,
   createProjectWorkspace,
   disconnectLocalProject,
@@ -1557,6 +1558,20 @@ export function useBriar(options: UseBriarOptions = {}) {
   const createProjectRepository = useCallback(async (name: string) => {
     setError(null);
     return await createProjectWorkspace(name);
+  }, []);
+
+  const cloneProjectRepository = useCallback(async (repositoryUrl: string) => {
+    setLoading(true);
+    setError(null);
+    try {
+      return await cloneGithubSshRepository(repositoryUrl);
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : String(caught);
+      setError(message);
+      throw caught;
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   const connectProject = useCallback(async (
@@ -3647,6 +3662,7 @@ export function useBriar(options: UseBriarOptions = {}) {
     changeProjectIssueKeyPrefix,
     changeProjectScheduleTab,
     checkOrganizationHandle,
+    cloneProjectRepository,
     connectProject,
     connectedProjectIds,
     isActiveProjectConnectedLocally: isProjectConnectedLocally(

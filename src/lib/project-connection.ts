@@ -89,6 +89,11 @@ export type CreatedProjectWorkspace = {
   created: boolean;
 };
 
+export type ClonedProjectRepository = {
+  repositoryPath: string;
+  repositoryName: string;
+};
+
 export type ConnectedLocalProject = {
   repositoryPath: string;
   workflow: AutoHuntWorkflow;
@@ -152,6 +157,18 @@ export async function createProjectWorkspace(
   }
   const { invoke } = await import("@tauri-apps/api/core");
   return invoke<CreatedProjectWorkspace>("create_project_workspace", { name });
+}
+
+export async function cloneGithubSshRepository(
+  repositoryUrl: string,
+): Promise<ClonedProjectRepository> {
+  if (!isTauri()) {
+    throw new Error("GitHub 저장소 가져오기는 Briar 데스크톱 앱에서 사용할 수 있습니다.");
+  }
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke<ClonedProjectRepository>("clone_github_ssh_repository", {
+    repositoryUrl,
+  });
 }
 
 export async function inspectRepositoryReadiness(
