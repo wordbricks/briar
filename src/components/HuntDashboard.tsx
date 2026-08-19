@@ -3319,6 +3319,7 @@ function IssueDescriptionField({
 
 function DraftIssueDescriptionEditor({
   attachments,
+  autoSizeTextFields = false,
   className,
   description,
   editorRef,
@@ -3330,6 +3331,7 @@ function DraftIssueDescriptionEditor({
   removeLabel,
 }: {
   attachments: IssueDraftInlineAttachment[];
+  autoSizeTextFields?: boolean;
   className?: string;
   description: string;
   editorRef: RefObject<HTMLDivElement | null>;
@@ -3356,7 +3358,7 @@ function DraftIssueDescriptionEditor({
       {parts.map((part, index) =>
         part.type === "text" ? (
           <IssueDescriptionField
-            autoSize={hasInlineAttachments}
+            autoSize={autoSizeTextFields || hasInlineAttachments}
             end={part.end}
             key={`text-${index}`}
             label={label}
@@ -6060,6 +6062,7 @@ export function RunPage({
                       {onUpdateIssue ? (
                         <DraftIssueDescriptionEditor
                           attachments={editableIssueAttachments}
+                          autoSizeTextFields
                           className="issue-description-inline-editor"
                           description={inlineDescription}
                           editorRef={inlineDescriptionEditorRef}

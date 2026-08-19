@@ -1468,6 +1468,64 @@ describe("HuntDashboard", () => {
     }
   });
 
+  it("sizes a long inline description from its full content height", async () => {
+    const previousScrollHeight = Object.getOwnPropertyDescriptor(
+      HTMLTextAreaElement.prototype,
+      "scrollHeight",
+    );
+    Object.defineProperty(HTMLTextAreaElement.prototype, "scrollHeight", {
+      configurable: true,
+      get: () => 740,
+    });
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    try {
+      await act(async () => root.render(
+        <RunPage
+          isSidebarOpen
+          error={null}
+          isRecovering={false}
+          onBack={() => undefined}
+          onCancel={async () => undefined}
+          onLoadAttachment={async () => new Blob()}
+          onLoadIssueMessages={async () => []}
+          onLoadRunEvidence={async () => []}
+          onMove={async () => undefined}
+          onRetry={async () => undefined}
+          onSendIssueMessage={async () => {
+            throw new Error("not implemented in this test");
+          }}
+          onUpdateIssue={async () => undefined}
+          run={{
+            ...demoDashboard.runs[0],
+            issueDescription: "A long wrapped description without explicit newlines.",
+          }}
+        />,
+      ));
+
+      expect(
+        container.querySelector<HTMLTextAreaElement>(
+          ".issue-description-inline-editor .issue-description-input",
+        )?.style.minHeight,
+      ).toBe("740px");
+    } finally {
+      await act(async () => root.unmount());
+      container.remove();
+      if (previousScrollHeight) {
+        Object.defineProperty(
+          HTMLTextAreaElement.prototype,
+          "scrollHeight",
+          previousScrollHeight,
+        );
+      } else {
+        delete (HTMLTextAreaElement.prototype as { scrollHeight?: number })
+          .scrollHeight;
+      }
+    }
+  });
+
   it("keeps spaces and newlines typed after an inline save", async () => {
     vi.useFakeTimers();
     const onUpdateIssue = vi.fn(async () => undefined);
