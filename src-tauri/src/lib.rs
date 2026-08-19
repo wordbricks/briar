@@ -3264,6 +3264,106 @@ fn briar_workspace_root(home: &Path) -> PathBuf {
     home.join("Briar")
 }
 
+/// Folder that holds repositories imported from external GitHub-backed tools.
+fn briar_git_root(home: &Path) -> PathBuf {
+    home.join("briar").join("git")
+}
+
+fn github_ssh_repository_name(repository_url: &str) -> Result<String, String> {
+    let repository_url = repository_url.trim();
+    let path = repository_url
+        .strip_prefix("git@github.com:")
+        .or_else(|| repository_url.strip_prefix("ssh://git@github.com/"))
+        .ok_or_else(|| {
+            "GitHub의 SSH 주소를 붙여넣어 주세요. 예: git@github.com:account/project.git"
+                .to_string()
+        })?;
+    let mut segments = path.split('/');
+    let owner = segments.next().unwrap_or_default();
+    let repository = segments.next().unwrap_or_default();
+    if segments.next().is_some() {
+        return Err("GitHub SSH 주소를 다시 확인해 주세요.".to_string());
+    }
+    let repository = repository.strip_suffix(".git").unwrap_or(repository);
+    let valid_segment = |segment: &str| {
+        !segment.is_empty()
+            && segment != "."
+            && segment != ".."
+            && segment
+                .chars()
+                .all(|character| character.is_ascii_alphanumeric() || "-_.".contains(character))
+    };
+    if !valid_segment(owner) || !valid_segment(repository) {
+        return Err("GitHub SSH 주소를 다시 확인해 주세요.".to_string());
+    }
+    Ok(repository.to_string())
+}
+
+fn friendly_git_clone_error(stderr: &str) -> String {
+    let detail = stderr.trim();
+    if detail.contains("Permission denied (publickey)") {
+        return "GitHub가 이 컴퓨터의 SSH 키를 확인하지 못했습니다. GitHub에 SSH 키를 등록한 뒤 다시 시도해 주세요."
+            .to_string();
+    }
+    if detail.contains("Repository not found") || detail.contains("not found") {
+        return "GitHub 저장소를 찾지 못했습니다. 주소가 맞는지, 해당 저장소를 볼 권한이 있는지 확인해 주세요."
+            .to_string();
+    }
+    if detail.contains("Host key verification failed") {
+        return "GitHub와의 보안 연결을 확인하지 못했습니다. 터미널에서 GitHub SSH 연결을 한 번 확인한 뒤 다시 시도해 주세요."
+            .to_string();
+    }
+    if detail.is_empty() {
+        "GitHub 저장소를 가져오지 못했습니다. 인터넷 연결과 GitHub 권한을 확인한 뒤 다시 시도해 주세요."
+            .to_string()
+    } else {
+        format!("GitHub 저장소를 가져오지 못했습니다: {detail}")
+    }
+}
+
+fn clone_github_ssh_repository_in(
+    git: &Path,
+    root: &Path,
+    repository_url: &str,
+) -> Result<ClonedProjectRepository, String> {
+    let repository_name = github_ssh_repository_name(repository_url)?;
+    fs::create_dir_all(root)
+        .map_err(|error| format!("저장소를 보관할 폴더를 만들지 못했습니다: {error}"))?;
+    let target = root.join(&repository_name);
+    if target.exists() {
+        return Err(format!(
+            "{} 폴더가 이미 있습니다. 기존 로컬 저장소 연결을 사용하거나 폴더 이름을 정리한 뒤 다시 시도해 주세요.",
+            target.display()
+        ));
+    }
+    let clone = Command::new(git)
+        .arg("clone")
+        .arg("--origin")
+        .arg("origin")
+        .arg("--")
+        .arg(repository_url.trim())
+        .arg(&target)
+        .env("GIT_TERMINAL_PROMPT", "0")
+        .env(
+            "GIT_SSH_COMMAND",
+            "ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new",
+        )
+        .output()
+        .map_err(|error| format!("Git을 실행할 수 없습니다: {error}"))?;
+    if !clone.status.success() {
+        if target.exists() {
+            let _ = fs::remove_dir_all(&target);
+        }
+        return Err(friendly_git_clone_error(
+            String::from_utf8_lossy(&clone.stderr).as_ref(),
+        ));
+    }
+    Ok(ClonedProjectRepository {
+        repository_path: path_display_string(canonical_directory(&target)?)?,
+        repository_name,
+    })
+}
+
 /// Turns a project name into a folder name that is safe on every platform.
 fn project_folder_name(name: &str) -> Result<String, String> {
     let sanitized: String = name
@@ -3393,6 +3493,13 @@ struct CreatedProjectWorkspace {
     created: bool,
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ClonedProjectRepository {
+    repository_path: String,
+    repository_name: String,
+}
+
 #[tauri::command]
 async fn create_project_workspace(
     app: tauri::AppHandle,
@@ -3402,6 +3509,20 @@ async fn create_project_workspace(
     tauri::async_runtime::spawn_blocking(move || {
         let git = git_binary(&home)?;
         create_project_workspace_in(&git, &briar_workspace_root(&home), &name)
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+async fn clone_github_ssh_repository(
+    app: tauri::AppHandle,
+    repository_url: String,
+) -> Result<ClonedProjectRepository, String> {
+    let home = app.path().home_dir().map_err(|error| error.to_string())?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let git = git_binary(&home)?;
+        clone_github_ssh_repository_in(&git, &briar_git_root(&home), &repository_url)
     })
     .await
     .map_err(|error| error.to_string())?
@@ -8218,6 +8339,7 @@ pub fn run() {
             set_app_icon,
             set_app_badge_count,
             validate_repository_path,
+            clone_github_ssh_repository,
             create_project_workspace,
             inspect_repository_readiness,
             discover_repository_icon,
@@ -9224,6 +9346,29 @@ branch refs/heads/briar/second-11111111
         );
         assert!(project_folder_name("   ").is_err());
         assert!(project_folder_name("///").is_err());
+    }
+
+    #[test]
+    fn github_ssh_urls_produce_safe_repository_names() {
+        assert_eq!(
+            github_ssh_repository_name("git@github.com:wordbricks/briar.git").as_deref(),
+            Ok("briar")
+        );
+        assert_eq!(
+            github_ssh_repository_name("ssh://git@github.com/wordbricks/my-app.git").as_deref(),
+            Ok("my-app")
+        );
+        assert!(github_ssh_repository_name("https://github.com/wordbricks/briar.git").is_err());
+        assert!(github_ssh_repository_name("git@github.com:wordbricks/../briar.git").is_err());
+    }
+
+    #[test]
+    fn git_clone_errors_explain_common_ssh_problems() {
+        assert!(
+            friendly_git_clone_error("git@github.com: Permission denied (publickey).")
+                .contains("SSH 키")
+        );
+        assert!(friendly_git_clone_error("ERROR: Repository not found.").contains("권한"));
     }
 
     #[test]
