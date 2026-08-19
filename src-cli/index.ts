@@ -117,12 +117,17 @@ import {
 } from "./worker-update";
 import {
   allocateAnalysisWorktree,
+  allocateCachedAnalysisWorktree,
   allocateIssueWorktree,
+  analysisWorktreePath,
   defaultWorktreeRoot,
   findExistingIssueWorktree,
+  issueReplyWorkspaceMode,
   listCompletedWorktrees,
   listIssueWorktrees,
+  maintainIdleAnalysisWorktrees,
   maintainTerminalIssueWorktree,
+  markCachedAnalysisWorktreeIdle,
   projectWorktreeRoot,
   recordCompletedWorktree,
   removeAnalysisWorktree,
@@ -2175,6 +2180,7 @@ const claimedIssueReplySchema = z.object({
   skillExecutionTarget:
     detachedAgentSkillExecutionTargetSchema.nullable().default(null),
   branch: z.string().nullable(),
+  requiresPreferredWorker: z.boolean().optional(),
   claimToken: z.string().startsWith("briar_reply_claim_"),
   claimedAt: z.string().datetime({ offset: true }),
   leaseExpiresAt: z.string().datetime({ offset: true }),
@@ -2354,6 +2360,23 @@ const activeReplyActivityPublishers = new Map<
   string,
   ChannelActivityPublisher
 >();
+const activeCachedAnalysisWorktreePaths = new Map<string, number>();
+
+function retainCachedAnalysisWorktree(path: string) {
+  activeCachedAnalysisWorktreePaths.set(
+    path,
+    (activeCachedAnalysisWorktreePaths.get(path) ?? 0) + 1,
+  );
+}
+
+function releaseCachedAnalysisWorktree(path: string) {
+  const remaining = (activeCachedAnalysisWorktreePaths.get(path) ?? 1) - 1;
+  if (remaining <= 0) {
+    activeCachedAnalysisWorktreePaths.delete(path);
+  } else {
+    activeCachedAnalysisWorktreePaths.set(path, remaining);
+  }
+}
 
 function detachedAgentWithActiveSkill(
   agent: z.infer<typeof detachedAgentClaimSchema>,
@@ -2997,14 +3020,17 @@ async function runClaimedIssueReply(
     (message) => message.id === issue.triggerMessageId,
   );
   if (!trigger) throw new Error("Mention message is missing from the reply snapshot");
-  // The reply must see the same uncommitted files as the Worker processing the
-  // issue. A fresh analysis checkout would only contain the last committed
-  // branch and would hide the work that the user is asking about.
-  const configuredWorktree = worktreesEnabled(project)
+  const projectUsesWorktrees = worktreesEnabled(project);
+  const settings = worktreeSettings(project);
+  const worktreeRoot = projectWorktreeRoot(settings.root, project.id);
+  // A running issue must see the processing Worker's uncommitted files. An
+  // unassigned issue has no execution worktree yet, so its read-only replies
+  // share a short-lived analysis checkout instead.
+  const configuredWorktree = projectUsesWorktrees
     ? findExistingIssueWorktree(
         runGit,
         project.repositoryPath,
-        projectWorktreeRoot(worktreeSettings(project).root, project.id),
+        worktreeRoot,
         {
           runId: issue.runId,
           sourceKey: issue.sourceKey,
@@ -3013,12 +3039,43 @@ async function runClaimedIssueReply(
         issue.branch,
       )
     : null;
-  if (worktreesEnabled(project) && !configuredWorktree) {
+  const workspaceMode = issueReplyWorkspaceMode({
+    worktreesEnabled: projectUsesWorktrees,
+    hasConfiguredWorktree: configuredWorktree !== null,
+    requiresPreferredWorker: issue.requiresPreferredWorker,
+    branch: issue.branch,
+  });
+  if (workspaceMode === "missing-required") {
     throw new Error(
       "The issue processing worktree is not available on this Worker",
     );
   }
-  const workspacePath = configuredWorktree?.path ?? project.repositoryPath;
+  const cachedAnalysisPath =
+    workspaceMode === "cached-analysis"
+      ? analysisWorktreePath(settings.root, project.id, issue.runId)
+      : null;
+  let cachedAnalysisWorktree:
+    | Awaited<ReturnType<typeof allocateCachedAnalysisWorktree>>
+    | null = null;
+  if (cachedAnalysisPath) {
+    retainCachedAnalysisWorktree(cachedAnalysisPath);
+    try {
+      cachedAnalysisWorktree = await allocateCachedAnalysisWorktree({
+        repositoryPath: project.repositoryPath,
+        projectId: project.id,
+        runId: issue.runId,
+        settings,
+        git: runGit,
+      });
+    } catch (error) {
+      releaseCachedAnalysisWorktree(cachedAnalysisPath);
+      throw error;
+    }
+  }
+  const workspacePath =
+    configuredWorktree?.path ??
+    cachedAnalysisWorktree?.path ??
+    project.repositoryPath;
   const imageDirectory = await mkdtemp(join(tmpdir(), "briar-issue-reply-images-"));
   let imagesCleaned = false;
   let lastActivityErrorAt = Number.NEGATIVE_INFINITY;
@@ -3114,7 +3171,7 @@ async function runClaimedIssueReply(
       },
       userMessage: trigger.body,
       workspaceAvailable: true,
-      workspaceShared: true,
+      workspaceShared: workspaceMode !== "cached-analysis",
       skillExecutionTarget: issue.skillExecutionTarget,
     });
     let sequence = 0;
@@ -3191,7 +3248,7 @@ async function runClaimedIssueReply(
     });
     if (!result.reply) throw new Error("Agent returned an empty issue reply");
     // Private downloaded images must be removed before the durable reply
-    // succeeds. The issue worktree itself belongs to the processing Worker.
+    // succeeds. Worktree cache bookkeeping is best-effort in the outer cleanup.
     await cleanupContext();
     await request(
       config.apiUrl,
@@ -3215,7 +3272,27 @@ async function runClaimedIssueReply(
     if (activeReplyActivityPublishers.get(issue.workId) === activityPublisher) {
       activeReplyActivityPublishers.delete(issue.workId);
     }
-    await cleanupContext();
+    try {
+      await cleanupContext();
+    } finally {
+      if (cachedAnalysisWorktree && cachedAnalysisPath) {
+        try {
+          await markCachedAnalysisWorktreeIdle({
+            root: worktreeRoot,
+            runId: issue.runId,
+            worktree: cachedAnalysisWorktree,
+          });
+        } catch (error) {
+          console.error(
+            `analysis worktree cache update failed for ${issue.runId}: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          );
+        } finally {
+          releaseCachedAnalysisWorktree(cachedAnalysisPath);
+        }
+      }
+    }
   }
 }
 
@@ -3862,6 +3939,7 @@ async function workerCommand() {
 
   const maxIssues = Number.parseInt(value("--max-issues") ?? "", 10);
   let lastWorktreeSweepAt = Number.NEGATIVE_INFINITY;
+  let lastAnalysisWorktreeSweepAt = Number.NEGATIVE_INFINITY;
   let lastTriggeredUpdateId: string | null = null;
   const result = await runWorkerLoop(
     {
@@ -3980,6 +4058,31 @@ async function workerCommand() {
         );
       },
       heartbeat: async (readinessState = "ready") => {
+        if (Date.now() - lastAnalysisWorktreeSweepAt >= 5 * 60_000) {
+          lastAnalysisWorktreeSweepAt = Date.now();
+          try {
+            const maintenance = await maintainIdleAnalysisWorktrees(
+              runGit,
+              project.repositoryPath,
+              projectWorktreeRoot(worktreeSettings(project).root, project.id),
+              { activePaths: [...activeCachedAnalysisWorktreePaths.keys()] },
+            );
+            const reportable = maintenance.filter(
+              (item) => item.status === "removed" || item.reason !== "active",
+            );
+            if (reportable.length > 0) {
+              console.log(
+                `analysis worktree maintenance: ${JSON.stringify(reportable)}`,
+              );
+            }
+          } catch (error) {
+            console.error(
+              `analysis worktree maintenance failed: ${
+                error instanceof Error ? error.message : String(error)
+              }`,
+            );
+          }
+        }
         if (Date.now() - lastWorktreeSweepAt >= 60 * 60 * 1_000) {
           lastWorktreeSweepAt = Date.now();
           try {

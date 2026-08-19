@@ -13434,6 +13434,7 @@ async function route(
             }
           : null,
         branch: run.branch,
+        requiresPreferredWorker: job.requires_preferred_worker === 1,
         claimToken,
         claimedAt: job.claimed_at,
         leaseExpiresAt: job.lease_expires_at,
