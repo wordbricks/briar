@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   allocateAnalysisWorktree,
+  allocateCachedAnalysisWorktree,
   allocateIssueWorktree,
   assertPathWithinRoot,
   compactWorktreeArtifacts,
@@ -13,8 +14,11 @@ import {
   defaultWorktreeRoot,
   findExistingIssueWorktree,
   isPathWithinRoot,
+  issueReplyWorkspaceMode,
+  listCachedAnalysisWorktrees,
   listCompletedWorktrees,
   listIssueWorktrees,
+  maintainIdleAnalysisWorktrees,
   maintainTerminalIssueWorktree,
   parseRemoteTrackingBase,
   parseWorktreeIncludeFile,
@@ -512,6 +516,45 @@ describe("allocation", () => {
 });
 
 describe("conversation worktree allocation", () => {
+  it("uses cached analysis only for replies that do not require an execution worktree", () => {
+    expect(issueReplyWorkspaceMode({
+      worktreesEnabled: true,
+      hasConfiguredWorktree: false,
+      requiresPreferredWorker: false,
+      branch: null,
+    })).toBe("cached-analysis");
+    expect(issueReplyWorkspaceMode({
+      worktreesEnabled: true,
+      hasConfiguredWorktree: false,
+      requiresPreferredWorker: true,
+      branch: "briar/in-progress",
+    })).toBe("missing-required");
+    expect(issueReplyWorkspaceMode({
+      worktreesEnabled: true,
+      hasConfiguredWorktree: true,
+      requiresPreferredWorker: true,
+      branch: "briar/in-progress",
+    })).toBe("shared");
+    expect(issueReplyWorkspaceMode({
+      worktreesEnabled: false,
+      hasConfiguredWorktree: false,
+      branch: null,
+    })).toBe("project");
+  });
+
+  it("uses branch presence as the safe rollout fallback for older servers", () => {
+    expect(issueReplyWorkspaceMode({
+      worktreesEnabled: true,
+      hasConfiguredWorktree: false,
+      branch: null,
+    })).toBe("cached-analysis");
+    expect(issueReplyWorkspaceMode({
+      worktreesEnabled: true,
+      hasConfiguredWorktree: false,
+      branch: "briar/in-progress",
+    })).toBe("missing-required");
+  });
+
   it("uses a detached latest-remote checkout and removes it without a branch", async () => {
     const root = await temporaryDirectory("briar-analysis-root-");
     const { git, calls } = fakeGit((gitArgs) => {
@@ -575,6 +618,185 @@ describe("conversation worktree allocation", () => {
     expect(await readFile(join(worktree.path, ".env.keys"), "utf8")).toBe(
       "DOTENV_PRIVATE_KEY=abc",
     );
+  });
+
+  it("reuses one cached checkout for successive replies to the same issue", async () => {
+    const root = await temporaryDirectory("briar-analysis-cache-root-");
+    const runId = "edededed-eded-4ded-8ded-edededededed";
+    const expectedPath = join(
+      root,
+      "project-1",
+      "analysis",
+      `analysis-${runId}`,
+    );
+    let attached = false;
+    const { git, calls } = fakeGit((gitArgs) => {
+      if (gitArgs[0] === "worktree" && gitArgs[1] === "list") {
+        return ok([
+          "worktree /repo",
+          "branch refs/heads/main",
+          ...(attached ? ["", `worktree ${expectedPath}`, "detached"] : []),
+        ].join("\n"));
+      }
+      if (gitArgs[0] === "worktree" && gitArgs[1] === "add") {
+        attached = true;
+        return ok();
+      }
+      if (gitArgs[0] === "remote") return ok("origin\n");
+      if (gitArgs[0] === "symbolic-ref") return ok("refs/remotes/origin/main\n");
+      if (gitArgs[0] === "rev-parse" && gitArgs[1] === "--verify") {
+        return ok("base-sha\n");
+      }
+      if (gitArgs[0] === "rev-parse") return ok("base-sha\n");
+      if (gitArgs[0] === "-c") return ok();
+      return ok();
+    });
+
+    const first = await allocateCachedAnalysisWorktree({
+      repositoryPath: "/repo",
+      projectId: "project-1",
+      runId,
+      settings: { root, branchPrefix: "unused" },
+      git,
+      nowMs: 1_000,
+    });
+    await mkdir(first.path, { recursive: true });
+    const second = await allocateCachedAnalysisWorktree({
+      repositoryPath: "/repo",
+      projectId: "project-1",
+      runId,
+      settings: { root, branchPrefix: "unused" },
+      git,
+      nowMs: 2_000,
+    });
+
+    expect(first.reused).toBe(false);
+    expect(second).toMatchObject({
+      path: first.path,
+      baseSha: "base-sha",
+      reused: true,
+    });
+    expect(
+      calls.filter((args) => args[0] === "worktree" && args[1] === "add"),
+    ).toHaveLength(1);
+    await expect(
+      listCachedAnalysisWorktrees(join(root, "project-1")),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        runId,
+        path: first.path,
+        lastUsedAt: new Date(2_000).toISOString(),
+      }),
+    ]);
+  });
+
+  it("coalesces concurrent checkout allocation for the same issue", async () => {
+    const root = await temporaryDirectory("briar-analysis-concurrent-root-");
+    const runId = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
+    const { git, calls } = fakeGit((gitArgs) => {
+      if (gitArgs[0] === "worktree" && gitArgs[1] === "list") {
+        return ok("worktree /repo\nbranch refs/heads/main\n");
+      }
+      if (gitArgs[0] === "remote") return ok("origin\n");
+      if (gitArgs[0] === "symbolic-ref") return ok("refs/remotes/origin/main\n");
+      if (gitArgs[0] === "rev-parse" && gitArgs[1] === "--verify") {
+        return ok("base-sha\n");
+      }
+      if (gitArgs[0] === "rev-parse") return ok("base-sha\n");
+      return ok();
+    });
+    const input = {
+      repositoryPath: "/repo",
+      projectId: "project-1",
+      runId,
+      settings: { root, branchPrefix: "unused" },
+      git,
+    };
+
+    const [first, second] = await Promise.all([
+      allocateCachedAnalysisWorktree(input),
+      allocateCachedAnalysisWorktree(input),
+    ]);
+
+    expect(second.path).toBe(first.path);
+    expect(
+      calls.filter((args) => args[0] === "worktree" && args[1] === "add"),
+    ).toHaveLength(1);
+  });
+
+  it("removes an idle cached checkout but never one with an active reply", async () => {
+    const root = await temporaryDirectory("briar-analysis-idle-root-");
+    const projectRoot = join(root, "project-1");
+    const runId = "efefefef-efef-4fef-8fef-efefefefefef";
+    const expectedPath = join(
+      projectRoot,
+      "analysis",
+      `analysis-${runId}`,
+    );
+    let attached = false;
+    const { git, calls } = fakeGit((gitArgs) => {
+      if (gitArgs[0] === "worktree" && gitArgs[1] === "list") {
+        return ok([
+          "worktree /repo",
+          "branch refs/heads/main",
+          ...(attached ? ["", `worktree ${expectedPath}`, "detached"] : []),
+        ].join("\n"));
+      }
+      if (gitArgs[0] === "worktree" && gitArgs[1] === "add") {
+        attached = true;
+        return ok();
+      }
+      if (gitArgs[0] === "worktree" && gitArgs[1] === "remove") {
+        attached = false;
+        return ok();
+      }
+      if (gitArgs[0] === "remote") return ok("origin\n");
+      if (gitArgs[0] === "symbolic-ref") return ok("refs/remotes/origin/main\n");
+      if (gitArgs[0] === "rev-parse" && gitArgs[1] === "--verify") {
+        return ok("base-sha\n");
+      }
+      if (gitArgs[0] === "rev-parse") return ok("base-sha\n");
+      if (gitArgs[0] === "-c") return ok();
+      return ok();
+    });
+    const worktree = await allocateCachedAnalysisWorktree({
+      repositoryPath: "/repo",
+      projectId: "project-1",
+      runId,
+      settings: { root, branchPrefix: "unused" },
+      git,
+      nowMs: 1_000,
+    });
+    await mkdir(worktree.path, { recursive: true });
+
+    await expect(
+      maintainIdleAnalysisWorktrees(git, "/repo", projectRoot, {
+        nowMs: 2_000,
+        idleTtlMs: 500,
+        activePaths: [worktree.path],
+      }),
+    ).resolves.toEqual([{
+      runId,
+      path: worktree.path,
+      status: "retained",
+      reason: "active",
+    }]);
+    expect(calls.some((args) => args[1] === "remove")).toBe(false);
+
+    await expect(
+      maintainIdleAnalysisWorktrees(git, "/repo", projectRoot, {
+        nowMs: 2_000,
+        idleTtlMs: 500,
+      }),
+    ).resolves.toEqual([{
+      runId,
+      path: worktree.path,
+      status: "removed",
+    }]);
+    expect(calls).toContainEqual([
+      "worktree", "remove", "--force", worktree.path,
+    ]);
+    await expect(listCachedAnalysisWorktrees(projectRoot)).resolves.toEqual([]);
   });
 });
 

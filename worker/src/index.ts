@@ -3362,6 +3362,9 @@ const attachmentResponse = (
   headers.set("Content-Type", attachment.content_type);
   headers.set("ETag", object.httpEtag);
   headers.set("X-Content-Type-Options", "nosniff");
+  if (attachment.content_type.toLowerCase() === "image/svg+xml") {
+    headers.set("Content-Security-Policy", "sandbox");
+  }
   return new Response(body, { headers });
 };
 
@@ -13431,6 +13434,7 @@ async function route(
             }
           : null,
         branch: run.branch,
+        requiresPreferredWorker: job.requires_preferred_worker === 1,
         claimToken,
         claimedAt: job.claimed_at,
         leaseExpiresAt: job.lease_expires_at,

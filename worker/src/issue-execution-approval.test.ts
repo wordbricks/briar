@@ -462,6 +462,90 @@ describe("conversational issue execution approval", () => {
     });
   });
 
+  it("marks an unassigned queued issue reply for a disposable workspace", async () => {
+    sequence += 1;
+    const suffix = sequence.toString(16).padStart(12, "0");
+    const sourceKey = `execution-queued-reply-${sequence}`;
+    const runId = await recordHuntEvent(db, projectAId, {
+      ...event(sourceKey, `Queued reply ${sequence}`),
+      status: "queued",
+      eventKey: `${sourceKey}:queued`,
+    });
+    const triggerMessageId = `bd000000-0000-4000-8000-${suffix}`;
+    const jobId = `be000000-0000-4000-8000-${suffix}`;
+    await createIssueMessage(db, {
+      id: triggerMessageId,
+      projectId: projectAId,
+      runId,
+      parentMessageId: null,
+      authorUserId: ownerId,
+      authorAgentProvider: null,
+      body: "@Execution Agent explain this queued issue",
+      createdAt: new Date().toISOString(),
+    });
+    await enqueueIssueAgentReply(db, {
+      id: jobId,
+      projectId: projectAId,
+      runId,
+      triggerMessageId,
+      parentMessageId: triggerMessageId,
+      replyMessageId: `bf000000-0000-4000-8000-${suffix}`,
+      agentId: projectAgentId,
+      requiresPreferredWorker: false,
+      createdAt: new Date().toISOString(),
+    });
+
+    const response = await worker.fetch(
+      new Request("https://briar.example/worker-claims", {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${executionWorkerCredential}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          claimedBy: "Execution Worker",
+          workerId: "execution-any-worker",
+          projectId: projectAId,
+        }),
+      }),
+      env(),
+    );
+    expect(response.status).toBe(200);
+    const claimed = await response.json<{
+      work: {
+        workId: string;
+        runId: string;
+        branch: string | null;
+        requiresPreferredWorker: boolean;
+        claimToken: string;
+      };
+    }>();
+    expect(claimed.work).toMatchObject({
+      workId: jobId,
+      runId,
+      branch: null,
+      requiresPreferredWorker: false,
+    });
+
+    const completed = await worker.fetch(
+      new Request(`https://briar.example/issue-reply-claims/${jobId}/complete`, {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${executionWorkerCredential}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          projectId: projectAId,
+          workerId: "execution-any-worker",
+          claimToken: claimed.work.claimToken,
+          body: "Queued issue reply completed.",
+        }),
+      }),
+      env(),
+    );
+    expect(completed.status).toBe(200);
+  });
+
   it("dispatches only after explicit approval and finalizes both audits atomically", async () => {
     const { runId, proposalId } = await seedIssueProposal();
     const providerReportedModel = "gpt-provider-reported-model";

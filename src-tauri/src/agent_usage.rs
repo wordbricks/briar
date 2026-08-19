@@ -938,24 +938,43 @@ fn parse_agy_cli_quota(value: &Value) -> Result<ProviderUsage, String> {
         ));
     }
 
-    let groups = value
-        .pointer("/command/data/groups")
-        .and_then(Value::as_object)
-        .ok_or_else(|| {
-            "올바르지 않은 CLI quota 형식입니다: groups가 누락되었습니다.".to_string()
-        })?;
+    let groups = value.pointer("/command/data/groups").ok_or_else(|| {
+        "올바르지 않은 CLI quota 형식입니다: groups가 누락되었습니다.".to_string()
+    })?;
 
-    let gemini_group = groups
-        .iter()
-        .find(|(k, _)| k.to_lowercase() == "gemini models")
-        .map(|(_, v)| v)
-        .and_then(Value::as_object)
-        .ok_or_else(|| "quota에서 Gemini Models 그룹을 찾을 수 없습니다.".to_string())?;
+    // Antigravity CLI 1.1.15 changed groups and buckets from name-keyed
+    // objects to arrays. Accept both layouts so older installations continue
+    // to work while current releases can report quota.
+    let gemini_buckets: Vec<&Value> = match groups {
+        Value::Object(groups) => groups
+            .iter()
+            .find(|(name, _)| name.eq_ignore_ascii_case("gemini models"))
+            .and_then(|(_, group)| group.as_object())
+            .map(|buckets| buckets.values().collect())
+            .ok_or_else(|| "quota에서 Gemini Models 그룹을 찾을 수 없습니다.".to_string())?,
+        Value::Array(groups) => groups
+            .iter()
+            .find(|group| {
+                group
+                    .get("name")
+                    .and_then(Value::as_str)
+                    .is_some_and(|name| name.eq_ignore_ascii_case("gemini models"))
+            })
+            .and_then(|group| group.get("buckets"))
+            .and_then(Value::as_array)
+            .map(|buckets| buckets.iter().collect())
+            .ok_or_else(|| "quota에서 Gemini Models 그룹을 찾을 수 없습니다.".to_string())?,
+        _ => {
+            return Err(
+                "올바르지 않은 CLI quota 형식입니다: groups 형식이 잘못되었습니다.".to_string(),
+            );
+        }
+    };
 
     let mut session = None;
     let mut weekly = None;
 
-    for (_, bucket_val) in gemini_group {
+    for bucket_val in gemini_buckets {
         let remaining_fraction = bucket_val
             .get("remaining_fraction")
             .or_else(|| bucket_val.get("remainingFraction"))
@@ -1706,6 +1725,55 @@ mod tests {
         assert_eq!(weekly.window_minutes, 10080);
         assert!((weekly.used_percent - 20.0).abs() < 0.0001);
         assert_eq!(weekly.resets_at, parse_iso_millis("2026-08-18T12:00:00Z"));
+    }
+
+    #[test]
+    fn parses_agy_cli_quota_from_v1_1_15_array_layout() {
+        let output = json!({
+            "command": {
+                "name": "usage",
+                "data": {
+                    "description": "Current quota usage",
+                    "groups": [
+                        {
+                            "name": "Gemini Models",
+                            "description": "Gemini model quotas",
+                            "buckets": [
+                                {
+                                    "id": "gemini-weekly",
+                                    "name": "Weekly",
+                                    "window": "weekly",
+                                    "remaining_fraction": 0.6,
+                                    "reset_time": "2026-08-25T12:00:00Z"
+                                },
+                                {
+                                    "id": "gemini-5h",
+                                    "name": "5 hour",
+                                    "window": "5h",
+                                    "remaining_fraction": 0.1,
+                                    "reset_time": "2026-08-19T12:00:00Z"
+                                }
+                            ]
+                        },
+                        {
+                            "name": "Claude and GPT models",
+                            "buckets": []
+                        }
+                    ]
+                }
+            }
+        });
+
+        let usage = parse_agy_cli_quota(&output).unwrap();
+        let session = usage.session.unwrap();
+        assert_eq!(session.window_minutes, 300);
+        assert!((session.used_percent - 90.0).abs() < 0.0001);
+        assert_eq!(session.resets_at, parse_iso_millis("2026-08-19T12:00:00Z"));
+
+        let weekly = usage.weekly.unwrap();
+        assert_eq!(weekly.window_minutes, 10080);
+        assert!((weekly.used_percent - 40.0).abs() < 0.0001);
+        assert_eq!(weekly.resets_at, parse_iso_millis("2026-08-25T12:00:00Z"));
     }
 
     #[test]

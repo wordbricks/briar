@@ -99,7 +99,9 @@ import { channelReplyErrorText } from "../lib/channel-reply-error";
 import { maxIssueAttachmentCount } from "../lib/issue-attachments";
 import {
   ChannelDraftImages,
+  ChannelMessageImageCacheProvider,
   ChannelMessageImages,
+  useChannelMessageImageCache,
 } from "./ChannelImages";
 import { ChannelMentionMenu } from "./ChannelMentionMenu";
 import { ChannelTypingState } from "./ChannelTypingState";
@@ -153,6 +155,8 @@ import {
   createOptimisticChannelMessage,
   removeOptimisticChannelMessage,
 } from "../lib/optimistic-channel-message";
+import { toggleOptimisticChannelReaction } from "../lib/optimistic-channel-reaction";
+import { useToast } from "./ui/toast";
 import { useChannelAgentActivity } from "../hooks/use-channel-agent-activity";
 import type {
   ChannelAgentActivityDescriptor,
@@ -394,6 +398,8 @@ export function Channels({
   onCreateAgent,
 }: ChannelsProps) {
   const { t, localeTag } = useI18n();
+  const { toast } = useToast();
+  const imageCache = useChannelMessageImageCache(`${organizationId}\0${token}`);
   useEffect(() => {
     onViewingChannelChange?.(activeChannelId);
     return () => onViewingChannelChange?.(null);
@@ -1962,8 +1968,19 @@ export function Channels({
   const toggleReaction = useCallback(
     async (message: ChannelMessage, emoji: string) => {
       if (!activeChannelId) return;
-      setBusy(true);
-      setError(null);
+      const optimisticReactions = (candidate: ChannelMessage) =>
+        candidate.id === message.id
+          ? {
+              ...candidate,
+              reactions: toggleOptimisticChannelReaction(
+                candidate.reactions,
+                emoji,
+                currentUserId,
+              ),
+            }
+          : candidate;
+      updateRootMessages((current) => current.map(optimisticReactions));
+      setThreadMessages((current) => current.map(optimisticReactions));
       try {
         const result = await toggleChannelMessageReaction(
           token,
@@ -1979,12 +1996,30 @@ export function Channels({
         updateRootMessages((current) => current.map(applyReactions));
         setThreadMessages((current) => current.map(applyReactions));
       } catch (cause) {
-        setError(errorMessage(cause));
-      } finally {
-        setBusy(false);
+        const revertReactions = (candidate: ChannelMessage) =>
+          candidate.id === message.id
+            ? {
+                ...candidate,
+                reactions: toggleOptimisticChannelReaction(
+                  candidate.reactions,
+                  emoji,
+                  currentUserId,
+                ),
+              }
+            : candidate;
+        updateRootMessages((current) => current.map(revertReactions));
+        setThreadMessages((current) => current.map(revertReactions));
+        toast(errorMessage(cause), { tone: "error" });
       }
     },
-    [activeChannelId, organizationId, token, updateRootMessages],
+    [
+      activeChannelId,
+      currentUserId,
+      organizationId,
+      toast,
+      token,
+      updateRootMessages,
+    ],
   );
 
   const toggleThreadSubscription = useCallback(
@@ -2053,7 +2088,8 @@ export function Channels({
   const memberCount = Math.max(activeChannel?.memberCount ?? 0, members.length);
 
   return (
-    <div
+    <ChannelMessageImageCacheProvider cache={imageCache}>
+      <div
       className={`channels${isResizingThread ? " is-resizing-thread" : ""}${
         showRequestedThreadOnly ? " channels-inbox-thread-only" : ""
       }`}
@@ -2445,7 +2481,8 @@ export function Channels({
           onRotate={rotateWebhook}
         />
       ) : null}
-    </div>
+      </div>
+    </ChannelMessageImageCacheProvider>
   );
 }
 

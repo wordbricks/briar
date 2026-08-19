@@ -321,10 +321,19 @@ describe("issue multipart input", () => {
     expect(result.input.status).toBe("queued");
   });
 
-  it("rejects unsupported media and oversized multipart bodies", async () => {
+  it("accepts SVG media and rejects oversized multipart bodies", async () => {
+    const svg = await readIssueRequest(
+      issueRequest(new File(["svg"], "diagram.svg", { type: "image/svg+xml" })),
+    );
+    expect(svg.attachments).toEqual([
+      expect.objectContaining({
+        name: "diagram.svg",
+        type: "image/svg+xml",
+      }),
+    ]);
     await expect(
       readIssueRequest(
-        issueRequest(new File(["svg"], "unsafe.svg", { type: "image/svg+xml" })),
+        issueRequest(new File(["document"], "unsafe.pdf", { type: "application/pdf" })),
       ),
     ).rejects.toThrow("지원하지 않는");
     await expect(

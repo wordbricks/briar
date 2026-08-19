@@ -14,6 +14,7 @@ import type {
   ChannelSummary,
 } from "../lib/channels-contract";
 import { requestMobileNavigationBack } from "../lib/mobile-navigation";
+import { ToastProvider } from "./ui/toast";
 
 const listChannels = vi.fn();
 const loadChannel = vi.fn();
@@ -174,10 +175,12 @@ const agent: ChannelAgentSummary = {
 
 const deferred = <T,>() => {
   let resolve!: (value: T) => void;
-  const promise = new Promise<T>((resolvePromise) => {
+  let reject!: (reason: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
     resolve = resolvePromise;
+    reject = rejectPromise;
   });
-  return { promise, resolve };
+  return { promise, reject, resolve };
 };
 
 describe("CompanionChannels", () => {
@@ -194,24 +197,26 @@ describe("CompanionChannels", () => {
   ) => {
     await act(async () => {
       root.render(
-        <I18nProvider>
-          <CompanionChannels
-            activeProjectId="project-1"
-            currentUserId="user-1"
-            channelInboxSyncSignal={channelInboxSyncSignal}
-            organizationId="org-1"
-            projects={[
-              { id: "project-1", name: "Briar" },
-              { id: "project-2", name: "Sprout" },
-            ]}
-            token="token"
-            channelCache={channelCache}
-            onIssueOpen={onIssueOpen}
-            requestedMessage={requestedMessage}
-            onRequestedMessageOpen={onRequestedMessageOpen}
-            onSkillSessionAccepted={onSkillSessionAccepted}
-          />
-        </I18nProvider>,
+        <ToastProvider>
+          <I18nProvider>
+            <CompanionChannels
+              activeProjectId="project-1"
+              currentUserId="user-1"
+              channelInboxSyncSignal={channelInboxSyncSignal}
+              organizationId="org-1"
+              projects={[
+                { id: "project-1", name: "Briar" },
+                { id: "project-2", name: "Sprout" },
+              ]}
+              token="token"
+              channelCache={channelCache}
+              onIssueOpen={onIssueOpen}
+              requestedMessage={requestedMessage}
+              onRequestedMessageOpen={onRequestedMessageOpen}
+              onSkillSessionAccepted={onSkillSessionAccepted}
+            />
+          </I18nProvider>
+        </ToastProvider>,
       );
     });
     await act(async () => {
@@ -245,6 +250,9 @@ describe("CompanionChannels", () => {
   afterEach(() => {
     act(() => root.unmount());
     container.remove();
+    document.body
+      .querySelectorAll("[data-testid='toast-viewport']")
+      .forEach((node) => node.remove());
     Reflect.deleteProperty(HTMLElement.prototype, "scrollIntoView");
     vi.restoreAllMocks();
     vi.useRealTimers();
@@ -643,6 +651,63 @@ describe("CompanionChannels", () => {
     );
     expect(container.querySelector(".companion-channel-proposal")).not.toBeNull();
     expect(container.querySelector(".execution-proposal-card")).not.toBeNull();
+  });
+
+  it("renders emoji reaction optimistically and reverts with error toast on network failure", async () => {
+    const item = message("m-opt-reaction", "Optimistic reaction test");
+    item.reactions = [{ emoji: "👍", count: 1, userIds: ["user-1"] }];
+    const pendingRequest = deferred<{ message: ChannelMessage }>();
+    toggleChannelMessageReaction.mockReturnValue(pendingRequest.promise);
+
+    loadChannel.mockResolvedValue({
+      channel: channel("c-common", "Welcome", null),
+      members: [],
+      agents: [agent],
+      messages: [item],
+    });
+    await render();
+    const channelButton = [
+      ...container.querySelectorAll<HTMLButtonElement>(
+        ".companion-channel-group button",
+      ),
+    ].find((button) => button.textContent?.includes("Welcome"));
+    await act(async () => {
+      channelButton!.click();
+      await Promise.resolve();
+    });
+
+    const chip = container.querySelector<HTMLButtonElement>(
+      ".channel-reaction-chip",
+    );
+    expect(chip).not.toBeNull();
+    expect(chip?.textContent).toContain("👍");
+
+    // Click chip to remove reaction
+    await act(async () => {
+      chip?.click();
+    });
+
+    // Optimistically removed before server responds
+    expect(container.querySelector(".channel-reaction-chip")).toBeNull();
+
+    // Reject request
+    await act(async () => {
+      pendingRequest.reject(new Error("리액션 저장 실패"));
+      await Promise.resolve();
+    });
+
+    // Reaction chip restored
+    const restoredChip = container.querySelector<HTMLButtonElement>(
+      ".channel-reaction-chip",
+    );
+    expect(restoredChip).not.toBeNull();
+    expect(restoredChip?.textContent).toContain("👍");
+
+    // Error toast shown
+    const toast = document.body.querySelector('[data-testid="app-toast"]');
+    expect(toast).not.toBeNull();
+    expect(toast?.textContent).toContain("리액션 저장 실패");
+    expect(toast?.className).toContain("error");
   });
 
   it("preserves accepted Skill history when a mobile reaction response is stale", async () => {
