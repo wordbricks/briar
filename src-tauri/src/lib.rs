@@ -1640,12 +1640,18 @@ fn command_provider_models(
     binary: Result<PathBuf, String>,
     args: &[&str],
     parser: fn(&str) -> Vec<AgentProviderModel>,
+    environment: &[(String, String)],
 ) -> Result<Vec<AgentProviderModel>, String> {
     let binary = binary?;
-    let output = Command::new(binary)
+    let mut command = Command::new(binary);
+    command
         .args(args)
         .env("PATH", cli_execution_path(home)?)
-        .env("HOME", home)
+        .env("HOME", home);
+    for (key, value) in environment {
+        command.env(key, value);
+    }
+    let output = command
         .output()
         .map_err(|error| format!("지원 모델 목록을 가져오지 못했습니다: {error}"))?;
     if !output.status.success() {
@@ -1671,7 +1677,7 @@ fn command_help(home: &Path, binary: Result<PathBuf, String>) -> Result<String, 
     Ok(text)
 }
 
-fn load_agent_provider_models_sync(home: &Path) -> AgentProviderModelCatalog {
+fn load_agent_provider_models_sync(home: &Path, config_path: &Path) -> AgentProviderModelCatalog {
     let execution_path = cli_execution_path(home).unwrap_or_default();
     let runner: Arc<dyn host::CommandRunner> = Arc::new(host::LocalRunner::new(
         execution_path.clone(),
@@ -1715,6 +1721,7 @@ fn load_agent_provider_models_sync(home: &Path) -> AgentProviderModelCatalog {
         agent::grok_binary(home, &execution_path),
         &["models"],
         parse_grok_models,
+        &[],
     );
     let agy_help = command_help(home, agent::agy_binary(home, &execution_path));
     let agy_efforts = agy_help
@@ -1744,13 +1751,24 @@ fn load_agent_provider_models_sync(home: &Path) -> AgentProviderModelCatalog {
         agent::opencode_binary(home, &execution_path),
         &["models", "--verbose"],
         parse_opencode_models_verbose,
+        &[],
     );
-    let openrouter = opencode.clone().map(|models| {
-        models
-            .into_iter()
-            .filter(|model| model.id.starts_with("openrouter/"))
-            .collect()
-    });
+    let openrouter = provider_environment_from(config_path, agent::AgentProviderKind::Openrouter)
+        .and_then(|environment| {
+            command_provider_models(
+                home,
+                agent::opencode_binary(home, &execution_path),
+                &["models", "--verbose"],
+                parse_opencode_models_verbose,
+                &environment,
+            )
+        })
+        .map(|models| {
+            models
+                .into_iter()
+                .filter(|model| model.id.starts_with("openrouter/"))
+                .collect()
+        });
     AgentProviderModelCatalog {
         codex: provider_model_entry(codex, Vec::new(), false),
         claude: provider_model_entry(claude, claude_efforts, true),
@@ -1928,9 +1946,12 @@ async fn load_agent_provider_models(
     app: tauri::AppHandle,
 ) -> Result<AgentProviderModelCatalog, String> {
     let home = app.path().home_dir().map_err(|error| error.to_string())?;
-    tauri::async_runtime::spawn_blocking(move || load_agent_provider_models_sync(&home))
-        .await
-        .map_err(|error| error.to_string())
+    let config_path = cli_config_path(&app)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        load_agent_provider_models_sync(&home, &config_path)
+    })
+    .await
+    .map_err(|error| error.to_string())
 }
 
 const BRIAR_CLI_PATH_BLOCK_START: &str = "# >>> Briar CLI path >>>";
@@ -10418,6 +10439,53 @@ branch refs/heads/briar/second-11111111
         assert!(
             provider_environment_from(&config_path, agent::AgentProviderKind::Openrouter,).is_err()
         );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn passes_openrouter_environment_to_model_discovery() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let config_path = test_config_path("openrouter-model-discovery");
+        config_with_cli_owned_settings(&config_path, None, None);
+        update_openrouter_api_key_at(
+            &config_path,
+            Some("sk-or-v1-discovery-test-key".to_string()),
+        )
+        .expect("OpenRouter credential should save");
+
+        let home = tempfile::tempdir().expect("fixture home should exist");
+        let binary = home.path().join("mock-opencode");
+        fs::write(
+            &binary,
+            r#"#!/bin/sh
+if [ "$OPENROUTER_API_KEY" != "sk-or-v1-discovery-test-key" ]; then
+  exit 11
+fi
+case "$OPENCODE_CONFIG_CONTENT" in
+  *openrouter*) ;;
+  *) exit 12 ;;
+esac
+printf '%s\n' 'openrouter/test-model' '{' '  "name": "Test model"' '}'
+"#,
+        )
+        .expect("mock OpenCode should be written");
+        fs::set_permissions(&binary, fs::Permissions::from_mode(0o700))
+            .expect("mock OpenCode should be executable");
+
+        let environment =
+            provider_environment_from(&config_path, agent::AgentProviderKind::Openrouter)
+                .expect("OpenRouter environment should resolve");
+        let models = command_provider_models(
+            home.path(),
+            Ok(binary),
+            &["models", "--verbose"],
+            parse_opencode_models_verbose,
+            &environment,
+        )
+        .expect("model discovery should receive the OpenRouter environment");
+
+        assert_eq!(models[0].id, "openrouter/test-model");
     }
 
     #[test]
