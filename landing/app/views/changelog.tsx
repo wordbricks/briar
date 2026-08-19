@@ -30,6 +30,19 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.139",
+        date: "2026년 8월 19일",
+        title: "이메일 로그인과 프로젝트 시작을 더 빠르게 연결합니다",
+        summary:
+          "이메일 OTP 로그인과 Lovable 저장소 가져오기를 추가하고, 온보딩·모바일 Companion 경험을 안정화했습니다.",
+        items: [
+          "이메일 주소로 6자리 일회용 인증 코드를 받아 데스크톱·웹·초대 온보딩에서 로그인할 수 있으며, 이메일 정규화와 재전송·시간당 발송 제한으로 안전하게 보호합니다.",
+          "Lovable 프로젝트 가져오기 흐름에서 GitHub SSH 저장소를 안내·검증하고, 저장소를 복제한 뒤 준비 상태를 확인해 바로 프로젝트를 만들 수 있습니다.",
+          "프로젝트 온보딩 선택·로딩·스피너 상태를 정리하고 관련 테스트를 보강해 시작 과정의 멈춤과 시각적 흔들림을 줄였습니다.",
+          "모바일 Companion 채널 첨부 파일을 카드로 표시하고 iOS 네이티브 동작을 보완하며, 이슈 답글 진행 상태에 Agent 이름을 표시합니다.",
+        ],
+      },
+      {
         version: "1.2.138",
         date: "2026년 8월 19일",
         title: "Agent 템플릿과 채널 경험을 더 빠르고 안정적으로 확장합니다",
@@ -823,6 +836,19 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.139",
+        date: "August 19, 2026",
+        title: "Connect email sign-in and project setup more smoothly",
+        summary:
+          "Add email OTP sign-in and Lovable repository imports while making onboarding and the mobile Companion experience more reliable.",
+        items: [
+          "Sign in from desktop, web, or invitation onboarding with a 6-digit email code, normalized addresses, and resend and hourly sending limits.",
+          "Import a Lovable project through a guided GitHub SSH flow that validates the repository, clones it, checks readiness, and creates the project.",
+          "Restructure project onboarding choices, loading, and spinner states, with additional coverage to reduce stuck or visually unstable setup steps.",
+          "Show mobile Companion channel attachments as cards, improve native iOS behavior, and include Agent names in issue reply progress states.",
+        ],
+      },
       {
         version: "1.2.138",
         date: "August 19, 2026",
@@ -1708,7 +1734,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <p>
             <strong>Briar</strong> <span>1.2</span>
           </p>
-          <a href="#v1-2-138">
+          <a href="#v1-2-139">
             {changelog.current} <span aria-hidden="true">↓</span>
           </a>
         </div>
@@ -1730,6 +1756,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   </div>
                   <time
                     dateTime={
+                      entry.version === "1.2.139" ||
                       entry.version === "1.2.138"
                         ? "2026-08-19"
                         : entry.version === "1.2.137"
