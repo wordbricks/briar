@@ -1031,7 +1031,8 @@ final class ChannelsStoreTests: XCTestCase {
             projectID: mixedProjectID
         )
 
-        let body = try XCTUnwrap(await configured.api.lastJSONBody(for: configured.acceptPath))
+        let recordedBody = await configured.api.lastJSONBody(for: configured.acceptPath)
+        let body = try XCTUnwrap(recordedBody)
         let object = try XCTUnwrap(
             JSONSerialization.jsonObject(with: body) as? [String: Any]
         )
