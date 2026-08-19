@@ -292,6 +292,159 @@ final class ChannelsStoreTests: XCTestCase {
     }
 
     @MainActor
+    func testConversationCacheKeepsFiveMostRecentChannels() async throws {
+        let channelIDs = (0...ChannelsStore.cachedConversationLimit).map { _ in UUID() }
+        let channels = channelIDs.enumerated().map { index, id in
+            summary(id: id, name: "Channel-\(index)")
+        }
+        let listPath = MobileAPIContract.Endpoint.channels(organizationID: organizationID)
+        var routes: [String: [Data]] = [
+            listPath: [try encoded(ChannelsResponse(channels: channels, cursor: 10))],
+        ]
+        var requestDelays: [String: [Duration]] = [:]
+
+        for (index, channel) in channels.enumerated() {
+            let detailPath = MobileAPIContract.Endpoint.channel(
+                organizationID: organizationID,
+                channelID: channel.id,
+                messageLimit: ChannelsStore.messagePageSize
+            )
+            let response = try encoded(ChannelDetailResponse(
+                channel: channel,
+                members: [],
+                agents: [],
+                messages: [message(
+                    id: UUID(),
+                    channelID: channel.id,
+                    body: "Cached channel \(index)"
+                )]
+            ))
+            routes[detailPath] = index == 0 ? [response, response] : [response]
+            if index == 0 {
+                requestDelays[detailPath] = [.zero, .milliseconds(200)]
+            }
+        }
+
+        let api = ChannelPollingAPI(
+            routes: routes,
+            requestDelays: requestDelays
+        )
+        let store = ChannelsStore(api: api, pollInterval: .seconds(3_600))
+        store.select(organizationID: organizationID, token: "token")
+        await waitForChannels(store, count: channels.count)
+
+        for channel in channels {
+            await store.openChannel(channel.id)
+            store.closeChannelFocus(channelID: channel.id)
+        }
+
+        let firstChannelID = try XCTUnwrap(channels.first?.id)
+        let firstDetailPath = MobileAPIContract.Endpoint.channel(
+            organizationID: organizationID,
+            channelID: firstChannelID,
+            messageLimit: ChannelsStore.messagePageSize
+        )
+        let refresh = Task { await store.openChannel(firstChannelID) }
+        await waitForRequests(api, path: firstDetailPath, count: 2)
+
+        XCTAssertTrue(store.messages.isEmpty)
+        XCTAssertTrue(store.loading)
+        refresh.cancel()
+        await refresh.value
+        store.applicationDidEnterBackground()
+    }
+
+    @MainActor
+    func testConversationCacheKeepsOnlyFortyNewestMessages() async throws {
+        let channel = summary(id: channelID, name: "Briar")
+        let allMessages = (0..<(ChannelsStore.cachedMessageLimit + 5)).map { index in
+            message(
+                id: UUID(),
+                channelID: channelID,
+                body: "Message \(index)",
+                createdAt: Date(timeIntervalSince1970: 1_700_000_000 + Double(index))
+            )
+        }
+        let listPath = MobileAPIContract.Endpoint.channels(organizationID: organizationID)
+        let detailPath = MobileAPIContract.Endpoint.channel(
+            organizationID: organizationID,
+            channelID: channelID,
+            messageLimit: ChannelsStore.messagePageSize
+        )
+        let response = try encoded(ChannelDetailResponse(
+            channel: channel,
+            members: [],
+            agents: [],
+            messages: allMessages
+        ))
+        let api = ChannelPollingAPI(
+            routes: [
+                listPath: [try encoded(ChannelsResponse(channels: [channel], cursor: 10))],
+                detailPath: [response, response],
+            ],
+            requestDelays: [detailPath: [.zero, .milliseconds(200)]]
+        )
+        let store = ChannelsStore(api: api, pollInterval: .seconds(3_600))
+        store.select(organizationID: organizationID, token: "token")
+        await waitForChannels(store, count: 1)
+        await store.openChannel(channelID)
+        store.closeChannelFocus(channelID: channelID)
+
+        let refresh = Task { await store.openChannel(channelID) }
+        await waitForRequests(api, path: detailPath, count: 2)
+
+        XCTAssertEqual(store.messages.count, ChannelsStore.cachedMessageLimit)
+        XCTAssertEqual(
+            store.messages.map(\.id),
+            Array(allMessages.suffix(ChannelsStore.cachedMessageLimit)).map(\.id)
+        )
+        XCTAssertTrue(store.hasEarlierMessages)
+        refresh.cancel()
+        await refresh.value
+        store.applicationDidEnterBackground()
+    }
+
+    @MainActor
+    func testMemoryWarningDropsConversationReentryCache() async throws {
+        let channel = summary(id: channelID, name: "Briar")
+        let cached = message(id: rootID, channelID: channelID, body: "Cached")
+        let listPath = MobileAPIContract.Endpoint.channels(organizationID: organizationID)
+        let detailPath = MobileAPIContract.Endpoint.channel(
+            organizationID: organizationID,
+            channelID: channelID,
+            messageLimit: ChannelsStore.messagePageSize
+        )
+        let response = try encoded(ChannelDetailResponse(
+            channel: channel,
+            members: [],
+            agents: [],
+            messages: [cached]
+        ))
+        let api = ChannelPollingAPI(
+            routes: [
+                listPath: [try encoded(ChannelsResponse(channels: [channel], cursor: 10))],
+                detailPath: [response, response],
+            ],
+            requestDelays: [detailPath: [.zero, .milliseconds(200)]]
+        )
+        let store = ChannelsStore(api: api, pollInterval: .seconds(3_600))
+        store.select(organizationID: organizationID, token: "token")
+        await waitForChannels(store, count: 1)
+        await store.openChannel(channelID)
+        store.closeChannelFocus(channelID: channelID)
+        store.applicationDidReceiveMemoryWarning()
+
+        let refresh = Task { await store.openChannel(channelID) }
+        await waitForRequests(api, path: detailPath, count: 2)
+
+        XCTAssertTrue(store.messages.isEmpty)
+        XCTAssertTrue(store.loading)
+        refresh.cancel()
+        await refresh.value
+        store.applicationDidEnterBackground()
+    }
+
+    @MainActor
     func testReopeningThreadShowsCachedMessagesWhileRefreshing() async throws {
         let channel = summary(id: channelID, name: "Briar")
         let root = message(id: rootID, channelID: channelID, body: "Question")

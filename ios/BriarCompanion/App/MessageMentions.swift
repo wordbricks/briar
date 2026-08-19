@@ -3,6 +3,22 @@ import SwiftUI
 
 /// Shared @mention linkify and issue-conversation candidate helpers for native iOS.
 enum MessageMentions {
+    private final class AttributedStringBox: NSObject {
+        let value: AttributedString
+
+        init(_ value: AttributedString) {
+            self.value = value
+        }
+    }
+
+    @MainActor
+    private static let attributedCache: NSCache<NSString, AttributedStringBox> = {
+        let cache = NSCache<NSString, AttributedStringBox>()
+        cache.countLimit = 400
+        cache.totalCostLimit = 2 * 1_024 * 1_024
+        return cache
+    }()
+
     struct Segment: Equatable, Sendable {
         enum Kind: Equatable, Sendable {
             case text
@@ -73,7 +89,12 @@ enum MessageMentions {
     }
 
     /// Blue hyperlink styling aligned with web `.issue-mention-link` / `.channel-mention-link`.
+    @MainActor
     static func attributed(_ body: String, handles: Set<String>) -> AttributedString {
+        let cacheKey = renderingCacheKey(body, handles: handles)
+        if let cached = attributedCache.object(forKey: cacheKey as NSString) {
+            return cached.value
+        }
         var result = AttributedString()
         for segment in segments(body, handles: handles) {
             var part = AttributedString(segment.value)
@@ -84,7 +105,25 @@ enum MessageMentions {
             }
             result.append(part)
         }
+        attributedCache.setObject(
+            AttributedStringBox(result),
+            forKey: cacheKey as NSString,
+            cost: body.utf16.count * MemoryLayout<UInt16>.size
+        )
         return result
+    }
+
+    static func renderingCacheKey(_ body: String, handles: Set<String>) -> String {
+        let normalizedHandles = handles
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
+            .filter { !$0.isEmpty }
+            .sorted()
+        return body + "\u{1F}" + normalizedHandles.joined(separator: "\u{1E}")
+    }
+
+    @MainActor
+    static func clearRenderingCache() {
+        attributedCache.removeAllObjects()
     }
 
     /// Rewrites known @handles into markdown links so MarkdownText can keep other markup.
@@ -197,7 +236,10 @@ struct MentionText: View {
         let attributed = MessageMentions.attributed(text, handles: handles)
         Group {
             if allowsRangeSelection {
-                SelectableText(attributed: attributed)
+                SelectableText(
+                    attributed: attributed,
+                    cacheKey: MessageMentions.renderingCacheKey(text, handles: handles)
+                )
             } else {
                 Text(attributed)
             }

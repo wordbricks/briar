@@ -1,3 +1,4 @@
+import UIKit
 import XCTest
 @testable import BriarCompanion
 
@@ -49,6 +50,30 @@ final class AttachmentPreviewTests: XCTestCase {
         let markdown = "일반 설명만 있습니다."
         let blocks = IssueDescriptionBlock.parse(markdown)
         XCTAssertEqual(blocks, [.markdown(markdown)])
+    }
+
+    @MainActor
+    func testLargeImagePreviewIsDownsampledBeforeDisplay() throws {
+        let originalSize = CGSize(width: 2_500, height: 1_250)
+        let image = UIGraphicsImageRenderer(size: originalSize).image { context in
+            context.cgContext.setFillColor(UIColor.systemBlue.cgColor)
+            context.cgContext.fill(CGRect(origin: .zero, size: originalSize))
+        }
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathExtension("png")
+        defer { try? FileManager.default.removeItem(at: url) }
+        try XCTUnwrap(image.pngData()).write(to: url)
+
+        let preview = try XCTUnwrap(
+            AuthenticatedImageDecoding.previewImage(at: url)
+        )
+
+        XCTAssertLessThanOrEqual(
+            max(preview.size.width, preview.size.height),
+            AuthenticatedImageDecoding.maxPreviewPixelSize
+        )
+        XCTAssertLessThan(preview.size.width, originalSize.width)
     }
 }
 

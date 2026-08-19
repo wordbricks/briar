@@ -63,10 +63,10 @@ where Message.ID: Hashable {
     let hasEarlierMessages: Bool
     let loadingEarlierMessages: Bool
     let onLoadEarlier: (() async -> Void)?
-    let measuresMessageHeightsEagerly: Bool
     let row: (Message) -> RowContent
     @State private var requestedEarlierMessages = false
-    @State private var eagerInitialPositionReady = false
+    @State private var positioningInitially = false
+    @State private var positionedInitially = false
     @State private var showsScrollToBottom = false
     @Namespace private var scrollCoordinateSpace
 
@@ -78,7 +78,6 @@ where Message.ID: Hashable {
         hasEarlierMessages: Bool = false,
         loadingEarlierMessages: Bool = false,
         onLoadEarlier: (() async -> Void)? = nil,
-        measuresMessageHeightsEagerly: Bool = false,
         @ViewBuilder row: @escaping (Message) -> RowContent
     ) {
         self.messages = messages
@@ -88,7 +87,6 @@ where Message.ID: Hashable {
         self.hasEarlierMessages = hasEarlierMessages
         self.loadingEarlierMessages = loadingEarlierMessages
         self.onLoadEarlier = onLoadEarlier
-        self.measuresMessageHeightsEagerly = measuresMessageHeightsEagerly
         self.row = row
     }
 
@@ -112,12 +110,16 @@ where Message.ID: Hashable {
                 }
                 .onChange(of: messages.last?.id, initial: true) { previous, current in
                     guard let current else { return }
-                    if measuresMessageHeightsEagerly, !eagerInitialPositionReady {
-                        Task { @MainActor in
-                            await Task.yield()
-                            proxy.scrollTo(current, anchor: .bottom)
-                            await Task.yield()
-                            eagerInitialPositionReady = true
+                    if !positionedInitially {
+                        if !positioningInitially {
+                            positioningInitially = true
+                            Task { @MainActor in
+                                await Task.yield()
+                                proxy.scrollTo(conversationBottomAnchorID, anchor: .bottom)
+                                await Task.yield()
+                                positionedInitially = true
+                                positioningInitially = false
+                            }
                         }
                         return
                     }
@@ -164,21 +166,10 @@ where Message.ID: Hashable {
 
     @ViewBuilder
     private var messageStack: some View {
-        if measuresMessageHeightsEagerly {
-            // Channel history arrives in bounded pages. Measuring the current
-            // page before scrolling prevents variable-height rows from leaving
-            // the initial offset beyond the rendered content on older iOS.
-            VStack(spacing: 0) {
-                earlierMessagesBoundary
-                messageRows
-                bottomAnchor
-            }
-        } else {
-            LazyVStack(spacing: 0) {
-                earlierMessagesBoundary
-                messageRows
-                bottomAnchor
-            }
+        LazyVStack(spacing: 0) {
+            earlierMessagesBoundary
+            messageRows
+            bottomAnchor
         }
     }
 
@@ -206,31 +197,28 @@ where Message.ID: Hashable {
                 .padding(.vertical, 8)
                 .accessibilityIdentifier("conversation-earlier-messages-loading")
         } else if hasEarlierMessages {
-            if measuresMessageHeightsEagerly {
-                Color.clear
-                    .frame(height: 1)
-                    .background {
-                        GeometryReader { geometry in
-                            Color.clear
-                                .onAppear {
-                                    requestEarlierMessagesIfNeeded(
-                                        boundaryMaxY: geometry.frame(in: .global).maxY
-                                    )
-                                }
-                                .onChange(of: geometry.frame(in: .global).maxY) { _, maxY in
-                                    requestEarlierMessagesIfNeeded(boundaryMaxY: maxY)
-                                }
-                        }
+            Color.clear
+                .frame(height: 1)
+                .background {
+                    GeometryReader { geometry in
+                        Color.clear
+                            .onAppear {
+                                requestEarlierMessagesIfNeeded(
+                                    boundaryMaxY: geometry.frame(in: .global).maxY
+                                )
+                            }
+                            .onChange(of: geometry.frame(in: .global).maxY) { _, maxY in
+                                requestEarlierMessagesIfNeeded(boundaryMaxY: maxY)
+                            }
+                            .onChange(of: positionedInitially) { _, positioned in
+                                guard positioned else { return }
+                                requestEarlierMessagesIfNeeded(
+                                    boundaryMaxY: geometry.frame(in: .global).maxY
+                                )
+                            }
                     }
-                    .accessibilityIdentifier("conversation-earlier-messages-trigger")
-            } else {
-                Color.clear
-                    .frame(height: 1)
-                    .onAppear {
-                        Task { await onLoadEarlier?() }
-                    }
-                    .accessibilityIdentifier("conversation-earlier-messages-trigger")
-            }
+                }
+                .accessibilityIdentifier("conversation-earlier-messages-trigger")
         }
     }
 
@@ -253,15 +241,14 @@ where Message.ID: Hashable {
 
     private func requestEarlierMessagesIfNeeded(boundaryMaxY: CGFloat) {
         guard
-            measuresMessageHeightsEagerly,
+            positionedInitially,
             hasEarlierMessages,
             !loadingEarlierMessages,
             !requestedEarlierMessages,
-            eagerInitialPositionReady,
             boundaryMaxY >= 0
         else { return }
         requestedEarlierMessages = true
-        Task {
+        Task { @MainActor in
             await onLoadEarlier?()
             requestedEarlierMessages = false
         }
