@@ -1,9 +1,10 @@
 import {
+  ArrowLeft,
   Bot,
-  Check,
   ChevronRight,
   CircleAlert,
   ExternalLink,
+  LayoutTemplate,
   LoaderCircle,
   Pencil,
   Play,
@@ -710,6 +711,8 @@ function modelLabel(
   return agentModelDisplayName(providerModels, agent.provider, agent.model);
 }
 
+type ProjectAgentCreationStep = "form" | "start" | "templates";
+
 export function ProjectAgentDialog({
   agent,
   isSubmitting,
@@ -741,6 +744,9 @@ export function ProjectAgentDialog({
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(
     null,
   );
+  const [creationStep, setCreationStep] = useState<ProjectAgentCreationStep>(
+    agent ? "form" : "start",
+  );
   const [submitError, setSubmitError] = useState<string | null>(null);
   const isEditing = agent !== null;
   const selectedTemplate = projectAgentTemplates.find(
@@ -753,8 +759,37 @@ export function ProjectAgentDialog({
     setDescription(template.description);
     setResponsibility(template.responsibility);
     setCalendarColor(template.calendarColor);
+    setCreationStep("form");
     setSubmitError(null);
   };
+
+  const startBlankAgent = () => {
+    setSelectedTemplateId(null);
+    setName("");
+    setProvider("codex");
+    setModel("");
+    setEffort(null);
+    setDescription("");
+    setResponsibility("");
+    setCalendarColor(defaultProjectAgentCalendarColor);
+    setCreationStep("form");
+    setSubmitError(null);
+  };
+
+  const templateDivisionLabel = (template: ProjectAgentTemplate) => {
+    switch (template.division) {
+      case "design":
+        return t("agents.templateDesign");
+      case "marketing":
+        return t("agents.templateMarketing");
+      case "product":
+        return t("agents.templateProduct");
+      default:
+        return t("agents.templateEngineering");
+    }
+  };
+
+  const canSubmit = isEditing || creationStep === "form";
 
   return (
     <div
@@ -772,7 +807,7 @@ export function ProjectAgentDialog({
         className="project-agent-dialog"
         onSubmit={(event) => {
           event.preventDefault();
-          if (!responsibility.trim() || isSubmitting) return;
+          if (!canSubmit || !responsibility.trim() || isSubmitting) return;
           setSubmitError(null);
           void onSubmit({
             name: name.trim() || null,
@@ -804,7 +839,13 @@ export function ProjectAgentDialog({
               {t(isEditing ? "agents.editEyebrow" : "agents.newEyebrow")}
             </p>
             <h2>
-              {t(isEditing ? "agents.editDialog" : "agents.create")}
+              {t(
+                isEditing
+                  ? "agents.editDialog"
+                  : creationStep === "templates"
+                    ? "agents.chooseTemplate"
+                    : "agents.create",
+              )}
             </h2>
           </div>
           <button
@@ -818,45 +859,100 @@ export function ProjectAgentDialog({
         </header>
 
         <div className="project-agent-form">
-          {!isEditing && (
+          {!isEditing && creationStep === "start" && (
+            <section className="project-agent-create-start">
+              <header>
+                <strong>{t("agents.createStartTitle")}</strong>
+                <small>{t("agents.createStartDescription")}</small>
+              </header>
+              <div className="project-agent-create-options">
+                <button
+                  className="template"
+                  onClick={() => setCreationStep("templates")}
+                  type="button"
+                >
+                  <span aria-hidden="true">
+                    <LayoutTemplate size={21} />
+                  </span>
+                  <span>
+                    <strong>{t("agents.templateTitle")}</strong>
+                    <small>{t("agents.templateDescription")}</small>
+                  </span>
+                  <ChevronRight aria-hidden="true" size={18} />
+                </button>
+                <button onClick={startBlankAgent} type="button">
+                  <span aria-hidden="true">
+                    <Plus size={21} />
+                  </span>
+                  <span>
+                    <strong>{t("agents.blankAgentTitle")}</strong>
+                    <small>{t("agents.blankAgentDescription")}</small>
+                  </span>
+                  <ChevronRight aria-hidden="true" size={18} />
+                </button>
+              </div>
+            </section>
+          )}
+
+          {!isEditing && creationStep === "templates" && (
             <section
               aria-labelledby="project-agent-template-title"
               className="project-agent-template-picker"
             >
+              <button
+                className="project-agent-create-back"
+                onClick={() => setCreationStep("start")}
+                type="button"
+              >
+                <ArrowLeft aria-hidden="true" size={14} />
+                {t("agents.creationBack")}
+              </button>
               <header>
                 <span>
                   <strong id="project-agent-template-title">
-                    {t("agents.templateTitle")}
+                    {t("agents.chooseTemplateTitle")}
                   </strong>
-                  <small>{t("agents.templateDescription")}</small>
+                  <small>{t("agents.chooseTemplateDescription")}</small>
                 </span>
-                <em>{t("common.optional")}</em>
+                <em>
+                  {t("agents.templateCount", {
+                    count: projectAgentTemplates.length,
+                  })}
+                </em>
               </header>
               <div className="project-agent-template-list">
                 {projectAgentTemplates.map((template) => {
-                  const isSelected = template.id === selectedTemplateId;
                   const includedSkill = template.skills[0];
                   return (
-                    <article
-                      className={isSelected ? "selected" : undefined}
-                      key={template.id}
-                    >
-                      <div className="project-agent-template-identity">
-                        <span aria-hidden="true">{template.emoji}</span>
-                        <div>
-                          <h3>{template.name}</h3>
-                          <p>{template.description}</p>
+                    <article key={template.id}>
+                      <button
+                        className="project-agent-template-select"
+                        onClick={() => applyTemplate(template)}
+                        type="button"
+                      >
+                        <div className="project-agent-template-identity">
+                          <span
+                            aria-hidden="true"
+                            style={{ "--template-color": template.calendarColor } as React.CSSProperties}
+                          >
+                            {template.emoji}
+                          </span>
+                          <div>
+                            <h3>{template.name}</h3>
+                            <p>{template.description}</p>
+                          </div>
                         </div>
-                      </div>
-                      <div className="project-agent-template-badges">
-                        <span>{t("agents.templateEngineering")}</span>
-                        <span>
-                          {t("agents.templateSkillCount", {
-                            count: template.skills.length,
-                          })}
-                        </span>
-                        <span>{t("agents.templateProviderNeutral")}</span>
-                      </div>
+                        <div className="project-agent-template-badges">
+                          <span>{templateDivisionLabel(template)}</span>
+                          <span>
+                            {t("agents.templateSkillCount", {
+                              count: template.skills.length,
+                            })}
+                          </span>
+                          <span>{t("agents.templateProviderNeutral")}</span>
+                        </div>
+                        <ChevronRight aria-hidden="true" size={17} />
+                      </button>
                       <div className="project-agent-template-actions">
                         <div>
                           <a
@@ -872,24 +968,6 @@ export function ProjectAgentDialog({
                             <pre>{template.source.licenseNotice}</pre>
                           </details>
                         </div>
-                        <button
-                          aria-pressed={isSelected}
-                          onClick={() => applyTemplate(template)}
-                          type="button"
-                        >
-                          {isSelected ? (
-                            <Check aria-hidden="true" size={14} />
-                          ) : (
-                            <Plus aria-hidden="true" size={14} />
-                          )}
-                          {t(
-                            isSelected
-                              ? "agents.templateApplied"
-                              : "agents.useTemplate",
-                          )}
-                        </button>
-                      </div>
-                      {isSelected && includedSkill && (
                         <div className="project-agent-template-skill">
                           <Wrench aria-hidden="true" size={15} />
                           <span>
@@ -900,15 +978,64 @@ export function ProjectAgentDialog({
                               })}
                             </small>
                           </span>
-                          <small>{t("agents.templateCopyHint")}</small>
                         </div>
-                      )}
+                      </div>
                     </article>
                   );
                 })}
               </div>
             </section>
           )}
+
+          {(isEditing || creationStep === "form") && (
+            <>
+              {!isEditing && (
+                <button
+                  className="project-agent-create-back"
+                  onClick={() =>
+                    setCreationStep(selectedTemplate ? "templates" : "start")
+                  }
+                  type="button"
+                >
+                  <ArrowLeft aria-hidden="true" size={14} />
+                  {t(
+                    selectedTemplate
+                      ? "agents.backToTemplates"
+                      : "agents.creationBack",
+                  )}
+                </button>
+              )}
+              {selectedTemplate && (
+                <section className="project-agent-selected-template">
+                  <span
+                    aria-hidden="true"
+                    style={{ "--template-color": selectedTemplate.calendarColor } as React.CSSProperties}
+                  >
+                    {selectedTemplate.emoji}
+                  </span>
+                  <div>
+                    <small>{t("agents.selectedTemplate")}</small>
+                    <strong>{selectedTemplate.name}</strong>
+                    <p>
+                      {selectedTemplate.skills[0]?.name} · {t("agents.templateCopyHint")}
+                    </p>
+                    <a
+                      href={selectedTemplate.source.url}
+                      rel="noreferrer"
+                      target="_blank"
+                    >
+                      {t("agents.templateSource")}
+                      <ExternalLink aria-hidden="true" size={11} />
+                    </a>
+                  </div>
+                  <button
+                    onClick={() => setCreationStep("templates")}
+                    type="button"
+                  >
+                    {t("agents.changeTemplate")}
+                  </button>
+                </section>
+              )}
           <label>
             <span>
               {t("agents.name")} <em>{t("common.optional")}</em>
@@ -1029,29 +1156,33 @@ export function ProjectAgentDialog({
               {submitError}
             </div>
           )}
+            </>
+          )}
         </div>
 
-        <footer>
-          <button disabled={isSubmitting} onClick={onClose} type="button">
-            {t("common.cancel")}
-          </button>
-          <button
-            className="project-agent-submit"
-            disabled={isSubmitting || !responsibility.trim()}
-            type="submit"
-          >
-            {isSubmitting ? (
-              <LoaderCircle className="spin" size={14} />
-            ) : isEditing ? (
-              <Pencil size={14} />
-            ) : (
-              <Plus size={14} />
-            )}
-            {isSubmitting
-              ? t(isEditing ? "agents.updating" : "agents.creating")
-              : t(isEditing ? "common.save" : "agents.create")}
-          </button>
-        </footer>
+        {(isEditing || creationStep === "form") && (
+          <footer>
+            <button disabled={isSubmitting} onClick={onClose} type="button">
+              {t("common.cancel")}
+            </button>
+            <button
+              className="project-agent-submit"
+              disabled={isSubmitting || !responsibility.trim()}
+              type="submit"
+            >
+              {isSubmitting ? (
+                <LoaderCircle className="spin" size={14} />
+              ) : isEditing ? (
+                <Pencil size={14} />
+              ) : (
+                <Plus size={14} />
+              )}
+              {isSubmitting
+                ? t(isEditing ? "agents.updating" : "agents.creating")
+                : t(isEditing ? "common.save" : "agents.create")}
+            </button>
+          </footer>
+        )}
       </form>
     </div>
   );

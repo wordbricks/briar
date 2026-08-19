@@ -544,6 +544,12 @@ describe("ProjectAgents", () => {
       />,
     );
 
+    await act(async () => {
+      Array.from(container.querySelectorAll<HTMLButtonElement>("button"))
+        .find((button) => button.textContent?.includes("직접 만들기"))
+        ?.click();
+    });
+
     const name = container.querySelector<HTMLInputElement>("input");
     const [description, responsibility] =
       container.querySelectorAll<HTMLTextAreaElement>("textarea");
@@ -605,10 +611,45 @@ describe("ProjectAgents", () => {
       />,
     );
 
-    const useTemplate = Array.from(
-      container.querySelectorAll<HTMLButtonElement>("button"),
-    ).find((button) => button.textContent?.includes("템플릿 사용"));
-    await act(async () => useTemplate?.click());
+    expect(container.querySelector("input")).toBeNull();
+    expect(container.textContent).toContain("템플릿으로 시작");
+    expect(container.textContent).toContain("직접 만들기");
+
+    await act(async () => {
+      Array.from(container.querySelectorAll<HTMLButtonElement>("button"))
+        .find((button) => button.textContent?.includes("템플릿으로 시작"))
+        ?.click();
+    });
+
+    const templateNames = [
+      "Frontend Developer",
+      "Backend Architect",
+      "Mobile App Builder",
+      "DevOps Automator",
+      "UI Designer",
+      "Sprint Prioritizer",
+      "Growth Hacker",
+      "Social Media Strategist",
+      "Content Creator",
+      "Instagram Curator",
+      "TikTok Strategist",
+    ];
+    for (const templateName of templateNames) {
+      expect(container.textContent).toContain(templateName);
+    }
+    expect(
+      container.querySelectorAll(".project-agent-template-select"),
+    ).toHaveLength(11);
+
+    await act(async () => {
+      Array.from(
+        container.querySelectorAll<HTMLButtonElement>(
+          ".project-agent-template-select",
+        ),
+      )
+        .find((button) => button.textContent?.includes("Frontend Developer"))
+        ?.click();
+    });
 
     const name = container.querySelector<HTMLInputElement>(
       'input:not([type="color"])',
@@ -624,6 +665,7 @@ describe("ProjectAgents", () => {
     );
     expect(container.textContent).toContain("Frontend Development");
     expect(container.textContent).toContain("agency-agents 원본 보기");
+    expect(container.textContent).not.toContain("Backend Architect");
 
     await act(async () => {
       container
