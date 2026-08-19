@@ -285,6 +285,44 @@
   color: var(--foreground);
 }
 
+.dark .project-settings-danger {
+  border-color: color-mix(in srgb, var(--destructive) 28%, var(--border));
+  background: color-mix(in srgb, var(--destructive) 7%, var(--card));
+}
+
+.dark .project-settings-danger strong,
+.dark .project-settings-danger > button {
+  color: var(--destructive);
+}
+
+.dark .project-settings-danger small {
+  color: color-mix(
+    in srgb,
+    var(--destructive) 38%,
+    var(--muted-foreground)
+  );
+}
+
+.dark .project-settings-danger .danger-icon {
+  color: var(--destructive);
+  background: color-mix(in srgb, var(--destructive) 12%, var(--card));
+}
+
+.dark .project-settings-danger > button {
+  border-color: color-mix(in srgb, var(--destructive) 68%, var(--border));
+  background: var(--card);
+}
+
+.dark .project-settings-danger > button:hover {
+  border-color: var(--destructive);
+  color: var(--destructive-foreground);
+  background: var(--destructive);
+}
+
+.dark .project-settings-danger > button:focus-visible {
+  outline-color: color-mix(in srgb, var(--destructive) 42%, transparent);
+}
+
 .dark .health-item strong {
   color: var(--foreground);
 }
