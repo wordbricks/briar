@@ -186,6 +186,57 @@ async function createPreWebhookChannelMessage(
 }
 
 describe("D1 migrations", () => {
+  it("adds shared email OTP rate limits and a single active sign-in code", async () => {
+    const miniflare = new Miniflare({
+      modules: true,
+      script: "export default { fetch() { return new Response('ok') } }",
+      d1Databases: { DB: "briar-email-otp-migration-test" },
+    });
+    try {
+      const db = (await miniflare.getD1Database("DB")) as unknown as D1Database;
+      await applyD1Migrations(db);
+      const rateLimitColumns = await db.prepare(
+        `pragma table_info("rateLimit")`,
+      ).all<{ name: string }>();
+      expect(rateLimitColumns.results.map((column) => column.name)).toEqual([
+        "id",
+        "key",
+        "count",
+        "lastRequest",
+      ]);
+      const emailLimitColumns = await db.prepare(
+        `pragma table_info(briar_auth_email_rate_limits)`,
+      ).all<{ name: string }>();
+      expect(emailLimitColumns.results.map((column) => column.name)).toEqual([
+        "identifier_hash",
+        "window_started_at",
+        "count",
+        "last_sent_at",
+        "updated_at",
+      ]);
+
+      const now = "2026-08-19T00:00:00.000Z";
+      await db.prepare(
+        `insert into verification (
+           id, identifier, value, expiresAt, createdAt, updatedAt
+         ) values (?, ?, 'encrypted:0', ?, ?, ?)`,
+      ).bind("otp-one", "sign-in-otp-person@example.com", now, now, now).run();
+      await expect(db.prepare(
+        `insert into verification (
+           id, identifier, value, expiresAt, createdAt, updatedAt
+         ) values (?, ?, 'encrypted:0', ?, ?, ?)`,
+      ).bind(
+        "otp-two",
+        "sign-in-otp-person@example.com",
+        now,
+        now,
+        now,
+      ).run()).rejects.toThrow();
+    } finally {
+      await miniflare.dispose();
+    }
+  }, 60_000);
+
   it("indexes GitHub reconcile candidates in reconciliation order", async () => {
     const miniflare = new Miniflare({
       modules: true,

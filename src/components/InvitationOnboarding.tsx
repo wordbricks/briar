@@ -1,9 +1,11 @@
 import {
+  ArrowUpRight,
   Building2,
   Check,
   FolderKanban,
   LoaderCircle,
   LogOut,
+  Mail,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -13,7 +15,7 @@ import { Typography } from "@/components/ui/typography";
 import { useI18n } from "../i18n";
 import { isApiErrorStatus, loadOrganizationInvitation } from "../lib/api";
 import type { OrganizationInvitationPreview, SessionUser } from "../types";
-import { GoogleIcon } from "./LoginScreen";
+import { GoogleIcon, type LoginMethod } from "./LoginScreen";
 import { Logo } from "./Logo";
 
 export function InvitationOnboarding({
@@ -36,7 +38,7 @@ export function InvitationOnboarding({
   onAccept: () => Promise<void>;
   onCancelLogin: () => void;
   onLeave: () => void;
-  onLogin: () => void;
+  onLogin: (method: LoginMethod) => void;
   onSwitchAccount: () => Promise<void>;
   token: string;
   user: SessionUser | null;
@@ -216,23 +218,40 @@ export function InvitationOnboarding({
                 </Button>
               </div>
             ) : (
-              <Button
-                className="google-button mt-5 h-11 w-full justify-between rounded-xl"
-                disabled={loginLoading}
-                onClick={onLogin}
-                type="button"
-                variant="outline"
-              >
-                {loginLoading ? (
-                  <LoaderCircle className="spin" size={18} />
-                ) : (
+              <div className="mt-5 grid gap-3">
+                <Button
+                  className="email-button h-11 w-full justify-between rounded-xl"
+                  disabled={loginLoading}
+                  onClick={() => onLogin("email")}
+                  type="button"
+                >
+                  {loginLoading ? (
+                    <LoaderCircle className="spin" size={18} />
+                  ) : (
+                    <Mail size={18} />
+                  )}
+                  <span className="flex-1 text-center">
+                    {t("invitation.signIn")}
+                  </span>
+                  <ArrowUpRight size={16} />
+                </Button>
+                <div className="login-provider-divider" role="separator">
+                  <span>{t("login.or")}</span>
+                </div>
+                <Button
+                  className="google-button h-11 w-full justify-between rounded-xl"
+                  disabled={loginLoading}
+                  onClick={() => onLogin("google")}
+                  type="button"
+                  variant="outline"
+                >
                   <GoogleIcon />
-                )}
-                <span className="flex-1 text-center">
-                  {t("invitation.signIn")}
-                </span>
-                <span aria-hidden="true" />
-              </Button>
+                  <span className="flex-1 text-center">
+                    {t("invitation.signInGoogle")}
+                  </span>
+                  <ArrowUpRight size={16} />
+                </Button>
+              </div>
             )}
           </>
         ) : (

@@ -1,10 +1,12 @@
-import { ArrowUpRight, LoaderCircle, X } from "lucide-react";
+import { ArrowUpRight, LoaderCircle, Mail, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Typography } from "@/components/ui/typography";
 import { cn } from "@/lib/utils";
 import { useI18n } from "../i18n";
 import { Logo } from "./Logo";
+
+export type LoginMethod = "email" | "google";
 
 export function LoginScreen({
   companionMode = false,
@@ -22,7 +24,7 @@ export function LoginScreen({
   loading: boolean;
   loginCode: string | null;
   onCancel: () => void;
-  onLogin: () => void;
+  onLogin: (method: LoginMethod) => void;
   webMode?: boolean;
 }) {
   const { t } = useI18n();
@@ -108,21 +110,36 @@ export function LoginScreen({
             </Typography>
           </div>
         ) : (
-          <Button
-            className="google-button h-11 w-full justify-between rounded-xl border border-border bg-card px-3.5 text-sm font-semibold text-foreground shadow-xs hover:bg-secondary"
-            disabled={loading}
-            onClick={onLogin}
-            type="button"
-            variant="outline"
-          >
-            {loading ? (
-              <LoaderCircle className="spin" size={18} />
-            ) : (
+          <div className="grid gap-3">
+            <Button
+              className="email-button h-11 w-full justify-between rounded-xl px-3.5 text-sm font-semibold"
+              disabled={loading}
+              onClick={() => onLogin("email")}
+              type="button"
+            >
+              {loading ? (
+                <LoaderCircle className="spin" size={18} />
+              ) : (
+                <Mail size={18} />
+              )}
+              <span className="flex-1 text-center">{t("login.continueEmail")}</span>
+              <ArrowUpRight size={16} />
+            </Button>
+            <div className="login-provider-divider" role="separator">
+              <span>{t("login.or")}</span>
+            </div>
+            <Button
+              className="google-button h-11 w-full justify-between rounded-xl border border-border bg-card px-3.5 text-sm font-semibold text-foreground shadow-xs hover:bg-secondary"
+              disabled={loading}
+              onClick={() => onLogin("google")}
+              type="button"
+              variant="outline"
+            >
               <GoogleIcon />
-            )}
-            <span className="flex-1 text-center">{t("login.continueGoogle")}</span>
-            <ArrowUpRight size={16} />
-          </Button>
+              <span className="flex-1 text-center">{t("login.continueGoogle")}</span>
+              <ArrowUpRight size={16} />
+            </Button>
+          </div>
         )}
         {error ? (
           <Typography className="login-error mt-3 text-destructive" role="alert" variant="caption">

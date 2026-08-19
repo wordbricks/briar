@@ -105,6 +105,12 @@
       "bucket_name": "briar-attachments"
     }
   ],
+  "send_email": [
+    {
+      "name": "EMAIL",
+      "allowed_sender_addresses": ["login@auth.wordbricks.ai"]
+    }
+  ],
   "triggers": {
     "crons": ["* * * * *", "17 */6 * * *"]
   },
