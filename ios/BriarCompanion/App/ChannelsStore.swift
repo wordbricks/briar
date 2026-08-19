@@ -96,6 +96,9 @@ final class OrganizationRealtimeStore: ObservableObject {
 @MainActor
 final class ChannelsStore: ObservableObject {
     static let messagePageSize = 20
+    static let cachedConversationLimit = 5
+    static let cachedThreadLimit = 5
+    static let cachedMessageLimit = 40
 
     private struct CachedChannelConversation {
         let messages: [ChannelMessage]
@@ -168,7 +171,9 @@ final class ChannelsStore: ObservableObject {
     private var focusedThreadParentID: UUID?
     private var nextMessageCursor: UUID?
     private var cachedConversations: [UUID: CachedChannelConversation] = [:]
+    private var cachedConversationOrder: [UUID] = []
     private var cachedThreads: [ThreadCacheKey: [ChannelMessage]] = [:]
+    private var cachedThreadOrder: [ThreadCacheKey] = []
     private var generation = 0
     private var catalogLoadRevision = 0
     private var authoritativeLoadRevision = 0
@@ -235,7 +240,9 @@ final class ChannelsStore: ObservableObject {
         focusedThreadParentID = nil
         nextMessageCursor = nil
         cachedConversations = [:]
+        cachedConversationOrder = []
         cachedThreads = [:]
+        cachedThreadOrder = []
         channels = []
         messages = []
         thread = []
@@ -319,7 +326,7 @@ final class ChannelsStore: ObservableObject {
         startActivitySynchronization()
         conversationLoadInFlight = true
         updateLoadingState()
-        let cachedConversation = cachedConversations[channelID]
+        let cachedConversation = cachedConversation(for: channelID)
         messages = cachedConversation?.messages ?? []
         nextMessageCursor = cachedConversation?.nextMessageCursor
         hasEarlierMessages = cachedConversation?.nextMessageCursor != nil
@@ -569,7 +576,7 @@ final class ChannelsStore: ObservableObject {
             channelID: channelID,
             parentMessageID: parentMessageID
         )
-        thread = cachedThreads[cacheKey] ?? []
+        thread = cachedThread(for: cacheKey)
         recordProposalMessages(thread)
         let previousThreadMessageIDs = Set(thread.map(\.id))
         defer {
@@ -609,7 +616,7 @@ final class ChannelsStore: ObservableObject {
                 current: thread,
                 incoming: response.messages
             )
-            cachedThreads[cacheKey] = thread
+            storeCachedThread(thread, for: cacheKey)
             errorMessage = nil
         } catch {
             guard
@@ -696,6 +703,13 @@ final class ChannelsStore: ObservableObject {
         activityTask = nil
         activityExpiryTask?.cancel()
         activityExpiryTask = nil
+    }
+
+    func applicationDidReceiveMemoryWarning() {
+        cachedConversations.removeAll(keepingCapacity: false)
+        cachedConversationOrder.removeAll(keepingCapacity: false)
+        cachedThreads.removeAll(keepingCapacity: false)
+        cachedThreadOrder.removeAll(keepingCapacity: false)
     }
 
     private var authoritativeLoadInFlight: Bool {
@@ -1724,10 +1738,12 @@ final class ChannelsStore: ObservableObject {
         channels = nextChannels
         for removedChannelID in removedChannelIDs {
             cachedConversations.removeValue(forKey: removedChannelID)
+            cachedConversationOrder.removeAll { $0 == removedChannelID }
         }
         cachedThreads = cachedThreads.filter {
             !removedChannelIDs.contains($0.key.channelID)
         }
+        cachedThreadOrder.removeAll { removedChannelIDs.contains($0.channelID) }
         if let focusedChannelID,
            nextChannels.contains(where: { $0.id == focusedChannelID && $0.hasUnread == true }) {
             Task { await markChannelRead(focusedChannelID) }
@@ -1823,12 +1839,16 @@ final class ChannelsStore: ObservableObject {
 
     private func cacheFocusedConversation() {
         guard let focusedChannelID else { return }
-        cachedConversations[focusedChannelID] = CachedChannelConversation(
-            messages: messages,
-            nextMessageCursor: nextMessageCursor,
+        let boundedMessages = Array(messages.suffix(Self.cachedMessageLimit))
+        let cacheCursor = messages.count > boundedMessages.count
+            ? boundedMessages.first?.id
+            : nextMessageCursor
+        storeCachedConversation(CachedChannelConversation(
+            messages: boundedMessages,
+            nextMessageCursor: cacheCursor,
             members: members,
             agents: agents
-        )
+        ), for: focusedChannelID)
     }
 
     private func mergeAuthoritativeSnapshot(
@@ -1845,10 +1865,11 @@ final class ChannelsStore: ObservableObject {
 
     private func cacheFocusedThread() {
         guard let focusedChannelID, let focusedThreadParentID else { return }
-        cachedThreads[ThreadCacheKey(
+        let key = ThreadCacheKey(
             channelID: focusedChannelID,
             parentMessageID: focusedThreadParentID
-        )] = thread
+        )
+        storeCachedThread(thread, for: key)
     }
 
     private func updateCachedThreads(
@@ -1858,6 +1879,7 @@ final class ChannelsStore: ObservableObject {
         for key in Array(cachedThreads.keys) {
             if removedMessageIDs.contains(key.parentMessageID) {
                 cachedThreads.removeValue(forKey: key)
+                cachedThreadOrder.removeAll { $0 == key }
                 continue
             }
             let relevantMessages = messages.filter {
@@ -1865,12 +1887,60 @@ final class ChannelsStore: ObservableObject {
                     ($0.id == key.parentMessageID ||
                         $0.parentMessageId == key.parentMessageID)
             }
-            cachedThreads[key] = Self.mergeMessages(
+            cachedThreads[key] = boundedThreadMessages(Self.mergeMessages(
                 cachedThreads[key] ?? [],
                 updates: relevantMessages,
                 removing: removedMessageIDs
-            )
+            ), for: key)
         }
+    }
+
+    private func cachedConversation(for channelID: UUID) -> CachedChannelConversation? {
+        guard let cached = cachedConversations[channelID] else { return nil }
+        cachedConversationOrder.removeAll { $0 == channelID }
+        cachedConversationOrder.append(channelID)
+        return cached
+    }
+
+    private func storeCachedConversation(
+        _ conversation: CachedChannelConversation,
+        for channelID: UUID
+    ) {
+        cachedConversations[channelID] = conversation
+        cachedConversationOrder.removeAll { $0 == channelID }
+        cachedConversationOrder.append(channelID)
+        while cachedConversationOrder.count > Self.cachedConversationLimit {
+            cachedConversations.removeValue(forKey: cachedConversationOrder.removeFirst())
+        }
+    }
+
+    private func cachedThread(for key: ThreadCacheKey) -> [ChannelMessage] {
+        guard let cached = cachedThreads[key] else { return [] }
+        cachedThreadOrder.removeAll { $0 == key }
+        cachedThreadOrder.append(key)
+        return cached
+    }
+
+    private func storeCachedThread(_ messages: [ChannelMessage], for key: ThreadCacheKey) {
+        cachedThreads[key] = boundedThreadMessages(messages, for: key)
+        cachedThreadOrder.removeAll { $0 == key }
+        cachedThreadOrder.append(key)
+        while cachedThreadOrder.count > Self.cachedThreadLimit {
+            cachedThreads.removeValue(forKey: cachedThreadOrder.removeFirst())
+        }
+    }
+
+    private func boundedThreadMessages(
+        _ messages: [ChannelMessage],
+        for key: ThreadCacheKey
+    ) -> [ChannelMessage] {
+        guard messages.count > Self.cachedMessageLimit else { return messages }
+        let root = messages.first { $0.id == key.parentMessageID }
+        let replies = messages.filter { $0.id != key.parentMessageID }
+        let replyLimit = root == nil
+            ? Self.cachedMessageLimit
+            : Self.cachedMessageLimit - 1
+        return (root.map { [$0] } ?? []) + Array(replies.suffix(replyLimit))
     }
 
     private func markChannelRead(_ channelID: UUID) async {

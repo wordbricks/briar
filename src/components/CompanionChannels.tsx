@@ -238,6 +238,85 @@ type ChannelSurfaceContext = {
 };
 
 const mobileChannelMessagePageSize = 20;
+export const mobileChannelCacheLimit = 5;
+export const mobileThreadCacheLimit = 5;
+export const mobileCachedMessageLimit = 40;
+
+function boundedThreadMessages(
+  parentMessageId: string,
+  messages: ChannelMessage[],
+) {
+  if (messages.length <= mobileCachedMessageLimit) return messages;
+  const root = messages.find((item) => item.id === parentMessageId);
+  const replies = messages.filter((item) => item.id !== parentMessageId);
+  const replyLimit = root
+    ? mobileCachedMessageLimit - 1
+    : mobileCachedMessageLimit;
+  return [...(root ? [root] : []), ...replies.slice(-replyLimit)];
+}
+
+export function cacheCompanionThreadSnapshot(
+  threads: Map<string, ChannelMessage[]>,
+  parentMessageId: string,
+  messages: ChannelMessage[],
+) {
+  threads.delete(parentMessageId);
+  threads.set(
+    parentMessageId,
+    boundedThreadMessages(parentMessageId, messages),
+  );
+  while (threads.size > mobileThreadCacheLimit) {
+    const oldest = threads.keys().next().value;
+    if (oldest === undefined) break;
+    threads.delete(oldest);
+  }
+}
+
+function readCachedThread(
+  threads: Map<string, ChannelMessage[]> | undefined,
+  parentMessageId: string,
+) {
+  const cached = threads?.get(parentMessageId) ?? null;
+  if (!cached || !threads) return cached;
+  threads.delete(parentMessageId);
+  threads.set(parentMessageId, cached);
+  return cached;
+}
+
+export function cacheCompanionChannelSnapshot(
+  cache: CompanionChannelCache,
+  snapshot: CachedCompanionChannel,
+) {
+  const threads = new Map<string, ChannelMessage[]>();
+  for (const [parentMessageId, messages] of snapshot.threads) {
+    cacheCompanionThreadSnapshot(threads, parentMessageId, messages);
+  }
+  const messages = snapshot.messages.slice(-mobileCachedMessageLimit);
+  const bounded = {
+    ...snapshot,
+    messages,
+    nextCursor: snapshot.messages.length > messages.length
+      ? messages[0]?.id ?? snapshot.nextCursor
+      : snapshot.nextCursor,
+    threads,
+  };
+  cache.delete(snapshot.channel.id);
+  cache.set(snapshot.channel.id, bounded);
+  while (cache.size > mobileChannelCacheLimit) {
+    const oldest = cache.keys().next().value;
+    if (oldest === undefined) break;
+    cache.delete(oldest);
+  }
+  return bounded;
+}
+
+function readCachedChannel(cache: CompanionChannelCache, channelId: string) {
+  const cached = cache.get(channelId) ?? null;
+  if (!cached) return null;
+  cache.delete(channelId);
+  cache.set(channelId, cached);
+  return cached;
+}
 
 /**
  * Home on mobile is a channel list, then a channel's root messages, then one
@@ -332,7 +411,9 @@ export function CompanionChannels({
   useLayoutEffect(() => {
     if (!channel || !threadParentId || thread === null) return;
     const cached = resolvedChannelCache.get(channel.id);
-    if (cached) cached.threads.set(threadParentId, thread);
+    if (!cached) return;
+    cacheCompanionThreadSnapshot(cached.threads, threadParentId, thread);
+    cacheCompanionChannelSnapshot(resolvedChannelCache, cached);
   }, [channel, resolvedChannelCache, thread, threadParentId]);
 
   useEffect(() => {
@@ -390,7 +471,7 @@ export function CompanionChannels({
     const snapshot = renderedChannel.current;
     if (!snapshot) return;
     const cached = resolvedChannelCache.get(snapshot.channel.id);
-    resolvedChannelCache.set(snapshot.channel.id, {
+    cacheCompanionChannelSnapshot(resolvedChannelCache, {
       ...snapshot,
       threads: cached?.threads ?? snapshot.threads,
     });
@@ -502,7 +583,7 @@ export function CompanionChannels({
       persistRenderedChannel();
       invalidateChannelSurface(summary.id, null);
       const selectionVersion = ++channelSelectionVersion.current;
-      const cached = resolvedChannelCache.get(summary.id) ?? null;
+      const cached = readCachedChannel(resolvedChannelCache, summary.id);
       setChannel(markSelectedChannelRead(cached?.channel ?? summary));
       setThread(null);
       setThreadParentId(null);
@@ -527,7 +608,7 @@ export function CompanionChannels({
         const nextMessages = result.messages;
         const nextCursor = result.nextCursor ?? null;
         const nextReplies = result.agentReplies ?? [];
-        resolvedChannelCache.set(summary.id, {
+        cacheCompanionChannelSnapshot(resolvedChannelCache, {
           channel: nextChannel,
           members: result.members,
           agents: result.agents,
@@ -842,8 +923,10 @@ export function CompanionChannels({
       if (!channel) return;
       invalidateChannelSurface(channel.id, parent.id);
       const selectionVersion = ++channelSelectionVersion.current;
-      const cachedThread = resolvedChannelCache
-        .get(channel.id)?.threads?.get(parent.id) ?? null;
+      const cachedThread = readCachedThread(
+        readCachedChannel(resolvedChannelCache, channel.id)?.threads,
+        parent.id,
+      );
       setThreadParentId(parent.id);
       setThread(cachedThread);
       setError(null);
@@ -862,8 +945,11 @@ export function CompanionChannels({
             current ?? [],
             result.messages,
           );
-          resolvedChannelCache
-            .get(channel.id)?.threads.set(parent.id, refreshed);
+          const cached = resolvedChannelCache.get(channel.id);
+          if (cached) {
+            cacheCompanionThreadSnapshot(cached.threads, parent.id, refreshed);
+            cacheCompanionChannelSnapshot(resolvedChannelCache, cached);
+          }
           return refreshed;
         });
       } catch (cause) {
@@ -924,18 +1010,19 @@ export function CompanionChannels({
         recordProposalMessages(result.messages);
         setMessages((current) =>
           mergeChannelMessageSnapshot(current, result.messages));
-        setMessageNextCursor(result.nextCursor ?? null);
+        const nextCursor = result.nextCursor ?? null;
+        setMessageNextCursor(nextCursor);
         setMembers(result.members);
         setAgents(result.agents);
         setReplies(result.agentReplies ?? []);
         const storedThreads = resolvedChannelCache.get(summary.id)?.threads ??
           new Map<string, ChannelMessage[]>();
-        resolvedChannelCache.set(summary.id, {
+        cacheCompanionChannelSnapshot(resolvedChannelCache, {
           channel: result.channel,
           members: result.members,
           agents: result.agents,
           messages: result.messages,
-          nextCursor: result.nextCursor ?? null,
+          nextCursor,
           threads: storedThreads,
         });
         let requestedThread: Awaited<ReturnType<typeof listChannelMessages>> | null =
