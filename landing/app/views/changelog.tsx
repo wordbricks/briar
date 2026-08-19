@@ -30,6 +30,21 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.136",
+        date: "2026년 8월 19일",
+        title: "Agent 실행과 채널 탐색을 더 안정적으로 개선합니다",
+        summary:
+          "멘션된 Agent 답글 라우팅과 세션 기록을 보강하고, 사용량·채널·다운로드 화면과 다국어 landing을 다듬습니다.",
+        items: [
+          "멘션된 Project Agent를 이슈 답글 대상으로 지정해 여러 Agent가 참여하는 대화에서도 올바른 Agent가 답하도록 하고, iOS·공유 계약·Worker 경로를 함께 맞춥니다.",
+          "직접 실행한 Agent task의 transcript를 저장하고 원격 세션 상세를 새로 고치며, 과거 세션에 최종 요약 fallback을 제공해 실행 결과를 잃지 않습니다.",
+          "Antigravity CLI의 /quota 응답을 해석해 Gemini quota와 사용량을 정확히 보여줍니다.",
+          "채널 Agent 답변의 provider 아이콘을 아바타 오른쪽 아래에 배치하고, 채널 재방문 뒤 하단 스크롤이 늦게 점프하지 않도록 고칩니다.",
+          "프로젝트 사이드바의 채널 내용이 옆으로 넘치지 않게 제한하고, 이슈 본문 자동 저장 직후 공백·엔터를 보존합니다.",
+          "landing의 다운로드 바를 Mac·Web App·iOS·Android·CLI와 지원 provider 아이콘으로 정리하고, 다국어 CJK typography와 테마를 개선합니다.",
+        ],
+      },
+      {
         version: "1.2.135",
         date: "2026년 8월 18일",
         title: "채널 문서와 Agent 제공자 선택을 더 넓게 지원합니다",
@@ -781,6 +796,21 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.136",
+        date: "August 19, 2026",
+        title: "Make Agent execution and channel navigation more reliable",
+        summary:
+          "Route issue replies to mentioned Project Agents, preserve session output and quota details, and refine channels, downloads, and localized landing pages.",
+        items: [
+          "Route issue replies to the mentioned Project Agents so conversations with multiple Agents reach the intended Agent, with matching iOS, shared-contract, and Worker paths.",
+          "Persist direct Agent task transcripts, refresh remote session details, and fall back to final summaries for historical sessions so execution output remains available.",
+          "Parse Antigravity CLI /quota responses to show Gemini quota and usage details accurately.",
+          "Move channel Agent provider badges to the lower-right of avatars and prevent delayed bottom-scroll jumps when revisiting a channel.",
+          "Prevent project sidebar channel overflow and preserve spaces and line breaks in issue descriptions immediately after autosave.",
+          "Replace the landing download CTA with an accessible Mac, Web App, iOS, Android, and CLI bar plus provider icons, while improving localized typography and theme.",
+        ],
+      },
       {
         version: "1.2.135",
         date: "August 18, 2026",
@@ -1624,7 +1654,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <p>
             <strong>Briar</strong> <span>1.2</span>
           </p>
-          <a href="#v1-2-135">
+          <a href="#v1-2-136">
             {changelog.current} <span aria-hidden="true">↓</span>
           </a>
         </div>
@@ -1646,7 +1676,9 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   </div>
                   <time
                     dateTime={
-                      entry.version === "1.2.135"
+                      entry.version === "1.2.136"
+                        ? "2026-08-19"
+                        : entry.version === "1.2.135"
                         ? "2026-08-18"
                         : entry.version === "1.2.134"
                         ? "2026-08-18"
