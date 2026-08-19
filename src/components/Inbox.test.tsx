@@ -162,6 +162,84 @@ describe("Inbox", () => {
     expect(container.querySelectorAll(".inbox-message")).toHaveLength(4);
   });
 
+  it("shows unread filter counts and hides badges when the count is zero", async () => {
+    const messages = [
+      issue("urgent-unread", "Unread production failure", {
+        status: "failed",
+        priority: 1,
+      }),
+      issue("urgent-read", "Read production failure", {
+        isUnread: false,
+        status: "failed",
+        priority: 1,
+      }),
+      issue("action-read", "Read decision request", {
+        isUnread: false,
+        status: "blocked",
+      }),
+      issue("important-unread", "Unread milestone", {
+        priority: 2,
+      }),
+      issue("activity-read", "Read routine update", {
+        isUnread: false,
+        priority: 3,
+      }),
+    ];
+
+    await act(async () =>
+      root.render(
+        <I18nProvider>
+          <Inbox
+            isSidebarOpen
+            messages={messages}
+            onMarkAllRead={vi.fn()}
+            onMarkRead={vi.fn()}
+            onOpen={vi.fn()}
+            projects={projects}
+            unreadCount={2}
+          />
+        </I18nProvider>,
+      ),
+    );
+
+    const filters = [...container.querySelectorAll(".inbox-filter")];
+    expect(
+      filters.map((filter) => filter.getAttribute("aria-label")),
+    ).toEqual(["긴급 1", "확인 필요", "중요 변경 1", "최근 활동"]);
+    expect(
+      filters.map(
+        (filter) =>
+          filter.querySelector(".inbox-filter-count")?.textContent ?? null,
+      ),
+    ).toEqual(["1", null, "1", null]);
+
+    await act(async () =>
+      root.render(
+        <I18nProvider>
+          <Inbox
+            isSidebarOpen
+            messages={messages.map((message) => ({
+              ...message,
+              isUnread: false,
+            }))}
+            onMarkAllRead={vi.fn()}
+            onMarkRead={vi.fn()}
+            onOpen={vi.fn()}
+            projects={projects}
+            unreadCount={0}
+          />
+        </I18nProvider>,
+      ),
+    );
+
+    expect(container.querySelector(".inbox-filter-count")).toBeNull();
+    expect(
+      [...container.querySelectorAll(".inbox-filter")].map((filter) =>
+        filter.getAttribute("aria-label"),
+      ),
+    ).toEqual(["긴급", "확인 필요", "중요 변경", "최근 활동"]);
+  });
+
   it("renders compact rows with title and detail content only", async () => {
     const message = issue("action", "Release scope decision", {
       structuredResult: {
