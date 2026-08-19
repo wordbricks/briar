@@ -127,6 +127,31 @@ describe("detached Agent runner", () => {
     expect(event.detail).toContain("transient HTTP 503");
   });
 
+  it("names Antigravity in a structured upstream overload handoff", () => {
+    const block = detachedProviderBlockFromPayload({
+      type: "blocked",
+      reason: "upstream_overloaded",
+      provider: "agy",
+      message: "The request queue is full.",
+      nextRetryAt: null,
+      statusCode: 503,
+    });
+
+    const event = detachedProviderBlockedRunEvent({
+      block: block!,
+      runId: "run-agy-503",
+      attempt: 1,
+      actor: "briar-worker:worker-1",
+      repository: "briar",
+      model: "gemini-3.7-flash-high",
+      occurredAt: "2026-08-19T01:00:00.000Z",
+    });
+
+    expect(event.structuredResult.summary).toContain("Antigravity 서비스");
+    expect(event.detail).toContain("Antigravity upstream returned transient HTTP 503");
+    expect(event.detail).not.toContain("OpenCode");
+  });
+
   it("maps a required MCP authentication failure to an authentication wait", () => {
     const block = detachedProviderBlockFromPayload({
       type: "blocked",

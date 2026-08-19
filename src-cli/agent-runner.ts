@@ -669,8 +669,13 @@ export function detachedProviderBlockedRunEvent(input: {
   model: string | null;
   occurredAt: string;
 }) {
+  const providerName = input.block.provider === "agy"
+    ? "Antigravity"
+    : input.block.provider === "opencode"
+      ? "OpenCode"
+      : input.block.provider;
   const availableAt = input.block.nextRetryAt
-      ? ` OpenCode가 안내한 다음 사용 가능 시각은 ${input.block.nextRetryAt}입니다.`
+      ? ` ${providerName}가 안내한 다음 사용 가능 시각은 ${input.block.nextRetryAt}입니다.`
       : "";
   const serverNames = input.block.reason === "mcp_auth_required"
     ? input.block.serverNames.join(", ")
@@ -678,8 +683,8 @@ export function detachedProviderBlockedRunEvent(input: {
   const summary = input.block.reason === "mcp_auth_required"
     ? `작업에 실제로 필요한 MCP 연결(${serverNames})의 인증이 없어 실행을 안전하게 멈췄습니다. 전체 실패로 처리하지 않았으며 현재까지의 코드와 작업 기록은 worktree에 보존됩니다.`
     : input.block.reason === "upstream_overloaded"
-      ? "OpenCode 서비스가 혼잡해 요청을 처리하지 못했습니다. 작업이 완료되지 않았으며 현재까지의 변경 사항은 worktree에 보존됩니다. 잠시 후 다시 시도하거나 사용 가능한 다른 모델로 변경해 주세요."
-      : "OpenCode 무료 사용 한도가 소진되어 에이전트가 작업을 계속할 수 없습니다. " +
+      ? `${providerName} 서비스가 혼잡해 요청을 처리하지 못했습니다. 작업이 완료되지 않았으며 현재까지의 변경 사항은 worktree에 보존됩니다. 잠시 후 다시 시도하거나 사용 가능한 다른 모델로 변경해 주세요.`
+      : `${providerName} 무료 사용 한도가 소진되어 에이전트가 작업을 계속할 수 없습니다. ` +
         `작업이 완료되지 않았으며 현재까지의 변경 사항은 worktree에 보존됩니다. 사용 가능한 모델이나 요금제를 준비한 뒤 다시 실행해야 합니다.${availableAt}`;
   const nextAction = input.block.reason === "mcp_auth_required"
     ? `Worker 컴퓨터를 관리하는 담당자가 Codex의 MCP 또는 플러그인 설정에서 ${serverNames} 연결을 다시 인증하고 인증됨으로 표시되는지 확인한 다음, Briar 이슈 화면에서 재시도를 눌러 실행이 다시 시작되는지 확인해 주세요.`
@@ -687,7 +692,7 @@ export function detachedProviderBlockedRunEvent(input: {
       ? "잠시 기다린 뒤 Briar 이슈 화면에서 재시도를 누르거나, 프로젝트 또는 이슈의 실행 모델을 다른 사용 가능한 모델로 변경한 뒤 새 실행이 시작되는지 확인해 주세요."
       : input.block.nextRetryAt
         ? `프로젝트 또는 이슈의 실행 모델을 사용 가능한 모델로 변경하거나 ${input.block.nextRetryAt} 이후까지 기다린 다음, Briar 이슈 화면에서 재시도를 눌러 새 실행이 시작되는지 확인해 주세요.`
-        : "프로젝트 또는 이슈의 실행 모델을 사용 가능한 모델로 변경하거나 OpenCode 요금제를 활성화한 다음, Briar 이슈 화면에서 재시도를 눌러 새 실행이 시작되는지 확인해 주세요.";
+        : `프로젝트 또는 이슈의 실행 모델을 사용 가능한 모델로 변경하거나 ${providerName} 요금제를 활성화한 다음, Briar 이슈 화면에서 재시도를 눌러 새 실행이 시작되는지 확인해 주세요.`;
   const selectedModel = input.model?.trim() || "provider default";
   return {
     runId: input.runId,
@@ -701,8 +706,8 @@ export function detachedProviderBlockedRunEvent(input: {
       (input.block.reason === "mcp_auth_required"
         ? `Codex required MCP authentication; servers=${serverNames}; `
         : input.block.reason === "upstream_overloaded"
-          ? `OpenCode upstream returned transient HTTP ${input.block.statusCode}; `
-          : `OpenCode session entered retry/${input.block.reason}; `) +
+          ? `${providerName} upstream returned transient HTTP ${input.block.statusCode}; `
+          : `${providerName} session entered retry/${input.block.reason}; `) +
       `provider=${input.block.provider}, model=${selectedModel}, ` +
       `providerMessage=${input.block.message}` +
       (input.block.nextRetryAt

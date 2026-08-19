@@ -369,19 +369,77 @@ export function agyFinalMessage(raw: unknown, fallback: string) {
   return (root ? textFrom(root.result) ?? textFrom(root) : undefined) ?? fallback;
 }
 
+const transientUpstreamStatusCodes = new Set([502, 503, 504]);
+
+function agyProviderBlockPayload(value: unknown): unknown {
+  if (typeof value === "string") return value.trim() || null;
+  const root = recordValue(value);
+  if (!root) return null;
+  const step = stepRecord(root);
+  const type = eventType(root);
+  if (type === "diagnostic") {
+    return stringValue(root.text) ?? stringValue(root.message) ?? null;
+  }
+  if (root.error !== undefined) return root.error;
+  if (step.error !== undefined) return step.error;
+  const failureSignal = [
+    type,
+    stringValue(root.status),
+    stringValue(root.state),
+    eventType(step),
+    stringValue(step.status),
+    stringValue(step.state),
+  ].filter(Boolean).join(" ");
+  return /error|fail|blocked|retry|exhausted/iu.test(failureSignal)
+    ? step
+    : null;
+}
+
+function transientUpstreamStatusCode(
+  value: unknown,
+  depth = 0,
+): 502 | 503 | 504 | null {
+  if (depth > 4) return null;
+  if (typeof value === "string") {
+    const match = value.match(
+      /\[(502|503|504)\]|\b(?:HTTP|status(?:\s*code)?)\D{0,8}(502|503|504)\b|\b(502|503|504)\s+(?:Bad Gateway|Service Unavailable|Gateway Timeout)\b/iu,
+    );
+    const parsed = Number(match?.[1] ?? match?.[2] ?? match?.[3]);
+    return transientUpstreamStatusCodes.has(parsed)
+      ? (parsed as 502 | 503 | 504)
+      : null;
+  }
+  const record = recordValue(value);
+  if (!record) return null;
+  for (const key of ["status", "statusCode", "code"]) {
+    const parsed = Number(record[key]);
+    if (transientUpstreamStatusCodes.has(parsed)) {
+      return parsed as 502 | 503 | 504;
+    }
+  }
+  for (const nested of Object.values(record)) {
+    const statusCode = transientUpstreamStatusCode(nested, depth + 1);
+    if (statusCode) return statusCode;
+  }
+  return null;
+}
+
 export function agyBlockedRetry(value: unknown): AgyBlockedRetry | null {
-  const message = typeof value === "string" ? value : JSON.stringify(value);
-  if (/resource_exhausted|quota|usage (?:limit|exhausted)|rate limit/i.test(message)) {
+  const payload = agyProviderBlockPayload(value);
+  if (payload === null) return null;
+  const serialized = typeof payload === "string" ? payload : JSON.stringify(payload);
+  const message = textFrom(payload) ?? serialized;
+  if (/resource_exhausted|quota|usage (?:limit|exhausted)|rate limit/i.test(serialized)) {
     return { reason: "usage_exhausted", provider: "agy", message, nextRetryAt: null };
   }
-  const status = message.match(/(?:\b|\[)(502|503|504)(?:\b|\])/u)?.[1];
-  if (status) {
+  const statusCode = transientUpstreamStatusCode(payload);
+  if (statusCode) {
     return {
       reason: "upstream_overloaded",
       provider: "agy",
       message,
       nextRetryAt: null,
-      statusCode: Number(status) as 502 | 503 | 504,
+      statusCode,
     };
   }
   return null;
