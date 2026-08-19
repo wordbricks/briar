@@ -5,7 +5,7 @@ const issueLinkPathPattern =
 const sessionLinkPathPattern =
   /^\/open\/sessions\/([0-9a-f-]{36})\/([0-9a-f-]{36})\/?$/iu;
 const channelLinkPathPattern =
-  /^\/open\/channels\/([0-9a-f-]{36})\/([0-9a-f-]{36})\/([0-9a-f-]{36})\/?$/iu;
+  /^\/open\/channels\/([0-9a-f-]{36})\/([0-9a-f-]{36})(?:\/([0-9a-f-]{36}))?\/?$/iu;
 const issueDeepLinkScheme = "briar-companion:";
 
 export type IssueLinkTarget = {
@@ -21,8 +21,8 @@ export type SessionLinkTarget = {
 export type ChannelLinkTarget = {
   organizationId: string;
   channelId: string;
-  messageId: string;
-  rootMessageId: string;
+  messageId: string | null;
+  rootMessageId: string | null;
 };
 
 export type BriarLinkTarget =
@@ -67,7 +67,7 @@ export function channelShareUrl(
   input: {
     organizationId: string;
     channelId: string;
-    messageId: string;
+    messageId?: string | null;
     rootMessageId?: string | null;
   },
   origin = configuredShareOrigin(),
@@ -76,11 +76,17 @@ export function channelShareUrl(
   url.pathname =
     `/open/channels/${encodeURIComponent(input.organizationId)}` +
     `/${encodeURIComponent(input.channelId)}` +
-    `/${encodeURIComponent(input.messageId)}`;
+    (input.messageId?.trim()
+      ? `/${encodeURIComponent(input.messageId.trim())}`
+      : "");
   url.search = "";
   url.hash = "";
   const rootMessageId = input.rootMessageId?.trim();
-  if (rootMessageId && rootMessageId !== input.messageId) {
+  if (
+    input.messageId?.trim() &&
+    rootMessageId &&
+    rootMessageId !== input.messageId
+  ) {
     url.searchParams.set("root", rootMessageId);
   }
   return url.toString();
@@ -131,15 +137,16 @@ export function parseSessionLink(value: string): SessionLinkTarget | null {
 function channelLinkFromParts(
   organizationId: string,
   channelId: string,
-  messageId: string,
+  messageId: string | null | undefined,
   rootMessageId?: string | null,
 ): ChannelLinkTarget {
+  const normalizedMessageId = messageId ?? null;
   const root = rootMessageId?.trim();
   return {
     organizationId,
     channelId,
-    messageId,
-    rootMessageId: root || messageId,
+    messageId: normalizedMessageId,
+    rootMessageId: root || normalizedMessageId,
   };
 }
 

@@ -515,6 +515,7 @@ export const mobileChannelSummarySchema = z.object({
   archivedAt: z.iso.datetime().nullable(),
   memberCount: z.number().int().nonnegative(),
   agentCount: z.number().int().nonnegative(),
+  createdByUserId: z.string().nullable().optional(),
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
   lastMessageAt: z.iso.datetime().nullable().optional(),

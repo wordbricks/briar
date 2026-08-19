@@ -65,6 +65,7 @@ const ownerId = "owner";
 const outsiderId = "outsider";
 const contextWorkerToken = "briar_worker_channels-context-test";
 const ownerSessionToken = "channels-owner-session-token";
+const outsiderSessionToken = "channels-outsider-session-token";
 const sha256Hex = (value: string) =>
   createHash("sha256").update(value).digest("hex");
 const at = (minute: number) =>
@@ -105,6 +106,11 @@ describe("organization channels", () => {
          id, expiresAt, token, createdAt, updatedAt, userId
        ) values ('channels-owner-session', '2099-01-01T00:00:00.000Z', ?, ?, ?, ?)`,
     ).bind(ownerSessionToken, at(0), at(0), ownerId).run();
+    await db.prepare(
+      `insert into "session" (
+         id, expiresAt, token, createdAt, updatedAt, userId
+       ) values ('channels-outsider-session', '2099-01-01T00:00:00.000Z', ?, ?, ?, ?)`,
+    ).bind(outsiderSessionToken, at(0), at(0), outsiderId).run();
     for (const id of [organizationId, otherOrganizationId]) {
       await db
         .prepare(
@@ -995,6 +1001,26 @@ describe("organization channels", () => {
     await expect(archives.head(objectKey)).resolves.toBeNull();
   });
 
+  it("allows the channel creator to delete a channel as an organization member", async () => {
+    const channelId = "e0000000-0000-4000-8000-000000000018";
+    await createChannel(db, {
+      id: channelId,
+      organizationId,
+      slug: "creator-delete-room",
+      name: "Creator delete room",
+      topic: null,
+      visibility: "public",
+      defaultProjectId: null,
+      createdByUserId: outsiderId,
+      createdAt: at(10),
+    });
+
+    await expect(
+      deleteChannel(db, organizationId, channelId, outsiderId, at(11)),
+    ).resolves.toBe(true);
+    await expect(getChannelById(db, organizationId, channelId)).resolves.toBeNull();
+  });
+
   it("does not delete or queue attachments after an admin role is removed", async () => {
     const channelId = "e0000000-0000-4000-8000-000000000017";
     const messageId = "f0000000-0000-4000-8000-000000000017";
@@ -1042,6 +1068,28 @@ describe("organization channels", () => {
       createdAt: at(8),
     });
 
+    const apiEnv = {
+      DB: db,
+      ARCHIVES: archives,
+      BETTER_AUTH_SECRET: "channels-admin-delete-test-admin-delete-test",
+      GOOGLE_CLIENT_ID: "google-client-test",
+      GOOGLE_CLIENT_SECRET: "google-secret-test",
+    } as unknown as Env;
+    const adminResponse = await apiWorker.fetch(new Request(
+      `https://briar-api.example/organizations/${organizationId}/channels/${channelId}`,
+      {
+        method: "DELETE",
+        headers: { authorization: `Bearer ${outsiderSessionToken}` },
+      },
+    ), apiEnv);
+    expect(adminResponse.status).toBe(403);
+
+    await expect(
+      deleteChannel(db, organizationId, channelId, outsiderId, at(8)),
+    ).resolves.toBe(false);
+    await expect(getChannelById(db, organizationId, channelId))
+      .resolves.toMatchObject({ id: channelId });
+
     // The route may have observed the prior admin role. The deletion batch must
     // authorize again after the downgrade and leave both D1 resources intact.
     await db
@@ -1077,6 +1125,40 @@ describe("organization channels", () => {
         .bind(objectKey)
         .first(),
     ).resolves.toBeNull();
+  });
+
+  it("lets a channel creator delete through the authenticated API route", async () => {
+    const channelId = "e0000000-0000-4000-8000-000000000019";
+    await createChannel(db, {
+      id: channelId,
+      organizationId,
+      slug: "creator-api-delete-room",
+      name: "Creator API delete room",
+      topic: null,
+      visibility: "public",
+      defaultProjectId: null,
+      createdByUserId: outsiderId,
+      createdAt: at(12),
+    });
+    const apiEnv = {
+      DB: db,
+      ARCHIVES: archives,
+      BETTER_AUTH_SECRET: "channels-creator-delete-test-creator-delete-test",
+      GOOGLE_CLIENT_ID: "google-client-test",
+      GOOGLE_CLIENT_SECRET: "google-secret-test",
+    } as unknown as Env;
+
+    const response = await apiWorker.fetch(new Request(
+      `https://briar-api.example/organizations/${organizationId}/channels/${channelId}`,
+      {
+        method: "DELETE",
+        headers: { authorization: `Bearer ${outsiderSessionToken}` },
+      },
+    ), apiEnv);
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ deleted: true });
+    await expect(getChannelById(db, organizationId, channelId)).resolves.toBeNull();
   });
 
   it("limits a claimed reply image to its device, token, and trigger message", async () => {

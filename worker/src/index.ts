@@ -3717,17 +3717,23 @@ const appLinkPage = (
     ? "이슈"
     : resource === "sessions"
       ? "세션"
-      : "메시지";
+      : extraPath
+        ? "메시지"
+        : "채널";
   const subjectWithParticle = resource === "issues"
     ? "이슈를"
     : resource === "sessions"
       ? "세션을"
-      : "메시지를";
+      : extraPath
+        ? "메시지를"
+        : "채널을";
   const englishSubject = resource === "issues"
     ? "issue"
     : resource === "sessions"
       ? "session"
-      : "message";
+      : extraPath
+        ? "message"
+        : "channel";
   const body = `<!doctype html>
 <html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="icon" type="image/png" href="/brand/briar-icon.png"><title>Briar에서 ${subject} 열기</title><style>
@@ -3895,6 +3901,25 @@ async function requireChannelAccess(
   if (!role) throw new HttpError(404, "Organization not found");
   const channel = await getChannel(db, organizationId, channelId, userId);
   if (!channel) throw new HttpError(404, "Channel not found");
+  return channel;
+}
+
+async function requireChannelDeletionAccess(
+  db: D1Database,
+  organizationId: string,
+  channelId: string,
+  userId: string,
+) {
+  const role = await getOrganizationRole(db, organizationId, userId);
+  if (!role) throw new HttpError(404, "Organization not found");
+  const channel = await getChannelById(db, organizationId, channelId);
+  if (!channel) throw new HttpError(404, "Channel not found");
+  if (role !== "owner" && channel.created_by_user_id !== userId) {
+    throw new HttpError(
+      403,
+      "Channel creator or organization owner access required",
+    );
+  }
   return channel;
 }
 
@@ -7773,10 +7798,12 @@ async function route(
   if (organizationChannelMatch && request.method === "DELETE") {
     const session = await requireSession(auth, request);
     const organizationId = organizationChannelMatch[1];
-    const role = await getOrganizationRole(db, organizationId, session.user.id);
-    if (!canManageOrganization(role)) {
-      throw new HttpError(403, "Organization admin access required");
-    }
+    await requireChannelDeletionAccess(
+      db,
+      organizationId,
+      organizationChannelMatch[2],
+      session.user.id,
+    );
     const observedAt = new Date().toISOString();
     const deleted = await deleteChannel(
       db,
@@ -15770,22 +15797,22 @@ export default {
       );
     }
     const channelLinkMatch = url.pathname.match(
-      /^\/open\/channels\/([0-9a-f-]{36})\/([0-9a-f-]{36})\/([0-9a-f-]{36})\/?$/iu,
+      /^\/open\/channels\/([0-9a-f-]{36})\/([0-9a-f-]{36})(?:\/([0-9a-f-]{36}))?\/?$/iu,
     );
     if (
       channelLinkMatch &&
       (request.method === "GET" || request.method === "HEAD")
     ) {
       const root = url.searchParams.get("root")?.trim();
-      const search = root && root !== channelLinkMatch[3]
+      const search = channelLinkMatch[3] && root && root !== channelLinkMatch[3]
         ? `?root=${encodeURIComponent(root)}`
         : "";
       return appLinkPage(
         "channels",
         channelLinkMatch[1],
-        `${channelLinkMatch[2]}/${channelLinkMatch[3]}`,
+        channelLinkMatch[2],
         request.method === "HEAD",
-        "",
+        channelLinkMatch[3] ? `/${channelLinkMatch[3]}` : "",
         search,
       );
     }

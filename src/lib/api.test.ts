@@ -20,6 +20,7 @@ import {
   createProjectAgent,
   createProjectAgentSchedule,
   deleteAccount,
+  deleteChannel,
   deleteProjectAgent,
   deleteIssue,
   transferIssue,
@@ -2349,6 +2350,24 @@ describe("channel message API", () => {
         method: "POST",
         body: JSON.stringify({ name: "Private notes", visibility: "private" }),
       }),
+    );
+  });
+
+  it("deletes a channel through its organization-scoped endpoint", async () => {
+    const fetchMock = vi.fn(async () => new Response(
+      JSON.stringify({ deleted: true }),
+      { headers: { "Content-Type": "application/json" } },
+    ));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      deleteChannel("token", "org-1", "channel-1"),
+    ).resolves.toEqual({ deleted: true });
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "/organizations/org-1/channels/channel-1",
+      ),
+      expect.objectContaining({ method: "DELETE" }),
     );
   });
 
