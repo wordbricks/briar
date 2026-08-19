@@ -25,9 +25,14 @@ final class IssueMutationTests: XCTestCase {
         )
         XCTAssertNil(PendingIssueAttachment.validationMessage(for: [image]))
         XCTAssertNotNil(PendingIssueAttachment.validationMessage(for: Array(repeating: image, count: 6)))
-        XCTAssertNotNil(PendingIssueAttachment.validationMessage(for: [PendingIssueAttachment(
-            filename: "unsafe.svg",
+        XCTAssertNil(PendingIssueAttachment.validationMessage(for: [PendingIssueAttachment(
+            filename: "diagram.svg",
             contentType: "image/svg+xml",
+            data: Data([1])
+        )]))
+        XCTAssertNotNil(PendingIssueAttachment.validationMessage(for: [PendingIssueAttachment(
+            filename: "unsafe.pdf",
+            contentType: "application/pdf",
             data: Data([1])
         )]))
         XCTAssertNotNil(PendingIssueAttachment.validationMessage(for: [PendingIssueAttachment(
