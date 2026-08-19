@@ -134,11 +134,13 @@ export function Inbox({
           ),
     [effectiveProjectId, messages],
   );
-  const categoryCounts = useMemo(
+  const unreadCategoryCounts = useMemo(
     () =>
       projectMessages.reduce<Record<InboxCategory, number>>(
         (counts, message) => {
-          counts[classifyInboxMessage(message)] += 1;
+          if (message.isUnread) {
+            counts[classifyInboxMessage(message)] += 1;
+          }
           return counts;
         },
         { urgent: 0, action_required: 0, important: 0, activity: 0 },
@@ -276,10 +278,10 @@ export function Inbox({
                     const label = t(
                       `inbox.category.${category}` as MessageKey,
                     );
-                    const count = categoryCounts[category];
+                    const count = unreadCategoryCounts[category];
                     return (
                       <button
-                        aria-label={`${label} ${count}`}
+                        aria-label={count > 0 ? `${label} ${count}` : label}
                         aria-pressed={activeFilters.has(category)}
                         className={cn("inbox-filter", category)}
                         key={category}
@@ -288,9 +290,14 @@ export function Inbox({
                         type="button"
                       >
                         <FilterIcon category={category} />
-                        <span aria-hidden="true" className="inbox-filter-count">
-                          {count}
-                        </span>
+                        {count > 0 ? (
+                          <span
+                            aria-hidden="true"
+                            className="inbox-filter-count"
+                          >
+                            {count}
+                          </span>
+                        ) : null}
                       </button>
                     );
                   })}
