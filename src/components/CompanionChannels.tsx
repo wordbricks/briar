@@ -88,7 +88,9 @@ import type {
 } from "../lib/channel-agent-activity";
 import {
   ChannelDraftImages,
+  ChannelMessageImageCacheProvider,
   ChannelMessageImages,
+  useChannelMessageImageCache,
 } from "./ChannelImages";
 import { ChannelMentionMenu } from "./ChannelMentionMenu";
 import { ChannelThreadSubscribeControls } from "./ChannelThreadSubscribeControls";
@@ -260,6 +262,7 @@ export function CompanionChannels({
 }: CompanionChannelsProps) {
   const { t } = useI18n();
   const { toast } = useToast();
+  const imageCache = useChannelMessageImageCache(`${organizationId}\0${token}`);
   const [channels, setChannels] = useState<ChannelSummary[]>([]);
   const [channel, setChannel] = useState<ChannelSummary | null>(null);
   const [messages, setMessages] = useState<ChannelMessage[]>([]);
@@ -1558,7 +1561,8 @@ export function CompanionChannels({
 
   if (channel && threadParentId) {
     return (
-      <section className="companion-channels companion-channel-detail">
+      <ChannelMessageImageCacheProvider cache={imageCache}>
+        <section className="companion-channels companion-channel-detail">
         <ChannelBar
           onBack={closeThread}
           subscribe={(
@@ -1671,13 +1675,15 @@ export function CompanionChannels({
           members={members}
           onSend={send}
         />
-      </section>
+        </section>
+      </ChannelMessageImageCacheProvider>
     );
   }
 
   if (channel) {
     return (
-      <section className="companion-channels companion-channel-detail">
+      <ChannelMessageImageCacheProvider cache={imageCache}>
+        <section className="companion-channels companion-channel-detail">
         <ChannelBar
           onBack={closeChannel}
           channel={channel}
@@ -1782,12 +1788,14 @@ export function CompanionChannels({
           members={members}
           onSend={send}
         />
-      </section>
+        </section>
+      </ChannelMessageImageCacheProvider>
     );
   }
 
   return (
-    <section className="companion-channels">
+    <ChannelMessageImageCacheProvider cache={imageCache}>
+      <section className="companion-channels">
       {error ? <p className="companion-channel-error">{error}</p> : null}
       {loading && channels.length === 0 ? <Spinner /> : null}
       {groups.map((group) => (
@@ -1822,7 +1830,8 @@ export function CompanionChannels({
       {!loading && groups.length === 0 ? (
         <p className="companion-channel-empty">{t("companion.channelsEmpty")}</p>
       ) : null}
-    </section>
+      </section>
+    </ChannelMessageImageCacheProvider>
   );
 }
 
