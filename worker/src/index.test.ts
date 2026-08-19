@@ -529,6 +529,33 @@ describe("Worker HTTP contract", () => {
         agent: null,
       }),
     ).toEqual({ model: "claude-sonnet-4-0", effort: "medium" });
+
+    expect(
+      issueReplyExecutionConfig({
+        provider: "codex",
+        preferred: {
+          provider: "codex",
+          model: "run-default",
+          effort: "medium",
+        },
+        requested: {
+          provider: "codex",
+          model: "run-requested",
+          effort: "high",
+        },
+        activeSkill: {
+          provider: "codex",
+          model: "mentioned-agent-skill",
+          effort: "xhigh",
+        },
+        agent: {
+          provider: "codex",
+          model: "mentioned-agent",
+          effort: "high",
+        },
+        prioritizeAgent: true,
+      }),
+    ).toEqual({ model: "mentioned-agent-skill", effort: "xhigh" });
   });
 
   it("projects active Skill instructions through the legacy Agent field", () => {
@@ -1383,9 +1410,12 @@ describe("Worker HTTP contract", () => {
           run_id: "run-1",
           parent_message_id: null,
           author_user_id: "user-1",
+          author_agent_id: null,
+          author_agent_name: null,
           author_agent_provider: null,
           author_name: "Jay",
           author_image: null,
+          author_agent_image: null,
           body: "Use all three requested articles.\n\n![screen](briar-attachment://attachment-1)",
           reply_count: 1,
           created_at: "2026-07-30T00:00:00.000Z",
@@ -1396,9 +1426,12 @@ describe("Worker HTTP contract", () => {
           run_id: "run-1",
           parent_message_id: "message-1",
           author_user_id: null,
+          author_agent_id: null,
+          author_agent_name: null,
           author_agent_provider: "codex",
           author_name: null,
           author_image: null,
+          author_agent_image: null,
           body: "I will preserve that acceptance criterion.",
           reply_count: 0,
           created_at: "2026-07-30T00:01:00.000Z",
@@ -1434,7 +1467,9 @@ describe("Worker HTTP contract", () => {
         parentMessageId: "message-1",
         body: "I will preserve that acceptance criterion.",
         author: expect.objectContaining({
-          name: "Briar · Codex",
+          id: null,
+          agentId: null,
+          name: "Agent · Codex",
           provider: "codex",
         }),
       }),

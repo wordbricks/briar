@@ -406,6 +406,7 @@ final class IssueMutationStore: ObservableObject {
         clientMessageID: UUID? = nil,
         parentMessageID: UUID?,
         mentionedUserIds: [String] = [],
+        mentionedAgentIds: [String] = [],
         attachments: [PendingIssueAttachment] = [],
         attachmentReferences: [String]? = nil,
         pollInterval: Duration = .seconds(2),
@@ -426,8 +427,13 @@ final class IssueMutationStore: ObservableObject {
             }
             let path = MobileAPIContract.Endpoint.runMessages(projectID: projectID, runID: runID)
             let uniqueMentionedUserIds = Array(Set(mentionedUserIds.filter { !$0.isEmpty })).sorted()
+            let uniqueMentionedAgentIds = Array(Set(mentionedAgentIds.filter { !$0.isEmpty })).sorted()
             let mentionedUserIdsJSON = String(
                 data: try JSONEncoder().encode(uniqueMentionedUserIds),
+                encoding: .utf8
+            ) ?? "[]"
+            let mentionedAgentIdsJSON = String(
+                data: try JSONEncoder().encode(uniqueMentionedAgentIds),
                 encoding: .utf8
             ) ?? "[]"
             let response: CreateIssueMessageResponse
@@ -441,6 +447,7 @@ final class IssueMutationStore: ObservableObject {
                         clientMessageId: clientMessageID,
                         parentMessageId: parentMessageID,
                         mentionedUserIds: uniqueMentionedUserIds,
+                        mentionedAgentIds: uniqueMentionedAgentIds,
                         agentConversationId: nil
                     ),
                     as: CreateIssueMessageResponse.self
@@ -459,6 +466,7 @@ final class IssueMutationStore: ObservableObject {
                         "clientMessageId": clientMessageID?.uuidString.lowercased() ?? "",
                         "parentMessageId": parentMessageID?.uuidString.lowercased() ?? "",
                         "mentionedUserIds": mentionedUserIdsJSON,
+                        "mentionedAgentIds": mentionedAgentIdsJSON,
                         "agentConversationId": "",
                         "attachmentReferences": payload.referencesJSON,
                     ],
@@ -468,8 +476,13 @@ final class IssueMutationStore: ObservableObject {
                 )
             }
             onCreated?(response.message)
-            guard let initialReply = response.agentReply else { return [response.message] }
-            onAgentReplyChanged?(initialReply)
+            let initialReplies = response.agentReplies.isEmpty
+                ? response.agentReply.map { [$0] } ?? []
+                : response.agentReplies
+            guard !initialReplies.isEmpty else { return [response.message] }
+            for initialReply in initialReplies {
+                onAgentReplyChanged?(initialReply)
+            }
             for _ in 0..<maximumPolls {
                 try await Task.sleep(for: pollInterval)
                 let polled: IssueAgentReplyResponse
@@ -490,16 +503,25 @@ final class IssueMutationStore: ObservableObject {
                 } catch {
                     throw IssueMutationError.agentReplyPollingFailed
                 }
-                onAgentReplyChanged?(polled.agentReply)
-                switch polled.agentReply.status {
-                case .completed:
-                    return [response.message] + (polled.message.map { [$0] } ?? [])
-                case .failed:
-                    throw IssueMutationError.agentReplyFailed(
-                        polled.agentReply.error ?? L10n.text("Briar가 답변을 만들지 못했습니다.")
-                    )
-                case .queued, .running:
-                    continue
+                let polledReplies = polled.agentReplies.isEmpty
+                    ? [polled.agentReply]
+                    : polled.agentReplies
+                for polledReply in polledReplies {
+                    onAgentReplyChanged?(polledReply)
+                    if polledReply.status == .failed {
+                        throw IssueMutationError.agentReplyFailed(
+                            polledReply.error ?? L10n.text("Agent가 답변을 만들지 못했습니다.")
+                        )
+                    }
+                }
+                if polledReplies.count >= initialReplies.count &&
+                    polledReplies.allSatisfy({ $0.status == .completed }) {
+                    let completedMessages = polled.messages.isEmpty
+                        ? polled.message.map { [$0] } ?? []
+                        : polled.messages
+                    return [response.message] + completedMessages.filter {
+                        $0.id != response.message.id
+                    }
                 }
             }
             throw IssueMutationError.agentReplyTimedOut

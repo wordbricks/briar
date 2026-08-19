@@ -1353,6 +1353,10 @@ describe("Channels", () => {
     expect(badge?.textContent?.trim()).toBe("");
     expect(badge?.getAttribute("aria-label")).toBe("Claude");
     expect(badge?.getAttribute("title")).toBe("Claude");
+    expect(container.querySelector(".channel-message-avatar .channel-agent-badge"))
+      .not.toBeNull();
+    expect(container.querySelector(".channel-message-body header .channel-agent-badge"))
+      .toBeNull();
   });
 
   it("shows hover quick reactions and toggles an existing reaction chip", async () => {

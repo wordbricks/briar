@@ -804,9 +804,10 @@
       "path": "/projects/{projectId}/runs/{runId}/messages",
       "status": 200,
       "request": {
-        "body": "@Briar please review",
+        "body": "@Developer please review",
         "parentMessageId": null,
         "mentionedUserIds": [],
+        "mentionedAgentIds": ["aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"],
         "agentConversationId": null
       },
       "response": {
@@ -814,7 +815,7 @@
           "id": "99999999-9999-4999-8999-999999999999",
           "runId": "33333333-3333-4333-8333-333333333333",
           "parentMessageId": null,
-          "body": "@Briar please review",
+          "body": "@Developer please review",
           "attachments": [],
           "author": {
             "id": "fixture-user",
@@ -830,10 +831,22 @@
           "id": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
           "triggerMessageId": "99999999-9999-4999-8999-999999999999",
           "parentMessageId": "99999999-9999-4999-8999-999999999999",
+          "agentId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          "agentName": "Developer",
           "status": "queued",
           "attempts": 0,
           "error": null
-        }
+        },
+        "agentReplies": [{
+          "id": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+          "triggerMessageId": "99999999-9999-4999-8999-999999999999",
+          "parentMessageId": "99999999-9999-4999-8999-999999999999",
+          "agentId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          "agentName": "Developer",
+          "status": "queued",
+          "attempts": 0,
+          "error": null
+        }]
       }
     },
     "getIssueAgentReply": {
@@ -845,6 +858,8 @@
           "id": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
           "triggerMessageId": "99999999-9999-4999-8999-999999999999",
           "parentMessageId": "99999999-9999-4999-8999-999999999999",
+          "agentId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          "agentName": "Developer",
           "status": "completed",
           "attempts": 1,
           "error": null
@@ -857,7 +872,8 @@
           "attachments": [],
           "author": {
             "id": null,
-            "name": "Briar · Codex",
+            "agentId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            "name": "Developer",
             "image": null,
             "provider": "codex"
           },

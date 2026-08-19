@@ -794,9 +794,9 @@ describe("detached Agent runner", () => {
       agent,
       snapshot: {
         run: { resultSummary: "Fixed the retry race.", branch: "briar/retry" },
-        messages: [{ body: "@briar what changed?" }],
+        messages: [{ body: "@developer what changed?" }],
       },
-      userMessage: "@briar what changed?",
+      userMessage: "@developer what changed?",
       workspaceAvailable: false,
     });
     const launch = detachedProviderRequest({
@@ -809,7 +809,7 @@ describe("detached Agent runner", () => {
 
     expect(prompt).toContain("worktree is unavailable");
     expect(prompt).toContain("Fixed the retry race.");
-    expect(prompt).toContain("@briar what changed?");
+    expect(prompt).toContain("@developer what changed?");
     expect(prompt).toContain("request_issue_rework");
     expect(prompt).toContain("request_issue_update");
     expect(prompt).toContain("request_issue_create");

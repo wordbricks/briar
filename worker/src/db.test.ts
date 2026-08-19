@@ -376,6 +376,11 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     }
     await executeSql(
       db,
+      `alter table briar_issue_messages add column author_agent_id text;
+       alter table briar_issue_messages add column author_agent_name text;`,
+    );
+    await executeSql(
+      db,
       `
       insert into user (id, name, email, emailVerified, createdAt, updatedAt)
       values ('owner', 'Owner', 'owner@example.com', 1, '${atMinute(0)}', '${atMinute(0)}');
@@ -991,6 +996,20 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         resolve("migrations/0113_project_schedule_tab.sql"),
         "utf8",
       ),
+    );
+    // The lifecycle suite intentionally uses a compact migration history, so
+    // add the issue-reply job columns that production migration 0116 supplies
+    // before exercising the shared DB helpers below.
+    await executeSql(
+      db,
+      `alter table briar_issue_agent_reply_jobs add column agent_id text;
+       alter table briar_issue_agent_reply_jobs
+         add column requires_preferred_worker integer not null default 0;
+       alter table briar_issue_agent_reply_jobs add column agent_name_snapshot text;
+       alter table briar_issue_agent_reply_jobs
+         add column agent_responsibility_snapshot text;
+       create unique index briar_issue_agent_reply_jobs_agent_test_idx
+         on briar_issue_agent_reply_jobs (project_id, trigger_message_id, agent_id);`,
     );
   }, 30_000);
 
