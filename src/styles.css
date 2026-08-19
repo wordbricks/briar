@@ -342,7 +342,6 @@ body { overflow: hidden; font-synthesis: none; }
   flex: none;
   overflow: visible;
   vertical-align: middle;
-  transform-box: view-box;
   transform-origin: center;
 }
 .spin { animation: briar-spin .8s linear infinite; }

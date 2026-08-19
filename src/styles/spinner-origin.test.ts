@@ -12,9 +12,9 @@ const originRule = styles.match(
 )?.[1];
 
 describe("spinner rotation origin", () => {
-  it("pins spinning icons to the SVG viewBox center", () => {
+  it("pins spinning icons to the element center without unscaled view-box offsets", () => {
     expect(originRule, "expected a shared spinner origin rule").toBeDefined();
-    expect(originRule).toContain("transform-box: view-box");
+    expect(originRule).not.toContain("transform-box: view-box");
     expect(originRule).toContain("transform-origin: center");
     expect(originRule).toContain("display: inline-block");
   });
