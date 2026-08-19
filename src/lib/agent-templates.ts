@@ -1,4 +1,14 @@
+import uiDesignerMarkdown from "../data/agent-templates/agency-agents/design/design-ui-designer.md?raw";
+import backendArchitectMarkdown from "../data/agent-templates/agency-agents/engineering/engineering-backend-architect.md?raw";
+import devopsAutomatorMarkdown from "../data/agent-templates/agency-agents/engineering/engineering-devops-automator.md?raw";
 import frontendDeveloperMarkdown from "../data/agent-templates/agency-agents/engineering/engineering-frontend-developer.md?raw";
+import mobileAppBuilderMarkdown from "../data/agent-templates/agency-agents/engineering/engineering-mobile-app-builder.md?raw";
+import contentCreatorMarkdown from "../data/agent-templates/agency-agents/marketing/marketing-content-creator.md?raw";
+import growthHackerMarkdown from "../data/agent-templates/agency-agents/marketing/marketing-growth-hacker.md?raw";
+import instagramCuratorMarkdown from "../data/agent-templates/agency-agents/marketing/marketing-instagram-curator.md?raw";
+import socialMediaStrategistMarkdown from "../data/agent-templates/agency-agents/marketing/marketing-social-media-strategist.md?raw";
+import tiktokStrategistMarkdown from "../data/agent-templates/agency-agents/marketing/marketing-tiktok-strategist.md?raw";
+import sprintPrioritizerMarkdown from "../data/agent-templates/agency-agents/product/product-sprint-prioritizer.md?raw";
 import agencyAgentsLicense from "../../third-party/agency-agents-LICENSE.md?raw";
 
 import type {
@@ -24,7 +34,7 @@ export type ProjectAgentTemplate = {
     licenseUrl: string;
     licenseNotice: string;
   };
-  division: "engineering";
+  division: "design" | "engineering" | "marketing" | "product";
   emoji: string;
   name: string;
   description: string;
@@ -47,18 +57,26 @@ export function agentTemplateMarkdownBody(markdown: string) {
   return normalized.slice(frontmatterEnd + "\n---\n".length).trim();
 }
 
+const agencyAgentsRepository = "https://github.com/msitarzewski/agency-agents";
+const agencyAgentsCommit = "ebe9c99acb5c96f9468de368d8bead775387d1a7";
+
+function agencyAgentsTemplateSource(path: string) {
+  return {
+    repository: agencyAgentsRepository,
+    commit: agencyAgentsCommit,
+    path,
+    url: `${agencyAgentsRepository}/blob/${agencyAgentsCommit}/${path}`,
+    license: "MIT" as const,
+    licenseUrl: `${agencyAgentsRepository}/blob/${agencyAgentsCommit}/LICENSE`,
+    licenseNotice: agencyAgentsLicense.trim(),
+  };
+}
+
 export const frontendDeveloperAgentTemplate = {
   id: "agency-agents:engineering/engineering-frontend-developer",
-  source: {
-    repository: "https://github.com/msitarzewski/agency-agents",
-    commit: "ebe9c99acb5c96f9468de368d8bead775387d1a7",
-    path: "engineering/engineering-frontend-developer.md",
-    url: "https://github.com/msitarzewski/agency-agents/blob/ebe9c99acb5c96f9468de368d8bead775387d1a7/engineering/engineering-frontend-developer.md",
-    license: "MIT",
-    licenseUrl:
-      "https://github.com/msitarzewski/agency-agents/blob/ebe9c99acb5c96f9468de368d8bead775387d1a7/LICENSE",
-    licenseNotice: agencyAgentsLicense.trim(),
-  },
+  source: agencyAgentsTemplateSource(
+    "engineering/engineering-frontend-developer.md",
+  ),
   division: "engineering",
   emoji: "🖥️",
   name: "Frontend Developer",
@@ -76,8 +94,230 @@ export const frontendDeveloperAgentTemplate = {
   ],
 } satisfies ProjectAgentTemplate;
 
+export const backendArchitectAgentTemplate = {
+  id: "agency-agents:engineering/engineering-backend-architect",
+  source: agencyAgentsTemplateSource(
+    "engineering/engineering-backend-architect.md",
+  ),
+  division: "engineering",
+  emoji: "🏗️",
+  name: "Backend Architect",
+  description:
+    "Senior backend architect specializing in scalable system design, database architecture, API development, and cloud infrastructure. Builds robust, secure, performant server-side applications and microservices",
+  responsibility:
+    "Own scalable backend architecture, data models, APIs, security, reliability, observability, and cloud infrastructure.",
+  calendarColor: "#3B82F6",
+  skills: [
+    {
+      name: "Backend Architecture",
+      instructions: agentTemplateMarkdownBody(backendArchitectMarkdown),
+      kind: "custom",
+    },
+  ],
+} satisfies ProjectAgentTemplate;
+
+export const mobileAppBuilderAgentTemplate = {
+  id: "agency-agents:engineering/engineering-mobile-app-builder",
+  source: agencyAgentsTemplateSource(
+    "engineering/engineering-mobile-app-builder.md",
+  ),
+  division: "engineering",
+  emoji: "📲",
+  name: "Mobile App Builder",
+  description:
+    "Specialized mobile application developer with expertise in native iOS/Android development and cross-platform frameworks",
+  responsibility:
+    "Own native and cross-platform mobile architecture, implementation, testing, performance, accessibility, and release quality across iOS and Android.",
+  calendarColor: "#8B5CF6",
+  skills: [
+    {
+      name: "Mobile App Development",
+      instructions: agentTemplateMarkdownBody(mobileAppBuilderMarkdown),
+      kind: "custom",
+    },
+  ],
+} satisfies ProjectAgentTemplate;
+
+export const devopsAutomatorAgentTemplate = {
+  id: "agency-agents:engineering/engineering-devops-automator",
+  source: agencyAgentsTemplateSource(
+    "engineering/engineering-devops-automator.md",
+  ),
+  division: "engineering",
+  emoji: "⚙️",
+  name: "DevOps Automator",
+  description:
+    "Expert DevOps engineer specializing in infrastructure automation, CI/CD pipeline development, and cloud operations",
+  responsibility:
+    "Own infrastructure automation, CI/CD, cloud operations, observability, reliability, security, and incident readiness.",
+  calendarColor: "#F97316",
+  skills: [
+    {
+      name: "DevOps Automation",
+      instructions: agentTemplateMarkdownBody(devopsAutomatorMarkdown),
+      kind: "custom",
+    },
+  ],
+} satisfies ProjectAgentTemplate;
+
+export const uiDesignerAgentTemplate = {
+  id: "agency-agents:design/design-ui-designer",
+  source: agencyAgentsTemplateSource("design/design-ui-designer.md"),
+  division: "design",
+  emoji: "🎨",
+  name: "UI Designer",
+  description:
+    "Expert UI designer specializing in visual design systems, component libraries, and pixel-perfect interface creation. Creates beautiful, consistent, accessible user interfaces that enhance UX and reflect brand identity",
+  responsibility:
+    "Own the visual design system, component library, accessibility, consistency, and pixel-perfect interface quality across product surfaces.",
+  calendarColor: "#A855F7",
+  skills: [
+    {
+      name: "UI Design",
+      instructions: agentTemplateMarkdownBody(uiDesignerMarkdown),
+      kind: "custom",
+    },
+  ],
+} satisfies ProjectAgentTemplate;
+
+export const sprintPrioritizerAgentTemplate = {
+  id: "agency-agents:product/product-sprint-prioritizer",
+  source: agencyAgentsTemplateSource(
+    "product/product-sprint-prioritizer.md",
+  ),
+  division: "product",
+  emoji: "🎯",
+  name: "Sprint Prioritizer",
+  description:
+    "Expert product manager specializing in agile sprint planning, feature prioritization, and resource allocation. Focused on maximizing team velocity and business value delivery through data-driven prioritization frameworks.",
+  responsibility:
+    "Own sprint planning and prioritization by balancing customer impact, business value, dependencies, risks, and team capacity.",
+  calendarColor: "#22C55E",
+  skills: [
+    {
+      name: "Sprint Prioritization",
+      instructions: agentTemplateMarkdownBody(sprintPrioritizerMarkdown),
+      kind: "custom",
+    },
+  ],
+} satisfies ProjectAgentTemplate;
+
+export const growthHackerAgentTemplate = {
+  id: "agency-agents:marketing/marketing-growth-hacker",
+  source: agencyAgentsTemplateSource("marketing/marketing-growth-hacker.md"),
+  division: "marketing",
+  emoji: "🚀",
+  name: "Growth Hacker",
+  description:
+    "Expert growth strategist specializing in rapid user acquisition through data-driven experimentation. Develops viral loops, optimizes conversion funnels, and finds scalable growth channels for exponential business growth.",
+  responsibility:
+    "Own data-driven growth strategy, experimentation, acquisition funnels, viral loops, retention, and scalable channel discovery.",
+  calendarColor: "#10B981",
+  skills: [
+    {
+      name: "Growth Hacking",
+      instructions: agentTemplateMarkdownBody(growthHackerMarkdown),
+      kind: "custom",
+    },
+  ],
+} satisfies ProjectAgentTemplate;
+
+export const socialMediaStrategistAgentTemplate = {
+  id: "agency-agents:marketing/marketing-social-media-strategist",
+  source: agencyAgentsTemplateSource(
+    "marketing/marketing-social-media-strategist.md",
+  ),
+  division: "marketing",
+  emoji: "📣",
+  name: "Social Media Strategist",
+  description:
+    "Expert social media strategist for LinkedIn, Twitter, and professional platforms. Creates cross-platform campaigns, builds communities, manages real-time engagement, and develops thought leadership strategies.",
+  responsibility:
+    "Own cross-platform social strategy, campaign planning, community engagement, thought leadership, and measurable channel performance.",
+  calendarColor: "#2563EB",
+  skills: [
+    {
+      name: "Social Media Strategy",
+      instructions: agentTemplateMarkdownBody(socialMediaStrategistMarkdown),
+      kind: "custom",
+    },
+  ],
+} satisfies ProjectAgentTemplate;
+
+export const contentCreatorAgentTemplate = {
+  id: "agency-agents:marketing/marketing-content-creator",
+  source: agencyAgentsTemplateSource("marketing/marketing-content-creator.md"),
+  division: "marketing",
+  emoji: "✍️",
+  name: "Content Creator",
+  description:
+    "Expert content strategist and creator for multi-platform campaigns. Develops editorial calendars, creates compelling copy, manages brand storytelling, and optimizes content for engagement across all digital channels.",
+  responsibility:
+    "Own content strategy, editorial calendars, brand storytelling, multi-format production, distribution, SEO, and performance optimization.",
+  calendarColor: "#14B8A6",
+  skills: [
+    {
+      name: "Content Creation",
+      instructions: agentTemplateMarkdownBody(contentCreatorMarkdown),
+      kind: "custom",
+    },
+  ],
+} satisfies ProjectAgentTemplate;
+
+export const instagramCuratorAgentTemplate = {
+  id: "agency-agents:marketing/marketing-instagram-curator",
+  source: agencyAgentsTemplateSource(
+    "marketing/marketing-instagram-curator.md",
+  ),
+  division: "marketing",
+  emoji: "📸",
+  name: "Instagram Curator",
+  description:
+    "Expert Instagram marketing specialist focused on visual storytelling, community building, and multi-format content optimization. Masters aesthetic development and drives meaningful engagement.",
+  responsibility:
+    "Own Instagram visual strategy, multi-format content, community growth, social commerce, creator partnerships, and performance optimization.",
+  calendarColor: "#E4405F",
+  skills: [
+    {
+      name: "Instagram Marketing",
+      instructions: agentTemplateMarkdownBody(instagramCuratorMarkdown),
+      kind: "custom",
+    },
+  ],
+} satisfies ProjectAgentTemplate;
+
+export const tiktokStrategistAgentTemplate = {
+  id: "agency-agents:marketing/marketing-tiktok-strategist",
+  source: agencyAgentsTemplateSource("marketing/marketing-tiktok-strategist.md"),
+  division: "marketing",
+  emoji: "🎵",
+  name: "TikTok Strategist",
+  description:
+    "Expert TikTok marketing specialist focused on viral content creation, algorithm optimization, and community building. Masters TikTok's unique culture and features for brand growth.",
+  responsibility:
+    "Own TikTok content strategy, trend and algorithm adaptation, creator partnerships, community growth, paid campaigns, and measurable performance.",
+  calendarColor: "#111827",
+  skills: [
+    {
+      name: "TikTok Marketing",
+      instructions: agentTemplateMarkdownBody(tiktokStrategistMarkdown),
+      kind: "custom",
+    },
+  ],
+} satisfies ProjectAgentTemplate;
+
 export const projectAgentTemplates = [
   frontendDeveloperAgentTemplate,
+  backendArchitectAgentTemplate,
+  mobileAppBuilderAgentTemplate,
+  devopsAutomatorAgentTemplate,
+  uiDesignerAgentTemplate,
+  sprintPrioritizerAgentTemplate,
+  growthHackerAgentTemplate,
+  socialMediaStrategistAgentTemplate,
+  contentCreatorAgentTemplate,
+  instagramCuratorAgentTemplate,
+  tiktokStrategistAgentTemplate,
 ] as const satisfies readonly ProjectAgentTemplate[];
 
 export function projectAgentTemplateSkillInputs(
@@ -141,11 +381,11 @@ export function projectAgentTemplateValidationErrors(
   return errors;
 }
 
-const frontendDeveloperTemplateErrors = projectAgentTemplateValidationErrors(
-  frontendDeveloperAgentTemplate,
-);
-if (frontendDeveloperTemplateErrors.length > 0) {
-  throw new Error(
-    `Invalid Frontend Developer Agent template: ${frontendDeveloperTemplateErrors.join(", ")}`,
-  );
+for (const template of projectAgentTemplates) {
+  const errors = projectAgentTemplateValidationErrors(template);
+  if (errors.length > 0) {
+    throw new Error(
+      `Invalid ${template.name} Agent template: ${errors.join(", ")}`,
+    );
+  }
 }
