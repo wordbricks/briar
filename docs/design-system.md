@@ -53,6 +53,8 @@ Semantic tokens (shadcn):
 - `muted` + `muted-foreground` — soft surface + secondary text
 - `accent` + `accent-foreground` — soft brand wash
 - `destructive` / `success` / `warning`
+- `status-{info,success,warning,destructive}-{surface,border,foreground,muted}` —
+  derived, theme-aware feedback banner colors
 - `border` / `input` / `ring`
 
 Legacy aliases still work for `styles.css`: `--ink`, `--line`, `--surface`, `--faint`, `--mint`, `--rose`, `--brand`.

@@ -97,6 +97,72 @@
   --warning: #d58a3d;
   --warning-foreground: #fffaf3;
 
+  /* Theme-aware status surfaces for banners and inline feedback. */
+  --status-info-surface: color-mix(
+    in srgb,
+    var(--mention-foreground) 8%,
+    var(--card)
+  );
+  --status-info-border: color-mix(
+    in srgb,
+    var(--mention-foreground) 28%,
+    var(--border)
+  );
+  --status-info-foreground: color-mix(
+    in srgb,
+    var(--mention-foreground) 72%,
+    var(--foreground)
+  );
+  --status-info-muted: color-mix(
+    in srgb,
+    var(--mention-foreground) 32%,
+    var(--muted-foreground)
+  );
+  --status-success-surface: color-mix(in srgb, var(--success) 8%, var(--card));
+  --status-success-border: color-mix(in srgb, var(--success) 30%, var(--border));
+  --status-success-foreground: color-mix(
+    in srgb,
+    var(--success) 72%,
+    var(--foreground)
+  );
+  --status-success-muted: color-mix(
+    in srgb,
+    var(--success) 36%,
+    var(--muted-foreground)
+  );
+  --status-warning-surface: color-mix(in srgb, var(--warning) 9%, var(--card));
+  --status-warning-border: color-mix(in srgb, var(--warning) 32%, var(--border));
+  --status-warning-foreground: color-mix(
+    in srgb,
+    var(--warning) 72%,
+    var(--foreground)
+  );
+  --status-warning-muted: color-mix(
+    in srgb,
+    var(--warning) 36%,
+    var(--muted-foreground)
+  );
+  --status-destructive-surface: color-mix(
+    in srgb,
+    var(--destructive) 8%,
+    var(--card)
+  );
+  --status-destructive-border: color-mix(
+    in srgb,
+    var(--destructive) 32%,
+    var(--border)
+  );
+  --status-destructive-foreground: color-mix(
+    in srgb,
+    var(--destructive) 72%,
+    var(--foreground)
+  );
+  --status-destructive-muted: color-mix(
+    in srgb,
+    var(--destructive) 36%,
+    var(--muted-foreground)
+  );
+
   --border: #e3e4dd;
   --input: #dcded8;
   --ring: #73585d;
