@@ -60,10 +60,12 @@ function useElapsed() {
 export function LoadingState({
   className,
   label,
+  size = "default",
   variant = "Drive",
 }: {
   className?: string;
   label?: string;
+  size?: "default" | "compact";
   variant?: LoadingStateVariant;
 }) {
   const { t } = useI18n();
@@ -73,21 +75,29 @@ export function LoadingState({
   return (
     <div
       className={cn(
-        "loading-state flex w-fit min-w-0 max-w-full items-center gap-2.5",
+        "loading-state flex w-fit min-w-0 max-w-full items-center",
+        size === "compact" ? "gap-2" : "gap-2.5",
         className,
       )}
+      data-size={size}
       data-testid="loading-state"
       data-variant={variant}
     >
       <span
         aria-hidden
-        className="grid shrink-0 grid-cols-[repeat(3,4px)] gap-[1.5px]"
+        className={cn(
+          "grid shrink-0",
+          size === "compact"
+            ? "grid-cols-[repeat(3,3px)] gap-[1px]"
+            : "grid-cols-[repeat(3,4px)] gap-[1.5px]",
+        )}
       >
         {delays.map((d, i) => (
           <span
             key={i}
             className={cn(
-              "loading-state-pixel size-[4px] bg-ink",
+              "loading-state-pixel bg-ink",
+              size === "compact" ? "size-[3px]" : "size-[4px]",
               round ? "rounded-full" : "rounded-[1px]",
             )}
             style={{
