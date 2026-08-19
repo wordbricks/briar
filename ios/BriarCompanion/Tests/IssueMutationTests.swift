@@ -984,13 +984,13 @@ final class IssueMutationTests: XCTestCase {
 
         let messages = try await store.sendMessage(
             runID: Self.runID,
-            body: "@Briar 확인해 줘",
+            body: "@Developer 확인해 줘",
             parentMessageID: nil,
             pollInterval: .zero,
             maximumPolls: 1
         )
 
-        XCTAssertEqual(messages.map(\.body), ["@Briar 확인해 줘", "확인했습니다."])
+        XCTAssertEqual(messages.map(\.body), ["@Developer 확인해 줘", "확인했습니다."])
         let methods = await recorder.recordedMethods()
         XCTAssertEqual(methods, ["POST", "GET"])
     }
@@ -1211,9 +1211,9 @@ private actor AgentReplyAPIRecorder: MobileAPIClientProtocol {
         methods.append(method)
         let payload: String
         if method == "POST", path.hasSuffix("/messages") {
-            payload = #"{"message":{"id":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","runId":"33333333-3333-4333-8333-333333333333","parentMessageId":null,"body":"@Briar 확인해 줘","author":{"id":"fixture-user","name":"Briar User","image":null,"provider":null},"replyCount":0,"createdAt":"2026-08-02T01:00:00Z","updatedAt":"2026-08-02T01:00:00Z"},"agentReply":{"id":"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","triggerMessageId":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","status":"queued","error":null}}"#
+            payload = #"{"message":{"id":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","runId":"33333333-3333-4333-8333-333333333333","parentMessageId":null,"body":"@Developer 확인해 줘","author":{"id":"fixture-user","name":"Briar User","image":null,"provider":null},"replyCount":0,"createdAt":"2026-08-02T01:00:00Z","updatedAt":"2026-08-02T01:00:00Z"},"agentReply":{"id":"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","triggerMessageId":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","status":"queued","error":null}}"#
         } else if method == "GET", path.hasSuffix("/agent-reply") {
-            payload = #"{"agentReply":{"id":"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","triggerMessageId":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","status":"completed","error":null},"message":{"id":"cccccccc-cccc-4ccc-8ccc-cccccccccccc","runId":"33333333-3333-4333-8333-333333333333","parentMessageId":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","body":"확인했습니다.","author":{"id":null,"name":"Briar · Codex","image":null,"provider":"codex"},"replyCount":0,"createdAt":"2026-08-02T01:01:00Z","updatedAt":"2026-08-02T01:01:00Z"}}"#
+            payload = #"{"agentReply":{"id":"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","triggerMessageId":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","parentMessageId":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","agentId":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","agentName":"Developer","status":"completed","error":null},"message":{"id":"cccccccc-cccc-4ccc-8ccc-cccccccccccc","runId":"33333333-3333-4333-8333-333333333333","parentMessageId":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","body":"확인했습니다.","author":{"id":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","agentId":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","name":"Developer","image":null,"provider":"codex"},"replyCount":0,"createdAt":"2026-08-02T01:01:00Z","updatedAt":"2026-08-02T01:01:00Z"}}"#
         } else {
             throw MobileAPIError.invalidRequest
         }

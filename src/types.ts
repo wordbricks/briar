@@ -125,6 +125,7 @@ export type HuntEvent = {
 
 export type IssueMessageAuthor = {
   id: string | null;
+  agentId?: string | null;
   name: string;
   image: string | null;
   provider: AgentProvider | null;
@@ -214,12 +215,15 @@ export type IssueMessageSendResult = {
   message: IssueMessage;
   agentReply: Promise<IssueMessage> | null;
   agentReplyJob?: IssueAgentReplyState | null;
+  agentReplyJobs?: IssueAgentReplyState[];
 };
 
 export type IssueAgentReplyState = {
   id: string;
   triggerMessageId: string;
   parentMessageId: string;
+  agentId?: string | null;
+  agentName?: string | null;
   status: "queued" | "running" | "completed" | "failed";
   attempts: number;
   workerId: string | null;

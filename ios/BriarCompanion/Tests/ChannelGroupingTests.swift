@@ -372,7 +372,7 @@ final class ChannelGroupingTests: XCTestCase {
         )
     }
 
-    func testIssueMentionCandidatesIncludeBriarAndMembers() {
+    func testIssueMentionCandidatesIncludeProjectAgentsAndMembers() {
         let member = OrganizationMember(
             userId: "user-2",
             name: "Sam",
@@ -381,19 +381,37 @@ final class ChannelGroupingTests: XCTestCase {
             role: "member",
             createdAt: Date(timeIntervalSince1970: 1_700_000_000)
         )
+        let agent = ProjectAgent(
+            id: UUID(uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!,
+            projectId: UUID(uuidString: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")!,
+            name: "Developer",
+            avatar: nil,
+            codexPet: nil,
+            provider: .codex,
+            model: nil,
+            effort: nil,
+            description: nil,
+            responsibility: "Owns code changes",
+            skill: "",
+            skills: [],
+            calendarColor: "#3275d5",
+            createdAt: Date(timeIntervalSince1970: 1_700_000_000),
+            updatedAt: Date(timeIntervalSince1970: 1_700_000_000)
+        )
         let candidates = MessageMentions.issueCandidates(
             members: [member],
+            agents: [agent],
             currentUserId: "user-1"
         )
 
-        XCTAssertEqual(candidates.map(\.handle), ["briar", "sam"])
+        XCTAssertEqual(candidates.map(\.handle), ["developer", "sam"])
         XCTAssertEqual(
             ChannelMentions.suggestions(in: "@s", candidates: candidates).map(\.handle),
             ["sam"]
         )
         XCTAssertEqual(
-            ChannelMentions.suggestions(in: "@b", candidates: candidates).map(\.handle),
-            ["briar"]
+            ChannelMentions.suggestions(in: "@d", candidates: candidates).map(\.handle),
+            ["developer"]
         )
     }
 

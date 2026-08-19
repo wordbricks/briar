@@ -2863,6 +2863,7 @@ export function useBriar(options: UseBriarOptions = {}) {
         clientMessageId?: string;
         parentMessageId: string | null;
         mentionedUserIds?: string[];
+        mentionedAgentIds?: string[];
         attachments?: File[];
         attachmentReferences?: string[];
       },
@@ -2923,6 +2924,7 @@ export function useBriar(options: UseBriarOptions = {}) {
           clientMessageId: input.clientMessageId,
           parentMessageId: input.parentMessageId,
           mentionedUserIds: input.mentionedUserIds,
+          mentionedAgentIds: input.mentionedAgentIds,
           attachments: input.attachments,
           attachmentReferences: input.attachmentReferences,
         },
@@ -2932,6 +2934,9 @@ export function useBriar(options: UseBriarOptions = {}) {
         message,
         agentReply: null,
         agentReplyJob: created.agentReply,
+        agentReplyJobs: created.agentReplies ?? (
+          created.agentReply ? [created.agentReply] : []
+        ),
       };
     },
     [activeProjectId, token],

@@ -3,9 +3,8 @@ import {
   agentReplyParentMessageId,
   issueMentionAtCaret,
   issueMentionHandle,
+  issueReplyAgentIds,
   mentionsIssueHandle,
-  mentionsBriar,
-  shouldBriarReply,
 } from "./issue-agent-reply";
 
 describe("issue agent replies", () => {
@@ -24,182 +23,95 @@ describe("issue agent replies", () => {
     ).toBe("thread-root");
   });
 
-  it("continues replying in a thread where Briar was mentioned", () => {
-    const rootMessage = {
-      id: "thread-root",
-      runId: "run-1",
-      parentMessageId: null,
-      body: "@briar 진행 상황을 알려줘",
-      author: { id: "user-1", name: "User", image: null, provider: null },
-      replyCount: 1,
-      createdAt: "2026-07-25T00:00:00.000Z",
-      updatedAt: "2026-07-25T00:00:00.000Z",
-    } as const;
-
+  it("routes every explicitly mentioned Project Agent", () => {
     expect(
-      shouldBriarReply([rootMessage], {
-        body: "그 다음에는 어떻게 됐어?",
-        parentMessageId: rootMessage.id,
-      }),
-    ).toBe(true);
-    expect(
-      shouldBriarReply([rootMessage], {
-        body: "별도의 새 메시지",
+      issueReplyAgentIds([], {
+        mentionedAgentIds: ["agent-2", "agent-1", "agent-2"],
         parentMessageId: null,
       }),
-    ).toBe(false);
+    ).toEqual(["agent-2", "agent-1"]);
   });
 
-  it("continues replying when Briar has already participated in the thread", () => {
-    const agentReply = {
-      id: "agent-reply",
-      runId: "run-1",
-      parentMessageId: "thread-root",
-      body: "현재 진행 중입니다.",
-      author: {
-        id: null,
-        name: "Briar · Codex",
-        image: null,
-        provider: "codex",
-      },
-      replyCount: 0,
-      createdAt: "2026-07-25T00:00:00.000Z",
-      updatedAt: "2026-07-25T00:00:00.000Z",
-    } as const;
-
+  it("does not treat the old @briar alias as a routing signal", () => {
     expect(
-      shouldBriarReply([agentReply], {
-        body: "완료되면 알려줘",
-        parentMessageId: "thread-root",
+      issueReplyAgentIds([], {
+        parentMessageId: null,
       }),
-    ).toBe(true);
+    ).toEqual([]);
   });
 
-  it("applies the same continuation rule to worker-row shaped messages", () => {
+  it("continues with every agent that participated in the same thread", () => {
     const thread = [
       {
         id: "thread-root",
         parentMessageId: null,
         body: "첫 질문",
-        author: { provider: null },
+        author: { agentId: null, provider: null },
       },
       {
-        id: "agent-reply",
+        id: "codex-reply",
         parentMessageId: "thread-root",
-        body: "현재 진행 중입니다.",
-        author: { provider: "codex" },
+        body: "Codex 답변",
+        author: { agentId: "agent-codex", provider: "codex" },
+      },
+      {
+        id: "claude-reply",
+        parentMessageId: "thread-root",
+        body: "Claude 답변",
+        author: { agentId: "agent-claude", provider: "claude" },
       },
     ];
 
     expect(
-      shouldBriarReply(thread, {
-        body: "이어서 질문",
+      issueReplyAgentIds(thread, {
         parentMessageId: "thread-root",
       }),
-    ).toBe(true);
-    expect(
-      shouldBriarReply([thread[0]], {
-        body: "이어서 질문",
-        parentMessageId: "thread-root",
-      }),
-    ).toBe(false);
-    expect(
-      shouldBriarReply(thread, {
-        body: "별도의 새 메시지",
-        parentMessageId: null,
-      }),
-    ).toBe(false);
+    ).toEqual(["agent-codex", "agent-claude"]);
   });
 
-  it("continues replying to a nested reply when an ancestor is agent-authored", () => {
+  it("continues with an agent ancestor for nested replies", () => {
     const thread = [
       {
         id: "thread-root",
         parentMessageId: null,
         body: "첫 질문",
-        author: { provider: null },
+        author: { agentId: null, provider: null },
       },
       {
         id: "agent-reply",
         parentMessageId: "thread-root",
         body: "현재 진행 중입니다.",
-        author: { provider: "codex" },
+        author: { agentId: "agent-1", provider: "codex" },
       },
       {
         id: "nested-reply",
         parentMessageId: "agent-reply",
         body: "자세히 알려줘",
-        author: { provider: null },
+        author: { agentId: null, provider: null },
       },
     ];
 
     expect(
-      shouldBriarReply(thread, {
-        body: "대댓글에 이어서 질문",
+      issueReplyAgentIds(thread, {
         parentMessageId: "nested-reply",
       }),
-    ).toBe(true);
+    ).toEqual(["agent-1"]);
   });
 
-  it("does not reply to a nested reply when no ancestor participated", () => {
-    const thread = [
-      {
-        id: "thread-root",
-        parentMessageId: null,
-        body: "첫 질문",
-        author: { provider: null },
-      },
-      {
-        id: "reply-1",
-        parentMessageId: "thread-root",
-        body: "동료 답변",
-        author: { provider: null },
-      },
-      {
-        id: "nested-reply",
-        parentMessageId: "reply-1",
-        body: "동료 대댓글",
-        author: { provider: null },
-      },
-    ];
-
+  it("does not continue from provider-only legacy messages", () => {
     expect(
-      shouldBriarReply(thread, {
-        body: "동료 대댓글에 이어서",
-        parentMessageId: "nested-reply",
-      }),
-    ).toBe(false);
-  });
-
-  it("continues replying to a nested reply whose parent is agent-authored", () => {
-    const thread = [
-      {
-        id: "thread-root",
-        parentMessageId: null,
-        body: "첫 질문",
-        author: { provider: null },
-      },
-      {
-        id: "agent-reply",
-        parentMessageId: "thread-root",
-        body: "현재 진행 중입니다.",
-        author: { provider: "grok" },
-      },
-    ];
-
-    expect(
-      shouldBriarReply(thread, {
-        body: "답변의 대댓글",
-        parentMessageId: "agent-reply",
-      }),
-    ).toBe(true);
-  });
-
-  it("recognizes a standalone @briar mention without matching email-like text", () => {
-    expect(mentionsBriar("@briar 이 변경을 설명해 줘")).toBe(true);
-    expect(mentionsBriar("Could you check this, @BRIAR?")).toBe(true);
-    expect(mentionsBriar("owner@briar.example")).toBe(false);
-    expect(mentionsBriar("@briard")).toBe(false);
+      issueReplyAgentIds(
+        [
+          {
+            id: "legacy-reply",
+            parentMessageId: "thread-root",
+            body: "기존 답변",
+            author: { agentId: null, provider: "codex" },
+          },
+        ],
+        { parentMessageId: "thread-root" },
+      ),
+    ).toEqual([]);
   });
 
   it("builds member mention handles and recognizes selected mentions", () => {

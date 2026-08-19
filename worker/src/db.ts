@@ -742,9 +742,12 @@ export type IssueMessageRow = {
   run_id: string;
   parent_message_id: string | null;
   author_user_id: string | null;
+  author_agent_id: string | null;
+  author_agent_name: string | null;
   author_agent_provider: ProjectAgentProvider | null;
   author_name: string | null;
   author_image: string | null;
+  author_agent_image: string | null;
   body: string;
   reply_count: number;
   created_at: string;
@@ -758,6 +761,10 @@ export type IssueAgentReplyJobRow = {
   trigger_message_id: string;
   parent_message_id: string;
   reply_message_id: string;
+  agent_id: string | null;
+  requires_preferred_worker: number;
+  agent_name_snapshot: string | null;
+  agent_responsibility_snapshot: string | null;
   status: "queued" | "running" | "completed" | "failed";
   preferred_worker_id: string | null;
   claimed_worker_id: string | null;
@@ -932,7 +939,6 @@ export type FreshBacklogExecutionTargetRow = {
 };
 
 export type IssueConversationNotificationRow = IssueMessageRow & {
-  author_agent_image: string | null;
   run_title: string;
   root_message_id: string;
   notification_reason: "mention" | "thread_reply" | "subscription";
@@ -7370,17 +7376,74 @@ export async function deleteIssueDependency(
   return result.meta.changes > 0;
 }
 
+async function issueMessageAgentSchema(db: D1Database) {
+  const result = await db.prepare(
+    `select
+       exists(
+         select 1 from pragma_table_info('briar_issue_messages')
+         where name = 'author_agent_id'
+       ) as has_author_agent_id,
+       exists(
+         select 1 from pragma_table_info('briar_issue_messages')
+         where name = 'author_agent_name'
+       ) as has_author_agent_name,
+       exists(
+         select 1 from pragma_table_info('briar_issue_messages')
+         where name = 'author_agent_provider'
+       ) as has_author_agent_provider,
+       exists(
+         select 1 from sqlite_master
+         where type = 'table' and name = 'briar_project_agents'
+       ) as has_project_agents`,
+  ).first<{
+    has_author_agent_id: number;
+    has_author_agent_name: number;
+    has_author_agent_provider: number;
+    has_project_agents: number;
+  }>();
+  return {
+    hasAuthorAgentId: result?.has_author_agent_id === 1,
+    hasAuthorAgentName: result?.has_author_agent_name === 1,
+    hasAuthorAgentProvider: result?.has_author_agent_provider === 1,
+    hasProjectAgents: result?.has_project_agents === 1,
+  };
+}
+
 export async function listIssueMessages(
   db: D1Database,
   projectId: string,
   runId: string,
 ) {
+  const schema = await issueMessageAgentSchema(db);
+  const authorAgentId = schema.hasAuthorAgentId
+    ? "message.author_agent_id"
+    : "null";
+  const authorAgentName = schema.hasAuthorAgentName
+    ? "message.author_agent_name"
+    : "null";
+  const authorAgentProvider = schema.hasAuthorAgentProvider
+    ? "message.author_agent_provider"
+    : "null";
+  const authorName = schema.hasAuthorAgentName
+    ? "coalesce(author.name, message.author_agent_name)"
+    : "author.name";
+  const agentImage = schema.hasAuthorAgentId && schema.hasProjectAgents
+    ? "agent.avatar"
+    : "null";
+  const agentJoin = schema.hasAuthorAgentId && schema.hasProjectAgents
+    ? `left join briar_project_agents agent
+         on agent.id = message.author_agent_id
+        and agent.project_id = message.project_id`
+    : "";
   const result = await db
     .prepare(
       `select message.id, message.run_id, message.parent_message_id,
-              message.author_user_id, message.author_agent_provider,
-              author.name as author_name,
-              author.image as author_image, message.body,
+              message.author_user_id, ${authorAgentId} as author_agent_id,
+              ${authorAgentName} as author_agent_name,
+              ${authorAgentProvider} as author_agent_provider,
+              ${authorName} as author_name,
+              author.image as author_image,
+              ${agentImage} as author_agent_image, message.body,
               (select count(*) from briar_issue_messages reply
                where reply.parent_message_id = message.id) as reply_count,
               message.created_at, message.updated_at
@@ -7388,6 +7451,7 @@ export async function listIssueMessages(
        join briar_hunt_runs run
          on run.id = message.run_id and run.project_id = message.project_id
        left join "user" author on author.id = message.author_user_id
+       ${agentJoin}
        where message.project_id = ? and message.run_id = ?
        order by message.created_at, message.id
        limit 1000`,
@@ -7403,12 +7467,36 @@ export async function listIssueThreadMessages(
   runId: string,
   messageId: string,
 ) {
+  const schema = await issueMessageAgentSchema(db);
+  const authorAgentId = schema.hasAuthorAgentId
+    ? "message.author_agent_id"
+    : "null";
+  const authorAgentName = schema.hasAuthorAgentName
+    ? "message.author_agent_name"
+    : "null";
+  const authorAgentProvider = schema.hasAuthorAgentProvider
+    ? "message.author_agent_provider"
+    : "null";
+  const authorName = schema.hasAuthorAgentName
+    ? "coalesce(author.name, message.author_agent_name)"
+    : "author.name";
+  const agentImage = schema.hasAuthorAgentId && schema.hasProjectAgents
+    ? "agent.avatar"
+    : "null";
+  const agentJoin = schema.hasAuthorAgentId && schema.hasProjectAgents
+    ? `left join briar_project_agents agent
+         on agent.id = message.author_agent_id
+        and agent.project_id = message.project_id`
+    : "";
   const result = await db
     .prepare(
       `select message.id, message.run_id, message.parent_message_id,
-              message.author_user_id, message.author_agent_provider,
-              author.name as author_name,
-              author.image as author_image, message.body,
+              message.author_user_id, ${authorAgentId} as author_agent_id,
+              ${authorAgentName} as author_agent_name,
+              ${authorAgentProvider} as author_agent_provider,
+              ${authorName} as author_name,
+              author.image as author_image,
+              ${agentImage} as author_agent_image, message.body,
               (select count(*) from briar_issue_messages reply
                where reply.parent_message_id = message.id) as reply_count,
               message.created_at, message.updated_at
@@ -7416,6 +7504,7 @@ export async function listIssueThreadMessages(
        join briar_hunt_runs run
          on run.id = message.run_id and run.project_id = message.project_id
        left join "user" author on author.id = message.author_user_id
+       ${agentJoin}
        where message.project_id = ? and message.run_id = ?
          and message.id in (
            with recursive thread_path(id, parent_message_id) as (
@@ -7453,6 +7542,8 @@ export async function createIssueMessage(
     runId: string;
     parentMessageId: string | null;
     authorUserId: string | null;
+    authorAgentId?: string | null;
+    authorAgentName?: string | null;
     authorAgentProvider: ProjectAgentProvider | null;
     body: string;
     mentionedUserIds?: string[];
@@ -7460,9 +7551,26 @@ export async function createIssueMessage(
   },
 ) {
   const parentMessageId = input.parentMessageId?.toLowerCase() ?? null;
+  const schema = await issueMessageAgentSchema(db);
+  const hasAgentIdentityColumns =
+    schema.hasAuthorAgentId && schema.hasAuthorAgentName;
   const result = await db
     .prepare(
-      `insert into briar_issue_messages (
+      hasAgentIdentityColumns
+        ? `insert into briar_issue_messages (
+         id, project_id, run_id, parent_message_id, author_user_id,
+         author_agent_id, author_agent_name, author_agent_provider,
+         body, created_at, updated_at
+       )
+       select ?, run.project_id, run.id, parent.id, ?, ?, ?, ?, ?, ?, ?
+       from briar_hunt_runs run
+       left join briar_issue_messages parent
+         on parent.id = ?
+        and parent.project_id = run.project_id
+        and parent.run_id = run.id
+       where run.id = ? and run.project_id = ?
+         and (? is null or parent.id is not null)`
+        : `insert into briar_issue_messages (
          id, project_id, run_id, parent_message_id, author_user_id,
          author_agent_provider, body, created_at, updated_at
        )
@@ -7475,18 +7583,35 @@ export async function createIssueMessage(
        where run.id = ? and run.project_id = ?
          and (? is null or parent.id is not null)`,
     )
-    .bind(
-      input.id,
-      input.authorUserId,
-      input.authorAgentProvider,
-      input.body,
-      input.createdAt,
-      input.createdAt,
-      parentMessageId,
-      input.runId,
-      input.projectId,
-      parentMessageId,
-    )
+    .bind(...(
+      hasAgentIdentityColumns
+        ? [
+            input.id,
+            input.authorUserId,
+            input.authorAgentId ?? null,
+            input.authorAgentName ?? null,
+            input.authorAgentProvider,
+            input.body,
+            input.createdAt,
+            input.createdAt,
+            parentMessageId,
+            input.runId,
+            input.projectId,
+            parentMessageId,
+          ]
+        : [
+            input.id,
+            input.authorUserId,
+            input.authorAgentProvider,
+            input.body,
+            input.createdAt,
+            input.createdAt,
+            parentMessageId,
+            input.runId,
+            input.projectId,
+            parentMessageId,
+          ]
+    ))
     .run();
   if (result.meta.changes < 1) return null;
   const mentionedUserIds = [...new Set(input.mentionedUserIds ?? [])];
@@ -7523,17 +7648,42 @@ export async function getIssueMessage(
   runId: string,
   messageId: string,
 ) {
+  const schema = await issueMessageAgentSchema(db);
+  const authorAgentId = schema.hasAuthorAgentId
+    ? "message.author_agent_id"
+    : "null";
+  const authorAgentName = schema.hasAuthorAgentName
+    ? "message.author_agent_name"
+    : "null";
+  const authorAgentProvider = schema.hasAuthorAgentProvider
+    ? "message.author_agent_provider"
+    : "null";
+  const authorName = schema.hasAuthorAgentName
+    ? "coalesce(author.name, message.author_agent_name)"
+    : "author.name";
+  const agentImage = schema.hasAuthorAgentId && schema.hasProjectAgents
+    ? "agent.avatar"
+    : "null";
+  const agentJoin = schema.hasAuthorAgentId && schema.hasProjectAgents
+    ? `left join briar_project_agents agent
+         on agent.id = message.author_agent_id
+        and agent.project_id = message.project_id`
+    : "";
   return await db
     .prepare(
       `select message.id, message.run_id, message.parent_message_id,
-              message.author_user_id, message.author_agent_provider,
-              author.name as author_name,
-              author.image as author_image, message.body,
+              message.author_user_id, ${authorAgentId} as author_agent_id,
+              ${authorAgentName} as author_agent_name,
+              ${authorAgentProvider} as author_agent_provider,
+              ${authorName} as author_name,
+              author.image as author_image,
+              ${agentImage} as author_agent_image, message.body,
               (select count(*) from briar_issue_messages reply
                where reply.parent_message_id = message.id) as reply_count,
               message.created_at, message.updated_at
        from briar_issue_messages message
        left join "user" author on author.id = message.author_user_id
+       ${agentJoin}
        where message.project_id = ? and message.run_id = ? and message.id = ?
          and exists (
            select 1 from briar_hunt_runs run
@@ -7639,18 +7789,55 @@ export async function enqueueIssueAgentReply(
     triggerMessageId: string;
     parentMessageId: string;
     replyMessageId: string;
+    agentId?: string | null;
     skillId?: string | null;
+    requiresPreferredWorker?: boolean;
     createdAt: string;
   },
 ) {
   const skillExecutionAvailable =
     await agentSkillExecutionApprovalTablesAvailable(db);
+  const targetAgentId = input.agentId ?? null;
+  const preferredWorkerRequirement = input.requiresPreferredWorker === undefined
+    ? null
+    : input.requiresPreferredWorker
+      ? 1
+      : 0;
+  const preferredProvider = targetAgentId
+    ? `coalesce(
+         selected_skill.provider,
+         (
+           select skill.provider
+           from briar_agent_skills skill
+           where skill.agent_id = agent.id
+             and skill.kind = 'issue_processing'
+           order by skill.position, skill.created_at, skill.id
+           limit 1
+         ),
+         agent.provider,
+         run.requested_agent_provider
+       )`
+    : `coalesce(
+         selected_skill.provider,
+         run.requested_agent_provider,
+         (
+           select skill.provider
+           from briar_agent_skills skill
+           where skill.agent_id = agent.id
+             and skill.kind = 'issue_processing'
+           order by skill.position, skill.created_at, skill.id
+           limit 1
+         ),
+         agent.provider
+       )`;
   await db
     .prepare(
       skillExecutionAvailable
         ? `insert into briar_issue_agent_reply_jobs (
          id, project_id, run_id, trigger_message_id, parent_message_id,
-         reply_message_id, preferred_worker_id, preferred_provider,
+         reply_message_id, agent_id, requires_preferred_worker,
+         agent_name_snapshot, agent_responsibility_snapshot,
+         preferred_worker_id, preferred_provider,
          skill_id, selected_skill_id_snapshot,
          selected_agent_name_snapshot,
          selected_agent_responsibility_snapshot,
@@ -7661,20 +7848,11 @@ export async function enqueueIssueAgentReply(
          created_at, updated_at
        )
        select ?, run.project_id, run.id, trigger.id, parent.id, ?,
+              agent.id,
+              coalesce(?, case when run.worker_id is null then 0 else 1 end),
+              agent.name, agent.responsibility,
               run.worker_id,
-              coalesce(
-                selected_skill.provider,
-                run.requested_agent_provider,
-                (
-                  select skill.provider
-                  from briar_agent_skills skill
-                  where skill.agent_id = agent.id
-                    and skill.kind = 'issue_processing'
-                  order by skill.position, skill.created_at, skill.id
-                  limit 1
-                ),
-                agent.provider
-              ),
+              ${preferredProvider},
               selected_skill.id, selected_skill.id,
               case when selected_skill.id is null then null else agent.name end,
               case when selected_skill.id is null then null
@@ -7693,31 +7871,50 @@ export async function enqueueIssueAgentReply(
          on parent.id = ? and parent.project_id = run.project_id
         and parent.run_id = run.id
        left join briar_project_agents agent
-         on agent.id = run.agent_id and agent.project_id = run.project_id
+         on agent.id = coalesce(?, run.agent_id)
+        and agent.project_id = run.project_id
        left join briar_agent_skills selected_skill
          on selected_skill.id = ? and selected_skill.agent_id = agent.id
        where run.id = ? and run.project_id = ?
          and (? is null or selected_skill.id is not null)
-       on conflict (project_id, trigger_message_id) do nothing`
+       on conflict (project_id, trigger_message_id, agent_id) do nothing`
         : `insert into briar_issue_agent_reply_jobs (
          id, project_id, run_id, trigger_message_id, parent_message_id,
-         reply_message_id, preferred_worker_id, preferred_provider,
+         reply_message_id, agent_id, requires_preferred_worker,
+         agent_name_snapshot, agent_responsibility_snapshot,
+         preferred_worker_id, preferred_provider,
          created_at, updated_at
        )
        select ?, run.project_id, run.id, trigger.id, parent.id, ?,
+              agent.id,
+              coalesce(?, case when run.worker_id is null then 0 else 1 end),
+              agent.name, agent.responsibility,
               run.worker_id,
-              coalesce(
-                run.requested_agent_provider,
-                (
-                  select skill.provider
-                  from briar_agent_skills skill
-                  where skill.agent_id = agent.id
-                    and skill.kind = 'issue_processing'
-                  order by skill.position, skill.created_at, skill.id
-                  limit 1
-                ),
-                agent.provider
-              ),
+              ${targetAgentId
+                ? `coalesce(
+                     (
+                       select skill.provider
+                       from briar_agent_skills skill
+                       where skill.agent_id = agent.id
+                         and skill.kind = 'issue_processing'
+                       order by skill.position, skill.created_at, skill.id
+                       limit 1
+                     ),
+                     agent.provider,
+                     run.requested_agent_provider
+                   )`
+                : `coalesce(
+                     run.requested_agent_provider,
+                     (
+                       select skill.provider
+                       from briar_agent_skills skill
+                       where skill.agent_id = agent.id
+                         and skill.kind = 'issue_processing'
+                       order by skill.position, skill.created_at, skill.id
+                       limit 1
+                     ),
+                     agent.provider
+                   )`},
               ?, ?
        from briar_hunt_runs run
        join briar_issue_messages trigger
@@ -7727,19 +7924,22 @@ export async function enqueueIssueAgentReply(
          on parent.id = ? and parent.project_id = run.project_id
         and parent.run_id = run.id
        left join briar_project_agents agent
-         on agent.id = run.agent_id and agent.project_id = run.project_id
+         on agent.id = coalesce(?, run.agent_id)
+        and agent.project_id = run.project_id
        where run.id = ? and run.project_id = ?
-       on conflict (project_id, trigger_message_id) do nothing`,
+       on conflict (project_id, trigger_message_id, agent_id) do nothing`,
     )
     .bind(...(
       skillExecutionAvailable
         ? [
             input.id,
             input.replyMessageId,
+            preferredWorkerRequirement,
             input.createdAt,
             input.createdAt,
             input.triggerMessageId,
             input.parentMessageId,
+            targetAgentId,
             input.skillId ?? null,
             input.runId,
             input.projectId,
@@ -7748,22 +7948,30 @@ export async function enqueueIssueAgentReply(
         : [
             input.id,
             input.replyMessageId,
+            preferredWorkerRequirement,
             input.createdAt,
             input.createdAt,
             input.triggerMessageId,
             input.parentMessageId,
+            targetAgentId,
             input.runId,
             input.projectId,
           ]
     ))
     .run();
-  return getIssueAgentReplyJob(db, input.projectId, input.triggerMessageId);
+  return getIssueAgentReplyJob(
+    db,
+    input.projectId,
+    input.triggerMessageId,
+    input.agentId ?? null,
+  );
 }
 
 export async function getIssueAgentReplyJob(
   db: D1Database,
   projectId: string,
   triggerMessageId: string,
+  agentId?: string | null,
 ) {
   return await db
     .prepare(
@@ -7771,9 +7979,10 @@ export async function getIssueAgentReplyJob(
        from briar_issue_agent_reply_jobs job
        join briar_hunt_runs run
          on run.id = job.run_id and run.project_id = job.project_id
-       where job.project_id = ? and job.trigger_message_id = ?`,
+       where job.project_id = ? and job.trigger_message_id = ?
+         and (? is null or job.agent_id = ?)`,
     )
-    .bind(projectId, triggerMessageId)
+    .bind(projectId, triggerMessageId, agentId ?? null, agentId ?? null)
     .first<IssueAgentReplyJobRow>();
 }
 
@@ -7822,7 +8031,7 @@ export async function claimNextIssueAgentReply(
              select 1
              from briar_projects project
              join briar_project_agents selected_agent
-               on selected_agent.id = run.agent_id
+               on selected_agent.id = coalesce(job.agent_id, run.agent_id)
               and selected_agent.project_id = run.project_id
               and selected_agent.organization_id = project.organization_id
              join briar_agent_skills selected_skill
@@ -7892,6 +8101,10 @@ export async function claimNextIssueAgentReply(
              or (job.status = 'running' and job.lease_expires_at <= ?)
            )
            and (
+             job.requires_preferred_worker = 0
+             or job.preferred_worker_id = ?
+           )
+           and (
              not exists (
                select 1 from briar_project_execution_worker_policies policy
                where policy.project_id = job.project_id
@@ -7957,6 +8170,7 @@ export async function claimNextIssueAgentReply(
       input.claimedAt,
       projectId,
       input.claimedAt,
+      input.workerId,
       input.workerId,
       input.workerId,
       input.staleBefore,
@@ -8046,7 +8260,10 @@ export async function failIssueAgentReply(
     .prepare(
       `update briar_issue_agent_reply_jobs
        set status = case when attempts >= 3 then 'failed' else 'queued' end,
-           preferred_worker_id = null,
+           preferred_worker_id = case
+             when requires_preferred_worker = 1 then preferred_worker_id
+             else null
+           end,
            claim_token_hash = null, claimed_at = null, lease_expires_at = null,
            error = ?, updated_at = ?
        where id = ? and project_id = ? and status = 'running'
@@ -8290,7 +8507,8 @@ export async function completeIssueAgentReplyOutput(
              from briar_hunt_runs run
              join briar_projects project on project.id = run.project_id
              join briar_project_agents agent
-               on agent.id = run.agent_id and agent.project_id = run.project_id
+               on agent.id = coalesce(job.agent_id, run.agent_id)
+              and agent.project_id = run.project_id
               and agent.organization_id = project.organization_id
              join briar_agent_skills skill
                on skill.id = job.skill_id and skill.agent_id = agent.id
@@ -8347,10 +8565,12 @@ export async function completeIssueAgentReplyOutput(
     db.prepare(
       `insert into briar_issue_messages (
          id, project_id, run_id, parent_message_id, author_user_id,
-         author_agent_provider, body, created_at, updated_at
+         author_agent_id, author_agent_name, author_agent_provider,
+         body, created_at, updated_at
        )
        select job.reply_message_id, job.project_id, job.run_id, parent.id,
-              null, job.agent_provider, ?, ?, ?
+              null, job.agent_id, job.agent_name_snapshot,
+              job.agent_provider, ?, ?, ?
        from briar_issue_agent_reply_jobs job
        join briar_issue_messages parent
          on parent.id = job.parent_message_id
@@ -8463,7 +8683,7 @@ export async function completeIssueAgentReplyOutput(
        )
        select ?, project.organization_id, job.project_id, 'issue', null,
               job.run_id, job.trigger_message_id, job.reply_message_id,
-              run.id, run.title, run.updated_at, run.agent_id,
+              run.id, run.title, run.updated_at, job.agent_id,
               null, null, ?, ?
        from briar_issue_agent_reply_jobs job
        join briar_hunt_runs run
@@ -8505,7 +8725,8 @@ export async function completeIssueAgentReplyOutput(
          on run.id = job.run_id and run.project_id = job.project_id
        join briar_projects project on project.id = job.project_id
        join briar_project_agents agent
-         on agent.id = run.agent_id and agent.project_id = run.project_id
+         on agent.id = coalesce(job.agent_id, run.agent_id)
+        and agent.project_id = run.project_id
         and agent.organization_id = project.organization_id
        join briar_agent_skills skill
          on skill.id = job.skill_id and skill.agent_id = agent.id
@@ -9038,7 +9259,7 @@ export async function createIssueExecutionProposal(
        )
        select ?, project.organization_id, run.project_id, 'issue', null,
               run.id, ?, ?, run.id, run.title, run.updated_at,
-              run.agent_id, null, null, ?, ?
+              job.agent_id, null, null, ?, ?
        from briar_hunt_runs run
        join briar_projects project on project.id = run.project_id
        join briar_issue_agent_reply_jobs job
@@ -9372,8 +9593,10 @@ export async function listIssueConversationNotifications(
   const result = await db
     .prepare(
       `select message.id, message.run_id, message.parent_message_id,
-              message.author_user_id, message.author_agent_provider,
-              author.name as author_name, author.image as author_image,
+              message.author_user_id, message.author_agent_id,
+              message.author_agent_name, message.author_agent_provider,
+              coalesce(author.name, message.author_agent_name) as author_name,
+              author.image as author_image,
               agent.avatar as author_agent_image,
               message.body, 0 as reply_count, message.created_at,
               message.updated_at, run.title as run_title,
@@ -9397,7 +9620,9 @@ export async function listIssueConversationNotifications(
        left join briar_agent_skills reply_skill
          on reply_skill.id = reply_job.skill_id
        left join briar_project_agents agent
-         on agent.id = coalesce(reply_skill.agent_id, run.agent_id)
+         on agent.id = coalesce(
+           reply_job.agent_id, reply_skill.agent_id, run.agent_id
+         )
         and agent.project_id = run.project_id
        left join briar_issue_messages root
          on root.id = message.parent_message_id

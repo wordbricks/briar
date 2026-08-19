@@ -448,9 +448,26 @@
             "bearerAuth": []
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateIssueMessageRequest"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
-            "description": "Message created and optional Agent reply queued"
+            "description": "Message created and optional Project Agent replies queued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateIssueMessageResponse"
+                }
+              }
+            }
           },
           "400": {
             "$ref": "#/components/responses/Error"
@@ -1039,7 +1056,14 @@
         ],
         "responses": {
           "200": {
-            "description": "Current Agent reply status and completed message"
+            "description": "Current Project Agent reply statuses and completed messages",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IssueAgentReplyResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -2240,6 +2264,13 @@
               "string",
               "null"
             ]
+          },
+          "agentId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
           },
           "name": {
             "type": "string"
@@ -3714,6 +3745,85 @@
               },
               "additionalProperties": true
             }
+          },
+          "agentReplies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IssueAgentReply"
+            }
+          }
+        },
+        "additionalProperties": true
+      },
+      "CreateIssueMessageRequest": {
+        "type": "object",
+        "required": [
+          "body",
+          "parentMessageId",
+          "mentionedUserIds",
+          "mentionedAgentIds",
+          "agentConversationId"
+        ],
+        "properties": {
+          "body": { "type": "string", "minLength": 1, "maxLength": 10000 },
+          "clientMessageId": { "type": "string", "format": "uuid" },
+          "parentMessageId": {
+            "type": ["string", "null"],
+            "format": "uuid"
+          },
+          "mentionedUserIds": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "mentionedAgentIds": {
+            "type": "array",
+            "items": { "type": "string", "format": "uuid" }
+          },
+          "agentConversationId": { "type": ["string", "null"] }
+        },
+        "additionalProperties": false
+      },
+      "CreateIssueMessageResponse": {
+        "type": "object",
+        "required": ["message", "agentReply", "agentReplies"],
+        "properties": {
+          "message": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "agentReply": {
+            "oneOf": [
+              { "$ref": "#/components/schemas/IssueAgentReply" },
+              { "type": "null" }
+            ]
+          },
+          "agentReplies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IssueAgentReply"
+            }
+          }
+        },
+        "additionalProperties": true
+      },
+      "IssueAgentReplyResponse": {
+        "type": "object",
+        "required": ["agentReply", "agentReplies", "message", "messages"],
+        "properties": {
+          "agentReply": { "$ref": "#/components/schemas/IssueAgentReply" },
+          "agentReplies": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/IssueAgentReply" }
+          },
+          "message": {
+            "oneOf": [
+              { "type": "object", "additionalProperties": true },
+              { "type": "null" }
+            ]
+          },
+          "messages": {
+            "type": "array",
+            "items": { "type": "object", "additionalProperties": true }
           }
         },
         "additionalProperties": true
@@ -4735,6 +4845,8 @@
           "id": { "type": "string", "format": "uuid" },
           "triggerMessageId": { "type": "string", "format": "uuid" },
           "parentMessageId": { "type": "string", "format": "uuid" },
+          "agentId": { "type": ["string", "null"], "format": "uuid" },
+          "agentName": { "type": ["string", "null"] },
           "status": {
             "type": "string",
             "enum": ["queued", "running", "completed", "failed"]

@@ -492,6 +492,7 @@ struct IssueMessage: Codable, Equatable, Identifiable, Sendable {
 
     struct Author: Codable, Equatable, Sendable {
         let id: String?
+        let agentId: UUID? = nil
         let name: String
         let image: String?
         let provider: String?
