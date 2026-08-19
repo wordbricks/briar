@@ -1918,7 +1918,8 @@ button.run-manual-qa-state { width:100%; border:0; border-radius:8px; cursor:poi
 .issue-description-markdown h3 { font-size:var(--text-xs); }
 .issue-description-markdown h4 { font-size:var(--text-xs); }
 .issue-description-markdown p,.issue-description-markdown ul,.issue-description-markdown ol,.issue-description-markdown blockquote,.issue-description-markdown pre,.issue-description-markdown table { margin:.7em 0; }
-.issue-description-markdown ul,.issue-description-markdown ol { padding-left:1.6em; }
+.issue-description-markdown ul { padding-left:1.6em; list-style:disc; }
+.issue-description-markdown ol { padding-left:1.6em; list-style:decimal; }
 .issue-description-markdown li + li { margin-top:.25em; }
 .issue-description-markdown a { color:var(--accent-foreground); text-decoration-thickness:1px; text-underline-offset:2px; }
 .issue-description-markdown blockquote { padding:.35em 0 .35em 1em; border-left:3px solid var(--border); color:var(--muted-foreground); }
