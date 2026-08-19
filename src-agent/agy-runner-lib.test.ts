@@ -117,6 +117,22 @@ describe("Antigravity runner helpers", () => {
       reason: "upstream_overloaded",
       statusCode: 503,
     });
+    expect(agyBlockedRetry({
+      event: "error",
+      error: { statusCode: 503, message: "The request queue is full." },
+    })).toMatchObject({
+      reason: "upstream_overloaded",
+      statusCode: 503,
+      message: "The request queue is full.",
+    });
+    expect(agyBlockedRetry({
+      event: "step_update",
+      step_update: {
+        state: "DONE",
+        step_type: "agent_response",
+        usage: { input_tokens: 5_222, output_tokens: 503, total_tokens: 5_725 },
+      },
+    })).toBeNull();
   });
 
   it("forces local Google subscription auth instead of API-key or ADC auth", () => {
