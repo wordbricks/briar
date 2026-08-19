@@ -400,7 +400,7 @@ body { overflow: hidden; font-synthesis: none; }
 .sidebar-channels-toggle > span { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .sidebar-channel-list button > span { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .sidebar-channel-list { display:grid; gap:1px; padding:2px 0 4px; }
-.sidebar-channel-list button { width:100%; height:32px; padding:0 10px 0 36px; display:flex; align-items:center; gap:8px; border:0; border-radius:8px; color:#676863; background:transparent; text-align:left; cursor:pointer; font:500 var(--text-xs)/1 inherit; }
+.sidebar-channel-list button { width:100%; min-width:0; height:32px; padding:0 10px 0 36px; display:flex; align-items:center; gap:8px; border:0; border-radius:8px; color:#676863; background:transparent; text-align:left; cursor:pointer; font:500 var(--text-xs)/1 inherit; }
 .sidebar-channel-list button:hover { color:var(--foreground); background:rgba(44,45,41,.055); }
 .sidebar-channel-list button.active { color:var(--foreground); background:rgba(48,49,45,.085); font-weight:600; }
 .sidebar-channel-list button.unread { color:var(--foreground); font-weight:700; }
@@ -449,7 +449,7 @@ body { overflow: hidden; font-synthesis: none; }
 .sidebar-section-heading button:hover { color:var(--foreground); background: rgba(44,45,41,.07); }
 .sidebar-section-heading button:active { transform: scale(.95); }
 .sidebar-section-heading button:focus-visible, .sidebar-project-heading:focus-visible, .sidebar-project-toggle:focus-visible, .sidebar-project-menu-trigger:focus-visible, .sidebar-project-view:focus-visible, .sidebar-agent-session:focus-visible, .sidebar-issue-add:focus-visible { outline: 2px solid #8b70dd; outline-offset: -1px; }
-.sidebar-project-list { min-height: 0; padding: 0 10px 16px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: rgba(82,83,77,.2) transparent; }
+.sidebar-project-list { min-height: 0; padding: 0 10px 16px; overflow-x: hidden; overflow-y: auto; scrollbar-width: thin; scrollbar-color: rgba(82,83,77,.2) transparent; }
 .organization-settings-layout { min-width:0; flex:1; height:100%; display:flex; background:#f7f7f6; }
 .organization-settings-sidebar { width:252px; flex:0 0 252px; height:100%; display:flex; flex-direction:column; border-right:1px solid rgba(56,57,52,.09); background:#f1f1f0; }
 .organization-settings-sidebar.organization-settings-sidebar-collapsed { width:0; flex-basis:0; overflow:hidden; border-right-width:0; }
