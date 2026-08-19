@@ -120,7 +120,7 @@ struct IssueDependencyReference: Codable, Equatable, Identifiable, Sendable {
 
 struct PendingIssueAttachment: Identifiable, Equatable, Sendable {
     static let allowedContentTypes = Set([
-        "image/jpeg", "image/png", "image/gif", "image/webp", "image/avif",
+        "image/jpeg", "image/png", "image/gif", "image/webp", "image/avif", "image/svg+xml",
         "video/mp4", "video/webm", "video/quicktime",
     ])
     static let maximumCount = 5

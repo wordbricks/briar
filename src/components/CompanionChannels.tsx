@@ -207,6 +207,8 @@ type CompanionChannelsProps = {
   onSkillSessionAccepted?: (session: AutoHuntSession) => void;
   channelInboxSyncSignal?: string;
   onViewingChannelChange?: (channelId: string | null) => void;
+  requestedChannelId?: string | null;
+  onRequestedChannelOpen?: () => void;
   requestedMessage?: {
     channelId: string;
     messageId: string;
@@ -250,6 +252,8 @@ export function CompanionChannels({
   onSkillSessionAccepted,
   channelInboxSyncSignal,
   onViewingChannelChange,
+  requestedChannelId,
+  onRequestedChannelOpen,
   requestedMessage,
   onRequestedMessageOpen,
   channelCache,
@@ -556,6 +560,24 @@ export function CompanionChannels({
       token,
     ],
   );
+
+  useEffect(() => {
+    if (!requestedChannelId || requestedMessage) return;
+    const summary = channels.find(
+      (candidate) =>
+        candidate.organizationId === organizationId &&
+        candidate.id === requestedChannelId,
+    );
+    if (!summary) return;
+    void openChannel(summary).finally(() => onRequestedChannelOpen?.());
+  }, [
+    channels,
+    onRequestedChannelOpen,
+    openChannel,
+    organizationId,
+    requestedChannelId,
+    requestedMessage,
+  ]);
 
   const loadEarlierChannelMessages = useCallback(async () => {
     if (

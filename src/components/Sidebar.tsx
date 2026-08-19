@@ -72,7 +72,9 @@ export function Sidebar({
   onScheduleOpen,
   onInboxOpen,
   onChannelCreate,
+  onChannelDelete,
   onChannelOpen,
+  onChannelSettings,
   onIssuesOpen,
   onCreateIssue,
   onAddOrganization,
@@ -109,7 +111,9 @@ export function Sidebar({
     name: string,
     visibility: ChannelVisibility,
   ) => Promise<void>;
+  onChannelDelete?: (channelId: string) => Promise<void>;
   onChannelOpen?: (channelId: string) => void;
+  onChannelSettings?: (channelId: string) => void;
   onIssuesOpen: () => void;
   onCreateIssue: (projectId: string) => void;
   onAddOrganization: () => void;
@@ -145,6 +149,9 @@ export function Sidebar({
   const languageTriggerRef = useRef<HTMLButtonElement>(null);
 
   const catalog = channels ?? EMPTY_CHANNELS;
+  const organizationRole = organizations.find(
+    (organization) => organization.id === activeOrganizationId,
+  )?.role ?? null;
   const activeChannelProjectId = catalog.find(
     (channel) => channel.id === activeChannelId,
   )?.defaultProjectId;
@@ -461,8 +468,12 @@ export function Sidebar({
             activePage={activePage}
             channels={catalog}
             channelsLoading={channelsLoading}
+            currentUserId={user.id}
             onChannelCreate={onChannelCreate}
+            onChannelDelete={onChannelDelete}
             onChannelOpen={onChannelOpen}
+            onChannelSettings={onChannelSettings}
+            organizationRole={organizationRole}
           />
         ) : null}
       </nav>
@@ -709,7 +720,11 @@ export function Sidebar({
                         activePage={activePage}
                         channels={catalog}
                         channelsLoading={channelsLoading}
+                        currentUserId={user.id}
+                        onDeleteChannel={onChannelDelete}
                         onOpen={onChannelOpen}
+                        onSettings={onChannelSettings}
+                        organizationRole={organizationRole}
                         projectId={project.id}
                         projectName={project.name}
                       />

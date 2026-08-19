@@ -185,16 +185,9 @@ export function useIssueDialogAttachments({
   };
 
   const onPaste: ClipboardEventHandler<HTMLFormElement> = (event) => {
-    const pastedImages = Array.from(event.clipboardData.items)
-      .filter((item) => item.kind === "file" && item.type.startsWith("image/"))
-      .map((item) => item.getAsFile())
-      .filter((file): file is File => file !== null);
-    const images =
-      pastedImages.length > 0
-        ? pastedImages
-        : Array.from(event.clipboardData.files).filter((file) =>
-            file.type.startsWith("image/"),
-          );
+    const images = filesFromDataTransfer(event.clipboardData).filter((file) =>
+      file.type.startsWith("image/"),
+    );
     if (images.length === 0) return;
     event.preventDefault();
     const target =

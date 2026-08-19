@@ -120,6 +120,7 @@ import { LITELLM_MAIN_PRICING_SOURCE } from "./lib/agent-usage-pricing";
 import { createCachedProjectUsageSummaryLoader } from "./lib/project-usage-summary";
 import {
   createChannel,
+  deleteChannel,
   dispatchHuntRun,
   listChannels,
   loadChannelDelta,
@@ -229,6 +230,16 @@ export function App() {
     ChannelSummary[]
   >([]);
   const [activeChannelId, setActiveChannelId] = useState<string | null>(null);
+  const [requestedChannelSettingsId, setRequestedChannelSettingsId] =
+    useState<string | null>(null);
+  const [requestedChannelId, setRequestedChannelId] = useState<string | null>(
+    null,
+  );
+  const [requestedChannelMessage, setRequestedChannelMessage] = useState<{
+    channelId: string;
+    messageId: string;
+    rootMessageId: string;
+  } | null>(null);
   const [initialChannelInviteId, setInitialChannelInviteId] = useState<string | null>(
     null,
   );
@@ -248,6 +259,8 @@ export function App() {
     setOrganizationChannels([]);
     setActiveChannelId(null);
     setInitialChannelInviteId(null);
+    setRequestedChannelSettingsId(null);
+    setRequestedChannelId(null);
     setChannelCatalogSnapshot(null);
     channelCatalogCursorRef.current = 0;
     companionChannelCache.current.clear();
@@ -699,6 +712,54 @@ export function App() {
       navigateToPage,
     ],
   );
+  const openOrganizationChannel = useCallback(
+    (channelId: string) => {
+      if (!briar.activeOrganizationId) return;
+      startDesktopChannelTransition(channelId);
+      setActiveChannelId(channelId);
+      markOrganizationChannelRead(channelId);
+      navigateToPage("channels");
+    },
+    [
+      briar.activeOrganizationId,
+      markOrganizationChannelRead,
+      navigateToPage,
+    ],
+  );
+  const openOrganizationChannelSettings = useCallback(
+    (channelId: string) => {
+      setRequestedChannelSettingsId(channelId);
+      openOrganizationChannel(channelId);
+    },
+    [openOrganizationChannel],
+  );
+  const deleteOrganizationChannel = useCallback(
+    async (channelId: string) => {
+      if (!briar.activeOrganizationId || !briar.token) {
+        throw new Error("Organization is not available");
+      }
+      await deleteChannel(briar.token, briar.activeOrganizationId, channelId);
+      setOrganizationChannels((current) =>
+        current.filter((channel) => channel.id !== channelId),
+      );
+      setRequestedChannelMessage((current) =>
+        current?.channelId === channelId ? null : current,
+      );
+      setRequestedChannelSettingsId((current) =>
+        current === channelId ? null : current,
+      );
+      if (activeChannelId === channelId) {
+        setActiveChannelId(null);
+        navigateToPage("lobby");
+      }
+    },
+    [
+      activeChannelId,
+      briar.activeOrganizationId,
+      briar.token,
+      navigateToPage,
+    ],
+  );
   const [pendingBriarLink, setPendingBriarLink] =
     useState<BriarLinkTarget | null>(null);
   const [pendingInboxNotificationTarget, setPendingInboxNotificationTarget] =
@@ -709,11 +770,6 @@ export function App() {
   const [requestedRunId, setRequestedRunId] = useState<string | null>(null);
   const [requestedRunInitialTab, setRequestedRunInitialTab] =
     useState<IssueDetailTab | null>(null);
-  const [requestedChannelMessage, setRequestedChannelMessage] = useState<{
-    channelId: string;
-    messageId: string;
-    rootMessageId: string;
-  } | null>(null);
   const clearRequestedChannelMessage = useCallback(
     () => setRequestedChannelMessage(null),
     [],
@@ -767,15 +823,26 @@ export function App() {
       }
       if (pendingBriarLink.organizationId !== briar.activeOrganizationId) {
         briar.setActiveOrganizationId(pendingBriarLink.organizationId);
+        return;
       }
       setRequestedRunInitialTab(null);
       setRequestedRunId(null);
       setRequestedSessionId(null);
-      setRequestedChannelMessage({
-        channelId: pendingBriarLink.channelId,
-        messageId: pendingBriarLink.messageId,
-        rootMessageId: pendingBriarLink.rootMessageId,
-      });
+      setRequestedChannelMessage(
+        pendingBriarLink.messageId && pendingBriarLink.rootMessageId
+          ? {
+              channelId: pendingBriarLink.channelId,
+              messageId: pendingBriarLink.messageId,
+              rootMessageId: pendingBriarLink.rootMessageId,
+            }
+          : null,
+      );
+      setRequestedChannelId(
+        briar.companionMode &&
+          !(pendingBriarLink.messageId && pendingBriarLink.rootMessageId)
+          ? pendingBriarLink.channelId
+          : null,
+      );
       setActiveChannelId(pendingBriarLink.channelId);
       markOrganizationChannelRead(pendingBriarLink.channelId);
       if (briar.companionMode) setCompanionPage("home");
@@ -1701,14 +1768,15 @@ export function App() {
                 ? createOrganizationChannel
                 : undefined
             }
-            onChannelOpen={
+            onChannelDelete={
+              briar.activeOrganizationId && briar.token
+                ? deleteOrganizationChannel
+                : undefined
+            }
+            onChannelOpen={briar.activeOrganizationId ? openOrganizationChannel : undefined}
+            onChannelSettings={
               briar.activeOrganizationId
-                ? (channelId) => {
-                    startDesktopChannelTransition(channelId);
-                    setActiveChannelId(channelId);
-                    markOrganizationChannelRead(channelId);
-                    navigateToPage("channels");
-                  }
+                ? openOrganizationChannelSettings
                 : undefined
             }
             onIssuesOpen={() => {
@@ -2085,6 +2153,8 @@ export function App() {
             organizationName={activeOrganization?.name}
             initialInviteChannelId={initialChannelInviteId}
             onInitialInviteHandled={() => setInitialChannelInviteId(null)}
+            initialSettingsChannelId={requestedChannelSettingsId}
+            onInitialSettingsHandled={() => setRequestedChannelSettingsId(null)}
             token={briar.token}
             requestedMessage={requestedChannelMessage}
             onRequestedMessageOpen={clearRequestedChannelMessage}
@@ -2309,6 +2379,8 @@ export function App() {
               token={briar.token}
               channelCache={companionChannelCache.current}
               requestedMessage={requestedChannelMessage}
+              requestedChannelId={requestedChannelId}
+              onRequestedChannelOpen={() => setRequestedChannelId(null)}
               onRequestedMessageOpen={clearRequestedChannelMessage}
               onIssueOpen={async (projectId, runId) => {
                 await briar.ensureProjectSelected(projectId);

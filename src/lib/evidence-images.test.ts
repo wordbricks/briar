@@ -10,6 +10,7 @@ describe("evidence images", () => {
       validateEvidenceImages([
         { name: "desktop.png", size: 1024, type: "image/png" },
         { name: "mobile.webp", size: 2048, type: "image/webp" },
+        { name: "flow.svg", size: 3072, type: "image/svg+xml" },
       ]),
     ).toBeNull();
   });

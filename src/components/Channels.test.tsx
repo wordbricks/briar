@@ -262,6 +262,8 @@ describe("Channels", () => {
     projects: Pick<Project, "id" | "name" | "organizationId">[] = [],
     initialInviteChannelId: string | null = null,
     onInitialInviteHandled?: (channelId: string) => void,
+    initialSettingsChannelId: string | null = null,
+    onInitialSettingsHandled?: () => void,
   ) => {
     listChannels.mockResolvedValue({ channels: [channel], cursor: 7 });
     loadChannel.mockResolvedValue({
@@ -299,6 +301,8 @@ describe("Channels", () => {
           onChannelsChange={() => undefined}
           onCreateAgent={onCreateAgent}
           onInitialInviteHandled={onInitialInviteHandled}
+          initialSettingsChannelId={initialSettingsChannelId}
+          onInitialSettingsHandled={onInitialSettingsHandled}
           onInboxDetailClose={onInboxDetailClose}
           organizationId="org-1"
           organizationName="wordbricks"
@@ -2277,6 +2281,31 @@ describe("Channels", () => {
       true,
     );
     expect(container.querySelector(".channel-invite-dialog")).toBeNull();
+  });
+
+  it("opens settings when a sidebar request selects the channel", async () => {
+    const initialSettingsHandled = vi.fn();
+    await render(
+      [message()],
+      undefined,
+      undefined,
+      undefined,
+      false,
+      undefined,
+      false,
+      [],
+      null,
+      undefined,
+      "channel-1",
+      initialSettingsHandled,
+    );
+
+    const dialog = container.querySelector<HTMLElement>(
+      ".channel-settings-dialog",
+    );
+    expect(dialog).not.toBeNull();
+    expect(dialog?.querySelector("h2")?.textContent).toContain("Welcome");
+    expect(initialSettingsHandled).toHaveBeenCalledTimes(1);
   });
 
   it("waits for every invite request before refreshing after a partial failure", async () => {

@@ -122,6 +122,35 @@ describe("issue links", () => {
   it("builds and parses channel share and app deep links", () => {
     expect(
       channelShareUrl(
+        { organizationId, channelId },
+        "https://briar-api.example/base",
+      ),
+    ).toBe(
+      `https://briar-api.example/open/channels/${organizationId}/${channelId}`,
+    );
+    expect(
+      parseChannelLink(
+        `https://briar-api.example/open/channels/${organizationId}/${channelId}`,
+      ),
+    ).toEqual({
+      organizationId,
+      channelId,
+      messageId: null,
+      rootMessageId: null,
+    });
+    expect(
+      parseBriarLink(
+        `briar-companion://channels/${organizationId}/${channelId}`,
+      ),
+    ).toEqual({
+      kind: "channel",
+      organizationId,
+      channelId,
+      messageId: null,
+      rootMessageId: null,
+    });
+    expect(
+      channelShareUrl(
         { organizationId, channelId, messageId },
         "https://briar-api.example/base",
       ),

@@ -190,6 +190,88 @@ describe("Sidebar", () => {
     container.remove();
   });
 
+  it("shows channel actions and confirms deletion for an authorized creator", async () => {
+    const onChannelDelete = vi.fn().mockResolvedValue(undefined);
+    const onChannelSettings = vi.fn();
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(
+        <Sidebar
+          {...sidebarProps}
+          activeChannelId="channel-1"
+          activePage="channels"
+          channels={[
+            {
+              ...sidebarChannel("channel-1", "General", null),
+              createdByUserId: "user-1",
+            },
+          ]}
+          onChannelDelete={onChannelDelete}
+          onChannelOpen={() => undefined}
+          onChannelSettings={onChannelSettings}
+        />,
+      );
+    });
+
+    const channelButton = container.querySelector<HTMLButtonElement>(
+      "#sidebar-channel-list button",
+    )!;
+    await act(async () => {
+      channelButton.dispatchEvent(
+        new MouseEvent("contextmenu", {
+          bubbles: true,
+          button: 2,
+          cancelable: true,
+          clientX: 120,
+          clientY: 90,
+        }),
+      );
+    });
+
+    const menu = document.body.querySelector<HTMLElement>(
+      ".sidebar-channel-context-menu",
+    )!;
+    expect(menu.textContent).toContain("채널 ID 복사");
+    expect(menu.textContent).toContain("채널 링크 복사");
+    expect(menu.textContent).toContain("채널 삭제");
+    expect(menu.textContent).toContain("채널 설정");
+
+    const settingsItem = [...menu.querySelectorAll<HTMLElement>('[role="menuitem"]')]
+      .find((item) => item.textContent?.includes("채널 설정"));
+    await act(async () => settingsItem?.click());
+    expect(onChannelSettings).toHaveBeenCalledWith("channel-1");
+
+    await act(async () => {
+      channelButton.dispatchEvent(
+        new MouseEvent("contextmenu", {
+          bubbles: true,
+          button: 2,
+          cancelable: true,
+          clientX: 120,
+          clientY: 90,
+        }),
+      );
+    });
+    const deleteItem = [...document.body.querySelectorAll<HTMLElement>(
+      ".sidebar-channel-context-menu [role=menuitem]",
+    )].find((item) => item.textContent?.includes("채널 삭제"));
+    await act(async () => deleteItem?.click());
+
+    const dialog = document.body.querySelector<HTMLElement>(
+      ".channel-delete-dialog",
+    )!;
+    expect(dialog.textContent).toContain("‘General’ 채널을 삭제할까요?");
+    const confirmButton = [...dialog.querySelectorAll<HTMLButtonElement>("button")]
+      .find((button) => button.textContent?.includes("채널 삭제"));
+    await act(async () => confirmButton?.click());
+    expect(onChannelDelete).toHaveBeenCalledWith("channel-1");
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
   it("nests project-linked channels under that project and keeps unlinked ones at the top", async () => {
     const onChannelOpen = vi.fn();
     const container = document.createElement("div");
