@@ -33,6 +33,7 @@ import type {
   ChannelMember,
   ChannelMessage,
   ChannelMessageAttachment,
+  ChannelMessageDocumentContent,
   ChannelExecutionProposal,
   ChannelSummary,
   ChannelVisibility,
@@ -1929,6 +1930,18 @@ export async function loadChannelMessageAttachment(
     throw new Error(`첨부 이미지를 열 수 없습니다. (${response.status})`);
   }
   return response.blob();
+}
+
+export async function loadChannelMessageDocument(
+  token: string,
+  organizationId: string,
+  channelId: string,
+  messageId: string,
+) {
+  return request<{ document: ChannelMessageDocumentContent }>(
+    `/organizations/${organizationId}/channels/${channelId}/messages/${messageId}/document`,
+    token,
+  );
 }
 
 /** Toggle the current user's emoji reaction on a channel message. */

@@ -491,6 +491,7 @@ import {
   getActiveOrganizationChannelReplyContextClaim,
   getChannelMessage,
   getChannelMessageAttachment,
+  getChannelMessageDocument,
   getProjectAgentChannel,
   getProjectOrganizationChannel,
   getIncomingChannelWebhook,
@@ -8003,6 +8004,32 @@ async function route(
   const channelAttachmentMatch = pathname.match(
     /^\/organizations\/([0-9a-f-]+)\/channels\/([0-9a-f-]+)\/messages\/([0-9a-f-]+)\/attachments\/([0-9a-f-]+)$/u,
   );
+  const channelDocumentMatch = pathname.match(
+    /^\/organizations\/([0-9a-f-]+)\/channels\/([0-9a-f-]+)\/messages\/([0-9a-f-]+)\/document$/u,
+  );
+  if (channelDocumentMatch && request.method === "GET") {
+    const session = await requireSession(auth, request);
+    await requireChannelAccess(
+      db,
+      channelDocumentMatch[1],
+      channelDocumentMatch[2],
+      session.user.id,
+    );
+    const document = await getChannelMessageDocument(
+      db,
+      channelDocumentMatch[2],
+      channelDocumentMatch[3],
+    );
+    if (!document) throw new HttpError(404, "Document not found");
+    return privateNoStoreJson({
+      document: {
+        messageId: document.message_id,
+        title: document.title,
+        markdown: document.markdown,
+        projectId: document.project_id,
+      },
+    });
+  }
   if (
     channelAttachmentMatch &&
     (request.method === "GET" || request.method === "HEAD")
@@ -14630,6 +14657,7 @@ async function route(
         sourceKey: `project-agent:${input.projectId}:${job.id}`,
         title: job.agent_name,
         claimToken,
+        claimAttempts: job.attempts,
         claimedAt: job.claimed_at,
         leaseExpiresAt: job.lease_expires_at,
         request: job.request,

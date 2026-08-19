@@ -160,7 +160,7 @@ const report = (runs: AgentUsageRun[]): AgentUsageReport => ({
 });
 
 const provider = (
-  id: "claude" | "codex" | "grok",
+  id: AgentUsageSnapshot["claude"]["provider"],
   usedPercent: number,
 ) => ({
   provider: id,
@@ -183,6 +183,10 @@ const snapshot: AgentUsageSnapshot = {
   claude: provider("claude", 45),
   codex: provider("codex", 30),
   grok: provider("grok", 10),
+  agy: provider("agy", 18),
+  opencode: provider("opencode", 7),
+  openrouter: provider("openrouter", 0),
+  cursor: provider("cursor", 33),
   updatedAt: Date.now(),
 };
 
@@ -229,6 +233,9 @@ describe("AgentUsageSettings", () => {
     expect(container.textContent).toContain("gpt-5.6-sol");
     expect(container.textContent).toContain("claude-sonnet-4-6");
     expect(container.textContent).toContain("Provider limits");
+    expect(container.textContent).toContain("Antigravity");
+    expect(container.textContent).toContain("OpenCode");
+    expect(container.textContent).toContain("Cursor");
     expect(container.textContent).toContain("Total cost");
     expect(container.textContent).toContain("$0.05");
     expect(container.textContent).toContain("Provider reported");

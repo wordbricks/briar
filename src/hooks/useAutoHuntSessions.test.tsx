@@ -140,28 +140,83 @@ describe("useAutoHuntSessions", () => {
       completedAt: null,
       conversationId: null,
       workspaceRoot: "/repo",
-      summary: null,
+      summary: "로컬 상세 결과",
       error: null,
-      events: [],
+      events: [{
+        id: "local-event",
+        type: "completed",
+        occurredAt: "2026-07-28T01:00:00.000Z",
+      }],
       dispatchEvents: [],
       workers: [],
       updatedAt: "2026-07-28T01:00:00.000Z",
       localOwner: true,
+      detailLoaded: true,
     } as AutoHuntSession;
     const remote = {
       ...local,
       status: "completed",
       completedAt: "2026-07-28T01:10:00.000Z",
       workspaceRoot: null,
+      summary: null,
+      events: [],
       updatedAt: "2026-07-28T01:10:00.000Z",
       localOwner: false,
+      detailLoaded: false,
     } as AutoHuntSession;
 
     expect(mergeSynchronizedSessions([local], [remote])[0])
       .toMatchObject({
         status: "completed",
         workspaceRoot: "/repo",
+        summary: "로컬 상세 결과",
+        events: [{ id: "local-event" }],
+        detailLoaded: true,
         localOwner: true,
+      });
+  });
+
+  it("invalidates stale loaded detail when a newer remote summary arrives", () => {
+    const local = {
+      id: "remote-task-1",
+      dispatchGroupId: "remote-task-1",
+      projectId: "project-1",
+      agentId: "agent-1",
+      sessionType: "task",
+      status: "running",
+      issues: [],
+      startedAt: "2026-08-18T01:00:00.000Z",
+      completedAt: null,
+      conversationId: null,
+      workspaceRoot: null,
+      summary: null,
+      error: null,
+      events: [{
+        id: "started-1",
+        type: "started",
+        occurredAt: "2026-08-18T01:00:00.000Z",
+      }],
+      dispatchEvents: [],
+      workers: [],
+      updatedAt: "2026-08-18T01:00:00.000Z",
+      localOwner: false,
+      detailLoaded: true,
+    } as AutoHuntSession;
+    const completedSummary = {
+      ...local,
+      status: "completed",
+      completedAt: "2026-08-18T01:05:00.000Z",
+      events: [],
+      updatedAt: "2026-08-18T01:05:00.000Z",
+      detailLoaded: false,
+    } as AutoHuntSession;
+
+    expect(mergeSynchronizedSessions([local], [completedSummary])[0])
+      .toMatchObject({
+        status: "completed",
+        events: [],
+        detailLoaded: false,
+        localOwner: false,
       });
   });
 

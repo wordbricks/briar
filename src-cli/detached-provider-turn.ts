@@ -42,6 +42,7 @@ export async function runDetachedProviderTurn(input: {
       : new Error("Worker execution was cancelled");
   }
   const provider = input.agent.provider;
+  const runnerProvider = provider === "openrouter" ? "opencode" : provider;
   const binaryName = agentProviderBinaryName(provider);
   const agentBinary = Bun.which(binaryName);
   if (!agentBinary) {
@@ -50,8 +51,8 @@ export async function runDetachedProviderTurn(input: {
   const runnerPath = (
     await Promise.all(
       [
-        resolve(import.meta.dir, `agent/${provider}-runner.js`),
-        resolve(import.meta.dir, `../dist-agent/${provider}-runner.js`),
+        resolve(import.meta.dir, `agent/${runnerProvider}-runner.js`),
+        resolve(import.meta.dir, `../dist-agent/${runnerProvider}-runner.js`),
       ].map(async (path) => ((await Bun.file(path).exists()) ? path : null)),
     )
   ).find((path): path is string => Boolean(path));
@@ -177,13 +178,26 @@ export function assertDetachedProviderTurnSucceeded(
   result: DetachedProviderTurnResult,
   options: { requireResult?: boolean } = {},
 ) {
+  const failure = detachedProviderTurnFailure(result, options);
+  if (failure) throw new Error(failure);
+}
+
+/**
+ * Return a provider-turn diagnostic without deciding the claimed run's
+ * lifecycle. Issue workers use this to inspect the durable claim first: an
+ * agent CLI exiting after a failed tool or CI command is a recoverable turn
+ * while the run remains active, not permission to fail the whole run.
+ */
+export function detachedProviderTurnFailure(
+  result: DetachedProviderTurnResult,
+  options: { requireResult?: boolean } = {},
+): string | null {
   if (result.exitCode !== 0 || result.runnerError) {
-    throw new Error(
-      result.runnerError ??
-        (result.stderr.trim() || `Agent exited with ${result.exitCode}`),
-    );
+    return result.runnerError ??
+      (result.stderr.trim() || `Agent exited with ${result.exitCode}`);
   }
   if (options.requireResult !== false && !result.completed) {
-    throw new Error("Agent runner exited without a result");
+    return "Agent runner exited without a result";
   }
+  return null;
 }

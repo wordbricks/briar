@@ -1,18 +1,14 @@
-import { Miniflare } from "miniflare";
 import { describe, expect, it } from "vitest";
 import { flushOrganizationInboxRealtimeOutbox } from "./index";
-import { applyD1Migrations } from "./test-helpers/d1";
+import { createIsolatedTestDatabase } from "./test-helpers/d1";
 
 describe("organization Inbox realtime outbox", () => {
   it("preserves a newer revision that commits while an older publish is acknowledged", async () => {
-    const miniflare = new Miniflare({
-      modules: true,
-      script: "export default { fetch() { return new Response('ok') } }",
-      d1Databases: { DB: "briar-inbox-realtime-outbox-test" },
+    const database = await createIsolatedTestDatabase({
+      suite: "inbox-realtime-outbox",
     });
+    const { miniflare, db } = database;
     try {
-      const db = (await miniflare.getD1Database("DB")) as unknown as D1Database;
-      await applyD1Migrations(db);
       const organizationId = "22222222-2222-4222-8222-222222222222";
       await db.prepare(
         `insert into briar_organization_inbox_sync_state (

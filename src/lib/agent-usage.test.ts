@@ -92,12 +92,39 @@ describe("agent usage presentation", () => {
       claude: { ...provider, provider: "claude" as const },
       codex: provider,
       grok: { ...provider, provider: "grok" as const },
+      agy: { ...provider, provider: "agy" as const },
+      opencode: { ...provider, provider: "opencode" as const },
+      openrouter: { ...provider, provider: "openrouter" as const },
+      cursor: { ...provider, provider: "cursor" as const },
     };
     recordAgentUsageSnapshot(snapshot);
     recordAgentUsageSnapshot({ ...snapshot, updatedAt: 62_000 });
 
     expect(readAgentUsageHistory()).toHaveLength(1);
     expect(readAgentUsageHistory()[0]?.updatedAt).toBe(62_000);
+    clearAgentUsageHistory();
+  });
+
+  it("fills missing quota providers when reading older snapshots", () => {
+    clearAgentUsageHistory();
+    window.localStorage.setItem(
+      "briar.agent-usage.history.v1",
+      JSON.stringify([
+        {
+          updatedAt: 70_000,
+          claude: { ...provider, provider: "claude" },
+          codex: provider,
+          grok: { ...provider, provider: "grok" },
+        },
+      ]),
+    );
+
+    const [restored] = readAgentUsageHistory();
+    expect(restored?.agy.provider).toBe("agy");
+    expect(restored?.opencode.provider).toBe("opencode");
+    expect(restored?.openrouter.provider).toBe("openrouter");
+    expect(restored?.cursor.provider).toBe("cursor");
+    expect(restored?.agy.status).toBe("unavailable");
     clearAgentUsageHistory();
   });
 });

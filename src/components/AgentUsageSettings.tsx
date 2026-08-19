@@ -27,6 +27,8 @@ import {
   readAgentUsageHistory,
   recordAgentUsageSnapshot,
   tightestUsageWindow,
+  quotaUsageProviderLabel,
+  quotaUsageProviders,
   type AgentUsageProvider,
   type AgentUsageSnapshot,
 } from "../lib/agent-usage";
@@ -41,7 +43,6 @@ import { LITELLM_MAIN_PRICING_SOURCE } from "../lib/agent-usage-pricing";
 import type { AgentUsagePricing, AgentUsageReport } from "../types";
 import { AgentProviderIcon } from "./AgentIcons";
 
-const quotaProviderOrder = ["claude", "codex", "grok"] as const;
 const rangeOptions = [7, 30, 90] as const satisfies readonly UsageRangeDays[];
 
 const providerColors: Record<UsageAttribution, string> = {
@@ -51,6 +52,7 @@ const providerColors: Record<UsageAttribution, string> = {
   grok: "#7765b5",
   agy: "#4285f4",
   opencode: "#4f8a70",
+  openrouter: "#6d5bd0",
   unknown: "var(--usage-unknown-color)",
 };
 
@@ -58,13 +60,8 @@ type ChartMetric = "tokens" | "cost" | "runs";
 type BreakdownMode = "model" | "day";
 
 function providerName(provider: UsageAttribution) {
-  if (provider === "claude") return "Claude";
-  if (provider === "cursor") return "Cursor";
-  if (provider === "grok") return "Grok";
-  if (provider === "agy") return "Antigravity";
-  if (provider === "opencode") return "OpenCode";
   if (provider === "unknown") return null;
-  return "Codex";
+  return quotaUsageProviderLabel(provider);
 }
 
 function formatCompact(value: number, locale: string) {
@@ -1113,7 +1110,7 @@ export function AgentUsageSettings({
             {providerError ? <SettingsAlert>{providerError}</SettingsAlert> : null}
             <div className="usage-overview-limits">
               {latest ? (
-                quotaProviderOrder.map((provider) => (
+                quotaUsageProviders.map((provider) => (
                   <ProviderLimitRow
                     key={provider}
                     provider={latest[provider]}

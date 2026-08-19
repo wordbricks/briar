@@ -25,7 +25,7 @@ import {
   organizationAgentContextMaxEncodedPageBytes,
   OrganizationAgentContextPageTooLargeError,
 } from "./organization-agent-context";
-import { applyD1Migrations } from "./test-helpers/d1";
+import { createIsolatedTestDatabase } from "./test-helpers/d1";
 
 const organizationId = "10000000-0000-4000-8000-000000000001";
 const otherOrganizationId = "10000000-0000-4000-8000-000000000002";
@@ -45,12 +45,7 @@ const currentDataAt = "2025-04-01T00:00:00.000Z";
 const snapshotAt = "2025-05-01T00:00:00.000Z";
 const futureDataAt = "2025-06-01T00:00:00.000Z";
 
-const miniflare = new Miniflare({
-  modules: true,
-  script: "export default { fetch() { return new Response('ok') } }",
-  d1Databases: { DB: "briar-organization-agent-context-test" },
-  r2Buckets: ["ARCHIVES"],
-});
+let miniflare: Miniflare;
 
 let db: D1Database;
 let archives: ArchiveBucket;
@@ -197,7 +192,16 @@ const insertIssue = async (input: {
 };
 
 beforeAll(async () => {
-  db = (await miniflare.getD1Database("DB")) as unknown as D1Database;
+  const database = await createIsolatedTestDatabase({
+    suite: "organization-agent-context",
+    miniflareOptions: {
+      modules: true,
+      script: "export default { fetch() { return new Response('ok') } }",
+      r2Buckets: ["ARCHIVES"],
+    },
+  });
+  miniflare = database.miniflare;
+  db = database.db;
   const miniflareBucket = await miniflare.getR2Bucket("ARCHIVES");
   archives = {
     async head(key) {
@@ -235,7 +239,6 @@ beforeAll(async () => {
       await miniflareBucket.delete(keys);
     },
   };
-  await applyD1Migrations(db);
 
   for (const [id, name, email] of [
     ["owner-a", "Owner A", "owner-a@example.com"],

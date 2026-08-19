@@ -70,7 +70,14 @@ run_app_worker() {
     fail "GitHub Actions workflows are not allowed; use the local CI and release scripts."
   fi
   bun run check
-  bun run test
+  bun run test:d1:prepare
+  if includes_context d1-migrations; then
+    bun run test -- \
+      --exclude worker/src/migrations.test.ts \
+      --exclude worker/src/db.test.ts
+  else
+    bun run test
+  fi
   bash -n \
     scripts/import-apple-signing-assets.sh \
     scripts/release-ios.sh \
@@ -97,7 +104,7 @@ run_d1_migrations() {
   trap 'rm -rf "$d1_state_dir"' RETURN
 
   bun run d1:migrate:local -- --persist-to "$d1_state_dir"
-  bun run test -- worker/src/db.test.ts
+  bun run test:d1:migrations
 
   rm -rf "$d1_state_dir"
   trap - RETURN

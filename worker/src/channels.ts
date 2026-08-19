@@ -151,6 +151,14 @@ export type ChannelMessageAttachmentRow = {
   created_at: string;
 };
 
+export type ChannelMessageDocumentRow = {
+  message_id: string;
+  channel_id: string;
+  project_id: string | null;
+  title: string;
+  markdown: string;
+};
+
 export type ChannelMessageAttachmentInput = Pick<
   ChannelMessageAttachmentRow,
   "id" | "organization_id" | "object_key" | "filename" | "content_type" | "byte_size"
@@ -1857,6 +1865,21 @@ export async function getChannelMessageAttachment(
     .first<ChannelMessageAttachmentRow>();
 }
 
+export async function getChannelMessageDocument(
+  db: D1Database,
+  channelId: string,
+  messageId: string,
+) {
+  return db
+    .prepare(
+      `select message_id, channel_id, project_id, title, markdown
+       from briar_channel_message_documents
+       where channel_id = ? and message_id = ?`,
+    )
+    .bind(channelId, messageId)
+    .first<ChannelMessageDocumentRow>();
+}
+
 /**
  * Resolve an image only when it belongs to the message that triggered the
  * active reply claim on this exact Worker device. This keeps a leaked claim
@@ -2193,7 +2216,8 @@ export async function claimNextChannelAgentReply(
          or (job.agent_provider = 'cursor' and ? = 1)
          or (job.agent_provider = 'grok' and ? = 1)
          or (job.agent_provider = 'agy' and ? = 1)
-         or (job.agent_provider = 'opencode' and ? = 1))
+         or (job.agent_provider = 'opencode' and ? = 1)
+         or (job.agent_provider = 'openrouter' and ? = 1))
        and exists (
          select 1 from briar_execution_workers binding
          where binding.id = ? and binding.device_id = ?
@@ -2243,6 +2267,7 @@ export async function claimNextChannelAgentReply(
     input.providers.includes("grok") ? 1 : 0,
     input.providers.includes("agy") ? 1 : 0,
     input.providers.includes("opencode") ? 1 : 0,
+    input.providers.includes("openrouter") ? 1 : 0,
     input.workerId,
     input.deviceId,
   ).all<ChannelReplyJobRow & {

@@ -442,6 +442,7 @@ struct OnboardingPrerequisites {
     grok: OnboardingPrerequisiteStatus,
     agy: OnboardingPrerequisiteStatus,
     opencode: OnboardingPrerequisiteStatus,
+    openrouter: OnboardingPrerequisiteStatus,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -480,6 +481,7 @@ struct AgentProviderModelCatalog {
     grok: AgentProviderModelCatalogEntry,
     agy: AgentProviderModelCatalogEntry,
     opencode: AgentProviderModelCatalogEntry,
+    openrouter: AgentProviderModelCatalogEntry,
 }
 
 #[derive(Serialize)]
@@ -577,6 +579,8 @@ struct CliConfig {
     user_token: Option<String>,
     #[serde(default)]
     agent_providers: AppProviderSettings,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    openrouter_api_key: Option<String>,
     #[serde(default)]
     app_settings: StoredAppRuntimeSettings,
     #[serde(default)]
@@ -816,6 +820,14 @@ struct AppProviderSettings {
     agy: bool,
     #[serde(default = "enabled_by_default")]
     opencode: bool,
+    #[serde(default = "enabled_by_default")]
+    openrouter: bool,
+}
+
+#[derive(Clone, Copy, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct OpenRouterCredentialStatus {
+    configured: bool,
 }
 
 impl Default for AppProviderSettings {
@@ -827,6 +839,7 @@ impl Default for AppProviderSettings {
             grok: true,
             agy: true,
             opencode: true,
+            openrouter: true,
         }
     }
 }
@@ -840,11 +853,18 @@ impl AppProviderSettings {
             agent::AgentProviderKind::Grok => self.grok,
             agent::AgentProviderKind::Agy => self.agy,
             agent::AgentProviderKind::Opencode => self.opencode,
+            agent::AgentProviderKind::Openrouter => self.openrouter,
         }
     }
 
     fn any_enabled(self) -> bool {
-        self.codex || self.claude || self.cursor || self.grok || self.agy || self.opencode
+        self.codex
+            || self.claude
+            || self.cursor
+            || self.grok
+            || self.agy
+            || self.opencode
+            || self.openrouter
     }
 }
 
@@ -1194,55 +1214,10 @@ fn inspect_agent_browser_cli(
     }
 }
 
-fn cursor_locally_authenticated(home: &Path, binary: &Path) -> bool {
-    if env::var("CURSOR_API_KEY").is_ok_and(|value| !value.trim().is_empty()) {
-        return true;
-    }
-    let execution_path = cli_execution_path(home).unwrap_or_default();
-    let output = Command::new(binary)
-        .env("HOME", home)
-        .env("PATH", execution_path)
-        .args(["about", "--format", "json"])
-        .output()
-        .ok();
-    if let Some(output) = output.filter(|output| output.status.success()) {
-        if let Ok(value) = serde_json::from_slice::<serde_json::Value>(&output.stdout) {
-            return value
-                .get("userEmail")
-                .and_then(serde_json::Value::as_str)
-                .is_some_and(|email| {
-                    let email = email.trim().to_ascii_lowercase();
-                    !email.is_empty()
-                        && email != "not logged in"
-                        && !email.contains("login required")
-                        && !email.contains("authentication required")
-                });
-        }
-    }
-    let output = Command::new(binary)
-        .env("HOME", home)
-        .args(["about"])
-        .output()
-        .ok();
-    output
-        .filter(|output| output.status.success())
-        .map(|output| {
-            String::from_utf8_lossy(&output.stdout)
-                .lines()
-                .find_map(|line| line.trim().strip_prefix("User Email"))
-                .map(str::trim)
-                .is_some_and(|email| {
-                    let email = email.to_ascii_lowercase();
-                    !email.is_empty()
-                        && email != "not logged in"
-                        && !email.contains("login required")
-                        && !email.contains("authentication required")
-                })
-        })
-        .unwrap_or(false)
-}
-
-fn inspect_onboarding_prerequisites_sync(home: &Path) -> OnboardingPrerequisites {
+fn inspect_onboarding_prerequisites_sync(
+    home: &Path,
+    openrouter_configured: bool,
+) -> OnboardingPrerequisites {
     let execution_path = cli_execution_path(home).unwrap_or_default();
     let mut codex = inspect_cli(agent::codex_binary(home, &execution_path));
     let claude_binary = agent::claude_binary(home, &execution_path);
@@ -1261,7 +1236,7 @@ fn inspect_onboarding_prerequisites_sync(home: &Path) -> OnboardingPrerequisites
     cursor.authenticated = cursor.installed
         && cursor_binary
             .as_deref()
-            .is_ok_and(|binary| cursor_locally_authenticated(home, binary));
+            .is_ok_and(|binary| agent_usage::cursor_locally_authenticated(home, binary));
     grok.authenticated = grok.installed && agent_usage::grok_locally_authenticated(home);
     agy.authenticated = agy.installed
         && agy_binary.as_deref().is_ok_and(|binary| {
@@ -1271,6 +1246,11 @@ fn inspect_onboarding_prerequisites_sync(home: &Path) -> OnboardingPrerequisites
     // healthy installed CLI is enough to launch; the server reports any
     // provider-specific authentication error during the request.
     opencode.authenticated = opencode.installed;
+    let openrouter = OnboardingPrerequisiteStatus {
+        installed: opencode.installed,
+        version: opencode.version.clone(),
+        authenticated: opencode.installed && openrouter_configured,
+    };
     OnboardingPrerequisites {
         git: inspect_cli(git_binary(home)),
         codex,
@@ -1279,6 +1259,7 @@ fn inspect_onboarding_prerequisites_sync(home: &Path) -> OnboardingPrerequisites
         grok,
         agy,
         opencode,
+        openrouter,
     }
 }
 
@@ -1764,6 +1745,12 @@ fn load_agent_provider_models_sync(home: &Path) -> AgentProviderModelCatalog {
         &["models", "--verbose"],
         parse_opencode_models_verbose,
     );
+    let openrouter = opencode.clone().map(|models| {
+        models
+            .into_iter()
+            .filter(|model| model.id.starts_with("openrouter/"))
+            .collect()
+    });
     AgentProviderModelCatalog {
         codex: provider_model_entry(codex, Vec::new(), false),
         claude: provider_model_entry(claude, claude_efforts, true),
@@ -1774,6 +1761,7 @@ fn load_agent_provider_models_sync(home: &Path) -> AgentProviderModelCatalog {
         grok: provider_model_entry(grok, Vec::new(), false),
         agy: provider_model_entry(agy, agy_efforts, false),
         opencode: provider_model_entry(opencode, Vec::new(), true),
+        openrouter: provider_model_entry(openrouter, Vec::new(), true),
     }
 }
 
@@ -1788,6 +1776,7 @@ fn connected_agent_provider(
         (agent::AgentProviderKind::Grok, &prerequisites.grok),
         (agent::AgentProviderKind::Agy, &prerequisites.agy),
         (agent::AgentProviderKind::Opencode, &prerequisites.opencode),
+        (agent::AgentProviderKind::Openrouter, &prerequisites.openrouter),
     ]
     .into_iter()
     .find_map(|(provider, status)| {
@@ -1795,7 +1784,7 @@ fn connected_agent_provider(
             .then_some(provider)
     })
     .ok_or_else(|| {
-        "연결된 LLM 프로바이더가 없습니다. 앱 설정에서 Codex, Claude, Cursor, Grok, Antigravity 또는 OpenCode를 연결한 뒤 다시 시도하세요."
+        "연결된 LLM 프로바이더가 없습니다. 앱 설정에서 Codex, Claude, Cursor, Grok, Antigravity, OpenCode 또는 OpenRouter를 연결한 뒤 다시 시도하세요."
             .to_string()
     })
 }
@@ -1925,9 +1914,13 @@ async fn inspect_onboarding_prerequisites(
     app: tauri::AppHandle,
 ) -> Result<OnboardingPrerequisites, String> {
     let home = app.path().home_dir().map_err(|error| error.to_string())?;
-    tauri::async_runtime::spawn_blocking(move || inspect_onboarding_prerequisites_sync(&home))
-        .await
-        .map_err(|error| error.to_string())
+    let config_path = cli_config_path(&app)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let configured = openrouter_api_key_from(&config_path)?.is_some();
+        Ok(inspect_onboarding_prerequisites_sync(&home, configured))
+    })
+    .await
+    .map_err(|error| error.to_string())?
 }
 
 #[tauri::command]
@@ -2257,6 +2250,7 @@ async fn install_onboarding_prerequisite(
     prerequisite: String,
 ) -> Result<OnboardingPrerequisites, String> {
     let home = app.path().home_dir().map_err(|error| error.to_string())?;
+    let config_path = cli_config_path(&app)?;
     tauri::async_runtime::spawn_blocking(move || {
         match prerequisite.as_str() {
             "git" => install_brew_package(&home, "git")?,
@@ -2266,9 +2260,11 @@ async fn install_onboarding_prerequisite(
             "grok" => install_grok_cli(&home)?,
             "agy" => install_agy_cli(&home)?,
             "opencode" => install_cli_package(&home, "opencode-ai")?,
+            "openrouter" => install_cli_package(&home, "opencode-ai")?,
             _ => return Err("지원하지 않는 필수 도구입니다.".to_string()),
         }
-        let prerequisites = inspect_onboarding_prerequisites_sync(&home);
+        let configured = openrouter_api_key_from(&config_path)?.is_some();
+        let prerequisites = inspect_onboarding_prerequisites_sync(&home, configured);
         let installed = match prerequisite.as_str() {
             "git" => prerequisites.git.installed,
             "codex" => prerequisites.codex.installed,
@@ -2277,6 +2273,7 @@ async fn install_onboarding_prerequisite(
             "grok" => prerequisites.grok.installed,
             "agy" => prerequisites.agy.installed,
             "opencode" => prerequisites.opencode.installed,
+            "openrouter" => prerequisites.openrouter.installed,
             _ => false,
         };
         if !installed {
@@ -3432,6 +3429,7 @@ fn write_cli_connection(
             api_url: api_url.clone(),
             user_token: None,
             agent_providers: AppProviderSettings::default(),
+            openrouter_api_key: None,
             app_settings: StoredAppRuntimeSettings::default(),
             projects: Vec::new(),
             extra: BTreeMap::new(),
@@ -3547,6 +3545,7 @@ fn read_cli_config(config_path: &Path) -> Result<CliConfig, String> {
             api_url: String::new(),
             user_token: None,
             agent_providers: AppProviderSettings::default(),
+            openrouter_api_key: None,
             app_settings: StoredAppRuntimeSettings::default(),
             projects: Vec::new(),
             extra: BTreeMap::new(),
@@ -4068,6 +4067,53 @@ fn project_llm_settings_from(
 
 fn app_provider_settings_from(config_path: &Path) -> Result<AppProviderSettings, String> {
     Ok(read_cli_config(config_path)?.agent_providers)
+}
+
+const OPENROUTER_OPENCODE_CONFIG: &str =
+    r#"{"provider":{"openrouter":{"options":{"apiKey":"{env:OPENROUTER_API_KEY}"}}}}"#;
+
+fn openrouter_api_key_from(config_path: &Path) -> Result<Option<String>, String> {
+    Ok(read_cli_config(config_path)?
+        .openrouter_api_key
+        .map(|key| key.trim().to_string())
+        .filter(|key| !key.is_empty()))
+}
+
+fn provider_environment_from(
+    config_path: &Path,
+    provider: agent::AgentProviderKind,
+) -> Result<Vec<(String, String)>, String> {
+    if provider != agent::AgentProviderKind::Openrouter {
+        return Ok(Vec::new());
+    }
+    let api_key = openrouter_api_key_from(config_path)?
+        .ok_or_else(|| "앱 설정에서 OpenRouter API 키를 먼저 저장하세요.".to_string())?;
+    Ok(vec![
+        ("OPENROUTER_API_KEY".to_string(), api_key),
+        (
+            "OPENCODE_CONFIG_CONTENT".to_string(),
+            OPENROUTER_OPENCODE_CONFIG.to_string(),
+        ),
+    ])
+}
+
+fn update_openrouter_api_key_at(
+    config_path: &Path,
+    api_key: Option<String>,
+) -> Result<OpenRouterCredentialStatus, String> {
+    let normalized = api_key
+        .map(|key| key.trim().to_string())
+        .filter(|key| !key.is_empty());
+    if normalized.as_deref().is_some_and(|key| {
+        key.len() < 10 || key.len() > 500 || key.chars().any(char::is_whitespace)
+    }) {
+        return Err("OpenRouter API 키는 공백 없이 10~500자로 입력하세요.".to_string());
+    }
+    let mut config = read_cli_config(config_path)?;
+    config.openrouter_api_key = normalized;
+    let configured = config.openrouter_api_key.is_some();
+    write_cli_config(config_path, &config)?;
+    Ok(OpenRouterCredentialStatus { configured })
 }
 
 fn app_runtime_settings_from(config_path: &Path) -> Result<StoredAppRuntimeSettings, String> {
@@ -5050,7 +5096,9 @@ fn auto_hunt_health_sync_with(
         agent::AgentProviderKind::Cursor => ".cursor",
         agent::AgentProviderKind::Grok => ".grok",
         agent::AgentProviderKind::Agy => ".gemini/config",
-        agent::AgentProviderKind::Opencode => ".config/opencode",
+        agent::AgentProviderKind::Opencode | agent::AgentProviderKind::Openrouter => {
+            ".config/opencode"
+        }
     };
     let skill_path = execution_home
         .join(skill_directory)
@@ -5359,17 +5407,19 @@ async fn project_llm_chat(
                 ))
                 .blocking_show()
         };
+        let mut execution = project_chat_execution(
+            full_access.unwrap_or(false),
+            settings.approval_policy,
+            model,
+            effort,
+            progress_event_sink,
+        );
+        execution.environment = provider_environment_from(&config_path, provider)?;
         let result = agent::AgentBackend::run(
             &backend,
             &project_id,
             workspace,
-            project_chat_execution(
-                full_access.unwrap_or(false),
-                settings.approval_policy,
-                model,
-                effort,
-                progress_event_sink,
-            ),
+            execution,
             request,
             &approve,
         );
@@ -5567,7 +5617,7 @@ async fn run_project_agent(
                 model,
                 effort,
                 event_sink: Some(event_sink),
-                environment: Vec::new(),
+                environment: provider_environment_from(&config_path, provider)?,
                 workspace_write_roots: Vec::new(),
             },
             &workflow_json,
@@ -6616,6 +6666,8 @@ async fn start_project_auto_hunt(
                 approved
             };
 
+            let mut worker_environment = cli_environment.environment().to_vec();
+            worker_environment.extend(provider_environment_from(&config_path, provider)?);
             match agent::start_auto_hunt_worker(
                 &backend,
                 &project_id,
@@ -6625,7 +6677,7 @@ async fn start_project_auto_hunt(
                     model: model.clone(),
                     effort: effort.clone(),
                     event_sink: worker_event_sink,
-                    environment: cli_environment.environment().to_vec(),
+                    environment: worker_environment,
                     // The worker starts inside its final worktree. Codex grants
                     // that checkout and its linked Git metadata together.
                     workspace_write_roots: Vec::new(),
@@ -6815,7 +6867,7 @@ async fn start_project_auto_hunt(
                 model: model.clone(),
                 effort,
                 event_sink: event_sink.clone(),
-                environment: Vec::new(),
+                environment: provider_environment_from(&config_path, provider)?,
                 workspace_write_roots: Vec::new(),
                 full_access: false,
             },
@@ -7080,6 +7132,33 @@ async fn load_app_provider_settings(app: tauri::AppHandle) -> Result<AppProvider
 }
 
 #[tauri::command]
+async fn load_openrouter_credential_status(
+    app: tauri::AppHandle,
+) -> Result<OpenRouterCredentialStatus, String> {
+    let config_path = cli_config_path(&app)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        Ok(OpenRouterCredentialStatus {
+            configured: openrouter_api_key_from(&config_path)?.is_some(),
+        })
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+async fn update_openrouter_api_key(
+    app: tauri::AppHandle,
+    api_key: Option<String>,
+) -> Result<OpenRouterCredentialStatus, String> {
+    let config_path = cli_config_path(&app)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        update_openrouter_api_key_at(&config_path, api_key)
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
 async fn load_app_runtime_settings(app: tauri::AppHandle) -> Result<AppRuntimeSettings, String> {
     let config_path = cli_config_path(&app)?;
     tauri::async_runtime::spawn_blocking(move || {
@@ -7296,7 +7375,10 @@ async fn connect_local_project(
         }
         install_auto_hunt_assets(&resource_directory, &home)?;
         let provider = connected_agent_provider(
-            &inspect_onboarding_prerequisites_sync(&home),
+            &inspect_onboarding_prerequisites_sync(
+                &home,
+                openrouter_api_key_from(&config_path)?.is_some(),
+            ),
             app_provider_settings_from(&config_path)?,
         )?;
         write_cli_connection(
@@ -8129,10 +8211,12 @@ pub fn run() {
             load_auto_hunt_app_server_events,
             load_auto_hunt_dispatch,
             load_app_provider_settings,
+            load_openrouter_credential_status,
             load_app_runtime_settings,
             load_browser_automation_settings,
             load_agent_usage,
             update_app_provider_settings,
+            update_openrouter_api_key,
             update_app_runtime_settings,
             update_browser_automation_settings,
             load_project_llm_settings,
@@ -8352,6 +8436,7 @@ mod tests {
             grok: provider_prerequisite(grok.0, grok.1),
             agy: provider_prerequisite(false, false),
             opencode: provider_prerequisite(opencode.0, opencode.1),
+            openrouter: provider_prerequisite(false, false),
         }
     }
 
@@ -8382,6 +8467,7 @@ mod tests {
                     grok: true,
                     agy: true,
                     opencode: true,
+                    openrouter: true,
                 },
             )
             .expect("Grok should be selected"),
@@ -9587,6 +9673,7 @@ branch refs/heads/briar/second-11111111
                 grok: true,
                 agy: true,
                 opencode: true,
+                openrouter: true,
             },
         )
         .expect("provider settings should save");
@@ -9648,6 +9735,7 @@ branch refs/heads/briar/second-11111111
         assert!(defaults.grok);
         assert!(defaults.agy);
         assert!(defaults.opencode);
+        assert!(defaults.openrouter);
 
         update_app_provider_settings_at(
             &config_path,
@@ -9658,6 +9746,7 @@ branch refs/heads/briar/second-11111111
                 grok: false,
                 agy: false,
                 opencode: false,
+                openrouter: false,
             },
         )
         .expect("provider settings should initialize the local config");
@@ -9669,6 +9758,7 @@ branch refs/heads/briar/second-11111111
         assert!(!saved.agent_providers.grok);
         assert!(!saved.agent_providers.agy);
         assert!(!saved.agent_providers.opencode);
+        assert!(!saved.agent_providers.openrouter);
 
         fs::remove_dir_all(
             config_path
@@ -10269,6 +10359,7 @@ branch refs/heads/briar/second-11111111
             api_url: "http://127.0.0.1:8787".to_string(),
             user_token: None,
             agent_providers: AppProviderSettings::default(),
+            openrouter_api_key: None,
             app_settings: StoredAppRuntimeSettings::default(),
             projects: vec![CliProject {
                 id: "project-1".to_string(),
@@ -10292,6 +10383,50 @@ branch refs/heads/briar/second-11111111
             extra: BTreeMap::new(),
         };
         write_cli_config(config_path, &config).expect("config should be written");
+    }
+
+    #[test]
+    fn stores_openrouter_credentials_locally_and_only_exposes_configuration_status() {
+        let config_path = test_config_path("openrouter-credential");
+        config_with_cli_owned_settings(&config_path, None, None);
+
+        let status = update_openrouter_api_key_at(
+            &config_path,
+            Some("  sk-or-v1-local-test-key  ".to_string()),
+        )
+        .expect("credential should save");
+        assert!(status.configured);
+
+        let contents = fs::read_to_string(&config_path).expect("config should remain readable");
+        assert!(contents.contains("sk-or-v1-local-test-key"));
+        let environment =
+            provider_environment_from(&config_path, agent::AgentProviderKind::Openrouter)
+                .expect("OpenRouter environment should resolve");
+        assert_eq!(
+            environment[0],
+            (
+                "OPENROUTER_API_KEY".to_string(),
+                "sk-or-v1-local-test-key".to_string(),
+            )
+        );
+        assert_eq!(environment[1].0, "OPENCODE_CONFIG_CONTENT");
+        assert!(!environment[1].1.contains("sk-or-v1-local-test-key"));
+
+        let cleared =
+            update_openrouter_api_key_at(&config_path, None).expect("credential should clear");
+        assert!(!cleared.configured);
+        assert!(
+            provider_environment_from(&config_path, agent::AgentProviderKind::Openrouter,).is_err()
+        );
+    }
+
+    #[test]
+    fn rejects_malformed_openrouter_credentials() {
+        let config_path = test_config_path("openrouter-invalid-credential");
+        config_with_cli_owned_settings(&config_path, None, None);
+        assert!(
+            update_openrouter_api_key_at(&config_path, Some("sk-or invalid".to_string()),).is_err()
+        );
     }
 
     #[test]

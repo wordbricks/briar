@@ -1387,6 +1387,11 @@ export function App() {
         availableRuns={briar.dashboard?.runs ?? []}
         conversationInboxSyncSignal={conversationInboxSyncSignal}
         error={briar.recoveryError}
+        initialDetailTab={
+          inboxDetailTarget.kind === "conversation"
+            ? "conversation"
+            : undefined
+        }
         isDeletingIssue={briar.deletingIssueId === inboxDetailRun.id}
         isProcessing={processingIssueIds.has(inboxDetailRun.id)}
         isRecovering={briar.recoveringRunId === inboxDetailRun.id}
@@ -1418,7 +1423,7 @@ export function App() {
         }}
         onDependencyOpen={(runId) =>
           setInboxDetailTarget((current) =>
-            current ? { ...current, targetId: runId } : current,
+            current ? { ...current, kind: "issue", targetId: runId } : current,
           )}
         onLoadAttachment={briar.readIssueAttachment}
         onLoadIssueMessages={() => briar.readIssueMessages(inboxDetailRun.id)}
@@ -1432,6 +1437,11 @@ export function App() {
           setInboxDetailTarget(null);
           setRequestedSessionId(null);
           setRequestedRunId(inboxDetailRun.id);
+          setRequestedRunInitialTab(
+            inboxDetailTarget.kind === "conversation"
+              ? "conversation"
+              : null,
+          );
           navigateToIssue(inboxDetailRun.id);
         }}
         onProcessNow={() => {

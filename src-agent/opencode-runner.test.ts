@@ -9,6 +9,7 @@ import {
   openCodeFinalTurnOutputs,
   openCodeReadOnlySeatbeltProfile,
   openCodeServerArgs,
+  openCodeServerEnvironment,
   openCodeServerSpawnSpec,
 } from "./opencode-runner";
 
@@ -21,6 +22,18 @@ describe("OpenCode runner terminal output", () => {
       "--port=4242",
     ]);
     expect(openCodeServerArgs(4242, false)).not.toContain("--pure");
+  });
+
+  it("preserves the generated OpenRouter provider configuration", () => {
+    const config = '{"provider":{"openrouter":{"options":{"apiKey":"{env:OPENROUTER_API_KEY}"}}}}';
+    expect(openCodeServerEnvironment({
+      OPENROUTER_API_KEY: "sk-or-v1-test-key",
+      OPENCODE_CONFIG_CONTENT: config,
+    })).toMatchObject({
+      OPENROUTER_API_KEY: "sk-or-v1-test-key",
+      OPENCODE_CONFIG_CONTENT: config,
+    });
+    expect(openCodeServerEnvironment({}).OPENCODE_CONFIG_CONTENT).toBe("{}");
   });
 
   it("wraps read-only OpenCode in a repository-scoped OS sandbox", () => {

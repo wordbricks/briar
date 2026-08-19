@@ -18,7 +18,10 @@ use std::{
 const CODEX_TIMEOUT: Duration = Duration::from_secs(10);
 const CLAUDE_TIMEOUT: Duration = Duration::from_secs(10);
 const GROK_TIMEOUT: Duration = Duration::from_secs(10);
+const AGY_TIMEOUT: Duration = Duration::from_secs(10);
 const CLAUDE_USAGE_URL: &str = "https://api.anthropic.com/api/oauth/usage";
+const AGY_LOAD_ASSIST_URL: &str = "https://cloudcode-pa.googleapis.com/v1internal:loadCodeAssist";
+const AGY_QUOTA_URL: &str = "https://cloudcode-pa.googleapis.com/v1internal:retrieveUserQuota";
 const GROK_DEFAULT_PROXY_BASE: &str = "https://cli-chat-proxy.grok.com/v1";
 const GROK_WEEKLY_MINUTES: u64 = 10_080;
 const GROK_MONTHLY_MINUTES: u64 = 43_200;
@@ -53,6 +56,10 @@ pub(crate) struct AgentUsageSnapshot {
     codex: ProviderUsage,
     claude: ProviderUsage,
     grok: ProviderUsage,
+    agy: ProviderUsage,
+    opencode: ProviderUsage,
+    openrouter: ProviderUsage,
+    cursor: ProviderUsage,
     updated_at: u64,
 }
 
@@ -147,10 +154,16 @@ struct GrokMoneyValue {
 pub(crate) async fn load(home: PathBuf) -> AgentUsageSnapshot {
     let codex_home = home.clone();
     let claude_home = home.clone();
-    let grok_home = home;
+    let grok_home = home.clone();
+    let agy_home = home.clone();
+    let opencode_home = home.clone();
+    let cursor_home = home;
     let codex = tauri::async_runtime::spawn_blocking(move || load_codex(&codex_home));
     let claude = tauri::async_runtime::spawn(async move { load_claude(&claude_home).await });
     let grok = tauri::async_runtime::spawn(async move { load_grok(&grok_home).await });
+    let agy = tauri::async_runtime::spawn(async move { load_agy(&agy_home).await });
+    let opencode = tauri::async_runtime::spawn_blocking(move || load_opencode(&opencode_home));
+    let cursor = tauri::async_runtime::spawn_blocking(move || load_cursor(&cursor_home));
     let codex = codex.await.unwrap_or_else(|error| {
         failed_provider("codex", format!("Codex usage task failed: {error}"))
     });
@@ -160,10 +173,28 @@ pub(crate) async fn load(home: PathBuf) -> AgentUsageSnapshot {
     let grok = grok.await.unwrap_or_else(|error| {
         failed_provider("grok", format!("Grok usage task failed: {error}"))
     });
+    let agy = agy.await.unwrap_or_else(|error| {
+        failed_provider("agy", format!("Antigravity usage task failed: {error}"))
+    });
+    let opencode = opencode.await.unwrap_or_else(|error| {
+        failed_provider("opencode", format!("OpenCode usage task failed: {error}"))
+    });
+    let cursor = cursor.await.unwrap_or_else(|error| {
+        failed_provider("cursor", format!("Cursor usage task failed: {error}"))
+    });
+    let openrouter = provider_without_usage(
+        "openrouter",
+        "unavailable",
+        "OpenRouter usage limits are managed at openrouter.ai.".to_string(),
+    );
     AgentUsageSnapshot {
         codex,
         claude,
         grok,
+        agy,
+        opencode,
+        openrouter,
+        cursor,
         updated_at: now_millis(),
     }
 }
@@ -217,6 +248,11 @@ pub(crate) fn agy_locally_authenticated(
         .output()
         .ok()
         .is_some_and(|output| output.status.success())
+}
+
+pub(crate) fn cursor_locally_authenticated(home: &Path, binary: &Path) -> bool {
+    env::var("CURSOR_API_KEY").is_ok_and(|value| !value.trim().is_empty())
+        || read_cursor_account_identity(home, binary).0
 }
 
 fn load_codex(home: &Path) -> ProviderUsage {
@@ -862,6 +898,351 @@ fn clamp_percent(value: f64) -> f64 {
     value.clamp(0.0, 100.0)
 }
 
+async fn load_agy(home: &Path) -> ProviderUsage {
+    let execution_path = crate::cli_execution_path(home).unwrap_or_default();
+    let binary = match crate::agent::agy_binary(home, &execution_path) {
+        Ok(path) => path,
+        Err(error) => return provider_without_usage("agy", "unavailable", error),
+    };
+    let authenticated = agy_locally_authenticated(home, &binary, &execution_path);
+    let credentials = read_gemini_oauth_access(home);
+    if let Some(credentials) = credentials.as_ref() {
+        match fetch_agy_usage(&credentials.access_token).await {
+            Ok(mut usage) => {
+                usage.account_label = credentials.email.clone();
+                usage.authenticated = true;
+                return usage;
+            }
+            Err(error) => {
+                return provider_without_usage_with_account(
+                    "agy",
+                    if authenticated {
+                        "error"
+                    } else {
+                        "unavailable"
+                    },
+                    error,
+                    credentials.email.clone(),
+                    authenticated,
+                );
+            }
+        }
+    }
+    if authenticated {
+        return connected_provider_without_windows("agy", None);
+    }
+    provider_without_usage(
+        "agy",
+        "unavailable",
+        "Antigravity 로그인이 필요합니다.".to_string(),
+    )
+}
+
+fn load_opencode(home: &Path) -> ProviderUsage {
+    let (authenticated, account_label) = read_opencode_account_identity(home);
+    if authenticated {
+        return connected_provider_without_windows("opencode", account_label);
+    }
+    provider_without_usage(
+        "opencode",
+        "unavailable",
+        "OpenCode CLI가 필요합니다.".to_string(),
+    )
+}
+
+fn load_cursor(home: &Path) -> ProviderUsage {
+    if env::var("CURSOR_API_KEY").is_ok_and(|value| !value.trim().is_empty()) {
+        return connected_provider_without_windows("cursor", None);
+    }
+    let execution_path = crate::cli_execution_path(home).unwrap_or_default();
+    let binary = match crate::agent::cursor_binary(home, &execution_path) {
+        Ok(path) => path,
+        Err(error) => return provider_without_usage("cursor", "unavailable", error),
+    };
+    let (authenticated, account_label) = read_cursor_account_identity(home, &binary);
+    if authenticated {
+        return connected_provider_without_windows("cursor", account_label);
+    }
+    provider_without_usage(
+        "cursor",
+        "unavailable",
+        "Cursor 로그인이 필요합니다.".to_string(),
+    )
+}
+
+fn read_cursor_account_identity(home: &Path, binary: &Path) -> (bool, Option<String>) {
+    let execution_path = crate::cli_execution_path(home).unwrap_or_default();
+    let output = Command::new(binary)
+        .env("HOME", home)
+        .env("PATH", execution_path)
+        .args(["about", "--format", "json"])
+        .output()
+        .ok();
+    if let Some(output) = output.filter(|output| output.status.success()) {
+        if let Some(email) = parse_cursor_about_email(&output.stdout) {
+            return (true, Some(email));
+        }
+    }
+    let output = Command::new(binary)
+        .env("HOME", home)
+        .args(["about"])
+        .output()
+        .ok();
+    output
+        .filter(|output| output.status.success())
+        .and_then(|output| {
+            parse_cursor_about_text(String::from_utf8_lossy(&output.stdout).as_ref())
+        })
+        .map(|email| (true, Some(email)))
+        .unwrap_or((false, None))
+}
+
+fn parse_cursor_about_email(stdout: &[u8]) -> Option<String> {
+    let value = serde_json::from_slice::<Value>(stdout).ok()?;
+    usable_account_email(value.get("userEmail").and_then(Value::as_str))
+}
+
+fn parse_cursor_about_text(stdout: &str) -> Option<String> {
+    stdout.lines().find_map(|line| {
+        usable_account_email(line.trim().strip_prefix("User Email").map(str::trim))
+    })
+}
+
+fn usable_account_email(value: Option<&str>) -> Option<String> {
+    let email = value?.trim();
+    let lowered = email.to_ascii_lowercase();
+    if email.is_empty()
+        || lowered == "not logged in"
+        || lowered.contains("login required")
+        || lowered.contains("authentication required")
+    {
+        return None;
+    }
+    Some(email.to_string())
+}
+
+fn read_opencode_account_identity(home: &Path) -> (bool, Option<String>) {
+    let mut candidates = vec![
+        home.join(".local/share/opencode/auth.json"),
+        home.join("Library/Application Support/opencode/auth.json"),
+    ];
+    if let Some(xdg) = env::var_os("XDG_DATA_HOME") {
+        candidates.insert(0, PathBuf::from(xdg).join("opencode/auth.json"));
+    }
+    if let Some(appdata) = env::var_os("APPDATA") {
+        candidates.insert(0, PathBuf::from(appdata).join("opencode/auth.json"));
+    }
+    for path in candidates {
+        let Ok(contents) = fs::read_to_string(path) else {
+            continue;
+        };
+        if let Some(label) = parse_opencode_auth_label(&contents) {
+            return (true, Some(label));
+        }
+        if serde_json::from_str::<Value>(&contents)
+            .ok()
+            .and_then(|value| value.as_object().map(|object| !object.is_empty()))
+            == Some(true)
+        {
+            return (true, None);
+        }
+    }
+    let execution_path = crate::cli_execution_path(home).unwrap_or_default();
+    (
+        crate::agent::opencode_binary(home, &execution_path).is_ok(),
+        None,
+    )
+}
+
+fn parse_opencode_auth_label(contents: &str) -> Option<String> {
+    let value = serde_json::from_str::<Value>(contents).ok()?;
+    collect_account_label(&value)
+}
+
+fn collect_account_label(value: &Value) -> Option<String> {
+    match value {
+        Value::Object(map) => {
+            for key in ["email", "emailAddress", "account", "user"] {
+                if let Some(label) = map.get(key).and_then(|item| match item {
+                    Value::String(raw) => usable_account_email(Some(raw)),
+                    other => collect_account_label(other),
+                }) {
+                    return Some(label);
+                }
+            }
+            map.values().find_map(collect_account_label)
+        }
+        Value::Array(items) => items.iter().find_map(collect_account_label),
+        _ => None,
+    }
+}
+
+struct GeminiOauthAccess {
+    access_token: String,
+    email: Option<String>,
+}
+
+fn read_gemini_oauth_access(home: &Path) -> Option<GeminiOauthAccess> {
+    let path = env::var_os("GEMINI_OAUTH_CREDS")
+        .filter(|value| !value.is_empty())
+        .map(PathBuf::from)
+        .unwrap_or_else(|| home.join(".gemini/oauth_creds.json"));
+    let contents = fs::read_to_string(path).ok()?;
+    parse_gemini_oauth_access(&contents)
+}
+
+fn parse_gemini_oauth_access(contents: &str) -> Option<GeminiOauthAccess> {
+    let value = serde_json::from_str::<Value>(contents).ok()?;
+    let access_token = value
+        .get("access_token")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|token| !token.is_empty())?
+        .to_string();
+    if let Some(expiry) = value.get("expiry_date").and_then(Value::as_i64) {
+        if expiry <= now_millis() as i64 {
+            return None;
+        }
+    }
+    Some(GeminiOauthAccess {
+        access_token,
+        email: usable_account_email(value.get("email").and_then(Value::as_str)),
+    })
+}
+
+async fn fetch_agy_usage(access_token: &str) -> Result<ProviderUsage, String> {
+    let _ = rustls::crypto::ring::default_provider().install_default();
+    let client = reqwest::Client::builder()
+        .timeout(AGY_TIMEOUT)
+        .build()
+        .map_err(|error| format!("Antigravity usage 연결을 만들지 못했습니다: {error}"))?;
+    let project_id = fetch_agy_project_id(&client, access_token).await?;
+    let response = client
+        .post(AGY_QUOTA_URL)
+        .header(AUTHORIZATION, format!("Bearer {access_token}"))
+        .json(&json!({ "project": project_id }))
+        .send()
+        .await
+        .map_err(|error| format!("Antigravity usage를 불러오지 못했습니다: {error}"))?;
+    if !response.status().is_success() {
+        return Err(match response.status().as_u16() {
+            401 | 403 => "Antigravity 로그인이 만료되었습니다.".to_string(),
+            status => format!("Antigravity usage를 불러오지 못했습니다. HTTP {status}"),
+        });
+    }
+    let body = response
+        .json::<Value>()
+        .await
+        .map_err(|error| format!("Antigravity usage 응답을 읽지 못했습니다: {error}"))?;
+    parse_agy_quota(&body)
+}
+
+async fn fetch_agy_project_id(
+    client: &reqwest::Client,
+    access_token: &str,
+) -> Result<String, String> {
+    if let Ok(project) = env::var("GOOGLE_CLOUD_PROJECT") {
+        let project = project.trim();
+        if !project.is_empty() {
+            return Ok(project.to_string());
+        }
+    }
+    let response = client
+        .post(AGY_LOAD_ASSIST_URL)
+        .header(AUTHORIZATION, format!("Bearer {access_token}"))
+        .json(&json!({
+            "metadata": {
+                "ideType": "GEMINI_CLI",
+                "pluginType": "GEMINI"
+            }
+        }))
+        .send()
+        .await
+        .map_err(|error| format!("Antigravity 프로젝트를 불러오지 못했습니다: {error}"))?;
+    if !response.status().is_success() {
+        return Err(match response.status().as_u16() {
+            401 | 403 => "Antigravity 로그인이 만료되었습니다.".to_string(),
+            status => format!("Antigravity 프로젝트를 불러오지 못했습니다. HTTP {status}"),
+        });
+    }
+    let body = response
+        .json::<Value>()
+        .await
+        .map_err(|error| format!("Antigravity 프로젝트 응답을 읽지 못했습니다: {error}"))?;
+    body.get("cloudaicompanionProject")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
+        .ok_or_else(|| "Antigravity 프로젝트 ID를 찾지 못했습니다.".to_string())
+}
+
+fn parse_agy_quota(body: &Value) -> Result<ProviderUsage, String> {
+    let buckets = parse_agy_quota_buckets(body);
+    let session = buckets.into_iter().max_by(|left, right| {
+        left.used_percent
+            .partial_cmp(&right.used_percent)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    Ok(ProviderUsage {
+        provider: "agy",
+        status: "ok",
+        session,
+        weekly: None,
+        monthly: None,
+        plan_type: None,
+        account_label: None,
+        authenticated: true,
+        updated_at: now_millis(),
+        error: None,
+    })
+}
+
+fn parse_agy_quota_buckets(body: &Value) -> Vec<AgentUsageWindow> {
+    let raw = if let Some(buckets) = body.get("buckets").and_then(Value::as_array) {
+        buckets.clone()
+    } else if let Some(array) = body.as_array() {
+        array.clone()
+    } else {
+        Vec::new()
+    };
+    raw.iter().filter_map(map_agy_quota_bucket).collect()
+}
+
+fn map_agy_quota_bucket(value: &Value) -> Option<AgentUsageWindow> {
+    let remaining = value.get("remainingFraction").and_then(Value::as_f64)?;
+    if !remaining.is_finite() {
+        return None;
+    }
+    let reset = value
+        .get("resetTime")
+        .and_then(Value::as_str)
+        .and_then(parse_iso_millis);
+    Some(AgentUsageWindow {
+        used_percent: clamp_percent((1.0 - remaining) * 100.0),
+        window_minutes: 60,
+        resets_at: reset,
+    })
+}
+
+fn connected_provider_without_windows(
+    provider: &'static str,
+    account_label: Option<String>,
+) -> ProviderUsage {
+    ProviderUsage {
+        provider,
+        status: "ok",
+        session: None,
+        weekly: None,
+        monthly: None,
+        plan_type: None,
+        account_label,
+        authenticated: true,
+        updated_at: now_millis(),
+        error: None,
+    }
+}
+
 fn failed_provider(provider: &'static str, error: String) -> ProviderUsage {
     provider_without_usage(provider, "error", error)
 }
@@ -1030,5 +1411,63 @@ mod tests {
         let window = map_grok_monthly(&config).unwrap();
         assert_eq!(window.used_percent, 50.0);
         assert_eq!(window.window_minutes, GROK_MONTHLY_MINUTES);
+    }
+
+    #[test]
+    fn parses_cursor_about_email_and_rejects_login_placeholders() {
+        assert_eq!(
+            parse_cursor_about_email(br#"{"userEmail":"dev@example.com"}"#).as_deref(),
+            Some("dev@example.com")
+        );
+        assert_eq!(
+            parse_cursor_about_email(br#"{"userEmail":"Not logged in"}"#),
+            None
+        );
+        assert_eq!(
+            parse_cursor_about_text("Version 1.0\nUser Email  team@example.com\n"),
+            Some("team@example.com".to_string())
+        );
+    }
+
+    #[test]
+    fn reads_opencode_account_email_from_nested_auth() {
+        let label =
+            parse_opencode_auth_label(r#"{"google":{"type":"oauth","email":"agy@example.com"}}"#);
+        assert_eq!(label.as_deref(), Some("agy@example.com"));
+    }
+
+    #[test]
+    fn maps_antigravity_quota_buckets_to_the_tightest_window() {
+        let usage = parse_agy_quota(&json!({
+            "buckets": [
+                {
+                    "remainingFraction": 0.8,
+                    "resetTime": "2026-08-18T12:00:00Z",
+                    "modelId": "gemini-3.1-flash"
+                },
+                {
+                    "remainingFraction": 0.25,
+                    "resetTime": "2026-08-18T11:00:00Z",
+                    "modelId": "gemini-3.1-pro"
+                }
+            ]
+        }))
+        .unwrap();
+        assert_eq!(usage.status, "ok");
+        let session = usage.session.unwrap();
+        assert_eq!(session.used_percent, 75.0);
+        assert_eq!(session.window_minutes, 60);
+        assert_eq!(session.resets_at, parse_iso_millis("2026-08-18T11:00:00Z"));
+    }
+
+    #[test]
+    fn ignores_expired_gemini_oauth_access() {
+        assert!(
+            parse_gemini_oauth_access(r#"{"access_token":"secret","expiry_date":1}"#).is_none()
+        );
+        assert!(parse_gemini_oauth_access(
+            r#"{"access_token":"secret","expiry_date":4102444800000}"#
+        )
+        .is_some());
     }
 }

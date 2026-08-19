@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  parseAgyQuota,
   parseClaudeUsageResponse,
   parseCodexRateLimits,
   parseGrokBilling,
@@ -87,5 +88,16 @@ describe("provider usage probes", () => {
     expect(parseCodexRateLimits({ id: 2, result: {} }).exhausted).toBe(false);
     expect(parseClaudeUsageResponse({}).exhausted).toBe(false);
     expect(parseGrokBilling({}, "weekly")).toBeNull();
+  });
+
+  it("marks Antigravity as exhausted from the tightest quota bucket", () => {
+    const result = parseAgyQuota({
+      buckets: [
+        { remainingFraction: 0.4, resetTime: "2026-08-18T12:00:00Z" },
+        { remainingFraction: 0, resetTime: "2026-08-18T11:00:00Z" },
+      ],
+    });
+    expect(result.exhausted).toBe(true);
+    expect(result.maxUsedPercent).toBe(100);
   });
 });

@@ -8,10 +8,17 @@ enum AgentProvider: String, Codable, CaseIterable, Hashable, Identifiable, Senda
     case grok
     case agy
     case opencode
+    case openrouter
 
     var id: String { rawValue }
-    var displayName: String { self == .agy ? "Antigravity" : rawValue.capitalized }
-
+    var displayName: String {
+        switch self {
+        case .agy: "Antigravity"
+        case .opencode: "OpenCode"
+        case .openrouter: "OpenRouter"
+        default: rawValue.capitalized
+        }
+    }
 }
 
 struct ModelEffort: RawRepresentable, Codable, Hashable, Identifiable, Sendable {

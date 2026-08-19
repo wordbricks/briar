@@ -27,6 +27,7 @@ import {
   errorWithMessage,
   deleteProjectAgentSchedule,
   loadDashboard,
+  loadChannelMessageDocument,
   loadDashboardDelta,
   loadIssueConversationDelta,
   loadIssueConversationSnapshot,
@@ -2432,6 +2433,35 @@ describe("channel message API", () => {
     });
 
     expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it("loads a channel document from its member-authenticated route", async () => {
+    const fetchMock = vi.fn(async (
+      _input: RequestInfo | URL,
+      _init?: RequestInit,
+    ) => new Response(JSON.stringify({
+      document: {
+        messageId: "message-1",
+        title: "Rollout plan",
+        markdown: "# Rollout",
+        projectId: null,
+      },
+    }), { headers: { "Content-Type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(loadChannelMessageDocument(
+      "token",
+      "org-1",
+      "channel-1",
+      "message-1",
+    )).resolves.toMatchObject({
+      document: { title: "Rollout plan", markdown: "# Rollout" },
+    });
+    expect(fetchMock.mock.calls[0]?.[0]).toContain(
+      "/organizations/org-1/channels/channel-1/messages/message-1/document",
+    );
+    expect(new Headers(fetchMock.mock.calls[0]?.[1]?.headers).get("Authorization"))
+      .toBe("Bearer token");
   });
 
   it("uploads channel images and attachment references as multipart form data", async () => {

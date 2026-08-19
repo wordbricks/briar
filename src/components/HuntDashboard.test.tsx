@@ -1468,6 +1468,88 @@ describe("HuntDashboard", () => {
     }
   });
 
+  it("keeps spaces and newlines typed after an inline save", async () => {
+    vi.useFakeTimers();
+    const onUpdateIssue = vi.fn(async () => undefined);
+    const run = {
+      ...demoDashboard.runs[0],
+      issueDescription: "저장된 본문",
+      workerId: null,
+    };
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    const renderRun = async (nextRun: typeof run) => {
+      await act(async () => {
+        root.render(
+          <RunPage
+            isSidebarOpen
+            error={null}
+            isRecovering={false}
+            onBack={() => undefined}
+            onCancel={async () => undefined}
+            onLoadAttachment={async () => new Blob()}
+            onLoadIssueMessages={async () => []}
+            onLoadRunEvidence={async () => []}
+            onMove={async () => undefined}
+            onRetry={async () => undefined}
+            onSendIssueMessage={async () => {
+              throw new Error("not implemented in this test");
+            }}
+            onUpdateIssue={onUpdateIssue}
+            run={nextRun}
+          />,
+        );
+      });
+    };
+
+    try {
+      await renderRun(run);
+      const description = container.querySelector<HTMLTextAreaElement>(
+        ".issue-description-inline-editor .issue-description-input",
+      );
+      expect(description?.value).toBe(run.issueDescription);
+
+      await act(async () => {
+        Object.getOwnPropertyDescriptor(
+          HTMLTextAreaElement.prototype,
+          "value",
+        )?.set?.call(description, "저장된 본문 수정");
+        description?.dispatchEvent(new Event("input", { bubbles: true }));
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(600);
+      });
+      expect(onUpdateIssue).toHaveBeenCalledWith({
+        title: run.title,
+        description: "저장된 본문 수정",
+        priority: run.priority,
+        attachments: [],
+      });
+
+      await renderRun({ ...run, issueDescription: "저장된 본문 수정" });
+
+      const setDescriptionValue = async (value: string) => {
+        await act(async () => {
+          Object.getOwnPropertyDescriptor(
+            HTMLTextAreaElement.prototype,
+            "value",
+          )?.set?.call(description, value);
+          description?.dispatchEvent(new Event("input", { bubbles: true }));
+        });
+      };
+      await setDescriptionValue("저장된 본문 수정 ");
+      expect(description?.value).toBe("저장된 본문 수정 ");
+      await setDescriptionValue("저장된 본문 수정 \n");
+      expect(description?.value).toBe("저장된 본문 수정 \n");
+    } finally {
+      await act(async () => root.unmount());
+      container.remove();
+      vi.useRealTimers();
+    }
+  });
+
   it("keeps referenced images inline while the issue body remains editable", async () => {
     vi.useFakeTimers();
     const createObjectUrl = vi.fn((blob: Blob) =>
@@ -3499,6 +3581,79 @@ describe("HuntDashboard", () => {
     vi.unstubAllGlobals();
   });
 
+  it("selects the conversation tab when a narrow issue opens from an Inbox reply", async () => {
+    let resizeCallback: ResizeObserverCallback | null = null;
+    class TestResizeObserver {
+      constructor(callback: ResizeObserverCallback) {
+        resizeCallback = callback;
+      }
+
+      disconnect() {}
+      observe() {}
+      unobserve() {}
+    }
+    vi.stubGlobal("ResizeObserver", TestResizeObserver);
+
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => root.render(
+      <RunPage
+        error={null}
+        initialDetailTab="conversation"
+        isRecovering={false}
+        isSidebarOpen
+        onBack={() => undefined}
+        onCancel={async () => undefined}
+        onLoadAttachment={async () => new Blob()}
+        onLoadIssueMessages={async () => []}
+        onLoadRunEvidence={async () => []}
+        onMove={async () => undefined}
+        onRetry={async () => undefined}
+        onSendIssueMessage={async () => {
+          throw new Error("not implemented in this test");
+        }}
+        run={demoDashboard.runs[0]}
+      />,
+    ));
+
+    const layout = container.querySelector<HTMLElement>(".run-page-layout")!;
+    await act(async () => {
+      resizeCallback?.([{
+        contentRect: { width: 959 } as DOMRectReadOnly,
+        target: layout,
+      } as unknown as ResizeObserverEntry], {} as ResizeObserver);
+    });
+
+    const conversationTab = Array.from(
+      container.querySelectorAll<HTMLButtonElement>('[role="tab"]'),
+    ).find((tab) => tab.textContent === "대화");
+    const conversationPanel = container.querySelector<HTMLElement>(
+      ".issue-conversation-tab-panel",
+    );
+    expect(layout.classList.contains("is-conversation-tabbed")).toBe(true);
+    expect(conversationTab?.getAttribute("aria-selected")).toBe("true");
+    expect(conversationPanel?.hidden).toBe(false);
+    expect(conversationPanel?.querySelector(".issue-conversation")).not.toBeNull();
+    expect(container.querySelector(".run-page-conversation-resizer")).toBeNull();
+
+    await act(async () => {
+      resizeCallback?.([{
+        contentRect: { width: 960 } as DOMRectReadOnly,
+        target: layout,
+      } as unknown as ResizeObserverEntry], {} as ResizeObserver);
+    });
+    expect(layout.classList.contains("is-conversation-tabbed")).toBe(false);
+    expect(container.querySelector(".issue-conversation-tab-panel")).toBeNull();
+    expect(
+      container.querySelector<HTMLElement>(".issue-description-pane")?.hidden,
+    ).toBe(false);
+
+    await act(async () => root.unmount());
+    container.remove();
+    vi.unstubAllGlobals();
+  });
+
   it("marks an open issue viewed again when its inbox version changes", async () => {
     const container = document.createElement("div");
     document.body.append(container);
@@ -3709,6 +3864,9 @@ describe("HuntDashboard", () => {
         selectedRunId={null}
       />,
     ));
+    const board = container.querySelector<HTMLDivElement>(".kanban-board");
+    expect(board).not.toBeNull();
+    if (board) board.scrollLeft = 248;
     await act(async () =>
       container.querySelector<HTMLButtonElement>(".kanban-card")?.click(),
     );
@@ -3732,6 +3890,51 @@ describe("HuntDashboard", () => {
         ?.click(),
     );
     expect(onSelectedRunChange).toHaveBeenLastCalledWith(null);
+
+    await act(async () => root.render(
+      <HuntDashboard
+        {...dashboardProps}
+        dashboard={dashboard}
+        onSelectedRunChange={onSelectedRunChange}
+        selectedRunId={null}
+      />,
+    ));
+    expect(container.querySelector<HTMLDivElement>(".kanban-board")?.scrollLeft)
+      .toBe(248);
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("restores the Kanban scroll position through internal issue navigation", async () => {
+    const run = demoDashboard.runs[0];
+    const dashboard = { ...demoDashboard, runs: [run] };
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => root.render(
+      <HuntDashboard
+        {...dashboardProps}
+        dashboard={dashboard}
+      />,
+    ));
+    const board = container.querySelector<HTMLDivElement>(".kanban-board");
+    expect(board).not.toBeNull();
+    if (board) board.scrollLeft = 248;
+
+    await act(async () =>
+      container.querySelector<HTMLElement>(".kanban-card")?.click(),
+    );
+    expect(container.querySelector(".run-page-shell")).not.toBeNull();
+
+    await act(async () =>
+      container.querySelector<HTMLButtonElement>(
+        ".run-page-titlebar-back",
+      )?.click(),
+    );
+    expect(container.querySelector<HTMLDivElement>(".kanban-board")?.scrollLeft)
+      .toBe(248);
 
     await act(async () => root.unmount());
     container.remove();
@@ -7499,6 +7702,169 @@ describe("HuntDashboard", () => {
     expect(markup).toContain("$4.00 / 100만 토큰");
     expect(markup).toContain("캐시 토큰은 가격표의 전용 단가");
     expect(markup).not.toContain('class="issue-description-markdown"');
+  });
+
+  it("prioritizes verified deployment evidence for completed-issue manual QA", async () => {
+    const completedRun: HuntRun = {
+      ...demoDashboard.runs[0],
+      status: "completed",
+      currentRevision: 2,
+      resultSummary: "검증된 배포 대상에서 완료 결과를 확인합니다.",
+      workflow: {
+        ...demoDashboard.runs[0].workflow,
+        stages: [
+          ...demoDashboard.runs[0].workflow.stages,
+          {
+            id: "production_qa",
+            label: "Production QA",
+            required: true,
+            evidence: ["production target"],
+          },
+        ],
+      },
+    };
+    const evidence = (overrides: Partial<RunEvidence>): RunEvidence => ({
+      key: "deployment-evidence",
+      attempt: 1,
+      revision: 2,
+      stage: "production_qa",
+      type: "production target",
+      status: "passed",
+      detail: "배포 후 화면을 확인했습니다.",
+      command: null,
+      url: "https://qa.example.com/result/2",
+      metadata: { environment: "Production EU" },
+      actor: "briar-workflow",
+      observedAt: "2026-08-18T01:00:00.000Z",
+      recordedAt: "2026-08-18T01:00:00.000Z",
+      requiredRevision: 2,
+      canonical: true,
+      ...overrides,
+    });
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <TooltipProvider>
+          <RunPage
+            error={null}
+            isRecovering={false}
+            isSidebarOpen
+            onBack={() => undefined}
+            onCancel={async () => undefined}
+            onLoadAttachment={async () => new Blob()}
+            onLoadIssueMessages={async () => []}
+            onLoadRunEvidence={async () => [
+              evidence({}),
+              evidence({
+                key: "ci-url",
+                stage: "ci_qa",
+                type: "ci run",
+                url: "https://ci.example.com/run/2",
+                metadata: { environment: "CI" },
+              }),
+              evidence({
+                key: "release-pr-url",
+                stage: "pr_open",
+                type: "release pull request",
+                url: "https://github.com/example/repo/pull/2",
+                metadata: { environment: "Release review" },
+              }),
+              evidence({
+                key: "stale-deployment",
+                canonical: false,
+                url: "https://stale.example.com/result/1",
+              }),
+              evidence({
+                key: "pending-deployment",
+                status: "pending",
+                url: "https://pending.example.com/result/2",
+              }),
+              evidence({
+                key: "unsafe-deployment",
+                url: "javascript:alert(1)",
+              }),
+            ]}
+            onMove={async () => undefined}
+            onRetry={async () => undefined}
+            onSendIssueMessage={async () => {
+              throw new Error("not implemented in this test");
+            }}
+            run={completedRun}
+          />
+        </TooltipProvider>,
+      );
+      await Promise.resolve();
+    });
+
+    const guide = container.querySelector(".run-manual-qa");
+    expect(guide?.textContent).toContain("검증된 배포 대상");
+    expect(guide?.textContent).toContain("Production EU");
+    expect(guide?.textContent).toContain("대상 리비전 2");
+    expect(
+      guide?.querySelector<HTMLAnchorElement>("a")?.getAttribute("href"),
+    ).toBe("https://qa.example.com/result/2");
+    expect(guide?.textContent).toContain("‘대화’ 탭에서 @briar");
+    expect(guide?.textContent).not.toContain("배포되지 않은 상태");
+    expect(guide?.innerHTML).not.toContain("ci.example.com");
+    expect(guide?.innerHTML).not.toContain("github.com");
+    expect(guide?.innerHTML).not.toContain("stale.example.com");
+    expect(guide?.innerHTML).not.toContain("pending.example.com");
+    expect(guide?.innerHTML).not.toContain("javascript:");
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("shows local QA preparation, checks, expected result, and paused actions without a deployment URL", async () => {
+    const pausedRun: HuntRun = {
+      ...demoDashboard.runs[1],
+      status: "paused",
+    };
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <TooltipProvider>
+          <RunPage
+            error={null}
+            isRecovering={false}
+            isSidebarOpen
+            onBack={() => undefined}
+            onCancel={async () => undefined}
+            onLoadAttachment={async () => new Blob()}
+            onLoadIssueMessages={async () => []}
+            onLoadRunEvidence={async () => []}
+            onMove={async () => undefined}
+            onRetry={async () => undefined}
+            onSendIssueMessage={async () => {
+              throw new Error("not implemented in this test");
+            }}
+            run={pausedRun}
+          />
+        </TooltipProvider>,
+      );
+      await Promise.resolve();
+    });
+
+    const guide = container.querySelector(".run-manual-qa");
+    expect(guide?.textContent).toContain("배포되지 않은 상태");
+    expect(guide?.textContent).toContain("1. 실행 준비");
+    expect(guide?.textContent).toContain("c49b012");
+    expect(guide?.textContent).toContain("2. 확인 절차");
+    expect(guide?.textContent).toContain("bun run test");
+    expect(guide?.textContent).toContain("bun run build");
+    expect(guide?.textContent).toContain("3. 기대 결과");
+    expect(guide?.textContent).toContain("‘승인하고 계속’을");
+    expect(guide?.textContent).toContain("‘수정 요청’을");
+    expect(guide?.querySelector("a")).toBeNull();
+
+    await act(async () => root.unmount());
+    container.remove();
   });
 
   it("shows provider, model, and worker next to the attempt · revision label", () => {

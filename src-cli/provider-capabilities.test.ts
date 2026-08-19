@@ -149,6 +149,7 @@ fi
         grok: false,
         agy: true,
         opencode: false,
+        openrouter: false,
       }, {
         refresh: true,
         home: directory,
@@ -209,5 +210,43 @@ fi
         { id: "max", label: "max" },
       ],
     }]);
+  });
+
+  it("advertises only OpenRouter models for the OpenRouter provider", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "briar-openrouter-capabilities-"));
+    const binary = join(directory, "opencode");
+    try {
+      await writeFile(binary, `#!/bin/sh
+printf '%s' 'openrouter/anthropic/claude-sonnet-4
+{
+  "name": "Claude Sonnet 4",
+  "variants": {}
+}
+openai/gpt-5
+{
+  "name": "GPT-5",
+  "variants": {}
+}
+'
+`, { mode: 0o755 });
+      const catalog = await discoverWorkerProviderCapabilities({
+        codex: false,
+        claude: false,
+        cursor: false,
+        grok: false,
+        agy: false,
+        opencode: false,
+        openrouter: true,
+      }, {
+        refresh: true,
+        home: directory,
+        which: (provider) => provider === "openrouter" ? binary : null,
+      });
+      expect(catalog.openrouter.models.map((model) => model.id)).toEqual([
+        "openrouter/anthropic/claude-sonnet-4",
+      ]);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
   });
 });

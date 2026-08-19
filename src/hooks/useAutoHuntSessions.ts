@@ -288,11 +288,13 @@ export function mergeSynchronizedSessions(
     const key = sessionSyncKey(remote);
     const local = merged.get(key);
     if (local && sessionVersion(local) >= sessionVersion(remote)) continue;
-    const preserveLoadedDetail =
-      remote.detailLoaded === false && local?.detailLoaded !== false;
+    const preserveLocalDetail =
+      remote.detailLoaded === false &&
+      local?.detailLoaded !== false &&
+      local?.localOwner !== false;
     merged.set(key, {
       ...remote,
-      ...(preserveLoadedDetail
+      ...(preserveLocalDetail
         ? {
             request: local?.request ?? remote.request,
             followUps: local?.followUps ?? [],
@@ -303,6 +305,9 @@ export function mergeSynchronizedSessions(
             detailLoaded: true,
           }
         : {}),
+      // A newer lightweight snapshot invalidates remote-owned detail. Local
+      // owners retain their native detail, but remote sessions must fetch the
+      // completed summary/events instead of presenting the older empty copy.
       localOwner: local?.localOwner ?? false,
       workspaceRoot: local?.workspaceRoot ?? null,
       dispatchEvents: local?.dispatchEvents ?? [],

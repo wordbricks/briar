@@ -20,7 +20,7 @@ import {
   recordHuntEvent,
   transferIssue,
 } from "./db";
-import { applyD1Migrations } from "./test-helpers/d1";
+import { createIsolatedTestDatabase } from "./test-helpers/d1";
 import { mobileAcceptIssueActionProposalResponseSchema } from "./mobile-contract";
 import {
   dispatchHuntRun,
@@ -97,24 +97,33 @@ const providerCapabilities = {
     allowCustomModels: true,
     error: null,
   },
+  openrouter: {
+    models: [],
+    defaultEfforts: [],
+    allowCustomModels: true,
+    error: null,
+  },
 };
 
 describe("channel issue proposal approval route", () => {
-  const miniflare = new Miniflare({
-    modules: true,
-    script: "export default { fetch() { return new Response('ok') } }",
-    d1Databases: { DB: "briar-channel-proposal-routes-test" },
-    r2Buckets: ["ATTACHMENTS"],
-  });
+  let miniflare: Miniflare;
   let db: D1Database;
   let attachments: R2Bucket;
 
   beforeAll(async () => {
-    db = (await miniflare.getD1Database("DB")) as unknown as D1Database;
+    const database = await createIsolatedTestDatabase({
+      suite: "channel-proposal-routes",
+      miniflareOptions: {
+        modules: true,
+        script: "export default { fetch() { return new Response('ok') } }",
+        r2Buckets: ["ATTACHMENTS"],
+      },
+    });
+    miniflare = database.miniflare;
+    db = database.db;
     attachments = await miniflare.getR2Bucket(
       "ATTACHMENTS",
     ) as unknown as R2Bucket;
-    await applyD1Migrations(db);
 
     for (const [id, name, token] of [
       [ownerId, "Owner", ownerToken],

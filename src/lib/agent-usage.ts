@@ -1,6 +1,21 @@
-import type { AgentProvider } from "./project-llm";
+import {
+  agentProviderLabels,
+  type AgentProvider,
+} from "./agent-provider-contract";
 
 export type AgentUsageStatus = "ok" | "error" | "unavailable";
+
+export const quotaUsageProviders = [
+  "claude",
+  "codex",
+  "grok",
+  "agy",
+  "opencode",
+  "openrouter",
+  "cursor",
+] as const;
+
+export type QuotaUsageProvider = (typeof quotaUsageProviders)[number];
 
 export type AgentUsageWindow = {
   usedPercent: number;
@@ -9,7 +24,7 @@ export type AgentUsageWindow = {
 };
 
 export type AgentUsageProvider = {
-  provider: "claude" | "codex" | "grok";
+  provider: QuotaUsageProvider;
   status: AgentUsageStatus;
   session: AgentUsageWindow | null;
   weekly: AgentUsageWindow | null;
@@ -25,8 +40,31 @@ export type AgentUsageSnapshot = {
   claude: AgentUsageProvider;
   codex: AgentUsageProvider;
   grok: AgentUsageProvider;
+  agy: AgentUsageProvider;
+  opencode: AgentUsageProvider;
+  openrouter: AgentUsageProvider;
+  cursor: AgentUsageProvider;
   updatedAt: number;
 };
+
+export function emptyUsageProvider(
+  provider: QuotaUsageProvider,
+): AgentUsageProvider {
+  return {
+    provider,
+    status: "unavailable",
+    session: null,
+    weekly: null,
+    monthly: null,
+    planType: null,
+    updatedAt: 0,
+    error: null,
+  };
+}
+
+export function quotaUsageProviderLabel(provider: QuotaUsageProvider) {
+  return agentProviderLabels[provider];
+}
 
 const historyStorageKey = "briar.agent-usage.history.v1";
 const historyLimit = 96;
@@ -52,13 +90,23 @@ export async function openAgentProviderLogin(
   return invoke<void>("open_agent_provider_login", { provider });
 }
 
+function isQuotaUsageProvider(value: unknown): value is QuotaUsageProvider {
+  return (
+    value === "claude" ||
+    value === "codex" ||
+    value === "grok" ||
+    value === "agy" ||
+    value === "opencode" ||
+    value === "openrouter" ||
+    value === "cursor"
+  );
+}
+
 function isUsageProvider(value: unknown): value is AgentUsageProvider {
   if (!value || typeof value !== "object") return false;
   const provider = value as Partial<AgentUsageProvider>;
   return (
-    (provider.provider === "claude" ||
-      provider.provider === "codex" ||
-      provider.provider === "grok") &&
+    isQuotaUsageProvider(provider.provider) &&
     (provider.status === "ok" ||
       provider.status === "error" ||
       provider.status === "unavailable") &&
@@ -66,15 +114,33 @@ function isUsageProvider(value: unknown): value is AgentUsageProvider {
   );
 }
 
-function isUsageSnapshot(value: unknown): value is AgentUsageSnapshot {
-  if (!value || typeof value !== "object") return false;
+function parseUsageSnapshot(value: unknown): AgentUsageSnapshot | null {
+  if (!value || typeof value !== "object") return null;
   const snapshot = value as Partial<AgentUsageSnapshot>;
-  return (
-    typeof snapshot.updatedAt === "number" &&
-    isUsageProvider(snapshot.claude) &&
-    isUsageProvider(snapshot.codex) &&
-    isUsageProvider(snapshot.grok)
-  );
+  if (
+    typeof snapshot.updatedAt !== "number" ||
+    !isUsageProvider(snapshot.claude) ||
+    !isUsageProvider(snapshot.codex) ||
+    !isUsageProvider(snapshot.grok)
+  ) {
+    return null;
+  }
+  return {
+    claude: snapshot.claude,
+    codex: snapshot.codex,
+    grok: snapshot.grok,
+    agy: isUsageProvider(snapshot.agy) ? snapshot.agy : emptyUsageProvider("agy"),
+    opencode: isUsageProvider(snapshot.opencode)
+      ? snapshot.opencode
+      : emptyUsageProvider("opencode"),
+    openrouter: isUsageProvider(snapshot.openrouter)
+      ? snapshot.openrouter
+      : emptyUsageProvider("openrouter"),
+    cursor: isUsageProvider(snapshot.cursor)
+      ? snapshot.cursor
+      : emptyUsageProvider("cursor"),
+    updatedAt: snapshot.updatedAt,
+  };
 }
 
 export function readAgentUsageHistory(): AgentUsageSnapshot[] {
@@ -85,7 +151,8 @@ export function readAgentUsageHistory(): AgentUsageSnapshot[] {
     );
     if (!Array.isArray(parsed)) return [];
     return parsed
-      .filter(isUsageSnapshot)
+      .map(parseUsageSnapshot)
+      .filter((snapshot): snapshot is AgentUsageSnapshot => snapshot !== null)
       .sort((left, right) => right.updatedAt - left.updatedAt)
       .slice(0, historyLimit);
   } catch {

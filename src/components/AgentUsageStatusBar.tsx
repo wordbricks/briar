@@ -8,9 +8,12 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useI18n } from "../i18n";
 import {
+  emptyUsageProvider,
   formatUsageDuration,
   formatUsageWindowLabel,
   loadAgentUsage,
+  quotaUsageProviderLabel,
+  quotaUsageProviders,
   recordAgentUsageSnapshot,
   tightestUsageWindow,
   type AgentUsageProvider,
@@ -21,19 +24,6 @@ import { AgentProviderIcon } from "./AgentIcons";
 
 const refreshIntervalMs = 5 * 60_000;
 type UsageMode = "detailed" | "compact";
-
-const emptyProvider = (
-  provider: AgentUsageProvider["provider"],
-): AgentUsageProvider => ({
-  provider,
-  status: "unavailable",
-  session: null,
-  weekly: null,
-  monthly: null,
-  planType: null,
-  updatedAt: 0,
-  error: null,
-});
 
 function ProviderIcon({
   provider,
@@ -48,9 +38,7 @@ function ProviderIcon({
 }
 
 function providerName(provider: AgentUsageProvider["provider"]) {
-  if (provider === "claude") return "Claude";
-  if (provider === "grok") return "Grok";
-  return "Codex";
+  return quotaUsageProviderLabel(provider);
 }
 
 function usageTone(usedPercent: number) {
@@ -347,11 +335,10 @@ export function AgentUsageStatusBar({
   }, [isOpen]);
 
   const providers = useMemo(
-    () => [
-      snapshot?.claude ?? emptyProvider("claude"),
-      snapshot?.codex ?? emptyProvider("codex"),
-      snapshot?.grok ?? emptyProvider("grok"),
-    ],
+    () =>
+      quotaUsageProviders.map(
+        (provider) => snapshot?.[provider] ?? emptyUsageProvider(provider),
+      ),
     [snapshot],
   );
 
@@ -373,7 +360,7 @@ export function AgentUsageStatusBar({
               provider={
                 providers.find(
                   (provider) => provider.provider === selectedProvider,
-                ) ?? emptyProvider(selectedProvider)
+                ) ?? emptyUsageProvider(selectedProvider)
               }
             />
           ) : (

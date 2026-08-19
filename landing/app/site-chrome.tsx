@@ -95,6 +95,7 @@ export function SiteHeader({
             label={copy.language.label}
             englishLabel={copy.language.english}
             koreanLabel={copy.language.korean}
+            chineseLabel={copy.language.chinese}
             hrefs={hrefs}
           />
           {secondaryAction ? (

@@ -1,8 +1,8 @@
-import { type Locale, copy, localizedPath } from "../i18n";
+import { type Locale, copy, localizedHrefs, localizedPath } from "../i18n";
 import { SiteFooter, SiteHeader } from "../site-chrome";
 import { GITHUB_URL } from "../site-links";
 
-export const blogCopy = {
+const blogCopyByLocale = {
   ko: {
     metadata: {
       title: "Briar 블로그 — 제품과 에이전트 개발 이야기",
@@ -33,6 +33,23 @@ export const blogCopy = {
     home: "Home",
     backTop: "Back to top ↑",
   },
+} as const;
+
+export const blogCopy = {
+  ...blogCopyByLocale,
+  zh: {
+    metadata: {
+      title: "Briar 博客 — 产品与 Agent 开发",
+      description: "分享 Briar 的产品动态，以及人与编码 Agent 协作的方式。",
+    },
+    eyebrow: "BRIAR JOURNAL",
+    title: "Briar 博客",
+    description: "记录产品动态，以及人与编码 Agent 如何一起工作。",
+    emptyTitle: "第一篇文章正在准备中。",
+    emptyDescription: "欢迎稍后回来阅读 Briar 的新故事。",
+    home: "首页",
+    backTop: "返回顶部 ↑",
+  },
 } as const satisfies Record<Locale, unknown>;
 
 const PATH = "/blog" as const;
@@ -40,10 +57,7 @@ const PATH = "/blog" as const;
 export default function BlogView({ locale }: { locale: Locale }) {
   const c = copy[locale];
   const b = blogCopy[locale];
-  const hrefs = {
-    en: localizedPath("en", PATH),
-    ko: localizedPath("ko", PATH),
-  } as const;
+  const hrefs = localizedHrefs(PATH);
 
   return (
     <main className="blog-page" id="top">

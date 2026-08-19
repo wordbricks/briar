@@ -14,6 +14,10 @@ import {
 } from "../src/lib/agent-usage";
 
 const CLAUDE_USAGE_URL = "https://api.anthropic.com/api/oauth/usage";
+const AGY_LOAD_ASSIST_URL =
+  "https://cloudcode-pa.googleapis.com/v1internal:loadCodeAssist";
+const AGY_QUOTA_URL =
+  "https://cloudcode-pa.googleapis.com/v1internal:retrieveUserQuota";
 const GROK_DEFAULT_PROXY_BASE = "https://cli-chat-proxy.grok.com/v1";
 const GROK_WEEKLY_MINUTES = 10_080;
 const GROK_MONTHLY_MINUTES = 43_200;
@@ -634,6 +638,122 @@ export async function probeGrokUsage(
   }
 }
 
+const parseGeminiOauthAccess = (contents: string, now: number) => {
+  try {
+    const parsed = JSON.parse(contents) as {
+      access_token?: string;
+      expiry_date?: number;
+    };
+    const accessToken = parsed.access_token?.trim();
+    if (!accessToken) return null;
+    if (
+      typeof parsed.expiry_date === "number" &&
+      parsed.expiry_date <= now
+    ) {
+      return null;
+    }
+    return accessToken;
+  } catch {
+    return null;
+  }
+};
+
+export function parseAgyQuota(body: unknown): ProviderUsageProbe {
+  if (!body || typeof body !== "object") {
+    return unknownUsage("Antigravity usage response was not an object.");
+  }
+  const root = body as Record<string, unknown>;
+  const rawBuckets = Array.isArray(body)
+    ? body
+    : Array.isArray(root.buckets)
+      ? root.buckets
+      : [];
+  const windows = rawBuckets.flatMap((entry) => {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) return [];
+    const remaining = (entry as { remainingFraction?: unknown }).remainingFraction;
+    if (typeof remaining !== "number" || !Number.isFinite(remaining)) return [];
+    const resetTime = (entry as { resetTime?: unknown }).resetTime;
+    return [
+      {
+        usedPercent: clampPercent((1 - remaining) * 100),
+        windowMinutes: 60,
+        resetsAt:
+          typeof resetTime === "string" ? parseIsoMillis(resetTime) : null,
+      } satisfies AgentUsageWindow,
+    ];
+  });
+  if (windows.length === 0) {
+    return exhaustedFromWindows("ok", null, null, null);
+  }
+  const session = windows.reduce((worst, window) =>
+    window.usedPercent > worst.usedPercent ? window : worst,
+  );
+  return exhaustedFromWindows("ok", session, null, null);
+}
+
+export async function probeAgyUsage(
+  home: string,
+  now = Date.now(),
+  timeoutMs = DEFAULT_PROBE_TIMEOUT_MS,
+  fetchImpl: typeof fetch = fetch,
+): Promise<ProviderUsageProbe> {
+  const credsPath =
+    process.env.GEMINI_OAUTH_CREDS?.trim() ||
+    join(home, ".gemini", "oauth_creds.json");
+  let contents: string;
+  try {
+    contents = await readFile(credsPath, "utf8");
+  } catch {
+    return unknownUsage(null);
+  }
+  const accessToken = parseGeminiOauthAccess(contents, now);
+  if (!accessToken) {
+    return unknownUsage(null);
+  }
+  const headers = {
+    Authorization: `Bearer ${accessToken}`,
+    "Content-Type": "application/json",
+  };
+  try {
+    const project =
+      process.env.GOOGLE_CLOUD_PROJECT?.trim() ||
+      (await (async () => {
+        const response = await fetchImpl(AGY_LOAD_ASSIST_URL, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            metadata: { ideType: "GEMINI_CLI", pluginType: "GEMINI" },
+          }),
+          signal: AbortSignal.timeout(timeoutMs),
+        });
+        if (!response.ok) return null;
+        const body = (await response.json()) as {
+          cloudaicompanionProject?: string;
+        };
+        return body.cloudaicompanionProject?.trim() || null;
+      })());
+    if (!project) return unknownUsage(null);
+    const response = await fetchImpl(AGY_QUOTA_URL, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ project }),
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    if (!response.ok) {
+      return unknownUsage(
+        `Failed to load Antigravity usage. HTTP ${response.status}`,
+      );
+    }
+    return parseAgyQuota(await response.json());
+  } catch (error) {
+    return unknownUsage(
+      error instanceof Error
+        ? error.message
+        : "Failed to load Antigravity usage.",
+    );
+  }
+}
+
 const defaultProbe: ProviderUsageProbeDependencies["probe"] = async (
   provider,
   binary,
@@ -651,8 +771,11 @@ const defaultProbe: ProviderUsageProbeDependencies["probe"] = async (
   if (provider === "grok") {
     return probeGrokUsage(home, now, timeoutMs);
   }
-  // Antigravity, Cursor, and OpenCode have no stable first-class quota surface in
-  // Briar yet. Unknown usage deliberately fails open.
+  if (provider === "agy") {
+    return probeAgyUsage(home, now, timeoutMs);
+  }
+  // Cursor and OpenCode have no stable first-class quota surface in Briar yet.
+  // Unknown usage deliberately fails open.
   return unknownUsage(null);
 };
 

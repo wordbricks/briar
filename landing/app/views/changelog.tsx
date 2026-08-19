@@ -1,8 +1,8 @@
-import { type Locale, copy, localizedPath } from "../i18n";
+import { type Locale, copy, localizedHrefs, localizedPath } from "../i18n";
 import { Arrow, SiteFooter, SiteHeader } from "../site-chrome";
 import { GITHUB_RELEASES_URL } from "../site-links";
 
-export const changelogCopy = {
+const changelogCopyByLocale = {
   ko: {
     metadata: {
       title: "Briar 변경 기록 — 새로운 기능과 개선 사항",
@@ -29,6 +29,35 @@ export const changelogCopy = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.135",
+        date: "2026년 8월 18일",
+        title: "채널 문서와 Agent 제공자 선택을 더 넓게 지원합니다",
+        summary:
+          "OpenRouter와 채널 문서 미리보기, 반응 작성자 정보, 결과 QA 안내를 추가하고 답글 진행 표시를 다듬습니다.",
+        items: [
+          "OpenRouter를 Agent 제공자로 추가해 API 키를 이 컴퓨터에 저장하고 여러 모델을 선택해 실행할 수 있습니다.",
+          "채널 Agent가 만든 계획 문서를 카드에서 열어 본문을 확인하고, 로드 오류가 나면 다시 시도할 수 있습니다.",
+          "채널 메시지의 이모지 반응을 누가 남겼는지 아바타·이름과 함께 확인하고, 많은 반응자는 요약해서 볼 수 있습니다.",
+          "완료된 작업 결과에 수동 QA 안내를 추가해 로컬 검증 단계나 배포된 대상 URL에서 확인할 위치와 리비전을 바로 볼 수 있습니다.",
+          "Briar 답글 진행 표시의 글꼴 크기와 굵기를 맞춰 실제 답변 UI와 일관되게 표시합니다.",
+        ],
+      },
+      {
+        version: "1.2.134",
+        date: "2026년 8월 18일",
+        title: "새 Agent 템플릿과 제공자 사용량을 더 넓게 지원합니다",
+        summary:
+          "Frontend Developer Agent 템플릿을 추가하고 주요 제공자 사용량을 보여주며, Inbox 답글과 제공자 오류 뒤의 실행을 안전하게 이어가도록 개선합니다.",
+        items: [
+          "바로 사용할 수 있는 책임과 Skill, 출처 정보를 포함한 Frontend Developer Agent 템플릿을 추가합니다.",
+          "데스크탑 사용량 팝오버·하단 상태 바·제공자 목록에 Antigravity, OpenCode, Cursor를 추가하고, 가능한 경우 Antigravity Gemini quota와 로컬 계정 정보를 함께 보여줍니다.",
+          "Provider turn이 실패해도 활성 claim을 가진 Antigravity 실행을 종료하지 않고 복구 가능한 상태로 유지합니다.",
+          "사이드바 Channels 메뉴의 아이콘·간격·클릭 영역을 맞춰 항목을 더 안정적으로 탐색할 수 있게 합니다.",
+          "마이그레이션된 D1 테스트 데이터베이스 템플릿을 캐시해 로컬 테스트 준비를 줄이고 실행 일관성을 높입니다.",
+          "Inbox에서 이슈 답글을 열면 화면 너비에 맞춰 대화 탭을 바로 선택하고, 관련 이슈로 이동할 때도 올바른 상세 탭을 유지합니다.",
+        ],
+      },
       {
         version: "1.2.133",
         date: "2026년 8월 18일",
@@ -753,6 +782,35 @@ export const changelogCopy = {
     },
     entries: [
       {
+        version: "1.2.135",
+        date: "August 18, 2026",
+        title: "Expand channel documents and Agent provider support",
+        summary:
+          "Add OpenRouter and channel document previews, show who reacted to messages, add actionable manual QA guidance, and refine reply progress styling.",
+        items: [
+          "Add OpenRouter as an Agent provider, keeping its API key on this computer and allowing people to choose from multiple models.",
+          "Let people open plan documents created by channel Agents from a message card, read the full body, and retry when loading fails.",
+          "Show who reacted to a channel message with names and avatars, summarizing the list when many people reacted.",
+          "Add manual QA guidance to completed work results so people can jump to local checks or a deployed target URL with the relevant revision.",
+          "Match Briar reply progress typography to the surrounding response UI for a more consistent visual hierarchy.",
+        ],
+      },
+      {
+        version: "1.2.134",
+        date: "August 18, 2026",
+        title: "Add agent templates and broader provider usage visibility",
+        summary:
+          "Add a Frontend Developer Agent template, broaden provider usage visibility, and keep Inbox replies and active runs on the right path after navigation or provider errors.",
+        items: [
+          "Add a ready-to-use Frontend Developer Agent template with its responsibility, Skills, and upstream attribution.",
+          "Add Antigravity, OpenCode, and Cursor to the desktop usage popover, bottom status bar, provider roster, and local account labels, including live Antigravity Gemini quota when available.",
+          "Prevent an active Antigravity run from ending after a failed provider turn while its claim remains active, so the run can recover and continue.",
+          "Align Channels menu icons, spacing, and hit areas in the sidebar for more consistent navigation.",
+          "Cache migrated D1 database templates so local tests spend less time preparing shared fixtures and run more consistently.",
+          "Open Inbox issue replies directly in the conversation tab on compact layouts, and preserve the correct detail tab when navigating to a related issue.",
+        ],
+      },
+      {
         version: "1.2.133",
         date: "August 18, 2026",
         title: "Keep Agent replies moving while Workers are busy",
@@ -1449,6 +1507,38 @@ export const changelogCopy = {
       },
     ],
   },
+} as const;
+
+export const changelogCopy = {
+  ...changelogCopyByLocale,
+  zh: {
+    ...changelogCopyByLocale.en,
+    metadata: {
+      title: "Briar 更新日志 — 新功能与改进",
+      description:
+        "查看 Briar 桌面端、频道、移动端和 Agent 工作流的最新更新。",
+    },
+    eyebrow: "PRODUCT UPDATES",
+    title: "Briar 更新日志",
+    description:
+      "记录让人与 Agent 协作更清晰的新功能与改进。历史版本条目保留原始英文，便于对应 GitHub 发布记录。",
+    current: "当前稳定版本",
+    latest: "最新",
+    released: "发布",
+    openApp: "打开 Briar",
+    allReleases: "查看全部版本",
+    releaseNotes: "打开 GitHub 版本",
+    home: "首页",
+    backTop: "返回顶部 ↑",
+    categories: {
+      label: "变更类型",
+      breaking: "Breaking",
+      added: "Added",
+      improved: "Improved",
+      fixed: "Fixed",
+    },
+    entries: changelogCopyByLocale.en.entries,
+  },
 } as const satisfies Record<Locale, unknown>;
 
 const PATH = "/changelog" as const;
@@ -1498,10 +1588,7 @@ function groupChanges(version: string, items: readonly string[]) {
 export default function ChangelogView({ locale }: { locale: Locale }) {
   const c = copy[locale];
   const changelog = changelogCopy[locale];
-  const hrefs = {
-    en: localizedPath("en", PATH),
-    ko: localizedPath("ko", PATH),
-  } as const;
+  const hrefs = localizedHrefs(PATH);
 
   return (
     <main className="changelog-page" id="top">
@@ -1537,7 +1624,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <p>
             <strong>Briar</strong> <span>1.2</span>
           </p>
-          <a href="#v1-2-133">
+          <a href="#v1-2-135">
             {changelog.current} <span aria-hidden="true">↓</span>
           </a>
         </div>
@@ -1559,9 +1646,12 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   </div>
                   <time
                     dateTime={
-                      entry.version === "1.2.133"
+                      entry.version === "1.2.135"
                         ? "2026-08-18"
-                        : entry.version === "1.2.132" ||
+                        : entry.version === "1.2.134"
+                        ? "2026-08-18"
+                        : entry.version === "1.2.133" ||
+                      entry.version === "1.2.132" ||
                       entry.version === "1.2.131" ||
                       entry.version === "1.2.130"
                         ? "2026-08-17"

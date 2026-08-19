@@ -16,6 +16,8 @@ import {
   detachedProviderBlockFromPayload,
   detachedRunContinuationPrompt,
   detachedRunDisposition,
+  detachedRunRecoveryPrompt,
+  detachedRunTurnDecision,
   detachedTranscriptSequence,
   detachedTranscriptSessionId,
   detachedTranscriptPayload,
@@ -598,6 +600,19 @@ describe("detached Agent runner", () => {
     expect(launch.request.message).toContain("A prose final answer by itself does not finish");
   });
 
+  it("treats a failed command as recovery input while the run remains active", () => {
+    const prompt = detachedRunRecoveryPrompt({
+      runId: "run-42",
+      sourceKey: "BRIAR-42",
+      failure: "ci:local exited with code 1",
+    });
+
+    expect(prompt).toContain("still has an active claim");
+    expect(prompt).toContain("is not by itself a terminal run outcome");
+    expect(prompt).toContain("correct the code or execution environment");
+    expect(prompt).toContain('"ci:local exited with code 1"');
+  });
+
   it("extracts provider conversation IDs from session payloads", () => {
     expect(
       detachedConversationIdFromPayload({
@@ -629,6 +644,16 @@ describe("detached Agent runner", () => {
     expect(detachedRunDisposition(undefined, "run-42")).toBe("released");
     expect(detachedRunDisposition({ runId: "run-new" }, "run-42")).toBe(
       "released",
+    );
+    expect(detachedRunTurnDecision("continue", "ci:local exited 1")).toBe(
+      "recover",
+    );
+    expect(detachedRunTurnDecision("continue", null)).toBe("continue");
+    expect(detachedRunTurnDecision("terminal", "late provider error")).toBe(
+      "stop",
+    );
+    expect(detachedRunTurnDecision("released", "late provider error")).toBe(
+      "stop",
     );
   });
 

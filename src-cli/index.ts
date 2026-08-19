@@ -35,6 +35,7 @@ import {
 import {
   agentProviders,
   modelEffortSchema,
+  type AgentProvider,
 } from "../src/lib/agent-provider-contract";
 import {
   agentResponsibilityMaxLength,
@@ -63,6 +64,8 @@ import {
   detachedProviderBlockFromPayload,
   detachedRunContinuationPrompt,
   detachedRunDisposition,
+  detachedRunRecoveryPrompt,
+  detachedRunTurnDecision,
   detachedTranscriptPayload,
   detachedTranscriptSessionId,
   parseDetachedIssueReplyResult,
@@ -74,6 +77,7 @@ import {
 import { agentImageAttachments } from "../src-agent/runner-attachments";
 import {
   assertDetachedProviderTurnSucceeded,
+  detachedProviderTurnFailure,
   runDetachedProviderTurn,
 } from "./detached-provider-turn";
 import {
@@ -95,6 +99,7 @@ import {
 import {
   createWorkerDeviceIdentity,
   defaultWorkerLabel,
+  errorDelayMs,
   issueWorkerSessionDirectory,
   interruptibleSleep,
   restartInstalledServices,
@@ -316,6 +321,7 @@ const configSchema = z
         grok: z.boolean().default(true),
         agy: z.boolean().default(true),
         opencode: z.boolean().default(true),
+        openrouter: z.boolean().default(true),
       })
       .default({
         codex: true,
@@ -324,7 +330,9 @@ const configSchema = z
         grok: true,
         agy: true,
         opencode: true,
+        openrouter: true,
       }),
+    openrouterApiKey: z.string().trim().min(10).max(500).optional(),
     appSettings: z
       .object({
         preventSleepWhileRunning: z.boolean().default(false),
@@ -347,6 +355,28 @@ const configSchema = z
 
 type Config = z.infer<typeof configSchema>;
 type ProjectConfig = z.infer<typeof projectConfigSchema>;
+const openRouterOpenCodeConfig = JSON.stringify({
+  provider: {
+    openrouter: { options: { apiKey: "{env:OPENROUTER_API_KEY}" } },
+  },
+});
+
+function providerExecutionEnvironment(
+  config: Config,
+  provider: AgentProvider,
+  environment: NodeJS.ProcessEnv,
+): NodeJS.ProcessEnv {
+  if (provider !== "openrouter") return environment;
+  const apiKey = config.openrouterApiKey?.trim();
+  if (!apiKey) {
+    throw new Error("앱 설정에서 OpenRouter API 키를 먼저 저장하세요.");
+  }
+  return {
+    ...environment,
+    OPENROUTER_API_KEY: apiKey,
+    OPENCODE_CONFIG_CONTENT: openRouterOpenCodeConfig,
+  };
+}
 const executionToken = (project: ProjectConfig) =>
   process.env.BRIAR_WORKER_TOKEN ??
   process.env.BRIAR_AGENT_TOKEN ??
@@ -394,6 +424,7 @@ async function loadConfig(): Promise<Config> {
           grok: true,
           agy: true,
           opencode: true,
+          openrouter: true,
         },
         appSettings: {
           preventSleepWhileRunning: false,
@@ -2113,6 +2144,7 @@ const claimedProjectAgentTaskSchema = z.object({
   sourceKey: z.string().min(1),
   title: z.string().min(1),
   claimToken: z.string().startsWith("briar_agent_task_claim_"),
+  claimAttempts: z.number().int().positive(),
   claimedAt: z.string().datetime({ offset: true }),
   leaseExpiresAt: z.string().datetime({ offset: true }),
   request: z.string().min(1),
@@ -2520,14 +2552,14 @@ async function runClaimedIssueInRuntime(
     issue.runId,
     issue.executionId,
   );
-  const environment = {
+  const environment = providerExecutionEnvironment(config, provider, {
     ...process.env,
     PATH: workerExecutionPath(),
     BRIAR_CLI: workerCliPath(),
     BRIAR_WORKER_TOKEN: workerToken,
     BRIAR_PROJECT_ID: project.id,
     BRIAR_CONFIG_HOME: runtimeDirectory,
-  };
+  });
 
   const detachedAgent: DetachedAgent = {
     id: logicalAgent?.id ?? issue.runId,
@@ -2581,6 +2613,7 @@ async function runClaimedIssueInRuntime(
   let conversationId: string | null = null;
   let nextPrompt = prompt;
   let turnNumber = 0;
+  let consecutiveProviderTurnFailures = 0;
   try {
     for (;;) {
       turnNumber += 1;
@@ -2632,7 +2665,7 @@ async function runClaimedIssueInRuntime(
         });
         return;
       }
-      assertDetachedProviderTurnSucceeded(turn);
+      const turnFailure = detachedProviderTurnFailure(turn);
 
       const runtimeConfig = configSchema.parse(
         JSON.parse(await readFile(join(runtimeDirectory, "config.json"), "utf8")),
@@ -2642,7 +2675,29 @@ async function runClaimedIssueInRuntime(
           ?.activeClaim,
         issue.runId,
       );
-      if (disposition !== "continue") return;
+      const turnDecision = detachedRunTurnDecision(disposition, turnFailure);
+      if (turnDecision === "stop") return;
+
+      if (turnDecision === "recover" && turnFailure) {
+        consecutiveProviderTurnFailures += 1;
+        console.error(
+          `recovering ${issue.sourceKey}: agent turn ${turnNumber} failed while the run remained active: ${turnFailure}`,
+        );
+        nextPrompt = detachedRunRecoveryPrompt({
+          runId: issue.runId,
+          sourceKey: issue.sourceKey,
+          failure: turnFailure,
+        });
+        if (!conversationId) {
+          nextPrompt = `${nextPrompt}\n\nThe provider did not return a reusable conversation ID, so the durable issue context follows again.\n\n${prompt}`;
+        }
+        await interruptibleSleep(
+          errorDelayMs(consecutiveProviderTurnFailures, 30_000),
+          signal,
+        );
+        continue;
+      }
+      consecutiveProviderTurnFailures = 0;
 
       console.error(
         `continuing ${issue.sourceKey}: agent turn ${turnNumber} ended while the run remained active`,
@@ -2802,20 +2857,71 @@ async function runClaimedProjectAgentTask(
     request: task.request,
     workspacePath,
   });
-  const turn = await runDetachedProviderTurn({
-    agent,
-    prompt,
-    workspacePath,
-    fullAccess: project.autoHunt?.sandbox?.fullAccess ?? true,
-    environment: {
-      ...process.env,
-      PATH: workerExecutionPath(),
-      BRIAR_CLI: workerCliPath(),
-      BRIAR_WORKER_TOKEN: workerToken,
-      BRIAR_PROJECT_ID: project.id,
+  const transcriptSequencer = createDetachedTranscriptSequencer(
+    task.claimAttempts,
+  );
+  // Direct Agent tasks are not Hunt runs. Their task/session UUID is the
+  // durable transcript key, while attempt-scoped sequence ranges make Worker
+  // retries append safely without requiring a Hunt-run binding.
+  const transcriptEnvelope = {
+    projectId: project.id,
+    sessionId: task.workId,
+    workerId,
+    agentProvider: agent.provider,
+  };
+  const transcriptBatcher = new TranscriptBatcher({
+    send: async (events) => {
+      await request(config.apiUrl, "/transcripts", workerToken, {
+        method: "POST",
+        body: serializeTranscriptRequest(transcriptEnvelope, events),
+      });
     },
-    signal,
+    measureBytes: (events) =>
+      Buffer.byteLength(
+        serializeTranscriptRequest(transcriptEnvelope, events),
+        "utf8",
+      ),
+    isPayloadTooLarge: isTranscriptPayloadTooLarge,
+    onError: (error) => {
+      console.error(
+        `transcript upload failed for ${task.sourceKey}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    },
   });
+  const turn = await (async () => {
+    try {
+      return await runDetachedProviderTurn({
+        agent,
+        prompt,
+        workspacePath,
+        fullAccess: project.autoHunt?.sandbox?.fullAccess ?? true,
+        environment: providerExecutionEnvironment(config, agent.provider, {
+          ...process.env,
+          PATH: workerExecutionPath(),
+          BRIAR_CLI: workerCliPath(),
+          BRIAR_WORKER_TOKEN: workerToken,
+          BRIAR_PROJECT_ID: project.id,
+        }),
+        signal,
+        onPayload: async (rawPayload, line) => {
+          const payload = detachedTranscriptPayload(rawPayload, line);
+          const sequence = transcriptSequencer.nextForPayload(payload);
+          if (sequence === null) return;
+          await transcriptBatcher.enqueue({
+            sequence,
+            direction: detachedPayloadDirection(rawPayload),
+            payload,
+          });
+        },
+      });
+    } finally {
+      // Transcript telemetry remains optional, but buffered progress deserves
+      // one final upload attempt before the durable task result is settled.
+      await transcriptBatcher.flush();
+    }
+  })();
   assertDetachedProviderTurnSucceeded(turn);
   if (!turn.resultText) throw new Error("Agent returned an empty direct-run summary");
   return {
@@ -3050,13 +3156,13 @@ async function runClaimedIssueReply(
           readOnly: true,
           attachments,
           outputSchema: detachedIssueReplyOutputSchema,
-          environment: {
+          environment: providerExecutionEnvironment(config, agent.provider, {
             ...process.env,
             PATH: workerExecutionPath(),
             BRIAR_CLI: workerCliPath(),
             BRIAR_WORKER_TOKEN: workerToken,
             BRIAR_PROJECT_ID: project.id,
-          },
+          }),
           signal,
           onPayload: async (payload, line) => {
             activityPublisher.observePayload(payload);
@@ -3305,13 +3411,13 @@ async function runClaimedChannelReply(
         delegationTargets: reply.scope.kind === "organization"
           ? reply.delegationTargets
           : undefined,
-        environment: {
+        environment: providerExecutionEnvironment(config, agent.provider, {
           ...process.env,
           PATH: workerExecutionPath(),
           BRIAR_CLI: workerCliPath(),
           BRIAR_WORKER_TOKEN: workerToken,
           BRIAR_PROJECT_ID: project.id,
-        },
+        }),
         signal,
         onPayload: (payload) => {
           activityPublisher.observePayload(payload);
@@ -3461,6 +3567,7 @@ async function workerRegisterCommand() {
   const configuredProvider = project.llm?.provider ?? "codex";
   const providerHealth = await inspectWorkerProviderHealth(
     config.agentProviders,
+    { openrouterApiKey: config.openrouterApiKey ?? null },
   );
   const providerCapabilities = await discoverWorkerProviderCapabilities(
     config.agentProviders,
@@ -3707,6 +3814,7 @@ async function workerCommand() {
   if (readinessProblem) {
     const providerHealth = await inspectWorkerProviderHealth(
       config.agentProviders,
+      { openrouterApiKey: config.openrouterApiKey ?? null },
     );
     const providerCapabilities = await discoverWorkerProviderCapabilities(
       config.agentProviders,
@@ -3890,6 +3998,7 @@ async function workerCommand() {
         }
         const providerHealth = await inspectWorkerProviderHealth(
           config.agentProviders,
+          { openrouterApiKey: config.openrouterApiKey ?? null },
         );
         const providerCapabilities = await discoverWorkerProviderCapabilities(
           config.agentProviders,

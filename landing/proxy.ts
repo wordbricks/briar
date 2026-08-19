@@ -10,15 +10,16 @@ import {
 
 /**
  * Convenience redirect for first-time (or previously-opted-in) visitors to
- * an unprefixed English URL who would rather see Korean.
+ * an unprefixed English URL who would rather see a supported localized page.
  *
  * This is intentionally the ONLY place that redirects based on cookie/
  * Accept-Language — every locale still has its own stable, crawlable URL
  * (`/`, `/tutorial`, ... for English; `/ko`, `/ko/tutorial`, ... for
- * Korean) that renders unconditionally when visited directly, so a
+ * Korean; `/zh`, `/zh/tutorial`, ... for Chinese) that renders
+ * unconditionally when visited directly, so a
  * crawler or a shared link never depends on this redirect to reach either
  * language. Only routes matched below (the unprefixed pages) are ever
- * redirected; `/ko/*` is left alone.
+ * redirected; prefixed locale paths are left alone.
  */
 export function proxy(request: NextRequest) {
   const cookieLocale = request.cookies.get(localeCookieName)?.value;

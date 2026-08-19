@@ -1263,6 +1263,14 @@ describe("Worker HTTP contract", () => {
             usageExhausted: false,
             maxUsedPercent: null,
           },
+          openrouter: {
+            installed: true,
+            authenticated: true,
+            healthy: true,
+            reason: null,
+            usageExhausted: false,
+            maxUsedPercent: null,
+          },
         },
         versions: { briar: "1.2.116" },
       }),
@@ -1274,6 +1282,7 @@ describe("Worker HTTP contract", () => {
         grok: { usageExhausted: true, maxUsedPercent: 100 },
         agy: { usageExhausted: false, maxUsedPercent: null },
         opencode: { usageExhausted: false, maxUsedPercent: null },
+        openrouter: { usageExhausted: false, maxUsedPercent: null },
       },
     });
   });
