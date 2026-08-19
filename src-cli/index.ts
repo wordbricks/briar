@@ -562,7 +562,7 @@ async function login() {
     body: JSON.stringify({ client_id: "briar-cli", scope: "openid profile email" }),
   });
   console.log(`Briar 로그인 코드: ${code.user_code}`);
-  console.log("시스템 브라우저에서 Google 로그인과 기기 승인을 완료하세요.");
+  console.log("시스템 브라우저에서 로그인하고 기기 승인을 완료하세요.");
   await openBrowser(code.verification_uri_complete ?? code.verification_uri);
 
   let interval = (code.interval ?? 5) * 1_000;

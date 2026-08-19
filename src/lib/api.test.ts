@@ -436,7 +436,7 @@ describe("API errors", () => {
     );
   });
 
-  it("requests explicit Google account selection for an account switch", async () => {
+  it("passes the selected method, locale, and account-switch choice", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(
@@ -455,11 +455,13 @@ describe("API errors", () => {
 
     await expect(
       beginDeviceAuthorization("briar-web", {
-        forceAccountSelection: true,
+        method: "email",
+        locale: "zh",
+        switchAccount: true,
       }),
     ).resolves.toMatchObject({
       verificationUrl:
-        "https://briar-api.example/device?user_code=USER-CODE&client=web&switch_account=1",
+        "https://briar-api.example/device?user_code=USER-CODE&client=web&method=email&locale=zh&switch_account=1",
     });
   });
 

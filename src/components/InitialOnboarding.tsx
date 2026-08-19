@@ -2,7 +2,7 @@ import { ArrowRight } from "lucide-react";
 import { useState } from "react";
 import onboardingEveIssueUrl from "../assets/onboarding-eve-issue.png";
 import { useI18n } from "../i18n";
-import { LoginScreen } from "./LoginScreen";
+import { LoginScreen, type LoginMethod } from "./LoginScreen";
 
 type Step = "welcome" | "login";
 
@@ -17,7 +17,7 @@ export function InitialOnboarding({
   loading: boolean;
   loginCode: string | null;
   onCancelLogin: () => void;
-  onLogin: () => void;
+  onLogin: (method: LoginMethod) => void;
 }) {
   const { t } = useI18n();
   const [step, setStep] = useState<Step>("welcome");

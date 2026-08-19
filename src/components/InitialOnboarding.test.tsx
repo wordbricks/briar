@@ -32,7 +32,7 @@ describe("InitialOnboarding", () => {
     vi.clearAllMocks();
   });
 
-  it("explains Briar before showing Google sign-in", async () => {
+  it("explains Briar before showing the provider-neutral sign-in choices", async () => {
     await act(async () =>
       root.render(<InitialOnboarding {...createProps()} />),
     );
@@ -42,6 +42,7 @@ describe("InitialOnboarding", () => {
       "에이전트의 진행 상황과 결과, 팀의 피드백",
     );
     expect(container.textContent).not.toContain("Google로 계속하기");
+    expect(container.textContent).not.toContain("이메일 인증코드로 계속하기");
     expect(container.textContent).not.toContain("작업 환경을 준비할게요");
 
     await act(async () => {
@@ -51,6 +52,7 @@ describe("InitialOnboarding", () => {
     });
 
     expect(container.querySelector(".embedded-login-shell")).not.toBeNull();
+    expect(container.textContent).toContain("이메일 인증코드로 계속하기");
     expect(container.textContent).toContain("Google로 계속하기");
     expect(container.querySelector(".initial-prerequisites-list")).toBeNull();
     expect(
@@ -79,6 +81,24 @@ describe("InitialOnboarding", () => {
     });
 
     expect(props.onLogin).toHaveBeenCalledOnce();
+    expect(props.onLogin).toHaveBeenCalledWith("google");
+  });
+
+  it("starts email verification from the primary second-step action", async () => {
+    const props = createProps();
+    await act(async () => root.render(<InitialOnboarding {...props} />));
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>(".initial-welcome-copy button")
+        ?.click();
+    });
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(".email-button")?.click();
+    });
+
+    expect(props.onLogin).toHaveBeenCalledOnce();
+    expect(props.onLogin).toHaveBeenCalledWith("email");
   });
 
   it("cancels an in-progress login before returning to the introduction", async () => {

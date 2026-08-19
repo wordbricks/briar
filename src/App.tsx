@@ -1636,7 +1636,7 @@ export function App() {
         loading={briar.loading}
         loginCode={briar.loginCode}
         onCancelLogin={briar.cancelLogin}
-        onLogin={() => void briar.login()}
+        onLogin={(method) => void briar.login({ method, locale })}
       />
     );
   } else if (invitationToken) {
@@ -1652,10 +1652,10 @@ export function App() {
           leaveOrganizationInvitationRoute();
           window.location.reload();
         }}
-        onLogin={() => void briar.login()}
+        onLogin={(method) => void briar.login({ method, locale })}
         onSwitchAccount={async () => {
           await briar.logout();
-          await briar.login({ forceAccountSelection: true });
+          await briar.login({ locale, switchAccount: true });
         }}
         token={invitationToken}
         user={briar.user}
@@ -1669,7 +1669,7 @@ export function App() {
         loading={briar.loading}
         loginCode={briar.loginCode}
         onCancel={briar.cancelLogin}
-        onLogin={() => void briar.login()}
+        onLogin={(method) => void briar.login({ method, locale })}
         webMode={briar.webMode}
       />
     );

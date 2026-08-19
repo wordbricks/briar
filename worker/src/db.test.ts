@@ -997,6 +997,10 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         "utf8",
       ),
     );
+    await executeSql(
+      db,
+      await readFile(resolve("migrations/0117_email_otp_auth.sql"), "utf8"),
+    );
     // The lifecycle suite intentionally uses a compact migration history, so
     // add the issue-reply job columns that production migration 0116 supplies
     // before exercising the shared DB helpers below.
@@ -3507,10 +3511,19 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
        );
        insert into verification (
          id, identifier, value, expiresAt, createdAt, updatedAt
-       ) values (
-         'account-deletion-verification', '${email}', 'token',
-         '${atMinute(30)}', '${atMinute(0)}', '${atMinute(0)}'
-       );
+       ) values
+         (
+           'account-deletion-verification', '${email}', 'token',
+           '${atMinute(30)}', '${atMinute(0)}', '${atMinute(0)}'
+         ),
+         (
+           'account-deletion-sign-in-otp', 'sign-in-otp-${email}',
+           'encrypted-token:0', '${atMinute(30)}', '${atMinute(0)}',
+           '${atMinute(0)}'
+         );
+       insert into briar_auth_email_rate_limits (
+         identifier_hash, window_started_at, count, last_sent_at, updated_at
+       ) values ('${"a".repeat(64)}', 1, 1, 1, '${atMinute(0)}');
        insert into deviceCode (
          id, deviceCode, userCode, userId, expiresAt, status
        ) values (
@@ -3538,12 +3551,28 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       deleteAccountData(db, {
         userId,
         email,
+        emailRateLimitIdentifierHash: "a".repeat(64),
         observedAt: atMinute(1),
       }),
     ).resolves.toBe("deleted");
 
     await expect(
       db.prepare(`select id from "user" where id = ?`).bind(userId).first(),
+    ).resolves.toBeNull();
+    await expect(
+      db
+        .prepare(`select id from verification where identifier = ?`)
+        .bind(`sign-in-otp-${email}`)
+        .first(),
+    ).resolves.toBeNull();
+    await expect(
+      db
+        .prepare(
+          `select identifier_hash from briar_auth_email_rate_limits
+           where identifier_hash = ?`,
+        )
+        .bind("a".repeat(64))
+        .first(),
     ).resolves.toBeNull();
     await expect(
       db

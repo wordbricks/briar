@@ -2558,6 +2558,7 @@ export async function deleteAccountData(
   input: {
     userId: string;
     email: string;
+    emailRateLimitIdentifierHash?: string;
     observedAt: string;
   },
 ) {
@@ -2816,12 +2817,15 @@ export async function deleteAccountData(
     db
       .prepare(
         `delete from verification
-         where lower(identifier) = lower(?)
+         where (
+           lower(identifier) = lower(?)
+           or lower(identifier) = lower('sign-in-otp-' || ?)
+         )
            and exists (
              select 1 from briar_account_deletion_jobs where id = ?
            )`,
       )
-      .bind(input.email, jobId),
+      .bind(input.email, input.email, jobId),
     db
       .prepare(
         `delete from deviceCode
@@ -2843,6 +2847,19 @@ export async function deleteAccountData(
       )
       .bind(input.userId, jobId),
   );
+  if (input.emailRateLimitIdentifierHash) {
+    statements.push(
+      db
+        .prepare(
+          `delete from briar_auth_email_rate_limits
+           where identifier_hash = ?
+             and exists (
+               select 1 from briar_account_deletion_jobs where id = ?
+             )`,
+        )
+        .bind(input.emailRateLimitIdentifierHash, jobId),
+    );
+  }
   const userDeleteIndex = statements.length;
   statements.push(
     db
