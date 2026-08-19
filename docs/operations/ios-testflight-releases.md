@@ -968,3 +968,44 @@ optimistic-message assertion element-type independent, passed the complete
 repository signoff, and was merged into main before this exact verified IPA was
 uploaded. App Store Connect accepted the build as `VALID` and automatically
 made it available to the all-builds internal group.
+
+## 2026-08-19 — 1.2.138 (2)
+
+- App: Briar Companion (`app.briar.companion`)
+- Marketing version: `1.2.138`
+- App Store Connect build: `2`
+- App Store Connect build ID: `da01f92c-0f1a-4f36-a0c1-6009c83b177e`
+- Latest main commit: `a74e7076549cd9d908bb112f05e616e547cde715`
+- Release source commit: `5b885b2ce3e03b36375bb197d97641f1848d9f5d`
+- Implementation: native SwiftUI
+- Toolchain: Xcode 26.6, iOS 26.5 SDK
+- Minimum iOS version: 17.0
+- App Store Connect processing state: `VALID`
+- TestFlight state: `IN_BETA_TESTING`
+- Internal group: `wordbricks` (`hasAccessToAllBuilds=true`)
+- Automatic tester notification: enabled
+- IPA SHA-256: `0fbc367e45e5c4d3ede5ded44116fb6d3ef40f55f6126e300dd4e42134f16b40`
+
+This release adds channel settings, invitations, deletion, emoji reactions,
+attachment previews and cards; Project Agent issue replies; OpenRouter support;
+guided Agent templates; Inbox unread counts; mobile rendering-cache and
+navigation fixes; and the latest email OTP authentication changes. The release
+source passed the shared mobile contract, Swift unit and 18 iPhone UI tests,
+iPad accessibility and largest Dynamic Type layout testing, Production analyze
+and build checks, session/download/log security checks, and the Tauri iOS
+simulator and Android ARM64 regression builds. Archive identity, App Store
+provisioning, distribution signature, production entitlements, exported IPA
+signature, and all alternate app icons were verified before upload.
+
+The initial latest-main gate stopped before upload on Swift compile errors from
+new initializer arguments and an actor-isolated XCTest request-body assertion.
+PR #1158 corrected those call sites, passed the complete repository signoff,
+and was merged before the release gate was rerun. Build 2 was then created from
+the newer email OTP main commit. One iPad accessibility audit timed out inside
+XCTest; the isolated retry and the complete clean gate rerun both passed.
+
+While that gate was running, main advanced to the recorded latest commit through
+PR #1160, which changes only web spinner CSS and its test. The native iOS inputs
+are identical to the release source; the changed spinner tests also passed.
+App Store Connect accepted the build as `VALID` and automatically made it
+available to the all-builds internal group.
