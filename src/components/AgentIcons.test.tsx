@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 
 import antigravityIconUrl from "../assets/antigravity.png";
 import grokIconUrl from "../assets/grok.png";
+import openrouterIconUrl from "../assets/openrouter.png";
 import { AgentProviderIcon } from "./AgentIcons";
 
 describe("AgentProviderIcon", () => {
@@ -32,6 +33,22 @@ describe("AgentProviderIcon", () => {
     expect(image?.getAttribute("src")).toBe(grokIconUrl);
     expect(image?.getAttribute("width")).toBe("18");
     expect(image?.getAttribute("height")).toBe("18");
+    expect(image?.getAttribute("aria-hidden")).toBe("true");
+
+    act(() => root.unmount());
+  });
+
+  it("uses the bundled OpenRouter artwork for the openrouter provider", () => {
+    const container = document.createElement("div");
+    const root = createRoot(container);
+    act(() =>
+      root.render(<AgentProviderIcon provider="openrouter" size={22} />),
+    );
+
+    const image = container.querySelector("img");
+    expect(image?.getAttribute("src")).toBe(openrouterIconUrl);
+    expect(image?.getAttribute("width")).toBe("22");
+    expect(image?.getAttribute("height")).toBe("22");
     expect(image?.getAttribute("aria-hidden")).toBe("true");
 
     act(() => root.unmount());

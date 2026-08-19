@@ -1899,7 +1899,7 @@ button.run-manual-qa-state { width:100%; border:0; border-radius:8px; cursor:poi
 .issue-content-divider:hover::after,.issue-content-divider:focus-visible::after,.run-page-content.is-resizing .issue-content-divider::after { border-color:#a997df; background:#f1edfc; opacity:1; }
 .issue-description-empty { margin:0; color:var(--muted-foreground); font-size:var(--text-2xs); }
 .issue-description-scroll .issue-description-inline-editor { width:100%; min-height:220px; flex:1 0 220px; display:flex; flex-direction:column; }
-.issue-description-scroll .issue-description-inline-editor .issue-description-field { min-width:0; min-height:220px; flex:1 0 220px; }
+.issue-description-scroll .issue-description-inline-editor .issue-description-field { min-width:0; min-height:220px; flex:1 0 auto; }
 .issue-description-scroll .issue-description-inline-editor .issue-description-input,
 .issue-description-scroll .issue-description-inline-editor .issue-description-mirror { padding:0; font:inherit; font-size:var(--text-xs); line-height:1.7; }
 .issue-description-scroll .issue-description-inline-editor .issue-description-input { resize:none; overflow:hidden; border:0; border-radius:0; outline:0; background:transparent; }

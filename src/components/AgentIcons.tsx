@@ -2,12 +2,13 @@ import type { CSSProperties } from "react";
 import antigravityIconUrl from "../assets/antigravity.png";
 import cursorIconUrl from "../assets/cursor.png";
 import grokIconUrl from "../assets/grok.png";
+import openrouterIconUrl from "../assets/openrouter.png";
 
 // Why: SVG paths sourced from Orca
 // (`~/git/orca/src/renderer/src/components/status-bar/icons.tsx`) so Briar
 // matches Orca’s Claude/Codex branding. Grok uses the updated brand logo PNG
-// bundled with Briar. Cursor uses the user-provided artwork, while Antigravity
-// uses the provider artwork bundled with Briar.
+// bundled with Briar. Cursor and OpenRouter use the user-provided artwork, while
+// Antigravity uses the provider artwork bundled with Briar.
 
 type AgentIconProps = {
   size?: number;
@@ -100,20 +101,15 @@ export function OpenCodeIcon({ size = 14, className, style }: AgentIconProps) {
 
 export function OpenRouterIcon({ size = 14, className, style }: AgentIconProps) {
   return (
-    <svg
+    <img
+      alt=""
       aria-hidden
       className={className}
-      fill="none"
       height={size}
-      style={style}
-      viewBox="0 0 24 24"
+      src={openrouterIconUrl}
+      style={{ display: "block", width: size, height: size, ...style }}
       width={size}
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <path d="M3 7h12.5l-2.25-2.25M15.5 7l-2.25 2.25M21 17H8.5l2.25-2.25M8.5 17l2.25 2.25" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
-      <circle cx="3" cy="7" fill="currentColor" r="1.5" />
-      <circle cx="21" cy="17" fill="currentColor" r="1.5" />
-    </svg>
+    />
   );
 }
 
