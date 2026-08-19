@@ -11,6 +11,7 @@ import type {
 } from "../lib/channels-contract";
 import { channelReplyNoAvailableWorkerError } from "../lib/channels-contract";
 import type { OrganizationMember, Project } from "../types";
+import { ToastProvider } from "./ui/toast";
 
 const listChannels = vi.fn();
 const loadChannel = vi.fn();
@@ -312,9 +313,14 @@ describe("Channels", () => {
       );
     };
     await act(async () => {
-      root.render(<RequestedMessageConsumer />);
+      root.render(
+        <ToastProvider>
+          <RequestedMessageConsumer />
+        </ToastProvider>,
+      );
     });
     await act(async () => {
+      await Promise.resolve();
       await Promise.resolve();
     });
   };
@@ -332,6 +338,9 @@ describe("Channels", () => {
   afterEach(() => {
     act(() => root.unmount());
     container.remove();
+    document.body
+      .querySelectorAll("[data-testid='toast-viewport']")
+      .forEach((node) => node.remove());
   });
 
   it("lists channels and their messages", async () => {
@@ -1432,6 +1441,141 @@ describe("Channels", () => {
     );
     expect(container.querySelector(".channel-proposal-card")).not.toBeNull();
     expect(container.querySelector(".execution-proposal-card")).not.toBeNull();
+  });
+
+  it("displays emoji reaction optimistically before the server responds", async () => {
+    const target = message({
+      id: "message-optimistic-reaction",
+      reactions: [],
+    });
+    const pendingRequest = deferred<{ message: ChannelMessage }>();
+    toggleChannelMessageReaction.mockReturnValue(pendingRequest.promise);
+
+    await render([target]);
+
+    const quickReactionButton = Array.from(
+      container.querySelectorAll<HTMLButtonElement>(
+        ".channel-message-actions .channel-quick-reaction",
+      ),
+    ).find((button) => button.getAttribute("title") === "👍");
+    expect(quickReactionButton).not.toBeNull();
+
+    // Click quick reaction button
+    await act(async () => {
+      quickReactionButton?.click();
+    });
+
+    // Reaction should appear optimistically immediately before network response resolves
+    const optimisticChip = container.querySelector<HTMLButtonElement>(
+      ".channel-reaction-chip",
+    );
+    expect(optimisticChip).not.toBeNull();
+    expect(optimisticChip?.textContent).toContain("👍");
+    expect(optimisticChip?.textContent).toContain("1");
+    expect(optimisticChip?.className).toContain("is-mine");
+
+    // Resolve network request
+    await act(async () => {
+      pendingRequest.resolve({
+        message: message({
+          id: target.id,
+          reactions: [{ emoji: "👍", count: 1, userIds: ["user-1"] }],
+        }),
+      });
+      await Promise.resolve();
+    });
+
+    const settledChip = container.querySelector<HTMLButtonElement>(
+      ".channel-reaction-chip",
+    );
+    expect(settledChip).not.toBeNull();
+    expect(settledChip?.textContent).toContain("👍");
+    expect(settledChip?.textContent).toContain("1");
+  });
+
+  it("reverts optimistic emoji reaction and shows an error toast when server request fails", async () => {
+    const target = message({
+      id: "message-failed-reaction",
+      reactions: [],
+    });
+    const pendingRequest = deferred<{ message: ChannelMessage }>();
+    toggleChannelMessageReaction.mockReturnValue(pendingRequest.promise);
+
+    await render([target]);
+
+    const quickReactionButton = Array.from(
+      container.querySelectorAll<HTMLButtonElement>(
+        ".channel-message-actions .channel-quick-reaction",
+      ),
+    ).find((button) => button.getAttribute("title") === "❤️");
+    expect(quickReactionButton).not.toBeNull();
+
+    // Click reaction button
+    await act(async () => {
+      quickReactionButton?.click();
+    });
+
+    // Optimistically visible
+    expect(container.querySelector(".channel-reaction-chip")).not.toBeNull();
+    expect(container.querySelector(".channel-reaction-chip")?.textContent).toContain("❤️");
+
+    // Fail the network request
+    await act(async () => {
+      pendingRequest.reject(new Error("리액션을 저장하지 못했습니다"));
+      await Promise.resolve();
+    });
+
+    // Optimistic emoji should be removed
+    expect(container.querySelector(".channel-reaction-chip")).toBeNull();
+
+    // Error toast should be visible
+    const toast = document.body.querySelector('[data-testid="app-toast"]');
+    expect(toast).not.toBeNull();
+    expect(toast?.textContent).toContain("리액션을 저장하지 못했습니다");
+    expect(toast?.className).toContain("error");
+  });
+
+  it("reverts removing an emoji reaction and shows an error toast when server request fails", async () => {
+    const target = message({
+      id: "message-remove-failed-reaction",
+      reactions: [{ emoji: "👍", count: 1, userIds: ["user-1"] }],
+    });
+    const pendingRequest = deferred<{ message: ChannelMessage }>();
+    toggleChannelMessageReaction.mockReturnValue(pendingRequest.promise);
+
+    await render([target]);
+
+    const chip = container.querySelector<HTMLButtonElement>(
+      ".channel-reaction-chip",
+    );
+    expect(chip).not.toBeNull();
+
+    // Click existing chip to remove reaction
+    await act(async () => {
+      chip?.click();
+    });
+
+    // Optimistically removed
+    expect(container.querySelector(".channel-reaction-chip")).toBeNull();
+
+    // Fail the network request
+    await act(async () => {
+      pendingRequest.reject(new Error("리액션 삭제 실패"));
+      await Promise.resolve();
+    });
+
+    // Emoji reaction should be restored
+    const restoredChip = container.querySelector<HTMLButtonElement>(
+      ".channel-reaction-chip",
+    );
+    expect(restoredChip).not.toBeNull();
+    expect(restoredChip?.textContent).toContain("👍");
+
+    // Error toast should be visible
+    const toast = document.body.querySelector('[data-testid="app-toast"]');
+    expect(toast).not.toBeNull();
+    expect(toast?.textContent).toContain("리액션 삭제 실패");
+    expect(toast?.className).toContain("error");
   });
 
   it("copies a message permalink and body from the overflow menu", async () => {
