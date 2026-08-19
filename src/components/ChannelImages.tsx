@@ -11,6 +11,7 @@ import {
 import { useObjectUrl } from "../hooks/useObjectUrl";
 import type { ChannelMessageAttachment } from "../lib/channels-contract";
 import { loadChannelMessageAttachment } from "../lib/api";
+import { formatAttachmentBytes } from "../lib/issue-attachments";
 import { issueAttachmentMarkdown } from "../lib/issue-markdown";
 import { ImageLightbox } from "./ImageLightbox";
 
@@ -280,30 +281,41 @@ function ChannelMessageImage({
   );
   const source = localSource ?? loadedSource;
 
+  let preview;
   if (failed) {
-    return (
+    preview = (
       <span className="channel-message-image-state" title={attachment.filename}>
         <CircleAlert aria-hidden="true" size={18} />
       </span>
     );
-  }
-  if (!source) {
-    return (
+  } else if (!source) {
+    preview = (
       <span className="channel-message-image-state" title={attachment.filename}>
         <LoaderCircle aria-hidden="true" className="spin" size={18} />
       </span>
     );
+  } else {
+    preview = interactive ? (
+      <ImageLightbox
+        alt={attachment.filename}
+        className="channel-message-image-trigger"
+        filename={attachment.filename}
+        source={source}
+      />
+    ) : (
+      <span className="channel-message-image-static">
+        <img alt={attachment.filename} loading="lazy" src={source} />
+      </span>
+    );
   }
-  return interactive ? (
-    <ImageLightbox
-      alt={attachment.filename}
-      className="channel-message-image-trigger"
-      filename={attachment.filename}
-      source={source}
-    />
-  ) : (
-    <span className="channel-message-image-static">
-      <img alt={attachment.filename} loading="lazy" src={source} />
-    </span>
+
+  return (
+    <figure className="channel-message-attachment-card">
+      <div className="channel-message-image-preview">{preview}</div>
+      <figcaption>
+        <strong title={attachment.filename}>{attachment.filename}</strong>
+        <small>{formatAttachmentBytes(attachment.byteSize)}</small>
+      </figcaption>
+    </figure>
   );
 }

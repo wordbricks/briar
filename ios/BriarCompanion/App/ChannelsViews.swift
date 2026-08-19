@@ -193,6 +193,7 @@ struct ChannelMessagesView: View {
         .task(id: channel.id) { await channels.openChannel(channel.id) }
         .sheet(item: $previewFile) { file in
             QuickLookPreview(fileURL: file.url)
+                .accessibilityIdentifier("channel-attachment-preview")
         }
         .navigationDestination(for: ChannelMessage.self) { message in
             ChannelThreadView(
@@ -371,6 +372,7 @@ struct ChannelThreadView: View {
         }
         .sheet(item: $previewFile) { file in
             QuickLookPreview(fileURL: file.url)
+                .accessibilityIdentifier("channel-attachment-preview")
         }
         .task(id: parent.id) {
             await channels.openThread(channelID: channel.id, parentMessageID: parent.id)
@@ -783,17 +785,9 @@ private struct ChannelMessageRow: View {
                         spacing: 6
                     ) {
                         ForEach(message.attachments) { attachment in
-                            AuthenticatedImagePreview(
-                                sourceID: attachment.url,
-                                filename: attachment.filename,
-                                detail: ByteCountFormatter.string(
-                                    fromByteCount: Int64(attachment.byteSize),
-                                    countStyle: .file
-                                ),
-                                accessibilityID: "channel-message-attachment-\(attachment.id.uuidString.lowercased())",
-                                load: {
-                                    try await onLoadAttachment(attachment)
-                                },
+                            ChannelAttachmentCard(
+                                attachment: attachment,
+                                load: onLoadAttachment,
                                 open: onOpenAttachment
                             )
                         }
@@ -952,6 +946,42 @@ private struct ChannelMessageRow: View {
         return String(
             format: L10n.text(.channelLastReply, locale: locale),
             relative
+        )
+    }
+}
+
+private struct ChannelAttachmentCard: View {
+    let attachment: ChannelMessageAttachment
+    let load: @MainActor (ChannelMessageAttachment) async throws -> URL
+    let open: @MainActor (URL) -> Void
+
+    var body: some View {
+        AuthenticatedImagePreview(
+            sourceID: attachment.url,
+            filename: attachment.filename,
+            detail: ByteCountFormatter.string(
+                fromByteCount: Int64(attachment.byteSize),
+                countStyle: .file
+            ),
+            accessibilityID: "channel-message-attachment-\(attachment.id.uuidString.lowercased())",
+            load: {
+                try await load(attachment)
+            },
+            open: open
+        )
+        .padding(10)
+        .background(
+            Color(.secondarySystemBackground),
+            in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(Color.secondary.opacity(0.22), lineWidth: 1)
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(L10n.format("%@ 크게 보기", attachment.filename))
+        .accessibilityIdentifier(
+            "channel-attachment-card-\(attachment.id.uuidString.lowercased())"
         )
     }
 }

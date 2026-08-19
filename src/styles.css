@@ -7163,26 +7163,60 @@ button.issue-message-state { width:100%; cursor:pointer; }
   display: grid;
   width: min(520px, 100%);
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 4px;
-  overflow: hidden;
-  border-radius: 12px;
+  gap: 8px;
   margin-top: 4px;
 }
 .channel-message-images.count-1 { grid-template-columns: minmax(0, 1fr); }
+.channel-message-attachment-card {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--border, #ddd8cf);
+  border-radius: 12px;
+  background: var(--background, #faf9f6);
+}
+.channel-message-image-preview {
+  display: grid;
+  min-height: 120px;
+  overflow: hidden;
+  background: var(--muted, #f2efe9);
+  place-items: center;
+}
 .channel-message-image-trigger,
 .channel-message-image-static,
 .channel-message-image-state {
   display: grid;
+  width: 100%;
+  height: 100%;
   min-height: 120px;
   place-items: center;
   overflow: hidden;
-  background: var(--muted, #f2efe9);
 }
 .channel-message-images img {
   display: block;
   width: 100%;
   max-height: 420px;
   object-fit: cover;
+}
+.channel-message-attachment-card figcaption {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 10px;
+}
+.channel-message-attachment-card figcaption strong {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.channel-message-attachment-card figcaption small {
+  flex: 0 0 auto;
+  color: var(--muted-foreground, #777168);
+  font-size: 11px;
 }
 .channel-message-text .image-lightbox-trigger { margin-top:7px; border:1px solid var(--border); border-radius:9px; background:var(--muted); }
 .channel-message-text .image-lightbox-trigger img { width:auto; max-width:100%; max-height:420px; display:block; object-fit:contain; }
