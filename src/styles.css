@@ -2828,6 +2828,9 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .companion-login-shell .login-glow { max-width:100%; pointer-events:none; }
 .companion-login-shell .login-card { width:100%; max-width:none; min-width:0; min-height:100dvh; padding:max(32px,env(safe-area-inset-top)) max(24px,env(safe-area-inset-right)) max(28px,env(safe-area-inset-bottom)) max(24px,env(safe-area-inset-left)); display:flex; justify-content:center; flex-direction:column; border:0; border-radius:0; box-shadow:none; }
 .companion-login-shell .login-copy,.companion-login-shell .google-button,.companion-login-shell .device-code-card,.companion-login-shell .login-error,.companion-login-shell .login-footnote { width:100%; max-width:480px; margin-right:auto; margin-left:auto; }
+.login-provider-divider { display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:10px; color:var(--muted-foreground); font-size:var(--text-2xs); }
+.login-provider-divider::before,.login-provider-divider::after { content:""; height:1px; background:var(--border); }
+.companion-login-shell .email-button,.companion-login-shell .login-provider-divider { width:100%; max-width:480px; margin-right:auto; margin-left:auto; }
 .companion-login-shell .device-code-card { min-width:0; }
 .companion-login-shell .device-code-card strong { max-width:100%; font-size:clamp(20px,7vw,25px); letter-spacing:clamp(2px,1.2vw,4px); }
 .launch-intro { position:fixed; z-index:2000; inset:0; overflow:hidden; display:grid; place-items:center; isolation:isolate; color:#fff; background:transparent; animation:launch-intro-curtain var(--launch-intro-fade-duration) var(--launch-intro-hold-duration) ease-out both; }

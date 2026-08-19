@@ -10,6 +10,18 @@ const baseProps = {
 };
 
 describe("LoginScreen", () => {
+  it("presents email verification before Google sign-in", () => {
+    const markup = renderToStaticMarkup(
+      <LoginScreen {...baseProps} loginCode={null} />,
+    );
+
+    expect(markup).toContain("이메일 인증코드로 계속하기");
+    expect(markup).toContain("Google로 계속하기");
+    expect(markup.indexOf("이메일 인증코드로 계속하기")).toBeLessThan(
+      markup.indexOf("Google로 계속하기"),
+    );
+  });
+
   it("shows a close button while device authorization is pending", () => {
     const markup = renderToStaticMarkup(
       <LoginScreen {...baseProps} loginCode="RZEHG4T5" />,
@@ -40,7 +52,9 @@ describe("LoginScreen", () => {
       <LoginScreen {...baseProps} companionMode loginCode="F65P9NQN" />,
     );
 
-    expect(markup).toContain("인앱 로그인에서 Google 계정으로 계속하세요");
+    expect(markup).toContain(
+      "인앱 로그인에서 이메일 인증코드 또는 Google로 계속하세요",
+    );
     expect(markup).toContain("자동으로 앱으로 돌아옵니다");
     expect(markup).toContain("안전한 인앱 브라우저");
     expect(markup).not.toContain("브라우저에서 로그인 후");

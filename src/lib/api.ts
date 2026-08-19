@@ -482,9 +482,15 @@ export type DeviceClientId =
   | "briar-desktop"
   | "briar-web";
 
+export type DeviceLoginMethod = "email" | "google";
+
 export async function beginDeviceAuthorization(
   clientId: DeviceClientId = "briar-desktop",
-  options: { forceAccountSelection?: boolean } = {},
+  options: {
+    method?: DeviceLoginMethod;
+    locale?: "ko" | "en" | "zh";
+    switchAccount?: boolean;
+  } = {},
 ): Promise<DeviceAuthorization> {
   const response = await request<{
     device_code: string;
@@ -507,7 +513,13 @@ export async function beginDeviceAuthorization(
   } else if (clientId === "briar-web") {
     clientVerificationUrl.searchParams.set("client", "web");
   }
-  if (options.forceAccountSelection) {
+  if (options.method) {
+    clientVerificationUrl.searchParams.set("method", options.method);
+  }
+  if (options.locale) {
+    clientVerificationUrl.searchParams.set("locale", options.locale);
+  }
+  if (options.switchAccount) {
     clientVerificationUrl.searchParams.set("switch_account", "1");
   }
   return {

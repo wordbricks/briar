@@ -74,17 +74,18 @@ describe("InvitationOnboarding", () => {
     await act(async () => {
       Array.from(container.querySelectorAll<HTMLButtonElement>("button"))
         .find((button) =>
-          button.textContent?.includes("초대받은 Google 계정으로 계속"),
+          button.textContent?.includes("초대받은 이메일로 인증코드 받기"),
         )
         ?.click();
     });
     expect(onLogin).toHaveBeenCalledOnce();
+    expect(onLogin).toHaveBeenCalledWith("email");
 
     await act(async () => root.unmount());
     container.remove();
   });
 
-  it("guides a signed-in user to switch Google accounts after a mismatch", async () => {
+  it("guides a signed-in user to switch accounts after an email mismatch", async () => {
     const container = document.createElement("div");
     document.body.append(container);
     const root = createRoot(container);
@@ -121,9 +122,9 @@ describe("InvitationOnboarding", () => {
     });
 
     expect(container.textContent).toContain(
-      "초대받은 이메일과 현재 Google 계정이 다릅니다.",
+      "초대받은 이메일과 현재 로그인한 이메일이 다릅니다.",
     );
-    expect(container.textContent).toContain("다른 Google 계정으로 로그인");
+    expect(container.textContent).toContain("다른 계정으로 로그인");
 
     await act(async () => root.unmount());
     container.remove();

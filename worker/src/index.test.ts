@@ -1970,9 +1970,17 @@ describe("Worker HTTP contract", () => {
 
     expect(page).toContain("<h1>데스크톱 연결 승인</h1>");
     expect(page).not.toContain("<h1>Companion 로그인 승인</h1>");
+    expect(page).toContain('inputmode="numeric"');
+    expect(page).toContain('autocomplete="one-time-code"');
+    expect(page).toContain("인증코드 다시 받기");
+    expect(page).toContain("replace(/\\D/g,'')");
+    expect(page).toContain("replace(/\\{(\\w+)\\}/g");
+    expect(page.indexOf('id="email-form"')).toBeLessThan(
+      page.indexOf('id="google"'),
+    );
   });
 
-  it("forces Google account selection when switching invitation accounts", async () => {
+  it("shows email and Google choices when switching invitation accounts", async () => {
     const response = await worker.fetch(
       new Request(
         "https://briar-api.example/device?user_code=F65P9NQN&client=web&switch_account=1",
@@ -1983,6 +1991,8 @@ describe("Worker HTTP contract", () => {
 
     expect(page).toContain("switchAccount=params.get('switch_account')==='1'");
     expect(page).toContain("additionalParams:{prompt:'select_account'}");
+    expect(page).toContain("if(switchAccount){showEmail();return}");
+    expect(page).not.toContain("if(switchAccount){google.hidden=true;await beginGoogle();return}");
   });
 
   it("serves issue links that open the exact issue in the Briar app", async () => {
