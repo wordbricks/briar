@@ -898,6 +898,171 @@ fn clamp_percent(value: f64) -> f64 {
     value.clamp(0.0, 100.0)
 }
 
+fn parse_cli_reset_time(value: &Value) -> Option<u64> {
+    if let Some(s) = value.as_str() {
+        if let Some(ms) = parse_iso_millis(s) {
+            return Some(ms);
+        }
+        if let Ok(u) = s.parse::<u64>() {
+            return Some(epoch_to_millis(u));
+        }
+    }
+    if let Some(u) = value.as_u64() {
+        return Some(epoch_to_millis(u));
+    }
+    None
+}
+
+fn read_gemini_oauth_email_any(home: &Path) -> Option<String> {
+    let path = env::var_os("GEMINI_OAUTH_CREDS")
+        .filter(|value| !value.is_empty())
+        .map(PathBuf::from)
+        .unwrap_or_else(|| home.join(".gemini/oauth_creds.json"));
+    let contents = fs::read_to_string(path).ok()?;
+    let value = serde_json::from_str::<Value>(&contents).ok()?;
+    usable_account_email(value.get("email").and_then(Value::as_str))
+}
+
+fn parse_agy_cli_quota(value: &Value) -> Result<ProviderUsage, String> {
+    let cmd_name = value
+        .pointer("/command/name")
+        .and_then(Value::as_str)
+        .ok_or_else(|| {
+            "올바르지 않은 CLI quota 형식입니다: command name이 누락되었습니다.".to_string()
+        })?;
+
+    if cmd_name != "usage" {
+        return Err(format!(
+            "올바르지 않은 command name입니다: 'usage'를 예상했으나 '{}'를 받았습니다.",
+            cmd_name
+        ));
+    }
+
+    let groups = value
+        .pointer("/command/data/groups")
+        .and_then(Value::as_object)
+        .ok_or_else(|| {
+            "올바르지 않은 CLI quota 형식입니다: groups가 누락되었습니다.".to_string()
+        })?;
+
+    let gemini_group = groups
+        .iter()
+        .find(|(k, _)| k.to_lowercase() == "gemini models")
+        .map(|(_, v)| v)
+        .and_then(Value::as_object)
+        .ok_or_else(|| "quota에서 Gemini Models 그룹을 찾을 수 없습니다.".to_string())?;
+
+    let mut session = None;
+    let mut weekly = None;
+
+    for (_, bucket_val) in gemini_group {
+        let remaining_fraction = bucket_val
+            .get("remaining_fraction")
+            .or_else(|| bucket_val.get("remainingFraction"))
+            .and_then(Value::as_f64);
+
+        let window = bucket_val.get("window").and_then(Value::as_str);
+
+        let reset_val = bucket_val
+            .get("reset_time")
+            .or_else(|| bucket_val.get("resetTime"));
+
+        if let (Some(rem), Some(win)) = (remaining_fraction, window) {
+            let used_percent = clamp_percent((1.0 - rem) * 100.0);
+            let resets_at = reset_val.and_then(parse_cli_reset_time);
+
+            if win == "5h" {
+                session = Some(AgentUsageWindow {
+                    used_percent,
+                    window_minutes: 300,
+                    resets_at,
+                });
+            } else if win == "weekly" {
+                weekly = Some(AgentUsageWindow {
+                    used_percent,
+                    window_minutes: 10080,
+                    resets_at,
+                });
+            }
+        }
+    }
+
+    Ok(ProviderUsage {
+        provider: "agy",
+        status: "ok",
+        session,
+        weekly,
+        monthly: None,
+        plan_type: None,
+        account_label: None,
+        authenticated: true,
+        updated_at: now_millis(),
+        error: None,
+    })
+}
+
+fn fetch_agy_usage_cli(
+    home: &Path,
+    binary: &Path,
+    execution_path: &OsStr,
+) -> Result<ProviderUsage, String> {
+    let mut child = Command::new(binary)
+        .args(["--print", "/quota", "--output-format", "json"])
+        .env("HOME", home)
+        .env("PATH", execution_path)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|error| format!("Antigravity CLI를 시작하지 못했습니다: {error}"))?;
+
+    let deadline = Instant::now() + AGY_TIMEOUT;
+    let mut exited = false;
+    while Instant::now() < deadline {
+        match child.try_wait() {
+            Ok(Some(_)) => {
+                exited = true;
+                break;
+            }
+            Ok(None) => {
+                thread::sleep(Duration::from_millis(50));
+            }
+            Err(error) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err(format!(
+                    "Antigravity CLI 상태 확인 중 오류가 발생했습니다: {error}"
+                ));
+            }
+        }
+    }
+
+    if !exited {
+        let _ = child.kill();
+        let _ = child.wait();
+        return Err("Antigravity CLI usage 조회 시간이 초과되었습니다.".to_string());
+    }
+
+    let output = child
+        .wait_with_output()
+        .map_err(|error| format!("Antigravity CLI 출력을 읽지 못했습니다: {error}"))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!(
+            "Antigravity CLI가 오류를 반환했습니다 (exit code: {:?}): {}",
+            output.status.code(),
+            stderr.trim()
+        ));
+    }
+
+    let parsed = serde_json::from_slice::<Value>(&output.stdout)
+        .map_err(|error| format!("Antigravity CLI JSON 파싱에 실패했습니다: {error}"))?;
+
+    let mut usage = parse_agy_cli_quota(&parsed)?;
+    usage.account_label = read_gemini_oauth_email_any(home);
+    Ok(usage)
+}
+
 async fn load_agy(home: &Path) -> ProviderUsage {
     let execution_path = crate::cli_execution_path(home).unwrap_or_default();
     let binary = match crate::agent::agy_binary(home, &execution_path) {
@@ -905,32 +1070,59 @@ async fn load_agy(home: &Path) -> ProviderUsage {
         Err(error) => return provider_without_usage("agy", "unavailable", error),
     };
     let authenticated = agy_locally_authenticated(home, &binary, &execution_path);
-    let credentials = read_gemini_oauth_access(home);
-    if let Some(credentials) = credentials.as_ref() {
-        match fetch_agy_usage(&credentials.access_token).await {
-            Ok(mut usage) => {
-                usage.account_label = credentials.email.clone();
-                usage.authenticated = true;
-                return usage;
+
+    // Try CLI path first if locally authenticated
+    let cli_result = if authenticated {
+        fetch_agy_usage_cli(home, &binary, &execution_path)
+    } else {
+        Err("Antigravity CLI가 인증되지 않았습니다.".to_string())
+    };
+
+    match cli_result {
+        Ok(mut usage) => {
+            usage.authenticated = true;
+            return usage;
+        }
+        Err(cli_error) => {
+            // Fallback to direct API path
+            let credentials = read_gemini_oauth_access(home);
+            if let Some(credentials) = credentials.as_ref() {
+                match fetch_agy_usage(&credentials.access_token).await {
+                    Ok(mut usage) => {
+                        usage.account_label = credentials.email.clone();
+                        usage.authenticated = true;
+                        return usage;
+                    }
+                    Err(api_error) => {
+                        // Both failed
+                        return provider_without_usage_with_account(
+                            "agy",
+                            if authenticated {
+                                "error"
+                            } else {
+                                "unavailable"
+                            },
+                            format!("CLI 오류: {}; API 오류: {}", cli_error, api_error),
+                            credentials.email.clone(),
+                            authenticated,
+                        );
+                    }
+                }
             }
-            Err(error) => {
+
+            // CLI failed and API fallback is unavailable
+            if authenticated {
                 return provider_without_usage_with_account(
                     "agy",
-                    if authenticated {
-                        "error"
-                    } else {
-                        "unavailable"
-                    },
-                    error,
-                    credentials.email.clone(),
-                    authenticated,
+                    "error",
+                    format!("CLI 오류: {}", cli_error),
+                    read_gemini_oauth_email_any(home),
+                    true,
                 );
             }
         }
     }
-    if authenticated {
-        return connected_provider_without_windows("agy", None);
-    }
+
     provider_without_usage(
         "agy",
         "unavailable",
@@ -1469,5 +1661,268 @@ mod tests {
             r#"{"access_token":"secret","expiry_date":4102444800000}"#
         )
         .is_some());
+    }
+
+    #[test]
+    fn parses_agy_cli_quota_success() {
+        let output = json!({
+            "command": {
+                "name": "usage",
+                "data": {
+                    "groups": {
+                        "Gemini Models": {
+                            "gemini-weekly": {
+                                "window": "weekly",
+                                "remaining_fraction": 0.8,
+                                "reset_time": "2026-08-18T12:00:00Z"
+                            },
+                            "gemini-5h": {
+                                "window": "5h",
+                                "remaining_fraction": 0.25,
+                                "reset_time": 1800000000000u64
+                            }
+                        },
+                        "Claude and GPT models": {
+                            "claude-weekly": {
+                                "window": "weekly",
+                                "remaining_fraction": 0.5,
+                                "reset_time": "2026-08-18T13:00:00Z"
+                            }
+                        }
+                    }
+                }
+            }
+        });
+        let usage = parse_agy_cli_quota(&output).unwrap();
+        assert_eq!(usage.status, "ok");
+        assert!(usage.authenticated);
+
+        let session = usage.session.unwrap();
+        assert_eq!(session.window_minutes, 300);
+        assert!((session.used_percent - 75.0).abs() < 0.0001);
+        assert_eq!(session.resets_at, Some(1800000000000u64));
+
+        let weekly = usage.weekly.unwrap();
+        assert_eq!(weekly.window_minutes, 10080);
+        assert!((weekly.used_percent - 20.0).abs() < 0.0001);
+        assert_eq!(weekly.resets_at, parse_iso_millis("2026-08-18T12:00:00Z"));
+    }
+
+    #[test]
+    fn parses_agy_cli_quota_malformed() {
+        let output_no_gemini = json!({
+            "command": {
+                "name": "usage",
+                "data": {
+                    "groups": {
+                        "Claude and GPT models": {
+                            "claude-weekly": {
+                                "window": "weekly",
+                                "remaining_fraction": 0.5
+                            }
+                        }
+                    }
+                }
+            }
+        });
+        assert!(parse_agy_cli_quota(&output_no_gemini).is_err());
+
+        let output_bad_cmd = json!({
+            "command": {
+                "name": "not-usage",
+                "data": {
+                    "groups": {}
+                }
+            }
+        });
+        assert!(parse_agy_cli_quota(&output_bad_cmd).is_err());
+
+        let output_malformed_bucket = json!({
+            "command": {
+                "name": "usage",
+                "data": {
+                    "groups": {
+                        "Gemini Models": {
+                            "gemini-weekly": {
+                                "window": "weekly"
+                            },
+                            "gemini-5h": {
+                                "remaining_fraction": 0.25
+                            }
+                        }
+                    }
+                }
+            }
+        });
+        let usage = parse_agy_cli_quota(&output_malformed_bucket).unwrap();
+        assert!(usage.session.is_none());
+        assert!(usage.weekly.is_none());
+    }
+
+    #[test]
+    fn test_parse_cli_reset_time() {
+        assert_eq!(
+            parse_cli_reset_time(&json!("2026-08-18T12:00:00Z")),
+            parse_iso_millis("2026-08-18T12:00:00Z")
+        );
+        assert_eq!(
+            parse_cli_reset_time(&json!(1800000000u64)),
+            Some(1800000000000u64)
+        );
+        assert_eq!(
+            parse_cli_reset_time(&json!("1800000000")),
+            Some(1800000000000u64)
+        );
+        assert_eq!(parse_cli_reset_time(&json!("not-a-date")), None);
+    }
+
+    #[test]
+    fn test_agy_cli_execution_and_fail() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let home = temp_dir.path();
+
+        let bin_dir = home.join("bin");
+        fs::create_dir_all(&bin_dir).unwrap();
+        let mock_agy = bin_dir.join("agy");
+
+        let mock_json = json!({
+            "command": {
+                "name": "usage",
+                "data": {
+                    "groups": {
+                        "Gemini Models": {
+                            "gemini-5h": {
+                                "window": "5h",
+                                "remaining_fraction": 0.5,
+                                "reset_time": "2026-08-18T12:00:00Z"
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        let script_content = format!(
+            "#!/bin/sh\necho '{}'\nexit 0\n",
+            serde_json::to_string(&mock_json).unwrap()
+        );
+        fs::write(&mock_agy, script_content).unwrap();
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            fs::set_permissions(&mock_agy, fs::Permissions::from_mode(0o755)).unwrap();
+        }
+
+        let execution_path = bin_dir.into_os_string();
+        let usage = fetch_agy_usage_cli(home, &mock_agy, &execution_path).unwrap();
+        assert_eq!(usage.status, "ok");
+        let session = usage.session.unwrap();
+        assert_eq!(session.window_minutes, 300);
+        assert_eq!(session.used_percent, 50.0);
+
+        let script_content_fail = "#!/bin/sh\necho 'some error' >&2\nexit 1\n";
+        fs::write(&mock_agy, script_content_fail).unwrap();
+
+        let err = fetch_agy_usage_cli(home, &mock_agy, &execution_path).unwrap_err();
+        assert!(err.contains("exit code"));
+    }
+
+    #[test]
+    fn test_load_agy_regression_and_fallback() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let home = temp_dir.path();
+
+        let bin_dir = home.join("bin");
+        fs::create_dir_all(&bin_dir).unwrap();
+        let mock_agy = bin_dir.join("agy");
+
+        let script_content = r#"#!/bin/sh
+for arg in "$@"; do
+    if [ "$arg" = "models" ]; then
+        exit 0
+    fi
+done
+exit 1
+"#;
+        fs::write(&mock_agy, script_content).unwrap();
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            fs::set_permissions(&mock_agy, fs::Permissions::from_mode(0o755)).unwrap();
+        }
+
+        let local_bin_dir = home.join(".local/bin");
+        fs::create_dir_all(&local_bin_dir).unwrap();
+        let target_mock_agy = local_bin_dir.join("agy");
+        fs::copy(&mock_agy, &target_mock_agy).unwrap();
+
+        let gemini_dir = home.join(".gemini");
+        fs::create_dir_all(&gemini_dir).unwrap();
+        let oauth_file = gemini_dir.join("oauth_creds.json");
+        let expired_oauth = json!({
+            "access_token": "expired-token",
+            "expiry_date": 1,
+            "email": "user@example.com"
+        });
+        fs::write(&oauth_file, serde_json::to_string(&expired_oauth).unwrap()).unwrap();
+
+        let usage = tauri::async_runtime::block_on(async { load_agy(home).await });
+
+        assert_eq!(usage.status, "error");
+        assert!(usage.authenticated);
+        assert_eq!(usage.account_label.as_deref(), Some("user@example.com"));
+        let err = usage.error.unwrap();
+        assert!(err.contains("CLI 오류"));
+    }
+
+    #[test]
+    fn test_load_agy_fallback_both_fail() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let home = temp_dir.path();
+
+        let bin_dir = home.join("bin");
+        fs::create_dir_all(&bin_dir).unwrap();
+        let mock_agy = bin_dir.join("agy");
+
+        let script_content = r#"#!/bin/sh
+for arg in "$@"; do
+    if [ "$arg" = "models" ]; then
+        exit 0
+    fi
+done
+exit 1
+"#;
+        fs::write(&mock_agy, script_content).unwrap();
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            fs::set_permissions(&mock_agy, fs::Permissions::from_mode(0o755)).unwrap();
+        }
+
+        let local_bin_dir = home.join(".local/bin");
+        fs::create_dir_all(&local_bin_dir).unwrap();
+        let target_mock_agy = local_bin_dir.join("agy");
+        fs::copy(&mock_agy, &target_mock_agy).unwrap();
+
+        let gemini_dir = home.join(".gemini");
+        fs::create_dir_all(&gemini_dir).unwrap();
+        let oauth_file = gemini_dir.join("oauth_creds.json");
+        let valid_oauth = json!({
+            "access_token": "valid-token-but-will-fail-network",
+            "expiry_date": now_millis() + 1000000,
+            "email": "fallback@example.com"
+        });
+        fs::write(&oauth_file, serde_json::to_string(&valid_oauth).unwrap()).unwrap();
+
+        let usage = tauri::async_runtime::block_on(async { load_agy(home).await });
+
+        assert_eq!(usage.status, "error");
+        assert!(usage.authenticated);
+        assert_eq!(usage.account_label.as_deref(), Some("fallback@example.com"));
+        let err = usage.error.unwrap();
+        assert!(err.contains("CLI 오류") && err.contains("API 오류"));
     }
 }
