@@ -101,10 +101,11 @@ Entries are **copied**, never symlinked, so an agent editing one issue's file
 cannot mutate the shared checkout. Missing entries are skipped silently — a
 worktree is never failed over an unavailable include.
 
-Project-scoped channel and issue conversation turns also receive these inputs
-in their detached, disposable worktrees. They run with the project's configured
-Worker filesystem profile and full execution tool surface; their local checkout
-changes are discarded when the reply finishes.
+Project-scoped channel turns and queued-issue replies also receive these inputs
+in detached analysis worktrees. A channel turn removes its checkout when the
+reply finishes. Queued-issue replies reuse one read-only checkout per issue
+conversation until its idle timeout; neither path preserves local changes as
+durable issue work.
 
 Build outputs are not copied. Agents run the project's own install/setup
 commands inside the worktree.
@@ -205,19 +206,21 @@ briar project configure \
 `--enable-worktrees` turns it back on. The block is owned by the CLI and is
 preserved when the app saves project settings.
 
-Issue conversation replies are durable Worker jobs. When a user mentions
-`@briar`, Briar first offers the reply to the Worker that most recently handled
-the run. That Worker resolves the recorded branch, or the deterministic run-id
-worktree name before a branch was recorded, against Git's registered worktree
-list and uses the existing worktree as read-only context.
+Issue conversation replies are durable Worker jobs. A reply for an actively
+processed run stays on its assigned Worker and reads the existing issue
+worktree without modifying it, so answers can include live uncommitted context.
+If that required worktree is missing, the reply fails instead of silently
+answering from an older checkout.
 
-The reply never creates a replacement worktree. If the original worktree has
-already been removed, the Worker answers from the durable server snapshot and
-its connected repository checkout. If the previous Worker is offline, disabled,
-not accepting work, needs attention, or excluded by project policy, another
-eligible Worker may claim the reply and answer from the same server snapshot.
-An issue that has never been assigned has no preferred Worker, so any eligible
-Worker may claim its mention reply.
+An issue that has never been assigned has no execution worktree and no
+preferred Worker, so any eligible Worker may claim its mention reply. That
+Worker creates a detached read-only analysis worktree keyed by run id. Later
+replies for the same run reuse that checkout when they land on the same Worker;
+conversation continuity itself remains in the durable server messages and does
+not depend on local files. The Worker records the last use outside the checkout,
+never stores private reply images in it, and removes it after 30 idle minutes.
+An automatic sweep runs every five minutes, excludes paths with active replies,
+and also reclaims idle records left behind by a Worker restart.
 
 For a completed run, a reply may attach a `request_issue_rework` proposal when
 the user's message explicitly asks to revise the result. Creating the proposal

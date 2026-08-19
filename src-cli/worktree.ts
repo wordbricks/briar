@@ -64,11 +64,23 @@ export const RECLAIMABLE_ARTIFACT_DIRECTORY_NAMES = new Set([
 export const COMPLETED_WORKTREE_RETENTION_MS = 24 * 60 * 60 * 1_000;
 const COMPLETED_WORKTREE_REGISTRY_DIRECTORY = ".briar-completed-worktrees";
 
+/** Reuse read-only conversation checkouts briefly before reclaiming their disk space. */
+export const ANALYSIS_WORKTREE_IDLE_TTL_MS = 30 * 60 * 1_000;
+const ANALYSIS_WORKTREE_REGISTRY_DIRECTORY = ".briar-analysis-worktrees";
+
 export type CompletedWorktreeRecord = {
   runId: string;
   path: string;
   branch: string;
   completedAt: string;
+};
+
+export type CachedAnalysisWorktreeRecord = {
+  runId: string;
+  path: string;
+  baseRef: string;
+  baseSha: string;
+  lastUsedAt: string;
 };
 
 function completedWorktreeRecordPath(root: string, runId: string): string {
@@ -127,6 +139,80 @@ export async function listCompletedWorktrees(root: string): Promise<CompletedWor
 
 export async function removeCompletedWorktreeRecord(root: string, runId: string): Promise<void> {
   await rm(completedWorktreeRecordPath(root, runId), { force: true });
+}
+
+function cachedAnalysisWorktreeRecordPath(root: string, runId: string): string {
+  if (!/^[0-9a-f-]{36}$/iu.test(runId)) {
+    throw new Error("분석 run ID가 올바르지 않습니다.");
+  }
+  return join(
+    resolve(root),
+    ANALYSIS_WORKTREE_REGISTRY_DIRECTORY,
+    `${runId}.json`,
+  );
+}
+
+async function recordCachedAnalysisWorktree(
+  root: string,
+  record: CachedAnalysisWorktreeRecord,
+): Promise<void> {
+  assertPathWithinRoot(record.path, root);
+  if (!Number.isFinite(Date.parse(record.lastUsedAt))) {
+    throw new Error("분석 워크트리의 마지막 사용 시각이 올바르지 않습니다.");
+  }
+  const path = cachedAnalysisWorktreeRecordPath(root, record.runId);
+  await mkdir(dirname(path), { recursive: true, mode: 0o700 });
+  const temporary = `${path}.${process.pid}.${randomUUID()}.tmp`;
+  await writeFile(temporary, `${JSON.stringify(record)}\n`, { mode: 0o600 });
+  await rename(temporary, path);
+}
+
+export async function listCachedAnalysisWorktrees(
+  root: string,
+): Promise<CachedAnalysisWorktreeRecord[]> {
+  const directory = join(resolve(root), ANALYSIS_WORKTREE_REGISTRY_DIRECTORY);
+  let entries: Dirent[];
+  try {
+    entries = await readdir(directory, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+  const records: CachedAnalysisWorktreeRecord[] = [];
+  for (const entry of entries) {
+    if (!entry.isFile() || !entry.name.endsWith(".json")) continue;
+    try {
+      const candidate = JSON.parse(await readFile(join(directory, entry.name), "utf8"));
+      if (
+        candidate &&
+        typeof candidate.runId === "string" &&
+        /^[0-9a-f-]{36}$/iu.test(candidate.runId) &&
+        typeof candidate.path === "string" &&
+        typeof candidate.baseRef === "string" &&
+        typeof candidate.baseSha === "string" &&
+        typeof candidate.lastUsedAt === "string" &&
+        Number.isFinite(Date.parse(candidate.lastUsedAt)) &&
+        isPathWithinRoot(candidate.path, root) &&
+        samePath(
+          candidate.path,
+          join(resolve(root), "analysis", `analysis-${candidate.runId}`),
+        )
+      ) {
+        records.push(candidate as CachedAnalysisWorktreeRecord);
+      }
+    } catch {
+      // A malformed record must not prevent cleanup of the remaining caches.
+    }
+  }
+  return records.sort((left, right) =>
+    left.lastUsedAt.localeCompare(right.lastUsedAt)
+  );
+}
+
+async function removeCachedAnalysisWorktreeRecord(
+  root: string,
+  runId: string,
+): Promise<void> {
+  await rm(cachedAnalysisWorktreeRecordPath(root, runId), { force: true });
 }
 
 /**
@@ -199,12 +285,47 @@ export type AnalysisWorktree = {
   warning?: string;
 };
 
+export type CachedAnalysisWorktree = AnalysisWorktree & {
+  reused: boolean;
+};
+
 export function defaultWorktreeRoot(home: string): string {
   return join(home, "briar", "workspaces");
 }
 
 export function projectWorktreeRoot(root: string, projectId: string): string {
   return join(resolve(root), projectId);
+}
+
+export function analysisWorktreePath(
+  root: string,
+  projectId: string,
+  runId: string,
+): string {
+  if (!/^[0-9a-f-]{36}$/iu.test(runId)) {
+    throw new Error("분석 run ID가 올바르지 않습니다.");
+  }
+  const analysisRoot = join(projectWorktreeRoot(root, projectId), "analysis");
+  return assertPathWithinRoot(join(analysisRoot, `analysis-${runId}`), analysisRoot);
+}
+
+export type IssueReplyWorkspaceMode =
+  | "project"
+  | "shared"
+  | "cached-analysis"
+  | "missing-required";
+
+export function issueReplyWorkspaceMode(input: {
+  worktreesEnabled: boolean;
+  hasConfiguredWorktree: boolean;
+  requiresPreferredWorker?: boolean;
+  branch: string | null;
+}): IssueReplyWorkspaceMode {
+  if (!input.worktreesEnabled) return "project";
+  if (input.hasConfiguredWorktree) return "shared";
+  const requiresExisting =
+    input.requiresPreferredWorker ?? input.branch !== null;
+  return requiresExisting ? "missing-required" : "cached-analysis";
 }
 
 /**
@@ -716,7 +837,11 @@ export async function allocateAnalysisWorktree(input: {
     projectWorktreeRoot(input.settings.root, input.projectId),
     "analysis",
   );
-  const path = assertPathWithinRoot(join(root, `analysis-${input.workId}`), root);
+  const path = analysisWorktreePath(
+    input.settings.root,
+    input.projectId,
+    input.workId,
+  );
   await mkdir(root, { recursive: true, mode: 0o700 });
   if (await pathExists(path)) {
     input.git(["worktree", "remove", "--force", path], {
@@ -764,6 +889,219 @@ export async function removeAnalysisWorktree(input: {
       `분석 워크트리를 정리하지 못했습니다: ${removed.stderr.trim()}`,
     );
   }
+}
+
+/**
+ * Reuse one detached, read-only checkout per issue conversation on this
+ * Worker. The durable registry lets a later heartbeat reclaim it even after a
+ * Worker restart; callers mark the path active while a reply is using it.
+ */
+const cachedAnalysisWorktreeAllocations = new Map<
+  string,
+  Promise<CachedAnalysisWorktree>
+>();
+
+export async function allocateCachedAnalysisWorktree(input: {
+  repositoryPath: string;
+  projectId: string;
+  runId: string;
+  settings: WorktreeSettings;
+  git: GitRunner;
+  nowMs?: number;
+}): Promise<CachedAnalysisWorktree> {
+  const path = analysisWorktreePath(
+    input.settings.root,
+    input.projectId,
+    input.runId,
+  );
+  const pending = cachedAnalysisWorktreeAllocations.get(path);
+  if (pending) return await pending;
+  const allocation = allocateCachedAnalysisWorktreeUncoordinated(input);
+  cachedAnalysisWorktreeAllocations.set(path, allocation);
+  try {
+    return await allocation;
+  } finally {
+    if (cachedAnalysisWorktreeAllocations.get(path) === allocation) {
+      cachedAnalysisWorktreeAllocations.delete(path);
+    }
+  }
+}
+
+async function allocateCachedAnalysisWorktreeUncoordinated(input: {
+  repositoryPath: string;
+  projectId: string;
+  runId: string;
+  settings: WorktreeSettings;
+  git: GitRunner;
+  nowMs?: number;
+}): Promise<CachedAnalysisWorktree> {
+  const projectRoot = projectWorktreeRoot(input.settings.root, input.projectId);
+  const path = analysisWorktreePath(
+    input.settings.root,
+    input.projectId,
+    input.runId,
+  );
+  const records = await listCachedAnalysisWorktrees(projectRoot);
+  const record = records.find((candidate) => candidate.runId === input.runId);
+  const attached = parseWorktreeList(
+    gitOrThrow(input.git, ["worktree", "list", "--porcelain"], {
+      cwd: input.repositoryPath,
+      message: "분석 워크트리 목록을 읽지 못했습니다.",
+    }),
+  ).find((candidate) => samePath(candidate.path, path));
+
+  if (attached && attached.branch !== null) {
+    throw new Error(`분석 워크트리 경로에 브랜치가 연결되어 있습니다: ${path}`);
+  }
+
+  let worktree: CachedAnalysisWorktree;
+  if (attached && await pathExists(path)) {
+    const baseRef = record?.baseRef ?? resolveBaseRef(input.git, input.repositoryPath);
+    if (!baseRef) {
+      throw new Error(
+        "기준 브랜치를 찾지 못했습니다. origin/HEAD 또는 main/master 중 하나가 필요합니다.",
+      );
+    }
+    worktree = {
+      path: attached.path,
+      baseRef,
+      baseSha: gitOrThrow(input.git, ["rev-parse", "HEAD"], {
+        cwd: attached.path,
+        message: "분석 워크트리의 HEAD를 읽지 못했습니다.",
+      }),
+      includedPaths: await copyWorktreeIncludes(
+        input.repositoryPath,
+        attached.path,
+      ),
+      reused: true,
+    };
+  } else {
+    if (attached) {
+      const removed = input.git(["worktree", "remove", "--force", attached.path], {
+        cwd: input.repositoryPath,
+        timeoutMs: WORKTREE_ADD_TIMEOUT_MS,
+      });
+      if (removed.exitCode !== 0) {
+        throw new Error(
+          `손상된 분석 워크트리 연결을 정리하지 못했습니다: ${removed.stderr.trim()}`,
+        );
+      }
+    }
+    if (await pathExists(path)) {
+      await rm(path, { recursive: true, force: true });
+    }
+    const allocated = await allocateAnalysisWorktree({
+      repositoryPath: input.repositoryPath,
+      projectId: input.projectId,
+      workId: input.runId,
+      settings: input.settings,
+      git: input.git,
+    });
+    worktree = { ...allocated, reused: false };
+  }
+
+  await recordCachedAnalysisWorktree(projectRoot, {
+    runId: input.runId,
+    path: worktree.path,
+    baseRef: worktree.baseRef,
+    baseSha: worktree.baseSha,
+    lastUsedAt: new Date(input.nowMs ?? Date.now()).toISOString(),
+  });
+  return worktree;
+}
+
+export async function markCachedAnalysisWorktreeIdle(input: {
+  root: string;
+  runId: string;
+  worktree: AnalysisWorktree;
+  nowMs?: number;
+}): Promise<void> {
+  await recordCachedAnalysisWorktree(input.root, {
+    runId: input.runId,
+    path: input.worktree.path,
+    baseRef: input.worktree.baseRef,
+    baseSha: input.worktree.baseSha,
+    lastUsedAt: new Date(input.nowMs ?? Date.now()).toISOString(),
+  });
+}
+
+export type AnalysisWorktreeMaintenanceResult = {
+  runId: string;
+  path: string;
+  status: "removed" | "retained";
+  reason?: "active" | "not-detached" | "removal-error";
+  detail?: string;
+};
+
+export async function maintainIdleAnalysisWorktrees(
+  git: GitRunner,
+  repositoryPath: string,
+  root: string,
+  options: {
+    nowMs?: number;
+    idleTtlMs?: number;
+    activePaths?: readonly string[];
+  } = {},
+): Promise<AnalysisWorktreeMaintenanceResult[]> {
+  const nowMs = options.nowMs ?? Date.now();
+  const idleTtlMs = options.idleTtlMs ?? ANALYSIS_WORKTREE_IDLE_TTL_MS;
+  const activePaths = options.activePaths ?? [];
+  const records = await listCachedAnalysisWorktrees(root);
+  if (records.length === 0) return [];
+  const attached = parseWorktreeList(
+    gitOrThrow(git, ["worktree", "list", "--porcelain"], {
+      cwd: repositoryPath,
+      message: "분석 워크트리 목록을 읽지 못했습니다.",
+    }),
+  );
+  const results: AnalysisWorktreeMaintenanceResult[] = [];
+
+  for (const record of records) {
+    if (Date.parse(record.lastUsedAt) > nowMs - idleTtlMs) continue;
+    if (activePaths.some((path) => samePath(path, record.path))) {
+      results.push({
+        runId: record.runId,
+        path: record.path,
+        status: "retained",
+        reason: "active",
+      });
+      continue;
+    }
+    const worktree = attached.find((candidate) =>
+      samePath(candidate.path, record.path)
+    );
+    if (worktree && worktree.branch !== null) {
+      results.push({
+        runId: record.runId,
+        path: record.path,
+        status: "retained",
+        reason: "not-detached",
+      });
+      continue;
+    }
+    try {
+      if (worktree) {
+        await removeAnalysisWorktree({ repositoryPath, path: worktree.path, git });
+      } else {
+        await rm(record.path, { recursive: true, force: true });
+      }
+      await removeCachedAnalysisWorktreeRecord(root, record.runId);
+      results.push({
+        runId: record.runId,
+        path: record.path,
+        status: "removed",
+      });
+    } catch (error) {
+      results.push({
+        runId: record.runId,
+        path: record.path,
+        status: "retained",
+        reason: "removal-error",
+        detail: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+  return results;
 }
 
 export type RemoveWorktreeResult = {
