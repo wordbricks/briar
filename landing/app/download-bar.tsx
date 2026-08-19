@@ -139,6 +139,7 @@ export function DownloadBar({
       <div
         aria-label={`${bar.supports}: ${providerNames}`}
         className="download-bar-supports"
+        role="group"
       >
         <span>{bar.supports}</span>
         <ul className="download-bar-providers">
