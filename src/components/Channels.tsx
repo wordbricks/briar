@@ -494,7 +494,7 @@ export function Channels({
   const channelLoadAbortController = useRef<AbortController | null>(null);
   const preparedChannelId = useRef<string | null>(null);
   const loadingEarlierMessagesRef = useRef(false);
-  const shouldScrollChannelToEnd = useRef(false);
+  const shouldScrollChannelToEnd = useRef<string | null>(null);
   const suppressEarlierLoadOnNextScroll = useRef(false);
   const displaySource = useRef<DesktopChannelDisplaySource>("network");
   const threadParentIdRef = useRef(threadParentId);
@@ -906,7 +906,7 @@ export function Channels({
     channelLoadAbortController.current?.abort();
     const cached = channelCache.current.get(activeChannelId) ?? null;
     displaySource.current = cached ? "cache" : "network";
-    shouldScrollChannelToEnd.current = true;
+    shouldScrollChannelToEnd.current = activeChannelId;
     setMembers(cached?.members ?? []);
     setAgents(cached?.agents ?? []);
     setMessages(cached?.messages ?? []);
@@ -968,7 +968,9 @@ export function Channels({
           return nextMessages;
         });
         setMessageNextCursor(nextCursor);
-        shouldScrollChannelToEnd.current = true;
+        if (!cached) {
+          shouldScrollChannelToEnd.current = activeChannelId;
+        }
         const target = requestedMessage?.channelId === activeChannelId
           ? requestedMessage
           : null;
@@ -1202,7 +1204,7 @@ export function Channels({
                 scroller.scrollHeight - scroller.scrollTop -
                     scroller.clientHeight <= 80
               ) {
-                shouldScrollChannelToEnd.current = true;
+                shouldScrollChannelToEnd.current = activeChannelId;
               }
               setMessages((current) => {
                 const next = mergeChannelMessages(
@@ -1385,11 +1387,17 @@ export function Channels({
     if (!activeChannelId || channelLoading) return;
     const cached = channelCache.current.get(activeChannelId);
     if (!cached) return;
-    if (shouldScrollChannelToEnd.current) {
+    if (
+      messages.length !== cached.messages.length ||
+      messages.some((message) => message.channelId !== activeChannelId)
+    ) {
+      return;
+    }
+    if (shouldScrollChannelToEnd.current === activeChannelId) {
       scrollContainerToEnd(messagesScrollRef.current);
       suppressEarlierLoadOnNextScroll.current = true;
       messagesScrollRef.current?.dispatchEvent(new Event("scroll"));
-      shouldScrollChannelToEnd.current = false;
+      shouldScrollChannelToEnd.current = null;
     }
     recordDesktopChannelFirstMessage(activeChannelId, displaySource.current);
   }, [activeChannelId, channelLoading, messages]);
@@ -1497,7 +1505,7 @@ export function Channels({
           mergeChannelMessages(current, [optimisticMessage], [])
         );
       } else {
-        shouldScrollChannelToEnd.current = true;
+        shouldScrollChannelToEnd.current = activeChannelId;
         updateRootMessages((current) =>
           mergeChannelMessages(current, [optimisticMessage], [])
         );
@@ -1544,7 +1552,7 @@ export function Channels({
             mergeChannelMessages(current, [result.message], []),
           );
         } else {
-          shouldScrollChannelToEnd.current = true;
+          shouldScrollChannelToEnd.current = activeChannelId;
           updateRootMessages((current) =>
             mergeChannelMessages(current, [result.message], []));
         }
