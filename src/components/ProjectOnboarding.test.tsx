@@ -115,6 +115,10 @@ const baseProps = {
     requirements: [],
   }),
   onCancel: () => undefined,
+  onCloneRepository: async () => ({
+    repositoryPath: readiness.repositoryPath,
+    repositoryName: "briar",
+  }),
   onConnect: async () => ({
     repositoryPath: readiness.repositoryPath,
     workflow: generatedWorkflow,
@@ -158,11 +162,14 @@ async function selectValidRepository(container: HTMLElement) {
 }
 
 describe("ProjectOnboarding", () => {
-  it("starts manual project creation at repository setup", () => {
+  it("starts project creation with three clear choices in a dialog", () => {
     const markup = renderToStaticMarkup(<ProjectOnboarding {...baseProps} />);
 
-    expect(markup).toContain("로컬 Git 저장소");
-    expect(markup).not.toContain("Briar를 어떻게 사용하고 싶으세요?");
+    expect(markup).toContain("Connect Local Git Repository");
+    expect(markup).toContain("Create from scratch");
+    expect(markup).toContain("Migrate from Lovable");
+    expect(markup).toContain("aria-modal=\"true\"");
+    expect(markup).toContain("disabled=\"\"");
   });
 
   it("shows developer tools before repository setup", async () => {
@@ -173,6 +180,9 @@ describe("ProjectOnboarding", () => {
       ),
     );
 
+    await act(async () => {
+      buttonWithText(container, "Connect Local Git Repository")?.click();
+    });
     expect(container.textContent).toContain("개발 도구를 연결해 주세요");
     expect(container.textContent).toContain("Git필수");
     expect(container.querySelectorAll(".initial-prerequisite-row")).toHaveLength(8);
@@ -190,22 +200,21 @@ describe("ProjectOnboarding", () => {
     container.remove();
   });
 
-  it("only offers an existing repository and makes it required", () => {
-    const markup = renderToStaticMarkup(
-      <ProjectOnboarding {...baseProps} canCancel />,
-    );
+  it("keeps create from scratch visibly disabled", () => {
+    const markup = renderToStaticMarkup(<ProjectOnboarding {...baseProps} canCancel />);
 
-    expect(markup).toContain("로컬 Git 저장소");
-    expect(markup).toContain("저장소 연결은 프로젝트 생성에 필수");
-    expect(markup).not.toContain("처음부터 시작");
-    expect(markup).not.toContain("나중에 하기");
-    expect(markup).not.toContain("Auto Hunt 워크플로");
+    expect(markup).toContain("Create from scratch");
+    expect(markup).toContain("준비 중");
+    expect(markup).toMatch(/<button[^>]*aria-disabled="true"[^>]*disabled/);
   });
 
   it("shows Next only after validating a Git repository", async () => {
     const { container, root } = mountOnboarding();
     await act(async () => root.render(<ProjectOnboarding {...baseProps} canCancel />));
 
+    await act(async () => {
+      buttonWithText(container, "Connect Local Git Repository")?.click();
+    });
     expect(buttonWithText(container, "다음")).toBeUndefined();
     await selectValidRepository(container);
 
@@ -213,6 +222,46 @@ describe("ProjectOnboarding", () => {
       container.querySelector<HTMLInputElement>('input[aria-label="프로젝트 이름"]')?.value,
     ).toBe("briar");
     expect(buttonWithText(container, "다음")?.disabled).toBe(false);
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("guides Lovable users through video, SSH copy, clone, and project naming", async () => {
+    const { container, root } = mountOnboarding();
+    const onCloneRepository = vi.fn().mockResolvedValue({
+      repositoryPath: "/Users/jay/briar/git/lovable-store",
+      repositoryName: "lovable-store",
+    });
+    const onCreate = vi.fn().mockResolvedValue(undefined);
+
+    await act(async () => root.render(
+      <ProjectOnboarding
+        {...baseProps}
+        onCloneRepository={onCloneRepository}
+        onCreate={onCreate}
+      />,
+    ));
+    await act(async () => buttonWithText(container, "Migrate from Lovable")?.click());
+
+    expect(container.textContent).toContain("먼저 Lovable을 GitHub와 연결");
+    expect(container.querySelector("iframe")?.getAttribute("src")).toContain(
+      "youtube-nocookie.com/embed/zgNkhU4SYgQ",
+    );
+    await act(async () => buttonWithText(container, "영상대로 연결했어요")?.click());
+
+    expect(container.textContent).toContain("Project settings → Git → GitHub");
+    const sshInput = container.querySelector<HTMLInputElement>(
+      "#lovable-github-ssh-url",
+    );
+    await act(async () => typeInto(sshInput!, "git@github.com:jay/lovable-store.git"));
+    expect(container.textContent).toContain("~/briar/git/lovable-store");
+    await act(async () => buttonWithText(container, "확인")?.click());
+
+    expect(onCloneRepository).toHaveBeenCalledWith(
+      "git@github.com:jay/lovable-store.git",
+    );
+    expect(onCreate).toHaveBeenCalledWith({ name: "lovable-store" });
 
     await act(async () => root.unmount());
     container.remove();

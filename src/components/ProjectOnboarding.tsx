@@ -4,15 +4,21 @@ import {
   Check,
   CheckCircle2,
   CircleAlert,
+  CloudDownload,
   Cpu,
+  ExternalLink,
+  FilePlus2,
   FolderGit2,
   FolderOpen,
   GitBranch,
+  Github,
+  HeartHandshake,
   Info,
   LoaderCircle,
-  LogOut,
+  PlayCircle,
   Sparkles,
   Wrench,
+  X,
 } from "lucide-react";
 import { useEffect, useRef, useState, type RefObject } from "react";
 import type { ProjectConnection } from "../hooks/useBriar";
@@ -27,16 +33,17 @@ import {
   repositoryWorkflowBootstrap,
   type AutoHuntWorkflow,
 } from "../lib/auto-hunt-contract";
-import { repositoryProjectName } from "../lib/project-workspace";
+import {
+  githubSshRepositoryName,
+  repositoryProjectName,
+} from "../lib/project-workspace";
 import {
   agentProviderLabels,
   type ProjectLlmProgress,
 } from "../lib/project-llm";
 import { formatExecutionDuration } from "../lib/agent-execution-metrics";
-import type { SessionUser } from "../types";
 import { useI18n } from "../i18n";
 import { DeveloperToolsSetup } from "./DeveloperToolsSetup";
-import { Logo } from "./Logo";
 
 type PreparedProjectConnection = {
   repositoryPath: string;
@@ -64,6 +71,10 @@ type Props = {
     onProgress?: (progress: ProjectLlmProgress) => void,
   ) => Promise<RequirementAnalysis>;
   onCancel: () => void;
+  onCloneRepository: (repositoryUrl: string) => Promise<{
+    repositoryPath: string;
+    repositoryName: string;
+  }>;
   onConnect: (
     settings: LocalAutoHuntConfig,
     repositoryPath: string,
@@ -71,7 +82,6 @@ type Props = {
   ) => Promise<PreparedProjectConnection>;
   onCreate: (input: { name: string }) => Promise<unknown>;
   onFinish: () => void;
-  onLogout: () => void;
   onReviseWorkflow: (
     projectId: string,
     requestedChange: string,
@@ -81,12 +91,14 @@ type Props = {
     repositoryPath: string,
     workflow: LocalAutoHuntConfig["workflow"],
   ) => Promise<RepositoryReadiness>;
-  user: SessionUser;
 };
 
 type OnboardingPhase =
+  | "choose-method"
   | "developer-tools"
   | "repository"
+  | "lovable-tutorial"
+  | "lovable-repository"
   | "workflow-loading"
   | "workflow-review"
   | "tools-loading"
@@ -259,18 +271,17 @@ export function ProjectOnboarding({
   loading,
   onAnalyzeRequirements,
   onCancel,
+  onCloneRepository,
   onConnect,
   onCreate,
   onFinish,
-  onLogout,
   onRepositoryInspect,
   onRepositorySelect,
   onReviseWorkflow,
-  user,
 }: Props) {
   const { t } = useI18n();
   const [phase, setPhase] = useState<OnboardingPhase>(
-    includeDeveloperTools && !connection ? "developer-tools" : "repository",
+    connection ? "repository" : "choose-method",
   );
   const [name, setName] = useState(connection?.project.name ?? "");
   const [repositoryPath, setRepositoryPath] = useState("");
@@ -296,6 +307,17 @@ export function ProjectOnboarding({
     WorkflowRequirementHealth[]
   >([]);
   const [toolsError, setToolsError] = useState<string | null>(null);
+  const [lovableRepositoryUrl, setLovableRepositoryUrl] = useState("");
+  const [lovableImporting, setLovableImporting] = useState(false);
+  const [lovableError, setLovableError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !loading && !lovableImporting) onCancel();
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [loading, lovableImporting, onCancel]);
 
   useEffect(() => {
     if (connection && !name) setName(connection.project.name);
@@ -393,6 +415,44 @@ export function ProjectOnboarding({
       );
     } finally {
       setSelectingRepository(false);
+    }
+  };
+
+  const startLocalRepositoryFlow = () => {
+    setPhase(includeDeveloperTools ? "developer-tools" : "repository");
+  };
+
+  const importLovableRepository = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const repositoryUrl = lovableRepositoryUrl.trim();
+    const repositoryName = githubSshRepositoryName(repositoryUrl);
+    if (!repositoryName) {
+      setLovableError(t("onboarding.lovableSshInvalid"));
+      return;
+    }
+    setLovableImporting(true);
+    setLovableError(null);
+    try {
+      const cloned = await onCloneRepository(repositoryUrl);
+      const readiness = await onRepositoryInspect(
+        cloned.repositoryPath,
+        repositoryWorkflowBootstrap,
+      );
+      if (!readiness.gitReady) {
+        throw new Error(
+          readiness.issues[0] ?? t("onboarding.lovableRepositoryNotReady"),
+        );
+      }
+      setRepositoryPath(readiness.repositoryPath);
+      setRepositoryReadiness(readiness);
+      setName(cloned.repositoryName || repositoryName);
+      await onCreate({ name: cloned.repositoryName || repositoryName });
+      setWorkflowError(null);
+      setPhase("workflow-loading");
+    } catch (caught) {
+      setLovableError(caught instanceof Error ? caught.message : String(caught));
+    } finally {
+      setLovableImporting(false);
     }
   };
 
@@ -506,46 +566,63 @@ export function ProjectOnboarding({
       : phase.startsWith("workflow")
         ? includeDeveloperTools ? 3 : 2
         : includeDeveloperTools ? 4 : 3;
+  const backAction = phase === "developer-tools"
+    ? () => setPhase("choose-method")
+    : phase === "repository" && !connection
+      ? includeDeveloperTools
+        ? () => setPhase("developer-tools")
+        : () => setPhase("choose-method")
+      : phase === "lovable-tutorial"
+        ? () => setPhase("choose-method")
+        : phase === "lovable-repository"
+          ? () => setPhase("lovable-tutorial")
+          : null;
+  const showsSetupProgress =
+    phase === "developer-tools" ||
+    phase === "repository" ||
+    phase.startsWith("workflow") ||
+    phase.startsWith("tools");
+  const lovableRepositoryName = githubSshRepositoryName(lovableRepositoryUrl);
 
   return (
-    <div className="onboarding-shell project-onboarding-shell">
-      <header className="onboarding-topbar">
-        <Logo />
-        <div className="onboarding-topbar-actions">
-          {phase === "developer-tools" ? (
-            <button onClick={onCancel} type="button">
-              <ArrowLeft size={14} /> {t("onboarding.back")}
-            </button>
-          ) : phase === "repository" ? (
-            <button
-              onClick={
-                includeDeveloperTools && !connection
-                  ? () => setPhase("developer-tools")
-                  : onCancel
-              }
-              type="button"
-            >
-              <ArrowLeft size={14} />
-              {includeDeveloperTools && !connection
-                ? t("onboarding.developerToolsBack")
-                : t("onboarding.back")}
-            </button>
-          ) : (
-            <button onClick={onCancel} type="button">
-              <ArrowLeft size={14} /> {t("onboarding.back")}
-            </button>
-          )}
-          <button onClick={onLogout} type="button">
-            <LogOut size={14} /> {user.email}
+    <div
+      className="dialog-backdrop project-onboarding-modal-backdrop"
+      onMouseDown={(event) => {
+        if (
+          event.currentTarget === event.target &&
+          !loading &&
+          !lovableImporting
+        ) onCancel();
+      }}
+    >
+      <section
+        aria-label={t("onboarding.addProject")}
+        aria-modal="true"
+        className="onboarding-card project-onboarding-card project-onboarding-dialog"
+        role="dialog"
+      >
+        <header className="project-onboarding-dialog-toolbar">
+          <span>
+            {backAction ? (
+              <button onClick={backAction} type="button">
+                <ArrowLeft size={15} /> {t("onboarding.previous")}
+              </button>
+            ) : null}
+          </span>
+          <button
+            aria-label={t("common.close")}
+            className="project-onboarding-dialog-close"
+            disabled={loading || lovableImporting}
+            onClick={onCancel}
+            type="button"
+          >
+            <X size={18} />
           </button>
-        </div>
-      </header>
-
-      <main className="onboarding-card project-onboarding-card">
-        <>
-            {reconnectingExistingWorkflow ? (
+        </header>
+        <div className="project-onboarding-dialog-body">
+            {showsSetupProgress && reconnectingExistingWorkflow ? (
               <p className="eyebrow">{t("health.reconnect")}</p>
-            ) : (
+            ) : showsSetupProgress ? (
               <>
                 <p className="eyebrow">
                   {t("onboarding.setupProgress", {
@@ -555,7 +632,138 @@ export function ProjectOnboarding({
                 </p>
                 <Progress current={currentStep} total={totalSteps} />
               </>
-            )}
+            ) : null}
+
+            {phase === "choose-method" ? (
+              <section className="project-start-choice">
+                <p className="eyebrow">{t("onboarding.addProject")}</p>
+                <h1>{t("onboarding.chooseMethodTitle")}</h1>
+                <p className="onboarding-copy">{t("onboarding.chooseMethodDescription")}</p>
+                <div className="project-start-choice-grid">
+                  <button onClick={startLocalRepositoryFlow} type="button">
+                    <i><FolderGit2 size={24} /></i>
+                    <span>
+                      <strong>{t("onboarding.connectLocalTitle")}</strong>
+                      <small>{t("onboarding.connectLocalDescription")}</small>
+                    </span>
+                    <ArrowRight size={18} />
+                  </button>
+                  <button aria-disabled="true" disabled type="button">
+                    <i><FilePlus2 size={24} /></i>
+                    <span>
+                      <strong>{t("onboarding.createScratchTitle")}</strong>
+                      <small>{t("onboarding.createScratchDescription")}</small>
+                    </span>
+                    <em>{t("onboarding.comingSoon")}</em>
+                  </button>
+                  <button onClick={() => setPhase("lovable-tutorial")} type="button">
+                    <i className="lovable"><HeartHandshake size={24} /></i>
+                    <span>
+                      <strong>{t("onboarding.migrateLovableTitle")}</strong>
+                      <small>{t("onboarding.migrateLovableDescription")}</small>
+                    </span>
+                    <ArrowRight size={18} />
+                  </button>
+                </div>
+              </section>
+            ) : null}
+
+            {phase === "lovable-tutorial" ? (
+              <section className="lovable-tutorial">
+                <p className="eyebrow">{t("onboarding.lovableStepVideo")}</p>
+                <div className="onboarding-icon lovable"><PlayCircle size={24} /></div>
+                <h1>{t("onboarding.lovableTutorialTitle")}</h1>
+                <p className="onboarding-copy">{t("onboarding.lovableTutorialDescription")}</p>
+                <div className="lovable-video-frame">
+                  <iframe
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    allowFullScreen
+                    src="https://www.youtube-nocookie.com/embed/zgNkhU4SYgQ?rel=0"
+                    title={t("onboarding.lovableVideoTitle")}
+                  />
+                </div>
+                <div className="lovable-tutorial-note">
+                  <Github size={18} />
+                  <span>
+                    <strong>{t("onboarding.lovableSyncResultTitle")}</strong>
+                    <small>{t("onboarding.lovableSyncResultDescription")}</small>
+                  </span>
+                </div>
+                <a
+                  className="lovable-docs-link"
+                  href="https://docs.lovable.dev/integrations/github"
+                  rel="noreferrer"
+                  target="_blank"
+                >
+                  {t("onboarding.lovableOpenDocs")} <ExternalLink size={14} />
+                </a>
+                <button
+                  className="onboarding-primary-action"
+                  onClick={() => setPhase("lovable-repository")}
+                  type="button"
+                >
+                  {t("onboarding.lovableVideoComplete")}<ArrowRight size={17} />
+                </button>
+              </section>
+            ) : null}
+
+            {phase === "lovable-repository" ? (
+              <section className="lovable-repository-step">
+                <p className="eyebrow">{t("onboarding.lovableStepRepository")}</p>
+                <div className="onboarding-icon lovable"><CloudDownload size={24} /></div>
+                <h1>{t("onboarding.lovableRepositoryTitle")}</h1>
+                <p className="onboarding-copy">{t("onboarding.lovableRepositoryDescription")}</p>
+                <ol className="lovable-copy-steps">
+                  <li><span>1</span><p>{t("onboarding.lovableCopyStepOne")}</p></li>
+                  <li><span>2</span><p>{t("onboarding.lovableCopyStepTwo")}</p></li>
+                  <li><span>3</span><p>{t("onboarding.lovableCopyStepThree")}</p></li>
+                </ol>
+                <form className="lovable-repository-form" onSubmit={(event) => void importLovableRepository(event)}>
+                  <label htmlFor="lovable-github-ssh-url">{t("onboarding.lovableSshLabel")}</label>
+                  <div className="lovable-repository-input">
+                    <Github size={18} />
+                    <input
+                      autoCapitalize="none"
+                      autoComplete="off"
+                      disabled={lovableImporting}
+                      id="lovable-github-ssh-url"
+                      onChange={(event) => {
+                        setLovableRepositoryUrl(event.currentTarget.value);
+                        setLovableError(null);
+                      }}
+                      placeholder="git@github.com:your-account/your-project.git"
+                      spellCheck={false}
+                      value={lovableRepositoryUrl}
+                    />
+                  </div>
+                  {lovableRepositoryName ? (
+                    <p className="lovable-destination-preview">
+                      <Check size={14} />
+                      {t("onboarding.lovableDestinationPreview", {
+                        name: lovableRepositoryName,
+                      })}
+                    </p>
+                  ) : null}
+                  {lovableError || error ? (
+                    <p className="repository-readiness-error" role="alert">
+                      <CircleAlert size={14} />{lovableError || error}
+                    </p>
+                  ) : null}
+                  <button
+                    className="onboarding-primary-action"
+                    disabled={lovableImporting || !lovableRepositoryName}
+                    type="submit"
+                  >
+                    {lovableImporting ? (
+                      <><LoaderCircle className="spin" size={17} />{t("onboarding.lovableCloning")}</>
+                    ) : (
+                      <>{t("onboarding.confirm")}<ArrowRight size={17} /></>
+                    )}
+                  </button>
+                </form>
+                <p className="onboarding-dimmed-note">{t("onboarding.lovableCloneNotice")}</p>
+              </section>
+            ) : null}
 
             {phase === "developer-tools" ? (
               <DeveloperToolsSetup onContinue={() => setPhase("repository")} />
@@ -772,8 +980,8 @@ export function ProjectOnboarding({
                 </button>
               </section>
             ) : null}
-          </>
-      </main>
+        </div>
+      </section>
     </div>
   );
 }
