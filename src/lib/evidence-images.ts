@@ -4,6 +4,7 @@ export const evidenceImageMimeTypes = [
   "image/gif",
   "image/webp",
   "image/avif",
+  "image/svg+xml",
 ] as const;
 
 export const maxEvidenceImageCount = 5;

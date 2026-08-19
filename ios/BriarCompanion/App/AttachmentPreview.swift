@@ -8,7 +8,7 @@ struct PreviewFile: Identifiable {
 /// Shared helpers for issue attachment media detection and inline markdown references.
 enum IssueAttachmentMedia {
     private static let imageExtensions: Set<String> = [
-        "png", "jpg", "jpeg", "gif", "webp", "heic", "heif", "bmp", "tif", "tiff",
+        "png", "jpg", "jpeg", "gif", "webp", "heic", "heif", "bmp", "tif", "tiff", "svg",
     ]
 
     static func isImage(contentType: String, filename: String) -> Bool {
@@ -161,23 +161,34 @@ struct AuthenticatedImagePreview: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel(L10n.format("%@ 크게 보기", filename))
             } else if failed {
-                Button {
-                    Task { await loadImage(force: true) }
-                } label: {
+                VStack(alignment: .leading, spacing: 8) {
                     Label {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(filename)
-                            Text(L10n.text("이미지를 불러올 수 없음 · 다시 시도"))
+                            Text(L10n.text("이미지 미리보기를 지원하지 않음"))
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
                     } icon: {
                         Image(systemName: "photo.badge.exclamationmark")
                     }
+                    if let fileURL {
+                        Button {
+                            open(fileURL)
+                        } label: {
+                            Label(L10n.text("파일 열기"), systemImage: "arrow.up.right.square")
+                        }
+                        .buttonStyle(.borderless)
+                    }
+                    Button {
+                        Task { await loadImage(force: true) }
+                    } label: {
+                        Label(L10n.text("다시 시도"), systemImage: "arrow.clockwise")
+                    }
+                    .buttonStyle(.borderless)
                 }
-                .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
-                .accessibilityLabel(L10n.format("%@ 이미지를 다시 불러오기", filename))
+                .accessibilityLabel(L10n.format("%@ 미리보기", filename))
             } else {
                 VStack(spacing: 8) {
                     ProgressView()
@@ -220,6 +231,7 @@ struct AuthenticatedImagePreview: View {
 
         do {
             let downloadedURL = try await load()
+            fileURL = downloadedURL
             let data = try Data(contentsOf: downloadedURL)
             guard let loaded = UIImage(data: data) else {
                 failed = true

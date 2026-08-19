@@ -23,6 +23,25 @@ final class AttachmentPipelineTests: XCTestCase {
         XCTAssertEqual(attachments.first?.data, Data([1, 2, 3]))
     }
 
+    func testImagesOnlyImportsSVGWithoutRasterizingIt() async throws {
+        let svgType = try XCTUnwrap(UTType(filenameExtension: "svg"))
+        let selection = PhotoAttachmentSelection(
+            supportedContentTypes: [svgType],
+            loadData: { Data([60, 115, 118, 103, 62]) }
+        )
+
+        let attachments = try await PhotoAttachmentImporter.importSelections(
+            [selection],
+            appendingTo: [],
+            policy: .imagesOnly,
+            filenameIdentifier: { "fixed-svg" }
+        )
+
+        XCTAssertEqual(attachments.map(\.filename), ["image-fixed-svg.svg"])
+        XCTAssertEqual(attachments.map(\.contentType), ["image/svg+xml"])
+        XCTAssertEqual(attachments.first?.data, Data([60, 115, 118, 103, 62]))
+    }
+
     func testImagesOnlyRejectsVideoButImagesAndVideosImportsIt() async throws {
         let selection = PhotoAttachmentSelection(
             supportedContentTypes: [.quickTimeMovie],

@@ -4,6 +4,7 @@ export const issueAttachmentMimeTypes = [
   "image/gif",
   "image/webp",
   "image/avif",
+  "image/svg+xml",
   "video/mp4",
   "video/webm",
   "video/quicktime",
@@ -28,6 +29,7 @@ const mimeTypesByExtension: Record<string, (typeof issueAttachmentMimeTypes)[num
   mov: "video/quicktime",
   mp4: "video/mp4",
   png: "image/png",
+  svg: "image/svg+xml",
   webm: "video/webm",
   webp: "image/webp",
 };
@@ -38,7 +40,7 @@ export type IssueAttachmentCandidate = {
   type: string;
 };
 
-/** Infer a supported media type from a filename when the browser omits File.type. */
+/** Infer a supported media type from a filename when the browser omits or generalizes File.type. */
 export function issueAttachmentMimeTypeFromName(name: string): string | null {
   const extension = name.normalize("NFC").trim().split(".").pop()?.toLowerCase();
   if (!extension) return null;
@@ -62,7 +64,6 @@ export function isIssueAttachmentImage(
  */
 export function normalizeIssueAttachmentFile(file: File): File {
   if (file.type && allowedMimeTypes.has(file.type)) return file;
-  if (file.type) return file;
   const inferred = issueAttachmentMimeTypeFromName(file.name);
   if (!inferred) return file;
   return new File([file], file.name, {

@@ -6,6 +6,7 @@ final class AttachmentPreviewTests: XCTestCase {
         XCTAssertTrue(IssueAttachmentMedia.isImage(contentType: "image/png", filename: "x.bin"))
         XCTAssertTrue(IssueAttachmentMedia.isImage(contentType: "", filename: "image.png"))
         XCTAssertTrue(IssueAttachmentMedia.isImage(contentType: "  ", filename: "photo.JPG"))
+        XCTAssertTrue(IssueAttachmentMedia.isImage(contentType: "", filename: "vector.svg"))
         XCTAssertTrue(IssueAttachmentMedia.isImage(contentType: "IMAGE/WEBP", filename: "shot"))
         XCTAssertFalse(IssueAttachmentMedia.isImage(contentType: "video/mp4", filename: "clip.mp4"))
         XCTAssertFalse(IssueAttachmentMedia.isImage(contentType: "", filename: "notes.txt"))
