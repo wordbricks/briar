@@ -5,10 +5,9 @@ import grokIconUrl from "../assets/grok.png";
 
 // Why: SVG paths sourced from Orca
 // (`~/git/orca/src/renderer/src/components/status-bar/icons.tsx`) so Briar
-// matches Orca’s Claude/Codex branding. Grok uses the bundled favicon PNG from
-// `~/git/orca/src/shared/agent-icons/grok.png` (same asset Orca ships offline).
-// Cursor uses the user-provided artwork, while Antigravity uses the provider
-// artwork bundled with Briar.
+// matches Orca’s Claude/Codex branding. Grok uses the updated brand logo PNG
+// bundled with Briar. Cursor uses the user-provided artwork, while Antigravity
+// uses the provider artwork bundled with Briar.
 
 type AgentIconProps = {
   size?: number;
