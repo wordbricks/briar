@@ -232,6 +232,33 @@ final class BriarCompanionUITests: XCTestCase {
         captureScreenshot(named: "companion-channel-composer")
     }
 
+    func testChannelAttachmentCardOpensPreview() {
+        let app = launchInsideCompanion()
+
+        app.tabBars.buttons["홈"].tap()
+        let channel = app.buttons[
+            "channel-row-cccccccc-cccc-4ccc-8ccc-cccccccccccc"
+        ]
+        XCTAssertTrue(channel.waitForExistence(timeout: 5))
+        channel.tap()
+
+        let card = app.descendants(matching: .any)[
+            "channel-attachment-card-abababab-abab-4bab-8bab-abababababab"
+        ]
+        XCTAssertTrue(card.waitForExistence(timeout: 5))
+        XCTAssertTrue(card.label.contains("channel-card.png"))
+        captureScreenshot(named: "companion-channel-attachment-card")
+
+        let previewButton = app.buttons["channel-card.png 크게 보기"]
+        XCTAssertTrue(previewButton.waitForExistence(timeout: 5))
+        previewButton.tap()
+        XCTAssertTrue(
+            app.descendants(matching: .any)["channel-attachment-preview"]
+                .waitForExistence(timeout: 5)
+        )
+        captureScreenshot(named: "companion-channel-attachment-preview")
+    }
+
     func testChannelSentMessageAppearsImmediatelyWithoutSendingLabel() {
         let app = launchInsideCompanion(
             additionalArguments: ["--ui-testing-delayed-message-send"]

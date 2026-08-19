@@ -389,8 +389,13 @@ describe("Channels", () => {
     const bodyTrigger = container.querySelector<HTMLButtonElement>(
       '.channel-message-text [aria-label="architecture.png 크게 보기"]',
     );
+    const attachmentCard = attachmentTrigger?.closest(
+      ".channel-message-attachment-card",
+    );
     expect(attachmentTrigger).not.toBeNull();
     expect(bodyTrigger).not.toBeNull();
+    expect(attachmentCard?.textContent).toContain("channel.png");
+    expect(attachmentCard?.textContent).toContain("5B");
 
     await act(async () => attachmentTrigger?.click());
     const download = document.querySelector<HTMLAnchorElement>(
