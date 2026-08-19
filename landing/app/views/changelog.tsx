@@ -30,6 +30,20 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.138",
+        date: "2026년 8월 19일",
+        title: "Agent 템플릿과 채널 경험을 더 빠르고 안정적으로 확장합니다",
+        summary:
+          "가이드형 Agent 템플릿과 제공자 모델을 쉽게 선택하고, 채널·첨부 파일·모바일 캐시·Worker 작업 공간을 더 안정적으로 이어갑니다.",
+        items: [
+          "책임·Skill·출처가 포함된 가이드형 Agent 템플릿을 분야별로 추가하고, 템플릿 선택과 직접 생성 흐름을 간결하게 정리합니다.",
+          "OpenRouter 모델 탐색과 Antigravity quota 표시를 보강하고, OpenRouter·Grok 제공자 아이콘을 실제 번들 아트워크로 교체합니다.",
+          "SVG 첨부 파일과 채널 이미지 탐색을 지원하며, 이모지 반응은 빠르게 표시하고 실패하면 원상 복구와 오류 안내를 제공합니다.",
+          "모바일 Companion의 채널·첨부 캐시와 긴 텍스트 선택을 안정화하고, 채널·이슈 화면에 오래된 내용이나 잘못된 스크롤이 남지 않게 정리합니다.",
+          "대기 중인 답글 작업이 유휴 Worker 작업 공간을 재사용하도록 해 실행 준비를 줄이고, 최신 Antigravity quota 형식을 이해합니다.",
+        ],
+      },
+      {
         version: "1.2.137",
         date: "2026년 8월 19일",
         title: "채널 관리와 링크 탐색을 더 안전하게 정리합니다",
@@ -809,6 +823,20 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.138",
+        date: "August 19, 2026",
+        title: "Expand Agent templates and make channel work faster and steadier",
+        summary:
+          "Choose guided Agent templates and provider models more easily, while keeping channels, attachments, mobile caches, and Worker workspaces reliable.",
+        items: [
+          "Add guided Agent templates with responsibilities, Skills, and sources, then simplify the template picker and direct creation flow.",
+          "Improve OpenRouter model discovery and Antigravity quota reporting, and replace the OpenRouter and Grok provider icons with bundled artwork.",
+          "Support SVG attachments and smoother channel image navigation, while emoji reactions appear immediately and roll back with an error when the request fails.",
+          "Stabilize Companion channel and attachment caches plus long-text selection, preventing stale content or incorrect scroll positions from surviving navigation.",
+          "Reuse idle Worker workspaces for queued reply jobs to reduce setup time, and understand the latest Antigravity quota format.",
+        ],
+      },
       {
         version: "1.2.137",
         date: "August 19, 2026",
@@ -1680,7 +1708,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <p>
             <strong>Briar</strong> <span>1.2</span>
           </p>
-          <a href="#v1-2-137">
+          <a href="#v1-2-138">
             {changelog.current} <span aria-hidden="true">↓</span>
           </a>
         </div>
@@ -1702,7 +1730,9 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   </div>
                   <time
                     dateTime={
-                      entry.version === "1.2.137"
+                      entry.version === "1.2.138"
+                        ? "2026-08-19"
+                        : entry.version === "1.2.137"
                         ? "2026-08-19"
                         : entry.version === "1.2.136"
                         ? "2026-08-19"
