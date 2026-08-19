@@ -3541,26 +3541,21 @@ const MessageRow = memo(function MessageRow({
             {authorInitial(message.author.name)}
           </span>
         )}
+        {isAgent && agentProvider ? (
+          <span
+            aria-label={agentProviderLabels[agentProvider]}
+            className={`channel-agent-badge ${agentProvider}`}
+            role="img"
+            title={agentProviderLabels[agentProvider]}
+          >
+            <AgentProviderIcon provider={agentProvider} size={11} />
+          </span>
+        ) : null}
       </div>
       <div className="channel-message-body">
         <header>
           <strong>{displayName}</strong>
-          {message.author.type === "agent" ? (
-            <span
-              aria-label={agentProvider ? agentProviderLabels[agentProvider] : "Agent"}
-              className={`channel-agent-badge${agentProvider ? ` ${agentProvider}` : ""}`}
-              role="img"
-              title={agentProvider ? agentProviderLabels[agentProvider] : "Agent"}
-            >
-              {agentProvider ? (
-                <AgentProviderIcon provider={agentProvider} size={12} />
-              ) : (
-                <>
-                  <Bot size={12} /> agent
-                </>
-              )}
-            </span>
-          ) : message.author.type === "webhook" ? (
+          {message.author.type === "webhook" ? (
             <span className="channel-agent-badge webhook">
               <Webhook size={12} /> {t("channel.webhookBadge")}
             </span>

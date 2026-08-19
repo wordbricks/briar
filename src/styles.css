@@ -7002,10 +7002,10 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .channel-message.is-optimistic,
 .companion-channel-message.is-optimistic { background:color-mix(in srgb,var(--muted,#f7f4ef) 58%,transparent); }
 .channel-message-avatar {
+  position: relative;
   width: 40px;
   height: 40px;
-  overflow: hidden;
-  border-radius: 50%;
+  flex: 0 0 40px;
 }
 .channel-message-avatar img,
 .channel-message-avatar-fallback {
@@ -7014,6 +7014,8 @@ button.issue-message-state { width:100%; cursor:pointer; }
   display: grid;
   place-items: center;
   object-fit: cover;
+  border-radius: 50%;
+  overflow: hidden;
 }
 .channel-message-avatar-fallback {
   color: #fff;
@@ -7023,6 +7025,25 @@ button.issue-message-state { width:100%; cursor:pointer; }
 }
 .channel-message-avatar-fallback.agent {
   background: linear-gradient(145deg, #765bc5, #5943a4);
+}
+.channel-message-avatar .channel-agent-badge {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  z-index: 2;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #ece7dd;
+  border: 1.5px solid var(--background, #faf9f6);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.14);
+}
+.channel-message-avatar .channel-agent-badge svg,
+.channel-message-avatar .channel-agent-badge img {
+  display: block;
 }
 .channel-message-body { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 .channel-message-body > header { display: flex; align-items: baseline; gap: 7px; min-height: 20px; }

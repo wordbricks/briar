@@ -306,3 +306,8 @@
   border-color: color-mix(in srgb, var(--destructive) 36%, var(--border));
   background: color-mix(in srgb, var(--destructive) 10%, var(--card));
 }
+
+.dark .channel-message-avatar .channel-agent-badge {
+  border-color: var(--background);
+  background: var(--secondary);
+}
