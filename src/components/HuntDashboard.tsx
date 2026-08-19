@@ -186,6 +186,7 @@ import {
   issueMentionHandle,
   mentionsIssueHandle,
 } from "../lib/issue-agent-reply";
+import { mentionHandle } from "../lib/channel-mentions";
 import {
   isIssueMentionUrl,
   issueMentionHandleFromUrl,
@@ -652,6 +653,7 @@ export function HuntDashboard({
       clientMessageId?: string;
       parentMessageId: string | null;
       mentionedUserIds?: string[];
+      mentionedAgentIds?: string[];
       attachments?: File[];
       attachmentReferences?: string[];
     },
@@ -1385,6 +1387,9 @@ export function HuntDashboard({
             ? () => onCompleteResultReview(selected.id)
             : undefined}
           mentionMembers={dashboard?.members ?? []}
+          mentionAgents={agents.filter(
+            (agent) => agent.projectId === dashboard?.project.id,
+          )}
           onMove={(placement) => onMoveRun(selected.id, placement)}
           onProcessNow={
             onProcessIssueNow ? () => onProcessIssueNow(selected) : undefined
@@ -4489,6 +4494,7 @@ export function RunPage({
   onLoadRunEvidenceImage,
   onCompleteResultReview,
   mentionMembers = [],
+  mentionAgents = [],
   onMove,
   onOpenFullPage,
   onProcessNow,
@@ -4558,6 +4564,7 @@ export function RunPage({
   onLoadRunEvidenceImage?: (image: RunEvidenceImage) => Promise<Blob>;
   onCompleteResultReview?: () => Promise<unknown>;
   mentionMembers?: OrganizationMember[];
+  mentionAgents?: ProjectAgent[];
   onMove: (placement: HuntRunPlacement) => Promise<unknown>;
   onOpenFullPage?: () => void;
   onProcessNow?: () => void;
@@ -4573,6 +4580,7 @@ export function RunPage({
     clientMessageId?: string;
     parentMessageId: string | null;
     mentionedUserIds?: string[];
+    mentionedAgentIds?: string[];
     attachments?: File[];
     attachmentReferences?: string[];
   }) => Promise<IssueMessageSendResult>;
@@ -6636,6 +6644,7 @@ export function RunPage({
                       executionRuns={availableRuns}
                       inboxSyncSignal={conversationInboxSyncSignal}
                       mentionMembers={mentionMembers}
+                      mentionAgents={mentionAgents}
                       onAcceptIssueAction={onAcceptIssueAction}
                       onAcceptIssueExecution={onAcceptIssueExecution}
                       onAcceptSkillExecution={onAcceptSkillExecution}
@@ -6680,6 +6689,7 @@ export function RunPage({
                     executionRuns={availableRuns}
                     inboxSyncSignal={conversationInboxSyncSignal}
                     mentionMembers={mentionMembers}
+                    mentionAgents={mentionAgents}
                     onAcceptIssueAction={onAcceptIssueAction}
                     onAcceptIssueExecution={onAcceptIssueExecution}
                     onAcceptSkillExecution={onAcceptSkillExecution}
@@ -8580,7 +8590,7 @@ const issueReplyParticipant = (
   author: IssueMessage["author"],
 ): ConversationReplyParticipant => ({
   id: author.provider
-    ? `agent:${author.provider}:${author.name}`
+    ? `agent:${author.agentId ?? `${author.provider}:${author.name}`}`
     : `user:${author.id ?? author.name}`,
   name: author.name,
   image: author.image,
@@ -8594,6 +8604,7 @@ function IssueConversation({
   executionWorkers,
   inboxSyncSignal,
   mentionMembers,
+  mentionAgents,
   onAcceptIssueAction,
   onAcceptIssueExecution,
   onAcceptSkillExecution,
@@ -8616,6 +8627,7 @@ function IssueConversation({
   executionWorkers: ExecutionWorker[];
   inboxSyncSignal?: string;
   mentionMembers: OrganizationMember[];
+  mentionAgents: ProjectAgent[];
   onAcceptIssueAction?: (
     proposal: IssueProposedAction,
   ) => Promise<IssueProposedAction>;
@@ -8640,6 +8652,7 @@ function IssueConversation({
     clientMessageId?: string;
     parentMessageId: string | null;
     mentionedUserIds?: string[];
+    mentionedAgentIds?: string[];
     attachments?: File[];
     attachmentReferences?: string[];
   }) => Promise<IssueMessageSendResult>;
@@ -8758,7 +8771,7 @@ function IssueConversation({
           [tracked.replyThreadId]: {
             pending,
             error: job.status === "failed"
-              ? job.error ?? "워커가 Briar 답변을 만들지 못했습니다."
+              ? job.error ?? "워커가 Agent 답변을 만들지 못했습니다."
               : null,
           },
         };
@@ -9103,24 +9116,13 @@ function IssueConversation({
   );
   const mentionHandles = useMemo(
     () => [
-      "briar",
       ...mentionMembers.map((member) => issueMentionHandle(member)),
+      ...mentionAgents.map((agent) => mentionHandle(agent.name)),
     ],
-    [mentionMembers],
+    [mentionAgents, mentionMembers],
   );
   const profilesByHandle = useMemo(() => {
     const profiles = new Map<string, ProfileTarget>();
-    profiles.set("briar", {
-      type: "agent",
-      id: "briar",
-      name: "Briar",
-      provider: null,
-      model: null,
-      responsibility: t("profile.briarResponsibility"),
-      skills: [],
-      projectId: null,
-      createdAt: null,
-    });
     for (const member of mentionMembers) {
       profiles.set(issueMentionHandle(member).toLowerCase(), {
         type: "user",
@@ -9133,8 +9135,22 @@ function IssueConversation({
         createdAt: member.createdAt,
       });
     }
+    for (const agent of mentionAgents) {
+      profiles.set(mentionHandle(agent.name).toLowerCase(), {
+        type: "agent",
+        id: agent.id,
+        name: agent.name,
+        provider: agent.provider,
+        model: agent.model,
+        description: agent.description ?? null,
+        responsibility: agent.responsibility,
+        skills: agent.skills,
+        projectId: agent.projectId,
+        createdAt: agent.createdAt,
+      });
+    }
     return profiles;
-  }, [mentionMembers, t]);
+  }, [mentionAgents, mentionMembers]);
   const openMentionProfile = useCallback((handle: string) => {
     const profile = profilesByHandle.get(handle.toLowerCase());
     if (profile) setActiveProfile(profile);
@@ -9152,6 +9168,7 @@ function IssueConversation({
     body: string,
     parentMessageId: string | null,
     mentionedUserIds: string[],
+    mentionedAgentIds: string[],
     attachments: File[],
     attachmentReferences: string[],
   ) => {
@@ -9209,6 +9226,7 @@ function IssueConversation({
         clientMessageId,
         parentMessageId,
         mentionedUserIds,
+        mentionedAgentIds,
         ...(attachments.length > 0
           ? { attachments, attachmentReferences }
           : {}),
@@ -9232,8 +9250,11 @@ function IssueConversation({
     } finally {
       for (const url of previewUrls) URL.revokeObjectURL(url);
     }
-    if (result.agentReplyJob) {
-      trackAgentReply(result.agentReplyJob, result.message);
+    const replyJobs = result.agentReplyJobs ?? (
+      result.agentReplyJob ? [result.agentReplyJob] : []
+    );
+    for (const replyJob of replyJobs) {
+      trackAgentReply(replyJob, result.message);
     }
     if (!result.agentReply) return;
     const replyThreadId = agentReplyParentMessageId(result.message);
@@ -9627,11 +9648,13 @@ function IssueConversation({
                       autoFocus
                       compact
                       mentionMembers={mentionMembers}
+                      mentionAgents={mentionAgents}
                       onCancel={() => setActiveReplyMessageId(null)}
                       onMentionOpen={openMentionProfile}
                       onSubmit={async (
                         body,
                         mentionedUserIds,
+                        mentionedAgentIds,
                         attachments,
                         references,
                       ) => {
@@ -9639,6 +9662,7 @@ function IssueConversation({
                           body,
                           message.id,
                           mentionedUserIds,
+                          mentionedAgentIds,
                           attachments,
                           references,
                         );
@@ -9661,11 +9685,13 @@ function IssueConversation({
                       disableAttachments
                       initialBody={message.body}
                       mentionMembers={mentionMembers}
+                      mentionAgents={mentionAgents}
                       onCancel={() => setActiveEditMessageId(null)}
                       onMentionOpen={openMentionProfile}
                       onSubmit={async (
                         body,
                         mentionedUserIds,
+                        _mentionedAgentIds,
                         _attachments,
                         _references,
                       ) => {
@@ -9694,9 +9720,17 @@ function IssueConversation({
       </div>
       <MessageComposer
         mentionMembers={mentionMembers}
+        mentionAgents={mentionAgents}
         onMentionOpen={openMentionProfile}
-        onSubmit={(body, mentionedUserIds, attachments, references) =>
-          sendMessage(body, null, mentionedUserIds, attachments, references)
+        onSubmit={(body, mentionedUserIds, mentionedAgentIds, attachments, references) =>
+          sendMessage(
+            body,
+            null,
+            mentionedUserIds,
+            mentionedAgentIds,
+            attachments,
+            references,
+          )
         }
         placeholder={t("run.messagePlaceholder", { title: run.title })}
       />
@@ -10134,6 +10168,7 @@ function MessageComposer({
   disableAttachments = false,
   initialBody = "",
   mentionMembers,
+  mentionAgents,
   onCancel,
   onMentionOpen,
   onSubmit,
@@ -10144,11 +10179,13 @@ function MessageComposer({
   disableAttachments?: boolean;
   initialBody?: string;
   mentionMembers: OrganizationMember[];
+  mentionAgents: ProjectAgent[];
   onCancel?: () => void;
   onMentionOpen: (handle: string) => void;
   onSubmit: (
     body: string,
     mentionedUserIds: string[],
+    mentionedAgentIds: string[],
     attachments: File[],
     attachmentReferences: string[],
   ) => Promise<void>;
@@ -10162,20 +10199,18 @@ function MessageComposer({
   const [composerFocused, setComposerFocused] = useState(false);
   const [mentionDismissed, setMentionDismissed] = useState(false);
   const [selectedMentions, setSelectedMentions] = useState<
-    Record<string, { handle: string; label: string; userId: string | null }>
+    Record<string, {
+      handle: string;
+      label: string;
+      userId: string | null;
+      agentId: string | null;
+    }>
   >(() => {
     const existing: Record<
       string,
-      { handle: string; label: string; userId: string | null }
+      { handle: string; label: string; userId: string | null; agentId: string | null }
     > = {};
     if (initialBody) {
-      if (mentionsIssueHandle(initialBody, "briar")) {
-        existing["agent:briar"] = {
-          handle: "briar",
-          label: "Briar",
-          userId: null,
-        };
-      }
       for (const member of mentionMembers) {
         const handle = issueMentionHandle(member);
         if (handle && mentionsIssueHandle(initialBody, handle)) {
@@ -10183,6 +10218,18 @@ function MessageComposer({
             handle,
             label: member.name,
             userId: member.userId,
+            agentId: null,
+          };
+        }
+      }
+      for (const agent of mentionAgents) {
+        const handle = mentionHandle(agent.name);
+        if (handle && mentionsIssueHandle(initialBody, handle)) {
+          existing[`agent:${agent.id}`] = {
+            handle,
+            label: agent.name,
+            userId: null,
+            agentId: agent.id,
           };
         }
       }
@@ -10206,25 +10253,27 @@ function MessageComposer({
   const activeMention = issueMentionAtCaret(body, caret);
   const mentionSuggestions = activeMention
     ? [
-        ...("briar".startsWith(activeMention.query.toLowerCase())
-          ? [
-              {
-                handle: "briar",
-                image: null,
-                name: "Briar",
-                userId: null,
-              },
-            ]
-          : []),
         ...mentionMembers
           .map((member) => ({
             handle: issueMentionHandle(member),
             image: member.image,
             name: member.name,
             userId: member.userId,
+            agentId: null,
           }))
           .filter((member) =>
             member.handle.startsWith(activeMention.query.toLowerCase()),
+          ),
+        ...mentionAgents
+          .map((agent) => ({
+            handle: mentionHandle(agent.name),
+            image: agent.avatar,
+            name: agent.name,
+            userId: null,
+            agentId: agent.id,
+          }))
+          .filter((agent) =>
+            agent.handle.startsWith(activeMention.query.toLowerCase()),
           ),
       ]
     : [];
@@ -10249,6 +10298,12 @@ function MessageComposer({
           ? [mention.userId]
           : [],
     );
+    const nextMentionedAgentIds = Object.values(selectedMentions).flatMap(
+      (mention) =>
+        mention.agentId && mentionsIssueHandle(nextBody, mention.handle)
+          ? [mention.agentId]
+          : [],
+    );
     const previousMentions = selectedMentions;
     const previousAttachments = attachments;
     setSending(true);
@@ -10262,6 +10317,7 @@ function MessageComposer({
       await onSubmit(
         nextBody,
         nextMentionedUserIds,
+        nextMentionedAgentIds,
         previousAttachments.map(({ file }) => file),
         previousAttachments.map(({ reference }) => reference),
       );
@@ -10310,13 +10366,14 @@ function MessageComposer({
     setMentionDismissed(false);
     const mentionKey = suggestion.userId
       ? `user:${suggestion.userId}`
-      : "agent:briar";
+      : `agent:${suggestion.agentId}`;
     setSelectedMentions((current) => ({
       ...current,
       [mentionKey]: {
         handle: suggestion.handle,
         label: suggestion.name,
         userId: suggestion.userId,
+        agentId: suggestion.agentId,
       },
     }));
     requestAnimationFrame(() => {
@@ -10357,7 +10414,7 @@ function MessageComposer({
           {mentionSuggestions.map((suggestion, index) => (
             <button
               aria-selected={index === 0}
-              key={suggestion.userId ?? "briar"}
+              key={suggestion.userId ?? suggestion.agentId}
               onClick={() => completeMention(suggestion)}
               onMouseDown={(event) => event.preventDefault()}
               role="option"
@@ -10371,11 +10428,15 @@ function MessageComposer({
                     suggestion.name.trim().charAt(0).toUpperCase() || "?"
                   )
                 ) : (
-                  <Bot size={14} />
+                  suggestion.image ? (
+                    <img alt="" src={suggestion.image} />
+                  ) : (
+                    <Bot size={14} />
+                  )
                 )}
               </span>
               <strong>@{suggestion.handle}</strong>
-              {suggestion.userId ? <small>{suggestion.name}</small> : null}
+              <small>{suggestion.name}</small>
             </button>
           ))}
         </div>

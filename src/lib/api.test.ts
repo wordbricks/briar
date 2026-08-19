@@ -1047,14 +1047,14 @@ describe("API errors", () => {
     expect(body).not.toHaveProperty("agentId");
   });
 
-  it("returns a durable worker reply job for an @briar message", async () => {
+  it("returns a durable worker reply job for a Project Agent mention", async () => {
     const projectId = "22222222-2222-4222-8222-222222222222";
     const runId = "11111111-1111-4111-8111-111111111111";
     const message = {
       id: "33333333-3333-4333-8333-333333333333",
       runId,
       parentMessageId: null,
-      body: "@briar summarize this",
+      body: "@developer summarize this",
       author: { id: "owner", name: "Owner", image: null, provider: null },
       replyCount: 0,
       createdAt: "2026-07-31T00:00:00.000Z",

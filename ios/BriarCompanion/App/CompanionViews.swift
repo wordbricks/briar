@@ -77,6 +77,7 @@ struct CompanionShellView: View {
                 TaskListView(
                     project: project,
                     projects: projects,
+                    projectAgents: agents.agents.filter { $0.projectId == project.id },
                     snapshot: snapshot,
                     errorMessage: errorMessage,
                     token: token,
@@ -198,6 +199,7 @@ struct CompanionShellView: View {
                 issueKeyPrefix: project.effectiveIssueKeyPrefix,
                 token: token,
                 api: api,
+                projectAgents: agents.agents.filter { $0.projectId == project.id },
                 projects: projects,
                 allRuns: snapshot?.runs ?? [],
                 workers: snapshot?.workers ?? [],
@@ -347,6 +349,7 @@ struct TaskListView: View {
 
     let project: ProjectsResponse.Project
     let projects: [ProjectsResponse.Project]
+    let projectAgents: [ProjectAgent]
     let snapshot: DashboardSnapshot?
     let errorMessage: String?
     let token: String
@@ -361,6 +364,7 @@ struct TaskListView: View {
     init(
         project: ProjectsResponse.Project,
         projects: [ProjectsResponse.Project] = [],
+        projectAgents: [ProjectAgent] = [],
         snapshot: DashboardSnapshot?,
         errorMessage: String?,
         token: String,
@@ -373,6 +377,7 @@ struct TaskListView: View {
     ) {
         self.project = project
         self.projects = projects
+        self.projectAgents = projectAgents
         self.snapshot = snapshot
         self.errorMessage = errorMessage
         self.token = token
@@ -437,6 +442,7 @@ struct TaskListView: View {
                                     issueKeyPrefix: project.effectiveIssueKeyPrefix,
                                     token: token,
                                     api: api,
+                                    projectAgents: projectAgents,
                                     projects: projects,
                                     allRuns: snapshot?.runs ?? [],
                                     workers: snapshot?.workers ?? [],
@@ -805,6 +811,7 @@ struct RunDetailView: View {
     private let issueKeyPrefix: String
     private let projects: [ProjectsResponse.Project]
     private let allRuns: [DashboardRun]
+    private let projectAgents: [ProjectAgent]
     private let workers: [DashboardWorker]
     private let providers: [AgentProvider]
     private let members: [OrganizationMember]
@@ -817,7 +824,11 @@ struct RunDetailView: View {
     private let api: any MobileAPIClientProtocol
 
     private var issueMentionCandidates: [ChannelMentionTarget] {
-        MessageMentions.issueCandidates(members: members, currentUserId: currentUserID)
+        MessageMentions.issueCandidates(
+            members: members,
+            agents: projectAgents,
+            currentUserId: currentUserID
+        )
     }
 
     private var providerCapabilities: AgentProviderCapabilityCatalog {
@@ -825,7 +836,7 @@ struct RunDetailView: View {
     }
 
     private var issueMentionHandles: Set<String> {
-        MessageMentions.issueHandles(members: members)
+        MessageMentions.issueHandles(members: members, agents: projectAgents)
     }
 
     private var transferDestinations: [ProjectsResponse.Project] {
@@ -861,6 +872,7 @@ struct RunDetailView: View {
         api: any MobileAPIClientProtocol,
         projects: [ProjectsResponse.Project] = [],
         allRuns: [DashboardRun] = [],
+        projectAgents: [ProjectAgent] = [],
         workers: [DashboardWorker] = [],
         providers: [AgentProvider] = [],
         members: [OrganizationMember] = [],
@@ -876,6 +888,7 @@ struct RunDetailView: View {
         self.issueKeyPrefix = issueKeyPrefix
         self.projects = projects
         self.allRuns = allRuns
+        self.projectAgents = projectAgents
         self.workers = workers
         self.providers = providers
         self.members = members
@@ -1551,7 +1564,7 @@ struct RunDetailView: View {
                 attachments: $messageAttachments,
                 sending: mutations.isActive("message-\(run.id)"),
                 candidates: issueMentionCandidates,
-                placeholder: L10n.text("메시지 또는 @Briar 질문", locale: locale),
+                placeholder: L10n.text("메시지 또는 @Agent 질문", locale: locale),
                 replyLabel: replyTo.map {
                     L10n.format("%@에게 답글", locale: locale, $0.author.name)
                 },
@@ -1846,9 +1859,9 @@ struct RunDetailView: View {
                                 .controlSize(.small)
                             Text(
                                 status.activity.map {
-                                    "Briar · \($0.displayHeadline)"
+                                    "Agent · \($0.displayHeadline)"
                                 } ?? L10n.text(
-                                    "Briar가 답변을 작성하고 있습니다…",
+                                    "Agent가 답변을 작성하고 있습니다…",
                                     locale: locale
                                 )
                             )
@@ -2731,6 +2744,9 @@ struct RunDetailView: View {
         let mentionedUserIds = mentions.compactMap {
             $0.kind == .user ? $0.recipientId : nil
         }
+        let mentionedAgentIds = mentions.compactMap {
+            $0.kind == .agent ? $0.recipientId : nil
+        }
         let clientMessageID = UUID()
         let attachmentReferences = attachments.map { _ in
             UUID().uuidString.lowercased()
@@ -2765,6 +2781,7 @@ struct RunDetailView: View {
                 clientMessageID: clientMessageID,
                 parentMessageID: replyTo?.id,
                 mentionedUserIds: mentionedUserIds,
+                mentionedAgentIds: mentionedAgentIds,
                 attachments: attachments,
                 attachmentReferences: attachmentReferences,
                 onCreated: { message in

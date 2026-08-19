@@ -67,6 +67,12 @@ const dashboardAgent: ProjectAgent = {
   updatedAt: "2026-07-29T00:00:00.000Z",
 };
 
+const issueMentionAgent: ProjectAgent = {
+  ...dashboardAgent,
+  id: "agent-mention-1",
+  name: "Developer",
+};
+
 const dashboardWorker: ExecutionWorker = {
   id: "worker-1",
   deviceId: "device-1",
@@ -134,7 +140,7 @@ function expectPendingAgentReplyLoader(scope: ParentNode | null | undefined) {
   );
   expect(loader).not.toBeNull();
   expect(loader?.dataset.variant).toBe("Drive");
-  expect(pending?.textContent).toContain("Briar가 답변을 작성하고 있습니다");
+  expect(pending?.textContent).toContain("Agent가 답변을 작성하고 있습니다");
   expect(pending?.textContent).toContain("0.0s");
   expect(pending?.querySelector(".spin")).toBeNull();
   return pending;
@@ -4898,7 +4904,7 @@ describe("HuntDashboard", () => {
       id: "message-trigger",
       runId: run.id,
       parentMessageId: null,
-      body: "@briar 답변해 줘",
+      body: "@developer 답변해 줘",
       author: { id: "jay", name: "Jay", image: null, provider: null },
       replyCount: 0,
       createdAt,
@@ -5028,7 +5034,7 @@ describe("HuntDashboard", () => {
     expect(loadDelta).toHaveBeenCalledTimes(2);
     expect(container.textContent).toContain(reply.body);
     expect(container.textContent).not.toContain(
-      "Briar가 답변을 작성하고 있습니다",
+      "Agent가 답변을 작성하고 있습니다",
     );
 
     await act(async () => root.unmount());
@@ -6358,7 +6364,7 @@ describe("HuntDashboard", () => {
       id: "message-agent",
       runId: demoDashboard.runs[0].id,
       parentMessageId: null,
-      body: "Briar의 답변",
+      body: "Developer의 답변",
       author: {
         id: null,
         name: "Briar · Codex",
@@ -6404,13 +6410,13 @@ describe("HuntDashboard", () => {
     container.remove();
   });
 
-  it("inserts @briar and places the provider reply below its comment", async () => {
+  it("inserts a Project Agent mention and places the provider reply below its comment", async () => {
     const createdAt = new Date().toISOString();
     const userMessage: IssueMessage = {
       id: "message-user",
       runId: demoDashboard.runs[0].id,
       parentMessageId: null,
-      body: "@briar 변경 내용을 설명해 줘",
+      body: "@developer 변경 내용을 설명해 줘",
       author: { id: "jay", name: "Jay", image: null, provider: null },
       replyCount: 0,
       createdAt,
@@ -6449,6 +6455,7 @@ describe("HuntDashboard", () => {
           onLoadRunEvidence={async () => []}
           onMove={async () => undefined}
           onRetry={async () => undefined}
+          mentionAgents={[issueMentionAgent]}
           onSendIssueMessage={async (input) => {
             sentBody = input.body;
             return {
@@ -6470,17 +6477,17 @@ describe("HuntDashboard", () => {
       Object.getOwnPropertyDescriptor(
         HTMLTextAreaElement.prototype,
         "value",
-      )?.set?.call(textarea, "@briar ");
+      )?.set?.call(textarea, "@dev ");
       textarea.dispatchEvent(new Event("input", { bubbles: true }));
     });
-    expect(textarea?.value).toBe("@briar ");
+    expect(textarea?.value).toBe("@dev ");
 
     await act(async () => {
       if (!textarea) return;
       Object.getOwnPropertyDescriptor(
         HTMLTextAreaElement.prototype,
         "value",
-      )?.set?.call(textarea, "@briar 변경 내용을 설명해 줘");
+      )?.set?.call(textarea, "@developer 변경 내용을 설명해 줘");
       textarea.dispatchEvent(new Event("input", { bubbles: true }));
     });
     await act(async () => {
@@ -6494,7 +6501,7 @@ describe("HuntDashboard", () => {
       );
     });
     expect(sentBody).toBe("");
-    expect(textarea?.value).toBe("@briar 변경 내용을 설명해 줘");
+    expect(textarea?.value).toBe("@developer 변경 내용을 설명해 줘");
 
     await act(async () => {
       textarea?.dispatchEvent(
@@ -6507,7 +6514,7 @@ describe("HuntDashboard", () => {
       await Promise.resolve();
     });
 
-    expect(sentBody).toBe("@briar 변경 내용을 설명해 줘");
+    expect(sentBody).toBe("@developer 변경 내용을 설명해 줘");
     expect(textarea?.value).toBe("");
     expect(container.textContent).toContain(userMessage.body);
     const userMessageGroup = Array.from(
@@ -6544,7 +6551,7 @@ describe("HuntDashboard", () => {
       id: "message-reply-failed",
       runId: demoDashboard.runs[0].id,
       parentMessageId: null,
-      body: "@briar 실패한 답변",
+      body: "@developer 실패한 답변",
       author: { id: "jay", name: "Jay", image: null, provider: null },
       replyCount: 0,
       createdAt,
@@ -6615,7 +6622,7 @@ describe("HuntDashboard", () => {
       ":scope > .issue-agent-reply-state.error",
     );
     expect(errorState?.textContent).toContain(
-      "Briar 답변을 생성하지 못했습니다: worker unavailable",
+      "Agent 답변을 생성하지 못했습니다: worker unavailable",
     );
     expect(errorState?.querySelector("[data-testid='loading-state']")).toBeNull();
     expect(errorState?.querySelector(".spin")).toBeNull();
@@ -6703,7 +6710,7 @@ describe("HuntDashboard", () => {
     container.remove();
   });
 
-  it("suggests and completes @briar when typing a mention", async () => {
+  it("suggests and completes a Project Agent when typing a mention", async () => {
     const container = document.createElement("div");
     document.body.append(container);
     const root = createRoot(container);
@@ -6720,6 +6727,7 @@ describe("HuntDashboard", () => {
           onLoadRunEvidence={async () => []}
           onMove={async () => undefined}
           onRetry={async () => undefined}
+          mentionAgents={[issueMentionAgent]}
           onSendIssueMessage={async () => {
             throw new Error("message should not be sent");
           }}
@@ -6744,7 +6752,7 @@ describe("HuntDashboard", () => {
     const suggestion = container.querySelector<HTMLButtonElement>(
       '[role="option"]',
     );
-    expect(suggestion?.textContent).toContain("@briar");
+    expect(suggestion?.textContent).toContain("@developer");
     expect(textarea?.getAttribute("aria-expanded")).toBe("true");
 
     await act(async () => {
@@ -6752,7 +6760,7 @@ describe("HuntDashboard", () => {
         new KeyboardEvent("keydown", { bubbles: true, key: "Enter" }),
       );
     });
-    expect(textarea?.value).toBe("@briar ");
+    expect(textarea?.value).toBe("@developer ");
     expect(container.querySelector('[role="option"]')).toBeNull();
 
     await act(async () => root.unmount());
@@ -6766,6 +6774,7 @@ describe("HuntDashboard", () => {
           body: string;
           parentMessageId: string | null;
           mentionedUserIds?: string[];
+          mentionedAgentIds?: string[];
         }
       | undefined;
     const container = document.createElement("div");
@@ -6869,6 +6878,7 @@ describe("HuntDashboard", () => {
       clientMessageId: expect.any(String),
       parentMessageId: null,
       mentionedUserIds: ["member-1"],
+      mentionedAgentIds: [],
     });
     await act(async () => root.unmount());
     container.remove();
@@ -7168,7 +7178,7 @@ describe("HuntDashboard", () => {
     container.remove();
   });
 
-  it("requires the user to accept an @briar rework proposal before revision", async () => {
+  it("requires the user to accept a Project Agent rework proposal before revision", async () => {
     const proposalId = "abababab-abab-4bab-8bab-abababababab";
     const message: IssueMessage = {
       id: "cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd",
@@ -7242,7 +7252,7 @@ describe("HuntDashboard", () => {
     container.remove();
   });
 
-  it("requires acceptance before an @briar-created issue is persisted", async () => {
+  it("requires acceptance before a Project Agent-created issue is persisted", async () => {
     const createdRunId = "30303030-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
     const message: IssueMessage = {
       id: "10101010-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
