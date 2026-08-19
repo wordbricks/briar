@@ -1,4 +1,5 @@
 import { type Locale, copy, localizedHrefs, localizedPath } from "../i18n";
+import { DownloadBar } from "../download-bar";
 import { DesktopDownloadLink } from "../desktop-download-link";
 import { Arrow, SiteFooter, SiteHeader } from "../site-chrome";
 import {
@@ -29,6 +30,14 @@ const downloadCopyByLocale = {
     android: "Android",
     androidDetail: "Android companion · 최신 GitHub 릴리즈",
     androidAction: "Android 릴리즈 열기",
+    ios: "iOS",
+    iosDetail: "iOS companion · 최신 GitHub 릴리즈",
+    iosAction: "iOS 릴리즈 열기",
+    cli: "CLI",
+    cliDescription: "터미널에서 Worker를 실행하는 명령줄 도구",
+    cliName: "Briar CLI",
+    cliDetail: "Mac 앱과 함께 설치 · 프로젝트 연결 시 동기화",
+    cliAction: "Mac 앱과 함께 받기",
     web: "웹",
     webDescription: "설치 없이 어떤 브라우저에서든 Briar에 연결하세요",
     webApp: "Briar Web",
@@ -61,6 +70,14 @@ const downloadCopyByLocale = {
     android: "Android",
     androidDetail: "Android companion · latest GitHub release",
     androidAction: "Open Android release",
+    ios: "iOS",
+    iosDetail: "iOS companion · latest GitHub release",
+    iosAction: "Open iOS release",
+    cli: "CLI",
+    cliDescription: "The command-line worker for running Briar from a terminal",
+    cliName: "Briar CLI",
+    cliDetail: "Installed with the Mac app · stays in sync when a project is connected",
+    cliAction: "Get it with the Mac app",
     web: "Web",
     webDescription: "Connect to Briar from any browser with nothing to install",
     webApp: "Briar Web",
@@ -97,6 +114,14 @@ export const downloadCopy = {
     android: "Android",
     androidDetail: "Android companion · 最新 GitHub 版本",
     androidAction: "打开 Android 版本",
+    ios: "iOS",
+    iosDetail: "iOS companion · 最新 GitHub 版本",
+    iosAction: "打开 iOS 版本",
+    cli: "CLI",
+    cliDescription: "在终端运行 Briar Worker 的命令行工具",
+    cliName: "Briar CLI",
+    cliDetail: "随 Mac 应用安装 · 连接项目后保持同步",
+    cliAction: "通过 Mac 应用获取",
     web: "Web",
     webDescription: "无需安装，从任意浏览器连接 Briar",
     webApp: "Briar Web",
@@ -110,8 +135,12 @@ export const downloadCopy = {
   },
 } as const satisfies Record<Locale, unknown>;
 
-function PlatformIcon({ platform }: { platform: "mac" | "android" | "web" }) {
-  const icons = { mac: "⌘", android: "●", web: "◎" } as const;
+function PlatformIcon({
+  platform,
+}: {
+  platform: "mac" | "android" | "ios" | "cli" | "web";
+}) {
+  const icons = { mac: "⌘", android: "●", ios: "⌘", cli: ">_", web: "◎" } as const;
   return (
     <span className={`download-platform-icon ${platform}`} aria-hidden="true">
       {icons[platform]}
@@ -142,6 +171,12 @@ export default function DownloadView({ locale }: { locale: Locale }) {
         <span className="section-index">{d.eyebrow}</span>
         <h1>{d.title}</h1>
         <p>{d.description}</p>
+        <DownloadBar
+          copy={c}
+          locale={locale}
+          showAllOptions={false}
+          trackingLocation="download_page"
+        />
       </section>
 
       <div className="download-catalog shell">
@@ -183,23 +218,42 @@ export default function DownloadView({ locale }: { locale: Locale }) {
               </div>
               <p>{d.mobileDescription}</p>
             </div>
-            <article className="download-card download-card-compact">
-              <div className="download-card-main">
-                <PlatformIcon platform="android" />
-                <div>
-                  <h3>{d.android}</h3>
-                  <p>{d.androidDetail}</p>
+            <div className="download-card-stack">
+              <article className="download-card download-card-compact">
+                <div className="download-card-main">
+                  <PlatformIcon platform="ios" />
+                  <div>
+                    <h3>{d.ios}</h3>
+                    <p>{d.iosDetail}</p>
+                  </div>
                 </div>
-              </div>
-              <a
-                className="button button-secondary"
-                href={GITHUB_LATEST_RELEASE_URL}
-                target="_blank"
-                rel="noreferrer"
-              >
-                {d.androidAction} <Arrow />
-              </a>
-            </article>
+                <a
+                  className="button button-secondary"
+                  href={GITHUB_LATEST_RELEASE_URL}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {d.iosAction} <Arrow />
+                </a>
+              </article>
+              <article className="download-card download-card-compact">
+                <div className="download-card-main">
+                  <PlatformIcon platform="android" />
+                  <div>
+                    <h3>{d.android}</h3>
+                    <p>{d.androidDetail}</p>
+                  </div>
+                </div>
+                <a
+                  className="button button-secondary"
+                  href={GITHUB_LATEST_RELEASE_URL}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {d.androidAction} <Arrow />
+                </a>
+              </article>
+            </div>
           </section>
 
           <section className="download-group" aria-labelledby="web-heading">
@@ -224,6 +278,34 @@ export default function DownloadView({ locale }: { locale: Locale }) {
             </article>
           </section>
         </div>
+
+        <section className="download-group" id="cli" aria-labelledby="cli-heading">
+          <div className="download-group-heading">
+            <div>
+              <span className="download-group-index">04</span>
+              <h2 id="cli-heading">{d.cli}</h2>
+            </div>
+            <p>{d.cliDescription}</p>
+          </div>
+          <article className="download-card">
+            <div className="download-card-main">
+              <PlatformIcon platform="cli" />
+              <div>
+                <h3>{d.cliName}</h3>
+                <p>{d.cliDetail}</p>
+              </div>
+            </div>
+            <DesktopDownloadLink
+              className="button button-secondary"
+              href={MAC_DOWNLOAD_URL}
+              locale={locale}
+              trackingLabel={d.cliAction}
+              trackingLocation="download_page"
+            >
+              {d.cliAction} <Arrow direction="down" />
+            </DesktopDownloadLink>
+          </article>
+        </section>
 
         <p className="download-releases-note">
           {d.releasesPrefix}{" "}

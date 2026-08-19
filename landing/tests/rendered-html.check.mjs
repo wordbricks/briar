@@ -130,17 +130,23 @@ test("server-renders Korean at /ko regardless of Accept-Language", async () => {
   assert.match(html, /briar-issue-to-complete-demo\.mp4/);
   assert.match(html, /class="product-stage product-stage-video"/);
   assert.match(html, /class="detail-properties"/);
-  assert.match(html, /Mac용 Briar 다운로드/);
+  assert.match(html, /Mac용 다운로드/);
+  assert.match(html, /웹 앱/);
+  assert.match(html, /모든 다운로드 옵션/);
+  assert.match(html, /지원/);
+  assert.match(html, /Claude/);
+  assert.match(html, /Codex/);
+  assert.match(html, /Cursor/);
+  assert.match(html, />Grok</);
+  assert.match(html, /Antigravity/);
+  assert.match(html, /OpenCode/);
+  assert.match(html, /OpenRouter/);
   assert.match(html, /macOS Apple Silicon/);
   assert.match(html, /Android용 다운로드/);
   assert.match(html, /Android 컴패니언/);
-  // Hero feature chips: previously hardcoded English that must now be
-  // translated (or, for pure proper nouns, intentionally identical).
-  assert.match(html, /저장소 무관/);
-  assert.match(html, /Codex \+ Claude/);
-  assert.match(html, /로컬 실행/);
   assert.doesNotMatch(html, /Repository-agnostic/);
   assert.doesNotMatch(html, /local-first/i);
+  assert.doesNotMatch(html, /All download options/);
   // Section-index eyebrows must pull from the Korean nav vocabulary
   // instead of leaking hardcoded English category words.
   assert.match(html, /01 \/ (?:<!-- -->)?제품/);
@@ -198,9 +204,13 @@ test("server-renders English for an English browser", async () => {
   assert.match(html, /briar-issue-to-complete-demo\.mp4/);
   assert.match(html, /class="product-stage product-stage-video"/);
   assert.match(html, /class="detail-properties"/);
+  assert.match(html, /Download for Mac/);
+  assert.match(html, /Web App/);
+  assert.match(html, /All download options/);
+  assert.match(html, />Supports</);
+  assert.match(html, /Claude/);
+  assert.match(html, /OpenRouter/);
   assert.match(html, /Download Briar for Mac/);
-  assert.match(html, /Repository-agnostic/);
-  assert.match(html, /Local execution/);
   assert.doesNotMatch(html, /local-first/i);
   assert.match(html, /01 \/ (?:<!-- -->)?PRODUCT/);
   assert.match(html, /02 \/ (?:<!-- -->)?WORKFLOW/);
@@ -226,9 +236,11 @@ test("server-renders Chinese at /zh regardless of Accept-Language", async () => 
   assert.match(html, /让 Agent 工作井然有序/);
   assert.match(html, /代码留在本地/);
   assert.match(html, /连接 Agent 事件流/);
+  assert.match(html, /下载 Mac 版/);
+  assert.match(html, /Web 应用/);
+  assert.match(html, /全部下载选项/);
+  assert.match(html, /支持/);
   assert.match(html, /下载 Mac 版 Briar/);
-  assert.match(html, /不限制仓库/);
-  assert.match(html, /本地执行/);
   assert.match(html, /aria-label="语言"/);
   assert.match(html, /aria-pressed="true"[^>]*aria-label="中文"/);
   assert.match(html, /href="\/zh\/tutorial"/);
@@ -325,7 +337,12 @@ test("server-renders the localized download catalog at /ko/download", async () =
   assert.match(html, /Briar 다운로드/);
   assert.match(html, /Apple Silicon 다운로드/);
   assert.match(html, /Android 릴리즈 열기/);
+  assert.match(html, /iOS 릴리즈 열기/);
+  assert.match(html, /Briar CLI/);
   assert.match(html, /웹 앱 열기/);
+  assert.match(html, /지원/);
+  assert.match(html, /href="\/ko\/download#mobile"/);
+  assert.match(html, /href="\/ko\/download#cli"/);
   assert.match(
     html,
     /https:\/\/briar-api\.wbai\.workers\.dev\/releases\/latest\/mac-aarch64\.dmg/,
@@ -347,6 +364,8 @@ test("server-renders the localized download catalog at /zh/download", async () =
   assert.match(html, /下载 Briar/);
   assert.match(html, /下载 Apple Silicon 版本/);
   assert.match(html, /打开 Android 版本/);
+  assert.match(html, /打开 iOS 版本/);
+  assert.match(html, /Briar CLI/);
   assert.match(html, /打开 Web 应用/);
   assert.match(html, /data-download-platform="macos"/);
   assert.match(html, /data-download-architecture="arm64"/);
