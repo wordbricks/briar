@@ -414,7 +414,11 @@ body { overflow: hidden; font-synthesis: none; }
 .sidebar-channel-context-menu { min-width:174px; z-index:80; padding:5px; border:1px solid var(--border); border-radius:11px; color:var(--popover-foreground); background:color-mix(in srgb,var(--popover) 98%,transparent); box-shadow:0 16px 45px rgba(0,0,0,.22); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); animation:sidebar-menu-in .12s cubic-bezier(.2,.8,.2,1); }
 .sidebar-channel-context-menu-item { height:34px; padding:0 9px; display:flex; align-items:center; gap:9px; border-radius:7px; outline:0; cursor:pointer; font-size:var(--text-xs); }
 .sidebar-channel-context-menu-item[data-highlighted] { color:var(--accent-foreground); background:var(--accent); }
+.sidebar-channel-context-menu-item.danger { color:var(--destructive); }
+.sidebar-channel-context-menu-item.danger[data-highlighted] { color:var(--destructive-foreground); background:var(--destructive); }
 .sidebar-channel-context-menu-item svg { color:#765bd0; }
+.sidebar-channel-context-menu-item.danger svg { color:currentColor; }
+.sidebar-channel-context-menu-separator { height:1px; margin:4px 4px; background:var(--border); }
 .channel-create-overlay { position:fixed; z-index:90; inset:0; background:rgba(30,31,28,.24); backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px); }
 .channel-create-dialog { width:min(420px,calc(100vw - 40px)); position:fixed; z-index:91; top:50%; left:50%; padding:22px; border:1px solid rgba(55,56,51,.1); border-radius:17px; color:var(--foreground); background:color-mix(in srgb,var(--card) 98%,transparent); box-shadow:0 24px 70px rgba(30,31,28,.22); transform:translate(-50%,-50%); animation:channel-create-dialog-in .16s cubic-bezier(.2,.8,.2,1); }
 @keyframes channel-create-dialog-in { from { opacity:0; transform:translate(-50%,calc(-50% + 5px)) scale(.98); } }
@@ -440,6 +444,8 @@ body { overflow: hidden; font-synthesis: none; }
 .channel-create-actions { display:flex; justify-content:flex-end; gap:8px; }
 .channel-create-dialog footer button { height:36px; padding:0 15px; border:1px solid var(--border); border-radius:999px; color:var(--foreground); background:var(--card); cursor:pointer; font-size:var(--text-xs); font-weight:600; }
 .channel-create-dialog footer button:last-child { border-color:var(--primary); color:var(--primary-foreground); background:var(--primary); }
+.channel-delete-dialog footer { justify-content:flex-end; padding-top:18px; }
+.channel-delete-dialog .channel-delete-confirm { border-color:var(--destructive); color:var(--destructive-foreground); background:var(--destructive); }
 .channel-create-dialog footer button:active:not(:disabled) { transform:scale(.97); }
 .channel-create-dialog footer button:disabled { cursor:not-allowed; opacity:.5; }
 .sidebar-unread-dot { width:7px; height:7px; flex:0 0 7px; margin-left:auto; border-radius:50%; background:#765bd0; box-shadow:0 0 0 3px rgba(118,91,208,.12); }

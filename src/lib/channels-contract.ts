@@ -424,6 +424,7 @@ export type ChannelSummary = {
   archivedAt: string | null;
   memberCount: number;
   agentCount: number;
+  createdByUserId?: string | null;
   createdAt: string;
   updatedAt: string;
   lastMessageAt?: string | null;

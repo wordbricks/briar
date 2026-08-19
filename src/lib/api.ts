@@ -1842,6 +1842,18 @@ export async function updateChannel(
   );
 }
 
+export async function deleteChannel(
+  token: string,
+  organizationId: string,
+  channelId: string,
+) {
+  return request<{ deleted: boolean }>(
+    `/organizations/${organizationId}/channels/${channelId}`,
+    token,
+    { method: "DELETE" },
+  );
+}
+
 export async function listChannelMessages(
   token: string,
   organizationId: string,

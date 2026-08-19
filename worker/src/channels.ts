@@ -37,6 +37,7 @@ export type ChannelRow = {
   archived_at: string | null;
   member_count: number;
   agent_count: number;
+  created_by_user_id: string | null;
   created_at: string;
   updated_at: string;
   last_message_at: string | null;
@@ -247,6 +248,7 @@ const channelSelectColumns = `
           where member.channel_id = channel.id) as member_count,
          (select count(*) from briar_channel_agents agent
           where agent.channel_id = channel.id) as agent_count,
+         channel.created_by_user_id,
          channel.created_at, channel.updated_at,
          (select max(message.created_at) from briar_channel_messages message
           where message.channel_id = channel.id) as last_message_at`;
@@ -488,6 +490,7 @@ export const channelJson = (row: ChannelRow): ChannelSummary => ({
   archivedAt: row.archived_at,
   memberCount: row.member_count,
   agentCount: row.agent_count,
+  createdByUserId: row.created_by_user_id,
   createdAt: row.created_at,
   updatedAt: row.updated_at,
   lastMessageAt: row.last_message_at,
@@ -892,7 +895,14 @@ export async function deleteChannel(
              select 1 from briar_organization_members membership
              where membership.organization_id = attachment.organization_id
                and membership.user_id = ?
-               and membership.role in ('owner', 'admin')
+               and (
+                 membership.role = 'owner'
+                 or attachment.channel_id in (
+                   select channel.id from briar_channels channel
+                   where channel.id = attachment.channel_id
+                     and channel.created_by_user_id = ?
+                 )
+               )
            )
            and exists (
              select 1 from briar_channels channel
@@ -912,7 +922,7 @@ export async function deleteChannel(
            alert_state = 'none',
            alert_detail_json = null`,
       )
-      .bind(observedAt, organizationId, channelId, userId),
+      .bind(observedAt, organizationId, channelId, userId, userId),
     db
       .prepare(
         `delete from briar_channels
@@ -921,11 +931,14 @@ export async function deleteChannel(
              select 1 from briar_organization_members membership
              where membership.organization_id = briar_channels.organization_id
                and membership.user_id = ?
-               and membership.role in ('owner', 'admin')
+               and (
+                 membership.role = 'owner'
+                 or briar_channels.created_by_user_id = ?
+               )
            )
          returning id`,
       )
-      .bind(channelId, organizationId, userId),
+      .bind(channelId, organizationId, userId, userId),
   ]);
   return (results[1]?.results?.length ?? 0) > 0;
 }

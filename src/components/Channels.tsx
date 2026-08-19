@@ -230,6 +230,8 @@ type ChannelsProps = {
   onViewingChannelChange?: (channelId: string | null) => void;
   initialInviteChannelId?: string | null;
   onInitialInviteHandled?: (channelId: string) => void;
+  initialSettingsChannelId?: string | null;
+  onInitialSettingsHandled?: () => void;
   onCreateAgent?: () => void;
   inboxDetail?: boolean;
   onInboxDetailClose?: () => void;
@@ -383,6 +385,8 @@ export function Channels({
   onViewingChannelChange,
   initialInviteChannelId = null,
   onInitialInviteHandled,
+  initialSettingsChannelId = null,
+  onInitialSettingsHandled,
   requestedMessage,
   onRequestedMessageOpen,
   inboxDetail = false,
@@ -498,6 +502,7 @@ export function Channels({
   const suppressEarlierLoadOnNextScroll = useRef(false);
   const displaySource = useRef<DesktopChannelDisplaySource>("network");
   const threadParentIdRef = useRef(threadParentId);
+  const initialSettingsHandledChannelId = useRef<string | null>(null);
   if (
     renderedChannelSurface.current.channelId !== activeChannelId ||
     renderedChannelSurface.current.threadParentId !== threadParentId
@@ -647,6 +652,33 @@ export function Channels({
     initialInviteChannelId,
     onInitialInviteHandled,
     openInvite,
+  ]);
+
+  useEffect(() => {
+    if (!initialSettingsChannelId) {
+      initialSettingsHandledChannelId.current = null;
+      return;
+    }
+    if (
+      initialSettingsChannelId !== activeChannelId ||
+      !activeChannel ||
+      !channelListReady ||
+      channelLoading ||
+      initialSettingsHandledChannelId.current === initialSettingsChannelId
+    ) {
+      return;
+    }
+    initialSettingsHandledChannelId.current = initialSettingsChannelId;
+    setSettingsError(null);
+    setSettingsOpen(true);
+    onInitialSettingsHandled?.();
+  }, [
+    activeChannel,
+    activeChannelId,
+    channelListReady,
+    channelLoading,
+    initialSettingsChannelId,
+    onInitialSettingsHandled,
   ]);
 
   const openWebhooks = useCallback(() => {
