@@ -537,8 +537,7 @@ private struct ChannelConversationView: View {
                     parentMessageID == nil && channels.loadingEarlierMessages,
                 onLoadEarlier: parentMessageID == nil
                     ? { await channels.loadEarlierMessages(channelID: channel.id) }
-                    : nil,
-                measuresMessageHeightsEagerly: true
+                    : nil
             ) { message in
                 ChannelMessageRow(
                             acceptingProposalID: channels.acceptingProposalID,

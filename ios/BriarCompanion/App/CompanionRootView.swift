@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct CompanionRootView: View {
     @Environment(\.scenePhase) private var scenePhase
@@ -218,6 +219,16 @@ struct CompanionRootView: View {
                 inbox.applicationDidEnterBackground()
             default: break
             }
+        }
+        .onReceive(
+            NotificationCenter.default.publisher(
+                for: UIApplication.didReceiveMemoryWarningNotification
+            )
+        ) { _ in
+            channels.applicationDidReceiveMemoryWarning()
+            MessageMentions.clearRenderingCache()
+            SelectableTextRendering.clearCaches()
+            AuthenticatedImageMemoryCache.removeAll()
         }
         .onChange(of: navigation.pendingProjectID) { _, projectID in
             guard projectID != nil else { return }

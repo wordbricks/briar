@@ -1,7 +1,7 @@
 import SwiftUI
 import UIKit
 
-enum SelectableTextStyle: Equatable {
+enum SelectableTextStyle: String, Equatable {
     case body
     case title2Bold
     case title3Bold
@@ -46,41 +46,70 @@ enum SelectableTextStyle: Equatable {
 struct SelectableText: View {
     let attributed: AttributedString
     var style: SelectableTextStyle = .body
+    private let cacheKey: String?
 
     @Environment(\.openURL) private var openURL
 
     init(_ text: String, style: SelectableTextStyle = .body) {
         self.attributed = AttributedString(text)
         self.style = style
+        cacheKey = nil
     }
 
-    init(attributed: AttributedString, style: SelectableTextStyle = .body) {
+    init(
+        attributed: AttributedString,
+        style: SelectableTextStyle = .body,
+        cacheKey: String? = nil
+    ) {
         self.attributed = attributed
         self.style = style
+        self.cacheKey = cacheKey
     }
 
     init(markdown: String, style: SelectableTextStyle = .body) {
         self.attributed = SelectableTextRendering.parseMarkdown(markdown)
         self.style = style
+        cacheKey = nil
     }
 
     var body: some View {
         if attributed.characters.isEmpty {
             EmptyView()
         } else {
+            let renderingKey = cacheKey.map {
+                SelectableTextRendering.renderingKey(
+                    sourceKey: $0,
+                    style: style
+                )
+            }
             SelectableTextRepresentable(
                 attributedText: SelectableTextRendering.nsAttributed(
                     attributed,
                     font: style.font,
-                    color: style.color
+                    color: style.color,
+                    cacheKey: renderingKey
                 ),
+                measurementKey: renderingKey,
                 openURL: openURL
             )
         }
     }
 }
 
+@MainActor
 enum SelectableTextRendering {
+    private static let attributedCache: NSCache<NSString, NSAttributedString> = {
+        let cache = NSCache<NSString, NSAttributedString>()
+        cache.countLimit = 500
+        cache.totalCostLimit = 4 * 1_024 * 1_024
+        return cache
+    }()
+    private static let heightCache: NSCache<NSString, NSNumber> = {
+        let cache = NSCache<NSString, NSNumber>()
+        cache.countLimit = 1_000
+        return cache
+    }()
+
     static let mentionLinkColor = UIColor(
         red: 37 / 255,
         green: 99 / 255,
@@ -98,8 +127,13 @@ enum SelectableTextRendering {
     static func nsAttributed(
         _ value: AttributedString,
         font: UIFont,
-        color: UIColor
+        color: UIColor,
+        cacheKey: String? = nil
     ) -> NSAttributedString {
+        if let cacheKey,
+           let cached = attributedCache.object(forKey: cacheKey as NSString) {
+            return cached
+        }
         let result = NSMutableAttributedString(attributedString: NSAttributedString(value))
         let fullRange = NSRange(location: 0, length: result.length)
         guard fullRange.length > 0 else { return result }
@@ -113,7 +147,43 @@ enum SelectableTextRendering {
             }
             result.setAttributes(next, range: range)
         }
+        if let cacheKey {
+            attributedCache.setObject(
+                result,
+                forKey: cacheKey as NSString,
+                cost: result.length * MemoryLayout<UInt16>.size
+            )
+        }
         return result
+    }
+
+    static func renderingKey(sourceKey: String, style: SelectableTextStyle) -> String {
+        let font = style.font
+        return sourceKey + "\u{1D}" + style.rawValue + "\u{1D}" +
+            font.fontName + "\u{1D}" + String(format: "%.2f", font.pointSize)
+    }
+
+    static func cachedHeight(for key: String, width: CGFloat) -> CGFloat? {
+        guard let value = heightCache.object(
+            forKey: heightKey(key, width: width)
+        ) else { return nil }
+        return CGFloat(value.doubleValue)
+    }
+
+    static func storeHeight(_ height: CGFloat, for key: String, width: CGFloat) {
+        heightCache.setObject(
+            NSNumber(value: height),
+            forKey: heightKey(key, width: width)
+        )
+    }
+
+    static func clearCaches() {
+        attributedCache.removeAllObjects()
+        heightCache.removeAllObjects()
+    }
+
+    private static func heightKey(_ key: String, width: CGFloat) -> NSString {
+        (key + "\u{1D}" + String(format: "%.2f", width)) as NSString
     }
 
     @MainActor
@@ -143,6 +213,7 @@ enum SelectableTextRendering {
 
 private struct SelectableTextRepresentable: UIViewRepresentable {
     var attributedText: NSAttributedString
+    var measurementKey: String?
     var openURL: OpenURLAction?
 
     func makeCoordinator() -> Coordinator {
@@ -175,10 +246,25 @@ private struct SelectableTextRepresentable: UIViewRepresentable {
         } else {
             width = 280
         }
+        if let measurementKey,
+           let cachedHeight = SelectableTextRendering.cachedHeight(
+               for: measurementKey,
+               width: width
+           ) {
+            return CGSize(width: width, height: cachedHeight)
+        }
         let size = uiView.sizeThatFits(
             CGSize(width: width, height: CGFloat.greatestFiniteMagnitude)
         )
-        return CGSize(width: width, height: ceil(size.height))
+        let height = ceil(size.height)
+        if let measurementKey {
+            SelectableTextRendering.storeHeight(
+                height,
+                for: measurementKey,
+                width: width
+            )
+        }
+        return CGSize(width: width, height: height)
     }
 
     @MainActor

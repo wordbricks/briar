@@ -71,7 +71,14 @@ vi.mock("@emoji-mart/react", () => ({
   default: () => null,
 }));
 
-const { CompanionChannels } = await import("./CompanionChannels");
+const {
+  CompanionChannels,
+  cacheCompanionChannelSnapshot,
+  cacheCompanionThreadSnapshot,
+  mobileCachedMessageLimit,
+  mobileChannelCacheLimit,
+  mobileThreadCacheLimit,
+} = await import("./CompanionChannels");
 
 const emitChannelChange = (cursor: number) => {
   for (const listener of channelRealtime.listeners) {
@@ -182,6 +189,70 @@ const deferred = <T,>() => {
   });
   return { promise, reject, resolve };
 };
+
+describe("companion channel cache bounds", () => {
+  it("retains only the five most recently used channels and forty messages", () => {
+    const cache: CompanionChannelCache = new Map();
+
+    for (let index = 0; index <= mobileChannelCacheLimit; index += 1) {
+      const channelMessages = Array.from(
+        { length: mobileCachedMessageLimit + 5 },
+        (_, messageIndex) =>
+          message(`m-${index}-${messageIndex}`, `Message ${messageIndex}`),
+      );
+      cacheCompanionChannelSnapshot(cache, {
+        channel: channel(`c-${index}`, `Channel ${index}`, null),
+        members: [],
+        agents: [],
+        messages: channelMessages,
+        nextCursor: `cursor-${index}`,
+        threads: new Map(),
+      });
+    }
+
+    expect(cache.size).toBe(mobileChannelCacheLimit);
+    expect(cache.has("c-0")).toBe(false);
+    expect(cache.get(`c-${mobileChannelCacheLimit}`)?.messages).toHaveLength(
+      mobileCachedMessageLimit,
+    );
+    expect(cache.get(`c-${mobileChannelCacheLimit}`)?.messages[0]?.id).toBe(
+      `m-${mobileChannelCacheLimit}-5`,
+    );
+    expect(cache.get(`c-${mobileChannelCacheLimit}`)?.nextCursor).toBe(
+      `m-${mobileChannelCacheLimit}-5`,
+    );
+  });
+
+  it("retains five threads while preserving each root and newest replies", () => {
+    const threads = new Map<string, ChannelMessage[]>();
+
+    for (let index = 0; index <= mobileThreadCacheLimit; index += 1) {
+      const parentId = `parent-${index}`;
+      const rootMessage = message(parentId, `Root ${index}`);
+      const replies = Array.from(
+        { length: mobileCachedMessageLimit + 5 },
+        (_, replyIndex) => ({
+          ...message(`reply-${index}-${replyIndex}`, `Reply ${replyIndex}`),
+          parentMessageId: parentId,
+        }),
+      );
+      cacheCompanionThreadSnapshot(
+        threads,
+        parentId,
+        [rootMessage, ...replies],
+      );
+    }
+
+    const newest = threads.get(`parent-${mobileThreadCacheLimit}`);
+    expect(threads.size).toBe(mobileThreadCacheLimit);
+    expect(threads.has("parent-0")).toBe(false);
+    expect(newest).toHaveLength(mobileCachedMessageLimit);
+    expect(newest?.[0]?.id).toBe(`parent-${mobileThreadCacheLimit}`);
+    expect(newest?.at(-1)?.id).toBe(
+      `reply-${mobileThreadCacheLimit}-${mobileCachedMessageLimit + 4}`,
+    );
+  });
+});
 
 describe("CompanionChannels", () => {
   let container: HTMLDivElement;

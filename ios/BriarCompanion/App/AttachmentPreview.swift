@@ -104,14 +104,27 @@ struct IdentifiedIssueDescriptionBlock: Identifiable, Equatable {
 }
 
 #if os(iOS)
+import ImageIO
 import QuickLook
 import UIKit
 
 /// In-memory cache so List cell recycle / `.task` restart does not re-download and flash.
 @MainActor
 enum AuthenticatedImageMemoryCache {
-    private static let images = NSCache<NSString, UIImage>()
-    private static let urls = NSCache<NSString, NSURL>()
+    static let imageCountLimit = 40
+    static let imageCostLimit = 64 * 1_024 * 1_024
+
+    private static let images: NSCache<NSString, UIImage> = {
+        let cache = NSCache<NSString, UIImage>()
+        cache.countLimit = imageCountLimit
+        cache.totalCostLimit = imageCostLimit
+        return cache
+    }()
+    private static let urls: NSCache<NSString, NSURL> = {
+        let cache = NSCache<NSString, NSURL>()
+        cache.countLimit = imageCountLimit
+        return cache
+    }()
 
     static func image(for sourceID: String) -> UIImage? {
         images.object(forKey: sourceID as NSString)
@@ -122,8 +135,53 @@ enum AuthenticatedImageMemoryCache {
     }
 
     static func store(sourceID: String, image: UIImage, fileURL: URL) {
-        images.setObject(image, forKey: sourceID as NSString)
+        let pixelCost = image.cgImage.map { $0.bytesPerRow * $0.height } ?? 0
+        images.setObject(
+            image,
+            forKey: sourceID as NSString,
+            cost: pixelCost
+        )
         urls.setObject(fileURL as NSURL, forKey: sourceID as NSString)
+    }
+
+    static func removeAll() {
+        images.removeAllObjects()
+        urls.removeAllObjects()
+    }
+}
+
+enum AuthenticatedImageDecoding {
+    struct SendableImage: @unchecked Sendable {
+        let value: UIImage?
+    }
+
+    static let maxPreviewPixelSize: CGFloat = 2_048
+
+    static func previewImage(at url: URL) throws -> UIImage? {
+        let sourceOptions = [
+            kCGImageSourceShouldCache: false,
+        ] as CFDictionary
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, sourceOptions) else {
+            return try fallbackImage(at: url)
+        }
+        let thumbnailOptions = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceShouldCacheImmediately: true,
+            kCGImageSourceThumbnailMaxPixelSize: maxPreviewPixelSize,
+        ] as CFDictionary
+        if let thumbnail = CGImageSourceCreateThumbnailAtIndex(
+            source,
+            0,
+            thumbnailOptions
+        ) {
+            return UIImage(cgImage: thumbnail)
+        }
+        return try fallbackImage(at: url)
+    }
+
+    private static func fallbackImage(at url: URL) throws -> UIImage? {
+        UIImage(data: try Data(contentsOf: url))
     }
 }
 
@@ -232,8 +290,14 @@ struct AuthenticatedImagePreview: View {
         do {
             let downloadedURL = try await load()
             fileURL = downloadedURL
-            let data = try Data(contentsOf: downloadedURL)
-            guard let loaded = UIImage(data: data) else {
+            let decoded = try await Task.detached(priority: .userInitiated) {
+                AuthenticatedImageDecoding.SendableImage(
+                    value: try AuthenticatedImageDecoding.previewImage(
+                        at: downloadedURL
+                    )
+                )
+            }.value
+            guard let loaded = decoded.value else {
                 failed = true
                 return
             }

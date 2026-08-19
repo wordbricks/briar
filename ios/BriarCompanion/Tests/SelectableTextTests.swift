@@ -64,4 +64,42 @@ final class SelectableTextTests: XCTestCase {
     func testEmptyMarkdownDoesNotCreateATextViewPayload() {
         XCTAssertTrue(SelectableTextRendering.parseMarkdown("").characters.isEmpty)
     }
+
+    func testAttributedConversionAndMeasuredHeightAreReused() {
+        SelectableTextRendering.clearCaches()
+        let attributed = MessageMentions.attributed(
+            "Ask @Honey once.",
+            handles: ["Honey"]
+        )
+        let sourceKey = MessageMentions.renderingCacheKey(
+            "Ask @Honey once.",
+            handles: ["Honey"]
+        )
+        let renderingKey = SelectableTextRendering.renderingKey(
+            sourceKey: sourceKey,
+            style: .body
+        )
+        let first = SelectableTextRendering.nsAttributed(
+            attributed,
+            font: .preferredFont(forTextStyle: .body),
+            color: .label,
+            cacheKey: renderingKey
+        )
+        let second = SelectableTextRendering.nsAttributed(
+            attributed,
+            font: .preferredFont(forTextStyle: .body),
+            color: .label,
+            cacheKey: renderingKey
+        )
+
+        XCTAssertTrue(first === second)
+        SelectableTextRendering.storeHeight(42, for: renderingKey, width: 320)
+        XCTAssertEqual(
+            SelectableTextRendering.cachedHeight(for: renderingKey, width: 320),
+            42
+        )
+        XCTAssertNil(
+            SelectableTextRendering.cachedHeight(for: renderingKey, width: 321)
+        )
+    }
 }
