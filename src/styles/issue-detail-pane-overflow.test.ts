@@ -46,4 +46,13 @@ describe("desktop issue detail pane height containment", () => {
     expect(scroll).toContain("flex-direction:column");
     expect(editor).toContain("flex:1 0 220px");
   });
+
+  it("lets long editable text grow the field and overflow into the pane scroller", () => {
+    const field = ruleBody(
+      ".issue-description-scroll .issue-description-inline-editor .issue-description-field",
+    );
+
+    expect(field).toContain("flex:1 0 auto");
+    expect(field).not.toContain("flex:1 0 220px");
+  });
 });
