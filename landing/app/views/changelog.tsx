@@ -30,6 +30,19 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.145",
+        date: "2026년 8월 21일",
+        title: "저장소 병합 큐와 타입 안전한 실행 경계를 강화합니다",
+        summary:
+          "저장소 단위 native merge queue를 도입하고 Effect 기반 계약·SQL 경계로 서버와 Worker 실행 흐름의 신뢰성을 높였습니다.",
+        items: [
+          "저장소 단위 merge batch를 영속화하고 native merge queue coordinator가 검토된 배치를 안전하게 전달·복구하도록 지원합니다.",
+          "API·realtime·Agent runner·archive·조직·프로젝트·Worker 경계를 Effect Schema와 Effect SQL로 정리해 입력 검증과 데이터 흐름을 더 명확하게 유지합니다.",
+          "OpenCode 시작, Worker claim, 실행 비용·사용량, realtime·archive 경로를 분리하고 회귀 테스트를 보강해 긴 실행과 동시 요청의 안정성을 높입니다.",
+          "저장소 merge batch 상태를 위한 원격 D1 마이그레이션과 운영 복구 문서를 추가합니다.",
+        ],
+      },
+      {
         version: "1.2.144",
         date: "2026년 8월 20일",
         title: "Lovable 프로젝트를 검토와 병합까지 연결합니다",
@@ -906,6 +919,19 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.145",
+        date: "August 21, 2026",
+        title: "Strengthen repository merge queues and typed execution boundaries",
+        summary:
+          "Introduce a repository-level native merge queue and use Effect-based contract and SQL boundaries to make server and Worker execution more dependable.",
+        items: [
+          "Add durable repository merge batches so the native merge queue coordinator can deliver reviewed batches safely and recover after interruptions.",
+          "Use Effect Schema and Effect SQL across API, realtime, Agent runner, archive, organization, project, and Worker boundaries to keep validation and data flow explicit.",
+          "Refine OpenCode startup, Worker claims, execution cost and usage metrics, realtime, and archive paths with stronger regression coverage for long-running and concurrent work.",
+          "Add the remote D1 migration and operational recovery guidance required for repository merge-batch state.",
+        ],
+      },
       {
         version: "1.2.144",
         date: "August 20, 2026",
@@ -1874,7 +1900,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <p>
             <strong>Briar</strong> <span>1.2</span>
           </p>
-          <a href="#v1-2-144">
+          <a href="#v1-2-145">
             {changelog.current} <span aria-hidden="true">↓</span>
           </a>
         </div>
@@ -1896,7 +1922,9 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   </div>
                   <time
                     dateTime={
-                      entry.version === "1.2.144" ||
+                      entry.version === "1.2.145"
+                        ? "2026-08-21"
+                        : entry.version === "1.2.144" ||
                       entry.version === "1.2.143" ||
                       entry.version === "1.2.142" ||
                       entry.version === "1.2.141" ||
