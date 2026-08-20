@@ -24,7 +24,6 @@ import {
   assertCanonicalMergeWaitCheckpoint,
   MERGE_GROUP_CI_CAPABILITY,
   MERGE_GROUP_CI_PROTOCOL,
-  MERGE_GROUP_STATUS_CONTEXTS,
 } from "../src/lib/merge-group-validation-contract";
 import { decodeStructuredAgentResult } from "../src/lib/agent-result";
 import {
@@ -132,10 +131,12 @@ import {
   type WorktreeSettings,
 } from "./worktree";
 import {
-  assertLiveMergeGroupRef,
+  assertValidationWorktreeClean,
   assertValidationWorktreeHead,
   fetchExactMergeGroupHead,
-  publishMergeGroupStatus,
+  mergeGroupContainerRuntime,
+  MergeGroupCiDefinitionChangedError,
+  prepareTrustedMergeGroupProfile,
   runFixedMergeGroupValidation,
   StaleMergeGroupError,
   type CommandRunner as MergeGroupCommandRunner,
@@ -143,6 +144,7 @@ import {
 import {
   doctorMergeQueue,
   enqueuePullRequestExact,
+  type MergeGroupDoctorProfile,
 } from "./merge-queue";
 import {
   sameApiEnvironment,
@@ -3300,6 +3302,18 @@ const runMergeGroupCommand: MergeGroupCommandRunner = (
   };
 };
 
+async function configuredMergeGroupDoctorProfile(
+  config: Config,
+  project: ProjectConfig,
+) {
+  if (!config.userToken) throw new Error("먼저 `briar login`을 실행하세요.");
+  return request<MergeGroupDoctorProfile>(
+    config.apiUrl,
+    `/projects/${encodeURIComponent(project.id)}/merge-group-ci-profile`,
+    config.userToken,
+  );
+}
+
 async function mergeQueueDoctorCommand() {
   const config = await loadConfig();
   const project = await currentProject(config);
@@ -3308,9 +3322,12 @@ async function mergeQueueDoctorCommand() {
   if (!repository) {
     throw new Error("The project does not have a connected GitHub repository");
   }
+  const profile = await configuredMergeGroupDoctorProfile(config, project);
   console.log(JSON.stringify(doctorMergeQueue(runMergeGroupCommand, {
     repository,
     baseBranch: value("--base-branch") ?? "main",
+    profile,
+    activation: has("--inactive-preflight") ? "inactive" : "active",
   })));
 }
 
@@ -3323,7 +3340,11 @@ async function mergeQueueEnqueueCommand() {
     throw new Error("The project does not have a connected GitHub repository");
   }
   const baseBranch = value("--base-branch") ?? "main";
-  doctorMergeQueue(runMergeGroupCommand, { repository, baseBranch });
+  const profile = await configuredMergeGroupDoctorProfile(config, project);
+  if (!profile.enabled) {
+    throw new Error("Merge-group CI must be explicitly enabled before enqueue");
+  }
+  doctorMergeQueue(runMergeGroupCommand, { repository, baseBranch, profile });
   const pullRequestUrl = required("--pull-request");
   const target = githubPullRequestTarget(pullRequestUrl);
   if (!target || `${target.owner}/${target.repository}`.toLowerCase() !==
@@ -3334,6 +3355,59 @@ async function mergeQueueEnqueueCommand() {
     pullRequestUrl,
     expectedBaseBranch: baseBranch,
   })));
+}
+
+async function mergeGroupJobsCommand() {
+  const config = await loadConfig();
+  const project = await currentProject(config);
+  if (!config.userToken) throw new Error("먼저 `briar login`을 실행하세요.");
+  console.log(JSON.stringify(await request(
+    config.apiUrl,
+    `/projects/${encodeURIComponent(project.id)}/merge-group-validations`,
+    config.userToken,
+  )));
+}
+
+async function retryMergeGroupJobCommand() {
+  const config = await loadConfig();
+  const project = await currentProject(config);
+  if (!config.userToken) throw new Error("먼저 `briar login`을 실행하세요.");
+  const jobId = decodeUuid(required("--job"));
+  console.log(JSON.stringify(await request(
+    config.apiUrl,
+    `/projects/${encodeURIComponent(project.id)}` +
+      `/merge-group-validations/${encodeURIComponent(jobId)}/retry`,
+    config.userToken,
+    { method: "POST" },
+  )));
+}
+
+async function configureMergeGroupCiCommand() {
+  const config = await loadConfig();
+  const project = await currentProject(config);
+  if (!config.userToken) throw new Error("먼저 `briar login`을 실행하세요.");
+  if (has("--enable") === has("--disable")) {
+    throw new Error("Choose exactly one of --enable or --disable");
+  }
+  const current = await configuredMergeGroupDoctorProfile(config, project);
+  const workerId = value("--worker") ?? current.workerId;
+  if (workerId) decodeUuid(workerId);
+  if (has("--enable") && !workerId) {
+    throw new Error("--worker is required the first time merge-group CI is enabled");
+  }
+  console.log(JSON.stringify(await request(
+    config.apiUrl,
+    `/projects/${encodeURIComponent(project.id)}/merge-group-ci-profile`,
+    config.userToken,
+    {
+      method: "PUT",
+      body: JSON.stringify({
+        enabled: has("--enable"),
+        baseRef: "refs/heads/main",
+        workerId,
+      }),
+    },
+  )));
 }
 
 async function runClaimedMergeGroupValidation(input: {
@@ -3349,6 +3423,8 @@ async function runClaimedMergeGroupValidation(input: {
   const operation = <T>(
     name:
       | "validation"
+      | "fetch-credential"
+      | "publication"
       | "publication-fence"
       | "publication-complete"
       | "failure"
@@ -3369,12 +3445,19 @@ async function runClaimedMergeGroupValidation(input: {
     },
   );
   let worktreePath: string | null = null;
+  let trustedProfileRoot: string | null = null;
   const localRef = `refs/briar/merge-group-validation/${job.workId}`;
   try {
     let passed = job.validationPassed;
     if (passed === null) {
-      assertLiveMergeGroupRef(runMergeGroupCommand, job);
-      fetchExactMergeGroupHead(runGit, project.repositoryPath, job);
+      const credential = await operation<{ token: string; expiresAt: string }>(
+        "fetch-credential",
+        { headSha: job.headSha },
+      );
+      fetchExactMergeGroupHead(runGit, project.repositoryPath, {
+        ...job,
+        fetchToken: credential.token,
+      });
       const worktree = await allocateMergeGroupValidationWorktree({
         repositoryPath: project.repositoryPath,
         projectId: project.id,
@@ -3385,35 +3468,57 @@ async function runClaimedMergeGroupValidation(input: {
       });
       worktreePath = worktree.path;
       input.reportCheckpoint({ workspacePath: worktree.path });
-      const exitCode = await runFixedMergeGroupValidation(
-        worktree.path,
-        signal,
-      );
+      assertValidationWorktreeClean(runGit, worktree.path);
+      let failureDetail: string | null = null;
+      try {
+        const profile = await prepareTrustedMergeGroupProfile(
+          runGit,
+          project.repositoryPath,
+          job,
+        );
+        trustedProfileRoot = profile.root;
+        const runtime = mergeGroupContainerRuntime();
+        if (!runtime.ready) throw new Error(runtime.detail);
+        const result = await runFixedMergeGroupValidation({
+          cwd: worktree.path,
+          profilePath: profile.profilePath,
+          scratchPath: profile.scratchPath,
+          bundlePath: profile.bundlePath,
+          headSha: job.headSha,
+          runtime,
+          signal,
+        });
+        passed = result.passed;
+        if (!passed) failureDetail = `Trusted isolated CI exited ${result.exitCode}`;
+      } catch (error) {
+        if (!(error instanceof MergeGroupCiDefinitionChangedError)) throw error;
+        passed = false;
+        failureDetail = error.message;
+      }
       if (signal.aborted) {
         throw signal.reason ?? new Error("Merge-group validation aborted");
       }
       assertValidationWorktreeHead(runGit, worktree.path, job.headSha);
-      assertLiveMergeGroupRef(runMergeGroupCommand, job);
-      passed = exitCode === 0;
+      assertValidationWorktreeClean(runGit, worktree.path);
       await operation("validation", {
         headSha: job.headSha,
         passed,
-        ...(passed ? {} : { detail: `bun run ci:local exited ${exitCode}` }),
+        ...(passed ? {} : { detail: failureDetail }),
       });
     }
 
-    for (const context of MERGE_GROUP_STATUS_CONTEXTS) {
+    while (true) {
       if (signal.aborted) {
         throw signal.reason ?? new Error("Merge-group publication aborted");
       }
-      await operation("publication-fence", { headSha: job.headSha });
-      assertLiveMergeGroupRef(runMergeGroupCommand, job);
-      publishMergeGroupStatus(runMergeGroupCommand, {
-        repository: job.repository,
-        headSha: job.headSha,
-        context,
-        passed,
-      });
+      const publication = await operation<{
+        complete?: boolean;
+        retry?: boolean;
+        terminal?: boolean;
+        superseded?: boolean;
+      }>("publication", { headSha: job.headSha });
+      if (publication.superseded || publication.retry || publication.terminal) return;
+      if (publication.complete) break;
     }
     await operation("publication-complete", { headSha: job.headSha });
   } catch (error) {
@@ -3433,6 +3538,9 @@ async function runClaimedMergeGroupValidation(input: {
     }
     throw error;
   } finally {
+    if (trustedProfileRoot) {
+      await rm(trustedProfileRoot, { recursive: true, force: true });
+    }
     if (worktreePath) {
       try {
         await removeAnalysisWorktree({
@@ -3732,7 +3840,8 @@ async function workerCommand() {
         );
         const providers = healthyWorkerProviders(providerHealth);
         const hasHealthyProvider = providers.length > 0;
-        const mergeGroupReady = worktreesEnabled(project);
+        const mergeGroupRuntime = mergeGroupContainerRuntime();
+        const mergeGroupReady = worktreesEnabled(project) && mergeGroupRuntime.ready;
         // Shared project workflow tools must be ready on this worker machine.
         // Prefer the requirements returned by the previous heartbeat (server is
         // source of truth); fall back to the local mirrored workflow.
@@ -3788,6 +3897,12 @@ async function workerCommand() {
                   ? {
                       [MERGE_GROUP_CI_CAPABILITY]: {
                         protocol: MERGE_GROUP_CI_PROTOCOL,
+                        isolation: "container",
+                        network: "none",
+                        uid: 65532,
+                        image: mergeGroupRuntime.ready
+                          ? mergeGroupRuntime.image
+                          : null,
                       },
                     }
                   : {}),
@@ -3875,6 +3990,12 @@ async function workerCommand() {
                         ? {
                             [MERGE_GROUP_CI_CAPABILITY]: {
                               protocol: MERGE_GROUP_CI_PROTOCOL,
+                              isolation: "container",
+                              network: "none",
+                              uid: 65532,
+                              image: mergeGroupRuntime.ready
+                                ? mergeGroupRuntime.image
+                                : null,
                             },
                           }
                         : {}),
@@ -4320,9 +4441,12 @@ const usage = `Briar CLI
     [--limit <1-100>] [--cursor <message-uuid>]
     [--parent-message-id <root-message-uuid>]
   briar workflow show
-  briar merge-queue doctor [--base-branch <branch>]
+  briar merge-queue doctor [--base-branch <branch>] [--inactive-preflight]
   briar merge-queue enqueue --pull-request <GitHub URL>
     [--base-branch <branch>]
+  briar merge-queue jobs
+  briar merge-queue retry --job <uuid>
+  briar merge-queue configure (--enable|--disable) [--worker <uuid>]
   briar queue claim [--run <uuid>] [--workspace <project|worktree|current|none>]
     [--base-branch <ref>]
   briar worktree show
@@ -4422,6 +4546,15 @@ async function main() {
   }
   if (args[0] === "merge-queue" && args[1] === "enqueue") {
     return mergeQueueEnqueueCommand();
+  }
+  if (args[0] === "merge-queue" && args[1] === "jobs") {
+    return mergeGroupJobsCommand();
+  }
+  if (args[0] === "merge-queue" && args[1] === "retry") {
+    return retryMergeGroupJobCommand();
+  }
+  if (args[0] === "merge-queue" && args[1] === "configure") {
+    return configureMergeGroupCiCommand();
   }
   if (args[0] === "queue" && args[1] === "claim") return claimWork();
   if (args[0] === "worktree" && args[1] === "show") return worktreeShow();

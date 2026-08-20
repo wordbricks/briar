@@ -919,22 +919,6 @@ export async function allocateMergeGroupValidationWorktree(input: {
   if (attached && attached.branch !== null) {
     throw new Error("merge-group 워크트리는 detached checkout이어야 합니다.");
   }
-  if (attached && await pathExists(path)) {
-    const head = gitOrThrow(input.git, ["rev-parse", "HEAD"], {
-      cwd: path,
-      message: "merge-group 워크트리 SHA를 읽지 못했습니다.",
-    });
-    if (head !== input.headSha) {
-      throw new Error("기존 merge-group 워크트리 SHA가 요청과 다릅니다.");
-    }
-    return {
-      path,
-      baseRef: input.headSha,
-      baseSha: head,
-      includedPaths: [],
-      reused: true,
-    };
-  }
   if (attached) {
     const removed = input.git(["worktree", "remove", "--force", path], {
       cwd: input.repositoryPath,

@@ -883,6 +883,35 @@ describe("merge-group validation worktrees", () => {
       headSha,
     ]);
   });
+
+  it("removes and recreates a prior detached worktree instead of reusing dirty state", async () => {
+    const root = await temporaryDirectory("briar-merge-group-dirty-");
+    const projectId = "11111111-1111-4111-8111-111111111111";
+    const jobId = "22222222-2222-4222-8222-222222222222";
+    const path = join(root, projectId, "merge-group-validation", `validation-${jobId}`);
+    await mkdir(path, { recursive: true });
+    await writeFile(join(path, "untracked-secret"), "must disappear");
+    const headSha = "b".repeat(40);
+    const { git, calls } = fakeGit((gitArgs) => {
+      if (gitArgs[0] === "worktree" && gitArgs[1] === "list") {
+        return ok(`worktree ${path}\ndetached\n`);
+      }
+      if (gitArgs[0] === "rev-parse") return ok(`${headSha}\n`);
+      return ok();
+    });
+    const result = await allocateMergeGroupValidationWorktree({
+      repositoryPath: "/repo",
+      projectId,
+      jobId,
+      headSha,
+      settings: { root, branchPrefix: "unused" },
+      git,
+    });
+
+    expect(result.reused).toBe(false);
+    expect(calls).toContainEqual(["worktree", "remove", "--force", path]);
+    expect(calls).toContainEqual(["worktree", "add", "--detach", path, headSha]);
+  });
 });
 
 describe("removal", () => {

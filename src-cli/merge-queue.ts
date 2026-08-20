@@ -1,5 +1,11 @@
 import * as Schema from "effect/Schema";
-import { MERGE_GROUP_STATUS_CONTEXTS } from "../src/lib/merge-group-validation-contract";
+import {
+  MERGE_GROUP_MAX_ENTRIES_TO_BUILD,
+  MERGE_GROUP_MAX_ENTRIES_TO_MERGE,
+  MERGE_GROUP_MIN_ENTRIES_TO_MERGE,
+  MERGE_GROUP_MIN_WAIT_MINUTES,
+  MERGE_GROUP_STATUS_CONTEXTS,
+} from "../src/lib/merge-group-validation-contract";
 import { githubPullRequestTarget } from "./github-pr";
 
 export type CommandResult = {
@@ -144,12 +150,22 @@ export function enqueuePullRequestExact(
 export const MERGE_QUEUE_RULESET_PROFILE = {
   checkResponseTimeoutMinutes: 60,
   groupingStrategy: "HEADGREEN",
-  maxEntriesToBuild: 1,
-  minEntriesToMerge: 1,
-  maxEntriesToMerge: 1,
-  minEntriesToMergeWaitMinutes: 0,
+  maxEntriesToBuild: MERGE_GROUP_MAX_ENTRIES_TO_BUILD,
+  minEntriesToMerge: MERGE_GROUP_MIN_ENTRIES_TO_MERGE,
+  maxEntriesToMerge: MERGE_GROUP_MAX_ENTRIES_TO_MERGE,
+  minEntriesToMergeWaitMinutes: MERGE_GROUP_MIN_WAIT_MINUTES,
   mergeMethod: "SQUASH",
 } as const;
+
+export type MergeGroupDoctorProfile = {
+  enabled: boolean;
+  baseRef: string;
+  workerId: string | null;
+  workerReady: boolean;
+  workflowReady: boolean;
+  appId: number | null;
+  fixedProfile: string;
+};
 
 const object = (value: unknown, label: string): Record<string, unknown> => {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -166,19 +182,38 @@ export function assertExactMainMergeQueueRuleset(
   rawRulesets: unknown,
   rawDetails: ReadonlyMap<number, unknown>,
   baseBranch: string,
+  expectedAppId: number,
+  activation: "active" | "inactive" = "active",
 ) {
   if (!Array.isArray(rawRulesets)) {
     throw new Error("GitHub ruleset list was invalid");
   }
   const exactRef = `refs/heads/${baseBranch}`;
-  const exact = rawRulesets.flatMap((summary) => {
+  const branchRulesets = rawRulesets.flatMap((summary) => {
     const value = object(summary, "GitHub ruleset summary");
     const id = value.id;
     if (
-      !Number.isSafeInteger(id) || value.target !== "branch" ||
-      value.enforcement !== "active"
+      !Number.isSafeInteger(id) || value.target !== "branch"
     ) return [];
-    const detail = object(rawDetails.get(Number(id)), "GitHub ruleset detail");
+    return [{
+      summary: value,
+      detail: object(rawDetails.get(Number(id)), "GitHub ruleset detail"),
+    }];
+  });
+  if (branchRulesets.length !== 1) {
+    throw new Error(
+      "Exactly one effective branch ruleset is allowed for fail-closed verification",
+    );
+  }
+  const enforcement = branchRulesets[0]!.summary.enforcement;
+  if (
+    (activation === "active" && enforcement !== "active") ||
+    (activation === "inactive" && enforcement === "active") ||
+    !["active", "evaluate", "disabled"].includes(String(enforcement))
+  ) {
+    throw new Error(`The exact-main ruleset must be ${activation}`);
+  }
+  const exact = branchRulesets.flatMap(({ detail }) => {
     const conditions = object(detail.conditions, "GitHub ruleset conditions");
     const refName = object(conditions.ref_name, "GitHub ruleset ref condition");
     return exactStringArray(refName.include, [exactRef]) &&
@@ -228,6 +263,9 @@ export function assertExactMainMergeQueueRuleset(
   }
   const contexts = checks.required_status_checks.map((item) => {
     const check = object(item, "Required status check");
+    if (check.integration_id !== expectedAppId) {
+      throw new Error("Every required status context must be bound to the Briar GitHub App");
+    }
     return check.context;
   });
   if (
@@ -241,12 +279,34 @@ export function assertExactMainMergeQueueRuleset(
 
 export function doctorMergeQueue(
   command: CommandRunner,
-  input: { repository: string; baseBranch: string },
+  input: {
+    repository: string;
+    baseBranch: string;
+    profile: MergeGroupDoctorProfile;
+    activation?: "active" | "inactive";
+  },
 ) {
+  const activation = input.activation ?? "active";
+  const expectedBaseRef = `refs/heads/${input.baseBranch}`;
+  if (
+    input.profile.baseRef !== expectedBaseRef ||
+    input.profile.workerId === null ||
+    !input.profile.workerReady ||
+    !input.profile.workflowReady ||
+    input.profile.appId === null ||
+    input.profile.fixedProfile !== "briar/merge-group-ci/v2"
+  ) {
+    throw new Error(
+      "Briar requires an exact-main profile, canonical merge-wait workflow, configured App, and ready isolated Worker",
+    );
+  }
+  if (activation === "active" && !input.profile.enabled) {
+    throw new Error("Briar merge-group CI must be enabled for active postflight");
+  }
   const list = command([
     "gh",
     "api",
-    `repos/${input.repository}/rulesets?includes_parents=false&per_page=100`,
+    `repos/${input.repository}/rulesets?includes_parents=true&per_page=100`,
   ]);
   if (list.exitCode !== 0) {
     throw new Error("GitHub rulesets could not be read");
@@ -269,16 +329,43 @@ export function doctorMergeQueue(
     summaries,
     details,
     input.baseBranch,
+    input.profile.appId,
+    activation,
   );
-  const repository = command(["gh", "api", `repos/${input.repository}`]);
-  if (repository.exitCode !== 0) throw new Error("GitHub Worker permission could not be read");
-  const permission = object(
-    object(parseJson(repository.stdout, "GitHub repository"), "GitHub repository")
-      .permissions,
-    "GitHub repository permission",
+  const installationResponse = command([
+    "gh",
+    "api",
+    `repos/${input.repository}/installation`,
+  ]);
+  if (installationResponse.exitCode !== 0) {
+    throw new Error("GitHub App installation could not be read");
+  }
+  const installation = object(
+    parseJson(installationResponse.stdout, "GitHub App installation"),
+    "GitHub App installation",
   );
-  if (permission.push !== true) {
-    throw new Error("The Worker credential requires repository push permission");
+  if (installation.app_id !== input.profile.appId) {
+    throw new Error("The connected repository is installed under a different GitHub App");
+  }
+  const permissions = object(installation.permissions, "GitHub App permissions");
+  const expectedPermissions = {
+    administration: "read",
+    contents: "read",
+    merge_queues: "read",
+    pull_requests: "read",
+    statuses: "write",
+  } as const;
+  for (const [permission, expected] of Object.entries(expectedPermissions)) {
+    if (permissions[permission] !== expected) {
+      throw new Error(`GitHub App permission ${permission} must be ${expected}`);
+    }
+  }
+  const events = installation.events;
+  if (
+    !Array.isArray(events) ||
+    !["merge_group", "pull_request"].every((event) => events.includes(event))
+  ) {
+    throw new Error("GitHub App event subscriptions require merge_group and pull_request");
   }
   const classic = command([
     "gh",
@@ -296,5 +383,13 @@ export function doctorMergeQueue(
   } else if (!/(?:HTTP 404|Not Found)/iu.test(classic.stderr)) {
     throw new Error("GitHub classic branch protection could not be read");
   }
-  return { ...verified, repository: input.repository, baseBranch: input.baseBranch };
+  return {
+    ...verified,
+    repository: input.repository,
+    baseBranch: input.baseBranch,
+    appId: input.profile.appId,
+    profileEnabled: input.profile.enabled,
+    workerId: input.profile.workerId,
+    activation,
+  };
 }

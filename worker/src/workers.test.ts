@@ -187,7 +187,8 @@ describe("detached execution workers", () => {
         "0103_agent_worklog_projection.sql",
         "0113_project_schedule_tab.sql",
         "0119_execution_worker_update_handoffs.sql",
-        "0121_merge_group_validation_jobs.sql",
+        "0121_repository_merge_batches.sql",
+        "0122_merge_group_executor_cleanup.sql",
       ],
     });
     await executeD1Sql(
@@ -295,6 +296,7 @@ describe("detached execution workers", () => {
        delete from briar_hunt_events;
        delete from briar_hunt_runs;
        delete from briar_channel_agent_reply_jobs;
+       delete from merge_group_validation_jobs;
        delete from briar_project_execution_worker_allowlist;
        delete from briar_project_execution_worker_policies;
        delete from briar_execution_worker_update_requests;
@@ -316,6 +318,7 @@ describe("detached execution workers", () => {
     seed: string,
     minute = 1,
     credentialTokenHash = fingerprint(`token-${seed}`),
+    maxConcurrentSessions = 1,
   ) =>
     registerExecutionWorker(db, projectId, {
       id: `worker-${seed}`,
@@ -397,6 +400,7 @@ describe("detached execution workers", () => {
         },
       },
       versions: { briar: "1.1.1" },
+      maxConcurrentSessions,
       observedAt: atMinute(minute),
     });
 
@@ -2220,7 +2224,7 @@ describe("detached execution workers", () => {
   });
 
   it("claims explicit dispatch snapshots ahead of pre-existing or mutated preferences", async () => {
-    const registered = await register("dispatch-snapshot");
+    const registered = await register("dispatch-snapshot", 1, undefined, 2);
     await recordWorkerHeartbeat(db, projectId, {
       workerId: registered.worker.id,
       capabilities: {
@@ -2567,6 +2571,70 @@ describe("detached execution workers", () => {
       claimToken: null,
     } as HuntEventInput);
     await expect(claim("c")).resolves.not.toBeNull();
+  });
+
+  it("counts a live merge-group validation as the device's only session and blocks run claims", async () => {
+    const registration = await register("merge-capacity");
+    const validationId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    await db.prepare(
+      `insert into merge_group_validation_jobs (
+         id, project_id, installation_id, repository_id, repository,
+         base_ref, head_ref, head_sha, base_sha, tail_pull_request_number,
+         tail_position, authority_checked_at, eligible_worker_id, state,
+         claimed_worker_id, claim_token_hash, claimed_at, lease_expires_at,
+         queued_at, started_at, created_at, updated_at
+       ) values (?, ?, 1, 1, 'example/repository', 'refs/heads/main',
+         'refs/heads/gh-readonly-queue/main/pr-1-aaaaaaaa', ?, ?, 1, 0, ?, ?,
+         'running', ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(
+      validationId,
+      projectId,
+      "a".repeat(40),
+      "b".repeat(40),
+      atMinute(1),
+      registration.worker.id,
+      registration.worker.id,
+      fingerprint("merge-validation-claim"),
+      atMinute(1),
+      atMinute(5),
+      atMinute(1),
+      atMinute(1),
+      atMinute(1),
+      atMinute(1),
+    ).run();
+    await recordHuntEvent(db, projectId, queuedEvent("merge-capacity-run", 1));
+
+    await expect(claimNextQueuedHuntRun(db, projectId, {
+      claimTokenHash: "9".repeat(64),
+      claimedBy: "merge-capacity",
+      claimedAt: atMinute(2),
+      leaseExpiresAt: atMinute(5),
+      workerId: registration.worker.id,
+      workerDeviceId: registration.device.id,
+    })).resolves.toBeNull();
+    await expect(countExecutionWorkerDeviceSessions(
+      db,
+      registration.device.id,
+      atMinute(2),
+    )).resolves.toBe(1);
+    const projected = (await listExecutionWorkers(db, projectId, atMinute(2)))
+      .find((worker) => worker.id === registration.worker.id);
+    expect(projected?.active_sessions).toBe(1);
+
+    await db.prepare(
+      `update merge_group_validation_jobs
+       set state = 'superseded', claim_token_hash = null,
+           claimed_worker_id = null, claimed_at = null, lease_expires_at = null,
+           superseded_at = ?, updated_at = ? where id = ?`,
+    ).bind(atMinute(3), atMinute(3), validationId).run();
+    await expect(claimNextQueuedHuntRun(db, projectId, {
+      claimTokenHash: "8".repeat(64),
+      claimedBy: "merge-capacity",
+      claimedAt: atMinute(3),
+      leaseExpiresAt: atMinute(6),
+      workerId: registration.worker.id,
+      workerDeviceId: registration.device.id,
+    })).resolves.not.toBeNull();
   });
 
   it("does not treat backlog work as held or leased Auto Hunt work", async () => {

@@ -8,6 +8,16 @@ import {
 } from "./merge-queue";
 
 const sha = (value: string) => value.repeat(40);
+const appId = 12345;
+const doctorProfile = {
+  enabled: true,
+  baseRef: "refs/heads/main",
+  workerId: "11111111-1111-4111-8111-111111111111",
+  workerReady: true,
+  workflowReady: true,
+  appId,
+  fixedProfile: "briar/merge-group-ci/v2",
+};
 const pullRequest = (entry: string | null = null) => ({
   data: {
     repository: {
@@ -50,10 +60,10 @@ const ruleset = (overrides: Record<string, unknown> = {}) => ({
     parameters: {
       strict_required_status_checks_policy: false,
       required_status_checks: [
-        { context: "signoff/app-worker" },
-        { context: "signoff/d1-migrations" },
-        { context: "signoff/rust" },
-        { context: "signoff/security" },
+        { context: "signoff/app-worker", integration_id: appId },
+        { context: "signoff/d1-migrations", integration_id: appId },
+        { context: "signoff/rust", integration_id: appId },
+        { context: "signoff/security", integration_id: appId },
       ],
     },
   }],
@@ -131,6 +141,7 @@ describe("merge-queue doctor", () => {
       [{ id: 7, target: "branch", enforcement: "active" }],
       new Map([[7, ruleset()]]),
       "main",
+      appId,
     )).toMatchObject({ rulesetId: 7 });
   });
 
@@ -165,10 +176,11 @@ describe("merge-queue doctor", () => {
       [{ id: 7, target: "branch", enforcement: "active" }],
       new Map([[7, changed()]]),
       "main",
+      appId,
     )).toThrow();
   });
 
-  it("fails when the Worker credential lacks push permission", () => {
+  it("fails when the GitHub App has not been reapproved for status write", () => {
     const command: CommandRunner = (args) => {
       if (args[2]?.includes("rulesets?")) {
         return {
@@ -180,16 +192,28 @@ describe("merge-queue doctor", () => {
       if (args[2]?.endsWith("rulesets/7")) {
         return { exitCode: 0, stdout: JSON.stringify(ruleset()), stderr: "" };
       }
-      return {
+      if (args[2]?.endsWith("/installation")) return {
         exitCode: 0,
-        stdout: JSON.stringify({ permissions: { push: false } }),
+        stdout: JSON.stringify({
+          app_id: appId,
+          permissions: {
+            administration: "read",
+            contents: "read",
+            merge_queues: "read",
+            pull_requests: "read",
+            statuses: "read",
+          },
+          events: ["merge_group", "pull_request"],
+        }),
         stderr: "",
       };
+      return { exitCode: 1, stdout: "", stderr: "HTTP 404" };
     };
     expect(() => doctorMergeQueue(command, {
       repository: "wordbricks/briar",
       baseBranch: "main",
-    })).toThrow(/push permission/u);
+      profile: doctorProfile,
+    })).toThrow(/statuses must be write/u);
   });
 
   it("rejects classic strict=true even when the ruleset is correct", () => {
@@ -211,15 +235,77 @@ describe("merge-queue doctor", () => {
           stderr: "",
         };
       }
-      return {
+      if (args[2]?.endsWith("/installation")) return {
         exitCode: 0,
-        stdout: JSON.stringify({ permissions: { push: true } }),
+        stdout: JSON.stringify({
+          app_id: appId,
+          permissions: {
+            administration: "read",
+            contents: "read",
+            merge_queues: "read",
+            pull_requests: "read",
+            statuses: "write",
+          },
+          events: ["merge_group", "pull_request"],
+        }),
         stderr: "",
       };
+      return { exitCode: 1, stdout: "", stderr: "unexpected" };
     };
     expect(() => doctorMergeQueue(command, {
       repository: "wordbricks/briar",
       baseBranch: "main",
+      profile: doctorProfile,
     })).toThrow(/strict=false/u);
+  });
+
+  it("rejects inherited or overlapping active branch rulesets", () => {
+    expect(() => assertExactMainMergeQueueRuleset(
+      [
+        { id: 7, target: "branch", enforcement: "active" },
+        { id: 8, target: "branch", enforcement: "active" },
+      ],
+      new Map([[7, ruleset()], [8, ruleset({ id: 8 })]]),
+      "main",
+      appId,
+    )).toThrow(/effective branch ruleset/u);
+  });
+
+  it("supports a fail-closed inactive preflight before activation", () => {
+    expect(assertExactMainMergeQueueRuleset(
+      [{ id: 7, target: "branch", enforcement: "disabled" }],
+      new Map([[7, ruleset({ enforcement: "disabled" })]]),
+      "main",
+      appId,
+      "inactive",
+    )).toMatchObject({ rulesetId: 7 });
+    expect(() => assertExactMainMergeQueueRuleset(
+      [{ id: 7, target: "branch", enforcement: "disabled" }],
+      new Map([[7, ruleset({ enforcement: "disabled" })]]),
+      "main",
+      appId,
+      "active",
+    )).toThrow(/must be active/u);
+  });
+
+  it("rejects an unavailable isolated Worker before reading GitHub", () => {
+    const command = (() => {
+      throw new Error("GitHub must not be queried");
+    }) as CommandRunner;
+    expect(() => doctorMergeQueue(command, {
+      repository: "wordbricks/briar",
+      baseBranch: "main",
+      profile: { ...doctorProfile, workerReady: false },
+    })).toThrow(/ready isolated Worker/u);
+  });
+
+  it("rejects a workflow without the canonical merge-wait checkpoint", () => {
+    expect(() => doctorMergeQueue(() => {
+      throw new Error("GitHub must not be read before the workflow fence");
+    }, {
+      repository: "wordbricks/briar",
+      baseBranch: "main",
+      profile: { ...doctorProfile, workflowReady: false },
+    })).toThrow(/canonical merge-wait workflow/u);
   });
 });

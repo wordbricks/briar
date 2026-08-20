@@ -1,7 +1,29 @@
 #!/bin/bash
 set -euo pipefail
 
-workspace_root="$(cd "$(dirname "$0")/.." && pwd -P)"
+isolated_merge_group=false
+
+if [[ "${BRIAR_TRUSTED_MERGE_GROUP_CI:-}" == "1" ]]; then
+  isolated_merge_group=true
+  export CARGO_NET_OFFLINE=true
+  [[ -n "${BRIAR_CI_WORKSPACE_ROOT:-}" &&
+    -n "${BRIAR_CI_REPOSITORY_BUNDLE:-}" &&
+    "${BRIAR_CI_HEAD_SHA:-}" =~ ^[0-9a-f]{40}$ ]] || {
+    echo "[local-ci] Missing isolated workspace root." >&2
+    exit 75
+  }
+  workspace_root="$BRIAR_CI_WORKSPACE_ROOT"
+  git clone --no-checkout "$BRIAR_CI_REPOSITORY_BUNDLE" "$workspace_root" || {
+    echo "[local-ci] Infrastructure: trusted Git bundle could not be cloned." >&2
+    exit 75
+  }
+  git -C "$workspace_root" reset --hard "$BRIAR_CI_HEAD_SHA" >/dev/null || {
+    echo "[local-ci] Infrastructure: exact candidate tree could not be created." >&2
+    exit 75
+  }
+else
+  workspace_root="$(cd "$(dirname "$0")/.." && pwd -P)"
+fi
 cd "$workspace_root"
 
 readonly rust_toolchain="1.96.0"
@@ -29,6 +51,21 @@ fail() {
   exit 1
 }
 
+infra_fail() {
+  echo "[local-ci] Infrastructure: $*" >&2
+  exit 75
+}
+
+is_infrastructure_failure() {
+  local status="$1"
+  local log_path="$2"
+  [[ "$status" -eq 75 || "$status" -eq 125 || "$status" -eq 126 ||
+    "$status" -eq 127 || "$status" -eq 137 ]] ||
+    grep -Eiq \
+      'EADDRNOTAVAIL|ENOSPC|No space left on device|ENOMEM|heap out of memory|Infrastructure:|attempting to make an HTTP request.*offline|failed to download|failed to get .* as a dependency' \
+      "$log_path"
+}
+
 cleanup() {
   if [[ -n "$ci_temp" ]]; then
     case "$ci_temp" in
@@ -42,8 +79,12 @@ trap cleanup EXIT
 require_command() {
   local command_name="$1"
   local install_hint="$2"
-  command -v "$command_name" >/dev/null 2>&1 ||
+  if ! command -v "$command_name" >/dev/null 2>&1; then
+    if $isolated_merge_group; then
+      infra_fail "Missing ${command_name} from the pinned executor image."
+    fi
     fail "Missing ${command_name}. ${install_hint}"
+  fi
 }
 
 includes_context() {
@@ -94,20 +135,36 @@ run_app_worker() {
 
 run_d1_migrations() {
   local d1_state_dir
+  local migration_log
+  local migration_status
   d1_state_dir="$(mktemp -d "${TMPDIR:-/tmp}/briar-local-ci-d1.XXXXXX")"
+  migration_log="$d1_state_dir/migration-tests.log"
   trap 'rm -rf "$d1_state_dir"' RETURN
 
   bun run d1:migrate:local -- --persist-to "$d1_state_dir"
-  bun run test:d1:migrations
+  set +e
+  bun run test:d1:migrations >"$migration_log" 2>&1
+  migration_status="$?"
+  set -e
+  cat "$migration_log"
+  if [[ "$migration_status" -ne 0 ]]; then
+    if is_infrastructure_failure "$migration_status" "$migration_log"; then
+      infra_fail "D1 migration tests encountered a sandbox, network, memory, or disk failure."
+    fi
+    return "$migration_status"
+  fi
 
   rm -rf "$d1_state_dir"
   trap - RETURN
 }
 
 run_rust() {
-  rustup toolchain install "$rust_toolchain" \
+  if ! rustup toolchain install "$rust_toolchain" \
     --profile minimal \
-    --component rustfmt,clippy
+    --component rustfmt,clippy; then
+    $isolated_merge_group && infra_fail "Pinned Rust toolchain is unavailable."
+    return 1
+  fi
   rustup run "$rust_toolchain" cargo fmt \
     --manifest-path src-tauri/Cargo.toml --all --check
   rustup run "$rust_toolchain" cargo clippy \
@@ -155,9 +212,10 @@ prepare_parallel_inputs() {
   if includes_context rust; then
     echo
     echo "[local-ci] === shared build inputs ==="
-    bun run runtime:prepare
-    bun run cli:build
-    bun run agent:build
+    if ! bun run runtime:prepare || ! bun run cli:build || ! bun run agent:build; then
+      $isolated_merge_group && infra_fail "Pinned shared build inputs are unavailable."
+      return 1
+    fi
     echo "[local-ci] ✓ shared build inputs"
   fi
 }
@@ -168,7 +226,9 @@ run_selected_contexts() {
   local log_path
   local index
   local pid
+  local context_exit
   local failed=false
+  local infrastructure_failed=false
   local contexts_to_run=("${selected_contexts[@]}")
   local pids=()
   local logs=()
@@ -200,12 +260,22 @@ run_selected_contexts() {
   done
 
   for index in "${!contexts_to_run[@]}"; do
-    if ! wait "${pids[$index]}"; then
+    set +e
+    wait "${pids[$index]}"
+    context_exit="$?"
+    set -e
+    if [[ "$context_exit" -ne 0 ]]; then
       failed=true
+      if is_infrastructure_failure "$context_exit" "${logs[$index]}"; then
+        infrastructure_failed=true
+      fi
     fi
     cat "${logs[$index]}"
   done
 
+  if [[ "$infrastructure_failed" == true ]]; then
+    infra_fail "One or more CI contexts encountered a sandbox, network, memory, or disk failure."
+  fi
   if [[ "$failed" == true ]]; then
     fail "One or more CI contexts failed."
   fi
@@ -254,7 +324,10 @@ if $should_signoff; then
     fail "Install gh-signoff first: gh extension install basecamp/gh-signoff"
 fi
 
-bun install --frozen-lockfile
+if ! bun install --frozen-lockfile; then
+  $isolated_merge_group && infra_fail "Dependencies are absent from the pinned executor cache."
+  exit 1
+fi
 
 prepare_parallel_inputs
 run_selected_contexts

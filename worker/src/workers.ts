@@ -1201,13 +1201,44 @@ export async function recordWorkerHeartbeat(
                   where holder.device_id = device.id
                     and task.status = 'running'
                     and task.lease_expires_at > ?
+                  union all
+                  select reply.id
+                  from briar_issue_agent_reply_jobs reply
+                  join briar_execution_workers holder
+                    on holder.id = reply.claimed_worker_id
+                  where holder.device_id = device.id
+                    and reply.status = 'running' and reply.lease_expires_at > ?
+                  union all
+                  select reply.id
+                  from briar_channel_agent_reply_jobs reply
+                  join briar_execution_workers holder
+                    on holder.id = reply.claimed_worker_id
+                  where holder.device_id = device.id
+                    and reply.status = 'running' and reply.lease_expires_at > ?
+                  union all
+                  select validation.id
+                  from merge_group_validation_jobs validation
+                  join briar_execution_workers holder
+                    on holder.id = validation.claimed_worker_id
+                  where holder.device_id = device.id
+                    and validation.claim_token_hash is not null
+                    and validation.lease_expires_at > ?
+                    and validation.state in ('running', 'validated', 'failed')
+                    and validation.published_at is null
                 ) active_work
               ) as active_sessions
        from briar_execution_workers worker
        join briar_execution_worker_devices device on device.id = worker.device_id
        where worker.id = ?`,
     )
-    .bind(input.observedAt, input.observedAt, input.workerId)
+    .bind(
+      input.observedAt,
+      input.observedAt,
+      input.observedAt,
+      input.observedAt,
+      input.observedAt,
+      input.workerId,
+    )
     .first<ExecutionWorkerRow>();
   if (!updated) {
     throw new WorkerConflictError("Worker heartbeat update was not persisted");
@@ -1418,6 +1449,30 @@ export async function listExecutionWorkers(
                   where holder.device_id = device.id
                     and task.status = 'running'
                     and task.lease_expires_at > ?
+                  union all
+                  select reply.id
+                  from briar_issue_agent_reply_jobs reply
+                  join briar_execution_workers holder
+                    on holder.id = reply.claimed_worker_id
+                  where holder.device_id = device.id
+                    and reply.status = 'running' and reply.lease_expires_at > ?
+                  union all
+                  select reply.id
+                  from briar_channel_agent_reply_jobs reply
+                  join briar_execution_workers holder
+                    on holder.id = reply.claimed_worker_id
+                  where holder.device_id = device.id
+                    and reply.status = 'running' and reply.lease_expires_at > ?
+                  union all
+                  select validation.id
+                  from merge_group_validation_jobs validation
+                  join briar_execution_workers holder
+                    on holder.id = validation.claimed_worker_id
+                  where holder.device_id = device.id
+                    and validation.claim_token_hash is not null
+                    and validation.lease_expires_at > ?
+                    and validation.state in ('running', 'validated', 'failed')
+                    and validation.published_at is null
                 ) active_work
               ) as active_sessions
        from briar_execution_workers worker
@@ -1425,7 +1480,7 @@ export async function listExecutionWorkers(
        where worker.project_id = ?
        order by worker.last_heartbeat_at desc, worker.id asc`,
     )
-    .bind(observedAt, observedAt, projectId)
+    .bind(observedAt, observedAt, observedAt, observedAt, observedAt, projectId)
     .all<
       ExecutionWorkerRow & {
         owner_user_id: string;
@@ -1562,6 +1617,30 @@ export async function listOrganizationExecutionWorkers(
                   where holder.device_id = device.id
                     and task.status = 'running'
                     and task.lease_expires_at > ?
+                  union all
+                  select reply.id
+                  from briar_issue_agent_reply_jobs reply
+                  join briar_execution_workers holder
+                    on holder.id = reply.claimed_worker_id
+                  where holder.device_id = device.id
+                    and reply.status = 'running' and reply.lease_expires_at > ?
+                  union all
+                  select reply.id
+                  from briar_channel_agent_reply_jobs reply
+                  join briar_execution_workers holder
+                    on holder.id = reply.claimed_worker_id
+                  where holder.device_id = device.id
+                    and reply.status = 'running' and reply.lease_expires_at > ?
+                  union all
+                  select validation.id
+                  from merge_group_validation_jobs validation
+                  join briar_execution_workers holder
+                    on holder.id = validation.claimed_worker_id
+                  where holder.device_id = device.id
+                    and validation.claim_token_hash is not null
+                    and validation.lease_expires_at > ?
+                    and validation.state in ('running', 'validated', 'failed')
+                    and validation.published_at is null
                 ) active_work
               ) as active_sessions
        from briar_execution_worker_devices device
@@ -1572,7 +1651,14 @@ export async function listOrganizationExecutionWorkers(
        where device.organization_id = ?
        order by device.last_heartbeat_at desc, device.id, project.created_at`,
     )
-    .bind(observedAt, observedAt, organizationId)
+    .bind(
+      observedAt,
+      observedAt,
+      observedAt,
+      observedAt,
+      observedAt,
+      organizationId,
+    )
     .all<{
       device_id: string;
       owner_user_id: string;

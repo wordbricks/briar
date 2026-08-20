@@ -67,6 +67,7 @@ import {
   type OrganizationRow,
 } from "./organization-repository";
 import type { ProjectRow } from "./project-repository";
+import { workerDeviceCapacityGuardSql } from "./worker-capacity";
 
 type ProjectAgentProvider = AgentSkillProvider;
 type ModelEffort = AgentSkillEffort;
@@ -4933,7 +4934,8 @@ export async function claimNextProjectAgentTask(
        )`;
   const claimed = await db
     .prepare(
-      `update briar_project_agent_task_jobs
+      `with claim_clock(observed_at) as (values (?))
+       update briar_project_agent_task_jobs
        set status = 'running', claimed_worker_id = ?,
            claim_token_hash = ?, claimed_at = ?, lease_expires_at = ?,
            attempts = attempts + case when planned_update_resume = 1 then 0 else 1 end,
@@ -4949,34 +4951,7 @@ export async function claimNextProjectAgentTask(
            and job.preferred_worker_id = ?
            and skill.provider in (${providerPlaceholders})
            ${skillExecutionEligibility}
-           and exists (
-             select 1
-             from briar_execution_workers selected_worker
-             join briar_execution_worker_devices selected_device
-               on selected_device.id = selected_worker.device_id
-             where selected_worker.id = ?
-               and (
-                 (select count(*)
-                  from briar_hunt_runs active
-                  join briar_execution_workers holder
-                    on holder.id = active.worker_id
-                  where holder.device_id = selected_device.id
-                    and active.claim_token_hash is not null
-                    and active.lease_expires_at is not null
-                    and active.lease_expires_at > ?
-                    and active.status not in (
-                      'backlog', 'completed', 'cancelled', 'blocked', 'failed'
-                    ))
-                 +
-                 (select count(*)
-                  from briar_project_agent_task_jobs active_task
-                  join briar_execution_workers holder
-                    on holder.id = active_task.claimed_worker_id
-                  where holder.device_id = selected_device.id
-                    and active_task.status = 'running'
-                    and active_task.lease_expires_at > ?)
-               ) < selected_device.max_concurrent_sessions
-           )
+           and ${workerDeviceCapacityGuardSql("?")}
            and job.attempts < 3
            and (
              job.status = 'queued'
@@ -4988,6 +4963,7 @@ export async function claimNextProjectAgentTask(
        returning *`,
     )
     .bind(
+      input.claimedAt,
       input.workerId,
       input.claimTokenHash,
       input.claimedAt,
@@ -4997,8 +4973,6 @@ export async function claimNextProjectAgentTask(
       input.workerId,
       ...input.agentProviders,
       input.workerId,
-      input.claimedAt,
-      input.claimedAt,
       input.claimedAt,
     )
     .first<ProjectAgentTaskJobRow>()
@@ -7848,7 +7822,8 @@ export async function claimNextIssueAgentReply(
     .run();
   return await db
     .prepare(
-      `update briar_issue_agent_reply_jobs
+      `with claim_clock(observed_at) as (values (?))
+       update briar_issue_agent_reply_jobs
        set status = 'running', claimed_worker_id = ?,
            agent_provider = case
              when preferred_provider = 'codex' and ? = 1 then 'codex'
@@ -7869,6 +7844,7 @@ export async function claimNextIssueAgentReply(
          join briar_hunt_runs run
            on run.id = job.run_id and run.project_id = job.project_id
          where job.project_id = ?
+           and ${workerDeviceCapacityGuardSql("?")}
            and job.attempts < 3
            and (
              job.status = 'queued'
@@ -7929,6 +7905,7 @@ export async function claimNextIssueAgentReply(
        returning *`,
     )
     .bind(
+      input.claimedAt,
       input.workerId,
       input.agentProviders.includes("codex") ? 1 : 0,
       input.agentProviders.includes("claude") ? 1 : 0,
@@ -7943,6 +7920,7 @@ export async function claimNextIssueAgentReply(
       input.leaseExpiresAt,
       input.claimedAt,
       projectId,
+      input.workerId,
       input.claimedAt,
       input.workerId,
       input.workerId,
@@ -9854,7 +9832,8 @@ export async function claimNextQueuedHuntRun(
   const executionId = crypto.randomUUID();
   const claimStatement = db
     .prepare(
-      `update briar_hunt_runs
+      `with claim_clock(observed_at) as (values (?))
+       update briar_hunt_runs
        set claim_token_hash = ?, claimed_by = ?, claimed_at = ?,
            lease_expires_at = ?,
            claim_attempts = claim_attempts +
@@ -10073,33 +10052,7 @@ export async function claimNextQueuedHuntRun(
                ) = 'openrouter'
              )
            )
-           and (
-             ? is null or (
-             (select count(*)
-              from briar_hunt_runs active
-              join briar_execution_workers holder
-                on holder.id = active.worker_id
-              where holder.device_id = ?
-                and active.claim_token_hash is not null
-                and active.lease_expires_at is not null
-                and active.lease_expires_at > ?
-                and active.status not in (
-                  'backlog', 'completed', 'cancelled', 'blocked', 'failed'
-                ))
-             +
-             (select count(*)
-              from briar_project_agent_task_jobs active_task
-              join briar_execution_workers holder
-                on holder.id = active_task.claimed_worker_id
-              where holder.device_id = ?
-                and active_task.status = 'running'
-                and active_task.lease_expires_at > ?)
-             ) < coalesce((
-               select device.max_concurrent_sessions
-               from briar_execution_worker_devices device
-               where device.id = ?
-             ), 0)
-           )
+           and (? is null or ${workerDeviceCapacityGuardSql("?")})
          order by
            case when resume_requested_at is not null then 0 else 1 end,
            case when priority is null then 1 else 0 end,
@@ -10111,6 +10064,7 @@ export async function claimNextQueuedHuntRun(
        returning *`,
     )
     .bind(
+      input.claimedAt,
       input.claimTokenHash,
       input.claimedBy,
       input.claimedAt,
@@ -10137,12 +10091,8 @@ export async function claimNextQueuedHuntRun(
       allowedProviders?.includes("agy") ? 1 : 0,
       allowedProviders?.includes("opencode") ? 1 : 0,
       allowedProviders?.includes("openrouter") ? 1 : 0,
-      input.workerDeviceId ?? null,
-      input.workerDeviceId ?? null,
-      input.claimedAt,
-      input.workerDeviceId ?? null,
-      input.claimedAt,
-      input.workerDeviceId ?? null,
+      input.workerId ?? null,
+      input.workerId ?? null,
     );
   const attemptStatement = db
     .prepare(

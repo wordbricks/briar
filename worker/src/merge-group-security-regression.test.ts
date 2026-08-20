@@ -15,23 +15,30 @@ describe("merge-group security regression", () => {
     expect(surface).not.toContain('workType: "mergeBatch"');
   });
 
-  it("keeps the executor shell-free and its environment allowlisted", async () => {
+  it("keeps the candidate in a networkless container without inherited credentials", async () => {
     const executor = await readFile("src-cli/merge-group-validation.ts", "utf8");
     expect(executor).toContain("shell: false");
-    expect(executor).not.toContain("/bin/bash");
     expect(executor).not.toContain('"-lc"');
     expect(executor).not.toContain("...process.env");
+    expect(executor).not.toContain("env: process.env");
+    expect(executor).toContain('"--network=none"');
+    expect(executor).toContain('"--user=65532:65532"');
+    expect(executor).toContain("dst=/candidate,ro");
+    expect(executor).toContain("repository.bundle");
+    expect(executor).not.toContain("dst=/repo/.git");
+    expect(executor).not.toContain("BRIAR_WORKER_TOKEN");
+    expect(executor).not.toContain("GH_TOKEN");
   });
 
-  it("uses one small migration table instead of a shadow merge queue", async () => {
+  it("uses a forward-only cleanup after preserving migration 0121", async () => {
     const migration = await readFile(
-      "migrations/0121_merge_group_validation_jobs.sql",
+      "migrations/0122_merge_group_executor_cleanup.sql",
       "utf8",
     );
     expect(migration.match(/create table/gu)).toHaveLength(1);
     expect(migration).toContain("create table merge_group_validation_jobs");
-    expect(migration).not.toContain("briar_repository_merge_policies");
-    expect(migration).not.toContain("briar_merge_batches");
-    expect(migration).not.toContain("candidate");
+    expect(migration).toContain("drop table if exists briar_repository_merge_policies");
+    expect(migration).toContain("drop table if exists briar_merge_batches");
+    expect(migration).toContain("drop table if exists briar_merge_batch_candidates");
   });
 });

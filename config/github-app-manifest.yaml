@@ -8,8 +8,11 @@ setup_url: https://YOUR_BRIAR_API_HOST/github/install/callback
 request_oauth_on_install: false
 public: true
 default_permissions:
+  administration: read
+  contents: read
   merge_queues: read
   pull_requests: read
+  statuses: write
 default_events:
   - merge_group
   - pull_request

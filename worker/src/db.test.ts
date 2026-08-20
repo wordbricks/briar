@@ -1020,6 +1020,20 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     );
     await executeSql(
       db,
+      await readFile(
+        resolve("migrations/0121_repository_merge_batches.sql"),
+        "utf8",
+      ),
+    );
+    await executeSql(
+      db,
+      await readFile(
+        resolve("migrations/0122_merge_group_executor_cleanup.sql"),
+        "utf8",
+      ),
+    );
+    await executeSql(
+      db,
       `alter table briar_project_agent_sessions
          add column requested_by_user_id text references "user" (id);
        alter table briar_project_agent_schedules
@@ -1036,6 +1050,8 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
        alter table briar_issue_agent_reply_jobs add column agent_name_snapshot text;
        alter table briar_issue_agent_reply_jobs
          add column agent_responsibility_snapshot text;
+       alter table briar_channel_agent_reply_jobs
+         add column claimed_worker_id text;
        create unique index briar_issue_agent_reply_jobs_agent_test_idx
          on briar_issue_agent_reply_jobs (project_id, trigger_message_id, agent_id);`,
     );
@@ -2165,6 +2181,34 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         preferred_worker_id: selected.worker.id,
       });
 
+      const validationId = "66666666-6666-4666-8666-666666666666";
+      await db.prepare(
+        `insert into merge_group_validation_jobs (
+           id, project_id, installation_id, repository_id, repository,
+           base_ref, head_ref, head_sha, base_sha, tail_pull_request_number,
+           tail_position, authority_checked_at, eligible_worker_id, state,
+           claimed_worker_id, claim_token_hash, claimed_at, lease_expires_at,
+           queued_at, started_at, created_at, updated_at
+         ) values (?, ?, 1, 1, 'example/repository', 'refs/heads/main',
+           'refs/heads/gh-readonly-queue/main/pr-1-aaaaaaaa', ?, ?, 1, 0, ?, ?,
+           'running', ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ).bind(
+        validationId,
+        projectId,
+        "a".repeat(40),
+        "b".repeat(40),
+        atMinute(11),
+        selected.worker.id,
+        selected.worker.id,
+        "6".repeat(64),
+        atMinute(11),
+        atMinute(14),
+        atMinute(11),
+        atMinute(11),
+        atMinute(11),
+        atMinute(11),
+      ).run();
+
       await expect(
         claimNextProjectAgentTask(db, projectId, {
           workerId: other.worker.id,
@@ -2174,6 +2218,22 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
           leaseExpiresAt: atMinute(14),
         }),
       ).resolves.toBeNull();
+
+      await expect(
+        claimNextProjectAgentTask(db, projectId, {
+          workerId: selected.worker.id,
+          agentProviders: ["codex"],
+          claimTokenHash,
+          claimedAt: atMinute(12),
+          leaseExpiresAt: atMinute(14),
+        }),
+      ).resolves.toBeNull();
+      await db.prepare(
+        `update merge_group_validation_jobs
+         set state = 'superseded', claim_token_hash = null,
+             claimed_worker_id = null, claimed_at = null, lease_expires_at = null,
+             superseded_at = ?, updated_at = ? where id = ?`,
+      ).bind(atMinute(12), atMinute(12), validationId).run();
 
       const claimed = await claimNextProjectAgentTask(db, projectId, {
         workerId: selected.worker.id,
@@ -2249,7 +2309,9 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     } finally {
       await executeSql(
         db,
-        `delete from briar_project_agent_task_jobs where id = '${taskId}';
+        `delete from merge_group_validation_jobs
+         where id = '66666666-6666-4666-8666-666666666666';
+         delete from briar_project_agent_task_jobs where id = '${taskId}';
          delete from briar_execution_worker_credentials
          where device_id in ('${selected.device.id}', '${other.device.id}');
          delete from briar_execution_workers

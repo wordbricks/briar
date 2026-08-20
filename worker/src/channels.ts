@@ -25,6 +25,7 @@ import {
   executionWorkerSupportsSelection,
   hasAvailableChannelReplyWorker,
 } from "./workers";
+import { workerDeviceCapacityGuardSql } from "./worker-capacity";
 
 export type ChannelRow = {
   id: string;
@@ -2337,7 +2338,8 @@ export async function claimNextChannelAgentReply(
     }
 
     const claimed = await db.prepare(
-      `update briar_channel_agent_reply_jobs
+      `with claim_clock(observed_at) as (values (?))
+       update briar_channel_agent_reply_jobs
        set status = 'running', claimed_device_id = ?, claimed_worker_id = ?,
            claim_token_hash = ?, claimed_at = ?, lease_expires_at = ?,
            attempts = attempts + case when planned_update_resume = 1 then 0 else 1 end,
@@ -2352,6 +2354,7 @@ export async function claimNextChannelAgentReply(
          )
          and ${liveChannelReplyRuntime("briar_channel_agent_reply_jobs")}
          and ${liveSkillSnapshot("briar_channel_agent_reply_jobs")}
+         and ${workerDeviceCapacityGuardSql("?")}
          and exists (
            select 1 from briar_execution_workers binding
            where binding.id = ? and binding.device_id = ?
@@ -2376,6 +2379,7 @@ export async function claimNextChannelAgentReply(
          )
        returning *`,
     ).bind(
+      input.claimedAt,
       input.deviceId,
       input.workerId,
       input.claimTokenHash,
@@ -2386,6 +2390,7 @@ export async function claimNextChannelAgentReply(
       organizationId,
       MAX_REPLY_ATTEMPTS,
       input.claimedAt,
+      input.workerId,
       input.workerId,
       input.deviceId,
     ).first<ChannelReplyJobRow>();

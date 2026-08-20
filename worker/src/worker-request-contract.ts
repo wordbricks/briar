@@ -84,6 +84,11 @@ export const MergeGroupSupersedeInput = strictSchema(Schema.Struct({
   claimToken: MergeGroupClaimToken,
   detail: trimmedText(1, 4_000),
 }));
+export const MergeGroupCiProfileInput = strictSchema(Schema.Struct({
+  enabled: Schema.Boolean,
+  baseRef: Schema.Literal("refs/heads/main"),
+  workerId: Schema.NullOr(UuidString),
+}));
 
 const ProviderHealth = strictSchema(Schema.Struct({
   installed: Schema.Boolean,
@@ -344,6 +349,9 @@ export const decodeMergeGroupReleaseInput = decodeRequestSync(
 );
 export const decodeMergeGroupSupersedeInput = decodeRequestSync(
   MergeGroupSupersedeInput,
+);
+export const decodeMergeGroupCiProfileInput = decodeRequestSync(
+  MergeGroupCiProfileInput,
 );
 export const decodeWorkerRegister = decodeRequestSync(WorkerRegister);
 export const decodeWorkerBind = decodeRequestSync(WorkerBind);
