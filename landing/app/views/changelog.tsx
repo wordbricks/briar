@@ -30,6 +30,20 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.143",
+        date: "2026년 8월 20일",
+        title: "앱 업데이트 중 실행 중인 Worker 작업을 안전하게 이어받습니다",
+        summary:
+          "앱 업데이트로 Worker가 재시작되어도 실행 중인 작업을 중복 없이 즉시 이어가고, 오래된 Worker의 늦은 기록은 안전하게 차단합니다.",
+        items: [
+          "Worker 자산이 바뀌기 전에 새 claim을 막고 provider를 중단하며 transcript·진행 상태·대화 ID·작업 공간 checkpoint를 저장합니다.",
+          "이슈·Project Agent task·이슈 답글·채널 답글을 현재 claim token으로 원자적으로 handoff해 lease 만료를 기다리지 않고 새 Worker가 이어받습니다.",
+          "계획된 인계는 재시도 횟수를 소모하지 않고, 이전 Worker의 늦은 lease 갱신·transcript·완료 요청은 fence해 중복 결과를 막습니다.",
+          "인계 실패 시 동시 실행을 허용하지 않고 lease 만료 복구로 안전하게 전환하며, Worker 상태 화면에 지연 사유와 재시도 동작을 표시합니다.",
+          "Worker 자산이 바뀌지 않은 일반 앱 재시작에서는 실행 중 Worker를 불필요하게 다시 시작하지 않습니다.",
+        ],
+      },
+      {
         version: "1.2.142",
         date: "2026년 8월 20일",
         title: "채널에서 이슈 생성과 실행 승인을 한 번에 연결합니다",
@@ -880,6 +894,20 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.143",
+        date: "August 20, 2026",
+        title: "Safely hand off active Worker jobs during app updates",
+        summary:
+          "Continue active work immediately without duplicate side effects when an app update restarts a Worker, while fencing late writes from the old Worker.",
+        items: [
+          "Drain new claims before changed Worker assets are restarted, stop the provider, and save transcript, progress, conversation ID, and workspace checkpoints.",
+          "Atomically hand off issue, Project Agent task, issue reply, and channel reply claims so a new Worker resumes without waiting for lease expiry.",
+          "Keep planned handoffs out of retry accounting and fence late lease renewals, transcript writes, and completion requests from the old Worker.",
+          "If handoff fails, prevent concurrent execution and fall back to lease-expiry recovery while showing the delay reason and retry action in Worker status UI.",
+          "Avoid restarting active Workers during ordinary app reopen when Worker assets have not changed.",
+        ],
+      },
       {
         version: "1.2.142",
         date: "August 20, 2026",
@@ -1822,7 +1850,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <p>
             <strong>Briar</strong> <span>1.2</span>
           </p>
-          <a href="#v1-2-142">
+          <a href="#v1-2-143">
             {changelog.current} <span aria-hidden="true">↓</span>
           </a>
         </div>
@@ -1844,6 +1872,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   </div>
                   <time
                     dateTime={
+                      entry.version === "1.2.143" ||
                       entry.version === "1.2.142" ||
                       entry.version === "1.2.141" ||
                       entry.version === "1.2.140"
