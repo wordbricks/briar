@@ -350,6 +350,18 @@ describe("Channels", () => {
   it("lists channels and their messages", async () => {
     await render([message()]);
     expect(container.querySelector(".channel-rail")).toBeNull();
+    const header = container.querySelector(".channel-header");
+    expect(header?.hasAttribute("data-tauri-drag-region")).toBe(true);
+    expect(
+      header
+        ?.querySelector(".channel-header-title")
+        ?.hasAttribute("data-tauri-drag-region"),
+    ).toBe(false);
+    expect(
+      header
+        ?.querySelector("button")
+        ?.hasAttribute("data-tauri-drag-region"),
+    ).toBe(false);
     expect(container.textContent).toContain("Welcome");
     expect(container.textContent).toContain("Hello team");
     expect(container.querySelector(".channel-welcome")).not.toBeNull();

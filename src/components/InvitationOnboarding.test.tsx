@@ -64,6 +64,11 @@ describe("InvitationOnboarding", () => {
       );
     });
 
+    const surface = container.querySelector(".login-shell");
+    expect(surface?.hasAttribute("data-tauri-drag-region")).toBe(true);
+    expect(
+      surface?.querySelector("button")?.hasAttribute("data-tauri-drag-region"),
+    ).toBe(false);
     expect(container.textContent).toContain("Wordbricks에 초대받았습니다.");
     expect(container.textContent).toContain("Briar 프로젝트");
     expect(container.textContent).toContain(
