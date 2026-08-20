@@ -112,7 +112,10 @@ run_app_worker() {
   fi
   bun run check
   bun run test:d1:prepare
-  bun run test
+  # Keep Miniflare and Node worker fan-out within the executor's fixed memory
+  # budget. Unbounded host-core parallelism can turn fixture startup into a
+  # timeout even when every suite passes in isolation.
+  bun run test -- --maxWorkers=1
   bash -n \
     scripts/import-apple-signing-assets.sh \
     scripts/release-ios.sh \

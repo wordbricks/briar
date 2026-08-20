@@ -16,7 +16,10 @@ describe("merge-group security regression", () => {
   });
 
   it("keeps the candidate in a networkless container without inherited credentials", async () => {
-    const executor = await readFile("src-cli/merge-group-validation.ts", "utf8");
+    const [executor, profile] = await Promise.all([
+      readFile("src-cli/merge-group-validation.ts", "utf8"),
+      readFile("scripts/ci-local.sh", "utf8"),
+    ]);
     expect(executor).toContain("shell: false");
     expect(executor).not.toContain('"-lc"');
     expect(executor).not.toContain("...process.env");
@@ -29,6 +32,7 @@ describe("merge-group security regression", () => {
     expect(executor).not.toContain("dst=/repo/.git");
     expect(executor).not.toContain("BRIAR_WORKER_TOKEN");
     expect(executor).not.toContain("GH_TOKEN");
+    expect(profile).toContain("bun run test -- --maxWorkers=1");
   });
 
   it("uses a forward-only cleanup after preserving migration 0121", async () => {
