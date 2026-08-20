@@ -1,0 +1,15 @@
+name: Briar
+url: https://YOUR_BRIAR_WEB_HOST
+hook_attributes:
+  url: https://YOUR_BRIAR_API_HOST/github/webhooks
+  active: true
+redirect_url: https://YOUR_BRIAR_API_HOST/github/oauth/callback
+setup_url: https://YOUR_BRIAR_API_HOST/github/install/callback
+request_oauth_on_install: false
+public: true
+default_permissions:
+  merge_queues: read
+  pull_requests: read
+default_events:
+  - merge_group
+  - pull_request

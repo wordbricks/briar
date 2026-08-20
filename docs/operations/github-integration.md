@@ -1,12 +1,13 @@
 # GitHub App integration
 
-Briar receives signed GitHub App webhooks and mirrors linked pull request state.
-When every pull request linked to the current run revision is merged, an issue
-waiting at an **after `pr_open`** checkpoint is approved and handed back to the
-worker queue automatically. A pull request that is merely closed never resumes
-the issue. Organization owners and admins connect the App from **Organization
-settings → Integrations → GitHub**; the GitHub user token used to verify the
-installation is never persisted.
+Briar receives signed GitHub App webhooks for linked pull requests and native
+merge groups. When every pull request linked to the current run revision is
+merged, an issue waiting at the canonical **before `merged`** checkpoint is
+approved and handed back to the worker queue automatically. The legacy
+**after `pr_open`** checkpoint remains resumable for existing runs. A pull
+request that is merely closed never resumes the issue. Organization owners and
+admins connect the App from **Organization settings → Integrations → GitHub**;
+the GitHub user token used to verify the installation is never persisted.
 
 ## 1. Create the GitHub App
 
@@ -28,11 +29,18 @@ available to GitHub accounts outside the account that owns the App. Configure:
 - Webhook URL: `https://<worker-host>/github/webhooks`
 - Webhook secret: the value of `BRIAR_GITHUB_WEBHOOK_SECRET`
 - Repository permission: **Pull requests — Read-only**
-- Subscribe to event: **Pull request**
+- Repository permission: **Merge queues — Read-only**
+- Subscribe to events: **Pull request** and **Merge group**
+
+[`config/github-app-manifest.yaml`](../../config/github-app-manifest.yaml)
+contains the reviewable permission/event template. Replace its host
+placeholders before using it to register an App.
 
 Record the App's **Client ID**, generate a **Client secret**, and record the App
 slug from `https://github.com/apps/<app-slug>`. The App does not need Contents
 write access, an App private key, or a long-lived user or installation token.
+Exact-SHA status publication uses the trusted Worker's local GitHub credential,
+not an issue agent token.
 
 GitHub sends a signed `ping` delivery when the webhook is saved. A successful
 configuration receives an HTTP 200 response from Briar.
@@ -131,6 +139,10 @@ For a current run revision with multiple linked PRs, Briar waits until all of
 them are merged. Links from an earlier attempt or revision cannot approve a
 newer checkpoint.
 
+Merge-queue enablement additionally requires a canonical checkpoint at the
+`merged:before` boundary. `briar merge-queue doctor` refuses custom workflows
+without that checkpoint.
+
 ## State and retry behavior
 
 - `opened`, `reopened`, draft, and ordinary updates store the current open state.
@@ -151,6 +163,9 @@ newer checkpoint.
 - Immediate resume is best-effort after the pause is committed. A one-minute
   scheduled reconciliation sweep retries any merged run left paused by a
   transient database failure.
+- Only a signed `merge_group.checks_requested` delivery can create an
+  exact-SHA validation job. Other merge-group actions and repositories not
+  connected to the installation create no job.
 
 GitHub does not automatically redeliver failed webhooks. Use the GitHub App's
 Recent deliveries screen to redeliver a failed request after correcting the
