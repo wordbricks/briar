@@ -110,6 +110,14 @@ durable issue work.
 Build outputs are not copied. Agents run the project's own install/setup
 commands inside the worktree.
 
+Repository merge coordinators use the same safe-copy boundary but a different
+worktree shape. They fetch GitHub's exact `gh-readonly-queue` ref, verify its
+SHA, and create a detached checkout below the project's `merge-groups`
+directory. They never reuse an issue worktree or edit the connected checkout.
+The checkout is removed after validation; durable batch and queue-entry state
+remain available if cleanup or the Worker process fails. See
+[`repository-merge-queue.md`](repository-merge-queue.md).
+
 ## Agent write access
 
 Auto Hunt worktree creation is a local runtime control-plane operation. The desktop
