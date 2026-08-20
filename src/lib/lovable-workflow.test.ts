@@ -17,11 +17,17 @@ describe("Lovable workflow preset", () => {
       stages: [
         { id: "analyzing" },
         { id: "implementing" },
+        { id: "reviewing", evidence: ["review findings"] },
         {
           id: "local_qa",
           checks: ["bun run lint", "bun run test", "bun run build"],
         },
-        { id: "pr_open" },
+        {
+          id: "pr_open",
+          evidence: ["branch", "commit", "push", "pull_request"],
+        },
+        { id: "ci_qa", evidence: ["ci", "signoff"] },
+        { id: "merged", evidence: ["merge_commit"] },
       ],
       execution: {
         checkpoints: [{
@@ -31,7 +37,15 @@ describe("Lovable workflow preset", () => {
         }],
       },
       completion: {
-        requiredStages: ["analyzing", "implementing", "local_qa", "pr_open"],
+        requiredStages: [
+          "analyzing",
+          "implementing",
+          "reviewing",
+          "local_qa",
+          "pr_open",
+          "ci_qa",
+          "merged",
+        ],
       },
     });
   });
