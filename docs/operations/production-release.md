@@ -58,7 +58,7 @@ either encrypted environment file. The Production release command requires
 `.env.keys` on the trusted release host; if it is missing the command exits
 without decrypting secrets. Never commit `.env.keys`.
 
-The release host requires macOS, the official Bun 1.3.14 binary, Rust 1.96.0,
+The release host requires macOS, the official Bun 1.4.0 binary, Rust 1.96.0,
 Xcode command-line tools, Syft, `gh`, `jq`, and a clean checkout with access to
 `origin`. The build verifies Bun against `config/bun-runtime.json`, copies it as
 a Tauri sidecar, signs it inside the app, and includes the upstream license
