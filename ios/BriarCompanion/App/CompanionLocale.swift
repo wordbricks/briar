@@ -158,6 +158,10 @@ enum L10n {
         "등록된 Skill이 없습니다.": "No skills registered.",
         "현재 실행 가능한 Worker 없음": "No worker is currently available",
         "실행 승인": "Execution approval",
+        "이슈 생성·실행 승인": "Approve issue creation and execution",
+        "이슈 내용과 실행 설정을 함께 확인합니다. 이 버튼을 한 번 승인하면 이슈를 만들고 실행을 예약합니다.": "Review the issue and execution settings together. One approval creates the issue and schedules execution.",
+        "승인하고 이슈 생성·실행": "Approve, create, and run",
+        "이슈 생성·실행 요청을 처리하지 못했습니다.": "The issue creation and execution request could not be processed.",
         "승인 시 선택한 설정으로 이슈 실행이 시작됩니다. 이슈 생성 승인과는 별개의 작업입니다.": "Approving starts the issue with the selected settings. This is separate from issue creation approval.",
         "승인하고 실행": "Approve and run",
         "생성 승인 후에도 자동 실행되지 않습니다. 별도의 실행 승인 카드가 이어서 표시됩니다.": "It will not run automatically after creation approval. A separate execution approval card will follow.",
@@ -474,6 +478,10 @@ enum L10n {
         "실행 Worker": "执行 Worker",
         "실행 가능": "可执行",
         "실행 승인": "执行批准",
+        "이슈 생성·실행 승인": "批准创建并执行问题",
+        "이슈 내용과 실행 설정을 함께 확인합니다. 이 버튼을 한 번 승인하면 이슈를 만들고 실행을 예약합니다.": "同时检查问题和执行设置。一次批准将创建问题并调度执行。",
+        "승인하고 이슈 생성·실행": "批准、创建并执行",
+        "이슈 생성·실행 요청을 처리하지 못했습니다.": "无法处理问题创建和执行请求。",
         "승인 시 선택한 설정으로 이슈 실행이 시작됩니다. 이슈 생성 승인과는 별개의 작업입니다.": "批准后将使用所选设置开始执行问题。此操作与创建问题的批准相互独立。",
         "승인하고 실행": "批准并执行",
         "생성 승인 후에도 자동 실행되지 않습니다. 별도의 실행 승인 카드가 이어서 표시됩니다.": "创建获批后不会自动执行，随后会显示单独的执行批准卡片。",
@@ -723,9 +731,12 @@ enum L10n {
         case channelIssuePriority
         case channelIssueProject
         case channelIssueCreationSafety
+        case channelIssueCreationAndExecutionSafety
         case channelIssueShowDescription
         case channelIssueHideDescription
         case channelCreateIssue
+        case channelCreateAndExecute
+        case channelRetryExecution
         case channelSelectProposalProject
         case channelViewIssue
 
@@ -773,9 +784,12 @@ enum L10n {
             case .channelIssuePriority: "우선순위 P%d"
             case .channelIssueProject: "대상 프로젝트: %@"
             case .channelIssueCreationSafety: "백로그 이슈로만 생성되며 실행은 시작되지 않습니다. 실행하려면 별도 승인이 필요합니다."
+            case .channelIssueCreationAndExecutionSafety: "이슈 내용과 실행 설정을 함께 확인합니다. 한 번 승인하면 이슈 생성과 실행 예약이 이어집니다."
             case .channelIssueShowDescription: "설명 전체 보기"
             case .channelIssueHideDescription: "설명 접기"
             case .channelCreateIssue: "승인하고 이슈 만들기"
+            case .channelCreateAndExecute: "승인하고 이슈 생성·실행"
+            case .channelRetryExecution: "실행 예약 다시 시도"
             case .channelSelectProposalProject: "프로젝트 선택"
             case .channelViewIssue: "이슈 보기"
             case .notificationHint: "선택한 분류의 새 항목이 도착하면 로컬 알림을 보냅니다."
@@ -826,9 +840,12 @@ enum L10n {
             case .channelIssuePriority: "Priority P%d"
             case .channelIssueProject: "Target project: %@"
             case .channelIssueCreationSafety: "Creates a backlog issue only; execution will not start. Separate approval is required to execute it."
+            case .channelIssueCreationAndExecutionSafety: "Review the issue and execution settings together. One approval creates the issue and schedules its execution."
             case .channelIssueShowDescription: "Show full description"
             case .channelIssueHideDescription: "Collapse description"
             case .channelCreateIssue: "Approve and create issue"
+            case .channelCreateAndExecute: "Approve, create, and run"
+            case .channelRetryExecution: "Retry execution scheduling"
             case .channelSelectProposalProject: "Select project"
             case .channelViewIssue: "View issue"
             case .notificationHint: "Local notifications fire for newly arrived items in the selected categories."
@@ -879,9 +896,12 @@ enum L10n {
             case .channelIssuePriority: "优先级 P%d"
             case .channelIssueProject: "目标项目：%@"
             case .channelIssueCreationSafety: "仅创建为待办问题，不会开始执行。执行需另行批准。"
+            case .channelIssueCreationAndExecutionSafety: "同时检查问题和执行设置。一次批准将创建问题并调度执行。"
             case .channelIssueShowDescription: "查看完整说明"
             case .channelIssueHideDescription: "收起说明"
             case .channelCreateIssue: "批准并创建问题"
+            case .channelCreateAndExecute: "批准、创建并执行"
+            case .channelRetryExecution: "重试执行调度"
             case .channelSelectProposalProject: "选择项目"
             case .channelViewIssue: "查看问题"
             case .notificationHint: "所选分类有新项目时会发送本地通知。"

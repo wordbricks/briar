@@ -316,6 +316,32 @@ final class ChannelGroupingTests: XCTestCase {
             object["projectId"] as? String,
             projectID.uuidString
         )
+        XCTAssertNil(object["execution"])
+    }
+
+    func testAcceptChannelProposalRequestEncodesCombinedExecutionSettings() throws {
+        let object = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder.mobileContract.encode(
+                    AcceptChannelProposalRequest(
+                        projectId: UUID(
+                            uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+                        ),
+                        execution: AcceptIssueExecutionProposalRequest(
+                            provider: .codex,
+                            model: "gpt-5.6-sol",
+                            effort: .high,
+                            workerId: "worker-1"
+                        )
+                    )
+                )
+            ) as? [String: Any]
+        )
+        let execution = try XCTUnwrap(object["execution"] as? [String: Any])
+        XCTAssertEqual(execution["provider"] as? String, "codex")
+        XCTAssertEqual(execution["model"] as? String, "gpt-5.6-sol")
+        XCTAssertEqual(execution["effort"] as? String, "high")
+        XCTAssertEqual(execution["workerId"] as? String, "worker-1")
     }
 
     func testChannelMessageDecodesStructuredMentionRecipients() throws {

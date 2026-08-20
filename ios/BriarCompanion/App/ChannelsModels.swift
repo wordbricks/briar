@@ -729,6 +729,15 @@ struct ToggleChannelMessageReactionResponse: Codable, Sendable {
 
 struct AcceptChannelProposalRequest: Codable, Equatable, Sendable {
     let projectId: UUID?
+    let execution: AcceptIssueExecutionProposalRequest?
+
+    init(
+        projectId: UUID?,
+        execution: AcceptIssueExecutionProposalRequest? = nil
+    ) {
+        self.projectId = projectId
+        self.execution = execution
+    }
 
     /// Approval compares project IDs as lowercase strings. Foundation's
     /// synthesized UUID encoding uses uppercase characters, which the worker
@@ -740,10 +749,11 @@ struct AcceptChannelProposalRequest: Codable, Equatable, Sendable {
         } else {
             try container.encodeNil(forKey: .projectId)
         }
+        try container.encodeIfPresent(execution, forKey: .execution)
     }
 
     private enum CodingKeys: String, CodingKey {
-        case projectId
+        case projectId, execution
     }
 }
 
@@ -751,20 +761,23 @@ struct AcceptChannelProposalResponse: Codable, Equatable, Sendable {
     let outcome: Outcome
     let projectId: UUID
     let resultRunId: UUID
-    /// A create-and-execute proposal materializes a second, pending approval
-    /// boundary in the same response. Older servers may omit this field.
+    /// Combined approval returns the materialized execution record. Older
+    /// servers and create-only responses may omit this field.
     let executionProposal: IssueExecutionProposal?
+    let dispatch: DispatchRunResponse?
 
     init(
         outcome: Outcome,
         projectId: UUID,
         resultRunId: UUID,
-        executionProposal: IssueExecutionProposal? = nil
+        executionProposal: IssueExecutionProposal? = nil,
+        dispatch: DispatchRunResponse? = nil
     ) {
         self.outcome = outcome
         self.projectId = projectId
         self.resultRunId = resultRunId
         self.executionProposal = executionProposal
+        self.dispatch = dispatch
     }
 
     enum Outcome: String, Codable, Equatable, Sendable {

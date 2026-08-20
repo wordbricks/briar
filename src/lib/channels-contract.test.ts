@@ -89,9 +89,27 @@ describe("channel message contract", () => {
       channelProposalAcceptInputSchema.parse({
         projectId: projectId.toUpperCase(),
       }),
-    ).toEqual({ projectId });
+    ).toEqual({ projectId, execution: null });
     expect(channelProposalAcceptInputSchema.parse({})).toEqual({
       projectId: null,
+      execution: null,
+    });
+    expect(channelProposalAcceptInputSchema.parse({
+      projectId,
+      execution: {
+        provider: "codex",
+        model: "gpt-5.6-sol",
+        effort: "high",
+        workerId: null,
+      },
+    })).toEqual({
+      projectId,
+      execution: {
+        provider: "codex",
+        model: "gpt-5.6-sol",
+        effort: "high",
+        workerId: null,
+      },
     });
   });
 

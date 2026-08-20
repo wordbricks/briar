@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { Miniflare } from "miniflare";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
+  addChannelAgent,
   createChannel,
   createChannelMessage,
   getChannelSyncCursor,
@@ -12,6 +13,7 @@ import worker from "./index";
 import { createOrganizationAgent } from "./organization-agents";
 import {
   claimNextQueuedHuntRun,
+  createProjectAgent,
   createIssueActionProposal,
   createIssueAttachments,
   moveHuntRun,
@@ -36,6 +38,7 @@ const projectBId = "20000000-0000-4000-8000-000000000002";
 const otherProjectId = "20000000-0000-4000-8000-000000000003";
 const channelId = "30000000-0000-4000-8000-000000000001";
 const agentId = "40000000-0000-4000-8000-000000000001";
+let projectAgentId = "";
 const ownerId = "proposal-owner";
 const memberId = "proposal-member";
 const outsiderId = "proposal-outsider";
@@ -233,6 +236,21 @@ describe("channel issue proposal approval route", () => {
       effort: null,
       createdAt: now,
     });
+    const projectAgent = await createProjectAgent(db, projectAId, {
+      name: "Builder",
+      provider: "codex",
+      model: "gpt-5.6-sol",
+      effort: "high",
+      responsibility: "Implement approved project changes.",
+      calendarColor: "#7c3aed",
+    });
+    projectAgentId = projectAgent.id;
+    await addChannelAgent(db, {
+      channelId,
+      agentId: projectAgent.id,
+      addedByUserId: ownerId,
+      createdAt: now,
+    });
   }, 60_000);
 
   afterAll(async () => {
@@ -279,6 +297,12 @@ describe("channel issue proposal approval route", () => {
     proposalId: string,
     projectId: string | null,
     token: string | null = ownerToken,
+    execution: {
+      provider: "codex";
+      model: string | null;
+      effort: "high" | "medium" | null;
+      workerId: string | null;
+    } | null = null,
   ) =>
     new Request(
       `https://briar.example/organizations/${organizationId}/channels/${channelId}/proposals/${proposalId}/accept`,
@@ -288,7 +312,7 @@ describe("channel issue proposal approval route", () => {
           ...(token ? { authorization: `Bearer ${token}` } : {}),
           "content-type": "application/json",
         },
-        body: JSON.stringify({ projectId }),
+        body: JSON.stringify({ projectId, execution }),
       },
     );
 
@@ -297,12 +321,14 @@ describe("channel issue proposal approval route", () => {
     options: {
       actionType?: "request_issue_create" | "request_plan_document";
       projectId?: string | null;
+      executeAfterCreate?: boolean;
     } = {},
   ) => {
     const suffix = sequence.toString(16).padStart(12, "0");
     const triggerId = `50000000-0000-4000-8000-${suffix}`;
     const replyId = `60000000-0000-4000-8000-${suffix}`;
     const proposalId = `70000000-0000-4000-8000-${suffix}`;
+    const proposalAgentId = options.executeAfterCreate ? projectAgentId : agentId;
     await createChannelMessage(db, {
       id: triggerId,
       channelId,
@@ -321,8 +347,8 @@ describe("channel issue proposal approval route", () => {
       channelId,
       parentMessageId: triggerId,
       authorUserId: null,
-      authorAgentId: agentId,
-      authorAgentName: "Bumble",
+      authorAgentId: proposalAgentId,
+      authorAgentName: options.executeAfterCreate ? "Builder" : "Bumble",
       authorAgentProvider: "codex",
       body: `Issue proposal ${sequence}`,
       mentionedUserIds: [],
@@ -332,12 +358,13 @@ describe("channel issue proposal approval route", () => {
     await db.prepare(
       `insert into briar_channel_action_proposals (
          id, channel_id, project_id, trigger_message_id, reply_message_id,
-         action_type, payload_json, created_at, updated_at
-       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         action_type, payload_json, execute_after_create,
+         execution_proposal_id, created_at, updated_at
+       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).bind(
       proposalId,
       channelId,
-      options.projectId ?? null,
+      options.executeAfterCreate ? projectAId : options.projectId ?? null,
       triggerId,
       replyId,
       options.actionType ?? "request_issue_create",
@@ -349,6 +376,10 @@ describe("channel issue proposal approval route", () => {
           status: "backlog",
         },
       }),
+      options.executeAfterCreate ? 1 : 0,
+      options.executeAfterCreate
+        ? `74000000-0000-4000-8000-${suffix}`
+        : null,
       now,
       now,
     ).run();
@@ -1391,6 +1422,190 @@ describe("channel issue proposal approval route", () => {
       effort: "high",
       requestedByUserId: ownerId,
     });
+  });
+
+  it("creates and dispatches exactly one issue with one authenticated approval", async () => {
+    const proposalId = await seedProposal(201, { executeAfterCreate: true });
+    const selected = await registerWorker(
+      projectAId,
+      "combined-approval",
+      new Date().toISOString(),
+    );
+    const selection = {
+      provider: "codex" as const,
+      model: "gpt-5.6-sol",
+      effort: "high" as const,
+      workerId: selected.worker.id,
+    };
+
+    const accepted = await worker.fetch(
+      request(proposalId, projectAId, ownerToken, selection),
+      env(),
+    );
+    expect(accepted.status).toBe(200);
+    const acceptedBody = await accepted.json<{
+      outcome: string;
+      projectId: string;
+      resultRunId: string;
+      executionProposal: { id: string; status: string };
+      dispatch: { runId: string; outcome: string };
+    }>();
+    expect(acceptedBody).toMatchObject({
+      outcome: "accepted",
+      projectId: projectAId,
+      executionProposal: { status: "accepted" },
+      dispatch: {
+        runId: acceptedBody.resultRunId,
+        outcome: "dispatched",
+      },
+    });
+
+    const retried = await worker.fetch(
+      request(proposalId, projectAId, ownerToken, selection),
+      env(),
+    );
+    expect(retried.status).toBe(200);
+    await expect(retried.json()).resolves.toMatchObject({
+      outcome: "already_accepted",
+      projectId: projectAId,
+      resultRunId: acceptedBody.resultRunId,
+      executionProposal: {
+        id: acceptedBody.executionProposal.id,
+        status: "accepted",
+      },
+      dispatch: {
+        runId: acceptedBody.resultRunId,
+        outcome: "already_dispatched",
+      },
+    });
+
+    await expect(db.prepare(
+      `select count(*) as count from briar_hunt_runs where ${proposalRunWhere}`,
+    ).bind(proposalId).first()).resolves.toEqual({ count: 1 });
+    await expect(db.prepare(
+      `select status, requested_agent_provider, requested_agent_model,
+              requested_agent_effort, requested_worker_id
+       from briar_hunt_runs where id = ?`,
+    ).bind(acceptedBody.resultRunId).first()).resolves.toEqual({
+      status: "queued",
+      requested_agent_provider: selection.provider,
+      requested_agent_model: selection.model,
+      requested_agent_effort: selection.effort,
+      requested_worker_id: selection.workerId,
+    });
+    await expect(db.prepare(
+      `select count(*) as count
+       from briar_issue_execution_proposals
+       where origin_create_proposal_id = ?`,
+    ).bind(proposalId).first()).resolves.toEqual({ count: 1 });
+    await expect(db.prepare(
+      `select count(*) as count
+       from briar_issue_execution_approval_audit
+       where proposal_id = ?`,
+    ).bind(acceptedBody.executionProposal.id).first()).resolves.toEqual({
+      count: 1,
+    });
+  });
+
+  it("rejects invalid integrated execution settings before creating an issue", async () => {
+    const proposalId = await seedProposal(202, { executeAfterCreate: true });
+    const rejected = await worker.fetch(
+      request(proposalId, projectAId, ownerToken, {
+        provider: "codex",
+        model: "gpt-5.6-sol",
+        effort: "high",
+        workerId: "worker-outside-the-project",
+      }),
+      env(),
+    );
+
+    expect(rejected.status).toBe(409);
+    await expect(db.prepare(
+      `select count(*) as count from briar_hunt_runs where ${proposalRunWhere}`,
+    ).bind(proposalId).first()).resolves.toEqual({ count: 0 });
+    await expect(db.prepare(
+      `select status, accepted_by_user_id, result_run_id
+       from briar_channel_action_proposals where id = ?`,
+    ).bind(proposalId).first()).resolves.toEqual({
+      status: "pending",
+      accepted_by_user_id: null,
+      result_run_id: null,
+    });
+  });
+
+  it("preserves the created issue and safely resumes a failed execution dispatch", async () => {
+    const proposalId = await seedProposal(203, { executeAfterCreate: true });
+    const selected = await registerWorker(
+      projectAId,
+      "combined-recovery",
+      new Date().toISOString(),
+    );
+    const selection = {
+      provider: "codex" as const,
+      model: "gpt-5.6-sol",
+      effort: "high" as const,
+      workerId: selected.worker.id,
+    };
+    const escapedProposalId = proposalId.replaceAll("'", "''");
+    await db.prepare(
+      `create trigger test_combined_dispatch_failure
+       before update of dispatch_request_id on briar_hunt_runs
+       when json_extract(new.context_json, '$.proposalId') = '${escapedProposalId}'
+         and new.dispatch_request_id is not null
+       begin
+         select raise(abort, 'simulated combined dispatch failure');
+       end`,
+    ).run();
+    try {
+      const failed = await worker.fetch(
+        request(proposalId, projectAId, ownerToken, selection),
+        env(),
+      );
+      expect(failed.status).toBe(500);
+      const created = await db.prepare(
+        `select id, status, dispatch_request_id
+         from briar_hunt_runs where ${proposalRunWhere}`,
+      ).bind(proposalId).all<{
+        id: string;
+        status: string;
+        dispatch_request_id: string | null;
+      }>();
+      expect(created.results).toEqual([{
+        id: expect.any(String),
+        status: "backlog",
+        dispatch_request_id: null,
+      }]);
+      await expect(db.prepare(
+        `select status, dispatch_request_id
+         from briar_issue_execution_proposals
+         where origin_create_proposal_id = ?`,
+      ).bind(proposalId).first()).resolves.toEqual({
+        status: "pending",
+        dispatch_request_id: expect.any(String),
+      });
+    } finally {
+      await db.prepare("drop trigger test_combined_dispatch_failure").run();
+    }
+
+    const recovered = await worker.fetch(
+      request(proposalId, projectAId, ownerToken, selection),
+      env(),
+    );
+    expect(recovered.status).toBe(200);
+    const recoveredBody = await recovered.json<{
+      outcome: string;
+      resultRunId: string;
+      executionProposal: { status: string };
+      dispatch: { outcome: string };
+    }>();
+    expect(recoveredBody).toMatchObject({
+      outcome: "already_accepted",
+      executionProposal: { status: "accepted" },
+      dispatch: { outcome: "dispatched" },
+    });
+    await expect(db.prepare(
+      `select count(*) as count from briar_hunt_runs where ${proposalRunWhere}`,
+    ).bind(proposalId).first()).resolves.toEqual({ count: 1 });
   });
 
   it("allows the approved provider/model/effort dispatch and Worker lifecycle", async () => {

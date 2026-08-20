@@ -400,16 +400,22 @@ export const channelMemberInputSchema = z
   .object({ role: z.enum(["owner", "member"]).default("member") })
   .strict();
 
-export const channelProposalAcceptInputSchema = z
-  .object({ projectId: canonicalUuidSchema.nullable().default(null) })
-  .strict();
-
 export const channelExecutionProposalAcceptInputSchema = z
   .object({
     provider: z.enum(channelAgentProviders),
     model: z.string().trim().min(1).max(100).nullable(),
     effort: modelEffortSchema.nullable(),
     workerId: z.string().trim().min(1).max(128).nullable(),
+  })
+  .strict();
+
+export const channelProposalAcceptInputSchema = z
+  .object({
+    projectId: canonicalUuidSchema.nullable().default(null),
+    // New clients submit the execution selection with the create approval.
+    // Keeping this nullable preserves rolling compatibility for create-only
+    // proposals and older clients that still render the follow-up card.
+    execution: channelExecutionProposalAcceptInputSchema.nullable().default(null),
   })
   .strict();
 
