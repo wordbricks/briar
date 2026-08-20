@@ -12,6 +12,7 @@ import { decodeRequestSync } from "./request-schema";
 
 export const GitHubWebhookEvent = Schema.Literals([
   "pull_request",
+  "merge_group",
   "issues",
   "ping",
   "installation",
@@ -87,6 +88,27 @@ export const GitHubPullRequestWebhookPayload = Schema.Struct({
     closed_at: NullableGitHubTimestamp,
     created_at: IsoDateTimeWithOffset,
     updated_at: IsoDateTimeWithOffset,
+  }),
+});
+
+const GitObjectSha = Schema.String.check(
+  Schema.isPattern(/^[0-9a-f]{40}$/u),
+);
+
+const GitRef = Schema.String.check(
+  Schema.isPattern(/^refs\/heads\/[A-Za-z0-9._\/-]{1,480}$/u),
+);
+
+export const GitHubMergeGroupWebhookPayload = Schema.Struct({
+  action: trimmedText(1, 100),
+  installation: GitHubInstallation,
+  repository: GitHubRepository,
+  sender: GitHubSender,
+  merge_group: Schema.Struct({
+    head_sha: GitObjectSha,
+    head_ref: GitRef,
+    base_sha: GitObjectSha,
+    base_ref: GitRef,
   }),
 });
 
@@ -208,6 +230,9 @@ export const decodeGitHubAppAuthorizationWebhookPayload =
   );
 export const decodeGitHubPullRequestWebhookPayload = decodeRequestSync(
   GitHubPullRequestWebhookPayload,
+);
+export const decodeGitHubMergeGroupWebhookPayload = decodeRequestSync(
+  GitHubMergeGroupWebhookPayload,
 );
 export const decodeGitHubIssuesWebhookPayload = decodeRequestSync(
   GitHubIssuesWebhookPayload,

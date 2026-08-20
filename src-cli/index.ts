@@ -20,6 +20,11 @@ import {
   autoHuntRequirementKinds,
   repositoryWorkflowPendingStageId,
 } from "../src/lib/auto-hunt-contract";
+import {
+  MERGE_GROUP_CI_CAPABILITY,
+  MERGE_GROUP_CI_PROTOCOL,
+  MERGE_GROUP_STATUS_CONTEXTS,
+} from "../src/lib/merge-group-validation-contract";
 import { decodeStructuredAgentResult } from "../src/lib/agent-result";
 import {
   agentExecutionCostRecordsFromObservations,
@@ -104,6 +109,7 @@ import {
   allocateAnalysisWorktree,
   allocateCachedAnalysisWorktree,
   allocateIssueWorktree,
+  allocateMergeGroupValidationWorktree,
   analysisWorktreePath,
   defaultWorktreeRoot,
   findExistingIssueWorktree,
@@ -124,6 +130,15 @@ import {
   type IssueWorktree,
   type WorktreeSettings,
 } from "./worktree";
+import {
+  assertLiveMergeGroupRef,
+  assertValidationWorktreeHead,
+  fetchExactMergeGroupHead,
+  publishMergeGroupStatus,
+  runFixedMergeGroupValidation,
+  StaleMergeGroupError,
+  type CommandRunner as MergeGroupCommandRunner,
+} from "./merge-group-validation";
 import {
   sameApiEnvironment,
   selectProjectForApi,
@@ -188,6 +203,7 @@ import {
 import {
   decodeClaimedChannelReply,
   decodeClaimedIssueReply,
+  decodeClaimedMergeGroupValidation,
   decodeClaimedProjectAgentTask,
   decodeClaimedRun,
   decodeDetachedAgentEffortOption,
@@ -197,6 +213,7 @@ import {
   decodeWorkerRegistration,
   type ClaimedChannelReply,
   type ClaimedIssueReply,
+  type ClaimedMergeGroupValidation,
   type ClaimedProjectAgentTask,
   type ClaimedRun,
   type DetachedAgentClaim,
@@ -3259,6 +3276,140 @@ async function workerSyncLabelCommand() {
   );
 }
 
+const runMergeGroupCommand: MergeGroupCommandRunner = (
+  command,
+  options = {},
+) => {
+  const result = Bun.spawnSync(command, {
+    cwd: options.cwd ?? process.cwd(),
+    stdout: "pipe",
+    stderr: "pipe",
+    env: { ...process.env, GH_PROMPT_DISABLED: "1" },
+    ...(options.timeoutMs ? { timeout: options.timeoutMs } : {}),
+  });
+  return {
+    exitCode: result.exitCode ?? 1,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  };
+};
+
+async function runClaimedMergeGroupValidation(input: {
+  config: Config;
+  project: ProjectConfig;
+  job: ClaimedMergeGroupValidation;
+  workerToken: string;
+  workerId: string;
+  signal: AbortSignal;
+  reportCheckpoint: (value: WorkerExecutionCheckpoint) => void;
+}) {
+  const { config, project, job, workerToken, workerId, signal } = input;
+  const operation = <T>(
+    name:
+      | "validation"
+      | "publication-fence"
+      | "publication-complete"
+      | "failure"
+      | "supersede",
+    body: Record<string, unknown>,
+  ) => request<T>(
+    config.apiUrl,
+    `/merge-group-validation-claims/${job.workId}/${name}`,
+    workerToken,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        projectId: project.id,
+        workerId,
+        claimToken: job.claimToken,
+        ...body,
+      }),
+    },
+  );
+  let worktreePath: string | null = null;
+  const localRef = `refs/briar/merge-group-validation/${job.workId}`;
+  try {
+    let passed = job.validationPassed;
+    if (passed === null) {
+      assertLiveMergeGroupRef(runMergeGroupCommand, job);
+      fetchExactMergeGroupHead(runGit, project.repositoryPath, job);
+      const worktree = await allocateMergeGroupValidationWorktree({
+        repositoryPath: project.repositoryPath,
+        projectId: project.id,
+        jobId: job.workId,
+        headSha: job.headSha,
+        settings: worktreeSettings(project),
+        git: runGit,
+      });
+      worktreePath = worktree.path;
+      input.reportCheckpoint({ workspacePath: worktree.path });
+      const exitCode = await runFixedMergeGroupValidation(
+        worktree.path,
+        signal,
+      );
+      if (signal.aborted) {
+        throw signal.reason ?? new Error("Merge-group validation aborted");
+      }
+      assertValidationWorktreeHead(runGit, worktree.path, job.headSha);
+      assertLiveMergeGroupRef(runMergeGroupCommand, job);
+      passed = exitCode === 0;
+      await operation("validation", {
+        headSha: job.headSha,
+        passed,
+        ...(passed ? {} : { detail: `bun run ci:local exited ${exitCode}` }),
+      });
+    }
+
+    for (const context of MERGE_GROUP_STATUS_CONTEXTS) {
+      if (signal.aborted) {
+        throw signal.reason ?? new Error("Merge-group publication aborted");
+      }
+      await operation("publication-fence", { headSha: job.headSha });
+      assertLiveMergeGroupRef(runMergeGroupCommand, job);
+      publishMergeGroupStatus(runMergeGroupCommand, {
+        repository: job.repository,
+        headSha: job.headSha,
+        context,
+        passed,
+      });
+    }
+    await operation("publication-complete", { headSha: job.headSha });
+  } catch (error) {
+    if (error instanceof StaleMergeGroupError) {
+      await operation("supersede", { detail: error.message });
+      return;
+    }
+    if (!signal.aborted) {
+      try {
+        await operation("failure", {
+          reason: "infra_error",
+          detail: error instanceof Error ? error.message : String(error),
+        });
+      } catch {
+        // A lost lease is already fenced server-side; preserve the root error.
+      }
+    }
+    throw error;
+  } finally {
+    if (worktreePath) {
+      try {
+        await removeAnalysisWorktree({
+          repositoryPath: project.repositoryPath,
+          path: worktreePath,
+          git: runGit,
+        });
+      } catch (error) {
+        console.error(
+          `merge-group worktree cleanup failed: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      }
+    }
+    runGit(["update-ref", "-d", localRef], { cwd: project.repositoryPath });
+  }
+}
+
 async function workerCommand() {
   const config = await loadConfig();
   await cleanupOrphanedOrganizationAgentWorkspaces({
@@ -3328,6 +3479,9 @@ async function workerCommand() {
               protocol: 1,
             },
             organizationAgentContext: organizationAgentContextCapability,
+            [MERGE_GROUP_CI_CAPABILITY]: {
+              protocol: MERGE_GROUP_CI_PROTOCOL,
+            },
           },
         }),
       },
@@ -3352,12 +3506,11 @@ async function workerCommand() {
   let lastTriggeredUpdateId: string | null = null;
   const result = await runWorkerLoop(
     {
-      claim: async (_options) => {
-        // The combined API claim is ordered by reply queues first and applies
-        // the regular-session limit atomically to issue/task queues. The loop
-        // still passes its local reply-only hint without adding a wire-field,
-        // keeping this endpoint compatible with older API deployments during
-        // rollout.
+      claim: async (options) => {
+        // The combined API reserves exact-SHA CI work before provider queues
+        // and applies the regular-session limit atomically. The loop
+        // passes its local reply-only hint so the server cannot return a
+        // slot-consuming validation while all execution slots are full.
         const claim = await request<{
           work: unknown;
           retryAfterMs?: number;
@@ -3371,6 +3524,7 @@ async function workerCommand() {
               claimedBy: label,
               workerId,
               projectId: project.id,
+              repliesOnly: options?.repliesOnly === true,
             }),
           },
         );
@@ -3382,6 +3536,8 @@ async function workerCommand() {
           : undefined;
         const work = workType === "issueReply"
           ? decodeClaimedIssueReply(claim.work)
+          : workType === "mergeGroupValidation"
+            ? decodeClaimedMergeGroupValidation(claim.work)
           : workType === "projectAgentTask"
             ? decodeClaimedProjectAgentTask(claim.work)
             : workType === "channelReply"
@@ -3390,6 +3546,23 @@ async function workerCommand() {
         return { work };
       },
       renewLease: async (issue) => {
+        if (issue.workType === "mergeGroupValidation") {
+          const job = decodeClaimedMergeGroupValidation(issue);
+          await request(
+            config.apiUrl,
+            `/merge-group-validation-claims/${job.workId}/lease`,
+            workerToken,
+            {
+              method: "POST",
+              body: JSON.stringify({
+                projectId: project.id,
+                workerId,
+                claimToken: job.claimToken,
+              }),
+            },
+          );
+          return;
+        }
         if (issue.workType === "projectAgentTask") {
           const task = decodeClaimedProjectAgentTask(issue);
           await request(
@@ -3517,6 +3690,7 @@ async function workerCommand() {
         );
         const providers = healthyWorkerProviders(providerHealth);
         const hasHealthyProvider = providers.length > 0;
+        const mergeGroupReady = worktreesEnabled(project);
         // Shared project workflow tools must be ready on this worker machine.
         // Prefer the requirements returned by the previous heartbeat (server is
         // source of truth); fall back to the local mirrored workflow.
@@ -3529,11 +3703,12 @@ async function workerCommand() {
         const requirementDetail =
           workflowRequirementReadinessDetail(requirementHealth);
         const toolsReady = requirementDetail === null;
-        const acceptingWork = hasHealthyProvider && toolsReady;
-        const nextReadinessState = !hasHealthyProvider || !toolsReady
+        const acceptingWork = (hasHealthyProvider || mergeGroupReady) && toolsReady;
+        const nextReadinessState = (!hasHealthyProvider && !mergeGroupReady) ||
+            !toolsReady
           ? "needs_attention"
           : readinessState;
-        const nextReadinessDetail = !hasHealthyProvider
+        const nextReadinessDetail = !hasHealthyProvider && !mergeGroupReady
           ? providerHealthReadinessDetail(providerHealth)
           : requirementDetail;
         const heartbeat = await request<{
@@ -3567,6 +3742,13 @@ async function workerCommand() {
                   protocol: 1,
                 },
                 organizationAgentContext: organizationAgentContextCapability,
+                ...(mergeGroupReady
+                  ? {
+                      [MERGE_GROUP_CI_CAPABILITY]: {
+                        protocol: MERGE_GROUP_CI_PROTOCOL,
+                      },
+                    }
+                  : {}),
                 workflowRequirements: requirementHealth.map((item) => ({
                   id: item.id,
                   healthy: item.healthy,
@@ -3622,7 +3804,7 @@ async function workerCommand() {
             );
             const refreshedDetail =
               workflowRequirementReadinessDetail(refreshedHealth);
-            if (refreshedDetail || !hasHealthyProvider) {
+            if (refreshedDetail || (!hasHealthyProvider && !mergeGroupReady)) {
               effectiveAcceptingWork = false;
               await request(
                 config.apiUrl,
@@ -3634,7 +3816,7 @@ async function workerCommand() {
                     versions: { briar: cliVersion },
                     acceptingWork: false,
                     readinessState: "needs_attention",
-                    readinessDetail: !hasHealthyProvider
+                    readinessDetail: !hasHealthyProvider && !mergeGroupReady
                       ? providerHealthReadinessDetail(providerHealth)
                       : refreshedDetail,
                     capabilities: {
@@ -3647,6 +3829,13 @@ async function workerCommand() {
                         protocol: 1,
                       },
                       organizationAgentContext: organizationAgentContextCapability,
+                      ...(mergeGroupReady
+                        ? {
+                            [MERGE_GROUP_CI_CAPABILITY]: {
+                              protocol: MERGE_GROUP_CI_PROTOCOL,
+                            },
+                          }
+                        : {}),
                       workflowRequirements: refreshedHealth.map((item) => ({
                         id: item.id,
                         healthy: item.healthy,
@@ -3667,6 +3856,25 @@ async function workerCommand() {
         };
       },
       handoff: async (issue, requestId, checkpoint) => {
+        if (issue.workType === "mergeGroupValidation") {
+          const job = decodeClaimedMergeGroupValidation(issue);
+          await request(
+            config.apiUrl,
+            `/merge-group-validation-claims/${job.workId}/handoff`,
+            workerToken,
+            {
+              method: "POST",
+              body: JSON.stringify({
+                projectId: project.id,
+                workerId,
+                claimToken: job.claimToken,
+                reason: "planned_update",
+                detail: `Worker update ${requestId}`,
+              }),
+            },
+          );
+          return;
+        }
         const workType = issue.workType ?? "issue";
         const workId = issue.workId ?? issue.runId;
         await request(
@@ -3691,6 +3899,18 @@ async function workerCommand() {
         );
       },
       runIssue: async (issue, signal, reportCheckpoint) => {
+        if (issue.workType === "mergeGroupValidation") {
+          await runClaimedMergeGroupValidation({
+            config,
+            project,
+            job: decodeClaimedMergeGroupValidation(issue),
+            workerToken,
+            workerId,
+            signal,
+            reportCheckpoint,
+          });
+          return;
+        }
         if (issue.workType === "projectAgentTask") {
           const task = decodeClaimedProjectAgentTask(issue);
           await runProjectAgentTaskCompletionFlow({

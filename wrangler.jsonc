@@ -41,6 +41,7 @@
       "/projects*",
       "/workers*",
       "/worker-claims",
+      "/merge-group-validation-claims*",
       "/runs*",
       "/transcripts",
       "/issue-reply-claims*",

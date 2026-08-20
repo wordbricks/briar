@@ -2695,9 +2695,21 @@ export async function countExecutionWorkerDeviceSessions(
            on worker.id = reply.claimed_worker_id
          where worker.device_id = ? and reply.status = 'running'
            and reply.lease_expires_at > ?
+         union all
+         select validation.id
+         from merge_group_validation_jobs validation
+         join briar_execution_workers worker
+           on worker.id = validation.claimed_worker_id
+         where worker.device_id = ?
+           and validation.claim_token_hash is not null
+           and validation.lease_expires_at > ?
+           and validation.state in ('running', 'validated', 'failed')
+           and validation.published_at is null
        ) active_work`,
     )
     .bind(
+      deviceId,
+      observedAt,
       deviceId,
       observedAt,
       deviceId,

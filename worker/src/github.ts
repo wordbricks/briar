@@ -4,6 +4,7 @@ import {
   decodeGitHubInstallationRepositoriesWebhookPayload,
   decodeGitHubInstallationWebhookPayload,
   decodeGitHubIssuesWebhookPayload,
+  decodeGitHubMergeGroupWebhookPayload,
   decodeGitHubOAuthErrorResponseOption,
   decodeGitHubOAuthTokenOption,
   decodeGitHubPingWebhookPayload,
@@ -387,6 +388,18 @@ export function parseGitHubWebhook(
       closedAt: normalizeNullableGitHubTimestamp(pullRequest.closed_at),
       createdAt: normalizeGitHubTimestamp(pullRequest.created_at),
       providerUpdatedAt: normalizeGitHubTimestamp(pullRequest.updated_at),
+    };
+  }
+
+  if (headers.event === "merge_group") {
+    const parsed = decodeGitHubMergeGroupWebhookPayload(payload);
+    return {
+      ...commonWebhookFields(headers, parsed),
+      event: "merge_group" as const,
+      headSha: parsed.merge_group.head_sha,
+      headRef: parsed.merge_group.head_ref,
+      baseSha: parsed.merge_group.base_sha,
+      baseRef: parsed.merge_group.base_ref,
     };
   }
 

@@ -36,12 +36,53 @@ export const WorkerClaimInput = strictSchema(Schema.Struct({
   claimedBy: trimmedText(1, 128),
   workerId: trimmedText(1, 128),
   projectId: UuidString,
+  repliesOnly: defaulted(Schema.Boolean, false),
 }));
 
 export const IssueReplyClaimInput = strictSchema(Schema.Struct({
   claimedBy: trimmedText(1, 128),
   workerId: trimmedText(1, 128),
   projectId: UuidString,
+}));
+
+const MergeGroupClaimToken = Schema.String.check(
+  Schema.isStartsWith("briar_merge_group_claim_"),
+);
+const GitObjectSha = Schema.String.check(
+  Schema.isPattern(/^[0-9a-f]{40}$/u),
+);
+const MergeGroupClaimFence = {
+  projectId: UuidString,
+  workerId: trimmedText(1, 128),
+  claimToken: MergeGroupClaimToken,
+  headSha: GitObjectSha,
+};
+
+export const MergeGroupLeaseInput = strictSchema(Schema.Struct({
+  projectId: UuidString,
+  workerId: trimmedText(1, 128),
+  claimToken: MergeGroupClaimToken,
+}));
+export const MergeGroupValidationInput = strictSchema(Schema.Struct({
+  ...MergeGroupClaimFence,
+  passed: Schema.Boolean,
+  detail: Schema.optional(Schema.NullOr(trimmedText(1, 4_000))),
+}));
+export const MergeGroupPublicationInput = strictSchema(Schema.Struct({
+  ...MergeGroupClaimFence,
+}));
+export const MergeGroupReleaseInput = strictSchema(Schema.Struct({
+  projectId: UuidString,
+  workerId: trimmedText(1, 128),
+  claimToken: MergeGroupClaimToken,
+  reason: Schema.Literals(["planned_update", "infra_error"]),
+  detail: Schema.optional(Schema.NullOr(trimmedText(1, 4_000))),
+}));
+export const MergeGroupSupersedeInput = strictSchema(Schema.Struct({
+  projectId: UuidString,
+  workerId: trimmedText(1, 128),
+  claimToken: MergeGroupClaimToken,
+  detail: trimmedText(1, 4_000),
 }));
 
 const ProviderHealth = strictSchema(Schema.Struct({
@@ -288,6 +329,21 @@ export const decodeClaimInput = decodeRequestSync(ClaimInput);
 export const decodeWorkerClaimInput = decodeRequestSync(WorkerClaimInput);
 export const decodeIssueReplyClaimInput = decodeRequestSync(
   IssueReplyClaimInput,
+);
+export const decodeMergeGroupLeaseInput = decodeRequestSync(
+  MergeGroupLeaseInput,
+);
+export const decodeMergeGroupValidationInput = decodeRequestSync(
+  MergeGroupValidationInput,
+);
+export const decodeMergeGroupPublicationInput = decodeRequestSync(
+  MergeGroupPublicationInput,
+);
+export const decodeMergeGroupReleaseInput = decodeRequestSync(
+  MergeGroupReleaseInput,
+);
+export const decodeMergeGroupSupersedeInput = decodeRequestSync(
+  MergeGroupSupersedeInput,
 );
 export const decodeWorkerRegister = decodeRequestSync(WorkerRegister);
 export const decodeWorkerBind = decodeRequestSync(WorkerBind);

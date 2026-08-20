@@ -219,6 +219,38 @@ export const ClaimedRun = Schema.Struct({
 export type ClaimedRun = typeof ClaimedRun.Type;
 export const decodeClaimedRun = Schema.decodeUnknownSync(ClaimedRun);
 
+const GitObjectSha = Schema.String.check(
+  Schema.isPattern(/^[0-9a-f]{40}$/u),
+);
+
+export const ClaimedMergeGroupValidation = strict(Schema.Struct({
+  workType: Schema.Literal("mergeGroupValidation"),
+  workId: Uuid,
+  runId: Uuid,
+  sourceKey: Schema.NonEmptyString,
+  title: Schema.NonEmptyString,
+  claimToken: Schema.String.check(
+    Schema.isStartsWith("briar_merge_group_claim_"),
+  ),
+  claimAttempts: PositiveInteger,
+  claimedAt: IsoDateTimeWithOffset,
+  leaseExpiresAt: IsoDateTimeWithOffset,
+  state: Schema.Literals(["running", "validated", "failed"]),
+  repository: Schema.NonEmptyString,
+  repositoryId: PositiveInteger,
+  installationId: PositiveInteger,
+  baseRef: Schema.NonEmptyString,
+  headRef: Schema.NonEmptyString,
+  headSha: GitObjectSha,
+  baseSha: GitObjectSha,
+  validationPassed: Schema.NullOr(Schema.Boolean),
+}));
+export type ClaimedMergeGroupValidation =
+  typeof ClaimedMergeGroupValidation.Type;
+export const decodeClaimedMergeGroupValidation = Schema.decodeUnknownSync(
+  ClaimedMergeGroupValidation,
+);
+
 export const ClaimedProjectAgentTask = Schema.Struct({
   workType: Schema.Literal("projectAgentTask"),
   workId: Uuid,

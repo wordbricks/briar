@@ -7,6 +7,7 @@ import {
   allocateAnalysisWorktree,
   allocateCachedAnalysisWorktree,
   allocateIssueWorktree,
+  allocateMergeGroupValidationWorktree,
   assertPathWithinRoot,
   compactWorktreeArtifacts,
   COMPLETED_WORKTREE_RETENTION_MS,
@@ -845,6 +846,42 @@ describe("symlinked roots", () => {
 
     expect(worktree).toMatchObject({ path: canonical, reused: true });
     expect(calls.some((gitArgs) => gitArgs[0] === "worktree" && gitArgs[1] === "add")).toBe(false);
+  });
+});
+
+describe("merge-group validation worktrees", () => {
+  it("creates an exact detached checkout without copying ignored secrets", async () => {
+    const root = await temporaryDirectory("briar-merge-group-");
+    const headSha = "a".repeat(40);
+    const { git, calls } = fakeGit((gitArgs) => {
+      if (gitArgs[0] === "worktree" && gitArgs[1] === "list") {
+        return ok("worktree /repo\nbranch refs/heads/main\n");
+      }
+      if (gitArgs[0] === "rev-parse") return ok(`${headSha}\n`);
+      return ok();
+    });
+    const result = await allocateMergeGroupValidationWorktree({
+      repositoryPath: "/repo",
+      projectId: "11111111-1111-4111-8111-111111111111",
+      jobId: "22222222-2222-4222-8222-222222222222",
+      headSha,
+      settings: { root, branchPrefix: "unused" },
+      git,
+    });
+
+    expect(result).toMatchObject({
+      baseRef: headSha,
+      baseSha: headSha,
+      includedPaths: [],
+      reused: false,
+    });
+    expect(calls).toContainEqual([
+      "worktree",
+      "add",
+      "--detach",
+      result.path,
+      headSha,
+    ]);
   });
 });
 

@@ -164,6 +164,36 @@ describe("GitHub webhooks", () => {
     });
   });
 
+  it("parses immutable merge-group identity only from the signed payload", () => {
+    expect(parseGitHubWebhook(
+      { event: "merge_group", deliveryId },
+      {
+        action: "checks_requested",
+        installation: { id: 901 },
+        repository: { id: 701, full_name: "wordbricks/briar" },
+        sender: { login: "github-merge-queue[bot]" },
+        merge_group: {
+          head_sha: "a".repeat(40),
+          head_ref: "refs/heads/gh-readonly-queue/main/pr-42-deadbeef",
+          base_sha: "b".repeat(40),
+          base_ref: "refs/heads/main",
+        },
+      },
+    )).toEqual({
+      deliveryId,
+      event: "merge_group",
+      action: "checks_requested",
+      installationId: 901,
+      repositoryId: 701,
+      repositoryFullName: "wordbricks/briar",
+      senderLogin: "github-merge-queue[bot]",
+      headSha: "a".repeat(40),
+      headRef: "refs/heads/gh-readonly-queue/main/pr-42-deadbeef",
+      baseSha: "b".repeat(40),
+      baseRef: "refs/heads/main",
+    });
+  });
+
   it("normalizes an open pull request and its provider timestamp", () => {
     const parsed = parseGitHubWebhook(
       pullRequestHeaders,

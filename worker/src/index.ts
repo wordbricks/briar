@@ -20,6 +20,10 @@ import {
   type AutoHuntWorkflowStageId,
 } from "../../src/lib/auto-hunt-contract";
 import {
+  MERGE_GROUP_CI_CAPABILITY,
+  MERGE_GROUP_CI_PROTOCOL,
+} from "../../src/lib/merge-group-validation-contract";
+import {
   decodeStructuredAgentResultOption,
   type StructuredAgentResult,
 } from "../../src/lib/agent-result";
@@ -393,6 +397,17 @@ import {
   verifyGitHubWebhook,
 } from "./github";
 import {
+  claimNextMergeGroupValidationJob,
+  completeMergeGroupStatusPublication,
+  enqueueMergeGroupValidationJob,
+  fenceMergeGroupStatusPublication,
+  mergeGroupValidationProject,
+  recordMergeGroupValidation,
+  releaseMergeGroupValidationClaim,
+  renewMergeGroupValidationLease,
+  supersedeMergeGroupValidationJob,
+} from "./merge-group-validation";
+import {
   assertStoredCheckpointPoliciesCompatible,
   checkpointPolicyJson,
   isStoredWorkflowUnchanged,
@@ -558,6 +573,11 @@ import {
   decodeDispatchRun,
   decodeExecutionWorkerPolicy,
   decodeIssueReplyClaimInput,
+  decodeMergeGroupLeaseInput,
+  decodeMergeGroupPublicationInput,
+  decodeMergeGroupReleaseInput,
+  decodeMergeGroupSupersedeInput,
+  decodeMergeGroupValidationInput,
   decodeLeaseRenew,
   decodeProjectAgentScheduleRunCompletion,
   decodeProjectAgentScheduleRunRenew,
@@ -3894,6 +3914,49 @@ async function handleGithubWebhookRequest(request: Request, env: Env) {
         event: event.event,
         ignored: true,
         reason: "integration_disconnected",
+      });
+    }
+    if (event.event === "merge_group") {
+      let jobId: string | null = null;
+      let reason: string | null = null;
+      if (event.action !== "checks_requested") {
+        reason = "action_not_checks_requested";
+      } else if (connection?.status !== "connected") {
+        reason = "integration_unconnected";
+      } else {
+        const project = await mergeGroupValidationProject(env.DB, {
+          installationId: event.installationId,
+          repositoryId: event.repositoryId,
+          repository: event.repositoryFullName,
+        });
+        if (!project) {
+          reason = "repository_unconnected";
+        } else {
+          const job = await enqueueMergeGroupValidationJob(env.DB, {
+            projectId: project.id,
+            installationId: event.installationId,
+            repositoryId: event.repositoryId,
+            repository: event.repositoryFullName,
+            baseRef: event.baseRef,
+            headRef: event.headRef,
+            headSha: event.headSha,
+            baseSha: event.baseSha,
+            queuedAt: claimedAt,
+          });
+          jobId = job?.id ?? null;
+        }
+      }
+      await completeGithubDelivery(
+        env.DB,
+        event.deliveryId,
+        claimedAt,
+        new Date().toISOString(),
+      );
+      return json({
+        ok: true,
+        event: event.event,
+        action: event.action,
+        ...(jobId ? { jobId } : { ignored: true, reason }),
       });
     }
     if (event.event === "issues") {
@@ -12453,13 +12516,13 @@ async function route(
       input.workerId,
     );
     const claimRoutes = [
+      ...(input.repliesOnly ? [] : [{
+        pathname: "/merge-group-validation-claims",
+        body: input,
+      }]),
       {
         pathname: "/issue-reply-claims",
         body: input,
-      },
-      {
-        pathname: "/agent-task-claims",
-        body: { workerId: input.workerId, projectId: input.projectId },
       },
       {
         pathname: "/channel-reply-claims",
@@ -12468,10 +12531,13 @@ async function route(
           workerId: input.workerId,
         },
       },
-      {
+      ...(input.repliesOnly ? [] : [{
+        pathname: "/agent-task-claims",
+        body: { workerId: input.workerId, projectId: input.projectId },
+      }, {
         pathname: "/queue/claims",
         body: input,
-      },
+      }]),
     ];
     for (const candidate of claimRoutes) {
       const internalRequest = new Request(
@@ -12495,6 +12561,172 @@ async function route(
       if (result.work !== null) return json({ work: result.work });
     }
     return json({ work: null, retryAfterMs: 15_000 });
+  }
+
+  if (
+    pathname === "/merge-group-validation-claims" &&
+    request.method === "POST"
+  ) {
+    const input = decodeWorkerClaimInput(await readJson(request));
+    const authenticatedWorker = await requireWorkerProjectBinding(
+      db,
+      request,
+      input.projectId,
+      input.workerId,
+      workerClaimContext,
+    );
+    const claimedAt = new Date().toISOString();
+    if (
+      input.repliesOnly ||
+      workerStateAt(
+        authenticatedWorker.binding.last_heartbeat_at,
+        claimedAt,
+        authenticatedWorker.binding.state,
+      ) !== "online" ||
+      authenticatedWorker.binding.accepting_work !== 1 ||
+      authenticatedWorker.binding.readiness_state === "needs_attention"
+    ) {
+      return json({ work: null });
+    }
+    const capability = await db.prepare(
+      `select json_extract(capabilities_json, ?) as protocol
+       from briar_execution_workers where id = ? and project_id = ?`,
+    ).bind(
+      `$.${MERGE_GROUP_CI_CAPABILITY}.protocol`,
+      authenticatedWorker.binding.id,
+      input.projectId,
+    ).first<number>("protocol");
+    if (capability !== MERGE_GROUP_CI_PROTOCOL) {
+      return json({ work: null });
+    }
+    const active = await countExecutionWorkerDeviceSessions(
+      db,
+      authenticatedWorker.principal.deviceId,
+      claimedAt,
+    );
+    if (
+      active >= (authenticatedWorker.binding.max_concurrent_sessions ?? 1)
+    ) {
+      return json({ work: null });
+    }
+    const claimToken =
+      `briar_merge_group_claim_${crypto.randomUUID().replaceAll("-", "")}` +
+      crypto.randomUUID().replaceAll("-", "");
+    const job = await claimNextMergeGroupValidationJob(db, input.projectId, {
+      workerId: authenticatedWorker.binding.id,
+      claimTokenHash: await sha256(claimToken),
+      claimedAt,
+      leaseExpiresAt: leaseExpiryFrom(claimedAt),
+    });
+    return json({
+      work: job
+        ? {
+            workType: "mergeGroupValidation",
+            workId: job.id,
+            runId: job.id,
+            sourceKey:
+              `merge-group:${job.repository}:${job.base_ref}:${job.head_sha}`,
+            title: `${job.repository} merge-group validation`,
+            claimToken,
+            claimAttempts: job.attempts,
+            claimedAt: job.claimed_at,
+            leaseExpiresAt: job.lease_expires_at,
+            state: job.state,
+            repository: job.repository,
+            repositoryId: job.repository_id,
+            installationId: job.installation_id,
+            baseRef: job.base_ref,
+            headRef: job.head_ref,
+            headSha: job.head_sha,
+            baseSha: job.base_sha,
+            validationPassed: job.validated_at === null
+              ? null
+              : job.state === "validated",
+          }
+        : null,
+    });
+  }
+
+  const mergeGroupClaimOperationMatch = pathname.match(
+    /^\/merge-group-validation-claims\/([0-9a-f-]+)\/(lease|validation|publication-fence|publication-complete|failure|supersede|handoff)$/u,
+  );
+  if (mergeGroupClaimOperationMatch && request.method === "POST") {
+    const jobId = mergeGroupClaimOperationMatch[1];
+    const operation = mergeGroupClaimOperationMatch[2];
+    const raw = await readJson(request);
+    const observedAt = new Date().toISOString();
+    const fenceFor = async (input: {
+      projectId: string;
+      workerId: string;
+      claimToken: string;
+    }) => {
+      const authenticatedWorker = await requireWorkerProjectBinding(
+        db,
+        request,
+        input.projectId,
+        input.workerId,
+        workerClaimContext,
+      );
+      return {
+        jobId,
+        projectId: input.projectId,
+        workerId: authenticatedWorker.binding.id,
+        claimTokenHash: await sha256(input.claimToken),
+        authenticatedAt: observedAt,
+      };
+    };
+    let result;
+    if (operation === "lease") {
+      const input = decodeMergeGroupLeaseInput(raw);
+      result = await renewMergeGroupValidationLease(db, {
+        ...await fenceFor(input),
+        leaseExpiresAt: leaseExpiryFrom(observedAt),
+      });
+    } else if (operation === "validation") {
+      const input = decodeMergeGroupValidationInput(raw);
+      result = await recordMergeGroupValidation(db, {
+        ...await fenceFor(input),
+        headSha: input.headSha,
+        passed: input.passed,
+        detail: input.detail,
+      });
+    } else if (operation === "publication-fence") {
+      const input = decodeMergeGroupPublicationInput(raw);
+      result = await fenceMergeGroupStatusPublication(db, {
+        ...await fenceFor(input),
+        headSha: input.headSha,
+        leaseExpiresAt: leaseExpiryFrom(observedAt),
+      });
+    } else if (operation === "publication-complete") {
+      const input = decodeMergeGroupPublicationInput(raw);
+      result = await completeMergeGroupStatusPublication(db, {
+        ...await fenceFor(input),
+        headSha: input.headSha,
+      });
+    } else if (operation === "supersede") {
+      const input = decodeMergeGroupSupersedeInput(raw);
+      result = await supersedeMergeGroupValidationJob(db, {
+        ...await fenceFor(input),
+        detail: input.detail,
+      });
+    } else {
+      const input = decodeMergeGroupReleaseInput(raw);
+      if (
+        (operation === "handoff" && input.reason !== "planned_update") ||
+        (operation === "failure" && input.reason !== "infra_error")
+      ) {
+        throw new HttpError(400, "Merge-group release reason is invalid");
+      }
+      result = await releaseMergeGroupValidationClaim(db, {
+        ...await fenceFor(input),
+        reason: input.reason,
+        detail: input.detail,
+      });
+    }
+    if (!result) {
+      throw new HttpError(409, "Merge-group claim fence changed");
+    }
+    return json({ job: result });
   }
 
   if (pathname === "/issue-reply-claims" && request.method === "POST") {
