@@ -2819,7 +2819,7 @@ export const workerRegisterSchema = z
     agentProvider: z.enum(agentProviders),
     providers: z
       .array(z.enum(agentProviders))
-      .max(4)
+      .max(agentProviders.length)
       .optional(),
     providerHealth: providerHealthSchema.optional(),
     providerCapabilities: agentProviderCapabilityCatalogSchema.optional(),
