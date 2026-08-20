@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   configureLocalExecutionWorker,
   connectLocalProject,
+  inspectLovableRepositoryCompatibility,
   inspectRepositoryReadiness,
   inspectVelen,
   resolveProjectConnectionWorkflow,
@@ -47,6 +48,15 @@ describe("local project connection", () => {
       repositoryPath: "/home/dev/briar",
       autoHunt: expect.objectContaining({ velenOrg: "wordbricks" }),
     });
+  });
+
+  it("requests a read-only Lovable compatibility inspection", async () => {
+    await inspectLovableRepositoryCompatibility("/home/dev/lovable-app");
+
+    expect(invoke).toHaveBeenCalledWith(
+      "inspect_lovable_repository_compatibility",
+      { repositoryPath: "/home/dev/lovable-app" },
+    );
   });
 
   it("inspects Velen on the local machine", async () => {
@@ -143,5 +153,32 @@ describe("local project connection", () => {
       shouldPersistProjectSettings: true,
     });
     expect(generateWorkflow).toHaveBeenCalledOnce();
+  });
+
+  it("persists a compatible preset without calling repository analysis", async () => {
+    const generateWorkflow = vi.fn();
+    const preset = {
+      version: 2 as const,
+      requirements: [],
+      stages: [
+        { id: "implementing", label: "Implement", required: true },
+        { id: "local_qa", label: "Local QA", required: true },
+      ],
+      execution: { checkpoints: [] },
+      completion: { requiredStages: ["implementing", "local_qa"] },
+    };
+
+    await expect(
+      resolveProjectConnectionWorkflow(
+        "admin",
+        repositoryWorkflowBootstrap,
+        generateWorkflow,
+        preset,
+      ),
+    ).resolves.toEqual({
+      workflow: preset,
+      shouldPersistProjectSettings: true,
+    });
+    expect(generateWorkflow).not.toHaveBeenCalled();
   });
 });

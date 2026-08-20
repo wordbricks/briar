@@ -2657,6 +2657,7 @@ export function App() {
             setRequestedSessionId(null);
             resetNavigation("lobby");
           }}
+          onInspectLovableRepository={briar.inspectLovableProject}
           onReviseWorkflow={briar.reviseWorkflow}
           onRepositorySelect={briar.selectProjectRepository}
           onRepositoryInspect={briar.inspectProjectRepository}
