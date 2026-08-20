@@ -505,9 +505,10 @@ struct ExecutionConfigurationFields: View {
     }
 }
 
-/// Explicit second-step confirmation used by channel and issue conversations.
+/// Explicit execution confirmation used by channel and issue conversations.
 /// Opening this sheet never dispatches; only its confirmation action sends the
-/// user-selected settings to the proposal-specific approval endpoint.
+/// user-selected settings to the proposal-specific approval endpoint. Channel
+/// create-and-execute proposals use the same sheet as their single boundary.
 struct ExecutionProposalApprovalSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var preferences: IssueExecutionPreferences
@@ -523,6 +524,7 @@ struct ExecutionProposalApprovalSheet: View {
     let policy: ProjectExecutionWorkerPolicy?
     let locale: CompanionLocale
     let delegationNotice: String?
+    let createsIssue: Bool
     let approve: @MainActor (AcceptIssueExecutionProposalRequest) async throws -> Bool
 
     init(
@@ -532,6 +534,8 @@ struct ExecutionProposalApprovalSheet: View {
         policy: ProjectExecutionWorkerPolicy? = nil,
         locale: CompanionLocale,
         delegationNotice: String? = nil,
+        createsIssue: Bool = false,
+        initialRequest: AcceptIssueExecutionProposalRequest? = nil,
         approve: @escaping @MainActor (AcceptIssueExecutionProposalRequest) async throws -> Bool
     ) {
         self.targetTitle = targetTitle
@@ -551,17 +555,21 @@ struct ExecutionProposalApprovalSheet: View {
         self.policy = policy
         self.locale = locale
         self.delegationNotice = delegationNotice
+        self.createsIssue = createsIssue
         self.approve = approve
+        let initialProvider = initialRequest.map(\.provider).flatMap { provider in
+            presentedProviders.contains(provider) ? provider : nil
+        } ?? presentedProviders.first
         _preferences = State(initialValue: IssueExecutionPreferences(
-            provider: presentedProviders.first,
-            model: nil,
-            effort: nil
+            provider: initialProvider,
+            model: initialRequest?.model,
+            effort: initialRequest?.effort
         ))
-        let preferredWorkerID = policy?.defaultWorkerId
+        let preferredWorkerID = initialRequest?.workerId ?? policy?.defaultWorkerId
         _workerID = State(initialValue: preferredWorkerID.flatMap { workerID in
             eligibleExecutionWorkers(
                 workers: workers,
-                provider: presentedProviders.first,
+                provider: initialProvider,
                 policy: policy
             ).contains(where: {
                 $0.id == workerID && $0.readiness == "available"
@@ -572,13 +580,20 @@ struct ExecutionProposalApprovalSheet: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section(L10n.text("실행 승인", locale: locale)) {
+                Section(
+                    L10n.text(
+                        createsIssue ? "이슈 생성·실행 승인" : "실행 승인",
+                        locale: locale
+                    )
+                ) {
                     Text(targetTitle)
                         .font(.headline)
                         .fixedSize(horizontal: false, vertical: true)
                     Text(
                         L10n.text(
-                            "승인 시 선택한 설정으로 이슈 실행이 시작됩니다. 이슈 생성 승인과는 별개의 작업입니다.",
+                            createsIssue
+                                ? "이슈 내용과 실행 설정을 함께 확인합니다. 이 버튼을 한 번 승인하면 이슈를 만들고 실행을 예약합니다."
+                                : "승인 시 선택한 설정으로 이슈 실행이 시작됩니다. 이슈 생성 승인과는 별개의 작업입니다.",
                             locale: locale
                         )
                     )
@@ -606,7 +621,12 @@ struct ExecutionProposalApprovalSheet: View {
                     Text(errorMessage).foregroundStyle(.red)
                 }
             }
-            .navigationTitle(L10n.text("실행 승인", locale: locale))
+            .navigationTitle(
+                L10n.text(
+                    createsIssue ? "이슈 생성·실행 승인" : "실행 승인",
+                    locale: locale
+                )
+            )
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(L10n.text("취소", locale: locale)) { dismiss() }
@@ -620,7 +640,14 @@ struct ExecutionProposalApprovalSheet: View {
                         } else if submitting {
                             ProgressView()
                         } else {
-                            Text(L10n.text("승인하고 실행", locale: locale))
+                            Text(
+                                L10n.text(
+                                    createsIssue
+                                        ? "승인하고 이슈 생성·실행"
+                                        : "승인하고 실행",
+                                    locale: locale
+                                )
+                            )
                         }
                     }
                     .disabled(

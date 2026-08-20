@@ -1168,7 +1168,9 @@ describe("detached Agent runner", () => {
       }],
     });
     expect(organizationPrompt).toContain("executionProposal must always be null");
-    expect(organizationPrompt).toContain("delegate every create-and-execute");
+    expect(organizationPrompt).toContain(
+      "create, create-and-execute, or execution proposal",
+    );
 
     const projectPrompt = detachedChannelReplyPrompt({
       agent: {
@@ -1198,6 +1200,41 @@ describe("detached Agent runner", () => {
     expect(projectPrompt).toContain("workspace-relative path in attachments");
     expect(projectPrompt).toContain('"attachments":["screenshot.png"]');
   });
+
+  it.each([
+    "로그인 실패 문제를 고쳐줘",
+    "배포 설정을 바꾸고 운영에 반영해 줄래?",
+    "Can you implement the empty state from this discussion?",
+    "Please migrate the channel records to the new schema.",
+  ])(
+    "routes semantic project-changing wording through one create-and-execute approval: %s",
+    (body) => {
+      const prompt = detachedChannelReplyPrompt({
+        agent: {
+          ...agent,
+          scope: {
+            kind: "project",
+            organizationId: "11111111-1111-4111-8111-111111111111",
+            projectId: "22222222-2222-4222-8222-222222222222",
+          },
+        },
+        snapshot: { messages: [{ body }] },
+        workspaceAvailable: true,
+      });
+
+      expect(prompt).toContain(body);
+      expect(prompt).toContain(
+        "Semantically distinguish requests for information or analysis",
+      );
+      expect(prompt).toContain(
+        "This is an intent judgment, never a keyword, phrase-list, or exact-wording check",
+      );
+      expect(prompt).toContain(
+        "one authenticated approval will review the issue plus provider/model/effort/Worker settings",
+      );
+      expect(prompt).toContain('"executeAfterCreate":true');
+    },
+  );
 
   it("extracts final replies from every detached provider event shape", () => {
     expect(

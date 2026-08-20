@@ -556,8 +556,16 @@ private struct ChannelConversationView: View {
                             members: channels.members,
                             message: message,
                             locale: locale,
-                            onAcceptProposal: { proposalID, projectID in
+                            onAcceptProposal: { proposalID, projectID, execution in
                                 await channels.acceptProposal(
+                                    channelID: channel.id,
+                                    proposalID: proposalID,
+                                    projectID: projectID,
+                                    execution: execution
+                                )
+                            },
+                            onPrepareCreateExecution: { proposalID, projectID in
+                                await channels.prepareCreateExecutionProposal(
                                     channelID: channel.id,
                                     proposalID: proposalID,
                                     projectID: projectID
@@ -700,7 +708,15 @@ private struct ChannelMessageRow: View {
     let members: [ChannelMember]
     let message: ChannelMessage
     let locale: CompanionLocale
-    let onAcceptProposal: (UUID, UUID) async -> AcceptChannelProposalResponse?
+    let onAcceptProposal: (
+        UUID,
+        UUID,
+        AcceptIssueExecutionProposalRequest?
+    ) async -> AcceptChannelProposalResponse?
+    let onPrepareCreateExecution: (
+        UUID,
+        UUID
+    ) async -> ChannelsStore.ExecutionApprovalContext?
     let onApproveExecution: (
         UUID,
         AcceptIssueExecutionProposalRequest
@@ -810,17 +826,24 @@ private struct ChannelMessageRow: View {
                             approvingSkillExecutionProposalID != nil ||
                             preparingSkillExecutionProposalID != nil,
                         channel: channel,
+                        executionProposal: message.executionProposal,
                         locale: locale,
-                        onAccept: { projectID in
-                            await onAcceptProposal(proposal.id, projectID)
+                        onAccept: { projectID, execution in
+                            await onAcceptProposal(proposal.id, projectID, execution)
                         },
                         onIssueOpen: onIssueOpen,
+                        onPrepareExecution: { projectID in
+                            await onPrepareCreateExecution(proposal.id, projectID)
+                        },
+                        openingExecution: preparingExecutionProposalID == proposal.id,
                         projects: projects,
-                        proposal: proposal
+                        proposal: proposal,
+                        workers: workers
                     )
                     .padding(.top, 5)
                 }
-                if let proposal = message.executionProposal {
+                if let proposal = message.executionProposal,
+                   message.proposal?.payload?.executeAfterCreate != true {
                     ChannelExecutionProposalCard(
                         acceptanceInFlight: acceptingProposalID != nil ||
                             approvingExecutionProposalID != nil ||
@@ -1203,15 +1226,25 @@ private struct FlowReactionRow<Content: View>: View {
 private struct ChannelProposalCard: View {
     @State private var selectedProjectID: UUID?
     @State private var descriptionExpanded = false
+    @State private var approvalContext: ChannelsStore.ExecutionApprovalContext?
 
     let accepting: Bool
     let acceptanceInFlight: Bool
     let channel: ChannelSummary
+    let executionProposal: IssueExecutionProposal?
     let locale: CompanionLocale
-    let onAccept: (UUID) async -> AcceptChannelProposalResponse?
+    let onAccept: (
+        UUID,
+        AcceptIssueExecutionProposalRequest?
+    ) async -> AcceptChannelProposalResponse?
     let onIssueOpen: (UUID, UUID) async -> Void
+    let onPrepareExecution: (
+        UUID
+    ) async -> ChannelsStore.ExecutionApprovalContext?
+    let openingExecution: Bool
     let projects: [ProjectsResponse.Project]
     let proposal: ChannelMessage.Proposal
+    let workers: [DashboardWorker]
 
     private var availableProjects: [ProjectsResponse.Project] {
         projects
@@ -1248,8 +1281,18 @@ private struct ChannelProposalCard: View {
             issueDescription.components(separatedBy: .newlines).count > 3
     }
 
-    private var requestsExecutionFollowUp: Bool {
+    private var requestsExecution: Bool {
         proposal.payload?.executeAfterCreate == true
+    }
+
+    private var initialExecutionRequest: AcceptIssueExecutionProposalRequest? {
+        guard let executionProposal else { return nil }
+        return AcceptIssueExecutionProposalRequest(
+            provider: executionProposal.requestedProvider ?? .codex,
+            model: executionProposal.requestedModel,
+            effort: executionProposal.requestedEffort,
+            workerId: executionProposal.requestedWorkerId
+        )
     }
 
     var body: some View {
@@ -1318,42 +1361,33 @@ private struct ChannelProposalCard: View {
                 )
             }
 
-            if proposal.status == .pending {
-                if let targetProjectName {
-                    Label(
-                        String(
-                            format: L10n.text(.channelIssueProject, locale: locale),
-                            targetProjectName
-                        ),
-                        systemImage: "folder"
-                    )
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                }
+            if let targetProjectName {
                 Label(
-                    L10n.text(.channelIssueCreationSafety, locale: locale),
-                    systemImage: "tray"
+                    String(
+                        format: L10n.text(.channelIssueProject, locale: locale),
+                        targetProjectName
+                    ),
+                    systemImage: "folder"
                 )
                 .font(.caption2)
                 .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-                if requestsExecutionFollowUp {
-                    Label(
-                        L10n.text(
-                            "생성 승인 후에도 자동 실행되지 않습니다. 별도의 실행 승인 카드가 이어서 표시됩니다.",
-                            locale: locale
-                        ),
-                        systemImage: "checkmark.shield"
-                    )
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityIdentifier(
-                        "channel-proposal-execution-follow-up-\(proposal.id.uuidString.lowercased())"
-                    )
-                }
+            }
+            Label(
+                L10n.text(
+                    requestsExecution
+                        ? .channelIssueCreationAndExecutionSafety
+                        : .channelIssueCreationSafety,
+                    locale: locale
+                ),
+                systemImage: requestsExecution ? "checkmark.shield" : "tray"
+            )
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
 
-                if proposal.projectId == nil, channel.defaultProjectId == nil {
+            if proposal.status == .pending,
+               proposal.projectId == nil,
+               channel.defaultProjectId == nil {
                     Menu {
                         ForEach(availableProjects, id: \.id) { project in
                             Button(project.name) { selectedProjectID = project.id }
@@ -1373,13 +1407,51 @@ private struct ChannelProposalCard: View {
                     .accessibilityIdentifier(
                         "channel-proposal-project-\(proposal.id.uuidString.lowercased())"
                     )
-                }
+            }
 
+            if requestsExecution {
+                if executionProposal?.status == .accepted {
+                    combinedExecutionSummary
+                } else {
+                    Button {
+                        guard let targetProjectID else { return }
+                        Task {
+                            approvalContext = await onPrepareExecution(targetProjectID)
+                        }
+                    } label: {
+                        if accepting || openingExecution {
+                            ProgressView().controlSize(.small)
+                        } else {
+                            Label(
+                                L10n.text(
+                                    proposal.status == .accepted
+                                        ? .channelRetryExecution
+                                        : .channelCreateAndExecute,
+                                    locale: locale
+                                ),
+                                systemImage: "slider.horizontal.3"
+                            )
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                    .disabled(
+                        !channelProposalApprovalIsEnabled(
+                            acceptanceInFlight: acceptanceInFlight,
+                            channelArchived: channel.archivedAt != nil,
+                            targetProjectID: targetProjectID,
+                            issue: proposal.payload?.issue
+                        )
+                    )
+                    .accessibilityIdentifier(
+                        "accept-channel-create-execution-\(proposal.id.uuidString.lowercased())"
+                    )
+                }
+            } else if proposal.status == .pending {
                 Button {
                     guard let targetProjectID else { return }
                     Task {
-                        if let result = await onAccept(targetProjectID),
-                           !requestsExecutionFollowUp,
+                        if let result = await onAccept(targetProjectID, nil),
                            result.executionProposal == nil {
                             await onIssueOpen(result.projectId, result.resultRunId)
                         }
@@ -1404,8 +1476,10 @@ private struct ChannelProposalCard: View {
                 .accessibilityIdentifier(
                     "accept-channel-proposal-\(proposal.id.uuidString.lowercased())"
                 )
-            } else if let projectID = proposal.projectId,
-                      let runID = proposal.resultRunId {
+            }
+            if proposal.status == .accepted,
+               let projectID = proposal.projectId,
+               let runID = proposal.resultRunId {
                 Button(L10n.text(.channelViewIssue, locale: locale)) {
                     Task { await onIssueOpen(projectID, runID) }
                 }
@@ -1422,6 +1496,60 @@ private struct ChannelProposalCard: View {
         .overlay {
             RoundedRectangle(cornerRadius: 10)
                 .stroke(Color.accentColor.opacity(0.24), lineWidth: 1)
+        }
+        .sheet(item: $approvalContext) { context in
+            ExecutionProposalApprovalSheet(
+                targetTitle: proposal.payload?.issue?.title ??
+                    L10n.text("새 이슈", locale: locale),
+                providers: context.snapshot.organizationProviders ?? [],
+                workers: context.snapshot.workers ?? [],
+                policy: context.snapshot.executionPolicy,
+                locale: locale,
+                createsIssue: true,
+                initialRequest: initialExecutionRequest,
+                approve: { request in
+                    guard let targetProjectID,
+                          let response = await onAccept(targetProjectID, request),
+                          response.executionProposal?.status == .accepted,
+                          response.dispatch != nil
+                    else {
+                        throw ChannelExecutionApprovalError(
+                            message: L10n.text(
+                                "이슈 생성·실행 요청을 처리하지 못했습니다.",
+                                locale: locale
+                            )
+                        )
+                    }
+                    return true
+                }
+            )
+        }
+        .onChange(of: channel.archivedAt) { _, archivedAt in
+            if archivedAt != nil { approvalContext = nil }
+        }
+        .onChange(of: proposal.id) { _, _ in approvalContext = nil }
+        .onChange(of: executionProposal?.status) { _, status in
+            if status == .accepted { approvalContext = nil }
+        }
+    }
+
+    @ViewBuilder
+    private var combinedExecutionSummary: some View {
+        if let provider = executionProposal?.requestedProvider {
+            let components = [
+                provider.displayName,
+                executionProposal?.requestedModel,
+                executionProposal?.requestedEffort?.rawValue,
+            ].compactMap { $0 }
+            Label(components.joined(separator: " · "), systemImage: "cpu")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+        if let workerID = executionProposal?.requestedWorkerId {
+            let label = workers.first(where: { $0.id == workerID })?.label ?? workerID
+            Label(label, systemImage: "desktopcomputer")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
         }
     }
 }

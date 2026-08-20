@@ -1724,6 +1724,125 @@ export async function auditExecutionEvent(
 }
 
 /**
+ * Revalidates one member-selected runtime against the target project without
+ * mutating a run. Combined channel approval uses this before creating the
+ * backlog issue, so an invalid or unauthorized Worker selection cannot leave
+ * an issue behind. dispatchHuntRun repeats the same check at the mutation
+ * boundary to close the race between preflight and dispatch.
+ */
+export async function assertExecutionSelectionAvailable(
+  db: D1Database,
+  organizationId: string,
+  projectId: string,
+  input: {
+    provider: AgentProvider;
+    model: string | null;
+    effort: ModelEffort | null;
+    workerId: string | null;
+    observedAt: string;
+  },
+) {
+  if (input.workerId) {
+    const worker = await db
+      .prepare(
+        `select worker.agent_provider, worker.capabilities_json, worker.state,
+                worker.accepting_work, worker.readiness_state,
+                worker.last_heartbeat_at
+         from briar_execution_workers worker
+         join briar_execution_worker_devices device on device.id = worker.device_id
+         where worker.id = ? and worker.project_id = ?
+           and device.organization_id = ?`,
+      )
+      .bind(input.workerId, projectId, organizationId)
+      .first<{
+        agent_provider: AgentProvider;
+        capabilities_json: string;
+        state: ExecutionWorkerState;
+        accepting_work: number;
+        readiness_state: ExecutionWorkerReadiness;
+        last_heartbeat_at: string;
+      }>();
+    if (!worker) throw new WorkerConflictError("Worker not found for this project");
+    if (
+      workerStateAt(worker.last_heartbeat_at, input.observedAt, worker.state) !==
+        "online" ||
+      worker.accepting_work !== 1 ||
+      worker.readiness_state === "needs_attention"
+    ) {
+      throw new WorkerConflictError("Worker is not ready to accept work");
+    }
+    if (
+      !executionWorkerSupportsSelection(
+        worker,
+        input.provider,
+        input.model,
+        input.effort,
+      )
+    ) {
+      throw new WorkerConflictError(
+        input.model || input.effort
+          ? `Worker does not support ${input.provider}${input.model ? ` model ${input.model}` : ""}${input.effort ? ` with ${input.effort} effort` : ""}`
+          : `Worker does not support the ${input.provider} provider`,
+      );
+    }
+    if (
+      !(await isExecutionWorkerAllowedForProject(db, projectId, input.workerId))
+    ) {
+      throw new WorkerConflictError(
+        "Worker is not allowed by this project's execution policy",
+      );
+    }
+    return;
+  }
+
+  const eligible = await db
+    .prepare(
+      `select worker.id, worker.agent_provider, worker.capabilities_json
+       from briar_execution_workers worker
+       join briar_execution_worker_devices device on device.id = worker.device_id
+       where worker.project_id = ? and device.organization_id = ?
+         and worker.state != 'disabled'
+         and worker.accepting_work = 1
+         and worker.readiness_state != 'needs_attention'
+         and coalesce(
+           json_extract(
+             worker.capabilities_json,
+             '$.providerHealth.' || ? || '.healthy'
+           ),
+           0
+         ) = 1
+         and (
+           not exists (
+             select 1 from briar_project_execution_worker_policies policy
+             where policy.project_id = worker.project_id
+               and policy.selection_mode = 'allowlist'
+           )
+           or exists (
+             select 1
+             from briar_project_execution_worker_allowlist allowed
+             where allowed.project_id = worker.project_id
+               and allowed.worker_id = worker.id
+           )
+         )
+       limit 100`,
+    )
+    .bind(projectId, organizationId, input.provider)
+    .all<Pick<ExecutionWorkerRow, "id" | "agent_provider" | "capabilities_json">>();
+  if (!eligible.results.some((worker) =>
+    executionWorkerSupportsSelection(
+      worker,
+      input.provider,
+      input.model,
+      input.effort,
+    )
+  )) {
+    throw new WorkerConflictError(
+      `No worker is configured for the ${input.provider} provider`,
+    );
+  }
+}
+
+/**
  * Assign execution settings and a Worker policy to one run. A logical Agent
  * remains optional and does not create an ownership edge with the Worker.
  */
@@ -1881,91 +2000,13 @@ export async function dispatchHuntRun(
         ? preferences.preferred_agent_effort
         : null;
 
-  if (input.workerId) {
-    const worker = await db
-      .prepare(
-        `select worker.agent_provider, worker.capabilities_json, worker.state,
-                worker.accepting_work, worker.readiness_state,
-                worker.last_heartbeat_at
-         from briar_execution_workers worker
-         join briar_execution_worker_devices device on device.id = worker.device_id
-         where worker.id = ? and worker.project_id = ?
-           and device.organization_id = ?`,
-      )
-      .bind(input.workerId, projectId, organizationId)
-      .first<{
-        agent_provider: AgentProvider;
-        capabilities_json: string;
-        state: ExecutionWorkerState;
-        accepting_work: number;
-        readiness_state: ExecutionWorkerReadiness;
-        last_heartbeat_at: string;
-      }>();
-    if (!worker) throw new WorkerConflictError("Worker not found for this project");
-    if (
-      workerStateAt(worker.last_heartbeat_at, input.occurredAt, worker.state) !==
-        "online" ||
-      worker.accepting_work !== 1 ||
-      worker.readiness_state === "needs_attention"
-    ) {
-      throw new WorkerConflictError("Worker is not ready to accept work");
-    }
-    if (!executionWorkerSupportsSelection(worker, provider, model, effort)) {
-      throw new WorkerConflictError(
-        model || effort
-          ? `Worker does not support ${provider}${model ? ` model ${model}` : ""}${effort ? ` with ${effort} effort` : ""}`
-          : `Worker does not support the ${provider} provider`,
-      );
-    }
-    if (
-      !(await isExecutionWorkerAllowedForProject(db, projectId, input.workerId))
-    ) {
-      throw new WorkerConflictError(
-        "Worker is not allowed by this project's execution policy",
-      );
-    }
-  } else {
-    const eligible = await db
-      .prepare(
-        `select worker.id, worker.agent_provider, worker.capabilities_json
-         from briar_execution_workers worker
-         join briar_execution_worker_devices device on device.id = worker.device_id
-         where worker.project_id = ? and device.organization_id = ?
-           and worker.state != 'disabled'
-           and worker.accepting_work = 1
-           and worker.readiness_state != 'needs_attention'
-           and coalesce(
-             json_extract(
-               worker.capabilities_json,
-               '$.providerHealth.' || ? || '.healthy'
-             ),
-             0
-           ) = 1
-           and (
-             not exists (
-               select 1 from briar_project_execution_worker_policies policy
-               where policy.project_id = worker.project_id
-                 and policy.selection_mode = 'allowlist'
-             )
-             or exists (
-               select 1
-               from briar_project_execution_worker_allowlist allowed
-               where allowed.project_id = worker.project_id
-                 and allowed.worker_id = worker.id
-             )
-           )
-         limit 100`,
-      )
-      .bind(projectId, organizationId, provider)
-      .all<Pick<ExecutionWorkerRow, "id" | "agent_provider" | "capabilities_json">>();
-    if (!eligible.results.some((worker) =>
-      executionWorkerSupportsSelection(worker, provider, model, effort)
-    )) {
-      throw new WorkerConflictError(
-        `No worker is configured for the ${provider} provider`,
-      );
-    }
-  }
+  await assertExecutionSelectionAvailable(db, organizationId, projectId, {
+    provider,
+    model,
+    effort,
+    workerId: input.workerId ?? null,
+    observedAt: input.occurredAt,
+  });
 
   const run = await db
     .prepare(
