@@ -178,6 +178,8 @@ describe("ProjectOnboarding", () => {
     expect(markup).toContain("Connect Local Git Repository");
     expect(markup).toContain("Create from scratch");
     expect(markup).toContain("Migrate from Lovable");
+    expect(markup).toMatch(/<img[^>]*src="[^"]*lovable-color\.png"[^>]*>/);
+    expect(markup).toContain('aria-hidden="true"');
     expect(markup).toContain("aria-modal=\"true\"");
     expect(markup).toContain("disabled=\"\"");
   });
