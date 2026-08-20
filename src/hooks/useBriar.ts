@@ -72,6 +72,7 @@ import {
 import { isRepositoryConnectedForImport } from "../lib/linear-import";
 import {
   cloneGithubSshRepository,
+  configureLocalExecutionWorker,
   connectLocalProject,
   createProjectWorkspace,
   disconnectLocalProject,
@@ -195,6 +196,7 @@ export type ProjectConnection = {
   project: Project;
   agentToken: string | null;
   workflow?: ProjectSettings["workflow"];
+  enableLocalWorkerAfterConnect?: boolean;
 };
 
 const demoMode = import.meta.env.VITE_BRIAR_DEMO !== "false" && !isApiConfigured;
@@ -1456,7 +1458,10 @@ export function useBriar(options: UseBriarOptions = {}) {
         setActiveProjectId(result.project.id);
         setIsCreatingProject(false);
         setVelen(null);
-        setProjectConnection(result);
+        setProjectConnection({
+          ...result,
+          enableLocalWorkerAfterConnect: true,
+        });
         return result;
       } catch (caught) {
         const message = caught instanceof Error ? caught.message : String(caught);
@@ -1680,6 +1685,18 @@ export function useBriar(options: UseBriarOptions = {}) {
           ? { ...current, project: connectedProject, workflow: generatedWorkflow }
           : current,
       );
+      if (connection.enableLocalWorkerAfterConnect && token) {
+        await configureLocalExecutionWorker(
+          connection.project.id,
+          token,
+          true,
+        );
+        setProjectConnection((current) =>
+          current?.project.id === connection.project.id
+            ? { ...current, enableLocalWorkerAfterConnect: false }
+            : current,
+        );
+      }
       setError(null);
       void refreshHealth();
       await refreshProjectReadiness(connection.project.id);

@@ -24,6 +24,7 @@ import {
   updateOrganizationExecutionWorkerIcon,
 } from "../lib/api";
 import { isDesktopTauri } from "../lib/platform";
+import { configureLocalExecutionWorker } from "../lib/project-connection";
 import {
   compareSemanticVersions,
   isSemanticVersion,
@@ -160,12 +161,7 @@ export function OrganizationWorkersSettings({
     setSavingProjectId(projectId);
     setError(null);
     try {
-      const { invoke } = await import("@tauri-apps/api/core");
-      await invoke("configure_execution_worker", {
-        projectId,
-        userToken: token,
-        enabled,
-      });
+      await configureLocalExecutionWorker(projectId, token, enabled);
       await refresh();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught));
@@ -186,15 +182,14 @@ export function OrganizationWorkersSettings({
     setError(null);
     try {
       if (desktop && device.deviceId === currentDeviceId) {
-        const { invoke } = await import("@tauri-apps/api/core");
         for (const status of localStatuses.filter(
           (candidate) => candidate.registered,
         )) {
-          await invoke("configure_execution_worker", {
-            projectId: status.projectId,
-            userToken: token,
-            enabled: false,
-          });
+          await configureLocalExecutionWorker(
+            status.projectId,
+            token,
+            false,
+          );
         }
       }
       await disableOrganizationExecutionWorker(

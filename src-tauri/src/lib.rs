@@ -4824,7 +4824,7 @@ fn configure_execution_worker(
 
     if enabled {
         run(&["worker", "register", "--project", &project_id])?;
-        run(&[
+        if let Err(error) = run(&[
             "worker",
             "install-service",
             "--project",
@@ -4833,7 +4833,13 @@ fn configure_execution_worker(
             bun_path,
             "--cli-script",
             cli_path,
-        ])?;
+        ]) {
+            // Registration and service installation are one user action. Do
+            // not leave a project half-enabled when the service cannot start.
+            let _ = run(&["worker", "uninstall-service", "--project", &project_id]);
+            let _ = run(&["worker", "unregister", "--project", &project_id]);
+            return Err(error);
+        }
     } else {
         run(&["worker", "uninstall-service", "--project", &project_id])?;
         run(&["worker", "unregister", "--project", &project_id])?;
