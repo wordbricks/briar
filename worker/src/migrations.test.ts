@@ -186,6 +186,93 @@ async function createPreWebhookChannelMessage(
 }
 
 describe("D1 migrations", () => {
+  it("adds immutable Agent Session requesters and schedule creators", async () => {
+    const miniflare = new Miniflare({
+      modules: true,
+      script: "export default { fetch() { return new Response('ok') } }",
+      d1Databases: { DB: "briar-session-requester-migration-test" },
+    });
+    try {
+      const db = (await miniflare.getD1Database("DB")) as unknown as D1Database;
+      await applyD1Migrations(db);
+      const sessionColumns = await db.prepare(
+        `pragma table_info(briar_project_agent_sessions)`,
+      ).all<{ name: string }>();
+      const scheduleColumns = await db.prepare(
+        `pragma table_info(briar_project_agent_schedules)`,
+      ).all<{ name: string }>();
+      expect(sessionColumns.results.map((column) => column.name)).toContain(
+        "requested_by_user_id",
+      );
+      expect(scheduleColumns.results.map((column) => column.name)).toContain(
+        "created_by_user_id",
+      );
+      const schemaObjects = await db.prepare(
+        `select name from sqlite_master
+         where name in (
+           'briar_project_agent_session_requester_immutable',
+           'briar_project_agent_schedule_creator_immutable',
+           'briar_project_agent_session_summaries_requester_recent_idx'
+         )`,
+      ).all<{ name: string }>();
+      expect(schemaObjects.results.map((object) => object.name).sort()).toEqual([
+        "briar_project_agent_schedule_creator_immutable",
+        "briar_project_agent_session_requester_immutable",
+        "briar_project_agent_session_summaries_requester_recent_idx",
+      ]);
+      const createdAt = "2026-08-20T00:00:00.000Z";
+      await executeD1Sql(
+        db,
+        `insert into "user" (
+           id, name, email, emailVerified, createdAt, updatedAt
+         ) values
+           ('requester-owner', 'Owner', 'requester-owner@example.com', 1,
+            '${createdAt}', '${createdAt}'),
+           ('requester-member', 'Member', 'requester-member@example.com', 1,
+            '${createdAt}', '${createdAt}');
+         insert into briar_organizations (
+           id, name, handle, created_at, updated_at
+         ) values (
+           'requester-org', 'Requester Org', 'requester-org',
+           '${createdAt}', '${createdAt}'
+         );
+         insert into briar_organization_members (
+           organization_id, user_id, role, created_at, updated_at
+         ) values
+           ('requester-org', 'requester-owner', 'owner', '${createdAt}', '${createdAt}'),
+           ('requester-org', 'requester-member', 'member', '${createdAt}', '${createdAt}');
+         insert into briar_projects (
+           id, owner_user_id, organization_id, name, agent_token_hash,
+           created_at, updated_at
+         ) values (
+           'requester-project', 'requester-owner', 'requester-org',
+           'Requester Project', '${"a".repeat(64)}', '${createdAt}', '${createdAt}'
+         );
+         insert into briar_project_agent_sessions (
+           project_id, id, status, session_type, payload_json, started_at,
+           completed_at, updated_at, requested_by_user_id
+         ) values (
+           'requester-project', 'requester-session', 'completed', 'task',
+           '{"status":"completed"}', '${createdAt}', '${createdAt}',
+           '${createdAt}', 'requester-member'
+         );`,
+      );
+      await expect(db.prepare(
+        `update briar_project_agent_sessions
+         set requested_by_user_id = 'requester-owner'
+         where project_id = 'requester-project' and id = 'requester-session'`,
+      ).run()).rejects.toThrow(/requester is immutable/iu);
+      await db.prepare(`delete from "user" where id = 'requester-member'`).run();
+      await expect(db.prepare(
+        `select requested_by_user_id
+         from briar_project_agent_sessions
+         where project_id = 'requester-project' and id = 'requester-session'`,
+      ).first()).resolves.toEqual({ requested_by_user_id: null });
+    } finally {
+      await miniflare.dispose();
+    }
+  }, 60_000);
+
   it("adds shared email OTP rate limits and a single active sign-in code", async () => {
     const miniflare = new Miniflare({
       modules: true,

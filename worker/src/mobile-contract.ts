@@ -1018,6 +1018,7 @@ export const mobileProjectAgentSessionSchema = z.object({
   workspaceRoot: z.null().optional(),
   requestedWorkerId: z.string().nullable().optional(),
   workerId: z.string().nullable().optional(),
+  requestedByUserId: z.string().nullable().optional(),
   summary: z.string().nullable().optional(),
   error: z.string().nullable().optional(),
   events: z.array(z.object({

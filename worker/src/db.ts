@@ -280,6 +280,7 @@ export type ProjectAgentSessionRow = {
   project_id: string;
   id: string;
   agent_id: string | null;
+  requested_by_user_id: string | null;
   status: "running" | "completed" | "failed" | "skipped" | "interrupted";
   session_type: "task" | "dispatch";
   payload_json: string;
@@ -386,6 +387,7 @@ export type ProjectAgentScheduleRow = {
   time_zone: string;
   enabled: number;
   next_run_at: string | null;
+  created_by_user_id: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -4805,6 +4807,7 @@ const projectAgentSessionSummaryJson = (row: ProjectAgentSessionRow) => {
     scheduleId: payload.scheduleId ?? null,
     scheduleRunId: payload.scheduleRunId ?? null,
     parentSessionId: payload.parentSessionId ?? null,
+    requestedByUserId: row.requested_by_user_id,
     request: typeof payload.request === "string"
       ? payload.request.slice(0, 500)
       : null,
@@ -4826,11 +4829,17 @@ const upsertProjectAgentSessionSummaryStatement = (
   db: D1Database,
   row: ProjectAgentSessionRow,
   archived: boolean,
-) =>
-  db.prepare(
+  requesterFromHotSession = false,
+) => {
+  const requesterExpression = requesterFromHotSession
+    ? `(select session.requested_by_user_id
+        from briar_project_agent_sessions session
+        where session.project_id = ? and session.id = ?)`
+    : "?";
+  return db.prepare(
     `insert into briar_project_agent_session_summaries (
        project_id, session_id, summary_json, updated_at, archived
-     ) values (?, ?, ?, ?, ?)
+     ) values (?, ?, json_set(?, '$.requestedByUserId', ${requesterExpression}), ?, ?)
      on conflict (project_id, session_id) do update set
        summary_json = excluded.summary_json,
        updated_at = excluded.updated_at,
@@ -4841,9 +4850,13 @@ const upsertProjectAgentSessionSummaryStatement = (
     row.project_id,
     row.id,
     projectAgentSessionSummaryJson(row),
+    ...(requesterFromHotSession
+      ? [row.project_id, row.id]
+      : [row.requested_by_user_id]),
     row.updated_at,
     archived ? 1 : 0,
   );
+};
 
 export async function upsertProjectAgentSessionSummary(
   db: D1Database,
@@ -4857,21 +4870,30 @@ export async function listProjectAgentSessionSummaries(
   db: D1Database,
   projectId: string,
   sessionIds?: readonly string[],
+  requestedByUserId?: string,
 ) {
   if (sessionIds?.length === 0) return [];
   const idFilter = sessionIds
     ? `and session_id in (${sessionIds.map(() => "?").join(",")})`
     : "";
+  const requesterFilter = requestedByUserId === undefined
+    ? ""
+    : "and json_extract(summary_json, '$.requestedByUserId') = ?";
   const rowLimit = sessionIds ? projectAgentSessionChangePageSize : 200;
   const result = await db
     .prepare(
       `select project_id, session_id, summary_json, updated_at, archived
        from briar_project_agent_session_summaries
-       where project_id = ? ${idFilter}
+       where project_id = ? ${idFilter} ${requesterFilter}
        order by updated_at desc, session_id
        limit ?`,
     )
-    .bind(projectId, ...(sessionIds ?? []), rowLimit)
+    .bind(
+      projectId,
+      ...(sessionIds ?? []),
+      ...(requestedByUserId === undefined ? [] : [requestedByUserId]),
+      rowLimit,
+    )
     .all<ProjectAgentSessionSummaryRow>();
   return result.results;
 }
@@ -4952,7 +4974,8 @@ export async function listProjectAgentSessions(
 ) {
   const result = await db
     .prepare(
-      `select project_id, id, agent_id, status, session_type, payload_json,
+      `select project_id, id, agent_id, requested_by_user_id, status,
+              session_type, payload_json,
               started_at, completed_at, updated_at
        from briar_project_agent_sessions
        where project_id = ?
@@ -4971,7 +4994,8 @@ export async function getProjectAgentSession(
 ) {
   return db
     .prepare(
-      `select project_id, id, agent_id, status, session_type, payload_json,
+      `select project_id, id, agent_id, requested_by_user_id, status,
+              session_type, payload_json,
               started_at, completed_at, updated_at
        from briar_project_agent_sessions
        where project_id = ? and id = ?`,
@@ -5024,8 +5048,8 @@ export async function upsertProjectAgentSession(
     db.prepare(
       `insert into briar_project_agent_sessions (
          project_id, id, agent_id, status, session_type, payload_json,
-         started_at, completed_at, updated_at
-       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?)
+         started_at, completed_at, updated_at, requested_by_user_id
+       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        on conflict (project_id, id) do update set
          agent_id = excluded.agent_id,
          status = excluded.status,
@@ -5046,12 +5070,14 @@ export async function upsertProjectAgentSession(
       input.started_at,
       input.completed_at,
       input.updated_at,
+      input.requested_by_user_id,
     ),
-    upsertProjectAgentSessionSummaryStatement(db, input, false),
+    upsertProjectAgentSessionSummaryStatement(db, input, false, true),
   ]);
   return db
     .prepare(
-      `select project_id, id, agent_id, status, session_type, payload_json,
+      `select project_id, id, agent_id, requested_by_user_id, status,
+              session_type, payload_json,
               started_at, completed_at, updated_at
        from briar_project_agent_sessions
        where project_id = ? and id = ?`,
@@ -5698,6 +5724,7 @@ type ProjectAgentScheduleInput = {
   daysOfWeek?: number[];
   notificationLevel?: ProjectAgentScheduleNotificationLevel;
   timeZone: string;
+  createdByUserId?: string | null;
 };
 
 function persistedProjectAgentScheduleRecurrence(
@@ -5721,7 +5748,7 @@ export async function listProjectAgentSchedules(
               schedule.interval_value, schedule.interval_unit,
               schedule.days_of_week, schedule.notification_level,
               schedule.time_zone, schedule.enabled,
-              schedule.next_run_at,
+              schedule.next_run_at, schedule.created_by_user_id,
               schedule.created_at, schedule.updated_at
        from briar_project_agent_schedules schedule
        join briar_project_agents agent on agent.id = schedule.agent_id
@@ -5731,6 +5758,22 @@ export async function listProjectAgentSchedules(
     .bind(projectId)
     .all<ProjectAgentScheduleRow>();
   return result.results;
+}
+
+export async function getProjectAgentScheduleCreatorId(
+  db: D1Database,
+  projectId: string,
+  scheduleId: string,
+) {
+  const schedule = await db
+    .prepare(
+      `select created_by_user_id
+       from briar_project_agent_schedules
+       where project_id = ? and id = ?`,
+    )
+    .bind(projectId, scheduleId)
+    .first<{ created_by_user_id: string | null }>();
+  return schedule?.created_by_user_id ?? null;
 }
 
 export async function createProjectAgentSchedule(
@@ -5773,8 +5816,8 @@ export async function createProjectAgentSchedule(
          id, project_id, agent_id, name, recurrence, frequency, time_of_day,
          day_of_week, interval_value, interval_unit, days_of_week,
          notification_level, time_zone, enabled, next_run_at, created_at,
-         updated_at
-       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`,
+         updated_at, created_by_user_id
+       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -5794,6 +5837,7 @@ export async function createProjectAgentSchedule(
       nextRunAt,
       createdAt,
       createdAt,
+      input.createdByUserId ?? null,
     )
     .run();
 
@@ -5806,7 +5850,7 @@ export async function createProjectAgentSchedule(
               schedule.interval_value, schedule.interval_unit,
               schedule.days_of_week, schedule.notification_level,
               schedule.time_zone, schedule.enabled,
-              schedule.next_run_at,
+              schedule.next_run_at, schedule.created_by_user_id,
               schedule.created_at, schedule.updated_at
        from briar_project_agent_schedules schedule
        join briar_project_agents agent on agent.id = schedule.agent_id
@@ -5893,7 +5937,7 @@ export async function updateProjectAgentSchedule(
               schedule.interval_value, schedule.interval_unit,
               schedule.days_of_week, schedule.notification_level,
               schedule.time_zone, schedule.enabled,
-              schedule.next_run_at,
+              schedule.next_run_at, schedule.created_by_user_id,
               schedule.created_at, schedule.updated_at
        from briar_project_agent_schedules schedule
        join briar_project_agents agent on agent.id = schedule.agent_id

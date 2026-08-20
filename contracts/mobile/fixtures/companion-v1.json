@@ -686,6 +686,7 @@
           "workspaceRoot": null,
           "requestedWorkerId": "worker-1",
           "workerId": "worker-1",
+          "requestedByUserId": "fixture-user",
           "summary": null,
           "error": null,
           "events": [
@@ -964,6 +965,7 @@
             "completedAt": "2026-08-02T01:05:00.000Z",
             "conversationId": null,
             "workspaceRoot": null,
+            "requestedByUserId": "fixture-user",
             "summary": "Completed the queued issue.",
             "error": null,
             "events": [
@@ -1018,6 +1020,7 @@
           "workspaceRoot": null,
           "requestedWorkerId": "worker-1",
           "workerId": "worker-1",
+          "requestedByUserId": "fixture-user",
           "summary": null,
           "error": null,
           "events": [
@@ -1486,6 +1489,7 @@
           "workspaceRoot": null,
           "requestedWorkerId": "worker-1",
           "workerId": "worker-1",
+          "requestedByUserId": "fixture-user",
           "summary": null,
           "error": null,
           "events": [

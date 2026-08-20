@@ -539,7 +539,8 @@ final class AgentsStore: ObservableObject {
             summary: summary,
             error: error,
             events: replacementEvents,
-            updatedAt: replacementUpdatedAt
+            updatedAt: replacementUpdatedAt,
+            requestedByUserId: session.requestedByUserId
         )
     }
 
