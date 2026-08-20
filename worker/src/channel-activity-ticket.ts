@@ -1,59 +1,25 @@
+import * as Option from "effect/Option";
+import {
+  decodeChannelActivityPublishTokenPayloadJson,
+  decodeChannelActivitySocketTicketPayloadJson,
+  decodeIssueActivityPublishTokenPayloadJson,
+  decodeIssueActivitySocketTicketPayloadJson,
+  type ChannelActivityPublishTokenPayload,
+  type ChannelActivitySocketTicketPayload,
+  type IssueActivityPublishTokenPayload,
+  type IssueActivitySocketTicketPayload,
+} from "./channel-activity-ticket-payload";
+
+export type {
+  ChannelActivityPublishTokenPayload,
+  ChannelActivitySocketTicketPayload,
+  IssueActivityPublishTokenPayload,
+  IssueActivitySocketTicketPayload,
+} from "./channel-activity-ticket-payload";
+
 export const CHANNEL_ACTIVITY_SOCKET_TICKET_TTL_MS = 60_000;
 export const CHANNEL_ACTIVITY_SOCKET_AUTHORIZATION_TTL_MS = 5 * 60_000;
 export const CHANNEL_ACTIVITY_PUBLISH_MAX_TTL_MS = 16 * 60_000;
-
-export type ChannelActivityPublishTokenPayload = {
-  purpose: "publish";
-  organizationId: string;
-  channelId: string;
-  replyJobId: string;
-  agentId: string;
-  triggerMessageId: string;
-  parentMessageId: string;
-  attempt: number;
-  workerId: string;
-  deviceId: string;
-  expiresAt: number;
-  nonce: string;
-};
-
-export type ChannelActivitySocketTicketPayload = {
-  purpose: "subscribe";
-  organizationId: string;
-  channelId: string;
-  userId: string;
-  expiresAt: number;
-  authorizationExpiresAt: number;
-  nonce: string;
-};
-
-export type IssueActivityPublishTokenPayload = {
-  purpose: "publish-issue";
-  organizationId: string;
-  projectId: string;
-  runId: string;
-  replyJobId: string;
-  triggerMessageId: string;
-  parentMessageId: string;
-  attempt: number;
-  workerId: string;
-  deviceId: string;
-  expiresAt: number;
-  nonce: string;
-};
-
-export type IssueActivitySocketTicketPayload = {
-  purpose: "subscribe-issue";
-  organizationId: string;
-  projectId: string;
-  runId: string;
-  userId: string;
-  expiresAt: number;
-  authorizationExpiresAt: number;
-  nonce: string;
-};
-
-const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
@@ -94,7 +60,7 @@ async function signPayload(secret: string, payload: object) {
 async function verifiedPayload(
   secret: string,
   token: string,
-): Promise<Record<string, unknown> | null> {
+): Promise<string | null> {
   try {
     const parts = token.split(".");
     if (parts.length !== 2) return null;
@@ -106,21 +72,14 @@ async function verifiedPayload(
       encoder.encode(encodedPayload),
     );
     if (!valid) return null;
-    const value = JSON.parse(
-      decoder.decode(base64UrlDecode(encodedPayload)),
-    ) as unknown;
-    return value && typeof value === "object"
-      ? value as Record<string, unknown>
-      : null;
+    return decoder.decode(base64UrlDecode(encodedPayload));
   } catch {
     return null;
   }
 }
 
-const validUuid = (value: unknown): value is string =>
-  typeof value === "string" && uuidPattern.test(value);
-const validShortText = (value: unknown, max: number): value is string =>
-  typeof value === "string" && value.length > 0 && value.length <= max;
+const expiresWithin = (expiresAt: number, now: number, maximumTtl: number) =>
+  expiresAt > now && expiresAt <= now + maximumTtl;
 
 export async function createChannelActivityPublishToken(
   secret: string,
@@ -140,28 +99,23 @@ export async function verifyChannelActivityPublishToken(
   replyJobId: string,
   now = Date.now(),
 ): Promise<ChannelActivityPublishTokenPayload | null> {
-  const payload = await verifiedPayload(secret, token);
+  const encodedPayload = await verifiedPayload(secret, token);
+  if (encodedPayload === null) return null;
+  const payload = Option.getOrNull(
+    decodeChannelActivityPublishTokenPayloadJson(encodedPayload),
+  );
   if (
-    payload?.purpose !== "publish" ||
+    !payload ||
     payload.replyJobId !== replyJobId ||
-    !validUuid(payload.organizationId) ||
-    !validUuid(payload.channelId) ||
-    !validUuid(payload.replyJobId) ||
-    !validUuid(payload.agentId) ||
-    !validUuid(payload.triggerMessageId) ||
-    !validUuid(payload.parentMessageId) ||
-    !Number.isSafeInteger(payload.attempt) ||
-    (payload.attempt as number) < 1 ||
-    !validShortText(payload.workerId, 64) ||
-    !validShortText(payload.deviceId, 200) ||
-    !Number.isSafeInteger(payload.expiresAt) ||
-    (payload.expiresAt as number) <= now ||
-    (payload.expiresAt as number) > now + CHANNEL_ACTIVITY_PUBLISH_MAX_TTL_MS ||
-    !validShortText(payload.nonce, 100)
+    !expiresWithin(
+      payload.expiresAt,
+      now,
+      CHANNEL_ACTIVITY_PUBLISH_MAX_TTL_MS,
+    )
   ) {
     return null;
   }
-  return payload as ChannelActivityPublishTokenPayload;
+  return payload;
 }
 
 export async function createChannelActivitySocketTicket(
@@ -191,26 +145,29 @@ export async function verifyChannelActivitySocketTicket(
   channelId: string,
   now = Date.now(),
 ): Promise<ChannelActivitySocketTicketPayload | null> {
-  const payload = await verifiedPayload(secret, ticket);
+  const encodedPayload = await verifiedPayload(secret, ticket);
+  if (encodedPayload === null) return null;
+  const payload = Option.getOrNull(
+    decodeChannelActivitySocketTicketPayloadJson(encodedPayload),
+  );
   if (
-    payload?.purpose !== "subscribe" ||
+    !payload ||
     payload.organizationId !== organizationId ||
     payload.channelId !== channelId ||
-    !validUuid(payload.organizationId) ||
-    !validUuid(payload.channelId) ||
-    !validShortText(payload.userId, 200) ||
-    !Number.isSafeInteger(payload.expiresAt) ||
-    (payload.expiresAt as number) <= now ||
-    (payload.expiresAt as number) > now + CHANNEL_ACTIVITY_SOCKET_TICKET_TTL_MS ||
-    !Number.isSafeInteger(payload.authorizationExpiresAt) ||
-    (payload.authorizationExpiresAt as number) <= now ||
-    (payload.authorizationExpiresAt as number) >
-      now + CHANNEL_ACTIVITY_SOCKET_AUTHORIZATION_TTL_MS ||
-    !validShortText(payload.nonce, 100)
+    !expiresWithin(
+      payload.expiresAt,
+      now,
+      CHANNEL_ACTIVITY_SOCKET_TICKET_TTL_MS,
+    ) ||
+    !expiresWithin(
+      payload.authorizationExpiresAt,
+      now,
+      CHANNEL_ACTIVITY_SOCKET_AUTHORIZATION_TTL_MS,
+    )
   ) {
     return null;
   }
-  return payload as ChannelActivitySocketTicketPayload;
+  return payload;
 }
 
 export async function createIssueActivityPublishToken(
@@ -231,28 +188,23 @@ export async function verifyIssueActivityPublishToken(
   replyJobId: string,
   now = Date.now(),
 ): Promise<IssueActivityPublishTokenPayload | null> {
-  const payload = await verifiedPayload(secret, token);
+  const encodedPayload = await verifiedPayload(secret, token);
+  if (encodedPayload === null) return null;
+  const payload = Option.getOrNull(
+    decodeIssueActivityPublishTokenPayloadJson(encodedPayload),
+  );
   if (
-    payload?.purpose !== "publish-issue" ||
+    !payload ||
     payload.replyJobId !== replyJobId ||
-    !validUuid(payload.organizationId) ||
-    !validUuid(payload.projectId) ||
-    !validUuid(payload.runId) ||
-    !validUuid(payload.replyJobId) ||
-    !validUuid(payload.triggerMessageId) ||
-    !validUuid(payload.parentMessageId) ||
-    !Number.isSafeInteger(payload.attempt) ||
-    (payload.attempt as number) < 1 ||
-    !validShortText(payload.workerId, 64) ||
-    !validShortText(payload.deviceId, 200) ||
-    !Number.isSafeInteger(payload.expiresAt) ||
-    (payload.expiresAt as number) <= now ||
-    (payload.expiresAt as number) > now + CHANNEL_ACTIVITY_PUBLISH_MAX_TTL_MS ||
-    !validShortText(payload.nonce, 100)
+    !expiresWithin(
+      payload.expiresAt,
+      now,
+      CHANNEL_ACTIVITY_PUBLISH_MAX_TTL_MS,
+    )
   ) {
     return null;
   }
-  return payload as IssueActivityPublishTokenPayload;
+  return payload;
 }
 
 export async function createIssueActivitySocketTicket(
@@ -289,25 +241,27 @@ export async function verifyIssueActivitySocketTicket(
   runId: string,
   now = Date.now(),
 ): Promise<IssueActivitySocketTicketPayload | null> {
-  const payload = await verifiedPayload(secret, ticket);
+  const encodedPayload = await verifiedPayload(secret, ticket);
+  if (encodedPayload === null) return null;
+  const payload = Option.getOrNull(
+    decodeIssueActivitySocketTicketPayloadJson(encodedPayload),
+  );
   if (
-    payload?.purpose !== "subscribe-issue" ||
+    !payload ||
     payload.projectId !== projectId ||
     payload.runId !== runId ||
-    !validUuid(payload.organizationId) ||
-    !validUuid(payload.projectId) ||
-    !validUuid(payload.runId) ||
-    !validShortText(payload.userId, 200) ||
-    !Number.isSafeInteger(payload.expiresAt) ||
-    (payload.expiresAt as number) <= now ||
-    (payload.expiresAt as number) > now + CHANNEL_ACTIVITY_SOCKET_TICKET_TTL_MS ||
-    !Number.isSafeInteger(payload.authorizationExpiresAt) ||
-    (payload.authorizationExpiresAt as number) <= now ||
-    (payload.authorizationExpiresAt as number) >
-      now + CHANNEL_ACTIVITY_SOCKET_AUTHORIZATION_TTL_MS ||
-    !validShortText(payload.nonce, 100)
+    !expiresWithin(
+      payload.expiresAt,
+      now,
+      CHANNEL_ACTIVITY_SOCKET_TICKET_TTL_MS,
+    ) ||
+    !expiresWithin(
+      payload.authorizationExpiresAt,
+      now,
+      CHANNEL_ACTIVITY_SOCKET_AUTHORIZATION_TTL_MS,
+    )
   ) {
     return null;
   }
-  return payload as IssueActivitySocketTicketPayload;
+  return payload;
 }
