@@ -324,7 +324,16 @@ describe("ProjectOnboarding", () => {
               id: "local_qa",
               checks: ["npm run lint", "npm run test", "npm run build"],
             }),
-            expect.objectContaining({ id: "pr_open" }),
+            expect.objectContaining({
+              id: "reviewing",
+              evidence: ["review findings"],
+            }),
+            expect.objectContaining({
+              id: "pr_open",
+              evidence: ["branch", "commit", "push", "pull_request"],
+            }),
+            expect.objectContaining({ id: "ci_qa", evidence: ["ci", "signoff"] }),
+            expect.objectContaining({ id: "merged", evidence: ["merge_commit"] }),
           ]),
         }),
       }),
