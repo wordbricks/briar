@@ -127,6 +127,10 @@ import {
 } from "./mobile-contract";
 import { buildInboxFeedMessages } from "./inbox-feed";
 import {
+  getDashboardSyncCursor,
+  listDashboardChanges,
+} from "./dashboard-change-repository";
+import {
   listInboxReadStates,
   upsertInboxReadStates,
 } from "./inbox-read-state-repository";
@@ -226,7 +230,6 @@ import {
   projectAgentSessionIsApprovalOwned,
   getProjectAgentTaskJob,
   getProjectAgentTaskJobByRequest,
-  getDashboardSyncCursor,
   getHuntRunForProject,
   getRunExecutionAttempt,
   HuntClaimError,
@@ -253,7 +256,6 @@ import {
   listEvidenceImagesForEvidence,
   listDashboardRuns,
   listDashboardRunsByIds,
-  listDashboardChanges,
   listHuntRunEvents,
   resolveHuntEventActorNames,
   listRunEvidence,

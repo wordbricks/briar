@@ -10,6 +10,10 @@ import {
 } from "../../src/lib/auto-hunt-contract";
 import type { HuntEventInput } from "./db";
 import {
+  getDashboardSyncCursor,
+  listDashboardChanges,
+} from "./dashboard-change-repository";
+import {
   acceptOrganizationInvitation,
   acceptIssueCreateProposal,
   reserveIssueCreateProposalApproval,
@@ -45,7 +49,6 @@ import {
   findProjectIdByAgentTokenHash,
   getProject,
   getProjectSettings,
-  getDashboardSyncCursor,
   getHuntRunForProject,
   getIssueAttachment,
   getIssueActionProposal,
@@ -69,7 +72,6 @@ import {
   listIssueReworkProposals,
   updateIssueMessage,
   deleteIssueMessage,
-  listDashboardChanges,
   pruneExpiredDashboardChanges,
   listDashboardRuns,
   listDashboardRunsByIds,
