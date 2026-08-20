@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   type ArchiveBucket,
   type ArchiveMetadataRow,
-  archiveFormatVersion,
   readArchivedProjectAgentSession,
 } from "./archive";
+import { archiveFormatVersion } from "./archive-contract";
 
 const encoder = new TextEncoder();
 const archiveId = "a".repeat(64);

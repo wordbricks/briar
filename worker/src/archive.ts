@@ -1,5 +1,4 @@
-import { z } from "zod";
-import { agentProviders } from "../../src/lib/agent-provider";
+import * as Option from "effect/Option";
 import type {
   HuntEventRow,
   IssueMessageRow,
@@ -9,12 +8,26 @@ import type {
 } from "./db";
 import { upsertProjectAgentSessionSummary } from "./db";
 import type { TranscriptSessionRow } from "./workers";
-import type {
-  AgentTranscriptSegmentRow,
-  AgentWorkLogEntryRow,
-} from "./agent-worklog";
+import {
+  archiveFormatVersion,
+  decodeArchivedExecutionAudit,
+  decodeArchivedHuntEvent,
+  decodeArchivedIssueMessage,
+  decodeArchivedProjectAgentSession,
+  decodeArchivedRunEvidence,
+  decodeArchivedRunEvidenceImage,
+  decodeArchivedTranscriptSegment,
+  decodeArchivedTranscriptSession,
+  decodeArchivedWorkLogEntry,
+  decodeArchiveLine,
+  decodeArchiveManifest,
+  decodeRelatedArchiveObjectKeysOption,
+  type AgentTranscriptSegmentArchiveRow,
+  type AgentWorkLogEntryArchiveRow,
+  type ArchiveKind,
+  type ExecutionAuditArchiveRow,
+} from "./archive-contract";
 
-export const archiveFormatVersion = 1;
 export const defaultArchiveRowLimit = 500;
 export const maxArchiveUncompressedBytes = 16 * 1024 * 1024;
 const deleteBatchSize = 100;
@@ -48,14 +61,6 @@ export type ArchiveBucket = {
   ): Promise<unknown>;
   delete(keys: string | string[]): Promise<void>;
 };
-
-export type ArchiveKind =
-  | "run_events"
-  | "run_evidence"
-  | "execution_audit"
-  | "agent_transcript"
-  | "issue_messages"
-  | "project_agent_sessions";
 
 export type ArchivePolicy = {
   kind: ArchiveKind;
@@ -131,22 +136,6 @@ export type ArchiveMetadataRow = {
   related_object_keys_json: string;
 };
 
-export type ExecutionAuditArchiveRow = {
-  id: string;
-  run_id: string | null;
-  worker_id: string | null;
-  agent_id: string | null;
-  actor_user_id: string | null;
-  actor_device_id: string | null;
-  action: string;
-  request_id: string | null;
-  detail_json: string;
-  occurred_at: string;
-};
-
-export type AgentWorkLogEntryArchiveRow = AgentWorkLogEntryRow;
-export type AgentTranscriptSegmentArchiveRow = AgentTranscriptSegmentRow;
-
 type ArchiveRecordType =
   | "hunt_event"
   | "run_evidence"
@@ -174,206 +163,6 @@ type ArchiveCandidate = {
   periodEnd: string;
   relatedObjectKeys: string[];
 };
-
-const manifestSchema = z.object({
-  recordType: z.literal("manifest"),
-  formatVersion: z.literal(archiveFormatVersion),
-  archiveId: z.string().length(64),
-  projectId: z.string().min(1),
-  runId: z.string().nullable(),
-  scopeId: z.string().min(1),
-  kind: z.enum([
-    "run_events",
-    "run_evidence",
-    "execution_audit",
-    "agent_transcript",
-    "issue_messages",
-    "project_agent_sessions",
-  ]),
-  rowCount: z.number().int().positive(),
-  periodStart: z.string(),
-  periodEnd: z.string(),
-  createdAt: z.string(),
-});
-
-const archiveLineSchema = z.object({
-  recordType: z.enum([
-    "hunt_event",
-    "run_evidence",
-    "run_evidence_image",
-    "execution_audit",
-    "transcript_session",
-    "worklog_entry",
-    "transcript_segment",
-    "issue_message",
-    "project_agent_session",
-  ]),
-  data: z.unknown(),
-});
-
-const nullableString = z.string().nullable();
-const huntEventSchema: z.ZodType<HuntEventRow> = z.object({
-  id: z.string(),
-  run_id: z.string(),
-  event_key: z.string(),
-  attempt: z.number(),
-  revision: z.number(),
-  stage: z.enum([
-    "queued",
-    "analyzing",
-    "implementing",
-    "pr_open",
-    "staging_qa",
-    "production_qa",
-    "completed",
-    "blocked",
-    "failed",
-    "cancelled",
-  ]),
-  status: z.enum([
-    "backlog",
-    "queued",
-    "running",
-    "blocked",
-    "failed",
-    "completed",
-    "cancelled",
-  ]),
-  workflow_stage: nullableString,
-  detail: nullableString,
-  actor: z.string(),
-  branch: nullableString,
-  commit_sha: nullableString,
-  qa_status: z.enum(["pending", "passed", "skipped"]).nullable(),
-  tracker_issue_state: nullableString,
-  pull_request_urls: z.string(),
-  target_sha: nullableString,
-  occurred_at: z.string(),
-  recorded_at: z.string(),
-});
-
-const runEvidenceSchema: z.ZodType<RunEvidenceRow> = z.object({
-  id: z.string(),
-  run_id: z.string(),
-  attempt: z.number(),
-  revision: z.number(),
-  evidence_key: z.string(),
-  workflow_stage: z.string(),
-  evidence_type: z.string(),
-  status: z.enum(["pending", "passed", "failed", "skipped"]),
-  detail: nullableString,
-  command: nullableString,
-  url: nullableString,
-  metadata_json: nullableString,
-  actor: z.string(),
-  observed_at: z.string(),
-  recorded_at: z.string(),
-});
-
-const runEvidenceImageSchema: z.ZodType<RunEvidenceImageRow> = z.object({
-  id: z.string(),
-  project_id: z.string(),
-  run_id: z.string(),
-  evidence_id: z.string(),
-  object_key: z.string(),
-  filename: z.string(),
-  content_type: z.string(),
-  byte_size: z.number(),
-  sha256: z.string(),
-  position: z.number(),
-  created_at: z.string(),
-});
-
-const issueMessageSchema: z.ZodType<IssueMessageRow> = z.object({
-  id: z.string(),
-  run_id: z.string(),
-  parent_message_id: nullableString,
-  author_user_id: nullableString,
-  author_agent_id: nullableString.default(null),
-  author_agent_name: nullableString.default(null),
-  author_agent_provider: z.enum(agentProviders).nullable(),
-  author_name: nullableString,
-  author_image: nullableString,
-  author_agent_image: nullableString.default(null),
-  body: z.string(),
-  reply_count: z.number(),
-  created_at: z.string(),
-  updated_at: z.string(),
-});
-
-const projectAgentSessionSchema: z.ZodType<ProjectAgentSessionRow> = z.object({
-  project_id: z.string(),
-  id: z.string(),
-  agent_id: nullableString,
-  status: z.enum(["running", "completed", "failed", "skipped", "interrupted"]),
-  session_type: z.enum(["task", "dispatch"]),
-  payload_json: z.string(),
-  started_at: z.string(),
-  completed_at: nullableString,
-  updated_at: z.string(),
-});
-
-const transcriptSessionSchema: z.ZodType<TranscriptSessionRow> = z.object({
-  session_id: z.string(),
-  project_id: z.string(),
-  run_id: nullableString,
-  worker_id: nullableString,
-  agent_provider: z.enum(agentProviders),
-  started_at: z.string(),
-  last_event_at: z.string(),
-  event_count: z.number(),
-  byte_count: z.number(),
-});
-
-const workLogEntrySchema: z.ZodType<AgentWorkLogEntryArchiveRow> = z.object({
-  session_id: z.string(),
-  entry_id: z.string(),
-  sequence: z.number(),
-  updated_sequence: z.number(),
-  entry_type: z.enum(["message", "activity"]),
-  activity_kind: z
-    .enum(["command", "fileChange", "webSearch", "tool"])
-    .nullable(),
-  phase: nullableString,
-  title: nullableString,
-  body: z.string(),
-  status: z.enum([
-    "writing",
-    "completed",
-    "failed",
-    "cancelled",
-    "interrupted",
-  ]),
-  started_at: z.string(),
-  updated_at: z.string(),
-  completed_at: nullableString,
-});
-
-const transcriptSegmentSchema: z.ZodType<AgentTranscriptSegmentArchiveRow> =
-  z.object({
-    session_id: z.string(),
-    first_sequence: z.number(),
-    last_sequence: z.number(),
-    object_key: z.string(),
-    event_count: z.number(),
-    uncompressed_bytes: z.number(),
-    compressed_bytes: z.number(),
-    sha256: z.string(),
-    recorded_at: z.string(),
-  });
-
-const executionAuditSchema: z.ZodType<ExecutionAuditArchiveRow> = z.object({
-  id: z.string(),
-  run_id: nullableString,
-  worker_id: nullableString,
-  agent_id: nullableString,
-  actor_user_id: nullableString,
-  actor_device_id: nullableString,
-  action: z.string(),
-  request_id: nullableString,
-  detail_json: z.string(),
-  occurred_at: z.string(),
-});
 
 const encoder = new TextEncoder();
 
@@ -976,7 +765,7 @@ const purgeArchiveRecords = async (
         db,
         "briar_hunt_events",
         "id",
-        records.map((record) => huntEventSchema.parse(record.data).id),
+        records.map((record) => decodeArchivedHuntEvent(record.data).id),
       );
       break;
     case "run_evidence":
@@ -986,13 +775,13 @@ const purgeArchiveRecords = async (
         "id",
         records
           .filter((record) => record.recordType === "run_evidence")
-          .map((record) => runEvidenceSchema.parse(record.data).id),
+          .map((record) => decodeArchivedRunEvidence(record.data).id),
       );
       break;
     case "execution_audit":
       await deleteArchivedExecutionAuditIds(
         db,
-        records.map((record) => executionAuditSchema.parse(record.data).id),
+        records.map((record) => decodeArchivedExecutionAudit(record.data).id),
       );
       break;
     case "agent_transcript":
@@ -1002,7 +791,9 @@ const purgeArchiveRecords = async (
         "session_id",
         records
           .filter((record) => record.recordType === "transcript_session")
-          .map((record) => transcriptSessionSchema.parse(record.data).session_id),
+          .map((record) =>
+            decodeArchivedTranscriptSession(record.data).session_id
+          ),
       );
       break;
     case "issue_messages":
@@ -1010,12 +801,12 @@ const purgeArchiveRecords = async (
         db,
         "briar_issue_messages",
         "id",
-        records.map((record) => issueMessageSchema.parse(record.data).id),
+        records.map((record) => decodeArchivedIssueMessage(record.data).id),
       );
       break;
     case "project_agent_sessions":
       for (const record of records) {
-        const session = projectAgentSessionSchema.parse(record.data);
+        const session = decodeArchivedProjectAgentSession(record.data);
         await upsertProjectAgentSessionSummary(db, session, true);
         await db
           .prepare(
@@ -1047,7 +838,7 @@ const readArchiveObject = async (
     throw new Error(`Archive content checksum failed: ${metadata.object_key}`);
   }
   const lines = content.trimEnd().split("\n");
-  const manifest = manifestSchema.parse(JSON.parse(lines.shift() ?? "null"));
+  const manifest = decodeArchiveManifest(JSON.parse(lines.shift() ?? "null"));
   if (
     manifest.archiveId !== metadata.id ||
     manifest.kind !== metadata.archive_kind ||
@@ -1055,7 +846,7 @@ const readArchiveObject = async (
   ) {
     throw new Error(`Archive manifest does not match D1 metadata: ${metadata.id}`);
   }
-  return lines.map((line) => archiveLineSchema.parse(JSON.parse(line)));
+  return lines.map((line) => decodeArchiveLine(JSON.parse(line)));
 };
 
 export async function readArchivedProjectAgentSession(
@@ -1084,7 +875,7 @@ export async function readArchivedProjectAgentSession(
     );
   }
 
-  const session = projectAgentSessionSchema.parse(records[0].data);
+  const session = decodeArchivedProjectAgentSession(records[0].data);
   if (
     session.project_id !== metadata.project_id ||
     session.id !== metadata.scope_id
@@ -1328,7 +1119,7 @@ export async function listArchivedRunEvents(
     runId,
     kind: "run_events",
   });
-  return records.map((record) => huntEventSchema.parse(record.data));
+  return records.map((record) => decodeArchivedHuntEvent(record.data));
 }
 
 export async function listArchivedRunEvidence(
@@ -1348,14 +1139,14 @@ export async function listArchivedRunEvidence(
     evidence: records
       .filter((record) => record.recordType === "run_evidence")
       .map((record) => ({
-        ...runEvidenceSchema.parse(record.data),
+        ...decodeArchivedRunEvidence(record.data),
         project_id: projectId,
         run_id: runId,
       })),
     images: records
       .filter((record) => record.recordType === "run_evidence_image")
       .map((record) => ({
-        ...runEvidenceImageSchema.parse(record.data),
+        ...decodeArchivedRunEvidenceImage(record.data),
         project_id: projectId,
         run_id: runId,
       })),
@@ -1373,7 +1164,7 @@ export async function listArchivedIssueMessages(
     runId,
     kind: "issue_messages",
   });
-  return records.map((record) => issueMessageSchema.parse(record.data));
+  return records.map((record) => decodeArchivedIssueMessage(record.data));
 }
 
 export async function listArchivedExecutionAuditEvents(
@@ -1386,7 +1177,7 @@ export async function listArchivedExecutionAuditEvents(
     runId,
     kind: "execution_audit",
   });
-  return records.map((record) => executionAuditSchema.parse(record.data));
+  return records.map((record) => decodeArchivedExecutionAudit(record.data));
 }
 
 const archivedWorkLogFromRecords = (records: ArchiveRecord[]) => {
@@ -1395,10 +1186,10 @@ const archivedWorkLogFromRecords = (records: ArchiveRecord[]) => {
   );
   if (!sessionRecord) return null;
   return {
-    session: transcriptSessionSchema.parse(sessionRecord.data),
+    session: decodeArchivedTranscriptSession(sessionRecord.data),
     entries: records
       .filter((record) => record.recordType === "worklog_entry")
-      .map((record) => workLogEntrySchema.parse(record.data))
+      .map((record) => decodeArchivedWorkLogEntry(record.data))
       .sort(
         (left, right) =>
           left.sequence - right.sequence ||
@@ -1406,7 +1197,7 @@ const archivedWorkLogFromRecords = (records: ArchiveRecord[]) => {
       ),
     segments: records
       .filter((record) => record.recordType === "transcript_segment")
-      .map((record) => transcriptSegmentSchema.parse(record.data))
+      .map((record) => decodeArchivedTranscriptSegment(record.data))
       .sort(
         (left, right) =>
           left.first_sequence - right.first_sequence ||
@@ -1475,7 +1266,9 @@ export async function listArchivedProjectAgentSessions(
   const records = await archivedRecords(db, bucket, projectId, {
     kind: "project_agent_sessions",
   });
-  return records.map((record) => projectAgentSessionSchema.parse(record.data));
+  return records.map((record) =>
+    decodeArchivedProjectAgentSession(record.data)
+  );
 }
 
 export async function getArchivedProjectAgentSession(
@@ -1576,8 +1369,10 @@ export async function listArchiveObjectsForDeletion(
   const attachments: string[] = [];
   for (const row of result.results ?? []) {
     archives.push(row.object_key);
-    const parsed = z.array(z.string()).safeParse(JSON.parse(row.related_object_keys_json));
-    if (parsed.success) attachments.push(...parsed.data);
+    const parsed = decodeRelatedArchiveObjectKeysOption(
+      JSON.parse(row.related_object_keys_json),
+    );
+    if (Option.isSome(parsed)) attachments.push(...parsed.value);
   }
   return { archives, attachments };
 }
@@ -1921,12 +1716,12 @@ export async function expireArchives(
     .all<ArchiveMetadataRow>();
   let deleted = 0;
   for (const archive of result.results ?? []) {
-    const related = z
-      .array(z.string())
-      .safeParse(JSON.parse(archive.related_object_keys_json));
+    const related = decodeRelatedArchiveObjectKeysOption(
+      JSON.parse(archive.related_object_keys_json),
+    );
     await archivesBucket.delete(archive.object_key);
-    if (related.success && related.data.length > 0) {
-      await attachmentsBucket.delete(related.data);
+    if (Option.isSome(related) && related.value.length > 0) {
+      await attachmentsBucket.delete(related.value);
     }
     if (archive.archive_kind === "project_agent_sessions") {
       await db.batch([
