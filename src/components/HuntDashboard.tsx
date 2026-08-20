@@ -7779,7 +7779,7 @@ function IssueStatusHistoryPanel({
   );
 }
 
-function IssueAgentActivityPanel({
+export function IssueAgentActivityPanel({
   activity,
   error,
   id,
@@ -7798,19 +7798,37 @@ function IssueAgentActivityPanel({
 }) {
   const { t } = useI18n();
   const panelRef = useRef<HTMLDivElement | null>(null);
+  const stickToBottomRef = useRef(true);
 
   useLayoutEffect(() => {
+    if (loading) {
+      stickToBottomRef.current = true;
+      return;
+    }
     const panel = panelRef.current;
-    if (panel && !loading && !error && activity.length > 0) {
+    if (
+      panel &&
+      stickToBottomRef.current &&
+      !error &&
+      activity.length > 0
+    ) {
       panel.scrollTop = panel.scrollHeight;
     }
   }, [activity, error, loading]);
+
+  const handleScroll = () => {
+    const panel = panelRef.current;
+    if (!panel) return;
+    stickToBottomRef.current =
+      panel.scrollHeight - panel.scrollTop - panel.clientHeight < 24;
+  };
 
   return (
     <div
       aria-labelledby={labelledBy}
       className="issue-agent-activity-panel"
       id={id}
+      onScroll={handleScroll}
       ref={panelRef}
       role="tabpanel"
     >
