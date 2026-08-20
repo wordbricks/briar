@@ -47,6 +47,14 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
+import {
+  StatusPanel,
+  StatusPanelAction,
+  StatusPanelContent,
+  StatusPanelDescription,
+  StatusPanelIcon,
+  StatusPanelTitle,
+} from "@/components/ui/status-panel";
 import { Textarea } from "@/components/ui/textarea";
 import { Typography } from "@/components/ui/typography";
 import type { DashboardPayload, Project, ProjectSettings as ProjectSettingsData } from "../types";
@@ -1545,32 +1553,30 @@ export function ProjectSettings({
             )}
           </section>
 
-          <section
-            className="project-settings-danger mx-auto mt-4 flex w-full max-w-[720px] items-center justify-between gap-4 rounded-xl border border-destructive/20 bg-destructive/5 px-5 py-4"
+          <StatusPanel
+            className="project-settings-danger mx-auto mt-4 max-w-[720px] items-center"
+            density="spacious"
             hidden={activeSection !== "general"}
+            tone="destructive"
           >
-            <div className="flex min-w-0 items-start gap-3">
-              <span className="danger-icon grid size-9 place-items-center rounded-lg bg-destructive/10 text-destructive">
-                <AlertTriangle size={18} strokeWidth={1.8} />
-              </span>
-              <span className="grid min-w-0 gap-1">
-                <Typography as="strong" variant="body">
-                  {t("settings.danger")}
-                </Typography>
-                <Typography as="small" tone="muted" variant="caption">
-                  {t("settings.dangerDescription")}
-                </Typography>
-              </span>
-            </div>
-            <Button
-              onClick={() => setIsConfirming(true)}
-              type="button"
-              variant="destructive"
-            >
-              <Trash2 size={15} strokeWidth={1.8} />
-              {t("settings.deleteProject")}
-            </Button>
-          </section>
+            <StatusPanelIcon className="bg-destructive/10 text-destructive">
+              <AlertTriangle size={18} strokeWidth={1.8} />
+            </StatusPanelIcon>
+            <StatusPanelContent>
+              <StatusPanelTitle>{t("settings.danger")}</StatusPanelTitle>
+              <StatusPanelDescription>{t("settings.dangerDescription")}</StatusPanelDescription>
+            </StatusPanelContent>
+            <StatusPanelAction>
+              <Button
+                onClick={() => setIsConfirming(true)}
+                type="button"
+                variant="destructive"
+              >
+                <Trash2 size={15} strokeWidth={1.8} />
+                {t("settings.deleteProject")}
+              </Button>
+            </StatusPanelAction>
+          </StatusPanel>
         </SettingsScroll>
       </SettingsMain>
 

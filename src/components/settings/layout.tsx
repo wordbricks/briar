@@ -3,6 +3,7 @@ import type { ButtonHTMLAttributes, HTMLAttributes, ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { StatusPanel } from "@/components/ui/status-panel";
 import { Switch } from "@/components/ui/switch";
 import { Typography } from "@/components/ui/typography";
 import { cn } from "@/lib/utils";
@@ -389,22 +390,14 @@ export function SettingsAlert({
   tone?: "error" | "success" | "warning" | "info";
 }) {
   return (
-    <p
-      className={cn(
-        "mt-4 rounded-lg border px-3 py-2.5 text-xs",
-        tone === "error" &&
-          "border-destructive/25 bg-destructive/8 text-destructive",
-        tone === "success" &&
-          "border-success/25 bg-success/10 text-success",
-        tone === "warning" &&
-          "border-warning/25 bg-warning/10 text-warning",
-        tone === "info" && "border-border bg-muted text-muted-foreground",
-        className,
-      )}
+    <StatusPanel
+      className={cn("mt-4 text-xs", className)}
+      density="compact"
       role={tone === "error" ? "alert" : "status"}
+      tone={tone === "error" ? "destructive" : tone}
     >
       {children}
-    </p>
+    </StatusPanel>
   );
 }
 

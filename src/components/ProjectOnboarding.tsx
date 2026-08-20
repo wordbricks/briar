@@ -44,6 +44,14 @@ import {
 import { formatExecutionDuration } from "../lib/agent-execution-metrics";
 import { useI18n } from "../i18n";
 import { DeveloperToolsSetup } from "./DeveloperToolsSetup";
+import { ChoiceCard } from "./ui/choice-card";
+import {
+  StatusPanel,
+  StatusPanelContent,
+  StatusPanelDescription,
+  StatusPanelIcon,
+  StatusPanelTitle,
+} from "./ui/status-panel";
 
 type PreparedProjectConnection = {
   repositoryPath: string;
@@ -170,10 +178,11 @@ function OnboardingProviderProgress({
   const displayedMessage = providerProgressMessage(progress, t);
 
   return (
-    <div
+    <StatusPanel
       aria-label={t("onboarding.workflowProviderProgress")}
       className={`onboarding-provider-progress${isQuiet ? " quiet" : ""}`}
       role="group"
+      tone={isQuiet ? "warning" : "info"}
     >
       <div className="onboarding-provider-progress-heading">
         <span>
@@ -202,12 +211,17 @@ function OnboardingProviderProgress({
         </span>
       </div>
       {isQuiet ? (
-        <div className="onboarding-provider-progress-notice">
+        <StatusPanel
+          className="onboarding-provider-progress-notice"
+          density="compact"
+          role="status"
+          tone="warning"
+        >
           <Info aria-hidden="true" size={14} />
           <span>{t("onboarding.workflowStillWorking")}</span>
-        </div>
+        </StatusPanel>
       ) : null}
-    </div>
+    </StatusPanel>
   );
 }
 
@@ -640,30 +654,32 @@ export function ProjectOnboarding({
                 <h1>{t("onboarding.chooseMethodTitle")}</h1>
                 <p className="onboarding-copy">{t("onboarding.chooseMethodDescription")}</p>
                 <div className="project-start-choice-grid">
-                  <button onClick={startLocalRepositoryFlow} type="button">
-                    <i><FolderGit2 size={24} /></i>
-                    <span>
-                      <strong>{t("onboarding.connectLocalTitle")}</strong>
-                      <small>{t("onboarding.connectLocalDescription")}</small>
-                    </span>
-                    <ArrowRight size={18} />
-                  </button>
-                  <button aria-disabled="true" disabled type="button">
-                    <i><FilePlus2 size={24} /></i>
-                    <span>
-                      <strong>{t("onboarding.createScratchTitle")}</strong>
-                      <small>{t("onboarding.createScratchDescription")}</small>
-                    </span>
-                    <em>{t("onboarding.comingSoon")}</em>
-                  </button>
-                  <button onClick={() => setPhase("lovable-tutorial")} type="button">
-                    <i className="lovable"><HeartHandshake size={24} /></i>
-                    <span>
-                      <strong>{t("onboarding.migrateLovableTitle")}</strong>
-                      <small>{t("onboarding.migrateLovableDescription")}</small>
-                    </span>
-                    <ArrowRight size={18} />
-                  </button>
+                  <ChoiceCard
+                    className="max-[680px]:min-h-[150px] min-[681px]:min-h-[218px]"
+                    description={t("onboarding.connectLocalDescription")}
+                    icon={<FolderGit2 />}
+                    onClick={startLocalRepositoryFlow}
+                    title={t("onboarding.connectLocalTitle")}
+                    trailing={<ArrowRight />}
+                  />
+                  <ChoiceCard
+                    aria-disabled="true"
+                    badge={t("onboarding.comingSoon")}
+                    className="max-[680px]:min-h-[150px] min-[681px]:min-h-[218px]"
+                    description={t("onboarding.createScratchDescription")}
+                    disabled
+                    icon={<FilePlus2 />}
+                    title={t("onboarding.createScratchTitle")}
+                  />
+                  <ChoiceCard
+                    className="max-[680px]:min-h-[150px] min-[681px]:min-h-[218px]"
+                    description={t("onboarding.migrateLovableDescription")}
+                    icon={<HeartHandshake />}
+                    iconClassName="bg-destructive/10 text-destructive"
+                    onClick={() => setPhase("lovable-tutorial")}
+                    title={t("onboarding.migrateLovableTitle")}
+                    trailing={<ArrowRight />}
+                  />
                 </div>
               </section>
             ) : null}
@@ -682,13 +698,13 @@ export function ProjectOnboarding({
                     title={t("onboarding.lovableVideoTitle")}
                   />
                 </div>
-                <div className="lovable-tutorial-note">
-                  <Github size={18} />
-                  <span>
-                    <strong>{t("onboarding.lovableSyncResultTitle")}</strong>
-                    <small>{t("onboarding.lovableSyncResultDescription")}</small>
-                  </span>
-                </div>
+                <StatusPanel className="lovable-tutorial-note" tone="success">
+                  <StatusPanelIcon><Github /></StatusPanelIcon>
+                  <StatusPanelContent>
+                    <StatusPanelTitle>{t("onboarding.lovableSyncResultTitle")}</StatusPanelTitle>
+                    <StatusPanelDescription>{t("onboarding.lovableSyncResultDescription")}</StatusPanelDescription>
+                  </StatusPanelContent>
+                </StatusPanel>
                 <a
                   className="lovable-docs-link"
                   href="https://docs.lovable.dev/integrations/github"
@@ -865,7 +881,7 @@ export function ProjectOnboarding({
                   <>
                     <span className="onboarding-process-icon error"><CircleAlert size={25} /></span>
                     <h1>{t("onboarding.workflowGenerationFailed")}</h1>
-                    <div className="onboarding-process-error" role="alert">
+                    <StatusPanel className="onboarding-process-error" role="alert" tone="destructive">
                       <p>{workflowError.message}</p>
                       {workflowError.issues.length > 0 ? (
                         <ul>
@@ -874,7 +890,7 @@ export function ProjectOnboarding({
                           ))}
                         </ul>
                       ) : null}
-                    </div>
+                    </StatusPanel>
                     <div className="onboarding-secondary-actions">
                       <button onClick={retryWorkflowGeneration} type="button">{t("onboarding.retry")}<ArrowRight size={15} /></button>
                       <button onClick={returnToRepository} type="button"><ArrowLeft size={15} />{t("onboarding.returnToRepository")}</button>
@@ -930,7 +946,7 @@ export function ProjectOnboarding({
                   <>
                     <span className="onboarding-process-icon error"><CircleAlert size={25} /></span>
                     <h1>{t("onboarding.toolAnalysisFailed")}</h1>
-                    <p className="onboarding-process-error" role="alert">{toolsError}</p>
+                    <StatusPanel className="onboarding-process-error" role="alert" tone="destructive">{toolsError}</StatusPanel>
                     <div className="onboarding-secondary-actions">
                       <button onClick={() => void analyzeRequirements()} type="button">{t("onboarding.retry")}<ArrowRight size={15} /></button>
                       <button onClick={() => setPhase("workflow-review")} type="button"><ArrowLeft size={15} />{t("onboarding.returnToWorkflow")}</button>
@@ -972,9 +988,9 @@ export function ProjectOnboarding({
                     })}
                   </ul>
                 ) : (
-                  <div className="onboarding-no-tools"><CheckCircle2 size={18} />{t("onboarding.noAdditionalTools")}</div>
+                  <StatusPanel className="onboarding-no-tools" role="status" tone="success"><CheckCircle2 size={18} />{t("onboarding.noAdditionalTools")}</StatusPanel>
                 )}
-                {hasMissingTools ? <p className="onboarding-tool-warning"><CircleAlert size={15} />{t("onboarding.missingToolsWarning")}</p> : null}
+                {hasMissingTools ? <StatusPanel className="onboarding-tool-warning" density="compact" role="status" tone="warning"><CircleAlert size={15} />{t("onboarding.missingToolsWarning")}</StatusPanel> : null}
                 <button className="onboarding-primary-action" onClick={onFinish} type="button">
                   {t("onboarding.confirm")}<ArrowRight size={17} />
                 </button>

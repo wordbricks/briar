@@ -72,6 +72,7 @@ import {
   CardHeader,
   CardTitle,
   CardDescription,
+  ChoiceCard,
   Badge,
   Dialog,
   DialogContent,
@@ -81,8 +82,35 @@ import {
   TabsList,
   TabsTrigger,
   Typography,
+  StatusPanel,
+  StatusPanelContent,
+  StatusPanelDescription,
+  StatusPanelIcon,
+  StatusPanelTitle,
 } from "@/components/ui";
 ```
+
+### Feedback surfaces
+
+Use `StatusPanel` for persistent status, warning, success, information, and
+destructive surfaces. It owns theme-aware surface, border, foreground, and
+muted colors through the `status-*` tokens. Compose it with its icon, content,
+title, description, meta, and action slots instead of creating feature-specific
+banner colors.
+
+```tsx
+<StatusPanel role="status" tone="success">
+  <StatusPanelIcon><Check /></StatusPanelIcon>
+  <StatusPanelContent>
+    <StatusPanelTitle>Connected</StatusPanelTitle>
+    <StatusPanelDescription>Last checked just now.</StatusPanelDescription>
+  </StatusPanelContent>
+</StatusPanel>
+```
+
+Use `ChoiceCard` for a button that presents a mutually exclusive setup or
+creation path. Use `Card` for non-interactive content. Do not turn a neutral
+`Card` into a status banner with one-off colors.
 
 Add more with the shadcn CLI:
 
@@ -98,7 +126,8 @@ Shared page layout primitives live in `src/components/layout/`:
 |--------|------|
 | `MainContent` | App main pane (`main-content` compatible) |
 | `PageHeader` | Page titles with optional eyebrow/actions |
-| `EmptyState` / `ErrorBanner` | Empty and error affordances |
+| `EmptyState` | Empty affordances |
+| `StatusPanel` | Global feedback and status surface |
 
 Migrated product surfaces include Login, Inbox, Auto Hunt, Agents, Schedule,
 Issue queue/dashboard, Organization create, Companion chrome, and settings.
@@ -131,7 +160,9 @@ Migrated screens:
 2. **Touching a screen** — replace one-off `font-size: 9px` / `11.5px` with `var(--text-*)` or semantic classes.
 3. **Buttons / inputs / dialogs** — prefer primitives over duplicated CSS.
 4. **Settings-like pages** — reuse `@/components/settings` layout primitives.
-5. Do not invent new hex colors; extend `tokens.css` if a new semantic color is required.
+5. **Feedback** — use `StatusPanel`; do not duplicate banner surface colors.
+6. **Choice cards** — use `ChoiceCard`; reserve `Card` for non-interactive content.
+7. Do not invent new hex colors; extend `tokens.css` if a new semantic color is required.
 
 ## Fonts
 
