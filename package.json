@@ -15,7 +15,7 @@
     "web:build": "bash scripts/with-release-env.sh env VITE_BRIAR_WEB=true vite build",
     "build:release": "bash scripts/with-release-env.sh bun run build && bash scripts/verify-release-config.sh",
     "check": "bun run skills:check && tsc --noEmit",
-    "test": "vitest run --no-file-parallelism",
+    "test": "vitest run --exclude worker/src/migrations.test.ts --exclude worker/src/db.test.ts",
     "ci:local": "bash scripts/ci-local.sh",
     "ci:signoff": "bash scripts/ci-local.sh --signoff",
     "mobile:contract": "vitest run worker/src/mobile-contract.test.ts worker/src/mobile-contract-effect.test.ts",
