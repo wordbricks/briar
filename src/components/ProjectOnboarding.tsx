@@ -12,7 +12,6 @@ import {
   FolderOpen,
   GitBranch,
   Github,
-  HeartHandshake,
   Info,
   LoaderCircle,
   PlayCircle,
@@ -45,6 +44,7 @@ import {
 } from "../lib/project-llm";
 import { formatExecutionDuration } from "../lib/agent-execution-metrics";
 import { useI18n } from "../i18n";
+import lovableLogo from "../assets/lovable-color.png";
 import { DeveloperToolsSetup } from "./DeveloperToolsSetup";
 import { ChoiceCard } from "./ui/choice-card";
 import {
@@ -697,8 +697,8 @@ export function ProjectOnboarding({
                   <ChoiceCard
                     className="max-[680px]:min-h-[150px] min-[681px]:min-h-[218px]"
                     description={t("onboarding.migrateLovableDescription")}
-                    icon={<HeartHandshake />}
-                    iconClassName="bg-destructive/10 text-destructive"
+                    icon={<img alt="" aria-hidden="true" src={lovableLogo} />}
+                    iconClassName="bg-transparent [&_img]:size-10 [&_img]:object-contain"
                     onClick={() => setPhase("lovable-tutorial")}
                     title={t("onboarding.migrateLovableTitle")}
                     trailing={<ArrowRight />}
