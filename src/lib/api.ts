@@ -4,11 +4,17 @@ export { briarApiUrl } from "./api-config";
 import { ApiError, isApiErrorStatus } from "./api/errors";
 export {
   ApiError,
+  ApiResponseDecodeError,
   apiErrorIssueMessages,
   errorWithMessage,
   isApiErrorStatus,
 } from "./api/errors";
 import { request } from "./api/request";
+export {
+  deleteAccount,
+  loadSession,
+  updateAccountProfile,
+} from "./api/account";
 import { structuredAgentResultSchema } from "./agent-result";
 import { validateIssueAttachments } from "./issue-attachments";
 import {
@@ -90,7 +96,6 @@ import type {
   ProjectUsageSummary,
   RunEvidence,
   RunEvidenceImage,
-  SessionUser,
   StatusTrayRunsPayload,
   UpdateProjectAgentInput,
   UpdateProjectAgentScheduleInput,
@@ -101,14 +106,6 @@ import type {
 
 const apiUrl = briarApiUrl;
 
-
-const sessionUserSchema = z.object({
-  id: z.string(),
-  username: z.string().nullable().optional(),
-  name: z.string(),
-  email: z.string().email(),
-  image: z.string().nullable().optional(),
-});
 
 const projectSchema = z.object({
   id: z.string().uuid(),
@@ -459,11 +456,6 @@ export async function pollDeviceToken(
   }
 }
 
-export async function loadSession(token: string): Promise<SessionUser> {
-  const result = await request<{ user: unknown }>("/me", token);
-  return sessionUserSchema.parse(result.user);
-}
-
 const inboxReadVersionsSchema = z.record(z.string().min(1), z.string().min(1));
 
 export type InboxFeedSyncState = {
@@ -548,27 +540,6 @@ export async function saveInboxReadStates(
     },
   );
   return inboxReadVersionsSchema.parse(result.readVersions ?? {});
-}
-
-export async function updateAccountProfile(
-  token: string,
-  input: { username: string; name: string; image: string | null },
-): Promise<SessionUser> {
-  const result = await request<{ user: unknown }>("/me", token, {
-    method: "PATCH",
-    body: JSON.stringify(input),
-  });
-  return sessionUserSchema.parse(result.user);
-}
-
-export async function deleteAccount(
-  token: string,
-  confirmation: string,
-): Promise<void> {
-  await request<void>("/me", token, {
-    method: "DELETE",
-    body: JSON.stringify({ confirmation }),
-  });
 }
 
 export async function loadProjects(token: string): Promise<Project[]> {

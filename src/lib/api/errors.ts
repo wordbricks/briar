@@ -1,12 +1,53 @@
-export class ApiError extends Error {
+import * as Data from "effect/Data";
+import * as Predicate from "effect/Predicate";
+import type { SchemaError } from "effect/Schema";
+
+export class ApiError extends Data.TaggedError("ApiError")<{
+  readonly status: number;
+  readonly message: string;
+  readonly code?: string;
+  readonly issues?: readonly unknown[];
+}> {
   constructor(
-    readonly status: number,
+    status: number,
     message: string,
-    readonly code?: string,
-    readonly issues?: readonly unknown[],
+    code?: string,
+    issues?: readonly unknown[],
   ) {
-    super(message);
-    this.name = "ApiError";
+    super({ status, message, code, issues });
+  }
+}
+
+export class ApiRequestError extends Data.TaggedError("ApiRequestError")<{
+  readonly method: string;
+  readonly path: string;
+  readonly cause: unknown;
+  readonly message: string;
+}> {
+  constructor(method: string, path: string, cause: unknown) {
+    const detail = Predicate.isError(cause) ? cause.message : String(cause);
+    super({
+      method,
+      path,
+      cause,
+      message: `Briar API ${method} ${path} 요청 실패: ${detail}`,
+    });
+  }
+}
+
+export class ApiResponseDecodeError extends Data.TaggedError(
+  "ApiResponseDecodeError",
+)<{
+  readonly path: string;
+  readonly cause: SchemaError;
+  readonly message: string;
+}> {
+  constructor(path: string, cause: SchemaError) {
+    super({
+      path,
+      cause,
+      message: `Briar API ${path} 응답 형식이 올바르지 않습니다: ${cause.message}`,
+    });
   }
 }
 
@@ -25,17 +66,21 @@ export function errorWithMessage(error: unknown, message: string) {
 export function apiErrorIssueMessages(error: unknown) {
   if (!(error instanceof ApiError) || !error.issues) return [];
   return error.issues.flatMap((issue) => {
-    if (typeof issue === "string") return [issue];
-    if (!issue || typeof issue !== "object") return [];
-    const candidate = issue as { message?: unknown; path?: unknown };
-    if (typeof candidate.message !== "string") return [];
-    const path = Array.isArray(candidate.path)
-      ? candidate.path
+    if (Predicate.isString(issue)) return [issue];
+    if (
+      !Predicate.hasProperty(issue, "message") ||
+      !Predicate.isString(issue.message)
+    ) return [];
+    const candidatePath = Predicate.hasProperty(issue, "path")
+      ? issue.path
+      : undefined;
+    const path = Array.isArray(candidatePath)
+      ? candidatePath
           .filter((part) =>
-            typeof part === "string" || typeof part === "number"
+            Predicate.isString(part) || Predicate.isNumber(part)
           )
           .join(".")
       : "";
-    return [path ? `${path}: ${candidate.message}` : candidate.message];
+    return [path ? `${path}: ${issue.message}` : issue.message];
   });
 }
