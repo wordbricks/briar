@@ -30,6 +30,18 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.144",
+        date: "2026년 8월 20일",
+        title: "Lovable 프로젝트를 검토와 병합까지 연결합니다",
+        summary:
+          "Lovable 프로젝트 온보딩을 더 쉽게 알아보고, 기본 워크플로가 PR 생성과 main 병합까지 이어지도록 확장했습니다.",
+        items: [
+          "저장소 가져오기 카드에 Lovable 로고를 표시해 Lovable 프로젝트 경로를 더 쉽게 구분합니다.",
+          "Lovable 호환 저장소의 기본 워크플로에 PR 생성과 main 병합 단계를 추가해 검토와 반영 과정을 명시합니다.",
+          "프로젝트 온보딩과 Lovable 워크플로 프리셋 회귀 테스트를 보강합니다.",
+        ],
+      },
+      {
         version: "1.2.143",
         date: "2026년 8월 20일",
         title: "앱 업데이트 중 실행 중인 Worker 작업을 안전하게 이어받습니다",
@@ -894,6 +906,18 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.144",
+        date: "August 20, 2026",
+        title: "Carry Lovable projects through review and merge",
+        summary:
+          "Make Lovable project onboarding easier to recognize and extend its default workflow through pull-request creation and merging to main.",
+        items: [
+          "Show the Lovable logo on the repository import card so the Lovable project path is easier to recognize.",
+          "Add pull-request creation and merge-to-main stages to the default workflow for compatible Lovable repositories.",
+          "Expand onboarding and Lovable workflow preset regression coverage.",
+        ],
+      },
       {
         version: "1.2.143",
         date: "August 20, 2026",
@@ -1850,7 +1874,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <p>
             <strong>Briar</strong> <span>1.2</span>
           </p>
-          <a href="#v1-2-143">
+          <a href="#v1-2-144">
             {changelog.current} <span aria-hidden="true">↓</span>
           </a>
         </div>
@@ -1872,6 +1896,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   </div>
                   <time
                     dateTime={
+                      entry.version === "1.2.144" ||
                       entry.version === "1.2.143" ||
                       entry.version === "1.2.142" ||
                       entry.version === "1.2.141" ||
