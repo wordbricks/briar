@@ -29,4 +29,23 @@ describe("ChoiceCard", () => {
     expect(markup).toContain('aria-pressed="true"');
     expect(markup).toContain('data-state="selected"');
   });
+
+  it("supports a compact horizontal selection row", () => {
+    const markup = renderToStaticMarkup(
+      <ChoiceCard
+        description="Available"
+        icon="worker"
+        layout="horizontal"
+        leading="status"
+        selected
+        title="Mango"
+        trailing="selected"
+      />,
+    );
+
+    expect(markup).toContain('data-slot="choice-card-leading"');
+    expect(markup).toContain("flex-row");
+    expect(markup).toContain("bg-card");
+    expect(markup).toContain("Available");
+  });
 });
