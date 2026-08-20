@@ -30,6 +30,21 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.140",
+        date: "2026년 8월 20일",
+        title: "다크 모드와 로컬 Worker 시작을 더 안정적으로 다듬습니다",
+        summary:
+          "Inbox 필터와 공통 상태 색상을 다크 테마에 맞추고, 새 프로젝트의 로컬 Worker 시작과 제공자 등록을 더 안정적으로 만듭니다.",
+        items: [
+          "Inbox 필터 바·프로젝트 선택기·카운트·활성 카테고리를 다크 테마 표면과 의미 있는 색상으로 맞춥니다.",
+          "피드백, 온보딩, health, 검토, 위험 영역에서 재사용할 수 있는 테마 대응 상태 색상 토큰을 추가합니다.",
+          "새 프로젝트를 연결하면 이 컴퓨터의 로컬 Worker를 자동으로 활성화하고, 서비스 설치에 실패하면 등록도 되돌립니다.",
+          "기존 네 개 제한 대신 등록 요청에서 지원되는 모든 Worker 제공자를 허용합니다.",
+          "워크플로 검토, 프로젝트 대화상자, 온보딩, 설정 화면의 다크 모드 대비와 상태 표현을 정리합니다.",
+          "Inbox 다크 모드 필터와 프로젝트 연결 경로의 회귀 테스트를 보강합니다.",
+        ],
+      },
+      {
         version: "1.2.139",
         date: "2026년 8월 19일",
         title: "이메일 로그인과 프로젝트 시작을 더 빠르게 연결합니다",
@@ -836,6 +851,21 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.140",
+        date: "August 20, 2026",
+        title: "Make dark mode and local Worker setup more reliable",
+        summary:
+          "Align Inbox filters and shared status colors with the dark theme while making new-project local Worker setup and provider registration more reliable.",
+        items: [
+          "Align Inbox filter bars, project selectors, counts, and active categories with dark-theme surfaces and semantic colors.",
+          "Introduce shared, theme-aware status tokens for feedback, onboarding, health, review, and danger-zone states.",
+          "Enable this computer's local Worker automatically after a new project connects, and roll back registration if service installation fails.",
+          "Accept every supported Worker provider in registration payloads instead of rejecting providers beyond the old four-provider cap.",
+          "Refine workflow review, project dialog, onboarding, and settings surfaces so dark mode retains readable contrast.",
+          "Add regression coverage for Inbox dark-mode filters and the local project-connection path.",
+        ],
+      },
       {
         version: "1.2.139",
         date: "August 19, 2026",
@@ -1734,7 +1764,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <p>
             <strong>Briar</strong> <span>1.2</span>
           </p>
-          <a href="#v1-2-139">
+          <a href="#v1-2-140">
             {changelog.current} <span aria-hidden="true">↓</span>
           </a>
         </div>
@@ -1756,7 +1786,9 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   </div>
                   <time
                     dateTime={
-                      entry.version === "1.2.139" ||
+                      entry.version === "1.2.140"
+                        ? "2026-08-20"
+                        : entry.version === "1.2.139" ||
                       entry.version === "1.2.138"
                         ? "2026-08-19"
                         : entry.version === "1.2.137"
