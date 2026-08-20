@@ -171,6 +171,7 @@ import type {
 export type UseBriarOptions = {
   adoptRemoteAgentSession?: (session: AutoHuntSession) => void;
   deferDefaultOrganization?: boolean;
+  lockedProjectId?: string | null;
   startScheduledAgentSession?: (
     run: ClaimedProjectAgentScheduleRun,
   ) => string | null;
@@ -323,6 +324,7 @@ export function useBriar(options: UseBriarOptions = {}) {
   const {
     adoptRemoteAgentSession,
     deferDefaultOrganization = false,
+    lockedProjectId = null,
     startScheduledAgentSession,
     startScheduledAgentWorkerDispatch,
     settleScheduledAgentSession,
@@ -336,16 +338,22 @@ export function useBriar(options: UseBriarOptions = {}) {
     demoMode ? [demoOrganization] : [],
   );
   const [activeOrganizationId, setActiveOrganizationId] = useState<string | null>(
-    demoMode ? demoOrganization.id : null,
+    demoMode && (!lockedProjectId || lockedProjectId === demoDashboard.project.id)
+      ? demoOrganization.id
+      : null,
   );
   const [activeProjectId, setActiveProjectId] = useState<string | null>(
-    demoMode ? demoDashboard.project.id : null,
+    demoMode && (!lockedProjectId || lockedProjectId === demoDashboard.project.id)
+      ? demoDashboard.project.id
+      : null,
   );
   const [connectedProjectIds, setConnectedProjectIds] = useState<
     string[] | null
   >(null);
   const [dashboard, setDashboardState] = useState<DashboardPayload | null>(
-    demoMode ? demoDashboard : null,
+    demoMode && (!lockedProjectId || lockedProjectId === demoDashboard.project.id)
+      ? demoDashboard
+      : null,
   );
   const [loading, setLoading] = useState(!demoMode);
   const [restoringSession, setRestoringSession] = useState(!demoMode);
@@ -392,9 +400,15 @@ export function useBriar(options: UseBriarOptions = {}) {
   const resumeRequestIds = useRef(new Map<string, string>());
   const reworkRequestIds = useRef(new Map<string, string>());
   const dashboardRef = useRef<DashboardPayload | null>(
-    demoMode ? demoDashboard : null,
+    demoMode && (!lockedProjectId || lockedProjectId === demoDashboard.project.id)
+      ? demoDashboard
+      : null,
   );
-  const dashboardCursor = useRef<number | null>(demoDashboard.cursor ?? null);
+  const dashboardCursor = useRef<number | null>(
+    demoMode && (!lockedProjectId || lockedProjectId === demoDashboard.project.id)
+      ? (demoDashboard.cursor ?? null)
+      : null,
+  );
   const dashboardRequest = useRef<{
     projectId: string;
     abort: AbortController;
@@ -445,9 +459,9 @@ export function useBriar(options: UseBriarOptions = {}) {
   }, [clearLoginTimer]);
 
   useEffect(() => {
-    if (!user || !activeOrganizationId) return;
+    if (lockedProjectId || !user || !activeOrganizationId) return;
     writeActiveOrganizationId(user.id, activeOrganizationId);
-  }, [activeOrganizationId, user]);
+  }, [activeOrganizationId, lockedProjectId, user]);
 
   useEffect(() => {
     dashboardRef.current = dashboard;
@@ -604,6 +618,7 @@ export function useBriar(options: UseBriarOptions = {}) {
         result.user.id,
         nextOrganizations,
         result.projects,
+        lockedProjectId,
       );
       setActiveOrganizationId(selection.activeOrganizationId);
       setActiveProjectId(selection.activeProjectId);
@@ -617,7 +632,7 @@ export function useBriar(options: UseBriarOptions = {}) {
       cancelled = true;
       if (retryTimer !== null) window.clearTimeout(retryTimer);
     };
-  }, []);
+  }, [lockedProjectId]);
 
   const refreshVelen = useCallback(async (org?: string | null) => {
     if (demoMode) {
@@ -656,7 +671,13 @@ export function useBriar(options: UseBriarOptions = {}) {
   }, [activeProjectId, refresh, token]);
 
   useEffect(() => {
-    if (demoMode || remoteMode || !token || connectedProjectIds === null) {
+    if (
+      lockedProjectId ||
+      demoMode ||
+      remoteMode ||
+      !token ||
+      connectedProjectIds === null
+    ) {
       return;
     }
     const projectIds = projects
@@ -710,6 +731,7 @@ export function useBriar(options: UseBriarOptions = {}) {
     );
   }, [
     connectedProjectIds,
+    lockedProjectId,
     projects,
     settleScheduledAgentSession,
     startScheduledAgentSession,
@@ -725,6 +747,7 @@ export function useBriar(options: UseBriarOptions = {}) {
   // the app or leave other connected repositories with stale worker settings.
   useEffect(() => {
     if (
+      lockedProjectId ||
       demoMode ||
       remoteMode ||
       !token ||
@@ -762,7 +785,7 @@ export function useBriar(options: UseBriarOptions = {}) {
     return () => {
       cancelled = true;
     };
-  }, [connectedProjectIds, projects, token]);
+  }, [connectedProjectIds, lockedProjectId, projects, token]);
 
   const refreshHealth = useCallback(async () => {
     if (
@@ -888,9 +911,12 @@ export function useBriar(options: UseBriarOptions = {}) {
 
   useEffect(() => {
     if (demoMode || remoteMode || projects.length === 0) return;
+    const relevantProjects = lockedProjectId
+      ? projects.filter((project) => project.id === lockedProjectId)
+      : projects;
     let cancelled = false;
     void Promise.all(
-      projects.map(async (project) => {
+      relevantProjects.map(async (project) => {
         if (!isProjectConnectedLocally(connectedProjectIds, project.id)) {
           return null;
         }
@@ -915,7 +941,7 @@ export function useBriar(options: UseBriarOptions = {}) {
     return () => {
       cancelled = true;
     };
-  }, [connectedProjectIds, projects]);
+  }, [connectedProjectIds, lockedProjectId, projects]);
 
   const login = useCallback(async (
     options: {
@@ -986,6 +1012,7 @@ export function useBriar(options: UseBriarOptions = {}) {
               nextUser.id,
               nextOrganizations,
               nextProjects,
+              lockedProjectId,
             );
             setActiveOrganizationId(selection.activeOrganizationId);
             setActiveProjectId(selection.activeProjectId);
@@ -1027,7 +1054,7 @@ export function useBriar(options: UseBriarOptions = {}) {
       setLoading(false);
       pollLoginNow.current = null;
     }
-  }, [clearLoginTimer, deferDefaultOrganization]);
+  }, [clearLoginTimer, deferDefaultOrganization, lockedProjectId]);
 
   const acceptInvitation = useCallback(
     async (invitationToken: string) => {
@@ -1131,6 +1158,7 @@ export function useBriar(options: UseBriarOptions = {}) {
 
   const selectProject = useCallback(
     (projectId: string) => {
+      if (lockedProjectId && projectId !== lockedProjectId) return;
       const project = projects.find((candidate) => candidate.id === projectId);
       if (!project) return;
       setActiveProjectId(projectId);
@@ -1147,11 +1175,14 @@ export function useBriar(options: UseBriarOptions = {}) {
       );
       setError(null);
     },
-    [projects],
+    [lockedProjectId, projects],
   );
 
   const ensureProjectSelected = useCallback(
     async (projectId: string) => {
+      if (lockedProjectId && projectId !== lockedProjectId) {
+        throw new Error("이 윈도우에서는 다른 프로젝트를 열 수 없습니다.");
+      }
       let nextProjects = projects;
       let project = nextProjects.find((candidate) => candidate.id === projectId);
       if (!project && token && !demoMode) {
@@ -1177,11 +1208,21 @@ export function useBriar(options: UseBriarOptions = {}) {
       setError(null);
       return project;
     },
-    [demoMode, projects, token],
+    [demoMode, lockedProjectId, projects, token],
   );
 
   const selectOrganization = useCallback(
     (organizationId: string) => {
+      if (lockedProjectId) {
+        const lockedProject = projects.find(
+          (project) => project.id === lockedProjectId,
+        );
+        if (lockedProject?.organizationId !== organizationId) return;
+        setActiveOrganizationId(organizationId);
+        setActiveProjectId(lockedProject.id);
+        setError(null);
+        return;
+      }
       if (!organizations.some((organization) => organization.id === organizationId)) {
         return;
       }
@@ -1201,7 +1242,7 @@ export function useBriar(options: UseBriarOptions = {}) {
       setHealthError(null);
       setError(null);
     },
-    [organizations, projects],
+    [lockedProjectId, organizations, projects],
   );
 
   const renameOrganization = useCallback(
@@ -1495,7 +1536,9 @@ export function useBriar(options: UseBriarOptions = {}) {
 
         const remaining = projects.filter((candidate) => candidate.id !== projectId);
         const deletedActiveProject = activeProjectId === projectId;
-        const nextActiveProject = deletedActiveProject
+        const nextActiveProject = deletedActiveProject && lockedProjectId
+          ? null
+          : deletedActiveProject
           ? (remaining.find(
               (candidate) =>
                 candidate.organizationId === activeOrganizationId,
@@ -1546,7 +1589,7 @@ export function useBriar(options: UseBriarOptions = {}) {
         setDeletingProjectId(null);
       }
     },
-    [activeOrganizationId, activeProjectId, projects, token],
+    [activeOrganizationId, activeProjectId, lockedProjectId, projects, token],
   );
 
   const selectProjectRepository = useCallback(async () => {
